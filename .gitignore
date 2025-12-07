@@ -1,0 +1,26 @@
+# --- Python y Entorno Virtual ---
+venv/
+__pycache__/
+*.pyc
+
+# --- Archivos de Sistema y VS Code ---
+.vscode/
+.DS_Store
+
+# --- Carpetas de Trabajo (Muy Importante) ---
+temp_work/
+# Ignoramos config.json porque puede tener rutas personales
+config/config.json
+
+# --- Multimedia (Para no llenar GitHub de videos) ---
+*.mp4
+*.mp3
+*.jpg
+*.png
+*.mov
+
+# --- Rutas específicas de tu proyecto (por seguridad) ---
+BIBLIOTECA_PRESIDENTES/
+BIBLIOTECA_INTRO/
+VIDEOS_TERMINADOS/
+TIKTOK_ASSETS/
