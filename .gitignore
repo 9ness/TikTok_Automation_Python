@@ -9,8 +9,8 @@ __pycache__/
 
 # --- Carpetas de Trabajo (Muy Importante) ---
 temp_work/
-# Ignoramos config.json porque puede tener rutas personales
-config/config.json
+# Ignoramos .env porque puede tener rutas personales
+.env
 
 # --- Multimedia (Para no llenar GitHub de videos) ---
 *.mp4

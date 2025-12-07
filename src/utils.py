@@ -1,10 +1,35 @@
 import json
 import os
 import glob
+from dotenv import load_dotenv
+
+# Cargar el archivo .env al inicio
+load_dotenv()
 
 def load_config(config_path="config/config.json"):
+    # 1. Cargar el JSON (Estructura)
     with open(config_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        config = json.load(f)
+    
+    # 2. Obtener la ruta base del sistema (.env)
+    # Si no existe, usa una por defecto o lanza error
+    root_path = os.getenv("TIKTOK_ROOT_PATH")
+    
+    if not root_path:
+        raise EnvironmentError("❌ ERROR: No se encontró la variable TIKTOK_ROOT_PATH en el archivo .env")
+
+    # 3. Construir las rutas completas dinámicamente
+    # Creamos una nueva sección 'paths' en memoria para que el resto del código siga funcionando igual
+    folders = config["folder_structure"]
+    
+    config["paths"] = {
+        "library_base": os.path.join(root_path, folders["presidents_folder"]),
+        "intro_library": os.path.join(root_path, folders["intro_folder"]),
+        "output_folder": os.path.join(root_path, folders["output_folder"]),
+        "temp_folder": folders["temp_folder"]
+    }
+    
+    return config
 
 def get_president_assets(base_path, president_name, config):
     target_folder = os.path.join(base_path, president_name)
@@ -16,6 +41,7 @@ def get_president_assets(base_path, president_name, config):
     vid_ext = ['*.mp4', '*.mov']
     
     all_files = []
+    # Buscar recursivamente o solo en la carpeta
     for ext in img_ext + vid_ext:
         all_files.extend(glob.glob(os.path.join(target_folder, ext)))
 

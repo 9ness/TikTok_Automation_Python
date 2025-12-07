@@ -1,0 +1,24 @@
+{
+    "folder_structure": {
+        "presidents_folder": "BIBLIOTECA_PRESIDENTES",
+        "intro_folder": "BIBLIOTECA_INTRO",
+        "output_folder": "VIDEOS_TERMINADOS",
+        "temp_folder": "./temp_work"
+    },
+    "video_settings": {
+        "resolution": [1080, 1920],
+        "fps": 30,
+        "codec": "libx264",
+        "audio_codec": "aac",
+        "bitrate": "5000k"
+    },
+    "editing_rules": {
+        "photos_per_top": 4,
+        "zoom_speed": 0.02,
+        "probability_video_injection": 0.5
+    },
+    "naming_convention": {
+        "video_suffix": "_video",
+        "silhouette_keyword": "silueta"
+    }
+}
