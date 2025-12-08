@@ -1,22 +1,30 @@
 import json
 import os
 import glob
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Cargar el archivo .env al inicio
-load_dotenv()
+# Cargar el archivo .env al inicio, buscando explícitamente
+load_dotenv(find_dotenv())
 
 def load_config(config_path="config/config.json"):
     # 1. Cargar el JSON (Estructura)
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = json.load(f)
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"❌ ERROR: No se encontró el archivo de configuración en {config_path}")
+    except json.JSONDecodeError:
+        raise ValueError(f"❌ ERROR: El archivo {config_path} no es un JSON válido")
     
     # 2. Obtener la ruta base del sistema (.env)
     # Si no existe, usa una por defecto o lanza error
     root_path = os.getenv("TIKTOK_ROOT_PATH")
     
     if not root_path:
-        raise EnvironmentError("❌ ERROR: No se encontró la variable TIKTOK_ROOT_PATH en el archivo .env")
+        raise EnvironmentError("❌ ERROR: No se encontró la variable TIKTOK_ROOT_PATH en el archivo .env. Asegúrate de tener un archivo .env correctamente configurado.")
+        
+    if not os.path.exists(root_path):
+        raise FileNotFoundError(f"❌ ERROR: La ruta definida en TIKTOK_ROOT_PATH no existe: {root_path}")
 
     # 3. Construir las rutas completas dinámicamente
     # Creamos una nueva sección 'paths' en memoria para que el resto del código siga funcionando igual
