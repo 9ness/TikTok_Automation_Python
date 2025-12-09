@@ -2,11 +2,15 @@
     "folder_structure": {
         "presidents_folder": "BIBLIOTECA_PRESIDENTES",
         "intro_folder": "BIBLIOTECA_INTRO",
+        "resources_folder": "BIBLIOTECA_RECURSOS",
         "output_folder": "VIDEOS_TERMINADOS",
         "temp_folder": "./temp_work"
     },
     "video_settings": {
-        "resolution": [1080, 1920],
+        "resolution": [
+            1080,
+            1920
+        ],
         "fps": 30,
         "codec": "libx264",
         "audio_codec": "aac",
