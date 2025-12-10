@@ -5,6 +5,7 @@ from dotenv import load_dotenv, find_dotenv
 
 import re
 import random
+import difflib
 
 # Cargar el archivo .env al inicio, buscando explícitamente
 load_dotenv(find_dotenv())
@@ -47,6 +48,60 @@ def load_config(config_path="config/config.json"):
     
     return config
 
+def find_best_match_folder(character_name_raw, assets_base_path):
+    """
+    Busca la carpeta más parecida ignorando guiones, mayúsculas e iniciales intermedias.
+    Ej: 'Harry_S_Truman' -> Match con carpeta 'Harry Truman'
+    """
+    if not os.path.exists(assets_base_path):
+        return None
+        
+    # 1. Limpieza del nombre que viene del TXT/Gemini
+    # Quitamos prefijos numéricos '2_' y extensiones
+    clean_input = character_name_raw.replace("_", " ").lower()
+    clean_input = "".join([c for c in clean_input if c.isalpha() or c.isspace()])
+    input_tokens = set(clean_input.split())
+    
+    try:
+        available_folders = [f for f in os.listdir(assets_base_path) if os.path.isdir(os.path.join(assets_base_path, f))]
+    except Exception:
+        return None
+    
+    best_match = None
+    highest_score = 0
+    
+    for folder in available_folders:
+        folder_clean = folder.replace("_", " ").lower()
+        folder_tokens = set(folder_clean.split())
+        
+        # A. Coincidencia Exacta (normalizada)
+        if clean_input == folder_clean:
+            return os.path.join(assets_base_path, folder)
+        
+        # B. Coincidencia de Palabras Clave (Tokens)
+        common = input_tokens.intersection(folder_tokens)
+        score = len(common)
+        
+        # Penalizamos si la carpeta tiene palabras que NO están en el input
+        # Pero permitimos que el input tenga extras (la 'S' de Truman).
+        # Ajuste: Si la carpeta es subset del input, es un buen candidato.
+        if len(folder_tokens) > 0 and score >= len(folder_tokens): 
+             # ¡Match perfecto de subconjunto!
+             return os.path.join(assets_base_path, folder)
+             
+        # C. Difflib (Parecido visual para typos)
+        similarity = difflib.SequenceMatcher(None, clean_input, folder_clean).ratio()
+        if similarity > highest_score:
+            highest_score = similarity
+            best_match = folder
+
+    # Umbral de seguridad para difflib
+    if best_match and highest_score > 0.6:
+        print(f"   🔍 Match Inteligente: '{character_name_raw}' -> '{best_match}' ({highest_score:.2f})")
+        return os.path.join(assets_base_path, best_match)
+        
+    return None
+
 def get_president_assets(base_path, president_name, config):
     # 1. Definir la raíz de búsqueda correcta
     # Si es "Intro", el usuario lo tiene en TIKTOK_ASSETS/BIBLIOTECA_INTRO/Intro
@@ -57,26 +112,8 @@ def get_president_assets(base_path, president_name, config):
         root_search = base_path
         
     # 2. Búsqueda UNIFICADA
-    target_folder = None
-    
-    # Intento directo
-    candidate = os.path.join(root_search, president_name)
-    if os.path.exists(candidate):
-        target_folder = candidate
-    else:
-        # Intento flexible
-        norm_input = normalize_name(president_name)
-        
-        try:
-            # Listar carpetas en la raíz seleccionada
-            available_folders = [d for d in os.listdir(root_search) if os.path.isdir(os.path.join(root_search, d))]
-        except Exception:
-            available_folders = []
-            
-        for folder in available_folders:
-            if normalize_name(folder) == norm_input:
-                target_folder = os.path.join(root_search, folder)
-                break
+    # 2. Búsqueda UNIFICADA con Inteligencia Difusa
+    target_folder = find_best_match_folder(president_name, root_search)
     
     if target_folder is None or not os.path.exists(target_folder):
         print(f"Combinación no encontrada para: {president_name} (Buscado en {root_search})")
@@ -112,3 +149,29 @@ def get_president_assets(base_path, president_name, config):
     
     # Return the full list of candidates to handle "Max 2" logic upstream
     return photos, videos, silhouette_candidates
+
+def find_president_folder(base_path, keyword):
+    """
+    Busca la carpeta de un presidente usando lógica fuzzy (nombre contiene keyword ignorando mayúsculas).
+    Retorna la ruta completa si la encuentra, o None si no.
+    """
+    if not os.path.exists(base_path):
+        return None
+    
+    # Normalizamos la palabra clave
+    keyword_norm = keyword.strip().lower()
+    
+    try:
+        # Listamos todos los directorios en base_path
+        all_folders = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
+        
+        for folder_name in all_folders:
+            # Comparamos ignorando mayúsculas/minúsculas
+            if keyword_norm in folder_name.lower():
+                return os.path.join(base_path, folder_name)
+                
+    except Exception as e:
+        print(f"Error en find_president_folder: {e}")
+        return None
+        
+    return None

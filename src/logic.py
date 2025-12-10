@@ -3,6 +3,7 @@ import os
 import math
 import numpy as np
 from moviepy.editor import *
+from moviepy.audio.fx.all import audio_fadeout
 from PIL import Image, ImageFilter, ImageOps
 import random
 import math
@@ -323,7 +324,17 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
         return None, video_token_used
 
     # Manual Volume Reduction REMOVED due to instability
-    audio_clip = AudioFileClip(audio_path)
+    audio = AudioFileClip(audio_path)
+    
+    # AGGRESSIVE GLITCH REMOVAL
+    # Cortamos las últimas décimas donde suele estar el ruido/palabra fantasma
+    # y aplicamos un fadeout rápido para suavizar el corte.
+    if audio.duration > 0.2:
+        new_dur = audio.duration - 0.15 # Hard Trim de 0.15s
+        audio = audio.subclip(0, new_dur)
+        audio = audio.fx(audio_fadeout, 0.05) # Suavizado final
+    
+    audio_clip = audio
     # No .fx, no .fl, no Arrays on Stack. Just pure audio.
     dur_total = audio_clip.duration
     
