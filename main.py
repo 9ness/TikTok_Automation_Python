@@ -35,19 +35,23 @@ if 'imghdr' not in sys.modules:
 from moviepy.editor import concatenate_videoclips, AudioFileClip, CompositeAudioClip
 from moviepy.audio.fx.all import audio_fadeout
 from proglog import ProgressBarLogger
-from src.utils import load_config, get_president_assets
+from src.utils import load_config, get_president_assets, validate_system_requirements
 from src.logic import create_video_segment
 
-# Importación de módulos nuevos
+# Importación de módulos nuevos con captura de errores
+guionista_error = None
 try:
     import src.guionista as guionista
-except ImportError:
+except Exception as e:
     guionista = None
+    guionista_error = str(e)
 
+locutor_error = None
 try:
     import src.locutor as locutor
-except ImportError:
+except Exception as e:
     locutor = None
+    locutor_error = str(e)
 
 class StreamlitLogger(ProgressBarLogger):
     def __init__(self, pb_object, time_placeholder):
@@ -74,6 +78,23 @@ class StreamlitLogger(ProgressBarLogger):
 CFG = load_config()
 
 st.set_page_config(page_title="TikTok Creator", layout="wide")
+
+# ---------------------------------------------------------
+# VALIDACIÓN DE ARRANQUE (CONTROL DE DAÑOS)
+# ---------------------------------------------------------
+if CFG:
+    startup_errors = validate_system_requirements(CFG)
+    if startup_errors:
+        for err in startup_errors:
+            st.error(err)
+        st.warning("⚠️ El sistema puede no funcionar correctamente debido a los errores anteriores.")
+
+if guionista_error:
+    st.error(f"❌ ERROR CRÍTICO al cargar el módulo 'guionista': {guionista_error}")
+if locutor_error:
+    st.error(f"❌ ERROR CRÍTICO al cargar el módulo 'locutor': {locutor_error}")
+
+
 st.title("🏭 Fábrica de TikToks")
 
 # ---------------------------------------------------------

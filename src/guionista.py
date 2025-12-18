@@ -130,6 +130,11 @@ def generate_script(user_topic=None, creative_mode=False):
     if "{{AVAILABLE_CHARACTERS}}" in final_prompt:
         final_prompt = final_prompt.replace("{{AVAILABLE_CHARACTERS}}", available_chars)
 
+    # INYECCIÓN FINAL DE ESTILO GLOBAL
+    if "{{GLOBAL_STYLE}}" in final_prompt:
+        global_style = prompts.get("global_viral_style", "")
+        final_prompt = final_prompt.replace("{{GLOBAL_STYLE}}", global_style)
+
     # 4. Llamada a Gemini
     try:
         model = genai.GenerativeModel('gemini-2.5-flash') # Modelo confirmado disponible
@@ -173,6 +178,15 @@ def save_scripts_to_txt(script_data, output_base_folder="inputs_generados"):
     # Helper para guardar
     def write_file(filename, content):
         path = os.path.join(full_path, filename)
+        
+        # Robustez: Si Gemini devuelve una lista (ej: por líneas), la unimos.
+        if isinstance(content, list):
+            content = "\n".join([str(line) for line in content])
+        
+        # Asegurar que sea string
+        if not isinstance(content, str):
+            content = str(content)
+            
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         saved_files.append(path)

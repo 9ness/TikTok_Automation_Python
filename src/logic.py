@@ -387,12 +387,15 @@ def generate_dynamic_intro(audio_clip, config, candidate_videos, log_callback=No
 
     if log_callback: log_callback(f"✅ Generando Intro Dinámica ({target_duration:.1f}s) con {len(candidates)} clips...")
 
-    # 2. Smart Fill Loop
-    selected_clips = []
+    # 2. Smart Fill Loop with Distributed Trimming
+    selected_clips_data = [] # List of tuples (clip, final_duration)
+    
     attempts = 0
-    max_attempts = 10
+    max_attempts = 20
     
     W, H = tuple(config["video_settings"]["resolution"])
+    
+    import random
     
     while attempts < max_attempts:
         current_selection = []
@@ -402,106 +405,112 @@ def generate_dynamic_intro(audio_clip, config, candidate_videos, log_callback=No
         random.shuffle(candidates)
         pool_idx = 0
         
-        valid_combo = False
+        # Build chain: Add clips until we exceed target
+        possible_chain = [] # List of VideoFileClip
+        chain_dur = 0.0
         
-        # Build chain
-        while current_dur < target_duration:
-            # Need more clips
+        while chain_dur < target_duration:
             if pool_idx >= len(candidates):
-                # Run out of clips, reshuffle or reuse?
-                # Just loop back
+                # Repopulate
                 pool_idx = 0
                 random.shuffle(candidates)
-                
+            
             vid_path = candidates[pool_idx]
             pool_idx += 1
             
             try:
-                # Load clip
                 clip = VideoFileClip(vid_path)
-                current_selection.append(clip)
-                current_dur += clip.duration
-            except Exception as e:
-                print(f"Error loading intro clip {vid_path}: {e}")
-                # If a clip fails to load, remove it from candidates for this attempt
-                candidates.pop(pool_idx - 1) # Adjust index as one was just popped
-                if not candidates: # If no more candidates, break
-                    break
+                # Validation: If raw clip is < 2.0s, it's useless for our constraints. Skip it.
+                if clip.duration < 2.0:
+                    clip.close()
+                    continue
+                    
+                possible_chain.append(clip)
+                chain_dur += clip.duration
+            except:
                 continue
                 
-            # Check if we passed target
-            if current_dur >= target_duration:
-                 # Check remainder
-                 # We will trim the LAST clip.
-                 # Duration needed from last clip:
-                 dur_others = current_dur - clip.duration
-                 needed_from_last = target_duration - dur_others
-                 
-                 # Constraint: "Si tiempo_faltante < 2.0 segundos: DESCARTAR"
-                 if needed_from_last >= 2.0:
-                     # Valid!
-                     valid_combo = True
-                     break
-                 else:
-                     # Invalid tail.
-                     break
+        # Now we have a chain where sum(durations) >= target_duration
+        # Optimization: Check if it's statistically possible to fit.
+        # Constraint: Each clip must be >= 2.0s
+        min_needed = len(possible_chain) * 2.0
         
-        if valid_combo:
-            selected_clips = current_selection
-            break
+        if min_needed > target_duration:
+            # Too many clips / clips too short to cover target effectively.
+            # Close and retry shuffle
+            for c in possible_chain: c.close()
+            attempts += 1
+            continue
             
-        attempts += 1
-        # Close clips to free resources if retrying
-        for c in current_selection: 
-            try: c.close()
-            except: pass
+        # Optimization: Distribute Cuts
+        # Strategy 1: Proportional Shrinker
+        # scale = target / chain_dur
+        # proposed = [d * scale]
+        # If all proposed >= 2.0 -> Winner.
+        
+        scale = target_duration / chain_dur
+        proposed_durs = [c.duration * scale for c in possible_chain]
+        
+        if min(proposed_durs) >= 2.0:
+            # Plan A Success: Proportional
+            final_durs = proposed_durs
+        else:
+            # Plan B: Backwards Squeeze
+            # Cut excess from end to start, adhering to 2.0 floor.
+            excess = chain_dur - target_duration
+            current_durs = [c.duration for c in possible_chain]
+            valid_squeeze = True
             
-    if not selected_clips:
-        print("⚠️ Used fallback intro (Could not find valid combo).")
-        return None, "NEUTRAL"
-        
-    # 3. Process Visuals (Crop/Resize/Mute)
-    processed_intro = []
-    
-    running_time = 0.0
-    
-    for i, raw_clip in enumerate(selected_clips):
-        # Mute
-        clip = raw_clip.without_audio()
-        
-        # Resize Height -> H (Preserve aspect ratio relative to height is implicit in some scenarios but we force)
-        # We need to fill W, H.
-        # If we resize height=H, width might be >W (if 16:9). Then crop center.
-        
-        if clip.h != H:
-           clip = clip.resize(height=H) # Resize keeping aspect ratio
-           
-        # Crop center
-        if clip.w > W:
-            clip = clip.crop(x1=(clip.w - W)/2, width=W, height=H)
-        elif clip.w < W:
-            # If still smaller, resize by width
-            clip = clip.resize(width=W) # Might crop top/bottom
-            clip = clip.crop(y1=(clip.h - H)/2, width=W, height=H)
+            for i in range(len(current_durs)-1, -1, -1):
+                can_cut = current_durs[i] - 2.0
+                take = min(can_cut, excess)
+                current_durs[i] -= take
+                excess -= take
+                if excess <= 0.001: break
             
-        # Ensure exact size
-        # clip.resize(newsize=(W,H)) forces distortion. Avoid.
-        
-        # Trim Logic
-        # If it's the last one, trim to exact fit
-        if i == len(selected_clips) - 1:
-            dur_others = running_time
-            needed = target_duration - dur_others
-            clip = clip.subclip(0, needed)
+            if excess > 0.001:
+                # Still have excess and hit all floors. Impossible combo.
+                for c in possible_chain: c.close()
+                attempts += 1
+                continue
             
-        processed_intro.append(clip)
-        running_time += clip.duration
+            final_durs = current_durs
+
+        # If we got here, we have a valid plan (possible_chain + final_durs)
+        # Apply cuts
+        processed_intro = []
+        running_time = 0.0
         
-    # 4. Concatenate
-    final_intro_video = concatenate_videoclips(processed_intro, method="compose")
-    final_intro_video = final_intro_video.set_audio(audio_clip)
-    
-    return final_intro_video, "NEUTRAL" # Intro ends neutrally
+        for i, clip in enumerate(possible_chain):
+            desired_dur = final_durs[i]
+            
+            # Mute & Resize Logic SAME AS BEFORE
+            clip = clip.without_audio()
+            
+            if clip.h != H:
+               clip = clip.resize(height=H)
+            if clip.w > W:
+                clip = clip.crop(x1=(clip.w - W)/2, width=W, height=H)
+            elif clip.w < W:
+                clip = clip.resize(width=W)
+                clip = clip.crop(y1=(clip.h - H)/2, width=W, height=H)
+                
+            # SUBCLIP TO EXACT DURATION
+            # Random subclip? Or start from 0? 
+            # Start from 0 is safer for continuity/intros, but random could be fun.
+            # Let's keep 0 for stability as per user request ("recorta el ultimo...").
+            clip = clip.subclip(0, desired_dur)
+            
+            processed_intro.append(clip)
+            
+        # ALL GOOD
+        final_intro_video = concatenate_videoclips(processed_intro, method="compose")
+        final_intro_video = final_intro_video.set_audio(audio_clip)
+        
+        return final_intro_video, "NEUTRAL"
+        
+    print("⚠️ Intro generator max attempts reached. Returning simple fallback.")
+    return None, "NEUTRAL"
 
 
 
@@ -653,30 +662,49 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
         list_intro = [f for f in photos if os.path.basename(f).lower().startswith('i')]
         list_normal = [f for f in photos if not os.path.basename(f).lower().startswith('i')]
         
-        slot1_img = None
+        selected_files = []
         
-        # 2. SELECTION SLOT 1
+        # 2. SELECT SLOT 1
+        slot1_img = None
         if list_intro:
              slot1_img = random.choice(list_intro)
-             # Unused intros are discarded (not added back to list_normal)
+             # Intro picks don't deplete list_normal
         elif list_normal:
              slot1_img = random.choice(list_normal)
+             # CRITICAL: Consumed from normal list
+             list_normal.remove(slot1_img)
              
-        # 3. SELECTION REST (Slots 2..N)
-        # Fill strictly from list_normal
-        needed = num_clips_body - 1
-        rest_imgs = []
+        if slot1_img:
+            selected_files.append(slot1_img)
+             
+        # 3. SELECT REST (Adapt dynamic count to avoid repeats)
+        # We want approx 3.0s per clip, but NO REPEATS.
+        # So max clips = available unique photos.
         
-        if list_normal and needed > 0:
-            # If we need more than we have, start repeating
-            pool = list_normal[:]
-            while len(pool) < needed:
-                pool += list_normal
-            rest_imgs = random.sample(pool, needed)
+        available_count = len(list_normal)
+        
+        # Ideal count based on time
+        ideal_num_rest = max(1, int(remaining_dur / 3.0)) - 1
+        
+        if ideal_num_rest <= 0 and available_count > 0:
+            # At least one more if we have space and photos? 
+            # If duration is short (e.g. 4s), 1 clip is enough. 
+            # But let's try to fit 2 if we have photos.
+            if remaining_dur > 4.0: ideal_num_rest = 1
+            else: ideal_num_rest = 0
+
+        # Cap by available (Strict No-Repeat Rule)
+        # If we have shortage, we reduce clips (longer duration per clip).
+        num_rest = min(ideal_num_rest, available_count)
+        
+        if num_rest > 0:
+            picked_rest = random.sample(list_normal, num_rest)
+            selected_files.extend(picked_rest)
             
-        selected_files = []
-        if slot1_img: selected_files.append(slot1_img)
-        selected_files.extend(rest_imgs)
+        # Fallback: If after all logic we have 0 clips (e.g. only 1 photo total and it was used in slot1),
+        # selected_files already has slot1.
+        # If selected_files is empty (0 photos total), handled above.
+
         
     clip_dur = remaining_dur / max(1, len(selected_files))
     

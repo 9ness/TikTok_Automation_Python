@@ -175,3 +175,39 @@ def find_president_folder(base_path, keyword):
         return None
         
     return None
+
+def validate_system_requirements(config, check_api=True):
+    """
+    Realiza validaciones críticas al inicio.
+    Devuelve una lista de strings con los errores encontrados.
+    Si la lista está vacía, todo ok.
+    """
+    errors = []
+
+    # 1. Validar API Key de Gemini
+    if check_api:
+        api_key = os.getenv("GOOGLE_GEMINI_KEY")
+        if not api_key:
+            errors.append("❌ ERROR CRÍTICO: No se encontró la variable 'GOOGLE_GEMINI_KEY' en el archivo .env")
+
+    # 2. Validar Carpeta de Assets (BIBLIOTECA_PRESIDENTES)
+    # Obtenemos la ruta final calculada en load_config/paths
+    presidents_path = config.get("paths", {}).get("library_base")
+    
+    if not presidents_path:
+         # Fallback por si la config viene rara
+         errors.append("❌ ERROR CONFIG: No se pudo determinar la ruta de 'library_base'.")
+    else:
+        if not os.path.exists(presidents_path):
+            errors.append(f"❌ ERROR PATH: La carpeta de presidentes no existe en: {presidents_path}")
+        else:
+            # Chequear si está vacía (o casi vacía)
+            # Listamos carpetas dentro, pues se espera estructura: library/Trump, library/Obama...
+            try:
+                subfolders = [f for f in os.listdir(presidents_path) if os.path.isdir(os.path.join(presidents_path, f))]
+                if not subfolders:
+                     errors.append(f"❌ ERROR ASSETS: La carpeta de assets está vacía (sin subcarpetas de personajes) en: {presidents_path}")
+            except Exception as e:
+                 errors.append(f"❌ ERROR LECTURA: No se pudo leer la carpeta de assets: {e}")
+
+    return errors
