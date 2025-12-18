@@ -7,6 +7,7 @@ from moviepy.audio.fx.all import audio_fadeout
 from PIL import Image, ImageFilter, ImageOps
 import random
 import math
+import glob
 
 # ==========================================
 # EASING FUNCTIONS
@@ -157,16 +158,216 @@ def create_smart_combo_clip_v1_stable(image_path, total_dur, resolution, prev_ex
 # ==========================================
 # 🧪 LÓGICA V2 BETA - EXPERIMENTAL (Para futuras mejoras)
 # ==========================================
-def create_smart_combo_clip_v2_beta(image_path, total_dur, resolution, prev_exit_dir, is_first_clip=False):
-    # Por ahora es una copia exacta de la V1
-    return create_smart_combo_clip_v1_stable(image_path, total_dur, resolution, prev_exit_dir, is_first_clip)
+def create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_exit_dir, is_first_clip=False, is_last_clip=False):
+    """
+    MOTOR V2 (Estilo CapCut/Viral - POLISHED & CONTINUITY):
+    - Universal Grid 3x3.
+    - Gravity Flow (Fast In -> Slow -> Fast Out).
+    - START/END LOGIC: Zoom Transitions para el primer y último clip del bloque.
+    """
+    W, H = resolution
+    
+    # 1. CARGA
+    try:
+        pil_img = Image.open(image_path)
+        pil_img = ImageOps.exif_transpose(pil_img)
+    except Exception as e:
+        print(f"Error loading {image_path}: {e}")
+        return ColorClip(size=resolution, color=(0,0,0), duration=total_dur), prev_exit_dir
+
+    img_w, img_h = pil_img.size
+
+    # ===============================
+    # DEFINIR ESCALA 1.0 (Ancho de Pantalla)
+    # ===============================
+    master_scale = W / img_w
+    final_w = int(img_w * master_scale)
+    final_h = int(img_h * master_scale)
+    
+    # Ajuste por si la altura es menor que H (Rellenar verticalmente con espejo)
+    # Con el grid 3x3 cubrimos siempre hasta 3 veces la altura. Suficiente.
+    
+    base_img = pil_img.resize((final_w, final_h), Image.Resampling.LANCZOS)
+    
+    # ===============================
+    # GENERAR SUPER-LIENZO 3x3 (UNIVERSAL GRID)
+    # ===============================
+    # Columna Izq: Espejo H
+    # Columna Cen: Base
+    # Columna Der: Espejo H
+    # Fila Sup: Espejo V (de toda la fila base)
+    # Fila Inf: Espejo V (de toda la fila base)
+    
+    # Versiones Base
+    tile_center = base_img
+    tile_mirror_h = ImageOps.mirror(base_img)
+    
+    # Fila Central Base (Izquierda - Centro - Derecha)
+    row_img = Image.new('RGB', (final_w * 3, final_h))
+    row_img.paste(tile_mirror_h, (0, 0))
+    row_img.paste(tile_center, (final_w, 0))
+    row_img.paste(tile_mirror_h, (final_w*2, 0))
+    
+    # Versiones Fila
+    row_center = row_img
+    row_flip_v = ImageOps.flip(row_img) # Espejo vertical de toda la tira
+    
+    # Lienzo Final 3x3
+    grid_img = Image.new('RGB', (final_w * 3, final_h * 3))
+    grid_img.paste(row_flip_v, (0, 0))           # Arriba
+    grid_img.paste(row_center, (0, final_h))     # Centro
+    grid_img.paste(row_flip_v, (0, final_h*2))   # Abajo
+    
+    # Convertir a Clip
+    # OJO: Es una imagen GIGANTE.
+    super_clip = ImageClip(np.array(grid_img)).set_duration(total_dur)
+    
+    # ===============================
+    # 3. ANIMACIÓN DE POSICIÓN (Slide del Universo)
+    # ===============================
+    
+    # ===============================
+    # ANIMACIÓN DE GRAVEDAD (2 FASES: In -> Out)
+    # ===============================
+    
+    # CENTRO (Target):
+    # La tile central (1,1) debe estar centrada en pantalla.
+    # Coordenadas TopLeft del Super-Clip para lograr esto:
+    center_x = (W - final_w)/2 - final_w 
+    center_y = (H - final_h)/2 - final_h
+    
+    # DETERMINAR INPUT (Start Point)
+    enter_dir = DIR_RIGHT
+    if prev_exit_dir == DIR_LEFT: enter_dir = DIR_RIGHT
+    elif prev_exit_dir == DIR_RIGHT: enter_dir = DIR_LEFT
+    elif prev_exit_dir == DIR_UP: enter_dir = DIR_DOWN
+    elif prev_exit_dir == DIR_DOWN: enter_dir = DIR_UP
+    
+    start_x, start_y = center_x, center_y
+    # Offset generoso para asegurar "Velocidad" al entrar.
+    offset_in_w = final_w * 0.7
+    offset_in_h = final_h * 0.7
+    
+    # LÓGICA DE ENTRADA (START POINT)
+    if is_first_clip:
+        # PRIMERA FOTO: ZOOM IN/OUT ENTRY (No slide lateral)
+        # Empieza CENTRADA en (center_x, center_y) pero manejaremos el ZOOM.
+        start_x, start_y = center_x, center_y
+    else:
+        # NORMAL: Viene de fuera según prev_exit_dir
+        if enter_dir == DIR_LEFT: start_x = center_x - offset_in_w   # Viene de izq
+        elif enter_dir == DIR_RIGHT: start_x = center_x + offset_in_w # Viene de der
+        elif enter_dir == DIR_UP: start_y = center_y - offset_in_h    # Viene de arriba
+        elif enter_dir == DIR_DOWN: start_y = center_y + offset_in_h  # Viene de abajo
+
+    # DETERMINAR OUTPUT (End Point)
+    next_exit = random.choice([DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN])
+    end_x, end_y = center_x, center_y
+    offset_out_w = final_w * 0.7
+    offset_out_h = final_h * 0.7
+    
+    # LÓGICA DE SALIDA (END POINT)
+    if is_last_clip:
+        # ÚLTIMA FOTO: ZOOM IN/OUT EXIT (No slide lateral)
+        # Termina CENTRADA, el movimiento será Zoom.
+        end_x, end_y = center_x, center_y
+        next_exit = "ZOOM_EXIT" # Marker
+    else:
+        # NORMAL: Sale lateralmente (dirección aleatoria)
+        if next_exit == DIR_LEFT: end_x = center_x - offset_out_w
+        elif next_exit == DIR_RIGHT: end_x = center_x + offset_out_w
+        elif next_exit == DIR_UP: end_y = center_y - offset_out_h
+        elif next_exit == DIR_DOWN: end_y = center_y + offset_out_h
+
+    # FUNCIÓN DE ZOOM (DEFINIDA ANTES PARA USARSE EN POS_FUNC)
+    def zoom_func(t):
+        if is_last_clip and t >= t_mid:
+            # Zoom In Final: 1.0 -> 1.3
+            dur_part = total_dur - t_mid
+            p = (t - t_mid) / dur_part
+            p = pow(p, 2) # EaseInQuad
+            return 1.0 + (0.3 * p)
+            
+        elif is_first_clip and t < t_mid:
+            # Zoom Out Inicial: 1.3 -> 1.0
+            dur_part = t_mid
+            p = t / dur_part
+            p = 1 - pow(1 - p, 2) # EaseOutQuad
+            return 1.3 - (0.3 * p)
+            
+        return 1.0 
+
+    # FUNCIÓN DE MOVIMIENTO (POSICIÓN)
+    t_mid = total_dur * 0.5
+    
+    def pos_func(t):
+        # 1. Calcular Escala Actual para corregir posición
+        s = zoom_func(t)
+        
+        # Coordenada "CENTRO" ajustada a la escala S
+        # Formula: W/2 - 1.5 * final_w * s
+        dynamic_center_x = (W / 2) - (1.5 * final_w * s)
+        dynamic_center_y = (H / 2) - (1.5 * final_h * s)
+        
+        # SI ES PRIMER CLIP:
+        if is_first_clip:
+            if t < t_mid:
+                # FASE 1: Zoom Entry (Estático en posición ajustada)
+                return (int(dynamic_center_x), int(dynamic_center_y))
+            else:
+                # FASE 2: Slide Out (Gravity) - Escala es 1.0 aquí
+                # Interpolamos desde center_x (1.0) a end_x
+                p = (t - t_mid) / (total_dur - t_mid)
+                p = pow(p, 3) # EaseInCubic
+                curr_x = center_x + (end_x - center_x) * p
+                curr_y = center_y + (end_y - center_y) * p
+                return (int(curr_x), int(curr_y))
+                
+        # SI ES ULTIMO CLIP:
+        elif is_last_clip:
+            if t < t_mid:
+                # FASE 1: Slide In (Gravity) - Escala es 1.0 aquí
+                p = t / t_mid
+                p = 1 - pow(1 - p, 3) # EaseOutCubic
+                curr_x = start_x + (center_x - start_x) * p
+                curr_y = start_y + (center_y - start_y) * p
+                return (int(curr_x), int(curr_y))
+            else:
+                # FASE 2: Zoom Exit (Estático en posición ajustada)
+                return (int(dynamic_center_x), int(dynamic_center_y))
+                
+        # NORMAL (MIDDLE CLIPS)
+        else:
+            if t < t_mid:
+                # FASE 1: Slide In
+                p = t / t_mid
+                p = 1 - pow(1 - p, 3) 
+                curr_x = start_x + (center_x - start_x) * p
+                curr_y = start_y + (center_y - start_y) * p
+                return (int(curr_x), int(curr_y))
+            else:
+                # FASE 2: Slide Out
+                p = (t - t_mid) / (total_dur - t_mid)
+                p = pow(p, 3) 
+                curr_x = center_x + (end_x - center_x) * p
+                curr_y = center_y + (end_y - center_y) * p
+                return (int(curr_x), int(curr_y))
+
+    # APLICAR
+    if is_first_clip or is_last_clip:
+        final_clip = super_clip.resize(zoom_func).set_position(pos_func)
+    else:
+        final_clip = super_clip.set_position(pos_func)
+    
+    # IMPORTANTE: size=resolution recorta el super-clip a la ventana visible.
+    return CompositeVideoClip([final_clip], size=resolution).set_duration(total_dur), next_exit
 
 # ==========================================
 # DISPATCHER
 # ==========================================
-def create_smart_combo_clip(image_path, total_dur, resolution, prev_exit_dir, is_first_clip=False, version="v1_estable"):
-    if version == "v2_beta":
-        return create_smart_combo_clip_v2_beta(image_path, total_dur, resolution, prev_exit_dir, is_first_clip)
+def create_smart_combo_clip(image_path, total_dur, resolution, prev_exit_dir, is_first_clip=False, is_last_clip=False, version="v1_estable"):
+    if version == "v2_estable":
+        return create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_exit_dir, is_first_clip, is_last_clip)
     else:
         return create_smart_combo_clip_v1_stable(image_path, total_dur, resolution, prev_exit_dir, is_first_clip)
 
@@ -304,8 +505,48 @@ def generate_dynamic_intro(audio_clip, config, candidate_videos, log_callback=No
 
 
 
-def create_video_segment(audio_path, puesto, president_name, config, video_token_used, log_callback=None, engine_version="v1_estable"):
-    from src.utils import get_president_assets
+def get_mystery_silhouette_image(top1_name, list_previous_presidents, library_path, specific_folder):
+    """
+    Selecciona la imagen para el audio del Top 1 (Bait/Pregunta).
+    Prioridad:
+    1. Silueta específica en la carpeta del presidente (*silueta*, *silhouette*)
+    2. Comodín 'Viral' (Si Trump NO ha salido antes)
+    3. Comodín 'Genérico' (Si Trump YA salió antes)
+    """
+    
+    # 1. Buscar silueta específica
+    # Buscamos patrones en español e inglés
+    specific_silhouettes = []
+    if specific_folder and os.path.exists(specific_folder):
+        specific_silhouettes = glob.glob(os.path.join(specific_folder, "*silueta*")) + \
+                               glob.glob(os.path.join(specific_folder, "*silhouette*"))
+    
+    # Filtrar solo archivos de imagen (evitar carpetas o basura)
+    valid_exts = ('.jpg', '.jpeg', '.png')
+    specific_silhouettes = [f for f in specific_silhouettes if f.lower().endswith(valid_exts)]
+
+    if specific_silhouettes:
+         # SI EXISTE: Úsala.
+         return random.choice(specific_silhouettes)
+
+    # 2. Lógica de Comodines (Si no hay silueta específica)
+    # Analiza si Trump ya salió en los puestos previos.
+    trump_revealed = False
+    if list_previous_presidents:
+        trump_revealed = any(("trump" in str(p).lower() or "donald" in str(p).lower()) for p in list_previous_presidents)
+    
+    if trump_revealed:
+         # CASO 1: Trump ya salió. Usar genérica.
+         # BIBLIOTECA_RECURSOS/comodin_silueta_2.png
+         return os.path.join(library_path, "comodin_silueta_2.png")
+    else:
+         # CASO 2: Trump NO ha salido. Usar cebo viral.
+         # BIBLIOTECA_RECURSOS/comodin_silueta_1.png
+         return os.path.join(library_path, "comodin_silueta_1.png")
+
+
+def create_video_segment(audio_path, puesto, president_name, config, video_token_used, log_callback=None, engine_version="v1_estable", revealed_presidents=None):
+    from src.utils import get_president_assets, find_best_match_folder
     
     paths = config["paths"]
     res = tuple(config["video_settings"]["resolution"])
@@ -348,13 +589,37 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
 
     # --- SILHOUETTE LOGIC (TOP 1 MYSTERY) ---
     is_silhouette_mode = False
+    
+    # Nueva lista de siluetas forzadas por la nueva lógica
+    forced_silhouettes = []
+    
     if puesto == 1:
-        # Check if we have dynamic intro? If above block returned, we're done.
-        # If not, we are here.
-        if silhouettes:
+        # Lógica mejorada para Top 1
+        
+        # 1. Recuperar carpeta específica para buscar siluetas a fondo
+        target_folder = find_best_match_folder(president_name, paths["library_base"])
+        
+        # 2. Obtener la silueta "Ideal" (Específica o Comodín Inteligente)
+        mystery_image = get_mystery_silhouette_image(
+            top1_name=president_name,
+            list_previous_presidents=revealed_presidents,
+            library_path=paths["resources_library"],
+            specific_folder=target_folder
+        )
+        
+        # 3. Verificar si la imagen existe
+        if mystery_image and os.path.exists(mystery_image):
             is_silhouette_mode = True
-            if log_callback: log_callback("👤 Modo Silueta Activado (Top 1) - Animado")
-            
+            forced_silhouettes = [mystery_image]
+            if log_callback: log_callback(f"👤 Modo Silueta Activado (Top 1) - Imagen: {os.path.basename(mystery_image)}")
+        else:
+             # Fallback si fallan los comodines (ej: no existen los archivos .jpg)
+             # Usamos lo que encontró get_president_assets originalmente
+             if silhouettes:
+                is_silhouette_mode = True
+                forced_silhouettes = silhouettes
+                if log_callback: log_callback("👤 Modo Silueta Activado (Top 1) - Fallback a siluetas detectadas")
+
     # --- PREPARE CLIPS ---
     
     intro_dur = 0
@@ -368,9 +633,11 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
     selected_files = []
     
     if is_silhouette_mode:
-        # Rule: "Si encuentras más de 1 silueta: Elige aleatoriamente 2 distinct."
-        # "Si solo 1: Úsala para toda la duración."
-        if len(silhouettes) > 1:
+        if forced_silhouettes:
+             selected_files = [forced_silhouettes[0]]
+        elif len(silhouettes) > 1:
+            # Rule: "Si encuentras más de 1 silueta: Elige aleatoriamente 2 distinct."
+            # "Si solo 1: Úsala para toda la duración."
             selected_files = random.sample(silhouettes, min(len(silhouettes), 2))
         else:
             selected_files = [silhouettes[0]]
@@ -418,6 +685,9 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
     # --- STATE TRACKING ---
     prev_exit = DIR_CENTER # Default start
     
+    # Pre-calculate indices of actual images to apply First/Last logic correctly
+    image_indices = [idx for idx, f in enumerate(selected_files) if not f.lower().endswith(('.mp4', '.mov'))]
+    
     for i, file_path in enumerate(selected_files):
         # VIDEO Handling (Pass-through)
         if file_path.lower().endswith(('.mp4', '.mov')):
@@ -432,9 +702,11 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
             continue
             
         # PHOTO Handling (Dynamic)
-        # Apply Bounce Zoom only for the very first clip of the sequence (i==0)
-        is_first = (i == 0)
-        clip, new_exit = create_smart_combo_clip(file_path, clip_dur, res, prev_exit, is_first_clip=is_first, version=engine_version)
+        # Apply Bounce Zoom only for the very first/last PHOTO of the sequence
+        is_first = (i == image_indices[0]) if image_indices else False
+        is_last = (i == image_indices[-1]) if image_indices else False
+        
+        clip, new_exit = create_smart_combo_clip(file_path, clip_dur, res, prev_exit, is_first_clip=is_first, is_last_clip=is_last, version=engine_version)
         processed_clips.append(clip)
         
         # Update State

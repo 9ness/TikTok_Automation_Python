@@ -55,22 +55,40 @@ def get_available_assets():
         if not os.path.exists(full_path):
              return "Cualquier presidente de USA (Sin restricción)"
              
-        # Listar carpetas reales
+        # Listar carpetas reales y limpiarlas para que la IA las entienda mejor
         folders = [f for f in os.listdir(full_path) if os.path.isdir(os.path.join(full_path, f))]
         
         if not folders:
             return "Cualquier presidente de USA (Sin restricción)"
             
-        return ", ".join(folders)
+        # Limpieza Avanzada (CamelCase -> Spaced)
+        # Ej: GeorgeWBush -> George W Bush
+        # Ej: WarrenGHarding -> Warren G Harding
+        clean_names = []
+        print("\n🔎 TRADUCCIÓN DE NOMBRES DETECTADA:")
+        for name in folders:
+            # 1. Si ya tiene espacios, respetar. Si no, aplicar split por mayúsculas.
+            if " " in name:
+                clean = name
+            else:
+                 # Regex: Insertar espacio antes de cualquier Mayúscula que NO sea la primera letra
+                clean = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
+            
+            clean_names.append(clean)
+            print(f"  - {name} \t-> {clean}")
+            
+        print(f"✅ Total procesados: {len(clean_names)}\n")
+        return ", ".join(clean_names)
         
     except Exception as e:
         print(f"⚠️ Error listando assets: {e}")
         return "Cualquier presidente de USA"
 
-def generate_script(user_topic=None):
+def generate_script(user_topic=None, creative_mode=False):
     """
     Genera un guion usando Google Gemini.
     - user_topic: String con el tema específico o None para aleatorio.
+    - creative_mode: Bool. Si True, usa prompts dinámicos. Si False, usa prompts estrictos (Legacy).
     """
     print("🤖 Iniciando Motor de Guiones (Gemini)...")
     
@@ -87,11 +105,13 @@ def generate_script(user_topic=None):
     
     # 3. Obtener Whitelist de Personajes
     available_chars = get_available_assets()
-    print(f"📋 Whitelist inyectada a Gemini ({len(available_chars.split(','))} personajes)")
+    print(f"📋 Whitelist DETALLADA inyectada a Gemini ({len(available_chars.split(','))} personajes detectados):")
+    print(f"LISTA COMPLETA: {available_chars}")
     
     if user_topic and user_topic.strip():
         # Modo Específico
-        base_prompt = prompts.get("script_specific_topic", "")
+        key = "script_specific_creative" if creative_mode else "script_specific_topic"
+        base_prompt = prompts.get(key, "")
         if not base_prompt:
              # Fallback simple
             final_prompt = f"Genera un guion de debate presidencial divertido sobre: {user_topic}. Devuelve JSON."
@@ -99,7 +119,8 @@ def generate_script(user_topic=None):
             final_prompt = base_prompt.replace("{{TEMA}}", user_topic)
     else:
         # Modo Aleatorio
-        base_prompt = prompts.get("script_random_topic", "")
+        key = "script_random_creative" if creative_mode else "script_random_topic"
+        base_prompt = prompts.get(key, "")
         if not base_prompt:
             final_prompt = "Genera un guion de debate presidencial divertido sobre un tema viral aleatorio. Devuelve JSON."
         else:
@@ -186,11 +207,15 @@ def save_scripts_to_txt(script_data, output_base_folder="inputs_generados"):
     name_1 = item_1_data.get("name", "Unknown_1")
     # El texto misterioso debería venir del prompt, pero lo forzamos aquí por seguridad si así se pide
     # O confiamos en que el prompt lo trajo. El usuario pidió: "fuerza el texto misterioso para el audio"
-    text_1_fixed = "Who do you think occupies the first place? Leave your answer on the comments, and be surprised with the answer."
-    
+    # Usar el texto generado por la IA (Dynamic CTA)
+    text_1 = item_1_data.get("text", "")
+    if not text_1:
+         # Fallback solo si la IA falló
+         text_1 = "Who do you think occupies the first place? Leave your answer on the comments."
+
     safe_name_1 = normalize_filename(name_1)
     filename_1 = f"1_{safe_name_1}.txt"
-    write_file(filename_1, text_1_fixed)
+    write_file(filename_1, text_1)
             
     print(f"✅ Guion desplegado en {len(saved_files)} archivos en: {full_path}")
     return full_path

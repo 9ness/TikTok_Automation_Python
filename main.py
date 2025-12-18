@@ -77,8 +77,17 @@ st.set_page_config(page_title="TikTok Creator", layout="wide")
 st.title("🏭 Fábrica de TikToks")
 
 # ---------------------------------------------------------
+# ---------------------------------------------------------
 # FUNCIÓN CORE DE GENERACIÓN DE VIDEO (REUTILIZABLE)
 # ---------------------------------------------------------
+
+def format_seconds(seconds):
+    """Formatea segundos a 'Xm Ys' si >60, o 'Xs' si no."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m {s}s"
+
 def generate_video_pipeline(src_folder, output_folder, config, status_container, log_callback, engine_version="v1_estable", sound_enabled=True):
     """
     Función central que orquesta la creación del video a partir de una carpeta de audios.
@@ -118,6 +127,7 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
     token = False
     
     # 3. Generar segmentos
+    revealed_presidents = []
     for aud in final_audio_order:
         try:
             name = os.path.splitext(os.path.basename(aud))[0]
@@ -140,7 +150,9 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
 
             log_callback(f"⚙️ Procesando segmento: **{name}** (Personaje: {presi})")
 
-            seg, token = create_video_segment(aud, puesto, presi, config, token, log_callback=log_callback, engine_version=engine_version)
+            seg, token = create_video_segment(aud, puesto, presi, config, token, log_callback=log_callback, engine_version=engine_version, revealed_presidents=revealed_presidents)
+            # Agregar a lista de ya revelados para lógica de siluetas
+            revealed_presidents.append(presi)
             if seg: clips.append(seg)
         except Exception as e:
             log_callback(f"❌ Error creando segmento {os.path.basename(aud)}: {e}")
@@ -242,7 +254,7 @@ selected_res_label = st.radio(
 )
 engine_version = st.sidebar.selectbox(
     "Motor de Animación",
-    ["v1_estable", "v2_beta"],
+    ["v2_estable", "v1_estable"],
     index=0
 )
 sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
@@ -328,8 +340,21 @@ elif mode == "Automático (IA)":
     
     # 1. CONFIGURACIÓN DE LOTE (NUEVA UI)
     st.markdown("### 🏭 Fábrica de Vídeos (Batch Mode)")
+
+    if st.button("📋 Verificar Whitelist (Logs + UI)"):
+        assets = guionista.get_available_assets()
+        print("\n" + "="*50)
+        print("VERIFICACIÓN MANUAL DE WHITELIST")
+        print(f"Total encontrados: {len(assets.split(','))}")
+        print(assets)
+        print("="*50 + "\n")
+        st.success(f"✅ Whitelist cargada: {len(assets.split(','))} personajes.")
+        with st.expander("Ver lista completa"):
+            st.write(assets)
     
     cantidad = st.number_input("¿Cuántos vídeos quieres generar?", min_value=1, max_value=10, value=1, step=1)
+    
+    use_creative_mode = st.checkbox("✨ Activar Modo Creativo (Hooks y CTAs dinámicos)", value=False, help="Si activas esto, la IA variará las frases de enganche y cierre. Si no, usará el formato clásico estricto.")
     
     queue_inputs = []
     st.write("Configura cada vídeo (Déjalo vacío para que la IA invente el tema):")
@@ -369,11 +394,11 @@ elif mode == "Automático (IA)":
                     st.write(f"🧠 ({idx+1}/{total_jobs}) Generando Guion...")
                     t0 = time.time()
                     
-                    script_data = guionista.generate_script(current_topic)
+                    script_data = guionista.generate_script(current_topic, creative_mode=use_creative_mode)
                     txt_output = guionista.save_scripts_to_txt(script_data)
                     
                     t1 = time.time()
-                    st.info(f"✅ Guion OK ({t1-t0:.1f}s)")
+                    st.info(f"✅ Guion OK ({format_seconds(t1-t0)})")
 
                     # --- PASO 2: LOCUTOR ---
                     st.write(f"🗣️ ({idx+1}/{total_jobs}) Clonando Voz...")
@@ -386,7 +411,7 @@ elif mode == "Automático (IA)":
                         raise Exception("No se generaron audios. Abortando este video.")
                     
                     t3 = time.time()
-                    st.info(f"✅ Audios OK ({t3-t2:.1f}s)")
+                    st.info(f"✅ Audios OK ({format_seconds(t3-t2)})")
                     
                     # --- PASO 3: EDITOR DE VIDEO ---
                     st.write(f"🎬 ({idx+1}/{total_jobs}) Editando...")
@@ -402,7 +427,7 @@ elif mode == "Automático (IA)":
                     )
                     
                     t5 = time.time()
-                    st.info(f"✅ Video Renderizado ({t5-t4:.1f}s)")
+                    st.info(f"✅ Video Renderizado ({format_seconds(t5-t4)})")
                     st.success(f"🎉 VIDEO {idx+1} COMPLETADO: {os.path.basename(final_video_path)}")
                     
                     # Mostrar Video Reciente

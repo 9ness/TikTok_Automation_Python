@@ -16,6 +16,7 @@ Herramienta automatizada para crear videos de "Tops" para TikTok usando Python (
 
 ## ▶️ Ejecución
 Ejecuta la interfaz web:
+.\venv\Scripts\activate
 streamlit run main.py
 
 ## 📂 Estructura de Carpetas (Drive)
