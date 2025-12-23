@@ -113,7 +113,7 @@ def main():
     payload = {
         "file_id": file_id,
         "voice_id": "voz_clonada_tiktok_v1", # ID sugerido fijo
-        "model": "speech-2.6-hd" # Específico
+        "model": "speech-2.5-turbo-preview" # Específico
     }
     
     if GROUP_ID:

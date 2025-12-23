@@ -26,7 +26,7 @@ headers = {
 payload = {
     "file_id": FILE_ID_RECUPERADO,
     "voice_id": "voz_final_tiktok_v2", # Intentamos este nombre
-    "model": "speech-2.6-hd" # El modelo HD
+    "model": "speech-2.5-turbo-preview" # El modelo Turbo
 }
 
 try:

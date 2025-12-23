@@ -218,8 +218,21 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
         # final_audio = final_audio.fx(audio_fadeout, 1.0)
         final = final.set_audio(final_audio)
 
-    timestamp = datetime.now().strftime("%H%M%S")
-    out_name = f"TikTok_AUTO_{timestamp}.mp4"
+    # NAMING CONVENTION (V2 - Sequential)
+    try:
+        current_mp4s = [f for f in os.listdir(output_folder) if f.endswith(".mp4") and "TikTok_AUTO_" in f]
+        count = len(current_mp4s)
+        out_name = f"TikTok_AUTO_{count + 1}.mp4"
+    except:
+        timestamp = datetime.now().strftime("%H%M%S")
+        out_name = f"TikTok_AUTO_{timestamp}.mp4"
+
+    # Fallback de Seguridad (Si existe, apendice Timestamp)
+    if os.path.exists(os.path.join(output_folder, out_name)):
+        timestamp = datetime.now().strftime("%H%M%S")
+        name_no_ext = os.path.splitext(out_name)[0]
+        out_name = f"{name_no_ext}_{timestamp}.mp4"
+        
     out_path = os.path.join(output_folder, out_name)
     
     sets = config["video_settings"]
@@ -255,30 +268,41 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
 # ---------------------------------------------------------
 # INTERFAZ PRINCIPAL
 # ---------------------------------------------------------
-# SELECTOR DE MODO
-# ---------------------------------------------------------
-mode = st.radio("Modo de Generación", ["Manual (Carpetas)", "Automático (IA)"], horizontal=True)
 
-# Common Settings
+# SIDEBAR CONFIGURATION (Optimización de Espacio)
+with st.sidebar:
+    st.header("⚙️ Configuración Global")
+    
+    res_options = {
+        "1080p (Producción) - Lento": [1080, 1920],
+        "720p (HD) - Medio": [720, 1280],
+        "480p (Borrador) - Rápido": [480, 854],
+        "240p (Test Lógica) - Ultra Rápido": [240, 426]
+    }
+    
+    selected_res_label = st.radio(
+        "Calidad de Renderizado",
+        options=list(res_options.keys()),
+        index=0
+    )
+    
+    st.divider()
+    
+    engine_version = st.selectbox(
+        "Motor de Animación",
+        ["v2_estable", "v1_estable"],
+        index=0
+    )
+    
+    st.divider()
+    
+    sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
+
+# SELECTOR DE MODO (Por defecto Automático)
+# ---------------------------------------------------------
+mode = st.radio("Modo de Generación", ["Automático (IA)", "Manual (Carpetas)"], index=0, horizontal=True) # Index 0 es Auto ahora
+
 st.markdown("---")
-res_options = {
-    "1080p (Producción) - Lento": [1080, 1920],
-    "720p (HD) - Medio": [720, 1280],
-    "480p (Borrador) - Rápido": [480, 854],
-    "240p (Test Lógica) - Ultra Rápido": [240, 426]
-}
-selected_res_label = st.radio(
-    "Calidad de Renderizado / Modo de Prueba",
-    options=list(res_options.keys()),
-    index=0, # Default 1080p
-    horizontal=True
-)
-engine_version = st.sidebar.selectbox(
-    "Motor de Animación",
-    ["v2_estable", "v1_estable"],
-    index=0
-)
-sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
 
 
 if mode == "Manual (Carpetas)":
@@ -359,31 +383,40 @@ elif mode == "Automático (IA)":
     st.markdown("### ✨ Automatización con Inteligencia Artificial")
     st.info("Este modo genera guiones y audios automáticamente usando Gemini y Minimax.")
     
-    # 1. CONFIGURACIÓN DE LOTE (NUEVA UI)
+    # 1. CONFIGURACIÓN DE LOTE (NUEVA UI COMPACTA)
     st.markdown("### 🏭 Fábrica de Vídeos (Batch Mode)")
 
-    if st.button("📋 Verificar Whitelist (Logs + UI)"):
-        assets = guionista.get_available_assets()
-        print("\n" + "="*50)
-        print("VERIFICACIÓN MANUAL DE WHITELIST")
-        print(f"Total encontrados: {len(assets.split(','))}")
-        print(assets)
-        print("="*50 + "\n")
-        st.success(f"✅ Whitelist cargada: {len(assets.split(','))} personajes.")
-        with st.expander("Ver lista completa"):
-            st.write(assets)
+    # Fila de configuración principal
+    c1, c2, c3 = st.columns([1, 2, 1])
     
-    cantidad = st.number_input("¿Cuántos vídeos quieres generar?", min_value=1, max_value=10, value=1, step=1)
+    with c1:
+        cantidad = st.number_input("Cantidad de videos:", min_value=1, max_value=10, value=1, step=1)
     
-    use_creative_mode = st.checkbox("✨ Activar Modo Creativo (Hooks y CTAs dinámicos)", value=False, help="Si activas esto, la IA variará las frases de enganche y cierre. Si no, usará el formato clásico estricto.")
+    with c2:
+        st.write("") # Spacer
+        st.write("") 
+        use_creative_mode = st.checkbox("✨ Activar Modo Creativo", value=False, help="Hooks y CTAs dinámicos variados por IA.")
+        
+    with c3:
+        st.write("") # Spacer
+        if st.button("📋 Ver Whitelist"):
+            assets = guionista.get_available_assets()
+            st.toast(f"✅ Whitelist: {len(assets.split(','))} personajes detectados.")
+            # Opcional: Mostrar en un expander si se quiere
+            # with st.expander("Ver lista"): st.write(assets)
     
+    st.divider()
+    
+    # Inputs Dinámicos en Grid (2 columnas) para ahorrar espacio
     queue_inputs = []
-    st.write("Configura cada vídeo (Déjalo vacío para que la IA invente el tema):")
+    st.write("⬇️ **Configura los temas de los videos:** (Deja vacío para tema aleatorio)")
     
-    # Inputs Dinámicos
+    grid_cols = st.columns(2)
     for i in range(cantidad):
-        topic = st.text_input(f"🎬 Video {i+1}: Título/Tema", key=f"topic_{i}", placeholder="Ej: Curiosidades de Lincoln (o vacío para Aleatorio)")
-        queue_inputs.append(topic)
+        col_idx = i % 2
+        with grid_cols[col_idx]:
+            topic = st.text_input(f"🎬 Video {i+1}: Título/Tema", key=f"topic_{i}", placeholder="Ej: Curiosidades de Lincoln")
+            queue_inputs.append(topic)
 
     # Botón de Acción
     if st.button("✨ INICIAR FÁBRICA DE VIDEOS"):
@@ -411,18 +444,33 @@ elif mode == "Automático (IA)":
                 status.update(label=f"Trabajando en {idx+1}/{total_jobs}: {topic_display}...", state="running")
                 
                 try:
+                    # --- DASHBOARD DE PROCESO (3 COLUMNAS PARALELAS) ---
+                    col_script, col_audio, col_edit = st.columns(3)
+                    
+                    with col_script:
+                        st_script_status = st.empty()
+                        st_script_status.info("⏳ 1. Guion: En espera...")
+                    
+                    with col_audio:
+                        st_audio_status = st.empty()
+                        st_audio_status.info("⏳ 2. Audio: En espera...")
+                        
+                    with col_edit:
+                        st_edit_status = st.empty()
+                        st_edit_status.info("⏳ 3. Edición: En espera...")
+
                     # --- PASO 1: GUIONISTA ---
-                    st.write(f"🧠 ({idx+1}/{total_jobs}) Generando Guion...")
+                    st_script_status.info("🔄 Generando Guion...")
                     t0 = time.time()
                     
                     script_data = guionista.generate_script(current_topic, creative_mode=use_creative_mode)
                     txt_output = guionista.save_scripts_to_txt(script_data)
                     
                     t1 = time.time()
-                    st.info(f"✅ Guion OK ({format_seconds(t1-t0)})")
+                    st_script_status.success(f"✅ Guion OK ({format_seconds(t1-t0)})")
 
                     # --- PASO 2: LOCUTOR ---
-                    st.write(f"🗣️ ({idx+1}/{total_jobs}) Clonando Voz...")
+                    st_audio_status.info("🔄 Clonando Voz...")
                     t2 = time.time()
                     
                     resources_base = CFG["paths"]["resources_library"]
@@ -432,30 +480,53 @@ elif mode == "Automático (IA)":
                         raise Exception("No se generaron audios. Abortando este video.")
                     
                     t3 = time.time()
-                    st.info(f"✅ Audios OK ({format_seconds(t3-t2)})")
+                    st_audio_status.success(f"✅ Audios OK ({format_seconds(t3-t2)})")
                     
                     # --- PASO 3: EDITOR DE VIDEO ---
-                    st.write(f"🎬 ({idx+1}/{total_jobs}) Editando...")
+                    st_edit_status.info("🔄 Renderizando...")
                     t4 = time.time()
                     
                     final_video_path = generate_video_pipeline(
                         audio_output_folder,
                         CFG["paths"]["output_folder"],
                         CFG,
-                        status,
+                        status,  # Status container global para logs de ffmpeg si fuera necesario
                         log_cb,
                         engine_version
                     )
                     
                     t5 = time.time()
-                    st.info(f"✅ Video Renderizado ({format_seconds(t5-t4)})")
-                    st.success(f"🎉 VIDEO {idx+1} COMPLETADO: {os.path.basename(final_video_path)}")
+                    st_edit_status.success(f"✅ Video OK ({format_seconds(t5-t4)})")
                     
-                    # Mostrar Video Reciente
-                    with st.expander(f"👁️ Ver Video {idx+1}", expanded=False):
-                        c1, c2, c3 = st.columns([3, 2, 3])
-                        with c2: st.video(final_video_path)
-                            
+                    # --- RESULTADO FINAL (Layout Optimizado) ---
+                    st.divider()
+                    # Ratio 1:2 para que el video sea más pequeño (ocupa 1/3 de ancho)
+                    col_video, col_details = st.columns([1, 2])
+                    
+                    video_name = os.path.basename(final_video_path)
+                    
+                    with col_video:
+                        st.subheader("📺 Video")
+                        st.video(final_video_path)
+                    
+                    with col_details:
+                        st.subheader("📊 Detalles")
+                        st.success(f"🎉 ¡VIDEO COMPLETADO!")
+                        st.text_input("Archivo:", value=video_name, disabled=True, key=f"v_name_{idx}")
+                        st.write(f"⏱️ Tiempo Total: {format_seconds(t5-t0)}")
+                        st.write(f"📂 Ruta Local: `{final_video_path}`")
+                        st.info("ℹ️ El archivo ya se guardó automáticamente.")
+                        
+                        # Botón único de abrir carpeta
+                        if st.button("📂 Abrir Carpeta de Salida", key=f"btn_open_{idx}"):
+                            # Intento de abrir explorador (Windows)
+                            try:
+                                folder_p = os.path.dirname(final_video_path)
+                                os.startfile(folder_p)
+                            except:
+                                st.warning("No se pudo abrir la carpeta automáticamente.")
+
+                    
                     # Limpieza Automática
                     try:
                         if os.path.exists(txt_output): shutil.rmtree(txt_output)
@@ -471,18 +542,18 @@ elif mode == "Automático (IA)":
                     st.warning("⚠️ Saltando al siguiente video de la cola...")
                     continue # VITAL: No parar la fábrica
                 
-                # RATE LIMITING (Enfriamiento)
-                # ELIMINADO: La generación de vídeo dura >60s, suficiente enfriamiento natural.
-                # if idx < total_jobs - 1:
-                #     wait_time = 60
-                #     st.info(f"⏳ Enfriando motores {wait_time}s para evitar bloqueos de API...")
-                #     time.sleep(wait_time)
-            
             status.update(label="✨ ¡Fábrica Finalizó la Cola!", state="complete", expanded=False)
             
             if sound_on: 
                 try: winsound.MessageBeep(winsound.MB_ICONASTERISK)
                 except: pass
+        
+        # BOTÓN DE REINICIO
+        st.markdown("---")
+        col_reset, _ = st.columns([1, 2])
+        with col_reset:
+            if st.button("🔄 REINICIAR / GENERAR NUEVO LOTE", type="primary"):
+                st.rerun()
                 
         with st.expander("📝 Detalle de Logs Globales"):
             for l in logs_auto: st.write(l)

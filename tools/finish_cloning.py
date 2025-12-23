@@ -26,7 +26,7 @@ headers = {
 payload = {
     "file_id": FILE_ID_SUBIDO,
     "voice_id": NOMBRE_VOZ,
-    "model": "speech-2.6-hd" # Modelo de alta calidad
+    "model": "speech-2.5-turbo-preview" # Modelo Turbo
 }
 
 try:

@@ -37,8 +37,8 @@ def generate_audios_from_text_folder(txt_folder_path, output_base_path):
         "Content-Type": "application/json"
     }
     
-    print(f"⏳ Procesando {len(txt_files)} archivos con speech-2.6-turbo...")
-    
+    print(f"⏳ Procesando {len(txt_files)} archivos con speech-2.5-turbo-preview...")
+
     for txt_file in txt_files:
         filename = os.path.basename(txt_file)
         name_no_ext = os.path.splitext(filename)[0]
@@ -50,7 +50,7 @@ def generate_audios_from_text_folder(txt_folder_path, output_base_path):
         
         # PAYLOAD ESPECIAL V2
         payload = {
-            "model": "speech-2.6-turbo",
+            "model": "speech-2.5-turbo-preview",
             "text": text_content,
             "stream": False,
             "voice_setting": {
