@@ -137,7 +137,7 @@ def generate_script(user_topic=None, creative_mode=False):
 
     # 4. Llamada a Gemini
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash') # Modelo confirmado disponible
+        model = genai.GenerativeModel('gemini-3-flash-preview') # Modelo confirmado disponible
         
         # Forzar respuesta JSON en la instrucción si no está
         if "json" not in final_prompt.lower():

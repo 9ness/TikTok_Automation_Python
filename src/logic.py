@@ -160,10 +160,10 @@ def create_smart_combo_clip_v1_stable(image_path, total_dur, resolution, prev_ex
 # ==========================================
 def create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_exit_dir, is_first_clip=False, is_last_clip=False):
     """
-    MOTOR V2 (Estilo CapCut/Viral - POLISHED & CONTINUITY):
-    - Universal Grid 3x3.
-    - Gravity Flow (Fast In -> Slow -> Fast Out).
-    - START/END LOGIC: Zoom Transitions para el primer y último clip del bloque.
+    MOTOR V2 (HYBRID OPT - 2025):
+    - First/Last Clips (Zoom): FULL 3x3 GRID to ensure safe coverage during scale changes.
+    - Middle Clips (Slide): DYNAMIC GRID (Optimized) based on flow.
+    - Safety: Auto-fill vertical bounds for landscape images.
     """
     W, H = resolution
     
@@ -184,169 +184,180 @@ def create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_e
     final_w = int(img_w * master_scale)
     final_h = int(img_h * master_scale)
     
-    # Ajuste por si la altura es menor que H (Rellenar verticalmente con espejo)
-    # Con el grid 3x3 cubrimos siempre hasta 3 veces la altura. Suficiente.
-    
     base_img = pil_img.resize((final_w, final_h), Image.Resampling.LANCZOS)
     
     # ===============================
-    # GENERAR SUPER-LIENZO 3x3 (UNIVERSAL GRID)
-    # ===============================
-    # Columna Izq: Espejo H
-    # Columna Cen: Base
-    # Columna Der: Espejo H
-    # Fila Sup: Espejo V (de toda la fila base)
-    # Fila Inf: Espejo V (de toda la fila base)
-    
-    # Versiones Base
-    tile_center = base_img
-    tile_mirror_h = ImageOps.mirror(base_img)
-    
-    # Fila Central Base (Izquierda - Centro - Derecha)
-    row_img = Image.new('RGB', (final_w * 3, final_h))
-    row_img.paste(tile_mirror_h, (0, 0))
-    row_img.paste(tile_center, (final_w, 0))
-    row_img.paste(tile_mirror_h, (final_w*2, 0))
-    
-    # Versiones Fila
-    row_center = row_img
-    row_flip_v = ImageOps.flip(row_img) # Espejo vertical de toda la tira
-    
-    # Lienzo Final 3x3
-    grid_img = Image.new('RGB', (final_w * 3, final_h * 3))
-    grid_img.paste(row_flip_v, (0, 0))           # Arriba
-    grid_img.paste(row_center, (0, final_h))     # Centro
-    grid_img.paste(row_flip_v, (0, final_h*2))   # Abajo
-    
-    # Convertir a Clip
-    # OJO: Es una imagen GIGANTE.
-    super_clip = ImageClip(np.array(grid_img)).set_duration(total_dur)
-    
-    # ===============================
-    # 3. ANIMACIÓN DE POSICIÓN (Slide del Universo)
+    # DECISIÓN DE DIRECCIONES
     # ===============================
     
-    # ===============================
-    # ANIMACIÓN DE GRAVEDAD (2 FASES: In -> Out)
-    # ===============================
-    
-    # CENTRO (Target):
-    # La tile central (1,1) debe estar centrada en pantalla.
-    # Coordenadas TopLeft del Super-Clip para lograr esto:
-    center_x = (W - final_w)/2 - final_w 
-    center_y = (H - final_h)/2 - final_h
-    
-    # DETERMINAR INPUT (Start Point)
-    enter_dir = DIR_RIGHT
+    # 1. INPUT
+    enter_dir = DIR_RIGHT # Default
     if prev_exit_dir == DIR_LEFT: enter_dir = DIR_RIGHT
     elif prev_exit_dir == DIR_RIGHT: enter_dir = DIR_LEFT
     elif prev_exit_dir == DIR_UP: enter_dir = DIR_DOWN
     elif prev_exit_dir == DIR_DOWN: enter_dir = DIR_UP
     
+    # 2. OUTPUT
+    possible_exits = [DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN]
+    next_exit = random.choice(possible_exits)
+    
+    if is_last_clip:
+        next_exit = "ZOOM_EXIT"
+
+    # ===============================
+    # GENERACIÓN DE GRID (HYBRID LOGIC)
+    # ===============================
+    # Coordenadas Grid Abstracto 3x3: x[0..2], y[0..2]. Center es (1,1).
+    active_cols = {1}
+    active_rows = {1}
+    
+    # REGLA 1: SI HAY ZOOM (First/Last) -> FULL 3x3 (Seguridad Máxima)
+    if is_first_clip or is_last_clip:
+        active_cols = {0, 1, 2}
+        active_rows = {0, 1, 2}
+    else:
+        # OPS TIEMPO REAL (Slide Only) -> OPTIMIZACIÓN
+        
+        # A) Dirección de Entrada
+        if enter_dir == DIR_LEFT: active_cols.add(2)
+        elif enter_dir == DIR_RIGHT: active_cols.add(0)
+        elif enter_dir == DIR_UP: active_rows.add(2)
+        elif enter_dir == DIR_DOWN: active_rows.add(0)
+            
+        # B) Dirección de Salida
+        if next_exit == DIR_LEFT: active_cols.add(2)
+        elif next_exit == DIR_RIGHT: active_cols.add(0)
+        elif next_exit == DIR_UP: active_rows.add(2)
+        elif next_exit == DIR_DOWN: active_rows.add(0)
+        
+        # C) SAFETY: Landscape Images (Altura insuficiente)
+        # Si la imagen escalada es más baja que la pantalla, necesitamos tiles verticales
+        # para rellenar el fondo (efecto espejo).
+        if final_h < H:
+            active_rows = {0, 1, 2}
+
+    min_col, max_col = min(active_cols), max(active_cols)
+    min_row, max_row = min(active_rows), max(active_rows)
+    
+    grid_cols = max_col - min_col + 1
+    grid_rows = max_row - min_row + 1
+    
+    # Dimensiones del Lienzo
+    canvas_w = final_w * grid_cols
+    canvas_h = final_h * grid_rows
+    
+    grid_img = Image.new('RGB', (canvas_w, canvas_h))
+    
+    # Preparar Variaciones
+    tile_normal = base_img
+    tile_mirror_h = ImageOps.mirror(base_img)
+    
+    # Populate function
+    def get_tile(c, r):
+        # Lógica de Espejos Original
+        base_t = tile_normal
+        if c == 0 or c == 2: base_t = tile_mirror_h
+        if r == 0 or r == 2: return ImageOps.flip(base_t)
+        return base_t
+
+    # Pintar Grid
+    for c in range(min_col, max_col + 1):
+        for r in range(min_row, max_row + 1):
+            tile = get_tile(c, r)
+            paste_x = (c - min_col) * final_w
+            paste_y = (r - min_row) * final_h
+            grid_img.paste(tile, (paste_x, paste_y))
+    
+    super_clip = ImageClip(np.array(grid_img)).set_duration(total_dur)
+    
+    # ===============================
+    # 3. ANIMACIÓN DE POSICIÓN
+    # ===============================
+    
+    # PIVOTE DINÁMICO
+    local_center_col = 1 - min_col
+    local_center_row = 1 - min_row
+    
+    center_x = ((W - final_w) / 2) - (local_center_col * final_w)
+    center_y = ((H - final_h) / 2) - (local_center_row * final_h)
+    
     start_x, start_y = center_x, center_y
-    # Offset generoso para asegurar "Velocidad" al entrar.
     offset_in_w = final_w * 0.7
     offset_in_h = final_h * 0.7
     
-    # LÓGICA DE ENTRADA (START POINT)
     if is_first_clip:
-        # PRIMERA FOTO: ZOOM IN/OUT ENTRY (No slide lateral)
-        # Empieza CENTRADA en (center_x, center_y) pero manejaremos el ZOOM.
-        start_x, start_y = center_x, center_y
+        pass 
     else:
-        # NORMAL: Viene de fuera según prev_exit_dir
-        if enter_dir == DIR_LEFT: start_x = center_x - offset_in_w   # Viene de izq
-        elif enter_dir == DIR_RIGHT: start_x = center_x + offset_in_w # Viene de der
-        elif enter_dir == DIR_UP: start_y = center_y - offset_in_h    # Viene de arriba
-        elif enter_dir == DIR_DOWN: start_y = center_y + offset_in_h  # Viene de abajo
-
-    # DETERMINAR OUTPUT (End Point)
-    next_exit = random.choice([DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN])
+        if enter_dir == DIR_LEFT: start_x = center_x - offset_in_w
+        elif enter_dir == DIR_RIGHT: start_x = center_x + offset_in_w
+        elif enter_dir == DIR_UP: start_y = center_y - offset_in_h
+        elif enter_dir == DIR_DOWN: start_y = center_y + offset_in_h
+    
     end_x, end_y = center_x, center_y
     offset_out_w = final_w * 0.7
     offset_out_h = final_h * 0.7
     
-    # LÓGICA DE SALIDA (END POINT)
     if is_last_clip:
-        # ÚLTIMA FOTO: ZOOM IN/OUT EXIT (No slide lateral)
-        # Termina CENTRADA, el movimiento será Zoom.
-        end_x, end_y = center_x, center_y
-        next_exit = "ZOOM_EXIT" # Marker
+        pass
     else:
-        # NORMAL: Sale lateralmente (dirección aleatoria)
-        if next_exit == DIR_LEFT: end_x = center_x - offset_out_w
-        elif next_exit == DIR_RIGHT: end_x = center_x + offset_out_w
-        elif next_exit == DIR_UP: end_y = center_y - offset_out_h
-        elif next_exit == DIR_DOWN: end_y = center_y + offset_out_h
+         if next_exit == DIR_LEFT: end_x = center_x - offset_out_w
+         elif next_exit == DIR_RIGHT: end_x = center_x + offset_out_w
+         elif next_exit == DIR_UP: end_y = center_y - offset_out_h
+         elif next_exit == DIR_DOWN: end_y = center_y + offset_out_h
 
-    # FUNCIÓN DE ZOOM (DEFINIDA ANTES PARA USARSE EN POS_FUNC)
-    def zoom_func(t):
-        if is_last_clip and t >= t_mid:
-            # Zoom In Final: 1.0 -> 1.3
-            dur_part = total_dur - t_mid
-            p = (t - t_mid) / dur_part
-            p = pow(p, 2) # EaseInQuad
-            return 1.0 + (0.3 * p)
-            
-        elif is_first_clip and t < t_mid:
-            # Zoom Out Inicial: 1.3 -> 1.0
-            dur_part = t_mid
-            p = t / dur_part
-            p = 1 - pow(1 - p, 2) # EaseOutQuad
-            return 1.3 - (0.3 * p)
-            
-        return 1.0 
-
-    # FUNCIÓN DE MOVIMIENTO (POSICIÓN)
+    # ZOOM FUNCTION
     t_mid = total_dur * 0.5
     
+    def zoom_func(t):
+        if is_last_clip and t >= t_mid:
+            dur_part = total_dur - t_mid
+            p = (t - t_mid) / dur_part
+            p = pow(p, 2)
+            return 1.0 + (0.3 * p)
+        elif is_first_clip and t < t_mid:
+            dur_part = t_mid
+            p = t / dur_part
+            p = 1 - pow(1 - p, 2)
+            return 1.3 - (0.3 * p)
+        return 1.0 
+
     def pos_func(t):
-        # 1. Calcular Escala Actual para corregir posición
         s = zoom_func(t)
         
-        # Coordenada "CENTRO" ajustada a la escala S
-        # Formula: W/2 - 1.5 * final_w * s
-        dynamic_center_x = (W / 2) - (1.5 * final_w * s)
-        dynamic_center_y = (H / 2) - (1.5 * final_h * s)
+        # PIVOTE REAL (Centro de la imagen central en el canvas)
+        pivot_x_in_img = (local_center_col + 0.5) * final_w
+        pivot_y_in_img = (local_center_row + 0.5) * final_h
         
-        # SI ES PRIMER CLIP:
+        dynamic_center_x = (W / 2) - (pivot_x_in_img * s)
+        dynamic_center_y = (H / 2) - (pivot_y_in_img * s)
+        
         if is_first_clip:
-            if t < t_mid:
-                # FASE 1: Zoom Entry (Estático en posición ajustada)
-                return (int(dynamic_center_x), int(dynamic_center_y))
+            if t < t_mid: return (int(dynamic_center_x), int(dynamic_center_y))
             else:
-                # FASE 2: Slide Out (Gravity) - Escala es 1.0 aquí
-                # Interpolamos desde center_x (1.0) a end_x
                 p = (t - t_mid) / (total_dur - t_mid)
-                p = pow(p, 3) # EaseInCubic
+                p = pow(p, 3) 
                 curr_x = center_x + (end_x - center_x) * p
                 curr_y = center_y + (end_y - center_y) * p
                 return (int(curr_x), int(curr_y))
                 
-        # SI ES ULTIMO CLIP:
         elif is_last_clip:
             if t < t_mid:
-                # FASE 1: Slide In (Gravity) - Escala es 1.0 aquí
-                p = t / t_mid
-                p = 1 - pow(1 - p, 3) # EaseOutCubic
-                curr_x = start_x + (center_x - start_x) * p
-                curr_y = start_y + (center_y - start_y) * p
-                return (int(curr_x), int(curr_y))
-            else:
-                # FASE 2: Zoom Exit (Estático en posición ajustada)
-                return (int(dynamic_center_x), int(dynamic_center_y))
-                
-        # NORMAL (MIDDLE CLIPS)
-        else:
-            if t < t_mid:
-                # FASE 1: Slide In
                 p = t / t_mid
                 p = 1 - pow(1 - p, 3) 
                 curr_x = start_x + (center_x - start_x) * p
                 curr_y = start_y + (center_y - start_y) * p
                 return (int(curr_x), int(curr_y))
             else:
-                # FASE 2: Slide Out
+                return (int(dynamic_center_x), int(dynamic_center_y))
+                
+        else:
+            if t < t_mid:
+                p = t / t_mid
+                p = 1 - pow(1 - p, 3) 
+                curr_x = start_x + (center_x - start_x) * p
+                curr_y = start_y + (center_y - start_y) * p
+                return (int(curr_x), int(curr_y))
+            else:
                 p = (t - t_mid) / (total_dur - t_mid)
                 p = pow(p, 3) 
                 curr_x = center_x + (end_x - center_x) * p
@@ -359,7 +370,6 @@ def create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_e
     else:
         final_clip = super_clip.set_position(pos_func)
     
-    # IMPORTANTE: size=resolution recorta el super-clip a la ventana visible.
     return CompositeVideoClip([final_clip], size=resolution).set_duration(total_dur), next_exit
 
 # ==========================================
