@@ -180,7 +180,9 @@ def create_smart_combo_clip_v2_estable(image_path, total_dur, resolution, prev_e
     # ===============================
     # DEFINIR ESCALA 1.0 (Ancho de Pantalla)
     # ===============================
-    master_scale = W / img_w
+    scale_w = W / img_w
+    scale_h = H / img_h
+    master_scale = max(scale_w, scale_h) * 1.02
     final_w = int(img_w * master_scale)
     final_h = int(img_h * master_scale)
     
@@ -564,12 +566,117 @@ def get_mystery_silhouette_image(top1_name, list_previous_presidents, library_pa
          return os.path.join(library_path, "comodin_silueta_1.png")
 
 
-def create_video_segment(audio_path, puesto, president_name, config, video_token_used, log_callback=None, engine_version="v1_estable", revealed_presidents=None):
+def create_video_segment(audio_path, puesto, president_name, config, video_token_used, log_callback=None, engine_version="v1_estable", revealed_presidents=None, transition_state=None):
     from src.utils import get_president_assets, find_best_match_folder
     
     paths = config["paths"]
     res = tuple(config["video_settings"]["resolution"])
     W, H = res
+
+    # -------------------------------------------------------------
+    # 🕵️‍♂️ LÓGICA MISTERIO AI (MODO ZERO-FOLDER)
+    # -------------------------------------------------------------
+    app_mode = config.get("app_mode", "PRESIDENTS_TOP5")
+    
+    if app_mode == "MYSTERY_AI":
+        # BYPASS TOTAL: No buscamos en carpetas locales de presidentes.
+        # Solo usamos audio + imagen IA.
+        
+        audio = AudioFileClip(audio_path)
+        # Glitch removal standard
+        if audio.duration > 0.2:
+            new_dur = audio.duration - 0.15 
+            audio = audio.subclip(0, new_dur)
+            audio = audio.fx(audio_fadeout, 0.05)
+            
+        dur_total = audio.duration
+        
+        try:
+            filename = os.path.basename(audio_path)
+            # Extraer número: "01_scene" -> 1
+            # Si falla el split, es un archivo "System" (Intro/Outro) que debería tener imagen genérica o texto
+            # Pero en Mystery AI, todo debería ser escena numerada.
+            
+            # Caso especial Intro/Outro sin numero
+            scene_idx = 0
+            parts = filename.split('_')
+            if parts[0].isdigit():
+                scene_idx = int(parts[0])
+            
+            # Buscar imagen generada
+            temp_root = config["folder_structure"]["temp_folder"]
+            ai_assets_dir = os.path.join(temp_root, "ai_assets")
+            
+            # Nombre esperado: scene_001.png
+            # Nota: Si es scene_idx 0 (Intro), quizás generamos scene_000.png?
+            # Asumimos que guionista genera orden 1..N.
+            # Intro es 00_title.txt -> Audio 00_title.mp3 -> Buscamos scene_000.png si existe, o fallback.
+            
+            img_name = f"scene_{scene_idx:03d}.png"
+            img_path = os.path.join(ai_assets_dir, img_name)
+            
+            # STATE MANAGEMENT
+            t_prev_exit = DIR_CENTER
+            t_is_first = True
+            t_is_last = True
+            
+            if transition_state:
+                t_prev_exit = transition_state.get("prev_exit", DIR_CENTER)
+                t_is_first = transition_state.get("is_first", True)
+                t_is_last = transition_state.get("is_last", True)
+
+            if not os.path.exists(img_path):
+                 if log_callback: log_callback(f"⚠️ [MysteryAI] Imagen NO encontrada: {img_name}. Buscando fallback...")
+                 
+                 # FALLBACK 1: Intentar buscar la imagen anterior (scene_N-1)
+                 # FALLBACK 2: Buscar cualquiera que exista en la carpeta
+                 
+                 fallback_img = None
+                 
+                 # Strategy: Look for closest existing image
+                 import glob
+                 all_generated = sorted(glob.glob(os.path.join(ai_assets_dir, "scene_*.png")))
+                 
+                 if all_generated:
+                     # Pick the one closest to current index? Or just random?
+                     # Random is safer to avoid static feel if multiple fail in a row, 
+                     # but previous is better for continuity. Let's use previous (last in list lower than current)
+                     
+                     # Simple: Use the last one generated (likely the previous scene)
+                     # If scene 5 fails, scene 4 (which is in all_generated) might be good.
+                     # But simple random might be less repetitive if 5, 6, 7 fail.
+                     fallback_img = random.choice(all_generated)
+                 
+                 if fallback_img:
+                     if log_callback: log_callback(f"   ↳ 🔄 Usando fallback: {os.path.basename(fallback_img)}")
+                     img_path = fallback_img
+                 else:
+                     # Ultimate Fail: Black Screen
+                     return ColorClip(size=res, color=(0,0,0), duration=dur_total).set_audio(audio), video_token_used, DIR_CENTER
+            
+            if log_callback: log_callback(f"🎨 [MysteryAI] Montando Escena {scene_idx} ({img_name})")
+            
+            clip, next_exit = create_smart_combo_clip(
+                image_path=img_path,
+                total_dur=dur_total,
+                resolution=res,
+                prev_exit_dir=t_prev_exit, 
+                is_first_clip=t_is_first,
+                is_last_clip=t_is_last, 
+                version=engine_version
+            )
+            
+            clip = clip.set_audio(audio)
+            return clip, video_token_used, next_exit
+            
+        except Exception as e:
+            if log_callback: log_callback(f"❌ Error Critical MysteryAI: {e}")
+            # Fallback final (3 values)
+            return ColorClip(size=res, color=(0,0,0), duration=dur_total).set_audio(audio), video_token_used, DIR_CENTER
+
+    # -------------------------------------------------------------
+    # 🏛️ LÓGICA CLÁSICA (PRESIDENTS TOP 5)
+    # -------------------------------------------------------------
     
     photos, videos, silhouettes = get_president_assets(paths["library_base"], president_name, config)
     
@@ -581,7 +688,7 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
         
     if not photos and not videos and not silhouettes: 
         if log_callback: log_callback(f"⚠️ No se encontraron recursos para {president_name}")
-        return None, video_token_used
+        return None, video_token_used, None
 
     # Manual Volume Reduction REMOVED due to instability
     audio = AudioFileClip(audio_path)
@@ -599,12 +706,15 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
     dur_total = audio_clip.duration
     
     # --- INTRO LOGIC (DYNAMIC) ---
+
+
     # --- INTRO LOGIC (DYNAMIC) ---
+    # Only for Presidents Mode or if "intro" keyword is present in legacy flows
     if "intro" in os.path.basename(audio_path).lower():
          if log_callback: log_callback("✅ Detectado archivo INTRO. Generando montaje visual...")
          dynamic_intro, exit_state = generate_dynamic_intro(audio_clip, config, videos, log_callback)
          if dynamic_intro:
-             return dynamic_intro, video_token_used
+             return dynamic_intro, video_token_used, None
 
     # --- SILHOUETTE LOGIC (TOP 1 MYSTERY) ---
     is_silhouette_mode = False
@@ -758,7 +868,7 @@ def create_video_segment(audio_path, puesto, president_name, config, video_token
     full_visual = final_body
     
     if not full_visual:
-        return None, video_token_used
+        return None, video_token_used, None
         
     full_visual = full_visual.set_audio(audio_clip)
-    return full_visual, video_token_used
+    return full_visual, video_token_used, None

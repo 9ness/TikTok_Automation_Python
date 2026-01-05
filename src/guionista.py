@@ -84,18 +84,19 @@ def get_available_assets():
         print(f"⚠️ Error listando assets: {e}")
         return "Cualquier presidente de USA"
 
-def generate_script(user_topic=None, creative_mode=False):
+def generate_script(user_topic=None, creative_mode=False, app_mode="PRESIDENTS_TOP5"):
     """
     Genera un guion usando Google Gemini.
     - user_topic: String con el tema específico o None para aleatorio.
     - creative_mode: Bool. Si True, usa prompts dinámicos. Si False, usa prompts estrictos (Legacy).
+    - app_mode: "PRESIDENTS_TOP5" o "MYSTERY_AI".
     """
     print("🤖 Iniciando Motor de Guiones (Gemini)...")
     
     # 1. Configuración de API
     api_key = os.getenv("GOOGLE_GEMINI_KEY")
     if not api_key:
-        raise ValueError("❌ Faltan las API KEYS. Configura GOOGLE_GEMINI_KEY en .env")
+        raise ValueError("GOOGLE_GEMINI_KEY not found in environment variables.")
 
     genai.configure(api_key=api_key)
     
@@ -108,32 +109,57 @@ def generate_script(user_topic=None, creative_mode=False):
     print(f"📋 Whitelist DETALLADA inyectada a Gemini ({len(available_chars.split(','))} personajes detectados):")
     print(f"LISTA COMPLETA: {available_chars}")
     
-    if user_topic and user_topic.strip():
-        # Modo Específico
-        key = "script_specific_creative" if creative_mode else "script_specific_topic"
-        base_prompt = prompts.get(key, "")
-        if not base_prompt:
-             # Fallback simple
-            final_prompt = f"Genera un guion de debate presidencial divertido sobre: {user_topic}. Devuelve JSON."
+    # 3.5 DETECTAR MODO (Argumento Prioritario)
+    # app_mode viene pasad desde main.py que tiene el estado real de la UI
+    
+    if app_mode == "MYSTERY_AI":
+        print(f"🕵️‍♂️ MODO MYSTERY AI DETECTADO")
+        base_prompt = prompts.get("mystery_viral_prompt", "")
+        
+        if not user_topic or not user_topic.strip():
+            # TREND HUNTER MODE
+            print("   -> Input vacío. Activando modo 'Trend Hunter'")
+            topic_str = "NO TOPIC PROVIDED. Your task is to research or select a highly viral, mysterious, or breaking news topic currently trending in the US. Focus on something that would captivate an adult audience (40-50 years old)."
         else:
-            final_prompt = base_prompt.replace("{{TEMA}}", user_topic)
-    else:
-        # Modo Aleatorio
-        key = "script_random_creative" if creative_mode else "script_random_topic"
-        base_prompt = prompts.get(key, "")
-        if not base_prompt:
-            final_prompt = "Genera un guion de debate presidencial divertido sobre un tema viral aleatorio. Devuelve JSON."
-        else:
-            final_prompt = base_prompt
+            # USER TOPIC MODE
+            print(f"   -> Input recibido: {user_topic}")
+            # Injecting forceful expansion instruction directly into the topic slot
+            topic_str = f"{user_topic}. (CRITICAL COMMAND: You MUST expand this specific topic into EXACTLY 12 distinct scenes/images. Do not summarize. If the topic is simple, break it down into smaller chronological details to fill 12 scenes.)"
             
-    # INYECCIÓN FINAL DE WHITELIST
-    if "{{AVAILABLE_CHARACTERS}}" in final_prompt:
-        final_prompt = final_prompt.replace("{{AVAILABLE_CHARACTERS}}", available_chars)
+        if not base_prompt:
+             # Fallback
+            final_prompt = "Generate a viral script about: " + str(topic_str) + ". Return JSON with 'scenes'."
+        else:
+            final_prompt = base_prompt.replace("{{TEMA}}", topic_str)
+            
+    else:
+        # MODO CLÁSICO (PRESIDENTS_TOP5)
+        if user_topic and user_topic.strip():
+            # Modo Específico
+            key = "script_specific_creative" if creative_mode else "script_specific_topic"
+            base_prompt = prompts.get(key, "")
+            if not base_prompt:
+                 # Fallback simple
+                final_prompt = f"Genera un guion de debate presidencial divertido sobre: {user_topic}. Devuelve JSON."
+            else:
+                final_prompt = base_prompt.replace("{{TEMA}}", user_topic)
+        else:
+            # Modo Aleatorio
+            key = "script_random_creative" if creative_mode else "script_random_topic"
+            base_prompt = prompts.get(key, "")
+            if not base_prompt:
+                final_prompt = "Genera un guion de debate presidencial divertido sobre un tema viral aleatorio. Devuelve JSON."
+            else:
+                final_prompt = base_prompt
+            
+        # INYECCIÓN FINAL DE WHITELIST
+        if "{{AVAILABLE_CHARACTERS}}" in final_prompt:
+            final_prompt = final_prompt.replace("{{AVAILABLE_CHARACTERS}}", available_chars)
 
-    # INYECCIÓN FINAL DE ESTILO GLOBAL
-    if "{{GLOBAL_STYLE}}" in final_prompt:
-        global_style = prompts.get("global_viral_style", "")
-        final_prompt = final_prompt.replace("{{GLOBAL_STYLE}}", global_style)
+        # INYECCIÓN FINAL DE ESTILO GLOBAL
+        if "{{GLOBAL_STYLE}}" in final_prompt:
+            global_style = prompts.get("global_viral_style", "")
+            final_prompt = final_prompt.replace("{{GLOBAL_STYLE}}", global_style)
 
     # 4. Llamada a Gemini
     try:
@@ -161,9 +187,10 @@ def generate_script(user_topic=None, creative_mode=False):
         print(f"❌ Error conectando con Gemini: {e}")
         raise e
 
-def save_scripts_to_txt(script_data, output_base_folder="inputs_generados"):
+def save_scripts_to_txt(script_data, output_base_folder="inputs_generados", app_mode="PRESIDENTS_TOP5"):
     """
     Guarda el script_data en archivos individuales .txt con estructura ESTRICTA.
+    Soporta PRESIDENTS_TOP5 y MYSTERY_AI.
     """
     # 1. Crear carpeta con timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -191,6 +218,28 @@ def save_scripts_to_txt(script_data, output_base_folder="inputs_generados"):
             f.write(content)
         saved_files.append(path)
 
+    # --- MODO MYSTERY AI ---
+    if "scenes" in script_data:
+        # Estructura: "full_script_txt" y "scenes".
+        # ESTRATEGIA: Guardamos por ESCENAS individuales para que el editor pueda sincronizar
+        # imagen exacta con audio exacto.
+        
+        scenes = script_data.get("scenes", [])
+        
+        for sc in scenes:
+            order = sc.get("order", 0)
+            text = sc.get("narration_segment", "")
+            if not text: continue
+            
+            # Nombre: 01_scene, 02_scene...
+            filename = f"{int(order):02d}_scene.txt"
+            write_file(filename, text)
+            
+        print(f"✅ [MYSTERY_AI] Guion desplegado en {len(saved_files)} escenas en: {full_path}")
+        return full_path
+
+    # --- MODO PRESIDENTS TOP5 (LEGACY) ---
+    
     # 2. Guardar Intro
     intro_data = script_data.get("intro", {})
     intro_text = intro_data.get("text", "")

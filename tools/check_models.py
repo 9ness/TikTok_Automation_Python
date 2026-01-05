@@ -18,7 +18,8 @@ try:
     
     available_models = []
     for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
+        print(f"   🔎 Checked: {m.name} | Methods: {m.supported_generation_methods}")
+        if 'image_generation' in m.supported_generation_methods or 'predict' in m.supported_generation_methods:
             available_models.append(m.name)
             print(f"   ✅ Disponible: {m.name}")
 

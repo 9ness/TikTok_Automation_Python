@@ -46,6 +46,14 @@ except Exception as e:
     guionista = None
     guionista_error = str(e)
 
+ai_gen_error = None
+try:
+    import src.ai_image_gen as ai_gen
+except Exception as e:
+    ai_gen = None
+    ai_gen_error = str(e)
+
+
 locutor_error = None
 try:
     import src.locutor as locutor
@@ -132,13 +140,19 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
         else:
             body_files.append(aud)
             
-    # Ordenar numéricamente inverso (5, 4, 3, 2, 1)
-    # Asumimos que empiezan con número N_Name.mp3
+    # Ordenar numéricamente
+    # PRESIDENTS_TOP5: Inverso (5, 4, 3...)
+    # MYSTERY_AI: Narrativo Cronológico (1, 2, 3...)
+    app_mode = config.get("app_mode", "PRESIDENTS_TOP5")
+    is_reverse = True
+    if app_mode == "MYSTERY_AI":
+        is_reverse = False
+        
     try:
-        body_files.sort(key=lambda x: int(os.path.basename(x).split('_')[0]), reverse=True)
+        body_files.sort(key=lambda x: int(os.path.basename(x).split('_')[0]), reverse=is_reverse)
     except:
         # Fallback por nombre si no cumple formato
-        body_files.sort(key=lambda x: os.path.basename(x), reverse=True)
+        body_files.sort(key=lambda x: os.path.basename(x), reverse=is_reverse)
     
     final_audio_order = []
     if intro_file: final_audio_order.append(intro_file)
@@ -149,7 +163,19 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
     
     # 3. Generar segmentos
     revealed_presidents = []
-    for aud in final_audio_order:
+    
+    # State tracking for Mystery Mode
+    mystery_last_exit = "CENTER" 
+    # DIR_CENTER might not be safe to import directly unless imported from src.logic
+    # We use string "CENTER" if logic handles it, or rely on internal defaults.
+    # Ideally import DIR_CENTER, but string usually works or is ignored if logic maps it.
+    # Looking at logic.py, DIR_CENTER is a variable/constant. Let's assume passed through logic handles imports.
+    # Actually, main.py doesn't import DIR_CENTER. We should check if logic handles raw strings or we need state object.
+    
+    # Simple integer index logic
+    total_segments = len(final_audio_order)
+    
+    for idx, aud in enumerate(final_audio_order):
         try:
             name = os.path.splitext(os.path.basename(aud))[0]
             # Extraer info
@@ -170,8 +196,28 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
                 presi = name
 
             log_callback(f"⚙️ Procesando segmento: **{name}** (Personaje: {presi})")
+            
+            # Transition State Logic
+            transition_state = None
+            if app_mode == "MYSTERY_AI":
+                transition_state = {
+                    "prev_exit": mystery_last_exit,
+                    "is_first": (idx == 0),
+                    "is_last": (idx == total_segments - 1)
+                }
 
-            seg, token = create_video_segment(aud, puesto, presi, config, token, log_callback=log_callback, engine_version=engine_version, revealed_presidents=revealed_presidents)
+            seg, token, next_exit_val = create_video_segment(
+                aud, puesto, presi, config, token, 
+                log_callback=log_callback, 
+                engine_version=engine_version, 
+                revealed_presidents=revealed_presidents,
+                transition_state=transition_state
+            )
+            
+            # Update State
+            if next_exit_val:
+                mystery_last_exit = next_exit_val
+            
             # Agregar a lista de ya revelados para lógica de siluetas
             revealed_presidents.append(presi)
             if seg: clips.append(seg)
@@ -199,7 +245,8 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
     
     final = concatenate_videoclips(clips, method="compose")
     
-    if len(clips) > 1 and sound_effect:
+    # SFX Condition: Disable for MYSTERY_AI
+    if len(clips) > 1 and sound_effect and app_mode != "MYSTERY_AI":
         sfx_clips = []
         current_time = 0
         for i in range(len(clips) - 1):
@@ -271,32 +318,47 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
 
 # SIDEBAR CONFIGURATION (Optimización de Espacio)
 with st.sidebar:
-    st.header("⚙️ Configuración Global")
+    # --- VISUALES ---
+    with st.expander("🎥 Configuración de Video & Animación", expanded=True):
+        st.markdown("**Resolución**")
+        res_options = {
+            "1080p (Lento)": [1080, 1920],
+            "720p (Medio)": [720, 1280],
+            "480p (Rápido)": [480, 854],
+            "240p (Ultra Rápido)": [240, 426]
+        }
+        selected_res_label = st.selectbox("Calidad", options=list(res_options.keys()), index=0)
+        
+        st.markdown("**Motor Animación**")
+        engine_version = st.selectbox("Motor", ["v2_estable", "v1_estable"], index=0, label_visibility="collapsed")
+
+    # --- IA IMAGEN ---
+    with st.expander("🎨 Motor de Imagen AI", expanded=True):
+        img_model_options = {
+            "Imagen 4.0 (Pro/Ultra)": "best",
+            "Imagen 4.0 (Fast)": "fast",
+            "Imagen 3.0/2.0 (Legacy)": "legacy" 
+        }
+        selected_img_model_label = st.selectbox("Modelo", options=list(img_model_options.keys()), index=0)
+        selected_img_quality_mode = img_model_options[selected_img_model_label]
+
+    # --- ESTRATEGIA ---
+    with st.expander("🎯 Estrategia & Nicho", expanded=True):
+        app_mode_label = st.radio(
+            "Nicho", 
+            ["🏛️ Presidentes Top 5", "🕵️‍♂️ Misterio & Conspiración AI"], 
+            index=1,
+            label_visibility="collapsed"
+        )
+        sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
     
-    res_options = {
-        "1080p (Producción) - Lento": [1080, 1920],
-        "720p (HD) - Medio": [720, 1280],
-        "480p (Borrador) - Rápido": [480, 854],
-        "240p (Test Lógica) - Ultra Rápido": [240, 426]
-    }
+    # Update Config Runtime
+    if "Presidentes" in app_mode_label:
+        CFG["app_mode"] = "PRESIDENTS_TOP5"
+    else:
+        CFG["app_mode"] = "MYSTERY_AI"
     
-    selected_res_label = st.radio(
-        "Calidad de Renderizado",
-        options=list(res_options.keys()),
-        index=0
-    )
-    
-    st.divider()
-    
-    engine_version = st.selectbox(
-        "Motor de Animación",
-        ["v2_estable", "v1_estable"],
-        index=0
-    )
-    
-    st.divider()
-    
-    sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
+    st.caption(f"Modo Activo: {CFG['app_mode']}")
 
 # SELECTOR DE MODO (Por defecto Automático)
 # ---------------------------------------------------------
@@ -395,15 +457,19 @@ elif mode == "Automático (IA)":
     with c2:
         st.write("") # Spacer
         st.write("") 
-        use_creative_mode = st.checkbox("✨ Activar Modo Creativo", value=False, help="Hooks y CTAs dinámicos variados por IA.")
-        
+        if CFG.get("app_mode") == "PRESIDENTS_TOP5":
+            use_creative_mode = st.checkbox("✨ Activar Modo Creativo", value=False, help="Hooks y CTAs dinámicos variados por IA.")
+        else:
+             use_creative_mode = False
+
     with c3:
         st.write("") # Spacer
-        if st.button("📋 Ver Whitelist"):
-            assets = guionista.get_available_assets()
-            st.toast(f"✅ Whitelist: {len(assets.split(','))} personajes detectados.")
-            # Opcional: Mostrar en un expander si se quiere
-            # with st.expander("Ver lista"): st.write(assets)
+        if CFG.get("app_mode") == "PRESIDENTS_TOP5":
+            if st.button("📋 Ver Whitelist"):
+                assets = guionista.get_available_assets()
+                st.toast(f"✅ Whitelist: {len(assets.split(','))} personajes detectados.")
+                # Opcional: Mostrar en un expander si se quiere
+                # with st.expander("Ver lista"): st.write(assets)
     
     st.divider()
     
@@ -444,8 +510,20 @@ elif mode == "Automático (IA)":
                 status.update(label=f"Trabajando en {idx+1}/{total_jobs}: {topic_display}...", state="running")
                 
                 try:
-                    # --- DASHBOARD DE PROCESO (3 COLUMNAS PARALELAS) ---
-                    col_script, col_audio, col_edit = st.columns(3)
+                    # 1. LEER MODO ACTUAL (DEL SIDEBAR)
+                    current_app_mode = CFG.get("app_mode", "PRESIDENTS_TOP5")
+                    
+                    # --- DASHBOARD DE PROCESO (DINÁMICO) ---
+                    if current_app_mode == "MYSTERY_AI":
+                        # 4 Columnas: Guion -> IMAGENES -> Audio -> Edit
+                        col_script, col_img, col_audio, col_edit = st.columns(4)
+                        with col_img:
+                            st_img_status = st.empty()
+                            st_img_status.info("⏳ 1.5. Visuales: En espera...")
+                    else:
+                        # 3 Columnas Clásicas
+                        col_script, col_audio, col_edit = st.columns(3)
+                        st_img_status = None
                     
                     with col_script:
                         st_script_status = st.empty()
@@ -463,17 +541,74 @@ elif mode == "Automático (IA)":
                     st_script_status.info("🔄 Generando Guion...")
                     t0 = time.time()
                     
-                    script_data = guionista.generate_script(current_topic, creative_mode=use_creative_mode)
-                    txt_output = guionista.save_scripts_to_txt(script_data)
+                    # PASAMOS app_mode APLICADO
+                    script_data = guionista.generate_script(
+                        user_topic=current_topic, 
+                        creative_mode=use_creative_mode,
+                        app_mode=current_app_mode  # <--- CRÍTICO: Pasamos el modo
+                    )
+                    
+                    # PASAMOS app_mode PARA GUARDADO (Define estructura de archivos)
+                    txt_output = guionista.save_scripts_to_txt(
+                        script_data, 
+                        app_mode=current_app_mode # <--- CRÍTICO: Pasamos el modo
+                    )
                     
                     t1 = time.time()
                     st_script_status.success(f"✅ Guion OK ({format_seconds(t1-t0)})")
 
+                    # --- PASO 1.5: IMAGENES (SOLO MYSTERY AI) ---
+                    if current_app_mode == "MYSTERY_AI" and st_img_status:
+                        st_img_status.info("🎨 Generando Asset Pack...")
+                        
+                        if ai_gen and "scenes" in script_data:
+                            try:
+                                t_img_0 = time.time()
+                                temp_dir = CFG["paths"]["temp_folder"]
+                                ai_assets_folder = os.path.join(temp_dir, "ai_assets")
+                                
+                                # DETERMINAR CALIDAD (NANO BANANA vs BEST)
+                                # Override de la UI
+                                gen_quality = selected_img_quality_mode 
+                                
+                                # LIMPIEZA DE ASSETS ANTIGUOS (CRÍTICO PARA EVITAR REUSO DE FOTOS)
+                                if os.path.exists(ai_assets_folder):
+                                    import shutil
+                                    try: 
+                                        shutil.rmtree(ai_assets_folder)
+                                        time.sleep(0.5) # Breve pausa para liberar lock de archivos
+                                    except Exception as e:
+                                        st_img_status.warning(f"⚠️ No se pudo limpiar carpeta assets: {e}")
+                                os.makedirs(ai_assets_folder, exist_ok=True)
+                                
+                                generated_paths = ai_gen.generate_images_from_list(
+                                    script_data["scenes"], 
+                                    ai_assets_folder,
+                                    quality_mode=gen_quality
+                                )
+                                
+                                t_img_1 = time.time()
+                                st_img_status.success(f"✅ {len(generated_paths)} Imágenes ({gen_quality.upper()}) ({format_seconds(t_img_1-t_img_0)})")
+                                
+                            except Exception as e:
+                                st_img_status.error(f"❌ Error Imagenes: {e}")
+                                # CRITICAL ABORT: Si fallan las imágenes en Modo Misterio, NO SEGUIMOS.
+                                raise RuntimeError(f"ABORTANDO: Fallo crítico en generación de imágenes: {e}")
+                                
+                            if not generated_paths:
+                                st_img_status.error("❌ 0 imágenes generadas.")
+                                raise RuntimeError("ABORTANDO: La API no devolvió ninguna imagen. No se puede crear video.")
+                        else:
+                            st_img_status.warning("⚠️ Módulo AI no cargado o JSON sin escenas.")
+                            if current_app_mode == "MYSTERY_AI":
+                                raise RuntimeError("ABORTANDO: Falta módulo AI o datos de escenas.")
+                    
                     # --- PASO 2: LOCUTOR ---
                     st_audio_status.info("🔄 Clonando Voz...")
                     t2 = time.time()
                     
                     resources_base = CFG["paths"]["resources_library"]
+                    # Nota: generate_audios_from_text_folder es agnóstico, lee lo que haya en la carpeta txt
                     audio_output_folder = locutor.generate_audios_from_text_folder(txt_output, resources_base)
                     
                     if not audio_output_folder:
@@ -490,9 +625,12 @@ elif mode == "Automático (IA)":
                         audio_output_folder,
                         CFG["paths"]["output_folder"],
                         CFG,
-                        status,  # Status container global para logs de ffmpeg si fuera necesario
+                        status, 
                         log_cb,
                         engine_version
+                        # Nota: logic.py leerá CFG['app_mode'] globalmente o deberíamos pasarlo?
+                        # generate_video_pipeline usa CFG, y CFG ya fue actualizado en el sidebar.
+                        # Así que logic.py leerá el modo correcto.
                     )
                     
                     t5 = time.time()
@@ -512,6 +650,11 @@ elif mode == "Automático (IA)":
                     with col_details:
                         st.subheader("📊 Detalles")
                         st.success(f"🎉 ¡VIDEO COMPLETADO!")
+                        
+                        # Mostrar Título Sugerido (Si existe)
+                        if "video_title" in script_data:
+                            st.markdown(f"### 📢 {script_data['video_title']}")
+
                         st.text_input("Archivo:", value=video_name, disabled=True, key=f"v_name_{idx}")
                         st.write(f"⏱️ Tiempo Total: {format_seconds(t5-t0)}")
                         st.write(f"📂 Ruta Local: `{final_video_path}`")
