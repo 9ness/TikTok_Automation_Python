@@ -1,6 +1,7 @@
 import json
 import os
 import glob
+import string
 from dotenv import load_dotenv, find_dotenv
 
 import re
@@ -9,6 +10,47 @@ import difflib
 
 # Cargar el archivo .env al inicio, buscando explícitamente
 load_dotenv(find_dotenv())
+
+# Cola de rutas relativas (dentro del Google Drive) donde buscar TIKTOK_ASSETS
+# si TIKTOK_ROOT_PATH no está definido o no existe. La primera coincidencia gana.
+_TIKTOK_ASSETS_RELATIVE_CANDIDATES = (
+    os.path.join("Mi unidad", "NEBULABS_AUTOMATED_TIKTOK", "TIKTOK_CR", "TIKTOK_ASSETS"),
+    os.path.join("Mi unidad", "COUSAS NESTOR", "TIKTOK10K", "TIKTOK_ASSETS"),
+)
+
+
+def _autodetect_tiktok_root():
+    """Escanea las unidades del sistema en busca de la carpeta TIKTOK_ASSETS
+    dentro de Google Drive ("Mi unidad"). Devuelve la primera ruta encontrada
+    o None si no se encuentra ninguna."""
+    if os.name == "nt":
+        roots = [f"{letter}:\\" for letter in string.ascii_uppercase]
+    else:
+        roots = ["/", os.path.expanduser("~")]
+    for root in roots:
+        if not os.path.exists(root):
+            continue
+        for relative in _TIKTOK_ASSETS_RELATIVE_CANDIDATES:
+            candidate = os.path.join(root, relative)
+            if os.path.isdir(candidate):
+                return candidate
+    return None
+
+
+def resolve_tiktok_root():
+    """Devuelve la ruta raíz de TIKTOK_ASSETS resolviendo en este orden:
+    1) TIKTOK_ROOT_PATH del entorno si existe en disco.
+    2) Auto-detección escaneando unidades por la ruta relativa conocida.
+    Si encuentra una ruta por auto-detección, exporta TIKTOK_ROOT_PATH al
+    entorno para que el resto de módulos (que leen os.getenv) la vean."""
+    env_path = os.getenv("TIKTOK_ROOT_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+    detected = _autodetect_tiktok_root()
+    if detected:
+        os.environ["TIKTOK_ROOT_PATH"] = detected
+        return detected
+    return env_path  # puede ser None o ruta inexistente; el llamador decide
 
 def normalize_name(name):
     """Elimina caracteres no alfanuméricos y pasa a minúsculas."""
@@ -24,15 +66,20 @@ def load_config(config_path="config/config.json"):
     except json.JSONDecodeError:
         raise ValueError(f"❌ ERROR: El archivo {config_path} no es un JSON válido")
     
-    # 2. Obtener la ruta base del sistema (.env)
-    # Si no existe, usa una por defecto o lanza error
-    root_path = os.getenv("TIKTOK_ROOT_PATH")
-    
+    # 2. Obtener la ruta base del sistema (auto-detecta unidad si hace falta)
+    root_path = resolve_tiktok_root()
+
     if not root_path:
-        raise EnvironmentError("❌ ERROR: No se encontró la variable TIKTOK_ROOT_PATH en el archivo .env. Asegúrate de tener un archivo .env correctamente configurado.")
-        
+        raise EnvironmentError(
+            "❌ ERROR: No se encontró TIKTOK_ASSETS. Define TIKTOK_ROOT_PATH en .env "
+            "o asegúrate de que la carpeta exista en alguna unidad bajo "
+            "'Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS'."
+        )
+
     if not os.path.exists(root_path):
-        raise FileNotFoundError(f"❌ ERROR: La ruta definida en TIKTOK_ROOT_PATH no existe: {root_path}")
+        print(f"⚠️ ADVERTENCIA: La ruta TIKTOK_ROOT_PATH no existe ({root_path}). Usando fallback temporal.")
+        root_path = os.path.abspath("./TIKTOK_ASSETS_FALLBACK")
+        os.makedirs(root_path, exist_ok=True)
 
     # 3. Construir las rutas completas dinámicamente
     # Creamos una nueva sección 'paths' en memoria para que el resto del código siga funcionando igual
@@ -43,7 +90,8 @@ def load_config(config_path="config/config.json"):
         "intro_library": os.path.join(root_path, folders["intro_folder"]),
         "output_folder": os.path.join(root_path, folders["output_folder"]),
         "resources_library": os.path.join(root_path, folders.get("resources_folder", "BIBLIOTECA_RECURSOS")),
-        "temp_folder": folders["temp_folder"]
+        "pronosticos_clips": os.path.join(root_path, folders.get("pronosticos_clips_folder", "BIBLIOTECA_PRONOSTICOS_CLIPS")),
+        "temp_folder": folders["temp_folder"],
     }
     
     return config

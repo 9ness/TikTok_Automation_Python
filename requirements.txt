@@ -3,3 +3,6 @@ streamlit
 moviepy<2.0
 python-dotenv
 Pillow
+numpy<2.0.0
+openai
+requests

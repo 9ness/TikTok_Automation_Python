@@ -4,16 +4,19 @@ import json
 import glob
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
+import time
 
 load_dotenv(find_dotenv())
 
-def generate_audios_from_text_folder(txt_folder_path, output_base_path):
+def generate_audios_from_text_folder(txt_folder_path, output_base_path, voice_id_override=None):
     print(f"🎙️ Iniciando locución PREMIUM (HD T2A V2) para: {os.path.abspath(txt_folder_path)}")
 
     # 1. Configuración
     API_KEY = os.getenv("MINIMAX_API_KEY")
-    VOICE_ID = os.getenv("MINIMAX_VOICE_ID")
+    VOICE_ID = voice_id_override or os.getenv("MINIMAX_VOICE_ID")
     GROUP_ID = os.getenv("MINIMAX_GROUP_ID")
+    if voice_id_override:
+        print(f"🗣️ Override de voz activado: {VOICE_ID}")
     # URL OBLIGATORIA PARA VOCES HD
     URL = "https://api.minimax.io/v1/t2a_v2"
     
@@ -70,29 +73,117 @@ def generate_audios_from_text_folder(txt_folder_path, output_base_path):
         if GROUP_ID:
             payload["group_id"] = GROUP_ID
             
-        try:
-            response = requests.post(URL, headers=headers, json=payload)
-            response_data = response.json()
-            
-            # MANEJO DE RESPUESTA V2 (Viene en HEX dentro del JSON, no binary stream directo)
-            if response_data.get("base_resp", {}).get("status_code") == 0:
-                if "data" in response_data and "audio" in response_data["data"]:
-                    hex_audio = response_data["data"]["audio"]
-                    audio_bytes = bytes.fromhex(hex_audio)
-                    
-                    mp3_path = os.path.join(full_output_path, f"{name_no_ext}.mp3")
-                    with open(mp3_path, "wb") as f_out:
-                        f_out.write(audio_bytes)
-                    print(f"   ✅ Generado: {filename}")
-                else:
-                    print(f"⚠️ JSON incompleto: {response_data}")
-            else:
-                print(f"❌ Error API: {response_data}")
-                raise Exception(f"Fallo MiniMax: {response_data.get('base_resp')}")
+        # RETRY LOGIC for Timeout Handling (Failed MiniMax: 1001)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(URL, headers=headers, json=payload, timeout=120) # Added timeout=120s
+                response_data = response.json()
                 
-        except Exception as e:
-            print(f"❌ Excepción: {e}")
-            raise e
+                # Check for explicit API error
+                base_resp = response_data.get("base_resp", {})
+                if base_resp.get("status_code") == 1001: # Timeout specifically
+                    print(f"⚠️ MiniMax Timeout (1001). Reintentando {attempt+1}/{max_retries} en {2**(attempt+1)}s...")
+                    time.sleep(2**(attempt+1))
+                    continue # Retry loop
+                
+                # MANEJO DE RESPUESTA V2 (Viene en HEX dentro del JSON, no binary stream directo)
+                if base_resp.get("status_code") == 0:
+                    if "data" in response_data and "audio" in response_data["data"]:
+                        hex_audio = response_data["data"]["audio"]
+                        audio_bytes = bytes.fromhex(hex_audio)
+                        
+                        mp3_path = os.path.join(full_output_path, f"{name_no_ext}.mp3")
+                        with open(mp3_path, "wb") as f_out:
+                            f_out.write(audio_bytes)
+                        print(f"   ✅ Generado: {filename}")
+                        break # Success, break retry loop!
+                    else:
+                        print(f"⚠️ JSON incompleto: {response_data}")
+                        raise Exception("JSON Incompleto")
+                else:
+                    print(f"❌ Error API: {response_data}")
+                    raise Exception(f"Fallo MiniMax: {response_data.get('base_resp')}")
+
+            except Exception as e:
+                print(f"❌ Excepción (Intento {attempt+1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2**(attempt+1))
+                else:
+                    raise e # Fail finally if retries exhausted
             
     print(f"✅ Locución finalizada en: {full_output_path}")
     return full_output_path
+
+
+def generate_single_audio(text, output_mp3_path, voice_id_override=None):
+    """Sintetiza un texto largo a un único MP3 (sin trocear).
+
+    Útil cuando ya tienes el guion completo en una sola pieza (por ejemplo, el
+    guion de vídeo del nicho Pronósticos viene de Redis con todas las
+    transiciones y CTA insertados).
+    """
+    print(f"🎙️ TTS single (T2A V2) → {os.path.abspath(output_mp3_path)}")
+
+    API_KEY = os.getenv("MINIMAX_API_KEY")
+    VOICE_ID = voice_id_override or os.getenv("MINIMAX_VOICE_ID")
+    GROUP_ID = os.getenv("MINIMAX_GROUP_ID")
+    URL = "https://api.minimax.io/v1/t2a_v2"
+
+    if not API_KEY or not VOICE_ID:
+        raise ValueError("❌ Faltan claves en .env (MINIMAX_API_KEY / MINIMAX_VOICE_ID).")
+
+    if voice_id_override:
+        print(f"🗣️ Override de voz activado: {VOICE_ID}")
+
+    payload = {
+        "model": "speech-2.5-turbo-preview",
+        "text": text,
+        "stream": False,
+        "voice_setting": {
+            "voice_id": VOICE_ID,
+            "speed": 1.0,
+            "vol": 1.0,
+            "pitch": 0,
+        },
+        "audio_setting": {
+            "sample_rate": 32000,
+            "bitrate": 128000,
+            "format": "mp3",
+            "channel": 1,
+        },
+    }
+    if GROUP_ID:
+        payload["group_id"] = GROUP_ID
+
+    headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_mp3_path)) or ".", exist_ok=True)
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(URL, headers=headers, json=payload, timeout=180)
+            response_data = response.json()
+            base_resp = response_data.get("base_resp", {})
+            if base_resp.get("status_code") == 1001:
+                print(f"⚠️ MiniMax Timeout (1001). Reintentando {attempt+1}/{max_retries}...")
+                time.sleep(2 ** (attempt + 1))
+                continue
+            if base_resp.get("status_code") == 0:
+                if "data" in response_data and "audio" in response_data["data"]:
+                    audio_bytes = bytes.fromhex(response_data["data"]["audio"])
+                    with open(output_mp3_path, "wb") as f_out:
+                        f_out.write(audio_bytes)
+                    print(f"✅ TTS OK ({len(audio_bytes)} bytes)")
+                    return output_mp3_path
+                raise Exception(f"JSON incompleto: {response_data}")
+            raise Exception(f"Fallo MiniMax: {base_resp}")
+        except Exception as e:
+            print(f"❌ Excepción intento {attempt+1}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** (attempt + 1))
+            else:
+                raise
+
+    raise RuntimeError("MiniMax TTS agotó reintentos.")

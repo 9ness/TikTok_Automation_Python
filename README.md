@@ -42,3 +42,23 @@ Al arrastrar los audios a la interfaz web, el nombre le dice al script el puesto
 * **`4_biden.mp3`** → Puesto 4, busca los archivos en la carpeta "biden".
 * **`1_obama.mp3`** → Puesto 1, busca carpeta "obama" y usa la silueta.
 * **`intro.mp3`** → Genera la introducción usando la biblioteca de intros.
+
+---
+
+## Comandos comunes
+
+```bash
+# Lanzar la app
+streamlit run main.py
+
+# Validar sintaxis de los módulos
+python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('src').rglob('*.py')]"
+
+# Inspeccionar lo que hay en Redis para una fecha
+python -c "
+from src.pronosticos.data_loader import load_raw_payload, list_versions
+p = load_raw_payload('2026-04-30')
+for v in list_versions(p):
+    print(f'v{v[\"id\"]} ({v[\"trigger\"]}) — {v[\"word_count\"]} palabras')
+"
+```
