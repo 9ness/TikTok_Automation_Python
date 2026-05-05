@@ -13,9 +13,15 @@ load_dotenv(find_dotenv())
 
 # Cola de rutas relativas (dentro del Google Drive) donde buscar TIKTOK_ASSETS
 # si TIKTOK_ROOT_PATH no está definido o no existe. La primera coincidencia gana.
+#
+# - "Mi unidad/..." aplica a Drive Desktop en Windows (estructura local)
+# - Las rutas SIN "Mi unidad/" aplican a rclone mount en Linux (en el mount,
+#   el contenido de "Mi unidad" se ve directo desde la raíz)
 _TIKTOK_ASSETS_RELATIVE_CANDIDATES = (
     os.path.join("Mi unidad", "NEBULABS_AUTOMATED_TIKTOK", "TIKTOK_CR", "TIKTOK_ASSETS"),
     os.path.join("Mi unidad", "COUSAS NESTOR", "TIKTOK10K", "TIKTOK_ASSETS"),
+    os.path.join("NEBULABS_AUTOMATED_TIKTOK", "TIKTOK_CR", "TIKTOK_ASSETS"),
+    os.path.join("COUSAS NESTOR", "TIKTOK10K", "TIKTOK_ASSETS"),
 )
 
 

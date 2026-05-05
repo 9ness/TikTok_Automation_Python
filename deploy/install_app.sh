@@ -54,15 +54,16 @@ log "Instalando requirements.txt (puede tardar 5-10 min, faster-whisper compila 
 pip install --quiet -r requirements.txt
 
 # ============================================================
-# 2. Carpetas locales (output + temp)
+# 2. Carpetas locales (temp_work + logs)
 # ============================================================
 log "2/5 Creando carpetas locales de trabajo…"
-mkdir -p "$APP_DIR/output_local"      # Donde MoviePy escribe inicialmente
-mkdir -p "$APP_DIR/temp_work"          # Caché temporal de la app
-mkdir -p "$APP_DIR/logs"               # Logs de servicios
-log "  · output_local/  (vídeos finales antes de subir a Drive)"
-log "  · temp_work/     (estado de la cola, audios temporales)"
-log "  · logs/          (stdout/stderr de los servicios systemd)"
+mkdir -p "$APP_DIR/temp_work"          # Caché temporal + persistencia de la cola
+mkdir -p "$APP_DIR/logs"               # Logs de la app (no rclone, ese va a /var/log)
+log "  · temp_work/   (estado de la cola, audios temporales)"
+log "  · logs/        (stdout de la app)"
+# NOTA: los outputs finales van directos al mount de Drive
+# (/home/nebulabsai/gdrive/...) — rclone se encarga de subirlos a Drive
+# en background gracias a vfs-cache-mode=full. No necesitamos output_local.
 
 # ============================================================
 # 3. Pre-descarga del modelo Whisper 'base' (evita esperar al primer render)

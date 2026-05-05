@@ -219,12 +219,17 @@ nano ~/TikTok_Automation_Python/.env
 Añade al final (o ajusta si ya existen):
 
 ```env
-# Path del mount rclone (ojo a "Mi unidad" — con espacio, igual que Drive Desktop)
-TIKTOK_ROOT_PATH=/home/nebulabsai/gdrive/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS
-
-# Outputs locales en SSD del VPS — el timer drive-sync los sube a Drive cada 60s
-TIKTOK_OUTPUT_LOCAL=/home/nebulabsai/TikTok_Automation_Python/output_local
+# Path del mount rclone — apunta directo al subdirectorio TIKTOK_ASSETS
+# dentro de NEBULABS_AUTOMATED_TIKTOK. En el mount Linux NO aparece "Mi unidad"
+# como subcarpeta (eso es solo cosa de Drive Desktop en Windows); el contenido
+# de "Mi unidad" se ve directamente desde la raíz del mount.
+TIKTOK_ROOT_PATH=/home/nebulabsai/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS
 ```
+
+Los outputs (vídeos finales) se escriben directos al mount (subcarpeta
+`BIBLIOTECA_VIDEOS_TERMINADOS/`) y rclone los sube a Drive en background
+gracias a `--vfs-cache-mode full`. **No definas `TIKTOK_OUTPUT_LOCAL` en el VPS**
+(esa variable solo se usa en Windows local cuando se quiere separar SSD/Drive).
 
 Guarda (Ctrl+O, Enter, Ctrl+X). Asegura permisos:
 
@@ -241,9 +246,9 @@ sudo bash ~/TikTok_Automation_Python/deploy/register_services.sh
 ```
 
 Esto:
-1. Copia los `.service` y `.timer` a `/etc/systemd/system/`
-2. Monta el Drive en `~/gdrive` (servicio `gdrive-mount`)
-3. Activa el sync timer (cada 60s sube outputs a Drive)
+1. Pre-crea `/var/log/rclone.log` con permisos correctos
+2. Copia los `.service` a `/etc/systemd/system/`
+3. Monta el Drive en `~/gdrive` (servicio `gdrive-mount`)
 4. Arranca Streamlit en `localhost:8501` (servicio `tiktok-factory`)
 
 Verifica:
@@ -342,16 +347,14 @@ Presidentes / Subs / Quitar Copy) y el widget de cola arriba.
 
 ### Estado de servicios
 ```bash
-systemctl status tiktok-factory gdrive-mount drive-sync.timer
-systemctl list-timers drive-sync.timer
+systemctl status tiktok-factory gdrive-mount
 ```
 
 ### Logs
 ```bash
 journalctl -u tiktok-factory -f                    # streamlit
 journalctl -u gdrive-mount -n 100                  # mount
-journalctl -u drive-sync -n 50                     # último sync
-tail -f ~/TikTok_Automation_Python/logs/rclone-mount.log
+tail -f /var/log/rclone.log                        # actividad rclone (subidas, fetches)
 ```
 
 ### Reiniciar la app
@@ -368,7 +371,7 @@ sudo systemctl restart tiktok-factory
 
 ### Pausar todo (vacaciones)
 ```bash
-sudo systemctl stop tiktok-factory drive-sync.timer gdrive-mount
+sudo systemctl stop tiktok-factory gdrive-mount
 ```
 
 ### Apagar el VPS (en panel Hetzner)
@@ -396,11 +399,14 @@ journalctl -u tiktok-factory -n 100
 
 ### "Los vídeos no aparecen en Drive"
 ```bash
-# Forzar sync ahora mismo
-sudo systemctl start drive-sync.service
-journalctl -u drive-sync -n 30
-# Verificar que hay archivos en local:
-ls -la ~/TikTok_Automation_Python/output_local/
+# Verifica que el archivo existe en el mount (caché local rclone):
+ls -la ~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS/BIBLIOTECA_VIDEOS_TERMINADOS/
+# Mira logs de subida de rclone (cualquier upload pendiente o error):
+tail -100 /var/log/rclone.log | grep -iE "upload|error"
+# Forzar flush de caché a Drive ahora mismo:
+rclone rc vfs/refresh recursive=true
+# Si rclone está colgado, reiniciar el mount:
+sudo systemctl restart gdrive-mount
 ```
 
 ### "La cola se quedó en RUNNING tras un crash"

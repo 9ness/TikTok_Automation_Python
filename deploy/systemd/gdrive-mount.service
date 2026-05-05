@@ -1,5 +1,5 @@
 [Unit]
-Description=rclone mount — Google Drive (assets de TikTok Automation)
+Description=rclone mount — Google Drive (assets + outputs de TikTok Automation)
 AssertPathIsDirectory=/home/nebulabsai/gdrive
 After=network-online.target
 Wants=network-online.target
@@ -9,26 +9,31 @@ Type=notify
 User=nebulabsai
 Group=nebulabsai
 
-# Mount RW para que la app pueda leer assets Y escribir outputs si quisiera
-# (en nuestra arquitectura los outputs van a output_local/ y se sincronizan
-# luego con drive-sync.timer; pero dejamos RW por flexibilidad).
+# Mount RW. Estrategia:
+# - Lectura de assets: caché VFS full (30GB) acelera reusos
+# - Escritura de outputs: rclone escribe a caché local primero y sube async
+#   a Drive en background, MoviePy no se bloquea esperando la subida
+# - Polling rápido (15s): cualquier asset nuevo subido desde el móvil/PC
+#   aparece en <30s en el VPS sin reiniciar nada
 ExecStart=/usr/bin/rclone mount gdrive: /home/nebulabsai/gdrive \
     --allow-other \
     --vfs-cache-mode full \
     --vfs-cache-max-size 30G \
     --vfs-cache-max-age 168h \
+    --vfs-cache-poll-interval 15s \
     --vfs-read-chunk-size 64M \
     --vfs-read-chunk-size-limit 512M \
     --buffer-size 256M \
-    --dir-cache-time 12h \
-    --poll-interval 1m \
+    --dir-cache-time 30s \
+    --poll-interval 15s \
     --umask 022 \
     --log-level INFO \
-    --log-file /home/nebulabsai/TikTok_Automation_Python/logs/rclone-mount.log
+    --log-file /var/log/rclone.log
 
 ExecStop=/bin/fusermount3 -u /home/nebulabsai/gdrive
 Restart=on-failure
 RestartSec=10
+TimeoutStartSec=120
 
 # El mount necesita acceso a /dev/fuse y /etc/fuse.conf
 PrivateTmp=false
