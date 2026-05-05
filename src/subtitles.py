@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 
 
@@ -134,7 +134,19 @@ DEFAULT_STYLE = {
     "stroke_color": "#000000",
     "stroke_width": 1,
     "highlight_color": "#1E01C4",  # azul preset del usuario; rojo preset alternativo: #BB0808
-    "pill_enabled": True,           # False = sin píldora de fondo, solo texto + borde
+    "pill_enabled": True,           # legacy: False fuerza highlight_mode="none"
+    # Cómo se marca la palabra activa. Modos:
+    #   "pill"        — píldora rellena detrás (default — TikTok style)
+    #   "color_swap"  — la palabra activa cambia a highlight_color, sin fondo
+    #   "underline"   — barra horizontal de highlight_color debajo de la palabra
+    #   "box_outline" — recuadro hueco redondeado alrededor (sin relleno)
+    #   "glow"        — halo difuminado de highlight_color alrededor del texto
+    #   "none"        — sin marcado (texto estático, la sincronización viene del cambio de chunk)
+    # IMPORTANTE: dejar None aquí para que `_resolve_highlight_mode` aplique el
+    # fallback legacy basado en `pill_enabled` cuando un caller no fija highlight_mode
+    # explícitamente (p.ej. PRONOSTICOS_SUB_STYLE define pill_enabled=False y espera
+    # comportamiento "none" sin tener que conocer la nueva API).
+    "highlight_mode": None,
     "case_mode": "UPPERCASE",  # UPPERCASE | lowercase | Title Case | original
     "max_words_per_chunk": 4,
     "y_position_pct": 0.62,  # margen amplio bajo el hook, lejos de la UI TikTok
@@ -143,7 +155,21 @@ DEFAULT_STYLE = {
     "pill_pad_y_pct": 0.005,  # padding vertical relativo al alto del vídeo
     "line_spacing_pct": 0.015,  # gap visible entre líneas (además del padding de la píldora)
     "word_spacing_multiplier": 0.65,  # <1.0 = palabras más juntas; >1.0 = más separadas
+    # Ancho máximo del bloque de texto como fracción del ancho del vídeo.
+    # None = comportamiento legacy (zona segura TikTok = 0.73). Útil para nicho
+    # SUBS_AUTO (vídeos no 9:16) donde quieres controlar márgenes laterales.
+    "max_width_pct": None,
 }
+
+
+def _resolve_highlight_mode(s: dict) -> str:
+    """Resuelve el modo de highlight respetando legacy `pill_enabled`.
+    Si highlight_mode está fijado explícitamente, gana. Si no, deriva del legacy.
+    """
+    mode = s.get("highlight_mode")
+    if mode:
+        return mode
+    return "pill" if s.get("pill_enabled", True) else "none"
 
 
 def _apply_case(text: str, case_mode: str) -> str:
@@ -220,8 +246,12 @@ def render_chunk_image(
     pad_x = int(W * s["pill_pad_x_pct"])
     pad_y = int(H * s["pill_pad_y_pct"])
 
-    # Wrap a líneas
-    max_line_w = int(W * (TIKTOK_SAFE_X[1] - TIKTOK_SAFE_X[0]) - pad_x * 4)
+    # Wrap a líneas. max_width_pct prevalece si está; si no, zona segura TikTok.
+    _mw_pct = s.get("max_width_pct")
+    if _mw_pct is None:
+        _mw_pct = TIKTOK_SAFE_X[1] - TIKTOK_SAFE_X[0]
+    _mw_pct = max(0.20, min(1.0, float(_mw_pct)))
+    max_line_w = int(W * _mw_pct - pad_x * 4)
     lines: list[list[tuple[int, str, int]]] = []
     current: list[tuple[int, str, int]] = []
     current_w = 0
@@ -248,30 +278,79 @@ def render_chunk_image(
     canvas = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
     cdraw = ImageDraw.Draw(canvas)
 
+    mode = _resolve_highlight_mode(s)
+
     y = pad_y * 2
     for line in lines:
         line_text_w = sum(w[2] for w in line) + space_w * (len(line) - 1)
         x = (W - line_text_w) // 2
 
         for idx, word_text, ww in line:
-            if idx == highlight_idx and s.get("pill_enabled", True):
-                # Usar el bbox REAL de la palabra a dibujar en esta posición (incluye stroke)
-                actual = cdraw.textbbox((x, y), word_text, font=font, anchor="lt", stroke_width=stroke_w)
+            is_active = (idx == highlight_idx)
+            actual = cdraw.textbbox((x, y), word_text, font=font, anchor="lt", stroke_width=stroke_w)
+
+            # ─── Capa BAJO el texto: pill / box_outline / glow ───
+            if is_active and mode == "pill":
                 cdraw.rounded_rectangle(
                     [actual[0] - pad_x, actual[1] - pad_y,
                      actual[2] + pad_x, actual[3] + pad_y],
                     radius=s["pill_radius"],
                     fill=s["highlight_color"],
                 )
+            elif is_active and mode == "box_outline":
+                cdraw.rounded_rectangle(
+                    [actual[0] - pad_x, actual[1] - pad_y,
+                     actual[2] + pad_x, actual[3] + pad_y],
+                    radius=s["pill_radius"],
+                    outline=s["highlight_color"],
+                    width=max(2, stroke_w + 2),
+                )
+            elif is_active and mode == "glow":
+                # Capa aparte con stroke MUY grueso del highlight_color → blur Gaussiano
+                glow_layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+                gdraw = ImageDraw.Draw(glow_layer)
+                glow_stroke = max(stroke_w + 8, int(font_size * 0.18))
+                gdraw.text(
+                    (x, y), word_text, font=font,
+                    fill=s["highlight_color"],
+                    stroke_width=glow_stroke,
+                    stroke_fill=s["highlight_color"],
+                    anchor="lt",
+                )
+                glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=max(4, font_size // 12)))
+                canvas.alpha_composite(glow_layer)
+
+            # ─── Texto principal (color depende del modo) ───
+            # Override por palabra: si chunk_words[idx] trae 'color', se respeta
+            # (lo usa el nicho Pronósticos para pintar de verde el texto del pick
+            # y la cifra del bote — ver src/pronosticos/pick_locator.py).
+            per_word_color = chunk_words[idx].get("color") if idx < len(chunk_words) else None
+            if is_active and mode == "color_swap":
+                text_fill = s["highlight_color"]
+            elif per_word_color:
+                text_fill = per_word_color
+            else:
+                text_fill = s["text_color"]
             cdraw.text(
                 (x, y),
                 word_text,
                 font=font,
-                fill=s["text_color"],
+                fill=text_fill,
                 stroke_width=stroke_w,
                 stroke_fill=s["stroke_color"],
                 anchor="lt",
             )
+
+            # ─── Capa SOBRE el texto: underline ───
+            if is_active and mode == "underline":
+                ul_thick = max(3, int(font_size * 0.10))
+                ul_y = actual[3] + max(2, pad_y // 2)
+                cdraw.rounded_rectangle(
+                    [actual[0] - 2, ul_y, actual[2] + 2, ul_y + ul_thick],
+                    radius=ul_thick // 2,
+                    fill=s["highlight_color"],
+                )
+
             x += ww + space_w
 
         y += row_h + line_spacing
@@ -300,17 +379,32 @@ def render_preview_image(
 # Chunking y overlay en vídeo
 # ---------------------------------------------------------------------
 
-def _chunk_words(words: list[dict], max_words_per_chunk: int = 3, max_duration: float = 2.5) -> list[list[dict]]:
-    """Agrupa palabras en chunks de max N palabras o máx N segundos."""
+def _chunk_words(
+    words: list[dict],
+    max_words_per_chunk: int = 3,
+    max_duration: float = 2.5,
+    pause_threshold: float = 0.6,
+) -> list[list[dict]]:
+    """Agrupa palabras en chunks. Corta cuando se da CUALQUIERA de:
+       - Se alcanza `max_words_per_chunk` palabras.
+       - El chunk excede `max_duration` segundos desde su primera palabra.
+       - Hay una pausa ≥ `pause_threshold` segundos entre palabras consecutivas
+         (límite natural de frase: respeta el fraseo real del audio y evita
+         que un chunk arrastre tras un silencio largo).
+    """
     chunks: list[list[dict]] = []
     current: list[dict] = []
     for w in words:
-        if current and (
-            len(current) >= max_words_per_chunk
-            or (w["end"] - current[0]["start"]) > max_duration
-        ):
-            chunks.append(current)
-            current = []
+        if current:
+            time_since_start = w["end"] - current[0]["start"]
+            pause_before = w["start"] - current[-1]["end"]
+            if (
+                len(current) >= max_words_per_chunk
+                or time_since_start > max_duration
+                or pause_before > pause_threshold
+            ):
+                chunks.append(current)
+                current = []
         current.append(w)
     if current:
         chunks.append(current)

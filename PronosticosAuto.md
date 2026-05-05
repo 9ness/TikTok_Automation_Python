@@ -196,8 +196,62 @@ Cada entry en `versions[]` con `mode: "single_match"` tiene esta forma:
 }
 ```
 
+### 🎯 Picks entre paréntesis — extracción del texto exacto
+
+**Garantizado por el sistema (no por el modelo):** el `script` lleva cada pick envuelto en `(...)` mediante post-proceso DETERMINISTA en el backend de bet-ai-master. Cada paréntesis cubre el texto LITERAL del pick, mismo case y misma puntuación que aparece narrado. Esto te permite:
+
+1. Extraer el texto exacto de cada pick para resaltarlo en pantalla
+2. Sincronizarlo con `word_timings` del TTS para saber CUÁNDO se narra
+3. Renderizar overlay con color/efecto distinto durante esa ventana temporal
+
+**Receta completa:**
+
+```python
+import re
+PICK_RE = re.compile(r"\(([^()]+)\)")
+
+# 1. Extrae picks (texto literal tal cual aparece en el script)
+picks = PICK_RE.findall(script)
+# Ejemplo: ["más de seis disparos a puerta", "ambos anotan", "Atlético no pierde", ...]
+
+# 2. Limpia paréntesis del script para pasarlo al TTS
+clean_script = PICK_RE.sub(lambda m: m.group(1), script)
+
+# 3. TTS → audio + word_timings sobre clean_script
+audio, word_timings = tts.synthesize(clean_script, return_timings=True)
+# word_timings = [{word: "Empezamos", start: 0.1, end: 0.5}, ...]
+
+# 4. Para cada pick, busca su ventana temporal exacta
+def find_pick_window(pick_text, words, start_from=0):
+    """Devuelve (start_s, end_s, next_cursor) del pick en el array de words."""
+    pt = [w.lower().strip(".,;:") for w in pick_text.split()]
+    for i in range(start_from, len(words) - len(pt) + 1):
+        seq = [words[i+j]["word"].lower().strip(".,;:") for j in range(len(pt))]
+        if seq == pt:
+            return words[i]["start"], words[i+len(pt)-1]["end"], i + len(pt)
+    return None, None, start_from
+
+# 5. Calcula ventanas para todos los picks (cursor avanza para no matchear repes)
+cursor = 0
+pick_windows = []  # [(pick_text, start_s, end_s)]
+for pick in picks:
+    start, end, cursor = find_pick_window(pick, word_timings, cursor)
+    if start is not None:
+        pick_windows.append((pick, start, end))
+
+# 6. Renderiza overlay/subtítulo con color destacado durante cada ventana
+for pick_text, start_s, end_s in pick_windows:
+    add_overlay_to_video(text=pick_text, start=start_s, end=end_s,
+                         style={"color": "#FFD700", "bold": True, "font_size": 80})
+```
+
+**Garantías del sistema:**
+- El texto dentro de `()` es **substring literal** del script (mismo case, misma puntuación, sin transformaciones).
+- El número de paréntesis `==` número de picks en `selected_picks` (multi) o `focus_selections` (single). Si hay menos, el log del backend ya lo marcó como warning.
+- El `i`-ésimo pick en `PICK_RE.findall(script)` corresponde 1-a-1 con `selected_picks[i]` (multi) o `focus_selections[i]` (single). Útil para asociar la cuota individual o el icono al overlay.
+
 **Cómo usar este modo:**
-1. **Audio**: pasa `script` directo al TTS. Cifras en letras (`"doce goles"`, `"dos a uno"`) para pronunciación correcta.
+1. **Audio**: pasa `clean_script` al TTS. Cifras en letras (`"doce goles"`, `"dos a uno"`) para pronunciación correcta.
 2. **Subtítulos**: si usas Whisper sobre el audio del TTS, ya te da word-level timing. El guion al ser una sola línea no rompe nada.
 3. **CTA midroll**: el guion incluye textualmente la frase `"el linkcito de mi perfil"`. Si quieres mantenerlo o sustituirlo, busca esa frase y reemplaza con tu CTA real.
 4. **Visual frames**: usa `focus_selections` para construir la imagen del carrusel del partido (logos en `home_logo`/`away_logo`). Mantén la imagen a 1080×1920 con los 3 picks como ya hace el bet-ai-master.

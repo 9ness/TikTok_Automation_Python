@@ -1,0 +1,37 @@
+[Unit]
+Description=rclone mount — Google Drive (assets de TikTok Automation)
+AssertPathIsDirectory=/home/NeBulabsAI/gdrive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=NeBulabsAI
+Group=NeBulabsAI
+
+# Mount RW para que la app pueda leer assets Y escribir outputs si quisiera
+# (en nuestra arquitectura los outputs van a output_local/ y se sincronizan
+# luego con drive-sync.timer; pero dejamos RW por flexibilidad).
+ExecStart=/usr/bin/rclone mount gdrive: /home/NeBulabsAI/gdrive \
+    --allow-other \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 30G \
+    --vfs-cache-max-age 168h \
+    --vfs-read-chunk-size 64M \
+    --vfs-read-chunk-size-limit 512M \
+    --buffer-size 256M \
+    --dir-cache-time 12h \
+    --poll-interval 1m \
+    --umask 022 \
+    --log-level INFO \
+    --log-file /home/NeBulabsAI/TikTok_Automation_Python/logs/rclone-mount.log
+
+ExecStop=/bin/fusermount3 -u /home/NeBulabsAI/gdrive
+Restart=on-failure
+RestartSec=10
+
+# El mount necesita acceso a /dev/fuse y /etc/fuse.conf
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

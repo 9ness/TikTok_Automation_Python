@@ -1,0 +1,38 @@
+[Unit]
+Description=TikTok Automation Python — Streamlit app
+After=network-online.target gdrive-mount.service redis-server.service
+Wants=network-online.target gdrive-mount.service redis-server.service
+# Si falla el mount de Drive, no arrancar (evita rendrs sin assets)
+Requires=gdrive-mount.service
+
+[Service]
+Type=simple
+User=NeBulabsAI
+Group=NeBulabsAI
+WorkingDirectory=/home/NeBulabsAI/TikTok_Automation_Python
+Environment="PATH=/home/NeBulabsAI/TikTok_Automation_Python/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+EnvironmentFile=-/home/NeBulabsAI/TikTok_Automation_Python/.env
+
+# Streamlit escucha solo en localhost (Tailscale Funnel hará de proxy)
+ExecStart=/home/NeBulabsAI/TikTok_Automation_Python/venv/bin/streamlit run main.py \
+    --server.address 127.0.0.1 \
+    --server.port 8501 \
+    --server.headless true \
+    --server.fileWatcherType none \
+    --browser.gatherUsageStats false \
+    --server.maxUploadSize 500
+
+Restart=always
+RestartSec=5
+
+# Logs a journald (consultable con: journalctl -u tiktok-factory -f)
+StandardOutput=journal
+StandardError=journal
+
+# Hardening: la app no necesita escribir fuera de su carpeta
+ProtectSystem=full
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

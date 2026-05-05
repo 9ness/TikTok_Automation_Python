@@ -187,3 +187,55 @@ def generate_single_audio(text, output_mp3_path, voice_id_override=None):
                 raise
 
     raise RuntimeError("MiniMax TTS agotó reintentos.")
+
+
+def generate_voice_sample(
+    voice_id: str,
+    output_path: str,
+    sample_text: str | None = None,
+) -> str:
+    """Genera (o devuelve cacheada) una muestra ~3-5s de la voz indicada.
+
+    Si `output_path` ya existe, NO llama a la API y devuelve la ruta directamente
+    (cache hit). Si no, llama a MiniMax con un texto corto fijo y la guarda.
+
+    Útil para audicionar voces en la UI sin consumir créditos en cada click.
+    """
+    if os.path.exists(output_path):
+        return output_path
+
+    text = sample_text or "4500 es lo que nos vamos a llevar con las ligas europeas."
+
+    API_KEY = os.getenv("MINIMAX_API_KEY")
+    GROUP_ID = os.getenv("MINIMAX_GROUP_ID")
+    if not API_KEY:
+        raise ValueError("❌ Falta MINIMAX_API_KEY en .env")
+    if not voice_id:
+        raise ValueError("❌ voice_id vacío")
+
+    URL = "https://api.minimax.io/v1/t2a_v2"
+    headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": "speech-2.5-turbo-preview",
+        "text": text,
+        "stream": False,
+        "voice_setting": {"voice_id": voice_id, "speed": 1.0, "vol": 1.0, "pitch": 0},
+        "audio_setting": {"sample_rate": 32000, "bitrate": 128000, "format": "mp3", "channel": 1},
+    }
+    if GROUP_ID:
+        payload["group_id"] = GROUP_ID
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+
+    response = requests.post(URL, headers=headers, json=payload, timeout=60)
+    data = response.json()
+    base = data.get("base_resp", {})
+    if base.get("status_code") != 0:
+        raise RuntimeError(f"MiniMax sample error: {base.get('status_msg', 'unknown')} ({base})")
+    if "data" not in data or "audio" not in data["data"]:
+        raise RuntimeError(f"MiniMax respuesta sin audio: {data}")
+
+    audio_bytes = bytes.fromhex(data["data"]["audio"])
+    with open(output_path, "wb") as f:
+        f.write(audio_bytes)
+    return output_path

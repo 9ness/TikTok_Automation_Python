@@ -66,6 +66,10 @@ PRONOSTICOS_SUB_STYLE = {
     "highlight_color": "#000000",   # ignorado al estar pill_enabled=False
 }
 
+# Verde "victoria" para resaltar texto de pick + cifra del bote en subtítulos.
+# Tono brillante con buen contraste sobre el stroke negro grueso (stroke_width=8).
+PRONOSTICOS_PICK_COLOR = "#3CD05E"
+
 
 def _tomorrow() -> str:
     return (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -231,24 +235,52 @@ def _apply_saturation(input_path: str, output_path: str, saturation: float,
 
 
 def _resize_cover(clip, W: int, H: int):
-    if clip.h != H:
+    """Encuadra `clip` para llenar W×H preservando aspect ratio (cover-fit).
+
+    Estrategia robusta: comparar aspect ratios.
+      - Si el clip es MÁS ANCHO que el target (ratio>target_ratio) → escala por
+        altura y crop horizontal.
+      - Si el clip es MÁS ALTO que el target (ratio<target_ratio) → escala por
+        ancho y crop vertical.
+      - Si ya cuadra → resize directo a (W, H).
+    Esto evita el bug de la lógica anterior cuando un clip tenía dimensiones
+    intermedias (la rama `clip.w<W` reescalaba en ancho descuidando el aspect
+    final, llevando a frames "estirados").
+    """
+    if clip.w <= 0 or clip.h <= 0:
+        return clip
+    target_ratio = W / H
+    src_ratio = clip.w / clip.h
+    if abs(src_ratio - target_ratio) < 1e-3:
+        # Mismo aspect → resize directo (sin distorsión, ratio idéntico)
+        return clip.resize((W, H))
+    if src_ratio > target_ratio:
+        # Más ancho que el target: ajusta a altura H y crop horizontal
         clip = clip.resize(height=H)
-    if clip.w > W:
-        clip = clip.crop(x1=(clip.w - W) / 2, width=W, height=H)
-    elif clip.w < W:
+        if clip.w > W:
+            clip = clip.crop(x_center=clip.w / 2, width=W, height=H)
+        return clip
+    else:
+        # Más alto que el target: ajusta a ancho W y crop vertical
         clip = clip.resize(width=W)
         if clip.h > H:
-            clip = clip.crop(y1=(clip.h - H) / 2, width=W, height=H)
-    return clip
+            clip = clip.crop(y_center=clip.h / 2, width=W, height=H)
+        return clip
 
 
-def _stock_visual(stock_path: str | None, duration: float, W: int, H: int):
+def _stock_visual(stock_path: str | None, duration: float, W: int, H: int,
+                   log: Callable[[str], None] | None = None):
     """Devuelve un VideoClip silente cubriendo `duration` (loop si hace falta)."""
     if not stock_path or not os.path.exists(stock_path):
         return ColorClip(size=(W, H), color=(8, 12, 28), duration=duration)
     try:
         v = VideoFileClip(stock_path).without_audio()
+        src_w, src_h = v.w, v.h
         v = _resize_cover(v, W, H)
+        if log and (src_w != W or src_h != H):
+            ratio = src_w / src_h if src_h else 0
+            log(f"  📐 stock '{os.path.basename(stock_path)}' "
+                f"src={src_w}×{src_h} (ar={ratio:.3f}) → {W}×{H}")
         if v.duration < duration:
             from moviepy.editor import vfx
             v = v.fx(vfx.loop, duration=duration)
@@ -286,6 +318,35 @@ def _league_overlay_clip(logo_paths: list[str], duration: float,
     y_top = int(H * y_position_pct) - clip_h // 2
     y_top = max(0, min(H - clip_h, y_top))
     return clip.set_position(("center", y_top))
+
+
+def _team_shield_clip(shield_path: str, duration: float,
+                       W: int, H: int, side: str,
+                       height_pct: float = 0.22,
+                       y_position_pct: float = 0.43,
+                       x_inset_pct: float = 0.06,
+                       fade_s: float = 0.15):
+    """Escudo del equipo posicionado a izquierda o derecha del frame.
+
+    `side` = "left" → escudo home;  "right" → escudo away.
+    Fade in/out suave para que la aparición/desaparición no sea brusca.
+    """
+    img = ImageClip(shield_path).resize(height=max(80, int(H * height_pct)))
+    # Cap horizontal por si el escudo es muy ancho (raro)
+    max_w = int(W * 0.30)
+    if img.w > max_w:
+        img = img.resize(width=max_w)
+    y_top = int(H * y_position_pct) - img.h // 2
+    y_top = max(0, min(H - img.h, y_top))
+    if side == "left":
+        x_left = int(W * x_inset_pct)
+    else:
+        x_left = W - img.w - int(W * x_inset_pct)
+    clip = img.set_position((x_left, y_top)).set_duration(duration)
+    fd = min(fade_s, max(0.0, duration / 3.0))
+    if fd > 0.01:
+        clip = clip.crossfadein(fd).crossfadeout(fd)
+    return clip
 
 
 def _perfil_visual_silent(perfil_path: str, duration: float, W: int, H: int,
@@ -358,6 +419,7 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
                            clip_pools: dict[str, list[str]],
                            perfil_path: str | None,
                            league_overlay: dict | None,
+                           team_shields: dict | None,
                            W: int, H: int,
                            show_pick_carousel: bool = False,
                            carousel_lead_s: float = 4.0) -> list:
@@ -476,6 +538,36 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
         # con un label para que el caller pueda loggearlo.
         pass
 
+    # ── Overlay escudos de equipo (single_match: home izquierda + away derecha) ──
+    # Cada escudo aparece en su propio anchor (home cuando se nombra al local,
+    # away cuando se nombra al visitante) pero AMBOS desaparecen a la vez,
+    # tomando el final más tardío como cierre común.
+    if team_shields:
+        shield_dur = float(team_shields.get("duration", 2.5))
+        sides_in: list[tuple[str, str, float]] = []  # (side, path, anchor_s)
+        for side, key_path, key_anchor in (
+            ("left", "home_path", "home_anchor"),
+            ("right", "away_path", "away_anchor"),
+        ):
+            sp = team_shields.get(key_path)
+            sa = team_shields.get(key_anchor)
+            if sp and sa is not None:
+                sides_in.append((side, sp, float(sa)))
+
+        if sides_in:
+            joint_end = min(audio_duration,
+                             max(a + shield_dur for _, _, a in sides_in))
+            for side, sp, sa_f in sides_in:
+                dur = max(0.5, joint_end - sa_f)
+                timeline.append({
+                    "start": sa_f, "duration": dur,
+                    "clip_factory": (
+                        lambda d=dur, p=sp, s=side: _team_shield_clip(p, d, W, H, s)
+                    ),
+                    "is_overlay": True,
+                    "label": f"shield_{side}",
+                })
+
     # ── Overlay logos de ligas (al detectar 'ligas'/'champions'/...) ──
     if league_overlay and league_overlay.get("logos") and league_overlay.get("anchor") is not None:
         anchor = float(league_overlay["anchor"])
@@ -586,13 +678,27 @@ def run_pronosticos_pipeline(
     if competition_focus:
         log(f"🏆 competition_focus: {competition_focus}")
 
+    # Extracción de picks entre paréntesis (PronosticosAuto.md §"Picks entre paréntesis").
+    # Garantía del backend bet-ai-master: cada pick va envuelto en `(...)` con el
+    # texto LITERAL narrado, y `len(parens) == len(picks)` 1-a-1.
+    from .pick_locator import extract_pick_texts, strip_pick_parens
+    pick_texts = extract_pick_texts(script)
+    tts_script = strip_pick_parens(script)
+    if pick_texts:
+        log(f"🟢 {len(pick_texts)} picks detectados entre paréntesis del guion")
+        if picks and len(pick_texts) != len(picks):
+            log(f"⚠️ Mismatch garantía: {len(pick_texts)} paréntesis vs "
+                f"{len(picks)} picks en payload — bet-ai-master debería loggearlo")
+    elif "(" in script:
+        log("ℹ️ Guion con paréntesis pero sin picks parseables — usando fallback por keywords")
+
     work_dir = tempfile.mkdtemp(prefix="pronosticos_")
 
     # 2. TTS único (MiniMax) — todo el script en una sola pieza
     _progress(0.05, "Sintetizando voz (MiniMax)...")
     log("🎙️ Sintetizando audio con MiniMax (script completo, una sola pasada)...")
     audio_path = os.path.join(work_dir, "voice.mp3")
-    locutor.generate_single_audio(script, audio_path, voice_id_override=voice_id_override)
+    locutor.generate_single_audio(tts_script, audio_path, voice_id_override=voice_id_override)
     _progress(0.20, "Voz sintetizada")
 
     # 3. Whisper local para word_timings
@@ -609,6 +715,15 @@ def run_pronosticos_pipeline(
     audio_duration = float(audio_clip.duration)
     segments = find_segments(word_timings, audio_duration, log_callback=log)
 
+    # 4.a Localizar la ventana exacta de cada pick en word_timings
+    # (a partir del texto entre paréntesis del script). Sirve para clink + verde.
+    pick_windows: list = []
+    if pick_texts and word_timings:
+        from .pick_locator import find_pick_windows
+        pick_windows = find_pick_windows(word_timings, pick_texts, log_callback=log)
+        n_ok = sum(1 for w in pick_windows if w is not None)
+        log(f"🟢 Picks localizados en audio: {n_ok}/{len(pick_texts)}")
+
     # 4.b SFX de dinero sincronizado con la cifra del bote en la intro
     if add_money_sfx and word_timings:
         money_path = _resolve_sfx("money.mp3", "cha-ching.mp3", "dinero.mp3")
@@ -621,18 +736,29 @@ def run_pronosticos_pipeline(
                     sfx_volume, audio_duration, log, label="💰 dinero",
                 )
             else:
-                log("ℹ️ No se halló palabra-número en la intro; SFX dinero omitido.")
+                # Diagnóstico: muestra los primeros tokens para ver qué transcribió Whisper
+                head = " ".join((w.get("word") or "").strip() for w in word_timings[:8])
+                log(f"ℹ️ No se halló palabra-número en la intro; SFX dinero omitido. "
+                    f"Primeros tokens Whisper: '{head}'")
         else:
             log("ℹ️ SFX dinero no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
 
-    # 4.c SFX clink cada vez que arranca el pick textual ("más", "ambos"...)
+    # 4.c SFX clink cada vez que arranca el pick textual.
+    # Si tenemos pick_windows (paréntesis del guion), ancla en el inicio EXACTO
+    # de cada pick. Si no, fallback a la heurística de keywords post-transición.
     if add_clink_sfx and word_timings:
         clink_path = _resolve_sfx("clink.mp3", "notification.mp3", "pick.mp3")
         if clink_path:
-            from .segment_locator import find_pick_anchors, find_pick_starts
-            pick_starts = find_pick_starts(word_timings)
-            log(f"🔔 Clink: {len(pick_starts)} transiciones detectadas")
-            anchors = find_pick_anchors(word_timings, pick_starts, log_callback=log)
+            anchors: list[float]
+            valid_windows = [w for w in pick_windows if w is not None]
+            if valid_windows:
+                anchors = [float(word_timings[w[0]]["start"]) for w in valid_windows]
+                log(f"🔔 Clink anclado en paréntesis del guion: {len(anchors)} picks")
+            else:
+                from .segment_locator import find_pick_anchors, find_pick_starts
+                pick_starts = find_pick_starts(word_timings)
+                log(f"🔔 Clink (fallback keywords): {len(pick_starts)} transiciones detectadas")
+                anchors = find_pick_anchors(word_timings, pick_starts, log_callback=log)
             audio_clip = _mix_sfx_at_timestamps(
                 audio_clip, clink_path, anchors,
                 clink_volume, audio_duration, log, label="🔔 clink picks",
@@ -658,7 +784,61 @@ def run_pronosticos_pipeline(
         else:
             log("ℹ️ No se halló trigger de ligas en la intro; sin overlay.")
 
-    # 4.e SFX cámara — unificado: dispara cuando aparece perfil.png (CTA) y/o logos de ligas
+    # 4.d.bis Escudos de equipo — vídeos de UN SOLO partido. Cubre:
+    #   • mode == "single_match" (deep-dive Champions, schema clásico)
+    #   • mode == "multi_match" + todos los picks del MISMO partido
+    #     (caso competition_focus con un único Atlético-Arsenal repetido)
+    # No se muestran cuando hay varios partidos distintos (multi_match clásico).
+    team_shields_data = None
+    unique_matches = {(p.get("match") or "").strip() for p in (picks or [])}
+    unique_matches.discard("")
+    is_solo_match = (mode == "single_match") or (len(unique_matches) == 1)
+    log(f"🎯 mode={mode!r}, partidos únicos en picks: {len(unique_matches)} → "
+        f"escudos: {'SÍ' if is_solo_match else 'NO'}")
+    if is_solo_match and picks and word_timings:
+        from .team_shield_overlay import resolve_team_shield, find_team_anchors
+        home_team_solo, away_team_solo = parse_match(picks[0].get("match", ""))
+        sp_home = resolve_team_shield(home_team_solo)
+        sp_away = resolve_team_shield(away_team_solo)
+        if sp_home or sp_away:
+            ah, aa = find_team_anchors(
+                word_timings, home_team_solo, away_team_solo,
+                intro_end=segments["intro"][1],
+            )
+            team_shields_data = {
+                "home_path": sp_home, "home_anchor": ah,
+                "away_path": sp_away, "away_anchor": aa,
+                "duration": 2.5,
+            }
+            log(f"🛡️ Escudos single_match: "
+                f"home={home_team_solo!r} {'✓' if sp_home else '✗'}"
+                + (f" @ {ah:.2f}s" if ah is not None else " (sin anchor)")
+                + f" | away={away_team_solo!r} {'✓' if sp_away else '✗'}"
+                + (f" @ {aa:.2f}s" if aa is not None else " (sin anchor)"))
+            # Coexistencia con overlay de liga: el logo de la liga aparece
+            # normalmente cuando se dice "champions/europa/...", pero se ACORTA
+            # para terminar justo antes del primer escudo de equipo (sin solape
+            # visual). Si el trigger de la liga es POSTERIOR al primer escudo,
+            # ahí sí se suprime entero (ya no tiene hueco).
+            shield_anchors = [t for t in (ah, aa) if t is not None]
+            if shield_anchors and league_overlay_anchor is not None and league_logos:
+                first_shield = min(shield_anchors)
+                if league_overlay_anchor < first_shield:
+                    gap = first_shield - league_overlay_anchor - 0.10  # 100ms colchón
+                    league_overlay_duration_cap = max(0.5, gap)
+                    if league_overlay_duration_cap < league_overlay_duration:
+                        log(f"🏆 Overlay liga acortado a {league_overlay_duration_cap:.2f}s "
+                            f"para no solaparse con escudos a partir de {first_shield:.2f}s")
+                        league_overlay_duration = league_overlay_duration_cap
+                else:
+                    log("🛡️ Overlay de liga suprimido (su trigger es posterior a los escudos)")
+                    league_overlay_anchor = None
+                    league_logos = []
+        else:
+            log("ℹ️ Modo single_match pero ninguna carpeta de equipo trae escudo.png")
+
+    # 4.e SFX cámara — unificado: dispara cuando aparece perfil.png (CTA),
+    # logos de ligas, y/o escudos de equipo.
     if add_camera_sfx:
         camera_path = _resolve_sfx("camera.mp3", "shutter.mp3", "foto.mp3")
         if camera_path:
@@ -667,6 +847,11 @@ def run_pronosticos_pipeline(
                 camera_timestamps.append(segments["cta"][0])
             if league_overlay_anchor is not None and league_logos:
                 camera_timestamps.append(league_overlay_anchor)
+            if team_shields_data:
+                for k_path, k_anchor in (("home_path", "home_anchor"),
+                                           ("away_path", "away_anchor")):
+                    if team_shields_data.get(k_path) and team_shields_data.get(k_anchor) is not None:
+                        camera_timestamps.append(float(team_shields_data[k_anchor]))
             if camera_timestamps:
                 audio_clip = _mix_sfx_at_timestamps(
                     audio_clip, camera_path, camera_timestamps,
@@ -730,6 +915,7 @@ def run_pronosticos_pipeline(
             log("ℹ️ No hay carpeta 'intro' poblada — la intro hereda del pick 1")
         clip_pools["intro"] = intro_pool
 
+    from .stock_search import _find_existing_folder as _find_dir
     for i, pick in enumerate(picks, start=1):
         home_team, away_team = parse_match(pick.get("match", ""))
         pool = get_clips_pool(
@@ -748,7 +934,17 @@ def run_pronosticos_pipeline(
             )
             pool = [single] if single else []
         clip_pools[str(i)] = pool
-        log(f"  pick #{i} ({pick.get('match', '?')}): {len(pool)} clips")
+        # Diagnóstico: ¿se mezclaron clips de ambos equipos o solo de uno?
+        home_dir = _find_dir(home_team) if home_team else None
+        away_dir = _find_dir(away_team) if away_team else None
+        if home_dir and away_dir and pool:
+            home_n = len(list(home_dir.glob("*.mp4")))
+            away_n = len(list(away_dir.glob("*.mp4")))
+            tag = f" [mix {home_team}({home_n}) + {away_team}({away_n})]" \
+                  if home_n and away_n else ""
+        else:
+            tag = ""
+        log(f"  pick #{i} ({pick.get('match', '?')}): {len(pool)} clips{tag}")
 
     # 7. perfil.png para CTA
     perfil_path = _resolve_perfil_png()
@@ -773,6 +969,8 @@ def run_pronosticos_pipeline(
             "logos": league_logos,
         }
 
+    # team_shields_data ya se calculó arriba (paso 4.d.bis), tras decidir
+    # si suprimir el overlay de liga.
     timeline = _build_visual_timeline(
         audio_duration=audio_duration,
         picks=picks,
@@ -781,6 +979,7 @@ def run_pronosticos_pipeline(
         clip_pools=clip_pools,
         perfil_path=perfil_path,
         league_overlay=league_overlay_data,
+        team_shields=team_shields_data,
         W=W, H=H,
         show_pick_carousel=show_pick_carousel,
     )
@@ -828,12 +1027,22 @@ def run_pronosticos_pipeline(
         try:
             from src.subtitles import render_karaoke_on_video
             from .number_parser import collapse_spanish_numbers
+            from .pick_locator import annotate_word_colors
             # Convierte 'cuatro mil quinientos' → '4.500' SOLO en los subtítulos
             # (los anchors del audio ya están detectados desde los timings originales)
             sub_words = collapse_spanish_numbers(word_timings)
             collapsed = len(word_timings) - len(sub_words)
             if collapsed > 0:
                 log(f"🔢 Cifras colapsadas en subtítulos: {collapsed} tokens fusionados a dígitos")
+            # Pintar de VERDE-VICTORIA: cifra del bote + texto literal de cada pick
+            sub_words = annotate_word_colors(
+                sub_words, pick_windows, word_timings,
+                pick_color=PRONOSTICOS_PICK_COLOR,
+                money_color=PRONOSTICOS_PICK_COLOR,
+            )
+            n_green = sum(1 for w in sub_words if w.get("color"))
+            if n_green:
+                log(f"🟢 Subtítulos en verde-victoria: {n_green} palabras (bote + picks)")
             tmp_subs = out_path + ".subs.mp4"
             render_karaoke_on_video(out_path, sub_words, PRONOSTICOS_SUB_STYLE, tmp_subs,
                                     log_callback=lambda m: log(m))

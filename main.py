@@ -102,7 +102,18 @@ try:
 except Exception as _e:
     print(f"[temp_cleanup] Auto-limpieza falló: {_e}")
 
-st.set_page_config(page_title="TikTok Creator Reward Auto", layout="wide")
+st.set_page_config(
+    page_title="TikTok Creator Reward Auto",
+    layout="wide",
+    initial_sidebar_state="auto",  # Streamlit colapsa la sidebar en móvil automáticamente
+)
+
+# CSS responsive global (móvil-first). Cero cambios de lógica.
+from src.mobile_ui import inject_responsive_css
+inject_responsive_css()
+
+# Cola unificada de generación (compartida entre los 4 modos).
+from src.queue import JobMode, get_queue, render_queue_widget
 
 # ---------------------------------------------------------
 # VALIDACIÓN DE ARRANQUE (CONTROL DE DAÑOS)
@@ -124,6 +135,13 @@ if cleaner_error:
 
 
 st.title("🏭 TikTok Creator Reward Auto")
+
+# Widget global de cola (compartido entre todos los modos). Ver src/queue/.
+# El JobQueue es un singleton vivo entre reruns + worker thread daemon que
+# procesa los jobs FIFO; el usuario puede encolar desde cualquier modo y
+# reordenar prioridad.
+_QUEUE_PERSIST_DIR = CFG["paths"].get("temp_folder") if CFG else None
+render_queue_widget(_QUEUE_PERSIST_DIR)
 
 # ---------------------------------------------------------
 # ---------------------------------------------------------
@@ -302,7 +320,7 @@ with st.sidebar:
     with st.expander("🎯 Estrategia & Nicho", expanded=True):
         app_mode_label = st.radio(
             "Nicho",
-            ["🏛️ Presidentes Top 5", "📊 Pronósticos Diarios", "🛡️ Quitar Copy"],
+            ["🏛️ Presidentes Top 5", "📊 Pronósticos Diarios", "🛡️ Quitar Copy", "🎬 Subs sobre Vídeo"],
             index=0,
             label_visibility="collapsed"
         )
@@ -312,12 +330,15 @@ with st.sidebar:
         CFG["app_mode"] = "COPYRIGHT_CLEANER"
     elif "Pronósticos" in app_mode_label:
         CFG["app_mode"] = "PRONOSTICOS_DIARIOS"
+    elif "Subs sobre Vídeo" in app_mode_label:
+        CFG["app_mode"] = "SUBS_AUTO"
     else:
         CFG["app_mode"] = "PRESIDENTS_TOP5"
 
     is_presidents = (CFG["app_mode"] == "PRESIDENTS_TOP5")
     is_pronosticos = (CFG["app_mode"] == "PRONOSTICOS_DIARIOS")
     is_copyright = (CFG["app_mode"] == "COPYRIGHT_CLEANER")
+    is_subs_auto = (CFG["app_mode"] == "SUBS_AUTO")
 
     st.caption(f"Modo Activo: {CFG['app_mode']}")
 
@@ -737,67 +758,67 @@ if CFG["app_mode"] == "COPYRIGHT_CLEANER":
             st.session_state.hook_color = "#FDD002" if "Amarillo" in hook_col_opt else "#FFFFFF"
 
             # Paso 1: Analizar / Auto-render
-            btn_label = "🚀 INICIAR LIMPIEZA MAESTRA" if auto_render else "📝 GENERAR BORRADOR (PREVIEW)"
-            if st.button(btn_label, type="primary"):
-                # ... (Proceso de guardado de input)
+            #
+            # Auto-render = encolar a la cola global (ahora todos los modos van por la cola).
+            # Borrador = sigue siendo síncrono porque requiere preview interactivo antes
+            # de confirmar (el usuario ve miniaturas y decide).
+            btn_label = "➕ ENCOLAR LIMPIEZA" if auto_render else "📝 GENERAR BORRADOR (PREVIEW)"
+            if st.button(btn_label, type="primary", use_container_width=True):
+                # Guardamos el input ANTES de encolar (luego el worker lo lee del disco)
                 temp_dir = CFG["paths"]["temp_folder"]
                 os.makedirs(temp_dir, exist_ok=True)
                 input_path = os.path.join(temp_dir, f"clean_in_{int(time.time())}.mp4")
                 with open(input_path, "wb") as f:
                     f.write(clean_upload.getbuffer())
 
-                with st.status("🛠️ Procesando etapa inicial...", expanded=True) as status:
-                    try:
-                        cleaner = CopyrightCleaner(CFG)
-                        log_slot = st.empty()
-                        ui_log = lambda m: log_slot.write(m)
-                        
-                        # PASO 1: Obtener datos
-                        traj_data = cleaner.map_text_trajectory(input_path, log_callback=ui_log)
-                        words_data = cleaner.transcribe_video(input_path, log_callback=ui_log)
-                        
-                        # GUARDADO CRÍTICO EN SESSION STATE
-                        st.session_state.cleaner_data = {
-                            'input_path': input_path,
-                            'words': words_data,
-                            'trajectory': traj_data
-                        }
-                        
-                        if auto_render:
-                            st_pb = st.progress(0)
-                            st_timer = st.empty()
-                            final_video = cleaner.process(
-                                input_path, CFG["paths"]["output_folder"], 
-                                words=words_data, trajectory=traj_data,
-                                log_callback=ui_log, logger=StreamlitLogger(st_pb, st_timer),
-                                clean_mode=clean_mode,
-                                hook_y_pct=st.session_state.hook_y_pct,
-                                hook_color=st.session_state.hook_color
-                            )
-                            status.update(label="✨ Proceso Completado", state="complete")
-                            st.success(f"🎉 ¡Video Listo! Guardado en: {os.path.basename(final_video)}")
-                            _, center_col, _ = st.columns([0.2, 0.6, 0.2])
-                            with center_col: st.video(final_video)
-                        else:
+                if auto_render:
+                    queue = get_queue(CFG["paths"]["temp_folder"])
+                    queue.enqueue(
+                        JobMode.COPYRIGHT,
+                        title=f"{clean_upload.name} · {clean_mode}",
+                        params={
+                            "input_path": input_path,
+                            "config": CFG,
+                            "clean_mode": clean_mode,
+                            "hook_y_pct": st.session_state.hook_y_pct,
+                            "hook_color": st.session_state.hook_color,
+                        },
+                    )
+                    st.toast("➕ Limpieza encolada — puedes seguir trabajando.", icon="🧵")
+                    time.sleep(0.4)
+                    st.rerun()
+                else:
+                    # Borrador síncrono (preview interactivo)
+                    with st.status("🛠️ Generando borrador…", expanded=True) as status:
+                        try:
+                            cleaner = CopyrightCleaner(CFG)
+                            log_slot = st.empty()
+                            ui_log = lambda m: log_slot.write(m)
+                            traj_data = cleaner.map_text_trajectory(input_path, log_callback=ui_log)
+                            words_data = cleaner.transcribe_video(input_path, log_callback=ui_log)
+                            st.session_state.cleaner_data = {
+                                'input_path': input_path,
+                                'words': words_data,
+                                'trajectory': traj_data,
+                            }
                             status.update(label="✅ Borrador Preparado", state="complete")
                             time.sleep(1)
                             st.rerun()
-                    except Exception as e:
-                        err_trace = traceback.format_exc()
-                        status.error(f"❌ Error en etapa inicial: {e}")
-            
+                        except Exception as e:
+                            status.error(f"❌ Error en etapa inicial: {e}")
+
             # Si hay borrador listo, mostrar preview estándar
             if st.session_state.get('cleaner_data') and not auto_render:
                 data = st.session_state.cleaner_data
                 st.divider()
                 st.subheader("🖼️ Galería de Borrador")
-                
+
                 try:
                     cleaner = CopyrightCleaner(CFG)
                     with st.spinner("Actualizando miniaturas..."):
                         previews = cleaner.get_preview_frames(
                             data['input_path'], data['words'], data['trajectory'],
-                            clean_mode=clean_mode, 
+                            clean_mode=clean_mode,
                             hook_y_pct=st.session_state.hook_y_pct,
                             hook_color=st.session_state.hook_color
                         )
@@ -805,36 +826,28 @@ if CFG["app_mode"] == "COPYRIGHT_CLEANER":
                     cols = st.columns(3)
                     for idx, img in enumerate(previews):
                         cols[idx].image(img, caption=f"Muestra {idx+1}")
-                    
+
                 except Exception as e:
                     st.error(f"Error al generar preview: {e}")
 
-                if st.button("🔥 CONFIRMAR RENDERIZADO FINAL", type="primary"):
-                    with st.status("🎬 Renderizando Video Completo...", expanded=True) as status:
-                        try:
-                            cleaner = CopyrightCleaner(CFG)
-                            st_pb = st.progress(0)
-                            st_timer = st.empty()
-                            
-                            final_video = cleaner.process(
-                                data['input_path'], CFG["paths"]["output_folder"], 
-                                words=data['words'], trajectory=data['trajectory'],
-                                log_callback=lambda m: status.write(m),
-                                logger=StreamlitLogger(st_pb, st_timer),
-                                clean_mode=clean_mode,
-                                hook_y_pct=st.session_state.hook_y_pct,
-                                hook_color=st.session_state.hook_color
-                            )
-                            status.update(label="✨ Proceso Completado", state="complete")
-                            st.success(f"🎉 ¡Video Finalizado!")
-                            _, center_col, _ = st.columns([0.2, 0.6, 0.2])
-                            with center_col: st.video(final_video)
-                        except Exception as e:
-                            err_trace = traceback.format_exc()
-                            print(f"\n❌ [ERROR CRÍTICO RENDERADO]\n{err_trace}")
-                            status.error(f"❌ Error Final: {e}")
-                            st.expander("🔍 Detalle técnico del error").code(err_trace)
-                            st.error(f"Detalle técnico: {str(e)}")
+                # Tras revisar el borrador → encolar el render final
+                if st.button("➕ ENCOLAR RENDER FINAL", type="primary", use_container_width=True):
+                    queue = get_queue(CFG["paths"]["temp_folder"])
+                    queue.enqueue(
+                        JobMode.COPYRIGHT,
+                        title=f"{os.path.basename(data['input_path'])} · {clean_mode}",
+                        params={
+                            "input_path": data['input_path'],
+                            "config": CFG,
+                            "clean_mode": clean_mode,
+                            "hook_y_pct": st.session_state.hook_y_pct,
+                            "hook_color": st.session_state.hook_color,
+                        },
+                    )
+                    st.toast("➕ Render encolado — se procesará tras los anteriores.", icon="🧵")
+                    st.session_state.pop('cleaner_data', None)
+                    time.sleep(0.4)
+                    st.rerun()
 
     st.stop()
 
@@ -914,6 +927,47 @@ if CFG["app_mode"] == "PRONOSTICOS_DIARIOS":
             voice_override = FAVORITE_VOICES[voice_label]
             st.caption(f"`{voice_override}`")
 
+        # Botones para audicionar cada voz favorita (cacheado en disco — la 2ª
+        # vez no consume créditos MiniMax). Click → genera/reproduce muestra ~4s.
+        # El hash del texto en el filename invalida la caché si cambias la frase.
+        import hashlib as _hashlib
+        _SAMPLE_TEXT = "4500 es lo que nos vamos a llevar con las ligas europeas."
+        _sample_hash = _hashlib.md5(_SAMPLE_TEXT.encode("utf-8")).hexdigest()[:8]
+        _samples_dir = os.path.join(CFG["paths"]["temp_folder"], "voice_samples")
+        _favorites_only = [(lbl, vid) for lbl, vid in FAVORITE_VOICES.items()
+                           if vid != "__CUSTOM__"]
+        st.caption(f"🔊 Audicionar — frase de muestra: *\"{_SAMPLE_TEXT}\"* "
+                   "(cacheado: 1ª vez consume crédito, después instantáneo)")
+        cols_audicion = st.columns(len(_favorites_only))
+        for idx_v, (lbl, vid) in enumerate(_favorites_only):
+            short_lbl = lbl.split(" ")[1] if len(lbl.split(" ")) > 1 else lbl
+            with cols_audicion[idx_v]:
+                if st.button(
+                    f"🔊 {short_lbl}",
+                    key=f"voice_sample_btn_{vid}",
+                    use_container_width=True,
+                    help=f"Generar/reproducir muestra de {vid}",
+                ):
+                    sample_path = os.path.join(_samples_dir, f"{vid}_{_sample_hash}.mp3")
+                    try:
+                        from src.locutor import generate_voice_sample
+                        with st.spinner(f"Generando muestra de {short_lbl}…"
+                                        if not os.path.exists(sample_path)
+                                        else f"Cargando {short_lbl}…"):
+                            generate_voice_sample(vid, sample_path, sample_text=_SAMPLE_TEXT)
+                        st.session_state["_pron_voice_sample_path"] = sample_path
+                        st.session_state["_pron_voice_sample_name"] = short_lbl
+                    except Exception as _se:
+                        st.error(f"❌ Error muestra: {_se}")
+
+        # Reproductor (autoplay) — solo se muestra cuando hay muestra preparada
+        if st.session_state.get("_pron_voice_sample_path"):
+            _sp = st.session_state["_pron_voice_sample_path"]
+            if os.path.exists(_sp):
+                st.audio(_sp, format="audio/mp3", autoplay=True)
+                st.caption(f"▶️ Sonando: **{st.session_state.get('_pron_voice_sample_name','?')}** "
+                           f"· `{os.path.basename(_sp)}`")
+
         add_subtitles = st.checkbox(
             "🔤 Quemar subtítulos karaoke",
             value=True,
@@ -922,7 +976,7 @@ if CFG["app_mode"] == "PRONOSTICOS_DIARIOS":
 
         use_intro_folder = st.checkbox(
             "🎬 Usar carpeta `intro/` para la intro",
-            value=True,
+            value=False,
             help="Si está activo, durante los segundos antes del primer 'Empezamos con' "
                  "el pipeline busca clips en BIBLIOTECA_PRONOSTICOS_CLIPS/intro/. "
                  "Si está apagado o la carpeta está vacía, hereda los clips del pick 1.",
@@ -1136,38 +1190,88 @@ if CFG["app_mode"] == "PRONOSTICOS_DIARIOS":
                 st.markdown(f"**#{i}** — {p.get('match', '?')} · "
                             f"`{p.get('league', '?')}` → **{p.get('pick', '?')}**")
 
-        # Guion editable (efímero — NO se guarda en Redis)
-        original_script = chosen_version.get("script", "")
-        edit_key = f"script_edit_{target_date_str}_{chosen_version.get('id', 'x')}"
-        edited_script = st.text_area(
-            "📜 Guion (editable solo en memoria — no se guarda en Redis)",
-            value=original_script,
-            height=240,
-            key=edit_key,
-            help="Edita el texto si quieres ajustar palabras, números o cambiar una frase. "
-                 "Los cambios SOLO afectan al vídeo que generes ahora — no se persiste nada. "
-                 "Si pulsas 'Cola TODAS' los cambios se ignoran (cada versión usa su original).",
-        )
-        is_edited = edited_script.strip() != original_script.strip()
-        if is_edited:
-            new_words = len(edited_script.split())
-            old_words = len(original_script.split())
-            delta = new_words - old_words
-            st.info(f"✏️ Guion editado · {new_words} palabras "
-                    f"({delta:+d} vs original) · NO se guardará en Redis")
-        st.caption(f"Title: {chosen_version.get('title', '—')}")
+        # ── Editores de guion (uno por versión seleccionada — efímeros) ──
+        # edited_scripts_map: vid (str) → texto editado actual
+        # edits_status: vid (str) → bool (si difiere del original)
+        edited_scripts_map: dict[str, str] = {}
+        edits_status: dict[str, bool] = {}
+
+        if len(selected_versions) <= 1:
+            # Caso single: un solo text_area (igual que antes)
+            v = chosen_version
+            vid_key = str(v.get("id", "x"))
+            original_script = v.get("script", "")
+            edit_key = f"script_edit_{target_date_str}_{vid_key}"
+            edited_script = st.text_area(
+                "📜 Guion (editable solo en memoria — no se guarda en Redis)",
+                value=original_script,
+                height=240,
+                key=edit_key,
+                help="Edita el texto si quieres ajustar palabras, números o cambiar una frase. "
+                     "Los cambios SOLO afectan al vídeo que generes ahora — no se persiste nada.",
+            )
+            edited_scripts_map[vid_key] = edited_script
+            edits_status[vid_key] = (edited_script.strip() != original_script.strip())
+            if edits_status[vid_key]:
+                new_words = len(edited_script.split())
+                old_words = len(original_script.split())
+                delta = new_words - old_words
+                st.info(f"✏️ Guion editado · {new_words} palabras "
+                        f"({delta:+d} vs original) · NO se guardará en Redis")
+            st.caption(f"Title: {v.get('title', '—')}")
+        else:
+            # Caso multi: una pestaña por versión, cada una con su propio text_area
+            st.markdown(f"📜 **{len(selected_versions)} guiones seleccionados** — "
+                        "edita cada uno en su pestaña (cambios efímeros, no se guardan en Redis):")
+            tab_labels = [
+                f"v{v.get('id', '?')} · {v.get('mode', '?')} · {v.get('word_count', '?')} pal"
+                for v in selected_versions
+            ]
+            tabs = st.tabs(tab_labels)
+            for tab, v in zip(tabs, selected_versions):
+                with tab:
+                    vid_key = str(v.get("id", "x"))
+                    v_original = v.get("script", "")
+                    v_edit_key = f"script_edit_{target_date_str}_{vid_key}"
+                    v_edited = st.text_area(
+                        f"Guion v{vid_key} (editable solo para esta generación)",
+                        value=v_original,
+                        height=220,
+                        key=v_edit_key,
+                    )
+                    edited_scripts_map[vid_key] = v_edited
+                    edits_status[vid_key] = (v_edited.strip() != v_original.strip())
+                    if edits_status[vid_key]:
+                        new_words = len(v_edited.split())
+                        old_words = len(v_original.split())
+                        delta = new_words - old_words
+                        st.caption(f"✏️ Editado · {new_words} pal "
+                                   f"({delta:+d} vs original) · solo en memoria")
+                    else:
+                        st.caption(f"Sin cambios · {len(v_original.split())} pal · "
+                                   f"Title: {v.get('title', '—')}")
+
+        # Compat con código de abajo: la primera versión sigue exponiendo
+        # `edited_script` / `original_script` / `is_edited` para preview / metadatos.
+        _first_v = selected_versions[0] if selected_versions else chosen_version
+        _first_vid = str(_first_v.get("id", "x"))
+        original_script = _first_v.get("script", "")
+        edited_script = edited_scripts_map.get(_first_vid, original_script)
+        is_edited = edits_status.get(_first_vid, False)
     else:
         st.info("👆 Pulsa 'Cargar guion del día' para previsualizar y elegir versión.")
         edited_script = ""
         original_script = ""
         is_edited = False
+        edited_scripts_map = {}
+        edits_status = {}
 
-    # Botón único: genera N versiones (cola si N>1)
+    # Botón único: encola N versiones a la cola global
     n_selected = len(selected_versions)
     btn_label = (
-        f"🚀 GENERAR {n_selected} VERSIÓN" if n_selected == 1 else
-        f"🧵 GENERAR EN COLA ({n_selected} versiones)" if n_selected > 1 else
-        "🚀 GENERAR (selecciona al menos 1)"
+        f"➕ ENCOLAR {n_selected} VERSIÓN" if n_selected == 1 else
+        f"➕ ENCOLAR {n_selected} VERSIONES" if n_selected > 1 else
+        "➕ ENCOLAR (selecciona al menos 1)"
     )
     btn_run = st.button(
         btn_label, type="primary",
@@ -1176,154 +1280,674 @@ if CFG["app_mode"] == "PRONOSTICOS_DIARIOS":
     )
 
     if btn_run:
-        try:
-            from src.pronosticos.pipeline import run_pronosticos_pipeline
-        except Exception as e:
-            st.error(f"❌ No se pudo cargar el pipeline de pronósticos: {e}")
-            st.stop()
+        # Resolución (con safety pares)
+        _res = res_options[selected_res_label]
+        _w = _res[0] if _res[0] % 2 == 0 else _res[0] - 1
+        _h = _res[1] if _res[1] % 2 == 0 else _res[1] - 1
 
-        # Determinar la cola de version_ids a procesar (lo elegido en el multiselect)
-        queue_ids = [str(v.get("id")) for v in selected_versions
-                     if v.get("id") is not None]
-        if not queue_ids:
-            queue_ids = [None]
-        is_queue = len(queue_ids) > 1
-        queue_label = (f"COLA de {len(queue_ids)} versiones" if is_queue
-                       else f"versión v{queue_ids[0]}")
+        queue = get_queue(CFG["paths"]["temp_folder"])
+        enqueued_count = 0
+        for v in selected_versions:
+            vid = v.get("id")
+            _vid_key = str(vid) if vid is not None else "x"
+            use_override = (
+                edits_status.get(_vid_key, False)
+                and edited_scripts_map.get(_vid_key)
+            )
+            _override_script = (
+                edited_scripts_map.get(_vid_key) if use_override else None
+            )
+            title = (
+                f"{target_date_str} · v{_vid_key} · {v.get('mode','?')}"
+                + (" · ✏️ editado" if use_override else "")
+            )
+            params = {
+                "target_date": target_date_str,
+                "output_folder": CFG["paths"]["output_folder"],
+                "video_size": (_w, _h),
+                "voice_id_override": (voice_override.strip() or None),
+                "publish_to_redis": publish_redis,
+                "add_subtitles": add_subtitles,
+                "use_intro_folder": use_intro_folder,
+                "add_money_sfx": add_money_sfx,
+                "sfx_volume": float(sfx_volume),
+                "add_clink_sfx": add_clink_sfx,
+                "clink_volume": float(clink_volume),
+                "add_camera_sfx": add_camera_sfx,
+                "camera_volume": float(camera_volume),
+                "add_league_overlay": add_league_overlay,
+                "league_overlay_duration": float(league_overlay_duration),
+                "saturation": float(saturation),
+                "show_pick_carousel": show_pick_carousel,
+                "version_id": vid if vid != "legacy" else None,
+                "script_override": _override_script,
+                "add_background_music": add_background_music,
+                "bgm_volume": float(bgm_volume),
+            }
+            queue.enqueue(JobMode.PRONOSTICOS, title, params)
+            enqueued_count += 1
 
-        with st.status(f"🏭 Pipeline — {queue_label}", expanded=True) as status:
-            # Barra de progreso global de la cola + ETA
-            queue_bar = st.progress(0.0, text="Iniciando...")
-            eta_slot = st.empty()
-            log_slot = st.empty()
-            logs_buffer = []
+        st.toast(
+            f"➕ {enqueued_count} pronóstico(s) encolado(s) — "
+            "puedes cambiar de modo y encolar más, se procesarán en orden.",
+            icon="🧵",
+        )
+        time.sleep(0.4)
+        st.rerun()
 
-            def _ui_log(msg):
-                logs_buffer.append(msg)
-                log_slot.markdown("\n".join(f"- {l}" for l in logs_buffer[-15:]))
+    st.stop()
 
-            t0 = time.time()
-            n_total = len(queue_ids)
+# ---------------------------------------------------------
+# INTERFAZ SUBS AUTO (NICHO 4 — SUBTÍTULOS SOBRE VÍDEO INPUT)
+# ---------------------------------------------------------
+if CFG["app_mode"] == "SUBS_AUTO":
+    st.header("🎬 Subtítulos Automáticos sobre Vídeo")
+    st.info(
+        "Sube un vídeo (cualquier aspect ratio), Whisper transcribe el audio palabra-a-palabra "
+        "y se quema un overlay karaoke. Opcionalmente puedes pasar el guion / letra de la "
+        "canción como referencia para guiar la transcripción (mejora vocabulario raro, nombres y letras musicales)."
+    )
 
-            def _make_progress_cb(idx_in_queue: int, vid: str):
-                """Construye el callback de progreso para la versión `idx_in_queue`."""
-                def cb(pct: float, msg: str):
-                    # Progreso global = (versiones_completadas + pct_versión_actual) / total
-                    global_pct = (idx_in_queue + pct) / n_total
-                    label = (f"v{vid} — {msg}" if is_queue
-                             else msg) + f" ({global_pct*100:.0f}%)"
-                    queue_bar.progress(global_pct, text=label)
-                    elapsed = time.time() - t0
-                    if global_pct > 0.05:
-                        total_est = elapsed / global_pct
-                        remaining = max(0, total_est - elapsed)
-                        eta_slot.caption(
-                            f"⏱️ {format_seconds(elapsed)} transcurridos · "
-                            f"queda ~{format_seconds(remaining)} "
-                            f"(estimado total ~{format_seconds(total_est)})"
-                        )
-                return cb
+    subs_in_upload = st.file_uploader(
+        "📂 Subir vídeo (MP4 / MOV / WEBM)",
+        type=["mp4", "mov", "webm", "mkv"],
+        key="subs_auto_upload",
+    )
 
-            results: list[tuple[str, str]] = []  # [(version_id, mp4_path)]
-            errors: list[tuple[str, str]] = []
+    if subs_in_upload:
+        # Persistimos el upload a un fichero temporal una vez por upload (para
+        # poder leer frames sin re-escribir en cada rerun de Streamlit).
+        _upload_key = f"{subs_in_upload.name}_{subs_in_upload.size}"
+        if st.session_state.get("sa_cached_upload_key") != _upload_key:
+            _temp_dir = CFG["paths"]["temp_folder"]
+            os.makedirs(_temp_dir, exist_ok=True)
+            _cached_path = os.path.join(_temp_dir, f"sa_input_{int(time.time())}.mp4")
+            with open(_cached_path, "wb") as _f:
+                _f.write(subs_in_upload.getbuffer())
+            st.session_state.sa_cached_input_path = _cached_path
+            st.session_state.sa_cached_upload_key = _upload_key
+        sa_cached_input_path = st.session_state.sa_cached_input_path
 
-            for idx, vid in enumerate(queue_ids):
-                try:
-                    _ui_log(f"\n━━━ versión v{vid or 'auto'} ({idx+1}/{n_total}) ━━━")
-                    # script_override: solo aplica si hay 1 sola versión + fue editada
-                    use_override = (
-                        not is_queue
-                        and is_edited
-                        and chosen_version is not None
-                        and str(chosen_version.get("id")) == str(vid)
-                    )
-                    # Resolución del selector de la sidebar (con safety pares)
-                    _res = res_options[selected_res_label]
-                    _w = _res[0] if _res[0] % 2 == 0 else _res[0] - 1
-                    _h = _res[1] if _res[1] % 2 == 0 else _res[1] - 1
-                    final_path = run_pronosticos_pipeline(
-                        target_date=target_date_str,
-                        output_folder=CFG["paths"]["output_folder"],
-                        log_callback=_ui_log,
-                        video_size=(_w, _h),
-                        voice_id_override=(voice_override.strip() or None),
-                        publish_to_redis=publish_redis,
-                        add_subtitles=add_subtitles,
-                        use_intro_folder=use_intro_folder,
-                        add_money_sfx=add_money_sfx,
-                        sfx_volume=float(sfx_volume),
-                        add_clink_sfx=add_clink_sfx,
-                        clink_volume=float(clink_volume),
-                        add_camera_sfx=add_camera_sfx,
-                        camera_volume=float(camera_volume),
-                        add_league_overlay=add_league_overlay,
-                        league_overlay_duration=float(league_overlay_duration),
-                        saturation=float(saturation),
-                        show_pick_carousel=show_pick_carousel,
-                        version_id=vid if vid != "legacy" else None,
-                        script_override=edited_script if use_override else None,
-                        add_background_music=add_background_music,
-                        bgm_volume=float(bgm_volume),
-                        progress_callback=_make_progress_cb(idx, vid or "auto"),
-                    )
-                    results.append((vid or "auto", final_path))
-                except Exception as e:
-                    errors.append((vid or "auto", str(e)))
-                    _ui_log(f"❌ v{vid}: {e}")
+        col_prev, col_cfg = st.columns([0.7, 1.3])
+        with col_prev:
+            st.subheader("📺 Vídeo original")
+            st.video(subs_in_upload)
 
-            elapsed = time.time() - t0
-            ok_n = len(results)
-            err_n = len(errors)
+        with col_cfg:
+            st.subheader("⚙️ Transcripción")
+            sa_model_size = st.selectbox(
+                "🧠 Modelo Whisper",
+                ["tiny", "base", "small", "medium", "large-v3"],
+                index=2,
+                help="Más grande = más preciso pero más lento. 'small' va fino para la mayoría de casos. "
+                     "'medium' / 'large-v3' recomendado para letras de canciones o audio difícil.",
+                key="sa_model_size",
+            )
 
-            if err_n == 0:
-                status.update(
-                    label=f"✅ {ok_n}/{ok_n} generado(s) en {format_seconds(elapsed)}",
-                    state="complete",
-                )
-            elif ok_n > 0:
-                status.update(
-                    label=f"⚠️ {ok_n} OK / {err_n} fallo(s) en {format_seconds(elapsed)}",
-                    state="error",
+            sa_lang_label = st.selectbox(
+                "🌍 Idioma",
+                ["Auto-detectar", "Español (es)", "English (en)", "Français (fr)", "Português (pt)",
+                 "Italiano (it)", "Deutsch (de)", "日本語 (ja)", "한국어 (ko)"],
+                index=1,
+                help="Si lo sabes, fíjalo: la transcripción es más rápida y precisa.",
+                key="sa_lang_label",
+            )
+            _lang_map = {
+                "Auto-detectar": None, "Español (es)": "es", "English (en)": "en",
+                "Français (fr)": "fr", "Português (pt)": "pt", "Italiano (it)": "it",
+                "Deutsch (de)": "de", "日本語 (ja)": "ja", "한국어 (ko)": "ko",
+            }
+            sa_language = _lang_map[sa_lang_label]
+
+            sa_audio_type_label = st.radio(
+                "🎚️ Tipo de audio",
+                ["🗣️ Voz hablada", "🎵 Música / canción"],
+                index=0,
+                horizontal=True,
+                key="sa_audio_type_label",
+                help=("• **Voz hablada**: VAD activo (corta silencios largos), Whisper usa "
+                      "contexto previo. Bueno para podcasts, vídeos hablados, entrevistas.\n\n"
+                      "• **Música / canción**: VAD DESACTIVADO + sin condicionamiento previo. "
+                      "Imprescindible para canciones — si no, los interludios musicales "
+                      "se interpretan como silencio y Whisper deja de transcribir a mitad."),
+            )
+            sa_audio_type = "music" if "Música" in sa_audio_type_label else "speech"
+
+            sa_pause_for_edit = st.checkbox(
+                "✏️ Pausar tras transcribir para editar palabras",
+                value=False,
+                key="sa_pause_for_edit",
+                help="Si está activo, después de transcribir verás un editor donde "
+                     "puedes corregir manualmente las palabras que Whisper haya pillado mal. "
+                     "Los timestamps se preservan (1:1 si no cambias el nº de palabras; "
+                     "se redistribuyen proporcionalmente si añades/quitas).",
+            )
+
+            sa_use_reference = st.checkbox(
+                "📖 Pasarle el guion / letra como referencia",
+                value=False,
+                help=("Whisper usará el texto como `initial_prompt` para sesgar la transcripción.\n\n"
+                      "✅ **Mejora**: ortografía, nombres propios, jerga específica.\n\n"
+                      "⚠️ **Trade-off para canciones**: a veces hace que Whisper *anticipe* "
+                      "palabras y los timestamps se adelanten. Si notas la marca llegando "
+                      "antes de la palabra cantada, prueba a desactivarlo o usa el slider "
+                      "'Sync offset' para corregir.\n\n"
+                      "NO es alineación forzada — Whisper sigue escuchando y puede añadir/"
+                      "quitar palabras si difieren mucho."),
+                key="sa_use_reference",
+            )
+            if sa_use_reference:
+                sa_reference_text = st.text_area(
+                    "Guion / letra de referencia",
+                    placeholder="Pega aquí el guion o la letra de la canción tal cual se pronuncia…",
+                    height=140,
+                    key="sa_reference_text",
                 )
             else:
-                status.update(label="❌ Pipeline abortado (todas fallaron)", state="error")
+                sa_reference_text = ""
 
-            # Render del/los resultado(s)
-            if results:
-                if len(results) == 1:
-                    vid, final_path = results[0]
-                    col_video, col_meta = st.columns([1, 2])
-                    with col_video:
-                        st.video(final_path)
-                    with col_meta:
-                        st.success(f"🎉 ¡Vídeo v{vid} listo para {target_date_str}!")
-                        st.text_input("Archivo:", value=os.path.basename(final_path),
-                                      disabled=True)
-                        st.caption(f"📂 `{final_path}`")
-                        if st.button("📂 Abrir Carpeta", key=f"open_{vid}"):
-                            try:
-                                os.startfile(os.path.dirname(final_path))
-                            except Exception:
-                                st.warning("No se pudo abrir la carpeta automáticamente.")
+        st.divider()
+
+        # Aplicar preset PENDIENTE antes de renderizar los widgets de estilo
+        # (se setea en session_state desde la galería de presets más abajo).
+        if "_sa_pending_preset" in st.session_state:
+            from src.subtitles_only import (
+                FONT_OPTIONS as _APPLY_FONTS,
+                HIGHLIGHT_MODES as _APPLY_HMODES,
+            )
+            _font_to_label = {v: k for k, v in _APPLY_FONTS.items()}
+            _hmode_to_label = {v: k for k, v in _APPLY_HMODES.items()}
+            _pending = st.session_state.pop("_sa_pending_preset")
+            for _k, _v in _pending.items():
+                if _k == "font_path":
+                    # Selectbox guarda el label, no el path
+                    if _v in _font_to_label:
+                        st.session_state["sa_font_label"] = _font_to_label[_v]
+                elif _k == "highlight_mode":
+                    if _v in _hmode_to_label:
+                        st.session_state["sa_hmode_label"] = _hmode_to_label[_v]
                 else:
-                    st.success(f"🎉 {len(results)} vídeos listos para {target_date_str}")
-                    cols = st.columns(min(len(results), 3))
-                    for idx, (vid, final_path) in enumerate(results):
-                        with cols[idx % len(cols)]:
-                            st.markdown(f"**v{vid}**")
-                            st.video(final_path)
-                            st.caption(os.path.basename(final_path))
+                    st.session_state[f"sa_{_k}"] = _v
 
-            if errors:
-                with st.expander(f"❌ Errores ({err_n})"):
-                    for vid, msg in errors:
-                        st.write(f"**v{vid}**: {msg}")
+        # ---------- ESTILO + POSICIÓN (sliders + preview live) ----------
+        st.subheader("🎨 Estilo y posición de subtítulos")
 
-            if sound_on:
+        from src.subtitles_only import FONT_OPTIONS as _SA_FONTS, HIGHLIGHT_MODES as _SA_HMODES
+
+        # Fila superior: tipografía + modo de marcado de la palabra activa
+        col_top1, col_top2 = st.columns(2)
+        with col_top1:
+            sa_font_label = st.selectbox(
+                "🔤 Tipografía",
+                list(_SA_FONTS.keys()),
+                index=0,
+                key="sa_font_label",
+                help="Fuentes TTF instaladas en Windows. Cambia el carácter visual completo del subtítulo.",
+            )
+            sa_font_path = _SA_FONTS[sa_font_label]
+        with col_top2:
+            sa_hmode_label = st.selectbox(
+                "✨ Modo de marcado de la palabra activa",
+                list(_SA_HMODES.keys()),
+                index=0,
+                key="sa_hmode_label",
+                help="Cómo se distingue visualmente la palabra que se está pronunciando: "
+                     "píldora rellena, cambio de color, subrayado, recuadro hueco, halo glow o sin marca.",
+            )
+            sa_highlight_mode = _SA_HMODES[sa_hmode_label]
+
+        col_st1, col_st2, col_st3 = st.columns(3)
+        with col_st1:
+            sa_highlight_color = st.color_picker(
+                "Color highlight", value="#1E01C4", key="sa_highlight_color",
+                help="Color del marcado (píldora / subrayado / recuadro / glow / palabra activa en color_swap).",
+            )
+            sa_text_color = st.color_picker(
+                "Color del texto", value="#FFFFFF", key="sa_text_color")
+            sa_pill_enabled = st.checkbox(
+                "Píldora detrás (legacy)", value=True, key="sa_pill_enabled",
+                help="Compat antigua. El selector '✨ Modo de marcado' de arriba tiene prioridad.",
+            )
+        with col_st2:
+            sa_stroke_color = st.color_picker(
+                "Color del borde", value="#000000", key="sa_stroke_color")
+            sa_stroke_width = st.slider(
+                "Grosor del borde", 0, 8, 3, key="sa_stroke_width")
+            sa_case = st.selectbox(
+                "Formato del texto",
+                ["UPPERCASE", "lowercase", "Title Case", "original"],
+                index=0,
+                key="sa_case",
+            )
+        with col_st3:
+            sa_font_scale = st.slider(
+                "Tamaño de fuente (% del alto del vídeo)",
+                0.025, 0.100, 0.045, 0.005,
+                key="sa_font_scale",
+            )
+            sa_max_words = st.slider(
+                "Palabras por bloque (chunk)", 1, 6, 3, key="sa_max_words",
+                help="Cuántas palabras se ven A LA VEZ en pantalla. La transcripción "
+                     "se trocea en grupos de N (o menos si hay pausa larga >2.5s entre palabras). "
+                     "↓ Bajar = más cambios rápidos, mejor sincronía con la voz. "
+                     "↑ Subir = más texto a la vez, menos cambios. El preview también lo respeta.",
+            )
+            sa_y_position = st.slider(
+                "Posición vertical (% del alto)",
+                0.05, 0.95, 0.78, 0.01,
+                key="sa_y_position",
+                help="0.10 = casi arriba · 0.50 = centro · 0.78 = recomendado para 9:16 "
+                     "(zona inferior tipo TikTok) · 0.90 = muy abajo.",
+            )
+            sa_max_width = st.slider(
+                "Ancho máximo del texto (% del ancho)",
+                0.30, 1.00, 0.85, 0.05,
+                key="sa_max_width",
+                help="Limita lo ancho que puede crecer el bloque de subtítulos. "
+                     "Si la frase no cabe, salta a la línea siguiente. "
+                     "0.50 = muy estrecho (más líneas) · 0.85 = recomendado · "
+                     "1.00 = casi todo el ancho del vídeo. Margen lateral = (1 - este valor) / 2 a cada lado.",
+            )
+            sa_sync_offset = st.slider(
+                "🎯 Sync offset (ms)",
+                -800, 800, 0, 25,
+                key="sa_sync_offset",
+                help=("Desplaza TODOS los subtítulos en el tiempo para corregir desincronización.\n\n"
+                      "• **Negativo (-)** → adelantar el highlight (aparece antes).\n"
+                      "• **Positivo (+)** → retrasar el highlight (aparece después).\n\n"
+                      "Si ves la palabra marcada *antes* de cantarla → usa **+150 a +300 ms** "
+                      "(típico con canciones + letra de referencia).\n"
+                      "Si llega *tarde* → usa valores negativos.\n\n"
+                      "Whisper estima los timestamps por atención, no son exactos: en música "
+                      "se suelen adelantar 100-300ms. Modelos `medium`/`large-v3` tienen "
+                      "timestamps más precisos que `base`/`small`."),
+            )
+
+        # ---------- PREVIEW WYSIWYG sobre un frame real del vídeo ----------
+        st.markdown("**👀 Vista previa sobre el vídeo**")
+        try:
+            from src.subtitles_only import (
+                render_video_frame_with_subtitle,
+                get_video_duration,
+            )
+
+            sa_video_dur = get_video_duration(sa_cached_input_path) or 1.0
+            col_pv1, col_pv2 = st.columns([3, 2])
+            with col_pv1:
+                sa_preview_time = st.slider(
+                    "⏱️ Momento del vídeo (segundos)",
+                    min_value=0.0,
+                    max_value=max(0.5, sa_video_dur - 0.1),
+                    value=min(1.0, sa_video_dur / 2),
+                    step=0.5,
+                    key="sa_preview_time",
+                    help="Mueve para ver el subtítulo sobre distintos frames del vídeo.",
+                )
+            with col_pv2:
+                sa_preview_text = st.text_input(
+                    "Texto de muestra",
+                    value="HELLO FROM THE OTHER SIDE",
+                    key="sa_preview_text",
+                    help="Frase de muestra para previsualizar — la real saldrá de la transcripción.",
+                )
+
+            sa_preview_style = {
+                "font_path": sa_font_path,
+                "highlight_mode": sa_highlight_mode,
+                "highlight_color": sa_highlight_color,
+                "text_color": sa_text_color,
+                "stroke_color": sa_stroke_color,
+                "stroke_width": sa_stroke_width,
+                "case_mode": sa_case,
+                "font_scale": sa_font_scale,
+                "max_words_per_chunk": sa_max_words,
+                "y_position_pct": sa_y_position,
+                "pill_enabled": sa_pill_enabled,
+                "max_width_pct": sa_max_width,
+            }
+            sa_words_count = max(1, len((sa_preview_text or "PREVIEW").split()))
+            sa_highlight_idx = min(sa_words_count // 2, sa_words_count - 1)
+
+            sa_preview_img = render_video_frame_with_subtitle(
+                sa_cached_input_path,
+                sa_preview_style,
+                sample_text=sa_preview_text or "PREVIEW",
+                highlight_word_index=sa_highlight_idx,
+                frame_time=sa_preview_time,
+                draw_width_guides=True,
+            )
+            _, col_show, _ = st.columns([1, 2, 1])
+            with col_show:
+                st.image(
+                    sa_preview_img, use_container_width=True,
+                    caption=(f"t = {sa_preview_time:.1f}s · resolución original · "
+                             f"📐 líneas amarillas = ancho máximo {int(sa_max_width*100)}%"),
+                )
+        except Exception as e:
+            st.warning(f"⚠️ Preview no disponible: {e}")
+
+        # ---------- GALERÍA DE PRESETS DE ESTILO ----------
+        with st.expander("🎨 Comparar estilos rápidos (clic en 'Aplicar' para usar uno)", expanded=True):
+            try:
+                from src.subtitles_only import STYLE_PRESETS as _SA_PRESETS
+
+                preset_items = list(_SA_PRESETS.items())
+                # 3 cols × 2 rows
+                cols_a = st.columns(3)
+                cols_b = st.columns(3)
+                all_cols = list(cols_a) + list(cols_b)
+
+                _gal_text = sa_preview_text or "GOL DE LOCURA"
+                _gal_words = max(1, len(_gal_text.split()))
+                _gal_hl = min(_gal_words // 2, _gal_words - 1)
+                _gal_t = sa_preview_time
+
+                for i, (preset_name, preset_style) in enumerate(preset_items):
+                    target_col = all_cols[i] if i < len(all_cols) else cols_b[i % 3]
+                    with target_col:
+                        try:
+                            gal_img = render_video_frame_with_subtitle(
+                                sa_cached_input_path,
+                                preset_style,
+                                sample_text=_gal_text,
+                                highlight_word_index=_gal_hl,
+                                frame_time=_gal_t,
+                            )
+                            st.image(gal_img, use_container_width=True, caption=preset_name)
+                        except Exception as _ge:
+                            st.caption(f"{preset_name} · ⚠️ {_ge}")
+
+                        def _apply_preset(p=preset_style):
+                            st.session_state._sa_pending_preset = p
+
+                        st.button(
+                            "📝 Aplicar",
+                            key=f"sa_apply_preset_{i}",
+                            on_click=_apply_preset,
+                            use_container_width=True,
+                        )
+            except Exception as _e:
+                st.warning(f"Galería no disponible: {_e}")
+
+        st.divider()
+
+        # ---------- ESTADO PARA FLUJO PAUSAR-Y-EDITAR ----------
+        st.session_state.setdefault("sa_pending_edit", None)
+
+        # Logger custom: mapea progreso de moviepy a una franja [lo, hi] de una pb global
+        class _ScaledRenderLogger(ProgressBarLogger):
+            def __init__(self, pb, timer_ph, lo: int = 0, hi: int = 100):
+                super().__init__(init_state=None, bars=None, ignored_bars=None,
+                                 logged_bars='all', min_time_interval=0, ignore_bars_under=0)
+                self.pb = pb
+                self.timer_ph = timer_ph
+                self.lo = lo
+                self.hi = hi
+                self.start_time = time.time()
+
+            def callback(self, **changes):
+                elapsed = int(time.time() - self.start_time)
+                mins, secs = divmod(elapsed, 60)
+                self.timer_ph.markdown(f"⏱️ **Render:** {mins:02d}:{secs:02d}")
+                for bar in changes.get('bars', []):
+                    if 'total' in self.bars[bar]:
+                        cur = self.bars[bar]['index']
+                        tot = self.bars[bar]['total']
+                        if tot > 0:
+                            frac = max(0.0, min(1.0, cur / tot))
+                            overall = self.lo + int((self.hi - self.lo) * frac)
+                            self.pb.progress(
+                                overall,
+                                text=f"🎞️ Renderizando overlay… {int(frac * 100)}%",
+                            )
+
+        # ---------- HELPER: corre solo el render + muestra resultado ----------
+        # Lee estilos/calidad de los widgets actuales (permite tweaking entre transcribir y renderizar).
+        def _sa_run_render(input_path: str, words: list, out_path: str, out_name: str, t_start: float):
+            from src.subtitles_only import (
+                QUALITY_FROM_SIDEBAR as _SA_QMAP,
+                render_subtitles_on_video,
+            )
+            sa_quality_settings = _SA_QMAP.get(
+                selected_res_label,
+                {"preset": "medium", "crf": 20, "max_long_side": 1280},
+            )
+            sa_style = {
+                "font_path": sa_font_path,
+                "highlight_mode": sa_highlight_mode,
+                "highlight_color": sa_highlight_color,
+                "text_color": sa_text_color,
+                "stroke_color": sa_stroke_color,
+                "stroke_width": sa_stroke_width,
+                "case_mode": sa_case,
+                "font_scale": sa_font_scale,
+                "max_words_per_chunk": sa_max_words,
+                "y_position_pct": sa_y_position,
+                "pill_enabled": sa_pill_enabled,
+                "max_width_pct": sa_max_width,
+                "sync_offset_ms": sa_sync_offset,
+            }
+
+            sa_pb = st.progress(0, text=f"🎞️ Preparando overlay ({selected_res_label})…")
+            sa_render_timer = st.empty()
+
+            with st.status("🎬 Renderizando…", expanded=True) as status:
                 try:
-                    winsound.MessageBeep(winsound.MB_ICONASTERISK)
-                except Exception:
-                    pass
+                    status.write(
+                        f"🎞️ Calidad sidebar: {selected_res_label} → "
+                        f"preset={sa_quality_settings['preset']}, crf={sa_quality_settings['crf']}"
+                    )
+                    t2 = time.time()
+                    render_subtitles_on_video(
+                        input_path, words, sa_style, out_path,
+                        quality_settings=sa_quality_settings,
+                        log_callback=lambda m: status.write(f"   ↳ {m}"),
+                        logger=_ScaledRenderLogger(sa_pb, sa_render_timer, lo=0, hi=100),
+                    )
+                    status.write(f"   ↳ ✅ Render completo ({format_seconds(time.time()-t2)})")
+                    sa_pb.progress(100, text="✨ Vídeo con subtítulos listo")
+                    sa_render_timer.empty()
+
+                    status.update(label="✨ ¡Vídeo con subtítulos listo!", state="complete")
+
+                    st.success(f"🎉 Guardado: `{out_path}`")
+                    col_v, col_d = st.columns([1, 1])
+                    with col_v:
+                        st.video(out_path)
+                    with col_d:
+                        st.text_input("Archivo:", value=out_name, disabled=True,
+                                      key=f"sa_outname_{out_name}")
+                        st.write(f"⏱️ Tiempo total: {format_seconds(time.time()-t_start)}")
+                        st.write(f"📂 Ruta: `{out_path}`")
+                        if st.button("📂 Abrir carpeta", key=f"sa_open_{out_name}"):
+                            try:
+                                os.startfile(os.path.dirname(out_path))
+                            except Exception:
+                                st.warning("No se pudo abrir la carpeta.")
+
+                    if sound_on:
+                        try: winsound.MessageBeep(winsound.MB_ICONASTERISK)
+                        except Exception: pass
+                except Exception as e:
+                    status.update(label=f"❌ Error: {e}", state="error")
+                    st.expander("🔍 Detalle técnico").code(traceback.format_exc())
+
+        # ---------- HELPERS PARA ENCOLAR ----------
+        def _sa_build_params(input_path: str, out_path: str,
+                             quality_label: str, edited_text: str | None = None) -> dict:
+            """Construye el dict de params para el runner subs_auto."""
+            return {
+                "input_path": input_path,
+                "out_path": out_path,
+                "config": CFG,
+                "quality_label": quality_label,
+                "model_size": sa_model_size,
+                "language": sa_language,
+                "audio_type": sa_audio_type,
+                "reference_text": sa_reference_text,
+                "edited_text": edited_text,
+                "font_path": sa_font_path,
+                "highlight_mode": sa_highlight_mode,
+                "highlight_color": sa_highlight_color,
+                "text_color": sa_text_color,
+                "stroke_color": sa_stroke_color,
+                "stroke_width": sa_stroke_width,
+                "case_mode": sa_case,
+                "font_scale": sa_font_scale,
+                "max_words": sa_max_words,
+                "y_position": sa_y_position,
+                "pill_enabled": sa_pill_enabled,
+                "max_width": sa_max_width,
+                "sync_offset": sa_sync_offset,
+            }
+
+        # ---------- BOTÓN PRINCIPAL ----------
+        st.markdown("")
+        # Si pause_for_edit está ON, primero hay que transcribir síncrono para
+        # mostrar el editor; el render final se encolará después.
+        # Si está OFF, encolamos directamente (worker transcribe + render).
+        if sa_pause_for_edit:
+            btn_label = "🎙️ TRANSCRIBIR PARA EDITAR PALABRAS"
+        else:
+            btn_label = "➕ ENCOLAR SUBTÍTULOS"
+
+        if st.button(btn_label, type="primary", use_container_width=True, key="sa_generate"):
+            temp_dir = CFG["paths"]["temp_folder"]
+            os.makedirs(temp_dir, exist_ok=True)
+            ts_label = int(time.time())
+            input_path = os.path.join(temp_dir, f"subs_in_{ts_label}.mp4")
+            with open(input_path, "wb") as f:
+                f.write(subs_in_upload.getbuffer())
+
+            output_folder = os.path.join(CFG["paths"]["output_folder"], "SUBS_AUTO")
+            os.makedirs(output_folder, exist_ok=True)
+            out_name = f"SUBS_AUTO_{ts_label}.mp4"
+            out_path = os.path.join(output_folder, out_name)
+
+            if not sa_pause_for_edit:
+                # Encolar directo: worker hace todo
+                queue = get_queue(CFG["paths"]["temp_folder"])
+                queue.enqueue(
+                    JobMode.SUBS_AUTO,
+                    title=f"{subs_in_upload.name} · {sa_model_size}",
+                    params=_sa_build_params(input_path, out_path, selected_res_label),
+                )
+                st.toast("➕ Subtítulos encolados.", icon="🧵")
+                time.sleep(0.4)
+                st.rerun()
+            else:
+                # Transcribir síncrono para que el usuario pueda editar palabras
+                from src.subtitles_only import (
+                    extract_audio_from_video, transcribe_with_reference,
+                )
+                tmp_audio = os.path.join(temp_dir, f"subs_audio_{ts_label}.mp3")
+                with st.status("🎙️ Transcribiendo para editar…", expanded=True) as status:
+                    try:
+                        t0 = time.time()
+                        status.write("🔊 Extrayendo audio…")
+                        extract_audio_from_video(input_path, tmp_audio)
+                        status.write(f"🎙️ Whisper '{sa_model_size}'…")
+                        sa_words = transcribe_with_reference(
+                            tmp_audio,
+                            reference_script=sa_reference_text if sa_reference_text.strip() else None,
+                            model_size=sa_model_size,
+                            language=sa_language,
+                            audio_type=sa_audio_type,
+                        )
+                        if not sa_words:
+                            raise RuntimeError("Whisper no detectó palabras")
+                        status.update(label=f"✅ {len(sa_words)} palabras", state="complete")
+                    except Exception as e:
+                        status.update(label=f"❌ {e}", state="error")
+                        st.expander("🔍 Detalle").code(traceback.format_exc())
+                        sa_words = None
+                    finally:
+                        try: os.remove(tmp_audio)
+                        except Exception: pass
+
+                if sa_words:
+                    st.session_state.sa_pending_edit = {
+                        "input_path": input_path,
+                        "out_path": out_path,
+                        "out_name": out_name,
+                        "words": sa_words,
+                        "quality_label": selected_res_label,
+                    }
+                    if "sa_edit_text" in st.session_state:
+                        del st.session_state["sa_edit_text"]
+                    st.toast("✏️ Edita las palabras y pulsa Encolar render.")
+                    st.rerun()
+
+        # ---------- EDITOR DE PALABRAS (se muestra si hay edit pendiente) ----------
+        if st.session_state.get("sa_pending_edit"):
+            pe = st.session_state["sa_pending_edit"]
+            st.divider()
+            st.subheader("✏️ Editar transcripción antes de renderizar")
+            st.caption(
+                f"Whisper detectó **{len(pe['words'])} palabras**. Corrige las que estén mal "
+                "(typos, palabras inventadas en música, jerga). Si conservas el mismo número "
+                "de palabras, los timestamps se mantienen exactos. Si añades o quitas, se "
+                "redistribuyen proporcionalmente sobre el rango temporal original."
+            )
+
+            # Inicializar textarea desde la transcripción al primer render del editor
+            if "sa_edit_text" not in st.session_state:
+                st.session_state["sa_edit_text"] = " ".join(w["word"] for w in pe["words"])
+
+            edited_text = st.text_area(
+                "Transcripción (edita las palabras incorrectas)",
+                height=240,
+                key="sa_edit_text",
+            )
+            new_count = len([w for w in (edited_text or "").split() if w.strip()])
+            orig_count = len(pe["words"])
+            if new_count == orig_count:
+                st.success(f"✅ {new_count} palabras (igual que el original) — timestamps preservados 1:1.")
+            else:
+                delta = new_count - orig_count
+                st.warning(
+                    f"⚠️ {new_count} palabras vs {orig_count} originales (Δ {delta:+d}) — "
+                    "los timestamps se redistribuirán proporcionalmente."
+                )
+
+            col_ea, col_eb, col_ec = st.columns([2, 1, 1])
+            with col_ea:
+                go_render = st.button(
+                    "➕ ENCOLAR RENDER",
+                    type="primary", use_container_width=True, key="sa_render_after_edit",
+                )
+            with col_eb:
+                if st.button("↩️ Restaurar original", use_container_width=True, key="sa_restore_text"):
+                    st.session_state["sa_edit_text"] = " ".join(w["word"] for w in pe["words"])
+                    st.rerun()
+            with col_ec:
+                if st.button("🗑️ Cancelar", use_container_width=True, key="sa_cancel_edit"):
+                    st.session_state.sa_pending_edit = None
+                    if "sa_edit_text" in st.session_state:
+                        del st.session_state["sa_edit_text"]
+                    st.rerun()
+
+            if go_render:
+                # Encolamos el render con edited_text. El runner transcribirá
+                # de nuevo (rápido en local) y aplicará el merge con la
+                # edición. Trabajo redundante mínimo a cambio de tener
+                # toda la cola unificada.
+                queue = get_queue(CFG["paths"]["temp_folder"])
+                queue.enqueue(
+                    JobMode.SUBS_AUTO,
+                    title=f"{os.path.basename(pe['input_path'])} · ✏️ editado",
+                    params=_sa_build_params(
+                        pe["input_path"], pe["out_path"],
+                        pe.get("quality_label", selected_res_label),
+                        edited_text=edited_text,
+                    ),
+                )
+                st.toast("➕ Render encolado.", icon="🧵")
+                st.session_state.sa_pending_edit = None
+                if "sa_edit_text" in st.session_state:
+                    del st.session_state["sa_edit_text"]
+                time.sleep(0.4)
+                st.rerun()
 
     st.stop()
 
@@ -1512,327 +2136,68 @@ elif mode == "Automático (IA)":
                 "include_hook": include_hook,
             })
 
-    # Botón de Acción
-    if st.button("✨ INICIAR FÁBRICA DE VIDEOS"):
-        # 0. PRE-FLIGHT CHECK (CON FEEDBACK VISUAL)
-        check_ph = st.empty()
-        with check_ph.status("🩺 Verificando estado de APIs...", expanded=True) as status:
-            def ui_cb(msg): st.write(msg)
-            
-            if not check_api_health(ui_callback=ui_cb):
-                status.update(label="❌ Error en comprobaciones", state="error")
-                st.error("⚠️ ABORTANDO: Una o más APIs no responden. No se ha consumido cuota.")
+    # Botón de Acción — encola N vídeos a la cola global
+    if st.button(f"➕ ENCOLAR {len(queue_inputs)} VÍDEO(S)",
+                 type="primary", use_container_width=True):
+        # Pre-flight check rápido (las APIs deben estar arriba)
+        with st.status("🩺 Verificando APIs…", expanded=False) as _ck:
+            ok = check_api_health(ui_callback=lambda m: _ck.write(m))
+            if not ok:
+                _ck.update(label="❌ APIs no disponibles", state="error")
+                st.error("⚠️ ABORTANDO encolado: una o más APIs no responden.")
                 st.stop()
-            else:
-                status.update(label="✅ Sistemas TIKTOK_AUTOMATION ONLINE", state="complete")
-                time.sleep(1.0)
-        
-        check_ph.empty() # Limpiar mensajes visuales después de éxito
-            
-        # Configurar resolución global una sola vez
+            _ck.update(label="✅ APIs OK", state="complete")
+
+        # Resolución (con safety pares)
         target_res = res_options[selected_res_label]
         w_safe = target_res[0] if target_res[0] % 2 == 0 else target_res[0] - 1
         h_safe = target_res[1] if target_res[1] % 2 == 0 else target_res[1] - 1
         CFG["video_settings"]["resolution"] = [w_safe, h_safe]
-        
-        logs_auto = []
-        def log_cb(msg): logs_auto.append(msg)
-        
-        # CONTENEDOR PRINCIPAL DE ESTADO
-        total_jobs = len(queue_inputs)
-        
-        with st.status("🏭 Arrancando Fábrica...", expanded=True) as status:
-            
-            for idx, video_cfg in enumerate(queue_inputs):
-                user_topic = video_cfg["topic"]
-                current_prefix = video_cfg["prefix"]
-                current_top_count = video_cfg["top_count"]
-                current_include_history = video_cfg["include_history"]
-                current_include_hook = video_cfg["include_hook"]
-                # Limpieza y Lógica de Tópico
-                current_topic = user_topic.strip() if user_topic and user_topic.strip() else None
-                topic_display = current_topic if current_topic else "🎲 Tema Aleatorio (Sorpréndeme)"
-                
-                st.divider()
-                st.markdown(f"### ▶️ Procesando Video {idx+1}/{total_jobs} | {topic_display}")
-                status.update(label=f"Trabajando en {idx+1}/{total_jobs}: {topic_display}...", state="running")
-                
-                # Init cleanup vars
-                txt_output = None
-                audio_output_folder = None
-                
-                try:
-                    col_script, col_audio, col_edit = st.columns(3)
 
-                    with col_script:
-                        st_script_status = st.empty()
-                        st_script_status.info("⏳ 1. Guion: En espera...")
+        queue = get_queue(CFG["paths"]["temp_folder"])
+        for video_cfg in queue_inputs:
+            user_topic = video_cfg["topic"]
+            current_topic = (
+                user_topic.strip() if user_topic and user_topic.strip() else None
+            )
+            topic_display = current_topic or "🎲 Aleatorio"
+            title = (
+                f"{video_cfg['prefix']} · {topic_display} · "
+                f"top {video_cfg['top_count']}"
+            )
+            params = {
+                "config": CFG,
+                "topic": current_topic,
+                "creative_mode": use_creative_mode,
+                "title_prefix": video_cfg["prefix"],
+                "top_count": video_cfg["top_count"],
+                "include_history": video_cfg["include_history"],
+                "include_hook": video_cfg["include_hook"],
+                "engine_version": engine_version,
+                "subs_enabled": subs_enabled,
+                "subs_highlight_color": subs_highlight_color,
+                "subs_text_color": subs_text_color,
+                "subs_stroke_color": subs_stroke_color,
+                "subs_stroke_width": subs_stroke_width,
+                "subs_case": subs_case,
+                "subs_font_scale": subs_font_scale,
+                "subs_max_words": subs_max_words,
+                "subs_y_position": subs_y_position,
+                "hook_enabled": hook_enabled,
+                "hook_duration": hook_duration,
+                "hook_animation": hook_animation,
+                "hook_y_position": hook_y_position,
+                "hook_shadow_color": hook_shadow_color,
+                "hook_box_color": hook_box_color,
+                "hook_text_color": hook_text_color,
+                "hook_font_scale": hook_font_scale,
+            }
+            queue.enqueue(JobMode.PRESIDENTS, title, params)
 
-                    with col_audio:
-                        st_audio_status = st.empty()
-                        st_audio_status.info("⏳ 2. Audio: En espera...")
-
-                    with col_edit:
-                        st_edit_status = st.empty()
-                        st_edit_status.info("⏳ 3. Edición: En espera...")
-
-                    # --- BARRA GLOBAL DE PROGRESO POR VÍDEO ---
-                    overall_start_t = time.time()
-                    # Pesos por paso (subs/hook = 0 si están desactivados)
-                    _w = [
-                        0.05,                              # guion
-                        0.15,                              # audio
-                        0.50,                              # video render
-                        0.20 if subs_enabled else 0.0,     # subs
-                        0.10 if hook_enabled else 0.0,     # hook
-                    ]
-                    _total_w = sum(_w) or 1.0
-                    _w = [x / _total_w for x in _w]
-                    _step_pct = []
-                    _cum = 0.0
-                    for x in _w:
-                        _cum += x
-                        _step_pct.append(_cum)
-                    # _step_pct[0..4] = pct acumulado tras: guion, audio, video, subs, hook
-
-                    overall_progress = st.progress(0, text="🔄 Iniciando...")
-                    overall_time_ph = st.empty()
-
-                    def _update_overall(pct: float, label: str):
-                        pct = max(0.0, min(1.0, pct))
-                        overall_progress.progress(pct, text=f"{label} · {int(pct*100)}%")
-                        elapsed = time.time() - overall_start_t
-                        emins, esecs = divmod(int(elapsed), 60)
-                        if pct > 0.05:
-                            eta_left = max(0.0, (elapsed / pct) - elapsed)
-                            rmins, rsecs = divmod(int(eta_left), 60)
-                            eta_str = f" · ⏳ Restante ~{rmins:02d}:{rsecs:02d}"
-                        else:
-                            eta_str = ""
-                        overall_time_ph.markdown(f"⏱️ Transcurrido {emins:02d}:{esecs:02d}{eta_str}")
-
-                    _update_overall(0.0, "📝 Generando guion")
-
-                    # --- PASO 1: GUIONISTA ---
-                    st_script_status.info("🔄 Generando Guion...")
-                    t0 = time.time()
-
-                    script_data = guionista.generate_script(
-                        user_topic=current_topic,
-                        creative_mode=use_creative_mode,
-                        title_prefix=current_prefix,
-                        include_history=current_include_history,
-                        include_hook=current_include_hook,
-                        top_count=current_top_count,
-                    )
-
-                    txt_output = guionista.save_scripts_to_txt(script_data, top_count=current_top_count)
-
-                    t1 = time.time()
-                    st_script_status.success(f"✅ Guion OK ({format_seconds(t1-t0)})")
-                    _update_overall(_step_pct[0], "🎙️ Generando audio")
-
-                    # --- PASO 2: LOCUTOR ---
-                    st_audio_status.info("🔄 Clonando Voz...")
-                    t2 = time.time()
-                    
-                    resources_base = CFG["paths"]["resources_library"]
-                    # Nota: generate_audios_from_text_folder es agnóstico, lee lo que haya en la carpeta txt
-                    audio_output_folder = locutor.generate_audios_from_text_folder(txt_output, resources_base)
-                    
-                    if not audio_output_folder:
-                        raise Exception("No se generaron audios. Abortando este video.")
-                    
-                    t3 = time.time()
-                    st_audio_status.success(f"✅ Audios OK ({format_seconds(t3-t2)})")
-                    _update_overall(_step_pct[1], "🎬 Renderizando vídeo")
-
-                    # --- PASO 3: EDITOR DE VIDEO ---
-                    st_edit_status.info("🔄 Renderizando...")
-                    t4 = time.time()
-                    
-                    final_video_path = generate_video_pipeline(
-                        audio_output_folder,
-                        CFG["paths"]["output_folder"],
-                        CFG,
-                        status,
-                        log_cb,
-                        engine_version
-                    )
-
-                    t5 = time.time()
-                    st_edit_status.success(f"✅ Video OK ({format_seconds(t5-t4)})")
-                    _next_label_after_video = (
-                        "🔤 Generando subtítulos" if subs_enabled
-                        else ("🎣 Añadiendo gancho de texto" if hook_enabled else "✨ Finalizando")
-                    )
-                    _update_overall(_step_pct[2], _next_label_after_video)
-
-                    # --- PASO 4 (opcional): SUBTÍTULOS KARAOKE ---
-                    if subs_enabled:
-                        st_subs_status = st.empty()
-                        st_subs_status.info("🔄 Generando subtítulos...")
-                        t_subs_0 = time.time()
-                        try:
-                            from src.subtitles import transcribe, render_karaoke_on_video, DEFAULT_STYLE
-
-                            # 1. Extraer audio del vídeo final
-                            from moviepy.editor import VideoFileClip as _VFC
-                            _tmp_audio_dir = CFG["paths"]["temp_folder"]
-                            os.makedirs(_tmp_audio_dir, exist_ok=True)
-                            tmp_audio = os.path.join(_tmp_audio_dir, f"subs_audio_{int(time.time())}.mp3")
-                            _vc = _VFC(final_video_path)
-                            _vc.audio.write_audiofile(tmp_audio, logger=None)
-                            _vc.close()
-
-                            # 2. Transcribir con faster-whisper
-                            st_subs_status.info("🔄 Transcribiendo audio (Whisper local)...")
-                            words = transcribe(tmp_audio, model_size="base", language="en")
-
-                            if not words:
-                                st_subs_status.warning("⚠️ Whisper no detectó palabras — se omite overlay.")
-                            else:
-                                # 3. Renderizar overlay a un archivo temporal y reemplazar el original
-                                st_subs_status.info(f"🔄 Componiendo overlay ({len(words)} palabras)...")
-                                subs_style = {
-                                    **DEFAULT_STYLE,
-                                    "highlight_color": subs_highlight_color,
-                                    "text_color": subs_text_color,
-                                    "stroke_color": subs_stroke_color,
-                                    "stroke_width": subs_stroke_width,
-                                    "case_mode": subs_case,
-                                    "font_scale": subs_font_scale,
-                                    "max_words_per_chunk": subs_max_words,
-                                    "y_position_pct": subs_y_position,
-                                }
-                                tmp_out = final_video_path + ".tmp.mp4"
-                                render_karaoke_on_video(
-                                    final_video_path, words, subs_style, tmp_out,
-                                    log_callback=lambda m: status.write(m),
-                                )
-                                # Sustituir el archivo original por el que tiene subs (sin crear _SUBS.mp4)
-                                os.replace(tmp_out, final_video_path)
-
-                            # Limpiar audio temporal
-                            try: os.remove(tmp_audio)
-                            except: pass
-
-                            t_subs_1 = time.time()
-                            st_subs_status.success(f"✅ Subtítulos OK ({format_seconds(t_subs_1-t_subs_0)})")
-                        except Exception as e:
-                            st_subs_status.error(f"❌ Error subtítulos: {e}")
-                            print(f"[SUBS ERROR] {traceback.format_exc()}")
-                        _update_overall(
-                            _step_pct[3],
-                            "🎣 Añadiendo gancho de texto" if hook_enabled else "✨ Finalizando",
-                        )
-
-                    # --- PASO 5 (opcional): GANCHO DE TEXTO ---
-                    if hook_enabled:
-                        st_hook_status = st.empty()
-                        st_hook_status.info("🔄 Añadiendo gancho de texto...")
-                        t_hook_0 = time.time()
-                        try:
-                            from src.text_hook import add_text_hook_to_video, DEFAULT_HOOK_STYLE as _HS
-
-                            # Prioridad: hook_box_text generado por la IA (3-6 palabras, estilo chapter title).
-                            # Fallback: video_title (por si la IA no devolvió hook_box_text).
-                            hook_text = (
-                                (script_data.get("hook_box_text") or "").strip()
-                                or (script_data.get("video_title") or "").strip()
-                                or "Top 5 US Presidents"
-                            )
-                            st.caption(f"🎣 Hook de texto: \"{hook_text}\"")
-                            hook_style = {
-                                **_HS,
-                                "duration": hook_duration,
-                                "animation": hook_animation,
-                                "y_position_pct": hook_y_position,
-                                "shadow_color": hook_shadow_color,
-                                "box_color": hook_box_color,
-                                "text_color": hook_text_color,
-                                "font_scale": hook_font_scale,
-                            }
-                            tmp_out = final_video_path + ".tmp.mp4"
-                            add_text_hook_to_video(
-                                final_video_path, hook_text, hook_style, tmp_out,
-                                log_callback=lambda m: status.write(m),
-                            )
-                            # Sustituir el archivo original por el que tiene hook (sin crear _HOOK.mp4)
-                            os.replace(tmp_out, final_video_path)
-
-                            t_hook_1 = time.time()
-                            st_hook_status.success(f"✅ Hook OK ({format_seconds(t_hook_1-t_hook_0)})")
-                        except Exception as e:
-                            st_hook_status.error(f"❌ Error hook: {e}")
-                            print(f"[HOOK ERROR] {traceback.format_exc()}")
-                        _update_overall(_step_pct[4], "🎉 Vídeo completado")
-
-                    # Asegurar que la barra termina al 100% incluso si subs/hook estaban OFF
-                    _update_overall(1.0, "🎉 Vídeo completado")
-                    
-                    # --- RESULTADO FINAL (Layout Optimizado) ---
-                    st.divider()
-                    # Ratio 1:2 para que el video sea más pequeño (ocupa 1/3 de ancho)
-                    col_video, col_details = st.columns([1, 2])
-                    
-                    video_name = os.path.basename(final_video_path)
-                    
-                    with col_video:
-                        st.subheader("📺 Video")
-                        st.video(final_video_path)
-                    
-                    with col_details:
-                        st.subheader("📊 Detalles")
-                        st.success(f"🎉 ¡VIDEO COMPLETADO!")
-                        
-                        # Mostrar Título Sugerido (Si existe)
-                        if "video_title" in script_data:
-                            st.markdown(f"### 📢 {script_data['video_title']}")
-
-                        st.text_input("Archivo:", value=video_name, disabled=True, key=f"v_name_{idx}")
-                        st.write(f"⏱️ Tiempo Total: {format_seconds(t5-t0)}")
-                        st.write(f"📂 Ruta Local: `{final_video_path}`")
-                        st.info("ℹ️ El archivo ya se guardó automáticamente.")
-                        
-                        # Botón único de abrir carpeta
-                        if st.button("📂 Abrir Carpeta de Salida", key=f"btn_open_{idx}"):
-                            # Intento de abrir explorador (Windows)
-                            try:
-                                folder_p = os.path.dirname(final_video_path)
-                                os.startfile(folder_p)
-                            except:
-                                st.warning("No se pudo abrir la carpeta automáticamente.")
-
-                    
-                except Exception as e:
-                    st.error(f"❌ FALLÓ el video '{topic_display}'. Motivo: {e}")
-                    st.warning("⚠️ Saltando al siguiente video de la cola...")
-                    continue # VITAL: No parar la fábrica
-                
-                finally:
-                    # Limpieza Automática (Siempre corre)
-                    try:
-                        if txt_output and os.path.exists(txt_output): shutil.rmtree(txt_output)
-                        if audio_output_folder and os.path.exists(audio_output_folder): shutil.rmtree(audio_output_folder)
-                        for f in os.listdir():
-                            if f.endswith(".mp3") and "TEMP" in f:
-                                try: os.remove(f)
-                                except: pass
-                    except: pass
-                
-            status.update(label="✨ ¡Fábrica Finalizó la Cola!", state="complete", expanded=False)
-            
-            if sound_on: 
-                try: winsound.MessageBeep(winsound.MB_ICONASTERISK)
-                except: pass
-        
-        # BOTÓN DE REINICIO
-        st.markdown("---")
-        col_reset, _ = st.columns([1, 2])
-        with col_reset:
-            if st.button("🔄 REINICIAR / GENERAR NUEVO LOTE", type="primary"):
-                st.rerun()
-                
-        with st.expander("📝 Detalle de Logs Globales"):
-            for l in logs_auto: st.write(l)
+        st.toast(
+            f"➕ {len(queue_inputs)} vídeo(s) de Presidentes encolado(s) — "
+            "se procesarán en orden FIFO. Puedes cambiar de modo y encolar más.",
+            icon="🧵",
+        )
+        time.sleep(0.4)
+        st.rerun()

@@ -139,13 +139,21 @@ def find_money_anchor(words: list[dict], intro_end: float | None = None) -> floa
     Sirve para sincronizar un SFX de dinero con la cifra del bote pronunciada
     al inicio del hook ('cuatro mil quinientos', 'diez mil', etc.).
 
+    Acepta tanto palabras-número en español ('cuatro', 'mil', ...) como tokens
+    de dígitos ('4500', '4.500') por si Whisper transcribe la cifra en formato
+    numérico — caso conocido del modelo `base` con language="es".
+
     Si `intro_end` se da, solo busca antes de ese timestamp.
     """
     for w in words or []:
         ts = float(w.get("start", 0))
         if intro_end is not None and ts >= intro_end:
             break
-        if _norm(w.get("word", "")) in _NUMBER_WORDS:
+        norm = _norm(w.get("word", ""))
+        if norm in _NUMBER_WORDS:
+            return ts
+        cleaned = norm.replace(".", "").replace(",", "")
+        if cleaned.isdigit() and len(cleaned) >= 2:
             return ts
     return None
 

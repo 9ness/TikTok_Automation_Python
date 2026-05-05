@@ -22,11 +22,36 @@ _TIKTOK_ASSETS_RELATIVE_CANDIDATES = (
 def _autodetect_tiktok_root():
     """Escanea las unidades del sistema en busca de la carpeta TIKTOK_ASSETS
     dentro de Google Drive ("Mi unidad"). Devuelve la primera ruta encontrada
-    o None si no se encuentra ninguna."""
+    o None si no se encuentra ninguna.
+
+    Soporta:
+    - Windows: todas las letras de unidad C:\\..Z:\\
+    - Linux (VPS con rclone mount): puntos de montaje típicos:
+      ~/gdrive, /mnt/gdrive, /media/<user>/gdrive, /srv/gdrive
+    """
     if os.name == "nt":
         roots = [f"{letter}:\\" for letter in string.ascii_uppercase]
     else:
-        roots = ["/", os.path.expanduser("~")]
+        # Puntos de montaje típicos en Linux. El primero (~/gdrive) es el que
+        # usa nuestro despliegue VPS por convención (ver deploy/README.md).
+        home = os.path.expanduser("~")
+        roots = [
+            os.path.join(home, "gdrive"),
+            "/mnt/gdrive",
+            "/srv/gdrive",
+            home,
+            "/",
+        ]
+        # Añadir /media/<user>/gdrive y /run/user/<uid>/gvfs (alguna distro)
+        media_root = "/media"
+        if os.path.isdir(media_root):
+            try:
+                for sub in os.listdir(media_root):
+                    p = os.path.join(media_root, sub, "gdrive")
+                    if os.path.isdir(p):
+                        roots.append(p)
+            except OSError:
+                pass
     for root in roots:
         if not os.path.exists(root):
             continue
@@ -85,15 +110,28 @@ def load_config(config_path="config/config.json"):
     # Creamos una nueva sección 'paths' en memoria para que el resto del código siga funcionando igual
     folders = config["folder_structure"]
     
+    # Output folder: por defecto va al subdir de Drive (uso local en Windows).
+    # En el VPS queremos que MoviePy escriba en SSD local y un timer
+    # systemd sincronice contra Drive (más rápido y robusto). Para esto se
+    # puede definir TIKTOK_OUTPUT_LOCAL en el .env del VPS apuntando a una
+    # ruta local — si existe, sobrescribe output_folder.
+    default_output = os.path.join(root_path, folders["output_folder"])
+    output_override = os.getenv("TIKTOK_OUTPUT_LOCAL")
+    if output_override:
+        os.makedirs(output_override, exist_ok=True)
+        output_folder = output_override
+    else:
+        output_folder = default_output
+
     config["paths"] = {
         "library_base": os.path.join(root_path, folders["presidents_folder"]),
         "intro_library": os.path.join(root_path, folders["intro_folder"]),
-        "output_folder": os.path.join(root_path, folders["output_folder"]),
+        "output_folder": output_folder,
         "resources_library": os.path.join(root_path, folders.get("resources_folder", "BIBLIOTECA_RECURSOS")),
         "pronosticos_clips": os.path.join(root_path, folders.get("pronosticos_clips_folder", "BIBLIOTECA_PRONOSTICOS_CLIPS")),
         "temp_folder": folders["temp_folder"],
     }
-    
+
     return config
 
 def find_best_match_folder(character_name_raw, assets_base_path):

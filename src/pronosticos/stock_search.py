@@ -75,6 +75,82 @@ _STOPWORDS = {
     "club",
 }
 
+
+# Aliases de tokens individuales: variantes idiomáticas/ortográficas mapeadas
+# a un canon común. El canon es arbitrario (lo importante es que ambos lados
+# converjan al MISMO canon tras normalizar).
+# Cubre los nombres de ciudad europeos en el guion (TTS español) vs carpeta
+# del usuario (suele estar en inglés/español sin acentos).
+_TOKEN_CANONICAL: dict[str, str] = {
+    # Múnich ↔ Munich ↔ München ↔ Muenchen
+    "munchen": "munich", "muenchen": "munich",
+    # Roma / Rome — el guion suele decir "Roma"
+    "roma": "rome",
+    # Milan / Milano
+    "milano": "milan",
+    # Turín / Torino
+    "torino": "turin",
+    # Nápoles / Napoli / Naples
+    "napoli": "naples", "napoles": "naples",
+    # Florencia / Firenze / Florence
+    "firenze": "florence", "florencia": "florence",
+    # Génova / Genova / Genoa
+    "genova": "genoa",
+    # Venecia / Venezia / Venice
+    "venezia": "venice", "venecia": "venice",
+    # Sevilla / Seville
+    "seville": "sevilla",
+    # Lisboa / Lisbon
+    "lisbon": "lisboa",
+    # Atenas / Athens
+    "athens": "atenas",
+    # Praga / Praha / Prague
+    "praha": "prague", "praga": "prague",
+    # Varsovia / Warszawa / Warsaw
+    "warszawa": "warsaw", "varsovia": "warsaw",
+    # Moscú / Moskva / Moscow
+    "moskva": "moscow", "moscu": "moscow",
+    # Colonia / Köln / Cologne
+    "koln": "cologne", "colonia": "cologne",
+    # Estambul / İstanbul
+    "estambul": "istanbul",
+}
+
+
+# Acrónimos populares de clubes ↔ tokens del nombre largo. Cuando una set de
+# tokens contiene el acrónimo, se añade su expansión (y al revés). Permite que
+# una carpeta llamada simplemente "Psg" matchee con "Paris Saint Germain" del
+# guion, o "BVB" con "Borussia Dortmund".
+_ACRONYM_EXPANSIONS: dict[str, frozenset[str]] = {
+    "psg":  frozenset({"paris", "saint", "germain"}),
+    "bvb":  frozenset({"borussia", "dortmund"}),
+    "manu": frozenset({"manchester", "united"}),
+    "manc": frozenset({"manchester", "city"}),
+    "mufc": frozenset({"manchester", "united"}),
+    "mcfc": frozenset({"manchester", "city"}),
+    "psv":  frozenset({"psv", "eindhoven"}),  # PSV ya está en el nombre largo
+    "rbl":  frozenset({"rb", "leipzig"}),
+}
+
+
+def _normalize_token(t: str) -> str:
+    """Mapea variantes idiomáticas a su token canónico (munchen→munich, etc.)."""
+    return _TOKEN_CANONICAL.get(t, t)
+
+
+def _expand_acronyms(tokens: set[str]) -> set[str]:
+    """Si la set contiene un acrónimo conocido, añade su expansión.
+    Si contiene la expansión completa, añade el acrónimo. Bidireccional.
+    """
+    out = set(tokens)
+    for tok in list(tokens):
+        if tok in _ACRONYM_EXPANSIONS:
+            out.update(_ACRONYM_EXPANSIONS[tok])
+    for acro, expansion in _ACRONYM_EXPANSIONS.items():
+        if expansion.issubset(tokens):
+            out.add(acro)
+    return out
+
 def _strip_accents(s: str) -> str:
     """'Atlético' → 'Atletico'. Necesario para que slugs de equipos con tilde
     se comparen correctamente con carpetas escritas sin tilde."""
@@ -92,8 +168,12 @@ def _slug(text: str) -> str:
 
 
 def _slug_tokens(text: str) -> set[str]:
-    """Tokens significativos de un slug (sin stopwords)."""
-    return {t for t in _slug(text).split("_") if t and t not in _STOPWORDS}
+    """Tokens significativos de un slug (sin stopwords), normalizados y con
+    expansión de acrónimos para tolerar variantes (Múnich/Munchen, PSG/Paris
+    Saint Germain, etc.)."""
+    raw = {t for t in _slug(text).split("_") if t and t not in _STOPWORDS}
+    normalized = {_normalize_token(t) for t in raw}
+    return _expand_acronyms(normalized)
 
 
 def _find_existing_folder(label: str) -> Path | None:
@@ -153,25 +233,48 @@ def get_clips_pool(home_team: str | None = None, away_team: str | None = None,
                    prefer_labels: list[str] | None = None) -> list[str]:
     """Devuelve TODOS los clips disponibles para un pick (en orden de prioridad).
 
-    Estrategia (de más específica a más genérica):
-      1. Carpetas de `prefer_labels` (ej: ['intro']) si tienen clips.
-      2. home_team
-      3. away_team
-      4. league
-      5. general
+    Estrategia:
+      1. Si hay `prefer_labels` (ej: ['intro']), gana la primera de esas carpetas
+         que tenga clips. (Caso especial: la intro NO se mezcla con equipos.)
+      2. Pool de equipos: si home Y away tienen carpeta con clips, devuelve la
+         UNIÓN de ambos pools (así un Atlético-Arsenal alterna stock de ambos).
+         Si solo uno tiene, devuelve ese. Si ninguno → fallback.
+      3. Fallback: league.
+      4. Fallback final: general.
 
-    Devuelve la lista de la PRIMERA carpeta de la cadena que tenga clips. Si
-    ninguna tiene → lista vacía. Caller decide si descargar desde Pexels o
-    usar fondo sólido.
+    Si ningún nivel tiene clips → lista vacía. Caller decide si descargar desde
+    Pexels o usar fondo sólido.
     """
-    labels: list[str] = []
     if prefer_labels:
-        labels.extend(prefer_labels)
-    for label in (home_team, away_team, league, "general"):
-        if label and label not in labels:
-            labels.append(label)
+        for label in prefer_labels:
+            match = _find_existing_folder(label)
+            if match:
+                cached = sorted(match.glob("*.mp4"))
+                if cached:
+                    return [str(p) for p in cached]
+        # prefer_labels es exclusivo: si ninguna lo tiene, NO caemos al pool de
+        # equipos (la llamada de intro espera lista vacía si no hay intro).
+        return []
 
-    for label in labels:
+    # Pool de equipos: union home+away cuando ambos tengan clips
+    team_pool: list[str] = []
+    seen_dirs: set[Path] = set()
+    for team in (home_team, away_team):
+        if not team:
+            continue
+        match = _find_existing_folder(team)
+        if match and match not in seen_dirs:
+            cached = sorted(match.glob("*.mp4"))
+            if cached:
+                team_pool.extend(str(p) for p in cached)
+                seen_dirs.add(match)
+    if team_pool:
+        return team_pool
+
+    # Fallback: league → general
+    for label in (league, "general"):
+        if not label:
+            continue
         match = _find_existing_folder(label)
         if match:
             cached = sorted(match.glob("*.mp4"))
