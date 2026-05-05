@@ -123,24 +123,24 @@ chmod +x setup.sh
 Qué hace (~5-10 min):
 - `apt update && upgrade`
 - Instala FFmpeg, Python 3.12, Redis, rclone, Tailscale, ImageMagick, fuentes
-- Crea usuario `NeBulabsAI` con sudo NOPASSWD
+- Crea usuario `nebulabsai` con sudo NOPASSWD
 - Copia tu clave SSH al usuario nuevo
 - Hardeniza SSH (deshabilita login root con contraseña)
 - Configura UFW (solo permite SSH)
 - Habilita Redis
 
-Cuando acabe, **cierra la sesión SSH y vuelve a entrar como `NeBulabsAI`**:
+Cuando acabe, **cierra la sesión SSH y vuelve a entrar como `nebulabsai`**:
 
 ```powershell
 exit  # cierra root
-ssh NeBulabsAI@49.12.34.56
+ssh nebulabsai@49.12.34.56
 ```
 
 ---
 
 ## Fase 4 — Configurar rclone con Google Drive
 
-Como `NeBulabsAI`:
+Como `nebulabsai`:
 
 ```bash
 rclone config
@@ -205,7 +205,7 @@ Tarda ~5-10 min (instala torch + faster-whisper + descarga modelo Whisper base).
 # Sube tu .env actual al VPS
 scp -i $env:USERPROFILE\.ssh\id_ed25519 `
     "D:\Proyectos_Personales\TikTok_Automation_Python\.env" `
-    NeBulabsAI@49.12.34.56:/home/NeBulabsAI/TikTok_Automation_Python/.env
+    nebulabsai@49.12.34.56:/home/nebulabsai/TikTok_Automation_Python/.env
 ```
 
 ### 5.3. Editar .env en el VPS
@@ -220,10 +220,10 @@ Añade al final (o ajusta si ya existen):
 
 ```env
 # Path del mount rclone (ojo a "Mi unidad" — con espacio, igual que Drive Desktop)
-TIKTOK_ROOT_PATH=/home/NeBulabsAI/gdrive/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS
+TIKTOK_ROOT_PATH=/home/nebulabsai/gdrive/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS
 
 # Outputs locales en SSD del VPS — el timer drive-sync los sube a Drive cada 60s
-TIKTOK_OUTPUT_LOCAL=/home/NeBulabsAI/TikTok_Automation_Python/output_local
+TIKTOK_OUTPUT_LOCAL=/home/nebulabsai/TikTok_Automation_Python/output_local
 ```
 
 Guarda (Ctrl+O, Enter, Ctrl+X). Asegura permisos:

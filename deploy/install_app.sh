@@ -27,7 +27,7 @@ warn() { echo -e "${YELLOW}[install_app]${NC} $1"; }
 err()  { echo -e "${RED}[install_app]${NC} $1" >&2; }
 
 if [[ "$APP_USER" == "root" ]]; then
-    err "No ejecutes este script como root. Cámbiate al usuario de la app primero (su - NeBulabsAI)."
+    err "No ejecutes este script como root. Cámbiate al usuario de la app primero (su - nebulabsai)."
     exit 1
 fi
 

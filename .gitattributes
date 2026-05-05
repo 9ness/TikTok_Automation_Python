@@ -1,0 +1,14 @@
+# Auto-detect text files y normaliza line endings
+* text=auto
+
+# Estos archivos DEBEN tener LF para funcionar en Linux (VPS de despliegue):
+# bash scripts, systemd units, archivos de config Linux.
+*.sh             text eol=lf
+*.service        text eol=lf
+*.timer          text eol=lf
+*.toml           text eol=lf
+deploy/**/*      text eol=lf
+
+# Los .py/.md no son críticos pero los normalizamos LF también
+*.py             text eol=lf
+*.md             text eol=lf

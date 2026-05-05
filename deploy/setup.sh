@@ -2,7 +2,7 @@
 #
 # setup.sh — Provisión inicial del VPS para TikTok Automation Python.
 #
-# Instala dependencias del sistema, crea usuario NeBulabsAI, configura
+# Instala dependencias del sistema, crea usuario nebulabsai, configura
 # firewall, hardeniza SSH e instala FFmpeg, Python, Redis, rclone y
 # Tailscale.
 #
@@ -12,14 +12,14 @@
 #   ./setup.sh
 #
 # IMPORTANTE: editar APP_USER abajo si quieres otro nombre. Por defecto
-# crea el usuario "NeBulabsAI" según lo acordado.
+# crea el usuario "nebulabsai" (minúsculas obligatorias en Debian/Ubuntu).
 
 set -euo pipefail
 
 # ============================================================
 # Configuración (editar antes de ejecutar si hace falta)
 # ============================================================
-APP_USER="NeBulabsAI"
+APP_USER="nebulabsai"  # Linux/Debian no permite mayúsculas por defecto en NAME_REGEX
 APP_USER_PASSWORD=""  # Se rellena interactivamente
 
 # ============================================================
@@ -133,7 +133,7 @@ else
 fi
 
 # Habilitar permitir 'allow_other' en fuse para que el mount sea visible
-# desde otros usuarios (útil para que systemd lo vea bajo NeBulabsAI)
+# desde otros usuarios (útil para que systemd lo vea bajo nebulabsai)
 if [[ -f /etc/fuse.conf ]]; then
     sed -i 's/^#*user_allow_other/user_allow_other/' /etc/fuse.conf
     grep -q user_allow_other /etc/fuse.conf || echo "user_allow_other" >> /etc/fuse.conf

@@ -13,7 +13,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-APP_USER="NeBulabsAI"
+APP_USER="nebulabsai"
 APP_DIR="/home/${APP_USER}/TikTok_Automation_Python"
 TEMPLATES="${APP_DIR}/deploy/systemd"
 SYSTEMD_DIR="/etc/systemd/system"

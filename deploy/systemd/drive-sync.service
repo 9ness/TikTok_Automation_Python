@@ -5,10 +5,10 @@ Requires=gdrive-mount.service
 
 [Service]
 Type=oneshot
-User=NeBulabsAI
-Group=NeBulabsAI
-WorkingDirectory=/home/NeBulabsAI/TikTok_Automation_Python
-ExecStart=/home/NeBulabsAI/TikTok_Automation_Python/deploy/sync_outputs.sh
+User=nebulabsai
+Group=nebulabsai
+WorkingDirectory=/home/nebulabsai/TikTok_Automation_Python
+ExecStart=/home/nebulabsai/TikTok_Automation_Python/deploy/sync_outputs.sh
 
 # Sin restart — el timer se encarga de relanzar
 StandardOutput=journal
