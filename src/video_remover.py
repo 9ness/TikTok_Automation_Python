@@ -22,9 +22,12 @@ class VideoRemover:
             raise ValueError("OPENAI_API_KEY no encontrada en el entorno.")
         self.client = openai.OpenAI(api_key=self.api_key)
         self.reader = None
-        self.font_path = "C:\\Windows\\Fonts\\impact.ttf"
+        # Path Windows; resolve_font() lo traduce a la ruta válida en Linux
+        # cada vez que se llama a ImageFont.truetype con esta cadena.
+        from src.font_resolver import resolve_font
+        self.font_path = resolve_font("C:\\Windows\\Fonts\\impact.ttf")
         if not os.path.exists(self.font_path):
-            self.font_path = "C:\\Windows\\Fonts\\arialbd.ttf"
+            self.font_path = resolve_font("C:\\Windows\\Fonts\\arialbd.ttf")
             
         self.trajectory = []
         self.cached_hook = None # Caché para previsualización

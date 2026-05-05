@@ -64,6 +64,16 @@ apt-get install -y -qq \
     libsm6 libxext6 libxrender1 libgl1 \
     imagemagick
 
+# ttf-mscorefonts-installer (Impact, Arial, Verdana, Times, Comic Sans, Trebuchet,
+# Georgia, Courier — son las fuentes que el código hardcodea como C:\Windows\Fonts\*).
+# Repo "contrib" + auto-aceptar EULA de Microsoft.
+add-apt-repository -y contrib 2>/dev/null || true
+apt-get update -qq
+echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true \
+    | debconf-set-selections
+apt-get install -y -qq ttf-mscorefonts-installer || warn "ttf-mscorefonts-installer falló — el código caerá a fallbacks DejaVu"
+fc-cache -fv 2>/dev/null || true
+
 # ImageMagick: MoviePy lo usa para algunos efectos de texto. Por defecto
 # tiene una policy que bloquea lectura/escritura de @* (un viejo CVE).
 # Permitimos la operación segura para que MoviePy funcione.

@@ -10,7 +10,6 @@ largo de la duración del segmento (centrado vertical-bajo).
 
 from __future__ import annotations
 
-import os
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -18,12 +17,12 @@ from moviepy.editor import ImageClip
 
 
 def _load_font(size: int):
+    from src.font_resolver import resolve_font
     for path in (r"C:\Windows\Fonts\impact.ttf", r"C:\Windows\Fonts\arialbd.ttf"):
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                continue
+        try:
+            return ImageFont.truetype(resolve_font(path), size)
+        except Exception:
+            continue
     return ImageFont.load_default()
 
 

@@ -42,7 +42,7 @@
         "minimax_url": "https://api.minimax.chat/v1/text_to_speech"
     },
     "copyright_cleaner_settings": {
-        "font_path": "C:\\Windows\\Fonts\\impact.ttf",
+        "_comment": "font_path se resuelve en runtime vía src/font_resolver.py — no hardcodear",
         "font_size_ratio": 0.4,
         "zoom_factor": 1.08,
         "subtitle_color": "yellow",

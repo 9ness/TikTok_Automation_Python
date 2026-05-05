@@ -19,7 +19,6 @@ y esas no están garantizadas en Windows estándar.
 from __future__ import annotations
 
 import io
-import os
 
 import requests
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -53,17 +52,17 @@ def _label_for_pick(pick: str) -> str:
 
 
 def _font(size: int, bold: bool = True):
+    from src.font_resolver import resolve_font
     candidates = (
         [r"C:\Windows\Fonts\impact.ttf", r"C:\Windows\Fonts\arialbd.ttf"]
         if bold else
         [r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"]
     )
     for path in candidates:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                continue
+        try:
+            return ImageFont.truetype(resolve_font(path), size)
+        except Exception:
+            continue
     return ImageFont.load_default()
 
 

@@ -14,7 +14,6 @@ el nombre de usuario, la descripción y los botones.
 
 from __future__ import annotations
 
-import os
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -183,19 +182,21 @@ def _apply_case(text: str, case_mode: str) -> str:
 
 
 def _load_font(font_path: str, size: int):
+    # resolve_font traduce paths Windows → ruta válida en el OS actual
+    # (Linux: msttcorefonts o DejaVu como fallback)
+    from src.font_resolver import resolve_font
     try:
-        return ImageFont.truetype(font_path, size)
+        return ImageFont.truetype(resolve_font(font_path), size)
     except Exception:
         for fallback in [
             r"C:\Windows\Fonts\impact.ttf",
             r"C:\Windows\Fonts\arialbd.ttf",
             r"C:\Windows\Fonts\arial.ttf",
         ]:
-            if os.path.exists(fallback):
-                try:
-                    return ImageFont.truetype(fallback, size)
-                except Exception:
-                    continue
+            try:
+                return ImageFont.truetype(resolve_font(fallback), size)
+            except Exception:
+                continue
         return ImageFont.load_default()
 
 
