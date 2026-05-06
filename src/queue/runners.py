@@ -427,8 +427,17 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                     os.remove(tmp_audio)
                 except Exception:
                     pass
+            except ModuleNotFoundError as e:
+                # Dependencia faltante — visible y específico para que se note
+                on_log(
+                    f"❌ Subs OMITIDOS — falta dependencia: {e.name}. "
+                    f"Instala en el VPS con: venv/bin/pip install -r requirements.txt"
+                )
+                print(f"[Presidents/SUBS] ModuleNotFoundError: {e}")
+                print(traceback.format_exc())
             except Exception as e:
-                on_log(f"❌ Error subs: {e}")
+                on_log(f"❌ Error subs (vídeo se entrega SIN subs): {e}")
+                print(f"[Presidents/SUBS] Detalle: {traceback.format_exc()}")
             on_progress(cum[3], "🎣 Añadiendo hook…")
 
         # ----- 5. HOOK (opcional) -----
