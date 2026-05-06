@@ -35,28 +35,38 @@ def _has_fragment() -> bool:
 
 
 def render_queue_widget(persist_dir: str | None = None) -> None:
-    """Renderiza el widget global de cola. Llamar una vez al principio
-    de cada vista (después de st.title)."""
+    """Renderiza el botón de cola como popover (no inline). Llamar una vez
+    al principio de cada vista, idealmente en una columna a la derecha del
+    título.
+
+    En vez de ocupar espacio vertical de la página, se muestra como un
+    botón compacto "🧵 Cola (N)" que al pulsarlo despliega el panel
+    completo (running, pending, recientes)."""
     queue = get_queue(persist_dir)
 
-    # Header del widget
     running = queue.get_running()
     pending = queue.get_pending()
-
     badge_count = len(pending) + (1 if running else 0)
-    badge = f" · {badge_count} activo(s)" if badge_count else ""
+
+    # Etiqueta del botón. Si hay actividad, mostramos contador destacado.
+    if running:
+        label = f"🎬 Cola · {badge_count}"
+    elif pending:
+        label = f"🧵 Cola · {badge_count}"
+    else:
+        label = "🧵 Cola"
 
     if _has_fragment() and (running or pending):
-        # Fragment auto-refresh cada 2s mientras haya jobs vivos.
-        # No re-ejecuta toda la app, solo este bloque.
+        # Fragment auto-refresh cada 2s para que el progreso se actualice
+        # mientras el popover esté abierto. Cuando está cerrado igual sigue
+        # rerunneando (es lo que hay con st.fragment).
         @st.fragment(run_every=2)
         def _live_block():
             _render_inner(queue)
-        with st.expander(f"🧵 Cola de generación{badge}", expanded=bool(running)):
+        with st.popover(label, use_container_width=True):
             _live_block()
     else:
-        with st.expander(f"🧵 Cola de generación{badge}",
-                         expanded=bool(running or pending)):
+        with st.popover(label, use_container_width=True):
             _render_inner(queue)
 
 

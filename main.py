@@ -169,14 +169,14 @@ if cleaner_error:
 
 
 
-st.title("🏭 TikTok Creator Reward Auto")
-
-# Widget global de cola (compartido entre todos los modos). Ver src/queue/.
-# El JobQueue es un singleton vivo entre reruns + worker thread daemon que
-# procesa los jobs FIFO; el usuario puede encolar desde cualquier modo y
-# reordenar prioridad.
+# Header: título + botón de cola (popover) alineados horizontalmente.
+# La cola ya no ocupa espacio vertical inline — se abre on-demand.
 _QUEUE_PERSIST_DIR = CFG["paths"].get("temp_folder") if CFG else None
-render_queue_widget(_QUEUE_PERSIST_DIR)
+_hcol_title, _hcol_queue = st.columns([4, 1], vertical_alignment="bottom")
+with _hcol_title:
+    st.title("🏭 TikTok Creator Reward Auto")
+with _hcol_queue:
+    render_queue_widget(_QUEUE_PERSIST_DIR)
 
 # ---------------------------------------------------------
 # ---------------------------------------------------------
@@ -2007,16 +2007,6 @@ if True:
             help="Hooks y CTAs dinámicos variados por IA.",
         )
 
-    # Whitelist movida a expander (raramente se consulta)
-    with st.expander("📋 Whitelist de personajes disponibles", expanded=False):
-        try:
-            assets = guionista.get_available_assets()
-            chars = [c.strip() for c in assets.split(",") if c.strip()]
-            st.caption(f"{len(chars)} personajes detectados en BIBLIOTECA_PRESIDENTES/:")
-            st.code(", ".join(chars), language=None)
-        except Exception as e:
-            st.warning(f"No pude leer la whitelist: {e}")
-
     # Inputs dinámicos: 2 columnas en desktop, apiladas en móvil
     queue_inputs = []
     grid_cols = st.columns(2)
@@ -2025,21 +2015,24 @@ if True:
         with grid_cols[col_idx]:
             st.markdown(f"**🎬 Vídeo {i+1}**")
 
-            # Fila compacta: Top + Palabra (50/50)
-            s1, s2 = st.columns(2)
-            with s1:
-                top_count = st.selectbox(
-                    "Top",
-                    [5, 4, 3],
-                    key=f"top_count_{i}",
-                    help="Nº de presidentes del ranking.",
-                )
-            with s2:
-                prefix_word = st.selectbox(
-                    "Prefijo",
-                    ["The", "Top"],
-                    key=f"prefix_word_{i}",
-                )
+            # Fila compacta: Top + Prefijo (50/50). Wrapper con key para
+            # que el CSS móvil mantenga estas 2 cols en línea — la regla
+            # global de mobile_ui.py apilaría ambos al 100% si no.
+            with st.container(key=f"compact_row_{i}"):
+                s1, s2 = st.columns(2)
+                with s1:
+                    top_count = st.selectbox(
+                        "Top",
+                        [5, 4, 3],
+                        key=f"top_count_{i}",
+                        help="Nº de presidentes del ranking.",
+                    )
+                with s2:
+                    prefix_word = st.selectbox(
+                        "Prefijo",
+                        ["The", "Top"],
+                        key=f"prefix_word_{i}",
+                    )
 
             # Tema (input principal, full-width)
             topic = st.text_input(

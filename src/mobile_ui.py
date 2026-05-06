@@ -195,6 +195,16 @@ hr { margin: 0.8rem 0 !important; opacity: 0.4; }
         min-width: 48% !important;
         width: 48% !important;
     }
+
+    /* Excepción: contenedores marcados con key="compact_row_*" mantienen
+       sus columnas internas en horizontal (50/50) en móvil. Útil para
+       pares Top+Prefijo, etc. donde el stacking forzado deja widgets
+       cortos como Selectbox a 100% y desperdicia altura. */
+    [class*="st-key-compact_row_"] [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - 0.3rem) !important;
+        min-width: calc(50% - 0.3rem) !important;
+        width: calc(50% - 0.3rem) !important;
+    }
     /* Padding interno + tipografía agresiva (selectores específicos
        para ganar a las clases auto-generadas de emotion) */
     [data-testid="stMetric"] {
