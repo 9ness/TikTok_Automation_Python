@@ -70,6 +70,12 @@ def get_status() -> dict:
         - state: "running" | "success" | "failed" | "unknown"
         - current_sha: str ("?" si no se puede determinar)
         - age_seconds: int (segundos desde el último cambio relevante)
+
+    Si el JSON registra un estado "failed"/"running" pero el HEAD real
+    de git es DISTINTO al registrado, asumimos que hubo una recuperación
+    manual (alguien hizo git pull + restart por SSH) y reseteamos el
+    estado a success en el SHA real. Sin esta detección el badge se
+    quedaría rojo para siempre tras un fallo aunque la app ya esté OK.
     """
     info = {
         "state": "unknown",
@@ -91,25 +97,46 @@ def get_status() -> dict:
         except Exception:
             pass
 
-    # 2. Si current_sha sigue desconocido, fallback a git
-    if info["current_sha"] == "?":
-        sha_short = _git_head_sha(short=True)
-        sha_full = _git_head_sha(short=False)
-        if sha_short:
-            info["current_sha"] = sha_short
-        if sha_full:
-            info["current_sha_full"] = sha_full
+    # 2. Leer SIEMPRE el HEAD real de git (independiente del JSON)
+    actual_sha = _git_head_sha(short=True)
+    actual_sha_full = _git_head_sha(short=False)
 
-    # 3. Calcular edad
+    # 3. Detección de recuperación manual: estado registrado dice failed
+    #    o running, pero HEAD ya está en otro SHA → manual recovery hecha,
+    #    el estado JSON está obsoleto.
+    recorded = info.get("current_sha")
+    state = info.get("state")
+    is_stale = (
+        state in ("failed", "running")
+        and actual_sha
+        and recorded
+        and recorded not in ("?", None)
+        and recorded != actual_sha
+    )
+    if is_stale:
+        info["state"] = "success"
+        info["current_sha"] = actual_sha
+        info["current_sha_full"] = actual_sha_full or "?"
+        info["error"] = None
+        info["finished_at"] = _git_head_time()  # fecha del commit
+        info["recovered_manually"] = True
+
+    # 4. Si current_sha sigue desconocido (no había JSON), fallback a git
+    if info["current_sha"] == "?":
+        if actual_sha:
+            info["current_sha"] = actual_sha
+        if actual_sha_full:
+            info["current_sha_full"] = actual_sha_full
+
+    # 5. Calcular edad
     now = time.time()
     ref_time = info.get("finished_at") or info.get("started_at")
     if ref_time is None:
-        # Sin deploy registrado → edad = age del commit en HEAD
         ref_time = _git_head_time()
     if ref_time is not None:
         info["age_seconds"] = int(max(0, now - ref_time))
 
-    # 4. Si no hay state pero tenemos sha, asumimos success (ya está corriendo)
+    # 6. Si no hay state pero tenemos sha, asumimos success (ya está corriendo)
     if info["state"] == "unknown" and info["current_sha"] != "?":
         info["state"] = "success"
 
