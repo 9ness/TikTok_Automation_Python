@@ -3,9 +3,36 @@ import os
 import shutil
 import time
 from datetime import datetime
-import winsound # For audio notification (Windows)
 import sys
 import PIL.Image
+
+# winsound es Windows-only. En Linux (VPS) usamos un no-op para que el código
+# de notificación sonora siga compilando sin tocar las llamadas existentes.
+if sys.platform.startswith("win"):
+    import winsound  # noqa: F401  (lo usan partes del código más abajo)
+else:
+    class _WinSoundShim:
+        """Stub no-op de winsound en Linux/macOS. Define solo lo que el
+        código existente referencia (MB_ICONASTERISK + MessageBeep)."""
+        MB_ICONASTERISK = 0x40
+        MB_OK = 0x00
+        MB_ICONHAND = 0x10
+        MB_ICONQUESTION = 0x20
+        MB_ICONEXCLAMATION = 0x30
+
+        @staticmethod
+        def MessageBeep(_type=0):
+            return None
+
+        @staticmethod
+        def Beep(_freq, _dur):
+            return None
+
+        @staticmethod
+        def PlaySound(*_args, **_kwargs):
+            return None
+
+    winsound = _WinSoundShim()  # type: ignore[assignment]
 import glob
 import traceback
 from dotenv import load_dotenv
