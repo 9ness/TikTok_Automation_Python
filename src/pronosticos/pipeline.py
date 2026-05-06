@@ -373,7 +373,41 @@ def _perfil_visual_silent(perfil_path: str, duration: float, W: int, H: int,
     return img.set_position(("center", y_top)).set_duration(duration)
 
 
-def _plan_clips_for_segment(segment_dur: float, available_clips: list[str],
+class _ClipDeck:
+    """Baraja sin reposición: entrega clips en orden aleatorio y solo repite
+    cuando se han usado TODOS. Estado compartido entre segmentos que usan la
+    misma pool (ej: en `single_match` los N picks comparten pool, así clip A
+    no sale en pick 1 y otra vez en pick 2 mientras quede B sin estrenar).
+    """
+
+    def __init__(self, clips: list[str]):
+        self._clips: list[str] = list(clips)
+        self._remaining: list[str] = []
+        self._last: str | None = None
+
+    @property
+    def size(self) -> int:
+        return len(self._clips)
+
+    def take(self, n: int) -> list[str]:
+        out: list[str] = []
+        for _ in range(n):
+            if not self._remaining:
+                self._remaining = list(self._clips)
+                random.shuffle(self._remaining)
+                # Evitar que el último del ciclo anterior abra el siguiente
+                if (self._last and len(self._remaining) > 1
+                        and self._remaining[0] == self._last):
+                    self._remaining[0], self._remaining[1] = (
+                        self._remaining[1], self._remaining[0]
+                    )
+            clip = self._remaining.pop(0)
+            self._last = clip
+            out.append(clip)
+        return out
+
+
+def _plan_clips_for_segment(segment_dur: float, deck: _ClipDeck,
                             target_clip_dur: float = 12.0,
                             min_clip_dur: float = 8.0,
                             max_clip_dur: float = 18.0) -> list[tuple[str, float]]:
@@ -384,33 +418,34 @@ def _plan_clips_for_segment(segment_dur: float, available_clips: list[str],
       - Mínimo `min_clip_dur` por clip (8s) — clips más cortos cansan al ojo.
       - Máximo `max_clip_dur` por clip (18s) — más largos aburren.
       - Si solo hay 1 clip o el segmento es muy corto, usa 1 solo clip.
-      - No repite clips dentro de un segmento si la pool tiene suficientes.
+      - No repite clips dentro de un segmento si el deck tiene suficientes.
+      - El deck garantiza que entre segmentos tampoco se repite hasta agotar
+        todos los clips disponibles.
 
     Returns: lista [(clip_path, duration), ...] cuya suma == segment_dur.
-    Si no hay clips, devuelve []  (caller usa fondo sólido).
+    Si el deck está vacío, devuelve []  (caller usa fondo sólido).
     """
-    if not available_clips or segment_dur <= 0:
+    available = deck.size
+    if available == 0 or segment_dur <= 0:
         return []
 
     # Caso trivial: segmento corto → 1 solo clip
     if segment_dur < min_clip_dur * 1.25:
-        return [(random.choice(available_clips), segment_dur)]
+        return [(deck.take(1)[0], segment_dur)]
 
     # Cuántos clips encajan apuntando a target_clip_dur
     n_ideal = max(1, round(segment_dur / target_clip_dur))
-    # No más clips que los disponibles (evita repeticiones)
-    n_clips = min(n_ideal, len(available_clips))
+    # No más clips que los disponibles (evita repeticiones dentro del segmento)
+    n_clips = min(n_ideal, available)
     # Bajar n_clips hasta que cada uno supere min_clip_dur
     while n_clips > 1 and (segment_dur / n_clips) < min_clip_dur:
         n_clips -= 1
     # Subir n_clips si cada uno excede max_clip_dur (y hay disponibilidad)
-    while (segment_dur / n_clips) > max_clip_dur and n_clips < len(available_clips):
+    while (segment_dur / n_clips) > max_clip_dur and n_clips < available:
         n_clips += 1
 
     dur_each = segment_dur / n_clips
-    pool = list(available_clips)
-    random.shuffle(pool)
-    selected = pool[:n_clips]
+    selected = deck.take(n_clips)
     return [(clip, dur_each) for clip in selected]
 
 
@@ -438,12 +473,28 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
     """
     timeline = []
 
+    # Decks compartidos: pools con exactamente los mismos clips reutilizan el
+    # mismo deck → un clip no se repite hasta agotar la baraja, ni siquiera
+    # entre segmentos distintos. Caso típico: `single_match` (todos los picks
+    # con la misma pool) o intro que hereda del pick 1.
+    decks_by_pool: dict[frozenset, _ClipDeck] = {}
+
+    def _deck_for(pool: list[str]) -> _ClipDeck:
+        if not pool:
+            return _ClipDeck([])
+        sig = frozenset(pool)
+        d = decks_by_pool.get(sig)
+        if d is None:
+            d = _ClipDeck(pool)
+            decks_by_pool[sig] = d
+        return d
+
     # ── INTRO ──
     intro_start, intro_end = segments["intro"]
     intro_dur = max(0.0, intro_end - intro_start)
     if intro_dur > 0:
         intro_pool = clip_pools.get("intro") or clip_pools.get("1") or []
-        plan = _plan_clips_for_segment(intro_dur, intro_pool)
+        plan = _plan_clips_for_segment(intro_dur, _deck_for(intro_pool))
         if plan:
             cursor = intro_start
             for clip_path, d in plan:
@@ -486,7 +537,7 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
         # Stock múltiple para el resto del segmento
         if stock_dur > 0:
             pool = clip_pools.get(str(i)) or []
-            plan = _plan_clips_for_segment(stock_dur, pool)
+            plan = _plan_clips_for_segment(stock_dur, _deck_for(pool))
             if plan:
                 cursor = stock_start
                 for clip_path, d in plan:
@@ -506,7 +557,7 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
     if covered < audio_duration - 0.05:
         pad = audio_duration - covered
         last_pool = clip_pools.get(str(len(picks))) or clip_pools.get("1") or []
-        plan = _plan_clips_for_segment(pad, last_pool)
+        plan = _plan_clips_for_segment(pad, _deck_for(last_pool))
         if plan:
             cursor = covered
             for clip_path, d in plan:
