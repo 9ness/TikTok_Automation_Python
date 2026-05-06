@@ -237,12 +237,13 @@ def require_login() -> str:
         # dejamos continuar el resto de main.py
         _record_success(client_ip)
         username = st.session_state.get("username", "")
-        # Logout button + nombre + badge de versión en sidebar
+        # Logout button + nombre + badge versión + diagnóstico en sidebar
         with st.sidebar:
             st.divider()
             st.caption(f"👤 Conectado: **{username}**")
             authenticator.logout(button_name="🚪 Cerrar sesión", location="sidebar")
             _render_version_badge()
+            _render_diagnostics_expander()
         return username
 
     if auth_status is False:
@@ -311,6 +312,122 @@ def _render_version_badge() -> None:
     except Exception as e:
         # Nunca rompemos el sidebar por un error en el badge
         print(f"[auth/version_badge] {e}")
+
+
+# ============================================================
+# Panel de diagnóstico (sidebar) — para ver logs desde el móvil sin SSH
+# ============================================================
+def _render_diagnostics_expander() -> None:
+    """Expander en la sidebar con tabs de diagnóstico:
+    Resumen / Deploy / App / Webhook / Mount / Cola.
+
+    Cada tab carga sus datos solo cuando el usuario lo pulsa
+    (lazy via st.tabs — Streamlit crea los tabs pero el contenido
+    solo se ejecuta al renderizar). Para forzar refresh hay un botón.
+    """
+    try:
+        with st.expander("🩺 Diagnóstico", expanded=False):
+            from src import diagnostics as diag
+
+            # Botón refresh manual (provoca rerun)
+            if st.button("🔄 Refrescar", key="diag_refresh",
+                         use_container_width=True):
+                st.rerun()
+
+            tabs = st.tabs([
+                "📊 Resumen", "🚀 Deploy", "🎬 App",
+                "🔔 Webhook", "💾 Mount", "🧵 Cola"
+            ])
+
+            # ---- Resumen ----
+            with tabs[0]:
+                services = diag.get_services_status()
+                for name, state in services.items():
+                    if state == "active":
+                        st.markdown(f"✅ **{name}**: `{state}`")
+                    elif state in ("activating", "reloading"):
+                        st.markdown(f"⏳ **{name}**: `{state}`")
+                    else:
+                        st.markdown(f"❌ **{name}**: `{state}`")
+
+                gst = diag.get_git_status()
+                st.markdown("**Git:**")
+                if gst.get("head_local"):
+                    st.caption(f"HEAD local: `{gst['head_local_msg']}`")
+                if gst.get("head_remote"):
+                    st.caption(f"GitHub:     `{gst['head_remote_msg']}`")
+                pending = gst.get("pending_commits") or ""
+                if pending:
+                    st.warning(
+                        f"⚠️ Hay commits sin aplicar:\n```\n{pending}\n```"
+                    )
+                else:
+                    st.success("✅ HEAD local = GitHub (al día)")
+                if gst.get("is_dirty"):
+                    st.warning("⚠️ working tree con cambios sin commitear")
+
+                queue = diag.get_queue_summary()
+                st.markdown("**Cola:**")
+                st.caption(
+                    f"total: {queue.get('total', 0)} · "
+                    f"pendientes: {queue.get('pending', 0)} · "
+                    f"corriendo: {queue.get('running', 0)} · "
+                    f"completados: {queue.get('completed', 0)} · "
+                    f"fallidos: {queue.get('failed', 0)}"
+                )
+
+                st.markdown("**Disco:**")
+                st.code(diag.get_disk_space(), language=None)
+
+            # ---- Deploy ----
+            with tabs[1]:
+                st.caption("`logs/deploy.log` (auto-deploy desde GitHub):")
+                st.code(diag.get_deploy_log(60), language=None)
+
+            # ---- App ----
+            with tabs[2]:
+                st.caption("`journalctl -u tiktok-factory` (Streamlit):")
+                st.code(diag.get_app_logs(50), language=None)
+
+            # ---- Webhook ----
+            with tabs[3]:
+                st.caption("`journalctl -u tiktok-webhook` (recibe pushes GitHub):")
+                st.code(diag.get_webhook_logs(30), language=None)
+
+            # ---- Mount ----
+            with tabs[4]:
+                st.caption("`journalctl -u gdrive-mount` (Drive rclone):")
+                st.code(diag.get_mount_logs(30), language=None)
+
+            # ---- Cola detallada ----
+            with tabs[5]:
+                from src.queue import get_queue
+                from src.queue.models import JobStatus
+                try:
+                    q = get_queue()
+                    all_jobs = q.get_all()
+                    if not all_jobs:
+                        st.info("Cola vacía.")
+                    else:
+                        for j in all_jobs[-20:]:
+                            icon = {
+                                JobStatus.PENDING: "🕐",
+                                JobStatus.RUNNING: "🎬",
+                                JobStatus.COMPLETED: "✅",
+                                JobStatus.FAILED: "❌",
+                                JobStatus.CANCELLED: "⛔",
+                            }.get(j.status, "·")
+                            st.caption(
+                                f"{icon} `{j.id}` · {j.mode.value} · "
+                                f"{j.status.value} · {j.title[:40]}"
+                            )
+                            if j.error:
+                                st.code(j.error[:500], language=None)
+                except Exception as e:
+                    st.warning(f"No se pudo leer la cola: {e}")
+    except Exception as e:
+        # Diagnóstico no debe romper la app — log y silencio
+        print(f"[auth/diagnostics] {e}")
 
 
 # ============================================================
