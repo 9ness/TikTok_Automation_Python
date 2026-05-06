@@ -164,8 +164,31 @@ def require_login() -> str:
 
     Renderiza también el botón Logout en la sidebar para sesiones activas.
     """
-    # Lazy import — evitamos cargar streamlit-authenticator cuando no haya
-    # auth configurado en el .env (modo dev local sin login).
+    cookie_key = os.getenv("AUTH_COOKIE_KEY", "").strip()
+    cookie_name = os.getenv("AUTH_COOKIE_NAME", "tiktok_factory_auth").strip()
+    expiry_days = int(os.getenv("AUTH_COOKIE_EXPIRY_DAYS", "30"))
+
+    users = _load_users_from_env()
+
+    # Modo "auth desactivada" — útil en dev local sin AUTH_*. Se detecta
+    # ANTES de importar streamlit-authenticator (no requiere la dependencia
+    # instalada localmente).
+    if not users and not cookie_key:
+        st.session_state.setdefault("_authed_user", "dev")
+        return "dev"
+
+    # Config a medias = error fatal
+    if not users or not cookie_key:
+        st.error(
+            "❌ Auth mal configurada. Necesitas en .env:\n"
+            "  - AUTH_COOKIE_KEY (token random)\n"
+            "  - Al menos un par USERNAME_X / PASSWORD_HASH_X\n\n"
+            "Genera el hash con: `python -m src.auth hash 'tu_password'`"
+        )
+        st.stop()
+
+    # Lazy import — solo se requiere streamlit-authenticator cuando hay auth
+    # configurada (en el VPS). En dev local sin AUTH_* no se ejecuta.
     try:
         import streamlit_authenticator as stauth
     except ImportError:
@@ -173,28 +196,6 @@ def require_login() -> str:
             "❌ Falta dependencia: `streamlit-authenticator`. Instala con "
             "`pip install streamlit-authenticator`. Si estás en el VPS, "
             "actualiza requirements.txt y reinstala el venv."
-        )
-        st.stop()
-
-    cookie_key = os.getenv("AUTH_COOKIE_KEY", "").strip()
-    cookie_name = os.getenv("AUTH_COOKIE_NAME", "tiktok_factory_auth").strip()
-    expiry_days = int(os.getenv("AUTH_COOKIE_EXPIRY_DAYS", "30"))
-
-    users = _load_users_from_env()
-
-    # Modo "auth desactivada" — útil en dev local. Se activa NO definiendo
-    # ningún USERNAME_* + PASSWORD_HASH_* y sin AUTH_COOKIE_KEY.
-    if not users or not cookie_key:
-        if not users and not cookie_key:
-            # Sin auth configurada: dev mode, no bloqueamos
-            st.session_state.setdefault("_authed_user", "dev")
-            return "dev"
-        # Config a medias = error fatal
-        st.error(
-            "❌ Auth mal configurada. Necesitas en .env:\n"
-            "  - AUTH_COOKIE_KEY (token random)\n"
-            "  - Al menos un par USERNAME_X / PASSWORD_HASH_X\n\n"
-            "Genera el hash con: `python -m src.auth hash 'tu_password'`"
         )
         st.stop()
 
