@@ -54,6 +54,34 @@ touch /var/log/rclone.log
 chown "${APP_USER}:${APP_USER}" /var/log/rclone.log
 chmod 644 /var/log/rclone.log
 
+# ============================================================
+# Sudoers granular para el auto-deploy
+# El webhook listener (tiktok-webhook.service) corre como nebulabsai y
+# necesita reiniciar tiktok-factory tras cada git pull. Le damos NOPASSWD
+# SOLO para ese comando exacto — ni shell ni nada más. Defensa-en-profundidad
+# por si alguien rompe el HMAC del webhook (improbable, pero por si acaso).
+# ============================================================
+SUDOERS_FILE="/etc/sudoers.d/${APP_USER}-deploy"
+SUDOERS_TMP=$(mktemp)
+cat > "$SUDOERS_TMP" <<EOF
+# Auto-generado por register_services.sh — permite al webhook reiniciar
+# la app sin password tras un push validado de GitHub.
+${APP_USER} ALL=(ALL) NOPASSWD: /bin/systemctl restart tiktok-factory, /bin/systemctl restart tiktok-factory.service, /usr/bin/systemctl restart tiktok-factory, /usr/bin/systemctl restart tiktok-factory.service
+EOF
+
+# Validar SIEMPRE con visudo antes de mover al sistema. Si visudo falla,
+# abortamos sin tocar /etc/sudoers.d/ — un sudoers roto deja al sistema
+# inutilizable para sudo.
+if visudo -c -f "$SUDOERS_TMP" >/dev/null; then
+    install -m 0440 -o root -g root "$SUDOERS_TMP" "$SUDOERS_FILE"
+    rm -f "$SUDOERS_TMP"
+    log "  ✅ sudoers granular: $SUDOERS_FILE"
+else
+    rm -f "$SUDOERS_TMP"
+    echo "ERROR: el sudoers generado falló visudo -c. Abortando." >&2
+    exit 1
+fi
+
 # Permisos del .env
 if [[ -f "${APP_DIR}/.env" ]]; then
     chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"

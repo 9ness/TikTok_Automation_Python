@@ -21,8 +21,14 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
-# Hardening: el listener no necesita escribir más allá del repo
-NoNewPrivileges=true
+# Hardening:
+# - ProtectSystem=full → /usr, /boot, /etc en read-only para el proceso
+# - User=nebulabsai → nunca corre como root
+# OJO: NO ponemos NoNewPrivileges=true porque el deploy script lanza sudo
+# (setuid) para `systemctl restart tiktok-factory`. NoNewPrivileges bloquea
+# todo binario setuid, lo que rompería el restart. La defensa-en-profundidad
+# va por sudoers granular: ver /etc/sudoers.d/nebulabsai-deploy creado por
+# register_services.sh — solo permite el comando exacto del restart.
 ProtectSystem=full
 
 [Install]

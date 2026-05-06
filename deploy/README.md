@@ -433,8 +433,14 @@ Verás:
 - Solo acepta `push` events sobre rama `main` (resto se ignora con 200)
 - Si secret está mal, devuelve 401 sin más
 - Lock con `flock` evita 2 deploys concurrentes si llegan 2 pushes seguidos
-- El listener corre como `nebulabsai`, no como root; el restart vía sudo
-  está permitido por NOPASSWD configurado en setup.sh
+- El listener corre como `nebulabsai`, no como root
+- Sudoers **granular** en `/etc/sudoers.d/nebulabsai-deploy` — solo permite
+  el comando exacto `systemctl restart tiktok-factory`, ni shell ni nada
+  más. Generado automáticamente por `register_services.sh` con validación
+  `visudo -c`
+- ⚠️ **NO** poner `NoNewPrivileges=true` en `tiktok-webhook.service` —
+  bloquearía sudo (setuid). La defensa va por sudoers granular, no por
+  capabilities
 
 ### Logs útiles
 ```bash
