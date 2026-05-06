@@ -1,4 +1,4 @@
-"""Login gate para la app — usado en main.py.
+"""Login gate para la app — usado en main.py + badge de versión desplegada.
 
 Estrategia:
 - Credenciales (usuario + bcrypt hash) en variables de entorno (.env)
@@ -237,11 +237,12 @@ def require_login() -> str:
         # dejamos continuar el resto de main.py
         _record_success(client_ip)
         username = st.session_state.get("username", "")
-        # Logout button + nombre en sidebar
+        # Logout button + nombre + badge de versión en sidebar
         with st.sidebar:
             st.divider()
             st.caption(f"👤 Conectado: **{username}**")
             authenticator.logout(button_name="🚪 Cerrar sesión", location="sidebar")
+            _render_version_badge()
         return username
 
     if auth_status is False:
@@ -257,6 +258,59 @@ def require_login() -> str:
     # auth_status == None → primer render, form mostrado, esperando input
     st.info("🔒 Introduce tus credenciales para acceder a TikTok Factory.")
     st.stop()
+
+
+# ============================================================
+# Badge de versión desplegada (sidebar)
+# ============================================================
+def _render_version_badge() -> None:
+    """Muestra en la sidebar la fecha de la última versión desplegada.
+    Lee `temp_work/deploy_status.json` (escrito por deploy_safe.sh) o cae
+    a `git log` si nunca ha corrido el deploy."""
+    try:
+        from datetime import datetime
+        from src.deploy_status import format_age, get_status
+
+        info = get_status()
+        state = info.get("state", "unknown")
+        sha = info.get("current_sha", "?")
+        age = info.get("age_seconds")
+
+        st.divider()
+
+        # Estado de deploy en curso → aviso destacado
+        if state == "running":
+            target = info.get("target_sha") or "?"
+            st.warning(f"🔄 Desplegando `{target}`…")
+            st.caption("La app se reiniciará al terminar. Puede que la página "
+                       "se desconecte ~5s — recarga si pasa.")
+            return
+
+        # Deploy fallido → marca clara
+        if state == "failed":
+            st.error("❌ Último deploy falló")
+            err = info.get("error", "")
+            st.caption(f"`{sha}` · hace {format_age(age)}"
+                       + (f" · {err}" if err else ""))
+            return
+
+        # success / unknown — caso normal
+        ref_time = info.get("finished_at") or info.get("started_at")
+        if ref_time:
+            try:
+                dt = datetime.fromtimestamp(float(ref_time))
+                date_str = dt.strftime("%d/%m/%Y %H:%M")
+                st.caption(f"📦 Última versión desplegada:")
+                st.caption(f"**{date_str}**  ·  hace {format_age(age)}")
+                st.caption(f"<span style='opacity:0.5'>commit `{sha}`</span>",
+                           unsafe_allow_html=True)
+            except Exception:
+                st.caption(f"📦 Versión `{sha}` · hace {format_age(age)}")
+        else:
+            st.caption(f"📦 Versión `{sha}`")
+    except Exception as e:
+        # Nunca rompemos el sidebar por un error en el badge
+        print(f"[auth/version_badge] {e}")
 
 
 # ============================================================

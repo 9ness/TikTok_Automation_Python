@@ -60,6 +60,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._json_response(200, {"status": "ok"})
             return
+        if self.path == "/version":
+            # Lee deploy_status.json (escrito por deploy_safe.sh) o cae a git
+            try:
+                import sys
+                sys.path.insert(0, APP_DIR)
+                from src.deploy_status import get_status
+                self._json_response(200, get_status())
+            except Exception as e:
+                self._json_response(500, {"error": str(e)})
+            return
         self.send_error(404)
 
     def do_POST(self):

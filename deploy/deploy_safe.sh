@@ -15,10 +15,28 @@ set -uo pipefail   # -e no, queremos continuar incluso con steps que fallen para
 
 APP_DIR="/home/nebulabsai/TikTok_Automation_Python"
 QUEUE_STATE="${APP_DIR}/temp_work/queue_state.json"
+DEPLOY_STATUS="${APP_DIR}/temp_work/deploy_status.json"
 LOG="${APP_DIR}/logs/deploy.log"
 MAX_WAIT_SEC=3600   # 1h máximo esperando que la cola se vacíe
 POLL_INTERVAL=30
 LOCK_FILE="/tmp/tiktok-deploy.lock"
+
+# Helper: escribe el estado del deploy en JSON. La UI lo lee para mostrar
+# el badge de versión y si hay un deploy en curso.
+write_status() {
+    local state="$1"
+    local extra="$2"   # JSON fragment adicional (sin llaves), p.ej. '"target_sha":"abc"'
+    mkdir -p "$(dirname "$DEPLOY_STATUS")"
+    local current_sha=$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo "?")
+    local current_full=$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || echo "?")
+    local now=$(date +%s)
+    local body="\"state\":\"${state}\",\"current_sha\":\"${current_sha}\",\"current_sha_full\":\"${current_full}\",\"updated_at\":${now}"
+    if [[ -n "$extra" ]]; then
+        body="${body},${extra}"
+    fi
+    echo "{${body}}" > "${DEPLOY_STATUS}.tmp"
+    mv "${DEPLOY_STATUS}.tmp" "$DEPLOY_STATUS"
+}
 
 mkdir -p "$(dirname "$LOG")"
 exec >> "$LOG" 2>&1
@@ -36,6 +54,10 @@ echo ""
 echo "============================================================"
 echo "[deploy_safe] $(date -Iseconds) — INICIADO"
 echo "============================================================"
+
+# Marcar estado RUNNING desde el principio (la UI ya lo verá)
+START_TS=$(date +%s)
+write_status "running" "\"started_at\":${START_TS}"
 
 # ============================================================
 # Función: ¿hay jobs activos en la cola?
@@ -87,16 +109,19 @@ REMOTE_SHA=$(git rev-parse origin/main)
 
 if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
     echo "[deploy_safe] HEAD ya está en $LOCAL_SHA — sin cambios. Saliendo."
+    write_status "success" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"note\":\"no_changes\""
     exit 0
 fi
 
 echo "[deploy_safe] pulling: ${LOCAL_SHA:0:8} → ${REMOTE_SHA:0:8}"
 if ! git pull --ff-only --quiet origin main; then
     echo "[deploy_safe] ❌ git pull falló (¿conflicto? ¿commits locales?)"
+    write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"git_pull_failed\""
     exit 1
 fi
 NEW_SHA=$(git rev-parse HEAD)
 echo "[deploy_safe] HEAD ahora en ${NEW_SHA:0:8}"
+write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\""
 
 # ============================================================
 # 3. Si requirements.txt cambió → reinstalar deps
@@ -116,13 +141,16 @@ if sudo systemctl restart tiktok-factory; then
     sleep 5
     if systemctl is-active --quiet tiktok-factory; then
         echo "[deploy_safe] ✅ tiktok-factory reiniciado y activo"
+        write_status "success" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"previous_sha\":\"${LOCAL_SHA:0:7}\""
     else
         echo "[deploy_safe] ❌ tiktok-factory NO está activo tras restart. Logs:"
         journalctl -u tiktok-factory -n 30 --no-pager
+        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"service_not_active\""
         exit 1
     fi
 else
     echo "[deploy_safe] ❌ systemctl restart falló"
+    write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"restart_failed\""
     exit 1
 fi
 
