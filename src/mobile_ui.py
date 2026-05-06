@@ -13,6 +13,40 @@ import streamlit as st
 _CSS = """
 <style>
 /* ============================================================
+   BOTÓN FLOTANTE DE COLA — esquina superior derecha, siempre fijo
+   ============================================================ */
+.st-key-queue_btn_floating {
+    position: fixed !important;
+    top: 0.5rem !important;
+    right: 0.6rem !important;
+    z-index: 999999 !important;
+    width: auto !important;
+    max-width: 60vw;
+    /* Anular el padding del element-container heredado */
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.st-key-queue_btn_floating [data-testid="stPopover"] button {
+    padding: 0.45rem 0.9rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    min-height: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(255, 75, 75, 0.92) !important;
+    color: white !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+    transition: transform 0.08s ease, background 0.15s ease;
+}
+.st-key-queue_btn_floating [data-testid="stPopover"] button:hover {
+    background: rgba(255, 75, 75, 1) !important;
+    transform: scale(1.04);
+}
+.st-key-queue_btn_floating [data-testid="stPopover"] button:active {
+    transform: scale(0.97);
+}
+
+/* ============================================================
    GLOBAL — base compacta para desktop también (sin pasarse)
    ============================================================ */
 .block-container {
@@ -204,6 +238,13 @@ hr { margin: 0.8rem 0 !important; opacity: 0.4; }
         flex: 1 1 calc(50% - 0.3rem) !important;
         min-width: calc(50% - 0.3rem) !important;
         width: calc(50% - 0.3rem) !important;
+    }
+
+    /* En la fila compacta, evitar que el checkbox del Modo creativo se
+       baje cuando el número_input es alto: alineación bottom + sin gap
+       extra arriba */
+    [class*="st-key-compact_row_topbar"] [data-testid="stCheckbox"] {
+        margin-top: 1.6rem !important;
     }
     /* Padding interno + tipografía agresiva (selectores específicos
        para ganar a las clases auto-generadas de emotion) */

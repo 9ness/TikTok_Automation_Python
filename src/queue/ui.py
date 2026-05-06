@@ -56,17 +56,17 @@ def render_queue_widget(persist_dir: str | None = None) -> None:
     else:
         label = "🧵 Cola"
 
+    # use_container_width=False → botón compacto (no full-width). Para
+    # posicionarlo en una esquina, envolver desde el llamador con un
+    # st.container(key="queue_btn_floating") que el CSS sube a fixed.
     if _has_fragment() and (running or pending):
-        # Fragment auto-refresh cada 2s para que el progreso se actualice
-        # mientras el popover esté abierto. Cuando está cerrado igual sigue
-        # rerunneando (es lo que hay con st.fragment).
         @st.fragment(run_every=2)
         def _live_block():
             _render_inner(queue)
-        with st.popover(label, use_container_width=True):
+        with st.popover(label, use_container_width=False):
             _live_block()
     else:
-        with st.popover(label, use_container_width=True):
+        with st.popover(label, use_container_width=False):
             _render_inner(queue)
 
 

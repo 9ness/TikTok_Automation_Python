@@ -169,14 +169,14 @@ if cleaner_error:
 
 
 
-# Header: título + botón de cola (popover) alineados horizontalmente.
-# La cola ya no ocupa espacio vertical inline — se abre on-demand.
+# Botón flotante de cola: esquina superior derecha, position: fixed
+# (CSS aplicado al st-key-queue_btn_floating en mobile_ui.py).
+# No ocupa espacio del flujo — el título queda full-width debajo.
 _QUEUE_PERSIST_DIR = CFG["paths"].get("temp_folder") if CFG else None
-_hcol_title, _hcol_queue = st.columns([4, 1], vertical_alignment="bottom")
-with _hcol_title:
-    st.title("🏭 TikTok Creator Reward Auto")
-with _hcol_queue:
+with st.container(key="queue_btn_floating"):
     render_queue_widget(_QUEUE_PERSIST_DIR)
+
+st.title("🏭 TikTok Creator Reward Auto")
 
 # ---------------------------------------------------------
 # ---------------------------------------------------------
@@ -1993,19 +1993,21 @@ if CFG["app_mode"] == "SUBS_AUTO":
 # ---------------------------------------------------------
 if True:
     # 1. CONFIGURACIÓN DE LOTE — fila compacta
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        cantidad = st.number_input(
-            "Vídeos", min_value=1, max_value=10, value=1, step=1,
-            help="Cuántos vídeos generar en este lote.",
-        )
-    with c2:
-        st.write("")  # alinear vertical con el number_input
-        use_creative_mode = st.checkbox(
-            "✨ Modo creativo",
-            value=False,
-            help="Hooks y CTAs dinámicos variados por IA.",
-        )
+    # Wrapper compact_row_topbar fuerza 50/50 horizontal incluso en móvil
+    # (mobile_ui.py reconoce el prefijo st-key-compact_row_).
+    with st.container(key="compact_row_topbar"):
+        c1, c2 = st.columns(2, vertical_alignment="bottom")
+        with c1:
+            cantidad = st.number_input(
+                "Vídeos", min_value=1, max_value=10, value=1, step=1,
+                help="Cuántos vídeos generar en este lote.",
+            )
+        with c2:
+            use_creative_mode = st.checkbox(
+                "✨ Modo creativo",
+                value=False,
+                help="Hooks y CTAs dinámicos variados por IA.",
+            )
 
     # Inputs dinámicos: 2 columnas en desktop, apiladas en móvil
     queue_inputs = []
