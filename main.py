@@ -139,6 +139,14 @@ st.set_page_config(
 from src.mobile_ui import inject_responsive_css
 inject_responsive_css()
 
+# ---------------------------------------------------------
+# AUTH GATE — bloqueante. Si AUTH_COOKIE_KEY + USERNAME_*/PASSWORD_HASH_*
+# están definidos en .env, muestra login screen antes de cargar nada más.
+# Si NO hay auth configurada (dev local), se salta sin pedir nada.
+# ---------------------------------------------------------
+from src.auth import require_login
+_current_user = require_login()
+
 # Cola unificada de generación (compartida entre los 4 modos).
 from src.queue import JobMode, get_queue, render_queue_widget
 

@@ -343,6 +343,121 @@ Presidentes / Subs / Quitar Copy) y el widget de cola arriba.
 
 ---
 
+## Login + password gate (obligatorio en producción con Funnel público)
+
+Si vas a usar **Tailscale Funnel público** (URL accesible desde cualquier
+sitio sin Tailscale en el cliente), añade un login screen antes de la app
+para evitar que cualquiera con la URL llegue al panel de generación.
+
+### Componentes
+- `src/auth.py` — gate, rate-limiting por IP, CLI helper para hashes
+- `streamlit-authenticator` (en requirements.txt) — form + cookie firmado
+- 2 usuarios `ness` y `buga` configurables vía .env
+
+### Setup paso a paso
+
+#### 1. Generar AUTH_COOKIE_KEY (firma del cookie de sesión)
+
+Una sola vez, en el VPS dentro del venv:
+
+```bash
+cd ~/TikTok_Automation_Python
+source venv/bin/activate
+python -m src.auth gen-cookie-key
+# imprime un hex de 64 caracteres → cópialo
+```
+
+#### 2. Generar bcrypt hashes para los passwords
+
+Para cada usuario:
+
+```bash
+python -m src.auth hash 'tu_password_aqui'
+# imprime $2b$12$... → cópialo
+```
+
+(Hazlo 2 veces, una por cada usuario. Los passwords NO se guardan en
+ningún sitio en texto plano — solo el hash bcrypt en .env.)
+
+#### 3. Añadir al .env del VPS
+
+```bash
+nano ~/TikTok_Automation_Python/.env
+```
+
+Añade al final (con tus valores reales):
+
+```env
+# === AUTH ===
+AUTH_COOKIE_KEY=PEGA_AQUI_EL_TOKEN_HEX_DE_64_CHARS
+AUTH_COOKIE_NAME=tiktok_factory_auth
+AUTH_COOKIE_EXPIRY_DAYS=30
+
+# Usuario 1 (Ness)
+USERNAME_NESS=ness
+PASSWORD_HASH_NESS=$2b$12$PEGA_AQUI_EL_HASH_DEL_PASSWORD_DE_NESS
+
+# Usuario 2 (Buga)
+USERNAME_BUGA=buga
+PASSWORD_HASH_BUGA=$2b$12$PEGA_AQUI_EL_HASH_DEL_PASSWORD_DE_BUGA
+
+# Rate limit (opcionales — defaults: 5 intentos / 5min → bloqueo 15min)
+# AUTH_RL_MAX_FAILURES=5
+# AUTH_RL_WINDOW_S=300
+# AUTH_RL_BLOCK_S=900
+```
+
+⚠️ Los `$` en el hash bcrypt confunden a algunas shells. **NO uses**
+`echo "..." >> .env` para añadirlos — pueden expandirse. Úsa `nano`
+y pega tal cual.
+
+Asegura permisos:
+
+```bash
+chmod 600 ~/TikTok_Automation_Python/.env
+```
+
+#### 4. Reinstalar deps + reiniciar
+
+`requirements.txt` ahora incluye `streamlit-authenticator` y `bcrypt`:
+
+```bash
+cd ~/TikTok_Automation_Python
+git pull
+venv/bin/pip install -r requirements.txt
+sudo systemctl restart tiktok-factory
+```
+
+#### 5. Verificar el flow
+
+Abre la URL (vía túnel SSH o Tailscale Funnel) → debe aparecer un form
+de login. Mete `ness` + tu password → debes entrar. La sidebar muestra
+"👤 Conectado: ness" + un botón **🚪 Cerrar sesión**.
+
+Si te equivocas 5 veces seguidas (mismo navegador/IP), el form devuelve
+"Demasiados intentos fallidos" durante 15 min.
+
+El cookie persiste 30 días → la próxima vez que abras la URL, entras
+directo sin form.
+
+### Seguridad
+- Passwords **nunca** en texto plano — solo hash bcrypt en .env
+- Cookie firmado con HMAC + AUTH_COOKIE_KEY (si rota, todas las sesiones invalidan)
+- Rate-limit por IP detrás del Funnel (lee `X-Forwarded-For`)
+- 2 usuarios completamente independientes (cada uno entra sin que el otro
+  apruebe nada)
+
+### Cambiar password
+Genera nuevo hash con `python -m src.auth hash 'nuevo_pass'` y reemplaza
+`PASSWORD_HASH_*` en .env. `sudo systemctl restart tiktok-factory`.
+
+### Añadir un tercer usuario
+Añade `USERNAME_PEPE=pepe` + `PASSWORD_HASH_PEPE=$2b$...` al .env.
+El código detecta automáticamente todos los pares `USERNAME_<KEY>` /
+`PASSWORD_HASH_<KEY>` — no hace falta tocar `src/auth.py`.
+
+---
+
 ## Auto-deploy con webhook GitHub (opcional, recomendado)
 
 Configura un webhook en GitHub para que cada `git push` a `main` haga

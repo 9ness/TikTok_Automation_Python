@@ -6,3 +6,5 @@ Pillow
 numpy<2.0.0
 openai
 requests
+streamlit-authenticator>=0.4.0
+bcrypt
