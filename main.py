@@ -1986,182 +1986,89 @@ if CFG["app_mode"] == "SUBS_AUTO":
 
     st.stop()
 
-# SELECTOR DE MODO (Por defecto Automático)
 # ---------------------------------------------------------
-mode = st.radio("Modo de Generación", ["Automático (IA)", "Manual (Carpetas)"], index=0, horizontal=True) # Index 0 es Auto ahora
-
-st.markdown("---")
-
-
-if mode == "Manual (Carpetas)":
-    # ---------------------------------------------------------
-    # MODO MANUAL
-    # ---------------------------------------------------------
-    num_videos = st.number_input("Cantidad de videos:", 1, 10, 1)
-    uploads = {}
-    cols = st.columns(num_videos)
-    for i in range(num_videos):
-        with cols[i]:
-            st.subheader(f"Video {i+1}")
-            files = st.file_uploader(f"Audios V{i+1}", accept_multiple_files=True, key=f"up_{i}")
-            if files: uploads[i] = files
-
-    col_btn1, col_btn2, _, _ = st.columns([1, 1, 1, 5])
-    with col_btn1:
-        btn_start = st.button("🚀 GENERAR (MANUAL)")
-    with col_btn2:
-        if st.button("⛔ CANCELAR"):
-            st.stop()
-            
-    if btn_start:
-        target_res = res_options[selected_res_label]
-        w_safe = target_res[0] if target_res[0] % 2 == 0 else target_res[0] - 1
-        h_safe = target_res[1] if target_res[1] % 2 == 0 else target_res[1] - 1
-        CFG["video_settings"]["resolution"] = [w_safe, h_safe]
-        
-        temp_dir = CFG["paths"]["temp_folder"]
-        if os.path.exists(temp_dir): 
-            try: shutil.rmtree(temp_dir)
-            except: pass
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        with st.status("🏭 Procesando Manual...", expanded=True) as status:
-             # Pre-procesar uploads para convertirlos en carpetas físicas
-             total = len(uploads)
-             progress = st.progress(0)
-             logs = []
-             def log_manual(msg): logs.append(msg)
-             
-             for idx, (vid_id, file_list) in enumerate(uploads.items()):
-                 status.write(f"🎞️ Video {vid_id+1}/{total}")
-                 path_lote = os.path.join(temp_dir, f"v{vid_id}")
-                 os.makedirs(path_lote, exist_ok=True)
-                 for f in file_list:
-                     with open(os.path.join(path_lote, f.name), "wb") as w: w.write(f.getbuffer())
-                     
-                 # LLAMADA AL NUEVO PIPELINE CON LA CARPETA
-                 try:
-                     out_video = generate_video_pipeline(
-                         path_lote, 
-                         CFG["paths"]["output_folder"], 
-                         CFG, 
-                         status, 
-                         log_manual, 
-                         engine_version
-                     )
-                     status.write(f"✅ Video {vid_id+1} OK: {os.path.basename(out_video)}")
-                 except Exception as e:
-                     status.error(f"Error en video {vid_id+1}: {e}")
-                 
-                 progress.progress((idx+1)/total)
-                 
-             if sound_on: 
-                 try: winsound.MessageBeep(winsound.MB_ICONASTERISK)
-                 except: pass
-             status.update(label="✨ Completado", state="complete", expanded=False)
-             
-             with st.expander("Logs"):
-                 for l in logs: st.write(l)
-
-
-elif mode == "Automático (IA)":
-    # ---------------------------------------------------------
-    # MODO AUTOMÁTICO
-    # ---------------------------------------------------------
-    st.markdown("### ✨ Automatización con Inteligencia Artificial")
-    st.info("Este modo genera guiones y audios automáticamente usando Gemini y Minimax.")
-    
-    # 1. CONFIGURACIÓN DE LOTE (NUEVA UI COMPACTA)
-    st.markdown("### 🏭 Fábrica de Vídeos (Batch Mode)")
-
-    # Fila de configuración principal
-    c1, c2, c3 = st.columns([1, 2, 1])
-    
+# MODO PRESIDENTES — único flujo (Auto IA). El antiguo modo Manual
+# (subir carpetas de audios manualmente) se eliminó: nunca se usaba
+# y duplicaba lógica con el flow Auto.
+# ---------------------------------------------------------
+if True:
+    # 1. CONFIGURACIÓN DE LOTE — fila compacta
+    c1, c2 = st.columns([1, 2])
     with c1:
-        cantidad = st.number_input("Cantidad de videos:", min_value=1, max_value=10, value=1, step=1)
-    
+        cantidad = st.number_input(
+            "Vídeos", min_value=1, max_value=10, value=1, step=1,
+            help="Cuántos vídeos generar en este lote.",
+        )
     with c2:
-        st.write("") # Spacer
-        st.write("")
-        use_creative_mode = st.checkbox("✨ Activar Modo Creativo", value=False, help="Hooks y CTAs dinámicos variados por IA.")
+        st.write("")  # alinear vertical con el number_input
+        use_creative_mode = st.checkbox(
+            "✨ Modo creativo",
+            value=False,
+            help="Hooks y CTAs dinámicos variados por IA.",
+        )
 
-    with c3:
-        st.write("") # Spacer
-        if st.button("📋 Ver Whitelist"):
+    # Whitelist movida a expander (raramente se consulta)
+    with st.expander("📋 Whitelist de personajes disponibles", expanded=False):
+        try:
             assets = guionista.get_available_assets()
-            st.toast(f"✅ Whitelist: {len(assets.split(','))} personajes detectados.")
-    
-    st.divider()
-    
-    # Inputs Dinámicos en Grid (2 columnas) para ahorrar espacio
-    queue_inputs = []
-    st.write("⬇️ **Configura los temas de los videos:** (Deja vacío para tema aleatorio)")
+            chars = [c.strip() for c in assets.split(",") if c.strip()]
+            st.caption(f"{len(chars)} personajes detectados en BIBLIOTECA_PRESIDENTES/:")
+            st.code(", ".join(chars), language=None)
+        except Exception as e:
+            st.warning(f"No pude leer la whitelist: {e}")
 
+    # Inputs dinámicos: 2 columnas en desktop, apiladas en móvil
+    queue_inputs = []
     grid_cols = st.columns(2)
     for i in range(cantidad):
         col_idx = i % 2
         with grid_cols[col_idx]:
-            st.markdown(f"**🎬 Video {i+1}**")
+            st.markdown(f"**🎬 Vídeo {i+1}**")
 
-            # Fila 1: opciones de título
-            opt1, opt2, opt3, opt4 = st.columns([1.2, 1.4, 2.4, 1.8])
-            with opt1:
+            # Fila compacta: Top + Palabra (50/50)
+            s1, s2 = st.columns(2)
+            with s1:
                 top_count = st.selectbox(
-                    "Nº Top",
+                    "Top",
                     [5, 4, 3],
                     key=f"top_count_{i}",
-                    help="Número de presidentes en el ranking. Ajusta palabras/ítem para ~1min.",
+                    help="Nº de presidentes del ranking.",
                 )
-            with opt2:
+            with s2:
                 prefix_word = st.selectbox(
-                    "Palabra",
+                    "Prefijo",
                     ["The", "Top"],
                     key=f"prefix_word_{i}",
                 )
-            with opt3:
-                include_history = st.checkbox(
-                    "Añadir \"in US history\"",
-                    value=True,
-                    key=f"history_{i}",
-                )
-            with opt4:
-                include_hook = st.checkbox(
-                    "Incluir hook",
-                    value=True,
-                    key=f"hook_{i}",
-                    help="Añade la frase 'Save this video before they delete it...' tras el título.",
-                )
 
-            # Prefijo combinado: "The 5", "Top 4", etc.
+            # Tema (input principal, full-width)
+            topic = st.text_input(
+                "Tema",
+                key=f"topic_{i}",
+                placeholder="worst / corruption / richest (vacío = aleatorio)",
+                label_visibility="collapsed",
+            )
+
+            # Checkboxes opcionales
+            include_history = st.checkbox(
+                'Añadir "in US history"',
+                value=True,
+                key=f"history_{i}",
+            )
+            include_hook = st.checkbox(
+                "Incluir hook",
+                value=True,
+                key=f"hook_{i}",
+                help='Frase "Save this video before they delete it..." tras el título.',
+            )
+
+            # Preview del título completo construido (caption pequeña)
             title_prefix = f"{prefix_word} {top_count}"
-
-            # Fila 2: título en línea con prefijo y sufijo bloqueados
-            suffix_display = "in US history" if include_history else ""
-            st.caption("Título final (edita solo el centro, lo gris es fijo):")
-            p_col, t_col, s_col = st.columns([2, 4, 4])
-            with p_col:
-                st.text_input(
-                    "prefix_lock",
-                    value=title_prefix,
-                    disabled=True,
-                    key=f"prefix_lock_{i}",
-                    label_visibility="collapsed",
-                )
-            with t_col:
-                topic = st.text_input(
-                    "topic",
-                    key=f"topic_{i}",
-                    placeholder="worst / corruption / richest",
-                    label_visibility="collapsed",
-                )
-            with s_col:
-                st.text_input(
-                    "suffix_lock",
-                    value=suffix_display,
-                    disabled=True,
-                    key=f"suffix_lock_{i}",
-                    label_visibility="collapsed",
-                )
+            suffix_display = " in US history" if include_history else ""
+            preview_topic = (topic.strip() or "[aleatorio]")
+            st.caption(
+                f"📢 *{title_prefix} {preview_topic} Presidents{suffix_display}*"
+            )
 
             queue_inputs.append({
                 "topic": topic,
