@@ -138,14 +138,24 @@ fi
 # ============================================================
 echo "[deploy_safe] reiniciando tiktok-factory…"
 if sudo systemctl restart tiktok-factory; then
-    sleep 5
-    if systemctl is-active --quiet tiktok-factory; then
+    # Streamlit tarda 6-12s en estar 'active' (carga faster-whisper, moviepy,
+    # etc). Esperamos hasta 30s con polling cada 2s — más robusto que un
+    # sleep fijo. Si tras 30s sigue activating, lo marcamos failed.
+    READY=0
+    for _ in $(seq 1 15); do
+        if systemctl is-active --quiet tiktok-factory; then
+            READY=1
+            break
+        fi
+        sleep 2
+    done
+    if [[ $READY -eq 1 ]]; then
         echo "[deploy_safe] ✅ tiktok-factory reiniciado y activo"
         write_status "success" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"previous_sha\":\"${LOCAL_SHA:0:7}\""
     else
-        echo "[deploy_safe] ❌ tiktok-factory NO está activo tras restart. Logs:"
+        echo "[deploy_safe] ❌ tiktok-factory NO arrancó en 30s. Logs:"
         journalctl -u tiktok-factory -n 30 --no-pager
-        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"service_not_active\""
+        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"service_not_active_30s\""
         exit 1
     fi
 else
