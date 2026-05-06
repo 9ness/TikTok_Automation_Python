@@ -260,34 +260,110 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         cum.append(acc)
     # cum[0..4] = pct acumulado tras: guion, audio, video, subs, hook
 
-    # ----- 1. GUIÓN -----
+    # ----- 1+2. GUIÓN + AUDIO con auto-calibración de palabras -----
+    # Calibra target_total_words por tipo de vídeo para clavar 60-65s.
     on_progress(0.0, "📝 Generando guion…")
-    on_log("📝 Generando guion con OpenAI…")
     import src.guionista as guionista
+    import src.locutor as locutor
+    from src import word_calibrator as wc
 
-    script_data = guionista.generate_script(
-        user_topic=p.get("topic"),
-        creative_mode=p.get("creative_mode", False),
-        title_prefix=p.get("title_prefix", "The 5"),
-        include_history=p.get("include_history", True),
-        include_hook=p.get("include_hook", True),
+    type_key = wc.build_type_key(
         top_count=p.get("top_count", 5),
+        include_hook=p.get("include_hook", True),
+        creative_mode=p.get("creative_mode", False),
     )
-    txt_output = guionista.save_scripts_to_txt(
-        script_data, top_count=p.get("top_count", 5)
+    target_words = wc.get_target_words(type_key)
+    on_log(
+        f"🎯 Calibración tipo='{type_key}' → target inicial: {target_words} "
+        f"palabras (rango {wc.TARGET_MIN_S:.0f}-{wc.TARGET_MAX_S:.0f}s)"
     )
-    on_log("✅ Guion listo")
-    on_progress(cum[0], "🎙️ Generando audio TTS…")
 
+    MAX_ATTEMPTS = p.get("calibration_max_attempts", 3)
+    script_data = None
+    txt_output = None
     audio_output_folder = None
+    total_dur = 0.0
+    success_in_range = False
+
     try:
-        # ----- 2. AUDIO -----
-        import src.locutor as locutor
-        audio_output_folder = locutor.generate_audios_from_text_folder(
-            txt_output, config["paths"]["resources_library"]
-        )
-        if not audio_output_folder:
-            raise RuntimeError("No se generaron audios MiniMax")
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            on_log(
+                f"📝 [Intento {attempt}/{MAX_ATTEMPTS}] Generando guion "
+                f"con OpenAI (target {target_words} palabras)…"
+            )
+            script_data = guionista.generate_script(
+                user_topic=p.get("topic"),
+                creative_mode=p.get("creative_mode", False),
+                title_prefix=p.get("title_prefix", "The 5"),
+                include_history=p.get("include_history", True),
+                include_hook=p.get("include_hook", True),
+                top_count=p.get("top_count", 5),
+                target_total_words=target_words,
+            )
+            txt_output = guionista.save_scripts_to_txt(
+                script_data, top_count=p.get("top_count", 5)
+            )
+            on_log("✅ Guion listo")
+            on_progress(cum[0], f"🎙️ TTS (intento {attempt})…")
+
+            # ----- AUDIO -----
+            audio_output_folder = locutor.generate_audios_from_text_folder(
+                txt_output, config["paths"]["resources_library"]
+            )
+            if not audio_output_folder:
+                raise RuntimeError("No se generaron audios MiniMax")
+            total_dur = wc.measure_audio_folder_duration(audio_output_folder)
+            on_log(
+                f"⏱️ Duración total audios: {total_dur:.1f}s "
+                f"(objetivo {wc.TARGET_MIN_S:.0f}-{wc.TARGET_MAX_S:.0f}s)"
+            )
+
+            in_range, next_target = wc.calibration_decision(
+                type_key, target_words, total_dur
+            )
+            if in_range:
+                on_log(
+                    f"✅ Duración OK ({total_dur:.1f}s). Calibración guardada "
+                    f"({target_words} palabras para '{type_key}')."
+                )
+                success_in_range = True
+                break
+
+            if attempt == MAX_ATTEMPTS:
+                on_log(
+                    f"⚠️ Máximo de intentos alcanzado. Continuando con "
+                    f"{total_dur:.1f}s. Calibrador actualizó target a "
+                    f"{next_target} para próximas ejecuciones."
+                )
+                break
+
+            on_log(
+                f"🔄 Fuera de rango. Reajustando {target_words} → {next_target} "
+                f"palabras y regenerando…"
+            )
+            target_words = next_target
+            # Limpia temporales del intento fallido antes de reintentar
+            try:
+                if txt_output and os.path.exists(txt_output):
+                    shutil.rmtree(txt_output, ignore_errors=True)
+                if audio_output_folder and os.path.exists(audio_output_folder):
+                    shutil.rmtree(audio_output_folder, ignore_errors=True)
+            except Exception:
+                pass
+            txt_output = None
+            audio_output_folder = None
+
+        if not script_data or not audio_output_folder:
+            raise RuntimeError(
+                "Falló la generación de guion/audios tras la calibración"
+            )
+
+        if not success_in_range:
+            on_log(
+                f"⚠️ Vídeo fuera del sweet spot 60-65s "
+                f"({total_dur:.1f}s) — se mantiene el render."
+            )
+
         on_log("✅ Audios MiniMax listos")
         on_progress(cum[1], "🎬 Renderizando vídeo…")
 

@@ -139,11 +139,15 @@ def _pick_creative_seeds():
     }
 
 
-def _calc_word_range(top_count, include_hook):
-    """Devuelve (low, high) palabras por ítem de contenido para cuadrar ~1min."""
+def _calc_word_range(top_count, include_hook, target_total_words=None):
+    """Devuelve (low, high) palabras por ítem de contenido para cuadrar ~1min.
+
+    target_total_words: si se pasa, sobrescribe la constante por defecto (lo
+    usa el calibrador automático en src/word_calibrator.py)."""
     intro = INTRO_WORDS_WITH_HOOK if include_hook else INTRO_WORDS_NO_HOOK
     num_content = top_count - 1  # ítems N..2; el 1 es el reveal de misterio
-    avg = (TARGET_TOTAL_WORDS - intro - OUTRO_WORDS) / num_content
+    total = target_total_words if target_total_words else TARGET_TOTAL_WORDS
+    avg = (total - intro - OUTRO_WORDS) / num_content
     low = math.floor(avg) - 1
     high = math.ceil(avg) + 1
     return low, high
@@ -275,7 +279,7 @@ def get_available_assets():
             pass
         return "Cualquier presidente de USA"
 
-def generate_script(user_topic=None, creative_mode=False, title_prefix="The 5", include_history=True, include_hook=True, top_count=5):
+def generate_script(user_topic=None, creative_mode=False, title_prefix="The 5", include_history=True, include_hook=True, top_count=5, target_total_words=None):
     """
     Genera un guion de Top N Presidentes USA usando OpenAI.
     - user_topic: String con el tema específico o None para aleatorio.
@@ -284,6 +288,7 @@ def generate_script(user_topic=None, creative_mode=False, title_prefix="The 5", 
     - include_history: Bool. Si True añade " in US history" al final; si False, sin sufijo.
     - include_hook: Bool. Si True añade línea de hook ("Save this video..." / hook dinámico creativo).
     - top_count: 3, 4 o 5 — número de presidentes en el ranking. Ajusta automáticamente palabras/ítem para ~1min.
+    - target_total_words: int o None. Si se pasa, sobrescribe TARGET_TOTAL_WORDS (calibrador automático).
     """
     print("🤖 Iniciando Motor de Guiones (OpenAI)...")
 
@@ -329,7 +334,9 @@ def generate_script(user_topic=None, creative_mode=False, title_prefix="The 5", 
     else:
         hook_line = ""
 
-    words_low, words_high = _calc_word_range(top_count, include_hook)
+    words_low, words_high = _calc_word_range(top_count, include_hook, target_total_words=target_total_words)
+    if target_total_words:
+        print(f"📏 Target total palabras (calibrador): {target_total_words} → {words_low}-{words_high} palabras/ítem")
     engagement_seed = creative_seeds["engagement"] if creative_mode else None
     items_spec = _build_items_spec(top_count, words_low, words_high, creative_mode, engagement_seed=engagement_seed)
     json_items = _build_json_items(top_count)

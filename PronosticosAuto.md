@@ -819,7 +819,7 @@ Una vez validado, automatiza con cron.
 
 ---
 
-## 9. Roadmap próximos pasos (después de v1)
+## 9. Roadmap proximos pasos (después de v1)
 
 | Idea | Prioridad |
 |---|---|
