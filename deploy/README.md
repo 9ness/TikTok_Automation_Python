@@ -343,6 +343,107 @@ Presidentes / Subs / Quitar Copy) y el widget de cola arriba.
 
 ---
 
+## Auto-deploy con webhook GitHub (opcional, recomendado)
+
+Configura un webhook en GitHub para que cada `git push` a `main` haga
+automáticamente `git pull + restart` en el VPS, **esperando a que la
+cola de renders esté vacía** antes de reiniciar (no rompe vídeos a
+medias).
+
+### Componentes
+- `deploy/webhook_listener.py` — servidor HTTP stdlib en puerto 9000
+- `deploy/deploy_safe.sh` — script que espera-cola + git pull + restart
+- `tiktok-webhook.service` — systemd unit que mantiene el listener vivo
+
+### Setup paso a paso
+
+#### 1. Generar un secret token (en el VPS)
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Guarda el output (algo como `a3b8c9...64chars`). Lo usarás en dos sitios.
+
+#### 2. Añadirlo al .env del VPS
+
+```bash
+echo "WEBHOOK_SECRET=PEGA_AQUI_EL_TOKEN" >> ~/TikTok_Automation_Python/.env
+chmod 600 ~/TikTok_Automation_Python/.env
+```
+
+#### 3. Abrir puerto 9000 en UFW (si no estaba ya)
+
+```bash
+sudo ufw allow 9000/tcp comment 'GitHub webhook'
+sudo ufw reload
+```
+
+#### 4. Arrancar el listener
+
+Si ya ejecutaste `register_services.sh` con WEBHOOK_SECRET en el .env,
+ya está activo. Si no:
+
+```bash
+sudo bash ~/TikTok_Automation_Python/deploy/register_services.sh
+# o solo el webhook:
+sudo systemctl enable --now tiktok-webhook
+```
+
+Verifica:
+```bash
+systemctl status tiktok-webhook --no-pager -n 10
+curl http://127.0.0.1:9000/health   # → {"status":"ok"}
+```
+
+#### 5. Configurar el webhook en GitHub
+
+1. Ve a https://github.com/9ness/TikTok_Automation_Python/settings/hooks
+2. **Add webhook**
+3. **Payload URL**: `http://62.238.19.31:9000/deploy`
+4. **Content type**: `application/json`
+5. **Secret**: pega el token del paso 1 (debe coincidir EXACTAMENTE con WEBHOOK_SECRET del .env)
+6. **Which events?**: "Just the push event"
+7. **Active**: ✅ marcado
+8. **Add webhook**
+
+GitHub envía un `ping` event al crear el webhook. Si todo está bien, en
+"Recent Deliveries" verás un ✅ verde con `200 pong`. Si ves rojo:
+- 401 → secret no coincide entre GitHub y `.env`
+- 500 → el listener no se levantó (revisa `journalctl -u tiktok-webhook`)
+- Connection timeout → puerto 9000 cerrado en UFW o firewall del cloud
+
+#### 6. Probar el flujo completo
+
+Desde tu PC haz un cambio cualquiera, commit y push. En el VPS:
+
+```bash
+journalctl -u tiktok-webhook -f
+# y en otra ventana:
+tail -f ~/TikTok_Automation_Python/logs/deploy.log
+```
+
+Verás:
+1. webhook recibe el push, valida HMAC, lanza `deploy_safe.sh`
+2. deploy_safe espera si hay cola activa (cada 30s logea)
+3. cuando la cola está vacía: `git pull` + `systemctl restart tiktok-factory`
+
+### Seguridad
+- HMAC-SHA256 con secret compartido — solo GitHub puede triggerar deploy
+- Solo acepta `push` events sobre rama `main` (resto se ignora con 200)
+- Si secret está mal, devuelve 401 sin más
+- Lock con `flock` evita 2 deploys concurrentes si llegan 2 pushes seguidos
+- El listener corre como `nebulabsai`, no como root; el restart vía sudo
+  está permitido por NOPASSWD configurado en setup.sh
+
+### Logs útiles
+```bash
+journalctl -u tiktok-webhook -f                       # listener (recibos de webhooks)
+tail -f ~/TikTok_Automation_Python/logs/deploy.log    # deploy script (git pull, restart)
+```
+
+---
+
 ## Comandos útiles del día a día
 
 ### Estado de servicios

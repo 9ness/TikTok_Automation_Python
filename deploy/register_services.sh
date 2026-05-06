@@ -63,14 +63,17 @@ fi
 # Hacer ejecutables los scripts shell del repo
 chmod +x "${APP_DIR}/deploy/setup.sh" 2>/dev/null || true
 chmod +x "${APP_DIR}/deploy/install_app.sh" 2>/dev/null || true
+chmod +x "${APP_DIR}/deploy/deploy_safe.sh" 2>/dev/null || true
 
 # ============================================================
 # 1. Copiar plantillas systemd
 # ============================================================
 log "Copiando plantillas systemd…"
-for unit in tiktok-factory.service gdrive-mount.service; do
-    cp "${TEMPLATES}/${unit}" "${SYSTEMD_DIR}/${unit}"
-    log "  · ${unit}"
+for unit in tiktok-factory.service gdrive-mount.service tiktok-webhook.service; do
+    if [[ -f "${TEMPLATES}/${unit}" ]]; then
+        cp "${TEMPLATES}/${unit}" "${SYSTEMD_DIR}/${unit}"
+        log "  · ${unit}"
+    fi
 done
 
 # Limpiar plantillas obsoletas si existen de un despliegue anterior
@@ -110,6 +113,26 @@ else
     echo "WARN: tiktok-factory no está activo. Logs: journalctl -u tiktok-factory -n 50" >&2
 fi
 
+# ============================================================
+# Webhook listener (auto-deploy desde GitHub)
+# Solo se arranca si WEBHOOK_SECRET está definido en el .env. Si no,
+# el listener saldría con error inmediato y systemd entraría en loop.
+# ============================================================
+if [[ -f "${APP_DIR}/.env" ]] && grep -qE '^WEBHOOK_SECRET=.+' "${APP_DIR}/.env"; then
+    log "Habilitando + arrancando tiktok-webhook (auto-deploy)…"
+    systemctl enable --now tiktok-webhook.service
+    sleep 2
+    if systemctl is-active --quiet tiktok-webhook.service; then
+        log "  ✅ Webhook listener escuchando en :9000"
+    else
+        echo "WARN: tiktok-webhook no está activo. Logs: journalctl -u tiktok-webhook -n 30" >&2
+    fi
+else
+    log "ℹ️  WEBHOOK_SECRET no encontrado en .env — saltando tiktok-webhook"
+    log "    Para activar auto-deploy: añade WEBHOOK_SECRET=<token> al .env y"
+    log "    ejecuta: sudo systemctl enable --now tiktok-webhook"
+fi
+
 cat <<EOF
 
 ============================================================
@@ -119,23 +142,24 @@ cat <<EOF
 Comandos útiles:
 
   Ver estado:
-    systemctl status tiktok-factory
-    systemctl status gdrive-mount
+    systemctl status tiktok-factory tiktok-webhook gdrive-mount
 
   Logs en vivo:
-    journalctl -u tiktok-factory -f
-    journalctl -u gdrive-mount -f
+    journalctl -u tiktok-factory -f      # streamlit
+    journalctl -u tiktok-webhook -f      # auto-deploy webhook
+    journalctl -u gdrive-mount -f        # rclone mount
     tail -f /var/log/rclone.log
+    tail -f /home/${APP_USER}/TikTok_Automation_Python/logs/deploy.log
 
   Reiniciar la app:
     sudo systemctl restart tiktok-factory
 
   Parar todo (vacaciones):
-    sudo systemctl stop tiktok-factory gdrive-mount
+    sudo systemctl stop tiktok-factory tiktok-webhook gdrive-mount
 
   Arrancar todo:
-    sudo systemctl start gdrive-mount tiktok-factory
+    sudo systemctl start gdrive-mount tiktok-factory tiktok-webhook
 
 Próximo paso: configurar Tailscale Funnel
-(ver deploy/README.md §6 — necesita login interactivo).
+(ver deploy/README.md — necesita login interactivo).
 EOF

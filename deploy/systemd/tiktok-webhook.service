@@ -1,0 +1,29 @@
+[Unit]
+Description=TikTok Automation — GitHub webhook listener (auto-deploy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nebulabsai
+Group=nebulabsai
+WorkingDirectory=/home/nebulabsai/TikTok_Automation_Python
+
+# El listener lee WEBHOOK_SECRET del .env de la app. Si no está, no arranca.
+EnvironmentFile=/home/nebulabsai/TikTok_Automation_Python/.env
+Environment="APP_DIR=/home/nebulabsai/TikTok_Automation_Python"
+
+# Python sistema (no venv) — solo necesita stdlib
+ExecStart=/usr/bin/python3 /home/nebulabsai/TikTok_Automation_Python/deploy/webhook_listener.py
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening: el listener no necesita escribir más allá del repo
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

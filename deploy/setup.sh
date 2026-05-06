@@ -129,6 +129,7 @@ log "5/8 Configurando firewall UFW…"
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp comment 'SSH'
+ufw allow 9000/tcp comment 'GitHub webhook (auto-deploy)'
 # Tailscale añadirá sus reglas más adelante automáticamente
 ufw --force enable
 
