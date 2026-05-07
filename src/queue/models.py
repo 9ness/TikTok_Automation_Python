@@ -66,8 +66,15 @@ class Job:
 
     @property
     def eta_s(self) -> float | None:
-        """ETA estimada en segundos (None si aún no se puede calcular)."""
-        if self.status != JobStatus.RUNNING or self.progress < 0.05:
+        """Tiempo restante estimado en segundos. None si aún no es fiable.
+
+        Usamos threshold 15% de progreso (no 5%) porque antes de eso el
+        ratio elapsed/progress es muy ruidoso y da estimaciones absurdas
+        (ej: "ETA 45m" cuando realmente quedan 5m). A partir de 15% ya
+        es razonablemente estable."""
+        if self.status != JobStatus.RUNNING:
+            return None
+        if self.progress < 0.15:
             return None
         elapsed = self.elapsed_s
         if elapsed <= 0:

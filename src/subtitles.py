@@ -132,14 +132,23 @@ DEFAULT_STYLE = {
     "text_color": "#FFFFFF",
     "stroke_color": "#000000",
     "stroke_width": 1,
+    # Drop shadow estilo CapCut. Si shadow_enabled=False, no se pinta
+    # sombra (idéntico a antes). Por defecto activo, sutil.
+    "shadow_enabled": False,
+    "shadow_color": "#000000",
+    "shadow_opacity": 0.8,            # 0-1
+    "shadow_offset_x_pct": 0.004,     # relativo al ancho del vídeo
+    "shadow_offset_y_pct": 0.005,     # relativo al alto del vídeo
+    "shadow_blur_radius": 4,          # px de blur (0 = sombra dura)
     "highlight_color": "#1E01C4",  # azul preset del usuario; rojo preset alternativo: #BB0808
     "pill_enabled": True,           # legacy: False fuerza highlight_mode="none"
-    # Cómo se marca la palabra activa. Modos:
-    #   "pill"        — píldora rellena detrás (default — TikTok style)
+    # Cómo se marca el bloque de subtítulos. Modos:
+    #   "pill"        — píldora rellena detrás de la palabra activa (karaoke clásico)
+    #   "block_bg"    — fondo continuo bajo TODA la línea (estilo CapCut/Creator Reward)
     #   "color_swap"  — la palabra activa cambia a highlight_color, sin fondo
-    #   "underline"   — barra horizontal de highlight_color debajo de la palabra
-    #   "box_outline" — recuadro hueco redondeado alrededor (sin relleno)
-    #   "glow"        — halo difuminado de highlight_color alrededor del texto
+    #   "underline"   — barra horizontal de highlight_color debajo de la palabra activa
+    #   "box_outline" — recuadro hueco redondeado alrededor de la palabra activa
+    #   "glow"        — halo difuminado de highlight_color alrededor del texto activo
     #   "none"        — sin marcado (texto estático, la sincronización viene del cambio de chunk)
     # IMPORTANTE: dejar None aquí para que `_resolve_highlight_mode` aplique el
     # fallback legacy basado en `pill_enabled` cuando un caller no fija highlight_mode
@@ -281,6 +290,25 @@ def render_chunk_image(
 
     mode = _resolve_highlight_mode(s)
 
+    # ─── Modo block_bg (fondo continuo por línea — estilo CapCut) ───
+    # Pintamos un rectángulo de highlight_color bajo TODA la línea
+    # (todas las palabras visibles), antes de pintar el texto. Dentro
+    # del bucle de palabras NO se pinta píldora individual porque mode
+    # ya no es "pill". Esto replica el estilo "fondo rojo bajo todo el
+    # subtítulo" de CapCut, que es lo que TikTok Creator Reward valida.
+    if mode == "block_bg":
+        y_blk = pad_y * 2
+        for line in lines:
+            line_text_w = sum(w[2] for w in line) + space_w * (len(line) - 1)
+            x_blk_start = (W - line_text_w) // 2
+            cdraw.rounded_rectangle(
+                [x_blk_start - pad_x, y_blk - pad_y,
+                 x_blk_start + line_text_w + pad_x, y_blk + line_h + pad_y],
+                radius=s.get("pill_radius", 0),
+                fill=s["highlight_color"],
+            )
+            y_blk += row_h + line_spacing
+
     y = pad_y * 2
     for line in lines:
         line_text_w = sum(w[2] for w in line) + space_w * (len(line) - 1)
@@ -320,6 +348,38 @@ def render_chunk_image(
                 )
                 glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=max(4, font_size // 12)))
                 canvas.alpha_composite(glow_layer)
+
+            # ─── Drop shadow estilo CapCut (capa BAJO el texto) ───
+            # Se pinta el texto desplazado con el color de la sombra, en un
+            # canvas temporal con blur y opacidad, y se compone por debajo.
+            if s.get("shadow_enabled"):
+                shadow_dx = int(W * s.get("shadow_offset_x_pct", 0.004))
+                shadow_dy = int(H * s.get("shadow_offset_y_pct", 0.005))
+                shadow_blur = int(s.get("shadow_blur_radius", 4))
+                shadow_op = max(0.0, min(1.0, float(s.get("shadow_opacity", 0.8))))
+                # Convertir hex shadow_color → RGBA con la opacidad pedida
+                _sc = s.get("shadow_color", "#000000")
+                if isinstance(_sc, str) and _sc.startswith("#") and len(_sc) == 7:
+                    sr, sg, sb = int(_sc[1:3], 16), int(_sc[3:5], 16), int(_sc[5:7], 16)
+                else:
+                    sr, sg, sb = 0, 0, 0
+                sa = int(255 * shadow_op)
+                shadow_layer = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
+                sdraw = ImageDraw.Draw(shadow_layer)
+                sdraw.text(
+                    (x + shadow_dx, y + shadow_dy),
+                    word_text,
+                    font=font,
+                    fill=(sr, sg, sb, sa),
+                    stroke_width=stroke_w,
+                    stroke_fill=(sr, sg, sb, sa),
+                    anchor="lt",
+                )
+                if shadow_blur > 0:
+                    shadow_layer = shadow_layer.filter(
+                        ImageFilter.GaussianBlur(radius=shadow_blur)
+                    )
+                canvas.alpha_composite(shadow_layer)
 
             # ─── Texto principal (color depende del modo) ───
             # Override por palabra: si chunk_words[idx] trae 'color', se respeta

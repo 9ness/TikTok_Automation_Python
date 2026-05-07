@@ -1,12 +1,11 @@
 """Widget global de cola que se renderiza en cada modo de la app.
 
-Muestra:
-- Trabajo en ejecución (nombre, modo, % progreso, ETA, label vivo)
-- Pendientes (ordenables con ⬆️ ⬇️ ⏫, cancelables)
-- Completados/fallidos recientes (con botón "abrir") + limpieza
+Botón compacto "🧵 Cola" arriba a la derecha que despliega popover con:
+- Trabajo en ejecución (progreso, tiempo restante, hitos del job)
+- Pendientes (ordenables/cancelables vía sub-popover por job)
+- Completados/fallidos recientes (con reproductor de vídeo embebido)
 
-Auto-refresca cada 2s mientras haya jobs activos usando `st.fragment`
-(Streamlit ≥1.33). Si no está disponible, degrada a refresco manual.
+Auto-refresca cada 2s mientras haya jobs vivos usando `st.fragment`.
 """
 
 from __future__ import annotations
@@ -20,6 +19,9 @@ from .manager import get_queue
 from .models import MODE_LABELS, JobStatus
 
 
+# ============================================================
+# Helpers
+# ============================================================
 def _format_seconds(s: float) -> str:
     if s < 60:
         return f"{s:.0f}s"
@@ -34,21 +36,53 @@ def _has_fragment() -> bool:
     return hasattr(st, "fragment")
 
 
-def render_queue_widget(persist_dir: str | None = None) -> None:
-    """Renderiza el botón de cola como popover (no inline). Llamar una vez
-    al principio de cada vista, idealmente en una columna a la derecha del
-    título.
+# Prefijos de logs que el usuario considera "hitos" (cambios de etapa,
+# éxitos, errores). Las líneas técnicas como "Procesando segmento 1_Trump"
+# se filtran fuera por defecto — están detrás de un toggle.
+_MILESTONE_PREFIXES = (
+    "✅", "❌", "⚠️", "🚀", "🎉", "🛑",
+    "🎙️", "🎬", "📝", "🎣", "🔤", "🔊", "📢", "📂",
+    "▶️", "🏭", "🩺", "🏆",
+)
 
-    En vez de ocupar espacio vertical de la página, se muestra como un
-    botón compacto "🧵 Cola (N)" que al pulsarlo despliega el panel
-    completo (running, pending, recientes)."""
+
+def _filter_log_milestones(logs: list[str]) -> list[str]:
+    """Devuelve solo las líneas que son hitos para el usuario (las que
+    empiezan con un emoji de los `_MILESTONE_PREFIXES`). El resto son
+    logs técnicos accesibles tras un toggle."""
+    out = []
+    for line in logs:
+        body = line.strip().lstrip("- ").lstrip()
+        if not body:
+            continue
+        if any(body.startswith(p) for p in _MILESTONE_PREFIXES):
+            out.append(body)
+    return out
+
+
+def _format_filesize(path: str) -> str:
+    """Devuelve '12.4 MB' o '?' si no se puede medir."""
+    try:
+        b = os.path.getsize(path)
+        if b < 1024 * 1024:
+            return f"{b / 1024:.0f} KB"
+        return f"{b / (1024 * 1024):.1f} MB"
+    except Exception:
+        return "?"
+
+
+# ============================================================
+# Punto de entrada — botón flotante
+# ============================================================
+def render_queue_widget(persist_dir: str | None = None) -> None:
+    """Renderiza el botón de cola como popover (no inline). Llamar una
+    sola vez al principio de cada vista."""
     queue = get_queue(persist_dir)
 
     running = queue.get_running()
     pending = queue.get_pending()
     badge_count = len(pending) + (1 if running else 0)
 
-    # Etiqueta del botón. Si hay actividad, mostramos contador destacado.
     if running:
         label = f"🎬 Cola · {badge_count}"
     elif pending:
@@ -56,9 +90,6 @@ def render_queue_widget(persist_dir: str | None = None) -> None:
     else:
         label = "🧵 Cola"
 
-    # use_container_width=False → botón compacto (no full-width). Para
-    # posicionarlo en una esquina, envolver desde el llamador con un
-    # st.container(key="queue_btn_floating") que el CSS sube a fixed.
     if _has_fragment() and (running or pending):
         @st.fragment(run_every=2)
         def _live_block():
@@ -70,8 +101,10 @@ def render_queue_widget(persist_dir: str | None = None) -> None:
             _render_inner(queue)
 
 
+# ============================================================
+# Cuerpo del panel
+# ============================================================
 def _render_inner(queue) -> None:
-    """Cuerpo del widget — re-renderiza en cada tick del fragment."""
     running = queue.get_running()
     pending = queue.get_pending()
     finished = queue.get_finished(limit=8)
@@ -101,77 +134,92 @@ def _render_inner(queue) -> None:
                 st.rerun()
 
 
+# ============================================================
+# Tarjeta del job EN EJECUCIÓN
+# ============================================================
 def _render_running(job, queue) -> None:
-    """Tarjeta destacada del job en ejecución. Móvil-first: bloque
-    compacto con badge de modo, título truncado, barra de progreso
-    grande, y línea de tiempo/ETA pequeña."""
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
-    title = job.title or job.id
+    title = job.title or "(sin título)"
     pct = max(0.0, min(1.0, job.progress))
     elapsed = _format_seconds(job.elapsed_s)
     eta = job.eta_s
-    eta_str = f" · ETA ~{_format_seconds(eta)}" if eta is not None else ""
 
-    # Tarjeta destacada (acento color primary)
+    # Tarjeta destacada
     st.markdown(
         f"<div style='"
         f"padding:0.55rem 0.75rem; border-radius:10px; "
         f"background:linear-gradient(135deg, rgba(255,75,75,0.12), rgba(255,75,75,0.04)); "
         f"border-left:3px solid #FF4B4B; margin-bottom:0.4rem;'>"
         f"<div style='font-size:0.9rem; font-weight:600;'>{mode_label}</div>"
-        f"<div style='font-size:0.78rem; opacity:0.8; "
+        f"<div style='font-size:0.78rem; opacity:0.85; "
         f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>"
-        f"<code>{job.id}</code> · {title}</div>"
+        f"{title}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
 
+    # Barra de progreso con etiqueta clara
     st.progress(pct, text=f"{job.progress_label} · {int(pct*100)}%")
-    st.caption(f"⏱️ {elapsed}{eta_str}")
 
-    # Logs últimos (mostrar 6 en móvil para no robar pantalla)
+    # Línea de tiempo + ETA explicado en lenguaje natural
+    if eta is None:
+        if pct < 0.15:
+            eta_part = "calculando tiempo restante…"
+        else:
+            eta_part = ""
+    else:
+        eta_part = f"queda ~{_format_seconds(eta)} aprox."
+    st.caption(f"⏱️ Llevamos {elapsed}{' · ' + eta_part if eta_part else ''}")
+
+    # Hitos del job (filtrados — solo lo importante)
     if job.logs:
-        with st.expander("📋 Logs en vivo", expanded=False):
-            tail = job.logs[-8:]
-            st.markdown("\n".join(f"- {line}" for line in tail))
+        milestones = _filter_log_milestones(job.logs)
+        if milestones:
+            st.markdown("**Progreso del trabajo:**")
+            # Mostramos los últimos 5 hitos en un caja sutil
+            for line in milestones[-5:]:
+                st.markdown(
+                    f"<div style='font-size:0.78rem; padding:0.15rem 0; "
+                    f"opacity:0.9;'>{line}</div>",
+                    unsafe_allow_html=True,
+                )
+        # Toggle para los logs técnicos completos (escondido por defecto)
+        if st.toggle("Ver logs técnicos detallados",
+                     key=f"queue_logs_full_{job.id}",
+                     value=False):
+            st.code("\n".join(job.logs[-30:]), language=None)
 
     if st.button("⛔ Cancelar este trabajo",
                  key=f"queue_cancel_{job.id}",
                  use_container_width=True):
         queue.cancel(job.id)
-        st.toast(f"⛔ Cancelando {job.id}…")
+        st.toast(f"⛔ Cancelando trabajo…")
         st.rerun()
 
 
+# ============================================================
+# Tarjeta de un job EN COLA (pendiente)
+# ============================================================
 def _render_pending(job, queue, position: int, total: int) -> None:
-    """Una tarjeta por job pendiente. Móvil-first: línea principal con
-    info y, debajo, un único `st.popover` "Mover" que abre menú con las
-    acciones en columna (en lugar de 4 mini-botones que se apilarían
-    feo en móvil)."""
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
-    title = job.title or job.id
+    title = job.title or "(sin título)"
 
-    # Tarjeta visual de la entrada en cola
     st.markdown(
         f"<div style='"
-        f"display:flex; align-items:center; justify-content:space-between; "
-        f"gap:0.5rem; padding:0.4rem 0.6rem; "
+        f"padding:0.4rem 0.6rem; "
         f"background:rgba(255,255,255,0.03); border-radius:8px; "
         f"font-size:0.88rem; margin-bottom:0.3rem;'>"
-        f"<div style='flex:1; min-width:0; overflow:hidden; "
-        f"text-overflow:ellipsis; white-space:nowrap;'>"
-        f"<b>#{position+1}</b> · {mode_label}<br>"
-        f"<span style='opacity:0.75; font-size:0.78rem;'>"
-        f"<code>{job.id}</code> · {title}</span>"
-        f"</div></div>",
+        f"<div style='font-weight:600;'>"
+        f"<span style='opacity:0.6'>#{position+1}</span> · {mode_label}</div>"
+        f"<div style='font-size:0.78rem; opacity:0.8; "
+        f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>"
+        f"{title}</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
-    # Popover — botón único, abre las acciones verticales (mobile-friendly)
-    with st.popover(
-        f"⚙️ Mover / quitar",
-        use_container_width=True,
-    ):
+    # Acciones detrás de un único popover (no llena la UI con 4 botones)
+    with st.popover("⚙️ Mover / quitar", use_container_width=True):
         st.caption(f"Posición actual: #{position+1} de {total}")
         if st.button("⏫ Saltar al principio",
                      key=f"queue_top_{job.id}",
@@ -201,11 +249,12 @@ def _render_pending(job, queue, position: int, total: int) -> None:
             st.rerun()
 
 
+# ============================================================
+# Tarjeta de un job FINALIZADO (completado/fallido/cancelado)
+# ============================================================
 def _render_finished(job, queue) -> None:
-    """Tarjeta resumida de un trabajo finalizado. Acciones secundarias
-    detrás de un popover para no inflar la UI en móvil."""
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
-    title = job.title or job.id
+    title = job.title or "(sin título)"
 
     if job.status == JobStatus.COMPLETED:
         emoji, accent = "✅", "#3CD05E"
@@ -220,45 +269,86 @@ def _render_finished(job, queue) -> None:
     )
     elapsed = _format_seconds(job.elapsed_s) if job.started_at else "?"
 
-    filename = (
-        os.path.basename(job.result_path)
-        if job.result_path else "—"
+    has_video = (
+        job.status == JobStatus.COMPLETED
+        and job.result_path
+        and os.path.exists(job.result_path)
     )
+
+    # Card visual: limpio sin IDs técnicos. Si hay vídeo, mostramos
+    # tamaño y duración del archivo.
+    extra_info = ""
+    if has_video:
+        size = _format_filesize(job.result_path)
+        extra_info = f" · {size}"
 
     st.markdown(
         f"<div style='"
-        f"padding:0.4rem 0.6rem; border-radius:8px; "
+        f"padding:0.45rem 0.65rem; border-radius:8px; "
         f"background:rgba(255,255,255,0.025); "
         f"border-left:3px solid {accent}; margin-bottom:0.3rem;'>"
         f"<div style='font-size:0.85rem; font-weight:600;'>"
         f"{emoji} {mode_label}</div>"
-        f"<div style='font-size:0.75rem; opacity:0.75; "
+        f"<div style='font-size:0.76rem; opacity:0.85; "
         f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>"
         f"{title}</div>"
         f"<div style='font-size:0.72rem; opacity:0.6;'>"
-        f"🕐 {finished_at} · ⏱️ {elapsed}"
-        f"{' · 📄 ' + filename if job.status == JobStatus.COMPLETED else ''}"
+        f"🕐 {finished_at} · ⏱️ {elapsed}{extra_info}"
         f"</div></div>",
         unsafe_allow_html=True,
     )
 
-    # Acciones detrás de popover (mobile-friendly)
-    with st.popover("⚙️ Acciones", use_container_width=True):
-        if job.status == JobStatus.COMPLETED and job.result_path:
-            st.caption(f"📂 `{job.result_path}`")
-            if st.button("📂 Abrir carpeta", key=f"queue_open_{job.id}",
-                         use_container_width=True):
-                try:
-                    os.startfile(os.path.dirname(job.result_path))  # type: ignore[attr-defined]
-                except Exception:
-                    st.warning("No se pudo abrir la carpeta")
-        elif job.status == JobStatus.FAILED and job.error:
-            st.caption("Detalle técnico del error:")
-            st.code(job.error[:1500], language=None)
+    # ---------- COMPLETADO + tiene MP4 ----------
+    if has_video:
+        # Toggle "Ver vídeo aquí" — embebe el reproductor sin abrir popover.
+        # session_state persiste el toggle entre reruns del fragment.
+        play_key = f"_play_{job.id}"
+        is_playing = st.session_state.get(play_key, False)
+        new_playing = st.toggle(
+            "▶️ Reproducir aquí" if not is_playing else "⬛ Ocultar reproductor",
+            key=f"queue_play_toggle_{job.id}",
+            value=is_playing,
+        )
+        if new_playing != is_playing:
+            st.session_state[play_key] = new_playing
+            st.rerun()
+        if new_playing:
+            try:
+                st.video(job.result_path)
+            except Exception as e:
+                st.warning(f"No se pudo reproducir: {e}")
 
+        # Quitar del historial — botón directo (no en popover)
         if st.button("🗑️ Quitar del historial",
                      key=f"queue_remove_{job.id}",
                      use_container_width=True,
                      type="secondary"):
             queue.remove(job.id)
+            st.toast("🗑️ Quitado")
+            st.rerun()
+
+    # ---------- FALLIDO ----------
+    elif job.status == JobStatus.FAILED:
+        with st.popover("🔍 Ver error y opciones", use_container_width=True):
+            if job.error:
+                st.caption("Detalle técnico del error:")
+                st.code(job.error[:1500], language=None)
+            else:
+                st.caption("(sin detalle del error)")
+            if st.button("🗑️ Quitar del historial",
+                         key=f"queue_remove_failed_{job.id}",
+                         use_container_width=True,
+                         type="secondary"):
+                queue.remove(job.id)
+                st.toast("🗑️ Quitado")
+                st.rerun()
+
+    # ---------- CANCELADO ----------
+    else:
+        if st.button("🗑️ Quitar del historial",
+                     key=f"queue_remove_cancel_{job.id}",
+                     use_container_width=True,
+                     type="secondary"):
+            queue.remove(job.id)
+            st.toast("🗑️ Quitado")
             st.rerun()

@@ -14,15 +14,18 @@ _CSS = """
 <style>
 /* ============================================================
    BOTÓN FLOTANTE DE COLA — esquina superior derecha, siempre fijo
+   Lo bajamos a `top: 3.2rem` para esquivar el header de Streamlit
+   y el botón `>>` de colapsar/expandir sidebar (que vive arriba a
+   ambos lados). Margen lateral generoso para que el popover content
+   tenga sitio donde abrirse sin cortarse.
    ============================================================ */
 .st-key-queue_btn_floating {
     position: fixed !important;
-    top: 0.5rem !important;
-    right: 0.6rem !important;
+    top: 3.2rem !important;
+    right: 1rem !important;
     z-index: 999999 !important;
     width: auto !important;
     max-width: 60vw;
-    /* Anular el padding del element-container heredado */
     padding: 0 !important;
     margin: 0 !important;
 }
@@ -44,6 +47,13 @@ _CSS = """
 }
 .st-key-queue_btn_floating [data-testid="stPopover"] button:active {
     transform: scale(0.97);
+}
+
+/* Popover content — limitar ancho máximo en desktop para que no se
+   corte cuando se abre desde un botón pegado al borde derecho.
+   En móvil ya está limitado a 92vw en el bloque @media de abajo. */
+[data-testid="stPopoverBody"] {
+    max-width: min(440px, calc(100vw - 1.5rem)) !important;
 }
 
 /* ============================================================

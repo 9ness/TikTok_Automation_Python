@@ -349,19 +349,43 @@ def generate_video_pipeline(src_folder, output_folder, config, status_container,
 # ---------------------------------------------------------
 
 # SIDEBAR CONFIGURATION (Optimización de Espacio)
-# Orden: 1) Estrategia (siempre, primero) → 2) Resolución → 3) Bloques específicos del nicho
+# Orden: 1) Proyecto (super-modo) → 2) Estrategia → 3) Resolución → 4) Bloques nicho
 with st.sidebar:
-    # --- ESTRATEGIA & NICHO (siempre visible, PRIMERO) ---
-    with st.expander("🎯 Estrategia & Nicho", expanded=True):
-        app_mode_label = st.radio(
-            "Nicho",
-            ["🏛️ Presidentes Top 5", "📊 Pronósticos Diarios", "🛡️ Quitar Copy", "🎬 Subs sobre Vídeo"],
-            index=0,
-            label_visibility="collapsed"
-        )
-        sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
+    # --- PROYECTO (super-modo): Creator Reward vs TikTok Shop ---
+    # Cambia toda la interfaz. Por defecto Creator Reward (todo lo de
+    # antes). El modo TikTok Shop está mockeado por ahora — el flow
+    # real se diseñará más adelante.
+    project_label = st.radio(
+        "Proyecto",
+        ["🏆 Creator Reward", "🛒 TikTok Shop"],
+        index=0,
+        key="project_mode_radio",
+        horizontal=True,
+        label_visibility="collapsed",
+        help="Cambia entre los 2 proyectos: Creator Reward (vídeos virales para "
+             "Programa de recompensas) o TikTok Shop (vídeos para venta de productos).",
+    )
+    is_shop_project = "Shop" in project_label
 
-    if "Quitar Copy" in app_mode_label:
+    # --- ESTRATEGIA & NICHO (solo en modo Creator Reward) ---
+    if not is_shop_project:
+        with st.expander("🎯 Estrategia & Nicho", expanded=True):
+            app_mode_label = st.radio(
+                "Nicho",
+                ["🏛️ Presidentes Top 5", "📊 Pronósticos Diarios", "🛡️ Quitar Copy", "🎬 Subs sobre Vídeo"],
+                index=0,
+                label_visibility="collapsed"
+            )
+            sound_on = st.checkbox("🔔 Sonido al Finalizar", value=True)
+    else:
+        # En modo Shop no hay sub-nichos (de momento). Ponemos defaults
+        # para que las variables existan si algún código las referencia.
+        app_mode_label = "🛒 TikTok Shop"
+        sound_on = True
+
+    if is_shop_project:
+        CFG["app_mode"] = "TIKTOK_SHOP"
+    elif "Quitar Copy" in app_mode_label:
         CFG["app_mode"] = "COPYRIGHT_CLEANER"
     elif "Pronósticos" in app_mode_label:
         CFG["app_mode"] = "PRONOSTICOS_DIARIOS"
@@ -421,11 +445,23 @@ with st.sidebar:
         hook_font_scale = 0.020
 
     if is_presidents:
+        # Mapeo nombre amigable → path real de fuente subs. Rubik-Bold vive
+        # en assets/fonts/ del repo; el resolver lo encuentra cross-platform.
+        # Impact/Arial vienen del sistema (msttcorefonts en Linux VPS).
+        # A nivel del bloque (no del expander) para que el enqueue lo vea.
+        _SUBS_FONT_PATHS = {
+            "Impact":               r"C:\Windows\Fonts\impact.ttf",
+            "Rubik Bold (CapCut)":  "Rubik-Bold.ttf",  # se resuelve a assets/fonts/
+            "Arial Bold":           r"C:\Windows\Fonts\arialbd.ttf",
+        }
+
         # --- PRESETS (guardar/cargar configs en Redis) ---
         # Lista de claves de session_state que viajan en cada preset
         _PRESET_KEYS = [
             "subs_enabled", "subs_highlight_color", "subs_text_color", "subs_stroke_color",
             "subs_stroke_width", "subs_case", "subs_font_scale", "subs_max_words", "subs_y_position",
+            "subs_font_choice", "subs_shadow_enabled", "subs_highlight_mode",
+            "subs_max_width",
             "hook_enabled", "hook_duration", "hook_animation", "hook_y_position",
             "hook_shadow_color", "hook_box_color", "hook_text_color", "hook_font_scale",
         ]
@@ -435,6 +471,8 @@ with st.sidebar:
         # (solo afecta a session_state — los widgets lo recogen al renderizar)
         if "_default_preset_attempted" not in st.session_state:
             st.session_state._default_preset_attempted = True
+            st.session_state._active_preset_name = _DEFAULT_PRESET_KEY
+            st.session_state._active_preset_snapshot = None
             try:
                 from src.configs_store import is_available as _cfg_av, load_config as _load_cfg
                 if _cfg_av():
@@ -443,185 +481,192 @@ with st.sidebar:
                         for _k, _v in _autoloaded.items():
                             if _k in _PRESET_KEYS:
                                 st.session_state[_k] = _v
+                        # Snapshot del preset cargado — usado para detectar
+                        # cambios sin guardar respecto al preset activo.
+                        st.session_state._active_preset_snapshot = {
+                            k: _autoloaded.get(k) for k in _PRESET_KEYS if k in _autoloaded
+                        }
             except Exception as _e:
                 print(f"[preset autoload] {_e}")
 
-        with st.expander("💾 Presets de configuración", expanded=False):
-            try:
-                from src.configs_store import (
-                    is_available as _cfg_available,
-                    list_configs, save_config, load_config, delete_config,
-                )
-                _redis_ok = _cfg_available()
-            except Exception as _e:
-                _redis_ok = False
-                st.warning(f"Redis no disponible: {_e}")
+        # Helper: ¿hay cambios sin guardar respecto al snapshot del preset
+        # activo? Útil para mostrar indicador visual.
+        def _preset_is_dirty() -> bool:
+            snap = st.session_state.get("_active_preset_snapshot")
+            if not snap:
+                return False
+            current = {k: st.session_state.get(k) for k in _PRESET_KEYS
+                       if k in st.session_state}
+            return snap != current
 
-            if not _redis_ok:
-                st.info("Define `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` en `.env` para guardar presets.")
-            else:
-                saved_names = list_configs()
-                # __default lo mostramos siempre arriba con la estrella
-                visible_names = [n for n in saved_names if n != _DEFAULT_PRESET_KEY]
-                has_default = _DEFAULT_PRESET_KEY in saved_names
-                if has_default:
-                    st.caption("⭐ Hay un preset por defecto guardado — se carga automáticamente al abrir la app.")
-                else:
-                    st.caption("ℹ️ No hay preset por defecto. Usa el botón ⭐ para guardar la config actual como default.")
-                st.caption("🔄 Auto-guardado activo: cualquier cambio se persiste como preset por defecto.")
-
-                # Botón rápido: guardar como default
-                if st.button("⭐ Guardar config actual como DEFAULT (auto-load al abrir)",
-                             use_container_width=True, key="preset_save_default_btn"):
-                    current_cfg = {k: st.session_state[k] for k in _PRESET_KEYS if k in st.session_state}
-                    if save_config(_DEFAULT_PRESET_KEY, current_cfg):
-                        st.toast("⭐ Default guardado — se cargará la próxima vez que abras la app")
-                        st.rerun()
-                    else:
-                        st.error("Error guardando default.")
-
-                st.divider()
-
-                # Cargar otros presets
-                load_col1, load_col2 = st.columns([3, 1])
-                with load_col1:
-                    selected_preset = st.selectbox(
-                        "Cargar preset",
-                        ["(ninguno)"] + visible_names,
-                        index=0,
-                        key="preset_load_select",
-                    )
-                with load_col2:
-                    st.write("")
-                    if st.button("📂 Cargar", use_container_width=True, key="preset_load_btn"):
-                        if selected_preset != "(ninguno)":
-                            cfg = load_config(selected_preset)
-                            if cfg:
-                                for k, v in cfg.items():
-                                    if k in _PRESET_KEYS:
-                                        st.session_state[k] = v
-                                st.toast(f"✅ Preset '{selected_preset}' cargado")
-                                st.rerun()
-                            else:
-                                st.error("No se pudo cargar el preset.")
-
-                # Guardar nuevo preset / borrar seleccionado
-                save_col1, save_col2, save_col3 = st.columns([3, 1, 1])
-                with save_col1:
-                    new_preset_name = st.text_input(
-                        "Nombre del nuevo preset",
-                        placeholder="ej: rojo-uppercase-top5",
-                        key="preset_save_name",
-                    )
-                with save_col2:
-                    st.write("")
-                    if st.button("💾 Guardar", use_container_width=True, key="preset_save_btn"):
-                        name = new_preset_name.strip()
-                        if not name:
-                            st.warning("Pon un nombre para el preset.")
-                        elif name.startswith("__"):
-                            st.warning("Los nombres que empiezan por '__' están reservados.")
-                        else:
-                            current_cfg = {k: st.session_state[k] for k in _PRESET_KEYS if k in st.session_state}
-                            if save_config(name, current_cfg):
-                                st.toast(f"✅ Preset '{name}' guardado")
-                                st.rerun()
-                            else:
-                                st.error("Error guardando el preset.")
-                with save_col3:
-                    st.write("")
-                    if st.button("🗑️ Borrar", use_container_width=True, key="preset_delete_btn",
-                                 disabled=(selected_preset == "(ninguno)")):
-                        if delete_config(selected_preset):
-                            st.toast(f"🗑️ Preset '{selected_preset}' borrado")
-                            st.rerun()
+        # NOTA: el expander de "Presets" se renderiza más abajo, después de
+        # los expanders de Subtítulos / Hook / Vista previa, porque es la
+        # última cosa que el usuario toca (gestión, no configuración).
 
         # --- SUBTÍTULOS AUTOMÁTICOS (solo Presidentes) ---
         with st.expander("📝 Subtítulos automáticos (karaoke)", expanded=False):
             subs_enabled = st.checkbox(
-                "Añadir subtítulos al vídeo final",
+                "Añadir al vídeo",
                 value=True,
                 key="subs_enabled",
-                help="Transcribe el audio con Whisper local (gratis) y superpone subtítulos palabra-a-palabra estilo TikTok.",
+                help="Whisper transcribe el audio y superpone subtítulos karaoke.",
             )
 
             if subs_enabled:
-                # Preset rápido para el color de highlight (default: rojo)
-                if "subs_highlight_color" not in st.session_state:
+                # Defaults si no hay valor previo
+                st.session_state.setdefault("subs_highlight_color", "#BB0808")
+                st.session_state.setdefault("subs_font_choice", "Impact")
+                st.session_state.setdefault("subs_shadow_enabled", False)
+                st.session_state.setdefault("subs_highlight_mode_label",
+                                             "Píldora (palabra activa)")
+
+                # Helper: aplicar preset CapCut (TikTok Creator Reward style)
+                # Fuente Rubik-Bold + UPPERCASE + texto blanco + borde negro
+                # grueso + FONDO rojo continuo bajo cada línea + sombra suave.
+                # Réplica exacta de CapCut: el fondo cubre TODAS las palabras
+                # del subtítulo visible, no solo la activa.
+                def _apply_capcut_preset():
+                    st.session_state.subs_font_choice = "Rubik Bold (CapCut)"
+                    st.session_state.subs_case = "UPPERCASE"
+                    st.session_state.subs_text_color = "#FFFFFF"
+                    st.session_state.subs_stroke_color = "#000000"
+                    # Stroke 3 — CapCut "Grosor 11" + escala 77% queda fino
+                    st.session_state.subs_stroke_width = 3
                     st.session_state.subs_highlight_color = "#BB0808"
-                preset_col1, preset_col2, preset_col3 = st.columns([1, 1, 2])
-                with preset_col1:
-                    if st.button("🔵 Azul", help="#1E01C4", use_container_width=True, key="subs_preset_blue"):
-                        st.session_state.subs_highlight_color = "#1E01C4"
-                with preset_col2:
-                    if st.button("🔴 Rojo", help="#BB0808", use_container_width=True, key="subs_preset_red"):
-                        st.session_state.subs_highlight_color = "#BB0808"
-                with preset_col3:
-                    st.caption("Presets rápidos de color highlight")
-
-                # Colores
-                col_c1, col_c2 = st.columns(2)
-                with col_c1:
-                    subs_highlight_color = st.color_picker(
-                        "🎨 Color highlight (pill)",
-                        key="subs_highlight_color",
-                        help="Color de la píldora detrás de la palabra actual. Presets: 🔵 #1E01C4 / 🔴 #BB0808",
+                    # font_scale 0.030 (~3% del alto = ~58px en 1920px). Replica
+                    # el tamaño efectivo de CapCut "tamaño 14 + escala 77%".
+                    # NOTA: si después de probar te queda pequeño, sube a
+                    # 0.033-0.035 con el slider Tamaño (% alto).
+                    st.session_state.subs_font_scale = 0.030
+                    st.session_state.subs_max_words = 3
+                    st.session_state.subs_y_position = 0.65
+                    st.session_state.subs_shadow_enabled = True
+                    # Karaoke palabra-a-palabra: solo la palabra activa
+                    # tiene la píldora roja. Si quieres fondo bajo TODAS las
+                    # palabras del chunk a la vez, cambia el selector
+                    # "Modo de marcado" a "Bloque continuo (CapCut)".
+                    st.session_state.subs_highlight_mode_label = (
+                        "Píldora (palabra activa)"
                     )
-                    subs_text_color = st.color_picker("Color del texto", value="#FFFFFF", key="subs_text_color")
-                with col_c2:
-                    subs_stroke_color = st.color_picker("Color del borde", value="#000000", key="subs_stroke_color")
-                    subs_stroke_width = st.slider("Grosor del borde", 0, 6, 3, key="subs_stroke_width")
+                    # Ancho máximo razonable para 3 palabras Rubik Bold:
+                    # 0.80 deja margen seguro y obliga a saltos de línea limpios.
+                    st.session_state.subs_max_width = 0.80
 
-                subs_case = st.selectbox(
-                    "Formato del texto",
-                    ["UPPERCASE", "lowercase", "Title Case", "original"],
-                    index=0,
-                    key="subs_case",
+                # Botón estrella: aplica todo el estilo CapCut de golpe
+                st.button(
+                    "🎬 Aplicar estilo CapCut (Creator Reward)",
+                    on_click=_apply_capcut_preset,
+                    use_container_width=True,
+                    type="primary",
+                    key="subs_preset_capcut",
+                    help="Replica el estilo de subtítulos que cumple los estándares "
+                         "de calidad de TikTok para Creator Reward Program.",
                 )
 
-                subs_font_scale = st.slider(
-                    "Tamaño de fuente (relativo al alto del vídeo)",
-                    min_value=0.03, max_value=0.08, value=0.040, step=0.005,
-                    key="subs_font_scale",
+                # Presets rápidos solo de color highlight (azul / rojo)
+                with st.container(key="compact_row_subs_presets"):
+                    pc1, pc2 = st.columns(2)
+                    with pc1:
+                        if st.button("🔵 Azul", use_container_width=True, key="subs_preset_blue",
+                                     help="Solo cambia color highlight a #1E01C4"):
+                            st.session_state.subs_highlight_color = "#1E01C4"
+                    with pc2:
+                        if st.button("🔴 Rojo", use_container_width=True, key="subs_preset_red",
+                                     help="Solo cambia color highlight a #BB0808"):
+                            st.session_state.subs_highlight_color = "#BB0808"
+
+                # Fuente + formato en línea
+                with st.container(key="compact_row_subs_font"):
+                    fc1, fc2 = st.columns(2)
+                    with fc1:
+                        subs_font_choice = st.selectbox(
+                            "Fuente",
+                            ["Impact", "Rubik Bold (CapCut)", "Arial Bold"],
+                            key="subs_font_choice",
+                            help="Rubik Bold = estilo CapCut. Impact = legacy.",
+                        )
+                    with fc2:
+                        subs_case = st.selectbox(
+                            "Formato", ["UPPERCASE", "lowercase", "Title Case", "original"],
+                            index=0, key="subs_case",
+                        )
+
+                # Modo de marcado: pill (karaoke palabra-a-palabra) vs
+                # block_bg (fondo continuo CapCut)
+                _SUBS_MODE_MAP = {
+                    "Píldora (palabra activa)": "pill",
+                    "Bloque continuo (CapCut)": "block_bg",
+                    "Cambio de color":          "color_swap",
+                    "Subrayado":                 "underline",
+                    "Sin marcado":               "none",
+                }
+                subs_highlight_mode_label = st.selectbox(
+                    "Modo de marcado",
+                    list(_SUBS_MODE_MAP.keys()),
+                    key="subs_highlight_mode_label",
+                    help="Píldora = karaoke palabra a palabra. Bloque continuo = "
+                         "fondo bajo TODAS las palabras (estilo CapCut TikTok).",
                 )
+                subs_highlight_mode = _SUBS_MODE_MAP[subs_highlight_mode_label]
 
-                subs_max_words = st.slider("Palabras por bloque (chunk)", 1, 5, 4, key="subs_max_words")
+                # 4 color pickers en 2 filas de 2 (compactos en móvil)
+                with st.container(key="compact_row_subs_colors1"):
+                    cc1, cc2 = st.columns(2)
+                    with cc1:
+                        subs_highlight_color = st.color_picker(
+                            "Highlight", key="subs_highlight_color",
+                            help="Color de la píldora bajo la palabra actual",
+                        )
+                    with cc2:
+                        subs_text_color = st.color_picker(
+                            "Texto", value="#FFFFFF", key="subs_text_color")
+                with st.container(key="compact_row_subs_colors2"):
+                    cc3, cc4 = st.columns(2)
+                    with cc3:
+                        subs_stroke_color = st.color_picker(
+                            "Borde", value="#000000", key="subs_stroke_color")
+                    with cc4:
+                        subs_stroke_width = st.slider(
+                            "Grosor borde", 0, 8, 3, key="subs_stroke_width")
 
-                # Posición Y (dentro de zona segura TikTok)
+                # Tamaño + palabras/chunk en línea
+                with st.container(key="compact_row_subs_meta"):
+                    fm1, fm2 = st.columns(2)
+                    with fm1:
+                        subs_font_scale = st.slider(
+                            "Tamaño (% alto)",
+                            min_value=0.03, max_value=0.08, value=0.040, step=0.005,
+                            key="subs_font_scale",
+                        )
+                    with fm2:
+                        subs_max_words = st.slider(
+                            "Palabras/chunk", 1, 5, 4, key="subs_max_words")
+
                 subs_y_position = st.slider(
-                    "Posición vertical (% del alto del vídeo)",
+                    "Posición Y (% alto)",
                     min_value=0.15, max_value=0.75, value=0.62, step=0.01,
                     key="subs_y_position",
-                    help="0.40 = bajo el hook (muy arriba) · 0.62 = recomendado (margen amplio bajo el hook) · 0.75 = casi abajo. "
-                         "Rango limitado a la zona segura que evita los iconos, descripción y sonido.",
+                    help="0.62 recomendado (zona segura bajo el hook). Mira el preview "
+                         "abajo para confirmar que no invade UI TikTok.",
                 )
 
-                # Preview
-                try:
-                    from src.subtitles import render_preview_image, DEFAULT_STYLE
+                # Ancho máximo del bloque de texto. Cuando el subtítulo
+                # supera este ancho, salta a la línea siguiente. El preview
+                # muestra el recuadro blanco sutil para visualizarlo.
+                subs_max_width = st.slider(
+                    "Ancho máximo (% ancho)",
+                    min_value=0.40, max_value=1.00, value=0.85, step=0.05,
+                    key="subs_max_width",
+                    help="0.85 recomendado. Si el texto se sale por los lados de la "
+                         "zona segura, baja este valor; si quieres líneas más largas, súbelo.",
+                )
 
-                    preview_style = {
-                        **DEFAULT_STYLE,
-                        "highlight_color": subs_highlight_color,
-                        "text_color": subs_text_color,
-                        "stroke_color": subs_stroke_color,
-                        "stroke_width": subs_stroke_width,
-                        "case_mode": subs_case,
-                        "font_scale": subs_font_scale,
-                        "max_words_per_chunk": subs_max_words,
-                        "y_position_pct": subs_y_position,
-                    }
-
-                    preview_img = render_preview_image(
-                        preview_style,
-                        sample_text="MORE FRAGILE THAN EVER",
-                        highlight_word_index=2,
-                        video_size=(1080, 1920),
-                    )
-                    st.caption("Vista previa del estilo:")
-                    st.image(preview_img, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"⚠️ Preview no disponible: {e}")
+                subs_shadow_enabled = st.checkbox(
+                    "🌑 Sombra suave (estilo CapCut)",
+                    key="subs_shadow_enabled",
+                    help="Drop shadow bajo el texto (offset 0.4%/0.5% + blur 4px). "
+                         "Imprescindible para parecer CapCut.",
+                )
             else:
                 subs_highlight_color = "#BB0808"
                 subs_text_color = "#FFFFFF"
@@ -631,87 +676,83 @@ with st.sidebar:
                 subs_font_scale = 0.040
                 subs_max_words = 4
                 subs_y_position = 0.62
+                subs_font_choice = "Impact"
+                subs_shadow_enabled = False
+                subs_highlight_mode = "pill"
+                subs_max_width = 0.85
 
         # --- GANCHO DE TEXTO (HOOK BOX) — solo Presidentes ---
         with st.expander("🎣 Gancho de texto (hook box)", expanded=False):
             hook_enabled = st.checkbox(
-                "Añadir gancho de texto al inicio del vídeo",
+                "Añadir al vídeo",
                 value=True,
                 key="hook_enabled",
-                help="Caja con el título del vídeo estilo noticia, centrada sobre el clip.",
+                help="Caja con título estilo noticia centrada sobre el primer clip.",
             )
 
             if hook_enabled:
-                hook_duration = st.slider("Duración (segundos)", 2.0, 10.0, 5.0, 0.5, key="hook_duration")
-
-                hook_animation = st.selectbox(
-                    "Animación de salida/entrada",
-                    ["swipe_left", "slide_in_out", "news_flash", "fade"],
-                    index=0,
-                    key="hook_animation",
-                    format_func=lambda x: {
-                        "swipe_left": "Swipe left (sale hacia la izquierda)",
-                        "slide_in_out": "Slide in/out (entra y sale por la izquierda)",
-                        "news_flash": "News flash (pop + vibración + swipe)",
-                        "fade": "Fade (fundido entrada/salida)",
-                    }[x],
-                )
-
-                hook_y_position = st.slider(
-                    "Posición vertical (% del alto)",
-                    min_value=0.20, max_value=0.75, value=0.33, step=0.01,
-                    key="hook_y_position",
-                    help="0.33 = recomendado (arriba del subtítulo, sin invadir UI TikTok). Respeta zona segura.",
-                )
-
-                # Presets de color de sombra (default: rojo)
+                # Default rojo si no hay valor previo
                 if "hook_shadow_color" not in st.session_state:
                     st.session_state.hook_shadow_color = "#BB0808"
-                hp1, hp2, hp3 = st.columns([1, 1, 2])
-                with hp1:
-                    if st.button("🔵 Azul", help="#1E01C4", use_container_width=True, key="hook_preset_blue"):
-                        st.session_state.hook_shadow_color = "#1E01C4"
-                with hp2:
-                    if st.button("🔴 Rojo", help="#BB0808", use_container_width=True, key="hook_preset_red"):
-                        st.session_state.hook_shadow_color = "#BB0808"
-                with hp3:
-                    st.caption("Presets de sombra del hook")
 
-                hc1, hc2 = st.columns(2)
-                with hc1:
-                    hook_shadow_color = st.color_picker(
-                        "Color sombra (3D)",
-                        key="hook_shadow_color",
-                    )
-                    hook_box_color = st.color_picker("Color de la caja", value="#FFFFFF", key="hook_box_color")
-                with hc2:
-                    hook_text_color = st.color_picker("Color del texto", value="#0B0B0B", key="hook_text_color")
-                    hook_font_scale = st.slider("Tamaño de fuente", 0.014, 0.040, 0.020, 0.002, key="hook_font_scale")
+                # Duración + animación en línea
+                with st.container(key="compact_row_hook_meta"):
+                    h1, h2 = st.columns(2)
+                    with h1:
+                        hook_duration = st.slider(
+                            "Duración (s)", 2.0, 10.0, 5.0, 0.5, key="hook_duration")
+                    with h2:
+                        hook_animation = st.selectbox(
+                            "Animación",
+                            ["swipe_left", "slide_in_out", "news_flash", "fade"],
+                            index=0,
+                            key="hook_animation",
+                            format_func=lambda x: {
+                                "swipe_left": "Swipe left",
+                                "slide_in_out": "Slide in/out",
+                                "news_flash": "News flash",
+                                "fade": "Fade",
+                            }[x],
+                        )
 
-                # Preview
-                try:
-                    from src.text_hook import render_preview_image as _hook_preview, DEFAULT_HOOK_STYLE as _HS
+                hook_y_position = st.slider(
+                    "Posición Y (% alto)",
+                    min_value=0.20, max_value=0.75, value=0.33, step=0.01,
+                    key="hook_y_position",
+                    help="0.33 recomendado (arriba del subs, sin invadir UI TikTok). "
+                         "Mira el preview abajo para confirmar.",
+                )
 
-                    hook_style_preview = {
-                        **_HS,
-                        "duration": hook_duration,
-                        "y_position_pct": hook_y_position,
-                        "shadow_color": hook_shadow_color,
-                        "box_color": hook_box_color,
-                        "text_color": hook_text_color,
-                        "font_scale": hook_font_scale,
-                        "animation": hook_animation,
-                    }
+                # Presets de color de sombra (sin caption sobrante)
+                with st.container(key="compact_row_hook_presets"):
+                    hp1, hp2 = st.columns(2)
+                    with hp1:
+                        if st.button("🔵 Azul", use_container_width=True, key="hook_preset_blue",
+                                     help="Sombra #1E01C4"):
+                            st.session_state.hook_shadow_color = "#1E01C4"
+                    with hp2:
+                        if st.button("🔴 Rojo", use_container_width=True, key="hook_preset_red",
+                                     help="Sombra #BB0808"):
+                            st.session_state.hook_shadow_color = "#BB0808"
 
-                    preview_hook = _hook_preview(
-                        "Ranked By Damage Done",
-                        hook_style_preview,
-                        video_size=(1080, 1920),
-                    )
-                    st.caption("Vista previa (texto de muestra; en el render real la IA genera un teaser de 3-6 palabras según el ángulo del vídeo):")
-                    st.image(preview_hook, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"⚠️ Preview no disponible: {e}")
+                # 4 inputs en 2 filas de 2 (compactos en móvil)
+                with st.container(key="compact_row_hook_colors1"):
+                    hc1, hc2 = st.columns(2)
+                    with hc1:
+                        hook_shadow_color = st.color_picker(
+                            "Sombra (3D)", key="hook_shadow_color")
+                    with hc2:
+                        hook_box_color = st.color_picker(
+                            "Caja", value="#FFFFFF", key="hook_box_color")
+                with st.container(key="compact_row_hook_colors2"):
+                    hc3, hc4 = st.columns(2)
+                    with hc3:
+                        hook_text_color = st.color_picker(
+                            "Texto", value="#0B0B0B", key="hook_text_color")
+                    with hc4:
+                        hook_font_scale = st.slider(
+                            "Tamaño fuente", 0.014, 0.040, 0.020, 0.002,
+                            key="hook_font_scale")
             else:
                 hook_duration = 5.0
                 hook_animation = "swipe_left"
@@ -721,16 +762,215 @@ with st.sidebar:
                 hook_text_color = "#0B0B0B"
                 hook_font_scale = 0.020
 
+        # --- VISTA PREVIA COMBINADA 9:16 (hook + subs + zonas seguras TikTok) ---
+        # Crítico para Creator Reward: confirma visualmente que el hook y los
+        # subtítulos NO invaden la UI nativa de TikTok (handle, like, share,
+        # caption, sound). Las zonas inseguras se pintan en rojo translúcido.
+        with st.expander("👁️ Vista previa 9:16 con zonas seguras TikTok",
+                          expanded=True):
+            try:
+                from src.preview_combined import render_combined_preview
+
+                _hook_style_pv = {
+                    "y_position_pct": hook_y_position,
+                    "shadow_color": hook_shadow_color,
+                    "box_color": hook_box_color,
+                    "text_color": hook_text_color,
+                    "font_scale": hook_font_scale,
+                } if hook_enabled else None
+
+                _sub_style_pv = {
+                    "font_path": _SUBS_FONT_PATHS.get(subs_font_choice, _SUBS_FONT_PATHS["Impact"]),
+                    "highlight_color": subs_highlight_color,
+                    "text_color": subs_text_color,
+                    "stroke_color": subs_stroke_color,
+                    "stroke_width": subs_stroke_width,
+                    "case_mode": subs_case,
+                    "font_scale": subs_font_scale,
+                    "max_words_per_chunk": subs_max_words,
+                    "y_position_pct": subs_y_position,
+                    "shadow_enabled": subs_shadow_enabled,
+                    "highlight_mode": subs_highlight_mode,
+                    "max_width_pct": subs_max_width,
+                } if subs_enabled else None
+
+                _combined_img = render_combined_preview(
+                    hook_text="Ranked By Damage Done" if hook_enabled else None,
+                    hook_style=_hook_style_pv,
+                    sub_text="MORE FRAGILE THAN EVER" if subs_enabled else "",
+                    sub_style=_sub_style_pv,
+                    sub_highlight_idx=2,
+                    video_size=(1080, 1920),
+                    show_safe_zones=True,
+                    show_y_markers=True,
+                )
+                # Centrar la imagen — en móvil ocupa todo el ancho del expander,
+                # que ya es estrecho. En desktop limitamos a 360px para no
+                # ocupar todo el ancho de la sidebar.
+                _, _pcol, _ = st.columns([1, 4, 1])
+                with _pcol:
+                    st.image(_combined_img, use_container_width=True)
+                st.caption(
+                    "🟢 Zona verde = segura para tu contenido · "
+                    "🔴 Zona roja = UI nativa de TikTok (no poner texto ahí)"
+                )
+            except Exception as _pv_err:
+                st.warning(f"⚠️ Preview combinado no disponible: {_pv_err}")
+
+        # --- PRESETS — al final, debajo de todo (gestión, no configuración) ---
+        # Título dinámico que dice qué preset hay cargado y si tiene cambios
+        # sin guardar. Lógica:
+        #  · "por defecto" (__default): autoguardado activo → siempre ✓
+        #  · preset nombrado: modo manual; si se modifica algo aparece ⚠️ y
+        #    botón explícito para guardar los cambios en ese preset.
+        try:
+            from src.configs_store import (
+                is_available as _cfg_available,
+                list_configs, save_config, load_config, delete_config,
+            )
+            _redis_ok = _cfg_available()
+        except Exception as _e:
+            _redis_ok = False
+            list_configs = lambda: []
+            save_config = load_config = delete_config = lambda *a, **kw: False
+
+        _active_name = st.session_state.get("_active_preset_name", _DEFAULT_PRESET_KEY)
+        _is_default = (_active_name == _DEFAULT_PRESET_KEY)
+        _dirty = _preset_is_dirty()
+
+        if _is_default:
+            _label_status = "auto-guardado ✓"
+        elif _dirty:
+            _label_status = "⚠️ cambios sin guardar"
+        else:
+            _label_status = "guardado ✓"
+        _label_name = "por defecto" if _is_default else f"'{_active_name}'"
+        _preset_label = f"💾 Preset: {_label_name} · {_label_status}"
+
+        with st.expander(_preset_label, expanded=False):
+            if not _redis_ok:
+                st.info("Define `UPSTASH_REDIS_REST_URL` y "
+                        "`UPSTASH_REDIS_REST_TOKEN` en `.env` para usar presets.")
+            else:
+                # Texto explicativo según contexto (1 línea)
+                if _is_default:
+                    st.caption(
+                        "💡 Modo automático: cualquier cambio se guarda solo. "
+                        "Carga otro preset abajo para tener varios estilos con nombre."
+                    )
+                elif _dirty:
+                    st.warning(
+                        f"⚠️ Has modificado este preset desde que lo cargaste. "
+                        f"Pulsa **Guardar cambios en '{_active_name}'** para no perderlos."
+                    )
+                else:
+                    st.success(
+                        f"✅ Preset `{_active_name}` al día — sin cambios pendientes."
+                    )
+
+                # Selector de preset activo (cambio inmediato)
+                _saved = list_configs() or []
+                _visible = [n for n in _saved if n != _DEFAULT_PRESET_KEY]
+                _options = ["(por defecto)"] + _visible
+                _current_label = "(por defecto)" if _is_default else _active_name
+                _idx = _options.index(_current_label) if _current_label in _options else 0
+                _new_sel = st.selectbox(
+                    "Preset cargado", _options, index=_idx,
+                    key="preset_active_select",
+                )
+                _target = _DEFAULT_PRESET_KEY if _new_sel == "(por defecto)" else _new_sel
+                if _target != _active_name:
+                    _cfg_loaded = load_config(_target) or {}
+                    for _k, _v in _cfg_loaded.items():
+                        if _k in _PRESET_KEYS:
+                            st.session_state[_k] = _v
+                    st.session_state._active_preset_name = _target
+                    st.session_state._active_preset_snapshot = {
+                        k: _cfg_loaded.get(k) for k in _PRESET_KEYS if k in _cfg_loaded
+                    }
+                    st.toast(f"📂 Cargado: {_new_sel}")
+                    st.rerun()
+
+                # Botón guardar cambios — solo si dirty y NO es default
+                if not _is_default and _dirty:
+                    if st.button(
+                        f"💾 Guardar cambios en '{_active_name}'",
+                        type="primary", use_container_width=True,
+                        key="preset_save_current_btn",
+                    ):
+                        _cur = {k: st.session_state[k] for k in _PRESET_KEYS
+                                if k in st.session_state}
+                        if save_config(_active_name, _cur):
+                            st.session_state._active_preset_snapshot = _cur
+                            st.toast(f"✅ Cambios guardados en '{_active_name}'")
+                            st.rerun()
+                        else:
+                            st.error("Error guardando.")
+
+                # Crear nuevo preset (input + botón en línea)
+                with st.container(key="compact_row_preset_new"):
+                    nc1, nc2 = st.columns([3, 1])
+                    with nc1:
+                        _new_name = st.text_input(
+                            "Nombre nuevo preset",
+                            placeholder="ej: rojo-impact-grande",
+                            key="preset_save_name",
+                            label_visibility="collapsed",
+                        )
+                    with nc2:
+                        if st.button(
+                            "➕ Nuevo", use_container_width=True,
+                            key="preset_save_new_btn",
+                            help="Guardar la config actual como nuevo preset con este nombre",
+                        ):
+                            _name = _new_name.strip()
+                            if not _name:
+                                st.warning("Pon un nombre.")
+                            elif _name.startswith("__"):
+                                st.warning("Nombres con '__' están reservados.")
+                            elif _name in (_saved or []):
+                                st.warning(f"Ya existe '{_name}'. Cárgalo y usa 'Guardar cambios'.")
+                            else:
+                                _cur = {k: st.session_state[k] for k in _PRESET_KEYS
+                                        if k in st.session_state}
+                                if save_config(_name, _cur):
+                                    st.session_state._active_preset_name = _name
+                                    st.session_state._active_preset_snapshot = _cur
+                                    st.toast(f"✅ Preset '{_name}' creado y cargado")
+                                    st.rerun()
+                                else:
+                                    st.error("Error guardando.")
+
+                # Borrar preset cargado (solo si nombrado)
+                if not _is_default:
+                    if st.button(
+                        f"🗑️ Borrar '{_active_name}'",
+                        use_container_width=True,
+                        key="preset_delete_btn",
+                    ):
+                        if delete_config(_active_name):
+                            st.session_state._active_preset_name = _DEFAULT_PRESET_KEY
+                            _d = load_config(_DEFAULT_PRESET_KEY) or {}
+                            for _k, _v in _d.items():
+                                if _k in _PRESET_KEYS:
+                                    st.session_state[_k] = _v
+                            st.session_state._active_preset_snapshot = {
+                                k: _d.get(k) for k in _PRESET_KEYS if k in _d
+                            }
+                            st.toast(f"🗑️ '{_active_name}' borrado — vuelvo al default")
+                            st.rerun()
+
         # --- AUTO-GUARDADO de la configuración en Redis (preset __default) ---
-        # Cualquier cambio en los widgets de arriba (subtítulos, hook, presets)
-        # se persiste como preset por defecto. La próxima sesión lo recarga
-        # automáticamente. Solo escribe a Redis cuando el snapshot cambia.
+        # SOLO se ejecuta si el preset activo es __default. Cuando hay un
+        # preset NOMBRADO cargado, los cambios NO se autoguardan — el usuario
+        # los guarda explícitamente con el botón "Guardar cambios en 'X'".
         try:
             from src.configs_store import (
                 is_available as _autosave_av,
                 save_config as _autosave_save,
             )
-            if _autosave_av():
+            _ap = st.session_state.get("_active_preset_name", _DEFAULT_PRESET_KEY)
+            if _autosave_av() and _ap == _DEFAULT_PRESET_KEY:
                 _autosave_snap = {
                     k: st.session_state[k]
                     for k in _PRESET_KEYS
@@ -740,9 +980,52 @@ with st.sidebar:
                 if st.session_state.get("_autosave_last_key") != _autosave_key:
                     if _autosave_save(_DEFAULT_PRESET_KEY, _autosave_snap):
                         st.session_state._autosave_last_key = _autosave_key
+                        # Mantener el snapshot del default en sync con lo guardado
+                        st.session_state._active_preset_snapshot = _autosave_snap
                         st.session_state._autosave_done_once = True
         except Exception as _autosave_err:
             print(f"[autosave preset] {_autosave_err}")
+
+# ---------------------------------------------------------
+# INTERFAZ TIKTOK SHOP (MODO EXCLUSIVO — mock placeholder)
+# Placeholder por ahora. Cuando definamos el flow real (productos
+# afiliados / extracción de specs / guión vendedor / etc.), aquí va.
+# ---------------------------------------------------------
+if CFG["app_mode"] == "TIKTOK_SHOP":
+    st.header("🛒 TikTok Shop")
+    st.info(
+        "🚧 **Modo en construcción.** Pronto podrás generar vídeos para "
+        "TikTok Shop (demos de producto, afiliados, reviews) desde aquí. "
+        "Mientras tanto te dejo un cuaderno para apuntar ideas que iremos "
+        "convirtiendo en features."
+    )
+
+    with st.container(border=True):
+        st.markdown("### 💡 Qué quiero poder hacer aquí")
+        st.text_area(
+            "Describe el flow que quieres en TikTok Shop",
+            placeholder=(
+                "ej:\n"
+                "- Pego un link de producto AliExpress / Amazon\n"
+                "- IA extrae specs/precio/imágenes\n"
+                "- Genera guión vendedor 30-60s con CTA\n"
+                "- TTS + clips de stock + texto overlay con precio\n"
+                "- MP4 9:16 listo para subir"
+            ),
+            height=200,
+            key="shop_idea_input",
+        )
+        st.caption(
+            "Cuando tengas claro lo que quieres, me lo dices y lo implementamos "
+            "igual que los modos actuales (cola, preview, deploy automático)."
+        )
+
+    st.divider()
+    st.caption(
+        "👈 Vuelve a **🏆 Creator Reward** arriba en la sidebar "
+        "para seguir usando el flow actual de Presidentes / Pronósticos / etc."
+    )
+    st.stop()
 
 # ---------------------------------------------------------
 # INTERFAZ COPYRIGHT CLEANER (MODO EXCLUSIVO)
@@ -2057,12 +2340,14 @@ if True:
                 help='Frase "Save this video before they delete it..." tras el título.',
             )
 
-            # Preview del título completo construido (caption pequeña)
+            # Preview del título completo construido (caption pequeña).
+            # NO autocompleta "Presidents" — si el usuario lo quiere lo
+            # añade en su tema. Si el tema está vacío se marca placeholder.
             title_prefix = f"{prefix_word} {top_count}"
             suffix_display = " in US history" if include_history else ""
-            preview_topic = (topic.strip() or "[aleatorio]")
+            preview_topic = topic.strip() or "[tema aleatorio]"
             st.caption(
-                f"📢 *{title_prefix} {preview_topic} Presidents{suffix_display}*"
+                f"📢 *{title_prefix} {preview_topic}{suffix_display}*"
             )
 
             queue_inputs.append({
@@ -2112,6 +2397,9 @@ if True:
                 "include_hook": video_cfg["include_hook"],
                 "engine_version": engine_version,
                 "subs_enabled": subs_enabled,
+                "subs_font_path": _SUBS_FONT_PATHS.get(
+                    subs_font_choice, _SUBS_FONT_PATHS["Impact"]
+                ),
                 "subs_highlight_color": subs_highlight_color,
                 "subs_text_color": subs_text_color,
                 "subs_stroke_color": subs_stroke_color,
@@ -2120,6 +2408,9 @@ if True:
                 "subs_font_scale": subs_font_scale,
                 "subs_max_words": subs_max_words,
                 "subs_y_position": subs_y_position,
+                "subs_shadow_enabled": subs_shadow_enabled,
+                "subs_highlight_mode": subs_highlight_mode,
+                "subs_max_width": subs_max_width,
                 "hook_enabled": hook_enabled,
                 "hook_duration": hook_duration,
                 "hook_animation": hook_animation,

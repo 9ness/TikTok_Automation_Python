@@ -412,7 +412,14 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                         "font_scale": p.get("subs_font_scale", 0.040),
                         "max_words_per_chunk": p.get("subs_max_words", 4),
                         "y_position_pct": p.get("subs_y_position", 0.62),
+                        "shadow_enabled": p.get("subs_shadow_enabled", False),
+                        "highlight_mode": p.get("subs_highlight_mode", "pill"),
+                        "max_width_pct": p.get("subs_max_width", 0.85),
                     }
+                    # Override del font_path solo si vino especificado (UI Presidentes
+                    # ahora puede elegir Impact / Rubik Bold / Arial Bold).
+                    if p.get("subs_font_path"):
+                        subs_style["font_path"] = p["subs_font_path"]
                     tmp_out = final_video_path + ".tmp.mp4"
                     render_karaoke_on_video(
                         final_video_path, words, subs_style, tmp_out,

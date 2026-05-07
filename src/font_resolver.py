@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Optional
 
 from PIL import ImageFont
 
@@ -82,16 +81,26 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
+def _bundled_fonts_dir() -> str:
+    """Carpeta de fuentes incluidas en el repo (assets/fonts/)."""
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "assets", "fonts",
+    )
+
+
 @lru_cache(maxsize=128)
 def resolve_font(path: str) -> str:
     """Devuelve una ruta válida a la fuente para el OS actual.
 
-    - Si el `path` ya existe en disco, lo devuelve tal cual.
-    - En Linux, si el path es Windows-style, mapea por nombre conocido
-      (Impact.ttf, Arial_Bold.ttf...) y busca en `_LINUX_FONT_DIRS`.
-    - Si no encuentra ninguna, devuelve `_LAST_RESORT_LINUX` (DejaVu).
-    - Como último último recurso, devuelve el path original (PIL fallará
-      con un error explícito).
+    Orden de resolución:
+    1. Si `path` existe en disco tal cual, devuelve.
+    2. Si el basename matchea una fuente bundled del repo (assets/fonts/),
+       la devuelve. Esto permite usar fuentes custom (Rubik-Bold, etc.)
+       igual en Windows y en Linux sin instalarlas en el sistema.
+    3. En Linux: mapea nombre Windows -> nombre Linux y busca en
+       `_LINUX_FONT_DIRS`.
+    4. Fallback final: DejaVu Sans Bold (preinstalado en Ubuntu).
 
     Resultado cacheado para no escanear el FS en cada palabra de subtítulo.
     """
@@ -100,6 +109,12 @@ def resolve_font(path: str) -> str:
 
     if os.path.exists(path):
         return path
+
+    # Buscar en assets/fonts/ del repo (cross-platform)
+    basename = os.path.basename(path)
+    bundled = os.path.join(_bundled_fonts_dir(), basename)
+    if os.path.exists(bundled):
+        return bundled
 
     if _is_windows():
         # Windows: si la ruta no existe es problema del usuario; devolvemos tal cual
