@@ -22,6 +22,28 @@ from .models import MODE_LABELS, JobStatus
 # ============================================================
 # Helpers
 # ============================================================
+def _format_finished_at_relative(ts: float | None) -> str:
+    """Devuelve 'HH:MM', 'ayer HH:MM' o 'DD MMM HH:MM' según antigüedad.
+
+    Evita que jobs antiguos (días pasados) parezcan recientes — en el widget
+    de cola los fallos de hace días deben distinguirse a primera vista.
+    """
+    if ts is None:
+        return "?"
+    finished = datetime.fromtimestamp(ts)
+    now = datetime.now()
+    if finished.date() == now.date():
+        return finished.strftime("%H:%M")
+    delta_days = (now.date() - finished.date()).days
+    if delta_days == 1:
+        return "ayer " + finished.strftime("%H:%M")
+    if delta_days < 7:
+        # Lun/Mar/.../Dom HH:MM
+        weekday_es = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"][finished.weekday()]
+        return f"{weekday_es} {finished.strftime('%H:%M')}"
+    return finished.strftime("%d %b %H:%M")
+
+
 def _format_seconds(s: float) -> str:
     if s < 60:
         return f"{s:.0f}s"
@@ -74,29 +96,64 @@ def _format_filesize(path: str) -> str:
 # ============================================================
 # Punto de entrada — botón flotante
 # ============================================================
-def render_queue_widget(persist_dir: str | None = None) -> None:
-    """Renderiza el botón de cola como popover (no inline). Llamar una
-    sola vez al principio de cada vista."""
-    queue = get_queue(persist_dir)
+#
+# El fragment vive a NIVEL DE MÓDULO (no dentro de la función render) para
+# que Streamlit lo identifique con el mismo code-object en cada rerun y
+# dispare correctamente el `run_every=2`. Si se define dentro de la función
+# de render, cada rerun crea un fragment object distinto y el polling se
+# pierde — síntoma: la cola solo se actualiza al recargar manualmente.
+#
+# Tanto el label del botón como el contenido del popover viven dentro del
+# fragment, así el badge "Cola · N" también se actualiza en tiempo real.
+def _persist_dir_state() -> str | None:
+    """Lee el persist_dir guardado en session_state. Necesario porque el
+    fragment a nivel de módulo no acepta parámetros que cambian — debe
+    leer estado externo."""
+    return st.session_state.get("_queue_widget_persist_dir")
 
-    running = queue.get_running()
-    pending = queue.get_pending()
-    badge_count = len(pending) + (1 if running else 0)
 
-    if running:
-        label = f"🎬 Cola · {badge_count}"
-    elif pending:
-        label = f"🧵 Cola · {badge_count}"
-    else:
-        label = "🧵 Cola"
+if _has_fragment():
+    @st.fragment(run_every=2)
+    def _live_queue_widget() -> None:
+        queue = get_queue(_persist_dir_state())
+        running = queue.get_running()
+        pending = queue.get_pending()
+        badge_count = len(pending) + (1 if running else 0)
 
-    if _has_fragment() and (running or pending):
-        @st.fragment(run_every=2)
-        def _live_block():
-            _render_inner(queue)
+        if running:
+            label = f"🎬 Cola · {badge_count}"
+        elif pending:
+            label = f"🧵 Cola · {badge_count}"
+        else:
+            label = "🧵 Cola"
+
         with st.popover(label, use_container_width=False):
-            _live_block()
+            _render_inner(queue)
+else:
+    _live_queue_widget = None  # type: ignore[assignment]
+
+
+def render_queue_widget(persist_dir: str | None = None) -> None:
+    """Renderiza el botón de cola como popover. Llamar una sola vez al
+    principio de cada vista. La actualización en tiempo real (cada 2s) la
+    gestiona el fragment a nivel de módulo `_live_queue_widget`."""
+    # Guardar persist_dir en session_state para que el fragment lo lea en
+    # subsequent reruns (las llamadas del `run_every` no reciben argumentos).
+    if persist_dir is not None:
+        st.session_state["_queue_widget_persist_dir"] = persist_dir
+
+    if _live_queue_widget is not None:
+        _live_queue_widget()
     else:
+        # Fallback Streamlit antiguo sin st.fragment
+        queue = get_queue(persist_dir)
+        running = queue.get_running()
+        pending = queue.get_pending()
+        badge_count = len(pending) + (1 if running else 0)
+        label = (
+            f"🎬 Cola · {badge_count}" if running
+            else (f"🧵 Cola · {badge_count}" if pending else "🧵 Cola")
+        )
         with st.popover(label, use_container_width=False):
             _render_inner(queue)
 
@@ -140,6 +197,8 @@ def _render_inner(queue) -> None:
 def _render_running(job, queue) -> None:
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
     title = job.title or "(sin título)"
+    by = f" · 👤 {job.enqueued_by}" if getattr(job, "enqueued_by", None) else ""
+    mode_label = f"{mode_label}{by}"
     pct = max(0.0, min(1.0, job.progress))
     elapsed = _format_seconds(job.elapsed_s)
     eta = job.eta_s
@@ -202,6 +261,8 @@ def _render_running(job, queue) -> None:
 # ============================================================
 def _render_pending(job, queue, position: int, total: int) -> None:
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
+    if getattr(job, "enqueued_by", None):
+        mode_label = f"{mode_label} · 👤 {job.enqueued_by}"
     title = job.title or "(sin título)"
 
     st.markdown(
@@ -254,6 +315,8 @@ def _render_pending(job, queue, position: int, total: int) -> None:
 # ============================================================
 def _render_finished(job, queue) -> None:
     mode_label = MODE_LABELS.get(job.mode, str(job.mode.value))
+    if getattr(job, "enqueued_by", None):
+        mode_label = f"{mode_label} · 👤 {job.enqueued_by}"
     title = job.title or "(sin título)"
 
     if job.status == JobStatus.COMPLETED:
@@ -263,10 +326,7 @@ def _render_finished(job, queue) -> None:
     else:
         emoji, accent = "⛔", "#888888"
 
-    finished_at = (
-        datetime.fromtimestamp(job.finished_at).strftime("%H:%M")
-        if job.finished_at else "?"
-    )
+    finished_at = _format_finished_at_relative(job.finished_at)
     elapsed = _format_seconds(job.elapsed_s) if job.started_at else "?"
 
     has_video = (
@@ -331,8 +391,20 @@ def _render_finished(job, queue) -> None:
     elif job.status == JobStatus.FAILED:
         with st.popover("🔍 Ver error y opciones", use_container_width=True):
             if job.error:
-                st.caption("Detalle técnico del error:")
-                st.code(job.error[:1500], language=None)
+                # Primera línea: mensaje conciso (sin traceback) — el resumen que
+                # cabe en el ancho del popover sin scroll feo.
+                first_line = job.error.split("\n", 1)[0].strip()
+                st.error(first_line)
+
+                # Traceback completo con word-wrap (Streamlit ≥1.32).
+                # `wrap_lines=True` evita que las líneas largas se corten al ancho
+                # del popover; en su lugar wrappean al ancho disponible.
+                with st.expander("📋 Traceback completo", expanded=False):
+                    st.code(
+                        job.error[:3000],
+                        language="text",
+                        wrap_lines=True,
+                    )
             else:
                 st.caption("(sin detalle del error)")
             if st.button("🗑️ Quitar del historial",

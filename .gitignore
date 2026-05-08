@@ -9,6 +9,7 @@ __pycache__/
 
 # --- Carpetas de Trabajo (Muy Importante) ---
 temp_work/
+logs/
 # Ignoramos .env porque puede tener rutas personales
 .env
 

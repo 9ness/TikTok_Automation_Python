@@ -9,13 +9,22 @@ Regla estricta: Respuestas de 1-2 líneas máximo. Cero explicaciones, cortesía
 ## Resumen del proyecto
 
 `TikTok_Automation_Python` — fábrica Streamlit que genera vídeos virales 9:16
-para TikTok Creator Reward Program. **3 nichos** seleccionables en la sidebar:
+para TikTok. **2 programas principales** seleccionables en la sidebar (Creator
+Reward / TikTok Shop), cada uno con sus nichos.
+
+### Programa 1 — Creator Reward (existente)
 
 | Nicho | Modo | Propósito |
 |---|---|---|
 | 🏛️ Presidentes Top 5 | `PRESIDENTS_TOP5` | Rankings de presidentes USA con guion IA + assets locales |
 | 📊 Pronósticos Diarios | `PRONOSTICOS_DIARIOS` | Vídeos de pronósticos deportivos desde Redis (bet-ai-master) |
 | 🛡️ Quitar Copy | `COPYRIGHT_CLEANER` | Re-subtitula vídeos para evadir copyright |
+
+### Programa 2 — TikTok Shop (en construcción)
+
+| Función | Modo | Propósito |
+|---|---|---|
+| 🛒 Generador Shop | `TIKTOK_SHOP` | Vídeos affiliate AI con Seedance/Veo3, multi-cuenta, multi-producto |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
 
@@ -104,55 +113,102 @@ No depende de Redis ni de assets externos.
 
 ---
 
+## Programa 2 — TikTok Shop (en construcción)
+
+**Briefing completo en [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md)** —
+fuente de verdad del módulo (arquitectura, esquemas Redis, fases, prompts,
+flujos por tier, Pilot Program, Drive layout).
+
+**Propósito:** afiliado TikTok Shop España. Vídeos AI multi-cuenta × producto
+con Seedance (3 tiers Atlas) o Veo3 / Nano Banana (prompt-only manual).
+Independiente del Programa 1 — selector en sidebar separa ambos.
+
+**Raíz Drive:** `TIKTOK_SHOP/` — HERMANA de `TIKTOK_CR/`, no anidada. Helper
+canónico: `src/tiktok_shop/config.py:resolve_shop_root()` (autodetect con
+override `TIKTOK_SHOP_ROOT_PATH` en .env). Estructura interna:
+`_users/@user/products/{slug}/videos/` + `_products/{slug}/photos_source/`
++ `_products/{slug}/photos_generated/`.
+
+**Módulos** (todos en [`src/tiktok_shop/`](src/tiktok_shop/)):
+`api/{atlas_cloud,gemini,minimax_clone}.py`,
+`pipeline/{analyzer,strategist,seedance_director,seedance_renderer,veo3_director,nano_banana_prompt_generator,editor,drive_uploader}.py`,
+`prompts/*.md`, `repos/*_repo.py`, `services/{cost_calculator,pilot_tracker,tier_selector}.py`,
+`utils/{duration_splitter,image_url_provider,photo_quality}.py`,
+`ui/{shop_router,tab_*}.py`.
+
+**Redis** (prefijo `tiktok_shop:`): `user:`, `product:`, `generation:`, `voice:`.
+Cola unificada con Creator Reward via `JobMode.TIKTOK_SHOP`.
+
+**Tiers** (5, ver [`config.py`](src/tiktok_shop/config.py)):
+🟢 `standard` ($0.018/s i2v) · 🟡 `advanced` ($0.047/s i2v) · 🔴 `pro`
+($0.072/s ref2v multi-shot) · 🟣 `veo3_prompt_only` · 🍌 `nano_banana_prompt_only`.
+Imágenes a Atlas como **base64 inline** (los 3 tiers). Pro acepta hasta 9 refs.
+
+**Críticas:** `ai_disclosure: true` siempre · presencia humana parcial · Pilot
+Program máx 5 shoppable/semana (tracker en `services/pilot_tracker.py`).
+
+---
+
 ## Variables de entorno (`.env`)
 
 ```env
-# Path raíz de assets (carpeta sincronizada con Drive). Opcional:
-# si no se define, src/utils.py:resolve_tiktok_root() escanea las unidades
-# del sistema buscando "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS".
-# Solo fíjala para forzar una ubicación concreta.
+# === Programa 1 — Creator Reward ===
+# Path raíz de assets CR (Drive sincronizado). Auto-detect si no se define
+# (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS").
 # TIKTOK_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS"
 
-# OpenAI (Presidentes — guion JSON)
-OPENAI_API_KEY=...
+# === Programa 2 — TikTok Shop ===
+# Path raíz TikTok Shop. HERMANO de TIKTOK_CR (no anidado). Auto-detect si
+# no se define (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP").
+# TIKTOK_SHOP_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP"
 
-# MiniMax (TTS)
-MINIMAX_API_KEY=...
+# Atlas Cloud (Seedance — los 3 tiers Standard/Advanced/Pro). URL default oficial.
+ATLASCLOUD_API_KEY=...
+# ATLASCLOUD_BASE_URL=https://api.atlascloud.ai/api/v1   # opcional override
+
+# === Compartido entre programas ===
+OPENAI_API_KEY=...                   # Presidentes — guion JSON
+MINIMAX_API_KEY=...                  # TTS — los 3 nichos CR + TikTok Shop
 MINIMAX_GROUP_ID=...
-MINIMAX_VOICE_ID=...                # voz por defecto (inglesa, Presidents)
-PRONOSTICOS_VOICE_ID=Spanish_*       # opcional — override del nicho Pronósticos
+MINIMAX_VOICE_ID=...                 # voz default (inglesa, Presidents)
+PRONOSTICOS_VOICE_ID=Spanish_*       # opcional — override Pronósticos
 
-# Gemini (legado de antes — Pronósticos NO lo usa)
-GOOGLE_GEMINI_KEY=...
+# Gemini — TikTok Shop dual-key con fallback (FREE → PAID si 429); legacy
+# `GOOGLE_GEMINI_KEY` lo usa Creator Reward y solo se reusa si no hay FREE/PAID.
+GOOGLE_GEMINI_KEY_FREE=AIza...       # proyecto sin billing (free tier)
+GOOGLE_GEMINI_KEY_PAID=AIza...       # proyecto con billing (~5€/mes)
+GOOGLE_GEMINI_KEY=...                # legacy compartido con CR
 
-# Redis Upstash (Pronósticos lee de aquí)
+# Upstash Redis (Pronósticos prefijo `betai:`, TikTok Shop prefijo `tiktok_shop:`)
 UPSTASH_REDIS_REST_URL=https://xxxxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=AX...
-REDIS_PREFIX=betai:                  # default
+REDIS_PREFIX=betai:                  # default — solo afecta a Pronósticos
 
-# APIs de stock (opcionales — sin ellas Pronósticos cae a fondo sólido)
+# APIs stock Pronósticos (opcionales)
 PEXELS_API_KEY=...
 PIXABAY_API_KEY=...
+
+# Opcional TikTok Shop
+# TIKTOK_SHOP_MONTHLY_BUDGET_USD=50   # alerta dashboard al 80%
 ```
 
 ---
 
 ## Configuración de la sidebar
 
-La sidebar muestra solo los bloques relevantes al nicho activo:
+La sidebar muestra solo los bloques relevantes al programa+nicho activo:
 
-| Bloque | Presidentes | Pronósticos | Quitar Copy |
-|---|---|---|---|
-| 🎯 Estrategia & Nicho | ✅ | ✅ | ✅ |
-| 🎥 Resolución | ✅ | ✅ | ✅ |
-| 🎥 Motor Animación (v1/v2) | ✅ | — | — |
-| 📝 Subtítulos karaoke | ✅ | — | — |
-| 🎣 Hook box | ✅ | — | — |
+### Programa 1 — Creator Reward
 
-Pronósticos tiene sus propios controles dedicados en el área principal:
-voz, SFX (4: dinero/clink/cámara/BGM), overlay de ligas, saturación,
-duración objetivo, carrusel pick, carpeta intro, edición efímera del guion,
-selector de versión + cola.
+Sidebar tiene: 🎯 Estrategia & Nicho, 🎥 Resolución (siempre); + 🎥 Motor
+Animación, 📝 Subtítulos karaoke, 🎣 Hook box (solo Presidentes). Pronósticos
+tiene controles dedicados en área principal (voz, SFX, overlays, saturación,
+carrusel, intro, selector de versión + cola).
+
+### Programa 2 — TikTok Shop
+
+Sin sidebar — todo en tabs del área principal: Productos / Usuarios /
+Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop/ui/)).
 
 ---
 
@@ -171,27 +227,21 @@ selector de versión + cola.
   Helper: `src/pronosticos/stock_search.py:_slug()`.
 - **Versiones de vídeo**: nombres de output incluyen sufijo `_v1`/`_v2`/`_v3`
   cuando hay varias versiones del mismo día.
+- **Aislamiento entre programas**: NUNCA mezclar lógica de Creator Reward y
+  TikTok Shop. Reusar solo módulos transversales (MiniMax, FFmpeg, Whisper,
+  Redis, logging). Cualquier cambio en un programa no debe romper el otro.
+- **System prompts en archivos `.md`**: todos los prompts de TikTok Shop viven
+  en `src/tiktok_shop/prompts/*.md`, NUNCA hardcoded en el código.
 
 ---
 
 ## Mantenimiento de este archivo
 
-Actualiza CLAUDE.md cuando:
-- Se añada/elimine un módulo en `src/`
-- Cambien las variables de entorno requeridas
-- Cambie el schema de Redis o los nombres de assets esperados
-- Se añada un nicho nuevo
-
-NO actualizes CLAUDE.md por:
-- Cambios menores de UI / refactors internos / bugfixes
-- Ajustes de parámetros (volúmenes, sliders, etc.)
-- Lo que se pueda derivar leyendo el código directamente
-
-Mantén el archivo bajo 250 líneas. Si crece más, mueve detalles a un
-markdown específico (ej: `docs/pronosticos.md`) y deja aquí solo el resumen
-+ un link.
+Actualiza CLAUDE.md cuando: módulo nuevo/eliminado en `src/`, env vars que
+cambian, schema Redis, assets esperados, nicho o programa nuevo.
+NO por: bugfixes, refactors, ajustes de parámetros, lo derivable del código.
+Cap 250 líneas — mover detalles a `.md` específico si crece.
 
 ### Memoria y Tareas
 - **Lectura**: Lee `tasks.md` para pendientes y `learnings.md` para historial técnico.
 - **Escritura Autónoma**: Al resolver un bug o implementar un patrón técnico nuevo, añade obligatoriamente un registro de 1 línea en `learnings.md`. Al finalizar una tarea, muévela a la sección `## ✅ Done` en `tasks.md`.
-

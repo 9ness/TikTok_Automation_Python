@@ -19,6 +19,7 @@ class JobMode(str, Enum):
     PRONOSTICOS = "pronosticos"
     SUBS_AUTO = "subs_auto"
     COPYRIGHT = "copyright"
+    TIKTOK_SHOP = "tiktok_shop"
 
 
 class JobStatus(str, Enum):
@@ -35,6 +36,7 @@ MODE_LABELS = {
     JobMode.PRONOSTICOS: "📊 Pronósticos",
     JobMode.SUBS_AUTO: "🎬 Subs sobre Vídeo",
     JobMode.COPYRIGHT: "🛡️ Quitar Copy",
+    JobMode.TIKTOK_SHOP: "🛒 TikTok Shop",
 }
 
 
@@ -52,6 +54,7 @@ class Job:
     logs: list[str] = field(default_factory=list)
     result_path: str | None = None       # MP4 final si completó
     error: str | None = None
+    enqueued_by: str | None = None       # username del operador que encoló (ness, buga, ...)
     created_at: float = field(default_factory=time.time)
     started_at: float | None = None
     finished_at: float | None = None

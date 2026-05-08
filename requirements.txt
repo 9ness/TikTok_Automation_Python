@@ -9,3 +9,6 @@ requests
 streamlit-authenticator>=0.4.0
 bcrypt
 faster-whisper
+pydantic>=2.6
+httpx>=0.27
+tenacity>=8.2

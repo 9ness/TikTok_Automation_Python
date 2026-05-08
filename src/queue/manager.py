@@ -61,8 +61,11 @@ class JobQueue:
         with self._lock:
             self._dispatch = dispatch
 
-    def enqueue(self, mode: JobMode, title: str, params: dict) -> Job:
-        job = Job(mode=mode, title=title, params=params)
+    def enqueue(
+        self, mode: JobMode, title: str, params: dict,
+        enqueued_by: str | None = None,
+    ) -> Job:
+        job = Job(mode=mode, title=title, params=params, enqueued_by=enqueued_by)
         with self._cond:
             self._jobs.append(job)
             self._save_state_locked()
@@ -307,15 +310,29 @@ def _make_queue(persist_dir: str) -> JobQueue:
 
 def get_queue(persist_dir: str | None = None) -> JobQueue:
     """Devuelve el singleton (cacheado en Streamlit). En la primera
-    llamada hay que pasar `persist_dir`."""
+    llamada hay que pasar `persist_dir`.
+
+    Nota crítica: re-registramos el dispatcher en CADA llamada porque el
+    `@st.cache_resource` mantiene viva la instancia entre reruns y reloads
+    de código. Sin este re-registro, si añades un runner nuevo (p. ej.
+    `JobMode.TIKTOK_SHOP`) al `_RUNNERS` dict de `runners.py`, el
+    dispatcher cacheado seguirá apuntando a la versión vieja de
+    `dispatch_job` y los jobs nuevos fallarán con "Modo desconocido".
+    """
     import streamlit as st
 
     if persist_dir is None:
-        # Fallback razonable
         persist_dir = os.path.join(os.getcwd(), "temp_work")
+    # Normalizar para evitar split de singleton si se pasan paths
+    # equivalentes pero con representación distinta (rel vs abs).
+    persist_dir = os.path.abspath(persist_dir)
 
     @st.cache_resource(show_spinner=False)
     def _cached(_persist_dir: str) -> JobQueue:
         return _make_queue(_persist_dir)
 
-    return _cached(persist_dir)
+    queue = _cached(persist_dir)
+    # Re-registra el dispatcher con la versión ACTUAL del código.
+    from .runners import dispatch_job
+    queue.set_dispatcher(dispatch_job)
+    return queue

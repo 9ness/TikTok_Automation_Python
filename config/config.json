@@ -4,6 +4,7 @@
         "intro_folder": "BIBLIOTECA_INTRO",
         "resources_folder": "BIBLIOTECA_RECURSOS",
         "pronosticos_clips_folder": "BIBLIOTECA_PRONOSTICOS_CLIPS",
+        "tiktok_shop_folder": "TIKTOK_SHOP",
         "output_folder": "VIDEOS_TERMINADOS",
         "temp_folder": "./temp_work"
     },

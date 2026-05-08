@@ -667,6 +667,445 @@ def run_copyright(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
 
 # ============================================================
+# RUNNER: TIKTOK SHOP (Programa 2)
+# ============================================================
+def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Pipeline TikTok Shop con 5 tiers:
+
+    - `standard` / `advanced`  → Atlas Seedance image-to-video, multi_clip_anchor
+    - `pro`                    → Atlas Seedance reference-to-video, single_shot_multishot
+    - `veo3_prompt_only`       → genera prompt Veo3 (8s) — no renderiza
+    - `nano_banana_prompt_only`→ genera prompt fotos premium — no renderiza vídeo
+
+    Voz MiniMax + captions Whisper se aplican en standard/advanced/pro.
+    No hay fallback Ken Burns: si Atlas falla, el job falla con mensaje claro.
+    """
+    p = job.params
+    tier = p.get("tier", "standard")
+    video_strategy = p.get("strategy", "dynamic")
+
+    on_progress(0.02, "📂 Cargando contexto…")
+    from src.tiktok_shop.config import (
+        DEFAULT_VIDEO_STRATEGY, STRATEGY_CONFIG, VIDEO_MODELS, VIDEO_STRATEGIES,
+    )
+    if video_strategy not in VIDEO_STRATEGIES:
+        video_strategy = DEFAULT_VIDEO_STRATEGY
+    strategy_cfg = STRATEGY_CONFIG[video_strategy]
+    from src.tiktok_shop.models import (
+        ClipPrompt, GenerationStatus, HookUsed, TikTokShopVideoMeta,
+        VideoCost, VideoGeneration, VoiceUsed,
+    )
+    from src.tiktok_shop.pipeline import (
+        analyze_product, generate_nano_banana_prompt, generate_seedance_prompts,
+        generate_strategy, generate_veo3_prompt,
+    )
+    from src.tiktok_shop.pipeline.drive_uploader import upload_video
+    from src.tiktok_shop.pipeline.editor import compose_shop_video
+    from src.tiktok_shop.repos import GenerationRepo, ProductRepo, UserRepo
+    from src.tiktok_shop.services import estimate_cost
+    from src.tiktok_shop.services.pilot_tracker import update_pilot_progress
+    from src.tiktok_shop.utils.logging_setup import log_error, log_info
+
+    LOGGER = "tiktok_shop.runner"
+
+    user_repo = UserRepo()
+    product_repo = ProductRepo()
+    gen_repo = GenerationRepo()
+
+    user = user_repo.get(p["user_id"])
+    product = product_repo.get(p["product_id"])
+    if user is None or product is None:
+        log_error(LOGGER, "Usuario o producto no encontrados",
+                  job_id=job.id, user_id=p.get("user_id"), product_id=p.get("product_id"))
+        raise RuntimeError("Usuario o producto no encontrados.")
+
+    if tier not in VIDEO_MODELS:
+        log_error(LOGGER, "Tier desconocido", job_id=job.id, tier=tier)
+        raise ValueError(f"Tier desconocido: {tier}")
+
+    log_info(LOGGER, "Job iniciado",
+             job_id=job.id, tier=tier, duration=p.get("duration"),
+             resolution=p.get("resolution"), user=user.username, product=product.slug,
+             shoppable=p.get("is_shoppable"),
+             strategy=video_strategy,
+             camera_style=strategy_cfg.get("camera_style"),
+             photo_strategy=strategy_cfg.get("photo_strategy"))
+
+    # Selección de fotos: prefiere `generated`, fallback a `source`.
+    photos_list, photos_source = product.photos.best_available()
+    photo_paths = [
+        ph.local_path for ph in photos_list
+        if ph.local_path and os.path.exists(ph.local_path)
+    ]
+    if not photo_paths:
+        raise RuntimeError(
+            f"El producto {product.slug} no tiene fotos válidas en photos_source ni photos_generated."
+        )
+
+    model_def = VIDEO_MODELS[tier]
+    is_prompt_only = model_def["type"] == "prompt_only"
+    strategy_key = model_def["strategy"]
+
+    # Crear registro inicial
+    gen = VideoGeneration(
+        user_id=user.id,
+        product_id=product.id,
+        tier_used=tier,
+        model_used=model_def.get("model_id") or "",
+        duration_seconds=int(p.get("duration", 15) if not is_prompt_only else (8 if tier == "veo3_prompt_only" else 0)),
+        resolution=p.get("resolution", "720p"),
+        clip_strategy=strategy_key,
+        language=p.get("language", "es"),
+        video_type="shoppable" if p.get("is_shoppable") else "normal",
+        ai_disclosure=bool(p.get("ai_disclosure", True)),
+        hook=HookUsed(category=p.get("hook_category", "general"), text=p.get("hook_text", "")),
+        voice_used=VoiceUsed(
+            type="tts_preset",
+            voice_id=p.get("voice_id", "Spanish_EnergeticBoy"),
+            name=p.get("voice_id"),
+        ),
+        photos_source=photos_source,
+        photos_used=[ph.filename for ph in photos_list if ph.filename],
+        generation_status=GenerationStatus.GENERATING,
+    )
+    gen_repo.save(gen)
+
+    try:
+        # ================================================================
+        # Branch A: Nano Banana 2 (prompt-only, no usa strategist)
+        # ================================================================
+        if tier == "nano_banana_prompt_only":
+            return _run_nano_banana(
+                on_log=on_log, on_progress=on_progress,
+                gen=gen, gen_repo=gen_repo, product=product,
+                photo_paths=photo_paths, params=p,
+                generate_nano_banana_prompt=generate_nano_banana_prompt,
+            )
+
+        # ================================================================
+        # Resto de tiers usan strategist + analyzer
+        # ================================================================
+        on_progress(0.08, "🔬 Analizando producto…")
+        on_log("🔬 Analizando producto con Gemini…")
+        analysis = (
+            {"key_features": product.key_features, "selling_points": product.selling_points}
+            if product.key_features else analyze_product(photo_paths)
+        )
+
+        on_progress(0.20, "🧠 Generando estrategia…")
+        on_log("🧠 Generando estrategia (hook + script + estructura)…")
+        strategy = generate_strategy(
+            analysis,
+            audience=p.get("audience", "Generalista"),
+            hook_category=p.get("hook_category", "curiosity"),
+            duration_seconds=gen.duration_seconds,
+            language=gen.language,
+            product_name=product.name,
+            extra_directives=p.get("hook_text", ""),
+            video_strategy=video_strategy,   # FUNC 5
+        )
+        gen.voiceover_script = strategy.get("voiceover_script", "")
+        gen.tiktok_shop_metadata = TikTokShopVideoMeta(
+            caption_template=strategy.get("hook_text", ""),
+            hashtags=strategy.get("tiktok_hashtags", []),
+            human_presence=bool(strategy.get("human_presence_required", True)),
+        )
+
+        # ================================================================
+        # Branch B: Veo3 prompt-only
+        # ================================================================
+        if tier == "veo3_prompt_only":
+            on_progress(0.55, "📝 Generando prompt Veo 3…")
+            on_log("📝 Generando prompt Veo 3 (8s, single shot)…")
+            style = (product.video_config.preferred_styles or ["cinematic_premium"])[0]
+            veo_prompt = generate_veo3_prompt(strategy, style=style)
+            gen.veo3_prompt = veo_prompt
+            gen.duration_seconds = 8
+            gen.generation_status = GenerationStatus.MANUAL_PENDING
+            gen.cost = VideoCost(video_generation=0.0, voice_tts=0.0, total=0.0)
+            gen.completed_at = _iso_now()
+            gen_repo.save(gen)
+
+            txt_path = _save_prompt_txt(p, gen.id, "veo3", veo_prompt)
+            on_progress(1.0, "✅ Prompt Veo 3 listo")
+            on_log("✅ Prompt Veo 3 generado. Cópialo desde Histórico → 📋")
+            return txt_path
+
+        # ================================================================
+        # Branch C: Seedance auto (standard / advanced / pro)
+        # ================================================================
+        from src.tiktok_shop.config import RESOLUTIONS
+        from src.tiktok_shop.utils.duration_splitter import split_duration
+
+        # Estimación inicial — se guarda en cost.estimated_at_creation
+        est = estimate_cost(
+            tier=tier, duration=gen.duration_seconds, resolution=gen.resolution,
+            voice_chars=len(strategy.get("voiceover_script") or "") or gen.duration_seconds * 18,
+        )
+        gen.cost = VideoCost(
+            video_generation=est["video_generation"],
+            voice_tts=est["voice_tts"],
+            total=est["total"],
+            estimated_at_creation=est["total"],
+        )
+        gen_repo.save(gen)
+
+        on_progress(0.30, "🎬 Generando prompts por clip…")
+        on_log(f"🎬 Generando prompts Seedance ({tier} / {strategy_key})…")
+        # FUNC 3: el usuario pudo asignar fotos manualmente a clips (i2v) o
+        # elegir el subset de fotos referencia (pro). Si no hay overrides en
+        # params, el director auto-asigna como antes.
+        clip_overrides = p.get("clip_photo_overrides")
+        pro_overrides = p.get("pro_ref_photo_overrides")
+        if clip_overrides:
+            on_log(f"📌 Asignación manual de fotos por clip: {clip_overrides}")
+        if pro_overrides:
+            on_log(f"📌 Subset manual de fotos referencia (Pro): {pro_overrides}")
+        seedance_specs = generate_seedance_prompts(
+            strategy,
+            tier=tier,
+            style=(product.video_config.preferred_styles or ["asmr_macro"])[0],
+            photos_count=len(photo_paths),
+            clip_photo_overrides=clip_overrides,
+            pro_ref_photo_overrides=pro_overrides,
+            camera_style=strategy_cfg.get("camera_style", "varied_contained"),
+        )
+
+        # Para Standard/Advanced, ajustamos la duración por clip a lo que
+        # devuelva `split_duration(total, tier)`. El director ya devolvió
+        # una lista con duraciones por clip, pero pueden no respetar los
+        # límites Atlas — los normalizamos.
+        if isinstance(seedance_specs, list):
+            target_clips = split_duration(gen.duration_seconds, tier, video_strategy)
+            if len(target_clips) != len(seedance_specs):
+                on_log(
+                    f"ℹ️ Director devolvió {len(seedance_specs)} clips, splitter "
+                    f"sugiere {len(target_clips)}. Ajustando duraciones."
+                )
+                # Recortar o extender la lista al len correcto
+                if len(seedance_specs) < len(target_clips):
+                    last = seedance_specs[-1]
+                    while len(seedance_specs) < len(target_clips):
+                        clone = dict(last)
+                        clone["clip_idx"] = len(seedance_specs)
+                        seedance_specs.append(clone)
+                else:
+                    seedance_specs = seedance_specs[:len(target_clips)]
+            for i, spec in enumerate(seedance_specs):
+                spec["clip_idx"] = i
+                spec["duration"] = target_clips[i]
+
+            # FUNC 5: photo_strategy=smooth_transitions fuerza misma foto base
+            # en todos los clips para máxima continuidad (Cinematográfico).
+            # Solo se aplica si el usuario NO hizo override manual de fotos.
+            if (
+                strategy_cfg.get("photo_strategy") == "smooth_transitions"
+                and not clip_overrides
+            ):
+                for spec in seedance_specs:
+                    spec["ref_photo_index"] = 0
+                on_log(
+                    "🎬 Cinematográfico: todos los clips usan foto base 0 "
+                    "(smooth transitions)"
+                )
+            elif (
+                strategy_cfg.get("photo_strategy") == "rotate"
+                and not clip_overrides
+            ):
+                # rotate_smart: en Dinámico, asigna fotos evitando repetición
+                # adyacente y matcheando tipo de plano con purpose del clip
+                # (hook→packshot/macro, demo→in_use/detail, cta→lifestyle).
+                from src.queue.runners import _rotate_smart_assignment
+                video_structure = strategy.get("video_structure", [])
+                photos_for_assignment = [
+                    {"type": ph.type, "filename": ph.filename}
+                    for ph in photos_list
+                    if not ph.deleted
+                ]
+                _rotate_smart_assignment(
+                    seedance_specs,
+                    photos=photos_for_assignment,
+                    video_structure=video_structure,
+                )
+                on_log(
+                    "⚡ Dinámico: rotate_smart — fotos asignadas por purpose "
+                    f"({[s['ref_photo_index'] for s in seedance_specs]})"
+                )
+
+            gen.video_prompts = [ClipPrompt(**spec) for spec in seedance_specs]
+            gen.num_clips = len(seedance_specs)
+        else:
+            # Pro: dict único; respetamos la duración total del usuario.
+            spec = seedance_specs
+            spec["duration"] = gen.duration_seconds
+            gen.video_prompts = [ClipPrompt(
+                clip_idx=0,
+                duration=int(spec.get("duration", 15)),
+                ref_photo_indices=list(spec.get("ref_photos_indices", [])),
+                prompt=spec.get("prompt", ""),
+            )]
+            gen.num_clips = 1
+
+        # Voz MiniMax
+        on_progress(0.42, "🎙️ Generando voz MiniMax…")
+        on_log("🎙️ Generando voz con MiniMax TTS…")
+        from src.locutor import generate_single_audio
+        voice_dir = os.path.join(p.get("temp_folder", "./temp_work"), f"shop_{gen.id}")
+        os.makedirs(voice_dir, exist_ok=True)
+        voice_mp3 = os.path.join(voice_dir, "voice.mp3")
+        generate_single_audio(
+            gen.voiceover_script,
+            voice_mp3,
+            voice_id_override=gen.voice_used.voice_id,
+        )
+
+        # Atlas render
+        on_progress(0.55, "🎥 Atlas Cloud renderizando clips…")
+        from src.tiktok_shop.pipeline.seedance_renderer import render_seedance_clips
+        clip_paths = render_seedance_clips(
+            tier=tier,
+            clip_specs=seedance_specs,
+            photo_paths=photo_paths,
+            resolution=gen.resolution,
+            output_dir=voice_dir,
+            log_callback=on_log,
+        )
+
+        # Compose
+        on_progress(0.80, "🎬 Componiendo vídeo final…")
+        res_def = RESOLUTIONS.get(gen.resolution, RESOLUTIONS["720p"])
+        target_size = (res_def["width"], res_def["height"])
+        composed_path = os.path.join(voice_dir, "composed.mp4")
+        compose_shop_video(
+            clip_paths=clip_paths,
+            voice_mp3=voice_mp3,
+            output_path=composed_path,
+            strategy=strategy_key,
+            size=target_size,
+            language=gen.language,           # BUG-3: idioma forzado en captions
+            # FUNC 5: crossfade y trim_head desde la estrategia
+            crossfade_s=float(strategy_cfg.get("crossfade_s", 0.0) or 0.0),
+            trim_head_s=float(strategy_cfg.get("trim_head_s", 0.05) or 0.05),
+            log_callback=on_log,
+        )
+
+        # Subir a Drive sincronizado
+        on_progress(0.92, "☁️ Copiando a Drive…")
+        actual_chars = len(gen.voiceover_script or "")
+        cost = estimate_cost(
+            tier=tier, duration=gen.duration_seconds,
+            resolution=gen.resolution, voice_chars=actual_chars,
+        )
+        gen.cost.video_generation = cost["video_generation"]
+        gen.cost.voice_tts = cost["voice_tts"]
+        gen.cost.total = cost["total"]
+        gen.cost.actual_after_completion = cost["total"]
+        final_path, meta_path = upload_video(
+            src_video_path=composed_path,
+            username=user.username,
+            product_slug=product.slug,
+            hook_category=gen.hook.category if gen.hook else "general",
+            metadata=_build_metadata(gen, user, product),
+        )
+        gen.local_path = final_path
+        gen.metadata_path = meta_path
+        gen.generation_status = GenerationStatus.COMPLETED
+        gen.completed_at = _iso_now()
+        gen_repo.save(gen)
+
+        if user.status == "pilot":
+            update_pilot_progress(user, video_was_shoppable=bool(p.get("is_shoppable")))
+            user_repo.save(user)
+
+        on_progress(1.0, "✅ Vídeo TikTok Shop listo")
+        on_log(f"✅ Vídeo guardado en {final_path}")
+        log_info(LOGGER, "Job completado",
+                 job_id=job.id, gen_id=gen.id, tier=tier,
+                 cost_total=gen.cost.total,
+                 cost_estimated=gen.cost.estimated_at_creation,
+                 final_path=final_path)
+        return final_path
+
+    except Exception as e:
+        gen.generation_status = GenerationStatus.FAILED
+        gen.error = str(e)
+        gen.completed_at = _iso_now()
+        gen_repo.save(gen)
+        log_error(LOGGER, "Job falló",
+                  job_id=job.id, gen_id=gen.id, tier=tier,
+                  error_type=type(e).__name__, error=str(e))
+        raise
+
+
+def _run_nano_banana(*, on_log, on_progress, gen, gen_repo, product, photo_paths, params, generate_nano_banana_prompt) -> str:
+    """Sub-runner para tier nano_banana_prompt_only."""
+    from src.tiktok_shop.models import GenerationStatus, VideoCost
+
+    on_progress(0.30, "🍌 Generando prompt Nano Banana 2…")
+    on_log("🍌 Generando prompt Nano Banana 2 para fotos premium…")
+    description = " ".join(filter(None, [
+        product.brand or "",
+        " · ".join(product.selling_points[:3]),
+    ])) or product.name
+    use_cases = product.video_config.preferred_styles or ["packshot", "lifestyle", "macro"]
+
+    nb_prompt = generate_nano_banana_prompt(
+        product_name=product.name,
+        product_description=description,
+        use_cases=use_cases,
+        n_angles=int(params.get("n_angles", 5)),
+        photo_paths=photo_paths,
+    )
+    gen.nano_banana_prompt = nb_prompt
+    gen.generation_status = GenerationStatus.MANUAL_PENDING
+    gen.cost = VideoCost(total=0.0)
+    gen.completed_at = _iso_now()
+    gen_repo.save(gen)
+
+    txt_path = _save_prompt_txt(params, gen.id, "nano_banana", nb_prompt)
+    on_progress(1.0, "✅ Prompt Nano Banana 2 listo")
+    on_log("✅ Prompt Nano Banana 2 generado. Pega en Gemini chat con las fotos source.")
+    return txt_path
+
+
+def _save_prompt_txt(params: dict, gen_id: str, kind: str, prompt: str) -> str:
+    txt_path = os.path.join(
+        params.get("temp_folder", "./temp_work"),
+        f"{kind}_prompt_{gen_id}.txt",
+    )
+    os.makedirs(os.path.dirname(txt_path), exist_ok=True)
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write(prompt)
+    return txt_path
+
+
+def _build_metadata(gen, user, product) -> dict:
+    return {
+        "generation_id": gen.id,
+        "user": user.username,
+        "product": product.slug,
+        "tier_used": gen.tier_used,
+        "model_used": gen.model_used,
+        "clip_strategy": gen.clip_strategy,
+        "video_type": gen.video_type,
+        "ai_disclosure": gen.ai_disclosure,
+        "tiktok_shop": gen.tiktok_shop_metadata.model_dump(),
+        "cost": gen.cost.model_dump(),
+        "voiceover_script": gen.voiceover_script,
+        "hook": gen.hook.model_dump() if gen.hook else None,
+        "video_prompts": [cp.model_dump() for cp in gen.video_prompts],
+        "photos_source": gen.photos_source,
+        "photos_used": gen.photos_used,
+        "created_at": gen.created_at,
+    }
+
+
+def _iso_now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+# ============================================================
 # Dispatch
 # ============================================================
 _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
@@ -674,6 +1113,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.PRONOSTICOS: run_pronosticos,
     JobMode.SUBS_AUTO: run_subs_auto,
     JobMode.COPYRIGHT: run_copyright,
+    JobMode.TIKTOK_SHOP: run_tiktok_shop,
 }
 
 
@@ -698,3 +1138,85 @@ def dispatch_job(job: Job) -> None:
 
     result_path = runner(job, _on_log, _on_progress)
     job.result_path = result_path
+
+
+# ============================================================
+# rotate_smart helper — asignación inteligente de fotos por clip
+# (estrategia "Dinámico TikTok" — FUNC 5 / fix tail-rotate-ffprobe)
+# ============================================================
+# Mapping purpose del clip → tipos de plano preferidos. Cada purpose
+# del strategist se intenta matchear contra el `type` de las fotos.
+_PURPOSE_TO_TYPE_PREFERENCE: dict[str, list[str]] = {
+    "hook":         ["packshot", "macro"],
+    "intro":        ["packshot", "macro"],
+    "reveal":       ["packshot", "macro"],
+    "demo":         ["in_use", "detail"],
+    "use":          ["in_use", "detail"],
+    "feature":      ["detail", "macro"],
+    "social_proof": ["lifestyle", "in_use"],
+    "lifestyle":    ["lifestyle"],
+    "cta":          ["lifestyle", "packshot"],
+    "outro":        ["lifestyle", "packshot"],
+}
+
+
+def _photos_by_type(photos: list[dict]) -> dict[str, list[int]]:
+    out: dict[str, list[int]] = {}
+    for i, ph in enumerate(photos):
+        t = (ph.get("type") or "").lower()
+        if t:
+            out.setdefault(t, []).append(i)
+    return out
+
+
+def _rotate_smart_assignment(
+    specs: list[dict],
+    *,
+    photos: list[dict],
+    video_structure: list[dict] | None = None,
+) -> None:
+    """Asigna `ref_photo_index` a cada spec evitando repetición adyacente
+    y matcheando `type` de la foto con `purpose` del clip cuando es posible.
+
+    Mutates `specs` in-place. Si `photos` está vacío, no hace nada.
+    """
+    n_photos = len(photos)
+    if n_photos == 0:
+        return
+    by_type = _photos_by_type(photos)
+    structure = video_structure or []
+
+    used_history: list[int] = []
+    for i, spec in enumerate(specs):
+        purpose_raw = (
+            (structure[i].get("purpose") or "") if i < len(structure) else ""
+        ).lower()
+        # Buscar match: el primer purpose-keyword presente en `purpose_raw`
+        preferred_types: list[str] = []
+        for keyword, types in _PURPOSE_TO_TYPE_PREFERENCE.items():
+            if keyword in purpose_raw:
+                preferred_types = types
+                break
+
+        prev = used_history[-1] if used_history else None
+
+        # 1ª preferencia: foto del tipo preferido y NO usada en clip anterior
+        candidates: list[int] = []
+        for t in preferred_types:
+            for idx in by_type.get(t, []):
+                if idx != prev:
+                    candidates.append(idx)
+        # 2ª: cualquier foto del tipo preferido (si solo hay 1, repetimos)
+        if not candidates:
+            for t in preferred_types:
+                candidates.extend(by_type.get(t, []))
+        # 3ª: cualquier foto distinta de la del clip anterior
+        if not candidates:
+            candidates = [j for j in range(n_photos) if j != prev]
+        # 4ª: cualquier foto (último recurso)
+        if not candidates:
+            candidates = list(range(n_photos))
+
+        chosen = candidates[0]
+        spec["ref_photo_index"] = chosen
+        used_history.append(chosen)

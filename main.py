@@ -146,6 +146,9 @@ inject_responsive_css()
 # ---------------------------------------------------------
 from src.auth import require_login
 _current_user = require_login()
+# Exponer el usuario logueado en session_state para que sub-tabs (TikTok Shop,
+# etc.) puedan etiquetar quién encoló cada job sin re-importar auth.
+st.session_state["_current_user"] = _current_user
 
 # Cola unificada de generación (compartida entre los 4 modos).
 from src.queue import JobMode, get_queue, render_queue_widget
@@ -402,20 +405,80 @@ with st.sidebar:
     st.caption(f"Modo Activo: {CFG['app_mode']}")
 
     # --- VISUALES (Resolución siempre, Motor solo Presidentes) ---
-    with st.expander("🎥 Configuración de Video", expanded=True):
-        res_options = {
-            "1080p (Lento)": [1080, 1920],
-            "720p (Medio)": [720, 1280],
-            "480p (Rápido)": [480, 854],
-            "240p (Ultra Rápido)": [240, 426]
-        }
-        selected_res_label = st.selectbox("Calidad", options=list(res_options.keys()), index=0)
+    # Defaults para que las variables existan aunque el expander no se renderice
+    # (en TikTok Shop la resolución la maneja el propio módulo en `tab_generator`).
+    res_options = {
+        "1080p (Lento)": [1080, 1920],
+        "720p (Medio)": [720, 1280],
+        "480p (Rápido)": [480, 854],
+        "240p (Ultra Rápido)": [240, 426]
+    }
+    selected_res_label = "1080p (Lento)"
+    engine_version = "v2_estable"
 
-        if is_presidents:
-            st.markdown("**Motor Animación**")
-            engine_version = st.selectbox("Motor", ["v2_estable", "v1_estable"], index=0, label_visibility="collapsed")
-        else:
-            engine_version = "v2_estable"  # default no usado fuera de Presidentes
+    if not is_shop_project:
+        with st.expander("🎥 Configuración de Video", expanded=True):
+            selected_res_label = st.selectbox("Calidad", options=list(res_options.keys()), index=0)
+
+            if is_presidents:
+                st.markdown("**Motor Animación**")
+                engine_version = st.selectbox("Motor", ["v2_estable", "v1_estable"], index=0, label_visibility="collapsed")
+    else:
+        # --- SIDEBAR específica de TikTok Shop: muestra qué cuenta y producto
+        # están seleccionados ahora mismo en el tab "Generar Vídeo".
+        # Orden de ejecución de Streamlit:
+        #   1) sidebar (este bloque)
+        #   2) body → tab_generator → selectboxes con `key=` settean session_state
+        # En el PRIMER render, session_state aún no tiene la key (porque el tab
+        # no se ha ejecutado todavía). Para mostrar info correcta la primera
+        # vez, replicamos aquí la misma lógica que el selectbox: si no hay
+        # valor en session_state, usar el primer item disponible.
+        with st.expander("🛒 Selección actual", expanded=True):
+            try:
+                from src.tiktok_shop.repos import ProductRepo, UserRepo
+                _ur, _pr = UserRepo(), ProductRepo()
+                _users = _ur.list_all()
+                _products = _pr.list_all()
+
+                # User: prefiere session_state, fallback al primer usuario
+                _shop_user_id = st.session_state.get("_shop_gen_user_id")
+                if not _shop_user_id and _users:
+                    _shop_user_id = _users[0].id
+
+                _u = _ur.get(_shop_user_id) if _shop_user_id else None
+                if _u:
+                    st.markdown("**👤 Cuenta TikTok**")
+                    st.markdown(f"### {_u.username}")
+                    st.caption(f"{_u.display_name} · {_u.niche} · {_u.language}/{_u.country}")
+                else:
+                    st.caption("👤 *(no hay cuentas TikTok creadas todavía)*")
+
+                # Product: prefiere session_state, fallback al primer producto
+                # ASIGNADO al usuario actual (mismo filtro que tab_generator)
+                _shop_product_id = st.session_state.get("_shop_gen_product_id")
+                _assigned = []
+                if _u:
+                    _assigned = [p for p in _products if p.id in _u.assigned_products]
+                # Validar que el product_id de session_state sigue asignado
+                # al user actual; si no, usar el primero asignado.
+                if _shop_product_id and not any(p.id == _shop_product_id for p in _assigned):
+                    _shop_product_id = None
+                if not _shop_product_id and _assigned:
+                    _shop_product_id = _assigned[0].id
+
+                _p = _pr.get(_shop_product_id) if _shop_product_id else None
+                if _p:
+                    st.markdown("**📦 Producto**")
+                    st.markdown(f"**{_p.name}**")
+                    st.caption(f"`{_p.slug}` · {_p.category}")
+                    if _p.tiktok_shop.price_eur is not None:
+                        st.caption(f"💶 {_p.tiktok_shop.price_eur:.2f}€ · 🏷️ {_p.tiktok_shop.commission_rate*100:.0f}%")
+                elif _u and not _assigned:
+                    st.caption("📦 *(esta cuenta no tiene productos asignados)*")
+                else:
+                    st.caption("📦 *(sin producto)*")
+            except Exception as _shop_err:
+                st.caption(f"⚠️ {_shop_err}")
 
     # ─────────────────────────────────────────────────────────────────
     # Bloques específicos de PRESIDENTES (subtítulos karaoke + hook box).
@@ -987,44 +1050,12 @@ with st.sidebar:
             print(f"[autosave preset] {_autosave_err}")
 
 # ---------------------------------------------------------
-# INTERFAZ TIKTOK SHOP (MODO EXCLUSIVO — mock placeholder)
-# Placeholder por ahora. Cuando definamos el flow real (productos
-# afiliados / extracción de specs / guión vendedor / etc.), aquí va.
+# INTERFAZ TIKTOK SHOP (Programa 2 — afiliado)
+# El flow vive en src/tiktok_shop/. Independiente de Creator Reward.
 # ---------------------------------------------------------
 if CFG["app_mode"] == "TIKTOK_SHOP":
-    st.header("🛒 TikTok Shop")
-    st.info(
-        "🚧 **Modo en construcción.** Pronto podrás generar vídeos para "
-        "TikTok Shop (demos de producto, afiliados, reviews) desde aquí. "
-        "Mientras tanto te dejo un cuaderno para apuntar ideas que iremos "
-        "convirtiendo en features."
-    )
-
-    with st.container(border=True):
-        st.markdown("### 💡 Qué quiero poder hacer aquí")
-        st.text_area(
-            "Describe el flow que quieres en TikTok Shop",
-            placeholder=(
-                "ej:\n"
-                "- Pego un link de producto AliExpress / Amazon\n"
-                "- IA extrae specs/precio/imágenes\n"
-                "- Genera guión vendedor 30-60s con CTA\n"
-                "- TTS + clips de stock + texto overlay con precio\n"
-                "- MP4 9:16 listo para subir"
-            ),
-            height=200,
-            key="shop_idea_input",
-        )
-        st.caption(
-            "Cuando tengas claro lo que quieres, me lo dices y lo implementamos "
-            "igual que los modos actuales (cola, preview, deploy automático)."
-        )
-
-    st.divider()
-    st.caption(
-        "👈 Vuelve a **🏆 Creator Reward** arriba en la sidebar "
-        "para seguir usando el flow actual de Presidentes / Pronósticos / etc."
-    )
+    from src.tiktok_shop.ui.shop_router import render as render_tiktok_shop
+    render_tiktok_shop(CFG)
     st.stop()
 
 # ---------------------------------------------------------
@@ -1101,6 +1132,7 @@ if CFG["app_mode"] == "COPYRIGHT_CLEANER":
                             "hook_y_pct": st.session_state.hook_y_pct,
                             "hook_color": st.session_state.hook_color,
                         },
+                        enqueued_by=_current_user,
                     )
                     st.toast("➕ Limpieza encolada — puedes seguir trabajando.", icon="🧵")
                     time.sleep(0.4)
@@ -1161,6 +1193,7 @@ if CFG["app_mode"] == "COPYRIGHT_CLEANER":
                             "hook_y_pct": st.session_state.hook_y_pct,
                             "hook_color": st.session_state.hook_color,
                         },
+                        enqueued_by=_current_user,
                     )
                     st.toast("➕ Render encolado — se procesará tras los anteriores.", icon="🧵")
                     st.session_state.pop('cleaner_data', None)
@@ -1642,7 +1675,7 @@ if CFG["app_mode"] == "PRONOSTICOS_DIARIOS":
                 "add_background_music": add_background_music,
                 "bgm_volume": float(bgm_volume),
             }
-            queue.enqueue(JobMode.PRONOSTICOS, title, params)
+            queue.enqueue(JobMode.PRONOSTICOS, title, params, enqueued_by=_current_user)
             enqueued_count += 1
 
         st.toast(
@@ -2149,6 +2182,7 @@ if CFG["app_mode"] == "SUBS_AUTO":
                     JobMode.SUBS_AUTO,
                     title=f"{subs_in_upload.name} · {sa_model_size}",
                     params=_sa_build_params(input_path, out_path, selected_res_label),
+                    enqueued_by=_current_user,
                 )
                 st.toast("➕ Subtítulos encolados.", icon="🧵")
                 time.sleep(0.4)
@@ -2259,6 +2293,7 @@ if CFG["app_mode"] == "SUBS_AUTO":
                         pe.get("quality_label", selected_res_label),
                         edited_text=edited_text,
                     ),
+                    enqueued_by=_current_user,
                 )
                 st.toast("➕ Render encolado.", icon="🧵")
                 st.session_state.sa_pending_edit = None
@@ -2420,7 +2455,7 @@ if True:
                 "hook_text_color": hook_text_color,
                 "hook_font_scale": hook_font_scale,
             }
-            queue.enqueue(JobMode.PRESIDENTS, title, params)
+            queue.enqueue(JobMode.PRESIDENTS, title, params, enqueued_by=_current_user)
 
         st.toast(
             f"➕ {len(queue_inputs)} vídeo(s) de Presidentes encolado(s) — "
