@@ -1,0 +1,68 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+
+import { useEnqueuePresidents } from "@/lib/queries/creator-reward/presidents";
+import { makeQueryClient, mockFetch } from "../helpers";
+
+const fetchMock = mockFetch();
+
+beforeEach(() => fetchMock.reset());
+
+describe("useEnqueuePresidents", () => {
+  it("hace POST con items + subs + hook", async () => {
+    fetchMock.on(
+      "POST",
+      "/api/v1/creator-reward/presidents/enqueue",
+      () => ({ jobs: [{ job_id: "j1", position_in_queue: 0, title: "x" }], total_enqueued: 1 }),
+    );
+    const client = makeQueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useEnqueuePresidents(), { wrapper });
+
+    result.current.mutate({
+      items: [{ topic: "worst", prefix: "The", top_count: 5, include_history: true, include_hook: true }],
+      creative_mode: false,
+      engine_version: "v2_estable",
+      resolution: "1080p (Lento)",
+      subs: {
+        enabled: false,
+        font_choice: "Impact",
+        highlight_color: "#fff",
+        text_color: "#000",
+        stroke_color: "#000",
+        stroke_width: 3,
+        case_mode: "UPPERCASE",
+        font_scale: 0.04,
+        max_words: 4,
+        y_position: 0.62,
+        shadow_enabled: false,
+        shadow_color: "#000000",
+        shadow_opacity: 0.8,
+        shadow_blur: 33,
+        shadow_distance: 8,
+        shadow_angle: -45,
+        highlight_mode: "pill",
+        max_width: 0.85,
+      },
+      hook: {
+        enabled: false,
+        duration: 5,
+        animation: "swipe_left",
+        y_position: 0.33,
+        shadow_color: "#000",
+        box_color: "#fff",
+        text_color: "#000",
+        font_scale: 0.02,
+      },
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const post = fetchMock.calls.find((c) => c.method === "POST");
+    expect(post?.url).toBe("/api/v1/creator-reward/presidents/enqueue");
+    expect((post?.body as Record<string, unknown>).items).toHaveLength(1);
+  });
+});

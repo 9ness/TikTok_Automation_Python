@@ -419,13 +419,26 @@ class VideoRemover:
         video.close()
         return previews
 
-    def process(self, input_path, output_folder, words=None, trajectory=None, log_callback=None, logger=None, clean_mode="Subtítulos Virales", hook_y_pct=0.20, hook_color="#FDD002"):
+    def process(self, input_path, output_folder, words=None, trajectory=None, log_callback=None, logger=None, clean_mode="Subtítulos Virales", hook_y_pct=0.20, hook_color="#FDD002", upscale_1080p=False, font_path=None):
         if not words or not trajectory:
             raise ValueError("No se puede renderizar: Faltan palabras o datos de trayectoria.")
             
         video_original = VideoFileClip(input_path)
         W, H = video_original.size
-        
+
+        # Override de la fuente del runner: el path llega desde el registry
+        # universal (`/api/v1/fonts`). Si no llega nada, se respeta el default
+        # resuelto en __init__ (Impact / Arial Bold como fallback).
+        if font_path:
+            try:
+                from src.font_resolver import resolve_font
+                resolved = resolve_font(font_path)
+                if resolved and os.path.exists(resolved):
+                    self.font_path = resolved
+            except Exception as e:
+                if log_callback:
+                    log_callback(f"⚠️ font_path inválida ({font_path}): {e} — uso default.")
+
         # INICIALIZACIÓN CRÍTICA (Evita NameError)
         clips = []
         is_camuflaje = "Camuflaje" in clean_mode
@@ -476,7 +489,9 @@ class VideoRemover:
                     final_y = int(center_y - (H*0.15 / 2) - (H * 0.015))
                 else:
                     final_y = int(H * 0.8)
-                c = self.create_text_clip(txt, end-start, (W, int(H * 0.15)))
+                # En subs mode reusamos hook_color como color de los subs nuevos
+                # (matches el control "Color de los subtítulos" del frontend).
+                c = self.create_text_clip(txt, end-start, (W, int(H * 0.15)), color=hook_color)
                 clips.append(c.set_start(start).set_position((0, final_y)))
             
         # Renderizado Final
@@ -490,7 +505,20 @@ class VideoRemover:
             "-flags", "+bitexact",        # Forzar bitexact para no dejar rastro de encoder
             "-fflags", "+bitexact"
         ]
-        
-        final.write_videofile(out, fps=video_original.fps, codec='libx264', audio_codec='aac', threads=12, preset='medium', bitrate='4500k', logger=logger, ffmpeg_params=ffmpeg_params)
+
+        # Upscale opcional a 1080p (lado mayor = 1920) con Lanczos durante el
+        # encode. Solo sube si el vídeo es menor que 1080 de ancho — evita
+        # downscale accidental. Lanczos en CPU añade ~5-15s para un vídeo de
+        # 1 min, sin coste API. Cambia los hashes de píxel → ayuda a evadir
+        # detección de copyright basada en hashing visual.
+        if upscale_1080p and W < 1080:
+            ffmpeg_params += ["-vf", "scale=1080:-2:flags=lanczos"]
+            target_bitrate = '6500k'  # bump bitrate para no perder calidad al escalar
+            if log_callback:
+                log_callback(f"⬆️ Upscale a 1080p activo ({W}x{H} → 1080p Lanczos).")
+        else:
+            target_bitrate = '4500k'
+
+        final.write_videofile(out, fps=video_original.fps, codec='libx264', audio_codec='aac', threads=12, preset='medium', bitrate=target_bitrate, logger=logger, ffmpeg_params=ffmpeg_params)
         video_original.close()
         return out

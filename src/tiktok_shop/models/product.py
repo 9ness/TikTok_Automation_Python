@@ -142,6 +142,7 @@ class Product(BaseModel):
     performance_history: PerformanceHistory = Field(default_factory=PerformanceHistory)
     needs_nano_banana_regeneration: bool = False
     drive_folder: str | None = None
+    deleted: bool = False                     # soft-delete: oculta sin tocar Drive/Redis
     last_analyzed_at: str | None = None      # último análisis Gemini exitoso
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)

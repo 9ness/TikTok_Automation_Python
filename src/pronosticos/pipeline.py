@@ -303,12 +303,17 @@ def _ken_burns_image_silent(image_path: str, duration: float, W: int, H: int):
 
 def _league_overlay_clip(logo_paths: list[str], duration: float,
                           video_size: tuple[int, int],
-                          y_position_pct: float = 0.30) -> "ImageClip | None":
+                          y_position_pct: float = 0.30,
+                          logo_height_pct: float = 0.13) -> "ImageClip | None":
     """Construye el ImageClip del overlay de ligas posicionado en y_position_pct.
+
+    `logo_height_pct` controla el tamaño de cada logo (% del alto del frame).
 
     Devuelve None si no hay logos.
     """
-    canvas = build_league_overlay_image(logo_paths, video_size)
+    canvas = build_league_overlay_image(
+        logo_paths, video_size, logo_height_pct=logo_height_pct,
+    )
     if canvas is None:
         return None
     W, H = video_size
@@ -457,7 +462,15 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
                            team_shields: dict | None,
                            W: int, H: int,
                            show_pick_carousel: bool = False,
-                           carousel_lead_s: float = 4.0) -> list:
+                           carousel_lead_s: float = 4.0,
+                           # Posiciones configurables (defaults históricos).
+                           league_overlay_y_pct: float = 0.30,
+                           league_logo_height_pct: float = 0.13,
+                           team_shield_y_pct: float = 0.43,
+                           team_shield_height_pct: float = 0.22,
+                           team_shield_x_inset_pct: float = 0.06,
+                           profile_cta_y_pct: float = 0.36,
+                           profile_cta_height_pct: float = 0.32) -> list:
     """Construye el timeline de visuales usando segmentos detectados.
 
     Estructura por pick:
@@ -579,7 +592,11 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
         timeline.append({
             "start": cta_start, "duration": cta_end - cta_start,
             "clip_factory": lambda dur=(cta_end - cta_start), p=perfil_path: (
-                _perfil_visual_silent(p, dur, W, H)
+                _perfil_visual_silent(
+                    p, dur, W, H,
+                    height_pct=profile_cta_height_pct,
+                    y_position_pct=profile_cta_y_pct,
+                )
             ),
             "is_overlay": True,
             "label": "perfil_overlay",
@@ -613,7 +630,12 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
                 timeline.append({
                     "start": sa_f, "duration": dur,
                     "clip_factory": (
-                        lambda d=dur, p=sp, s=side: _team_shield_clip(p, d, W, H, s)
+                        lambda d=dur, p=sp, s=side: _team_shield_clip(
+                            p, d, W, H, s,
+                            height_pct=team_shield_height_pct,
+                            x_inset_pct=team_shield_x_inset_pct,
+                            y_position_pct=team_shield_y_pct,
+                        )
                     ),
                     "is_overlay": True,
                     "label": f"shield_{side}",
@@ -628,7 +650,11 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
         logos = league_overlay["logos"]
         timeline.append({
             "start": anchor, "duration": dur,
-            "clip_factory": lambda d=dur, lg=logos: _league_overlay_clip(lg, d, (W, H)),
+            "clip_factory": lambda d=dur, lg=logos: _league_overlay_clip(
+                lg, d, (W, H),
+                y_position_pct=league_overlay_y_pct,
+                logo_height_pct=league_logo_height_pct,
+            ),
             "is_overlay": True,
         })
 
@@ -679,6 +705,16 @@ def run_pronosticos_pipeline(
     add_background_music: bool = True,
     bgm_volume: float = 0.20,
     progress_callback: Callable[[float, str], None] | None = None,
+    # Posiciones de overlays (configurables desde la UI vía preview).
+    # 0.0 = top, 1.0 = bottom. Heights/insets en fracción del lado mayor.
+    subtitle_y_pct: float = 0.78,
+    league_overlay_y_pct: float = 0.30,
+    league_logo_height_pct: float = 0.13,
+    team_shield_y_pct: float = 0.43,
+    team_shield_height_pct: float = 0.22,
+    team_shield_x_inset_pct: float = 0.06,
+    profile_cta_y_pct: float = 0.36,
+    profile_cta_height_pct: float = 0.32,
 ) -> str:
     """Genera el MP4 final y devuelve la ruta.
 
@@ -1033,6 +1069,13 @@ def run_pronosticos_pipeline(
         team_shields=team_shields_data,
         W=W, H=H,
         show_pick_carousel=show_pick_carousel,
+        league_overlay_y_pct=league_overlay_y_pct,
+        league_logo_height_pct=league_logo_height_pct,
+        team_shield_y_pct=team_shield_y_pct,
+        team_shield_height_pct=team_shield_height_pct,
+        team_shield_x_inset_pct=team_shield_x_inset_pct,
+        profile_cta_y_pct=profile_cta_y_pct,
+        profile_cta_height_pct=profile_cta_height_pct,
     )
 
     # Log resumen del timeline (debug del overlay perfil + ligas)
@@ -1095,7 +1138,9 @@ def run_pronosticos_pipeline(
             if n_green:
                 log(f"🟢 Subtítulos en verde-victoria: {n_green} palabras (bote + picks)")
             tmp_subs = out_path + ".subs.mp4"
-            render_karaoke_on_video(out_path, sub_words, PRONOSTICOS_SUB_STYLE, tmp_subs,
+            # Permitir override de la posición Y de los subs (UI: preview drag).
+            subs_style = {**PRONOSTICOS_SUB_STYLE, "y_position_pct": subtitle_y_pct}
+            render_karaoke_on_video(out_path, sub_words, subs_style, tmp_subs,
                                     log_callback=lambda m: log(m))
             os.replace(tmp_subs, out_path)
         except Exception as e:

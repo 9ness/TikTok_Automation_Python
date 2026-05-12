@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1.6
+#
+# Imagen del backend FastAPI. Mantiene la lógica de los pipelines
+# (MoviePy, Whisper, MiniMax, Atlas) y expone /api/* + /ws/queue.
+#
+# Build:
+#   docker build -f Dockerfile.api -t tiktok-api:latest .
+#
+# Run (sin compose):
+#   docker run --rm -p 8000:8000 --env-file .env \
+#     -v /mnt/drive:/mnt/drive \
+#     tiktok-api:latest
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Sistema: ffmpeg para MoviePy/Whisper/editor, libgomp1 para faster-whisper,
+# build-essential ligero para wheels que no traen binarios precompilados.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libgomp1 \
+        curl \
+        ca-certificates \
+        build-essential \
+        gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ---------------------------------------------------------------------------
+# Stage builder — instala deps en un wheelhouse aislado (cache-friendly)
+# ---------------------------------------------------------------------------
+FROM base AS builder
+
+COPY requirements.txt ./
+RUN pip install --upgrade pip wheel setuptools \
+    && pip install --prefix=/install -r requirements.txt
+
+# ---------------------------------------------------------------------------
+# Stage runtime — copia solo lo necesario
+# ---------------------------------------------------------------------------
+FROM base AS runtime
+
+# Copia los paquetes Python instalados desde el builder.
+COPY --from=builder /install /usr/local
+
+# Código fuente. Solo lo que el módulo API necesita en runtime —
+# Streamlit (`main.py`) NO se copia (no se sirve desde Docker).
+COPY src ./src
+COPY config ./config
+COPY assets ./assets
+
+# Carpetas que el runner crea en runtime (cola persiste estado, uploads).
+RUN mkdir -p /app/temp_work /app/temp_work/api_uploads
+
+# Usuario no-root.
+RUN groupadd --system app && useradd --system --gid app --home /app app \
+    && chown -R app:app /app
+USER app
+
+EXPOSE 8000
+
+# Healthcheck simple.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+
+# 2 workers por defecto. Para máquinas pequeñas (CX22) ajustar a 1.
+ENV API_WORKERS=2 \
+    API_HOST=0.0.0.0 \
+    API_PORT=8000
+
+CMD ["sh", "-c", "uvicorn src.api.main:app --host ${API_HOST} --port ${API_PORT} --workers ${API_WORKERS}"]

@@ -44,6 +44,7 @@ def transcribe_with_reference(
     model_size: str = "base",
     language: str | None = None,
     audio_type: str = "speech",
+    progress_callback=None,
 ) -> list[dict]:
     """Transcribe audio con faster-whisper.
 
@@ -85,16 +86,41 @@ def transcribe_with_reference(
         # cortamos a 1000 chars (Whisper trunca internamente a ~224 tokens).
         transcribe_kwargs["initial_prompt"] = reference_script.strip()[:1000]
 
-    segments, _info = model.transcribe(audio_path, **transcribe_kwargs)
+    segments, info = model.transcribe(audio_path, **transcribe_kwargs)
+    total_duration = float(getattr(info, "duration", 0.0)) or 0.0
+
     raw_words: list[dict] = []
+    import time as _time
+    last_emit = 0.0
     for segment in segments:
-        if not getattr(segment, "words", None):
-            continue
-        for w in segment.words:
-            text = (w.word or "").strip()
-            if not text:
-                continue
-            raw_words.append({"word": text, "start": float(w.start), "end": float(w.end)})
+        if getattr(segment, "words", None):
+            for w in segment.words:
+                text = (w.word or "").strip()
+                if not text:
+                    continue
+                raw_words.append({"word": text, "start": float(w.start), "end": float(w.end)})
+
+        # Reportar progreso ~cada 0.5s wallclock para no saturar el WS.
+        # Mensaje minimalista: el cliente ya tiene su propio % + ETA, aquí
+        # solo informamos del punto del audio en el que va Whisper. Sin
+        # porcentajes ni ETAs duplicados.
+        if progress_callback and total_duration > 0:
+            now = _time.time()
+            if now - last_emit >= 0.5:
+                seg_end = float(getattr(segment, "end", 0.0))
+                frac = max(0.0, min(1.0, seg_end / total_duration))
+                msg = f"🎙️ Transcribiendo audio ({seg_end:.0f}s / {total_duration:.0f}s)"
+                try:
+                    progress_callback(frac, msg)
+                except Exception:
+                    pass
+                last_emit = now
+
+    if progress_callback:
+        try:
+            progress_callback(1.0, "🎙️ Transcripción completa")
+        except Exception:
+            pass
 
     return _clean_whisper_tokens(raw_words)
 
@@ -115,7 +141,12 @@ QUALITY_FROM_SIDEBAR = {
 
 
 # ---------------------------------------------------------------------
-# Fuentes disponibles (TTF instalados en Windows por defecto)
+# Fuentes disponibles — derivado del registry universal del proyecto.
+# Se mantiene el dict {label: path} para back-compat con los STYLE_PRESETS
+# de abajo y con código que indexa por label fijo. Las claves siguen
+# correspondiendo a las fuentes Windows estándar; las bundled adicionales
+# (`assets/fonts/*.ttf`) aparecen en `GET /api/v1/fonts` aunque no estén
+# aquí (los presets usan paths concretos; el selector pinta el registry).
 # ---------------------------------------------------------------------
 FONT_OPTIONS = {
     "Impact (TikTok default)": r"C:\Windows\Fonts\impact.ttf",
@@ -327,31 +358,101 @@ def _normalize_word_for_match(w: str) -> str:
     return re.sub(r"[^\w]", "", (w or "").lower())
 
 
+_PHRASE_PAUSE_S = 0.30
+_MAX_PHRASE_DUR_S = 6.0
+
+
+def _split_original_into_phrases(
+    original_words: list[dict],
+    pause_threshold: float = _PHRASE_PAUSE_S,
+    max_phrase_dur: float = _MAX_PHRASE_DUR_S,
+) -> list[tuple[int, int]]:
+    """Agrupa palabras originales en frases naturales separadas por pausas
+    ≥ `pause_threshold` segundos. Devuelve una lista de (i_start, i_end_inclusive).
+
+    Las pausas son las anclas temporales fiables tras una edición manual: dentro
+    de una frase Whisper puede tener timestamps imprecisos (especialmente con
+    audio_type=music), pero los huecos entre frases sí se corresponden con
+    silencios reales del audio.
+
+    Adicionalmente, **limita la duración máxima de cada frase** (`max_phrase_dur`)
+    partiendo recursivamente por el hueco interno mayor. Esto previene el
+    síntoma "subs congelados 4s + race de 3 frases en 1s" cuando Whisper no
+    detecta ninguna pausa en un tramo largo (típico en canciones sin silencios
+    o con voz continua sobre música)."""
+    if not original_words:
+        return []
+    # Paso 1: split inicial por pausa explícita.
+    raw: list[tuple[int, int]] = []
+    start = 0
+    for i in range(1, len(original_words)):
+        gap = float(original_words[i]["start"]) - float(original_words[i - 1]["end"])
+        if gap >= pause_threshold:
+            raw.append((start, i - 1))
+            start = i
+    raw.append((start, len(original_words) - 1))
+
+    # Paso 2: partir recursivamente frases > max_phrase_dur por su hueco mayor.
+    def split_if_long(pi0: int, pi1: int) -> list[tuple[int, int]]:
+        dur = float(original_words[pi1]["end"]) - float(original_words[pi0]["start"])
+        if dur <= max_phrase_dur or pi1 - pi0 < 1:
+            return [(pi0, pi1)]
+        # Encontrar el hueco interno mayor (start[k] - end[k-1]).
+        best_k = pi0 + 1
+        best_gap = -1.0
+        for k in range(pi0 + 1, pi1 + 1):
+            gap = float(original_words[k]["start"]) - float(original_words[k - 1]["end"])
+            if gap > best_gap:
+                best_gap = gap
+                best_k = k
+        # Si el hueco mayor es despreciable, partir por la mitad (índice central)
+        # para evitar bucle infinito en flujos sin silencios.
+        if best_gap < 0.01:
+            best_k = pi0 + (pi1 - pi0 + 1) // 2
+            best_k = max(pi0 + 1, min(pi1, best_k))
+        return split_if_long(pi0, best_k - 1) + split_if_long(best_k, pi1)
+
+    phrases: list[tuple[int, int]] = []
+    for pi0, pi1 in raw:
+        phrases.extend(split_if_long(pi0, pi1))
+    return phrases
+
+
 def merge_edited_text_with_timings(
     edited_text: str,
     original_words: list[dict],
 ) -> list[dict]:
-    """Fusiona el texto editado con los timestamps de Whisper de forma INTELIGENTE
-    usando alineación de secuencias (difflib.SequenceMatcher).
+    """Fusiona el texto editado con los timestamps de Whisper, manteniendo la
+    SINCRONÍA con el audio incluso cuando el usuario añade o elimina palabras.
 
-    Estrategia:
-      1. **Palabras que coinciden** (mismo texto, ignorando case + puntuación) →
-         conservan su timestamp ORIGINAL EXACTO.
-      2. **Palabras sustituidas 1:1** (typo fix tipo 'arano'→'araño') → conservan
-         el timestamp de la palabra original que reemplazaron.
-      3. **Palabras INSERTADAS** (añadidas, sin equivalente en el original) →
-         se interpolan UNIFORMEMENTE en el hueco entre sus vecinas matched.
-      4. **Palabras ELIMINADAS** → desaparecen sin afectar a las demás.
+    Estrategia (sin forced-alignment, sin reinvocar a Whisper):
 
-    Esto evita el desfase progresivo del enfoque ingenuo (distribuir todo
-    uniformemente cuando difiere el número de palabras).
+      1. Detectar **frases naturales** en el original separadas por pausas
+         ≥ 0.35s. Los límites de frase son las únicas anclas temporales que
+         realmente se corresponden con silencios del audio.
+      2. Alinear edited↔original con `difflib.SequenceMatcher` para mapear
+         qué palabra editada cae en qué frase. El primer/último índice editado
+         que se alinea dentro de la frase fija sus bordes; las palabras no
+         alineadas (insertadas/eliminadas) se reparten al vecino más cercano.
+      3. Dentro de cada frase, distribuir las palabras editadas con peso por
+         **número de caracteres** sobre el rango [phrase_t0, phrase_t1].
+         Esto da duraciones realistas (palabras largas → más tiempo) y
+         elimina los micro-stacks de 1ms del enfoque anterior.
+
+    Por qué el enfoque anterior fallaba con muchas inserciones:
+      - Conservaba timestamps de palabras matched exactamente. Cuando entre
+        dos palabras consecutivas no había hueco real, las inserciones se
+        apilaban con incrementos de 1ms → los subtítulos "saltaban" varias
+        palabras de golpe. Y si Whisper tenía drift dentro de una frase
+        (común en modo music), el drift se acumulaba en los siguientes
+        chunks → "se quedan congelados y después corren muy rápido".
 
     Args:
         edited_text: texto editado por el usuario (palabras separadas por espacio).
         original_words: salida de Whisper con {word, start, end}.
 
     Returns:
-        Lista nueva de {word, start, end}.
+        Lista nueva de {word, start, end} totalmente sincronizada por frase.
     """
     import difflib
 
@@ -361,96 +462,217 @@ def merge_edited_text_with_timings(
     if not new_words:
         return list(original_words)
 
-    # Fast path: mismo número → match 1:1 directo (no requiere alineación)
+    # Fast path: mismo número de palabras → match 1:1 (preserva timing exacto).
     if len(new_words) == len(original_words):
         return [
             {"word": new_words[i], "start": float(ow["start"]), "end": float(ow["end"])}
             for i, ow in enumerate(original_words)
         ]
 
-    # Alineación con SequenceMatcher sobre versiones normalizadas
+    phrases = _split_original_into_phrases(original_words)
+
+    # Mapeo original_idx → new_idx para anclas (matched o sustitución 1:1).
     orig_norm = [_normalize_word_for_match(w["word"]) for w in original_words]
     new_norm = [_normalize_word_for_match(w) for w in new_words]
     matcher = difflib.SequenceMatcher(a=orig_norm, b=new_norm, autojunk=False)
-
-    # mapping[j] = índice en original_words al que se alinea new_words[j], o None si insertado
-    mapping: list[int | None] = [None] * len(new_words)
+    o2n: dict[int, int] = {}
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
+        if tag == "equal" or (tag == "replace" and (i2 - i1) == (j2 - j1)):
             for k in range(i2 - i1):
-                mapping[j1 + k] = i1 + k
-        elif tag == "replace" and (i2 - i1) == (j2 - j1):
-            # Sustitución 1:1 (typo fix) → preserva timestamp del original
-            for k in range(i2 - i1):
-                mapping[j1 + k] = i1 + k
-        # 'insert', 'delete' y 'replace' con cardinalidades distintas → quedan None
-        # (las inserciones se interpolarán; las deleciones simplemente se omiten)
+                o2n[i1 + k] = j1 + k
 
-    # Construir output con timestamps preservados o marcados para interpolar
-    out: list[dict] = []
-    for j, w in enumerate(new_words):
-        idx = mapping[j]
-        if idx is not None:
-            ow = original_words[idx]
-            out.append({"word": w, "start": float(ow["start"]), "end": float(ow["end"])})
+    # Determinar el rango de new_words [nj0, nj1] que cae en cada frase.
+    # Estrategia: para frase p, recoger anclas mapeadas dentro de [pi0, pi1];
+    # usar min/max como pista. Las palabras editadas sin ancla (insertadas)
+    # se asignan a la frase cuyo borde quede más cerca.
+    n_new = len(new_words)
+    phrase_anchors: list[tuple[int | None, int | None]] = []
+    for pi0, pi1 in phrases:
+        mapped = [o2n[i] for i in range(pi0, pi1 + 1) if i in o2n]
+        if mapped:
+            phrase_anchors.append((min(mapped), max(mapped)))
         else:
-            out.append({"word": w, "start": None, "end": None})  # marcador
+            phrase_anchors.append((None, None))
 
-    # Interpolación de palabras insertadas: por runs consecutivos.
-    # REGLA CLAVE: nunca modificar el timestamp de una palabra matched.
-    # Las inserciones se acomodan en el hueco [prev_end, next_start). Si no hay
-    # hueco real (Whisper puso las palabras back-to-back), se apilan con micro-
-    # incrementos en el instante del límite — aparecerán brevemente, pero el
-    # resto de la canción mantiene su sincronía exacta.
-    n = len(out)
-    audio_t0 = float(original_words[0]["start"])
-    audio_t1 = float(original_words[-1]["end"])
-    i = 0
-    while i < n:
-        if out[i]["start"] is not None:
-            i += 1
+    # Fallback degenerado: si NO hay ninguna ancla (reescritura total),
+    # repartir new_words entre frases en proporción a su duración de audio.
+    if not o2n and len(phrases) > 1:
+        phrase_durs = [
+            float(original_words[pi1]["end"]) - float(original_words[pi0]["start"])
+            for pi0, pi1 in phrases
+        ]
+        total_dur = sum(phrase_durs) or 1.0
+        nj_cursor = 0
+        for p_idx, dur in enumerate(phrase_durs):
+            share = max(1, round(n_new * (dur / total_dur)))
+            nj0 = nj_cursor
+            nj1 = min(n_new - 1, nj_cursor + share - 1)
+            if p_idx == len(phrase_durs) - 1:
+                nj1 = n_new - 1
+            phrase_anchors[p_idx] = (nj0, nj1)
+            nj_cursor = nj1 + 1
+
+    # Resolver rangos [nj0, nj1] cubriendo TODAS las new_words, sin huecos
+    # ni solapes, respetando las anclas en el orden de las frases.
+    ranges: list[tuple[int, int]] = []
+    cursor = 0
+    for p_idx, (a0, a1) in enumerate(phrase_anchors):
+        if p_idx == len(phrase_anchors) - 1:
+            nj1 = n_new - 1
+        else:
+            # Buscar la primera ancla en frases posteriores para fijar el límite.
+            next_anchor: int | None = None
+            for q in range(p_idx + 1, len(phrase_anchors)):
+                if phrase_anchors[q][0] is not None:
+                    next_anchor = phrase_anchors[q][0]
+                    break
+            if next_anchor is not None:
+                # Las palabras [cursor, next_anchor-1] caen entre esta frase y
+                # la siguiente con ancla. Damos a esta frase su ancla derecha
+                # (a1) si la tiene; si no, partimos el rango proporcionalmente
+                # por número de frases sin anclas restantes.
+                if a1 is not None:
+                    nj1 = a1
+                else:
+                    # Repartir uniformemente hasta next_anchor entre frases
+                    # consecutivas sin anclas.
+                    unanchored_count = 1
+                    for q in range(p_idx + 1, len(phrase_anchors)):
+                        if phrase_anchors[q][0] is not None:
+                            break
+                        unanchored_count += 1
+                    span = max(0, next_anchor - cursor)
+                    nj1 = cursor + (span // unanchored_count) - 1
+                    if nj1 < cursor:
+                        nj1 = cursor  # garantiza ≥1 palabra
+            else:
+                # No quedan anclas → resto del rango actual hasta el final.
+                nj1 = n_new - 1
+        nj0 = cursor
+        nj1 = max(nj0, min(nj1, n_new - 1))
+        ranges.append((nj0, nj1))
+        cursor = nj1 + 1
+    # Si quedaron palabras sueltas al final (no debería, pero por seguridad),
+    # añadirlas a la última frase.
+    if cursor < n_new and ranges:
+        last_pi = len(ranges) - 1
+        ranges[last_pi] = (ranges[last_pi][0], n_new - 1)
+
+    # Distribución por SUB-SEGMENTOS dentro de cada frase usando las palabras
+    # matched como anclas internas. Esto preserva la sincronía exacta de las
+    # palabras que Whisper SÍ acertó, y reparte las insertadas en los huecos
+    # entre anclas con peso por carácter. Si un hueco es demasiado pequeño
+    # para meter las inserciones (mín 80ms por palabra), absorbe el ancla
+    # contigua y reparte sobre un sub-segmento más ancho. Así se mantiene
+    # coordinación incluso con muchas inserciones.
+    MIN_WORD_DUR = 0.08
+    out: list[dict] = [None] * n_new  # type: ignore[list-item]
+
+    # Mapeo inverso: new_idx → (orig_idx, orig_start, orig_end) para identificar
+    # anclas dentro de cada frase.
+    n2anchor: dict[int, tuple[float, float]] = {}
+    for orig_idx, new_idx in o2n.items():
+        ow = original_words[orig_idx]
+        n2anchor[new_idx] = (float(ow["start"]), float(ow["end"]))
+
+    for (pi0, pi1), (nj0, nj1) in zip(phrases, ranges):
+        phrase_t0 = float(original_words[pi0]["start"])
+        phrase_t1 = float(original_words[pi1]["end"])
+        words_in_phrase = new_words[nj0:nj1 + 1]
+        if not words_in_phrase:
             continue
-        # Run de inserciones [run_start, run_end)
-        run_start = i
-        while i < n and out[i]["start"] is None:
-            i += 1
-        run_end = i
-        run_len = run_end - run_start
 
-        # Anclajes temporales — extraídos de palabras matched o del rango de audio.
-        prev_end = float(out[run_start - 1]["end"]) if run_start > 0 else audio_t0
-        if run_end < n:
-            next_start = float(out[run_end]["start"])
-        else:
-            # Inserciones al final (después de la última matched): permitimos
-            # extender hasta audio_t1, o un poco más si hace falta. Esto es
-            # seguro porque NO hay siguiente matched que se vaya a desincronizar.
-            next_start = max(prev_end + run_len * 0.3, audio_t1)
+        # Anclas dentro de la frase: lista ordenada de (new_idx_relativo, ts_start, ts_end).
+        # Forzamos anclas virtuales en los extremos de la frase para acotar.
+        local_anchors: list[tuple[int, float, float]] = []
+        for j_local, _w in enumerate(words_in_phrase):
+            j_global = nj0 + j_local
+            if j_global in n2anchor:
+                t_s, t_e = n2anchor[j_global]
+                # Solo aceptar la ancla si su timestamp cae dentro del span de la
+                # frase (sanity check ante mappings cross-frase ocasionales).
+                if phrase_t0 - 0.05 <= t_s <= phrase_t1 + 0.05:
+                    local_anchors.append((j_local, t_s, t_e))
 
-        gap = next_start - prev_end
-        if gap > 0.01:
-            # Distribución uniforme en el hueco real
-            each = gap / run_len
-            for k in range(run_len):
-                s = prev_end + each * k
-                e = prev_end + each * (k + 1)
-                out[run_start + k] = {
-                    "word": out[run_start + k]["word"],
-                    "start": s,
-                    "end": e,
-                }
-        else:
-            # Sin hueco real: apilar en el límite con micro-incrementos.
-            # Aparecerán brevemente pero NO desplazan la siguiente palabra matched,
-            # que mantiene su timestamp exacto y por tanto su sincronía con el audio.
-            for k in range(run_len):
-                s = prev_end + k * 0.001
-                e = s + 0.001
-                out[run_start + k] = {
-                    "word": out[run_start + k]["word"],
-                    "start": s,
-                    "end": e,
-                }
+        # Sub-segmentos: [(start_local, end_local_exclusive, t_start, t_end)].
+        # Cada segmento va de una "frontera" (ancla o borde de frase) a la siguiente.
+        boundaries: list[tuple[int, float]] = [(0, phrase_t0)]
+        for j_local, t_s, _t_e in local_anchors:
+            # El ancla j_local arranca en t_s (su start). El segmento previo
+            # termina en t_s. El siguiente segmento empieza en t_s con la propia
+            # palabra ancla incluida.
+            boundaries.append((j_local, t_s))
+        boundaries.append((len(words_in_phrase), phrase_t1))
+
+        # Eliminar boundaries duplicadas en índice o en tiempo (raro pero seguro).
+        cleaned: list[tuple[int, float]] = []
+        for b in boundaries:
+            if cleaned and cleaned[-1][0] == b[0]:
+                continue
+            cleaned.append(b)
+        boundaries = cleaned
+
+        # Merge greedy bidireccional: si un segmento tiene N palabras y
+        # N*MIN_WORD_DUR > duración, absorber un vecino (siguiente si existe,
+        # en su defecto el anterior). Se ejecuta hasta que todos los segmentos
+        # quepan o solo quede el segmento-frase completo. Bidireccional para
+        # cubrir el caso del ÚLTIMO segmento de la frase, que no tiene siguiente
+        # con quien fusionarse.
+        changed = True
+        while changed and len(boundaries) > 2:
+            changed = False
+            for i in range(len(boundaries) - 1):
+                s_idx, s_t = boundaries[i]
+                e_idx, e_t = boundaries[i + 1]
+                n_words = e_idx - s_idx
+                dur = e_t - s_t
+                if n_words > 0 and n_words * MIN_WORD_DUR > dur:
+                    # Preferir absorber al siguiente (boundary i+1 interna).
+                    if i + 1 < len(boundaries) - 1:
+                        boundaries.pop(i + 1)
+                    elif i > 0:
+                        # Es el último segmento — absorber al anterior eliminando
+                        # la boundary i (que pasa a unirse con el segmento previo).
+                        boundaries.pop(i)
+                    else:
+                        # Solo queda 1 segmento (la frase entera) — no se puede merge.
+                        break
+                    changed = True
+                    break
+
+        # Distribuir dentro de cada sub-segmento: reservar primero MIN_WORD_DUR
+        # para cada palabra (floor), después repartir el remanente char-weighted.
+        # Si la duración total es menor que N*MIN_WORD_DUR (caso degenerado tras
+        # merging exhaustivo), cae en distribución uniforme — peor que el ideal
+        # pero al menos sin micro-stacks invisibles.
+        for i in range(len(boundaries) - 1):
+            s_idx, s_t = boundaries[i]
+            e_idx, e_t = boundaries[i + 1]
+            seg_words = words_in_phrase[s_idx:e_idx]
+            if not seg_words:
+                continue
+            dur = max(0.05, e_t - s_t)
+            n_seg = len(seg_words)
+            floor_total = n_seg * MIN_WORD_DUR
+            if dur >= floor_total:
+                # Floor garantizado + remanente char-weighted.
+                remaining = dur - floor_total
+                weights = [len(w) + 1 for w in seg_words]
+                total_w = sum(weights) or 1
+                durs = [MIN_WORD_DUR + remaining * (weights[k] / total_w) for k in range(n_seg)]
+            else:
+                # Sin espacio ni para el floor → uniforme (último recurso).
+                durs = [dur / n_seg] * n_seg
+            t = s_t
+            for k, w in enumerate(seg_words):
+                out[nj0 + s_idx + k] = {"word": w, "start": t, "end": t + durs[k]}
+                t += durs[k]
+
+    # Defensive fill — no debería quedar ningún None.
+    for j in range(n_new):
+        if out[j] is None:
+            prev_end = out[j - 1]["end"] if j > 0 and out[j - 1] else 0.0
+            out[j] = {"word": new_words[j], "start": prev_end, "end": prev_end + 0.2}
 
     return out
 

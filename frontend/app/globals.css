@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   Identidad NebulabsAI — tema oscuro prioritario.
+   - Fondo principal: negro puro.
+   - Marca: gradient cyan → violet del monograma "NB".
+   - Modo claro mantenido para usuarios que lo prefieran (sin gradient).
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* Light mode — secundario */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+    --primary: 271 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 271 91% 65%;
+    --radius: 0.625rem;
+
+    /* Marca — accesible en ambos temas */
+    --brand-cyan: 188 95% 53%;
+    --brand-violet: 271 91% 65%;
+    --brand-glow: 215 100% 60%;
+  }
+
+  .dark {
+    /* Dark mode — primario. Negro puro de fondo. */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 4%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 271 91% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 10%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 5% 10%;
+    --muted-foreground: 240 4% 60%;
+    --accent: 240 5% 12%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 14%;
+    --input: 240 5% 14%;
+    --ring: 188 95% 53%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* =============================================================================
+   Utilidades de marca
+   ========================================================================== */
+@layer components {
+  .brand-gradient {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--brand-cyan)) 0%,
+      hsl(var(--brand-violet)) 100%
+    );
+  }
+
+  .brand-gradient-text {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--brand-cyan)) 0%,
+      hsl(var(--brand-violet)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .brand-glow {
+    box-shadow:
+      0 0 0 1px hsl(var(--brand-cyan) / 0.2),
+      0 0 20px -4px hsl(var(--brand-violet) / 0.35);
+  }
+
+  .brand-glow-hover {
+    transition: box-shadow 200ms ease;
+  }
+  .brand-glow-hover:hover {
+    box-shadow:
+      0 0 0 1px hsl(var(--brand-cyan) / 0.3),
+      0 0 24px -2px hsl(var(--brand-violet) / 0.45);
+  }
+
+  /* Indicador de item activo en sidebar — barra vertical con gradient */
+  .nav-active-indicator {
+    position: relative;
+  }
+  .nav-active-indicator::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 4px;
+    background-image: linear-gradient(
+      180deg,
+      hsl(var(--brand-cyan)) 0%,
+      hsl(var(--brand-violet)) 100%
+    );
+  }
+}

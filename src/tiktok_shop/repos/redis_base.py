@@ -144,6 +144,11 @@ class ShopRedis:
         result = self._get(f"lrange/{self._enc(self._full_key(key))}/{start}/{stop}")
         return list(result or [])
 
+    def ltrim(self, key: str, start: int, stop: int) -> bool:
+        """LTRIM key start stop — recorta la lista en sitio."""
+        result = self._post(f"ltrim/{self._enc(self._full_key(key))}/{start}/{stop}")
+        return result == "OK"
+
 
 # Singleton perezoso
 _INSTANCE: ShopRedis | None = None

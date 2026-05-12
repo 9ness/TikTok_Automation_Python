@@ -256,6 +256,27 @@ class JobQueue:
                     job.finished_at = time.time()
                     self._save_state_locked()
 
+            # Medir duración del MP4 final con ffprobe (cacheado). Se guarda
+            # en el job para que la UI lo muestre y se persiste en disk.
+            try:
+                if job.status == JobStatus.COMPLETED and job.result_path:
+                    from src.queue.metrics import _video_duration
+                    dur = _video_duration(job.result_path)
+                    if dur is not None:
+                        with self._cond:
+                            job.duration_seconds = dur
+                            self._save_state_locked()
+            except Exception as e:
+                print(f"[JobQueue] ffprobe duration error: {e}")
+
+            # Persistir métrica de duración para ETA inteligente (fuera del
+            # lock — fallos aquí NO deben afectar al worker loop).
+            try:
+                from src.queue.metrics import record_job_metric
+                record_job_metric(job)
+            except Exception as e:
+                print(f"[JobQueue] record_job_metric error: {e}")
+
     # ----------------------------------------------------------
     # Persistencia
     # ----------------------------------------------------------

@@ -654,3 +654,121 @@ sudo systemctl restart tiktok-factory
 
 Si quieres apretar más, el snapshot es opcional (sin él pierdes el
 estado en caso de necesitar recrear el VPS).
+
+---
+
+## Despliegue Docker (FastAPI + Next.js + Caddy) — Fase 3A
+
+A partir de Fase 3A, el stack Next.js + FastAPI vive en
+`docker-compose.yml` en la raíz del repo. **Convive con el setup systemd
+actual de Streamlit** — no se pisan: el Compose stack solo expone puertos
+a través de Caddy (80/443), Streamlit sigue en su servicio systemd como
+hasta ahora.
+
+### Arrancar en local (sin dominio, solo HTTP)
+
+```bash
+# 1. Copia .env.example a .env y rellena las API keys
+cp .env.example .env
+
+# 2. Build + up
+docker compose --env-file .env up -d --build
+
+# 3. Verificar
+curl http://localhost/api/health        # → {"status":"ok",...}
+curl http://localhost                   # → HTML de Next.js
+docker compose ps                       # estado de los 3 contenedores
+docker compose logs -f api web caddy    # logs en vivo
+```
+
+URLs en local:
+- Frontend: http://localhost
+- API + Swagger: http://localhost/api/docs
+- WebSocket: `ws://localhost/ws/queue`
+
+### Arrancar en producción (HTTPS automático)
+
+1. Apunta el DNS del dominio al servidor (registro A → IP del VPS).
+2. En el `.env` del servidor define:
+
+```env
+DOMAIN=tiktok.example.com
+PUBLIC_API_URL=https://tiktok.example.com
+PUBLIC_WS_URL=wss://tiktok.example.com
+DRIVE_PATH=/mnt/drive          # rclone mount del Drive
+API_KEY=secret-token-largo     # opcional pero recomendado
+```
+
+3. Asegúrate de que los puertos 80 y 443 están libres antes de arrancar
+   Caddy:
+
+```bash
+sudo lsof -i :80 -i :443
+```
+
+4. Arranca:
+
+```bash
+docker compose --env-file .env up -d --build
+```
+
+Caddy obtiene el certificado HTTPS automáticamente la primera vez que
+recibe tráfico al dominio.
+
+### Operaciones cotidianas
+
+```bash
+# Ver estado
+docker compose ps
+
+# Logs (todos / un servicio concreto)
+docker compose logs -f
+docker compose logs -f api
+
+# Reiniciar un servicio
+docker compose restart api
+docker compose restart web
+
+# Rebuild tras cambios en código
+docker compose up -d --build api
+docker compose up -d --build web
+
+# Parar todo
+docker compose down
+
+# Parar + borrar volúmenes (queue state, certs Caddy → ¡cuidado!)
+docker compose down -v
+```
+
+### Cambiar URLs públicas del frontend
+
+Las env vars `NEXT_PUBLIC_API_URL` y `NEXT_PUBLIC_WS_URL` se inlinean en
+el bundle JS **en build-time**. Para cambiarlas hay que rebuild:
+
+```bash
+# Edita .env con los nuevos PUBLIC_API_URL / PUBLIC_WS_URL y:
+docker compose up -d --build web
+```
+
+### Verificación post-deploy
+
+```bash
+# Health
+curl https://tiktok.example.com/api/health
+
+# WebSocket (necesita wscat: npm i -g wscat)
+wscat -c "wss://tiktok.example.com/ws/queue?api_key=$API_KEY"
+# Debe llegar el primer mensaje: {"type":"snapshot","data":{"jobs":[]}}
+
+# Frontend
+curl -I https://tiktok.example.com
+```
+
+### Streamlit + Docker en el mismo VPS
+
+- Streamlit sigue en `systemd` escuchando en su puerto interno
+  (típicamente 8501) y se accede vía Tailscale Funnel.
+- El stack Docker escucha en 80/443 con dominio público.
+- No hay conflicto: distintos puertos. Drive: ambos consumen el mismo
+  mount (rclone) — Streamlit lo lee desde `~/gdrive/...`, el container
+  API lo lee desde `/mnt/drive/...` mapeado vía volumen.

@@ -1,0 +1,27 @@
+# Frontend dockerignore — el contexto es ./frontend.
+
+node_modules/
+.next/
+out/
+
+# Tests
+coverage/
+tests/
+vitest.config.ts
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Env locales
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*

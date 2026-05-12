@@ -58,6 +58,7 @@ class Job:
     created_at: float = field(default_factory=time.time)
     started_at: float | None = None
     finished_at: float | None = None
+    duration_seconds: float | None = None  # duración del MP4 final (ffprobe)
 
     # ---- helpers ----
     @property

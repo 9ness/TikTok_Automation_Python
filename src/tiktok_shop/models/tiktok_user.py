@@ -45,6 +45,7 @@ class TikTokUser(BaseModel):
     default_voice_id: str | None = None
     default_language: str = "es"
     default_video_tier: Literal["standard", "advanced", "pro", "veo3_prompt_only"] = "standard"
+    deleted: bool = False                     # soft-delete: oculta sin tocar Drive/Redis
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 

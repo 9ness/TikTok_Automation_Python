@@ -18,6 +18,14 @@ Diseño:
 
 from .models import Job, JobMode, JobStatus
 from .manager import get_queue
-from .ui import render_queue_widget
+
+# `render_queue_widget` se importa LAZY porque depende de `streamlit`, que
+# es solo necesario para la UI Streamlit legacy (`main.py`). La API FastAPI
+# y los runners NO necesitan streamlit. Hacerlo top-level rompe la API si
+# el entorno no tiene streamlit instalado.
+def render_queue_widget(*args, **kwargs):  # type: ignore[no-untyped-def]
+    from .ui import render_queue_widget as _impl
+    return _impl(*args, **kwargs)
+
 
 __all__ = ["Job", "JobMode", "JobStatus", "get_queue", "render_queue_widget"]

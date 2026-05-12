@@ -1,0 +1,40 @@
+# Caddyfile — reverse proxy para TikTok Automation.
+#
+# Comportamiento:
+#   - Si la env var $DOMAIN está vacía (o = ":80"), Caddy escucha en HTTP local.
+#   - Si $DOMAIN está set (ej. "tiktok.example.com"), Caddy obtiene cert HTTPS
+#     automáticamente vía Let's Encrypt (puertos 80/443 expuestos al host).
+#
+# Rutas:
+#   /api/*       → contenedor api:8000   (REST + Swagger en /api/docs)
+#   /ws/*        → contenedor api:8000   (WebSocket /ws/queue, headers Upgrade)
+#   /            → contenedor web:3000   (Next.js standalone)
+
+{$DOMAIN} {
+	# `encode` reduce ancho de banda HTTP. El WebSocket pasa intacto.
+	encode gzip
+
+	# Endpoints REST + docs
+	@api path /api/* /api
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	# WebSocket de la cola (incluye headers Upgrade automáticamente en
+	# Caddy v2 cuando detecta `Connection: upgrade`).
+	@ws path /ws/*
+	handle @ws {
+		reverse_proxy api:8000
+	}
+
+	# Frontend Next.js (cualquier otra ruta).
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Logs de acceso (json en stdout — `docker compose logs caddy`).
+	log {
+		output stdout
+		format json
+	}
+}

@@ -278,7 +278,7 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         f"palabras (rango {wc.TARGET_MIN_S:.0f}-{wc.TARGET_MAX_S:.0f}s)"
     )
 
-    MAX_ATTEMPTS = p.get("calibration_max_attempts", 3)
+    MAX_ATTEMPTS = p.get("calibration_max_attempts", 5)
     script_data = None
     txt_output = None
     audio_output_folder = None
@@ -330,10 +330,24 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                 break
 
             if attempt == MAX_ATTEMPTS:
+                # Si la duración final está POR DEBAJO del mínimo (60s) no se
+                # acepta — un vídeo corto no monetiza. Si está por ENCIMA (66s+)
+                # se tolera: videos largos son menos críticos.
+                if total_dur < wc.TARGET_MIN_S:
+                    on_log(
+                        f"❌ Máximo de intentos ({MAX_ATTEMPTS}) alcanzado y "
+                        f"duración {total_dur:.1f}s sigue debajo del mínimo "
+                        f"({wc.TARGET_MIN_S:.0f}s). Calibrador guardó target "
+                        f"{next_target} para futuros intentos."
+                    )
+                    raise RuntimeError(
+                        f"Duración final {total_dur:.1f}s < {wc.TARGET_MIN_S:.0f}s mínimo "
+                        f"tras {MAX_ATTEMPTS} intentos. Reintenta el job — el calibrador "
+                        f"ha aprendido y debería converger."
+                    )
                 on_log(
-                    f"⚠️ Máximo de intentos alcanzado. Continuando con "
-                    f"{total_dur:.1f}s. Calibrador actualizó target a "
-                    f"{next_target} para próximas ejecuciones."
+                    f"⚠️ Máximo de intentos alcanzado. Duración {total_dur:.1f}s "
+                    f"está por encima del rango pero es aceptable. Continuando."
                 )
                 break
 
@@ -402,6 +416,16 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
                 if words:
                     on_log(f"📝 Componiendo overlay ({len(words)} palabras)")
+                    # Drop shadow CapCut → params de subtitles.py.
+                    # distance (CapCut units, ~px sobre 1920) + angle → offsets
+                    # relativos al W/H del frame.
+                    import math
+                    _dist = float(p.get("subs_shadow_distance", 8.0)) / 1920.0
+                    _angle_rad = math.radians(float(p.get("subs_shadow_angle", -45.0)))
+                    _sh_x = _dist * math.cos(_angle_rad)
+                    _sh_y = _dist * abs(math.sin(_angle_rad))  # CSS Y/PIL Y baja
+                    _sh_blur_px = int(float(p.get("subs_shadow_blur", 33.0)) / 8.0)
+
                     subs_style = {
                         **DEFAULT_STYLE,
                         "highlight_color": p.get("subs_highlight_color", "#BB0808"),
@@ -413,6 +437,11 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                         "max_words_per_chunk": p.get("subs_max_words", 4),
                         "y_position_pct": p.get("subs_y_position", 0.62),
                         "shadow_enabled": p.get("subs_shadow_enabled", False),
+                        "shadow_color": p.get("subs_shadow_color", "#000000"),
+                        "shadow_opacity": float(p.get("subs_shadow_opacity", 0.8)),
+                        "shadow_offset_x_pct": _sh_x,
+                        "shadow_offset_y_pct": _sh_y,
+                        "shadow_blur_radius": _sh_blur_px,
                         "highlight_mode": p.get("subs_highlight_mode", "pill"),
                         "max_width_pct": p.get("subs_max_width", 0.85),
                     }
@@ -525,6 +554,14 @@ def run_pronosticos(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         add_background_music=p.get("add_background_music", True),
         bgm_volume=p.get("bgm_volume", 0.20),
         progress_callback=on_progress,
+        subtitle_y_pct=p.get("subtitle_y_pct", 0.78),
+        league_overlay_y_pct=p.get("league_overlay_y_pct", 0.30),
+        league_logo_height_pct=p.get("league_logo_height_pct", 0.13),
+        team_shield_y_pct=p.get("team_shield_y_pct", 0.43),
+        team_shield_height_pct=p.get("team_shield_height_pct", 0.22),
+        team_shield_x_inset_pct=p.get("team_shield_x_inset_pct", 0.06),
+        profile_cta_y_pct=p.get("profile_cta_y_pct", 0.36),
+        profile_cta_height_pct=p.get("profile_cta_height_pct", 0.32),
     )
     return final_path
 
@@ -567,12 +604,21 @@ def run_subs_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         on_progress(0.18, f"🎙️ Whisper '{p.get('model_size','small')}'…")
         on_log(f"🎙️ Transcribiendo con Whisper '{p.get('model_size','small')}'"
                f"{' (con guion ref.)' if ref else ''}")
+
+        # Mapeo del progreso de transcripción [0..1] al rango overall [0.18..0.55].
+        # faster-whisper emite progreso por segmento; aquí lo recibimos y lo
+        # propagamos al WebSocket con ETA estimado.
+        def _on_transcribe_progress(frac: float, msg: str) -> None:
+            overall = 0.18 + (0.55 - 0.18) * frac
+            on_progress(overall, msg)
+
         words = transcribe_with_reference(
             tmp_audio,
             reference_script=ref,
             model_size=p.get("model_size", "small"),
             language=p.get("language"),
             audio_type=p.get("audio_type", "speech"),
+            progress_callback=_on_transcribe_progress,
         )
 
         # Si hay edited_text, fundir
@@ -661,6 +707,8 @@ def run_copyright(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         clean_mode=p.get("clean_mode", "Subtítulos Virales"),
         hook_y_pct=p.get("hook_y_pct", 0.20),
         hook_color=p.get("hook_color", "#FDD002"),
+        upscale_1080p=bool(p.get("upscale_1080p", False)),
+        font_path=p.get("font_path"),
     )
     on_progress(1.0, "✅ Limpieza completada")
     return final

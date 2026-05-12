@@ -1,0 +1,60 @@
+# Dockerignore raíz — el contexto de Dockerfile.api es la raíz del repo.
+# Excluir cualquier cosa que no sea código + config + assets.
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# IDE / editor
+.vscode/
+.idea/
+.DS_Store
+
+# Git + CI
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Tests, docs, scripts locales
+tests/
+docs/
+*.md
+!README.md
+LICENSE
+
+# Frontend completo (lo construye su propio Dockerfile en otro contexto)
+frontend/
+
+# Streamlit-only / dev artifacts
+temp_work/
+output/
+logs/
+*.log
+.streamlit/
+output_videos/
+TIKTOK_ASSETS_FALLBACK/
+TIKTOK_SHOP_FALLBACK/
+
+# Docker / compose state
+docker-compose.override.yml
+.env
+.env.*
+!.env.example
+
+# Memoria local del agente
+.claude/
+memory/

@@ -103,5 +103,6 @@ class VideoGeneration(BaseModel):
     tiktok_shop_metadata: TikTokShopVideoMeta = Field(default_factory=TikTokShopVideoMeta)
     performance: Performance = Field(default_factory=Performance)
     error: str | None = None
+    deleted: bool = False                      # soft-delete: oculta del histórico
     created_at: str = Field(default_factory=_now_iso)
     completed_at: str | None = None

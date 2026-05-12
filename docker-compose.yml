@@ -1,0 +1,108 @@
+# docker-compose.yml — TikTok Automation (FastAPI + Next.js + Caddy)
+#
+# Convive con la instalación systemd actual (Streamlit) sin pisarla:
+# este stack solo expone los puertos del container (no del host) y todo
+# pasa por Caddy en :80/:443.
+#
+# Uso:
+#   docker compose --env-file .env up -d --build
+#
+# Logs:
+#   docker compose logs -f api web caddy
+#
+# Variables clave en .env:
+#   DOMAIN                           — dominio público (HTTPS auto). Vacío → solo HTTP local.
+#   PUBLIC_API_URL / PUBLIC_WS_URL   — URLs que el bundle Next.js inlinea (build-time).
+#   API_KEY (opcional)
+#   UPSTASH_REDIS_REST_URL / TOKEN
+#   ATLASCLOUD_API_KEY / GOOGLE_GEMINI_KEY_* / MINIMAX_API_KEY / ...
+#   DRIVE_PATH                       — carpeta en el host con rclone Drive montado
+#                                      (default ./drive_mount, no rompe en dev local).
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: tiktok-api:latest
+    container_name: tiktok-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Forzar host/port correctos dentro del container, independientes de .env.
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+      # CORS abierto al dominio público (Caddy reescribe Origin).
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost,https://${DOMAIN:-localhost}}
+      # temp_work y api_uploads viven dentro del volumen persistido.
+      API_TEMP_ROOT: "/app/temp_work"
+    volumes:
+      - api_temp:/app/temp_work
+      # Drive sincronizado (rclone mount en el host) → necesario para los
+      # pipelines que leen TIKTOK_CR/TIKTOK_SHOP. En dev local crea ./drive_mount.
+      - ${DRIVE_PATH:-./drive_mount}:/mnt/drive:rw
+    networks:
+      - app-network
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time: estos valores quedan inlineados en el bundle JS del cliente.
+        # Para cambiarlos hay que rebuild.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL:-ws://localhost:8000}
+        NEXT_PUBLIC_API_KEY: ${API_KEY:-}
+    image: tiktok-web:latest
+    container_name: tiktok-web
+    restart: unless-stopped
+    networks:
+      - app-network
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: tiktok-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app-network
+    depends_on:
+      - api
+      - web
+
+volumes:
+  api_temp:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app-network:
+    driver: bridge

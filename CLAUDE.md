@@ -245,3 +245,7 @@ Cap 250 líneas — mover detalles a `.md` específico si crece.
 ### Memoria y Tareas
 - **Lectura**: Lee `tasks.md` para pendientes y `learnings.md` para historial técnico.
 - **Escritura Autónoma**: Al resolver un bug o implementar un patrón técnico nuevo, añade obligatoriamente un registro de 1 línea en `learnings.md`. Al finalizar una tarea, muévela a la sección `## ✅ Done` en `tasks.md`.
+
+### Setup local
+- Ver [`DEV_SETUP.md`](DEV_SETUP.md) para arranque (uvicorn + npm run dev),
+  troubleshooting de WS/dashboard/cache, y los fixes recientes aplicados.
