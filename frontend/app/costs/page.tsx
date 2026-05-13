@@ -161,11 +161,19 @@ export default function CostsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {(shopUsers.data?.items ?? []).map((u) => (
-                    <SelectItem key={u.username} value={u.username}>
-                      @{u.username}
-                    </SelectItem>
-                  ))}
+                  {(shopUsers.data?.items ?? []).map((u) => {
+                    // username puede venir con o sin '@'. Normalizamos para
+                    // que el display sea siempre `@xxx` (un solo @) y el
+                    // valor enviado al backend sea el username raw.
+                    const label = u.username.startsWith("@")
+                      ? u.username
+                      : `@${u.username}`;
+                    return (
+                      <SelectItem key={u.username} value={u.username}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </FilterField>

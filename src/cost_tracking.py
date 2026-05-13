@@ -285,10 +285,17 @@ def _list_tiktok_shop_legacy(
         return []
 
     out: list[dict] = []
+    # Normaliza con/sin @ — históricamente algunos VideoGeneration guardan
+    # `user_id=@pisadaviva` y otros `pisadaviva` según en qué versión del
+    # código se crearon. Comparamos sin sensibilidad al @.
+    def _norm(s: str | None) -> str:
+        return (s or "").lstrip("@").strip().lower()
+
+    user_norm = _norm(user) if user else None
     for g in gens:
         if g.deleted:
             continue
-        if user and g.user_id != user:
+        if user_norm and _norm(g.user_id) != user_norm:
             continue
         if product_id and g.product_id != product_id:
             continue
