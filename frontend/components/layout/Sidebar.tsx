@@ -175,8 +175,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </ul>
       </nav>
 
-      <div className="space-y-2 border-t px-3 py-3">
-        <QueueBadge />
+      <div className="shrink-0 space-y-2 border-t px-3 py-3">
         <SidebarUserBadge />
         <DiagnosticsPanel />
         <div className="flex items-center justify-between px-1">
@@ -266,10 +265,21 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop */}
-      <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:bg-card">
+      {/* Desktop: sticky a la viewport, h-screen + overflow-hidden para que
+          el nav haga scroll interno y el footer (user/diagnóstico/versión)
+          quede SIEMPRE abajo sin necesidad de scroll de página. */}
+      <aside className="sticky top-0 hidden h-screen overflow-hidden md:flex md:w-64 md:flex-col md:border-r md:bg-card">
         <SidebarContent />
       </aside>
+
+      {/* QueueBadge flotante en esquina superior derecha (desktop). En
+          móvil ya está en la barra superior. z-40 para quedar bajo modales
+          (que usan z-50) pero sobre todo el contenido. */}
+      <div className="pointer-events-none fixed right-3 top-3 z-40 hidden md:block">
+        <div className="pointer-events-auto rounded-md border bg-card/95 px-2 py-1 shadow-lg backdrop-blur">
+          <QueueBadge />
+        </div>
+      </div>
 
       {/* Mobile trigger + drawer */}
       <div className="flex h-14 items-center justify-between border-b px-4 md:hidden">
