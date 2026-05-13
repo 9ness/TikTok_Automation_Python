@@ -274,28 +274,51 @@ def _list_tiktok_shop_legacy(
 ) -> list[dict]:
     """Lee `VideoGeneration` históricas de TikTok Shop y las convierte al
     formato unificado. Esto es para que el panel `/costs` muestre datos
-    pre-existentes sin tener que migrar storage."""
+    pre-existentes sin tener que migrar storage.
+
+    `user_id` en VideoGeneration es el UUID interno del TikTokUser, NO el
+    username. Si el filtro `user` parece un username (no hex de 32 chars),
+    resolvemos a UUID vía `UserRepo.get_by_username` antes de comparar.
+    También admitimos pasar directamente el UUID."""
     try:
         from src.tiktok_shop.repos.redis_base import get_shop_redis
         from src.tiktok_shop.repos.generation_repo import GenerationRepo
-        repo = GenerationRepo(get_shop_redis())
+        from src.tiktok_shop.repos.user_repo import UserRepo
+        redis = get_shop_redis()
+        repo = GenerationRepo(redis)
+        user_repo = UserRepo(redis)
         gens = repo.list_recent(limit=limit * 2)
     except Exception as e:
         print(f"[cost_tracking] legacy load fail: {e}")
         return []
 
-    out: list[dict] = []
-    # Normaliza con/sin @ — históricamente algunos VideoGeneration guardan
-    # `user_id=@pisadaviva` y otros `pisadaviva` según en qué versión del
-    # código se crearon. Comparamos sin sensibilidad al @.
-    def _norm(s: str | None) -> str:
-        return (s or "").lstrip("@").strip().lower()
+    # Resolver username → UUID si hace falta. Acepta `@pisadaviva`,
+    # `pisadaviva`, y también UUIDs hex de 32 chars.
+    target_user_id: str | None = None
+    if user:
+        s = user.strip()
+        # UUID de uuid.uuid4().hex tiene 32 chars hex.
+        if len(s) == 32 and all(c in "0123456789abcdef" for c in s.lower()):
+            target_user_id = s
+        else:
+            # Probamos con @ y sin @ porque User.username convencionalmente
+            # se guarda con @ pero podríamos recibir cualquiera.
+            candidate = s if s.startswith("@") else f"@{s}"
+            u = user_repo.get_by_username(candidate)
+            if not u:
+                # Reintento sin @ por si la BD tiene formato distinto.
+                u = user_repo.get_by_username(s.lstrip("@"))
+            target_user_id = u.id if u else None
+            if user and target_user_id is None:
+                # Username pasado pero no resuelto → no hay generations
+                # asociadas (devolvemos vacío, sin error).
+                return []
 
-    user_norm = _norm(user) if user else None
+    out: list[dict] = []
     for g in gens:
         if g.deleted:
             continue
-        if user_norm and _norm(g.user_id) != user_norm:
+        if target_user_id and g.user_id != target_user_id:
             continue
         if product_id and g.product_id != product_id:
             continue
