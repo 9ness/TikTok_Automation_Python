@@ -7,6 +7,11 @@ Wants=network-online.target
 Type=simple
 User=nebulabsai
 Group=nebulabsai
+# Grupo supplementary `docker` necesario para que deploy_safe.sh pueda
+# correr `docker compose` (acceso al socket /var/run/docker.sock). Sin
+# este flag, `usermod -aG docker nebulabsai` solo aplica a NUEVAS shells
+# del user — el systemd service usa el group set en arranque del proceso.
+SupplementaryGroups=docker
 WorkingDirectory=/home/nebulabsai/TikTok_Automation_Python
 
 # El listener lee WEBHOOK_SECRET del .env de la app. Si no está, no arranca.

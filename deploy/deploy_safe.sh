@@ -183,15 +183,28 @@ bump_version() {
 
 determine_bump() {
     local commits="$1"
-    if echo "$commits" | grep -qE '^[a-f0-9]+ (feat!|fix!|refactor!|.*BREAKING CHANGE)'; then
-        echo "major"
-    elif echo "$commits" | grep -qE '^[a-f0-9]+ feat(\(|:)'; then
-        echo "minor"
-    elif echo "$commits" | grep -qE '^[a-f0-9]+ (fix|chore|deploy|refactor|perf|docs)(\(|:)'; then
-        echo "patch"
-    else
+    # Sin commits → no bump
+    if [[ -z "$(echo "$commits" | tr -d '[:space:]')" ]]; then
         echo "none"
+        return
     fi
+    # Major: breaking change explícito (con `!` o "BREAKING CHANGE" en
+    # cualquier parte del subject).
+    if echo "$commits" | grep -qiE '(^|[ (])(feat|fix|refactor)![ (:]'; then
+        echo "major"; return
+    fi
+    if echo "$commits" | grep -qi 'BREAKING CHANGE'; then
+        echo "major"; return
+    fi
+    # Minor: `feat` (con o sin scope).
+    if echo "$commits" | grep -qiE '(^|[[:space:]])feat([[:space:]]|\(|:)'; then
+        echo "minor"; return
+    fi
+    # Patch: cualquier otro commit en el rango. Esto incluye fix, chore,
+    # deploy, refactor, perf, docs, tests, build, ci, style, AND
+    # commits sin convención (subjects libres) — porque si llegó algo al
+    # main, al menos algo cambió y el version debe reflejarlo.
+    echo "patch"
 }
 
 VERSION_FILE="${APP_DIR}/VERSION"
