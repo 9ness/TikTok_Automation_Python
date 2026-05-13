@@ -20,6 +20,12 @@ logs/
 *.png
 *.mov
 
+# Excepción: assets de marca del frontend SÍ se commitean (necesarios
+# para que el container web los sirva en /brand/*).
+!frontend/public/brand/*.png
+!frontend/public/brand/*.jpg
+!frontend/public/**/*.svg
+
 # --- Rutas específicas de tu proyecto (por seguridad) ---
 BIBLIOTECA_PRESIDENTES/
 BIBLIOTECA_INTRO/
