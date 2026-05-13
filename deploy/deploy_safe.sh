@@ -124,6 +124,72 @@ echo "[deploy_safe] HEAD ahora en ${NEW_SHA:0:8}"
 write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\""
 
 # ============================================================
+# 2.b. Auto-bump del archivo VERSION según commits incluidos
+# ============================================================
+# Convención usada por nuestros commits:
+#   feat:      → bump minor
+#   feat!:     → bump major
+#   fix:|chore:|deploy:|refactor: → bump patch
+#   BREAKING CHANGE en el body → bump major
+#
+# La versión final se escribe en `VERSION` y se commitea con `[skip ci]`
+# para no triggerear otro deploy. Si no hay commits relevantes, mantiene
+# la versión actual. La UI lee `/api/v1/diagnostics/summary` y muestra
+# este valor (cae al short SHA si VERSION no existe).
+bump_version() {
+    local current_version="$1"
+    local bump_type="$2"   # major|minor|patch
+    local IFS=.
+    # shellcheck disable=SC2206
+    local parts=($current_version)
+    local major=${parts[0]:-0}
+    local minor=${parts[1]:-0}
+    local patch=${parts[2]:-0}
+    case "$bump_type" in
+        major) major=$((major + 1)); minor=0; patch=0 ;;
+        minor) minor=$((minor + 1)); patch=0 ;;
+        patch) patch=$((patch + 1)) ;;
+    esac
+    echo "${major}.${minor}.${patch}"
+}
+
+determine_bump() {
+    local commits="$1"
+    if echo "$commits" | grep -qE '^[a-f0-9]+ (feat!|fix!|refactor!|.*BREAKING CHANGE)'; then
+        echo "major"
+    elif echo "$commits" | grep -qE '^[a-f0-9]+ feat(\(|:)'; then
+        echo "minor"
+    elif echo "$commits" | grep -qE '^[a-f0-9]+ (fix|chore|deploy|refactor|perf|docs)(\(|:)'; then
+        echo "patch"
+    else
+        echo "none"
+    fi
+}
+
+VERSION_FILE="${APP_DIR}/VERSION"
+CURRENT_VERSION=$(cat "$VERSION_FILE" 2>/dev/null | tr -d '[:space:]')
+CURRENT_VERSION=${CURRENT_VERSION:-0.1.0}
+COMMITS_BETWEEN=$(git log --format="%h %s" "${LOCAL_SHA}..${NEW_SHA}")
+BUMP_TYPE=$(determine_bump "$COMMITS_BETWEEN")
+if [[ "$BUMP_TYPE" != "none" ]]; then
+    NEW_VERSION=$(bump_version "$CURRENT_VERSION" "$BUMP_TYPE")
+    echo "[deploy_safe] versión: ${CURRENT_VERSION} → ${NEW_VERSION} (bump=${BUMP_TYPE})"
+    echo "$NEW_VERSION" > "$VERSION_FILE"
+    # Commit + push del bump (skip CI para no re-disparar el webhook).
+    if git -C "$APP_DIR" add VERSION 2>/dev/null && \
+       git -C "$APP_DIR" -c user.email="deploy@nebulabs.local" \
+                        -c user.name="auto-deploy" \
+                        commit -m "chore(release): v${NEW_VERSION} [skip ci]" --quiet 2>/dev/null; then
+        # Push best-effort: si falla (no permission), no rompe el deploy.
+        git -C "$APP_DIR" push --quiet origin main 2>/dev/null \
+            || echo "[deploy_safe] ⚠️ no se pudo push del bump VERSION (sigue local)"
+    fi
+else
+    NEW_VERSION="$CURRENT_VERSION"
+    echo "[deploy_safe] commits no triggerean bump (versión sigue ${NEW_VERSION})"
+fi
+
+# ============================================================
 # 3. Si requirements.txt cambió → reinstalar deps
 # ============================================================
 if git diff --name-only "$LOCAL_SHA" "$NEW_SHA" | grep -qE "^requirements\.txt$"; then

@@ -27,7 +27,11 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { QueueBadge } from "@/components/queue/QueueBadge";
+import { DiagnosticsPanel } from "@/components/layout/DiagnosticsPanel";
 import { ThemeToggle } from "./ThemeToggle";
+import { useMe } from "@/lib/queries/auth";
+import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
+import { User } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -110,6 +114,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           width={36}
           height={36}
           className="rounded-md"
+          unoptimized
           priority
         />
         <div className="leading-tight">
@@ -173,13 +178,36 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="space-y-2 border-t px-3 py-3">
         <QueueBadge />
+        <SidebarUserBadge />
+        <DiagnosticsPanel />
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-muted-foreground">v0.1.0</span>
+          <VersionLabel />
           <ThemeToggle />
         </div>
       </div>
     </>
   );
+}
+
+function SidebarUserBadge() {
+  const me = useMe();
+  const username = me.data?.username;
+  if (!username) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs">
+      <User className="h-3.5 w-3.5 text-brand-cyan" strokeWidth={2} />
+      <span className="text-muted-foreground">Conectado:</span>
+      <span className="font-semibold">{username}</span>
+    </div>
+  );
+}
+
+function VersionLabel() {
+  // Lee la versión del endpoint /api/v1/diagnostics/summary. Fallback al
+  // texto estático si la API no responde aún (primer render).
+  const q = useDiagnosticsSummary();
+  const v = q.data?.version || "0.1.0";
+  return <span className="text-xs text-muted-foreground">v{v}</span>;
 }
 
 function SidebarLink({
@@ -238,6 +266,7 @@ export function Sidebar() {
             width={28}
             height={28}
             className="rounded"
+            unoptimized
           />
           <span className="brand-gradient-text text-sm font-bold">NebulabsAI</span>
         </div>

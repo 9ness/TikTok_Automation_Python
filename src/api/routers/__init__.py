@@ -15,6 +15,8 @@ from .creator_reward import (
 )
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
+from .auth import router as auth_router
+from .diagnostics import router as diagnostics_router
 from .fonts import file_router as fonts_file_router, router as fonts_router
 
 __all__ = [
@@ -35,4 +37,6 @@ __all__ = [
     "dashboard_router",
     "fonts_router",
     "fonts_file_router",
+    "auth_router",
+    "diagnostics_router",
 ]
