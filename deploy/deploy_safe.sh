@@ -190,13 +190,93 @@ else
 fi
 
 # ============================================================
-# 3. Si requirements.txt cambió → reinstalar deps
+# 3. Si requirements.txt cambió → reinstalar deps (Streamlit venv)
 # ============================================================
-if git diff --name-only "$LOCAL_SHA" "$NEW_SHA" | grep -qE "^requirements\.txt$"; then
-    echo "[deploy_safe] requirements.txt modificado, reinstalando deps…"
+CHANGED_FILES=$(git diff --name-only "$LOCAL_SHA" "$NEW_SHA")
+if echo "$CHANGED_FILES" | grep -qE "^requirements\.txt$"; then
+    echo "[deploy_safe] requirements.txt modificado, reinstalando deps del venv…"
     if ! "${APP_DIR}/venv/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"; then
         echo "[deploy_safe] ⚠️ pip install falló — sigo con el restart, pero revisa logs"
     fi
+fi
+
+# ============================================================
+# 3.b. Auto-rebuild de containers Docker según ficheros cambiados
+# ============================================================
+# El stack Docker (FastAPI + Next.js + Caddy) corre en paralelo a Streamlit.
+# Cuando cambian ficheros del nuevo stack, hay que rebuildar/restart los
+# containers correspondientes — `git pull` solo no basta porque docker no
+# detecta cambios en la imagen al vuelo.
+#
+# Mapping fichero → acción:
+#   Dockerfile.api | docker-compose.yml | src/ (excepto src/streamlit*) | requirements.txt
+#       → rebuild api
+#   frontend/      | docker-compose.yml
+#       → rebuild web
+#   Caddyfile      | docker-compose.yml
+#       → restart caddy (no rebuild)
+#
+# Si docker no está instalado o no hay docker-compose.yml en el repo, se
+# omite limpiamente (modo Streamlit-only).
+NEEDS_API_REBUILD=false
+NEEDS_WEB_REBUILD=false
+NEEDS_CADDY_RESTART=false
+
+if [[ -f "${APP_DIR}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1; then
+    if echo "$CHANGED_FILES" | grep -qE "^(Dockerfile\.api|docker-compose\.yml|requirements\.txt)$"; then
+        NEEDS_API_REBUILD=true
+    fi
+    if echo "$CHANGED_FILES" | grep -qE "^src/(api|fonts_registry\.py|queue/(metrics|manager|models|runners|__init__)\.py|subtitles|pronosticos|tiktok_shop|video_remover|locutor|guionista|logic|word_calibrator|text_hook|font_resolver|diagnostics)"; then
+        NEEDS_API_REBUILD=true
+    fi
+    if echo "$CHANGED_FILES" | grep -qE "^frontend/"; then
+        NEEDS_WEB_REBUILD=true
+    fi
+    if echo "$CHANGED_FILES" | grep -qE "^(Caddyfile|docker-compose\.yml)$"; then
+        NEEDS_CADDY_RESTART=true
+    fi
+fi
+
+# Función helper: corre docker compose con env-file y captura errores.
+dc() {
+    (cd "$APP_DIR" && docker compose --env-file .env "$@")
+}
+
+if [[ "$NEEDS_API_REBUILD" == "true" ]]; then
+    echo "[deploy_safe] 🐳 cambios en API/deps detectados — rebuild api…"
+    write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_api\""
+    if ! dc up -d --build api; then
+        echo "[deploy_safe] ❌ rebuild api falló"
+        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"docker_api_build_failed\""
+        exit 1
+    fi
+    echo "[deploy_safe] ✅ api rebuildado"
+fi
+
+if [[ "$NEEDS_WEB_REBUILD" == "true" ]]; then
+    echo "[deploy_safe] 🐳 cambios en frontend detectados — rebuild web…"
+    write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_web\""
+    if ! dc up -d --build web; then
+        echo "[deploy_safe] ❌ rebuild web falló"
+        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"docker_web_build_failed\""
+        exit 1
+    fi
+    echo "[deploy_safe] ✅ web rebuildado"
+fi
+
+if [[ "$NEEDS_CADDY_RESTART" == "true" ]]; then
+    echo "[deploy_safe] 🐳 Caddyfile/compose modificado — restart caddy…"
+    if ! dc up -d caddy; then
+        echo "[deploy_safe] ⚠️ caddy restart falló — comprueba `docker compose logs caddy`"
+    else
+        echo "[deploy_safe] ✅ caddy reiniciado"
+    fi
+fi
+
+if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
+    # Tras los rebuilds, log un ps para auditoría
+    echo "[deploy_safe] estado containers tras rebuild:"
+    dc ps || true
 fi
 
 # ============================================================
