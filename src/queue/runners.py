@@ -1165,10 +1165,24 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
 }
 
 
+_MODE_TO_PROGRAM: dict[JobMode, str] = {
+    JobMode.PRESIDENTS: "creator_reward",
+    JobMode.PRONOSTICOS: "creator_reward",
+    JobMode.SUBS_AUTO: "creator_reward",
+    JobMode.COPYRIGHT: "creator_reward",
+    JobMode.TIKTOK_SHOP: "tiktok_shop",
+}
+
+
 def dispatch_job(job: Job) -> None:
     """Llamado por el worker thread del JobQueue. Orquesta el runner
     y rellena `job.result_path` o lanza excepción (que el worker
-    captura y marca como FAILED)."""
+    captura y marca como FAILED).
+
+    Envuelve la ejecución en `cost_tracking.start_job` + `finalize_and_persist`
+    para registrar el coste agregado del job en Redis. Las APIs externas
+    (OpenAI, MiniMax, Atlas) escriben sus líneas dentro del tracker via
+    contextvar."""
     runner = _RUNNERS.get(job.mode)
     if runner is None:
         raise RuntimeError(f"Modo desconocido: {job.mode}")
@@ -1184,8 +1198,30 @@ def dispatch_job(job: Job) -> None:
         if label:
             job.progress_label = label
 
-    result_path = runner(job, _on_log, _on_progress)
-    job.result_path = result_path
+    # Activar cost tracking. NUNCA falla — si Redis no está, simplemente
+    # no persiste pero el runner sigue.
+    try:
+        from src import cost_tracking
+        cost_tracking.start_job(
+            job_id=job.id,
+            program=_MODE_TO_PROGRAM.get(job.mode, "creator_reward"),
+            mode=job.mode.value,
+            user=job.enqueued_by,
+            product_id=job.params.get("product_id"),
+            title=job.title,
+        )
+    except Exception as e:
+        print(f"[dispatch] cost_tracking.start_job failed: {e}")
+
+    try:
+        result_path = runner(job, _on_log, _on_progress)
+        job.result_path = result_path
+    finally:
+        try:
+            from src import cost_tracking
+            cost_tracking.finalize_and_persist()
+        except Exception as e:
+            print(f"[dispatch] cost_tracking.finalize failed: {e}")
 
 
 # ============================================================

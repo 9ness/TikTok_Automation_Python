@@ -46,6 +46,18 @@ class VideoRemover:
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": f"Summarize this into a VIRAL HOOK phrase in ENGLISH (max 5 words, clear, uppercase): '{intro_text}'"}]
             )
+            try:
+                from src import cost_tracking
+                usage = getattr(res_en, "usage", None)
+                if usage:
+                    cost_tracking.record_openai_chat(
+                        input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+                        output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+                        model="gpt-4o-mini",
+                        detail="hook copyright",
+                    )
+            except Exception:
+                pass
             self.cached_hook = res_en.choices[0].message.content.strip().replace('"', '').upper()
             return self.cached_hook
         except:
@@ -152,12 +164,23 @@ class VideoRemover:
             
             with open(temp_audio, "rb") as audio_file:
                 response = self.client.audio.transcriptions.create(
-                    file=audio_file, 
-                    model="whisper-1", 
-                    response_format="verbose_json", 
+                    file=audio_file,
+                    model="whisper-1",
+                    response_format="verbose_json",
                     timestamp_granularities=["word"]
                 )
-            
+
+            # Cost tracking — Whisper se factura por segundo de audio
+            try:
+                from src import cost_tracking
+                duration = float(getattr(response, "duration", 0) or 0)
+                if duration > 0:
+                    cost_tracking.record_openai_whisper(
+                        audio_seconds=duration, detail="whisper-1 transcribe",
+                    )
+            except Exception:
+                pass
+
             if not response or not hasattr(response, 'words') or response.words is None:
                 raise ValueError("La API de Whisper devolvió una respuesta vacía o sin palabras.")
                 

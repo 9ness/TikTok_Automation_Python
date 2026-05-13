@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Download, ExternalLink, Film, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
+/** Volumen por defecto al abrir el modal (15%). El usuario puede subirlo
+ *  en los controles del player si quiere. */
+const DEFAULT_VOLUME = 0.15;
 
 /**
  * Modal de vídeo TOTALMENTE custom (sin Radix Dialog) para garantizar
@@ -33,6 +37,16 @@ export function VideoModal({
   const driveSearchUrl = filename
     ? `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`
     : null;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Volumen por defecto al abrir. Se aplica en cuanto el video monta y
+  // cada vez que se reabre — el atributo `volume` HTML no es respetado
+  // por todos los browsers, hay que setearlo vía JS sobre el elemento.
+  useEffect(() => {
+    if (!open) return;
+    const v = videoRef.current;
+    if (v) v.volume = DEFAULT_VOLUME;
+  }, [open, videoUrl]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -109,10 +123,17 @@ export function VideoModal({
         {videoUrl ? (
           <div className="overflow-hidden rounded-md bg-black">
             <video
+              ref={videoRef}
               src={videoUrl}
               controls
               preload="metadata"
               playsInline
+              onLoadedMetadata={(e) => {
+                // Defensa adicional por si el useEffect corre antes que el
+                // metadata cargue (en algunos navegadores `volume` antes de
+                // loadedmetadata no persiste).
+                (e.currentTarget as HTMLVideoElement).volume = DEFAULT_VOLUME;
+              }}
               className="w-full"
               style={{ aspectRatio: "9 / 16", display: "block" }}
             />

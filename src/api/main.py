@@ -6,6 +6,18 @@ Arrancar en local con:
 
 from __future__ import annotations
 
+# ============================================================
+# Compat patch: moviepy 1.0.3 usa `Image.ANTIALIAS` que Pillow 10+ eliminó.
+# El equivalente moderno es `Image.LANCZOS`. Hay que parchearlo ANTES de
+# importar moviepy (que se carga indirectamente por los runners). El mismo
+# parche existe en main.py (Streamlit). Sin esto, render de Presidentes
+# falla con `module 'PIL.Image' has no attribute 'ANTIALIAS'` y los vídeos
+# salen de 4-8s solo con la intro.
+# ============================================================
+import PIL.Image  # noqa: E402
+if not hasattr(PIL.Image, "ANTIALIAS"):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS  # type: ignore[attr-defined]
+
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator

@@ -384,9 +384,23 @@ def generate_script(user_topic=None, creative_mode=False, title_prefix="The 5", 
             ],
             response_format={ "type": "json_object" }
         )
-        
+
+        # Cost tracking
+        try:
+            from src import cost_tracking
+            usage = getattr(response, "usage", None)
+            if usage:
+                cost_tracking.record_openai_chat(
+                    input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+                    output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+                    model=model,
+                    detail="guion presidents",
+                )
+        except Exception:
+            pass
+
         text_response = response.choices[0].message.content
-        
+
         # 4. Limpieza y Parseo de JSON
         script_data = json.loads(text_response)
         return script_data

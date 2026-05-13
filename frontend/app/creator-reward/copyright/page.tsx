@@ -224,6 +224,9 @@ export default function CopyrightPage() {
                   controls
                   preload="metadata"
                   playsInline
+                  onLoadedMetadata={(e) => {
+                    (e.currentTarget as HTMLVideoElement).volume = 0.15;
+                  }}
                   className="w-full"
                   style={{ aspectRatio: "9 / 16", display: "block" }}
                 />

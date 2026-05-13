@@ -232,6 +232,14 @@ Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop
   Redis, logging). Cualquier cambio en un programa no debe romper el otro.
 - **System prompts en archivos `.md`**: todos los prompts de TikTok Shop viven
   en `src/tiktok_shop/prompts/*.md`, NUNCA hardcoded en el código.
+- **Cost tracking obligatorio**: TODA llamada a API externa con coste (OpenAI,
+  MiniMax, Atlas Cloud, …) debe pasar por un `record_*` de
+  [`src/cost_tracking.py`](src/cost_tracking.py). El runner ya envuelve cada
+  job con `start_job`/`finalize_and_persist` vía `dispatch_job`. Al añadir
+  un MODO o API nueva: (1) si la API no existe aún, añade tarifa + helper
+  `record_<api>` con la tarifa vigente; (2) llama al helper justo tras el
+  response real (con tokens/chars/segundos reales del provider). El panel
+  `/costs` mostrará el desglose automáticamente — no hace falta tocar UI.
 
 ---
 

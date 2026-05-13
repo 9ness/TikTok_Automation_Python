@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Crown,
+  DollarSign,
   History,
   LayoutDashboard,
   Loader2,
@@ -74,6 +75,10 @@ const NAV: NavGroup[] = [
       { href: "/tiktok-shop/history", label: "Histórico", icon: History },
       { href: "/tiktok-shop/voices", label: "Voces", icon: Mic },
     ],
+  },
+  {
+    kind: "single",
+    item: { href: "/costs", label: "Costes", icon: DollarSign },
   },
   {
     kind: "single",

@@ -68,8 +68,13 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
 
-# 2 workers por defecto. Para máquinas pequeñas (CX22) ajustar a 1.
-ENV API_WORKERS=2 \
+# 1 worker — CRÍTICO: la `JobQueue` es un singleton en memoria del proceso
+# Python con threads que dispatchean los jobs. Si hay >1 worker uvicorn,
+# cada uno tiene SU PROPIA cola: enqueue puede caer en worker A pero el
+# WebSocket conectado al worker B no ve el job nuevo hasta recargar (y a
+# veces ni eso). Para soportar multi-worker habría que mover el estado a
+# Redis (refactor mayor). Para esta app de un usuario, 1 worker basta.
+ENV API_WORKERS=1 \
     API_HOST=0.0.0.0 \
     API_PORT=8000
 

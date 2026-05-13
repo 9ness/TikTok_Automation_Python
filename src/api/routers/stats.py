@@ -38,6 +38,7 @@ from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 from src.tiktok_shop.models import VideoGeneration
 from src.tiktok_shop.repos import GenerationRepo
+from src import cost_tracking
 
 
 router = APIRouter(
@@ -45,6 +46,42 @@ router = APIRouter(
     tags=["stats"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+@router.get("/jobs")
+def list_jobs_with_costs(
+    month: Annotated[str | None, Query(description="YYYY-MM")] = None,
+    program: Annotated[str | None, Query(description="creator_reward | tiktok_shop")] = None,
+    mode: Annotated[str | None, Query(description="presidents | pronosticos | copyright | subs_auto | tiktok_shop")] = None,
+    user: Annotated[str | None, Query()] = None,
+    product_id: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> dict:
+    """Lista jobs (con su breakdown de coste) filtrados + agregado summary.
+
+    Lee del módulo `src/cost_tracking.py`, que persiste cada job
+    finalizado en Redis con su lista de líneas (OpenAI, MiniMax, Atlas).
+    """
+    jobs = cost_tracking.list_jobs(
+        month=month,
+        program=program,
+        mode=mode,
+        user=user,
+        product_id=product_id,
+        limit=limit,
+    )
+    summary = cost_tracking.aggregate_summary(jobs)
+    return {
+        "month": month or _current_month_str(),
+        "filters": {
+            "program": program,
+            "mode": mode,
+            "user": user,
+            "product_id": product_id,
+        },
+        "summary": summary,
+        "jobs": jobs,
+    }
 
 
 def _current_month_str() -> str:

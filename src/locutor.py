@@ -92,11 +92,19 @@ def generate_audios_from_text_folder(txt_folder_path, output_base_path, voice_id
                     if "data" in response_data and "audio" in response_data["data"]:
                         hex_audio = response_data["data"]["audio"]
                         audio_bytes = bytes.fromhex(hex_audio)
-                        
+
                         mp3_path = os.path.join(full_output_path, f"{name_no_ext}.mp3")
                         with open(mp3_path, "wb") as f_out:
                             f_out.write(audio_bytes)
                         print(f"   ✅ Generado: {filename}")
+                        # Cost tracking — no rompe el flow si Redis no está
+                        try:
+                            from src import cost_tracking
+                            cost_tracking.record_minimax_tts(
+                                chars=len(text_content), voice=VOICE_ID,
+                            )
+                        except Exception:
+                            pass
                         break # Success, break retry loop!
                     else:
                         print(f"⚠️ JSON incompleto: {response_data}")
@@ -176,6 +184,11 @@ def generate_single_audio(text, output_mp3_path, voice_id_override=None):
                     with open(output_mp3_path, "wb") as f_out:
                         f_out.write(audio_bytes)
                     print(f"✅ TTS OK ({len(audio_bytes)} bytes)")
+                    try:
+                        from src import cost_tracking
+                        cost_tracking.record_minimax_tts(chars=len(text), voice=VOICE_ID)
+                    except Exception:
+                        pass
                     return output_mp3_path
                 raise Exception(f"JSON incompleto: {response_data}")
             raise Exception(f"Fallo MiniMax: {base_resp}")
