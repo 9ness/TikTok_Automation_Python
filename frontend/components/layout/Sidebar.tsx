@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +10,7 @@ import {
   Crown,
   History,
   LayoutDashboard,
+  Loader2,
   Menu,
   Mic,
   Package,
@@ -29,9 +29,9 @@ import { Button } from "@/components/ui/button";
 import { QueueBadge } from "@/components/queue/QueueBadge";
 import { DiagnosticsPanel } from "@/components/layout/DiagnosticsPanel";
 import { ThemeToggle } from "./ThemeToggle";
-import { useMe } from "@/lib/queries/auth";
+import { useLogout, useMe } from "@/lib/queries/auth";
 import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
-import { User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -108,14 +108,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="flex h-20 items-center gap-3 border-b px-5">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/brand/logo.png"
           alt="NebulabsAI"
           width={36}
           height={36}
           className="rounded-md"
-          unoptimized
-          priority
         />
         <div className="leading-tight">
           <p className="brand-gradient-text text-base font-bold tracking-tight">
@@ -191,6 +190,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 function SidebarUserBadge() {
   const me = useMe();
+  const logout = useLogout();
   const username = me.data?.username;
   if (!username) return null;
   return (
@@ -198,6 +198,20 @@ function SidebarUserBadge() {
       <User className="h-3.5 w-3.5 text-brand-cyan" strokeWidth={2} />
       <span className="text-muted-foreground">Conectado:</span>
       <span className="font-semibold">{username}</span>
+      <button
+        type="button"
+        onClick={() => logout.mutate()}
+        disabled={logout.isPending}
+        className="ml-auto rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-destructive disabled:opacity-50"
+        title="Cerrar sesión"
+        aria-label="Cerrar sesión"
+      >
+        {logout.isPending ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <LogOut className="h-3 w-3" strokeWidth={2} />
+        )}
+      </button>
     </div>
   );
 }
@@ -260,13 +274,13 @@ export function Sidebar() {
       {/* Mobile trigger + drawer */}
       <div className="flex h-14 items-center justify-between border-b px-4 md:hidden">
         <div className="flex items-center gap-2">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/brand/logo.png"
             alt="NebulabsAI"
             width={28}
             height={28}
             className="rounded"
-            unoptimized
           />
           <span className="brand-gradient-text text-sm font-bold">NebulabsAI</span>
         </div>

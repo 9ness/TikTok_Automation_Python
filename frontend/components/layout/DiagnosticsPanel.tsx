@@ -283,6 +283,11 @@ function DeployState({
     status.started_at && status.finished_at
       ? `${Math.max(0, status.finished_at - status.started_at)}s`
       : null;
+  // Timestamp absoluto del último cambio de estado. Se prefiere `finished_at`
+  // (deploy ya completado/fallado); en `running` cae a `updated_at` o
+  // `started_at` para mostrar al menos "cuándo empezó".
+  const eventTs =
+    status.finished_at ?? status.updated_at ?? status.started_at ?? null;
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between">
@@ -291,6 +296,12 @@ function DeployState({
           {state}
         </span>
       </div>
+      {eventTs && (
+        <KV
+          label={state === "running" ? "empezó" : "cuándo"}
+          value={formatRelativeTimestamp(eventTs)}
+        />
+      )}
       {status.current_sha && (
         <KV label="commit" value={<span className="font-mono">{status.current_sha}</span>} />
       )}
@@ -315,4 +326,30 @@ function DeployState({
       )}
     </div>
   );
+}
+
+/** "hoy 14:35", "ayer 09:12", "lun 14:00", "12/05 14:35" según antigüedad. */
+function formatRelativeTimestamp(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  const time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  if (sameDay) return `hoy ${time}`;
+  if (isYesterday) return `ayer ${time}`;
+  if (diffDays < 7) {
+    const wd = d.toLocaleDateString("es-ES", { weekday: "short" });
+    return `${wd} ${time}`;
+  }
+  const date = d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+  return `${date} ${time}`;
 }

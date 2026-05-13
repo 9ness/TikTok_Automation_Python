@@ -57,6 +57,9 @@ async function request<T>(
     method,
     headers,
     body: payload,
+    // Mandar cookies en cross-origin (auth login + me). El backend tiene
+    // CORS con `allow_credentials=True`.
+    credentials: "include",
     ...init,
   });
 

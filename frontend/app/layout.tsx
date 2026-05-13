@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Rubik } from "next/font/google";
 
 import "./globals.css";
+import { LoginGate } from "@/components/layout/LoginModal";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "./providers";
 
@@ -24,10 +25,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={rubik.variable} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
         <Providers>
-          <div className="flex min-h-screen flex-col md:flex-row">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto bg-background">{children}</main>
-          </div>
+          <LoginGate>
+            <div className="flex min-h-screen flex-col md:flex-row">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto bg-background">{children}</main>
+            </div>
+          </LoginGate>
         </Providers>
       </body>
     </html>

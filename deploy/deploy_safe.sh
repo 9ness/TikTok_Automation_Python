@@ -104,6 +104,34 @@ done
 cd "$APP_DIR" || { echo "[deploy_safe] ❌ no existe $APP_DIR"; exit 1; }
 
 git fetch --quiet origin
+
+# Safety net: si por algún deploy anterior (con el commit+push del bump
+# VERSION) quedó un commit local "ahead" de origin que no se pudo pushear,
+# `git pull --ff-only` fallará. Detectamos y descartamos los commits
+# locales SI Y SOLO SI todos son del auto-deploy (autor=auto-deploy) y
+# tocan exclusivamente el archivo VERSION — no toca commits manuales.
+LOCAL_AHEAD=$(git rev-list origin/main..HEAD --oneline 2>/dev/null | wc -l)
+if [[ "$LOCAL_AHEAD" -gt 0 ]]; then
+    echo "[deploy_safe] detectados ${LOCAL_AHEAD} commit(s) locales ahead de origin/main"
+    ALL_AUTO=1
+    while IFS= read -r sha; do
+        author=$(git log -1 --format='%an' "$sha" 2>/dev/null)
+        files=$(git show --name-only --format= "$sha" 2>/dev/null | tr '\n' ' ')
+        if [[ "$author" != "auto-deploy" ]] || [[ "$(echo "$files" | xargs)" != "VERSION" ]]; then
+            ALL_AUTO=0
+            break
+        fi
+    done < <(git rev-list origin/main..HEAD)
+    if [[ $ALL_AUTO -eq 1 ]]; then
+        echo "[deploy_safe] todos son commits auto-deploy de VERSION → reset a origin/main"
+        git reset --hard origin/main --quiet || true
+    else
+        echo "[deploy_safe] ⚠️ hay commits locales NO auto — abortando para no perderlos"
+        write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"local_commits_ahead\""
+        exit 1
+    fi
+fi
+
 LOCAL_SHA=$(git rev-parse HEAD)
 REMOTE_SHA=$(git rev-parse origin/main)
 
@@ -174,16 +202,12 @@ BUMP_TYPE=$(determine_bump "$COMMITS_BETWEEN")
 if [[ "$BUMP_TYPE" != "none" ]]; then
     NEW_VERSION=$(bump_version "$CURRENT_VERSION" "$BUMP_TYPE")
     echo "[deploy_safe] versión: ${CURRENT_VERSION} → ${NEW_VERSION} (bump=${BUMP_TYPE})"
-    echo "$NEW_VERSION" > "$VERSION_FILE"
-    # Commit + push del bump (skip CI para no re-disparar el webhook).
-    if git -C "$APP_DIR" add VERSION 2>/dev/null && \
-       git -C "$APP_DIR" -c user.email="deploy@nebulabs.local" \
-                        -c user.name="auto-deploy" \
-                        commit -m "chore(release): v${NEW_VERSION} [skip ci]" --quiet 2>/dev/null; then
-        # Push best-effort: si falla (no permission), no rompe el deploy.
-        git -C "$APP_DIR" push --quiet origin main 2>/dev/null \
-            || echo "[deploy_safe] ⚠️ no se pudo push del bump VERSION (sigue local)"
-    fi
+    # Sobrescribe el archivo IN-PLACE (mismo inode → el bind-mount Docker
+    # ve el cambio sin restart). NO commiteamos a git: el VERSION es un
+    # estado local del servidor que evoluciona con cada deploy; meterlo
+    # en git crearía divergencia entre local/origin y rompería el siguiente
+    # `git pull --ff-only`.
+    printf "%s\n" "$NEW_VERSION" > "$VERSION_FILE"
 else
     NEW_VERSION="$CURRENT_VERSION"
     echo "[deploy_safe] commits no triggerean bump (versión sigue ${NEW_VERSION})"
