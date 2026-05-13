@@ -31,8 +31,6 @@ Documentación obligatoria para AÑADIR un nuevo modo o API:
 
 from __future__ import annotations
 
-import json
-import os
 import time
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
@@ -267,6 +265,93 @@ def finalize_and_persist() -> JobCost | None:
 # ---------------------------------------------------------------------------
 # Read API — usado por el endpoint /api/v1/stats/jobs
 # ---------------------------------------------------------------------------
+def _list_tiktok_shop_legacy(
+    *,
+    month: str | None,
+    user: str | None,
+    product_id: str | None,
+    limit: int,
+) -> list[dict]:
+    """Lee `VideoGeneration` históricas de TikTok Shop y las convierte al
+    formato unificado. Esto es para que el panel `/costs` muestre datos
+    pre-existentes sin tener que migrar storage."""
+    try:
+        from src.tiktok_shop.repos.redis_base import get_shop_redis
+        from src.tiktok_shop.repos.generation_repo import GenerationRepo
+        repo = GenerationRepo(get_shop_redis())
+        gens = repo.list_recent(limit=limit * 2)
+    except Exception as e:
+        print(f"[cost_tracking] legacy load fail: {e}")
+        return []
+
+    out: list[dict] = []
+    for g in gens:
+        if g.deleted:
+            continue
+        if user and g.user_id != user:
+            continue
+        if product_id and g.product_id != product_id:
+            continue
+        # Filtro de mes por created_at (ISO string).
+        if month and g.created_at:
+            try:
+                if not g.created_at.startswith(month):
+                    continue
+            except Exception:
+                pass
+        cost = g.cost
+        lines = []
+        if cost.video_generation:
+            lines.append({
+                "kind": "atlas_cloud",
+                "units": 0,
+                "unit_label": "seconds",
+                "cost_usd": float(cost.video_generation),
+                "detail": f"tier={g.tier_used}",
+            })
+        if cost.voice_tts:
+            lines.append({
+                "kind": "minimax_tts",
+                "units": 0,
+                "unit_label": "chars",
+                "cost_usd": float(cost.voice_tts),
+                "detail": None,
+            })
+        if cost.other:
+            lines.append({
+                "kind": "other",
+                "units": 0,
+                "unit_label": "",
+                "cost_usd": float(cost.other),
+                "detail": None,
+            })
+        out.append({
+            "job_id": g.id,
+            "program": "tiktok_shop",
+            "mode": "tiktok_shop",
+            "user": g.user_id,
+            "product_id": g.product_id,
+            "title": f"{g.tier_used} · {g.user_id}/{g.product_id}",
+            "started_at": _iso_to_ts(g.created_at),
+            "finished_at": _iso_to_ts(g.completed_at),
+            "lines": lines,
+            "total_usd": float(cost.total or 0.0),
+        })
+    return out
+
+
+def _iso_to_ts(iso: str | None) -> float:
+    if not iso:
+        return 0.0
+    try:
+        from datetime import datetime
+        # Normaliza el sufijo Z → +00:00 para fromisoformat
+        s = iso.replace("Z", "+00:00")
+        return datetime.fromisoformat(s).timestamp()
+    except Exception:
+        return 0.0
+
+
 def list_jobs(
     *,
     month: str | None = None,
@@ -277,33 +362,58 @@ def list_jobs(
     limit: int = 500,
 ) -> list[dict]:
     """Devuelve hasta `limit` JobCosts del mes filtrados. Si `month=None`
-    usa el mes actual UTC."""
-    redis = _redis()
-    if redis is None:
-        return []
+    usa el mes actual UTC.
+
+    Combina dos fuentes:
+      1. Jobs registrados por el nuevo `cost_tracking` (Creator Reward +
+         futuros TikTok Shop tras el deploy).
+      2. `VideoGeneration` históricas de TikTok Shop (read-only legacy)
+         convertidas al mismo shape — para que el panel muestre datos
+         que ya existían antes del nuevo sistema.
+    """
     if month is None:
         month = datetime.now(timezone.utc).strftime("%Y-%m")
 
-    # 1. Recoger candidates: por programa/mes o por user/product (interseca después).
-    idx_key = f"cost:index:{program or 'all'}:{month}"
-    ids: list[str] = redis.lrange(idx_key, 0, limit * 2)
-
-    if user:
-        user_set = set(redis.smembers(f"cost:by_user:{user}"))
-        ids = [i for i in ids if i in user_set]
-    if product_id:
-        prod_set = set(redis.smembers(f"cost:by_product:{product_id}"))
-        ids = [i for i in ids if i in prod_set]
-
     out: list[dict] = []
-    for job_id in ids[:limit]:
-        raw = redis.get_json(f"cost:job:{job_id}")
-        if not raw:
-            continue
-        if mode and raw.get("mode") != mode:
-            continue
-        out.append(raw)
-    return out
+    redis = _redis()
+
+    # Fuente 1: nuevo sistema (Redis cost:job:*).
+    if redis is not None:
+        idx_key = f"cost:index:{program or 'all'}:{month}"
+        ids: list[str] = redis.lrange(idx_key, 0, limit * 2)
+        if user:
+            user_set = set(redis.smembers(f"cost:by_user:{user}"))
+            ids = [i for i in ids if i in user_set]
+        if product_id:
+            prod_set = set(redis.smembers(f"cost:by_product:{product_id}"))
+            ids = [i for i in ids if i in prod_set]
+        for job_id in ids[:limit]:
+            raw = redis.get_json(f"cost:job:{job_id}")
+            if not raw:
+                continue
+            if mode and raw.get("mode") != mode:
+                continue
+            out.append(raw)
+
+    # Fuente 2: TikTok Shop legacy (VideoGeneration). Se omite si el filtro
+    # de programa es explícitamente "creator_reward".
+    if program != "creator_reward":
+        legacy = _list_tiktok_shop_legacy(
+            month=month, user=user, product_id=product_id, limit=limit,
+        )
+        # Evitar duplicados si el mismo job_id ya está en `out` (no debería,
+        # pero por si en el futuro se persisten en ambos sitios).
+        seen = {j["job_id"] for j in out}
+        for j in legacy:
+            if j["job_id"] in seen:
+                continue
+            if mode and mode != "tiktok_shop":
+                continue
+            out.append(j)
+
+    # Ordenar por started_at desc + cap a limit.
+    out.sort(key=lambda j: j.get("started_at") or 0, reverse=True)
+    return out[:limit]
 
 
 def aggregate_summary(jobs: list[dict]) -> dict[str, Any]:

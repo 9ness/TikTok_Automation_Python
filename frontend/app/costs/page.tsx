@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,19 +14,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useJobsWithCosts, type JobCost } from "@/lib/queries/costs";
+import { useProducts } from "@/lib/queries/products";
+import { useUser, useUsers } from "@/lib/queries/users";
 
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-const PROGRAMS = [
+type Program = "all" | "creator_reward" | "tiktok_shop";
+
+const PROGRAMS: { value: Program; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "creator_reward", label: "Creator Reward" },
   { value: "tiktok_shop", label: "TikTok Shop" },
 ];
 
-const MODES_BY_PROGRAM: Record<string, { value: string; label: string }[]> = {
+const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
   all: [],
   creator_reward: [
     { value: "presidents", label: "Presidentes Top 5" },
@@ -37,19 +41,61 @@ const MODES_BY_PROGRAM: Record<string, { value: string; label: string }[]> = {
   tiktok_shop: [{ value: "tiktok_shop", label: "TikTok Shop" }],
 };
 
+// Operadores Creator Reward (los que pueden encolar jobs). Si en el futuro
+// el `/auth/me` devuelve `available_users`, podríamos cargarlos de ahí.
+const CR_OPERATORS = ["ness", "buga"];
+
 export default function CostsPage() {
   const [month, setMonth] = useState<string>(currentMonth());
-  const [program, setProgram] = useState<string>("all");
+  const [program, setProgram] = useState<Program>("all");
   const [mode, setMode] = useState<string>("all");
-  const [user, setUser] = useState<string>("");
-  const [productId, setProductId] = useState<string>("");
+  // Para creator_reward: operador (ness/buga). Para tiktok_shop: username TT Shop.
+  const [crOperator, setCrOperator] = useState<string>("all");
+  const [shopUser, setShopUser] = useState<string>("all");
+  const [productId, setProductId] = useState<string>("all");
+
+  // Datos para los dropdowns
+  const shopUsers = useUsers({ limit: 100 });
+  const selectedUser = useUser(shopUser !== "all" ? shopUser : undefined);
+  const allProducts = useProducts({ limit: 200 });
+
+  // Productos del user seleccionado (cascada). Si "all" → todos.
+  const productsForUser = useMemo(() => {
+    const all = allProducts.data?.items ?? [];
+    if (shopUser === "all") return all;
+    const assigned = new Set(selectedUser.data?.assigned_products ?? []);
+    return all.filter((p) => assigned.has(p.id));
+  }, [allProducts.data, selectedUser.data, shopUser]);
+
+  // Reset de filtros dependientes cuando cambia el programa.
+  function handleProgramChange(p: Program) {
+    setProgram(p);
+    setMode("all");
+    setCrOperator("all");
+    setShopUser("all");
+    setProductId("all");
+  }
+
+  // Calcular `user` y `product_id` que se mandan al backend según el programa.
+  const filterUser =
+    program === "tiktok_shop"
+      ? shopUser !== "all"
+        ? shopUser
+        : undefined
+      : program === "creator_reward"
+        ? crOperator !== "all"
+          ? crOperator
+          : undefined
+        : undefined;
+  const filterProductId =
+    program === "tiktok_shop" && productId !== "all" ? productId : undefined;
 
   const q = useJobsWithCosts({
     month,
     program: program === "all" ? undefined : program,
     mode: mode === "all" ? undefined : mode,
-    user: user.trim() || undefined,
-    product_id: productId.trim() || undefined,
+    user: filterUser,
+    product_id: filterProductId,
   });
 
   const data = q.data;
@@ -63,21 +109,20 @@ export default function CostsPage() {
         </p>
       </header>
 
-      {/* Filtros */}
+      {/* Filtros — adaptables al programa seleccionado */}
       <Card>
         <CardContent className="grid gap-3 p-3 md:grid-cols-5">
-          <div className="space-y-1">
-            <Label className="text-xs">Mes</Label>
+          <FilterField label="Mes">
             <Input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
               className="h-9"
             />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Programa</Label>
-            <Select value={program} onValueChange={(v) => { setProgram(v); setMode("all"); }}>
+          </FilterField>
+
+          <FilterField label="Programa">
+            <Select value={program} onValueChange={(v) => handleProgramChange(v as Program)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PROGRAMS.map((p) => (
@@ -85,11 +130,13 @@ export default function CostsPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Modo</Label>
+          </FilterField>
+
+          <FilterField label="Modo">
             <Select value={mode} onValueChange={setMode} disabled={program === "all"}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 {(MODES_BY_PROGRAM[program] ?? []).map((m) => (
@@ -97,25 +144,87 @@ export default function CostsPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Usuario</Label>
-            <Input
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              placeholder="ness / buga / @user"
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Producto (TT Shop)</Label>
-            <Input
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              placeholder="product_id"
-              className="h-9"
-            />
-          </div>
+          </FilterField>
+
+          {/* Usuario — UI distinta según programa */}
+          {program === "tiktok_shop" ? (
+            <FilterField label="Usuario (TT Shop)">
+              <Select
+                value={shopUser}
+                onValueChange={(v) => {
+                  setShopUser(v);
+                  setProductId("all");
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {(shopUsers.data?.items ?? []).map((u) => (
+                    <SelectItem key={u.username} value={u.username}>
+                      @{u.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          ) : program === "creator_reward" ? (
+            <FilterField label="Operador">
+              <Select value={crOperator} onValueChange={setCrOperator}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {CR_OPERATORS.map((u) => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          ) : (
+            <FilterField label="Usuario">
+              <Select disabled value="all" onValueChange={() => {}}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Elige programa" />
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </FilterField>
+          )}
+
+          {/* Producto — solo TT Shop, cascada del user */}
+          {program === "tiktok_shop" ? (
+            <FilterField label="Producto">
+              <Select
+                value={productId}
+                onValueChange={setProductId}
+                disabled={shopUser !== "all" && productsForUser.length === 0}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {productsForUser.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          ) : (
+            <FilterField label="Producto">
+              <Select disabled value="all" onValueChange={() => {}}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </FilterField>
+          )}
         </CardContent>
       </Card>
 
@@ -153,7 +262,6 @@ export default function CostsPage() {
             className="!grid-cols-1"
           />
 
-          {/* Tabla de jobs */}
           <Card>
             <CardContent className="p-0">
               <div className="border-b px-4 py-2 text-sm font-semibold">
@@ -188,6 +296,21 @@ export default function CostsPage() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      {children}
     </div>
   );
 }
@@ -242,9 +365,11 @@ function BreakdownCard({
 
 function JobRow({ j }: { j: JobCost }) {
   const [open, setOpen] = useState(false);
-  const date = new Date(j.started_at * 1000).toLocaleString("es-ES", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
+  const date = j.started_at
+    ? new Date(j.started_at * 1000).toLocaleString("es-ES", {
+        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+      })
+    : "—";
   return (
     <>
       <tr className="border-b cursor-pointer hover:bg-accent/30" onClick={() => setOpen(!open)}>
