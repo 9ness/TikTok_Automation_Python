@@ -1,6 +1,14 @@
 "use client";
 
-import { Loader2, Plus, Trash2, Users as UsersIcon } from "lucide-react";
+import {
+  FolderOpen,
+  Inbox,
+  Loader2,
+  Plus,
+  Trash2,
+  Users as UsersIcon,
+  Wand2,
+} from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +21,15 @@ import {
   useCreateEditorUser,
   useDeleteEditorUser,
   useEditorUsers,
+  useUserFolderCounts,
 } from "@/lib/queries/editor-auto";
 import type { EditorUser } from "@/lib/types/editor-auto";
+import { cn } from "@/lib/utils";
 
 import { UserFlowEditor } from "./_components/UserFlowEditor";
+import { UserFoldersPanel } from "./_components/UserFoldersPanel";
+
+type RightTab = "flow" | "folders";
 
 export default function EditorAutoUsersPage() {
   const users = useEditorUsers();
@@ -27,6 +40,7 @@ export default function EditorAutoUsersPage() {
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [rightTab, setRightTab] = useState<RightTab>("flow");
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -144,14 +158,49 @@ export default function EditorAutoUsersPage() {
           </Card>
         </div>
 
-        {/* Columna derecha: editor de flujo del usuario seleccionado */}
-        <div>
+        {/* Columna derecha: tabs Flujo / Carpetas del usuario seleccionado */}
+        <div className="space-y-3">
           {selectedUserId ? (
-            <UserFlowEditor userId={selectedUserId} />
+            <>
+              <div className="flex gap-1.5 rounded-md border bg-card/30 p-1">
+                <button
+                  type="button"
+                  onClick={() => setRightTab("flow")}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm transition-colors",
+                    rightTab === "flow"
+                      ? "bg-background font-medium shadow"
+                      : "text-muted-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Flujo de herramientas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightTab("folders")}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm transition-colors",
+                    rightTab === "folders"
+                      ? "bg-background font-medium shadow"
+                      : "text-muted-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Carpetas
+                </button>
+              </div>
+              {rightTab === "flow" ? (
+                <UserFlowEditor userId={selectedUserId} />
+              ) : (
+                <UserFoldersPanel userId={selectedUserId} />
+              )}
+            </>
           ) : (
             <Card>
               <CardContent className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                Selecciona un usuario para editar su flujo de herramientas.
+                Selecciona un usuario para editar su flujo o gestionar sus
+                carpetas.
               </CardContent>
             </Card>
           )}
@@ -173,6 +222,12 @@ function UserListItem({
   onDelete: () => void;
 }) {
   const toolCount = user.tool_flow.filter((s) => s.enabled).length;
+  // Conteos de carpetas — solo el endpoint de counts, refresca cada 30s.
+  // Si el endpoint falla (server no actualizado) el badge no aparece y el
+  // listado sigue funcionando.
+  const counts = useUserFolderCounts(user.id);
+  const entrada = counts.data?.counts.entrada ?? 0;
+  const salida = counts.data?.counts.salida ?? 0;
   return (
     <div
       className={`flex items-center gap-2 rounded-md border p-2 text-sm transition-colors ${
@@ -184,9 +239,22 @@ function UserListItem({
         className="flex-1 text-left"
         onClick={onSelect}
       >
-        <div className="font-medium">{user.display_name || user.name}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{user.display_name || user.name}</span>
+          {entrada > 0 && (
+            <Badge
+              variant="default"
+              className="gap-1 bg-amber-500/90 px-1.5 text-[10px] text-black hover:bg-amber-500"
+              title={`${entrada} vídeo(s) en entrada — pendiente(s) de encolar`}
+            >
+              <Inbox className="h-2.5 w-2.5" />
+              {entrada}
+            </Badge>
+          )}
+        </div>
         <div className="text-xs text-muted-foreground">
           <code>{user.name}</code> · {toolCount} tool(s)
+          {salida > 0 && ` · ${salida} en salida`}
         </div>
       </button>
       <Badge variant="outline" className="text-xs">

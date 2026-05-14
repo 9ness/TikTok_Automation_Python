@@ -8,13 +8,22 @@ import type {
   EditorUser,
   EditorUserCreateInput,
   EditorUserUpdateInput,
+  EnqueueFromEntradaInput,
+  EnqueueFromEntradaResponse,
+  FolderName,
+  GlobalFolderCountsResponse,
+  MoveFileInput,
+  MoveFileResponse,
   ToolDescriptor,
+  UserFolderCountsResponse,
+  UserFoldersResponse,
 } from "@/lib/types/editor-auto";
 
 const USERS_ROOT = "/api/v1/editor-auto/users";
 const TOOLS_ROOT = "/api/v1/editor-auto/tools";
 const ENQUEUE_ROOT = "/api/v1/editor-auto/enqueue";
 const STICKERS_ROOT = "/api/v1/editor-auto/stickers";
+const EDITOR_ROOT = "/api/v1/editor-auto";
 
 export const editorAutoKeys = {
   all: ["editor-auto"] as const,
@@ -22,6 +31,11 @@ export const editorAutoKeys = {
   user: (id: string) => [...editorAutoKeys.all, "user", id] as const,
   tools: () => [...editorAutoKeys.all, "tools"] as const,
   arrows: () => [...editorAutoKeys.all, "stickers", "arrows"] as const,
+  userFolders: (id: string) => [...editorAutoKeys.all, "user", id, "folders"] as const,
+  userFolderCounts: (id: string) =>
+    [...editorAutoKeys.all, "user", id, "folder-counts"] as const,
+  globalFolderCounts: () =>
+    [...editorAutoKeys.all, "folder-counts", "global"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -176,4 +190,113 @@ export function useEnqueueEditorAuto() {
       return api.post<EditorAutoEnqueueResponse>(ENQUEUE_ROOT, fd);
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Carpetas del usuario — entrada / cola / recuperacion / salida
+// ---------------------------------------------------------------------------
+/** Lista completa de las 4 carpetas con metadatos por archivo. */
+export function useUserFolders(userId: string | null | undefined) {
+  return useQuery<UserFoldersResponse>({
+    queryKey: editorAutoKeys.userFolders(userId ?? ""),
+    queryFn: () =>
+      api.get<UserFoldersResponse>(
+        `${USERS_ROOT}/${encodeURIComponent(userId!)}/folders`,
+      ),
+    enabled: Boolean(userId),
+    // refetchInterval lo decide cada componente con setRefetchInterval si quiere
+  });
+}
+
+/** Solo los 4 conteos. Más barato — pensado para badge de lista. */
+export function useUserFolderCounts(userId: string | null | undefined) {
+  return useQuery<UserFolderCountsResponse>({
+    queryKey: editorAutoKeys.userFolderCounts(userId ?? ""),
+    queryFn: () =>
+      api.get<UserFolderCountsResponse>(
+        `${USERS_ROOT}/${encodeURIComponent(userId!)}/folders/counts`,
+      ),
+    enabled: Boolean(userId),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Conteos agregados de TODOS los usuarios — badge global de la sidebar. */
+export function useGlobalFolderCounts() {
+  return useQuery<GlobalFolderCountsResponse>({
+    queryKey: editorAutoKeys.globalFolderCounts(),
+    queryFn: () =>
+      api.get<GlobalFolderCountsResponse>(`${EDITOR_ROOT}/folders/counts`),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+/** URL absoluta para servir un MP4 al `<video>` del preview. Auth dual. */
+export function userFilePreviewUrl(
+  userId: string,
+  folder: FolderName,
+  filename: string,
+): string {
+  const params = new URLSearchParams({ folder, filename });
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  if (apiKey) params.set("api_key", apiKey);
+  return `${api.baseUrl}${USERS_ROOT}/${encodeURIComponent(userId)}/folders/file/preview?${params.toString()}`;
+}
+
+export function useMoveUserFile(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<MoveFileResponse, Error, MoveFileInput>({
+    mutationFn: (input) =>
+      api.post<MoveFileResponse>(
+        `${USERS_ROOT}/${encodeURIComponent(userId)}/folders/move`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.userFolderCounts(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.globalFolderCounts() });
+    },
+  });
+}
+
+export function useDeleteUserFile(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { folder: FolderName; filename: string }>({
+    mutationFn: ({ folder, filename }) => {
+      const qs = new URLSearchParams({ folder, filename }).toString();
+      return api.del<void>(
+        `${USERS_ROOT}/${encodeURIComponent(userId)}/folders/file?${qs}`,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.userFolderCounts(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.globalFolderCounts() });
+    },
+  });
+}
+
+/** Encola un vídeo que ya está en `entrada/`. Backend mueve a `cola/`
+ *  y crea el job — más eficiente que upload tradicional. */
+export function useEnqueueFromEntrada(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<EnqueueFromEntradaResponse, Error, EnqueueFromEntradaInput>(
+    {
+      mutationFn: (input) =>
+        api.post<EnqueueFromEntradaResponse>(
+          `${USERS_ROOT}/${encodeURIComponent(userId)}/folders/enqueue`,
+          input,
+        ),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
+        qc.invalidateQueries({
+          queryKey: editorAutoKeys.userFolderCounts(userId),
+        });
+        qc.invalidateQueries({
+          queryKey: editorAutoKeys.globalFolderCounts(),
+        });
+      },
+    },
+  );
 }

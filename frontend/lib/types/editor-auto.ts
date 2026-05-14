@@ -62,3 +62,68 @@ export interface EditorAutoEnqueueResponse {
   user_name: string;
   tool_count: number;
 }
+
+// Las 4 carpetas que el cliente y el admin gestionan:
+//   entrada       — cliente deposita aquí
+//   cola          — vídeo bloqueado mientras procesa (admin no toca)
+//   recuperacion  — original tras procesado OK (re-editable)
+//   salida        — MP4 final que el cliente descarga
+export type FolderName = "entrada" | "cola" | "recuperacion" | "salida";
+
+export interface FolderFile {
+  filename: string;
+  folder: FolderName;
+  ext: string;
+  size_bytes: number;
+  modified_at: number; // epoch seconds
+}
+
+export interface FolderCounts {
+  entrada: number;
+  cola: number;
+  recuperacion: number;
+  salida: number;
+}
+
+export interface UserFoldersResponse {
+  user_id: string;
+  user_name: string;
+  folders: Record<FolderName, FolderFile[]>;
+  counts: FolderCounts;
+}
+
+export interface UserFolderCountsResponse {
+  user_id: string;
+  user_name: string;
+  counts: FolderCounts;
+}
+
+export interface GlobalFolderCountsResponse {
+  totals: FolderCounts;
+  by_user: UserFolderCountsResponse[];
+}
+
+export interface MoveFileInput {
+  src_folder: FolderName;
+  dst_folder: FolderName;
+  filename: string;
+}
+
+export interface MoveFileResponse {
+  filename_new: string;
+  src_folder: FolderName;
+  dst_folder: FolderName;
+  moved: boolean;
+}
+
+export interface EnqueueFromEntradaInput {
+  filename: string;
+  script?: string;
+}
+
+export interface EnqueueFromEntradaResponse {
+  job_id: string;
+  title: string;
+  filename: string;
+  moved: MoveFileResponse;
+}

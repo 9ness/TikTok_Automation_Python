@@ -58,8 +58,8 @@ def run_editor_auto_pipeline(
     on_log(f"[editor_auto] Job {job_id} · usuario '{user.name}' · "
            f"{len(enabled_steps)} herramienta(s)")
 
-    # Carpetas del usuario en Drive
-    _, _, out_folder = ensure_user_folders(user.name)
+    # Carpetas del usuario en Drive — 4 carpetas: entrada/cola/recuperacion/salida
+    _, _, _, _, out_folder = ensure_user_folders(user.name)
     on_log(f"[editor_auto] Output folder: {out_folder}")
 
     # Nombre versionado: <YYYY-MM-DD>_<HHMMSS>_<job_id>.mp4

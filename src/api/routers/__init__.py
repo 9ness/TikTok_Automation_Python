@@ -15,6 +15,7 @@ from .creator_reward import (
 )
 from .editor_auto import (
     enqueue_router as editor_auto_enqueue_router,
+    folders_router as editor_auto_folders_router,
     stickers_router as editor_auto_stickers_router,
     tools_router as editor_auto_tools_router,
     users_router as editor_auto_users_router,
@@ -48,6 +49,7 @@ __all__ = [
     "deploy_router",
     "diagnostics_router",
     "editor_auto_enqueue_router",
+    "editor_auto_folders_router",
     "editor_auto_stickers_router",
     "editor_auto_tools_router",
     "editor_auto_users_router",

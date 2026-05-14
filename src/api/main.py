@@ -35,6 +35,7 @@ from src.api.routers import (
     dashboard_router,
     diagnostics_router,
     editor_auto_enqueue_router,
+    editor_auto_folders_router,
     editor_auto_stickers_router,
     editor_auto_tools_router,
     editor_auto_users_router,
@@ -144,6 +145,7 @@ def create_app() -> FastAPI:
     app.include_router(editor_auto_users_router)
     app.include_router(editor_auto_enqueue_router)
     app.include_router(editor_auto_stickers_router)
+    app.include_router(editor_auto_folders_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)

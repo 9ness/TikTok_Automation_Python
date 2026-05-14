@@ -34,7 +34,8 @@ import { DiagnosticsPanel } from "@/components/layout/DiagnosticsPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { useLogout, useMe } from "@/lib/queries/auth";
 import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
-import { LogOut, User } from "lucide-react";
+import { useGlobalFolderCounts } from "@/lib/queries/editor-auto";
+import { Inbox, LogOut, User } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -169,6 +170,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 >
                   <node.icon className="h-4 w-4" strokeWidth={1.75} />
                   {node.title}
+                  {node.basePath === "/editor-auto" && (
+                    <EditorAutoEntradaBadge />
+                  )}
                   {expanded[node.title] ? (
                     <ChevronDown className="ml-auto h-3 w-3" strokeWidth={2} />
                   ) : (
@@ -349,5 +353,25 @@ export function Sidebar() {
         </div>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Badge "N en entrada" en la cabecera del grupo Editor Auto. Suma vídeos
+// pendientes de encolar de TODOS los usuarios. Refresca cada 30s. Si el
+// endpoint /folders/counts no existe (backend antiguo), no se renderiza.
+// ---------------------------------------------------------------------------
+function EditorAutoEntradaBadge() {
+  const q = useGlobalFolderCounts();
+  const pending = q.data?.totals?.entrada ?? 0;
+  if (pending <= 0) return null;
+  return (
+    <span
+      className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-bold text-black"
+      title={`${pending} vídeo(s) en entrada/ pendientes de encolar`}
+    >
+      <Inbox className="h-2.5 w-2.5" />
+      {pending}
+    </span>
   );
 }

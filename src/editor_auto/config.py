@@ -168,19 +168,57 @@ def user_output_folder(username: str) -> str:
 
 
 def user_input_folder(username: str) -> str:
-    """Carpeta de entrada (archivo original tras procesar — opcional)."""
+    """Carpeta de entrada — el cliente deposita sus vídeos crudos aquí.
+    El admin los ve listados en la UI y los encola desde ahí."""
     return os.path.join(user_folder(username), "entrada")
 
 
-def ensure_user_folders(username: str) -> tuple[str, str, str]:
-    """Crea las carpetas del usuario si no existen. Devuelve (root, entrada, salida)."""
+def user_queue_folder(username: str) -> str:
+    """Carpeta de cola — al encolar un vídeo desde `entrada/`, se MUEVE
+    aquí para `lockearlo` (el cliente no debería tocar archivos en
+    procesamiento). Tras éxito → `recuperacion/`. Tras fallo → `entrada/`."""
+    return os.path.join(user_folder(username), "cola")
+
+
+def user_recovery_folder(username: str) -> str:
+    """Carpeta de recuperación — guarda los ORIGINALES tras procesado OK,
+    por si el operador necesita re-editar (mover de vuelta a `entrada/`)
+    o borrarlos cuando no los necesita."""
+    return os.path.join(user_folder(username), "recuperacion")
+
+
+# Slugs canónicos de las 4 carpetas — el frontend los usa como IDs en
+# las URLs y los validamos contra esta whitelist en el backend.
+USER_FOLDERS = ("entrada", "cola", "recuperacion", "salida")
+
+
+def user_subfolder(username: str, folder: str) -> str:
+    """Resuelve una subcarpeta del usuario por nombre (`entrada`/`cola`/
+    `recuperacion`/`salida`). Lanza `ValueError` si `folder` no está en
+    la whitelist — defensa contra path traversal."""
+    if folder not in USER_FOLDERS:
+        raise ValueError(
+            f"Carpeta no permitida: {folder!r} (válidas: {USER_FOLDERS})"
+        )
+    return os.path.join(user_folder(username), folder)
+
+
+def ensure_user_folders(username: str) -> tuple[str, str, str, str, str]:
+    """Crea las carpetas del usuario si no existen.
+
+    Devuelve `(base, entrada, cola, recuperacion, salida)`. Idempotente —
+    se invoca al crear/editar el usuario y también al ejecutar un job
+    (defensivo). Las carpetas vacías no rompen Drive sync.
+    """
     base = user_folder(username)
     Path(base).mkdir(parents=True, exist_ok=True)
     inp = user_input_folder(username)
+    queue = user_queue_folder(username)
+    recovery = user_recovery_folder(username)
     out = user_output_folder(username)
-    Path(inp).mkdir(parents=True, exist_ok=True)
-    Path(out).mkdir(parents=True, exist_ok=True)
-    return base, inp, out
+    for p in (inp, queue, recovery, out):
+        Path(p).mkdir(parents=True, exist_ok=True)
+    return base, inp, queue, recovery, out
 
 
 # ---------------------------------------------------------------------------

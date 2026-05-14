@@ -1177,20 +1177,68 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     input_path = p["input_path"]
     temp_folder = p.get("temp_folder", "./temp_work")
     script = (p.get("script") or "").strip() or None
+    # Si el job vino del workflow "entrada→cola→…", `source` = "entrada"
+    # y el runner gestiona el ciclo de vida del input tras la ejecución:
+    #   éxito → mueve cola/<file> → recuperacion/<file>
+    #   fallo → mueve cola/<file> → entrada/<file> (admin re-encola)
+    # Para upload directo (campo `file` en /enqueue), `source` no existe
+    # y no se toca nada (compat con flujo anterior).
+    source = p.get("source")
+    source_filename = p.get("source_filename")
+
     on_log(f"[editor_auto] user_id={user_id} · input={os.path.basename(input_path)}")
+    if source == "entrada" and source_filename:
+        on_log(f"[editor_auto] source=entrada · gestiono ciclo cola↔recuperacion/entrada")
     if script:
         on_log(f"[editor_auto] script · {len(script)} chars (modo scripted)")
     on_progress(0.01, "📂 Resolviendo usuario y carpetas…")
 
-    return run_editor_auto_pipeline(
-        user_id=user_id,
-        input_video_path=input_path,
-        job_id=job.id,
-        temp_folder=temp_folder,
-        on_log=on_log,
-        on_progress=on_progress,
-        script=script,
-    )
+    try:
+        result = run_editor_auto_pipeline(
+            user_id=user_id,
+            input_video_path=input_path,
+            job_id=job.id,
+            temp_folder=temp_folder,
+            on_log=on_log,
+            on_progress=on_progress,
+            script=script,
+        )
+    except Exception:
+        # Fallo del pipeline: devolver el input a `entrada/` para que el
+        # admin pueda reencolarlo cuando quiera. Si la mudanza falla
+        # (FS issues), no anulamos el error original.
+        if source == "entrada" and source_filename:
+            try:
+                user_name = p.get("user_name") or ""
+                from src.editor_auto.services import folder_manager
+                folder_manager.move_file(
+                    user_name, "cola", "entrada", source_filename,
+                )
+                on_log(
+                    f"[editor_auto] ↩ Job fallido → input devuelto a entrada/"
+                )
+            except Exception as cleanup_err:
+                on_log(
+                    f"[editor_auto] ⚠️ no pude devolver cola→entrada: {cleanup_err}"
+                )
+        raise
+
+    # Éxito: mover original a recuperacion/ (preserva por si re-editar).
+    if source == "entrada" and source_filename:
+        try:
+            user_name = p.get("user_name") or ""
+            from src.editor_auto.services import folder_manager
+            folder_manager.move_file(
+                user_name, "cola", "recuperacion", source_filename,
+            )
+            on_log(
+                f"[editor_auto] 📦 Job OK → original cola → recuperacion/"
+            )
+        except Exception as cleanup_err:
+            on_log(
+                f"[editor_auto] ⚠️ no pude mover cola→recuperacion: {cleanup_err}"
+            )
+    return result
 
 
 # ============================================================

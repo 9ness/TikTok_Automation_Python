@@ -115,7 +115,7 @@ def create_user(payload: EditorUserCreateRequest) -> EditorUserResponse:
     # TIKTOK_EDITOR como hermana de TIKTOK_CR/TIKTOK_SHOP. Si Drive no
     # está accesible cae al fallback local (visible en el path devuelto).
     try:
-        _, _, _ = ensure_user_folders(payload.name)
+        ensure_user_folders(payload.name)
     except OSError as e:
         print(f"[editor_auto.users] ensure_user_folders falló: {e}")
     user = EditorUser(
