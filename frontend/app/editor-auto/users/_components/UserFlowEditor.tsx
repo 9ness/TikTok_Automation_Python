@@ -530,7 +530,11 @@ function PresetPickerField({
           if (sel && onApplyPreset) {
             // El preset trae font_path, highlight_*, etc. Mergeamos en la
             // config del step para que el preview reaccione al instante.
-            onApplyPreset(sel.config as Record<string, unknown>);
+            // Cast doble: TS rechaza el cast directo porque
+            // `SubsAutoStyleConfig` no tiene index signature.
+            // `as unknown as Record<string, unknown>` es el escape
+            // estándar recomendado por TS para estos casos.
+            onApplyPreset(sel.config as unknown as Record<string, unknown>);
           }
           e.currentTarget.value = "";
         }}
