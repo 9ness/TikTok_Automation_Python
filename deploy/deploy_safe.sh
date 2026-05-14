@@ -258,12 +258,20 @@ fi
 NEEDS_API_REBUILD=false
 NEEDS_WEB_REBUILD=false
 NEEDS_CADDY_RESTART=false
+NEEDS_WEBHOOK_RESTART=false
+
+# Si el código del propio listener cambió, hay que reiniciar el service
+# `tiktok-webhook` ANTES de continuar — el resto del script puede correr
+# tranquilo después (es subprocess, no afecta al deploy en curso).
+if echo "$CHANGED_FILES" | grep -qE "^deploy/webhook_listener\.py$"; then
+    NEEDS_WEBHOOK_RESTART=true
+fi
 
 if [[ -f "${APP_DIR}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1; then
     if echo "$CHANGED_FILES" | grep -qE "^(Dockerfile\.api|docker-compose\.yml|requirements\.txt)$"; then
         NEEDS_API_REBUILD=true
     fi
-    if echo "$CHANGED_FILES" | grep -qE "^src/(api|fonts_registry\.py|queue/(metrics|manager|models|runners|__init__)\.py|subtitles|pronosticos|tiktok_shop|video_remover|locutor|guionista|logic|word_calibrator|text_hook|font_resolver|diagnostics)"; then
+    if echo "$CHANGED_FILES" | grep -qE "^src/(api|editor_auto|fonts_registry\.py|queue/(metrics|manager|models|runners|__init__)\.py|subtitles|pronosticos|tiktok_shop|video_remover|locutor|guionista|logic|word_calibrator|text_hook|font_resolver|diagnostics|cost_tracking)"; then
         NEEDS_API_REBUILD=true
     fi
     if echo "$CHANGED_FILES" | grep -qE "^frontend/"; then
@@ -314,6 +322,21 @@ if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
     # Tras los rebuilds, log un ps para auditoría
     echo "[deploy_safe] estado containers tras rebuild:"
     dc ps || true
+fi
+
+# Reiniciar tiktok-webhook si su código cambió. Requiere sudoers granular
+# (ver register_services.sh). Si la entrada sudoers no incluye el comando
+# todavía, sale con warning — el operador hace `sudo systemctl restart
+# tiktok-webhook` manualmente UNA vez para activar el nuevo listener.
+if [[ "$NEEDS_WEBHOOK_RESTART" == "true" ]]; then
+    echo "[deploy_safe] 🔄 deploy/webhook_listener.py cambió — restart tiktok-webhook…"
+    if sudo -n /bin/systemctl restart tiktok-webhook 2>/dev/null; then
+        echo "[deploy_safe] ✅ tiktok-webhook reiniciado"
+    else
+        echo "[deploy_safe] ⚠️ sudo NOPASSWD no permite restart de tiktok-webhook."
+        echo "[deploy_safe]    Ejecuta manualmente: sudo systemctl restart tiktok-webhook"
+        echo "[deploy_safe]    (o re-ejecuta register_services.sh para actualizar sudoers)"
+    fi
 fi
 
 # ============================================================

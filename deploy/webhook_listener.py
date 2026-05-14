@@ -248,6 +248,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(200, _system_status())
             return
 
+        if path == "/admin/status":
+            if not self._check_admin_auth():
+                return
+            self._json_response(200, _smart_status())
+            return
+
         self.send_error(404)
 
     # ------------------------------------------------------------------
@@ -420,6 +426,121 @@ class WebhookHandler(BaseHTTPRequestHandler):
             "stdout": out[-500:],
             "stderr": err[-500:],
         })
+
+
+def _smart_status() -> dict:
+    """Snapshot inteligente para que el panel UI decida si ofrecer Deploy
+    activo o "ya estás al día".
+
+    Devuelve:
+      - `current_sha`, `current_sha_short`
+      - `remote_sha`, `remote_sha_short`
+      - `commits_behind`: cuántos commits hay en origin/main respecto a HEAD
+      - `commits_preview`: hasta 10 oneline de esos commits
+      - `deploy_in_progress`: True si el lock file existe Y hay proceso vivo
+      - `would_rebuild`: lista de servicios que se rebuildearían si se
+        deployase AHORA (api / web / caddy / webhook). Calcula en base a
+        los ficheros que cambiarían (no triggerea el deploy).
+      - `last_deploy`: contenido de deploy_status.json (estado + SHA + when)
+    """
+    out: dict = {"timestamp": int(time.time())}
+
+    # Fetch silencioso para tener la referencia más reciente del remoto.
+    # Si falla (sin conectividad, repo sin remote), seguimos con info local.
+    _run(["git", "fetch", "--quiet", "origin", "main"], timeout=15)
+
+    rc, sha_local, _ = _run(["git", "rev-parse", "HEAD"], timeout=5)
+    rc2, sha_remote, _ = _run(["git", "rev-parse", "origin/main"], timeout=5)
+    sha_local = sha_local.strip() if rc == 0 else ""
+    sha_remote = sha_remote.strip() if rc2 == 0 else ""
+    out["current_sha"] = sha_local
+    out["current_sha_short"] = sha_local[:8]
+    out["remote_sha"] = sha_remote
+    out["remote_sha_short"] = sha_remote[:8]
+
+    # Commits que llegarían con un git pull
+    commits_preview: list[dict] = []
+    commits_behind = 0
+    changed_files: list[str] = []
+    if sha_local and sha_remote and sha_local != sha_remote:
+        rc, count, _ = _run(
+            ["git", "rev-list", "--count", f"{sha_local}..{sha_remote}"],
+            timeout=5,
+        )
+        if rc == 0 and count.strip().isdigit():
+            commits_behind = int(count.strip())
+        rc, log_out, _ = _run(
+            ["git", "log", "--pretty=%h\t%s\t%an",
+             f"{sha_local}..{sha_remote}", "--max-count=10"],
+            timeout=5,
+        )
+        if rc == 0:
+            for line in log_out.splitlines():
+                parts = line.split("\t", 2)
+                if len(parts) >= 2:
+                    commits_preview.append({
+                        "sha": parts[0],
+                        "subject": parts[1],
+                        "author": parts[2] if len(parts) > 2 else "",
+                    })
+        rc, diff_out, _ = _run(
+            ["git", "diff", "--name-only", f"{sha_local}..{sha_remote}"],
+            timeout=5,
+        )
+        if rc == 0:
+            changed_files = [f for f in diff_out.splitlines() if f]
+    out["commits_behind"] = commits_behind
+    out["commits_preview"] = commits_preview
+
+    # ¿Qué se rebuildearía si se deploya ahora? — mismos patterns que el
+    # `deploy_safe.sh`. Mantener sincronizado con esa lógica.
+    would_rebuild: list[str] = []
+    api_re = (
+        "^Dockerfile\\.api$|^docker-compose\\.yml$|^requirements\\.txt$|"
+        "^src/(api|editor_auto|fonts_registry\\.py|queue/(metrics|manager|models|runners|__init__)\\.py|"
+        "subtitles|pronosticos|tiktok_shop|video_remover|locutor|guionista|logic|"
+        "word_calibrator|text_hook|font_resolver|diagnostics|cost_tracking)"
+    )
+    import re as _re
+    api_pat = _re.compile(api_re)
+    for f in changed_files:
+        if api_pat.search(f) and "api" not in would_rebuild:
+            would_rebuild.append("api")
+        if f.startswith("frontend/") and "web" not in would_rebuild:
+            would_rebuild.append("web")
+        if f in ("Caddyfile", "docker-compose.yml") and "caddy" not in would_rebuild:
+            would_rebuild.append("caddy")
+        if f == "deploy/webhook_listener.py" and "webhook" not in would_rebuild:
+            would_rebuild.append("webhook")
+    out["would_rebuild"] = would_rebuild
+    out["changed_files_count"] = len(changed_files)
+    out["changed_files_preview"] = changed_files[:30]
+
+    # ¿Hay un deploy corriendo ahora mismo? El lock file existe pero
+    # podría ser zombie — verificamos PID si está disponible.
+    lock = "/tmp/tiktok-deploy.lock"
+    in_progress = False
+    if os.path.exists(lock):
+        # `flock` no escribe PID por defecto, pero podemos buscar procesos
+        # bash ejecutando deploy_safe.sh.
+        rc, ps_out, _ = _run(
+            ["pgrep", "-f", "deploy_safe.sh"], timeout=3,
+        )
+        in_progress = rc == 0 and bool(ps_out.strip())
+    out["deploy_in_progress"] = in_progress
+
+    # Último deploy persistido
+    last_path = os.path.join(APP_DIR, "temp_work", "deploy_status.json")
+    if os.path.isfile(last_path):
+        try:
+            with open(last_path, "r", encoding="utf-8") as f:
+                out["last_deploy"] = json.load(f)
+        except Exception:
+            out["last_deploy"] = None
+    else:
+        out["last_deploy"] = None
+
+    return out
 
 
 def _system_status() -> dict:

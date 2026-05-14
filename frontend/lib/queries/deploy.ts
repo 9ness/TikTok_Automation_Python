@@ -9,10 +9,52 @@ const ROOT = "/api/v1/deploy";
 export const deployKeys = {
   all: ["deploy"] as const,
   health: () => [...deployKeys.all, "health"] as const,
+  status: () => [...deployKeys.all, "status"] as const,
   system: () => [...deployKeys.all, "system"] as const,
   containers: () => [...deployKeys.all, "containers"] as const,
   log: () => [...deployKeys.all, "log"] as const,
 };
+
+export interface DeployCommitPreview {
+  sha: string;
+  subject: string;
+  author: string;
+}
+
+export interface DeployStatus {
+  timestamp: number;
+  current_sha: string;
+  current_sha_short: string;
+  remote_sha: string;
+  remote_sha_short: string;
+  commits_behind: number;
+  commits_preview: DeployCommitPreview[];
+  would_rebuild: ("api" | "web" | "caddy" | "webhook")[];
+  changed_files_count: number;
+  changed_files_preview: string[];
+  deploy_in_progress: boolean;
+  last_deploy:
+    | {
+        state: string;
+        current_sha?: string;
+        previous_sha?: string;
+        started_at?: number;
+        finished_at?: number;
+        stage?: string;
+        error?: string;
+      }
+    | null;
+}
+
+export function useDeployStatus(opts?: { enabled?: boolean; live?: boolean }) {
+  return useQuery<DeployStatus>({
+    queryKey: deployKeys.status(),
+    queryFn: () => api.get<DeployStatus>(`${ROOT}/status`),
+    enabled: opts?.enabled ?? true,
+    // Live polling rápido si hay deploy en curso, lento si no.
+    refetchInterval: opts?.live ? 3_000 : 20_000,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Tipos

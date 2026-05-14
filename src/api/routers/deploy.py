@@ -123,6 +123,20 @@ def _api_key_or_raise(settings: APISettings) -> str:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+@router.get("/status")
+def deploy_status(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """Estado inteligente: commits pendientes, qué se rebuildearía, si hay
+    deploy en curso. La UI lo consume para decidir habilitar/deshabilitar
+    el botón Smart Deploy."""
+    key = _api_key_or_raise(settings)
+    code, body = _call("GET", "/admin/status", api_key=key, timeout=20)
+    if code != 200:
+        raise HTTPException(status_code=code, detail=body)
+    return body
+
+
 @router.get("/health")
 def deploy_health(
     settings: Annotated[APISettings, Depends(get_settings)],

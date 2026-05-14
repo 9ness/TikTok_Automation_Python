@@ -66,7 +66,7 @@ SUDOERS_TMP=$(mktemp)
 cat > "$SUDOERS_TMP" <<EOF
 # Auto-generado por register_services.sh — permite al webhook reiniciar
 # la app sin password tras un push validado de GitHub.
-${APP_USER} ALL=(ALL) NOPASSWD: /bin/systemctl restart tiktok-factory, /bin/systemctl restart tiktok-factory.service, /usr/bin/systemctl restart tiktok-factory, /usr/bin/systemctl restart tiktok-factory.service
+${APP_USER} ALL=(ALL) NOPASSWD: /bin/systemctl restart tiktok-factory, /bin/systemctl restart tiktok-factory.service, /usr/bin/systemctl restart tiktok-factory, /usr/bin/systemctl restart tiktok-factory.service, /bin/systemctl restart tiktok-webhook, /bin/systemctl restart tiktok-webhook.service, /usr/bin/systemctl restart tiktok-webhook, /usr/bin/systemctl restart tiktok-webhook.service
 EOF
 
 # Validar SIEMPRE con visudo antes de mover al sistema. Si visudo falla,

@@ -3,9 +3,12 @@
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Container,
   Cpu,
   Database,
+  GitCommitHorizontal,
   HardDrive,
   Loader2,
   Play,
@@ -39,54 +42,73 @@ import {
 } from "@/components/ui/card";
 import {
   type DeployServiceName,
+  type DeployStatus,
   useDeployContainers,
   useDeployHealth,
   useDeployLog,
   useDeployRebuild,
   useDeployRestart,
   useDeployRun,
+  useDeployStatus,
   useDeploySystem,
 } from "@/lib/queries/deploy";
 import { cn } from "@/lib/utils";
 
 /**
- * Panel "Deploy" del Settings — botones de acción + estado del host y
- * containers. Está pensado para que un usuario sin experiencia técnica
- * pueda desplegar, reiniciar y diagnosticar sin SSH.
+ * Panel "Deploy" — diseñado para que un usuario sin experiencia técnica
+ * pueda actualizar y diagnosticar sin SSH.
  *
- * Diseña a prueba de pánico:
- *   - Cada acción destructiva pide confirmación (AlertDialog).
- *   - Estado del webhook_listener bien visible (rojo si caído → todos los
- *     botones disabled con explicación).
- *   - Log en vivo con polling 3s tras una acción → 15s en reposo.
+ * Estructura:
+ *   1. SMART DEPLOY (botón principal): el panel detecta si hay commits
+ *      pendientes; el botón decide solo qué hacer (`deploy_safe.sh` ya es
+ *      idempotente y rebuildea solo lo necesario).
+ *   2. Estado en vivo: containers, host stats, log.
+ *   3. Avanzado (colapsado): rebuild forzado, restart individual.
+ *
+ * El botón principal está deshabilitado cuando:
+ *   - El listener no responde
+ *   - Ya hay un deploy en curso
+ *   - No hay commits pendientes Y no hay rebuild manual seleccionado
  */
 export function DeployPanel() {
   const health = useDeployHealth();
   const reachable = health.data?.reachable === true;
 
+  const status = useDeployStatus({ enabled: reachable, live: false });
+  const inProgress = status.data?.deploy_in_progress === true;
+
+  // Re-key polling para "en vivo": cuando deploy_in_progress=true, el panel
+  // refresca cada 3s; en reposo cada 20s.
+  const liveStatus = useDeployStatus({ enabled: reachable, live: inProgress });
+
   const containers = useDeployContainers({ enabled: reachable });
   const system = useDeploySystem({ enabled: reachable });
 
-  const [livePolling, setLivePolling] = useState(false);
-  const log = useDeployLog({ enabled: reachable, lines: 200, live: livePolling });
-
-  // Tras pulsar un botón, refrescamos el log más rápido durante 2 min,
-  // luego volvemos al ritmo lento.
+  const [logLive, setLogLive] = useState(false);
+  const log = useDeployLog({ enabled: reachable, lines: 250, live: logLive || inProgress });
   const liveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startLivePoll = () => {
-    setLivePolling(true);
+    setLogLive(true);
     if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
-    liveTimerRef.current = setTimeout(() => setLivePolling(false), 120_000);
+    liveTimerRef.current = setTimeout(() => setLogLive(false), 180_000);
   };
-  useEffect(() => () => {
-    if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
+    },
+    [],
+  );
 
   const runDeploy = useDeployRun();
   const rebuild = useDeployRebuild();
   const restart = useDeployRestart();
-
   const busy = runDeploy.isPending || rebuild.isPending || restart.isPending;
+
+  // El status puede venir de la query inicial o la live — preferimos la
+  // más reciente (live siempre tras la primera respuesta).
+  const stat: DeployStatus | undefined = liveStatus.data ?? status.data;
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   return (
     <Card>
@@ -98,7 +120,7 @@ export function DeployPanel() {
               Deploy
             </CardTitle>
             <CardDescription>
-              Despliegues, rebuilds y reinicios sin SSH.
+              Despliegue inteligente y diagnóstico sin SSH.
             </CardDescription>
           </div>
           <HealthBadge reachable={reachable} loading={health.isLoading} />
@@ -109,71 +131,27 @@ export function DeployPanel() {
           <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="space-y-1">
-              <p className="font-medium">
-                El webhook listener no responde
-              </p>
+              <p className="font-medium">El listener del host no responde</p>
               <p className="text-xs">
                 {health.data?.error ??
-                  "Comprueba en el server: sudo systemctl status tiktok-webhook"}
-                . Hasta que esté activo, no puedo lanzar deploys ni reinicios
-                desde aquí.
+                  "Conéctate por SSH y ejecuta: sudo systemctl restart tiktok-webhook"}
               </p>
             </div>
           </div>
         )}
 
-        {/* ----- Acciones principales ----- */}
-        <div className="grid gap-2 sm:grid-cols-2">
-          <ActionButton
-            label="Deploy ahora"
-            description="git pull + rebuild si cambió código"
-            icon={Play}
-            confirmTitle="¿Lanzar deploy ahora?"
-            confirmBody="Hará git pull en main y si hay cambios reconstruye los containers afectados. Tarda ~5–10 min la primera vez."
-            confirmActionLabel="Lanzar deploy"
-            onAction={async () => {
-              await runDeploy.mutateAsync();
-              startLivePoll();
-            }}
-            disabled={!reachable || busy}
-            loading={runDeploy.isPending}
-            tone="primary"
-          />
-
-          <ActionButton
-            label="Rebuild containers"
-            description="Forzar rebuild api + web (sin git pull)"
-            icon={RefreshCw}
-            confirmTitle="¿Rebuildear api y web?"
-            confirmBody="Reconstruye las imágenes de api y web desde cero con el código actual. Útil tras tocar el .env o si algo se quedó raro."
-            confirmActionLabel="Rebuild"
-            onAction={async () => {
-              await rebuild.mutateAsync({ services: ["api", "web"] });
-              startLivePoll();
-            }}
-            disabled={!reachable || busy}
-            loading={rebuild.isPending}
-          />
-        </div>
-
-        {/* ----- Restart individual ----- */}
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Reiniciar un container (rápido, sin rebuild)
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {(["api", "web", "caddy"] as DeployServiceName[]).map((svc) => (
-              <RestartButton
-                key={svc}
-                service={svc}
-                disabled={!reachable || busy}
-                onDone={startLivePoll}
-                pending={restart.isPending && restart.variables?.service === svc}
-                run={restart.mutateAsync}
-              />
-            ))}
-          </div>
-        </div>
+        {/* ----- SMART DEPLOY ----- */}
+        <SmartDeployBlock
+          status={stat}
+          loading={status.isLoading}
+          inProgress={inProgress}
+          disabled={!reachable || busy}
+          pending={runDeploy.isPending}
+          onDeploy={async () => {
+            await runDeploy.mutateAsync();
+            startLivePoll();
+          }}
+        />
 
         {/* ----- Estado containers ----- */}
         <ContainersBlock query={containers} />
@@ -181,14 +159,68 @@ export function DeployPanel() {
         {/* ----- Host stats ----- */}
         <SystemBlock query={system} />
 
-        {/* ----- Log en vivo ----- */}
+        {/* ----- Log ----- */}
         <LogBlock
           log={log.data?.log ?? ""}
           loading={log.isLoading}
-          live={livePolling}
+          live={logLive || inProgress}
         />
 
-        {/* ----- Errores recientes (toast-style) ----- */}
+        {/* ----- Avanzado ----- */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex w-full items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        >
+          {showAdvanced ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          Avanzado
+        </button>
+        {showAdvanced && (
+          <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              Solo si Smart Deploy no es suficiente. Estos botones fuerzan
+              acciones aunque no haya cambios.
+            </p>
+            <AdvancedAction
+              label="Rebuild forzado api + web"
+              description="Reconstruye imágenes desde cero (sin git)"
+              icon={RefreshCw}
+              confirmTitle="¿Rebuildear api y web?"
+              confirmBody="Reconstruye desde cero con el código actual del server. Útil tras tocar .env o si algo se quedó raro."
+              confirmActionLabel="Rebuild"
+              onAction={async () => {
+                await rebuild.mutateAsync({ services: ["api", "web"] });
+                startLivePoll();
+              }}
+              disabled={!reachable || busy}
+              loading={rebuild.isPending}
+            />
+            <div>
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Restart sin rebuild (~5s)
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["api", "web", "caddy"] as DeployServiceName[]).map((svc) => (
+                  <RestartButton
+                    key={svc}
+                    service={svc}
+                    disabled={!reachable || busy}
+                    onDone={startLivePoll}
+                    pending={
+                      restart.isPending && restart.variables?.service === svc
+                    }
+                    run={restart.mutateAsync}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {(runDeploy.error || rebuild.error || restart.error) && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
             {String(
@@ -204,7 +236,170 @@ export function DeployPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Subcomponentes
+// Smart Deploy — el botón principal con auto-detección
+// ---------------------------------------------------------------------------
+function SmartDeployBlock({
+  status,
+  loading,
+  inProgress,
+  disabled,
+  pending,
+  onDeploy,
+}: {
+  status: DeployStatus | undefined;
+  loading: boolean;
+  inProgress: boolean;
+  disabled: boolean;
+  pending: boolean;
+  onDeploy: () => Promise<void>;
+}) {
+  if (loading || !status) {
+    return (
+      <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+        Comprobando estado del repo…
+      </div>
+    );
+  }
+
+  const behind = status.commits_behind ?? 0;
+  const upToDate = behind === 0;
+  const rebuild = status.would_rebuild ?? [];
+
+  // Tono visual del block: verde si up-to-date, ámbar si hay cambios, azul
+  // si deploy en curso.
+  let blockTone =
+    "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300";
+  let title = "Estás al día";
+  let subtitle = `HEAD: ${status.current_sha_short || "?"} — no hay nada que aplicar.`;
+  let actionLabel = "Forzar deploy";
+  let actionTone: "primary" | "muted" = "muted";
+  let buttonDisabled = disabled;
+
+  if (inProgress) {
+    blockTone =
+      "border-brand-cyan/40 bg-brand-cyan/5 text-brand-cyan";
+    title = "Deploy en curso";
+    subtitle = "Esperando a que termine el rebuild — el log se actualiza solo.";
+    actionLabel = "Esperando…";
+    actionTone = "muted";
+    buttonDisabled = true;
+  } else if (!upToDate) {
+    blockTone =
+      "border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-300";
+    title = `${behind} commit${behind === 1 ? "" : "s"} pendiente${behind === 1 ? "" : "s"}`;
+    subtitle =
+      rebuild.length > 0
+        ? `Se rebuildearán: ${rebuild.join(" + ")}`
+        : "Solo cambios menores — no requiere rebuild de containers.";
+    actionLabel = `Aplicar ${behind} commit${behind === 1 ? "" : "s"}`;
+    actionTone = "primary";
+  }
+
+  const confirmBody = upToDate
+    ? "No hay commits nuevos en origin/main. El deploy correrá igual, pero no rebuildeará nada salvo que fuerces."
+    : `Aplicará ${behind} commit(s) y rebuildeará: ${rebuild.length ? rebuild.join(" + ") : "(nada — solo docs/config)"}.\n\nCommits:\n${(status.commits_preview ?? [])
+        .slice(0, 5)
+        .map((c) => `• ${c.sha} ${c.subject}`)
+        .join("\n")}`;
+
+  return (
+    <div className={cn("rounded-lg border p-4", blockTone)}>
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-current/10">
+          {inProgress ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : upToDate ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <GitCommitHorizontal className="h-5 w-5" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs opacity-80">{subtitle}</p>
+          {!upToDate && status.commits_preview.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-[11px] opacity-90">
+              {status.commits_preview.slice(0, 4).map((c) => (
+                <li key={c.sha} className="truncate">
+                  <code className="font-mono">{c.sha}</code> · {c.subject}
+                </li>
+              ))}
+              {status.commits_preview.length > 4 && (
+                <li className="opacity-60">
+                  …y {behind - 4} más
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="lg"
+              className={cn(
+                "shrink-0 gap-2",
+                actionTone === "primary"
+                  ? "bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+                  : "",
+              )}
+              variant={actionTone === "primary" ? "default" : "outline"}
+              disabled={buttonDisabled}
+            >
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {actionLabel}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {upToDate ? "¿Forzar deploy?" : "¿Aplicar cambios?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="whitespace-pre-wrap text-xs">
+                  {confirmBody}
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void onDeploy()}>
+                {upToDate ? "Forzar deploy" : "Aplicar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {/* Last deploy meta */}
+      {status.last_deploy && !inProgress && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-current/15 pt-2 text-[11px] opacity-75">
+          <span>Último:</span>
+          <Badge variant="outline" className="border-current/30 text-[10px]">
+            {status.last_deploy.state ?? "?"}
+          </Badge>
+          {status.last_deploy.current_sha && (
+            <code className="font-mono">
+              {status.last_deploy.current_sha.slice(0, 7)}
+            </code>
+          )}
+          {status.last_deploy.error && (
+            <span className="text-rose-500">
+              · err: {status.last_deploy.error}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponentes auxiliares
 // ---------------------------------------------------------------------------
 function HealthBadge({
   reachable,
@@ -223,21 +418,27 @@ function HealthBadge({
   }
   if (reachable) {
     return (
-      <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+      <Badge
+        variant="outline"
+        className="gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+      >
         <CheckCircle2 className="h-3 w-3" />
         listener OK
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+    <Badge
+      variant="outline"
+      className="gap-1 border-destructive/40 text-destructive"
+    >
       <AlertCircle className="h-3 w-3" />
       listener caído
     </Badge>
   );
 }
 
-function ActionButton({
+function AdvancedAction({
   label,
   description,
   icon: Icon,
@@ -247,7 +448,6 @@ function ActionButton({
   confirmTitle,
   confirmBody,
   confirmActionLabel,
-  tone,
 }: {
   label: string;
   description: string;
@@ -258,18 +458,13 @@ function ActionButton({
   confirmTitle: string;
   confirmBody: string;
   confirmActionLabel: string;
-  tone?: "primary" | "default";
 }) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button
-          variant={tone === "primary" ? "default" : "outline"}
-          className={cn(
-            "h-auto justify-start gap-3 p-3 text-left",
-            tone === "primary" &&
-              "bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90",
-          )}
+          variant="outline"
+          className="h-auto w-full justify-start gap-3 p-3 text-left"
           disabled={disabled}
         >
           {loading ? (
@@ -279,10 +474,7 @@ function ActionButton({
           )}
           <span className="flex flex-col">
             <span className="text-sm font-medium leading-tight">{label}</span>
-            <span className={cn(
-              "text-[11px] leading-tight",
-              tone === "primary" ? "text-white/80" : "text-muted-foreground",
-            )}>
+            <span className="text-[11px] leading-tight text-muted-foreground">
               {description}
             </span>
           </span>
@@ -338,8 +530,7 @@ function RestartButton({
         <AlertDialogHeader>
           <AlertDialogTitle>¿Reiniciar {service}?</AlertDialogTitle>
           <AlertDialogDescription>
-            Reinicia el container sin rebuild (rápido, ~5s). Útil tras tocar
-            el .env o si el servicio se quedó tieso.
+            Reinicia el container sin rebuild (rápido, ~5s).
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -429,9 +620,7 @@ function SystemBlock({
   query: ReturnType<typeof useDeploySystem>;
 }) {
   const sys = query.data;
-  if (!sys) {
-    return null;
-  }
+  if (!sys) return null;
   return (
     <div>
       <div className="mb-2 flex items-center gap-2">
@@ -442,11 +631,7 @@ function SystemBlock({
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {sys.uptime_seconds != null && (
-          <Stat
-            icon={Cpu}
-            label="uptime"
-            value={formatUptime(sys.uptime_seconds)}
-          />
+          <Stat icon={Cpu} label="uptime" value={formatUptime(sys.uptime_seconds)} />
         )}
         {sys.disk && (
           <Stat
