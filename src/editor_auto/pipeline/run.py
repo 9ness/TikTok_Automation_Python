@@ -23,35 +23,28 @@ from src.editor_auto.repos import UserRepo
 from src.editor_auto.services import run_flow
 
 
-def _preflight_check(enabled_steps) -> list[str]:
-    """Comprueba que cada tool del flow pueda arrancar SIN error de
-    dependencias antes de empezar a llamar a APIs de pago.
+def _preflight_check(enabled_steps) -> tuple[list[str], list[str]]:
+    """Comprueba que cada tool del flow pueda arrancar antes de gastar
+    dinero. Distingue:
 
-    Devuelve lista de errores (vacía = todo OK). Cada error es un string
-    legible para el operador. El runner aborta el job si hay >0 errores
-    — el cliente reencola tras arreglar la causa, sin doble cobro.
+    - **errors** (lista 0+): problemas que IMPIDEN el pipeline. El runner
+      aborta SIN cobrar. Ej: faster-whisper missing, OPENAI_API_KEY
+      ausente cuando la tool usa OpenAI, ningún encoder H264 funcional.
+    - **warnings** (lista 0+): features OPCIONALES que degradan (la tool
+      las maneja con `try/except` interno). Se loguean al inicio y el
+      pipeline sigue. Ej: silero-vad no instalado → cae a amplitude +
+      IA; Gemini missing → cae a solo OpenAI o n-gram heuristic.
 
-    Validaciones:
-      - FFmpeg presente y al menos UN encoder H264 funcional (libx264
-        o h264_nvenc — uno de los dos debe abrir).
-      - Por cada tool habilitada:
-          silence_cutter / silence_cutter_scripted:
-            · faster-whisper importable
-            · OPENAI_API_KEY si la tool usa OpenAI (pass 1 o pass 2)
-            · Gemini config si gemini pass2 habilitado
-            · silero-vad importable si vad_enabled
-          sticker_arrow:
-            · faster-whisper si transcribe_for_detection
-          subs_auto:
-            · nada externo, solo ffmpeg
+    Devuelve `(errors, warnings)`. El runner solo aborta si `errors`.
     """
     errors: list[str] = []
+    warnings: list[str] = []
 
     # 1. FFmpeg present
     import shutil as _shutil
     if not _shutil.which("ffmpeg"):
         errors.append("ffmpeg no está en PATH")
-        return errors  # sin ffmpeg el resto no tiene sentido
+        return errors, warnings  # sin ffmpeg el resto no tiene sentido
 
     # 2. Al menos UN encoder H264 funcional. Probamos NVENC primero
     # (cache global vía _has_nvenc); si falla, probamos libx264.
@@ -83,7 +76,8 @@ def _preflight_check(enabled_steps) -> list[str]:
         cfg = step.config or {}
 
         if tool_id in ("silence_cutter", "silence_cutter_scripted"):
-            # faster-whisper local — no necesita API key
+            # faster-whisper local — HARD (sin él no hay transcripción
+            # ni word_timings, base de todo el cortador).
             try:
                 import faster_whisper  # noqa: F401
             except ImportError as e:
@@ -91,24 +85,30 @@ def _preflight_check(enabled_steps) -> list[str]:
                     f"{tool_id}: faster-whisper no instalado ({e})"
                 )
 
-            # Silero si vad_enabled
+            # Silero — SOFT. El cortador funciona sin él usando amplitude
+            # + IA + inter-word-gap. Solo perdemos detección fina de
+            # silencios sutiles (respiración, "ejem" boca cerrada).
             if bool(cfg.get("vad_enabled", True)):
                 try:
                     import silero_vad  # noqa: F401
                 except ImportError as e:
-                    errors.append(
-                        f"{tool_id}: silero-vad no instalado ({e}) — "
-                        f"desactiva 'vad_enabled' o instala la dep"
+                    warnings.append(
+                        f"{tool_id}: silero-vad no disponible ({e}) — "
+                        f"el cortador usará amplitude + IA + gaps "
+                        f"entre palabras como sustituto"
                     )
 
-            # OpenAI (pass 1 si ai_clean_enabled, pass 2 si openai pass2,
-            # o scripted_llm_arbitration en scripted)
-            uses_openai = (
+            # OpenAI — HARD si la tool requiere OpenAI activamente.
+            # Para silence_cutter: ai_clean_enabled (default True) y/o
+            # ai_pass2_openai_enabled. Para scripted: scripted_llm_arbitration.
+            uses_openai_hard = (
                 bool(cfg.get("ai_clean_enabled", True))
                 or bool(cfg.get("ai_pass2_openai_enabled", False))
-                or bool(cfg.get("scripted_llm_arbitration", False))
             )
-            if uses_openai:
+            uses_openai_optional = bool(
+                cfg.get("scripted_llm_arbitration", False)
+            )
+            if uses_openai_hard:
                 try:
                     from src.editor_auto.api.openai_client import is_configured
                     if not is_configured():
@@ -118,41 +118,52 @@ def _preflight_check(enabled_steps) -> list[str]:
                         )
                 except ImportError as e:
                     errors.append(f"{tool_id}: openai SDK no importable ({e})")
+            elif uses_openai_optional:
+                # En scripted, el LLM es opcional (el diff por sí solo
+                # ya hace la mayoría del trabajo). Solo warning.
+                try:
+                    from src.editor_auto.api.openai_client import is_configured
+                    if not is_configured():
+                        warnings.append(
+                            f"{tool_id}: arbitrator LLM activado pero "
+                            f"OPENAI_API_KEY ausente — solo se usará el "
+                            f"diff transcript-vs-guión"
+                        )
+                except ImportError:
+                    pass
 
-            # Gemini (solo silence_cutter — scripted no usa Gemini)
+            # Gemini — SOFT. Si no está, queda solo OpenAI pass2 (si
+            # habilitado) o solo la heurística n-gram. Tool degrada bien.
             if tool_id == "silence_cutter" and bool(
                 cfg.get("ai_pass2_gemini_enabled", True)
             ):
                 try:
                     from src.editor_auto.api.gemini_client import is_configured
                     if not is_configured():
-                        errors.append(
-                            f"{tool_id}: usa Gemini pass2 pero "
-                            f"GOOGLE_GEMINI_KEY no configurada"
+                        warnings.append(
+                            f"{tool_id}: Gemini pass2 activo pero "
+                            f"GOOGLE_GEMINI_KEY ausente — n-gram + OpenAI "
+                            f"pass2 (si activo) cubrirán la detección"
                         )
                 except ImportError as e:
-                    errors.append(f"{tool_id}: gemini SDK no importable ({e})")
-
-            # silence_cutter_scripted: avisar si .txt resultará vacío.
-            # (El validation real lo hace el router antes de encolar; aquí
-            # solo recordatorio si por algún motivo llega sin script).
-            if tool_id == "silence_cutter_scripted":
-                if not (cfg.get("script") or "").strip():
-                    # No es error duro — el runner inyecta el script desde
-                    # job.params si es source=entrada con companion. Pero
-                    # si llega aquí sin script, fallará la tool en run().
-                    # Lo dejamos pasar; la tool lo gestiona.
-                    pass
+                    warnings.append(
+                        f"{tool_id}: gemini SDK no importable ({e}) — "
+                        f"omitiendo pass2 Gemini"
+                    )
 
         elif tool_id == "sticker_arrow":
+            # transcribe_for_detection — SOFT. Sin Whisper la tool usa
+            # solo el fallback de "últimos N segundos".
             if bool(cfg.get("transcribe_for_detection", True)):
                 try:
                     import faster_whisper  # noqa: F401
                 except ImportError as e:
-                    errors.append(
-                        f"sticker_arrow: faster-whisper no instalado ({e})"
+                    warnings.append(
+                        f"sticker_arrow: faster-whisper no disponible ({e}) "
+                        f"— detección de gatillo deshabilitada, se usará "
+                        f"fallback de últimos N segundos"
                     )
-            # Validar que el sticker_file elegido existe en Assets/flechas/
+            # sticker_file — HARD. Sin el asset no hay nada que overlay.
             sticker = (cfg.get("sticker_file") or "").strip()
             if not sticker:
                 errors.append(
@@ -181,7 +192,7 @@ def _preflight_check(enabled_steps) -> list[str]:
                 f"Tool '{tool_id}' desconocida (no registrada en REGISTRY)"
             )
 
-    return errors
+    return errors, warnings
 
 
 LogFn = Callable[[str], None]
@@ -228,17 +239,23 @@ def run_editor_auto_pipeline(
 
     # ===== PREFLIGHT CHECKS =====
     # Validamos que TODO lo que el flow necesita esté operativo ANTES de
-    # gastar dinero en Whisper/OpenAI/Gemini. Si algo falla, abortamos
-    # SIN cobrar — el input queda intacto para re-intentar.
+    # gastar dinero en Whisper/OpenAI/Gemini. Si hay errors (hard) →
+    # abortamos SIN cobrar. Si hay warnings (soft) → los logueamos y
+    # seguimos (la tool maneja la feature ausente).
     on_log("[editor_auto] 🔎 Preflight: comprobando deps de cada tool…")
-    errors = _preflight_check(enabled_steps)
+    errors, warnings = _preflight_check(enabled_steps)
+    for w in warnings:
+        on_log(f"[editor_auto] ⚠️  {w}")
     if errors:
         msg = "Preflight FAILED — abortando antes de cobrar:\n" + "\n".join(
             f"  • {e}" for e in errors
         )
         on_log(msg)
         raise RuntimeError(msg)
-    on_log("[editor_auto] ✅ Preflight OK — arrancando pipeline")
+    on_log(
+        f"[editor_auto] ✅ Preflight OK — arrancando pipeline"
+        + (f" ({len(warnings)} warning(s) — features degradadas)" if warnings else "")
+    )
 
     # Carpetas del usuario en Drive — 4 carpetas: entrada/cola/recuperacion/salida
     _, _, _, _, out_folder = ensure_user_folders(user.name)
