@@ -34,6 +34,12 @@ from src.editor_auto.config import (
 
 
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
+# Extensión del archivo de guión que acompaña a un vídeo. El cliente
+# deposita `1.mp4` + `1.txt` en `entrada/`; el listado asocia ambos
+# automáticamente y al encolar leemos el contenido del .txt como script
+# si el flow del usuario usa `silence_cutter_scripted`.
+SCRIPT_EXT = ".txt"
+SCRIPT_MAX_BYTES = 200_000  # cap defensivo (~200KB) — un guion normal son <10KB
 
 
 class FolderError(Exception):
@@ -74,9 +80,36 @@ def _stat(path: str) -> dict[str, Any]:
         return {"size_bytes": 0, "modified_at": 0}
 
 
+def _script_companion(dir_path: str, video_name: str) -> dict[str, Any] | None:
+    """Si junto al vídeo existe `<stem>.txt`, devuelve `{filename, size_bytes,
+    modified_at}` del .txt. Si no, `None`. La asociación es por stem
+    insensible a mayúsculas para tolerar `Video.MP4` + `video.txt`."""
+    stem = os.path.splitext(video_name)[0]
+    candidate = stem + SCRIPT_EXT
+    path = os.path.join(dir_path, candidate)
+    if os.path.isfile(path):
+        return {"filename": candidate, **_stat(path)}
+    # Fallback case-insensitive: itera el dir si la primera ruta no existe.
+    # Útil en filesystems case-sensitive (Linux) cuando el cliente sube con
+    # otra capitalización.
+    lower = (stem + SCRIPT_EXT).lower()
+    try:
+        for n in os.listdir(dir_path):
+            if n.lower() == lower:
+                p = os.path.join(dir_path, n)
+                if os.path.isfile(p):
+                    return {"filename": n, **_stat(p)}
+    except OSError:
+        pass
+    return None
+
+
 def list_files(username: str, folder: str) -> list[dict[str, Any]]:
     """Lista los vídeos de una carpeta del usuario, ordenados por
-    `modified_at` descendente (más reciente arriba)."""
+    `modified_at` descendente. Cada vídeo lleva `script` (dict con
+    `filename`+`size_bytes`+`modified_at`) si existe `<stem>.txt` al
+    lado, o `None` en caso contrario. Los `.txt` NO aparecen como
+    items separados — son metadatos del vídeo."""
     dir_path = user_subfolder(username, folder)
     if not os.path.isdir(dir_path):
         return []
@@ -93,10 +126,36 @@ def list_files(username: str, folder: str) -> list[dict[str, Any]]:
             "filename": name,
             "folder": folder,
             "ext": ext,
+            "script": _script_companion(dir_path, name),
             **meta,
         })
     files.sort(key=lambda f: f["modified_at"], reverse=True)
     return files
+
+
+def read_script_companion(
+    username: str, folder: str, video_filename: str,
+) -> str | None:
+    """Lee el contenido del .txt companion del vídeo. Devuelve `None` si
+    no existe. Cap `SCRIPT_MAX_BYTES`. UTF-8 con replace para tolerar
+    archivos guardados en latin-1."""
+    base = _validate_filename(video_filename)
+    dir_path = user_subfolder(username, folder)
+    companion = _script_companion(dir_path, base)
+    if not companion:
+        return None
+    path = os.path.join(dir_path, companion["filename"])
+    try:
+        with open(path, "rb") as f:
+            data = f.read(SCRIPT_MAX_BYTES + 1)
+    except OSError:
+        return None
+    if len(data) > SCRIPT_MAX_BYTES:
+        # Demasiado grande — probablemente no es un guion, no lo usamos.
+        # No es un error, simplemente lo ignoramos como "sin script".
+        return None
+    text = data.decode("utf-8", errors="replace").strip()
+    return text or None
 
 
 def count_files(username: str) -> dict[str, int]:
@@ -143,16 +202,20 @@ def move_file(
     src_folder: str,
     dst_folder: str,
     filename: str,
+    *,
+    move_companion: bool = True,
 ) -> dict[str, Any]:
     """Mueve `filename` de `src_folder` a `dst_folder` (ambos del mismo
     usuario). Si el destino ya tiene un archivo con ese nombre, renombra
     con sufijo `_2`, `_3`, … en lugar de pisar.
 
-    Devuelve `{filename_new, src_folder, dst_folder}` con el nombre
-    final tras la deduplicación.
+    Si existe el archivo de guion companion (`<stem>.txt`) Y
+    `move_companion=True`, también lo mueve preservando la asociación
+    (el companion adopta el nuevo stem si hubo deduplicación).
 
-    Mover a la misma carpeta de origen es no-op (devuelve el archivo tal
-    cual). Si src y dst son la misma + filename existe → devuelve idem.
+    Devuelve `{filename_new, src_folder, dst_folder, moved,
+    companion_moved}`. `companion_moved` es el nombre nuevo del .txt si
+    se movió, o `None`.
     """
     base = _validate_filename(filename)
     src_dir = user_subfolder(username, src_folder)
@@ -168,6 +231,7 @@ def move_file(
             "src_folder": src_folder,
             "dst_folder": dst_folder,
             "moved": False,
+            "companion_moved": None,
         }
     Path(dst_dir).mkdir(parents=True, exist_ok=True)
     final_name = _unique_name_in(dst_dir, base)
@@ -175,17 +239,46 @@ def move_file(
     # `shutil.move` maneja cross-device (en algunos mounts FUSE de rclone
     # `os.rename` falla con EXDEV — necesitamos copy + delete).
     shutil.move(src_path, dst_path)
+
+    # Mover companion .txt si existe y el flag lo permite. El companion
+    # adopta el nuevo stem para preservar la asociación tras dedup
+    # (si `1.mp4` se renombró a `1_2.mp4`, su .txt va como `1_2.txt`).
+    companion_moved: str | None = None
+    if move_companion:
+        companion = _script_companion(src_dir, base)
+        if companion:
+            try:
+                src_txt = os.path.join(src_dir, companion["filename"])
+                new_stem = os.path.splitext(final_name)[0]
+                new_txt_name = new_stem + SCRIPT_EXT
+                # Dedup también el .txt por si por algún motivo ya existe.
+                new_txt_name = _unique_name_in(dst_dir, new_txt_name)
+                dst_txt = os.path.join(dst_dir, new_txt_name)
+                shutil.move(src_txt, dst_txt)
+                companion_moved = new_txt_name
+            except OSError:
+                # Si falla el companion no abortamos el move del vídeo —
+                # el .txt quedará huérfano en src pero el video llegó OK.
+                pass
+
     return {
         "filename_new": final_name,
         "src_folder": src_folder,
         "dst_folder": dst_folder,
         "moved": True,
+        "companion_moved": companion_moved,
     }
 
 
-def delete_file(username: str, folder: str, filename: str) -> None:
-    """Borra el archivo del filesystem. IRREVERSIBLE — la UI pide
-    confirmación antes de llamar."""
+def delete_file(
+    username: str,
+    folder: str,
+    filename: str,
+    *,
+    delete_companion: bool = True,
+) -> None:
+    """Borra el archivo del filesystem. IRREVERSIBLE. Si existe el
+    companion .txt y `delete_companion=True`, lo borra también."""
     base = _validate_filename(filename)
     dir_path = user_subfolder(username, folder)
     path = os.path.join(dir_path, base)
@@ -194,3 +287,10 @@ def delete_file(username: str, folder: str, filename: str) -> None:
             f"Archivo no encontrado en {folder}/: {base}"
         )
     os.remove(path)
+    if delete_companion:
+        companion = _script_companion(dir_path, base)
+        if companion:
+            try:
+                os.remove(os.path.join(dir_path, companion["filename"]))
+            except OSError:
+                pass

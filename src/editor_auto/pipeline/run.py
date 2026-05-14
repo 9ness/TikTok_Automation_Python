@@ -36,8 +36,15 @@ def run_editor_auto_pipeline(
     on_log: LogFn,
     on_progress: ProgressFn,
     script: str | None = None,
+    source_filename: str | None = None,
 ) -> str:
-    """Pipeline completo. Devuelve la ruta absoluta del MP4 final en Drive."""
+    """Pipeline completo. Devuelve la ruta absoluta del MP4 final en Drive.
+
+    `source_filename`: si está presente (caso workflow entrada→cola), el
+    output toma el mismo nombre base con sufijo `_editado`. Ej:
+    `1.mp4` → `1_editado.mp4`. Para uploads directos sin source_filename,
+    se cae al esquema timestamped legacy (`<fecha>_editor_<jobid>.mp4`).
+    """
     repo = UserRepo()
     user = repo.get(user_id)
     if user is None:
@@ -62,11 +69,26 @@ def run_editor_auto_pipeline(
     _, _, _, _, out_folder = ensure_user_folders(user.name)
     on_log(f"[editor_auto] Output folder: {out_folder}")
 
-    # Nombre versionado: <YYYY-MM-DD>_<HHMMSS>_<job_id>.mp4
-    # (con _vN si ya existe para el mismo día — lo dejamos simple)
-    ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    base_name = f"{ts}_editor_{job_id}.mp4"
+    # Naming del MP4 final:
+    #   - source_filename presente → `<stem>_editado.mp4` (siempre .mp4,
+    #     aunque el input sea .mov/.webm — el encoder estabiliza a H264).
+    #   - sin source_filename (upload directo) → timestamped legacy.
+    # Si ya existe un editado del mismo día con ese nombre, dedup `_2`/`_3`.
+    if source_filename:
+        stem = os.path.splitext(os.path.basename(source_filename))[0]
+        base_name = f"{stem}_editado.mp4"
+        # Dedup si ya hay un editado con ese nombre
+        n = 2
+        candidate = base_name
+        while os.path.exists(os.path.join(out_folder, candidate)):
+            candidate = f"{stem}_editado_{n}.mp4"
+            n += 1
+        base_name = candidate
+    else:
+        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        base_name = f"{ts}_editor_{job_id}.mp4"
     final_output_path = os.path.join(out_folder, base_name)
+    on_log(f"[editor_auto] Output filename: {base_name}")
 
     # Output intermedio en temp_folder (lo movemos a Drive al terminar
     # para que un fallo a mitad de render no contamine Drive).

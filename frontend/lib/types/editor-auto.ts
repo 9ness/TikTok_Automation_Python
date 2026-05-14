@@ -76,6 +76,14 @@ export interface FolderFile {
   ext: string;
   size_bytes: number;
   modified_at: number; // epoch seconds
+  // Si en la misma carpeta existe `<stem>.txt`, el backend lo asocia
+  // como guion companion. Para flows con `silence_cutter_scripted`, al
+  // encolar el backend lee el .txt automáticamente.
+  script: {
+    filename: string;
+    size_bytes: number;
+    modified_at: number;
+  } | null;
 }
 
 export interface FolderCounts {

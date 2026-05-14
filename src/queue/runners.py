@@ -1202,6 +1202,10 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             on_log=on_log,
             on_progress=on_progress,
             script=script,
+            # Pasamos el filename original para que el output se llame
+            # `<stem>_editado.mp4` en lugar del timestamped legacy.
+            source_filename=source_filename
+            if source == "entrada" else None,
         )
     except Exception:
         # Fallo del pipeline: devolver el input a `entrada/` para que el

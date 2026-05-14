@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Download,
+  FileText,
   FileVideo,
   FolderInput,
   FolderOpen,
@@ -454,12 +455,26 @@ function FileRow({
   disabled: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const hasScript = Boolean(file.script);
   return (
     <li className="rounded-md border bg-card/40 p-2">
       <div className="flex flex-wrap items-center gap-2">
         <FileVideo className="h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{file.filename}</p>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium">
+              {file.filename}
+            </span>
+            {hasScript && (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-violet-600 dark:text-violet-300"
+                title={`Guión asociado: ${file.script!.filename} (${formatBytes(file.script!.size_bytes)})`}
+              >
+                <FileText className="h-2.5 w-2.5" />
+                guión
+              </span>
+            )}
+          </div>
           <p className="text-[10px] text-muted-foreground">
             {formatBytes(file.size_bytes)} ·{" "}
             {formatRelative(file.modified_at)}
@@ -483,6 +498,7 @@ function FileRow({
           <EnqueueAction
             filename={file.filename}
             needsScript={needsScript}
+            scriptCompanion={file.script?.filename ?? null}
             onEnqueue={onEnqueue}
             disabled={disabled}
           />
@@ -542,17 +558,25 @@ function FileRow({
 function EnqueueAction({
   filename,
   needsScript,
+  scriptCompanion,
   onEnqueue,
   disabled,
 }: {
   filename: string;
   needsScript: boolean;
+  /** Nombre del `.txt` companion si existe en la carpeta (el backend lo
+   *  detecta automáticamente al listar). Cuando existe, no pedimos
+   *  textarea — el backend lo lee al encolar. */
+  scriptCompanion: string | null;
   onEnqueue: (script: string) => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [script, setScript] = useState("");
-  const ready = !needsScript || script.trim().length > 0;
+  // Necesitamos guión SOLO si el flow lo pide Y no hay companion .txt.
+  // Si hay companion, dejamos `script` vacío y el backend lo lee del .txt.
+  const needsManualScript = needsScript && !scriptCompanion;
+  const ready = !needsManualScript || script.trim().length > 0;
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
@@ -575,11 +599,28 @@ function EnqueueAction({
             a entrada/.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {needsScript && (
+        {needsScript && scriptCompanion && (
+          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <p className="flex items-center gap-1.5 font-medium">
+              <FileText className="h-3 w-3" />
+              Guión detectado: <code>{scriptCompanion}</code>
+            </p>
+            <p className="mt-0.5 text-[10px] opacity-80">
+              El backend lo leerá automáticamente al encolar. Ambos archivos
+              se mueven juntos por todo el flujo.
+            </p>
+          </div>
+        )}
+        {needsManualScript && (
           <div className="space-y-1">
             <p className="text-xs font-medium">
               Guión de referencia (obligatorio — el flow usa
               silence_cutter_scripted)
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              Tip: la próxima vez puedes subir{" "}
+              <code>{filename.replace(/\.[^.]+$/, ".txt")}</code> junto al
+              vídeo en entrada/ y se detectará solo.
             </p>
             <Textarea
               value={script}
@@ -595,7 +636,7 @@ function EnqueueAction({
           <AlertDialogAction
             disabled={!ready}
             onClick={() => {
-              onEnqueue(needsScript ? script.trim() : "");
+              onEnqueue(needsManualScript ? script.trim() : "");
               setScript("");
             }}
           >

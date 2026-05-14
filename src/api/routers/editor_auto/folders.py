@@ -206,7 +206,7 @@ def enqueue_from_entrada(
     """
     u = _user_or_raise(user_id)
     filename = (payload.get("filename") or "").strip()
-    script = (payload.get("script") or "").strip()
+    script_from_body = (payload.get("script") or "").strip()
 
     enabled = [s for s in u.tool_flow if s.enabled]
     if not enabled:
@@ -214,13 +214,33 @@ def enqueue_from_entrada(
             f"El usuario '{u.name}' no tiene herramientas habilitadas."
         )
     needs_script = any(s.tool_id == "silence_cutter_scripted" for s in enabled)
+
+    # Resolución del guion (prioridad: body > companion .txt en entrada/).
+    # Para flows scripted, si el cliente subió `<stem>.txt` junto al
+    # vídeo en entrada/, lo leemos automáticamente — el operador no tiene
+    # que copiar/pegar nada.
+    script: str = ""
+    if script_from_body:
+        script = script_from_body
+    elif needs_script:
+        try:
+            companion = folder_manager.read_script_companion(
+                u.name, "entrada", filename,
+            )
+        except (folder_manager.FolderError, ValueError) as e:
+            raise ValidationError(str(e))
+        if companion:
+            script = companion
+
     if needs_script and not script:
         raise ValidationError(
-            f"El usuario '{u.name}' tiene 'silence_cutter_scripted' — el "
-            f"guión es obligatorio para encolar."
+            f"El usuario '{u.name}' tiene 'silence_cutter_scripted' en su "
+            f"flow — necesita un guión. Sube un archivo `.txt` con el "
+            f"mismo nombre base que el vídeo (ej: `{os.path.splitext(filename)[0]}.txt`) "
+            f"a la carpeta `entrada/`, o pasa el guión en el body."
         )
 
-    # 1+2. mover entrada → cola
+    # 1+2. mover entrada → cola (incluye companion .txt si existe)
     try:
         move_result = folder_manager.move_file(
             u.name, "entrada", "cola", filename,
