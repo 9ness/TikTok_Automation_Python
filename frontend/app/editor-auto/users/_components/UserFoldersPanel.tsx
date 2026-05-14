@@ -43,6 +43,7 @@ import {
   useDeleteUserFile,
   useEditorUser,
   useEnqueueFromEntrada,
+  useForgetKnownEmail,
   useMoveUserFile,
   useRevokeUserShare,
   useSharingStatus,
@@ -241,14 +242,24 @@ function SharingSection({
   const shares = useUserShares(userId);
   const create = useCreateUserShare(userId);
   const revoke = useRevokeUserShare(userId);
+  const forget = useForgetKnownEmail(userId);
 
   const [email, setEmail] = useState("");
   const [showAll, setShowAll] = useState(false);
+  // Carpetas seleccionadas por defecto al añadir un nuevo email. Por
+  // requerimiento del operador: `entrada` por defecto, `salida` NO — así
+  // primero el cliente sube, tú revisas, y solo entonces le das salida.
+  const [shareEntrada, setShareEntrada] = useState(true);
+  const [shareSalida, setShareSalida] = useState(false);
 
-  // Drive devuelve los mismos perms en `entrada` y `salida` (si compartiste
-  // ambas con el mismo email). Agrupamos por email para no duplicar visualmente.
-  const grouped = groupSharesByEmail(shares.data?.shares);
-  const visible = showAll ? grouped : grouped.slice(0, 4);
+  // Construimos la lista combinando shares activos + known_emails. Así
+  // los gmails que ya usaste alguna vez quedan visibles aunque ahora no
+  // tengan ninguna carpeta compartida — un solo click los re-activa.
+  const grouped = mergeKnownEmails(
+    groupSharesByEmail(shares.data?.shares),
+    shares.data?.known_emails ?? [],
+  );
+  const visible = showAll ? grouped : grouped.slice(0, 6);
 
   if (status.isLoading) {
     return (
@@ -279,13 +290,42 @@ function SharingSection({
   const handleShare = async () => {
     const e = email.trim().toLowerCase();
     if (!e) return;
+    const folders: FolderName[] = [];
+    if (shareEntrada) folders.push("entrada");
+    if (shareSalida) folders.push("salida");
+    if (folders.length === 0) return;
     await create.mutateAsync({
       email: e,
-      folders: ["entrada", "salida"],
+      folders,
       role: "reader",
       notify: true,
     });
     setEmail("");
+    // Reset a los defaults seguros: solo entrada para el siguiente
+    setShareEntrada(true);
+    setShareSalida(false);
+  };
+
+  // Toggle granular para una persona existente — añade o quita acceso a
+  // una sola carpeta sin tocar la otra. La UI usa esto para que puedas
+  // dar `salida` solo después de revisar el output.
+  const handleToggleFolder = async (g: GroupedShare, folder: FolderName) => {
+    const existing = g.folders[folder];
+    if (existing) {
+      // Revocar solo esa carpeta
+      await revoke.mutateAsync({
+        permission_id: existing.permission_id,
+        folder,
+      });
+    } else {
+      // Conceder solo esa carpeta (sin tocar las demás del email)
+      await create.mutateAsync({
+        email: g.email,
+        folders: [folder],
+        role: "reader",
+        notify: false, // ya tiene la carpeta hermana — no spam email
+      });
+    }
   };
 
   return (
@@ -301,39 +341,62 @@ function SharingSection({
       </div>
       <p className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
         <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-        Le doy acceso de SOLO LECTURA a <code>entrada/</code> y{" "}
-        <code>salida/</code> de <code>{userName}</code>. La persona recibe un
-        email de Google Drive con el link.
+        Acceso de SOLO LECTURA por carpeta — controlas si ve{" "}
+        <code>entrada/</code>, <code>salida/</code> o ambas. La persona recibe
+        un email de Google Drive con el link directo.
       </p>
 
       {/* Form: añadir nuevo */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Mail className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@gmail.com"
-            className="h-8 pl-7 text-xs"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleShare();
-            }}
-          />
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Mail className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@gmail.com"
+              className="h-8 pl-7 text-xs"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleShare();
+              }}
+            />
+          </div>
+          <Button
+            size="sm"
+            className="h-8 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+            onClick={handleShare}
+            disabled={
+              !email.trim() ||
+              create.isPending ||
+              (!shareEntrada && !shareSalida)
+            }
+          >
+            {create.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <UserPlus className="h-3 w-3" />
+            )}
+            Compartir
+          </Button>
         </div>
-        <Button
-          size="sm"
-          className="h-8 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
-          onClick={handleShare}
-          disabled={!email.trim() || create.isPending}
-        >
-          {create.isPending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <UserPlus className="h-3 w-3" />
+        <div className="flex items-center gap-3 px-0.5">
+          <FolderCheckbox
+            label="entrada"
+            checked={shareEntrada}
+            onChange={setShareEntrada}
+          />
+          <FolderCheckbox
+            label="salida"
+            checked={shareSalida}
+            onChange={setShareSalida}
+          />
+          {!shareEntrada && !shareSalida && (
+            <span className="text-[9px] text-amber-600 dark:text-amber-400">
+              elige al menos una carpeta
+            </span>
           )}
-          Compartir
-        </Button>
+        </div>
       </div>
       {create.error && (
         <p className="text-[10px] text-destructive">
@@ -341,63 +404,90 @@ function SharingSection({
         </p>
       )}
 
-      {/* Lista de compartidos actuales */}
+      {/* Lista de compartidos + emails recordados */}
       {grouped.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">
-          Nadie tiene acceso aún.
+          Nadie tiene acceso aún. Añade un email arriba para empezar.
         </p>
       ) : (
         <ul className="space-y-1">
-          {visible.map((g) => (
-            <li
-              key={g.email}
-              className="flex items-center gap-2 rounded-md border bg-card/40 px-2 py-1 text-xs"
-            >
-              <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{g.email}</span>
-              <span className="flex gap-1">
-                {(["entrada", "salida"] as FolderName[]).map((f) => {
-                  const has = g.folders[f];
-                  return has ? (
-                    <span
-                      key={f}
-                      className="rounded bg-emerald-500/15 px-1 text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400"
-                      title={`acceso ${has.role}`}
-                    >
-                      {f}
-                    </span>
-                  ) : null;
-                })}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                title="Revocar acceso"
-                disabled={revoke.isPending}
-                onClick={async () => {
-                  for (const folder of ["entrada", "salida"] as FolderName[]) {
-                    const s = g.folders[folder];
-                    if (s) {
-                      await revoke.mutateAsync({
-                        permission_id: s.permission_id,
-                        folder,
-                      });
-                    }
-                  }
-                }}
+          {visible.map((g) => {
+            const hasAnyAccess =
+              Boolean(g.folders.entrada) || Boolean(g.folders.salida);
+            return (
+              <li
+                key={g.email}
+                className="flex flex-wrap items-center gap-2 rounded-md border bg-card/40 px-2 py-1 text-xs"
               >
-                <X className="h-3 w-3 text-destructive" />
-              </Button>
-            </li>
-          ))}
-          {grouped.length > 4 && !showAll && (
+                <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">
+                  {g.email}
+                  {!hasAnyAccess && (
+                    <span className="ml-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+                      · sin acceso
+                    </span>
+                  )}
+                </span>
+                <div className="flex shrink-0 gap-1">
+                  {(["entrada", "salida"] as FolderName[]).map((f) => (
+                    <FolderToggle
+                      key={f}
+                      folder={f}
+                      has={Boolean(g.folders[f])}
+                      disabled={create.isPending || revoke.isPending}
+                      onClick={() => handleToggleFolder(g, f)}
+                    />
+                  ))}
+                </div>
+                {hasAnyAccess && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Revocar TODAS las carpetas (mantiene el email recordado)"
+                    disabled={revoke.isPending}
+                    onClick={async () => {
+                      for (const folder of [
+                        "entrada",
+                        "salida",
+                      ] as FolderName[]) {
+                        const s = g.folders[folder];
+                        if (s) {
+                          await revoke.mutateAsync({
+                            permission_id: s.permission_id,
+                            folder,
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    <X className="h-3 w-3 text-destructive" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title={
+                    hasAnyAccess
+                      ? "Revoca primero los accesos para olvidar este email"
+                      : "Olvidar email (quita de la agenda)"
+                  }
+                  disabled={hasAnyAccess || forget.isPending}
+                  onClick={() => forget.mutate({ email: g.email })}
+                >
+                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                </Button>
+              </li>
+            );
+          })}
+          {grouped.length > 6 && !showAll && (
             <button
               type="button"
               onClick={() => setShowAll(true)}
               className="text-[10px] text-muted-foreground hover:text-foreground"
             >
-              +{grouped.length - 4} más
+              +{grouped.length - 6} más
             </button>
           )}
         </ul>
@@ -414,6 +504,35 @@ function SharingSection({
 interface GroupedShare {
   email: string;
   folders: Partial<Record<FolderName, DriveShare>>;
+}
+
+/** Mezcla las filas con accesos activos + los emails recordados pero
+ *  sin acceso actual. Resultado ordenado: primero los que tienen acceso,
+ *  luego los "fríos" — todos alfabéticos dentro de su grupo. */
+function mergeKnownEmails(
+  active: GroupedShare[],
+  knownEmails: string[],
+): GroupedShare[] {
+  const byEmail = new Map<string, GroupedShare>();
+  for (const g of active) byEmail.set(g.email.toLowerCase(), g);
+  for (const e of knownEmails) {
+    const key = e.toLowerCase();
+    if (!byEmail.has(key)) {
+      byEmail.set(key, { email: key, folders: {} });
+    }
+  }
+  const all = Array.from(byEmail.values());
+  const withAccess = all
+    .filter(
+      (g) => Boolean(g.folders.entrada) || Boolean(g.folders.salida),
+    )
+    .sort((a, b) => a.email.localeCompare(b.email));
+  const withoutAccess = all
+    .filter(
+      (g) => !g.folders.entrada && !g.folders.salida,
+    )
+    .sort((a, b) => a.email.localeCompare(b.email));
+  return [...withAccess, ...withoutAccess];
 }
 
 function groupSharesByEmail(
@@ -733,6 +852,80 @@ function DeleteAction({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponentes del sharing (checkbox del form, toggle por fila)
+// ---------------------------------------------------------------------------
+function FolderCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer select-none items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
+        checked
+          ? "border-brand-cyan/60 bg-brand-cyan/10 text-brand-cyan"
+          : "border-muted-foreground/30 text-muted-foreground hover:bg-accent/40",
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span
+        className={cn(
+          "h-2 w-2 rounded-sm border",
+          checked
+            ? "border-brand-cyan bg-brand-cyan"
+            : "border-muted-foreground/50",
+        )}
+      />
+      {label}
+    </label>
+  );
+}
+
+function FolderToggle({
+  folder,
+  has,
+  disabled,
+  onClick,
+}: {
+  folder: FolderName;
+  has: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={
+        has
+          ? `Tiene acceso a ${folder}/ — click para revocar`
+          : `Sin acceso a ${folder}/ — click para conceder`
+      }
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider transition-colors disabled:opacity-50",
+        has
+          ? "bg-emerald-500/15 text-emerald-600 hover:bg-rose-500/15 hover:text-rose-600 dark:text-emerald-400"
+          : "bg-muted/40 text-muted-foreground hover:bg-emerald-500/15 hover:text-emerald-600",
+      )}
+    >
+      {has ? "✓ " : "+ "}
+      {folder}
+    </button>
   );
 }
 

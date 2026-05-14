@@ -48,6 +48,13 @@ class EditorUser(BaseModel):
     description: str = ""
     tool_flow: list[ToolStep] = Field(default_factory=list)
     drive_folder: str | None = None     # path local Drive sincronizado
+    # Lista de emails conocidos a los que se les ha dado acceso a alguna
+    # carpeta alguna vez. Se actualiza al hacer share (append si nuevo).
+    # Permite a la UI mostrarlos siempre — el admin puede re-conceder o
+    # revocar acceso a esos emails con un click sin re-tipearlos.
+    # `revoke_permission` NO los elimina; solo el endpoint de
+    # `forget_share_email` los borra explícitamente.
+    known_share_emails: list[str] = Field(default_factory=list)
     deleted: bool = False
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)

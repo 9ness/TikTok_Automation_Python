@@ -157,6 +157,10 @@ export interface UserSharesResponse {
   user_id: string;
   user_name: string;
   shares: Record<FolderName, DriveShare[]>;
+  /** Emails a los que el usuario ha dado acceso alguna vez (incluso si
+   *  ahora no tienen ninguna carpeta compartida). Permite al UI mostrar
+   *  filas re-utilizables sin re-tipear el gmail. */
+  known_emails: string[];
 }
 
 export interface CreateShareInput {

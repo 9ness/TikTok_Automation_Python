@@ -68,7 +68,10 @@ def sharing_status() -> dict[str, Any]:
 @router.get("/users/{user_id}/shares")
 def list_user_shares(user_id: str) -> dict[str, Any]:
     """Lista los permissions activos en `entrada`, `cola`, `recuperacion`,
-    `salida` del usuario. Filtra automáticamente al owner y al SA."""
+    `salida` del usuario + el conjunto de `known_emails` (memorizados al
+    compartir por primera vez). El frontend usa los known_emails para
+    mostrar filas incluso si el email no tiene acceso activo a ninguna
+    carpeta — facilita re-conceder con un click."""
     u = _user_or_raise(user_id)
     try:
         shares = drive_sharing.list_shares(u.name)
@@ -78,6 +81,7 @@ def list_user_shares(user_id: str) -> dict[str, Any]:
         "user_id": u.id,
         "user_name": u.name,
         "shares": shares,
+        "known_emails": list(u.known_share_emails or []),
     }
 
 
@@ -93,6 +97,10 @@ def create_user_share(
             role: "reader" | "commenter" | "writer"   // default "reader"
             notify: bool                       // default true (email Drive)
         }
+
+    Side-effect: el email se añade a `user.known_share_emails` la primera
+    vez que se comparte algo con él, para que la UI lo recuerde y permita
+    re-conceder/revocar rápido sin re-tipearlo.
     """
     u = _user_or_raise(user_id)
     email = _validate_email(payload.get("email") or "")
@@ -109,11 +117,36 @@ def create_user_share(
         )
     except drive_sharing.DriveSharingError as e:
         raise ValidationError(str(e))
+
+    # Persistir el email en known_share_emails si es nuevo. Insensible a
+    # mayúsculas (todos ya en lowercase por _validate_email).
+    if email not in (u.known_share_emails or []):
+        u.known_share_emails = [*(u.known_share_emails or []), email]
+        UserRepo().save(u)
+
     return {
         "user_id": u.id,
         "user_name": u.name,
         "shared": results,
     }
+
+
+@router.delete("/users/{user_id}/known-emails/{email}")
+def forget_known_email(user_id: str, email: str) -> dict[str, Any]:
+    """Elimina un email de la lista `known_share_emails` del usuario.
+
+    NO revoca permisos activos en Drive — solo lo quita de la "agenda"
+    para que la UI deje de mostrarlo. Si la persona tiene accesos
+    activos, primero hay que revocarlos con DELETE /shares/{pid}.
+    """
+    u = _user_or_raise(user_id)
+    e = (email or "").strip().lower()
+    if not e:
+        raise ValidationError("Email vacío.")
+    if e in (u.known_share_emails or []):
+        u.known_share_emails = [x for x in u.known_share_emails if x != e]
+        UserRepo().save(u)
+    return {"user_id": u.id, "email": e, "removed": True}
 
 
 @router.delete("/users/{user_id}/shares/{permission_id}")

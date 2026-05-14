@@ -370,3 +370,18 @@ export function useRevokeUserShare(userId: string) {
     },
   });
 }
+
+/** Elimina un email de la lista `known_share_emails` del usuario.
+ *  No revoca permisos activos en Drive — solo lo quita de la agenda. */
+export function useForgetKnownEmail(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { email: string }>({
+    mutationFn: ({ email }) =>
+      api.del<void>(
+        `${USERS_ROOT}/${encodeURIComponent(userId)}/known-emails/${encodeURIComponent(email)}`,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: userSharesKey(userId) });
+    },
+  });
+}
