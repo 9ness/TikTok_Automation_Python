@@ -25,6 +25,12 @@ logs/
 !frontend/public/brand/*.png
 !frontend/public/brand/*.jpg
 !frontend/public/**/*.svg
+# Convención Next.js App Router: app/icon.png genera el favicon automático
+# vía Metadata Files. Si no se commitea, producción se queda sin favicon.
+!frontend/app/icon.png
+!frontend/app/apple-icon.png
+!frontend/app/opengraph-image.png
+!frontend/app/twitter-image.png
 
 # --- Rutas específicas de tu proyecto (por seguridad) ---
 BIBLIOTECA_PRESIDENTES/
