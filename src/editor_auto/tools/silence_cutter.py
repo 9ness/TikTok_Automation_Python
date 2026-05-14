@@ -1921,6 +1921,15 @@ _NVENC_CACHE: bool | None = None
 
 
 def _has_nvenc() -> bool:
+    """¿Podemos USAR h264_nvenc en este host?
+
+    No basta con ver "h264_nvenc" en `-encoders` (el FFmpeg de Debian
+    viene compilado con NVENC aunque el host no tenga GPU NVIDIA). Hace
+    falta abrir realmente el encoder — si `libcuda.so.1` falta o el
+    driver NVIDIA no está, falla y caemos a libx264 (CPU).
+
+    Cache por proceso: una vez detectado, no re-probamos.
+    """
     global _NVENC_CACHE
     if _NVENC_CACHE is not None:
         return _NVENC_CACHE
@@ -1929,7 +1938,26 @@ def _has_nvenc() -> bool:
             ["ffmpeg", "-hide_banner", "-encoders"],
             stderr=subprocess.DEVNULL, timeout=10,
         )
-        _NVENC_CACHE = b"h264_nvenc" in out
+        if b"h264_nvenc" not in out:
+            _NVENC_CACHE = False
+            return False
+    except Exception:
+        _NVENC_CACHE = False
+        return False
+
+    # Smoke test real: encode 1 frame negro 64x64 a /dev/null. Si falta
+    # libcuda o driver, esto sale con código ≠ 0 en ~1s.
+    try:
+        rc = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.05:r=10",
+                "-c:v", "h264_nvenc", "-frames:v", "1",
+                "-f", "null", "-",
+            ],
+            capture_output=True, timeout=15,
+        ).returncode
+        _NVENC_CACHE = rc == 0
     except Exception:
         _NVENC_CACHE = False
     return _NVENC_CACHE
