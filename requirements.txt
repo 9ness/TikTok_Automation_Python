@@ -16,3 +16,9 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 websockets>=11.0
 python-multipart>=0.0.9
+# Silero VAD requiere torchaudio. La 2.5.x es la compatible con torch 2.5.1
+# que ya está pinneado por el resto del stack; versiones >=2.10 dan
+# `OSError WinError 127` al cargar `_torchaudio.dll`.
+torchaudio==2.5.1
+silero-vad>=5.1
+onnxruntime>=1.20

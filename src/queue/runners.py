@@ -1154,6 +1154,46 @@ def _iso_now() -> str:
 
 
 # ============================================================
+# RUNNER: EDITOR AUTO (Programa 3)
+# ============================================================
+def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Pipeline Editor Auto: ejecuta el flujo de herramientas del usuario
+    sobre un vídeo input subido manualmente.
+
+    Params esperados en job.params:
+      - user_id: id del EditorUser
+      - input_path: ruta absoluta al MP4 subido
+      - temp_folder: carpeta temporal para archivos intermedios
+    """
+    # Logs tempranos — confirman al usuario que el runner arrancó y que
+    # los imports funcionaron. Sin esto, un ImportError silencioso aquí
+    # dejaba el job en "Iniciando…" sin pistas.
+    on_progress(0.005, "🚀 Cargando pipeline Editor Auto…")
+    on_log("[editor_auto] Worker arrancado, importando pipeline…")
+    from src.editor_auto.pipeline import run_editor_auto_pipeline
+
+    p = job.params
+    user_id = p["user_id"]
+    input_path = p["input_path"]
+    temp_folder = p.get("temp_folder", "./temp_work")
+    script = (p.get("script") or "").strip() or None
+    on_log(f"[editor_auto] user_id={user_id} · input={os.path.basename(input_path)}")
+    if script:
+        on_log(f"[editor_auto] script · {len(script)} chars (modo scripted)")
+    on_progress(0.01, "📂 Resolviendo usuario y carpetas…")
+
+    return run_editor_auto_pipeline(
+        user_id=user_id,
+        input_video_path=input_path,
+        job_id=job.id,
+        temp_folder=temp_folder,
+        on_log=on_log,
+        on_progress=on_progress,
+        script=script,
+    )
+
+
+# ============================================================
 # Dispatch
 # ============================================================
 _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
@@ -1162,6 +1202,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.SUBS_AUTO: run_subs_auto,
     JobMode.COPYRIGHT: run_copyright,
     JobMode.TIKTOK_SHOP: run_tiktok_shop,
+    JobMode.EDITOR_AUTO: run_editor_auto,
 }
 
 
@@ -1171,6 +1212,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.SUBS_AUTO: "creator_reward",
     JobMode.COPYRIGHT: "creator_reward",
     JobMode.TIKTOK_SHOP: "tiktok_shop",
+    JobMode.EDITOR_AUTO: "editor_auto",
 }
 
 
@@ -1202,13 +1244,34 @@ def dispatch_job(job: Job) -> None:
     # no persiste pero el runner sigue.
     try:
         from src import cost_tracking
+        program = _MODE_TO_PROGRAM.get(job.mode, "creator_reward")
+        # Para Editor Auto el "user" relevante es el EditorUser.name (lo que
+        # configura el flujo), no el operador autenticado que encoló. Esto
+        # permite filtrar costes por EditorUser en /costs y agrupar gasto
+        # por persona/canal sin mezclar con operadores.
+        if job.mode == JobMode.EDITOR_AUTO:
+            cost_user = job.params.get("user_name") or job.enqueued_by
+        else:
+            cost_user = job.enqueued_by
+
+        # Meta arbitraria que sobrevive en `cost:job:{id}` y aparece en
+        # /costs. Para editor_auto guardamos las tools usadas + combo
+        # ordenado para agrupar.
+        meta: dict = {}
+        if job.mode == JobMode.EDITOR_AUTO:
+            tools_used = list(job.params.get("tools_used") or [])
+            meta["tools"] = tools_used
+            meta["tools_key"] = "+".join(sorted(tools_used)) if tools_used else "(empty)"
+            meta["editor_user"] = job.params.get("user_name")
+
         cost_tracking.start_job(
             job_id=job.id,
-            program=_MODE_TO_PROGRAM.get(job.mode, "creator_reward"),
+            program=program,
             mode=job.mode.value,
-            user=job.enqueued_by,
+            user=cost_user,
             product_id=job.params.get("product_id"),
             title=job.title,
+            meta=meta,
         )
     except Exception as e:
         print(f"[dispatch] cost_tracking.start_job failed: {e}")

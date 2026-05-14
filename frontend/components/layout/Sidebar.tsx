@@ -15,12 +15,14 @@ import {
   Menu,
   Mic,
   Package,
+  Scissors,
   Settings,
   ShieldOff,
   ShoppingBag,
   Sparkles,
   Trophy,
   Users,
+  Wrench,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -74,6 +76,17 @@ const NAV: NavGroup[] = [
       { href: "/tiktok-shop/generate", label: "Generador", icon: Sparkles },
       { href: "/tiktok-shop/history", label: "Histórico", icon: History },
       { href: "/tiktok-shop/voices", label: "Voces", icon: Mic },
+    ],
+  },
+  {
+    kind: "group",
+    title: "Editor Auto",
+    basePath: "/editor-auto",
+    icon: Scissors,
+    items: [
+      { href: "/editor-auto/users", label: "Usuarios", icon: Users },
+      { href: "/editor-auto/tools", label: "Herramientas", icon: Wrench },
+      { href: "/editor-auto/generate", label: "Generador", icon: Sparkles },
     ],
   },
   {

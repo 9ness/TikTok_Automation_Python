@@ -1,0 +1,59 @@
+"""Modelo de usuario del programa Editor Auto.
+
+Cada usuario tiene UN flujo (lista de ToolStep) que se ejecuta sobre el
+vídeo input al generar. El orden de las herramientas en `tool_flow` es
+indicativo — el orchestrator reordena por `position_weight` para garantizar
+flujo correcto (ej. cortar antes que poner subs).
+
+La config de cada herramienta vive embebida en `ToolStep.config` para que
+la UI pueda editarla por usuario sin tocar otras entidades.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class ToolStep(BaseModel):
+    """Una herramienta dentro del flujo de un usuario.
+
+    Attrs:
+        tool_id: slug canónico de la herramienta (ej. "subs_auto",
+            "silence_cutter"). Debe existir en `tools.registry`.
+        enabled: si False, se ignora al ejecutar (útil para deshabilitar
+            temporalmente sin perder config).
+        config: dict libre con la config específica de la herramienta.
+            La forma la define cada `BaseTool.default_config()`.
+    """
+
+    tool_id: str
+    enabled: bool = True
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class EditorUser(BaseModel):
+    """Usuario del Editor Auto. UN flujo por usuario (por ahora)."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    name: str                      # nombre carpeta (sin @ — esto no es TikTok)
+    display_name: str = ""
+    description: str = ""
+    tool_flow: list[ToolStep] = Field(default_factory=list)
+    drive_folder: str | None = None     # path local Drive sincronizado
+    deleted: bool = False
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+    def touch(self) -> None:
+        self.updated_at = _now_iso()
+
+    def enabled_steps(self) -> list[ToolStep]:
+        return [s for s in self.tool_flow if s.enabled]

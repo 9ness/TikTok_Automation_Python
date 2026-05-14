@@ -62,7 +62,8 @@ export function QueueDrawer() {
   const grouped = useMemo(() => {
     const ts = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "tiktok_shop");
     const cr = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "creator_reward");
-    return { ts, cr };
+    const ea = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "editor_auto");
+    return { ts, cr, ea };
   }, [filtered]);
 
   if (!open) return null;
@@ -109,20 +110,22 @@ export function QueueDrawer() {
         {/* Filtros principales */}
         <div className="space-y-2 border-b px-4 py-3">
           <div className="flex flex-wrap gap-1">
-            {(["all", "tiktok_shop", "creator_reward"] as ProgramFilter[]).map((f) => (
-              <Button
-                key={f}
-                size="sm"
-                variant={programFilter === f ? "default" : "outline"}
-                onClick={() => {
-                  setProgramFilter(f);
-                  if (f !== "creator_reward") setCrSubFilter("all");
-                }}
-                className="h-7 text-xs"
-              >
-                {f === "all" ? "Todos" : PROGRAM_LABEL[f]}
-              </Button>
-            ))}
+            {(["all", "tiktok_shop", "creator_reward", "editor_auto"] as ProgramFilter[]).map(
+              (f) => (
+                <Button
+                  key={f}
+                  size="sm"
+                  variant={programFilter === f ? "default" : "outline"}
+                  onClick={() => {
+                    setProgramFilter(f);
+                    if (f !== "creator_reward") setCrSubFilter("all");
+                  }}
+                  className="h-7 text-xs"
+                >
+                  {f === "all" ? "Todos" : PROGRAM_LABEL[f]}
+                </Button>
+              ),
+            )}
           </div>
           {programFilter === "creator_reward" && (
             <div className="flex flex-wrap gap-1">
@@ -160,6 +163,9 @@ export function QueueDrawer() {
                 )}
                 {grouped.cr.length > 0 && (
                   <ProgramGroup label={PROGRAM_LABEL.creator_reward} jobs={grouped.cr} />
+                )}
+                {grouped.ea.length > 0 && (
+                  <ProgramGroup label={PROGRAM_LABEL.editor_auto} jobs={grouped.ea} />
                 )}
               </>
             ) : (

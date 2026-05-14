@@ -41,6 +41,10 @@ services:
       # solo existe `/mnt/drive`. Estos overrides ganan al `env_file`.
       TIKTOK_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS"
       TIKTOK_SHOP_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP"
+      # TIKTOK_EDITOR aún no existe en Drive — la app la crea lazy como
+      # hermana de TIKTOK_CR/TIKTOK_SHOP la primera vez que se crea un
+      # usuario (vía `resolve_editor_root` → `ensure_user_folders`).
+      TIKTOK_EDITOR_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
     volumes:
       - api_temp:/app/temp_work
       # Drive sincronizado (rclone mount en el host) → necesario para los

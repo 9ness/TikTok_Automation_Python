@@ -23,6 +23,14 @@ export interface JobCost {
   finished_at: number | null;
   lines: CostLine[];
   total_usd: number;
+  /** Datos arbitrarios del runner. Para editor_auto contiene `tools`
+   *  (lista) y `tools_key` (combo ordenado). */
+  meta?: {
+    tools?: string[];
+    tools_key?: string;
+    editor_user?: string;
+    [k: string]: unknown;
+  };
 }
 
 export interface CostSummary {
@@ -32,6 +40,8 @@ export interface CostSummary {
   by_mode: Record<string, number>;
   by_user: Record<string, number>;
   by_kind: Record<string, number>;
+  /** Solo aplica a editor_auto — coste agregado por combinación de tools. */
+  by_tools_combo?: Record<string, number>;
 }
 
 export interface JobsWithCostsResponse {

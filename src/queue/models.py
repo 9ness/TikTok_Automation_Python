@@ -20,6 +20,7 @@ class JobMode(str, Enum):
     SUBS_AUTO = "subs_auto"
     COPYRIGHT = "copyright"
     TIKTOK_SHOP = "tiktok_shop"
+    EDITOR_AUTO = "editor_auto"
 
 
 class JobStatus(str, Enum):
@@ -37,6 +38,7 @@ MODE_LABELS = {
     JobMode.SUBS_AUTO: "🎬 Subs sobre Vídeo",
     JobMode.COPYRIGHT: "🛡️ Quitar Copy",
     JobMode.TIKTOK_SHOP: "🛒 TikTok Shop",
+    JobMode.EDITOR_AUTO: "✂️ Editor Auto",
 }
 
 

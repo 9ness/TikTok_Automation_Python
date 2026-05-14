@@ -1,14 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { AlertCircle, Check, Clock, Download, ExternalLink, Loader2, Play, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertCircle, Check, Clock, Coins, Download, ExternalLink, FileText, Film, Loader2, Play, Timer, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
-import { useCancelJob, useRemoveJob } from "@/lib/queries/queue";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  useCancelJob,
+  useDeleteJobWithFile,
+  useJobSummary,
+  useRemoveJob,
+} from "@/lib/queries/queue";
 import { useQueueStore } from "@/lib/stores/queueStore";
+import { JobDetailDialog } from "./JobDetailDialog";
 import { JobVideoDialog } from "./JobVideoDialog";
 import {
   describeJobParams,
@@ -30,11 +46,43 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   cancelled: "Cancelado",
 };
 
+/** Tick cada 1s mientras `enabled` para recalcular elapsed sin esperar
+ *  a que el backend emita progress events. Devuelve `Date.now()` para
+ *  poder hacer cálculos derivados estables dentro del render. */
+function useTickEverySecond(enabled: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!enabled) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [enabled]);
+  return now;
+}
+
 export function JobCard({ job }: { job: ActiveJob }) {
   const cancel = useCancelJob();
   const remove = useRemoveJob();
+  const deleteWithFile = useDeleteJobWithFile();
   const dismissRecentLocal = useQueueStore((s) => s.dismissRecent);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  async function handleDeleteWithFile() {
+    try {
+      await deleteWithFile.mutateAsync(job.job_id);
+      dismissRecentLocal(job.job_id);
+      toast.success("Vídeo eliminado del disco y de la cola.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : "Error al eliminar el vídeo.",
+      );
+    } finally {
+      setDeleteConfirmOpen(false);
+    }
+  }
 
   async function handleDismiss() {
     try {
@@ -48,6 +96,38 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const isRunning = job.status === "running";
   const isFailed = job.status === "failed";
   const isCompleted = job.status === "completed";
+
+  // Tick cliente: el WS emite `elapsed_seconds` cuando hay progress, pero
+  // entre eventos pueden pasar varios segundos. Recomputamos cada 1s
+  // contra `started_at` para que el contador se vea fluido.
+  const nowMs = useTickEverySecond(isRunning);
+  const elapsedLive: number = (() => {
+    if (isRunning && job.started_at != null) {
+      return Math.max(0, nowMs / 1000 - job.started_at);
+    }
+    return job.elapsed_seconds ?? 0;
+  })();
+  // Tiempo total de generación para jobs ya terminados — preferimos la
+  // diferencia exacta `finished_at - started_at` y caemos a
+  // `elapsed_seconds` si el backend no envió ambos timestamps.
+  const generationSeconds: number | null = !isRunning
+    ? job.finished_at != null && job.started_at != null
+      ? Math.max(0, job.finished_at - job.started_at)
+      : (job.elapsed_seconds ?? null)
+    : null;
+
+  // Para jobs completed/failed, hacemos fetch del /summary que trae
+  // total_cost_usd + duration cacheada (fallback si el WS no llegó a
+  // sincronizar duration_seconds). Skip para jobs running (el dialog
+  // tiene su propio fetch live cuando se abre).
+  const summary = useJobSummary(
+    isCompleted || isFailed ? job.job_id : null,
+    { live: false },
+  );
+  const effectiveDurationS =
+    job.duration_seconds ?? summary.data?.output_duration_seconds ?? null;
+  const costUsd = summary.data?.total_cost_usd ?? null;
+  const createdAt = job.created_at;
   const isCancellable = job.status === "pending" || job.status === "running";
   const isDismissible =
     job.status === "completed" || job.status === "failed" || job.status === "cancelled";
@@ -102,12 +182,54 @@ export function JobCard({ job }: { job: ActiveJob }) {
           <p className="mt-1 truncate text-sm font-medium" title={job.title}>
             {job.title || "(sin título)"}
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {job.job_id.slice(0, 8)}
-            {job.duration_seconds != null &&
-              job.duration_seconds > 0 &&
-              ` · ⏱ ${formatDuration(job.duration_seconds)}`}
-            {details.length > 0 && ` · ${details.join(" · ")}`}
+          <p
+            className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground"
+            title={`Job ID: ${job.job_id}`}
+          >
+            {effectiveDurationS != null && effectiveDurationS > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 tabular-nums"
+                title="Duración del vídeo final"
+              >
+                <Film className="h-3 w-3" strokeWidth={1.75} />
+                {formatDuration(effectiveDurationS)}
+              </span>
+            )}
+            {generationSeconds != null && generationSeconds > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 tabular-nums"
+                title="Tiempo de generación (cuánto tardó en producirse)"
+              >
+                · <Timer className="h-3 w-3" strokeWidth={1.75} />
+                {formatSeconds(generationSeconds)}
+              </span>
+            )}
+            {(createdAt != null || (costUsd != null && costUsd > 0)) && (
+              // Hora + coste en el MISMO span → flex-wrap no los separa
+              // a líneas distintas. Si la card es estrecha, los dos saltan
+              // juntos a una segunda línea.
+              <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+                {createdAt != null && (
+                  <span
+                    className="inline-flex items-center gap-0.5"
+                    title={`Creado a las ${formatClockTime(createdAt)}`}
+                  >
+                    · <Clock className="h-3 w-3" strokeWidth={1.75} />
+                    {formatClockTime(createdAt)}
+                  </span>
+                )}
+                {costUsd != null && costUsd > 0 && (
+                  <span
+                    className="inline-flex items-center gap-0.5 text-amber-500"
+                    title={`Coste APIs externas: $${costUsd.toFixed(4)} USD`}
+                  >
+                    · <Coins className="h-3 w-3" strokeWidth={1.75} />
+                    ${costUsd.toFixed(3)}
+                  </span>
+                )}
+              </span>
+            )}
+            {details.length > 0 && <span>· {details.join(" · ")}</span>}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -165,9 +287,10 @@ export function JobCard({ job }: { job: ActiveJob }) {
             </span>
             <span className="shrink-0 font-mono tabular-nums">
               {job.progress_percent.toFixed(0)}%
+              {elapsedLive > 0 && ` · ${formatSeconds(elapsedLive)}`}
               {job.estimated_remaining_seconds != null &&
                 job.estimated_remaining_seconds > 0 &&
-                ` · ${formatSeconds(job.estimated_remaining_seconds)}`}
+                ` · ETA ${formatSeconds(job.estimated_remaining_seconds)}`}
             </span>
           </div>
         </div>
@@ -180,6 +303,22 @@ export function JobCard({ job }: { job: ActiveJob }) {
         >
           {job.error}
         </p>
+      )}
+
+      {/* Botón "Ver detalle" — abre dialog con métricas resumidas + tab
+          de logs raw. Disponible para todos los estados del job. */}
+      {(isRunning || isCompleted || isFailed) && (
+        <div className="mt-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1 text-xs"
+            onClick={() => setDetailOpen(true)}
+          >
+            <FileText className="h-3 w-3" />
+            Ver detalle
+          </Button>
+        </div>
       )}
 
       {hasVideo && (
@@ -209,8 +348,71 @@ export function JobCard({ job }: { job: ActiveJob }) {
               </a>
             </Button>
           )}
+          {/* Eliminar — borra MP4 del disco (Drive sync borrará en Google
+              Drive) + quita el job del historial. Requiere confirmación. */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={deleteWithFile.isPending}
+          >
+            {deleteWithFile.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+            Eliminar
+          </Button>
         </div>
       )}
+
+      {/* AlertDialog de confirmación — el borrado es destructivo (no
+          reversible salvo que Drive tenga papelera). */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este vídeo?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Se borrará el archivo{" "}
+                <code className="rounded bg-muted px-1 text-xs">{filename}</code>{" "}
+                del disco local. Drive Desktop sincronizará el borrado a
+                Google Drive (se quedará 30 días en la papelera de Drive
+                por si quieres recuperarlo).
+              </span>
+              <span className="block">
+                También se eliminará el job de la lista de Recientes.
+                <strong className="text-destructive">
+                  {" "}Esta acción no se puede deshacer desde la app.
+                </strong>
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteWithFile.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWithFile}
+              disabled={deleteWithFile.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteWithFile.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Eliminando…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-3 w-3" />
+                  Sí, eliminar
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {hasVideo && (
         <JobVideoDialog
@@ -219,6 +421,14 @@ export function JobCard({ job }: { job: ActiveJob }) {
           onOpenChange={setVideoOpen}
         />
       )}
+
+      <JobDetailDialog
+        jobId={job.job_id}
+        title={job.title || job.job_id}
+        isRunning={isRunning}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
     </div>
   );
 }
@@ -242,6 +452,12 @@ function formatSeconds(s: number): string {
   const min = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${min}m ${sec}s`;
+}
+
+/** Hora del día en HH:MM local desde un timestamp epoch en segundos. */
+function formatClockTime(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** Duración del vídeo final en formato mm:ss (o ss si < 60s). */

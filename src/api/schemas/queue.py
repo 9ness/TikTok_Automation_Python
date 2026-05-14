@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 JobStatusValue = Literal["pending", "running", "completed", "failed", "cancelled"]
 JobModeValue = Literal[
     "presidents", "pronosticos", "subs_auto", "copyright", "tiktok_shop",
+    "editor_auto",
 ]
 
 

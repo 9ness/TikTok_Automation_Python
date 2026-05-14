@@ -130,8 +130,251 @@ def get_job(
 
 
 # ---------------------------------------------------------------------------
-# DELETE /queue/{job_id} — cancel
+# GET /queue/{job_id}/summary — resumen ejecutivo del job (editor_auto)
 # ---------------------------------------------------------------------------
+# Lee `temp_work/editor_diagnostic_<job_id>.json` y devuelve métricas
+# pre-procesadas (duración antes/después, % cortado, quality score,
+# breakdown de cortes por fuente, false-starts detectados, silencios
+# remanentes). El frontend lo consume para mostrar un dialog ejecutivo
+# en lugar de logs raw.
+@router.get("/{job_id}/summary")
+def get_job_summary(
+    job_id: str,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    import json
+    import os
+
+    job = next((j for j in queue.get_all() if j.id == job_id), None)
+    if job is None:
+        raise JobNotFoundError(
+            f"Job '{job_id}' no encontrado.",
+            details={"job_id": job_id},
+        )
+
+    # Base: info del propio job (siempre disponible)
+    gen_s: float | None = None
+    if job.finished_at is not None and job.started_at is not None:
+        gen_s = max(0.0, job.finished_at - job.started_at)
+    elif job.elapsed_s:
+        gen_s = job.elapsed_s
+
+    # Coste total del job — lookup DIRECTO `cost:job:{id}` en Redis.
+    # Antes hacíamos `list_jobs(limit=2000)` (scan completo de hasta 2000
+    # jobs) por cada card → con 7 cards = 14000 reads → la card tardaba
+    # >30s en mostrar el coste. Lookup directo es ~10ms.
+    total_cost_usd: float | None = None
+    cost_lines_count = 0
+    try:
+        from src.tiktok_shop.repos.redis_base import get_shop_redis
+        redis = get_shop_redis()
+        if redis.is_available():
+            raw = redis.get_json(f"cost:job:{job.id}")
+            if raw:
+                total_cost_usd = float(raw.get("total_usd") or 0.0)
+                cost_lines_count = len(raw.get("lines") or [])
+    except Exception:
+        pass
+
+    base: dict = {
+        "job_id": job.id,
+        "status": job.status.value,
+        "mode": job.mode.value,
+        "title": job.title,
+        "generation_seconds": gen_s,
+        "output_duration_seconds": job.duration_seconds,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+        "total_cost_usd": total_cost_usd,
+        "cost_lines_count": cost_lines_count,
+        "error": job.error,
+        "has_diagnostic": False,
+    }
+
+    # Buscar `editor_diagnostic_<job_id>.json` en temp_work (la herramienta
+    # silence_cutter lo escribe ahí). Si no existe, devolvemos solo `base`.
+    candidate_paths: list[str] = []
+    tf = job.params.get("temp_folder") if job.params else None
+    if isinstance(tf, str):
+        candidate_paths.append(os.path.join(tf, f"editor_diagnostic_{job.id}.json"))
+    candidate_paths.append(
+        os.path.join(os.getcwd(), "temp_work", f"editor_diagnostic_{job.id}.json")
+    )
+
+    diag_path = next((p for p in candidate_paths if os.path.exists(p)), None)
+    if not diag_path:
+        return base
+
+    try:
+        with open(diag_path, "r", encoding="utf-8") as f:
+            diag = json.load(f)
+    except Exception as e:
+        base["diagnostic_error"] = str(e)
+        return base
+
+    base["has_diagnostic"] = True
+    base["diagnostic_path"] = diag_path
+
+    phases = diag.get("phases", {}) or {}
+    final = diag.get("final", {}) or {}
+    audit = diag.get("audit", {}) or {}
+
+    input_dur = diag.get("video_duration_s")
+    output_dur = job.duration_seconds or audit.get("output_duration_s")
+    total_cut = final.get("total_cut_s", 0.0)
+    cut_pct = (total_cut / input_dur * 100.0) if input_dur else None
+
+    # Auto-trim head/tail — la fase devuelve la lista de cuts; tomamos los
+    # 2 extremos si existen (el primero es head si empieza en 0, el último
+    # es tail si termina en input_duration).
+    auto_trim_cuts = (phases.get("auto_trim") or {}).get("cuts") or []
+    head_trim_s: float | None = None
+    tail_trim_s: float | None = None
+    for c in auto_trim_cuts:
+        s = float(c.get("start", 0))
+        e = float(c.get("end", 0))
+        if s < 0.5:
+            head_trim_s = round(e - s, 2)
+        elif input_dur and e > input_dur - 0.5:
+            tail_trim_s = round(e - s, 2)
+
+    # Inter-word gaps
+    iwg = phases.get("inter_word_gap") or {}
+    n_long_gaps = int(iwg.get("n_cuts", 0))
+    iwg_preview = (iwg.get("cuts") or [])[:5]
+
+    # Phantom words detectados
+    phantoms = phases.get("phantom_words") or {}
+    n_phantoms = int(phantoms.get("n_phantoms_detected", 0))
+
+    # False-starts (pasada 2 IA)
+    pass2 = phases.get("ai_pass2_false_starts") or {}
+    n_false_starts = int(pass2.get("n_cuts_parsed", 0))
+    false_starts_preview = []
+    for c in (pass2.get("raw_cuts") or [])[:5]:
+        false_starts_preview.append({
+            "kind": c.get("kind"),
+            "first_attempt": c.get("first_attempt"),
+            "kept_version": c.get("kept_version"),
+            "reason": c.get("reason"),
+        })
+
+    # IA general (pasada 1) — cuenta de cuts por reason
+    ai_general = phases.get("ai") or {}
+    ai_cuts_by_reason = ai_general.get("cuts_by_reason") or {}
+
+    # Quality + silencios remanentes
+    quality_score = audit.get("quality_score")
+    quality_verdict = audit.get("verdict")
+    n_remaining = int(audit.get("n_internal_silences", 0))
+    remaining_preview = []
+    for s in (audit.get("internal_silences_preview") or [])[:5]:
+        before = ((s.get("context") or {}).get("before_word") or {}).get("word")
+        after = ((s.get("context") or {}).get("after_word") or {}).get("word")
+        remaining_preview.append({
+            "duration_s": s.get("duration_s"),
+            "input_start": s.get("input_start"),
+            "input_end": s.get("input_end"),
+            "before_word": before,
+            "after_word": after,
+        })
+
+    base.update({
+        "input_duration_seconds": input_dur,
+        "output_duration_seconds_calc": output_dur,
+        "cut_duration_seconds": round(total_cut, 2) if total_cut else 0.0,
+        "cut_pct": round(cut_pct, 1) if cut_pct is not None else None,
+        "cuts_by_source": final.get("cuts_by_source") or {},
+        "n_cuts_merged": int(final.get("n_cuts_merged", 0)),
+        "n_keep_segments": int(final.get("n_keep_intervals", 0)),
+        "head_trim_seconds": head_trim_s,
+        "tail_trim_seconds": tail_trim_s,
+        "n_long_gaps_cut": n_long_gaps,
+        "long_gaps_preview": iwg_preview,
+        "n_phantom_words": n_phantoms,
+        "n_false_starts_cut": n_false_starts,
+        "false_starts_preview": false_starts_preview,
+        "ai_cuts_by_reason": ai_cuts_by_reason,
+        "quality_score": quality_score,
+        "quality_verdict": quality_verdict,
+        "n_silences_remaining": n_remaining,
+        "silences_remaining_preview": remaining_preview,
+        "tools_used": job.params.get("tools_used") if job.params else None,
+    })
+    return base
+
+
+# ---------------------------------------------------------------------------
+# GET /queue/{job_id}/logs — logs línea-a-línea del job (lazy fetch)
+# ---------------------------------------------------------------------------
+# Razón para tenerlo separado del `/queue/{id}`: cada job acumula hasta 200
+# líneas y nos meteríamos un payload pesado en cada snapshot del WS. Aquí
+# se piden solo cuando el frontend abre el dialog "Ver logs".
+@router.get("/{job_id}/logs")
+def get_job_logs(
+    job_id: str,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    for j in queue.get_all():
+        if j.id == job_id:
+            return {
+                "job_id": j.id,
+                "status": j.status.value,
+                "title": j.title,
+                "lines": list(j.logs),
+                "error": j.error,
+                "current_step": j.progress_label,
+                "started_at": j.started_at,
+                "finished_at": j.finished_at,
+            }
+    raise JobNotFoundError(
+        f"Job '{job_id}' no encontrado.",
+        details={"job_id": job_id},
+    )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /queue/{job_id} — cancel/remove (+ opcionalmente borra el MP4)
+# ---------------------------------------------------------------------------
+# Rutas seguras donde se permite el borrado físico — anti path-traversal.
+# Solo aceptamos paths bajo los roots de Drive de los 3 programas; si el
+# `result_path` cae fuera (ej. en un /etc/), rechazamos para no permitir
+# que un job manipulado borre archivos arbitrarios del server.
+def _is_path_under_safe_roots(path: str) -> bool:
+    import os
+    abs_path = os.path.abspath(path)
+    safe_roots: list[str] = []
+    try:
+        from src.editor_auto.config import resolve_editor_root
+        safe_roots.append(os.path.abspath(resolve_editor_root()))
+    except Exception:
+        pass
+    try:
+        from src.tiktok_shop.config import resolve_shop_root
+        safe_roots.append(os.path.abspath(resolve_shop_root()))
+    except Exception:
+        pass
+    try:
+        from src.utils import load_config
+        cfg = load_config()
+        out = cfg.get("paths", {}).get("output_folder")
+        if out:
+            safe_roots.append(os.path.abspath(out))
+    except Exception:
+        pass
+    for root in safe_roots:
+        if not root:
+            continue
+        try:
+            if os.path.commonpath([abs_path, root]) == root:
+                return True
+        except ValueError:
+            # Drive letters distintos en Windows → commonpath lanza ValueError
+            continue
+    return False
+
+
 @router.delete(
     "/{job_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -139,21 +382,61 @@ def get_job(
 def cancel_or_remove_job(
     job_id: str,
     queue: Annotated[JobQueue, Depends(get_queue)],
+    delete_file: bool = False,
 ) -> Response:
     """- Si el job está activo (pending/running) → lo CANCELA.
-    - Si el job está en estado final (completed/failed/cancelled) → lo
-      QUITA del historial persistente (queue_state.json)."""
+    - Si el job está en estado final → lo QUITA del historial persistente.
+    - Si `delete_file=true` Y el job está en estado final Y tiene
+      `result_path` válido bajo una raíz segura → borra también el MP4
+      del disco (Drive Desktop sincronizará el borrado a Google Drive).
+    """
+    import os as _os
+
     job = next((j for j in queue.get_all() if j.id == job_id), None)
     if job is None:
         raise JobNotFoundError(
             f"Job '{job_id}' no encontrado.",
             details={"job_id": job_id},
         )
+
+    file_deleted = False
+    file_error: str | None = None
+    if delete_file and job.status in _FINAL_STATUSES and job.result_path:
+        if _is_path_under_safe_roots(job.result_path):
+            try:
+                if _os.path.exists(job.result_path):
+                    _os.remove(job.result_path)
+                    file_deleted = True
+                # Borrar también el .json adyacente de metadata si existe
+                # (caso TikTok Shop: `<video>.mp4` + `<video>.json`).
+                stem, ext = _os.path.splitext(job.result_path)
+                meta = stem + ".json"
+                if _os.path.exists(meta):
+                    try:
+                        _os.remove(meta)
+                    except OSError:
+                        pass
+            except OSError as e:
+                file_error = f"{type(e).__name__}: {e}"
+        else:
+            file_error = (
+                f"result_path fuera de raíces seguras: {job.result_path}"
+            )
+
     if job.status in _FINAL_STATUSES:
         queue.remove(job_id)
     else:
         queue.cancel(job_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # 204 si todo bien. Si delete_file fue solicitado pero falló, usamos
+    # un 207 con info — pero como el frontend espera 204, devolvemos 204
+    # y dejamos el error en un header para visibilidad.
+    headers = {}
+    if delete_file:
+        headers["X-File-Deleted"] = "1" if file_deleted else "0"
+        if file_error:
+            headers["X-File-Error"] = file_error[:200]
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=headers)
 
 
 # ---------------------------------------------------------------------------

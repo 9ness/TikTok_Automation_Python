@@ -9,8 +9,8 @@ Regla estricta: Respuestas de 1-2 líneas máximo. Cero explicaciones, cortesía
 ## Resumen del proyecto
 
 `TikTok_Automation_Python` — fábrica Streamlit que genera vídeos virales 9:16
-para TikTok. **2 programas principales** seleccionables en la sidebar (Creator
-Reward / TikTok Shop), cada uno con sus nichos.
+para TikTok. **3 programas principales** seleccionables en la sidebar (Creator
+Reward / TikTok Shop / Editor Auto), cada uno con sus nichos.
 
 ### Programa 1 — Creator Reward (existente)
 
@@ -25,6 +25,12 @@ Reward / TikTok Shop), cada uno con sus nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | 🛒 Generador Shop | `TIKTOK_SHOP` | Vídeos affiliate AI con Seedance/Veo3, multi-cuenta, multi-producto |
+
+### Programa 3 — Editor Auto
+
+| Función | Modo | Propósito |
+|---|---|---|
+| ✂️ Editor Auto | `EDITOR_AUTO` | Edita vídeo input con flujo configurable de herramientas componibles por usuario (subs, cortador silencios + IA, ...) |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
 
@@ -190,6 +196,13 @@ PIXABAY_API_KEY=...
 
 # Opcional TikTok Shop
 # TIKTOK_SHOP_MONTHLY_BUDGET_USD=50   # alerta dashboard al 80%
+
+# === Programa 3 — Editor Auto ===
+# Path raíz TikTok Editor. HERMANO de TIKTOK_CR/TIKTOK_SHOP. Auto-detect si
+# no se define (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR").
+# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+# EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
+# OPENAI_API_KEY ya definida arriba — silence_cutter usa gpt-4o (mejor calidad)
 ```
 
 ---
@@ -232,6 +245,11 @@ Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop
   Redis, logging). Cualquier cambio en un programa no debe romper el otro.
 - **System prompts en archivos `.md`**: todos los prompts de TikTok Shop viven
   en `src/tiktok_shop/prompts/*.md`, NUNCA hardcoded en el código.
+- **Frontend mobile-first**: toda UI nueva/modificada debe diseñarse y
+  validarse para móvil además de desktop. Grids `grid-cols-2 sm:grid-cols-N`,
+  diálogos con `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto
+  `text-xs sm:text-sm`, valores largos con `truncate`/`break-words`. La app
+  se usa también desde móvil.
 - **Cost tracking obligatorio**: TODA llamada a API externa con coste (OpenAI,
   MiniMax, Atlas Cloud, …) debe pasar por un `record_*` de
   [`src/cost_tracking.py`](src/cost_tracking.py). El runner ya envuelve cada
@@ -243,17 +261,41 @@ Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop
 
 ---
 
+## Índice de documentación
+
+| Archivo | Contenido |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Este archivo — contexto general, programas, env vars, convenciones |
+| [`ADDING_PROGRAM.md`](ADDING_PROGRAM.md) | **Checklist para añadir un programa nuevo** (touchpoints API + runner + Redis + frontend + cost + deploy + tests + docs) |
+| [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
+| [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + OpenAI GPT-4o |
+| [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |
+| [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local (uvicorn + npm run dev), troubleshooting WS/cache |
+| [`deploy/README.md`](deploy/README.md) | Despliegue VPS Hetzner + Docker stack + Tailscale Funnel + webhook |
+| [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Runbook SSH al server (IP, paths, comandos comunes) |
+| [`learnings.md`](learnings.md) | Historial técnico (1 línea por aprendizaje/fix) — **escribir al resolver bug o patrón nuevo** |
+| [`tasks.md`](tasks.md) | TODO pendientes — mover a `## ✅ Done` al cerrar |
+| [`README.md`](README.md) | Onboarding general del repo |
+
+## Estructura por programa
+
+Cada programa vive aislado en `src/<programa>/` con: `config.py`, `models/`,
+`repos/`, `services/`, `pipeline/`, `prompts/*.md`. **Nunca se comparte
+lógica entre programas** — solo módulos transversales (`src/locutor.py`,
+`src/cost_tracking.py`, `src/fonts_registry.py`, `src/queue/*`,
+`src/subtitles*`, etc.).
+
+API: `src/api/routers/<programa>/` + `src/api/schemas/<programa>/`.
+Frontend: `frontend/app/<programa>/` + `frontend/lib/queries/<programa>.ts`.
+
 ## Mantenimiento de este archivo
 
 Actualiza CLAUDE.md cuando: módulo nuevo/eliminado en `src/`, env vars que
 cambian, schema Redis, assets esperados, nicho o programa nuevo.
 NO por: bugfixes, refactors, ajustes de parámetros, lo derivable del código.
-Cap 250 líneas — mover detalles a `.md` específico si crece.
+Cap 250 líneas — mover detalles a `.md` específico si crece (p. ej.
+`ADDING_PROGRAM.md` recoge la guía completa de "añadir programa").
 
 ### Memoria y Tareas
 - **Lectura**: Lee `tasks.md` para pendientes y `learnings.md` para historial técnico.
 - **Escritura Autónoma**: Al resolver un bug o implementar un patrón técnico nuevo, añade obligatoriamente un registro de 1 línea en `learnings.md`. Al finalizar una tarea, muévela a la sección `## ✅ Done` en `tasks.md`.
-
-### Setup local
-- Ver [`DEV_SETUP.md`](DEV_SETUP.md) para arranque (uvicorn + npm run dev),
-  troubleshooting de WS/dashboard/cache, y los fixes recientes aplicados.

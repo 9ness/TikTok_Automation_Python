@@ -44,10 +44,30 @@ from typing import Any
 # OpenAI gpt-4o-mini: $0.15 input + $0.60 output por 1M tokens
 OPENAI_GPT4O_MINI_INPUT_PER_1M = 0.15
 OPENAI_GPT4O_MINI_OUTPUT_PER_1M = 0.60
+# OpenAI gpt-4o (full): $2.50 input + $10.00 output por 1M tokens
+OPENAI_GPT4O_INPUT_PER_1M = 2.50
+OPENAI_GPT4O_OUTPUT_PER_1M = 10.00
 # OpenAI Whisper API: $0.006 por minuto de audio
 OPENAI_WHISPER_PER_MIN = 0.006
 # MiniMax speech-02-turbo: $0.06 por 1000 caracteres (≈ TikTok Shop config)
 MINIMAX_TTS_PER_1K_CHARS = 0.06
+
+# Tarifas por modelo OpenAI Chat — se selecciona por prefix del `model` recibido.
+# Por compatibilidad, modelos desconocidos caen a gpt-4o-mini.
+_OPENAI_CHAT_RATES: dict[str, tuple[float, float]] = {
+    "gpt-4o-mini": (OPENAI_GPT4O_MINI_INPUT_PER_1M, OPENAI_GPT4O_MINI_OUTPUT_PER_1M),
+    "gpt-4o":      (OPENAI_GPT4O_INPUT_PER_1M, OPENAI_GPT4O_OUTPUT_PER_1M),
+}
+
+
+def _resolve_openai_rates(model: str) -> tuple[float, float]:
+    """Devuelve `(input_per_1M, output_per_1M)` para el modelo OpenAI Chat.
+    Match por prefix más largo (ej. `gpt-4o-2024-11-20` → gpt-4o)."""
+    candidates = sorted(_OPENAI_CHAT_RATES.keys(), key=len, reverse=True)
+    for prefix in candidates:
+        if model.startswith(prefix):
+            return _OPENAI_CHAT_RATES[prefix]
+    return _OPENAI_CHAT_RATES["gpt-4o-mini"]
 
 
 # ---------------------------------------------------------------------------
@@ -66,14 +86,18 @@ class CostLine:
 @dataclass
 class JobCost:
     job_id: str
-    program: str              # "creator_reward" | "tiktok_shop"
-    mode: str                 # "presidents" | "pronosticos" | "copyright" | "subs_auto" | "tiktok_shop"
-    user: str | None = None   # username (para filtrar)
+    program: str              # "creator_reward" | "tiktok_shop" | "editor_auto"
+    mode: str                 # "presidents" | ... | "editor_auto"
+    user: str | None = None   # username (para filtrar). Para editor_auto es el EditorUser.name.
     product_id: str | None = None  # solo TikTok Shop
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     lines: list[CostLine] = field(default_factory=list)
     title: str | None = None
+    # Datos arbitrarios añadidos por el runner. Para `editor_auto` aquí
+    # ponemos `{"tools": ["silence_cutter", "subs_auto"], "tools_key": "..."}`
+    # para poder agrupar el coste por combo de herramientas en `/costs`.
+    meta: dict[str, Any] = field(default_factory=dict)
 
     @property
     def total_usd(self) -> float:
@@ -101,6 +125,7 @@ def start_job(
     user: str | None = None,
     product_id: str | None = None,
     title: str | None = None,
+    meta: dict[str, Any] | None = None,
 ) -> JobCost:
     """Inicia tracking para el job actual. Asociado al contextvar — todos los
     `record_*` siguientes en este thread/coroutine añaden a este JobCost."""
@@ -111,6 +136,7 @@ def start_job(
         user=user,
         product_id=product_id,
         title=title,
+        meta=dict(meta or {}),
     )
     _active_tracker.set(job)
     return job
@@ -118,6 +144,16 @@ def start_job(
 
 def get_active() -> JobCost | None:
     return _active_tracker.get()
+
+
+def set_meta(key: str, value: Any) -> None:
+    """Añade/actualiza un campo del `meta` del tracker activo. No-op si no
+    hay tracker. Usado por runners para enriquecer el job con datos que
+    no son coste pero importan al análisis (ej. lista de herramientas)."""
+    job = _active_tracker.get()
+    if job is None:
+        return
+    job.meta[key] = value
 
 
 def _add_line(line: CostLine) -> None:
@@ -139,13 +175,15 @@ def record_openai_chat(
     model: str = "gpt-4o-mini",
     detail: str | None = None,
 ) -> float:
-    """Registra una call a la Chat Completions API de OpenAI. Devuelve coste."""
-    # Solo conocemos gpt-4o-mini de momento; cualquier otro usa esa misma rate
-    # como aproximación (mejor que perder el dato). Si añadís gpt-5 etc.,
-    # añadid sus rates aquí.
+    """Registra una call a la Chat Completions API de OpenAI. Devuelve coste.
+
+    Soporta gpt-4o-mini y gpt-4o (rates en `_OPENAI_CHAT_RATES`). Modelos
+    no listados caen a tarifa gpt-4o-mini como aproximación.
+    """
+    in_per_1m, out_per_1m = _resolve_openai_rates(model)
     cost = (
-        (input_tokens / 1_000_000) * OPENAI_GPT4O_MINI_INPUT_PER_1M
-        + (output_tokens / 1_000_000) * OPENAI_GPT4O_MINI_OUTPUT_PER_1M
+        (input_tokens / 1_000_000) * in_per_1m
+        + (output_tokens / 1_000_000) * out_per_1m
     )
     _add_line(CostLine(
         kind="openai_chat",
@@ -426,8 +464,10 @@ def list_jobs(
             out.append(raw)
 
     # Fuente 2: TikTok Shop legacy (VideoGeneration). Se omite si el filtro
-    # de programa es explícitamente "creator_reward".
-    if program != "creator_reward":
+    # de programa es explícitamente "creator_reward" o "editor_auto" — el
+    # legacy solo contiene generations de TikTok Shop, así que mezclarlas
+    # con filtros de otros programas crea ruido en el panel.
+    if program not in ("creator_reward", "editor_auto"):
         legacy = _list_tiktok_shop_legacy(
             month=month, user=user, product_id=product_id, limit=limit,
         )
@@ -447,12 +487,18 @@ def list_jobs(
 
 
 def aggregate_summary(jobs: list[dict]) -> dict[str, Any]:
-    """Suma totales y agrupa por programa/mode/user para el panel de stats."""
+    """Suma totales y agrupa por programa/mode/user para el panel de stats.
+
+    Agrega también `by_tools_combo`: agrupa los jobs por la combinación de
+    herramientas usada (`meta.tools_key`) — útil para Editor Auto, donde
+    el coste depende de qué herramientas el usuario tenga en su flujo.
+    """
     total = 0.0
     by_program: dict[str, float] = {}
     by_mode: dict[str, float] = {}
     by_user: dict[str, float] = {}
     by_kind: dict[str, float] = {}
+    by_tools_combo: dict[str, float] = {}
     count = 0
     for j in jobs:
         amt = float(j.get("total_usd") or sum(l.get("cost_usd", 0) for l in j.get("lines", [])))
@@ -465,6 +511,10 @@ def aggregate_summary(jobs: list[dict]) -> dict[str, Any]:
         for line in j.get("lines", []):
             k = line.get("kind", "?")
             by_kind[k] = by_kind.get(k, 0.0) + line.get("cost_usd", 0.0)
+        meta = j.get("meta") or {}
+        combo = meta.get("tools_key")
+        if combo:
+            by_tools_combo[combo] = by_tools_combo.get(combo, 0.0) + amt
     return {
         "total_usd": round(total, 4),
         "count": count,
@@ -472,4 +522,5 @@ def aggregate_summary(jobs: list[dict]) -> dict[str, Any]:
         "by_mode": {k: round(v, 4) for k, v in by_mode.items()},
         "by_user": {k: round(v, 4) for k, v in by_user.items()},
         "by_kind": {k: round(v, 4) for k, v in by_kind.items()},
+        "by_tools_combo": {k: round(v, 4) for k, v in by_tools_combo.items()},
     }

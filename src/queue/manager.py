@@ -266,6 +266,11 @@ class JobQueue:
                         with self._cond:
                             job.duration_seconds = dur
                             self._save_state_locked()
+                            # CRÍTICO: notificar al WS para que el frontend
+                            # reciba el update con `duration_seconds`. Sin
+                            # esto, la card de Recientes nunca muestra la
+                            # duración del MP4 (solo se ve tras refresco).
+                            self._cond.notify_all()
             except Exception as e:
                 print(f"[JobQueue] ffprobe duration error: {e}")
 

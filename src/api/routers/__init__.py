@@ -13,6 +13,12 @@ from .creator_reward import (
     subs_auto_frame_router,
     subs_auto_router,
 )
+from .editor_auto import (
+    enqueue_router as editor_auto_enqueue_router,
+    stickers_router as editor_auto_stickers_router,
+    tools_router as editor_auto_tools_router,
+    users_router as editor_auto_users_router,
+)
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
@@ -39,4 +45,8 @@ __all__ = [
     "fonts_file_router",
     "auth_router",
     "diagnostics_router",
+    "editor_auto_enqueue_router",
+    "editor_auto_stickers_router",
+    "editor_auto_tools_router",
+    "editor_auto_users_router",
 ]

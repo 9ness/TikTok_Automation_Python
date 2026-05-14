@@ -9,7 +9,8 @@ export type JobMode =
   | "pronosticos"
   | "subs_auto"
   | "copyright"
-  | "tiktok_shop";
+  | "tiktok_shop"
+  | "editor_auto";
 
 export interface ActiveJob {
   job_id: string;

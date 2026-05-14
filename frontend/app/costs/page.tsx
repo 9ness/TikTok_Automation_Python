@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useJobsWithCosts, type JobCost } from "@/lib/queries/costs";
+import { useEditorUsers } from "@/lib/queries/editor-auto";
 import { useProducts } from "@/lib/queries/products";
 import { useUser, useUsers } from "@/lib/queries/users";
 
@@ -22,12 +23,13 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-type Program = "all" | "creator_reward" | "tiktok_shop";
+type Program = "all" | "creator_reward" | "tiktok_shop" | "editor_auto";
 
 const PROGRAMS: { value: Program; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "creator_reward", label: "Creator Reward" },
   { value: "tiktok_shop", label: "TikTok Shop" },
+  { value: "editor_auto", label: "Editor Auto" },
 ];
 
 const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
@@ -39,6 +41,7 @@ const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
     { value: "subs_auto", label: "Subs sobre Vídeo" },
   ],
   tiktok_shop: [{ value: "tiktok_shop", label: "TikTok Shop" }],
+  editor_auto: [{ value: "editor_auto", label: "Editor Auto" }],
 };
 
 // Operadores Creator Reward (los que pueden encolar jobs). Si en el futuro
@@ -50,14 +53,17 @@ export default function CostsPage() {
   const [program, setProgram] = useState<Program>("all");
   const [mode, setMode] = useState<string>("all");
   // Para creator_reward: operador (ness/buga). Para tiktok_shop: username TT Shop.
+  // Para editor_auto: nombre del EditorUser que ejecutó el flujo.
   const [crOperator, setCrOperator] = useState<string>("all");
   const [shopUser, setShopUser] = useState<string>("all");
+  const [editorUser, setEditorUser] = useState<string>("all");
   const [productId, setProductId] = useState<string>("all");
 
   // Datos para los dropdowns
   const shopUsers = useUsers({ limit: 100 });
   const selectedUser = useUser(shopUser !== "all" ? shopUser : undefined);
   const allProducts = useProducts({ limit: 200 });
+  const editorUsers = useEditorUsers();
 
   // Productos del user seleccionado (cascada). Si "all" → todos.
   const productsForUser = useMemo(() => {
@@ -73,10 +79,13 @@ export default function CostsPage() {
     setMode("all");
     setCrOperator("all");
     setShopUser("all");
+    setEditorUser("all");
     setProductId("all");
   }
 
   // Calcular `user` y `product_id` que se mandan al backend según el programa.
+  // Backend filtra por `cost:by_user:{user}` SET: para editor_auto el user
+  // es el EditorUser.name (lo rellena `dispatch_job` desde params.user_name).
   const filterUser =
     program === "tiktok_shop"
       ? shopUser !== "all"
@@ -86,7 +95,11 @@ export default function CostsPage() {
         ? crOperator !== "all"
           ? crOperator
           : undefined
-        : undefined;
+        : program === "editor_auto"
+          ? editorUser !== "all"
+            ? editorUser
+            : undefined
+          : undefined;
   const filterProductId =
     program === "tiktok_shop" && productId !== "all" ? productId : undefined;
 
@@ -105,7 +118,7 @@ export default function CostsPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Costes</h1>
         <p className="text-sm text-muted-foreground">
-          Gasto por job de cualquier modo (Creator Reward + TikTok Shop).
+          Gasto por job de cualquier modo (Creator Reward + TikTok Shop + Editor Auto).
         </p>
       </header>
 
@@ -191,6 +204,22 @@ export default function CostsPage() {
                 </SelectContent>
               </Select>
             </FilterField>
+          ) : program === "editor_auto" ? (
+            <FilterField label="Usuario (Editor)">
+              <Select value={editorUser} onValueChange={setEditorUser}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {(editorUsers.data ?? []).map((u) => (
+                    <SelectItem key={u.id} value={u.name}>
+                      {u.display_name || u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
           ) : (
             <FilterField label="Usuario">
               <Select disabled value="all" onValueChange={() => {}}>
@@ -270,6 +299,17 @@ export default function CostsPage() {
             className="!grid-cols-1"
           />
 
+          {/* Editor Auto: coste por combinación de herramientas. Útil para
+              decidir cuánto cobrar según las tools que activa cada user. */}
+          {data.summary.by_tools_combo &&
+            Object.keys(data.summary.by_tools_combo).length > 0 && (
+              <BreakdownCard
+                title="Editor Auto · Por combo de herramientas"
+                data={data.summary.by_tools_combo}
+                className="!grid-cols-1"
+              />
+            )}
+
           <Card>
             <CardContent className="p-0">
               <div className="border-b px-4 py-2 text-sm font-semibold">
@@ -283,6 +323,7 @@ export default function CostsPage() {
                       <th className="px-3 py-2">programa</th>
                       <th className="px-3 py-2">modo</th>
                       <th className="px-3 py-2">user</th>
+                      <th className="px-3 py-2">tools</th>
                       <th className="px-3 py-2">título</th>
                       <th className="px-3 py-2 text-right">$ total</th>
                       <th className="px-3 py-2">desglose</th>
@@ -293,7 +334,7 @@ export default function CostsPage() {
                       <JobRow key={j.job_id} j={j} />
                     ))}
                     {data.jobs.length === 0 && (
-                      <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">
+                      <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">
                         Sin jobs en ese filtro.
                       </td></tr>
                     )}
@@ -378,6 +419,7 @@ function JobRow({ j }: { j: JobCost }) {
         day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
       })
     : "—";
+  const tools = j.meta?.tools ?? [];
   return (
     <>
       <tr className="border-b cursor-pointer hover:bg-accent/30" onClick={() => setOpen(!open)}>
@@ -385,6 +427,15 @@ function JobRow({ j }: { j: JobCost }) {
         <td className="px-3 py-2">{j.program}</td>
         <td className="px-3 py-2">{j.mode}</td>
         <td className="px-3 py-2">{j.user ?? "—"}</td>
+        <td className="px-3 py-2">
+          {tools.length > 0 ? (
+            <span className="font-mono text-[10px]" title={tools.join(" + ")}>
+              {tools.join(" + ")}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </td>
         <td className="px-3 py-2 max-w-xs truncate" title={j.title ?? ""}>
           <span className="text-muted-foreground">{date} · </span>
           {j.title ?? "—"}
@@ -398,7 +449,7 @@ function JobRow({ j }: { j: JobCost }) {
       </tr>
       {open && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={7} className="px-4 py-2">
+          <td colSpan={8} className="px-4 py-2">
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-muted-foreground">
