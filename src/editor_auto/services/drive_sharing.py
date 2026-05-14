@@ -1,0 +1,336 @@
+"""Wrapper de Google Drive API para compartir carpetas del Editor Auto.
+
+Caso de uso: el admin entra al panel del usuario `bugalleitor`, pulsa
+"Compartir" en una carpeta, mete un gmail y la persona recibe acceso
+de solo lectura (Drive "viewer") a `entrada/` y `salida/` — pero NO a
+las otras carpetas (cola, recuperacion) ni a las carpetas de otros
+usuarios.
+
+Diseño:
+- Autenticación con Service Account (clave JSON local en
+  `GOOGLE_SA_KEY_PATH`). Sin OAuth flow, sin refresh tokens.
+- Resolución de folder IDs por navegación: buscamos por nombre dentro
+  del padre. Los IDs se cachean en memoria (LRU) — invalidamos si una
+  operación falla por 404.
+- Permissions: `type=user role=reader` con `sendNotificationEmail=True`
+  para que la persona reciba el email de Drive con el link.
+
+Scopes:
+- `https://www.googleapis.com/auth/drive` — necesario porque queremos
+  manejar carpetas que NO ha creado el SA (compartidas por ness4b).
+
+Pre-requisito (one-time setup):
+1. Crear SA en GCP → descargar JSON key.
+2. Compartir `TIKTOK_EDITOR/` con el email del SA como Editor desde
+   drive.google.com. Sin esto el SA no ve ninguna carpeta.
+3. Subir JSON a `secrets/google-sa.json` del server + bind-mount al
+   container + `GOOGLE_SA_KEY_PATH=/app/secrets/google-sa.json` en .env.
+"""
+
+from __future__ import annotations
+
+import os
+import threading
+from functools import lru_cache
+from typing import Any
+
+# La carpeta raíz del Editor Auto en Drive. Sus subcarpetas son
+# `Usuarios/<user>/{entrada,cola,recuperacion,salida}/`. Cambiable por
+# env si en el futuro tenemos varios entornos.
+DRIVE_ROOT_NAME = os.getenv("DRIVE_EDITOR_ROOT_NAME", "TIKTOK_EDITOR")
+DRIVE_USERS_FOLDER = "Usuarios"
+
+# Carpetas que se pueden compartir desde la UI. cola/recuperacion quedan
+# fuera por defecto — son internas del flujo. El admin puede pedir share
+# de cualquiera vía el endpoint, pero la UI solo ofrece estas dos.
+SHAREABLE_FOLDERS = {"entrada", "cola", "recuperacion", "salida"}
+DEFAULT_SHARE_FOLDERS = ("entrada", "salida")
+
+
+class DriveSharingError(Exception):
+    """Error de operación Drive (autenticación, folder not found,
+    quota). El router lo traduce a HTTP 400/404/500."""
+
+
+# ---------------------------------------------------------------------------
+# Authentication — Service Account
+# ---------------------------------------------------------------------------
+_service_lock = threading.Lock()
+_service_cache: dict[str, Any] = {"v": None}
+
+
+def is_configured() -> bool:
+    """¿Hay un SA key file configurado? Permite a la UI ocultar la
+    sección de sharing si el operador aún no completó el setup."""
+    path = os.getenv("GOOGLE_SA_KEY_PATH")
+    return bool(path and os.path.isfile(path))
+
+
+def _service():
+    """Cliente `drive.v3` reusable. Cacheado a nivel proceso. Thread-safe
+    para el JobQueue worker + las requests FastAPI concurrentes."""
+    if _service_cache["v"] is not None:
+        return _service_cache["v"]
+    with _service_lock:
+        if _service_cache["v"] is not None:
+            return _service_cache["v"]
+        path = os.getenv("GOOGLE_SA_KEY_PATH")
+        if not path or not os.path.isfile(path):
+            raise DriveSharingError(
+                "GOOGLE_SA_KEY_PATH no configurada o el archivo no existe. "
+                "Sube la JSON del Service Account a secrets/google-sa.json "
+                "del server y define la env var."
+            )
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+        except ImportError as e:
+            raise DriveSharingError(
+                f"Faltan deps google-api-python-client / google-auth: {e}"
+            )
+        creds = service_account.Credentials.from_service_account_file(
+            path, scopes=["https://www.googleapis.com/auth/drive"],
+        )
+        # `cache_discovery=False` evita el warning de googleapiclient
+        # `file_cache is only supported with oauth2client<4.0.0`.
+        svc = build("drive", "v3", credentials=creds, cache_discovery=False)
+        _service_cache["v"] = svc
+        return svc
+
+
+def sa_email() -> str | None:
+    """Email del SA según la JSON — útil para mostrarlo en la UI
+    ("compartido por nebulabs-editor@…") y para diagnóstico."""
+    path = os.getenv("GOOGLE_SA_KEY_PATH")
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        import json
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f).get("client_email")
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Folder resolution
+# ---------------------------------------------------------------------------
+def _escape_q(s: str) -> str:
+    """Escapa apóstrofos para las queries Drive `q=`. Las querys usan
+    delimitadores `'…'`, así que `O'Brien` rompería el parser."""
+    return s.replace("'", "\\'")
+
+
+def _find_child_folder_id(parent_id: str | None, name: str) -> str | None:
+    """Busca una carpeta hija por nombre exacto. `parent_id=None` busca
+    a nivel global del SA (cualquier carpeta visible)."""
+    svc = _service()
+    name_safe = _escape_q(name)
+    q_parts = [
+        f"name = '{name_safe}'",
+        "mimeType = 'application/vnd.google-apps.folder'",
+        "trashed = false",
+    ]
+    if parent_id:
+        q_parts.append(f"'{parent_id}' in parents")
+    results = svc.files().list(
+        q=" and ".join(q_parts),
+        fields="files(id, name)",
+        pageSize=10,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute()
+    files = results.get("files", [])
+    if not files:
+        return None
+    return files[0]["id"]
+
+
+@lru_cache(maxsize=1)
+def _root_folder_id() -> str:
+    """ID del folder raíz `TIKTOK_EDITOR/`. Cacheado para vida del proceso
+    porque el ID no cambia salvo que el operador re-cree la carpeta."""
+    fid = _find_child_folder_id(parent_id=None, name=DRIVE_ROOT_NAME)
+    if not fid:
+        raise DriveSharingError(
+            f"No encuentro la carpeta {DRIVE_ROOT_NAME!r} en el Drive del "
+            f"Service Account. Comprueba que has compartido esa carpeta "
+            f"con {sa_email() or '<SA email>'} como Editor."
+        )
+    return fid
+
+
+@lru_cache(maxsize=256)
+def _users_folder_id() -> str:
+    """ID del folder `TIKTOK_EDITOR/Usuarios/`."""
+    fid = _find_child_folder_id(_root_folder_id(), DRIVE_USERS_FOLDER)
+    if not fid:
+        raise DriveSharingError(
+            f"No encuentro {DRIVE_USERS_FOLDER!r} dentro de "
+            f"{DRIVE_ROOT_NAME!r}. ¿Está la carpeta sincronizada en Drive?"
+        )
+    return fid
+
+
+@lru_cache(maxsize=512)
+def _user_folder_id(username: str) -> str:
+    """ID del folder del usuario `Usuarios/<username>/`."""
+    fid = _find_child_folder_id(_users_folder_id(), username)
+    if not fid:
+        raise DriveSharingError(
+            f"No encuentro la carpeta del usuario {username!r} en Drive. "
+            f"¿El cliente rclone del server la ha sincronizado ya?"
+        )
+    return fid
+
+
+def _subfolder_id(username: str, folder: str) -> str:
+    """ID de una subcarpeta concreta: entrada/cola/recuperacion/salida."""
+    if folder not in SHAREABLE_FOLDERS:
+        raise DriveSharingError(f"Carpeta inválida: {folder!r}")
+    parent = _user_folder_id(username)
+    fid = _find_child_folder_id(parent, folder)
+    if not fid:
+        raise DriveSharingError(
+            f"No encuentro {folder!r} en {username!r}/ en Drive."
+        )
+    return fid
+
+
+def invalidate_cache_for_user(username: str) -> None:
+    """Invalida el cache de IDs si una operación falla con 404 (carpeta
+    fue movida/borrada). El siguiente lookup re-buscará."""
+    # functools.lru_cache no permite invalidar entradas individuales →
+    # limpiamos todos los caches relacionados.
+    _user_folder_id.cache_clear()
+    _users_folder_id.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+def share_folders(
+    username: str,
+    email: str,
+    folders: list[str] | None = None,
+    role: str = "reader",
+    notify: bool = True,
+) -> list[dict[str, Any]]:
+    """Comparte las subcarpetas indicadas de `username` con `email`.
+
+    Por defecto comparte `entrada` y `salida` (lo que el cliente
+    necesita ver). Devuelve lista de permissions creados — uno por
+    carpeta, con `{folder, permission_id, role, email}`.
+
+    Si el email ya tiene acceso a alguna carpeta, la API devuelve un
+    permiso existente — no falla. `notify=False` evita el email
+    automático de Drive (útil para re-shares silenciosos).
+    """
+    if role not in ("reader", "commenter", "writer"):
+        raise DriveSharingError(f"Role no permitido: {role!r}")
+    targets = folders or list(DEFAULT_SHARE_FOLDERS)
+    invalid = [f for f in targets if f not in SHAREABLE_FOLDERS]
+    if invalid:
+        raise DriveSharingError(
+            f"Carpetas no permitidas: {invalid}. Válidas: {sorted(SHAREABLE_FOLDERS)}"
+        )
+    svc = _service()
+    results: list[dict[str, Any]] = []
+    for folder in targets:
+        folder_id = _subfolder_id(username, folder)
+        body = {"type": "user", "role": role, "emailAddress": email}
+        try:
+            perm = svc.permissions().create(
+                fileId=folder_id,
+                body=body,
+                sendNotificationEmail=notify,
+                supportsAllDrives=True,
+                fields="id,emailAddress,role,type,displayName",
+            ).execute()
+        except Exception as e:
+            raise DriveSharingError(
+                f"Fallo compartiendo {folder!r} con {email!r}: {e}"
+            )
+        results.append({
+            "folder": folder,
+            "folder_id": folder_id,
+            "permission_id": perm.get("id"),
+            "email": perm.get("emailAddress", email),
+            "role": perm.get("role", role),
+            "type": perm.get("type", "user"),
+            "display_name": perm.get("displayName"),
+        })
+    return results
+
+
+def list_shares(username: str) -> dict[str, list[dict[str, Any]]]:
+    """Lista los permissions activos en cada subcarpeta del usuario.
+
+    Returns:
+        {entrada: [{id, email, role, ...}, ...], cola: […], ...}
+    Filtra el owner y el SA (no son shares manuales relevantes).
+    """
+    svc = _service()
+    sa = sa_email()
+    out: dict[str, list[dict[str, Any]]] = {}
+    for folder in SHAREABLE_FOLDERS:
+        try:
+            folder_id = _subfolder_id(username, folder)
+        except DriveSharingError:
+            out[folder] = []
+            continue
+        try:
+            resp = svc.permissions().list(
+                fileId=folder_id,
+                supportsAllDrives=True,
+                fields="permissions(id,emailAddress,role,type,displayName)",
+                pageSize=100,
+            ).execute()
+        except Exception as e:
+            raise DriveSharingError(
+                f"Fallo listando perms de {folder!r}: {e}"
+            )
+        perms = resp.get("permissions", []) or []
+        filtered = [
+            {
+                "permission_id": p.get("id"),
+                "email": p.get("emailAddress"),
+                "role": p.get("role"),
+                "type": p.get("type"),
+                "display_name": p.get("displayName"),
+                "folder_id": folder_id,
+            }
+            for p in perms
+            # Filtra: owners (siempre presentes), SA propio (no es un
+            # "share manual"), perms de tipo "domain"/"anyone" raros.
+            if p.get("role") != "owner"
+            and p.get("emailAddress") != sa
+            and p.get("type") == "user"
+        ]
+        out[folder] = filtered
+    return out
+
+
+def revoke_permission(
+    username: str,
+    folder: str,
+    permission_id: str,
+) -> None:
+    """Revoca un permission concreto de una subcarpeta del usuario.
+
+    Solo se necesita `folder` + `permission_id` (el folder_id se
+    resuelve internamente). Esto evita que el frontend tenga que
+    conocer los Drive IDs.
+    """
+    svc = _service()
+    folder_id = _subfolder_id(username, folder)
+    try:
+        svc.permissions().delete(
+            fileId=folder_id,
+            permissionId=permission_id,
+            supportsAllDrives=True,
+        ).execute()
+    except Exception as e:
+        raise DriveSharingError(
+            f"Fallo revocando perm {permission_id!r} en {folder!r}: {e}"
+        )

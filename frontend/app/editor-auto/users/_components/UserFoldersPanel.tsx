@@ -1,17 +1,23 @@
 "use client";
 
 import {
+  AlertCircle,
   ArrowLeft,
   Download,
   FileVideo,
   FolderInput,
   FolderOpen,
+  Info,
   Loader2,
+  Mail,
   Play,
   PlayCircle,
   Rocket,
   RotateCcw,
+  Share2,
   Trash2,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -29,16 +35,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useCreateUserShare,
   useDeleteUserFile,
   useEditorUser,
   useEnqueueFromEntrada,
   useMoveUserFile,
+  useRevokeUserShare,
+  useSharingStatus,
   useUserFolders,
+  useUserShares,
   userFilePreviewUrl,
 } from "@/lib/queries/editor-auto";
-import type { FolderFile, FolderName } from "@/lib/types/editor-auto";
+import type {
+  DriveShare,
+  FolderFile,
+  FolderName,
+} from "@/lib/types/editor-auto";
 import { cn } from "@/lib/utils";
 
 const SCRIPTED_TOOL_ID = "silence_cutter_scripted";
@@ -203,8 +218,218 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             )}
           </p>
         )}
+
+        {/* Sección de sharing con emails concretos (Google Drive) */}
+        <SharingSection userId={userId} userName={user.data?.name ?? ""} />
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sección "Personas con acceso" — comparte entrada+salida con un email
+// ---------------------------------------------------------------------------
+function SharingSection({
+  userId,
+  userName,
+}: {
+  userId: string;
+  userName: string;
+}) {
+  const status = useSharingStatus();
+  const shares = useUserShares(userId);
+  const create = useCreateUserShare(userId);
+  const revoke = useRevokeUserShare(userId);
+
+  const [email, setEmail] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  // Drive devuelve los mismos perms en `entrada` y `salida` (si compartiste
+  // ambas con el mismo email). Agrupamos por email para no duplicar visualmente.
+  const grouped = groupSharesByEmail(shares.data?.shares);
+  const visible = showAll ? grouped : grouped.slice(0, 4);
+
+  if (status.isLoading) {
+    return (
+      <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+        <Loader2 className="mr-2 inline h-3 w-3 animate-spin" />
+        Comprobando configuración de sharing…
+      </div>
+    );
+  }
+
+  if (!status.data?.configured) {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+        <div className="mb-1 flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300">
+          <AlertCircle className="h-3.5 w-3.5" />
+          Sharing de Drive no configurado
+        </div>
+        <p className="text-muted-foreground">
+          Falta el Service Account JSON en{" "}
+          <code className="rounded bg-muted px-1">secrets/google-sa.json</code>{" "}
+          del server. Ver guía en{" "}
+          <code className="rounded bg-muted px-1">deploy/DRIVE_SHARING.md</code>.
+        </p>
+      </div>
+    );
+  }
+
+  const handleShare = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e) return;
+    await create.mutateAsync({
+      email: e,
+      folders: ["entrada", "salida"],
+      role: "reader",
+      notify: true,
+    });
+    setEmail("");
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+      <div className="flex items-center gap-2">
+        <Share2 className="h-3.5 w-3.5 text-brand-cyan" />
+        <p className="flex-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Personas con acceso
+        </p>
+        {shares.isFetching && (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+        )}
+      </div>
+      <p className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+        <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+        Le doy acceso de SOLO LECTURA a <code>entrada/</code> y{" "}
+        <code>salida/</code> de <code>{userName}</code>. La persona recibe un
+        email de Google Drive con el link.
+      </p>
+
+      {/* Form: añadir nuevo */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Mail className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@gmail.com"
+            className="h-8 pl-7 text-xs"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleShare();
+            }}
+          />
+        </div>
+        <Button
+          size="sm"
+          className="h-8 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+          onClick={handleShare}
+          disabled={!email.trim() || create.isPending}
+        >
+          {create.isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <UserPlus className="h-3 w-3" />
+          )}
+          Compartir
+        </Button>
+      </div>
+      {create.error && (
+        <p className="text-[10px] text-destructive">
+          {(create.error as Error).message}
+        </p>
+      )}
+
+      {/* Lista de compartidos actuales */}
+      {grouped.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          Nadie tiene acceso aún.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {visible.map((g) => (
+            <li
+              key={g.email}
+              className="flex items-center gap-2 rounded-md border bg-card/40 px-2 py-1 text-xs"
+            >
+              <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{g.email}</span>
+              <span className="flex gap-1">
+                {(["entrada", "salida"] as FolderName[]).map((f) => {
+                  const has = g.folders[f];
+                  return has ? (
+                    <span
+                      key={f}
+                      className="rounded bg-emerald-500/15 px-1 text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400"
+                      title={`acceso ${has.role}`}
+                    >
+                      {f}
+                    </span>
+                  ) : null;
+                })}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                title="Revocar acceso"
+                disabled={revoke.isPending}
+                onClick={async () => {
+                  for (const folder of ["entrada", "salida"] as FolderName[]) {
+                    const s = g.folders[folder];
+                    if (s) {
+                      await revoke.mutateAsync({
+                        permission_id: s.permission_id,
+                        folder,
+                      });
+                    }
+                  }
+                }}
+              >
+                <X className="h-3 w-3 text-destructive" />
+              </Button>
+            </li>
+          ))}
+          {grouped.length > 4 && !showAll && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              +{grouped.length - 4} más
+            </button>
+          )}
+        </ul>
+      )}
+      {revoke.error && (
+        <p className="text-[10px] text-destructive">
+          {(revoke.error as Error).message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface GroupedShare {
+  email: string;
+  folders: Partial<Record<FolderName, DriveShare>>;
+}
+
+function groupSharesByEmail(
+  shares: Record<FolderName, DriveShare[]> | undefined,
+): GroupedShare[] {
+  if (!shares) return [];
+  const byEmail = new Map<string, GroupedShare>();
+  for (const folder of Object.keys(shares) as FolderName[]) {
+    for (const s of shares[folder] ?? []) {
+      const email = s.email ?? "(sin email)";
+      const existing = byEmail.get(email) ?? { email, folders: {} };
+      existing.folders[folder] = s;
+      byEmail.set(email, existing);
+    }
+  }
+  return Array.from(byEmail.values()).sort((a, b) =>
+    a.email.localeCompare(b.email),
   );
 }
 

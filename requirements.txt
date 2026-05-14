@@ -22,3 +22,9 @@ python-multipart>=0.0.9
 torchaudio==2.5.1
 silero-vad>=5.1
 onnxruntime>=1.20
+# Google Drive API — compartir carpetas entrada/salida del usuario con
+# emails concretos. Wrapper en src/editor_auto/services/drive_sharing.py.
+# `google-generativeai` ya está arriba pero usa otra capa distinta de
+# auth (API key); estos dos paquetes son los específicos de Drive API.
+google-api-python-client>=2.150
+google-auth>=2.35

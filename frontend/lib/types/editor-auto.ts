@@ -127,3 +127,47 @@ export interface EnqueueFromEntradaResponse {
   filename: string;
   moved: MoveFileResponse;
 }
+
+// Google Drive sharing — fase 2 con Service Account
+export interface SharingStatus {
+  configured: boolean;
+  service_account_email: string | null;
+}
+
+export type ShareRole = "reader" | "commenter" | "writer";
+
+export interface DriveShare {
+  permission_id: string;
+  email: string | null;
+  role: ShareRole;
+  type: string;
+  display_name: string | null;
+  folder_id: string;
+}
+
+export interface UserSharesResponse {
+  user_id: string;
+  user_name: string;
+  shares: Record<FolderName, DriveShare[]>;
+}
+
+export interface CreateShareInput {
+  email: string;
+  folders?: FolderName[];
+  role?: ShareRole;
+  notify?: boolean;
+}
+
+export interface CreateShareResponse {
+  user_id: string;
+  user_name: string;
+  shared: {
+    folder: FolderName;
+    folder_id: string;
+    permission_id: string;
+    email: string;
+    role: ShareRole;
+    type: string;
+    display_name: string | null;
+  }[];
+}

@@ -45,6 +45,11 @@ services:
       # hermana de TIKTOK_CR/TIKTOK_SHOP la primera vez que se crea un
       # usuario (vía `resolve_editor_root` → `ensure_user_folders`).
       TIKTOK_EDITOR_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+      # Service Account de Google Drive — necesario para compartir
+      # carpetas entrada/salida con emails desde el panel del usuario.
+      # El archivo JSON real lo coloca el operador en `secrets/google-sa.json`
+      # del host (no se sube a git — está en .gitignore).
+      GOOGLE_SA_KEY_PATH: "/app/secrets/google-sa.json"
     volumes:
       - api_temp:/app/temp_work
       # Drive sincronizado (rclone mount en el host) → necesario para los
@@ -63,6 +68,11 @@ services:
       - ./logs:/host_data/logs:ro
       - ./.git:/host_data/.git:ro
       - ./VERSION:/host_data/VERSION:ro
+      # Service Account JSON — read-only, solo el container `api` lo lee.
+      # La carpeta puede no existir en dev local: si falla el mount, los
+      # endpoints de sharing devolverán 503 "no configurado" (manejado en
+      # `drive_sharing.is_configured()`).
+      - ./secrets:/app/secrets:ro
     networks:
       - app-network
     # Permite al container llamar al host (donde corre `webhook_listener.py`

@@ -300,3 +300,73 @@ export function useEnqueueFromEntrada(userId: string) {
     },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Google Drive Sharing — fase 2 (Service Account)
+// ---------------------------------------------------------------------------
+import type {
+  CreateShareInput,
+  CreateShareResponse,
+  SharingStatus,
+  UserSharesResponse,
+} from "@/lib/types/editor-auto";
+
+const SHARING_STATUS_KEY = ["editor-auto", "sharing", "status"] as const;
+const userSharesKey = (id: string) =>
+  ["editor-auto", "user", id, "shares"] as const;
+
+/** ¿Está configurado el SA en el server? La UI lo consulta para
+ *  mostrar/ocultar la sección de sharing (si no, instrucciones de setup). */
+export function useSharingStatus() {
+  return useQuery<SharingStatus>({
+    queryKey: SHARING_STATUS_KEY,
+    queryFn: () => api.get<SharingStatus>(`${EDITOR_ROOT}/sharing/status`),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUserShares(userId: string | null | undefined) {
+  return useQuery<UserSharesResponse>({
+    queryKey: userSharesKey(userId ?? ""),
+    queryFn: () =>
+      api.get<UserSharesResponse>(
+        `${USERS_ROOT}/${encodeURIComponent(userId!)}/shares`,
+      ),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useCreateUserShare(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<CreateShareResponse, Error, CreateShareInput>({
+    mutationFn: (input) =>
+      api.post<CreateShareResponse>(
+        `${USERS_ROOT}/${encodeURIComponent(userId)}/shares`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: userSharesKey(userId) });
+    },
+  });
+}
+
+export function useRevokeUserShare(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { permission_id: string; folder: FolderName }
+  >({
+    mutationFn: ({ permission_id, folder }) => {
+      const qs = new URLSearchParams({ folder }).toString();
+      return api.del<void>(
+        `${USERS_ROOT}/${encodeURIComponent(
+          userId,
+        )}/shares/${encodeURIComponent(permission_id)}?${qs}`,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: userSharesKey(userId) });
+    },
+  });
+}

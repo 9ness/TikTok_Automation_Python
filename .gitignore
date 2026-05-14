@@ -13,6 +13,13 @@ logs/
 # Ignoramos .env porque puede tener rutas personales
 .env
 
+# --- Secrets (nunca a git) ---
+secrets/
+*.json.key
+# Excepción: el dir tiene que existir en el repo para que docker-compose
+# bind-mount no falle. Commiteamos solo el .gitkeep.
+!secrets/.gitkeep
+
 # --- Multimedia (Para no llenar GitHub de videos) ---
 *.mp4
 *.mp3
