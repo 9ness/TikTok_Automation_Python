@@ -22,6 +22,11 @@ python-multipart>=0.0.9
 torchaudio==2.5.1
 silero-vad>=5.1
 onnxruntime>=1.20
+# `packaging` lo usa silero-vad (lo importa al cargar) y aunque suele
+# venir con pip/setuptools, en algunas imágenes slim no está disponible
+# para `import packaging` desde el proceso uvicorn. Lo pinneamos explícito
+# para evitar ImportError en producción.
+packaging>=23.0
 # Google Drive API — compartir carpetas entrada/salida del usuario con
 # emails concretos. Wrapper en src/editor_auto/services/drive_sharing.py.
 # `google-generativeai` ya está arriba pero usa otra capa distinta de
