@@ -307,8 +307,15 @@ class JobQueue:
 
     def _reset_orphans(self) -> None:
         """Trabajos que estaban RUNNING al reiniciar la app no pueden
-        retomarse — los marcamos como FAILED."""
+        retomarse — los marcamos como FAILED.
+
+        Para jobs `editor_auto` con `source=entrada`, además devolvemos
+        el input desde `cola/` a `entrada/` para que el admin pueda
+        re-encolarlo. Sin esto, el archivo queda atrapado en cola/ tras
+        cada deploy/restart con un job a medio procesar.
+        """
         changed = False
+        orphan_jobs: list = []
         with self._lock:
             for j in self._jobs:
                 if j.status == JobStatus.RUNNING:
@@ -317,8 +324,46 @@ class JobQueue:
                     j.progress_label = "❌ Interrumpido por reinicio"
                     j.finished_at = time.time()
                     changed = True
+                    orphan_jobs.append(j)
             if changed:
                 self._save_state_locked()
+
+        # Cleanup filesystem fuera del lock (puede ser lento en Drive
+        # FUSE). Best-effort: errores se loguean pero no abortan.
+        for j in orphan_jobs:
+            try:
+                self._cleanup_orphan_editor_auto(j)
+            except Exception as e:
+                print(f"[JobQueue] cleanup orphan {j.id} falló: {e}")
+
+    @staticmethod
+    def _cleanup_orphan_editor_auto(job) -> None:
+        """Si el job era editor_auto con `source=entrada`, mueve el input
+        de cola → entrada. Para otros modos / sources, no-op."""
+        if str(job.mode) != "JobMode.EDITOR_AUTO" and getattr(job.mode, "value", None) != "editor_auto":
+            return
+        p = job.params or {}
+        if p.get("source") != "entrada":
+            return
+        filename = p.get("source_filename")
+        user_name = p.get("user_name")
+        if not filename or not user_name:
+            return
+        # Import diferido para no acoplar el módulo `queue` con `editor_auto`.
+        from src.editor_auto.services import folder_manager
+        try:
+            folder_manager.move_file(user_name, "cola", "entrada", filename)
+            print(
+                f"[JobQueue] orphan {job.id}: input {filename!r} devuelto "
+                f"de cola/ a entrada/ para reencolar"
+            )
+        except folder_manager.FolderError as e:
+            # Puede que ya esté en entrada (mismo run del cleanup, etc).
+            # No es un error real.
+            print(
+                f"[JobQueue] orphan {job.id}: no se pudo mover "
+                f"{filename!r} ({e}) — quizá ya está en entrada/"
+            )
 
 
 # ----------------------------------------------------------

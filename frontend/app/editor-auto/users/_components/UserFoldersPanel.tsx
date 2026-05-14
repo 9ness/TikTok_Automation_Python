@@ -634,6 +634,21 @@ function FileRow({
           />
         )}
 
+        {/* En cola/ normalmente solo previsualizamos (no tocar lo que
+            procesa). PERO si un job se interrumpió (deploy/crash) el
+            archivo se queda huérfano en cola — añadimos esta acción
+            manual para que el admin lo recupere sin SSH. */}
+        {file.folder === "cola" && (
+          <MoveAction
+            label="Devolver a entrada"
+            icon={ArrowLeft}
+            confirmTitle={`¿Devolver "${file.filename}" a entrada?`}
+            confirmBody="Úsalo solo si el job se quedó atascado tras un deploy/crash. Si está procesando ahora mismo, NO lo muevas — espera a que termine."
+            onAction={() => onMove("entrada")}
+            disabled={disabled}
+          />
+        )}
+
         {file.folder === "salida" && (
           <a
             href={userFilePreviewUrl(userId, file.folder, file.filename)}
@@ -646,17 +661,15 @@ function FileRow({
           </a>
         )}
 
-        {/* Borrar disponible en TODAS las carpetas (incluso entrada). cola
-            queda fuera porque está en procesamiento — borrar mid-process
-            rompería el job. */}
-        {file.folder !== "cola" && (
-          <DeleteAction
-            filename={file.filename}
-            folder={file.folder}
-            onAction={onDelete}
-            disabled={disabled}
-          />
-        )}
+        {/* Borrar disponible en TODAS las carpetas. En cola/ es peligroso
+            si hay un job activo procesándolo, pero útil cuando el job
+            crasheó y dejó basura — la confirmación deja claro el riesgo. */}
+        <DeleteAction
+          filename={file.filename}
+          folder={file.folder}
+          onAction={onDelete}
+          disabled={disabled}
+        />
       </div>
       {previewOpen && (
         <div className="mt-2 overflow-hidden rounded-md bg-black">
