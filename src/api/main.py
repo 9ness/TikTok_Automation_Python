@@ -30,6 +30,7 @@ from src.api.config import get_settings
 from src.api.exceptions import register_exception_handlers
 from src.api.routers import (
     auth_router,
+    deploy_router,
     copyright_router,
     dashboard_router,
     diagnostics_router,
@@ -148,6 +149,7 @@ def create_app() -> FastAPI:
     app.include_router(fonts_router)
     app.include_router(fonts_file_router)
     app.include_router(auth_router)
+    app.include_router(deploy_router)
     app.include_router(diagnostics_router)
     app.include_router(queue_ws_router)
     return app

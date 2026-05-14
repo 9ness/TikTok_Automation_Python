@@ -65,6 +65,12 @@ services:
       - ./VERSION:/host_data/VERSION:ro
     networks:
       - app-network
+    # Permite al container llamar al host (donde corre `webhook_listener.py`
+    # en :9000). El router `src/api/routers/deploy.py` proxea hacia
+    # `http://host.docker.internal:9000` para alimentar el panel Deploy
+    # de Settings. En Linux Docker `host-gateway` resuelve al bridge IP.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8000"
     healthcheck:

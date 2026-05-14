@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { DeployPanel } from "@/components/settings/DeployPanel";
 import { ApiError, api } from "@/lib/api";
 import { checkApiHealth, type HealthResponse } from "@/lib/queries/queue";
 
@@ -118,6 +119,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <DeployPanel />
 
       <Card>
         <CardHeader>

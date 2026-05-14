@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""webhook_listener.py — Servidor HTTP minimal que recibe webhooks de GitHub
-y dispara `deploy_safe.sh` en background para auto-deploy.
+"""webhook_listener.py — Servidor HTTP minimal que:
+
+1) **Recibe webhooks de GitHub** (HMAC-SHA256) y dispara `deploy_safe.sh`.
+2) **Expone endpoints autenticados de admin** para el panel "Deploy" del
+   frontend: deploy manual, rebuild docker, restart containers, tail de
+   logs, lista de containers, estado del sistema.
 
 Diseño:
 - stdlib only (sin Flask) → cero dependencias, vive fuera del venv principal
 - Validación HMAC-SHA256 con secret compartido (header X-Hub-Signature-256)
-- Solo acepta `push` events sobre la rama `main`
+  para webhook GitHub
+- Auth `X-API-Key` (mismo valor que `API_KEY` de la app) para endpoints admin
 - Lanza `deploy_safe.sh` como subprocess detached y responde 202 inmediato
   (GitHub no espera; el deploy puede tardar lo que tarde la cola en vaciarse)
 - Logs a stdout → systemd journald
@@ -14,6 +19,20 @@ Variables de entorno requeridas (vienen del .env de la app vía systemd):
 - WEBHOOK_SECRET: secret compartido con GitHub (mismo que en Settings → Webhooks)
 - WEBHOOK_PORT: puerto del listener (default 9000)
 - APP_DIR: raíz del repo (default /home/nebulabsai/TikTok_Automation_Python)
+- API_KEY: token compartido con la app — autentica el panel admin del frontend
+
+Endpoints:
+  GitHub:
+    POST /deploy                  — webhook GitHub (HMAC)
+    GET  /health                  — healthcheck simple
+    GET  /version                 — estado del último deploy
+  Admin (requieren `X-API-Key`):
+    POST /admin/deploy            — git pull + rebuild
+    POST /admin/docker/rebuild    — docker compose up -d --build api web
+    POST /admin/docker/restart    — docker compose restart {service}
+    GET  /admin/docker/ps         — docker compose ps (parseado)
+    GET  /admin/deploy/log?n=200  — tail de logs/deploy.log
+    GET  /admin/system            — uptime + disk + mem
 """
 
 import hashlib
@@ -21,9 +40,12 @@ import hmac
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 
 LOG = logging.getLogger("webhook")
@@ -35,11 +57,64 @@ LOG.addHandler(_h)
 
 APP_DIR = os.environ.get("APP_DIR", "/home/nebulabsai/TikTok_Automation_Python")
 DEPLOY_SCRIPT = os.path.join(APP_DIR, "deploy", "deploy_safe.sh")
+DEPLOY_LOG = os.path.join(APP_DIR, "logs", "deploy.log")
 SECRET = os.environ.get("WEBHOOK_SECRET", "").encode()
+ADMIN_API_KEY = os.environ.get("API_KEY", "")  # mismo de la app
 PORT = int(os.environ.get("WEBHOOK_PORT", "9000"))
 ALLOWED_BRANCHES = ("main",)
-MAX_BODY_BYTES = 5_000_000  # 5MB — los push payloads son pequeños, pero
-                            # GitHub puede mandar hasta ~25MB en push grandes.
+MAX_BODY_BYTES = 5_000_000
+
+# Whitelist de servicios que se pueden reiniciar vía /admin/docker/restart.
+# Cualquier otro nombre se rechaza con 400 — evita que un atacante con la
+# API key reinicie servicios arbitrarios del docker-compose del host.
+ALLOWED_SERVICES = {"api", "web", "caddy"}
+
+
+def _run(cmd: list[str], timeout: int = 30, cwd: str | None = None) -> tuple[int, str, str]:
+    """Ejecuta un comando capturando salida. Devuelve (rc, stdout, stderr)."""
+    try:
+        p = subprocess.run(
+            cmd, cwd=cwd or APP_DIR, capture_output=True, timeout=timeout, text=True,
+        )
+        return p.returncode, p.stdout, p.stderr
+    except subprocess.TimeoutExpired:
+        return -1, "", f"timeout tras {timeout}s"
+    except Exception as e:
+        return -2, "", str(e)
+
+
+def _spawn_background(cmd: list[str], logfile: str | None = None) -> None:
+    """Lanza un proceso detached. Si `logfile` se provee, redirige stdout+
+    stderr ahí; si no, a /dev/null."""
+    if logfile:
+        f = open(logfile, "ab", buffering=0)
+        subprocess.Popen(
+            cmd, stdout=f, stderr=f, start_new_session=True, cwd=APP_DIR,
+        )
+    else:
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            cwd=APP_DIR,
+        )
+
+
+def _tail_file(path: str, n: int = 200) -> str:
+    if not os.path.isfile(path):
+        return ""
+    try:
+        # Leer las últimas ~64KB es suficiente para 200 líneas razonables.
+        size = os.path.getsize(path)
+        with open(path, "rb") as f:
+            if size > 65536:
+                f.seek(-65536, 2)
+                f.readline()  # descartar línea parcial
+            data = f.read()
+        return "\n".join(data.decode("utf-8", errors="replace").splitlines()[-n:])
+    except OSError as e:
+        return f"<error leyendo {path}: {e}>"
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -47,36 +122,164 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         LOG.info("%s - %s", self.client_address[0], fmt % args)
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
     def _json_response(self, code: int, payload: dict) -> None:
         body = json.dumps(payload).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        # Mismo CORS que la API principal — Caddy reescribe Origin pero por
+        # si alguna ruta del frontend llama directo en dev.
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
         self.end_headers()
         self.wfile.write(body)
 
+    def _check_admin_auth(self) -> bool:
+        """Auth para endpoints `/admin/*`. Compara `X-API-Key` (o `?api_key=`
+        en query) con `API_KEY` del entorno. Si `API_KEY` está vacía,
+        rechaza TODO (no modo dev permisivo en admin)."""
+        if not ADMIN_API_KEY:
+            LOG.warning("API_KEY no configurada — admin desactivado")
+            self._json_response(503, {"error": "admin disabled (no API_KEY)"})
+            return False
+        header = self.headers.get("X-API-Key", "")
+        if not header:
+            # Fallback: query param para clientes que no pueden setear headers.
+            qs = parse_qs(urlparse(self.path).query)
+            header = (qs.get("api_key") or [""])[0]
+        if header != ADMIN_API_KEY:
+            self._json_response(401, {"error": "invalid api key"})
+            return False
+        return True
+
+    def _parse_json_body(self) -> dict | None:
+        try:
+            n = int(self.headers.get("Content-Length", "0") or 0)
+        except ValueError:
+            return None
+        if n <= 0:
+            return {}
+        if n > MAX_BODY_BYTES:
+            return None
+        raw = self.rfile.read(n)
+        try:
+            return json.loads(raw or b"{}")
+        except json.JSONDecodeError:
+            return None
+
+    # ------------------------------------------------------------------
+    # CORS preflight
+    # ------------------------------------------------------------------
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+        self.end_headers()
+
+    # ------------------------------------------------------------------
+    # GET routes
+    # ------------------------------------------------------------------
     def do_GET(self):
-        # Healthcheck simple
-        if self.path == "/health":
+        path = urlparse(self.path).path
+
+        if path == "/health":
             self._json_response(200, {"status": "ok"})
             return
-        if self.path == "/version":
-            # Lee deploy_status.json (escrito por deploy_safe.sh) o cae a git
+
+        if path == "/version":
             try:
-                import sys
                 sys.path.insert(0, APP_DIR)
                 from src.deploy_status import get_status
                 self._json_response(200, get_status())
             except Exception as e:
                 self._json_response(500, {"error": str(e)})
             return
-        self.send_error(404)
 
-    def do_POST(self):
-        if self.path != "/deploy":
-            self.send_error(404)
+        # -------- Admin --------
+        if path == "/admin/docker/ps":
+            if not self._check_admin_auth():
+                return
+            rc, out, err = _run(["docker", "compose", "ps", "--format", "json"], timeout=15)
+            # `docker compose ps --format json` puede devolver un JSON array
+            # o NDJSON según versión. Normalizamos a list[dict].
+            containers: list[dict] = []
+            if rc == 0 and out.strip():
+                stripped = out.strip()
+                if stripped.startswith("["):
+                    try:
+                        containers = json.loads(stripped)
+                    except json.JSONDecodeError:
+                        containers = []
+                else:
+                    for line in stripped.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            containers.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+            self._json_response(200 if rc == 0 else 500, {
+                "ok": rc == 0,
+                "containers": containers,
+                "raw_error": err if rc != 0 else None,
+            })
             return
 
+        if path == "/admin/deploy/log":
+            if not self._check_admin_auth():
+                return
+            qs = parse_qs(urlparse(self.path).query)
+            try:
+                n = max(1, min(2000, int((qs.get("n") or ["200"])[0])))
+            except ValueError:
+                n = 200
+            self._json_response(200, {"log": _tail_file(DEPLOY_LOG, n=n)})
+            return
+
+        if path == "/admin/system":
+            if not self._check_admin_auth():
+                return
+            self._json_response(200, _system_status())
+            return
+
+        self.send_error(404)
+
+    # ------------------------------------------------------------------
+    # POST routes
+    # ------------------------------------------------------------------
+    def do_POST(self):
+        path = urlparse(self.path).path
+
+        # GitHub webhook
+        if path == "/deploy":
+            self._handle_github_webhook()
+            return
+
+        # Admin
+        if path == "/admin/deploy":
+            self._handle_manual_deploy()
+            return
+
+        if path == "/admin/docker/rebuild":
+            self._handle_docker_rebuild()
+            return
+
+        if path == "/admin/docker/restart":
+            self._handle_docker_restart()
+            return
+
+        self.send_error(404)
+
+    # ------------------------------------------------------------------
+    # Handlers
+    # ------------------------------------------------------------------
+    def _handle_github_webhook(self) -> None:
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
@@ -88,7 +291,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         body = self.rfile.read(content_length)
 
-        # 1. HMAC validation
         if not SECRET:
             LOG.error("WEBHOOK_SECRET no configurado — rechazando")
             self.send_error(500, "Server misconfigured")
@@ -106,7 +308,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_error(401, "Invalid signature")
             return
 
-        # 2. Tipo de evento
         event = self.headers.get("X-GitHub-Event", "")
         if event == "ping":
             LOG.info("ping de GitHub OK (config webhook validada)")
@@ -117,7 +318,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(200, {"status": "ignored", "reason": "not push"})
             return
 
-        # 3. Parse payload + filtro de rama
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
@@ -130,18 +330,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(200, {"status": "ignored", "reason": "branch"})
             return
 
-        # 4. Disparar deploy en background y responder 202 inmediato
         head_sha = (payload.get("head_commit") or {}).get("id", "?")[:8]
         pusher = (payload.get("pusher") or {}).get("name", "?")
         LOG.info(f"✅ Push validado: {branch} @ {head_sha} por {pusher} — lanzando deploy_safe.sh")
         try:
-            subprocess.Popen(
-                ["/bin/bash", DEPLOY_SCRIPT],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-                cwd=APP_DIR,
-            )
+            _spawn_background(["/bin/bash", DEPLOY_SCRIPT])
         except Exception as e:
             LOG.error(f"No pude lanzar deploy: {e}")
             self.send_error(500, "Deploy launch failed")
@@ -153,6 +346,132 @@ class WebhookHandler(BaseHTTPRequestHandler):
             "pusher": pusher,
         })
 
+    def _handle_manual_deploy(self) -> None:
+        """Botón "Deploy ahora" del panel admin — equivalente a un push.
+        Llama a `deploy_safe.sh` en background y responde 202 inmediato."""
+        if not self._check_admin_auth():
+            return
+        if not os.path.exists(DEPLOY_SCRIPT):
+            self._json_response(500, {"error": f"script no existe: {DEPLOY_SCRIPT}"})
+            return
+        try:
+            _spawn_background(["/bin/bash", DEPLOY_SCRIPT])
+        except Exception as e:
+            self._json_response(500, {"error": f"no pude lanzar deploy: {e}"})
+            return
+        LOG.info("🚀 Deploy manual lanzado desde panel admin")
+        self._json_response(202, {"status": "deploy_started", "kind": "manual"})
+
+    def _handle_docker_rebuild(self) -> None:
+        """Rebuild explícito de containers (sin tocar git). Útil cuando
+        cambias el `.env` o quieres forzar un build limpio sin esperar a
+        `deploy_safe.sh`. Escribe stdout/err a `logs/deploy.log` para que
+        el panel pueda mostrar el progreso."""
+        if not self._check_admin_auth():
+            return
+        body = self._parse_json_body()
+        if body is None:
+            self._json_response(400, {"error": "invalid body"})
+            return
+        services = body.get("services") or ["api", "web"]
+        services = [s for s in services if s in ALLOWED_SERVICES]
+        if not services:
+            self._json_response(400, {"error": "no valid services",
+                                       "allowed": sorted(ALLOWED_SERVICES)})
+            return
+        cmd = ["docker", "compose", "up", "-d", "--build", *services]
+        try:
+            # Wrapper script que escribe header al deploy.log y lanza el build
+            with open(DEPLOY_LOG, "a", encoding="utf-8") as f:
+                f.write(f"\n===== {time.strftime('%Y-%m-%dT%H:%M:%S')} "
+                        f"rebuild manual: {' '.join(services)} =====\n")
+            _spawn_background(cmd, logfile=DEPLOY_LOG)
+        except Exception as e:
+            self._json_response(500, {"error": str(e)})
+            return
+        LOG.info(f"🐳 Rebuild manual lanzado: {services}")
+        self._json_response(202, {"status": "rebuild_started", "services": services})
+
+    def _handle_docker_restart(self) -> None:
+        """Restart de un container concreto SIN rebuild. Más rápido (~5s)
+        que rebuild, útil para aplicar cambios de .env o desbloquear un
+        container que se cuelga."""
+        if not self._check_admin_auth():
+            return
+        body = self._parse_json_body()
+        if body is None:
+            self._json_response(400, {"error": "invalid body"})
+            return
+        service = (body.get("service") or "").strip()
+        if service not in ALLOWED_SERVICES:
+            self._json_response(400, {
+                "error": f"service '{service}' no permitido",
+                "allowed": sorted(ALLOWED_SERVICES),
+            })
+            return
+        # Síncrono — el restart es rápido y queremos devolver el rc.
+        rc, out, err = _run(
+            ["docker", "compose", "restart", service], timeout=60,
+        )
+        LOG.info(f"🔄 restart {service} → rc={rc}")
+        self._json_response(200 if rc == 0 else 500, {
+            "ok": rc == 0,
+            "service": service,
+            "stdout": out[-500:],
+            "stderr": err[-500:],
+        })
+
+
+def _system_status() -> dict:
+    """Snapshot rápido del host: uptime, disco, memoria, carga."""
+    out: dict = {"timestamp": int(time.time())}
+
+    # Uptime
+    try:
+        with open("/proc/uptime", "r") as f:
+            up = float(f.read().split()[0])
+        out["uptime_seconds"] = int(up)
+    except Exception:
+        out["uptime_seconds"] = None
+
+    # Disco — punto raíz "/"
+    try:
+        total, used, free = shutil.disk_usage("/")
+        out["disk"] = {
+            "total_gb": round(total / 1e9, 1),
+            "used_gb": round(used / 1e9, 1),
+            "free_gb": round(free / 1e9, 1),
+            "used_pct": round(used / total * 100, 1) if total else None,
+        }
+    except Exception:
+        out["disk"] = None
+
+    # Memoria — parsea /proc/meminfo
+    try:
+        mem: dict[str, int] = {}
+        with open("/proc/meminfo", "r") as f:
+            for line in f:
+                k, v = line.split(":", 1)
+                # valores en kB
+                mem[k.strip()] = int(v.strip().split()[0]) * 1024
+        total = mem.get("MemTotal", 0)
+        avail = mem.get("MemAvailable", mem.get("MemFree", 0))
+        out["memory"] = {
+            "total_gb": round(total / 1e9, 2),
+            "available_gb": round(avail / 1e9, 2),
+            "used_pct": round((total - avail) / total * 100, 1) if total else None,
+        }
+    except Exception:
+        out["memory"] = None
+
+    # Load average
+    try:
+        out["load_avg"] = list(os.getloadavg())
+    except Exception:
+        out["load_avg"] = None
+
+    return out
+
 
 def main():
     if not SECRET:
@@ -161,12 +480,20 @@ def main():
     if not os.path.exists(DEPLOY_SCRIPT):
         LOG.error(f"Script de deploy no existe: {DEPLOY_SCRIPT}")
         sys.exit(1)
+    if not ADMIN_API_KEY:
+        LOG.warning("⚠️  API_KEY no definida — endpoints /admin/* responderán 503")
 
     server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
     LOG.info(f"Webhook listener arrancado en 0.0.0.0:{PORT}")
     LOG.info("Endpoints:")
-    LOG.info("  POST /deploy   (GitHub push events, requiere X-Hub-Signature-256)")
-    LOG.info("  GET  /health   (healthcheck)")
+    LOG.info("  POST /deploy                    (GitHub push events, HMAC)")
+    LOG.info("  GET  /health, /version")
+    LOG.info("  POST /admin/deploy              (X-API-Key)")
+    LOG.info("  POST /admin/docker/rebuild      (X-API-Key)")
+    LOG.info("  POST /admin/docker/restart      (X-API-Key)")
+    LOG.info("  GET  /admin/docker/ps           (X-API-Key)")
+    LOG.info("  GET  /admin/deploy/log?n=200    (X-API-Key)")
+    LOG.info("  GET  /admin/system              (X-API-Key)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
