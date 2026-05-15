@@ -385,18 +385,37 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(400, {"error": "no valid services",
                                        "allowed": sorted(ALLOWED_SERVICES)})
             return
-        cmd = ["docker", "compose", "up", "-d", "--build", *services]
+        # `--no-cache` por defecto: el botón "Rebuild forzado" del panel
+        # se invoca normalmente cuando una imagen se quedó atascada con
+        # layers viejas (typical: requirements.txt cambió pero el cache
+        # de pip sirvió el wheel viejo). Si el caller quiere usar cache,
+        # pasa `no_cache: false` en el body.
+        no_cache = bool(body.get("no_cache", True))
+        no_cache_flag = " --no-cache" if no_cache else ""
+        services_str = " ".join(services)
+        # Encadenamos build + up --force-recreate en una shell para
+        # ejecutar como un solo subprocess detached. El `&&` asegura que
+        # el up solo corre si el build pasa (sin imagen rota corriendo).
+        shell_cmd = (
+            f"docker compose build{no_cache_flag} {services_str} "
+            f"&& docker compose up -d --force-recreate {services_str}"
+        )
         try:
-            # Wrapper script que escribe header al deploy.log y lanza el build
             with open(DEPLOY_LOG, "a", encoding="utf-8") as f:
-                f.write(f"\n===== {time.strftime('%Y-%m-%dT%H:%M:%S')} "
-                        f"rebuild manual: {' '.join(services)} =====\n")
-            _spawn_background(cmd, logfile=DEPLOY_LOG)
+                f.write(
+                    f"\n===== {time.strftime('%Y-%m-%dT%H:%M:%S')} "
+                    f"rebuild manual: {services_str} "
+                    f"(no_cache={no_cache}) =====\n"
+                )
+            _spawn_background(["/bin/bash", "-c", shell_cmd], logfile=DEPLOY_LOG)
         except Exception as e:
             self._json_response(500, {"error": str(e)})
             return
-        LOG.info(f"🐳 Rebuild manual lanzado: {services}")
-        self._json_response(202, {"status": "rebuild_started", "services": services})
+        LOG.info(f"🐳 Rebuild manual lanzado: {services} (no_cache={no_cache})")
+        self._json_response(
+            202,
+            {"status": "rebuild_started", "services": services, "no_cache": no_cache},
+        )
 
     def _handle_docker_restart(self) -> None:
         """Restart de un container concreto SIN rebuild. Más rápido (~5s)
