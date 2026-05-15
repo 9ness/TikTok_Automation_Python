@@ -30,10 +30,10 @@ export default function HomePage() {
   }).format(new Date());
 
   return (
-    <div className="container mx-auto space-y-6 p-6 md:p-10">
+    <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm capitalize text-muted-foreground">{month}</p>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard</h1>
+        <p className="text-xs capitalize text-muted-foreground sm:text-sm">{month}</p>
       </header>
 
       {summary.isError && (
@@ -51,7 +51,7 @@ export default function HomePage() {
       )}
 
       {/* KPIs principales */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-5">
         <KPICard
           label="Usuarios"
           value={summary.data?.total_users ?? "—"}
@@ -97,17 +97,17 @@ export default function HomePage() {
         <AlertsPanel alerts={summary.data.alerts} />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <BudgetCard />
         <RecentVideosGrid videos={summary.data?.recent_videos ?? []} />
       </div>
 
-      <PilotStatusList users={summary.data?.pilot_users_summary ?? []} />
-
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <CostByModuleChart data={monthly.data?.cost_by_module ?? {}} />
         <DailyCostChart data={monthly.data?.daily_breakdown ?? []} />
       </div>
+
+      <PilotStatusList users={summary.data?.pilot_users_summary ?? []} />
     </div>
   );
 }

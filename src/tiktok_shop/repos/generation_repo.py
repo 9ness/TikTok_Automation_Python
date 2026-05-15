@@ -47,11 +47,21 @@ class GenerationRepo:
 
     def list_recent(self, limit: int = 50) -> list[VideoGeneration]:
         ids = self.r.lrange(self.INDEX_LIST, 0, limit - 1)
-        out = []
-        for gid in ids:
-            g = self.get(gid)
-            if g is not None:
-                out.append(g)
+        if not ids:
+            return []
+        # mget_json bate todos los GETs en 1 roundtrip a Upstash (antes N
+        # sequential GETs → segundos en local). Si algún elemento es None
+        # (key borrada) lo descartamos.
+        keys = [self._key(gid) for gid in ids]
+        raws = self.r.mget_json(keys)
+        out: list[VideoGeneration] = []
+        for data in raws:
+            if not data:
+                continue
+            try:
+                out.append(VideoGeneration.model_validate(data))
+            except Exception as e:
+                print(f"[GenerationRepo] decode error: {e}")
         return out
 
     def list_by_user(self, user_id: str) -> list[VideoGeneration]:

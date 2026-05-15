@@ -339,16 +339,17 @@ function SharingSection({
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
         )}
       </div>
-      <p className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-        <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-        Acceso de SOLO LECTURA por carpeta — controlas si ve{" "}
-        <code>entrada/</code>, <code>salida/</code> o ambas. La persona recibe
-        un email de Google Drive con el link directo.
+      <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
+        <Info className="mt-0.5 h-3 w-3 shrink-0" />
+        <span>
+          Solo lectura. Elige por carpeta si la persona ve <b>entrada</b>,{" "}
+          <b>salida</b> o ambas. Recibirá un email de Drive con el link.
+        </span>
       </p>
 
       {/* Form: añadir nuevo */}
       <div className="space-y-1.5">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Mail className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -356,7 +357,7 @@ function SharingSection({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@gmail.com"
-              className="h-8 pl-7 text-xs"
+              className="h-9 pl-7 text-xs sm:h-8"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleShare();
               }}
@@ -364,7 +365,7 @@ function SharingSection({
           </div>
           <Button
             size="sm"
-            className="h-8 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+            className="h-9 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90 sm:h-8"
             onClick={handleShare}
             disabled={
               !email.trim() ||
@@ -417,18 +418,20 @@ function SharingSection({
             return (
               <li
                 key={g.email}
-                className="flex flex-wrap items-center gap-2 rounded-md border bg-card/40 px-2 py-1 text-xs"
+                className="flex flex-col gap-1.5 rounded-md border bg-card/40 px-2 py-1.5 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-2"
               >
-                <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">
-                  {g.email}
-                  {!hasAnyAccess && (
-                    <span className="ml-1 text-[9px] uppercase tracking-wider text-muted-foreground">
-                      · sin acceso
-                    </span>
-                  )}
-                </span>
-                <div className="flex shrink-0 gap-1">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 break-all">
+                    {g.email}
+                    {!hasAnyAccess && (
+                      <span className="ml-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+                        · sin acceso
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-end gap-1 sm:shrink-0">
                   {(["entrada", "salida"] as FolderName[]).map((f) => (
                     <FolderToggle
                       key={f}
@@ -438,46 +441,46 @@ function SharingSection({
                       onClick={() => handleToggleFolder(g, f)}
                     />
                   ))}
-                </div>
-                {hasAnyAccess && (
+                  {hasAnyAccess && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 sm:h-6 sm:w-6"
+                      title="Revocar TODAS las carpetas (mantiene el email recordado)"
+                      disabled={revoke.isPending}
+                      onClick={async () => {
+                        for (const folder of [
+                          "entrada",
+                          "salida",
+                        ] as FolderName[]) {
+                          const s = g.folders[folder];
+                          if (s) {
+                            await revoke.mutateAsync({
+                              permission_id: s.permission_id,
+                              folder,
+                            });
+                          }
+                        }
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5 text-destructive sm:h-3 sm:w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
-                    title="Revocar TODAS las carpetas (mantiene el email recordado)"
-                    disabled={revoke.isPending}
-                    onClick={async () => {
-                      for (const folder of [
-                        "entrada",
-                        "salida",
-                      ] as FolderName[]) {
-                        const s = g.folders[folder];
-                        if (s) {
-                          await revoke.mutateAsync({
-                            permission_id: s.permission_id,
-                            folder,
-                          });
-                        }
-                      }
-                    }}
+                    className="h-7 w-7 sm:h-6 sm:w-6"
+                    title={
+                      hasAnyAccess
+                        ? "Revoca primero los accesos para olvidar este email"
+                        : "Olvidar email (quita de la agenda)"
+                    }
+                    disabled={hasAnyAccess || forget.isPending}
+                    onClick={() => forget.mutate({ email: g.email })}
                   >
-                    <X className="h-3 w-3 text-destructive" />
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive sm:h-3 sm:w-3" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  title={
-                    hasAnyAccess
-                      ? "Revoca primero los accesos para olvidar este email"
-                      : "Olvidar email (quita de la agenda)"
-                  }
-                  disabled={hasAnyAccess || forget.isPending}
-                  onClick={() => forget.mutate({ email: g.email })}
-                >
-                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                </Button>
+                </div>
               </li>
             );
           })}

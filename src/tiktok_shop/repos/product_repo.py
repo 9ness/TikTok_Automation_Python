@@ -75,12 +75,20 @@ class ProductRepo:
 
     def list_all(self) -> list[Product]:
         ids = self.r.smembers(self.INDEX_KEY)
-        products = [self.get(i) for i in ids]
-        return sorted(
-            (p for p in products if p is not None),
-            key=lambda p: p.created_at,
-            reverse=True,
-        )
+        if not ids:
+            return []
+        # mget_json: 1 roundtrip en vez de N. Crítico para dashboard.
+        keys = [self._key(pid) for pid in ids]
+        raws = self.r.mget_json(keys)
+        products: list[Product] = []
+        for data in raws:
+            if not data:
+                continue
+            try:
+                products.append(Product.model_validate(data))
+            except Exception as e:
+                print(f"[ProductRepo] decode error: {e}")
+        return sorted(products, key=lambda p: p.created_at, reverse=True)
 
     def delete(self, product_id: str) -> bool:
         p = self.get(product_id)

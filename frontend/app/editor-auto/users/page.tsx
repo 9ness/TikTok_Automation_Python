@@ -14,6 +14,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +41,7 @@ export default function EditorAutoUsersPage() {
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [rightTab, setRightTab] = useState<RightTab>("flow");
+  const [rightTab, setRightTab] = useState<RightTab>("folders");
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -73,14 +74,15 @@ export default function EditorAutoUsersPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         {/* Columna izquierda: crear + listar */}
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+          <CollapsibleCard
+            title={
+              <span className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Crear usuario
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </span>
+            }
+          >
+            <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="ea-name">Nombre (carpeta Drive)</Label>
                 <Input
@@ -126,8 +128,8 @@ export default function EditorAutoUsersPage() {
                   {(createUser.error as Error).message}
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </CollapsibleCard>
 
           <Card>
             <CardHeader>

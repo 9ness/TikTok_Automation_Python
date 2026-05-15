@@ -30,18 +30,22 @@ export function BudgetCard() {
   if (b.status === "no_budget") {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Presupuesto mensual</CardTitle>
+        <CardHeader className="pb-2 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">Presupuesto mensual</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          No hay presupuesto configurado. Define{" "}
-          <code className="rounded bg-muted px-1 font-mono">
-            TIKTOK_SHOP_MONTHLY_BUDGET_USD
-          </code>{" "}
-          en el .env del backend.
-          <p className="mt-2">
-            Coste actual del mes:{" "}
-            <span className="font-semibold">${b.current_month_cost.toFixed(2)}</span>
+        <CardContent className="space-y-2 text-xs text-muted-foreground sm:text-sm">
+          <p className="flex items-baseline justify-between gap-2">
+            <span>Coste actual del mes:</span>
+            <span className="text-lg font-semibold tabular-nums text-foreground sm:text-xl">
+              ${b.current_month_cost.toFixed(2)}
+            </span>
+          </p>
+          <p>
+            Sin presupuesto configurado. Define{" "}
+            <code className="rounded bg-muted px-1 font-mono text-[10px] sm:text-xs">
+              TIKTOK_SHOP_MONTHLY_BUDGET_USD
+            </code>{" "}
+            en <code>.env</code>.
           </p>
         </CardContent>
       </Card>
@@ -56,16 +60,16 @@ export function BudgetCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Presupuesto mensual</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 sm:pb-4">
+        <CardTitle className="text-base sm:text-lg">Presupuesto mensual</CardTitle>
         <Badge variant={badgeVariant(b.status)}>{labelFor(b.status)}</Badge>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 sm:space-y-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-2xl font-semibold tabular-nums">
+          <span className="text-xl font-semibold tabular-nums sm:text-2xl">
             ${b.current_month_cost.toFixed(2)}
           </span>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground sm:text-sm">
             / ${b.monthly_budget_usd?.toFixed(2)}
           </span>
         </div>

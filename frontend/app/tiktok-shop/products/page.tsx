@@ -15,16 +15,24 @@ export default function ShopProductsPage() {
   const products = useProducts({ limit: 100 });
 
   return (
-    <div className="container mx-auto p-6 md:p-10">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Productos TikTok Shop</h1>
-          <p className="text-sm text-muted-foreground">
+    <div className="container mx-auto p-3 sm:p-6 md:p-10">
+      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-bold tracking-tight sm:text-2xl">
+            Productos TikTok Shop
+          </h1>
+          <p className="hidden text-sm text-muted-foreground sm:block">
             Catálogo de productos para promocionar.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> Nuevo producto
+        <Button
+          onClick={() => setOpen(true)}
+          size="sm"
+          className="shrink-0 sm:size-default"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Nuevo producto</span>
+          <span className="sm:hidden">Nuevo</span>
         </Button>
       </div>
 
@@ -59,7 +67,7 @@ export default function ShopProductsPage() {
       )}
 
       {products.data && products.data.items.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {products.data.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}

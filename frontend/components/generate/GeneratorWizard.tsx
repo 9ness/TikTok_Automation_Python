@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { useProducts } from "@/lib/queries/products";
 import { useUsers } from "@/lib/queries/users";
 import { useVoices } from "@/lib/queries/voices";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
-import type { Tier } from "@/lib/types/product";
+import type { Product, Tier } from "@/lib/types/product";
 import type {
   ClipPhotoOverride,
   EnqueueRequest,
@@ -339,7 +339,7 @@ function StepUserProduct({ form, patch }: StepProps) {
           onValueChange={(v) => patch("productId", v)}
           disabled={!form.username}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-auto py-1.5">
             <SelectValue
               placeholder={
                 form.username
@@ -353,7 +353,7 @@ function StepUserProduct({ form, patch }: StepProps) {
           <SelectContent>
             {eligibleProducts.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {p.name} ({p.slug})
+                <ProductOption product={p} />
               </SelectItem>
             ))}
           </SelectContent>
@@ -361,6 +361,40 @@ function StepUserProduct({ form, patch }: StepProps) {
       </div>
     </div>
   );
+}
+
+function ProductOption({ product }: { product: Product }) {
+  const cover = pickProductCoverUrl(product);
+  return (
+    <div className="flex items-center gap-2">
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={cover}
+          alt=""
+          className="h-7 w-7 shrink-0 rounded object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+      )}
+      <span className="truncate text-sm">{product.name}</span>
+    </div>
+  );
+}
+
+function pickProductCoverUrl(product: Product): string | null {
+  const photo =
+    product.photos.generated.find((p) => !p.deleted) ??
+    product.photos.source.find((p) => !p.deleted);
+  if (!photo?.filename) return null;
+  const base =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
+  return `${base}/api/v1/products/${product.id}/photos/${encodeURIComponent(photo.filename)}/file${qs}`;
 }
 
 function StepTier({ form, patch }: StepProps) {

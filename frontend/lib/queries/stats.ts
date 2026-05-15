@@ -16,6 +16,11 @@ export const statsKeys = {
   historical: (months: number) => [...statsKeys.all, "historical", months] as const,
 };
 
+// staleTime alineado con el cache del backend (60s). Sin esto, cada
+// montaje del Dashboard refetch-eaba los 3 endpoints aunque el backend
+// devuelva el mismo valor desde su LRU cache.
+const STATS_STALE_MS = 60 * 1000;
+
 export function useMonthlyStats(month?: string) {
   return useQuery<MonthlyStatsResponse>({
     queryKey: statsKeys.monthly(month),
@@ -23,6 +28,7 @@ export function useMonthlyStats(month?: string) {
       const qs = month ? `?month=${month}` : "";
       return api.get<MonthlyStatsResponse>(`/api/v1/stats/monthly${qs}`);
     },
+    staleTime: STATS_STALE_MS,
   });
 }
 
@@ -30,6 +36,7 @@ export function useBudgetStatus() {
   return useQuery<BudgetStatusResponse>({
     queryKey: statsKeys.budget(),
     queryFn: () => api.get<BudgetStatusResponse>("/api/v1/stats/budget"),
+    staleTime: STATS_STALE_MS,
   });
 }
 
@@ -38,5 +45,6 @@ export function useHistoricalStats(months = 12) {
     queryKey: statsKeys.historical(months),
     queryFn: () =>
       api.get<HistoricalStatsResponse>(`/api/v1/stats/historical?months=${months}`),
+    staleTime: STATS_STALE_MS,
   });
 }

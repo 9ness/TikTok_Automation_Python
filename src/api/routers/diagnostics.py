@@ -30,6 +30,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -183,12 +184,24 @@ def _version_label() -> str:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+# Cache módulo — diagnostics_summary corre subprocess (git log) + systemctl
+# + psutil. Cada call ~1-2s en local. La sidebar lo pide cada 30s desde
+# cada cliente. 10s TTL = la 2ª navegación dentro de ese windows es
+# instantánea sin perder reactividad.
+_DIAG_CACHE_TTL = 10.0
+_diag_cache: dict[str, tuple[float, dict]] = {}
+
+
 @router.get("/summary")
 def diagnostics_summary() -> dict:
     """Snapshot único para el panel de la UI. Combina:
     servicios + git + deploy + cola + disco + versión."""
+    now = time.time()
+    cached = _diag_cache.get("summary")
+    if cached and now - cached[0] < _DIAG_CACHE_TTL:
+        return cached[1]
     deploy_status = _read_json(_host_or_local("temp_work/deploy_status.json")) or {}
-    return {
+    result = {
         "version": _version_label(),
         "services": _services_status(),
         "git": _git_log_oneline(),
@@ -196,6 +209,8 @@ def diagnostics_summary() -> dict:
         "queue": _queue_counts(),
         "disk": _disk_summary(),
     }
+    _diag_cache["summary"] = (now, result)
+    return result
 
 
 @router.get("/deploy")

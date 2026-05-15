@@ -88,6 +88,32 @@ class ShopRedis:
         except json.JSONDecodeError:
             return None
 
+    def mget_json(self, keys: list[str]) -> list[dict | None]:
+        """MGET batched — un solo roundtrip HTTP a Upstash para N keys.
+        Sustituye a `[get_json(k) for k in keys]` que serializa N HTTP
+        calls. En Upstash REST esto convierte N×latencia en 1×latencia,
+        crítico para listados largos (list_recent, etc.).
+
+        Devuelve una lista paralela a `keys`: cada posición es el dict
+        decodificado o `None` si el key no existía o falló parse.
+        """
+        if not keys:
+            return []
+        encoded = "/".join(self._enc(self._full_key(k)) for k in keys)
+        raw_list = self._get(f"mget/{encoded}")
+        if not raw_list:
+            return [None] * len(keys)
+        out: list[dict | None] = []
+        for raw in raw_list:
+            if raw is None:
+                out.append(None)
+                continue
+            try:
+                out.append(json.loads(raw) if isinstance(raw, str) else raw)
+            except (json.JSONDecodeError, TypeError):
+                out.append(None)
+        return out
+
     def set_json(self, key: str, value: dict | list) -> bool:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)

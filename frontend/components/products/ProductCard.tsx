@@ -29,7 +29,7 @@ export function ProductCard({ product }: { product: Product }) {
           product.deleted && "opacity-50",
         )}
       >
-        <div className="aspect-video bg-muted">
+        <div className="aspect-square bg-muted sm:aspect-video">
           {cover ? (
             <img
               src={cover}
@@ -43,18 +43,22 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
           )}
         </div>
-        <CardContent className="space-y-2 p-4">
-          <div className="flex items-start justify-between gap-2">
+        <CardContent className="space-y-1 p-2 sm:space-y-2 sm:p-4">
+          <div className="flex items-start justify-between gap-1.5 sm:gap-2">
             <div className="min-w-0">
-              <h3 className="truncate font-semibold">{product.name}</h3>
-              <p className="truncate text-xs text-muted-foreground">
+              <h3 className="truncate text-sm font-semibold sm:text-base">
+                {product.name}
+              </h3>
+              <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
                 {product.brand ? `${product.brand} · ` : ""}
                 <span className="font-mono">{product.slug}</span>
               </p>
             </div>
-            <Badge variant="secondary">{TIER_LABEL[tier] ?? tier}</Badge>
+            <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px] sm:text-xs">
+              {TIER_LABEL[tier] ?? tier}
+            </Badge>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground sm:gap-2 sm:text-xs">
             <span>{product.category}</span>
             <span>·</span>
             <span>{photoCount} fotos</span>
@@ -65,8 +69,10 @@ export function ProductCard({ product }: { product: Product }) {
               </>
             )}
             {product.needs_nano_banana_regeneration && (
-              <Badge variant="destructive" className="gap-1">
-                <AlertTriangle className="h-3 w-3" /> Regenerar fotos
+              <Badge variant="destructive" className="gap-1 px-1.5 text-[10px] sm:text-xs">
+                <AlertTriangle className="h-3 w-3" />
+                <span className="hidden sm:inline">Regenerar fotos</span>
+                <span className="sm:hidden">Regen</span>
               </Badge>
             )}
           </div>

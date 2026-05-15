@@ -303,8 +303,10 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Mobile trigger + drawer */}
-      <div className="flex h-14 items-center justify-between border-b px-4 md:hidden">
+      {/* Mobile trigger + drawer — sticky para que el botón Cola y el menú
+          queden siempre visibles al hacer scroll. backdrop-blur + bg con
+          alpha para que se vea el contenido por debajo desplazándose. */}
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:hidden">
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

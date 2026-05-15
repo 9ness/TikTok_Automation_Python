@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -73,20 +74,26 @@ def dashboard_summary(
     cached = _cache.get("summary")
     if cached and now - cached[0] < _CACHE_TTL_SECONDS:
         return cached[1]
-    products = [p for p in product_repo.list_all() if not p.deleted]
-    users = [u for u in user_repo.list_all() if not u.deleted]
 
-    # Stats del mes actual
+    # I/O paralelo — todas las llamadas son read-only e independientes. Sin
+    # esto el endpoint era estrictamente secuencial: products → users →
+    # stats → recent_gens (~5-8s cold). En paralelo: el tiempo total es
+    # ≈ el del más lento (~2-3s).
     month = _current_month_str()
-    stats = _build_monthly_stats(gen_repo, queue, month)
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        f_products = ex.submit(product_repo.list_all)
+        f_users = ex.submit(user_repo.list_all)
+        f_stats = ex.submit(_build_monthly_stats, gen_repo, queue, month)
+        f_recent = ex.submit(gen_repo.list_recent, 20)
+        products = [p for p in f_products.result() if not p.deleted]
+        users = [u for u in f_users.result() if not u.deleted]
+        stats = f_stats.result()
+        recent_gens = f_recent.result()
 
-    # Cola
+    # Cola (in-memory, instantáneo — no merece thread aparte)
     all_jobs = queue.get_all()
     pending = sum(1 for j in all_jobs if j.status == JobStatus.PENDING)
     running = sum(1 for j in all_jobs if j.status == JobStatus.RUNNING)
-
-    # Vídeos recientes (últimos 5 generados — TT Shop)
-    recent_gens = gen_repo.list_recent(limit=20)
     recent_videos = [
         VideoSummary(
             generation_id=g.id,

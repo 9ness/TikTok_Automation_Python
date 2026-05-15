@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -105,6 +106,16 @@ def user_folder_counts(user_id: str) -> dict[str, Any]:
     }
 
 
+# Cache módulo para `/folders/counts`. El badge global de la sidebar
+# llama a este endpoint cada 30s desde cada cliente — y cada call hace
+# `listdir` + `stat` sobre las 4 carpetas de Drive de CADA usuario, lo
+# que en Drive Desktop / rclone puede tardar varios segundos. Cachear
+# 15s evita golpear el FS en cada navegación SPA sin perder reactividad
+# (al subir un vídeo, el badge tarda como mucho 15s en actualizarse).
+_GLOBAL_COUNTS_TTL = 15.0
+_global_counts_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
 @router.get(
     "/folders/counts",
     dependencies=[Depends(get_current_user)],
@@ -120,23 +131,38 @@ def global_folder_counts() -> dict[str, Any]:
             "by_user": [{"user_id", "user_name", "counts": {...}}, ...]
         }
     """
+    now = time.time()
+    cached = _global_counts_cache.get("data")
+    if cached and now - cached[0] < _GLOBAL_COUNTS_TTL:
+        return cached[1]
+
     repo = UserRepo()
     users = repo.list_all(include_deleted=False)
+
+    # Paralelizar el conteo por usuario: cada `count_files` hace 4 listdir
+    # + stat sobre Drive Desktop (que en Windows es lento por sync). Para
+    # N usuarios secuencial sería N × ~0.5-1s; en paralelo ≈ max() ~1s.
+    def _count_one(u) -> tuple[Any, dict[str, int]]:
+        try:
+            return u, folder_manager.count_files(u.name)
+        except Exception:
+            return u, {f: 0 for f in USER_FOLDERS}
+
     totals = {f: 0 for f in USER_FOLDERS}
     by_user: list[dict[str, Any]] = []
-    for u in users:
-        try:
-            counts = folder_manager.count_files(u.name)
-        except Exception:
-            counts = {f: 0 for f in USER_FOLDERS}
-        for k, v in counts.items():
-            totals[k] = totals.get(k, 0) + v
-        by_user.append({
-            "user_id": u.id,
-            "user_name": u.name,
-            "counts": counts,
-        })
-    return {"totals": totals, "by_user": by_user}
+    if users:
+        with ThreadPoolExecutor(max_workers=min(8, len(users))) as ex:
+            for u, counts in ex.map(_count_one, users):
+                for k, v in counts.items():
+                    totals[k] = totals.get(k, 0) + v
+                by_user.append({
+                    "user_id": u.id,
+                    "user_name": u.name,
+                    "counts": counts,
+                })
+    result = {"totals": totals, "by_user": by_user}
+    _global_counts_cache["data"] = (now, result)
+    return result
 
 
 # ---------------------------------------------------------------------------

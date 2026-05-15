@@ -322,29 +322,29 @@ export function JobCard({ job }: { job: ActiveJob }) {
       )}
 
       {hasVideo && (
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-2 grid grid-cols-4 gap-1 sm:flex sm:flex-wrap">
           <Button
             size="sm"
             variant="default"
-            className="h-7 gap-1 text-xs"
+            className="h-7 min-w-0 gap-0.5 px-1.5 text-[10px] sm:gap-1 sm:px-3 sm:text-xs"
             onClick={() => setVideoOpen(true)}
           >
-            <Play className="h-3 w-3" />
-            Reproducir
+            <Play className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" />
+            <span className="truncate">Reproducir</span>
           </Button>
           {downloadUrl && (
-            <Button asChild size="sm" variant="outline" className="h-7 gap-1 text-xs">
+            <Button asChild size="sm" variant="outline" className="h-7 min-w-0 gap-0.5 px-1.5 text-[10px] sm:gap-1 sm:px-3 sm:text-xs">
               <a href={downloadUrl} download={filename}>
-                <Download className="h-3 w-3" />
-                Descargar
+                <Download className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" />
+                <span className="truncate">Descargar</span>
               </a>
             </Button>
           )}
           {driveSearchUrl && (
-            <Button asChild size="sm" variant="outline" className="h-7 gap-1 text-xs">
+            <Button asChild size="sm" variant="outline" className="h-7 min-w-0 gap-0.5 px-1.5 text-[10px] sm:gap-1 sm:px-3 sm:text-xs">
               <a href={driveSearchUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3" />
-                Drive
+                <ExternalLink className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" />
+                <span className="truncate">Drive</span>
               </a>
             </Button>
           )}
@@ -353,16 +353,16 @@ export function JobCard({ job }: { job: ActiveJob }) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 min-w-0 gap-0.5 border-destructive/40 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive sm:gap-1 sm:px-3 sm:text-xs"
             onClick={() => setDeleteConfirmOpen(true)}
             disabled={deleteWithFile.isPending}
           >
             {deleteWithFile.isPending ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin sm:h-3 sm:w-3" />
             ) : (
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" />
             )}
-            Eliminar
+            <span className="truncate">Eliminar</span>
           </Button>
         </div>
       )}

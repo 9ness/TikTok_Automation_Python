@@ -352,6 +352,26 @@ def _list_tiktok_shop_legacy(
                 # asociadas (devolvemos vacío, sin error).
                 return []
 
+    # Cache UUID → username para no resolver el mismo user N veces dentro
+    # del loop. El panel `/costs` agrupa por `user` así que sin esto
+    # mostraríamos el UUID crudo (ej. `ca190299c0264f...`) en vez de
+    # `@pisadaviva`.
+    _username_cache: dict[str, str] = {}
+
+    def _resolve_username(uid: str) -> str:
+        if not uid:
+            return uid
+        cached = _username_cache.get(uid)
+        if cached is not None:
+            return cached
+        try:
+            u = user_repo.get(uid)
+            label = (u.username if u and u.username else uid)
+        except Exception:
+            label = uid
+        _username_cache[uid] = label
+        return label
+
     out: list[dict] = []
     for g in gens:
         if g.deleted:
@@ -393,13 +413,14 @@ def _list_tiktok_shop_legacy(
                 "cost_usd": float(cost.other),
                 "detail": None,
             })
+        user_label = _resolve_username(g.user_id)
         out.append({
             "job_id": g.id,
             "program": "tiktok_shop",
             "mode": "tiktok_shop",
-            "user": g.user_id,
+            "user": user_label,
             "product_id": g.product_id,
-            "title": f"{g.tier_used} · {g.user_id}/{g.product_id}",
+            "title": f"{g.tier_used} · {user_label}/{g.product_id}",
             "started_at": _iso_to_ts(g.created_at),
             "finished_at": _iso_to_ts(g.completed_at),
             "lines": lines,
@@ -455,13 +476,18 @@ def list_jobs(
         if product_id:
             prod_set = set(redis.smembers(f"cost:by_product:{product_id}"))
             ids = [i for i in ids if i in prod_set]
-        for job_id in ids[:limit]:
-            raw = redis.get_json(f"cost:job:{job_id}")
-            if not raw:
-                continue
-            if mode and raw.get("mode") != mode:
-                continue
-            out.append(raw)
+        ids = ids[:limit]
+        # MGET batched — 1 roundtrip a Upstash REST en vez de N. Antes
+        # esto era el bottleneck nº1 de `/stats/monthly` en local.
+        if ids:
+            keys = [f"cost:job:{jid}" for jid in ids]
+            raws = redis.mget_json(keys)
+            for raw in raws:
+                if not raw:
+                    continue
+                if mode and raw.get("mode") != mode:
+                    continue
+                out.append(raw)
 
     # Fuente 2: TikTok Shop legacy (VideoGeneration). Se omite si el filtro
     # de programa es explícitamente "creator_reward" o "editor_auto" — el

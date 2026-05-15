@@ -45,12 +45,20 @@ class UserRepo:
 
     def list_all(self) -> list[TikTokUser]:
         ids = self.r.smembers(self.INDEX_KEY)
-        users = [self.get(i) for i in ids]
-        return sorted(
-            (u for u in users if u is not None),
-            key=lambda u: u.created_at,
-            reverse=True,
-        )
+        if not ids:
+            return []
+        # mget_json: 1 roundtrip en vez de N. Crítico para dashboard.
+        keys = [self._key(uid) for uid in ids]
+        raws = self.r.mget_json(keys)
+        users: list[TikTokUser] = []
+        for data in raws:
+            if not data:
+                continue
+            try:
+                users.append(TikTokUser.model_validate(data))
+            except Exception as e:
+                print(f"[UserRepo] decode error: {e}")
+        return sorted(users, key=lambda u: u.created_at, reverse=True)
 
     def delete(self, user_id: str) -> bool:
         u = self.get(user_id)

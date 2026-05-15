@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import calendar
 import os
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated
@@ -117,41 +118,69 @@ def _gens_in_month(repo: GenerationRepo, month: str, *, scan_limit: int = 1000) 
     return out
 
 
+# Cache compartido por mes. `/dashboard/summary`, `/stats/monthly` y
+# `/stats/budget` llaman a `_build_monthly_stats(month)`. Sin cache, una
+# carga del dashboard dispara 3 escaneos completos de Redis (cada uno con
+# ~1000 GET_JSON por roundtrip en Upstash REST → ~10s acumulados). Con
+# TTL 60s la 2ª y 3ª llamada del mismo render son ~0ms.
+_STATS_CACHE_TTL_SECONDS = 60.0
+_stats_cache: dict[str, tuple[float, "MonthlyStatsResponse"]] = {}
+
+
 def _build_monthly_stats(
     repo: GenerationRepo,
     queue: JobQueue,
     month: str,
 ) -> MonthlyStatsResponse:
-    gens = _gens_in_month(repo, month)
+    now = time.time()
+    cached = _stats_cache.get(month)
+    if cached and now - cached[0] < _STATS_CACHE_TTL_SECONDS:
+        return cached[1]
 
+    # TikTok Shop legacy: VideoGeneration tiene metadata específica (tier,
+    # product_id, user_id) que cost_tracking no preserva. La mantenemos
+    # como fuente para los breakdowns granulares de TT Shop.
+    gens = _gens_in_month(repo, month)
     cost_by_user: dict[str, float] = defaultdict(float)
     cost_by_product: dict[str, float] = defaultdict(float)
     cost_by_tier: dict[str, float] = defaultdict(float)
-    daily: dict[str, dict] = defaultdict(lambda: {"cost": 0.0, "count": 0})
-
-    total_cost = 0.0
     for g in gens:
         c = g.cost.total or 0.0
-        total_cost += c
         cost_by_user[g.user_id] += c
         cost_by_product[g.product_id] += c
         cost_by_tier[g.tier_used] += c
+
+    # Coste agregado unificado: cost_tracking ya combina TT Shop legacy
+    # + jobs nuevos (Creator Reward, Editor Auto, TT Shop nuevo). Usar
+    # esto como única fuente de `cost_by_module` evita que CR/Editor Auto
+    # queden en 0 en el dashboard cuando sí han gastado dinero.
+    jobs_unified = cost_tracking.list_jobs(month=month, limit=2000)
+    summary = cost_tracking.aggregate_summary(jobs_unified)
+    cost_by_module: dict[str, float] = {
+        "tiktok_shop": float(summary["by_program"].get("tiktok_shop", 0.0)),
+        "creator_reward": float(summary["by_program"].get("creator_reward", 0.0)),
+        "editor_auto": float(summary["by_program"].get("editor_auto", 0.0)),
+    }
+    total_cost = float(summary.get("total_usd", 0.0))
+
+    # Breakdown diario: lo construimos del feed unificado para que sume
+    # los 3 programas (antes solo TT Shop).
+    daily: dict[str, dict] = defaultdict(lambda: {"cost": 0.0, "count": 0})
+    for j in jobs_unified:
+        ts_raw = j.get("started_at") or 0
+        if not ts_raw:
+            continue
         try:
-            ts = datetime.fromisoformat((g.created_at or "").replace("Z", "+00:00"))
-            day_key = ts.strftime("%Y-%m-%d")
-            daily[day_key]["cost"] += c
-            daily[day_key]["count"] += 1
-        except ValueError:
-            pass
+            day_key = datetime.fromtimestamp(float(ts_raw), tz=timezone.utc).strftime("%Y-%m-%d")
+        except (ValueError, OSError):
+            continue
+        amt = float(j.get("total_usd") or 0.0)
+        daily[day_key]["cost"] += amt
+        daily[day_key]["count"] += 1
 
     # Conteo total de vídeos: TT Shop generations + jobs completados de CR en el mismo mes
     cr_completed_in_month = _count_cr_completed_jobs_in_month(queue, month)
     total_videos = len(gens) + cr_completed_in_month
-
-    cost_by_module = {
-        "tiktok_shop": round(total_cost, 4),
-        "creator_reward": 0.0,  # placeholder hasta que tengamos cost tracking en CR
-    }
 
     daily_breakdown = sorted(
         (
@@ -161,16 +190,18 @@ def _build_monthly_stats(
         key=lambda p: p.date,
     )
 
-    return MonthlyStatsResponse(
+    response = MonthlyStatsResponse(
         month=month,
         total_cost_usd=round(total_cost, 4),
         total_videos_generated=total_videos,
-        cost_by_module=cost_by_module,
+        cost_by_module={k: round(v, 4) for k, v in cost_by_module.items()},
         cost_by_user={k: round(v, 4) for k, v in cost_by_user.items()},
         cost_by_product={k: round(v, 4) for k, v in cost_by_product.items()},
         cost_by_tier={k: round(v, 4) for k, v in cost_by_tier.items()},
         daily_breakdown=daily_breakdown,
     )
+    _stats_cache[month] = (now, response)
+    return response
 
 
 def _count_cr_completed_jobs_in_month(queue: JobQueue, month: str) -> int:
