@@ -69,18 +69,25 @@ def sharing_status() -> dict[str, Any]:
 def list_user_shares(user_id: str) -> dict[str, Any]:
     """Lista los permissions activos en `entrada`, `cola`, `recuperacion`,
     `salida` del usuario + el conjunto de `known_emails` (memorizados al
-    compartir por primera vez). El frontend usa los known_emails para
-    mostrar filas incluso si el email no tiene acceso activo a ninguna
-    carpeta — facilita re-conceder con un click."""
+    compartir por primera vez) + permisos HEREDADOS de carpetas padre
+    (TIKTOK_EDITOR, Usuarios, <user>/). Estos últimos no se pueden
+    revocar desde aquí — habría que tocar la carpeta padre."""
     u = _user_or_raise(user_id)
     try:
         shares = drive_sharing.list_shares(u.name)
     except drive_sharing.DriveSharingError as e:
         raise ValidationError(str(e))
+    # Heredados: best-effort, si falla no abortamos el endpoint completo
+    inherited: list[dict] = []
+    try:
+        inherited = drive_sharing.list_inherited_shares(u.name)
+    except drive_sharing.DriveSharingError:
+        inherited = []
     return {
         "user_id": u.id,
         "user_name": u.name,
         "shares": shares,
+        "inherited_shares": inherited,
         "known_emails": list(u.known_share_emails or []),
     }
 
@@ -117,6 +124,18 @@ def create_user_share(
         )
     except drive_sharing.DriveSharingError as e:
         raise ValidationError(str(e))
+    except Exception as e:
+        # Cualquier otro error (Drive API down, network, OAuth) →
+        # devolvemos JSON con detalle. Sin este catch FastAPI escupía
+        # `Internal Server Error` HTML que rompía el parser del frontend
+        # ("Unexpected token 'I'...").
+        import logging
+        logging.getLogger("editor_auto.sharing").exception(
+            "fallo creando share user=%s email=%s", user_id, email,
+        )
+        raise ValidationError(
+            f"Fallo al compartir con {email}: {type(e).__name__}: {e}",
+        )
 
     # Persistir el email en known_share_emails si es nuevo. Insensible a
     # mayúsculas (todos ya en lowercase por _validate_email).

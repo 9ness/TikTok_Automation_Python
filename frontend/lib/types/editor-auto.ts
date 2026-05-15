@@ -153,10 +153,20 @@ export interface DriveShare {
   folder_id: string;
 }
 
+export interface InheritedShare extends DriveShare {
+  /** De qué carpeta padre se hereda — "TIKTOK_EDITOR" / "Usuarios" /
+   *  el nombre del usuario. La UI lo muestra como read-only. */
+  inherited_from: string;
+}
+
 export interface UserSharesResponse {
   user_id: string;
   user_name: string;
   shares: Record<FolderName, DriveShare[]>;
+  /** Permisos heredados de carpetas padre (TIKTOK_EDITOR, Usuarios,
+   *  <user>/). No se pueden revocar desde aquí — habría que tocar la
+   *  carpeta padre directamente. */
+  inherited_shares: InheritedShare[];
   /** Emails a los que el usuario ha dado acceso alguna vez (incluso si
    *  ahora no tienen ninguna carpeta compartida). Permite al UI mostrar
    *  filas re-utilizables sin re-tipear el gmail. */

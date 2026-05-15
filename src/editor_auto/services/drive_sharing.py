@@ -263,15 +263,45 @@ def share_folders(
     return results
 
 
+def _list_folder_perms(folder_id: str) -> list[dict[str, Any]]:
+    """Lista permissions de un folder concreto. Filtra owner + SA + tipos
+    no-user (domain, anyone). Devuelve lista normalizada."""
+    svc = _service()
+    sa = sa_email()
+    try:
+        resp = svc.permissions().list(
+            fileId=folder_id,
+            supportsAllDrives=True,
+            fields="permissions(id,emailAddress,role,type,displayName)",
+            pageSize=100,
+        ).execute()
+    except Exception as e:
+        raise DriveSharingError(f"Fallo listando perms: {e}")
+    perms = resp.get("permissions", []) or []
+    return [
+        {
+            "permission_id": p.get("id"),
+            "email": p.get("emailAddress"),
+            "role": p.get("role"),
+            "type": p.get("type"),
+            "display_name": p.get("displayName"),
+            "folder_id": folder_id,
+        }
+        for p in perms
+        if p.get("role") != "owner"
+        and p.get("emailAddress") != sa
+        and p.get("type") == "user"
+    ]
+
+
 def list_shares(username: str) -> dict[str, list[dict[str, Any]]]:
-    """Lista los permissions activos en cada subcarpeta del usuario.
+    """Lista permissions DIRECTOS sobre cada subcarpeta del usuario.
 
     Returns:
         {entrada: [{id, email, role, ...}, ...], cola: […], ...}
-    Filtra el owner y el SA (no son shares manuales relevantes).
+    Filtra el owner y el SA. NO incluye perms heredados de carpetas
+    padre — para eso usar `list_inherited_shares()`.
     """
-    svc = _service()
-    sa = sa_email()
     out: dict[str, list[dict[str, Any]]] = {}
     for folder in SHAREABLE_FOLDERS:
         try:
@@ -279,36 +309,63 @@ def list_shares(username: str) -> dict[str, list[dict[str, Any]]]:
         except DriveSharingError:
             out[folder] = []
             continue
-        try:
-            resp = svc.permissions().list(
-                fileId=folder_id,
-                supportsAllDrives=True,
-                fields="permissions(id,emailAddress,role,type,displayName)",
-                pageSize=100,
-            ).execute()
-        except Exception as e:
-            raise DriveSharingError(
-                f"Fallo listando perms de {folder!r}: {e}"
-            )
-        perms = resp.get("permissions", []) or []
-        filtered = [
-            {
-                "permission_id": p.get("id"),
-                "email": p.get("emailAddress"),
-                "role": p.get("role"),
-                "type": p.get("type"),
-                "display_name": p.get("displayName"),
-                "folder_id": folder_id,
-            }
-            for p in perms
-            # Filtra: owners (siempre presentes), SA propio (no es un
-            # "share manual"), perms de tipo "domain"/"anyone" raros.
-            if p.get("role") != "owner"
-            and p.get("emailAddress") != sa
-            and p.get("type") == "user"
-        ]
-        out[folder] = filtered
+        out[folder] = _list_folder_perms(folder_id)
     return out
+
+
+def list_inherited_shares(username: str) -> list[dict[str, Any]]:
+    """Permisos en carpetas PADRE que se heredan a entrada/salida del
+    usuario. Drive no marca explícitamente la herencia: si compartes
+    TIKTOK_EDITOR/ con `X@gmail.com`, ese email tiene acceso efectivo a
+    todas las subcarpetas pero NO aparece en `permissions.list(entrada/)`.
+
+    Esta función recorre los 3 niveles padre:
+        TIKTOK_EDITOR/ → todos los usuarios + carpetas
+        TIKTOK_EDITOR/Usuarios/ → todos los usuarios + carpetas
+        TIKTOK_EDITOR/Usuarios/<user>/ → entrada, cola, recuperacion, salida
+
+    Para cada permission devuelve `{..., inherited_from}` indicando el
+    nivel padre. El frontend lo muestra como read-only (revocar
+    requeriría tocar la carpeta padre, riesgo de cascada).
+    """
+    items: list[dict[str, Any]] = []
+    seen_emails_per_level: dict[str, set[str]] = {}
+
+    levels: list[tuple[str, str]] = []
+    try:
+        levels.append(("TIKTOK_EDITOR", _root_folder_id()))
+    except DriveSharingError:
+        return items  # sin acceso al root, no hay nada
+    try:
+        levels.append(("Usuarios", _users_folder_id()))
+    except DriveSharingError:
+        pass
+    try:
+        levels.append((username, _user_folder_id(username)))
+    except DriveSharingError:
+        pass
+
+    for level_name, folder_id in levels:
+        try:
+            perms = _list_folder_perms(folder_id)
+        except DriveSharingError:
+            continue
+        seen = set()
+        for p in perms:
+            email = (p.get("email") or "").lower()
+            if not email:
+                continue
+            # Si ya lo vimos en un nivel SUPERIOR, lo skip — atribuimos al
+            # padre más cercano (más específico).
+            if any(email in s for s in seen_emails_per_level.values()):
+                continue
+            seen.add(email)
+            items.append({
+                **p,
+                "inherited_from": level_name,
+            })
+        seen_emails_per_level[level_name] = seen
+    return items
 
 
 def revoke_permission(
