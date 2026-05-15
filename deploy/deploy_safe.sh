@@ -255,6 +255,22 @@ fi
 #
 # Si docker no está instalado o no hay docker-compose.yml en el repo, se
 # omite limpiamente (modo Streamlit-only).
+# ============================================================
+# 3.a-pre. Liberar disco si está bajo (defensa contra builds huérfanos
+# que llenan el host con layers de torch/torchaudio sin usar).
+# ============================================================
+# Si quedan < 5 GB libres, lanzamos un prune ANTES de los rebuilds —
+# evita builds a medias por ENOSPC. Más conservador que `system prune
+# -af`: solo limpia builder cache + imágenes sin tag.
+DISK_FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+if [[ -n "$DISK_FREE_GB" && "$DISK_FREE_GB" -lt 5 ]]; then
+    echo "[deploy_safe] ⚠️ disco bajo (${DISK_FREE_GB} GB libres) — limpiando builder cache + dangling images…"
+    docker builder prune -af >/dev/null 2>&1 || true
+    docker image prune -af >/dev/null 2>&1 || true
+    DISK_FREE_GB_AFTER=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+    echo "[deploy_safe]   tras prune: ${DISK_FREE_GB_AFTER} GB libres"
+fi
+
 NEEDS_API_REBUILD=false
 NEEDS_WEB_REBUILD=false
 NEEDS_CADDY_RESTART=false
