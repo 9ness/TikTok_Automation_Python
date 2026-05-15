@@ -37,14 +37,20 @@ WORKDIR /app
 FROM base AS builder
 
 COPY requirements.txt ./
-# `packaging` se instala PRIMERO en el wheelhouse `/install`: silero-vad
-# 5.x lo importa al cargar (`from packaging.version import parse`) y si
-# el orden de install lo deja para el final, en algunos casos no acaba
-# en `/usr/local/lib/python3.11/site-packages/` tras el COPY del runtime.
-# Forzarlo al inicio garantiza que esté presente para cualquier consumer.
+# Causa del bug previo: `pip install --prefix=/install packaging` veía
+# `packaging` ya satisfecho a nivel sistema (lo trae setuptools) y no
+# lo instalaba al wheelhouse `/install`. Resultado: silero-vad falla al
+# importar `packaging` en runtime porque NO está en /usr/local tras el
+# COPY. Fix: `--ignore-installed --upgrade` fuerza la instalación local
+# al wheelhouse aunque exista a nivel sistema.
+#
+# Verificamos al final que `packaging/` exista en /install — si no, el
+# build falla aquí con un mensaje claro en lugar de propagarse a runtime.
 RUN pip install --upgrade pip wheel setuptools \
-    && pip install --prefix=/install --no-cache-dir "packaging>=23.0" \
-    && pip install --prefix=/install --no-cache-dir -r requirements.txt
+    && pip install --prefix=/install --no-cache-dir --upgrade --ignore-installed "packaging>=23.0" \
+    && pip install --prefix=/install --no-cache-dir -r requirements.txt \
+    && test -d /install/lib/python3.11/site-packages/packaging \
+       || (echo "ERROR: packaging no acabó en /install — el COPY al runtime fallará" && exit 1)
 
 # ---------------------------------------------------------------------------
 # Stage runtime — copia solo lo necesario
