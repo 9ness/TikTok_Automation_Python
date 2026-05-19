@@ -171,14 +171,44 @@ def _preflight_check(enabled_steps) -> tuple[list[str], list[str]]:
                 )
             else:
                 try:
+                    from src.editor_auto.config import arrows_folder
                     from src.editor_auto.tools.sticker_arrow import (
+                        STICKER_EXTS,
                         _resolve_sticker_path,
                     )
                     if not _resolve_sticker_path(sticker):
-                        errors.append(
-                            f"sticker_arrow: no encuentro '{sticker}' en "
-                            f"Assets/flechas/. ¿Sync rclone pendiente?"
-                        )
+                        folder = arrows_folder()
+                        if not os.path.isdir(folder):
+                            errors.append(
+                                f"sticker_arrow: la carpeta '{folder}' no existe "
+                                f"en este entorno. Crea la carpeta en Drive y "
+                                f"sube tus stickers (.mov/.webm/.gif) ahí."
+                            )
+                        else:
+                            try:
+                                available = sorted([
+                                    n for n in os.listdir(folder)
+                                    if os.path.splitext(n)[1].lower() in STICKER_EXTS
+                                ])
+                            except OSError:
+                                available = []
+                            if not available:
+                                errors.append(
+                                    f"sticker_arrow: la carpeta '{folder}' existe "
+                                    f"pero está vacía. Sube '{sticker}' a Drive en "
+                                    f"esa carpeta (o fuerza refresh rclone: "
+                                    f"`rclone rc vfs/refresh recursive=true`)."
+                                )
+                            else:
+                                preview = ", ".join(available[:8]) + (
+                                    f" (+{len(available) - 8} más)" if len(available) > 8 else ""
+                                )
+                                errors.append(
+                                    f"sticker_arrow: '{sticker}' no está en "
+                                    f"'{folder}'. Disponibles: {preview}. Si "
+                                    f"acabas de subirlo a Drive, ejecuta "
+                                    f"`rclone rc vfs/refresh recursive=true`."
+                                )
                 except Exception as e:
                     errors.append(f"sticker_arrow: error resolviendo asset ({e})")
 
