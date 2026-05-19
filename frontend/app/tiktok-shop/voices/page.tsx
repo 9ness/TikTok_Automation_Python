@@ -24,7 +24,10 @@ export default function ShopVoicesPage() {
 
   const voices = useVoices({
     language: language === "__all__" ? undefined : language,
-    gender: gender === "__all__" ? undefined : gender,
+    gender:
+      gender === "__all__"
+        ? undefined
+        : (gender as "male" | "female" | "neutral"),
     include_presets: includePresets,
   });
 

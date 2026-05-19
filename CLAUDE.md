@@ -19,6 +19,8 @@ Reward / TikTok Shop / Editor Auto), cada uno con sus nichos.
 | 🏛️ Presidentes Top 5 | `PRESIDENTS_TOP5` | Rankings de presidentes USA con guion IA + assets locales |
 | 📊 Pronósticos Diarios | `PRONOSTICOS_DIARIOS` | Vídeos de pronósticos deportivos desde Redis (bet-ai-master) |
 | 🛡️ Quitar Copy | `COPYRIGHT_CLEANER` | Re-subtitula vídeos para evadir copyright |
+| 🏗️ Construcción POV | `CONSTRUCCION_POV` | Vídeo input → guion Gemini 1ª persona → voz MiniMax EN + anti-copy + subs |
+| 🔧 Herramientas · Voces | (sin modo) | Hub global voces MiniMax: presets ES/EN + clonado reutilizable entre modos |
 
 ### Programa 2 — TikTok Shop (en construcción)
 
@@ -116,6 +118,39 @@ Override por `PRONOSTICOS_VOICE_ID` o por la UI.
 Sube un vídeo, detecta los subtítulos originales, los enmascara y añade
 nuevos con estilo viral. Usa [`src/video_remover.py`](src/video_remover.py).
 No depende de Redis ni de assets externos.
+
+---
+
+## Nicho 4 — Construcción POV
+
+**Flujo:** vídeo input (sin voz) → Gemini 2.5 Pro analiza el vídeo y devuelve
+un guion narrado 1ª persona US English calibrado a la duración real → MiniMax
+TTS (voz preset EN o clonada) → ffmpeg mux audio nuevo sobre vídeo → Whisper
+alinea palabras → transformaciones visuales anti-copy (zoom, saturación,
+metadata strip, opcional 1080p Lanczos) → render karaoke subs sobre el
+resultado. Sin Redis, sin assets externos — todo en runtime.
+
+**Módulos clave** (todos en [`src/construccion_pov/`](src/construccion_pov/)):
+- `gemini_video.py` — cliente Gemini con upload de vídeo (Files API + polling
+  ACTIVE + delete) y fallback dual-key FREE→PAID
+- `script_generator.py` — calcula `target_chars` por duración (15.5 ch/s EN,
+  cola silenciosa 4s) y construye el prompt desde `prompts/pov_script.md`
+- `pipeline.py` — orquestador end-to-end con franjas de progreso
+
+**Voces:** preset MiniMax inglés (`English_*` definidas en
+[`tiktok_shop/config.py:DEFAULT_VOICE_PRESETS_EN`](src/tiktok_shop/config.py))
+o clones globales gestionados desde `/creator-reward/tools/voices` (UI hub).
+
+**Endpoints API:**
+- `POST /api/v1/creator-reward/construccion-pov/enqueue` — multipart con
+  vídeo + style subs + voice_id + anti-copy options
+- `POST /api/v1/voices/clone` — sube sample → MiniMax voice_clone → guarda
+  VoiceClone en Redis (índice `voice:index`)
+- `GET  /api/v1/voices/{id}/sample` — MP3 cacheado para audicionar voz (sin
+  auth, sirve `<audio src>`)
+- `DELETE /api/v1/voices/{id}` — borra clones (presets bloqueados)
+
+**Output:** `<output_folder>/CONSTRUCCION_POV/POV_<stem>_<ts>.mp4`.
 
 ---
 

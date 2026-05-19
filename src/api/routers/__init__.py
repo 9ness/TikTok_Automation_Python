@@ -2,11 +2,13 @@ from .products import photo_file_router as product_photo_file_router
 from .products import router as products_router
 from .users import router as users_router
 from .voices import router as voices_router
+from .voices import sample_router as voices_sample_router
 from .generations import router as generations_router
 from .generations import video_router as generations_video_router
 from .queue import router as queue_router
 from .queue import video_router as queue_video_router
 from .creator_reward import (
+    construccion_pov_router,
     copyright_router,
     presidents_router,
     pronosticos_router,
@@ -33,10 +35,12 @@ __all__ = [
     "product_photo_file_router",
     "users_router",
     "voices_router",
+    "voices_sample_router",
     "generations_router",
     "generations_video_router",
     "queue_router",
     "queue_video_router",
+    "construccion_pov_router",
     "copyright_router",
     "presidents_router",
     "pronosticos_router",

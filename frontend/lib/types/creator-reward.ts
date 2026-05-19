@@ -216,3 +216,42 @@ export interface SubsAutoEnqueueResponse {
   job_id: string;
   position_in_queue: number;
 }
+
+// ---------------------------------------------------------------------------
+// Construcción POV
+// ---------------------------------------------------------------------------
+export interface ConstruccionPovEnqueueRequest {
+  file: File;
+  voice_id: string;
+  // Estilo subs (mismo shape que SubsAutoStyleConfig).
+  font_path: string;
+  highlight_mode: SubsAutoHighlightMode;
+  highlight_color: string;
+  text_color: string;
+  stroke_color: string;
+  stroke_width: number;
+  case_mode: SubsAutoCaseMode;
+  font_scale: number;
+  max_words: number;
+  y_position: number;
+  pill_enabled: boolean;
+  max_width: number;
+  sync_offset: number;
+  // Anti-copy + render
+  upscale_1080p: boolean;
+  saturation: number;
+  pulse_zoom: boolean;
+  mirror: boolean;
+  whisper_model_size: string;
+  quality_label: string;
+  // Guion: si manual_script != null/"", se omite Gemini (coste $0).
+  gemini_model: "gemini-2.5-flash" | "gemini-2.5-pro";
+  manual_script?: string | null;
+}
+
+export interface ConstruccionPovEnqueueResponse {
+  job_id: string;
+  title: string;
+  position_in_queue: number;
+  input_path_relative: string;
+}

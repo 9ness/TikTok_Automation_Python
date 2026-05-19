@@ -53,7 +53,7 @@ router = APIRouter(
 def list_jobs_with_costs(
     month: Annotated[str | None, Query(description="YYYY-MM")] = None,
     program: Annotated[str | None, Query(description="creator_reward | tiktok_shop | editor_auto")] = None,
-    mode: Annotated[str | None, Query(description="presidents | pronosticos | copyright | subs_auto | tiktok_shop | editor_auto")] = None,
+    mode: Annotated[str | None, Query(description="presidents | pronosticos | copyright | subs_auto | construccion_pov | tiktok_shop | editor_auto")] = None,
     user: Annotated[str | None, Query()] = None,
     product_id: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=2000)] = 500,

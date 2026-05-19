@@ -61,6 +61,12 @@ def transcribe_with_reference(
               canciones: el VAD agresivo trata interludios como silencio y corta
               la transcripción a mitad de la canción; el condicionamiento previo
               hace que Whisper se atasque si pierde el hilo en un puente musical.
+            - "tts": VAD OFF + `condition_on_previous_text=True`. Específico
+              para audio TTS limpio (MiniMax, Eleven, etc.) — sabemos que el
+              archivo entero es speech, no hay silencios reales. Con VAD on
+              algunas voces TTS hacen que el VAD marque regiones como silencio
+              erróneamente, descuadrando timestamps de los subs (subs aparecen
+              después de que la voz ya está hablando).
 
     Returns:
         Lista de dicts {word, start, end} con timestamps por palabra.
@@ -69,14 +75,20 @@ def transcribe_with_reference(
 
     model = _get_whisper_model(model_size)
     is_music = (audio_type == "music")
+    is_tts = (audio_type == "tts")
+    # VAD off cuando sabemos que TODO el audio es speech (música o TTS).
+    vad_off = is_music or is_tts
 
     transcribe_kwargs: dict = {
         "word_timestamps": True,
         "language": language,
-        "vad_filter": not is_music,
+        "vad_filter": not vad_off,
+        # TTS mantiene `condition_on_previous_text=True` para coherencia entre
+        # chunks (todo el guion es una narración continua). Música lo desactiva
+        # porque el VAD off + condicionamiento puede atascar a Whisper en bridges.
         "condition_on_previous_text": not is_music,
     }
-    if not is_music:
+    if not vad_off:
         # Default real de faster-whisper. Antes tenía 300ms, demasiado agresivo
         # → cortaba canciones a las primeras estrofas.
         transcribe_kwargs["vad_parameters"] = {"min_silence_duration_ms": 2000}
@@ -697,12 +709,19 @@ def render_subtitles_on_video(
     quality_settings: dict | None = None,
     log_callback=None,
     logger=None,
+    last_chunk_max_end: float | None = None,
 ) -> str:
     """Compone los subtítulos karaoke sobre el vídeo y exporta.
 
     `quality_settings` espera dict con keys: preset, crf, max_long_side.
     Si `max_long_side` es menor que el lado largo del vídeo, se downscalea
     proporcionalmente (nunca upscale). Si es None, conserva resolución original.
+
+    `last_chunk_max_end`: si se pasa (segundos), el ÚLTIMO chunk no se
+    extiende hasta `video_duration` sino hasta ese valor. Útil para nichos
+    donde el audio acaba antes que el vídeo (Construcción POV: narración
+    ~55s + cola silenciosa hasta 60s) y no queremos que la última palabra
+    quede congelada en pantalla durante el silencio.
     """
     from src.subtitles import (
         DEFAULT_STYLE,
@@ -748,12 +767,20 @@ def render_subtitles_on_video(
 
     overlays: list[ImageClip] = []
     video_duration = float(video.duration)
+    # Para el último chunk: por defecto extiende hasta el fin del vídeo
+    # (Pronósticos y Subs Auto necesitan esto). POV pasa `last_chunk_max_end`
+    # para que el último sub no quede congelado en la cola silenciosa.
+    last_end_cap = (
+        min(float(last_chunk_max_end), video_duration)
+        if last_chunk_max_end is not None
+        else video_duration
+    )
 
     for chunk_idx, chunk in enumerate(chunks):
         if chunk_idx + 1 < len(chunks):
             next_chunk_start = chunks[chunk_idx + 1][0]["start"]
         else:
-            next_chunk_start = video_duration
+            next_chunk_start = last_end_cap
 
         if mode == "none":
             # 1 imagen estática por chunk → cero transiciones por palabra.

@@ -41,11 +41,15 @@ export function SubsAutoStyleEditor({
   onChange,
   inputPath,
   sampleText = "HELLO FROM THE OTHER SIDE",
+  showSafeZones = false,
 }: {
   style: SubsAutoStyleConfig;
   onChange: (next: SubsAutoStyleConfig) => void;
   inputPath: string;
   sampleText?: string;
+  /** Si true, dibuja las zonas inseguras TikTok (15% arriba / 25% abajo)
+   *  sobre el preview interno. Útil cuando no hay vídeo cargado (POV). */
+  showSafeZones?: boolean;
 }) {
   const presets = useSubsAutoPresets();
   const modes = useSubsAutoHighlightModes();
@@ -276,6 +280,7 @@ export function SubsAutoStyleEditor({
             style={style}
             sampleText={sampleText}
             onYChange={(y) => patch("y_position", y)}
+            showSafeZones={showSafeZones}
           />
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">
@@ -305,11 +310,13 @@ function SubsAutoPreview({
   style,
   sampleText,
   onYChange,
+  showSafeZones = false,
 }: {
   frameUrl: string | null;
   style: SubsAutoStyleConfig;
   sampleText: string;
   onYChange: (y: number) => void;
+  showSafeZones?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
@@ -361,6 +368,24 @@ function SubsAutoPreview({
         containerType: "size",
       }}
     >
+      {/* Zonas inseguras TikTok (15% arriba, 25% abajo). Opcional —
+          se activa con `showSafeZones`. */}
+      {showSafeZones && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 border-b border-dashed border-amber-400/40 bg-amber-400/5"
+            style={{ height: "15%" }}
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-dashed border-amber-400/40 bg-amber-400/5"
+            style={{ height: "25%" }}
+          />
+          <span className="pointer-events-none absolute right-1 top-1 rounded bg-amber-500/70 px-1 text-[8px] font-medium text-black">
+            no-safe
+          </span>
+        </>
+      )}
+
       {/* Línea Y indicator */}
       <div
         className="pointer-events-none absolute inset-x-0 h-px bg-cyan-400/60"

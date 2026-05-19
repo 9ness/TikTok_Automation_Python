@@ -19,6 +19,7 @@ class JobMode(str, Enum):
     PRONOSTICOS = "pronosticos"
     SUBS_AUTO = "subs_auto"
     COPYRIGHT = "copyright"
+    CONSTRUCCION_POV = "construccion_pov"
     TIKTOK_SHOP = "tiktok_shop"
     EDITOR_AUTO = "editor_auto"
 
@@ -37,6 +38,7 @@ MODE_LABELS = {
     JobMode.PRONOSTICOS: "📊 Pronósticos",
     JobMode.SUBS_AUTO: "🎬 Subs sobre Vídeo",
     JobMode.COPYRIGHT: "🛡️ Quitar Copy",
+    JobMode.CONSTRUCCION_POV: "🏗️ Construcción POV",
     JobMode.TIKTOK_SHOP: "🛒 TikTok Shop",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
 }

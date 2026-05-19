@@ -30,6 +30,7 @@ from src.api.config import get_settings
 from src.api.exceptions import register_exception_handlers
 from src.api.routers import (
     auth_router,
+    construccion_pov_router,
     deploy_router,
     copyright_router,
     dashboard_router,
@@ -55,6 +56,7 @@ from src.api.routers import (
     subs_auto_router,
     users_router,
     voices_router,
+    voices_sample_router,
 )
 from src.api.websockets import queue_ws_router
 
@@ -133,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(product_photo_file_router)
     app.include_router(users_router)
     app.include_router(voices_router)
+    app.include_router(voices_sample_router)
     app.include_router(generations_router)
     app.include_router(generations_video_router)
     app.include_router(queue_router)
@@ -140,6 +143,7 @@ def create_app() -> FastAPI:
     app.include_router(presidents_router)
     app.include_router(pronosticos_router)
     app.include_router(copyright_router)
+    app.include_router(construccion_pov_router)
     app.include_router(subs_auto_router)
     app.include_router(subs_auto_frame_router)
     app.include_router(editor_auto_tools_router)

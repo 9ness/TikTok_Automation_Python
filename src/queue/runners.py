@@ -715,6 +715,60 @@ def run_copyright(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
 
 # ============================================================
+# RUNNER: CONSTRUCCION POV (nicho 4 Creator Reward)
+# ============================================================
+def run_construccion_pov(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Construcción POV: vídeo input → Gemini guion → MiniMax voz →
+    anti-copy + subs karaoke. Devuelve ruta del MP4 final."""
+    p = job.params
+    from src.construccion_pov.pipeline import run_pipeline
+
+    config = p["config"]
+
+    # Defense-in-depth: si el voice_id viene con prefijo `preset_*` (job
+    # encolado por un path antiguo o tests), lo strippeamos para que
+    # MiniMax lo acepte. El preflight del enqueue ya lo resuelve, esto
+    # es solo red de seguridad.
+    voice_id = p["voice_id"]
+    if isinstance(voice_id, str) and voice_id.startswith("preset_"):
+        voice_id = voice_id[len("preset_"):]
+        on_log(f"⚠️ voice_id venía con prefijo preset_*, usando '{voice_id}'.")
+    style = {
+        "font_path": p["font_path"],
+        "highlight_mode": p["highlight_mode"],
+        "highlight_color": p["highlight_color"],
+        "text_color": p["text_color"],
+        "stroke_color": p["stroke_color"],
+        "stroke_width": p["stroke_width"],
+        "case_mode": p["case_mode"],
+        "font_scale": p["font_scale"],
+        "max_words_per_chunk": p["max_words"],
+        "y_position_pct": p["y_position"],
+        "pill_enabled": p.get("pill_enabled", True),
+        "max_width_pct": p.get("max_width", 0.85),
+        "sync_offset_ms": p.get("sync_offset", 0),
+    }
+    return run_pipeline(
+        input_path=p["input_path"],
+        output_folder=config["paths"]["output_folder"],
+        config=config,
+        voice_id=voice_id,
+        subs_style=style,
+        upscale_1080p=bool(p.get("upscale_1080p", False)),
+        saturation=float(p.get("saturation", 1.25)),
+        pulse_zoom=bool(p.get("pulse_zoom", True)),
+        mirror=bool(p.get("mirror", False)),
+        whisper_model_size=p.get("whisper_model_size", "small"),
+        quality_label=p.get("quality_label", "1080p (Lento)"),
+        gemini_model=p.get("gemini_model", "gemini-2.5-pro"),
+        manual_script=p.get("manual_script"),
+        output_name=p.get("output_name"),
+        on_log=on_log,
+        on_progress=on_progress,
+    )
+
+
+# ============================================================
 # RUNNER: TIKTOK SHOP (Programa 2)
 # ============================================================
 def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -1253,6 +1307,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.PRONOSTICOS: run_pronosticos,
     JobMode.SUBS_AUTO: run_subs_auto,
     JobMode.COPYRIGHT: run_copyright,
+    JobMode.CONSTRUCCION_POV: run_construccion_pov,
     JobMode.TIKTOK_SHOP: run_tiktok_shop,
     JobMode.EDITOR_AUTO: run_editor_auto,
 }
@@ -1263,6 +1318,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.PRONOSTICOS: "creator_reward",
     JobMode.SUBS_AUTO: "creator_reward",
     JobMode.COPYRIGHT: "creator_reward",
+    JobMode.CONSTRUCCION_POV: "creator_reward",
     JobMode.TIKTOK_SHOP: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
 }

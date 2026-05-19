@@ -157,6 +157,51 @@ DEFAULT_VOICE_PRESETS_ES: list[dict] = [
     {"id": "Spanish_PassionateWarrior", "label": "Apasionado (chico, ES)"},
 ]
 
+# Voces preset MiniMax en inglés (usadas por Construcción POV — narración EN).
+# Solo IDs del catálogo MiniMax estándar (no clones).
+DEFAULT_VOICE_PRESETS_EN: list[dict] = [
+    {"id": "English_Trustworth_Man", "label": "Trustworthy Man (EN)"},
+    {"id": "English_CalmWoman", "label": "Calm Woman (EN)"},
+    {"id": "English_UpsetGirl", "label": "Upset Girl (EN)"},
+    {"id": "English_Gentle-voiced_man", "label": "Gentle-voiced Man (EN)"},
+    {"id": "English_Graceful_Lady", "label": "Graceful Lady (EN)"},
+    {"id": "English_ReservedYoungMan", "label": "Reserved Young Man (EN)"},
+    {"id": "English_PlayfulGirl", "label": "Playful Girl (EN)"},
+    {"id": "English_ManWithDeepVoice", "label": "Deep-voiced Man (EN)"},
+    {"id": "English_MaturePartner", "label": "Mature Partner (EN)"},
+    {"id": "English_FriendlyPerson", "label": "Friendly Person (EN)"},
+    {"id": "English_MatureBoss", "label": "Mature Boss (EN)"},
+    {"id": "English_Debator", "label": "Debator (EN)"},
+    {"id": "English_LovelyGirl", "label": "Lovely Girl (EN)"},
+    {"id": "English_Steady_Female_1", "label": "Steady Female (EN)"},
+    {"id": "English_AggressiveLady", "label": "Aggressive Lady (EN)"},
+    {"id": "English_DecentYoungMan", "label": "Decent Young Man (EN)"},
+    {"id": "English_SentimentalLady", "label": "Sentimental Lady (EN)"},
+    {"id": "English_ImposingManner", "label": "Imposing Manner (EN)"},
+    {"id": "English_SadTeen", "label": "Sad Teen (EN)"},
+    {"id": "English_PassionateWarrior", "label": "Passionate Warrior (EN)"},
+    {"id": "English_WiseScholar", "label": "Wise Scholar (EN)"},
+    {"id": "English_Soft-spokenGirl", "label": "Soft-spoken Girl (EN)"},
+    {"id": "English_SereneWoman", "label": "Serene Woman (EN)"},
+    {"id": "English_ConfidentWoman", "label": "Confident Woman (EN)"},
+    {"id": "English_PatientMan", "label": "Patient Man (EN)"},
+    {"id": "English_Comedian", "label": "Comedian (EN)"},
+    {"id": "English_BossyLeader", "label": "Bossy Leader (EN)"},
+    {"id": "English_Strong-WilledBoy", "label": "Strong-Willed Boy (EN)"},
+    {"id": "English_StressedLady", "label": "Stressed Lady (EN)"},
+    {"id": "English_AssertiveQueen", "label": "Assertive Queen (EN)"},
+    {"id": "English_AnimeCharacter", "label": "Anime Character (EN)"},
+    {"id": "English_Jovial-Man", "label": "Jovial Man (EN)"},
+    {"id": "English_WhimsicalGirl", "label": "Whimsical Girl (EN)"},
+    {"id": "English_Curt-MannedMan", "label": "Curt-Manned Man (EN)"},
+    {"id": "English_DelicateGirl", "label": "Delicate Girl (EN)"},
+    {"id": "English_RudeBoy", "label": "Rude Boy (EN)"},
+    {"id": "English_ThoughtfulMan", "label": "Thoughtful Man (EN)"},
+    {"id": "English_PassionateLady", "label": "Passionate Lady (EN)"},
+    {"id": "English_CaptivatingStoryteller", "label": "Captivating Storyteller (EN)"},
+    {"id": "English_DisdainfulYoungman", "label": "Disdainful Youngman (EN)"},
+]
+
 NICHE_OPTIONS = ["skincare", "fitness", "hogar", "tech", "moda", "otros"]
 LANGUAGE_OPTIONS = ["es", "en", "pt", "fr", "it", "de"]
 COUNTRY_OPTIONS = ["ES", "MX", "AR", "CO", "CL", "PE", "US", "FR", "IT", "DE"]

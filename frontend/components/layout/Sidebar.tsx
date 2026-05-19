@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Crown,
   DollarSign,
+  HardHat,
   History,
   LayoutDashboard,
   Loader2,
@@ -64,6 +65,8 @@ const NAV: NavGroup[] = [
       { href: "/creator-reward/pronosticos", label: "Pronósticos Diarios", icon: BarChart3 },
       { href: "/creator-reward/copyright", label: "Quitar Copy", icon: ShieldOff },
       { href: "/creator-reward/subs-auto", label: "Subs sobre Vídeo", icon: Captions },
+      { href: "/creator-reward/construccion-pov", label: "Construcción POV", icon: HardHat },
+      { href: "/creator-reward/tools/voices", label: "Herramientas · Voces", icon: Wrench },
     ],
   },
   {

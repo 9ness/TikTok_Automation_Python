@@ -9,6 +9,7 @@ export type JobMode =
   | "pronosticos"
   | "subs_auto"
   | "copyright"
+  | "construccion_pov"
   | "tiktok_shop"
   | "editor_auto";
 

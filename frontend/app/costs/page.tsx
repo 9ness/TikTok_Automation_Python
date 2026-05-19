@@ -39,6 +39,7 @@ const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
     { value: "pronosticos", label: "Pronósticos Diarios" },
     { value: "copyright", label: "Quitar Copy" },
     { value: "subs_auto", label: "Subs sobre Vídeo" },
+    { value: "construccion_pov", label: "Construcción POV" },
   ],
   tiktok_shop: [{ value: "tiktok_shop", label: "TikTok Shop" }],
   editor_auto: [{ value: "editor_auto", label: "Editor Auto" }],

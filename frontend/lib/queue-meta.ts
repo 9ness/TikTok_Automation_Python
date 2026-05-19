@@ -11,6 +11,7 @@ import {
   BarChart3,
   Captions,
   Crown,
+  HardHat,
   Scissors,
   ShieldOff,
   ShoppingBag,
@@ -27,6 +28,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   pronosticos: "creator_reward",
   copyright: "creator_reward",
   subs_auto: "creator_reward",
+  construccion_pov: "creator_reward",
   editor_auto: "editor_auto",
 };
 
@@ -48,6 +50,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   pronosticos: "Pronósticos",
   copyright: "Quitar Copy",
   subs_auto: "Subs Auto",
+  construccion_pov: "Construcción POV",
   editor_auto: "Editor Auto",
 };
 
@@ -57,6 +60,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   pronosticos: BarChart3,
   copyright: ShieldOff,
   subs_auto: Captions,
+  construccion_pov: HardHat,
   editor_auto: Scissors,
 };
 
@@ -107,6 +111,10 @@ export function describeJobParams(
     case "subs_auto":
       if (params.quality_label) out.push(String(params.quality_label));
       if (params.model_size) out.push(`whisper ${String(params.model_size)}`);
+      break;
+    case "construccion_pov":
+      if (params.voice_id) out.push(`voz ${String(params.voice_id).slice(0, 18)}`);
+      if (params.upscale_1080p) out.push("1080p");
       break;
     case "editor_auto":
       if (params.user_name) out.push(String(params.user_name));
