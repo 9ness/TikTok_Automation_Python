@@ -326,6 +326,22 @@ def _probe_duration(path: str) -> float:
         return 0.0
 
 
+def _probe_video_size(path: str) -> tuple[int, int]:
+    """Devuelve `(width, height)` del primer stream de vídeo. (0, 0) si falla."""
+    try:
+        out = subprocess.check_output(
+            ["ffprobe", "-v", "error",
+             "-select_streams", "v:0",
+             "-show_entries", "stream=width,height",
+             "-of", "csv=p=0:s=x", path],
+            timeout=30,
+        )
+        w_str, h_str = out.decode().strip().split("x")[:2]
+        return int(w_str), int(h_str)
+    except Exception:
+        return 0, 0
+
+
 def _strip_accents(s: str) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", s)
@@ -448,8 +464,22 @@ def _apply_overlay_ffmpeg(
     #   [1:v] (flip/rotate),scale=W*sw:-2,format=rgba [s];
     #   [0:v][s] overlay=x:y:enable='between(t,T0,T1)' [v]
     # `format=rgba` asegura que el alpha del MOV/WebM/GIF se preserve.
+    #
+    # IMPORTANTE: `main_w`/`main_h` son variables de `scale2ref` / `overlay`
+    # y NO son válidas en un `scale` plano (ffmpeg 5.x del container las
+    # rechaza con "Expressions with scale2ref variables are not valid in
+    # scale filter"). En `overlay` SÍ son válidas. Para el scale del
+    # sticker probamos el width real del input vía ffprobe y usamos un
+    # literal. Si ffprobe falla (raro), caemos a 1080 como tamaño TikTok
+    # típico — mejor que reventar.
+    main_w_px, _main_h_px = _probe_video_size(input_path)
+    if main_w_px <= 0:
+        main_w_px = 1080
+    sticker_w_px = max(2, int(round(main_w_px * sw)))
+    if sticker_w_px % 2 != 0:
+        sticker_w_px -= 1
     filter_complex = (
-        f"[1:v]{pre_chain}scale=trunc(main_w*{sw}/2)*2:-2,format=rgba[s];"
+        f"[1:v]{pre_chain}scale={sticker_w_px}:-2,format=rgba[s];"
         f"[0:v][s]overlay="
         f"x=(main_w*{px})-(overlay_w/2):"
         f"y=(main_h*{py})-(overlay_h/2):"
