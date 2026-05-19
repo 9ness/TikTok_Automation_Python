@@ -88,6 +88,11 @@ class StickerArrowTool:
             "flip_vertical": False,
             # Detección
             "trigger_keywords": _DEFAULT_KEYWORDS,
+            # Estrategia ante varias ocurrencias del keyword:
+            #   "first" → primera ocurrencia (legacy, útil si el CTA es al inicio)
+            #   "last"  → última ocurrencia (DEFAULT — típico CTA al final)
+            #   "all"   → todas las ocurrencias (flechas múltiples)
+            "match_strategy": "last",
             # Cuánto antes del keyword aparece el sticker (s).
             "lead_seconds": 1.0,
             # Cuánto se mantiene visible (s).
@@ -96,6 +101,10 @@ class StickerArrowTool:
             "fallback_last_seconds": 4.0,
             # Solo buscar keyword en el último X% del vídeo (anti-falso-positivo).
             "search_last_fraction": 0.5,
+            # Tolerancia a errores de Whisper (edit-distance 1 para keywords
+            # ≥5 chars). Capta variantes tipo "carrito"↔"carito" o
+            # "comprar"↔"compra" sin que el operador tenga que listarlas.
+            "fuzzy_match": True,
             # Re-transcribir el vídeo post-cortes (Whisper local, sin coste).
             # Si lo desactivas, solo funciona el fallback de últimos N s.
             "transcribe_for_detection": True,
@@ -127,6 +136,13 @@ class StickerArrowTool:
             {"key": "trigger_keywords",
              "label": "Palabras gatillo (separadas por coma)",
              "type": "string"},
+            {"key": "match_strategy",
+             "label": "Si hay varias ocurrencias del gatillo",
+             "type": "select",
+             "options": ["first", "last", "all"]},
+            {"key": "fuzzy_match",
+             "label": "Tolerar errores de transcripción (carrito↔carito)",
+             "type": "bool"},
             {"key": "lead_seconds",
              "label": "Aparece N segundos ANTES del gatillo",
              "type": "float", "min": 0.0, "max": 5.0, "step": 0.1},
@@ -188,9 +204,9 @@ class StickerArrowTool:
         duration = _probe_duration(input_path)
         ctx.on_log(f"[sticker_arrow] Duración input: {duration:.1f}s")
 
-        # 2) Detectar timestamp del gatillo (opcional)
-        match_t: float | None = None
-        match_word: str | None = None
+        # 2) Detectar timestamp(s) del gatillo (opcional). Soporta múltiples
+        # ocurrencias según `match_strategy` (first / last / all).
+        keyword_matches: list[dict] = []
         if bool(config.get("transcribe_for_detection", True)):
             ctx.on_progress(0.15, "🎙️ Whisper para detectar gatillo…")
             try:
@@ -225,22 +241,38 @@ class StickerArrowTool:
                         "search_last_fraction", 0.5
                     ))))
                 )
-                match = _find_first_keyword(
+                fuzzy = bool(config.get("fuzzy_match", True))
+                strategy = str(config.get("match_strategy", "last")).lower()
+                if strategy not in ("first", "last", "all"):
+                    strategy = "last"
+                all_matches = _find_keyword_matches(
                     words=words, keywords=keywords,
                     after_t=search_from_s,
+                    fuzzy=fuzzy,
                 )
-                if match:
-                    match_t = match["start"]
-                    match_word = match["word"]
+                if all_matches:
+                    if strategy == "first":
+                        selected = [all_matches[0]]
+                    elif strategy == "all":
+                        selected = all_matches
+                    else:  # "last"
+                        selected = [all_matches[-1]]
+                    keyword_matches = selected
+                    summary = " · ".join(
+                        f"'{m['word']}'@{m['start']:.2f}s"
+                        for m in selected
+                    )
                     ctx.on_log(
-                        f"[sticker_arrow] 🎯 Gatillo '{match_word}' detectado "
-                        f"@ {match_t:.2f}s (buscando desde {search_from_s:.1f}s)"
+                        f"[sticker_arrow] 🎯 {len(all_matches)} ocurrencia(s) "
+                        f"de gatillo encontradas (estrategia={strategy}, "
+                        f"fuzzy={fuzzy}, buscando desde {search_from_s:.1f}s). "
+                        f"Aplicando: {summary}"
                     )
                 else:
                     ctx.on_log(
                         f"[sticker_arrow] Sin gatillo en último "
                         f"{int((1 - search_from_s / duration) * 100)}% "
-                        f"({len(keywords)} keywords probadas)"
+                        f"({len(keywords)} keywords probadas, fuzzy={fuzzy})"
                     )
             except Exception as e:
                 ctx.on_log(
@@ -248,21 +280,32 @@ class StickerArrowTool:
                     f"caigo al fallback de últimos N segundos."
                 )
 
-        # 3) Calcular ventana del overlay
+        # 3) Calcular ventana(s) del overlay
         lead = max(0.0, float(config.get("lead_seconds", 1.0)))
         dur_overlay = max(0.5, float(config.get("duration_seconds", 3.5)))
-        if match_t is not None:
-            t_start = max(0.0, match_t - lead)
-            t_end = min(duration, t_start + dur_overlay)
+        windows: list[tuple[float, float]] = []
+        if keyword_matches:
+            for m in keyword_matches:
+                ws = max(0.0, float(m["start"]) - lead)
+                we = min(duration, ws + dur_overlay)
+                if we > ws:
+                    windows.append((ws, we))
             source = "keyword"
         else:
             fallback = max(1.0, float(config.get("fallback_last_seconds", 4.0)))
-            t_start = max(0.0, duration - fallback)
-            t_end = duration
+            ws = max(0.0, duration - fallback)
+            windows.append((ws, duration))
             source = "fallback"
+        # Mergeamos ventanas solapadas (p. ej. dos matches separados por
+        # menos de `duration_seconds` ⇒ una sola ventana extendida) para
+        # que ffmpeg no haga overlays redundantes.
+        windows = _merge_overlapping_windows(windows)
+        windows_str = ", ".join(
+            f"[{ws:.2f}, {we:.2f}]" for ws, we in windows
+        )
         ctx.on_log(
-            f"[sticker_arrow] Ventana overlay [{t_start:.2f}, {t_end:.2f}]s "
-            f"({t_end - t_start:.2f}s · source={source})"
+            f"[sticker_arrow] {len(windows)} ventana(s) overlay {windows_str} "
+            f"(source={source})"
         )
 
         # 4) FFmpeg overlay
@@ -279,8 +322,7 @@ class StickerArrowTool:
             input_path=input_path,
             sticker_path=sticker_path,
             output_path=output_path,
-            t_start=t_start,
-            t_end=t_end,
+            windows=windows,
             position_x_pct=float(config.get("position_x_pct", 50.0)),
             position_y_pct=float(config.get("position_y_pct", 80.0)),
             scale_width_pct=float(config.get("scale_width_pct", 25.0)),
@@ -363,17 +405,29 @@ def _parse_keywords(raw: str) -> list[str]:
     ]
 
 
-def _find_first_keyword(
+def _find_keyword_matches(
     *,
     words: list[dict],
     keywords: list[str],
     after_t: float,
-) -> dict | None:
-    """Primera palabra del transcript cuyo `start >= after_t` y cuya forma
-    normalizada está en `keywords`."""
+    fuzzy: bool = True,
+) -> list[dict]:
+    """Devuelve TODAS las palabras del transcript con `start >= after_t`
+    cuya forma normalizada coincide con alguna `keyword`.
+
+    Si `fuzzy=True`, también acepta edit-distance ≤ 1 para keywords con
+    ≥5 chars normalizados — útil para capturar variantes de Whisper como
+    'carrito'↔'carito' (Whisper a veces se come la doble RR) o
+    'comprar'↔'compra'. Para keywords cortas (<5 chars) solo exact match
+    para evitar falsos positivos tipo 'a'↔'b'.
+
+    Devuelve lista de dicts {start, end, word, matched_keyword}.
+    """
     if not keywords:
-        return None
+        return []
     kw_set = set(keywords)
+    long_kws = [k for k in kw_set if len(k) >= 5]
+    out: list[dict] = []
     for w in words:
         try:
             t = float(w.get("start", 0.0))
@@ -381,13 +435,69 @@ def _find_first_keyword(
             continue
         if t < after_t:
             continue
-        if _normalize(w.get("word", "")) in kw_set:
-            return {
+        norm = _normalize(w.get("word", ""))
+        if not norm:
+            continue
+        matched: str | None = None
+        if norm in kw_set:
+            matched = norm
+        elif fuzzy and len(norm) >= 5:
+            for kw in long_kws:
+                if abs(len(norm) - len(kw)) <= 1 and _edit_distance_at_most_1(norm, kw):
+                    matched = kw
+                    break
+        if matched is not None:
+            out.append({
                 "start": t,
                 "end": float(w.get("end", t)),
                 "word": w.get("word", ""),
-            }
-    return None
+                "matched_keyword": matched,
+            })
+    return out
+
+
+def _edit_distance_at_most_1(a: str, b: str) -> bool:
+    """True si Levenshtein(a, b) ≤ 1. Versión rápida sin matriz completa:
+    enumera el primer mismatch y verifica que el resto coincide tras una
+    sustitución / inserción / eliminación.
+    """
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    # Localizar el primer índice donde difieren.
+    i = 0
+    while i < min(la, lb) and a[i] == b[i]:
+        i += 1
+    if la == lb:
+        # Sustitución: rest debe coincidir exacto
+        return a[i + 1:] == b[i + 1:]
+    if la > lb:
+        # Eliminación en `a`: rest de a[i+1:] == b[i:]
+        return a[i + 1:] == b[i:]
+    # Inserción en `a`: rest de a[i:] == b[i+1:]
+    return a[i:] == b[i + 1:]
+
+
+def _merge_overlapping_windows(
+    windows: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Mergea ventanas (t_start, t_end) que se solapan o tocan en una sola.
+    Útil cuando varios matches están más juntos que `duration_seconds` →
+    una flecha extendida es más natural que múltiples redundantes.
+    """
+    if not windows:
+        return []
+    sorted_w = sorted(windows, key=lambda w: w[0])
+    out: list[tuple[float, float]] = [sorted_w[0]]
+    for s, e in sorted_w[1:]:
+        ps, pe = out[-1]
+        if s <= pe:
+            out[-1] = (ps, max(pe, e))
+        else:
+            out.append((s, e))
+    return out
 
 
 def _apply_overlay_ffmpeg(
@@ -395,8 +505,7 @@ def _apply_overlay_ffmpeg(
     input_path: str,
     sticker_path: str,
     output_path: str,
-    t_start: float,
-    t_end: float,
+    windows: list[tuple[float, float]],
     position_x_pct: float,
     position_y_pct: float,
     scale_width_pct: float,
@@ -424,11 +533,15 @@ def _apply_overlay_ffmpeg(
                               contenedor mínimo del sticker rotado
 
     `enable='between(t,T0,T1)'` solo dibuja el sticker en la ventana
-    deseada, fuera de ella se queda transparente.
+    deseada, fuera de ella se queda transparente. Si se pasan N ventanas,
+    se concatenan con `+` (OR lógico en sintaxis de expr de ffmpeg):
+    `enable='between(t,T0a,T0b)+between(t,T1a,T1b)'`.
 
     `-stream_loop -1` repite el MOV/WebM si su duración es menor que la
     ventana de overlay (típico: loop de 2s para ventana de 4s).
     """
+    if not windows:
+        raise RuntimeError("sticker_arrow: lista de windows vacía")
     # Resolver pct → expresiones FFmpeg que usan W/H del vídeo:
     sw = max(0.05, scale_width_pct / 100.0)
     px = max(0.0, min(1.0, position_x_pct / 100.0))
@@ -478,12 +591,15 @@ def _apply_overlay_ffmpeg(
     sticker_w_px = max(2, int(round(main_w_px * sw)))
     if sticker_w_px % 2 != 0:
         sticker_w_px -= 1
+    enable_expr = "+".join(
+        f"between(t,{ws:.3f},{we:.3f})" for ws, we in windows
+    )
     filter_complex = (
         f"[1:v]{pre_chain}scale={sticker_w_px}:-2,format=rgba[s];"
         f"[0:v][s]overlay="
         f"x=(main_w*{px})-(overlay_w/2):"
         f"y=(main_h*{py})-(overlay_h/2):"
-        f"enable='between(t,{t_start:.3f},{t_end:.3f})'[v]"
+        f"enable='{enable_expr}'[v]"
     )
 
     cmd = [
@@ -501,7 +617,8 @@ def _apply_overlay_ffmpeg(
     log(
         f"[sticker_arrow] FFmpeg overlay · scale={sw*100:.0f}% · "
         f"pos=({px*100:.0f}%, {py*100:.0f}%) · rot={rotation_deg}° · "
-        f"hflip={flip_horizontal} vflip={flip_vertical}"
+        f"hflip={flip_horizontal} vflip={flip_vertical} · "
+        f"{len(windows)} ventana(s)"
     )
     proc = subprocess.run(cmd, capture_output=True, timeout=900)
     if proc.returncode != 0:
