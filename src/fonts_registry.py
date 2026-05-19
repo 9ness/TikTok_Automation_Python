@@ -121,13 +121,30 @@ def list_fonts() -> list[dict]:
     return out
 
 
+def _cross_platform_basename(path: str) -> str:
+    """Devuelve el basename del path tratando `/` y `\\` como separadores.
+
+    `os.path.basename` en Linux NO trata `\\` como separador, así que un
+    path Windows como `C:\\Windows\\Fonts\\impact.ttf` devuelve la cadena
+    entera. Aquí dividimos manualmente por ambos separadores para que la
+    comparación basename funcione cross-platform — necesario porque el
+    frontend puede mandar paths Windows guardados en presets viejos
+    incluso cuando el backend corre en Linux.
+    """
+    if not path:
+        return ""
+    # Reemplazar backslashes por forward slashes y tomar el último segmento.
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
 def find_by_path(path: str) -> dict | None:
     """Resuelve un path (absoluto o basename bundled) a la entrada del registry."""
     target = os.path.normpath(os.path.abspath(path)) if path else ""
+    target_base = _cross_platform_basename(path).lower()
     for f in list_fonts():
         if os.path.normpath(f["path"]) == target:
             return f
-        if os.path.basename(f["path"]).lower() == os.path.basename(path).lower():
+        if _cross_platform_basename(f["path"]).lower() == target_base:
             return f
     return None
 

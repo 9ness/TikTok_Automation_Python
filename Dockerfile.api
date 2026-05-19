@@ -20,6 +20,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Sistema: ffmpeg para MoviePy/Whisper/editor, libgomp1 para faster-whisper,
 # build-essential ligero para wheels que no traen binarios precompilados.
+# Fuentes: dejavu/liberation/noto cubren fallbacks; ttf-mscorefonts-installer
+# instala Impact, Arial Black, Verdana, Times, Comic Sans, Trebuchet, Georgia,
+# Courier (las que el código hardcodea como C:\Windows\Fonts\*). El paquete
+# vive en `contrib` (no en main) y requiere aceptar EULA de Microsoft via
+# debconf antes del install.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libgomp1 \
@@ -27,6 +32,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         build-essential \
         gcc \
+        fontconfig \
+        fonts-dejavu \
+        fonts-liberation \
+        fonts-noto-color-emoji \
+    && echo "deb http://deb.debian.org/debian bookworm contrib" > /etc/apt/sources.list.d/contrib.list \
+    && apt-get update \
+    && echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
+       | debconf-set-selections \
+    && apt-get install -y --no-install-recommends ttf-mscorefonts-installer \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
