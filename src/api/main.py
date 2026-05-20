@@ -96,8 +96,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as e:
         logger.warning("temp_work cleanup falló: %s", e)
 
-    yield
-    logger.info("API shutting down")
+    # Editor Auto · watcher de auto-enqueue. Background task que cada
+    # 30s escanea entrada/ de los usuarios con `auto_enqueue=True` y
+    # encola los vídeos nuevos sin intervención humana. Pensado para el
+    # VPS 24/7. Se gestiona con un stop_event para cierre limpio.
+    import asyncio
+    from src.editor_auto.services.auto_enqueue_watcher import watcher_loop
+
+    watcher_stop = asyncio.Event()
+    watcher_task = asyncio.create_task(watcher_loop(watcher_stop))
+
+    try:
+        yield
+    finally:
+        logger.info("API shutting down — parando watcher auto-enqueue…")
+        watcher_stop.set()
+        try:
+            await asyncio.wait_for(watcher_task, timeout=5)
+        except asyncio.TimeoutError:
+            logger.warning("watcher no paró en 5s, cancelando")
+            watcher_task.cancel()
 
 
 def create_app() -> FastAPI:

@@ -1,0 +1,264 @@
+"""Background watcher que encola automáticamente vídeos nuevos en
+`entrada/` de los usuarios con `auto_enqueue=True`.
+
+Modelo: polling cada `INTERVAL_S` segundos. No usamos inotify porque
+las carpetas viven en un mount rclone (Drive) y los eventos del FS no
+son fiables ahí. Polling cada 30s da latencia aceptable para un
+flujo "subir vídeo → procesar" cuando el server está 24/7.
+
+Reglas:
+  - Solo escanea usuarios con `auto_enqueue=True` y `deleted=False`.
+  - Ignora archivos con `mtime` < `MIN_FILE_AGE_S` segundos: rclone
+    podría aún estar sincronizando un upload en curso.
+  - Llama exactamente al MISMO endpoint que el botón Encolar (via
+    helper de orquestación interno), así la lógica de move + crear
+    job + companion .txt es idéntica.
+  - Errors per file se loguean pero NO paran el loop: si un vídeo
+    falla, los siguientes se siguen encolando.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import time
+from typing import Any
+
+logger = logging.getLogger("editor_auto.auto_enqueue")
+
+
+# Intervalo entre polls. 30s = latencia máxima desde que el archivo
+# aparece en entrada/ hasta que se encola. Suficiente para el caso de
+# uso (cliente sube de noche, ve resultado por la mañana).
+INTERVAL_S = 30.0
+
+# Edad mínima del archivo antes de considerarlo "estable". Defensa
+# contra encolar un upload en progreso (rclone aún subiendo desde
+# Drive). Tomado del `mtime`. 60s da margen generoso para cualquier
+# vídeo razonable hasta ~500MB en redes domésticas.
+MIN_FILE_AGE_S = 60.0
+
+# Margen EXTRA cuando el flow del usuario tiene `silence_cutter_scripted`
+# Y aún no existe el companion `<stem>.txt`. Damos tiempo a que el
+# cliente suba el .txt (que a menudo lo hace después del vídeo). Si
+# pasados estos segundos sigue sin haber companion, se encola igual y
+# la tool hace fallback automático a modo sin guion.
+SCRIPTED_NO_COMPANION_AGE_S = 180.0
+
+
+def _user_has_scripted(user) -> bool:
+    """¿El flow del usuario incluye `silence_cutter_scripted` habilitado?"""
+    return any(
+        s.enabled and s.tool_id == "silence_cutter_scripted"
+        for s in (user.tool_flow or [])
+    )
+
+
+def _list_pending_videos(user) -> list[dict[str, Any]]:
+    """Vídeos en `entrada/` del usuario que están listos para encolar.
+
+    Reglas:
+      1. `mtime + MIN_FILE_AGE_S < now` (general, evita uploads en curso).
+      2. Si flow es scripted Y no hay companion `.txt`, esperamos hasta
+         `SCRIPTED_NO_COMPANION_AGE_S` por si el cliente sube el .txt
+         poco después del vídeo. Pasado ese tiempo, encolamos igual
+         (la tool hará fallback a modo sin guion).
+    """
+    from src.editor_auto.services import folder_manager
+
+    try:
+        files = folder_manager.list_files(user.name, "entrada")
+    except Exception as e:
+        logger.warning(
+            "[auto_enqueue] list_files falló para %s: %s", user.name, e,
+        )
+        return []
+    now = time.time()
+    is_scripted = _user_has_scripted(user)
+    out: list[dict[str, Any]] = []
+    for f in files:
+        mtime = float(f.get("modified_at") or 0.0)
+        if mtime <= 0:
+            continue
+        age = now - mtime
+        if age < MIN_FILE_AGE_S:
+            continue
+        # Scripted + sin companion → margen extra para que llegue el .txt
+        if is_scripted and not f.get("script") and age < SCRIPTED_NO_COMPANION_AGE_S:
+            logger.debug(
+                "[auto_enqueue] esperando companion .txt para %s/%s "
+                "(edad %.0fs / %.0fs)",
+                user.name, f["filename"], age, SCRIPTED_NO_COMPANION_AGE_S,
+            )
+            continue
+        out.append(f)
+    return out
+
+
+def _enqueue_one(user, filename: str) -> bool:
+    """Replica la lógica de `POST /folders/enqueue` para un vídeo.
+
+    Devuelve True si OK, False si error. Diseño "fail-safe": ante
+    CUALQUIER fallo el vídeo queda en `entrada/` (donde estaba) para
+    que el operador pueda encolarlo manualmente desde la UI. Si el
+    `move_file` ya tuvo éxito pero la creación del job falla, se
+    intenta un rollback (cola → entrada) para no dejar el archivo
+    huérfano en `cola/`.
+    """
+    from src.editor_auto.services import folder_manager
+    from src.editor_auto.config import user_subfolder
+    from src.queue.manager import get_queue
+    from src.queue.models import JobMode
+
+    # 1. Detectar companion .txt opcional (NO crítico — si falla,
+    #    seguimos sin guion y la tool hará fallback).
+    companion_script = ""
+    try:
+        companion_script = (
+            folder_manager.read_script_companion(
+                user.name, "entrada", filename,
+            ) or ""
+        )
+    except Exception as e:
+        logger.warning(
+            "[auto_enqueue] companion check falló (%s/%s): %s",
+            user.name, filename, e,
+        )
+
+    # 2. Mover entrada → cola. Si falla, el vídeo sigue en entrada/.
+    try:
+        move_result = folder_manager.move_file(
+            user.name, "entrada", "cola", filename,
+        )
+    except Exception as e:
+        logger.warning(
+            "[auto_enqueue] move entrada→cola falló para %s/%s — "
+            "vídeo sigue en entrada/, encólalo manual si hace falta: %s",
+            user.name, filename, e,
+        )
+        return False
+    final_filename = move_result["filename_new"]
+    input_path = os.path.join(
+        user_subfolder(user.name, "cola"), final_filename,
+    )
+
+    # 3. Crear el job en la cola. Si esto falla TRAS el move,
+    #    rollback: devolvemos el archivo a entrada/ para que el
+    #    operador pueda re-encolar manual.
+    try:
+        from src.utils import load_config
+        cfg = load_config()
+        temp_folder = cfg["paths"]["temp_folder"]
+
+        queue = get_queue()
+        title = f"{user.name} · {final_filename}"
+        n_enabled = sum(1 for s in user.tool_flow if s.enabled)
+        if n_enabled > 0:
+            title += f" · {n_enabled} tool(s)"
+
+        job = queue.enqueue(
+            mode=JobMode.EDITOR_AUTO,
+            title=title,
+            enqueued_by=user.name,
+            params={
+                "user_id": user.id,
+                "user_name": user.name,
+                "input_path": input_path,
+                "source": "entrada",
+                "source_filename": final_filename,
+                "temp_folder": temp_folder,
+                "script": companion_script,
+                "tools_used": [
+                    s.tool_id for s in user.tool_flow if s.enabled
+                ],
+                "tool_count": n_enabled,
+                "auto_enqueued": True,
+            },
+        )
+        logger.info(
+            "[auto_enqueue] encolado %s/%s → job %s (companion=%s)",
+            user.name, final_filename, job.id[:8],
+            "sí" if companion_script else "no",
+        )
+        return True
+    except Exception as e:
+        # Rollback: mover cola → entrada para no perder el archivo.
+        logger.warning(
+            "[auto_enqueue] creación de job falló para %s/%s — "
+            "rollback cola→entrada: %s",
+            user.name, final_filename, e,
+        )
+        try:
+            folder_manager.move_file(
+                user.name, "cola", "entrada", final_filename,
+            )
+            logger.info(
+                "[auto_enqueue] rollback OK · %s vuelve a entrada/",
+                final_filename,
+            )
+        except Exception as rb_err:
+            # Si TAMBIÉN falla el rollback, el archivo queda en cola/.
+            # Lo logueamos LOUD para que el operador lo arregle a mano
+            # (la UI permite mover cola→entrada con un click).
+            logger.error(
+                "[auto_enqueue] ❌ ROLLBACK FALLÓ para %s/%s — archivo "
+                "queda en cola/, revisa manualmente: %s",
+                user.name, final_filename, rb_err,
+            )
+        return False
+
+
+def _scan_once() -> dict[str, int]:
+    """Una pasada completa: itera usuarios y encola sus vídeos pendientes.
+
+    Devuelve un dict `{username: n_encolados}` solo para los que tuvieron
+    algo encolado, para logging resumido.
+    """
+    from src.editor_auto.repos.user_repo import UserRepo
+
+    repo = UserRepo()
+    users = repo.list_all() or []
+    encolados_per_user: dict[str, int] = {}
+    for u in users:
+        if u.deleted or not getattr(u, "auto_enqueue", False):
+            continue
+        pending = _list_pending_videos(u)
+        if not pending:
+            continue
+        n_ok = 0
+        for f in pending:
+            if _enqueue_one(u, f["filename"]):
+                n_ok += 1
+        if n_ok > 0:
+            encolados_per_user[u.name] = n_ok
+    return encolados_per_user
+
+
+async def watcher_loop(stop_event: asyncio.Event) -> None:
+    """Loop principal — corre hasta que `stop_event` se setea.
+
+    Cada vuelta:
+      1. `_scan_once()` en un thread (es bloqueante: I/O al FS,
+         repos a Redis HTTP, etc).
+      2. Espera `INTERVAL_S` o hasta `stop_event` (lo que llegue antes).
+    """
+    logger.info(
+        "[auto_enqueue] watcher arrancado (interval=%.0fs, min_age=%.0fs)",
+        INTERVAL_S, MIN_FILE_AGE_S,
+    )
+    while not stop_event.is_set():
+        try:
+            result = await asyncio.to_thread(_scan_once)
+            if result:
+                summary = ", ".join(f"{n}×{u}" for u, n in result.items())
+                logger.info("[auto_enqueue] tick: %s", summary)
+        except Exception as e:
+            # Defensa contra cualquier excepción inesperada — no rompe
+            # el loop bajo ninguna circunstancia.
+            logger.exception("[auto_enqueue] tick falló: %s", e)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_S)
+        except asyncio.TimeoutError:
+            pass
+    logger.info("[auto_enqueue] watcher detenido limpiamente")

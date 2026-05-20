@@ -8,8 +8,10 @@ import {
   Trash2,
   Users as UsersIcon,
   Wand2,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,11 +19,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateEditorUser,
   useDeleteEditorUser,
   useEditorUsers,
+  useUpdateEditorUser,
   useUserFolderCounts,
 } from "@/lib/queries/editor-auto";
 import type { EditorUser } from "@/lib/types/editor-auto";
@@ -230,6 +234,8 @@ function UserListItem({
   const counts = useUserFolderCounts(user.id);
   const entrada = counts.data?.counts.entrada ?? 0;
   const salida = counts.data?.counts.salida ?? 0;
+  const updateUser = useUpdateEditorUser(user.id);
+  const autoOn = Boolean(user.auto_enqueue);
   return (
     <div
       className={`flex items-center gap-2 rounded-md border p-2 text-sm transition-colors ${
@@ -243,6 +249,16 @@ function UserListItem({
       >
         <div className="flex items-center gap-2">
           <span className="font-medium">{user.display_name || user.name}</span>
+          {autoOn && (
+            <Badge
+              variant="default"
+              className="gap-1 bg-emerald-500/90 px-1.5 text-[10px] text-black hover:bg-emerald-500"
+              title="Auto-enqueue activo: el watcher encola vídeos nuevos cada 30s"
+            >
+              <Zap className="h-2.5 w-2.5" />
+              auto
+            </Badge>
+          )}
           {entrada > 0 && (
             <Badge
               variant="default"
@@ -259,6 +275,42 @@ function UserListItem({
           {salida > 0 && ` · ${salida} en salida`}
         </div>
       </button>
+      <div
+        className="flex items-center gap-1 px-1"
+        title={
+          autoOn
+            ? "Auto-enqueue ON — el watcher escanea entrada/ cada 30s y encola vídeos automáticamente"
+            : "Auto-enqueue OFF — encolas manualmente con el botón Encolar"
+        }
+      >
+        <Zap
+          className={cn(
+            "h-3 w-3 transition-colors",
+            autoOn ? "text-emerald-500" : "text-muted-foreground/40",
+          )}
+        />
+        <Switch
+          checked={autoOn}
+          disabled={updateUser.isPending}
+          onCheckedChange={(checked) => {
+            updateUser.mutate(
+              { auto_enqueue: checked },
+              {
+                onSuccess: () => {
+                  toast.success(
+                    checked
+                      ? `Auto-enqueue ACTIVADO para ${user.name}.`
+                      : `Auto-enqueue DESACTIVADO para ${user.name}.`,
+                  );
+                },
+                onError: (err) =>
+                  toast.error(`Error: ${(err as Error).message}`),
+              },
+            );
+          }}
+          aria-label="Auto-enqueue"
+        />
+      </div>
       <Badge variant="outline" className="text-xs">
         {toolCount}
       </Badge>

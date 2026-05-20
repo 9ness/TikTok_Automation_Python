@@ -55,6 +55,12 @@ class EditorUser(BaseModel):
     # `revoke_permission` NO los elimina; solo el endpoint de
     # `forget_share_email` los borra explícitamente.
     known_share_emails: list[str] = Field(default_factory=list)
+    # Si `auto_enqueue=True`, un background watcher escanea periódicamente
+    # la carpeta entrada/ de este usuario y encola los vídeos nuevos sin
+    # intervención. Pensado para clientes "set and forget": suben vídeo a
+    # Drive → en <1 minuto el job arranca. Vídeos con mtime < 30s se
+    # ignoran para no encolar uploads aún en progreso.
+    auto_enqueue: bool = False
     deleted: bool = False
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)

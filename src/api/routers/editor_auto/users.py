@@ -44,6 +44,7 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         tool_flow=[ToolStepIn(**s.model_dump()) for s in u.tool_flow],
         drive_folder=user_folder(u.name) if u.name else None,
         output_folder=user_output_folder(u.name) if u.name else None,
+        auto_enqueue=u.auto_enqueue,
         deleted=u.deleted,
         created_at=u.created_at,
         updated_at=u.updated_at,
@@ -146,6 +147,8 @@ def update_user(
         u.description = payload.description
     if payload.tool_flow is not None:
         u.tool_flow = _validate_steps(payload.tool_flow)
+    if payload.auto_enqueue is not None:
+        u.auto_enqueue = bool(payload.auto_enqueue)
     # Asegurar carpetas en Drive — idempotente. Cubre el caso de users
     # creados antes de que `resolve_editor_root` supiera autodetectar el
     # padre del Drive (entonces cayeron al fallback local).

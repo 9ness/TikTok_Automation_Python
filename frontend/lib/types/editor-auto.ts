@@ -36,6 +36,9 @@ export interface EditorUser {
   tool_flow: ToolStep[];
   drive_folder: string | null;
   output_folder: string | null;
+  /** Si true, un watcher del backend encola automáticamente los vídeos
+   *  nuevos en entrada/ del usuario. Polling cada 30s. */
+  auto_enqueue: boolean;
   deleted: boolean;
   created_at: string;
   updated_at: string;
@@ -52,6 +55,7 @@ export interface EditorUserUpdateInput {
   display_name?: string;
   description?: string;
   tool_flow?: ToolStep[];
+  auto_enqueue?: boolean;
 }
 
 export interface EditorAutoEnqueueResponse {

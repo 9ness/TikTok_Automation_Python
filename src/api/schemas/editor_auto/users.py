@@ -26,6 +26,7 @@ class EditorUserUpdateRequest(BaseModel):
     display_name: str | None = None
     description: str | None = None
     tool_flow: list[ToolStepIn] | None = None
+    auto_enqueue: bool | None = None
 
 
 class EditorUserResponse(BaseModel):
@@ -36,6 +37,7 @@ class EditorUserResponse(BaseModel):
     tool_flow: list[ToolStepIn]
     drive_folder: str | None
     output_folder: str | None
+    auto_enqueue: bool = False
     deleted: bool
     created_at: str
     updated_at: str
