@@ -467,6 +467,17 @@ function ConfigField({
   );
 }
 
+/** Basename de un path que puede venir con separadores Windows o POSIX.
+ * `os.path.basename` en Linux NO trata `\` como separador, así que un path
+ * Windows guardado en localStorage (dev local) o en un preset viejo se vería
+ * entero en la UI. Aquí dividimos manualmente por `/` y `\` antes de mostrar. */
+function crossPlatformBasename(path: string): string {
+  if (!path) return "";
+  const normalized = path.replace(/\\/g, "/");
+  const i = normalized.lastIndexOf("/");
+  return i >= 0 ? normalized.slice(i + 1) : normalized;
+}
+
 function FontPickerField({
   id,
   field,
@@ -481,19 +492,37 @@ function FontPickerField({
   const fonts = useFonts();
   const items = fonts.data?.items ?? [];
   const current = String(value ?? "");
+  // Match cross-platform: si el path exacto no está, intentamos resolver
+  // por basename (caso típico: la config se creó en local Windows con path
+  // `C:\Users\…\Rubik-Bold.ttf` y ahora estamos en producción Linux con
+  // `/usr/share/fonts/…/Rubik-Bold.ttf`). Si el basename coincide con
+  // alguna fuente del registry, usamos esa como "selected".
+  const exactMatch = items.find((f) => f.path === current);
+  const currentBase = crossPlatformBasename(current).toLowerCase();
+  const basenameMatch = exactMatch
+    ? null
+    : items.find(
+        (f) => crossPlatformBasename(f.path).toLowerCase() === currentBase,
+      );
+  const resolved = exactMatch ?? basenameMatch;
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>{field.label}</Label>
       <select
         id={id}
         className="w-full rounded border bg-background p-1.5 text-sm"
-        value={current}
+        value={resolved ? resolved.path : current}
         onChange={(e) => onChange(e.target.value)}
         disabled={fonts.isLoading}
       >
         {fonts.isLoading && <option value="">cargando…</option>}
-        {!fonts.isLoading && !items.find((f) => f.path === current) && (
-          <option value={current}>{current || "—"}</option>
+        {!fonts.isLoading && !resolved && (
+          // No matchea ni por path ni por basename → mostramos solo el
+          // nombre del archivo (no la ruta completa, que es ruido feo
+          // tipo "D:\Proyectos…\Rubik-Bold.ttf").
+          <option value={current}>
+            {current ? `${crossPlatformBasename(current)} ·sin resolver` : "—"}
+          </option>
         )}
         {items.map((f) => (
           <option key={f.path} value={f.path}>
@@ -551,6 +580,23 @@ function PresetPickerField({
   );
 }
 
+/** Convierte un nombre de archivo en label amistoso, p. ej.
+ * `flecha_roja.mov` → "Flecha roja", `arrow-down-red.gif` → "Arrow down red".
+ * Quita extensión, sustituye separadores por espacios, capitaliza inicial. */
+function prettyFilename(filename: string): string {
+  if (!filename) return "";
+  const stem = filename.replace(/\.[^.]+$/, "");
+  const words = stem.replace(/[_\-.]+/g, " ").trim();
+  if (!words) return filename;
+  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
+}
+
+function formatStickerSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function StickerPickerField({
   id,
   field,
@@ -579,11 +625,14 @@ function StickerPickerField({
         {!stickers.isLoading && (
           <option value="">— elige sticker —</option>
         )}
-        {items.map((s) => (
-          <option key={s.filename} value={s.filename}>
-            {s.filename} · {(s.size_bytes / 1024).toFixed(0)} KB
-          </option>
-        ))}
+        {items.map((s) => {
+          const ext = (s.ext || "").replace(/^\./, "").toUpperCase() || "?";
+          return (
+            <option key={s.filename} value={s.filename}>
+              {prettyFilename(s.filename)} · {ext} · {formatStickerSize(s.size_bytes)}
+            </option>
+          );
+        })}
       </select>
       {!stickers.isLoading && items.length === 0 && (
         <p className="text-[10px] text-muted-foreground">
