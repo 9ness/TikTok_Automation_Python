@@ -112,6 +112,17 @@ class SilenceCutterTool:
             # Auditoría post-render: re-analizar el MP4 final con
             # silencedetect para validar calidad y dar quality score.
             "post_audit_enabled": True,
+            # ---- Detección de estilo (monólogo vs conversación) ----
+            # Si `auto_detect_style=True` (default), una heurística analiza el
+            # output de Silero VAD para decidir si el vídeo es monólogo o
+            # conversación y ajusta los thresholds de cortes en consecuencia.
+            # Si está OFF, se usa `manual_style` directamente.
+            # En conversación, `inter_word_gap_threshold_s` sube de 0.5 → 1.2
+            # y `inter_word_gap_keep_ms` sube de 200 → 350: respeta los
+            # silencios naturales entre turnos de habla en vez de comerse
+            # cada pausa entre frases.
+            "auto_detect_style": True,
+            "manual_style": "monologue",  # solo usado si auto_detect_style=False
         }
 
     def config_schema(self) -> list[dict[str, Any]]:
@@ -165,6 +176,13 @@ class SilenceCutterTool:
              "type": "select", "options": ["9:16", "preserve"]},
             {"key": "post_audit_enabled",
              "label": "Auditoría post-render (quality score)", "type": "bool"},
+            {"key": "auto_detect_style",
+             "label": "Detección automática de estilo (monólogo vs conversación)",
+             "type": "bool"},
+            {"key": "manual_style",
+             "label": "Estilo del vídeo (si detección auto está OFF)",
+             "type": "select",
+             "options": ["monologue", "conversation"]},
         ]
 
     def descriptor(self):  # type: ignore[override]
@@ -289,6 +307,54 @@ class SilenceCutterTool:
                 silero_diag["error"] = f"{type(e).__name__}: {e}"
                 ctx.on_log(f"[silence_cutter] ⚠️ Silero VAD falló ({e}).")
         diagnostic["phases"]["silero_vad"] = silero_diag
+
+        # 4.5) Detección de estilo (monólogo vs conversación) + overrides.
+        # Si `auto_detect_style=True`, la heurística sobre Silero decide.
+        # Si está OFF, usa `manual_style` (default 'monologue' = legacy).
+        # En 'conversation', sube el threshold de inter-word-gap de 0.5 →
+        # 1.2s y el keep_ms de 200 → 350: preserva los gaps naturales de
+        # turn-taking en vez de cortarlos.
+        auto_detect = bool(config.get("auto_detect_style", True))
+        if auto_detect and vad_on:
+            try:
+                speech_for_detect = speech_intervals  # type: ignore[has-type]
+            except NameError:
+                speech_for_detect = []
+            style_decision, style_metrics = _detect_conversation_style(
+                speech_for_detect, video_duration,
+            )
+            ctx.on_log(
+                f"[silence_cutter] 🎬 Estilo auto-detectado: "
+                f"{style_decision.upper()} · "
+                f"mean_seg={style_metrics.get('mean_segment_s', '?')}s · "
+                f"turn_gap_ratio={style_metrics.get('turn_gap_ratio', '?')} · "
+                f"motivo: {style_metrics.get('reason')}"
+            )
+        else:
+            style_decision = str(config.get("manual_style", "monologue")).lower()
+            if style_decision not in ("monologue", "conversation"):
+                style_decision = "monologue"
+            style_metrics = {
+                "style": style_decision,
+                "reason": (
+                    "manual (auto-detect OFF)" if not auto_detect
+                    else "VAD desactivado — usando manual"
+                ),
+            }
+            ctx.on_log(
+                f"[silence_cutter] 🎬 Estilo manual: {style_decision.upper()} "
+                f"(auto_detect={auto_detect}, vad_on={vad_on})"
+            )
+        diagnostic["phases"]["style_detection"] = style_metrics
+        # Aplicar overrides: copy local de config con thresholds ajustados.
+        config = _apply_style_overrides(config, style_decision)
+        if style_decision == "conversation":
+            ctx.on_log(
+                f"[silence_cutter]   → modo CONVERSACIÓN: "
+                f"inter_word_gap_threshold={config['inter_word_gap_threshold_s']}s "
+                f"(default 0.5), keep_ms={config['inter_word_gap_keep_ms']}ms "
+                f"(default 200) — preserva gaps de turn-taking."
+            )
 
         # 5) Detectar palabras fantasma de Whisper usando Silero como
         # source of truth. Si Whisper transcribe una palabra DENTRO de un
@@ -2214,3 +2280,93 @@ def _run_ffmpeg_with_progress(
             f"FFmpeg salió con código {code}. Stderr (últimas {len(stderr_tail)} líneas):\n"
             + err_text
         )
+
+
+# ---------------------------------------------------------------------------
+# Detección de estilo: monólogo vs conversación
+# ---------------------------------------------------------------------------
+def _detect_conversation_style(
+    speech_intervals: list[tuple[float, float]],
+    video_duration: float,
+) -> tuple[str, dict]:
+    """Decide si el vídeo es 'monologue' o 'conversation' a partir del
+    output de Silero VAD.
+
+    Heurística sin coste (los datos ya los tenemos):
+
+      - `mean_segment_s`  = duración media de tramos de voz. Monólogos
+        suelen tener segmentos largos (≥5s); conversaciones cortos (1-4s)
+        por turnos de habla.
+      - `turn_gap_ratio`  = fracción de la duración total ocupada por
+        pausas cortas (0.4-1.5s) — patrón típico de turn-taking. Alto
+        ratio = muchas pausas cortas = conversación.
+
+    Reglas (en orden):
+      1. < 3 segmentos de voz → datos insuficientes → 'monologue'.
+      2. `mean_segment_s < 4.0` Y `turn_gap_ratio > 0.05` → conversación clara.
+      3. `mean_segment_s ≥ 6.0` → monólogo claro.
+      4. Caso intermedio: si `turn_gap_ratio > 0.08` → conversación;
+         si no → monólogo (default conservador, preserva legacy).
+
+    Devuelve `(style, metrics_dict)` para logging.
+    """
+    n = len(speech_intervals)
+    if n < 3 or video_duration <= 0:
+        return "monologue", {
+            "style": "monologue",
+            "reason": "datos insuficientes",
+            "n_speech_intervals": n,
+        }
+    seg_durs = [b - a for a, b in speech_intervals if b > a]
+    mean_seg = sum(seg_durs) / len(seg_durs) if seg_durs else 0.0
+    # Gaps cortos entre tramos de voz (típicos de turnos).
+    short_gap_total = 0.0
+    for i in range(1, n):
+        gap = speech_intervals[i][0] - speech_intervals[i - 1][1]
+        if 0.4 <= gap <= 1.5:
+            short_gap_total += gap
+    turn_gap_ratio = short_gap_total / max(video_duration, 0.001)
+
+    if mean_seg < 4.0 and turn_gap_ratio > 0.05:
+        decision = "conversation"
+        reason = "segmentos cortos + muchos gaps cortos (turn-taking)"
+    elif mean_seg >= 6.0:
+        decision = "monologue"
+        reason = "segmentos largos (monólogo claro)"
+    elif turn_gap_ratio > 0.08:
+        decision = "conversation"
+        reason = "muchos gaps cortos (turn-taking)"
+    else:
+        decision = "monologue"
+        reason = "default conservador (caso intermedio)"
+
+    return decision, {
+        "style": decision,
+        "reason": reason,
+        "n_speech_intervals": n,
+        "mean_segment_s": round(mean_seg, 2),
+        "turn_gap_ratio": round(turn_gap_ratio, 4),
+    }
+
+
+def _apply_style_overrides(
+    config: dict[str, Any],
+    style: str,
+) -> dict[str, Any]:
+    """Devuelve una copia de config con thresholds ajustados según el estilo.
+
+    Solo 'conversation' modifica defaults. 'monologue' devuelve la copia
+    tal cual (= comportamiento legacy/agresivo intacto)."""
+    new_config = dict(config)
+    if style == "conversation":
+        # Sube el umbral inter-frase de 0.5s → 1.2s: solo silencios MUY
+        # largos se cortan, los gaps de turnos se preservan.
+        new_config["inter_word_gap_threshold_s"] = max(
+            1.2, float(config.get("inter_word_gap_threshold_s", 0.5))
+        )
+        # Aumenta el padding natural que se conserva (200ms → 350ms).
+        # Hace que los cortes que SÍ ocurren no suenen secos.
+        new_config["inter_word_gap_keep_ms"] = max(
+            350, int(config.get("inter_word_gap_keep_ms", 200))
+        )
+    return new_config
