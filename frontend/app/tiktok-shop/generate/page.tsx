@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Settings2 } from "lucide-react";
@@ -18,7 +18,31 @@ import {
 import { useProducts } from "@/lib/queries/products";
 import { useUsers } from "@/lib/queries/users";
 
+// `useSearchParams` requiere un `<Suspense>` boundary para que Next pueda
+// pre-renderizar el shell estático. Sin esto el `next build` falla con
+// "Export encountered errors on /tiktok-shop/generate". Patrón oficial:
+// https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
 export default function ShopGeneratePage() {
+  return (
+    <Suspense fallback={<ShopGenerateLoading />}>
+      <ShopGenerateInner />
+    </Suspense>
+  );
+}
+
+function ShopGenerateLoading() {
+  return (
+    <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
+      <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="h-10 animate-pulse rounded bg-muted" />
+        <div className="h-10 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  );
+}
+
+function ShopGenerateInner() {
   const params = useSearchParams();
   const users = useUsers({ limit: 200 });
   const products = useProducts({ limit: 200 });
@@ -114,7 +138,7 @@ export default function ShopGeneratePage() {
       ) : (
         <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Elige cuenta y producto para ver los 3 modos de generación con sus presets.
+            Elige cuenta y producto para ver los 4 modos de generación con sus presets.
           </p>
         </div>
       )}
