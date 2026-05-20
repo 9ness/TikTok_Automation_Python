@@ -108,7 +108,11 @@ class StickerArrowTool:
             # Re-transcribir el vídeo post-cortes (Whisper local, sin coste).
             # Si lo desactivas, solo funciona el fallback de últimos N s.
             "transcribe_for_detection": True,
-            "whisper_model_size": "small",
+            # `large-v3` por defecto — máxima precisión para detectar
+            # gatillos en audio rápido/sucio. Más lento pero el trade-off
+            # vale la pena (detección errónea = flecha en el sitio
+            # equivocado). Puedes bajar a `medium`/`small` si quieres.
+            "whisper_model_size": "large-v3",
             "ai_language": "es",
         }
 
@@ -223,7 +227,7 @@ class StickerArrowTool:
                 words = transcribe_with_reference(
                     tmp_audio,
                     reference_script=None,
-                    model_size=config.get("whisper_model_size", "small"),
+                    model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es") or None,
                     audio_type="speech",
                     progress_callback=lambda f, m: ctx.on_progress(

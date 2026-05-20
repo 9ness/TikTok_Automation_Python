@@ -54,7 +54,10 @@ class SubsAutoTool:
         )
         return {
             "preset_name": preset_name,
-            "model_size": "small",
+            # `large-v3` por defecto — máxima precisión de transcripción.
+            # ~3-5x más lento que `small` y ~6-8GB RAM (vs ~1GB). El
+            # operador puede bajar a `medium`/`small` si va justo.
+            "model_size": "large-v3",
             "language": None,            # auto-detect
             "audio_type": "speech",
             "quality_label": "1080p (Lento)",
@@ -211,7 +214,7 @@ class SubsAutoTool:
             words = transcribe_with_reference(
                 tmp_audio,
                 reference_script=ref,
-                model_size=config.get("model_size", "small"),
+                model_size=config.get("model_size", "large-v3"),
                 language=config.get("language") or None,
                 audio_type=config.get("audio_type", "speech"),
                 progress_callback=_on_transcribe_progress,

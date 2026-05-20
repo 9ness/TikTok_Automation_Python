@@ -80,7 +80,11 @@ class SilenceCutterScriptedTool:
             "llm_min_region_words": 3,
             "ai_model": "gpt-4o",
             "ai_language": "es",
-            "whisper_model_size": "small",
+            # `large-v3` por defecto para máxima precisión del diff
+            # transcript↔guion. ~3-5x más lento que `small` y ~6-8GB RAM
+            # (vs ~1GB). El operador puede bajar a `medium`/`small` si
+            # el servidor va justo.
+            "whisper_model_size": "large-v3",
             "output_aspect": "9:16",
             "post_audit_enabled": True,
         }
@@ -210,7 +214,7 @@ class SilenceCutterScriptedTool:
         try:
             words = _sc._transcribe(
                 tmp_audio,
-                model_size=config.get("whisper_model_size", "small"),
+                model_size=config.get("whisper_model_size", "large-v3"),
                 language=config.get("ai_language", "es"),
                 on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.20, m),
             )

@@ -107,7 +107,10 @@ class SilenceCutterTool:
             "ai_pass2_openai_enabled": False,
             "ai_pass2_gemini_enabled": True,
             "gemini_model": "gemini-2.5-pro",
-            "whisper_model_size": "small",
+            # `large-v3` por defecto — máxima precisión. ~3-5x más lento
+            # que `small` y ~6-8GB RAM (vs ~1GB). El operador puede bajar
+            # a `medium` o `small` si el server va justo de recursos.
+            "whisper_model_size": "large-v3",
             "output_aspect": "9:16",
             # Auditoría post-render: re-analizar el MP4 final con
             # silencedetect para validar calidad y dar quality score.
@@ -254,7 +257,7 @@ class SilenceCutterTool:
             try:
                 words = _transcribe(
                     tmp_audio,
-                    model_size=config.get("whisper_model_size", "small"),
+                    model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es"),
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
                 )
