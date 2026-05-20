@@ -220,6 +220,22 @@ def _trim_leading_silence(audio_path: str, log_callback=None) -> None:
         )
 
 
+_ORIGINAL_AUDIO_VOLUME = 0.85  # ~-1.4 dB → casi idéntico, lo justo para romper el match exacto de TikTok
+
+
+def _has_audio_stream(video_path: str) -> bool:
+    """True si el vídeo tiene al menos una pista de audio (ffprobe)."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a",
+             "-show_entries", "stream=index", "-of", "csv=p=0", video_path],
+            check=True, capture_output=True, text=True, timeout=15,
+        )
+        return bool(out.stdout.strip())
+    except Exception:
+        return False
+
+
 def _mux_audio_over_video(
     video_path: str,
     audio_path: str,
@@ -227,35 +243,58 @@ def _mux_audio_over_video(
     *,
     log_callback=None,
 ) -> str:
-    """Reemplaza el audio del vídeo por la narración.
+    """Mezcla la narración con el audio original del vídeo (bajado en dB).
 
-    Audio paddeado con silencio (`apad`) + `-shortest`:
-      - Si la narración es más corta que el vídeo (caso típico), `apad`
-        rellena con silencio hasta que `-shortest` corta al fin del vídeo.
-        IMPORTANTE: sin este pad, MoviePy (en el render de subs posterior)
-        lee el audio con AudioFileClip y al pedir samples más allá del fin
-        real repite en bucle el último buffer → la última palabra suena
-        loopeada hasta el final del vídeo.
-      - Si la narración es más larga (eco MiniMax que el trim no atrapó),
-        `-shortest` la corta al fin del vídeo.
+    Si el vídeo no tiene audio, cae a comportamiento clásico: solo narración
+    paddeada con silencio.
+
+    Diseño del filtro (cuando hay audio original):
+      - `[0:a]volume=0.20` → atenúa el original a ~-14dB (de fondo, no se
+        confunde con la narración pero sigue oyéndose).
+      - `[1:a]apad` → la narración rellena con silencio hasta el fin del
+        vídeo. Sin esto, MoviePy en la pasada de subs repite el último
+        buffer audio al pedir samples más allá del fin → última palabra
+        loopeada hasta el final del clip.
+      - `amix=inputs=2:duration=first` → toma la duración del primer
+        input (vídeo original) y mezcla.
+      - `dynaudnorm` opcional: NO se aplica para no aplastar la dinámica.
+    `-shortest` se mantiene como salvavidas si la narración resulta más
+    larga por bug del trim.
     """
     try:
         video_dur = _probe_duration_seconds(video_path)
     except Exception:
         video_dur = 0.0
+
+    if _has_audio_stream(video_path):
+        filter_complex = (
+            f"[0:a]volume={_ORIGINAL_AUDIO_VOLUME}[bg];"
+            "[1:a]apad[voice];"
+            "[bg][voice]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]"
+        )
+        if log_callback:
+            log_callback(
+                f"🔊 Mezclando narración + audio original a {_ORIGINAL_AUDIO_VOLUME * 100:.0f}% "
+                f"(cap {video_dur:.1f}s)…"
+            )
+    else:
+        filter_complex = "[1:a]apad[aout]"
+        if log_callback:
+            log_callback(
+                f"🔊 Vídeo sin audio — solo narración (cap {video_dur:.1f}s, silencio al final)…"
+            )
+
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
         "-i", audio_path,
-        "-filter_complex", "[1:a]apad[aout]",
+        "-filter_complex", filter_complex,
         "-map", "0:v:0", "-map", "[aout]",
         "-c:v", "copy",
         "-c:a", "aac", "-b:a", "192k",
         "-shortest",
         output_path,
     ]
-    if log_callback:
-        log_callback(f"🔊 Mux audio nuevo → vídeo (cap {video_dur:.1f}s, silencio al final)…")
     subprocess.run(cmd, check=True, capture_output=True, timeout=300)
     return output_path
 
