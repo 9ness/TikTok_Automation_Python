@@ -708,10 +708,11 @@ function EnqueueAction({
 }) {
   const [open, setOpen] = useState(false);
   const [script, setScript] = useState("");
-  // Necesitamos guión SOLO si el flow lo pide Y no hay companion .txt.
-  // Si hay companion, dejamos `script` vacío y el backend lo lee del .txt.
-  const needsManualScript = needsScript && !scriptCompanion;
-  const ready = !needsManualScript || script.trim().length > 0;
+  // El flow scripted soporta fallback automático al modo sin guion. El
+  // guion es opcional: si está vacío en el encolado, el backend cae a
+  // VAD/IA normal (con log claro en la cola). Aquí solo mostramos el
+  // textarea cuando el flow PODRÍA usarlo y no hay companion `.txt`.
+  const offersManualScript = needsScript && !scriptCompanion;
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
@@ -746,21 +747,21 @@ function EnqueueAction({
             </p>
           </div>
         )}
-        {needsManualScript && (
+        {offersManualScript && (
           <div className="space-y-1">
             <p className="text-xs font-medium">
-              Guión de referencia (obligatorio — el flow usa
-              silence_cutter_scripted)
+              Guión de referencia (opcional)
             </p>
             <p className="text-[10px] text-muted-foreground">
-              Tip: la próxima vez puedes subir{" "}
+              Si lo dejas vacío, el flow cae al modo SIN guion (corte por
+              VAD/IA). Para usarlo, pega el guion abajo, o sube{" "}
               <code>{filename.replace(/\.[^.]+$/, ".txt")}</code> junto al
-              vídeo en entrada/ y se detectará solo.
+              vídeo en entrada/ y se detectará solo la próxima vez.
             </p>
             <Textarea
               value={script}
               onChange={(e) => setScript(e.target.value)}
-              placeholder="Pega aquí lo que el speaker debía decir…"
+              placeholder="Pega aquí lo que el speaker debía decir… (vacío = modo sin guion)"
               rows={6}
               className="text-xs"
             />
@@ -769,9 +770,8 @@ function EnqueueAction({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            disabled={!ready}
             onClick={() => {
-              onEnqueue(needsManualScript ? script.trim() : "");
+              onEnqueue(offersManualScript ? script.trim() : "");
               setScript("");
             }}
           >
