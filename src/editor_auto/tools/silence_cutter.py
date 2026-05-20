@@ -104,7 +104,14 @@ class SilenceCutterTool:
             #   - Ambos (consenso, ~$0.027): los 2 modelos en pass2. Máxima
             #     fiabilidad, recomendado para vídeos premium.
             "ai_false_starts_pass2": True,
-            "ai_pass2_openai_enabled": False,
+            # Default = consenso PRO: GPT-4o pass2 + Gemini 2.5 Pro pass2.
+            # Más caro (~+$0.008/min de vídeo) pero máxima fiabilidad — la
+            # pasada 2 cubre false-starts que escapan al pass1 y entre 2
+            # modelos hay red de seguridad ante non-determinismo (caso real
+            # visto en prod: gpt-4o se atascó en una iteración, gemini lo
+            # salvó). Si quieres bajar costes, desactiva uno de los dos
+            # toggles en la config UI.
+            "ai_pass2_openai_enabled": True,
             "ai_pass2_gemini_enabled": True,
             "gemini_model": "gemini-2.5-pro",
             # `large-v3` por defecto — máxima precisión. ~3-5x más lento
