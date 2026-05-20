@@ -244,7 +244,11 @@ def enqueue_from_entrada(
     # Resolución del guion (prioridad: body > companion .txt en entrada/).
     # Para flows scripted, si el cliente subió `<stem>.txt` junto al
     # vídeo en entrada/, lo leemos automáticamente — el operador no tiene
-    # que copiar/pegar nada.
+    # que copiar/pegar nada. Si NO hay companion ni body, el job se
+    # encola igualmente con `script=""`: el runtime de
+    # `silence_cutter_scripted` detecta el guion vacío y hace fallback
+    # automático a `silence_cutter` (modo sin guion), loguenado la
+    # decisión en la cola del job. No bloqueamos el encolado.
     script: str = ""
     if script_from_body:
         script = script_from_body
@@ -257,14 +261,6 @@ def enqueue_from_entrada(
             raise ValidationError(str(e))
         if companion:
             script = companion
-
-    if needs_script and not script:
-        raise ValidationError(
-            f"El usuario '{u.name}' tiene 'silence_cutter_scripted' en su "
-            f"flow — necesita un guión. Sube un archivo `.txt` con el "
-            f"mismo nombre base que el vídeo (ej: `{os.path.splitext(filename)[0]}.txt`) "
-            f"a la carpeta `entrada/`, o pasa el guión en el body."
-        )
 
     # 1+2. mover entrada → cola (incluye companion .txt si existe)
     try:

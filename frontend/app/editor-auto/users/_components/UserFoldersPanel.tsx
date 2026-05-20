@@ -38,7 +38,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateUserShare,
   useDeleteUserFile,
@@ -59,7 +58,6 @@ import type {
 } from "@/lib/types/editor-auto";
 import { cn } from "@/lib/utils";
 
-const SCRIPTED_TOOL_ID = "silence_cutter_scripted";
 
 interface FolderMeta {
   id: FolderName;
@@ -115,10 +113,6 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
     salida: 0,
   };
   const items = folders.data?.folders[active] ?? [];
-
-  const needsScript = (user.data?.tool_flow ?? []).some(
-    (s) => s.enabled && s.tool_id === SCRIPTED_TOOL_ID,
-  );
 
   return (
     <Card>
@@ -206,7 +200,6 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
                 key={f.filename}
                 file={f}
                 userId={userId}
-                needsScript={needsScript}
                 onMove={(dst) =>
                   move.mutate({
                     src_folder: f.folder,
@@ -574,7 +567,6 @@ function groupSharesByEmail(
 function FileRow({
   file,
   userId,
-  needsScript,
   onMove,
   onDelete,
   onEnqueue,
@@ -582,7 +574,6 @@ function FileRow({
 }: {
   file: FolderFile;
   userId: string;
-  needsScript: boolean;
   onMove: (dst: FolderName) => void;
   onDelete: () => void;
   onEnqueue: (script: string) => void;
@@ -631,7 +622,6 @@ function FileRow({
         {file.folder === "entrada" && (
           <EnqueueAction
             filename={file.filename}
-            needsScript={needsScript}
             scriptCompanion={file.script?.filename ?? null}
             onEnqueue={onEnqueue}
             disabled={disabled}
@@ -704,94 +694,37 @@ function FileRow({
 // ---------------------------------------------------------------------------
 function EnqueueAction({
   filename,
-  needsScript,
   scriptCompanion,
   onEnqueue,
   disabled,
 }: {
   filename: string;
-  needsScript: boolean;
   /** Nombre del `.txt` companion si existe en la carpeta (el backend lo
-   *  detecta automáticamente al listar). Cuando existe, no pedimos
-   *  textarea — el backend lo lee al encolar. */
+   *  detecta automáticamente al listar). Aquí solo lo usamos para el
+   *  tooltip — el backend lee el archivo al encolar. */
   scriptCompanion: string | null;
   onEnqueue: (script: string) => void;
   disabled: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [script, setScript] = useState("");
-  // El flow scripted soporta fallback automático al modo sin guion. El
-  // guion es opcional: si está vacío en el encolado, el backend cae a
-  // VAD/IA normal (con log claro en la cola). Aquí solo mostramos el
-  // textarea cuando el flow PODRÍA usarlo y no hay companion `.txt`.
-  const offersManualScript = needsScript && !scriptCompanion;
+  // Encolar directo, sin modal de confirmación: el flow scripted hace
+  // fallback automático a modo sin guion si no hay companion `.txt`.
+  // Para usar guion manual, el operador sube `<stem>.txt` junto al
+  // vídeo en entrada/ y el backend lo lee solo.
+  const title = scriptCompanion
+    ? `Encolar — guion detectado: ${scriptCompanion}`
+    : `Encolar — modo sin guion (sube ${filename.replace(/\.[^.]+$/, ".txt")} para usar modo con guion)`;
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="default"
-          size="sm"
-          className="h-7 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
-          disabled={disabled}
-        >
-          <Rocket className="h-3 w-3" />
-          Encolar
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>¿Encolar &ldquo;{filename}&rdquo;?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Se moverá entrada/ → cola/ y se creará el job con el flow del
-            usuario. Tras procesar OK irá a recuperacion/; si falla volverá
-            a entrada/.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {needsScript && scriptCompanion && (
-          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs text-emerald-700 dark:text-emerald-300">
-            <p className="flex items-center gap-1.5 font-medium">
-              <FileText className="h-3 w-3" />
-              Guión detectado: <code>{scriptCompanion}</code>
-            </p>
-            <p className="mt-0.5 text-[10px] opacity-80">
-              El backend lo leerá automáticamente al encolar. Ambos archivos
-              se mueven juntos por todo el flujo.
-            </p>
-          </div>
-        )}
-        {offersManualScript && (
-          <div className="space-y-1">
-            <p className="text-xs font-medium">
-              Guión de referencia (opcional)
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              Si lo dejas vacío, el flow cae al modo SIN guion (corte por
-              VAD/IA). Para usarlo, pega el guion abajo, o sube{" "}
-              <code>{filename.replace(/\.[^.]+$/, ".txt")}</code> junto al
-              vídeo en entrada/ y se detectará solo la próxima vez.
-            </p>
-            <Textarea
-              value={script}
-              onChange={(e) => setScript(e.target.value)}
-              placeholder="Pega aquí lo que el speaker debía decir… (vacío = modo sin guion)"
-              rows={6}
-              className="text-xs"
-            />
-          </div>
-        )}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              onEnqueue(offersManualScript ? script.trim() : "");
-              setScript("");
-            }}
-          >
-            Encolar
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      variant="default"
+      size="sm"
+      className="h-7 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+      disabled={disabled}
+      title={title}
+      onClick={() => onEnqueue("")}
+    >
+      <Rocket className="h-3 w-3" />
+      Encolar
+    </Button>
   );
 }
 
