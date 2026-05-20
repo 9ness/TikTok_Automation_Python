@@ -135,12 +135,38 @@ class SilenceCutterScriptedTool:
         from src.subtitles_only import extract_audio_from_video
 
         # El guion lo inyecta el orchestrator desde job.params["script"]. Si
-        # no llega, falla limpio: esta tool no tiene sentido sin guion.
+        # no llega, esta tool NO tiene base para alinear → fallback automático
+        # a `silence_cutter` normal (mismo recorte de silencios, sin la pasada
+        # de diff transcript↔guion). Mantenemos los campos comunes (VAD,
+        # idioma, Whisper model, aspect) para que el comportamiento sea lo
+        # más parecido posible a lo que el usuario configuró.
         script_raw = (config.get("script") or "").strip()
         if not script_raw:
-            raise RuntimeError(
-                "silence_cutter_scripted: falta el guión. Indícalo en el "
-                "generador antes de encolar."
+            ctx.on_log(
+                "[silence_cutter_scripted] ⚠️ No se ha encontrado guion para "
+                "este vídeo → fallback automático a 'Cortador de silencios' "
+                "(modo SIN guion). Los cortes serán por VAD/IA, no por diff "
+                "transcript↔guion. Para usar el modo con guion, pega el guion "
+                "al encolar el vídeo."
+            )
+            from src.editor_auto.tools.silence_cutter import SilenceCutterTool
+            fallback_tool = SilenceCutterTool()
+            fallback_config = fallback_tool.default_config()
+            # Pasar los campos comunes que el usuario quizá hubiera tuneado
+            # en la config scripted, para respetar sus preferencias.
+            _COMMON_KEYS = (
+                "vad_enabled", "min_silence_ms", "padding_ms",
+                "ai_language", "whisper_model_size", "output_aspect",
+                "post_audit_enabled",
+            )
+            for k in _COMMON_KEYS:
+                if k in config:
+                    fallback_config[k] = config[k]
+            return fallback_tool.run(
+                input_path=input_path,
+                output_path=output_path,
+                config=fallback_config,
+                ctx=ctx,
             )
 
         diagnostic: dict[str, Any] = {
