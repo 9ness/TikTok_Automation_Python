@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -171,10 +172,21 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           ))}
         </div>
 
-        {/* Descripción de la carpeta activa */}
-        <p className="text-[11px] text-muted-foreground">
-          {FOLDERS.find((f) => f.id === active)?.description}
-        </p>
+        {/* Descripción de la carpeta activa + acción batch (solo en entrada/) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="flex-1 text-[11px] text-muted-foreground">
+            {FOLDERS.find((f) => f.id === active)?.description}
+          </p>
+          {active === "entrada" && items.length > 1 && (
+            <BatchEnqueueButton
+              files={items}
+              disabled={enqueue.isPending}
+              onEnqueueOne={(filename, script) =>
+                enqueue.mutateAsync({ filename, script })
+              }
+            />
+          )}
+        </div>
 
         {/* Lista de archivos */}
         {folders.isLoading ? (
@@ -776,6 +788,111 @@ function EnqueueAction({
             }}
           >
             Encolar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** Botón "Encolar todos N" — solo visible en el tab entrada/ cuando hay
+ *  ≥2 vídeos. Procesa secuencialmente cada vídeo con script vacío: el
+ *  backend usa el companion `.txt` si existe (detectado al listar) y
+ *  cae al modo SIN guion si no. Para encolar con guion manual pegado
+ *  por vídeo, sigue habiendo el botón individual de cada fila. */
+function BatchEnqueueButton({
+  files,
+  disabled,
+  onEnqueueOne,
+}: {
+  files: FolderFile[];
+  disabled: boolean;
+  onEnqueueOne: (filename: string, script: string) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const withCompanion = files.filter((f) => f.script).length;
+  const withoutCompanion = files.length - withCompanion;
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 gap-1 bg-gradient-to-r from-brand-cyan to-brand-violet text-white hover:opacity-90"
+          disabled={disabled || running}
+        >
+          <Rocket className="h-3 w-3" />
+          Encolar todos ({files.length})
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Encolar {files.length} vídeos?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se moverán todos de entrada/ → cola/ y se procesarán uno
+            detrás de otro. Tras procesar OK irán a recuperacion/; si
+            alguno falla volverá a entrada/.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1 rounded-md border bg-muted/20 p-2 text-xs">
+          <p>
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              ✓ {withCompanion}
+            </span>{" "}
+            con guion (`.txt` junto al vídeo) — modo premium con diff
+          </p>
+          <p>
+            <span className="font-medium text-muted-foreground">
+              ○ {withoutCompanion}
+            </span>{" "}
+            sin guion — modo VAD/IA con auto-detect estilo
+          </p>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={running}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={running}
+            onClick={async (e) => {
+              // Bloquea el cierre automático del AlertDialog para poder
+              // ejecutar todo el batch antes de cerrar.
+              e.preventDefault();
+              setRunning(true);
+              let ok = 0;
+              const failed: string[] = [];
+              for (const f of files) {
+                try {
+                  await onEnqueueOne(f.filename, "");
+                  ok += 1;
+                } catch {
+                  failed.push(f.filename);
+                }
+              }
+              setRunning(false);
+              setOpen(false);
+              if (failed.length === 0) {
+                toast.success(`Encolados ${ok} vídeos.`);
+              } else if (ok === 0) {
+                toast.error(
+                  `No se pudo encolar ningún vídeo (${failed.length} fallidos).`,
+                );
+              } else {
+                toast.warning(
+                  `Encolados ${ok}/${files.length}. Fallidos: ${failed
+                    .slice(0, 3)
+                    .join(", ")}${failed.length > 3 ? "…" : ""}`,
+                );
+              }
+            }}
+          >
+            {running ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Encolando…
+              </>
+            ) : (
+              `Encolar ${files.length}`
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
