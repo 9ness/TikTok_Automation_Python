@@ -220,7 +220,8 @@ def _trim_leading_silence(audio_path: str, log_callback=None) -> None:
         )
 
 
-_ORIGINAL_AUDIO_VOLUME = 0.85  # ~-1.4 dB → casi idéntico, lo justo para romper el match exacto de TikTok
+DEFAULT_ORIGINAL_AUDIO_VOLUME = 0.60   # vídeo original al 60% por defecto
+DEFAULT_NARRATION_VOLUME = 1.20        # voz narrador al 120% por defecto
 
 
 def _has_audio_stream(video_path: str) -> bool:
@@ -241,47 +242,51 @@ def _mux_audio_over_video(
     audio_path: str,
     output_path: str,
     *,
+    original_audio_volume: float = DEFAULT_ORIGINAL_AUDIO_VOLUME,
+    narration_volume: float = DEFAULT_NARRATION_VOLUME,
     log_callback=None,
 ) -> str:
-    """Mezcla la narración con el audio original del vídeo (bajado en dB).
+    """Mezcla la narración con el audio original del vídeo.
 
-    Si el vídeo no tiene audio, cae a comportamiento clásico: solo narración
-    paddeada con silencio.
+    Volúmenes configurables por job:
+      - `original_audio_volume`: 1.0 = mismo nivel que el original. <1 baja,
+        >1 sube. Default 0.60 (vídeo de fondo, no compite con la voz).
+      - `narration_volume`: 1.0 = nivel nativo del MP3 MiniMax. Default 1.20
+        (sube ~+1.6dB para que la voz se imponga al fondo).
 
-    Diseño del filtro (cuando hay audio original):
-      - `[0:a]volume=0.20` → atenúa el original a ~-14dB (de fondo, no se
-        confunde con la narración pero sigue oyéndose).
-      - `[1:a]apad` → la narración rellena con silencio hasta el fin del
-        vídeo. Sin esto, MoviePy en la pasada de subs repite el último
-        buffer audio al pedir samples más allá del fin → última palabra
-        loopeada hasta el final del clip.
-      - `amix=inputs=2:duration=first` → toma la duración del primer
-        input (vídeo original) y mezcla.
-      - `dynaudnorm` opcional: NO se aplica para no aplastar la dinámica.
-    `-shortest` se mantiene como salvavidas si la narración resulta más
-    larga por bug del trim.
+    Si el vídeo no tiene audio, solo aplicamos el volumen de la narración.
+
+    `apad` en la narración asegura que el audio rellene con silencio hasta
+    el fin del vídeo (necesario porque MoviePy en la pasada de subs repite
+    el último buffer si pide samples más allá del fin del MP3 → última
+    palabra loopeada).
     """
     try:
         video_dur = _probe_duration_seconds(video_path)
     except Exception:
         video_dur = 0.0
 
+    # Clamps de seguridad (UI envía 0-2, pero por si llega un job legado).
+    orig_v = max(0.0, min(3.0, float(original_audio_volume)))
+    narr_v = max(0.1, min(3.0, float(narration_volume)))
+
     if _has_audio_stream(video_path):
         filter_complex = (
-            f"[0:a]volume={_ORIGINAL_AUDIO_VOLUME}[bg];"
-            "[1:a]apad[voice];"
+            f"[0:a]volume={orig_v}[bg];"
+            f"[1:a]volume={narr_v},apad[voice];"
             "[bg][voice]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]"
         )
         if log_callback:
             log_callback(
-                f"🔊 Mezclando narración + audio original a {_ORIGINAL_AUDIO_VOLUME * 100:.0f}% "
+                f"🔊 Mezclando voz {narr_v * 100:.0f}% + original {orig_v * 100:.0f}% "
                 f"(cap {video_dur:.1f}s)…"
             )
     else:
-        filter_complex = "[1:a]apad[aout]"
+        filter_complex = f"[1:a]volume={narr_v},apad[aout]"
         if log_callback:
             log_callback(
-                f"🔊 Vídeo sin audio — solo narración (cap {video_dur:.1f}s, silencio al final)…"
+                f"🔊 Vídeo sin audio — solo narración {narr_v * 100:.0f}% "
+                f"(cap {video_dur:.1f}s, silencio al final)…"
             )
 
     cmd = [
@@ -427,6 +432,8 @@ def run_pipeline(
     gemini_model: str = "gemini-2.5-pro",
     manual_script: str | None = None,
     output_name: str | None = None,
+    original_audio_volume: float = DEFAULT_ORIGINAL_AUDIO_VOLUME,
+    narration_volume: float = DEFAULT_NARRATION_VOLUME,
     on_log=None,
     on_progress=None,
 ) -> str:
@@ -642,6 +649,8 @@ def run_pipeline(
     prog(0.65, "🔊 Mezclando audio nuevo con vídeo…")
     _mux_audio_over_video(
         input_path, str(narration_path), str(muxed_path),
+        original_audio_volume=original_audio_volume,
+        narration_volume=narration_volume,
         log_callback=log,
     )
     prog(0.75, "✅ Audio reemplazado")

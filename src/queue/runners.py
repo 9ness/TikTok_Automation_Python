@@ -763,6 +763,8 @@ def run_construccion_pov(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
         gemini_model=p.get("gemini_model", "gemini-2.5-pro"),
         manual_script=p.get("manual_script"),
         output_name=p.get("output_name"),
+        original_audio_volume=float(p.get("original_audio_volume", 0.60)),
+        narration_volume=float(p.get("narration_volume", 1.20)),
         on_log=on_log,
         on_progress=on_progress,
     )

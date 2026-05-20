@@ -26,26 +26,47 @@ import re
 from pathlib import Path
 from typing import Iterable
 
-from src.font_resolver import _bundled_fonts_dir, resolve_font
+from src.font_resolver import _bundled_fonts_dir
 
 
-# Fuentes Windows conocidas (etiqueta amistosa → basename para resolve_font).
-# `resolve_font` traduce a Linux automáticamente. Si el path resuelto no
-# existe en el OS actual, la fuente se omite de la lista (no aparece como
-# opción rota en el selector).
-_SYSTEM_FONTS: dict[str, str] = {
-    "Impact": r"C:\Windows\Fonts\impact.ttf",
-    "Arial Black": r"C:\Windows\Fonts\ariblk.ttf",
-    "Arial Bold": r"C:\Windows\Fonts\arialbd.ttf",
-    "Bahnschrift": r"C:\Windows\Fonts\bahnschrift.ttf",
-    "Comic Sans Bold": r"C:\Windows\Fonts\comicbd.ttf",
-    "Verdana Bold": r"C:\Windows\Fonts\verdanab.ttf",
-    "Tahoma Bold": r"C:\Windows\Fonts\tahomabd.ttf",
-    "Trebuchet MS Bold": r"C:\Windows\Fonts\trebucbd.ttf",
-    "Georgia Bold": r"C:\Windows\Fonts\georgiab.ttf",
-    "Rockwell Extra Bold": r"C:\Windows\Fonts\ROCKEB.TTF",
-    "Consolas Bold": r"C:\Windows\Fonts\consolab.ttf",
+# Labels "bonitos" para fuentes conocidas. Si el filename escaneado matchea
+# una clave aquí (lowercase), usamos este label en vez del derivado del
+# filename. Para todo lo demás se usa `_label_from_filename`.
+_CURATED_LABELS: dict[str, str] = {
+    "impact.ttf": "Impact",
+    "ariblk.ttf": "Arial Black",
+    "arialbd.ttf": "Arial Bold",
+    "arial.ttf": "Arial",
+    "bahnschrift.ttf": "Bahnschrift",
+    "comicbd.ttf": "Comic Sans Bold",
+    "comic.ttf": "Comic Sans",
+    "verdanab.ttf": "Verdana Bold",
+    "verdana.ttf": "Verdana",
+    "tahomabd.ttf": "Tahoma Bold",
+    "tahoma.ttf": "Tahoma",
+    "trebucbd.ttf": "Trebuchet MS Bold",
+    "trebuc.ttf": "Trebuchet MS",
+    "georgiab.ttf": "Georgia Bold",
+    "georgia.ttf": "Georgia",
+    "rockeb.ttf": "Rockwell Extra Bold",
+    "rockwell.ttf": "Rockwell",
+    "consolab.ttf": "Consolas Bold",
+    "consola.ttf": "Consolas",
+    "calibrib.ttf": "Calibri Bold",
+    "calibri.ttf": "Calibri",
+    "segoeuib.ttf": "Segoe UI Bold",
+    "segoeui.ttf": "Segoe UI",
+    "times.ttf": "Times New Roman",
+    "timesbd.ttf": "Times New Roman Bold",
 }
+
+# Patrones a EXCLUIR del scan (ruido típico de la carpeta Fonts de Windows /
+# Linux: iconos, símbolos, fuentes que no sirven para subs de vídeo).
+_EXCLUDE_PATTERNS: tuple[str, ...] = (
+    "symbol", "wingding", "webding", "marlett", "mtextra", "mt extra",
+    "bsssym", "bookos", "holomdl", "segmdl", "segui emoji", "seguiemj",
+    "seguisym", "segoeicons", "segoescb",  # symbol/icon fonts
+)
 
 _ALLOWED_EXTS = {".ttf", ".otf"}
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -89,19 +110,87 @@ def _scan_bundled() -> Iterable[dict]:
     return out
 
 
+def _platform_font_dirs() -> list[Path]:
+    """Directorios donde el OS guarda las fuentes instaladas.
+
+    Windows: `%WINDIR%\\Fonts` (system) + `%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts`
+             (per-user, donde van las fuentes instaladas con click derecho
+             "Install for me only").
+    Linux:   los dirs típicos definidos en `font_resolver._LINUX_FONT_DIRS`.
+    macOS:   `/Library/Fonts`, `/System/Library/Fonts`, `~/Library/Fonts`.
+    """
+    import sys
+    dirs: list[Path] = []
+    if sys.platform.startswith("win"):
+        win_root = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        dirs.append(win_root / "Fonts")
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            dirs.append(Path(local_appdata) / "Microsoft" / "Windows" / "Fonts")
+    elif sys.platform == "darwin":
+        dirs.extend([
+            Path("/System/Library/Fonts"),
+            Path("/Library/Fonts"),
+            Path.home() / "Library" / "Fonts",
+        ])
+    else:
+        dirs.extend([
+            Path("/usr/share/fonts"),
+            Path("/usr/local/share/fonts"),
+            Path.home() / ".fonts",
+            Path.home() / ".local" / "share" / "fonts",
+        ])
+    return dirs
+
+
+def _looks_like_subtitle_font(filename_lower: str) -> bool:
+    """Filtra ruido del directorio de fuentes del sistema (iconos, símbolos)."""
+    for pat in _EXCLUDE_PATTERNS:
+        if pat in filename_lower:
+            return False
+    return True
+
+
 def _scan_system() -> Iterable[dict]:
+    """Escanea TODAS las fuentes instaladas en el sistema (recursivo).
+
+    Dedup por basename lowercase: si la misma fuente vive en varios dirs
+    (system + user en Windows, p.ej.), nos quedamos con la primera. La
+    etiqueta usa `_CURATED_LABELS` si la conocemos, si no se deriva del
+    filename.
+    """
     out: list[dict] = []
-    for label, win_path in _SYSTEM_FONTS.items():
-        resolved = resolve_font(win_path)
-        # Solo incluir si la fuente existe realmente en este OS.
-        if not resolved or not os.path.exists(resolved):
+    seen_basenames: set[str] = set()
+    for fdir in _platform_font_dirs():
+        if not fdir.is_dir():
             continue
-        out.append({
-            "name": label,
-            "path": resolved,
-            "filename": os.path.basename(resolved),
-            "source": "system",
-        })
+        try:
+            entries = list(fdir.rglob("*"))
+        except (PermissionError, OSError):
+            continue
+        for entry in entries:
+            try:
+                if not entry.is_file():
+                    continue
+            except OSError:
+                continue
+            ext = entry.suffix.lower()
+            if ext not in _ALLOWED_EXTS:
+                continue
+            base_lower = entry.name.lower()
+            if base_lower in seen_basenames:
+                continue
+            if not _looks_like_subtitle_font(base_lower):
+                continue
+            seen_basenames.add(base_lower)
+            label = _CURATED_LABELS.get(base_lower) or _label_from_filename(entry.name)
+            out.append({
+                "name": label,
+                "path": str(entry.resolve()),
+                "filename": entry.name,
+                "source": "system",
+            })
+    out.sort(key=lambda f: f["name"].lower())
     return out
 
 

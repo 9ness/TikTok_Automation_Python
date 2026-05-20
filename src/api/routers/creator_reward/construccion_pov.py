@@ -232,6 +232,8 @@ async def enqueue_construccion_pov(
     quality_label: Annotated[str, Form()] = "1080p (Lento)",
     gemini_model: Annotated[str, Form()] = "gemini-2.5-pro",
     manual_script: Annotated[str | None, Form()] = None,
+    original_audio_volume: Annotated[float, Form()] = 0.60,
+    narration_volume: Annotated[float, Form()] = 1.20,
 ) -> ConstruccionPovEnqueueResponse:
     """Encola el job. Acepta `file` (multipart) o `input_path_relative`
     (reusa el upload del paso /generate-script).
@@ -329,6 +331,8 @@ async def enqueue_construccion_pov(
         "whisper_model_size": whisper_model_size,
         "quality_label": quality_label,
         "output_name": output_name,
+        "original_audio_volume": float(original_audio_volume),
+        "narration_volume": float(narration_volume),
     }
     job = queue.enqueue(JobMode.CONSTRUCCION_POV, title=title, params=params)
 

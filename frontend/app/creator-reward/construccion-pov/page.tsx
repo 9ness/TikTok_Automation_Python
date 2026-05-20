@@ -78,6 +78,8 @@ export default function ConstruccionPovPage() {
   const [mirror, setMirror] = useState(false);
   const [whisperModel, setWhisperModel] = useState<string>("small");
   const [quality, setQuality] = useState<string>("1080p (Lento)");
+  const [originalAudioVolume, setOriginalAudioVolume] = useState<number>(0.60);
+  const [narrationVolume, setNarrationVolume] = useState<number>(1.20);
   const [geminiModel, setGeminiModel] = useState<"gemini-2.5-flash" | "gemini-2.5-pro">(
     "gemini-2.5-pro",
   );
@@ -99,10 +101,13 @@ export default function ConstruccionPovPage() {
       whisper_model: whisperModel,
       quality,
       gemini_model: geminiModel,
+      original_audio_volume: originalAudioVolume,
+      narration_volume: narrationVolume,
     }),
     [
       voiceId, style, upscale, saturation, pulseZoom, mirror,
       whisperModel, quality, geminiModel,
+      originalAudioVolume, narrationVolume,
     ],
   );
 
@@ -151,6 +156,12 @@ export default function ConstruccionPovPage() {
     if (typeof cfg.quality === "string") setQuality(cfg.quality);
     if (cfg.gemini_model === "gemini-2.5-flash" || cfg.gemini_model === "gemini-2.5-pro") {
       setGeminiModel(cfg.gemini_model);
+    }
+    if (typeof cfg.original_audio_volume === "number") {
+      setOriginalAudioVolume(cfg.original_audio_volume);
+    }
+    if (typeof cfg.narration_volume === "number") {
+      setNarrationVolume(cfg.narration_volume);
     }
   }
 
@@ -233,6 +244,8 @@ export default function ConstruccionPovPage() {
         whisper_model_size: whisperModel,
         quality_label: quality,
         gemini_model: geminiModel,
+        original_audio_volume: originalAudioVolume,
+        narration_volume: narrationVolume,
         manual_script: manualScript.trim() ? manualScript : null,
       });
       toast.success(`Encolado · job ${res.job_id.slice(0, 8)}`);
@@ -442,6 +455,45 @@ export default function ConstruccionPovPage() {
                   onChange={(e) => setSaturation(Number(e.target.value))}
                   className="w-full"
                 />
+              </div>
+
+              <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Mezcla de audio</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    100% = mismo nivel que el original. Sube/baja para que la voz no compita con el fondo.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Voz narrador</Label>
+                    <span className="text-xs font-mono">{Math.round(narrationVolume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.05"
+                    value={narrationVolume}
+                    onChange={(e) => setNarrationVolume(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Audio vídeo original</Label>
+                    <span className="text-xs font-mono">{Math.round(originalAudioVolume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.05"
+                    value={originalAudioVolume}
+                    onChange={(e) => setOriginalAudioVolume(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

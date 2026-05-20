@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Save, Star, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, Loader2, Save, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -112,6 +112,28 @@ export function PovPresetManager({
     }
   }
 
+  async function handleOverwriteSelected() {
+    if (!selected) return;
+    try {
+      await save.mutateAsync({ name: selected, config });
+      toast.success(`Preset '${selected}' actualizado.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Error al actualizar.");
+    }
+  }
+
+  // Detecta si hay cambios sin guardar respecto al preset cargado. Comparación
+  // por JSON stringify (suficiente para los shapes planos que manejamos —
+  // primitivos + un objeto `style` con primitivos).
+  const hasUnsavedChanges = useMemo(() => {
+    if (!selected || !loaded.data) return false;
+    try {
+      return JSON.stringify(loaded.data.config) !== JSON.stringify(config);
+    } catch {
+      return false;
+    }
+  }, [selected, loaded.data, config]);
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -209,6 +231,26 @@ export function PovPresetManager({
           Guardar como favorita
         </Button>
       </div>
+
+      {selected && hasUnsavedChanges && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+          <p className="text-xs text-amber-200">
+            Has modificado <b>'{selected}'</b> — los cambios no están guardados.
+          </p>
+          <Button
+            size="sm"
+            onClick={handleOverwriteSelected}
+            disabled={save.isPending}
+          >
+            {save.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Guardar en '{selected}'
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

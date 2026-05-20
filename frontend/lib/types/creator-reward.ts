@@ -244,6 +244,9 @@ export interface ConstruccionPovEnqueueRequest {
   mirror: boolean;
   whisper_model_size: string;
   quality_label: string;
+  // Mezcla audio (1.0 = nivel original/nativo MP3).
+  original_audio_volume: number;
+  narration_volume: number;
   // Guion: si manual_script != null/"", se omite Gemini (coste $0).
   gemini_model: "gemini-2.5-flash" | "gemini-2.5-pro";
   manual_script?: string | null;

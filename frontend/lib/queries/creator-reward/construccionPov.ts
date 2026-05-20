@@ -107,6 +107,8 @@ export function useEnqueueConstruccionPov() {
       fd.append("whisper_model_size", input.whisper_model_size);
       fd.append("quality_label", input.quality_label);
       fd.append("gemini_model", input.gemini_model);
+      fd.append("original_audio_volume", String(input.original_audio_volume));
+      fd.append("narration_volume", String(input.narration_volume));
       if (input.manual_script && input.manual_script.trim()) {
         fd.append("manual_script", input.manual_script);
       }
