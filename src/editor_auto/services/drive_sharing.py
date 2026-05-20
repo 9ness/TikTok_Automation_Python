@@ -372,22 +372,85 @@ def revoke_permission(
     username: str,
     folder: str,
     permission_id: str,
-) -> None:
-    """Revoca un permission concreto de una subcarpeta del usuario.
+) -> str:
+    """Revoca un permission. Devuelve el nivel donde se revocó realmente.
 
-    Solo se necesita `folder` + `permission_id` (el folder_id se
-    resuelve internamente). Esto evita que el frontend tenga que
-    conocer los Drive IDs.
+    Cascade automático: si el permiso es heredado de una carpeta padre
+    (Drive devuelve `cannotDeletePermission` con código 403), intenta
+    revocarlo desde el nivel padre más próximo. Esto es necesario porque
+    el `permission_id` que el frontend ve en una subcarpeta es el MISMO
+    perm que vive en la padre — Drive no permite "des-heredar" en el
+    hijo; solo se puede borrar donde realmente está.
+
+    Niveles en orden (de hijo a padre):
+      1. `entrada/` o `salida/` (subcarpeta — el caso normal)
+      2. `<usuario>/` (raíz del usuario — afecta a todas sus subcarpetas)
+      3. `Usuarios/` (todos los usuarios)
+      4. `TIKTOK_EDITOR/` (toda la app)
+
+    Devuelve el nombre del nivel donde el delete tuvo éxito (`"subcarpeta"`,
+    `"usuario"`, `"Usuarios"` o `"TIKTOK_EDITOR"`) para que el caller
+    pueda avisar al operador si la revocación cascadeó más arriba de lo
+    esperado.
     """
     svc = _service()
-    folder_id = _subfolder_id(username, folder)
+
+    # Construimos la lista de candidatos hijo→padre.
+    levels: list[tuple[str, str]] = []
     try:
-        svc.permissions().delete(
-            fileId=folder_id,
-            permissionId=permission_id,
-            supportsAllDrives=True,
-        ).execute()
-    except Exception as e:
+        levels.append(("subcarpeta", _subfolder_id(username, folder)))
+    except DriveSharingError:
+        pass
+    try:
+        levels.append(("usuario", _user_folder_id(username)))
+    except DriveSharingError:
+        pass
+    try:
+        levels.append(("Usuarios", _users_folder_id()))
+    except DriveSharingError:
+        pass
+    try:
+        levels.append(("TIKTOK_EDITOR", _root_folder_id()))
+    except DriveSharingError:
+        pass
+
+    if not levels:
         raise DriveSharingError(
-            f"Fallo revocando perm {permission_id!r} en {folder!r}: {e}"
+            f"No se resolvió ningún folder_id para usuario {username!r} "
+            f"/ carpeta {folder!r}."
         )
+
+    last_err: Exception | None = None
+    for level_name, folder_id in levels:
+        try:
+            svc.permissions().delete(
+                fileId=folder_id,
+                permissionId=permission_id,
+                supportsAllDrives=True,
+            ).execute()
+            return level_name
+        except Exception as e:
+            err_str = str(e)
+            last_err = e
+            # Errores recuperables que indican "el perm no está en ESTE
+            # nivel" → seguimos cascadeando al padre:
+            #   - cannotDeletePermission: heredado, no se puede borrar aquí
+            #   - 404 / notFound: el perm no existe en este folder
+            recoverable_markers = (
+                "cannotDeletePermission",
+                "permissionNotFound",
+                "notFound",
+                "404",
+            )
+            if any(m.lower() in err_str.lower() for m in recoverable_markers):
+                continue
+            # Cualquier otro error es fatal — no seguimos cascadeando.
+            raise DriveSharingError(
+                f"Fallo revocando perm {permission_id!r} en nivel "
+                f"{level_name!r}: {e}"
+            )
+
+    raise DriveSharingError(
+        f"No se pudo revocar perm {permission_id!r} en ningún nivel "
+        f"(probé {[n for n, _ in levels]}). Último error: {last_err}"
+    )

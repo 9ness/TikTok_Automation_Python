@@ -178,7 +178,9 @@ def revoke_user_share(
     porque Drive scope-a los permission IDs por archivo)."""
     u = _user_or_raise(user_id)
     try:
-        drive_sharing.revoke_permission(u.name, folder, permission_id)
+        revoked_level = drive_sharing.revoke_permission(
+            u.name, folder, permission_id,
+        )
     except drive_sharing.DriveSharingError as e:
         raise ValidationError(str(e))
     return {
@@ -187,4 +189,8 @@ def revoke_user_share(
         "folder": folder,
         "permission_id": permission_id,
         "revoked": True,
+        # `revoked_at_level` cuenta DÓNDE se borró realmente. Si != "subcarpeta",
+        # el frontend puede avisar de que cascadeó (afecta también a otras
+        # carpetas hermanas).
+        "revoked_at_level": revoked_level,
     }
