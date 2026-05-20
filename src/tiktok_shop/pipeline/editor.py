@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Callable, Literal
 
 
@@ -350,6 +351,10 @@ def compose_shop_video(
     trim_head_each_clip: bool = True,
     trim_head_s: float | None = None,
     crossfade_s: float = 0.0,
+    overlays: dict | None = None,
+    hook_text_fallback: str = "",
+    job_id: str = "shop",
+    temp_folder: str = "./temp_work",
     log_callback: LogCallback = _noop,
 ) -> str:
     """Compone el vídeo final usando FFmpeg directo (xfade real, sin negro).
@@ -480,8 +485,135 @@ def compose_shop_video(
         raise RuntimeError(
             f"Output con duración inválida ({actual_final:.2f}s). Abortando."
         )
+
+    # 4. Overlays componibles (Fase 3): hook box al inicio + CTA flecha al
+    # final. Aplicados secuencialmente sobre el MP4 ya con captions.
+    if overlays:
+        output_path = _apply_shop_overlays(
+            video_path=output_path,
+            overlays=overlays,
+            hook_text_fallback=hook_text_fallback,
+            job_id=job_id,
+            temp_folder=temp_folder,
+            log_callback=log_callback,
+        )
+        actual_final = _ffprobe_duration(output_path)
+
     log_callback(f"✅ Vídeo final: {output_path} ({actual_final:.2f}s)")
     return output_path
+
+
+def _apply_shop_overlays(
+    *,
+    video_path: str,
+    overlays: dict,
+    hook_text_fallback: str,
+    job_id: str,
+    temp_folder: str,
+    log_callback: LogCallback,
+) -> str:
+    """Aplica hook_box y/o cta_arrow sobre `video_path` y devuelve el path
+    del MP4 con los overlays aplicados. Cualquier overlay con `enabled=False`
+    se omite. Si los dos están deshabilitados, devuelve `video_path` sin
+    tocar nada.
+
+    Errores en overlays NO abortan: log warning y se devuelve el último MP4
+    válido (los overlays son cosméticos, no críticos para el render).
+    """
+    current = video_path
+    tmp_dir = Path(temp_folder)
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Hook box al inicio ---
+    hook_cfg = overlays.get("hook_box") or {}
+    if hook_cfg.get("enabled"):
+        try:
+            from src.text_hook import add_text_hook_to_video
+            hook_text = (hook_cfg.get("text") or hook_text_fallback or "").strip()
+            if not hook_text:
+                log_callback("⚠️ Hook box habilitado pero sin texto — saltando.")
+            else:
+                style: dict = {
+                    k: v for k, v in hook_cfg.items()
+                    if k != "enabled" and v is not None
+                }
+                hook_out = str(tmp_dir / f"shop_hook_{job_id}.mp4")
+                log_callback(f"🎣 Aplicando hook box: '{hook_text[:50]}'…")
+                add_text_hook_to_video(
+                    current, hook_text, style, hook_out,
+                    log_callback=log_callback,
+                )
+                # Si nos cargamos el archivo intermedio anterior libera disco.
+                if current != video_path:
+                    try:
+                        os.remove(current)
+                    except OSError:
+                        pass
+                current = hook_out
+        except Exception as e:
+            log_callback(f"⚠️ Hook box overlay falló ({e}). Continuando sin hook.")
+
+    # --- CTA flecha al final ---
+    cta_cfg = overlays.get("cta_arrow") or {}
+    if cta_cfg.get("enabled"):
+        try:
+            from src.editor_auto.tools.base import ToolContext
+            from src.editor_auto.tools.sticker_arrow import StickerArrowTool
+
+            sticker_file = (cta_cfg.get("sticker_file") or "").strip()
+            if not sticker_file:
+                log_callback("⚠️ CTA flecha habilitada pero sin sticker_file — saltando.")
+            else:
+                arrow_out = str(tmp_dir / f"shop_cta_{job_id}.mp4")
+                # Skip Whisper — usamos siempre fallback_last_seconds para
+                # TikTok Shop (la voz ya la conocemos, no hace falta detectar
+                # keywords y ahorra ~5-10s por render).
+                tool_cfg: dict = {
+                    "sticker_file": sticker_file,
+                    "position_x_pct": float(cta_cfg.get("position_x_pct", 50.0)),
+                    "position_y_pct": float(cta_cfg.get("position_y_pct", 78.0)),
+                    "scale_width_pct": float(cta_cfg.get("scale_width_pct", 25.0)),
+                    "rotation_deg": int(cta_cfg.get("rotation_deg", 0)),
+                    "flip_horizontal": bool(cta_cfg.get("flip_horizontal", False)),
+                    "flip_vertical": bool(cta_cfg.get("flip_vertical", False)),
+                    "duration_seconds": float(cta_cfg.get("duration_seconds", 3.5)),
+                    "fallback_last_seconds": float(cta_cfg.get("fallback_last_seconds", 4.0)),
+                    "transcribe_for_detection": False,
+                    "lead_seconds": 0.0,
+                }
+                ctx = ToolContext(
+                    user_id="shop",
+                    user_name="shop",
+                    job_id=job_id,
+                    temp_folder=str(tmp_dir),
+                    on_log=log_callback,
+                    on_progress=lambda _f, _m: None,
+                )
+                log_callback(f"➡️ Aplicando CTA flecha: {sticker_file}…")
+                StickerArrowTool().run(
+                    input_path=current,
+                    output_path=arrow_out,
+                    config=tool_cfg,
+                    ctx=ctx,
+                )
+                if current != video_path:
+                    try:
+                        os.remove(current)
+                    except OSError:
+                        pass
+                current = arrow_out
+        except Exception as e:
+            log_callback(f"⚠️ CTA flecha overlay falló ({e}). Continuando sin CTA.")
+
+    # Si aplicamos algún overlay, mover el último resultado al output_path.
+    if current != video_path:
+        try:
+            os.replace(current, video_path)
+            return video_path
+        except OSError:
+            # Si replace falla (filesystem cross-device), devolver el path nuevo.
+            return current
+    return current
 
 
 def _default_caption_style() -> dict:

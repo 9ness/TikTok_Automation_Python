@@ -1,17 +1,123 @@
 "use client";
 
-import { GeneratorWizard } from "@/components/generate/GeneratorWizard";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Settings2 } from "lucide-react";
+
+import { ShopGenerateCards } from "@/components/generate/ShopGenerateCards";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useProducts } from "@/lib/queries/products";
+import { useUsers } from "@/lib/queries/users";
 
 export default function ShopGeneratePage() {
+  const params = useSearchParams();
+  const users = useUsers({ limit: 200 });
+  const products = useProducts({ limit: 200 });
+
+  const [userId, setUserId] = useState<string>(params?.get("user_id") ?? "");
+  const [productId, setProductId] = useState<string>(params?.get("product_id") ?? "");
+
+  const activeUsers = (users.data?.items ?? []).filter((u) => !u.deleted);
+  const activeProducts = (products.data?.items ?? []).filter((p) => !p.deleted);
+
+  const selectedUser = activeUsers.find((u) => u.id === userId);
+  const assignedSet = new Set(selectedUser?.assigned_products ?? []);
+  const eligibleProducts = activeProducts.filter((p) => assignedSet.has(p.id));
+
+  // Auto-reset product si el seleccionado deja de estar asignado al user.
+  useEffect(() => {
+    if (productId && selectedUser && !assignedSet.has(productId)) {
+      setProductId("");
+    }
+  }, [userId, productId, selectedUser, assignedSet]);
+
+  const selectedProduct = activeProducts.find((p) => p.id === productId);
+
   return (
-    <div className="container mx-auto p-6 md:p-10">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Generador de vídeos</h1>
-        <p className="text-sm text-muted-foreground">
-          Wizard de 8 pasos: usuario × producto × tier → encolar generación.
-        </p>
+    <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Generador de vídeos</h1>
+          <p className="text-sm text-muted-foreground">
+            Elige usuario + producto, y genera en 1 clic con presets guardados.
+          </p>
+        </div>
+        <Link href="/tiktok-shop/generate/advanced">
+          <Button variant="outline" size="sm">
+            <Settings2 className="h-4 w-4" />
+            Modo avanzado
+          </Button>
+        </Link>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Cuenta TikTok</Label>
+          <Select value={userId} onValueChange={setUserId}>
+            <SelectTrigger>
+              <SelectValue placeholder={users.isLoading ? "Cargando…" : "Selecciona cuenta"} />
+            </SelectTrigger>
+            <SelectContent>
+              {activeUsers.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.username} · {u.niche}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Producto</Label>
+          <Select
+            value={productId}
+            onValueChange={setProductId}
+            disabled={!selectedUser}
+          >
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  !selectedUser
+                    ? "Elige cuenta primero"
+                    : eligibleProducts.length === 0
+                      ? "Sin productos asignados"
+                      : "Selecciona producto"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {eligibleProducts.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <GeneratorWizard />
+
+      {selectedUser && selectedProduct ? (
+        <ShopGenerateCards
+          userId={selectedUser.id}
+          username={selectedUser.username}
+          productId={selectedProduct.id}
+          productName={selectedProduct.name}
+        />
+      ) : (
+        <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            Elige cuenta y producto para ver los 3 modos de generación con sus presets.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

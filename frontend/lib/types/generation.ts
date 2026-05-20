@@ -12,6 +12,38 @@ export interface ClipPhotoOverride {
   photo_index: number;
 }
 
+// Fase 3 — overlays componibles
+export interface HookBoxOverlay {
+  enabled: boolean;
+  text?: string | null;
+  animation?: string;
+  duration?: number;
+  y_position_pct?: number;
+  text_color?: string;
+  box_color?: string;
+  shadow_color?: string;
+  font_path?: string | null;
+  font_scale?: number;
+}
+
+export interface CtaArrowOverlay {
+  enabled: boolean;
+  sticker_file?: string | null;
+  position_x_pct?: number;
+  position_y_pct?: number;
+  scale_width_pct?: number;
+  rotation_deg?: number;
+  flip_horizontal?: boolean;
+  flip_vertical?: boolean;
+  duration_seconds?: number;
+  fallback_last_seconds?: number;
+}
+
+export interface OverlaysConfig {
+  hook_box: HookBoxOverlay;
+  cta_arrow: CtaArrowOverlay;
+}
+
 export interface EnqueueRequest {
   username: string;
   product_id: string;
@@ -29,6 +61,7 @@ export interface EnqueueRequest {
   n_angles?: number | null;
   clip_photo_overrides?: ClipPhotoOverride[] | null;
   pro_ref_photo_overrides?: number[] | null;
+  overlays?: OverlaysConfig | null;
 }
 
 export interface EnqueueResponse {

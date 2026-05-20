@@ -1090,6 +1090,12 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             # FUNC 5: crossfade y trim_head desde la estrategia
             crossfade_s=float(strategy_cfg.get("crossfade_s", 0.0) or 0.0),
             trim_head_s=float(strategy_cfg.get("trim_head_s", 0.05) or 0.05),
+            # Fase 3: overlays (hook box + CTA flecha) — sin overlays, dict
+            # vacío hace que compose_shop_video los salte transparentemente.
+            overlays=p.get("overlays") or None,
+            hook_text_fallback=strategy.get("hook_text", "") if isinstance(strategy, dict) else "",
+            job_id=job.id,
+            temp_folder=p.get("temp_folder", "./temp_work"),
             log_callback=on_log,
         )
 

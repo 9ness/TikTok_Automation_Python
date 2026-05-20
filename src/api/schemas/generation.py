@@ -70,6 +70,42 @@ class ClipPhotoOverride(BaseModel):
     photo_index: int = Field(..., ge=0)
 
 
+# ---------------------------------------------------------------------------
+# Overlays componibles — Fase 3 (hook box al inicio + CTA flecha al final)
+# Schemas flexibles (estructura libre) para que la UI evolucione sin tocar
+# Pydantic en cada iteración. Los pipelines validan internamente sus campos.
+# ---------------------------------------------------------------------------
+class HookBoxOverlay(BaseModel):
+    enabled: bool = False
+    text: str | None = None  # si vacío → usa strategy.hook_text del strategist
+    animation: str = "swipe_left"
+    duration: float = 5.0
+    y_position_pct: float = 0.40
+    text_color: str = "#0B0B0B"
+    box_color: str = "#FFFFFF"
+    shadow_color: str = "#1E01C4"
+    font_path: str | None = None
+    font_scale: float = 0.018
+
+
+class CtaArrowOverlay(BaseModel):
+    enabled: bool = False
+    sticker_file: str | None = None  # nombre archivo en Assets/flechas/
+    position_x_pct: float = 50.0
+    position_y_pct: float = 78.0
+    scale_width_pct: float = 25.0
+    rotation_deg: int = 0
+    flip_horizontal: bool = False
+    flip_vertical: bool = False
+    duration_seconds: float = 3.5
+    fallback_last_seconds: float = 4.0
+
+
+class OverlaysConfig(BaseModel):
+    hook_box: HookBoxOverlay = Field(default_factory=HookBoxOverlay)
+    cta_arrow: CtaArrowOverlay = Field(default_factory=CtaArrowOverlay)
+
+
 class EnqueueRequest(BaseModel):
     username: str = Field(..., min_length=1)
     product_id: str = Field(..., min_length=1)
@@ -90,6 +126,9 @@ class EnqueueRequest(BaseModel):
     clip_photo_overrides: list[ClipPhotoOverride] | None = None
     pro_ref_photo_overrides: list[int] | None = None
 
+    # Fase 3 — overlays componibles
+    overlays: OverlaysConfig | None = None
+
     @field_validator("username")
     @classmethod
     def _ensure_at(cls, v: str) -> str:
@@ -105,12 +144,99 @@ class EnqueueResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Fase 4 — Test batches (variantes A/B)
+# ---------------------------------------------------------------------------
+VARYABLE_DIMENSIONS = (
+    "hook_category",
+    "voice_id",
+    "strategy",
+    "duration_seconds",
+    "hook_box_animation",
+)
+
+
+class TestBatchRequest(BaseModel):
+    """Encolado de N variantes derivadas de un base_payload.
+
+    `vary` declara las dimensiones que rotan entre variantes. Si `custom_values`
+    está vacío, usamos defaults razonables por dimensión (definidos en el
+    router). Si `custom_values["hook_category"] = ["curiosity","shock"]`, las
+    variantes rotan SOLO esos valores para esa dimensión.
+    """
+
+    base: EnqueueRequest
+    vary: list[str] = Field(..., min_length=1, max_length=3)
+    count: int = Field(default=4, ge=2, le=8)
+    custom_values: dict[str, list[str]] | None = None
+
+    @field_validator("vary")
+    @classmethod
+    def _check_vary(cls, v: list[str]) -> list[str]:
+        for dim in v:
+            if dim not in VARYABLE_DIMENSIONS:
+                raise ValueError(
+                    f"Dimensión '{dim}' no soportada. Acepta: {VARYABLE_DIMENSIONS}",
+                )
+        return v
+
+
+class TestBatchResponse(BaseModel):
+    test_batch_id: str
+    job_ids: list[str]
+    estimated_cost_total: float
+    variants: list[dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
 # Input — regenerar
 # ---------------------------------------------------------------------------
 class RegenerateRequest(BaseModel):
     """Cambios opcionales sobre el job original. Si está vacío → regenera idéntico."""
 
     overrides: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Input/Output — preview prompts (Veo3 / Nano Banana, sin tocar la cola)
+# ---------------------------------------------------------------------------
+class PreviewVeo3Request(BaseModel):
+    username: str = Field(..., min_length=1)
+    product_id: str = Field(..., min_length=1)
+    hook_category: str = "curiosity"
+    hook_custom: str | None = None
+    target_audience: str = "Generalista"
+    language: str = "es"
+
+    @field_validator("username")
+    @classmethod
+    def _ensure_at(cls, v: str) -> str:
+        v = v.strip()
+        return v if v.startswith("@") else f"@{v}"
+
+
+class PreviewVeo3Response(BaseModel):
+    prompt: str
+    hook_text: str
+    voiceover_script: str
+    style: str
+
+
+class PreviewNanoBananaRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    product_id: str = Field(..., min_length=1)
+    n_angles: int = Field(default=5, ge=4, le=8)
+    use_cases: list[str] | None = None
+
+    @field_validator("username")
+    @classmethod
+    def _ensure_at(cls, v: str) -> str:
+        v = v.strip()
+        return v if v.startswith("@") else f"@{v}"
+
+
+class PreviewNanoBananaResponse(BaseModel):
+    prompt: str
+    n_angles: int
 
 
 # ---------------------------------------------------------------------------

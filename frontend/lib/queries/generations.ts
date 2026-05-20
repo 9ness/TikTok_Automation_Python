@@ -86,3 +86,83 @@ export function useDeleteGeneration() {
     onSuccess: () => qc.invalidateQueries({ queryKey: generationKeys.all }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Preview prompts (Veo3 / Nano Banana) — síncronos, NO encolan
+// ---------------------------------------------------------------------------
+export interface PreviewVeo3Request {
+  username: string;
+  product_id: string;
+  hook_category?: string;
+  hook_custom?: string | null;
+  target_audience?: string;
+  language?: string;
+}
+
+export interface PreviewVeo3Response {
+  prompt: string;
+  hook_text: string;
+  voiceover_script: string;
+  style: string;
+}
+
+export interface PreviewNanoBananaRequest {
+  username: string;
+  product_id: string;
+  n_angles?: number;
+  use_cases?: string[];
+}
+
+export interface PreviewNanoBananaResponse {
+  prompt: string;
+  n_angles: number;
+}
+
+export function usePreviewVeo3Prompt() {
+  return useMutation<PreviewVeo3Response, Error, PreviewVeo3Request>({
+    mutationFn: (input) =>
+      api.post<PreviewVeo3Response>(`${ROOT}/preview/veo3`, input),
+  });
+}
+
+export function usePreviewNanoBananaPrompt() {
+  return useMutation<PreviewNanoBananaResponse, Error, PreviewNanoBananaRequest>({
+    mutationFn: (input) =>
+      api.post<PreviewNanoBananaResponse>(`${ROOT}/preview/nano-banana`, input),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fase 4 — Test batches (variantes A/B)
+// ---------------------------------------------------------------------------
+export const VARYABLE_DIMENSIONS = [
+  "hook_category",
+  "voice_id",
+  "strategy",
+  "duration_seconds",
+  "hook_box_animation",
+] as const;
+
+export type VaryableDimension = (typeof VARYABLE_DIMENSIONS)[number];
+
+export interface TestBatchRequest {
+  base: EnqueueRequest;
+  vary: VaryableDimension[];
+  count: number;
+  custom_values?: Record<string, string[]> | null;
+}
+
+export interface TestBatchResponse {
+  test_batch_id: string;
+  job_ids: string[];
+  estimated_cost_total: number;
+  variants: Record<string, unknown>[];
+}
+
+export function useEnqueueTestBatch() {
+  const qc = useQueryClient();
+  return useMutation<TestBatchResponse, Error, TestBatchRequest>({
+    mutationFn: (input) => api.post<TestBatchResponse>(`${ROOT}/test-batch`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: generationKeys.all }),
+  });
+}

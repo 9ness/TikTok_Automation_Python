@@ -23,6 +23,10 @@ from .editor_auto import (
     tools_router as editor_auto_tools_router,
     users_router as editor_auto_users_router,
 )
+from .tiktok_shop import (
+    presets_router as tiktok_shop_presets_router,
+    replicate_viral_router as tiktok_shop_replicate_viral_router,
+)
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
@@ -59,4 +63,6 @@ __all__ = [
     "editor_auto_stickers_router",
     "editor_auto_tools_router",
     "editor_auto_users_router",
+    "tiktok_shop_presets_router",
+    "tiktok_shop_replicate_viral_router",
 ]

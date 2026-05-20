@@ -1,12 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Image as ImageIcon, Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,7 +27,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
-import { useEnqueueGeneration } from "@/lib/queries/generations";
+import {
+  useEnqueueGeneration,
+  usePreviewNanoBananaPrompt,
+  usePreviewVeo3Prompt,
+} from "@/lib/queries/generations";
 import { useProducts } from "@/lib/queries/products";
 import { useUsers } from "@/lib/queries/users";
 import { useVoices } from "@/lib/queries/voices";
@@ -61,6 +73,12 @@ const TIERS: { value: Tier; label: string; cost: string; tooltip: string }[] = [
     cost: "$0 (manual)",
     tooltip: "Solo prompt 8s — pegar en Gemini chat",
   },
+  {
+    value: "nano_banana_prompt_only",
+    label: "🍌 Nano Banana",
+    cost: "$0 (manual)",
+    tooltip: "Solo prompt para fotos premium — pegar en Gemini chat con las fotos source",
+  },
 ];
 
 const DURATIONS = [5, 10, 12, 15, 20, 24, 25, 30];
@@ -70,6 +88,7 @@ const RESOLUTIONS_BY_TIER: Record<string, string[]> = {
   advanced: ["480p", "720p"],
   pro: ["480p", "720p", "1080p-SR", "1440p-SR"],
   veo3_prompt_only: ["720p"],
+  nano_banana_prompt_only: ["720p"],
 };
 
 const HOOK_CATEGORIES = [
@@ -99,7 +118,10 @@ interface WizardForm {
   voiceEnabled: boolean;
   voiceId: string;
   clipPhotoOverrides: ClipPhotoOverride[];
+  nanoBananaAngles: number;
 }
+
+const PROMPT_ONLY_TIERS: Tier[] = ["veo3_prompt_only", "nano_banana_prompt_only"];
 
 const STEPS = [
   "Usuario y producto",
@@ -128,9 +150,17 @@ export function GeneratorWizard() {
     voiceEnabled: true,
     voiceId: "Spanish_EnergeticBoy",
     clipPhotoOverrides: [],
+    nanoBananaAngles: 5,
   });
   const enqueue = useEnqueueGeneration();
+  const previewVeo3 = usePreviewVeo3Prompt();
+  const previewNanoBanana = usePreviewNanoBananaPrompt();
   const openQueue = useDrawerStore((s) => s.openQueue);
+
+  const [promptModal, setPromptModal] = useState<
+    | { kind: "veo3" | "nano_banana"; prompt: string; meta?: string }
+    | null
+  >(null);
 
   function patch<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -148,6 +178,45 @@ export function GeneratorWizard() {
   }
 
   async function submit() {
+    // Veo3 / Nano Banana → endpoints síncronos, NO encolar. Mostramos el
+    // prompt en modal copyable. El resto (Atlas Seedance) sí pasa por la cola.
+    if (form.tier === "veo3_prompt_only") {
+      try {
+        const res = await previewVeo3.mutateAsync({
+          username: form.username,
+          product_id: form.productId,
+          hook_category: form.hookCategory,
+          hook_custom: form.hookCustom.trim() || null,
+          target_audience: form.targetAudience.trim() || "Generalista",
+        });
+        setPromptModal({
+          kind: "veo3",
+          prompt: res.prompt,
+          meta: `Hook: "${res.hook_text}" · estilo: ${res.style}`,
+        });
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Error generando prompt Veo 3.");
+      }
+      return;
+    }
+    if (form.tier === "nano_banana_prompt_only") {
+      try {
+        const res = await previewNanoBanana.mutateAsync({
+          username: form.username,
+          product_id: form.productId,
+          n_angles: form.nanoBananaAngles,
+        });
+        setPromptModal({
+          kind: "nano_banana",
+          prompt: res.prompt,
+          meta: `${res.n_angles} ángulos · pega en Gemini chat con las fotos source`,
+        });
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Error generando prompt Nano Banana.");
+      }
+      return;
+    }
+
     const payload: EnqueueRequest = buildPayload(form);
     try {
       const res = await enqueue.mutateAsync(payload);
@@ -160,6 +229,20 @@ export function GeneratorWizard() {
       toast.error(message);
     }
   }
+
+  async function copyPromptToClipboard() {
+    if (!promptModal) return;
+    try {
+      await navigator.clipboard.writeText(promptModal.prompt);
+      toast.success("Prompt copiado al portapapeles.");
+    } catch {
+      toast.error("No se pudo copiar — selecciónalo manualmente.");
+    }
+  }
+
+  const isPromptOnly = PROMPT_ONLY_TIERS.includes(form.tier);
+  const submitPending =
+    enqueue.isPending || previewVeo3.isPending || previewNanoBanana.isPending;
 
   return (
     <div className="space-y-6">
@@ -174,7 +257,7 @@ export function GeneratorWizard() {
           {step === 4 && <StepPhotos form={form} patch={patch} />}
           {step === 5 && <StepHook form={form} patch={patch} />}
           {step === 6 && <StepVoice form={form} patch={patch} />}
-          {step === 7 && <StepReview form={form} />}
+          {step === 7 && <StepReview form={form} patch={patch} />}
         </CardContent>
       </Card>
 
@@ -188,16 +271,52 @@ export function GeneratorWizard() {
             Siguiente <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={submit} disabled={!stepValid || enqueue.isPending}>
-            {enqueue.isPending ? (
+          <Button onClick={submit} disabled={!stepValid || submitPending}>
+            {submitPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isPromptOnly ? (
+              <Sparkles className="h-4 w-4" />
             ) : (
               <Send className="h-4 w-4" />
             )}
-            Encolar generación
+            {isPromptOnly ? "Generar prompt" : "Encolar generación"}
           </Button>
         )}
       </div>
+
+      {/* Modal con el prompt generado (Veo 3 / Nano Banana). No encola nada. */}
+      <Dialog open={promptModal !== null} onOpenChange={(o) => !o && setPromptModal(null)}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {promptModal?.kind === "veo3"
+                ? "🟣 Prompt Veo 3 listo"
+                : "🍌 Prompt Nano Banana listo"}
+            </DialogTitle>
+            <DialogDescription>
+              {promptModal?.kind === "veo3"
+                ? "Pega este prompt en Gemini chat junto a las fotos del producto. 8s, single shot, 9:16."
+                : "Pega este prompt en Gemini chat con las fotos source del producto. Sube las fotos generadas a 'Photos generated'."}
+              {promptModal?.meta ? ` · ${promptModal.meta}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            readOnly
+            value={promptModal?.prompt ?? ""}
+            className="min-h-[260px] font-mono text-xs"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromptModal(null)}>
+              Cerrar
+            </Button>
+            <Button onClick={copyPromptToClipboard} disabled={!promptModal?.prompt}>
+              <Copy className="h-4 w-4" />
+              Copiar prompt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -622,26 +741,71 @@ function StepVoice({ form, patch }: StepProps) {
   );
 }
 
-function StepReview({ form }: { form: WizardForm }) {
+function StepReview({ form, patch }: StepProps) {
   const cost = estimateCost(form);
+  const isPromptOnly = PROMPT_ONLY_TIERS.includes(form.tier);
   return (
     <div className="space-y-3">
       <Row label="Cuenta" value={form.username} />
       <Row label="Producto" value={form.productId} mono />
       <Row label="Tier" value={form.tier} />
-      <Row label="Estrategia" value={form.strategy} />
-      <Row
-        label="Duración × Resolución"
-        value={`${form.durationSeconds}s · ${form.resolution}`}
-      />
-      <Row label="Hook" value={form.hookCustom || form.hookCategory} />
+      {!isPromptOnly && (
+        <>
+          <Row label="Estrategia" value={form.strategy} />
+          <Row
+            label="Duración × Resolución"
+            value={`${form.durationSeconds}s · ${form.resolution}`}
+          />
+        </>
+      )}
+      {form.tier !== "nano_banana_prompt_only" && (
+        <Row label="Hook" value={form.hookCustom || form.hookCategory} />
+      )}
       <Row label="Audiencia" value={form.targetAudience} />
-      <Row label="Voz" value={form.voiceEnabled ? form.voiceId : "(sin voz)"} />
-      <Row label="Shoppable" value={form.shoppable ? "Sí" : "No"} />
-      <div className="mt-3 rounded-md border bg-primary/5 p-3">
-        <p className="text-xs text-muted-foreground">Coste estimado</p>
-        <p className="text-2xl font-semibold">${cost.toFixed(3)}</p>
-      </div>
+      {!isPromptOnly && (
+        <>
+          <Row label="Voz" value={form.voiceEnabled ? form.voiceId : "(sin voz)"} />
+          <Row label="Shoppable" value={form.shoppable ? "Sí" : "No"} />
+        </>
+      )}
+
+      {form.tier === "nano_banana_prompt_only" && (
+        <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+          <Label className="text-xs">Número de ángulos a pedir</Label>
+          <Select
+            value={String(form.nanoBananaAngles)}
+            onValueChange={(v) => patch("nanoBananaAngles", Number(v))}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[4, 5, 6, 7, 8].map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n} ángulos
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {isPromptOnly ? (
+        <div className="mt-3 rounded-md border border-purple-500/40 bg-purple-500/5 p-3">
+          <p className="text-xs text-muted-foreground">Resultado</p>
+          <p className="text-sm font-medium">
+            Prompt generado al instante (no encola) — lo copias y pegas en Gemini chat.
+          </p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Coste Gemini: ~$0.004 Veo3 · ~$0.002 Nano Banana (modelo 2.5 Flash)
+          </p>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-md border bg-primary/5 p-3">
+          <p className="text-xs text-muted-foreground">Coste estimado</p>
+          <p className="text-2xl font-semibold">${cost.toFixed(3)}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -52,6 +52,28 @@ OPENAI_WHISPER_PER_MIN = 0.006
 # MiniMax speech-02-turbo: $0.06 por 1000 caracteres (≈ TikTok Shop config)
 MINIMAX_TTS_PER_1K_CHARS = 0.06
 
+# Gemini API — precios paid tier (verificado mayo 2026 en ai.google.dev/pricing).
+# Para modelos no listados, fallback a 2.5-flash. Actualizar manualmente cuando
+# Google publique nuevos modelos o cambien tarifas.
+_GEMINI_RATES_PER_1M: dict[str, tuple[float, float]] = {
+    # (input_per_1M, output_per_1M) — input incluye texto/imagen/vídeo.
+    "gemini-2.5-pro":                (1.25, 10.00),
+    "gemini-2.5-flash":              (0.30, 2.50),
+    "gemini-3.5-flash":              (1.50, 9.00),
+    "gemini-3.1-flash-lite-preview": (0.25, 1.50),
+    # alias legacy del proyecto (Flash CR)
+    "gemini-2.5-flash-lite":         (0.30, 2.50),
+}
+
+
+def _resolve_gemini_rates(model: str) -> tuple[float, float]:
+    """Match por prefijo más largo. Si no matchea, usa flash 2.5 como fallback."""
+    candidates = sorted(_GEMINI_RATES_PER_1M.keys(), key=len, reverse=True)
+    for prefix in candidates:
+        if model.startswith(prefix):
+            return _GEMINI_RATES_PER_1M[prefix]
+    return _GEMINI_RATES_PER_1M["gemini-2.5-flash"]
+
 # Tarifas por modelo OpenAI Chat — se selecciona por prefix del `model` recibido.
 # Por compatibilidad, modelos desconocidos caen a gpt-4o-mini.
 _OPENAI_CHAT_RATES: dict[str, tuple[float, float]] = {
@@ -242,6 +264,25 @@ def record_atlas_cloud(
         unit_label="seconds",
         cost_usd=cost,
         detail=detail or f"tier={tier},res={resolution}",
+    ))
+    return cost
+
+
+def record_gemini(
+    *, input_tokens: int, output_tokens: int, model: str, detail: str | None = None,
+) -> float:
+    """Registra una llamada a la Gemini API. Si el `model` no está en la
+    tabla `_GEMINI_RATES_PER_1M`, usa el rate de gemini-2.5-flash como
+    fallback conservador (evita romper la línea de coste cuando se prueba
+    un modelo nuevo)."""
+    in_rate, out_rate = _resolve_gemini_rates(model)
+    cost = (input_tokens / 1_000_000) * in_rate + (output_tokens / 1_000_000) * out_rate
+    _add_line(CostLine(
+        kind="gemini",
+        units=float(input_tokens + output_tokens),
+        unit_label="tokens",
+        cost_usd=cost,
+        detail=f"{model} · in={input_tokens} out={output_tokens}" + (f" · {detail}" if detail else ""),
     ))
     return cost
 
