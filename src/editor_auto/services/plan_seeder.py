@@ -71,7 +71,7 @@ BASE_PLANS: list[dict] = [
         "slug": "starter",
         "name": "Starter · 3 vídeos/día",
         "description": (
-            "Para creadores que arrancan. 3 vídeos/día (≈90/mes), tools "
+            "Para creadores que arrancan. 3 vídeos/día (≈90 vídeos/mes), tools "
             "esenciales (subs auto + corte de silencios). Procesado en "
             "horario laboral 9:00-19:00 para que llegue ordenado."
         ),
@@ -85,7 +85,7 @@ BASE_PLANS: list[dict] = [
         "queue_delay_minutes": 5,
         "support_level": "email",
         "features": [
-            "🎬 3 vídeos/día (≈90/mes)",
+            "🎬 3 vídeos/día (≈90 vídeos/mes)",
             "🕐 Horario 9:00-19:00 (10 h al día)",
             "⏱ Espaciado 25 min entre vídeos",
             "🛠 Subtítulos auto + corte de silencios",
@@ -100,8 +100,8 @@ BASE_PLANS: list[dict] = [
         "slug": "pro",
         "name": "Pro · 5 vídeos/día ★ OFERTA",
         "description": (
-            "El plan estrella. 5 vídeos/día (≈150/mes) — la misma "
-            "capacidad que un editor freelance a 600-800€/mes. "
+            "El plan estrella. 5 vídeos/día (≈150 vídeos/mes) — la misma "
+            "capacidad que un editor freelance que cobra 600-800€/mes. "
             "Todas las tools (incluye silence_cutter_scripted con guión "
             "y sticker CTA). Precio especial para los primeros 20 clientes."
         ),
@@ -115,7 +115,7 @@ BASE_PLANS: list[dict] = [
         "queue_delay_minutes": 0,
         "support_level": "telegram",
         "features": [
-            "🎬 5 vídeos/día (≈150/mes) — vs editor humano a 600-800€",
+            "🎬 5 vídeos/día (≈150 vídeos/mes) — vs editor humano a 600-800€",
             "🕐 Horario 8:00-19:00 (11 h al día)",
             "⏱ Espaciado 20 min entre vídeos",
             "🛠 TODAS las herramientas (subs, silencios, sticker CTA, guión)",
@@ -147,7 +147,7 @@ BASE_PLANS: list[dict] = [
         "queue_delay_minutes": 0,
         "support_level": "telegram_vip",
         "features": [
-            "🎬 10 vídeos/día (≈300/mes) — apto para 2-3 cuentas",
+            "🎬 10 vídeos/día (≈300 vídeos/mes) — apto para 2-3 cuentas",
             "🕐 Horario 8:00-21:00 (13 h al día — reacción a tendencias)",
             "⏱ Espaciado 15 min entre vídeos (entrega ágil)",
             "🛠 TODAS las herramientas",
