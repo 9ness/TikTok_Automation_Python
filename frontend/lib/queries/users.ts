@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
@@ -42,10 +47,14 @@ function buildQS(filters?: UsersFilters): string {
   return qs ? `?${qs}` : "";
 }
 
-export function useUsers(filters?: UsersFilters) {
+export function useUsers(
+  filters?: UsersFilters,
+  options?: Omit<UseQueryOptions<UserListResponse>, "queryKey" | "queryFn">,
+) {
   return useQuery<UserListResponse>({
     queryKey: userKeys.list(filters),
     queryFn: () => api.get<UserListResponse>(`${ROOT}${buildQS(filters)}`),
+    ...options,
   });
 }
 

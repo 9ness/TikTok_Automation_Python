@@ -29,15 +29,20 @@ import type {
   ProductPhoto,
 } from "@/lib/types/product";
 import { cn } from "@/lib/utils";
+import { PhotoImportFromUrls } from "./PhotoImportFromUrls";
+import { TabHint } from "./TabHint";
 
 const PHOTO_TYPES: PhotoType[] = ["packshot", "lifestyle", "detail", "in_use", "macro"];
 const ORIGINS: PhotoOrigin[] = ["internet", "own", "tiktok_shop_url"];
 
 export function PhotoManager({ product }: { product: Product }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <PhotoSection product={product} location="source" title="Fotos source" />
-      <PhotoSection product={product} location="generated" title="Fotos generadas (Nano Banana)" />
+    <div className="space-y-6">
+      <PhotoImportFromUrls product={product} />
+      <div className="grid gap-6 md:grid-cols-2">
+        <PhotoSection product={product} location="source" title="Fotos source" />
+        <PhotoSection product={product} location="generated" title="Fotos generadas (Nano Banana)" />
+      </div>
     </div>
   );
 }

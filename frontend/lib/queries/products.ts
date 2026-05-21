@@ -9,6 +9,18 @@ import {
 
 import { api } from "@/lib/api";
 import type {
+  AnalyzeUrlPreviewInput,
+  AnalyzeUrlPreviewResponse,
+  CommitImportedPhotosInput,
+  CommitImportedPhotosResponse,
+  GeneratePresetsInput,
+  GeneratePresetsResponse,
+  GenerateVariantsInput,
+  GenerateVariantsResponse,
+  GoogleImageSearchInput,
+  GoogleImageSearchResponse,
+  ImportPhotosFromUrlsInput,
+  ImportPhotosFromUrlsResponse,
   NanoBananaPromptInput,
   NanoBananaPromptResponse,
   PhotoLocation,
@@ -21,6 +33,8 @@ import type {
   ProductPhoto,
   ProductUpdateInput,
   ReanalyzeResponse,
+  VideoPreset,
+  VideoPresetUpdateInput,
 } from "@/lib/types/product";
 
 const ROOT = "/api/v1/products";
@@ -156,6 +170,155 @@ export function useReanalyzeProduct() {
   return useMutation<ReanalyzeResponse, Error, string>({
     mutationFn: (productId) => api.post<ReanalyzeResponse>(`${ROOT}/${productId}/analyze`),
     onSuccess: (_data, productId) => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+/**
+ * Analiza una URL de TikTok Shop sin persistir nada. Devuelve los campos
+ * detectados (nombre, marca, categoría, precio, …) para auto-rellenar
+ * el form de Identidad. El usuario revisa y guarda con el PUT normal.
+ */
+export function useAnalyzeUrlPreview() {
+  return useMutation<AnalyzeUrlPreviewResponse, Error, AnalyzeUrlPreviewInput>({
+    mutationFn: (input) =>
+      api.post<AnalyzeUrlPreviewResponse>(`${ROOT}/analyze-url-preview`, input),
+  });
+}
+
+/** Descarga + graduea con Gemini un lote de URLs de imagen. NO persiste —
+ *  el user revisa los scores y elige cuáles guardar via commit. */
+export function useImportPhotosFromUrls(productId: string) {
+  return useMutation<
+    ImportPhotosFromUrlsResponse,
+    Error,
+    ImportPhotosFromUrlsInput
+  >({
+    mutationFn: (input) =>
+      api.post<ImportPhotosFromUrlsResponse>(
+        `${ROOT}/${productId}/import-photos-from-urls`,
+        input,
+      ),
+  });
+}
+
+/** Confirma los candidatos que el user marcó keep. Mueve los temp files
+ *  a la carpeta source y registra ProductPhoto en el producto. */
+export function useCommitImportedPhotos(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    CommitImportedPhotosResponse,
+    Error,
+    CommitImportedPhotosInput
+  >({
+    mutationFn: (input) =>
+      api.post<CommitImportedPhotosResponse>(
+        `${ROOT}/${productId}/commit-imported-photos`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+/** Búsqueda opcional en Google Images vía CSE. Devuelve `configured:false`
+ *  si las env vars no están set — UI muestra un hint en ese caso. */
+export function useSearchPhotosOnGoogle(productId: string) {
+  return useMutation<GoogleImageSearchResponse, Error, GoogleImageSearchInput>({
+    mutationFn: (input) =>
+      api.post<GoogleImageSearchResponse>(
+        `${ROOT}/${productId}/search-photos-on-google`,
+        input,
+      ),
+  });
+}
+
+// --- Video Presets ------------------------------------------------
+export function useVideoPresets(productId: string) {
+  return useQuery<VideoPreset[]>({
+    queryKey: [...productKeys.detail(productId), "video-presets"],
+    queryFn: () => api.get<VideoPreset[]>(`${ROOT}/${productId}/video-presets`),
+    staleTime: 30_000,
+  });
+}
+
+export function useGeneratePresets(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<GeneratePresetsResponse, Error, GeneratePresetsInput>({
+    mutationFn: (input) =>
+      api.post<GeneratePresetsResponse>(
+        `${ROOT}/${productId}/video-presets/generate`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+export function useUpdateVideoPreset(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    VideoPreset,
+    Error,
+    { presetId: string; patch: VideoPresetUpdateInput }
+  >({
+    mutationFn: ({ presetId, patch }) =>
+      api.patch<VideoPreset>(
+        `${ROOT}/${productId}/video-presets/${presetId}`,
+        patch,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+/** Genera N variantes A/B de un preset via Gemini. NO persiste — son
+ *  one-shot para encolar tests inteligentes. */
+export function useGenerateVariants(productId: string) {
+  return useMutation<
+    GenerateVariantsResponse,
+    Error,
+    { presetId: string; input: GenerateVariantsInput }
+  >({
+    mutationFn: ({ presetId, input }) =>
+      api.post<GenerateVariantsResponse>(
+        `${ROOT}/${productId}/video-presets/${presetId}/generate-variants`,
+        input,
+      ),
+  });
+}
+
+export function useDeleteVideoPreset(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (presetId) =>
+      api.del<void>(`${ROOT}/${productId}/video-presets/${presetId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+/** Borra TODOS los presets del producto. Si `only_autogenerated=true`,
+ *  mantiene los manuales (source="manual"). */
+export function useDeleteAllVideoPresets(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { deleted_count: number; remaining: number },
+    Error,
+    { onlyAutogenerated?: boolean }
+  >({
+    mutationFn: ({ onlyAutogenerated }) =>
+      api.del<{ deleted_count: number; remaining: number }>(
+        `${ROOT}/${productId}/video-presets/all${
+          onlyAutogenerated ? "?only_autogenerated=true" : ""
+        }`,
+      ),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
     },
   });

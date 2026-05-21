@@ -78,27 +78,44 @@ export default function ProductEditorPage({
   const p = product.data;
 
   return (
-    <div className="container mx-auto space-y-6 p-6 md:p-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button asChild size="icon" variant="ghost" aria-label="Volver">
-            <Link href="/tiktok-shop/products">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{p.name}</h1>
-            <p className="font-mono text-xs text-muted-foreground">
-              {p.slug} · {p.category}
-            </p>
-          </div>
+    <div className="container mx-auto space-y-4 p-3 sm:p-6 md:space-y-6 md:p-10">
+      {/* Header — 1 fila compacta: back · título · eliminar (icon-only en mobile) */}
+      <div className="flex items-center gap-2">
+        <Button
+          asChild
+          size="icon"
+          variant="ghost"
+          aria-label="Volver"
+          className="shrink-0"
+        >
+          <Link href="/tiktok-shop/products">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-bold tracking-tight sm:text-xl md:text-2xl">
+            {p.name}
+          </h1>
+          <p className="truncate font-mono text-[10px] text-muted-foreground sm:text-xs">
+            {p.slug} · {p.category}
+          </p>
         </div>
 
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={del.isPending}>
-              {del.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              Eliminar
+            <Button
+              variant="destructive"
+              size="icon"
+              disabled={del.isPending}
+              aria-label="Eliminar producto"
+              className="shrink-0 sm:size-default sm:[&]:w-auto sm:px-3"
+            >
+              {del.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              <span className="ml-2 hidden sm:inline">Eliminar</span>
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>

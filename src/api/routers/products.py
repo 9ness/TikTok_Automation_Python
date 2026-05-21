@@ -38,8 +38,23 @@ from src.api.exceptions import (
     ValidationError,
 )
 from src.api.schemas.product import (
+    AnalyzeUrlPreviewRequest,
+    AnalyzeUrlPreviewResponse,
+    CommitImportedPhotosRequest,
+    CommitImportedPhotosResponse,
+    GeneratePresetsRequest,
+    GeneratePresetsResponse,
+    GenerateVariantsRequest,
+    GenerateVariantsResponse,
+    VariantMeta,
+    GoogleImageSearchRequest,
+    GoogleImageSearchResponse,
+    GoogleImageSearchResultItem,
+    ImportPhotosFromUrlsRequest,
+    ImportPhotosFromUrlsResponse,
     NanoBananaPromptRequest,
     NanoBananaPromptResponse,
+    PhotoCandidateGrade,
     PhotoLocation,
     PhotoOrigin,
     PhotoResponse,
@@ -50,6 +65,8 @@ from src.api.schemas.product import (
     ProductResponse,
     ProductUpdate,
     ReanalyzeResponse,
+    VideoPresetResponse,
+    VideoPresetUpdateRequest,
 )
 from src.tiktok_shop.config import (
     product_drive_folder,
@@ -186,6 +203,31 @@ def create_product(
         video_config=video_config,
         drive_folder=drive_folder,
     )
+
+    # Auto-descarga de la `og:image` detectada al pegar URL en el form
+    # crear-producto. Best-effort: si falla (URL caída, content-type
+    # raro, lo que sea) el producto YA está creado, el usuario sube la
+    # foto a mano luego. Nunca aborta la creación.
+    if payload.image_url_to_download:
+        try:
+            from src.tiktok_shop.utils.photo_downloader import (
+                download_image_to_product,
+            )
+            photo = download_image_to_product(
+                product_slug=slug,
+                image_url=payload.image_url_to_download,
+                photo_type="packshot",
+                origin="tiktok_shop_url",
+            )
+            if photo is not None:
+                product.photos.source.append(photo)
+        except Exception as e:
+            # Log y seguimos — la creación del producto tiene prioridad
+            import logging
+            logging.getLogger("api.products").warning(
+                "[create_product] download_image_to_product falló: %s", e,
+            )
+
     repo.save(product)
 
     if payload.analyze_with_gemini:
@@ -236,6 +278,14 @@ def _apply_analysis(product: Product, result: dict) -> None:
         product.needs_nano_banana_regeneration = bool(
             result.get("needs_nano_banana_regeneration")
         )
+    if "photos_quality_assessment" in result:
+        q = str(result.get("photos_quality_assessment") or "").lower()
+        if q in ("high", "medium", "low"):
+            product.photos_quality_assessment = q
+    if "warnings" in result:
+        product.last_analysis_warnings = [
+            str(w)[:300] for w in (result.get("warnings") or [])
+        ][:10]
     product.last_analyzed_at = _now_iso()
 
 
@@ -329,12 +379,43 @@ def delete_product(
     product_id: str,
     repo: Annotated[ProductRepo, Depends(get_product_repo)],
 ) -> Response:
+    """Soft-delete del producto en Redis + borra recursivamente la
+    carpeta del producto en Drive (TIKTOK_SHOP/_products/<slug>/).
+
+    El borrado de la carpeta es best-effort: si falla (Drive no
+    sincronizado, permisos, lo que sea) sólo logueamos warning y
+    devolvemos 204 igual — el producto ya no aparece en el listado.
+    Drive Desktop sincroniza el delete a la papelera de Google Drive
+    (~30 días recuperable). El modelo Redis queda como `deleted=true`
+    por si hace falta auditoría histórica.
+    """
+    import logging
+    import shutil
+
     product = repo.get(product_id)
     if product is None:
         raise ProductNotFoundError(
             f"Producto '{product_id}' no encontrado.",
             details={"product_id": product_id},
         )
+
+    # 1) Borrar carpeta del producto en Drive (best-effort)
+    drive_folder = product.drive_folder or product_drive_folder(product.slug)
+    if drive_folder:
+        try:
+            folder_path = Path(drive_folder)
+            if folder_path.exists() and folder_path.is_dir():
+                shutil.rmtree(str(folder_path), ignore_errors=True)
+                logging.getLogger("api.products").info(
+                    "[delete_product] carpeta Drive borrada: %s", folder_path,
+                )
+        except Exception as e:
+            logging.getLogger("api.products").warning(
+                "[delete_product] no se pudo borrar carpeta Drive %s: %s",
+                drive_folder, e,
+            )
+
+    # 2) Soft-delete en Redis
     product.deleted = True
     repo.save(product)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -559,6 +640,441 @@ def update_photo(
 # ---------------------------------------------------------------------------
 # POST /products/{id}/analyze
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# POST /products/analyze-url-preview
+# ---------------------------------------------------------------------------
+# Endpoint STATELESS — no toca Redis ni Drive. El usuario pega una URL
+# de TikTok Shop en el form de Identidad y este endpoint devuelve los
+# campos detectados (name/brand/category/price_eur/…) para autopoblar
+# el form. El usuario revisa y guarda con el PUT habitual.
+@router.post(
+    "/analyze-url-preview",
+    response_model=AnalyzeUrlPreviewResponse,
+)
+def analyze_url_preview(payload: AnalyzeUrlPreviewRequest) -> AnalyzeUrlPreviewResponse:
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.utils.url_scraper import (
+        extract_from_text,
+        scrape_product_url,
+    )
+
+    # Job adhoc para capturar el coste de las llamadas Gemini que haga
+    # el scraper / extract_from_text. Sin user/product_id porque el
+    # producto aún no existe (este endpoint se llama desde el dialog
+    # de crear).
+    start_job(
+        job_id=f"analyze_url_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="url_analysis",
+        title="Analyze URL/text (product create)",
+    )
+
+    url = (payload.url or "").strip()
+    raw_text = (payload.raw_text or "").strip()
+
+    if not url and not raw_text:
+        raise ValidationError(
+            "Necesito al menos una URL o un texto del producto.",
+            details={},
+        )
+    if url and not url.startswith(("http://", "https://")):
+        raise ValidationError(
+            "La URL debe empezar por http:// o https://",
+            details={"url": url},
+        )
+
+    # Combinamos las 2 vías. Lo encontrado por scraping va primero; lo
+    # del raw_text sólo rellena lo que falte (el user pegó texto bueno
+    # pero scraping ya encontró algo más fiable estructuralmente).
+    scraped: dict = {}
+    warnings: list[str] = []
+
+    if url:
+        scraped = scrape_product_url(url, use_gemini=payload.use_gemini)
+        warnings.extend(scraped.get("warnings") or [])
+
+    if raw_text:
+        extra = extract_from_text(raw_text)
+        warnings.extend(extra.get("warnings") or [])
+        # Solo rellenamos campos que el scraper no encontró
+        for k, v in extra.items():
+            if k == "warnings":
+                continue
+            if v and not scraped.get(k):
+                scraped[k] = v
+
+    # Sanea price_eur a float si vino como string
+    raw_price = scraped.get("price_eur")
+    price: float | None = None
+    if raw_price is not None:
+        try:
+            price = float(raw_price)
+        except (TypeError, ValueError):
+            price = None
+
+    response = AnalyzeUrlPreviewResponse(
+        name=scraped.get("name"),
+        brand=scraped.get("brand"),
+        description=scraped.get("description"),
+        category=(scraped.get("category") or "").lower() or None,
+        subcategory=scraped.get("subcategory"),
+        price_eur=price,
+        currency=scraped.get("currency"),
+        image_url=scraped.get("image_url"),
+        warnings=warnings,
+    )
+    # Cerrar el job adhoc y persistir el coste (Gemini tokens).
+    try:
+        finalize_and_persist()
+    except Exception:
+        pass
+    return response
+
+
+# ---------------------------------------------------------------------------
+# POST /products/{id}/import-photos-from-urls
+# ---------------------------------------------------------------------------
+# Workflow: el user pega N URLs de fotos del producto (las copia desde
+# Google Images, la web de la marca, donde sea). Descargamos cada una a
+# temp_work/, pasamos por Gemini Vision para puntuar 0-10 + detectar
+# tipo (packshot/lifestyle/…) + detectar problemas (watermark, collage,
+# texto promo). Devolvemos los resultados sin guardar — el frontend
+# muestra el grid de candidatas con scores y el user marca cuáles quiere.
+# Luego llamará a /commit-imported-photos.
+def _photo_candidate_dir(product_id: str) -> Path:
+    """temp_work/product_photo_candidates/{product_id}/"""
+    from src.tiktok_shop.config import resolve_shop_root  # lazy
+    base = Path("temp_work") / "product_photo_candidates" / product_id
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+@router.post(
+    "/{product_id}/import-photos-from-urls",
+    response_model=ImportPhotosFromUrlsResponse,
+)
+def import_photos_from_urls(
+    product_id: str,
+    payload: ImportPhotosFromUrlsRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> ImportPhotosFromUrlsResponse:
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.pipeline.photo_grader import grade_photo
+    from src.tiktok_shop.utils.photo_downloader import download_image_to_product
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    # Job adhoc para que record_gemini se acumule
+    start_job(
+        job_id=f"import_photos_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="photo_grading",
+        title=f"Import photos: {product.slug}",
+        product_id=product_id,
+    )
+
+    candidates_dir = _photo_candidate_dir(product_id)
+    candidates: list[PhotoCandidateGrade] = []
+
+    # Fotos source ya verificadas del producto = ground truth para detectar
+    # "producto diferente". Pasamos hasta 2 (más infla el cost del Gemini).
+    reference_paths: list[str] = []
+    for p in product.photos.source:
+        if p.deleted or not p.local_path:
+            continue
+        if not os.path.exists(p.local_path):
+            continue
+        reference_paths.append(p.local_path)
+        if len(reference_paths) >= 2:
+            break
+
+    import requests as _rq
+
+    _UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+
+    for url in payload.urls:
+        url = url.strip()
+        if not url:
+            continue
+        candidate_id = uuid.uuid4().hex[:12]
+
+        # 1) Descargar al temp del candidato. Reusamos un mini-helper
+        # inline porque queremos respetar la URL original y guardarla
+        # con el `candidate_id` (no con la nomenclatura final de
+        # `download_image_to_product`, que es para fotos definitivas).
+        try:
+            r = _rq.get(
+                url,
+                headers={"User-Agent": _UA},
+                timeout=20,
+                allow_redirects=True,
+                stream=True,
+            )
+            if r.status_code >= 400:
+                candidates.append(PhotoCandidateGrade(
+                    candidate_id=candidate_id, url=url,
+                    score=0, type="other",
+                    is_same_product=True,
+                    same_product_confidence="no_reference",
+                    is_branded=False, has_text_overlay=False,
+                    has_watermark=False, is_collage=False,
+                    shows_product_clearly=False, reasons="",
+                    preview_url="",
+                    error=f"HTTP {r.status_code} al descargar",
+                ))
+                continue
+            content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            ext = {
+                "image/jpeg": ".jpg", "image/jpg": ".jpg",
+                "image/png": ".png", "image/webp": ".webp",
+                "image/gif": ".gif",
+            }.get(content_type, ".jpg")
+            chunks: list[bytes] = []
+            total = 0
+            for chunk in r.iter_content(64 * 1024):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > 10 * 1024 * 1024:
+                    raise IOError("Imagen > 10MB, cancelo")
+                chunks.append(chunk)
+            data = b"".join(chunks)
+            if not data:
+                raise IOError("Descarga vacía")
+            dest = candidates_dir / f"{candidate_id}{ext}"
+            dest.write_bytes(data)
+        except Exception as e:
+            candidates.append(PhotoCandidateGrade(
+                candidate_id=candidate_id, url=url,
+                score=0, type="other",
+                is_same_product=True,
+                same_product_confidence="no_reference",
+                is_branded=False, has_text_overlay=False,
+                has_watermark=False, is_collage=False,
+                shows_product_clearly=False, reasons="",
+                preview_url="",
+                error=f"Descarga falló: {e}",
+            ))
+            continue
+
+        # 2) Grade con Gemini Vision — pasamos las fotos source como
+        # referencia para que Gemini detecte si la candidata es el MISMO
+        # producto o solo uno parecido (resuelve el problema del usuario
+        # con productos similares de otras marcas / variantes).
+        grade = grade_photo(
+            str(dest),
+            product_name=product.name,
+            product_brand=product.brand or "",
+            product_category=product.category or "",
+            reference_image_paths=reference_paths,
+        )
+        candidates.append(PhotoCandidateGrade(
+            candidate_id=candidate_id,
+            url=url,
+            score=int(grade["score"]),
+            type=str(grade["type"]),
+            is_same_product=bool(grade.get("is_same_product", True)),
+            same_product_confidence=str(grade.get("same_product_confidence", "no_reference")),
+            is_duplicate_of_reference=bool(grade.get("is_duplicate_of_reference", False)),
+            is_branded=bool(grade["is_branded"]),
+            has_text_overlay=bool(grade["has_text_overlay"]),
+            has_watermark=bool(grade["has_watermark"]),
+            is_collage=bool(grade["is_collage"]),
+            shows_product_clearly=bool(grade["shows_product_clearly"]),
+            reasons=str(grade["reasons"]),
+            preview_url=f"/api/v1/products/{product_id}/photo-candidates/{candidate_id}{ext}",
+        ))
+
+    try:
+        finalize_and_persist()
+    except Exception:
+        pass
+
+    # Ordena por score desc para que las mejores aparezcan arriba en la UI
+    candidates.sort(key=lambda c: c.score, reverse=True)
+    return ImportPhotosFromUrlsResponse(
+        product_id=product_id,
+        candidates=candidates,
+    )
+
+
+@router.get(
+    "/{product_id}/photo-candidates/{filename}",
+    include_in_schema=False,
+)
+def serve_photo_candidate(product_id: str, filename: str):
+    """Sirve los temp files de los candidatos para que la UI los muestre
+    como preview. No autenticado — solo expone temp dir del propio user."""
+    # Sanitización mínima: rechazar paths fuera del temp dir
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise ValidationError("filename inválido", details={"filename": filename})
+    path = _photo_candidate_dir(product_id) / filename
+    if not path.exists():
+        raise PhotoNotFoundError(
+            f"Candidate {filename} no existe.",
+            details={"product_id": product_id, "filename": filename},
+        )
+    return FileResponse(str(path))
+
+
+@router.post(
+    "/{product_id}/search-photos-on-google",
+    response_model=GoogleImageSearchResponse,
+)
+def search_photos_on_google(
+    product_id: str,
+    payload: GoogleImageSearchRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> GoogleImageSearchResponse:
+    """Busca imágenes en Google CSE para autorellenar la textarea de URLs.
+
+    Requiere `GOOGLE_CSE_API_KEY` + `GOOGLE_CSE_ID` en .env. Si no están
+    set, devuelve `configured: false` y un mensaje de cómo configurarlo.
+    """
+    from src.tiktok_shop.utils.image_search import (
+        ddg_image_search,
+        google_cse_is_configured,
+        google_image_search,
+        search_product_images,
+    )
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    # Query default: marca + nombre. El user puede override con payload.query.
+    # Evitamos duplicar la marca si el name ya empieza con ella (ej. brand
+    # "Freshly" + name "Freshly - Crema..." → solo "Freshly - Crema...").
+    if payload.query and payload.query.strip():
+        query = payload.query.strip()
+    else:
+        brand = (product.brand or "").strip()
+        name = (product.name or "").strip()
+        if brand and name and not name.lower().startswith(brand.lower()):
+            query = f"{brand} {name}"
+        else:
+            query = name or brand or product.slug
+
+    provider_pref = (payload.provider or "auto").lower()
+    raw_results: list[dict] = []
+    provider_used = "none"
+
+    if provider_pref == "google":
+        # Modo forzado — falla si CSE no configurado
+        if not google_cse_is_configured():
+            return GoogleImageSearchResponse(
+                configured=False,
+                provider_used="none",
+                query_used=query,
+                results=[],
+                hint=(
+                    "Google CSE no configurado. Define GOOGLE_CSE_API_KEY "
+                    "y GOOGLE_CSE_ID en .env. Por defecto se usa DuckDuckGo."
+                ),
+            )
+        raw_results = google_image_search(query, num=payload.num)
+        provider_used = "google_cse" if raw_results else "none"
+    elif provider_pref == "ddg":
+        raw_results = ddg_image_search(query, max_results=payload.num)
+        provider_used = "ddg" if raw_results else "none"
+    else:
+        # auto: DDG primero, fallback CSE si está disponible
+        provider_used, raw_results = search_product_images(
+            query, num=payload.num, prefer_google=False,
+        )
+
+    return GoogleImageSearchResponse(
+        configured=True,
+        provider_used=provider_used,
+        query_used=query,
+        results=[
+            GoogleImageSearchResultItem(
+                link=r["link"], title=r.get("title", ""),
+            )
+            for r in raw_results
+        ],
+        hint=(
+            "" if raw_results else f"Sin resultados para '{query}'."
+        ),
+    )
+
+
+@router.post(
+    "/{product_id}/commit-imported-photos",
+    response_model=CommitImportedPhotosResponse,
+)
+def commit_imported_photos(
+    product_id: str,
+    payload: CommitImportedPhotosRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> CommitImportedPhotosResponse:
+    """Mueve los candidatos seleccionados de temp_work a la carpeta de
+    fotos source del producto y los registra en `product.photos.source`.
+    """
+    import shutil
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    candidates_dir = _photo_candidate_dir(product_id)
+    source_folder = Path(product_photos_source_folder(product.slug))
+    source_folder.mkdir(parents=True, exist_ok=True)
+
+    skipped: list[str] = []
+    saved = 0
+    for item in payload.candidates:
+        # Buscar el file en temp (cualquier extensión)
+        matches = list(candidates_dir.glob(f"{item.candidate_id}.*"))
+        if not matches:
+            skipped.append(item.candidate_id)
+            continue
+        src_path = matches[0]
+        ext = src_path.suffix.lower()
+        stamp = _now_iso().replace(":", "").replace("-", "")[:14]
+        safe_name = f"import_{stamp}_{item.candidate_id}{ext}"
+        dest_path = source_folder / safe_name
+        try:
+            shutil.move(str(src_path), str(dest_path))
+        except OSError as e:
+            skipped.append(item.candidate_id)
+            continue
+
+        photo = ProductPhoto(
+            filename=safe_name,
+            local_path=str(dest_path),
+            type=item.type or "packshot",
+            origin="internet",
+            added_at=_now_iso(),
+        )
+        product.photos.source.append(photo)
+        saved += 1
+
+    if saved > 0:
+        repo.save(product)
+
+    return CommitImportedPhotosResponse(
+        product_id=product_id,
+        saved_count=saved,
+        skipped=skipped,
+    )
+
+
 @router.post(
     "/{product_id}/analyze",
     response_model=ReanalyzeResponse,
@@ -669,3 +1185,265 @@ def generate_nano_banana_prompt(
         prompt=prompt_text,
         instructions=instructions,
     )
+
+
+# ---------------------------------------------------------------------------
+# Video presets — blueprints precocinados de vídeo por producto
+# ---------------------------------------------------------------------------
+def _preset_to_response(p) -> VideoPresetResponse:
+    return VideoPresetResponse(**p.model_dump())
+
+
+@router.get(
+    "/{product_id}/video-presets",
+    response_model=list[VideoPresetResponse],
+)
+def list_video_presets(
+    product_id: str,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> list[VideoPresetResponse]:
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    return [_preset_to_response(p) for p in product.video_presets]
+
+
+@router.post(
+    "/{product_id}/video-presets/generate",
+    response_model=GeneratePresetsResponse,
+)
+def generate_video_presets(
+    product_id: str,
+    payload: GeneratePresetsRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> GeneratePresetsResponse:
+    """Pide a Gemini que cree N presets musicales + M scripted para
+    el producto. Se acumulan a `product.video_presets`. Si
+    `replace_existing=true`, primero limpia los autogenerados del
+    mismo `source` (manuales nunca se tocan).
+    """
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.pipeline.preset_generator import generate_presets
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    # Job adhoc para cost tracking de Gemini
+    start_job(
+        job_id=f"presets_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="preset_generation",
+        title=f"Generate presets: {product.slug} · {payload.kind}",
+        product_id=product_id,
+    )
+
+    try:
+        presets, warnings = generate_presets(
+            product,
+            kind=payload.kind,
+            n_music=payload.n_music,
+            n_scripted=payload.n_scripted,
+        )
+    except Exception as e:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+        raise GeminiError(
+            f"Generación de presets falló: {e}",
+            details={"product_id": product_id},
+        )
+
+    # Si replace_existing: borrar autogenerados previos del mismo kind
+    if payload.replace_existing:
+        sources_to_drop = set()
+        if payload.kind in ("music", "both"):
+            sources_to_drop.add("music_bof")
+        if payload.kind in ("scripted", "both"):
+            sources_to_drop.add("scripted_bof")
+        product.video_presets = [
+            p for p in product.video_presets if p.source not in sources_to_drop
+        ]
+
+    # Append nuevos
+    product.video_presets.extend(presets)
+    product.touch()
+    repo.save(product)
+
+    try:
+        finalize_and_persist()
+    except Exception:
+        pass
+
+    return GeneratePresetsResponse(
+        product_id=product_id,
+        created_count=len(presets),
+        presets=[_preset_to_response(p) for p in presets],
+        warnings=warnings,
+    )
+
+
+@router.patch(
+    "/{product_id}/video-presets/{preset_id}",
+    response_model=VideoPresetResponse,
+)
+def update_video_preset(
+    product_id: str,
+    preset_id: str,
+    payload: VideoPresetUpdateRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> VideoPresetResponse:
+    """Edita campos sueltos de un preset existente."""
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    preset = next((p for p in product.video_presets if p.id == preset_id), None)
+    if preset is None:
+        raise PhotoNotFoundError(
+            f"Preset {preset_id} no encontrado en el producto.",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+    updates = payload.model_dump(exclude_unset=True)
+    for k, v in updates.items():
+        setattr(preset, k, v)
+    from datetime import datetime, timezone
+    preset.updated_at = datetime.now(timezone.utc).isoformat()
+    product.touch()
+    repo.save(product)
+    return _preset_to_response(preset)
+
+
+@router.post(
+    "/{product_id}/video-presets/{preset_id}/generate-variants",
+    response_model=GenerateVariantsResponse,
+)
+def generate_preset_variants(
+    product_id: str,
+    preset_id: str,
+    payload: GenerateVariantsRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> GenerateVariantsResponse:
+    """Genera N variantes A/B de un preset existente via Gemini. Las
+    variantes NO se persisten — el frontend las usa one-shot para encolar
+    una tanda de tests. Cada variante difiere del base en las dimensiones
+    pedidas (text_overlay, color, cta_arrow, voice_tone, etc).
+    """
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.pipeline.variants_generator import generate_variants
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    base_preset = next(
+        (p for p in product.video_presets if p.id == preset_id), None,
+    )
+    if base_preset is None:
+        raise PhotoNotFoundError(
+            f"Preset {preset_id} no encontrado.",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+
+    start_job(
+        job_id=f"variants_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="variant_generation",
+        title=f"A/B variants: {base_preset.name}",
+        product_id=product_id,
+    )
+    try:
+        variants, meta = generate_variants(
+            base_preset,
+            count=payload.count,
+            dimensions=payload.dimensions,
+        )
+    except Exception as e:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+        raise GeminiError(
+            f"Generación de variantes falló: {e}",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+
+    try:
+        finalize_and_persist()
+    except Exception:
+        pass
+
+    return GenerateVariantsResponse(
+        base_preset_id=preset_id,
+        variants=[_preset_to_response(v) for v in variants],
+        meta=[VariantMeta(**m) for m in meta],
+        warnings=[] if variants else ["Gemini no devolvió variantes válidas."],
+    )
+
+
+@router.delete(
+    "/{product_id}/video-presets/all",
+    status_code=status.HTTP_200_OK,
+)
+def delete_all_video_presets(
+    product_id: str,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+    only_autogenerated: bool = False,
+) -> dict:
+    """Borra TODOS los presets del producto. Si `only_autogenerated=true`,
+    mantiene los `source=manual`. Devuelve cuántos borró."""
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    before = len(product.video_presets)
+    if only_autogenerated:
+        product.video_presets = [
+            p for p in product.video_presets if p.source == "manual"
+        ]
+    else:
+        product.video_presets = []
+    deleted = before - len(product.video_presets)
+    product.touch()
+    repo.save(product)
+    return {"deleted_count": deleted, "remaining": len(product.video_presets)}
+
+
+@router.delete(
+    "/{product_id}/video-presets/{preset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_video_preset(
+    product_id: str,
+    preset_id: str,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> Response:
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    before = len(product.video_presets)
+    product.video_presets = [p for p in product.video_presets if p.id != preset_id]
+    if len(product.video_presets) == before:
+        raise PhotoNotFoundError(
+            f"Preset {preset_id} no encontrado.",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+    product.touch()
+    repo.save(product)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

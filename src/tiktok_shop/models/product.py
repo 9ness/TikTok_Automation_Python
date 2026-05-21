@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.tiktok_shop.config import (
     DEFAULT_DURATION, DEFAULT_RESOLUTION, DEFAULT_TIER,
 )
+from src.tiktok_shop.models.video_preset import VideoPreset
 
 
 def _now_iso() -> str:
@@ -139,11 +140,21 @@ class Product(BaseModel):
     photos: ProductPhotos = Field(default_factory=ProductPhotos)
     video_config: VideoConfig = Field(default_factory=VideoConfig)
     hooks_library: list[Hook] = Field(default_factory=list)
+    # Presets de vídeo precocinados (blueprints clickables en /generate).
+    # Se crean desde la UI del producto pulsando "Generar" — Gemini usa
+    # los prompts music_bof_director.md / scripted_bof_director.md.
+    video_presets: list["VideoPreset"] = Field(default_factory=list)
     performance_history: PerformanceHistory = Field(default_factory=PerformanceHistory)
     needs_nano_banana_regeneration: bool = False
     drive_folder: str | None = None
     deleted: bool = False                     # soft-delete: oculta sin tocar Drive/Redis
     last_analyzed_at: str | None = None      # último análisis Gemini exitoso
+    # Calidad de fotos según Gemini: "high" | "medium" | "low" | ""
+    photos_quality_assessment: str = ""
+    # Warnings explicativos del último análisis (por qué needs_nano_banana,
+    # por qué packaging complejo, etc). Se muestran en la UI para que el
+    # admin entienda las decisiones sin tener que ir al raw.
+    last_analysis_warnings: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 

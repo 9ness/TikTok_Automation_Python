@@ -84,6 +84,15 @@ export interface Product {
   photos: ProductPhotos;
   video_config: VideoConfig;
   hooks_library: Hook[];
+  /** Presets de vídeo precocinados (música + scripted). Generables con
+   *  Gemini desde el tab Presets del producto. */
+  video_presets: VideoPreset[];
+  /** "high" | "medium" | "low" | "" — última evaluación de calidad
+   *  de las fotos source por Gemini Vision. */
+  photos_quality_assessment: string;
+  /** Lista de motivos/avisos del último análisis (explica por qué se
+   *  marcó packaging complejo, needs nano banana, etc). */
+  last_analysis_warnings: string[];
   performance_history: PerformanceHistory;
   needs_nano_banana_regeneration: boolean;
   drive_folder: string | null;
@@ -114,6 +123,10 @@ export interface ProductCreateInput {
   default_duration?: number;
   default_resolution?: string;
   analyze_with_gemini?: boolean;
+  /** Si viene, backend descarga esta imagen tras crear y la añade como
+   *  primera foto source (packshot). Pensado para auto-completar productos
+   *  creados desde URL TikTok Shop con la og:image detectada. */
+  image_url_to_download?: string | null;
 }
 
 export type ProductUpdateInput = Partial<ProductCreateInput> & {
@@ -150,4 +163,234 @@ export interface NanoBananaPromptResponse {
   product_id: string;
   prompt: string;
   instructions: string;
+}
+
+export interface AnalyzeUrlPreviewInput {
+  url?: string;
+  /** Texto libre pegado por el user (título, descripción, share text del
+   *  móvil…). Al menos UNO de los dos (url / raw_text) debe ir relleno. */
+  raw_text?: string;
+  use_gemini?: boolean;
+}
+
+export interface AnalyzeUrlPreviewResponse {
+  name: string | null;
+  brand: string | null;
+  description: string | null;
+  category: string | null;
+  subcategory: string | null;
+  price_eur: number | null;
+  currency: string | null;
+  image_url: string | null;
+  warnings: string[];
+}
+
+// --- Importar fotos por URL + grading -------------------------
+export interface PhotoCandidateGrade {
+  candidate_id: string;
+  url: string;
+  score: number; // 0-10
+  type: PhotoType | "other";
+  /** Si el producto ya tenía fotos, Gemini comparó y decidió si es
+   *  el mismo SKU. Si false, el score está capado a 3 = descartable. */
+  is_same_product: boolean;
+  same_product_confidence: "high" | "medium" | "low" | "no_reference";
+  /** True si el candidato es el mismo plano que una foto de referencia
+   *  (mismo ángulo, composición, fondo). El score ya viene -3 capado;
+   *  la UI también muestra badge "duplicado" para no marcarla. */
+  is_duplicate_of_reference: boolean;
+  is_branded: boolean;
+  has_text_overlay: boolean;
+  has_watermark: boolean;
+  is_collage: boolean;
+  shows_product_clearly: boolean;
+  reasons: string;
+  preview_url: string;
+  error?: string | null;
+}
+
+export interface ImportPhotosFromUrlsInput {
+  urls: string[];
+}
+
+export interface ImportPhotosFromUrlsResponse {
+  product_id: string;
+  candidates: PhotoCandidateGrade[];
+}
+
+export interface CommitImportedPhotoItem {
+  candidate_id: string;
+  type?: PhotoType | null;
+}
+
+export interface CommitImportedPhotosInput {
+  candidates: CommitImportedPhotoItem[];
+}
+
+export interface CommitImportedPhotosResponse {
+  product_id: string;
+  saved_count: number;
+  skipped: string[];
+}
+
+export interface GoogleImageSearchInput {
+  query?: string;
+  num?: number;
+  /** Provider: "auto" (DDG primero, fallback CSE), "ddg", "google" */
+  provider?: "auto" | "ddg" | "google";
+}
+
+export interface GoogleImageSearchResultItem {
+  link: string;
+  title: string;
+}
+
+export interface GoogleImageSearchResponse {
+  configured: boolean;
+  provider_used: "ddg" | "google_cse" | "none";
+  query_used: string;
+  results: GoogleImageSearchResultItem[];
+  hint: string;
+}
+
+// --- Video Presets -------------------------
+export type PresetKind = "music" | "scripted";
+
+export const TEXT_OVERLAY_POSITIONS = [
+  "top_center", "top_left", "top_right",
+  "middle_center", "middle_left", "middle_right",
+  "bottom_center", "bottom_left", "bottom_right",
+] as const;
+
+export const TEXT_OVERLAY_ANIMATIONS = [
+  "none", "fade_in", "slide_up", "slide_down", "pop", "typing",
+  "shake", "bounce",
+] as const;
+
+export interface TextOverlayStyle {
+  font: string;          // path absoluto del registry o vacío (default)
+  size_px: number;
+  color: string;
+  stroke_color: string;
+  stroke_width: number;
+  position: string;
+  animation: string;
+  uppercase: boolean;
+  background: string; // "none" | "black_bar" | "blur"
+  /** Segundos que el hook permanece en pantalla (default 4s = stop-scroll). */
+  duration_s: number;
+}
+
+export interface SubtitleStyle {
+  enabled: boolean;
+  font: string;
+  size_px: number;
+  color: string;
+  stroke_color: string;
+  stroke_width: number;
+  position: string;
+  highlight_color: string;
+  max_words_per_line: number;
+  uppercase: boolean;
+  animation: string;
+}
+
+export interface CtaArrowStyle {
+  enabled: boolean;
+  sticker_file: string;        // "flecha_negra.mov" | "flecha_roja.mov"
+  position_x_pct: number;
+  position_y_pct: number;
+  scale_width_pct: number;
+  rotation_deg: number;
+  flip_horizontal: boolean;
+  flip_vertical: boolean;
+  duration_seconds: number;
+  show_at_end: boolean;
+}
+
+export interface VideoPreset {
+  id: string;
+  kind: PresetKind;
+  name: string;
+  angle: string;
+  /** "voiceover" (VO sobre planos producto — todos los tiers OK)
+   *  | "creator_pov" (persona habla a cámara — solo Pro/Veo3)
+   *  | "" (legacy / music) */
+  style: string;
+  /** "single_shot" (1 plano continuo) | "multi_shot" (cortes) | "auto" */
+  shot_style: string;
+  /** Estrategia de cámara: "cinematic" (continuo, lento) | "dynamic" (cortes) */
+  strategy: string;
+  duration_s: number;
+  compatible_tiers: string[];
+  text_overlay: string;
+  text_overlay_style: TextOverlayStyle;
+  subtitle_style: SubtitleStyle;
+  cta_arrow_style: CtaArrowStyle;
+  music_mood: string;
+  voice_id: string | null;
+  voice_tone: string;
+  title: string;
+  voice_script: string;
+  hooks_alternatives: string[];
+  cta: string;
+  oratory_tips: string;
+  keywords: string[];
+  seedance_prompt: string;
+  veo3_prompt: string;
+  source: string; // "music_bof" | "scripted_bof" | "manual"
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GeneratePresetsInput {
+  kind?: "music" | "scripted" | "both";
+  n_music?: number;
+  n_scripted?: number;
+  replace_existing?: boolean;
+}
+
+export interface GeneratePresetsResponse {
+  product_id: string;
+  created_count: number;
+  presets: VideoPreset[];
+  warnings: string[];
+}
+
+export type VideoPresetUpdateInput = Partial<
+  Omit<VideoPreset, "id" | "kind" | "source" | "created_at" | "updated_at">
+>;
+
+// --- Variantes A/B -------------------------
+export const VARIANT_DIMENSIONS = [
+  "text_overlay",
+  "text_overlay_color",
+  "text_overlay_position",
+  "cta_arrow",
+  "voice_tone",
+  "voice_script",
+  "music_mood",
+  "shot_style",
+  "hooks_alternatives",
+  "subtitle_style",
+] as const;
+export type VariantDimension = (typeof VARIANT_DIMENSIONS)[number];
+
+export interface GenerateVariantsInput {
+  count?: number;
+  dimensions?: VariantDimension[];
+}
+
+export interface VariantMeta {
+  variant_id: string;
+  hypothesis: string;
+  patch_keys: string[];
+}
+
+export interface GenerateVariantsResponse {
+  base_preset_id: string;
+  variants: VideoPreset[];
+  meta: VariantMeta[];
+  warnings: string[];
 }

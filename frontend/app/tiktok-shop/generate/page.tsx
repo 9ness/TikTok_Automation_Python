@@ -44,8 +44,18 @@ function ShopGenerateLoading() {
 
 function ShopGenerateInner() {
   const params = useSearchParams();
-  const users = useUsers({ limit: 200 });
-  const products = useProducts({ limit: 200 });
+  // refetchOnMount + staleTime 0 → al volver a la página del generador
+  // siempre traemos productos/usuarios frescos del backend. Antes pasaba
+  // que tras asignar un producto a un user en otra pestaña, al venir aquí
+  // el dropdown salía con la lista cacheada vieja sin el nuevo producto.
+  const users = useUsers(
+    { limit: 200 },
+    { refetchOnMount: "always", staleTime: 0 },
+  );
+  const products = useProducts(
+    { limit: 200 },
+    { refetchOnMount: "always", staleTime: 0 },
+  );
 
   const [userId, setUserId] = useState<string>(params?.get("user_id") ?? "");
   const [productId, setProductId] = useState<string>(params?.get("product_id") ?? "");

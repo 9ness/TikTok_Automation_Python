@@ -7,6 +7,7 @@ from .video_generation import (
     ClipPrompt, GenerationStatus, HookUsed, Performance,
     TikTokShopVideoMeta, VideoCost, VideoGeneration, VoiceUsed,
 )
+from .video_preset import VideoPreset, SUGGESTED_ANGLES, make_preset_id
 from .voice import VoiceClone
 
 __all__ = [
@@ -21,6 +22,9 @@ __all__ = [
     "TikTokShopMeta",
     "VoicePreference",
     "VideoGeneration",
+    "VideoPreset",
+    "SUGGESTED_ANGLES",
+    "make_preset_id",
     "ClipPrompt",
     "GenerationStatus",
     "HookUsed",

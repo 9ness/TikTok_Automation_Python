@@ -117,6 +117,27 @@ def _call_with_key(
     text = (response.text or "").strip()
     if expect_json:
         text = _strip_json_fences(text)
+
+    # Cost tracking — google-generativeai expone tokens en `usage_metadata`.
+    # Si no hay job activo, `record_gemini` se ignora silenciosamente (eso
+    # lo decide cost_tracking._add_line), así que llamar es seguro siempre.
+    try:
+        usage = getattr(response, "usage_metadata", None)
+        if usage is not None:
+            input_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
+            output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
+            if input_tokens or output_tokens:
+                from src.cost_tracking import record_gemini
+
+                record_gemini(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    model=model,
+                )
+    except Exception as e:
+        # Cost tracking nunca debe romper el call. Log y seguimos.
+        log_warning(_LOGGER_NAME, "cost tracking falló (ignorando)", error=str(e))
+
     return text
 
 

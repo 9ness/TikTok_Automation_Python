@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { useUpdateProduct } from "@/lib/queries/products";
 import type { Hook, Product } from "@/lib/types/product";
+import { TabHint } from "./TabHint";
 
 export function HooksEditor({ product }: { product: Product }) {
   const update = useUpdateProduct(product.id);
@@ -43,6 +44,11 @@ export function HooksEditor({ product }: { product: Product }) {
 
   return (
     <div className="space-y-4">
+      <TabHint mode="manual" source="Opcional · suelen estar dentro de los Presets">
+        Hooks reutilizables propios. Los presets ya generan{" "}
+        <code>hooks_alternatives</code> en cada uno — esto es para frases tuyas
+        que quieras tener a mano. Puedes dejarlo vacío.
+      </TabHint>
       <div className="space-y-2">
         <Label>Hooks guardados</Label>
         {product.hooks_library.length === 0 ? (

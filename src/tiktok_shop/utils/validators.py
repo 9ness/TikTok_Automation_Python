@@ -19,7 +19,12 @@ PHOTO_MIN_RESOLUTION_DEFAULT = 512   # px (cualquier lado >= 512)
 PHOTO_MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 SUPPORTED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 TIKTOK_SHOP_URL_PATTERN = re.compile(
-    r"^https?://(www\.)?(tiktok\.com|shop-\w+\.tiktok\.com)/.+",
+    # Acepta cualquier subdominio de tiktok.com:
+    #   - www.tiktok.com  (URL larga del producto)
+    #   - shop-xx.tiktok.com  (storefront por región)
+    #   - vm.tiktok.com / vt.tiktok.com  (short URLs de share)
+    #   - p.tiktok.com  (perfil)
+    r"^https?://([\w-]+\.)*tiktok\.com(/.*)?$",
     re.IGNORECASE,
 )
 

@@ -82,6 +82,8 @@ export const api = {
     request<T>("POST", path, body, init),
   put: <T>(path: string, body?: unknown, init?: RequestInit) =>
     request<T>("PUT", path, body, init),
+  patch: <T>(path: string, body?: unknown, init?: RequestInit) =>
+    request<T>("PATCH", path, body, init),
   del: <T>(path: string, init?: RequestInit) => request<T>("DELETE", path, undefined, init),
   baseUrl: BASE_URL,
   wsUrl: (process.env.NEXT_PUBLIC_WS_URL ?? BASE_URL.replace(/^http/, "ws")).replace(/\/$/, ""),

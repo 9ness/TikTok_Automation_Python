@@ -67,6 +67,11 @@ class ProductCreate(BaseModel):
     default_duration: int = Field(default=DEFAULT_DURATION, ge=5, le=30)
     default_resolution: str = DEFAULT_RESOLUTION
     analyze_with_gemini: bool = False  # si true → background task tras crear
+    # Si viene relleno, tras crear el producto descarga esta imagen y la
+    # añade como primera foto source (photo_type=packshot). Pensado para
+    # auto-completar productos creados desde URL TikTok Shop con la
+    # `og:image` que sale del scraping.
+    image_url_to_download: str | None = Field(default=None, max_length=2000)
 
     @field_validator("slug")
     @classmethod
@@ -130,11 +135,16 @@ class ProductResponse(BaseModel):
     photos: dict[str, Any]
     video_config: dict[str, Any]
     hooks_library: list[dict[str, Any]]
+    # Presets de vídeo precocinados (música + scripted). Dump genérico
+    # — el frontend tiene types VideoPreset que matchea.
+    video_presets: list[dict[str, Any]] = Field(default_factory=list)
     performance_history: dict[str, Any]
     needs_nano_banana_regeneration: bool = False
     drive_folder: str | None = None
     deleted: bool = False
     last_analyzed_at: str | None = None
+    photos_quality_assessment: str = ""
+    last_analysis_warnings: list[str] = Field(default_factory=list)
     created_at: str
     updated_at: str
 
@@ -211,6 +221,259 @@ class ReanalyzeResponse(BaseModel):
     needs_nano_banana_regeneration: bool = False
     warnings: list[str] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)  # JSON bruto de Gemini
+
+
+# ---------------------------------------------------------------------------
+# URL preview — auto-rellenar form Identidad pegando URL de TikTok Shop
+# ---------------------------------------------------------------------------
+class AnalyzeUrlPreviewRequest(BaseModel):
+    # Al menos UNO de los dos tiene que venir relleno (validado en el router).
+    # url      — la pegamos en TikTok Shop y la app intenta scrapearla
+    # raw_text — el user pega texto del producto (título, descripción,
+    #            precio, share text del móvil…). Gemini saca campos
+    #            estructurados. Útil cuando TikTok bloquea el scraping.
+    url: str | None = Field(default=None, max_length=2000)
+    raw_text: str | None = Field(default=None, max_length=8000)
+    use_gemini: bool = True  # opcionalmente desactivable para debug
+
+
+class AnalyzeUrlPreviewResponse(BaseModel):
+    """Campos detectados — todos opcionales (devolvemos lo que pudimos)."""
+    name: str | None = None
+    brand: str | None = None
+    description: str | None = None
+    category: str | None = None
+    subcategory: str | None = None
+    price_eur: float | None = None
+    currency: str | None = None
+    image_url: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Importar fotos por URL + grading con Gemini
+# ---------------------------------------------------------------------------
+class ImportPhotosFromUrlsRequest(BaseModel):
+    """Lista de URLs candidatas. Backend descarga + Gemini puntúa cada una."""
+    urls: list[str] = Field(..., min_length=1, max_length=20)
+
+
+class PhotoCandidateGrade(BaseModel):
+    """Resultado de evaluar una foto candidata. NO está guardada todavía
+    en el producto — se queda en `temp_work/` hasta que el user marque
+    cuáles confirmar vía `commit-imported-photos`."""
+    candidate_id: str          # uuid corto, se usa en el commit
+    url: str
+    score: int                  # 0-10
+    type: str                   # packshot|lifestyle|detail|in_use|macro|other
+    # Detección "mismo producto vs producto parecido". Si el producto
+    # ya tiene fotos source, Gemini compara la candidata con esas como
+    # ground truth y marca is_same_product=false si dudosamente es el
+    # mismo SKU. En ese caso el score se forzó a max 3 en el backend.
+    is_same_product: bool = True
+    same_product_confidence: str = "no_reference"  # high|medium|low|no_reference
+    # Si la candidata es esencialmente el MISMO plano que alguna foto de
+    # referencia (mismo ángulo, composición, fondo). El score ya viene
+    # capado en -3 desde el grader. La UI muestra badge "duplicado" para
+    # que el user no la marque y prefiera fotos complementarias.
+    is_duplicate_of_reference: bool = False
+    is_branded: bool
+    has_text_overlay: bool
+    has_watermark: bool
+    is_collage: bool
+    shows_product_clearly: bool
+    reasons: str
+    preview_url: str            # endpoint para servir el preview en la UI
+    error: str | None = None   # si la descarga falló
+
+
+class ImportPhotosFromUrlsResponse(BaseModel):
+    product_id: str
+    candidates: list[PhotoCandidateGrade]
+
+
+class CommitImportedPhotosRequest(BaseModel):
+    """El user marcó qué candidatos quiere guardar. Llega el candidate_id
+    + el `type` final (puede haber editado el detectado por Gemini)."""
+    candidates: list["CommitImportedPhotoItem"] = Field(..., min_length=1)
+
+
+class CommitImportedPhotoItem(BaseModel):
+    candidate_id: str
+    type: PhotoType | None = None  # si None, usa el detectado por Gemini
+
+
+class CommitImportedPhotosResponse(BaseModel):
+    product_id: str
+    saved_count: int
+    skipped: list[str] = Field(default_factory=list)  # candidate_ids que fallaron
+
+
+CommitImportedPhotosRequest.model_rebuild()
+
+
+class GoogleImageSearchRequest(BaseModel):
+    """Buscar imágenes externas para el producto.
+
+    Provider:
+      - "auto" (default): DDG primero, fallback CSE si está configurado
+      - "ddg": fuerza DuckDuckGo (sin API key, siempre funciona)
+      - "google": fuerza Google CSE (requiere env vars, falla si no)
+    """
+    query: str | None = Field(default=None, max_length=200)
+    num: int = Field(default=10, ge=1, le=10)
+    provider: str = Field(default="auto")  # auto | ddg | google
+
+
+class GoogleImageSearchResultItem(BaseModel):
+    link: str
+    title: str = ""
+
+
+class GoogleImageSearchResponse(BaseModel):
+    configured: bool                    # True si hubo algún provider disponible
+    provider_used: str = "none"        # ddg | google_cse | none
+    query_used: str
+    results: list[GoogleImageSearchResultItem] = Field(default_factory=list)
+    hint: str = ""  # mensaje al usuario (ej. "ningún resultado")
+
+
+# ---------------------------------------------------------------------------
+# Video presets (blueprints precocinados de vídeo por producto)
+# ---------------------------------------------------------------------------
+PresetKindRequest = Literal["music", "scripted", "both"]
+
+
+class TextOverlayStyleSchema(BaseModel):
+    font: str = ""
+    size_px: int = 56
+    color: str = "#FFFFFF"
+    stroke_color: str = "#000000"
+    stroke_width: int = 6
+    position: str = "top_center"
+    animation: str = "fade_in"
+    uppercase: bool = True
+    background: str = "none"
+    duration_s: float = 4.0
+
+
+class SubtitleStyleSchema(BaseModel):
+    enabled: bool = True
+    font: str = ""
+    size_px: int = 48
+    color: str = "#FFFFFF"
+    stroke_color: str = "#000000"
+    stroke_width: int = 5
+    position: str = "bottom_center"
+    highlight_color: str = "#FFE066"
+    max_words_per_line: int = 3
+    uppercase: bool = False
+    animation: str = "fade_in"
+
+
+class CtaArrowStyleSchema(BaseModel):
+    enabled: bool = False
+    sticker_file: str = "flecha_negra.mov"
+    position_x_pct: float = 50.0
+    position_y_pct: float = 75.0
+    scale_width_pct: float = 25.0
+    rotation_deg: int = 0
+    flip_horizontal: bool = False
+    flip_vertical: bool = False
+    duration_seconds: float = 4.0
+    show_at_end: bool = True
+
+
+class VideoPresetResponse(BaseModel):
+    """Dump completo de un VideoPreset persistido."""
+    id: str
+    kind: str
+    name: str
+    angle: str = ""
+    style: str = ""              # "voiceover" | "creator_pov" | ""
+    shot_style: str = "auto"     # "single_shot" | "multi_shot" | "auto"
+    strategy: str = "dynamic"    # "cinematic" | "dynamic"
+    duration_s: int
+    compatible_tiers: list[str]
+    text_overlay: str = ""
+    text_overlay_style: TextOverlayStyleSchema = Field(default_factory=TextOverlayStyleSchema)
+    subtitle_style: SubtitleStyleSchema = Field(default_factory=SubtitleStyleSchema)
+    cta_arrow_style: CtaArrowStyleSchema = Field(default_factory=CtaArrowStyleSchema)
+    music_mood: str = ""
+    voice_id: str | None = None
+    voice_tone: str = "energetic"
+    title: str = ""
+    voice_script: str = ""
+    hooks_alternatives: list[str] = Field(default_factory=list)
+    cta: str = ""
+    oratory_tips: str = ""
+    keywords: list[str] = Field(default_factory=list)
+    seedance_prompt: str = ""
+    veo3_prompt: str = ""
+    source: str = "manual"
+    notes: str = ""
+    created_at: str
+    updated_at: str
+
+
+class GeneratePresetsRequest(BaseModel):
+    kind: PresetKindRequest = "both"
+    n_music: int = Field(default=8, ge=1, le=20)
+    n_scripted: int = Field(default=12, ge=1, le=20)
+    # Si true, reemplaza los presets autogenerados anteriores del mismo
+    # `source` (music_bof/scripted_bof). Los manuales nunca se tocan.
+    replace_existing: bool = False
+
+
+class GeneratePresetsResponse(BaseModel):
+    product_id: str
+    created_count: int
+    presets: list[VideoPresetResponse] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class GenerateVariantsRequest(BaseModel):
+    count: int = Field(default=4, ge=2, le=8)
+    dimensions: list[str] = Field(default_factory=list)
+
+
+class VariantMeta(BaseModel):
+    variant_id: str
+    hypothesis: str
+    patch_keys: list[str]
+
+
+class GenerateVariantsResponse(BaseModel):
+    base_preset_id: str
+    variants: list[VideoPresetResponse] = Field(default_factory=list)
+    meta: list[VariantMeta] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class VideoPresetUpdateRequest(BaseModel):
+    """PATCH parcial de un preset (edición a mano desde la UI)."""
+    name: str | None = None
+    shot_style: str | None = None
+    strategy: str | None = None
+    duration_s: int | None = Field(default=None, ge=5, le=60)
+    text_overlay: str | None = None
+    text_overlay_style: TextOverlayStyleSchema | None = None
+    subtitle_style: SubtitleStyleSchema | None = None
+    cta_arrow_style: CtaArrowStyleSchema | None = None
+    music_mood: str | None = None
+    voice_id: str | None = None
+    voice_tone: str | None = None
+    title: str | None = None
+    voice_script: str | None = None
+    hooks_alternatives: list[str] | None = None
+    cta: str | None = None
+    oratory_tips: str | None = None
+    keywords: list[str] | None = None
+    seedance_prompt: str | None = None
+    veo3_prompt: str | None = None
+    angle: str | None = None
+    notes: str | None = None
+    compatible_tiers: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
