@@ -17,6 +17,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .billing import Subscription, UsageStats
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -61,6 +63,17 @@ class EditorUser(BaseModel):
     # Drive → en <1 minuto el job arranca. Vídeos con mtime < 30s se
     # ignoran para no encolar uploads aún en progreso.
     auto_enqueue: bool = False
+    # Billing — opcional. `subscription=None` significa "user de prueba"
+    # (sin cuotas ni ventana horaria). Útil para QA, betas internos, demos.
+    subscription: Subscription | None = None
+    usage: UsageStats = Field(default_factory=UsageStats)
+    # Code propio (auto-generado al activar primera suscripción o al pulsar
+    # "generar code" en UI). Otros users pueden usarlo al registrarse para
+    # darle descuento al owner el mes siguiente.
+    referral_code: str | None = None
+    # Code que ESTE user usó al registrarse (si lo hizo). Solo lectura tras
+    # creación — no se puede cambiar a posteriori.
+    referred_by_code: str | None = None
     deleted: bool = False
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)

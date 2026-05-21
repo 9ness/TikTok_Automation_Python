@@ -18,8 +18,11 @@ from .creator_reward import (
 from .editor_auto import (
     enqueue_router as editor_auto_enqueue_router,
     folders_router as editor_auto_folders_router,
+    plans_router as editor_auto_plans_router,
+    referrals_router as editor_auto_referrals_router,
     sharing_router as editor_auto_sharing_router,
     stickers_router as editor_auto_stickers_router,
+    subscriptions_router as editor_auto_subscriptions_router,
     tools_router as editor_auto_tools_router,
     users_router as editor_auto_users_router,
 )
@@ -63,6 +66,9 @@ __all__ = [
     "editor_auto_stickers_router",
     "editor_auto_tools_router",
     "editor_auto_users_router",
+    "editor_auto_plans_router",
+    "editor_auto_subscriptions_router",
+    "editor_auto_referrals_router",
     "tiktok_shop_presets_router",
     "tiktok_shop_replicate_viral_router",
 ]

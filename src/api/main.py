@@ -37,8 +37,11 @@ from src.api.routers import (
     diagnostics_router,
     editor_auto_enqueue_router,
     editor_auto_folders_router,
+    editor_auto_plans_router,
+    editor_auto_referrals_router,
     editor_auto_sharing_router,
     editor_auto_stickers_router,
+    editor_auto_subscriptions_router,
     editor_auto_tools_router,
     editor_auto_users_router,
     fonts_file_router,
@@ -97,6 +100,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
     except Exception as e:
         logger.warning("temp_work cleanup falló: %s", e)
+
+    # Editor Auto · seed de planes base (idempotente). Si el admin ya
+    # tiene planes creados en Redis, no toca nada. Se ejecuta antes del
+    # watcher para que la primera quota check tenga los planes listos.
+    try:
+        from src.editor_auto.services.plan_seeder import seed_base_plans
+        created = seed_base_plans()
+        if created > 0:
+            logger.info("plan_seeder: %d planes base creados", created)
+    except Exception as e:
+        logger.warning("plan_seeder falló (no crítico): %s", e)
 
     # Editor Auto · watcher de auto-enqueue. Background task que cada
     # 30s escanea entrada/ de los usuarios con `auto_enqueue=True` y
@@ -172,6 +186,9 @@ def create_app() -> FastAPI:
     app.include_router(editor_auto_stickers_router)
     app.include_router(editor_auto_folders_router)
     app.include_router(editor_auto_sharing_router)
+    app.include_router(editor_auto_plans_router)
+    app.include_router(editor_auto_subscriptions_router)
+    app.include_router(editor_auto_referrals_router)
     app.include_router(tiktok_shop_presets_router)
     app.include_router(tiktok_shop_replicate_viral_router)
     app.include_router(stats_router)

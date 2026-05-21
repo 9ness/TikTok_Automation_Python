@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CreditCard,
   FolderOpen,
   Inbox,
   Loader2,
@@ -31,10 +32,11 @@ import {
 import type { EditorUser } from "@/lib/types/editor-auto";
 import { cn } from "@/lib/utils";
 
+import { UserBillingPanel } from "./_components/UserBillingPanel";
 import { UserFlowEditor } from "./_components/UserFlowEditor";
 import { UserFoldersPanel } from "./_components/UserFoldersPanel";
 
-type RightTab = "flow" | "folders";
+type RightTab = "flow" | "folders" | "billing";
 
 export default function EditorAutoUsersPage() {
   const users = useEditorUsers();
@@ -44,6 +46,7 @@ export default function EditorAutoUsersPage() {
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
+  const [referredByCode, setReferredByCode] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("folders");
 
@@ -54,10 +57,12 @@ export default function EditorAutoUsersPage() {
       display_name: displayName.trim() || name.trim(),
       description: description.trim(),
       tool_flow: [],
+      referred_by_code: referredByCode.trim().toUpperCase() || undefined,
     });
     setName("");
     setDisplayName("");
     setDescription("");
+    setReferredByCode("");
     setSelectedUserId(u.id);
   };
 
@@ -114,6 +119,22 @@ export default function EditorAutoUsersPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ea-refcode">Código de referido (opcional)</Label>
+                <Input
+                  id="ea-refcode"
+                  placeholder="ABCD1234"
+                  value={referredByCode}
+                  onChange={(e) =>
+                    setReferredByCode(e.target.value.toUpperCase())
+                  }
+                  className="font-mono uppercase"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Si el cliente fue referido, el código aplica descuento al
+                  referidor el mes siguiente.
+                </p>
               </div>
               <Button
                 className="w-full"
@@ -173,20 +194,20 @@ export default function EditorAutoUsersPage() {
                   type="button"
                   onClick={() => setRightTab("flow")}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm transition-colors",
+                    "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs transition-colors sm:text-sm",
                     rightTab === "flow"
                       ? "bg-background font-medium shadow"
                       : "text-muted-foreground hover:bg-accent/40",
                   )}
                 >
                   <Wand2 className="h-3.5 w-3.5" />
-                  Flujo de herramientas
+                  Flujo
                 </button>
                 <button
                   type="button"
                   onClick={() => setRightTab("folders")}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm transition-colors",
+                    "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs transition-colors sm:text-sm",
                     rightTab === "folders"
                       ? "bg-background font-medium shadow"
                       : "text-muted-foreground hover:bg-accent/40",
@@ -195,11 +216,28 @@ export default function EditorAutoUsersPage() {
                   <FolderOpen className="h-3.5 w-3.5" />
                   Carpetas
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setRightTab("billing")}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs transition-colors sm:text-sm",
+                    rightTab === "billing"
+                      ? "bg-background font-medium shadow"
+                      : "text-muted-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Billing
+                </button>
               </div>
-              {rightTab === "flow" ? (
+              {rightTab === "flow" && (
                 <UserFlowEditor userId={selectedUserId} />
-              ) : (
+              )}
+              {rightTab === "folders" && (
                 <UserFoldersPanel userId={selectedUserId} />
+              )}
+              {rightTab === "billing" && (
+                <UserBillingPanel userId={selectedUserId} />
               )}
             </>
           ) : (
@@ -247,8 +285,26 @@ function UserListItem({
         className="flex-1 text-left"
         onClick={onSelect}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{user.display_name || user.name}</span>
+          {user.subscription ? (
+            <Badge
+              variant="default"
+              className="gap-1 bg-emerald-600/90 px-1.5 text-[10px] text-white hover:bg-emerald-600"
+              title={`Plan ${user.subscription.plan_name} · ${user.subscription.status}`}
+            >
+              <CreditCard className="h-2.5 w-2.5" />
+              {user.subscription.plan_slug}
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="px-1.5 text-[10px]"
+              title="Sin plan asignado — modo prueba (sin cuotas)"
+            >
+              prueba
+            </Badge>
+          )}
           {autoOn && (
             <Badge
               variant="default"
@@ -272,6 +328,11 @@ function UserListItem({
         </div>
         <div className="text-xs text-muted-foreground">
           <code>{user.name}</code> · {toolCount} tool(s)
+          {user.usage && user.usage.daily_limit && user.usage.daily_limit > 0 && (
+            <span className="ml-1">
+              · {user.usage.daily_videos_used}/{user.usage.daily_limit} hoy
+            </span>
+          )}
           {salida > 0 && ` · ${salida} en salida`}
         </div>
       </button>

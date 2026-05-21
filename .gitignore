@@ -47,3 +47,7 @@ TIKTOK_ASSETS/
 
 # --- GUIONES GENERADOS (Añade esto) ---
 inputs_generados/
+
+# --- Arranque local (Claude Desktop / Desktop Commander) ---
+LAUNCH.md
+STOP.md

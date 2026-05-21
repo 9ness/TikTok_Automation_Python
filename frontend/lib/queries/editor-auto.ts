@@ -14,6 +14,12 @@ import type {
   GlobalFolderCountsResponse,
   MoveFileInput,
   MoveFileResponse,
+  Plan,
+  PlanCreateInput,
+  PlanUpdateInput,
+  ReferralCode,
+  Subscription,
+  SubscriptionAssignInput,
   ToolDescriptor,
   UserFolderCountsResponse,
   UserFoldersResponse,
@@ -24,6 +30,8 @@ const TOOLS_ROOT = "/api/v1/editor-auto/tools";
 const ENQUEUE_ROOT = "/api/v1/editor-auto/enqueue";
 const STICKERS_ROOT = "/api/v1/editor-auto/stickers";
 const EDITOR_ROOT = "/api/v1/editor-auto";
+const PLANS_ROOT = "/api/v1/editor-auto/plans";
+const REFERRALS_ROOT = "/api/v1/editor-auto/referrals";
 
 export const editorAutoKeys = {
   all: ["editor-auto"] as const,
@@ -36,7 +44,138 @@ export const editorAutoKeys = {
     [...editorAutoKeys.all, "user", id, "folder-counts"] as const,
   globalFolderCounts: () =>
     [...editorAutoKeys.all, "folder-counts", "global"] as const,
+  plans: () => [...editorAutoKeys.all, "plans"] as const,
+  plan: (id: string) => [...editorAutoKeys.all, "plan", id] as const,
+  referrals: () => [...editorAutoKeys.all, "referrals"] as const,
+  userSubscription: (id: string) =>
+    [...editorAutoKeys.all, "user", id, "subscription"] as const,
 };
+
+// ---------------------------------------------------------------------------
+// Plans CRUD
+// ---------------------------------------------------------------------------
+export function useEditorPlans(only_active = false) {
+  return useQuery<Plan[]>({
+    queryKey: [...editorAutoKeys.plans(), { only_active }],
+    queryFn: () =>
+      api.get<Plan[]>(`${PLANS_ROOT}${only_active ? "?only_active=true" : ""}`),
+  });
+}
+
+export function useEditorPlan(id: string | null | undefined) {
+  return useQuery<Plan>({
+    queryKey: editorAutoKeys.plan(id ?? ""),
+    queryFn: () => api.get<Plan>(`${PLANS_ROOT}/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCreateEditorPlan() {
+  const qc = useQueryClient();
+  return useMutation<Plan, Error, PlanCreateInput>({
+    mutationFn: (input) => api.post<Plan>(PLANS_ROOT, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: editorAutoKeys.plans() }),
+  });
+}
+
+export function useUpdateEditorPlan(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Plan, Error, PlanUpdateInput>({
+    mutationFn: (input) =>
+      fetch(`${api.baseUrl}${PLANS_ROOT}/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(process.env.NEXT_PUBLIC_API_KEY
+            ? { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY }
+            : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify(input),
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(await r.text());
+        return r.json() as Promise<Plan>;
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(editorAutoKeys.plan(id), data);
+      qc.invalidateQueries({ queryKey: editorAutoKeys.plans() });
+    },
+  });
+}
+
+export function useDeleteEditorPlan() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => api.del<void>(`${PLANS_ROOT}/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: editorAutoKeys.plans() }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// User subscription
+// ---------------------------------------------------------------------------
+export function useAssignSubscription(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<Subscription, Error, SubscriptionAssignInput>({
+    mutationFn: (input) =>
+      fetch(`${api.baseUrl}${USERS_ROOT}/${userId}/subscription`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(process.env.NEXT_PUBLIC_API_KEY
+            ? { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY }
+            : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify(input),
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(await r.text());
+        return r.json() as Promise<Subscription>;
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.user(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.users() });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.plans() });
+    },
+  });
+}
+
+export function useClearSubscription(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, void>({
+    mutationFn: () =>
+      api.del<void>(`${USERS_ROOT}/${userId}/subscription`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.user(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.users() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Referrals
+// ---------------------------------------------------------------------------
+export function useEditorReferrals() {
+  return useQuery<ReferralCode[]>({
+    queryKey: editorAutoKeys.referrals(),
+    queryFn: () => api.get<ReferralCode[]>(REFERRALS_ROOT),
+  });
+}
+
+export function useGenerateReferralForUser() {
+  const qc = useQueryClient();
+  return useMutation<ReferralCode, Error, string>({
+    mutationFn: (userId) =>
+      api.post<ReferralCode>(`${REFERRALS_ROOT}/users/${userId}/generate`, {}),
+    onSuccess: (_data, userId) => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.user(userId) });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.users() });
+      qc.invalidateQueries({ queryKey: editorAutoKeys.referrals() });
+    },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Stickers · flechas

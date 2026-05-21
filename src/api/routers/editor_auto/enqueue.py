@@ -14,6 +14,7 @@ from src.api.schemas.editor_auto import EditorAutoEnqueueResponse
 from src.api.temp_storage import to_relative, upload_subdir
 from src.editor_auto.config import TOOL_SILENCE_CUTTER_SCRIPTED
 from src.editor_auto.repos import UserRepo
+from src.editor_auto.services import quota_service
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -125,6 +126,34 @@ async def enqueue_editor_auto(
     tool_count = len(enabled_steps)
     title = f"{user.name} · {Path(file.filename or 'video').name} · {tool_count} tool(s)"
 
+    # Check de cuota / plan / ventana horaria. Test users (sin subscription)
+    # pasan siempre. Para users con plan, se valida límite diario, ventana
+    # horaria, espaciado y tools permitidas. Si el plan no permite alguna
+    # tool del flow, devolvemos 402 (Payment Required) para que el frontend
+    # invite a upgrade.
+    decision = quota_service.check_can_enqueue(user, tool_ids=tools_used)
+    if not decision.ok:
+        # Mapeamos kind → status HTTP coherente
+        sc_map = {
+            "no_subscription": 402,
+            "inactive_subscription": 402,
+            "tool_not_allowed": 402,
+            "daily_limit": 429,
+            "monthly_limit": 429,
+            "outside_window": 425,    # Too Early
+            "spacing": 425,
+            "promo_exhausted": 402,
+        }
+        sc = sc_map.get(decision.kind, 429)
+        raise APIError(
+            decision.message,
+            status_code=sc,
+            details={
+                "kind": decision.kind,
+                "retry_after_seconds": decision.retry_after_seconds,
+            },
+        )
+
     params: dict[str, Any] = {
         "user_id": user.id,
         "user_name": user.name,
@@ -140,6 +169,15 @@ async def enqueue_editor_auto(
         "script": script_clean,
     }
     job = queue.enqueue(JobMode.EDITOR_AUTO, title=title, params=params)
+
+    # Incrementar cuota tras encolar exitosamente. Si falla persistir
+    # (Redis caído), el job ya está en cola — no rollback porque el
+    # vídeo ya se procesará y la siguiente cuota check leerá contadores
+    # un poco desactualizados (mejor que perder el vídeo).
+    try:
+        quota_service.register_enqueue(user)
+    except Exception:
+        pass
 
     return EditorAutoEnqueueResponse(
         job_id=job.id,

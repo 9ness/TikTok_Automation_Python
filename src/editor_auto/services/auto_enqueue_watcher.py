@@ -105,11 +105,28 @@ def _enqueue_one(user, filename: str) -> bool:
     `move_file` ya tuvo éxito pero la creación del job falla, se
     intenta un rollback (cola → entrada) para no dejar el archivo
     huérfano en `cola/`.
+
+    Antes de encolar, comprueba la cuota del user con `quota_service`.
+    Si la cuota está agotada o está fuera de la ventana horaria, el
+    vídeo se deja en `entrada/` y se reintenta en próximas pasadas. Esto
+    es lo que permite la ilusión de "edición humana en horario laboral":
+    aunque el cliente suba 20 vídeos a las 02:00, solo se procesan según
+    el plan (ej. 5/día entre las 8:00 y las 18:00).
     """
-    from src.editor_auto.services import folder_manager
+    from src.editor_auto.services import folder_manager, quota_service
     from src.editor_auto.config import user_subfolder
     from src.queue.manager import get_queue
     from src.queue.models import JobMode
+
+    # 0. CHECK DE CUOTA + VENTANA HORARIA.
+    tool_ids = [s.tool_id for s in user.tool_flow if s.enabled]
+    decision = quota_service.check_can_enqueue(user, tool_ids=tool_ids)
+    if not decision.ok:
+        logger.debug(
+            "[auto_enqueue] %s/%s diferido — %s (%s)",
+            user.name, filename, decision.kind, decision.message,
+        )
+        return False
 
     # 1. Detectar companion .txt opcional (NO crítico — si falla,
     #    seguimos sin guion y la tool hará fallback).
@@ -181,6 +198,16 @@ def _enqueue_one(user, filename: str) -> bool:
             user.name, final_filename, job.id[:8],
             "sí" if companion_script else "no",
         )
+        # Registrar consumo de cuota. NO crítico si falla — el job ya
+        # está en cola y se procesará; lo peor es que el siguiente check
+        # use contadores levemente desactualizados.
+        try:
+            quota_service.register_enqueue(user)
+        except Exception as e:
+            logger.warning(
+                "[auto_enqueue] register_enqueue falló para %s: %s",
+                user.name, e,
+            )
         return True
     except Exception as e:
         # Rollback: mover cola → entrada para no perder el archivo.
@@ -229,6 +256,14 @@ def _scan_once() -> dict[str, int]:
         n_ok = 0
         for f in pending:
             if _enqueue_one(u, f["filename"]):
+                # Tras encolar uno, recargamos el user para que el
+                # siguiente loop iter use el `last_enqueue_at` recién
+                # actualizado y respete `spacing_minutes`. Si el plan
+                # tiene espaciado >0, los demás vídeos quedarán
+                # diferidos en esta pasada y se intentarán en la próxima.
+                refreshed = repo.get(u.id)
+                if refreshed:
+                    u = refreshed
                 n_ok += 1
         if n_ok > 0:
             encolados_per_user[u.name] = n_ok

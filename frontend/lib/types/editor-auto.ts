@@ -28,6 +28,131 @@ export interface ToolStep {
   config: Record<string, unknown>;
 }
 
+// =============================================================
+// Billing (Planes / Suscripciones / Referidos)
+// =============================================================
+
+export interface Plan {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  daily_video_limit: number;
+  monthly_video_limit: number | null;
+  allowed_tools: string[];
+  processing_window_start_hour: number;
+  processing_window_end_hour: number;
+  spacing_minutes: number;
+  queue_priority: number;
+  queue_delay_minutes: number;
+  support_level: string;
+  features: string[];
+  price_eur_monthly: number;
+  price_eur_setup_once: number;
+  is_active: boolean;
+  is_promo: boolean;
+  promo_slots_total: number | null;
+  promo_slots_used: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanCreateInput {
+  slug: string;
+  name: string;
+  description?: string;
+  daily_video_limit?: number;
+  monthly_video_limit?: number | null;
+  allowed_tools?: string[];
+  processing_window_start_hour?: number;
+  processing_window_end_hour?: number;
+  spacing_minutes?: number;
+  queue_priority?: number;
+  queue_delay_minutes?: number;
+  support_level?: string;
+  features?: string[];
+  price_eur_monthly?: number;
+  price_eur_setup_once?: number;
+  is_active?: boolean;
+  is_promo?: boolean;
+  promo_slots_total?: number | null;
+  sort_order?: number;
+}
+
+export interface PlanUpdateInput {
+  name?: string;
+  description?: string;
+  daily_video_limit?: number;
+  monthly_video_limit?: number | null;
+  allowed_tools?: string[];
+  processing_window_start_hour?: number;
+  processing_window_end_hour?: number;
+  spacing_minutes?: number;
+  queue_priority?: number;
+  queue_delay_minutes?: number;
+  support_level?: string;
+  features?: string[];
+  price_eur_monthly?: number;
+  price_eur_setup_once?: number;
+  is_active?: boolean;
+  is_promo?: boolean;
+  promo_slots_total?: number | null;
+  promo_slots_used?: number;
+  sort_order?: number;
+}
+
+export interface Subscription {
+  plan_id: string;
+  plan_slug: string;
+  plan_name: string;
+  status: string;
+  started_at: string;
+  current_period_start: string;
+  current_period_end: string | null;
+  discount_pct_next_period: number;
+  notes: string;
+}
+
+export interface UsageStats {
+  daily_videos_used: number;
+  monthly_videos_used: number;
+  total_videos_ever: number;
+  last_reset_date: string;
+  month_period: string;
+  last_enqueue_at: string | null;
+  daily_limit: number | null;
+  monthly_limit: number | null;
+}
+
+export interface SubscriptionAssignInput {
+  plan_id: string;
+  status?: string;
+  notes?: string;
+  started_at?: string | null;
+  discount_pct_next_period?: number;
+}
+
+export interface ReferralUse {
+  referred_user_id: string;
+  referred_user_name: string;
+  used_at: string;
+  discount_pct_applied: number;
+  valid_until_period: string | null;
+}
+
+export interface ReferralCode {
+  code: string;
+  owner_user_id: string;
+  owner_user_name: string;
+  uses: ReferralUse[];
+  created_at: string;
+  active_uses_count: number;
+  accumulated_discount_pct_next_period: number;
+}
+
+// =============================================================
+
 export interface EditorUser {
   id: string;
   name: string;
@@ -39,6 +164,11 @@ export interface EditorUser {
   /** Si true, un watcher del backend encola automáticamente los vídeos
    *  nuevos en entrada/ del usuario. Polling cada 30s. */
   auto_enqueue: boolean;
+  subscription: Subscription | null;
+  usage: UsageStats | null;
+  referral_code: string | null;
+  referred_by_code: string | null;
+  referrals_count: number;
   deleted: boolean;
   created_at: string;
   updated_at: string;
@@ -49,6 +179,7 @@ export interface EditorUserCreateInput {
   display_name?: string;
   description?: string;
   tool_flow?: ToolStep[];
+  referred_by_code?: string;
 }
 
 export interface EditorUserUpdateInput {
