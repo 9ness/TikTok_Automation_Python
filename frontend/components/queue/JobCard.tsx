@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Clock, Coins, Download, ExternalLink, FileText, Film, Loader2, Play, Timer, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowUp, ChevronUp, ChevronDown, Check, Clock, Coins, Download, ExternalLink, FileText, Film, Loader2, Play, Timer, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ import {
   useDeleteJobWithFile,
   useJobSummary,
   useRemoveJob,
+  useReorderJob,
 } from "@/lib/queries/queue";
 import { useQueueStore } from "@/lib/stores/queueStore";
 import { JobDetailDialog } from "./JobDetailDialog";
@@ -63,6 +64,7 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const cancel = useCancelJob();
   const remove = useRemoveJob();
   const deleteWithFile = useDeleteJobWithFile();
+  const reorder = useReorderJob();
   const dismissRecentLocal = useQueueStore((s) => s.dismissRecent);
   const [videoOpen, setVideoOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -237,6 +239,64 @@ export function JobCard({ job }: { job: ActiveJob }) {
             {iconFor(job.status)}
             {STATUS_LABEL[job.status]}
           </Badge>
+          {job.status === "pending" && (
+            <div className="flex items-center gap-0.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() =>
+                  reorder.mutate(
+                    { jobId: job.job_id, direction: "top" },
+                    {
+                      onError: (e) => toast.error(`No se pudo mover: ${e.message}`),
+                    },
+                  )
+                }
+                disabled={reorder.isPending}
+                aria-label="Mover al principio"
+                title="Mover al principio (próximo en ejecutarse)"
+              >
+                <ArrowUp className="h-3 w-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() =>
+                  reorder.mutate(
+                    { jobId: job.job_id, direction: "up" },
+                    {
+                      onError: (e) => toast.error(`No se pudo mover: ${e.message}`),
+                    },
+                  )
+                }
+                disabled={reorder.isPending}
+                aria-label="Subir 1 posición"
+                title="Subir 1 posición"
+              >
+                <ChevronUp className="h-3 w-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() =>
+                  reorder.mutate(
+                    { jobId: job.job_id, direction: "down" },
+                    {
+                      onError: (e) => toast.error(`No se pudo mover: ${e.message}`),
+                    },
+                  )
+                }
+                disabled={reorder.isPending}
+                aria-label="Bajar 1 posición"
+                title="Bajar 1 posición"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
           {isCancellable && (
             <Button
               size="icon"

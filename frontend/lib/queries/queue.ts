@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
@@ -112,6 +112,27 @@ export function useJobLogs(jobId: string | null, options?: { live?: boolean }) {
 export function useCancelJob() {
   return useMutation<void, Error, string>({
     mutationFn: (jobId) => api.del<void>(`/api/v1/queue/${encodeURIComponent(jobId)}`),
+  });
+}
+
+/** Reordena un job PENDING en la cola. `direction`:
+ *   - "up": sube 1 posición (intercambia con el PENDING anterior)
+ *   - "down": baja 1 posición
+ *   - "top": al principio (próximo en ejecutarse) */
+export function useReorderJob() {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { jobId: string; direction: "up" | "down" | "top" }
+  >({
+    mutationFn: ({ jobId, direction }) =>
+      api.post<void>(
+        `/api/v1/queue/${encodeURIComponent(jobId)}/reorder?direction=${direction}`,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["queue"] });
+    },
   });
 }
 

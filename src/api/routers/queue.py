@@ -440,6 +440,44 @@ def cancel_or_remove_job(
 
 
 # ---------------------------------------------------------------------------
+# POST /queue/{job_id}/reorder — sube/baja un PENDING en la cola
+# ---------------------------------------------------------------------------
+@router.post(
+    "/{job_id}/reorder",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def reorder_job(
+    job_id: str,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    direction: str,
+) -> Response:
+    """Reordena un job PENDING en la cola.
+
+    Query param `direction`:
+      - `up`   → sube 1 posición (swap con el PENDING anterior)
+      - `down` → baja 1 posición
+      - `top`  → mueve al principio (próximo en ejecutarse cuando un
+                 worker quede libre)
+
+    Si el job no es PENDING o ya está en el extremo correspondiente,
+    devuelve 204 igualmente (idempotente, no rompe la UI).
+    """
+    direction = (direction or "").lower().strip()
+    if direction not in ("up", "down", "top"):
+        raise ValidationError(
+            "direction debe ser 'up', 'down' o 'top'.",
+            details={"direction": direction},
+        )
+    if direction == "up":
+        queue.move_up(job_id)
+    elif direction == "down":
+        queue.move_down(job_id)
+    else:
+        queue.move_to_top(job_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
 # DELETE /queue/recent — vacía el historial de jobs finalizados
 # ---------------------------------------------------------------------------
 @router.delete(

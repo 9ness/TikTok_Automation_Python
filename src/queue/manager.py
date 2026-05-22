@@ -230,7 +230,11 @@ class JobQueue:
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
             with self._cond:
-                # Esperar a que haya algo pendiente
+                # Esperar a que haya algo pendiente.
+                # El orden de selección es el de la lista `_jobs`. Los
+                # métodos move_up/move_down/move_to_top reordenan la lista
+                # directamente — así el orden visible en la UI == orden
+                # real de ejecución, sin truco de priority field.
                 while not self._stop_event.is_set():
                     pending = next(
                         (j for j in self._jobs if j.status == JobStatus.PENDING),
