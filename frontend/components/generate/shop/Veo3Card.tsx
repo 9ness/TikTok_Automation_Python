@@ -562,6 +562,7 @@ function ResultItemCard({
     toast.info(`Descargando ${item.veo3_photo_filenames.length} foto(s)…`);
     for (let i = 0; i < item.veo3_photo_filenames.length; i++) {
       const fn = item.veo3_photo_filenames[i];
+      if (!fn) continue;
       const url = buildPhotoUrl(productId, fn);
       if (!url) continue;
       await downloadOne(url, fn);

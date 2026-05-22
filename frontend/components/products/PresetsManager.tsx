@@ -714,6 +714,7 @@ async function downloadAllPhotos(
   toast.info(`Descargando ${filenames.length} foto(s)…`);
   for (let i = 0; i < filenames.length; i++) {
     const fn = filenames[i];
+    if (!fn) continue;
     const url = buildPhotoUrl(productId, fn);
     if (!url) continue;
     await downloadPhoto(url, fn);
