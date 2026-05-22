@@ -51,3 +51,5 @@ inputs_generados/
 # --- Arranque local (Claude Desktop / Desktop Commander) ---
 LAUNCH.md
 STOP.md
+# Claude Code session locks
+.claude/*.lock
