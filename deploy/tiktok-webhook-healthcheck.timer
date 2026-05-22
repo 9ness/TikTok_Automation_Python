@@ -1,0 +1,16 @@
+[Unit]
+Description=Health-check del webhook listener cada 2 min
+# Solo correr si el servicio webhook está supuestamente activo
+Requires=tiktok-webhook.service
+
+[Timer]
+# Primera ejecución 2 min después del arranque del sistema
+OnBootSec=2min
+# Después cada 2 minutos
+OnUnitActiveSec=2min
+# Tolerancia: si el sistema estaba dormido, no acumular ticks perdidos
+AccuracySec=10s
+Unit=tiktok-webhook-healthcheck.service
+
+[Install]
+WantedBy=timers.target

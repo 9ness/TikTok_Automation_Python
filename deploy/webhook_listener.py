@@ -44,7 +44,7 @@ import shutil
 import subprocess
 import sys
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 
@@ -623,8 +623,14 @@ def main():
     if not ADMIN_API_KEY:
         LOG.warning("⚠️  API_KEY no definida — endpoints /admin/* responderán 503")
 
-    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
-    LOG.info(f"Webhook listener arrancado en 0.0.0.0:{PORT}")
+    # ThreadingHTTPServer (no HTTPServer) — el single-threaded se colgaba
+    # con cualquier conexión lenta/abandonada que dejaba el socket abierto,
+    # bloqueando todas las requests siguientes. ThreadingHTTPServer spawnea
+    # un hilo por request → las conexiones lentas no afectan al resto.
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), WebhookHandler)
+    # Marcar los threads como daemon → se cierran limpios al shutdown.
+    server.daemon_threads = True
+    LOG.info(f"Webhook listener arrancado en 0.0.0.0:{PORT} (threaded)")
     LOG.info("Endpoints:")
     LOG.info("  POST /deploy                    (GitHub push events, HMAC)")
     LOG.info("  GET  /health, /version")

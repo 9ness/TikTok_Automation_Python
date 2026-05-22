@@ -1,0 +1,14 @@
+[Unit]
+Description=TikTok webhook listener — health check probe
+After=tiktok-webhook.service
+# Solo correr si el servicio webhook está supuestamente activo
+Requires=tiktok-webhook.service
+
+[Service]
+Type=oneshot
+# curl pinger con timeout corto. Si /health no responde en 5s →
+# considera al listener "colgado" y dispara restart. RestartSec=5s del
+# unit principal aplica → recover automático.
+ExecStart=/bin/bash -c 'curl --max-time 5 --fail --silent --output /dev/null http://127.0.0.1:9000/health || (echo "[watchdog] webhook no responde — restarting" && systemctl restart tiktok-webhook)'
+# No reintentar el OneShot — si falla el curl, el comando ya hizo el restart.
+RemainAfterExit=no
