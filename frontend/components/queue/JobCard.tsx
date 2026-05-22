@@ -47,6 +47,74 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   cancelled: "Cancelado",
 };
 
+/** Sub-estado derivado del `progress_label`. Lo usamos cuando el job
+ *  está RUNNING pero realmente está esperando un servicio externo
+ *  (Atlas Cloud) — el user lo distingue de "procesando activamente". */
+function detectSubState(label: string | undefined): "waiting_atlas" | null {
+  if (!label) return null;
+  const lower = label.toLowerCase();
+  // Heartbeat de Atlas: "⏳ Clip 1: 12m05s (status=processing)…"
+  // o "🎥 Atlas Cloud renderizando clips…"
+  if (lower.includes("atlas") || /\(status=(processing|pending|queued)/.test(lower)) {
+    return "waiting_atlas";
+  }
+  return null;
+}
+
+/** Devuelve la clase Tailwind del badge según estado/sub-estado +
+ *  label corto + icono. Distinto color por estado para que el user
+ *  identifique de un vistazo qué está pasando con cada job. */
+function statusBadge(job: ActiveJob): {
+  label: string;
+  cls: string;
+  Icon: typeof Clock;
+  spin?: boolean;
+} {
+  if (job.status === "pending") {
+    return {
+      label: "En cola",
+      cls: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300",
+      Icon: Clock,
+    };
+  }
+  if (job.status === "running") {
+    const sub = detectSubState(job.current_step);
+    if (sub === "waiting_atlas") {
+      return {
+        label: "Esperando Atlas",
+        cls: "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+        Icon: Timer,
+      };
+    }
+    return {
+      label: "Procesando",
+      cls: "border-blue-500/50 bg-blue-500/15 text-blue-700 dark:text-blue-300",
+      Icon: Loader2,
+      spin: true,
+    };
+  }
+  if (job.status === "completed") {
+    return {
+      label: "Completado",
+      cls: "border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+      Icon: Check,
+    };
+  }
+  if (job.status === "failed") {
+    return {
+      label: "Fallado",
+      cls: "border-red-500/50 bg-red-500/15 text-red-700 dark:text-red-300",
+      Icon: AlertCircle,
+    };
+  }
+  // cancelled
+  return {
+    label: "Cancelado",
+    cls: "border-slate-500/40 bg-slate-500/15 text-slate-700 dark:text-slate-300",
+    Icon: X,
+  };
+}
+
 /** Tick cada 1s mientras `enabled` para recalcular elapsed sin esperar
  *  a que el backend emita progress events. Devuelve `Date.now()` para
  *  poder hacer cálculos derivados estables dentro del render. */
@@ -235,10 +303,23 @@ export function JobCard({ job }: { job: ActiveJob }) {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Badge variant={badgeVariant(job.status)} className="gap-1">
-            {iconFor(job.status)}
-            {STATUS_LABEL[job.status]}
-          </Badge>
+          {(() => {
+            const meta = statusBadge(job);
+            return (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                  meta.cls,
+                )}
+                title={job.current_step || meta.label}
+              >
+                <meta.Icon
+                  className={cn("h-3 w-3", meta.spin && "animate-spin")}
+                />
+                {meta.label}
+              </span>
+            );
+          })()}
           {job.status === "pending" && (
             <div className="flex items-center gap-0.5">
               <Button
@@ -491,20 +572,6 @@ export function JobCard({ job }: { job: ActiveJob }) {
       />
     </div>
   );
-}
-
-function badgeVariant(status: JobStatus): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "running") return "default";
-  if (status === "failed") return "destructive";
-  if (status === "completed") return "outline";
-  return "secondary";
-}
-
-function iconFor(status: JobStatus) {
-  if (status === "running") return <Loader2 className="h-3 w-3 animate-spin" />;
-  if (status === "completed") return <Check className="h-3 w-3" />;
-  if (status === "failed") return <AlertCircle className="h-3 w-3" />;
-  return <Clock className="h-3 w-3" />;
 }
 
 function formatSeconds(s: number): string {
