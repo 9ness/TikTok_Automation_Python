@@ -20,8 +20,10 @@ Errores manejados:
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 import requests
 
@@ -30,11 +32,15 @@ from src.tiktok_shop.config import atlas_api_key, atlas_base_url, atlas_is_confi
 
 SUBMIT_TIMEOUT_S = 30
 POLL_INTERVAL_S = 3.0
-# 30 min hard cap. Atlas Standard en horas pico EU puede tardar 12-20 min
-# por clip cuando la cola está saturada. Subido desde 900s tras timeouts
-# reales en producción (clip se quedaba en "processing" → cliente daba
-# timeout pero Atlas seguía renderizando = pago perdido).
-POLL_TIMEOUT_S = 1800
+# Hard cap del polling. Atlas Standard en horas pico EU puede tardar
+# 20-40 min por clip cuando la cola está saturada — preferimos esperar
+# antes que cancelar (que cobra crédito sin entregar resultado). Default
+# 2h, configurable con ATLAS_POLL_TIMEOUT_S env var. Si el user quiere
+# cancelar antes, puede hacerlo manualmente desde la UI de cola.
+try:
+    POLL_TIMEOUT_S = int(os.environ.get("ATLAS_POLL_TIMEOUT_S", "7200"))
+except ValueError:
+    POLL_TIMEOUT_S = 7200
 MAX_RETRIES_TRANSIENT = 3       # 429 / 5xx
 
 
@@ -352,8 +358,15 @@ class AtlasCloudClient:
         *,
         timeout_s: int = POLL_TIMEOUT_S,
         poll_interval: float = POLL_INTERVAL_S,
+        on_heartbeat: Callable[[int, str], None] | None = None,
     ) -> AtlasJob:
-        """Polling síncrono hasta status terminal o timeout."""
+        """Polling síncrono hasta status terminal o timeout.
+
+        `on_heartbeat(elapsed_s, status)` se llama cada 60s para que el
+        runner pueda actualizar el progress_label del job (que se ve en
+        la UI de cola). Sin esto, los Standard tier saturados se veían
+        bloqueados en "🎥 Atlas renderizando" sin pista de tiempo.
+        """
         started = time.time()
         deadline = started + timeout_s
         last: AtlasJob | None = None
@@ -381,7 +394,8 @@ class AtlasCloudClient:
                 )
             # Heartbeat cada 60s — útil para diagnosticar jobs que se
             # quedan en "processing" mucho tiempo (en lugar de fail
-            # silencioso al timeout).
+            # silencioso al timeout). También notifica al runner para
+            # que actualice el progress_label de la UI.
             now = time.time()
             if now - last_log_t >= 60:
                 elapsed = int(now - started)
@@ -389,6 +403,11 @@ class AtlasCloudClient:
                     f"[Atlas poll] job {job_id[:8]} status={last.status} "
                     f"elapsed={elapsed}s timeout={timeout_s}s"
                 )
+                if on_heartbeat is not None:
+                    try:
+                        on_heartbeat(elapsed, last.status if last else "?")
+                    except Exception:
+                        pass  # heartbeat es cosmético, no debe romper el wait
                 last_log_t = now
             time.sleep(poll_interval)
         # Best-effort cancel para no dejar el job consumiendo crédito en

@@ -45,12 +45,30 @@ class JobQueue:
         self._load_state()
         self._reset_orphans()
 
-        self._worker = threading.Thread(
-            target=self._worker_loop,
-            name="JobQueueWorker",
-            daemon=True,
-        )
-        self._worker.start()
+        # Multi-worker: cada thread procesa un job a la vez. Permite que
+        # mientras un worker está bloqueado esperando Atlas (que puede
+        # tardar 20-30+ min en horas pico Standard), otros workers sigan
+        # procesando jobs distintos. La selección del próximo PENDING es
+        # atómica bajo el lock — dos workers no pueden tomar el mismo job.
+        #
+        # Sizing: cada worker usa pico ~500MB RAM (Whisper small + ffmpeg).
+        # En Hetzner CX21 (4GB) → max 3 workers. CX31 (8GB) → 4-5. Por
+        # defecto 2, configurable con QUEUE_WORKERS env var.
+        try:
+            n_workers = int(os.environ.get("QUEUE_WORKERS", "2"))
+        except ValueError:
+            n_workers = 2
+        n_workers = max(1, min(4, n_workers))
+
+        self._workers: list[threading.Thread] = []
+        for i in range(n_workers):
+            t = threading.Thread(
+                target=self._worker_loop,
+                name=f"JobQueueWorker-{i + 1}",
+                daemon=True,
+            )
+            t.start()
+            self._workers.append(t)
 
     # ----------------------------------------------------------
     # API pública

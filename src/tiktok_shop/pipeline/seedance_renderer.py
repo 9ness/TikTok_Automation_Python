@@ -173,7 +173,18 @@ async def _run_single_i2v(
     job = await loop.run_in_executor(None, _submit)
     log_callback(f"⏳ Clip {idx+1}: job {job.job_id} encolado, esperando…")
 
-    final_job = await loop.run_in_executor(None, lambda: client.wait(job.job_id))
+    def _hb(elapsed: int, status: str) -> None:
+        # Notifica al runner cada 60s para que aparezca en la UI cuánto
+        # lleva el clip esperando Atlas (Standard tier puede tardar 20+ min
+        # en horas pico).
+        log_callback(
+            f"⏳ Clip {idx+1}: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    final_job = await loop.run_in_executor(
+        None, lambda: client.wait(job.job_id, on_heartbeat=_hb)
+    )
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
     await loop.run_in_executor(
         None, lambda: client.download(final_job.output_url or "", out_path),
@@ -218,8 +229,13 @@ def _render_pro(
     )
     log_callback(f"⏳ Pro job {job.job_id} encolado, esperando…")
 
+    def _hb_pro(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Pro: {elapsed//60}m{elapsed%60:02d}s (status={status})…"
+        )
+
     try:
-        final_job = client.wait(job.job_id)
+        final_job = client.wait(job.job_id, on_heartbeat=_hb_pro)
     except AtlasCloudTransient as e:
         # Per doc nota: si "9:16" falla, probar "adaptive" como fallback.
         log_callback(f"⚠️ Pro job timeout/transient ({e}). Reintentando con ratio='adaptive'…")
@@ -228,7 +244,7 @@ def _render_pro(
             duration=int(spec.get("duration", 15)), resolution=resolution,
             ratio="adaptive", generate_audio=False, watermark=False,
         )
-        final_job = client.wait(job2.job_id)
+        final_job = client.wait(job2.job_id, on_heartbeat=_hb_pro)
 
     out_path = os.path.join(out_dir, "clip_pro.mp4")
     client.download(final_job.output_url or "", out_path)
