@@ -74,6 +74,61 @@ class AtlasCloudClient:
             "Content-Type": "application/json",
         }
 
+    def healthcheck(self, *, timeout_s: float = 8.0) -> tuple[bool, str]:
+        """Pre-flight rápido: confirma que la API responde + nuestra key
+        es válida ANTES de submitir un job (que tarda 5-20 min).
+
+        Devuelve `(ok, message)`. `ok=False` se da en:
+          - sin API key configurada
+          - timeout/conn refused (Atlas API caída)
+          - 401/403 (API key inválida o expirada)
+          - 402 (sin saldo)
+        Otros 4xx/5xx se consideran "respondiendo, no bloqueante" → ok=True
+        para no abortar generaciones por errores transitorios del endpoint
+        de healthcheck (que no es el de submit). El de submit ya maneja
+        sus propios errores con reintentos.
+        """
+        if not self.api_key:
+            return False, "Atlas API key no configurada (ATLASCLOUD_API_KEY vacío)"
+        # Hacemos una GET ligera al base_url — Atlas devuelve 404/405 si
+        # el path no existe, pero CON nuestra auth header en una conexión
+        # real. Eso basta para diagnosticar caída total vs key bloqueada.
+        try:
+            r = requests.get(
+                self.base_url.rstrip("/") + "/",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=timeout_s,
+            )
+        except requests.Timeout:
+            return False, f"Atlas Cloud timeout ({timeout_s}s) — API caída o muy lenta"
+        except requests.ConnectionError as e:
+            return False, f"Atlas Cloud no responde — {str(e)[:120]}"
+        if r.status_code in (401, 403):
+            return False, "Atlas API key inválida o expirada (HTTP 401/403)"
+        if r.status_code == 402:
+            return False, "Atlas sin saldo (HTTP 402) — recarga créditos"
+        # Cualquier otro código (200, 404, 405, 5xx) → la API responde,
+        # no bloqueamos. El error real saldrá en el submit.
+        return True, f"Atlas OK (HTTP {r.status_code})"
+
+    def cancel(self, job_id: str) -> bool:
+        """Best-effort cancel del job — útil al pillar timeout para que
+        Atlas no siga "renderizando" en background y consumiendo crédito.
+        No conozco con certeza el endpoint exacto que Atlas expone; probamos
+        DELETE /model/prediction/{id} (convención REST). Si falla, no
+        propagamos — es best-effort, no rompe el flow."""
+        if not self.api_key or not job_id:
+            return False
+        try:
+            r = requests.delete(
+                f"{self.base_url}/model/prediction/{job_id}",
+                headers=self._headers(),
+                timeout=10,
+            )
+            return r.status_code < 400
+        except Exception:
+            return False
+
     # ----------------------------------------------------------------
     # SUBMIT helpers internos
     # ----------------------------------------------------------------
@@ -336,11 +391,21 @@ class AtlasCloudClient:
                 )
                 last_log_t = now
             time.sleep(poll_interval)
+        # Best-effort cancel para no dejar el job consumiendo crédito en
+        # background. Si Atlas no soporta DELETE, esto es no-op (ver `cancel`).
+        try:
+            cancelled = self.cancel(job_id)
+        except Exception:
+            cancelled = False
+        cancel_msg = (
+            "Cancelado correctamente en Atlas." if cancelled
+            else "Cancel del job en Atlas no confirmado — puede seguir cobrando crédito."
+        )
         raise AtlasCloudTransient(
-            f"Atlas job {job_id} no terminó en {timeout_s}s (último status: "
-            f"{last.status if last else 'sin respuesta'}). El job puede "
-            f"seguir renderizando en Atlas — apunta este ID para reclamar "
-            f"refund si nunca completa."
+            f"Atlas job {job_id} no terminó en {timeout_s/60:.0f}min "
+            f"(último status: {last.status if last else 'sin respuesta'}). "
+            f"{cancel_msg} Posible causa: cola Standard saturada en hora pico — "
+            f"reintenta más tarde, o cambia al tier Advanced (~3x más rápido)."
         )
 
     def download(self, output_url: str, dest_path: str) -> str:

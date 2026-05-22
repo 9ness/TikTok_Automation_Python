@@ -969,6 +969,21 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         from src.tiktok_shop.config import RESOLUTIONS
         from src.tiktok_shop.utils.duration_splitter import split_duration
 
+        # ── Pre-flight Atlas Cloud ──
+        # Abortamos ANTES de gastar Gemini/MiniMax si Atlas está caído o
+        # nuestra key está mal. Solo ~200ms de overhead, se ahorra ~$0.03
+        # de Gemini+TTS en cada job en caso de Atlas down.
+        on_progress(0.05, "🔌 Verificando Atlas Cloud…")
+        from src.tiktok_shop.api.atlas_cloud import AtlasCloudClient
+        _atlas_check = AtlasCloudClient()
+        _atlas_ok, _atlas_msg = _atlas_check.healthcheck()
+        on_log(f"🔌 Atlas: {_atlas_msg}")
+        if not _atlas_ok:
+            raise RuntimeError(
+                f"Atlas Cloud no disponible: {_atlas_msg}. "
+                f"Reintenta cuando vuelva a responder. No se ha gastado nada."
+            )
+
         # Estimación inicial — se guarda en cost.estimated_at_creation
         est = estimate_cost(
             tier=tier, duration=gen.duration_seconds, resolution=gen.resolution,
