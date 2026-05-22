@@ -3,9 +3,13 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
+      "Bash(git push:*)",
       "Bash(npx tsc *)",
       "Bash(git -C d:/Proyectos_Personales/TikTok_Automation_Python add frontend/app/editor-auto/users/_components/UserFlowEditor.tsx frontend/tsconfig.tsbuildinfo learnings.md)",
-      "Bash(git -C d:/Proyectos_Personales/TikTok_Automation_Python diff --cached --stat)"
+      "Bash(git -C d:/Proyectos_Personales/TikTok_Automation_Python diff --cached --stat)",
+      "Bash(ssh*root@62.238.19.31*)",
+      "Bash(ssh*nebulabsai@62.238.19.31*)",
+      "Bash(scp*62.238.19.31*)"
     ]
   }
 }

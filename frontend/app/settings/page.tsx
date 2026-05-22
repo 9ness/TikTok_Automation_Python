@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -51,11 +52,13 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">API</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Deploy arriba — lo que más usas para diagnosticar prod */}
+      <DeployPanel />
+
+      {/* API colapsada por defecto — config raramente toca, no necesita
+          ocupar espacio. Se abre con click si hay que ver/testar conexión. */}
+      <CollapsibleCard title="API" defaultOpen={false}>
+        <div className="space-y-4 p-4">
           <div className="space-y-2">
             <Label className="text-xs">API base URL</Label>
             <Input value={api.baseUrl} readOnly className="font-mono text-sm" />
@@ -117,10 +120,8 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      <DeployPanel />
+        </div>
+      </CollapsibleCard>
 
       <Card>
         <CardHeader>
