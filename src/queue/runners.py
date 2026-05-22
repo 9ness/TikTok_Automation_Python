@@ -1050,18 +1050,53 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             )]
             gen.num_clips = 1
 
-        # Voz MiniMax
-        on_progress(0.42, "🎙️ Generando voz MiniMax…")
-        on_log("🎙️ Generando voz con MiniMax TTS…")
-        from src.locutor import generate_single_audio
+        # Voz MiniMax — solo si voice_enabled=True (presets `kind=music`
+        # piden voice_enabled=false desde el front; el vídeo sale MUDO y
+        # el user añade trending audio al subir a TikTok, que da mejor
+        # alcance que cualquier música embebida).
         voice_dir = os.path.join(p.get("temp_folder", "./temp_work"), f"shop_{gen.id}")
         os.makedirs(voice_dir, exist_ok=True)
-        voice_mp3 = os.path.join(voice_dir, "voice.mp3")
-        generate_single_audio(
-            gen.voiceover_script,
-            voice_mp3,
-            voice_id_override=gen.voice_used.voice_id,
-        )
+        voice_mp3: str | None = None
+        # El payload del enqueue mapea `voice_enabled` del frontend a la
+        # clave `with_voice` en la cola (ver generations.py:_build_params).
+        voice_enabled = bool(p.get("with_voice", True))
+        if voice_enabled and (gen.voiceover_script or "").strip():
+            on_progress(0.42, "🎙️ Generando voz MiniMax…")
+            on_log("🎙️ Generando voz con MiniMax TTS…")
+            from src.locutor import generate_single_audio
+            voice_mp3 = os.path.join(voice_dir, "voice.mp3")
+            generate_single_audio(
+                gen.voiceover_script,
+                voice_mp3,
+                voice_id_override=gen.voice_used.voice_id,
+            )
+        else:
+            on_progress(0.42, "🔇 Vídeo sin voz (preset música)…")
+            on_log(
+                "🔇 Skip MiniMax TTS — voice_enabled=false. El vídeo saldrá "
+                "mudo; añade trending audio al subirlo a TikTok."
+            )
+            # Generamos un MP3 silencioso de la duración objetivo para que
+            # `compose_shop_video` no rompa (su pipeline asume voice_mp3
+            # como track principal). Whisper sobre silencio devuelve 0
+            # palabras → no se renderizan subs (correcto para music preset).
+            import subprocess
+            voice_mp3 = os.path.join(voice_dir, "voice_silent.mp3")
+            silence_dur = int(gen.duration_seconds or 10)
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-f", "lavfi",
+                        "-i", f"anullsrc=channel_layout=mono:sample_rate=44100",
+                        "-t", str(silence_dur),
+                        "-q:a", "9", "-acodec", "libmp3lame", voice_mp3,
+                    ],
+                    check=True, capture_output=True,
+                )
+                on_log(f"🔇 Silencio {silence_dur}s generado → {voice_mp3}")
+            except Exception as e:
+                on_log(f"⚠️ No pude generar silencio: {e}. Compose puede fallar.")
+                voice_mp3 = None
 
         # Atlas render
         on_progress(0.55, "🎥 Atlas Cloud renderizando clips…")

@@ -8,6 +8,11 @@ Cada preset trae `seedance_prompt` y `veo3_prompt` para ser compatible
 con los 4 tiers (Standard/Advanced/Pro/Veo3). Cost tracking automático
 vía generate_json — el caller debería estar dentro de un start_job.
 
+Las fotos source del producto se envían a Gemini como contexto VISUAL
+para que pueda (a) describir mejor los prompts y (b) elegir, para cada
+preset, hasta 3 fotos a adjuntar manualmente al pegar el prompt de
+Veo 3 en Gemini chat / Flow (`veo3_photo_filenames`).
+
 Nunca lanza: si Gemini falla, devuelve [] + log warning. El endpoint
 decide qué reportar al user.
 """
@@ -15,6 +20,7 @@ decide qué reportar al user.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Literal
 
 from src.tiktok_shop.api.gemini import (
@@ -104,6 +110,68 @@ def _resolve_shot_strategy(
 
 _VALID_TONES = {"energetic", "calm", "persuasive", "serious", "playful"}
 _VALID_BACKGROUNDS = {"none", "black_bar", "blur"}
+
+# Máximo de fotos source que pasamos a Gemini como contexto visual al
+# generar presets. Más infla el coste (Gemini cobra por tile) y rara vez
+# aporta: con 6 ya tiene packshot + lifestyle + texture. El user puede
+# tener más fotos en el producto — Gemini solo ve estas y solo de éstas
+# puede elegir las que adjuntar a Veo 3.
+_MAX_PHOTOS_FOR_GEMINI = 6
+# Máximo de fotos que Gemini puede elegir como reference para Veo 3.
+# Veo 3 oficial (API) acepta 1; en Gemini chat / Flow puedes pegar varias
+# y aporta contexto visual extra (packshot + lifestyle + textura).
+_MAX_VEO3_PHOTOS = 3
+
+
+def _collect_product_photos(product) -> tuple[list[str], list[str]]:
+    """Devuelve `(filenames, paths)` de hasta `_MAX_PHOTOS_FOR_GEMINI`
+    fotos source no borradas del producto que existan en disco. Orden:
+    igual que están en `product.photos.source`. Si no hay fotos en disco
+    → devuelve ([], [])."""
+    filenames: list[str] = []
+    paths: list[str] = []
+    for p in product.photos.source:
+        if p.deleted or not p.local_path:
+            continue
+        if not os.path.exists(p.local_path):
+            continue
+        filenames.append(p.filename)
+        paths.append(p.local_path)
+        if len(paths) >= _MAX_PHOTOS_FOR_GEMINI:
+            break
+    return filenames, paths
+
+
+def _sanitize_veo3_photo_filenames(
+    raw: Any, *, available: list[str],
+) -> list[str]:
+    """Filtra a los filenames que Gemini puede haber referenciado en su
+    output, validando que cada uno exista en la lista que le pasamos
+    (`available`). De-dup, máximo `_MAX_VEO3_PHOTOS`. Si Gemini no
+    referenció nada o todo es inválido → fallback al primer filename
+    available (mejor que vacío para el user; siempre puede editarlo)."""
+    if not available:
+        return []
+    if not isinstance(raw, list):
+        # Fallback: 1 sola foto packshot (la primera available).
+        return [available[0]]
+    seen: set[str] = set()
+    out: list[str] = []
+    available_set = set(available)
+    for x in raw:
+        if not isinstance(x, str):
+            continue
+        # Gemini a veces devuelve el path entero o solo el basename.
+        # Normalizamos a basename.
+        name = os.path.basename(x.strip())
+        if name in available_set and name not in seen:
+            seen.add(name)
+            out.append(name)
+            if len(out) >= _MAX_VEO3_PHOTOS:
+                break
+    if not out:
+        return [available[0]]
+    return out
 
 
 def _parse_overlay_style(raw: Any) -> TextOverlayStyle:
@@ -320,6 +388,19 @@ def _generate_music(
     product: Product, *, n: int = 8,
 ) -> tuple[list[VideoPreset], list[str]]:
     system = load_system_prompt("music_bof_director.md")
+    photo_filenames, photo_paths = _collect_product_photos(product)
+    photos_block = (
+        "Fotos del producto disponibles (te las paso como imágenes en "
+        "este mismo prompt, en el MISMO ORDEN):\n"
+        + "\n".join(f"  - {fn}" for fn in photo_filenames)
+        + "\n\nPara CADA preset, elige hasta 3 filenames de esta lista "
+          "en `veo3_photo_filenames` (la(s) que mejor encajen con el "
+          "ángulo / escena del veo3_prompt). DEBES referenciar los "
+          "filenames EXACTAMENTE como están arriba.\n"
+    ) if photo_filenames else (
+        "El producto no tiene fotos source disponibles — deja "
+        "`veo3_photo_filenames: []` en cada preset.\n"
+    )
     user_prompt = (
         f"Contexto del producto:\n"
         f"- Nombre: {product.name}\n"
@@ -331,12 +412,14 @@ def _generate_music(
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n\n"
+        f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets musicales. Sigue el schema al pie de la letra."
     )
 
     result = generate_json(
         system_prompt=system, user_prompt=user_prompt,
         model=DEFAULT_MODEL, temperature=0.85,
+        images=photo_paths or None,
     )
     if not isinstance(result, dict):
         return [], ["Music director devolvió respuesta no-dict."]
@@ -387,6 +470,9 @@ def _generate_music(
                 voice_tone="energetic",
                 seedance_prompt=str(p.get("seedance_prompt", ""))[:500],
                 veo3_prompt=str(p.get("veo3_prompt", ""))[:1500],
+                veo3_photo_filenames=_sanitize_veo3_photo_filenames(
+                    p.get("veo3_photo_filenames"), available=photo_filenames,
+                ),
                 source="music_bof",
                 compatible_tiers=tiers,
             )
@@ -415,6 +501,19 @@ def _generate_music(
 # ---------------------------------------------------------------------------
 def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
     system = load_system_prompt("scripted_bof_director.md")
+    photo_filenames, photo_paths = _collect_product_photos(product)
+    photos_block = (
+        "Fotos del producto disponibles (te las paso como imágenes en "
+        "este mismo prompt, en el MISMO ORDEN):\n"
+        + "\n".join(f"  - {fn}" for fn in photo_filenames)
+        + "\n\nPara CADA preset, elige hasta 3 filenames de esta lista "
+          "en `veo3_photo_filenames` (la(s) que mejor encajen con el "
+          "ángulo / escena del veo3_prompt). DEBES referenciar los "
+          "filenames EXACTAMENTE como están arriba.\n"
+    ) if photo_filenames else (
+        "El producto no tiene fotos source disponibles — deja "
+        "`veo3_photo_filenames: []` en cada preset.\n"
+    )
     user_prompt = (
         f"Contexto del producto:\n"
         f"- Nombre: {product.name}\n"
@@ -426,6 +525,7 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n\n"
+        f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets scripted, cada uno con un ÁNGULO "
         f"distinto del menú. Sigue el schema al pie de la letra."
     )
@@ -433,6 +533,7 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
     result = generate_json(
         system_prompt=system, user_prompt=user_prompt,
         model=DEFAULT_MODEL, temperature=0.85,
+        images=photo_paths or None,
     )
     if not isinstance(result, dict):
         return []
@@ -494,6 +595,9 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
                 voice_tone=_safe_tone(p.get("voice_tone")),
                 seedance_prompt=str(p.get("seedance_prompt", ""))[:500],
                 veo3_prompt=str(p.get("veo3_prompt", ""))[:2000],
+                veo3_photo_filenames=_sanitize_veo3_photo_filenames(
+                    p.get("veo3_photo_filenames"), available=photo_filenames,
+                ),
                 source="scripted_bof",
                 compatible_tiers=tiers,
             )

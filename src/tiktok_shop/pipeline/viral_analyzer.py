@@ -208,20 +208,164 @@ def _map_to_nano_banana(detected: dict) -> dict:
     }
 
 
+def _map_to_video_preset(
+    raw_preset: dict,
+    *,
+    product: Any,
+    available_photos: list[str],
+) -> dict:
+    """Convierte el bloque `video_preset` del JSON de Gemini en un dict
+    listo para crear un `VideoPreset` (mismo formato que el preset_generator).
+    Aplica los mismos sanitizers para garantizar consistencia con los
+    presets autogenerados.
+    """
+    # Importes locales para evitar circular imports en tests.
+    from src.tiktok_shop.pipeline.preset_generator import (
+        _parse_cta_arrow_style,
+        _parse_overlay_style,
+        _parse_subtitle_style,
+        _resolve_shot_strategy,
+        _sanitize_tiers,
+        _sanitize_veo3_photo_filenames,
+        _safe_tone,
+    )
+
+    if not isinstance(raw_preset, dict):
+        raw_preset = {}
+
+    kind = _safe_str(raw_preset.get("kind"), "scripted")
+    if kind not in ("music", "scripted"):
+        kind = "scripted"
+
+    style = _safe_str(raw_preset.get("style"), "voiceover")
+    if style not in ("voiceover", "creator_pov"):
+        style = "voiceover"
+
+    duration_s = max(5, min(60, _safe_int(raw_preset.get("duration_s"), 12)))
+
+    # compatible_tiers: confiamos en lo que Gemini dijo, pero saneamos
+    # contra las reglas duras (Veo3 ≤10s, creator_pov no Std/Adv).
+    proposed_tiers = raw_preset.get("compatible_tiers")
+    if not isinstance(proposed_tiers, list):
+        proposed_tiers = ["standard", "advanced", "pro", "veo3_prompt_only"]
+    tiers = _sanitize_tiers(
+        [str(t) for t in proposed_tiers],
+        duration_s=duration_s,
+        style=style,
+    )
+
+    # shot_style + strategy con failsafes del modelo
+    shot_style, strategy_val = _resolve_shot_strategy(
+        duration_s=duration_s,
+        kind=kind,
+        style=style,
+        raw_shot_style=raw_preset.get("shot_style"),
+        raw_strategy=raw_preset.get("strategy"),
+        compatible_tiers=tiers,
+    )
+
+    # Sanea sub-objetos (overlay, subs, cta_arrow) con los helpers que
+    # ya usa el preset_generator → garantiza coherencia visual con el
+    # resto del producto.
+    text_overlay_style = _parse_overlay_style(raw_preset.get("text_overlay_style"))
+    # Música → subs OFF por defecto; scripted → respeta lo que dijo Gemini
+    subtitle_raw = raw_preset.get("subtitle_style")
+    if kind == "music" and (not isinstance(subtitle_raw, dict) or "enabled" not in subtitle_raw):
+        from src.tiktok_shop.models.video_preset import SubtitleStyle
+        subtitle_style = SubtitleStyle(enabled=False)
+    else:
+        subtitle_style = _parse_subtitle_style(subtitle_raw)
+    cta_arrow_style = _parse_cta_arrow_style(raw_preset.get("cta_arrow_style"))
+
+    veo3_photos = _sanitize_veo3_photo_filenames(
+        raw_preset.get("veo3_photo_filenames"),
+        available=available_photos,
+    )
+
+    name = _safe_str(raw_preset.get("name"), f"Réplica · {kind} {duration_s}s")[:120]
+    angle = _safe_str(raw_preset.get("angle"), "")[:30]
+
+    return {
+        "name": name,
+        "kind": kind,
+        "angle": "" if kind == "music" else angle,
+        "style": style,
+        "shot_style": shot_style,
+        "strategy": strategy_val,
+        "duration_s": duration_s,
+        "compatible_tiers": tiers,
+        "text_overlay": _safe_str(raw_preset.get("text_overlay"), "")[:200],
+        "text_overlay_style": text_overlay_style.model_dump(),
+        "subtitle_style": subtitle_style.model_dump(),
+        "cta_arrow_style": cta_arrow_style.model_dump(),
+        "music_mood": _safe_str(raw_preset.get("music_mood"), "trendy_uplifting")[:60],
+        "voice_id": None,
+        "voice_tone": _safe_tone(raw_preset.get("voice_tone")),
+        "title": _safe_str(raw_preset.get("title"), "")[:200],
+        "voice_script": _safe_str(raw_preset.get("voice_script"), "")[:3000],
+        "hooks_alternatives": [
+            str(h)[:200] for h in (raw_preset.get("hooks_alternatives") or [])
+        ][:8],
+        "cta": _safe_str(raw_preset.get("cta"), "")[:200],
+        "oratory_tips": _safe_str(raw_preset.get("oratory_tips"), "")[:500],
+        "keywords": [
+            str(k)[:60] for k in (raw_preset.get("keywords") or [])
+        ][:10],
+        "seedance_prompt": _safe_str(raw_preset.get("seedance_prompt"), "")[:500],
+        "veo3_prompt": _safe_str(raw_preset.get("veo3_prompt"), "")[:2000],
+        "veo3_photo_filenames": veo3_photos,
+        "source": "viral_replica",
+    }
+
+
+def _hook_price_suggestion(product: Any) -> str:
+    """Mismo helper que preset_generator: 30% off del precio real,
+    redondeado a barrera psicológica. Si no hay precio → string vacío."""
+    p = getattr(getattr(product, "tiktok_shop", None), "price_eur", None)
+    if p is None or p <= 0:
+        return ""
+    real = float(p)
+    target = real * 0.70
+    if target < 5:
+        s = max(2, int(target))
+    elif target < 10:
+        s = max(5, int(target))
+    elif target < 50:
+        s = max(10, (int(target) // 5) * 5)
+    elif target < 200:
+        s = (int(target) // 10) * 10
+    else:
+        s = (int(target) // 50) * 50
+    return f"{s}€ (real: {real:.2f}€)"
+
+
 def analyze_viral_video(
     video_path: str,
     *,
     target_kind: PresetKind,
     same_product: bool,
-    gemini_model: str = "gemini-2.5-flash",
+    gemini_model: str = "gemini-3.5-flash",
     temp_folder: str = "./temp_work",
     log_callback: LogCallback = _noop,
+    product: Any = None,
 ) -> dict:
-    """Devuelve `{"config": dict, "detected": dict, "cost_breakdown": dict}`.
+    """Analiza un vídeo viral y devuelve `{config, detected, video_preset,
+    cost_breakdown}`.
 
-    El campo `config` es el preset listo para `useSaveShopPreset`.
-    `detected` contiene la respuesta cruda de Gemini para mostrar en UI.
-    `cost_breakdown` contiene `{gemini_usd, total_usd}` (Whisper local = $0).
+    - `config`: preset LEGACY ShopPreset (formato viejo "configuraciones
+      guardadas") — kept for backward compat.
+    - `detected`: respuesta cruda de Gemini con la "receta" detectada.
+    - `video_preset`: dict listo para crear un VideoPreset NUEVO en
+      `product.video_presets[]` (replica completa: prompts Seedance/Veo3,
+      fotos elegidas, overlays, subs, voz, etc.). Solo se genera si
+      `product` se pasa y `target_kind` es `auto_video` o `veo3`.
+    - `cost_breakdown`: `{gemini_usd, total_usd}` (Whisper local = $0).
+
+    Args:
+        product: objeto Product (opcional). Si se pasa, Gemini recibe
+            contexto del producto (nombre, marca, categoría, precio,
+            fotos source) y genera un VideoPreset completo adaptado.
+            Sin product, solo se hace análisis básico (config legacy).
     """
     log_callback(f"📐 Probing duración de '{video_path}'…")
     duration_s = _probe_duration_seconds(video_path)
@@ -272,17 +416,68 @@ def analyze_viral_video(
         )
 
     system_prompt = load_system_prompt("viral_analyzer.md")
+
+    # Contexto del producto destino — el video_preset generado adapta la
+    # fórmula viral al producto del user (no copia el original).
+    product_block = ""
+    available_photo_filenames: list[str] = []
+    if product is not None:
+        try:
+            product_name = getattr(product, "name", "") or ""
+            product_brand = getattr(product, "brand", "") or ""
+            product_category = getattr(product, "category", "") or ""
+            tiktok_meta = getattr(product, "tiktok_shop", None)
+            price = getattr(tiktok_meta, "price_eur", None) if tiktok_meta else None
+            price_str = f"{float(price):.2f}€" if price else "(sin definir)"
+            hook_price = _hook_price_suggestion(product)
+            audiences = getattr(product, "target_audience", []) or []
+            features = getattr(product, "key_features", []) or []
+            selling = getattr(product, "selling_points", []) or []
+
+            # Source photos del producto — para que Gemini elija filenames
+            # reales en `veo3_photo_filenames`.
+            source_photos = getattr(getattr(product, "photos", None), "source", []) or []
+            for p in source_photos:
+                if getattr(p, "deleted", False):
+                    continue
+                local = getattr(p, "local_path", None)
+                if not local or not os.path.exists(local):
+                    continue
+                available_photo_filenames.append(p.filename)
+                if len(available_photo_filenames) >= 6:
+                    break
+
+            product_block = (
+                f"\n\n=== USER'S PRODUCT CONTEXT (adapt the formula to this) ===\n"
+                f"- Name: {product_name}\n"
+                f"- Brand: {product_brand or '(no brand)'}\n"
+                f"- Category: {product_category}\n"
+                f"- Real price: {price_str}\n"
+                f"- Hook price (for savings/comparison angles): {hook_price or '(N/A)'}\n"
+                f"- Target audiences: {', '.join(audiences) or '(generic)'}\n"
+                f"- Key features: {', '.join(features) or '(none defined)'}\n"
+                f"- Selling points: {', '.join(selling) or '(none defined)'}\n"
+                f"\nAvailable source photos for veo3_photo_filenames "
+                f"(pick filenames EXACTLY from this list, max 3):\n"
+                + ("\n".join(f"  - {fn}" for fn in available_photo_filenames)
+                   if available_photo_filenames
+                   else "  (no photos available — return [])")
+            )
+        except Exception as e:
+            log_callback(f"⚠️ No pude leer contexto del producto ({e}). Sigo sin él.")
+
     user_msg = (
         f"Total duration: {duration_s:.1f} seconds\n"
         f"Same product as user's: {'yes' if same_product else 'no — competitor reference'}\n"
         f"Target preset kind: {target_kind}\n"
         f"Word-level transcript ({n_words} words): {transcript[:3000]}\n\n"
         f"Frames are attached, sampled at ~1 fps in chronological order."
+        f"{product_block}"
     )
 
     log_callback(f"🤖 Llamando a Gemini '{gemini_model}' con {len(frame_paths)} frames…")
     try:
-        detected_raw = generate_json(
+        gemini_raw = generate_json(
             system_prompt, user_msg,
             model=gemini_model,
             images=frame_paths,
@@ -293,9 +488,17 @@ def analyze_viral_video(
         _cleanup(tmp_dir)
         raise RuntimeError(f"Gemini falló al analizar el vídeo: {e}")
 
+    if not isinstance(gemini_raw, dict):
+        log_callback(f"⚠️ Gemini devolvió tipo inesperado ({type(gemini_raw).__name__}), usando dict vacío.")
+        gemini_raw = {}
+
+    # El nuevo schema devuelve {detected: {...}, video_preset: {...}}.
+    # Backward compat: si Gemini devuelve los campos planos (schema viejo),
+    # los tomamos como `detected`.
+    detected_raw = gemini_raw.get("detected") if "detected" in gemini_raw else gemini_raw
     if not isinstance(detected_raw, dict):
-        log_callback(f"⚠️ Gemini devolvió tipo inesperado ({type(detected_raw).__name__}), usando dict vacío.")
         detected_raw = {}
+    raw_video_preset = gemini_raw.get("video_preset") if isinstance(gemini_raw.get("video_preset"), dict) else None
 
     # Aseguramos que el hook_text del transcript se usa si Gemini no lo extrajo bien.
     if not detected_raw.get("hook_text"):
@@ -327,13 +530,37 @@ def analyze_viral_video(
     except Exception:
         pass  # contextvar no activo, ok
 
-    # 5. Mapping al config del modo objetivo
+    # 5. Mapping al config del modo objetivo (legacy ShopPreset format)
     if target_kind == "auto_video":
         config = _map_to_auto_video(detected_raw)
     elif target_kind == "veo3":
         config = _map_to_veo3(detected_raw)
     else:
         config = _map_to_nano_banana(detected_raw)
+
+    # 5b. Mapping al NUEVO VideoPreset si tenemos product context.
+    # Solo aplica a auto_video / veo3 (nano_banana es solo prompt de fotos,
+    # no encaja en el modelo VideoPreset).
+    video_preset_dict: dict | None = None
+    if (
+        product is not None
+        and target_kind in ("auto_video", "veo3")
+        and raw_video_preset is not None
+    ):
+        try:
+            video_preset_dict = _map_to_video_preset(
+                raw_video_preset,
+                product=product,
+                available_photos=available_photo_filenames,
+            )
+            log_callback(
+                f"🎯 VideoPreset construido: {video_preset_dict['name']} "
+                f"({video_preset_dict['kind']}, {video_preset_dict['duration_s']}s, "
+                f"{len(video_preset_dict['veo3_photo_filenames'])} fotos)"
+            )
+        except Exception as e:
+            log_callback(f"⚠️ Fallo construyendo VideoPreset: {e}")
+            video_preset_dict = None
 
     # 6. Cleanup
     _cleanup(tmp_dir)
@@ -345,6 +572,7 @@ def analyze_viral_video(
             "duration_seconds": duration_s,
             "n_words": n_words,
         },
+        "video_preset": video_preset_dict,
         "cost_breakdown": {
             "gemini_usd": round(cost_usd, 4),
             "whisper_usd": 0.0,

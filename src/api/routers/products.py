@@ -46,6 +46,7 @@ from src.api.schemas.product import (
     GeneratePresetsResponse,
     GenerateVariantsRequest,
     GenerateVariantsResponse,
+    PresetGenStatusResponse,
     VariantMeta,
     GoogleImageSearchRequest,
     GoogleImageSearchResponse,
@@ -1211,6 +1212,126 @@ def list_video_presets(
     return [_preset_to_response(p) for p in product.video_presets]
 
 
+def _generate_presets_background(
+    *,
+    product_id: str,
+    gen_id: str,
+    kind: str,
+    n_music: int,
+    n_scripted: int,
+    replace_existing: bool,
+) -> None:
+    """Función que corre en BackgroundTasks. Actualiza el tracker en
+    Redis por stages para que el frontend pueda mostrar progress.
+
+    NO usar `get_product_repo` aquí — es una FastAPI dependency que
+    necesita la request scope (redis injection). Construimos `ProductRepo()`
+    directo, igual que `_analyze_in_background`.
+    """
+    from src.cost_tracking import finalize_and_persist, get_active, start_job
+    from src.tiktok_shop.pipeline.preset_generator import (
+        _generate_music,
+        _generate_scripted,
+    )
+    from src.tiktok_shop.services import preset_gen_tracker
+
+    def _current_cost() -> float:
+        """Lee el coste acumulado del job activo en USD. 0.0 si no hay
+        tracker activo (no debería pasar — `start_job` corre justo
+        antes). Solo se usa para reportarlo al frontend."""
+        job = get_active()
+        return float(job.total_usd) if job is not None else 0.0
+
+    try:
+        repo = ProductRepo()
+        product = repo.get(product_id)
+    except Exception as e:
+        preset_gen_tracker.update(
+            gen_id, stage="error", error=f"No se pudo cargar el producto: {e}",
+        )
+        return
+    if product is None:
+        preset_gen_tracker.update(
+            gen_id, stage="error", error=f"Producto {product_id} no encontrado",
+        )
+        return
+
+    start_job(
+        job_id=f"presets_{gen_id}",
+        program="tiktok_shop",
+        mode="preset_generation",
+        title=f"Generate presets: {product.slug} · {kind}",
+        product_id=product_id,
+    )
+
+    all_presets = []
+    all_warnings: list[str] = []
+    try:
+        # ── Música ──
+        if kind in ("music", "both"):
+            preset_gen_tracker.update(
+                gen_id, stage="generating_music", percent=5,
+            )
+            try:
+                music_presets, lib_warnings = _generate_music(product, n=n_music)
+                all_presets.extend(music_presets)
+                all_warnings.extend(lib_warnings)
+                preset_gen_tracker.update(
+                    gen_id,
+                    percent=50 if kind == "both" else 80,
+                    created_count=len(all_presets),
+                    cost_usd=_current_cost(),
+                )
+            except Exception as e:
+                all_warnings.append(f"Music director falló: {e}")
+
+        # ── Scripted ──
+        if kind in ("scripted", "both"):
+            preset_gen_tracker.update(
+                gen_id, stage="generating_scripted",
+                percent=55 if kind == "both" else 5,
+            )
+            try:
+                scripted_presets = _generate_scripted(product, n=n_scripted)
+                all_presets.extend(scripted_presets)
+                preset_gen_tracker.update(
+                    gen_id, percent=90,
+                    created_count=len(all_presets),
+                    cost_usd=_current_cost(),
+                )
+            except Exception as e:
+                all_warnings.append(f"Scripted director falló: {e}")
+
+        # ── Persistir ──
+        preset_gen_tracker.update(gen_id, stage="saving", percent=95)
+        if replace_existing:
+            sources_to_drop = set()
+            if kind in ("music", "both"):
+                sources_to_drop.add("music_bof")
+            if kind in ("scripted", "both"):
+                sources_to_drop.add("scripted_bof")
+            product.video_presets = [
+                p for p in product.video_presets if p.source not in sources_to_drop
+            ]
+        product.video_presets.extend(all_presets)
+        product.touch()
+        repo.save(product)
+
+        preset_gen_tracker.update(
+            gen_id, stage="done", percent=100,
+            created_count=len(all_presets), warnings=all_warnings,
+            cost_usd=_current_cost(),
+        )
+    except Exception as e:
+        preset_gen_tracker.update(gen_id, stage="error", error=str(e))
+        return
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+
 @router.post(
     "/{product_id}/video-presets/generate",
     response_model=GeneratePresetsResponse,
@@ -1218,15 +1339,16 @@ def list_video_presets(
 def generate_video_presets(
     product_id: str,
     payload: GeneratePresetsRequest,
+    background: BackgroundTasks,
     repo: Annotated[ProductRepo, Depends(get_product_repo)],
 ) -> GeneratePresetsResponse:
-    """Pide a Gemini que cree N presets musicales + M scripted para
-    el producto. Se acumulan a `product.video_presets`. Si
-    `replace_existing=true`, primero limpia los autogenerados del
-    mismo `source` (manuales nunca se tocan).
+    """ASÍNCRONO. Lanza la generación en background y devuelve gen_id
+    al instante. La UI hace polling de /preset-gen-status/{gen_id} para
+    mostrar progress y refrescar la lista cuando termine. El gen_id se
+    persiste en localStorage en el frontend, así un refresh del navegador
+    no pierde la generación.
     """
-    from src.cost_tracking import finalize_and_persist, start_job
-    from src.tiktok_shop.pipeline.preset_generator import generate_presets
+    from src.tiktok_shop.services import preset_gen_tracker
 
     product = repo.get(product_id)
     if product is None:
@@ -1235,59 +1357,57 @@ def generate_video_presets(
             details={"product_id": product_id},
         )
 
-    # Job adhoc para cost tracking de Gemini
-    start_job(
-        job_id=f"presets_{uuid.uuid4().hex[:12]}",
-        program="tiktok_shop",
-        mode="preset_generation",
-        title=f"Generate presets: {product.slug} · {payload.kind}",
+    expected = 0
+    if payload.kind in ("music", "both"):
+        expected += payload.n_music
+    if payload.kind in ("scripted", "both"):
+        expected += payload.n_scripted
+
+    gen_id = preset_gen_tracker.create(
         product_id=product_id,
+        kind=payload.kind,
+        expected_count=expected,
     )
 
-    try:
-        presets, warnings = generate_presets(
-            product,
-            kind=payload.kind,
-            n_music=payload.n_music,
-            n_scripted=payload.n_scripted,
-        )
-    except Exception as e:
-        try:
-            finalize_and_persist()
-        except Exception:
-            pass
-        raise GeminiError(
-            f"Generación de presets falló: {e}",
-            details={"product_id": product_id},
-        )
-
-    # Si replace_existing: borrar autogenerados previos del mismo kind
-    if payload.replace_existing:
-        sources_to_drop = set()
-        if payload.kind in ("music", "both"):
-            sources_to_drop.add("music_bof")
-        if payload.kind in ("scripted", "both"):
-            sources_to_drop.add("scripted_bof")
-        product.video_presets = [
-            p for p in product.video_presets if p.source not in sources_to_drop
-        ]
-
-    # Append nuevos
-    product.video_presets.extend(presets)
-    product.touch()
-    repo.save(product)
-
-    try:
-        finalize_and_persist()
-    except Exception:
-        pass
+    background.add_task(
+        _generate_presets_background,
+        product_id=product_id,
+        gen_id=gen_id,
+        kind=payload.kind,
+        n_music=payload.n_music,
+        n_scripted=payload.n_scripted,
+        replace_existing=payload.replace_existing,
+    )
 
     return GeneratePresetsResponse(
         product_id=product_id,
-        created_count=len(presets),
-        presets=[_preset_to_response(p) for p in presets],
-        warnings=warnings,
+        gen_id=gen_id,
+        stage="started",
+        created_count=0,
+        presets=[],
+        warnings=[],
     )
+
+
+@router.get(
+    "/{product_id}/preset-gen-status/{gen_id}",
+    response_model=PresetGenStatusResponse,
+)
+def get_preset_gen_status(
+    product_id: str,
+    gen_id: str,
+) -> PresetGenStatusResponse:
+    """Devuelve el progreso actual de la generación. La UI hace polling
+    cada 2s hasta ver stage=done o error."""
+    from src.tiktok_shop.services import preset_gen_tracker
+
+    state = preset_gen_tracker.get(gen_id)
+    if state is None:
+        raise PhotoNotFoundError(
+            f"Generación {gen_id} no encontrada o expirada.",
+            details={"product_id": product_id, "gen_id": gen_id},
+        )
+    return PresetGenStatusResponse(**state)
 
 
 @router.patch(
@@ -1390,6 +1510,54 @@ def generate_preset_variants(
         meta=[VariantMeta(**m) for m in meta],
         warnings=[] if variants else ["Gemini no devolvió variantes válidas."],
     )
+
+
+@router.post(
+    "/{product_id}/video-presets/save-viral",
+    response_model=VideoPresetResponse,
+)
+def save_viral_video_preset(
+    product_id: str,
+    payload: dict,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> VideoPresetResponse:
+    """Persiste un VideoPreset generado por `analyze_viral_video` en el
+    producto. El payload trae el dict completo (con name, kind, prompts,
+    fotos, etc.) que devolvió `analyze_viral_video` en `result.video_preset`.
+
+    Source automático: `viral_replica` para distinguirlo de los autogen
+    (`music_bof`/`scripted_bof`) y los manuales.
+    """
+    from src.tiktok_shop.models.video_preset import VideoPreset, make_preset_id
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    if not isinstance(payload, dict) or not payload.get("seedance_prompt"):
+        raise ValidationError(
+            "Payload inválido — esperado el dict `video_preset` que devuelve "
+            "analyze_viral_video (con seedance_prompt, veo3_prompt, etc.).",
+            details={},
+        )
+
+    # Forzamos source=viral_replica y un id fresco
+    payload_clean = {**payload, "id": make_preset_id(), "source": "viral_replica"}
+    try:
+        preset = VideoPreset(**payload_clean)
+    except Exception as e:
+        raise ValidationError(
+            f"VideoPreset payload no validó: {e}",
+            details={"keys": sorted(list(payload.keys()))[:30]},
+        )
+
+    product.video_presets.append(preset)
+    product.touch()
+    repo.save(product)
+    return _preset_to_response(preset)
 
 
 @router.delete(

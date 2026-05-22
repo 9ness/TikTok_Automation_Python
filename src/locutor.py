@@ -1,10 +1,22 @@
 import os
+import sys
 import requests
 import json
 import glob
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 import time
+
+# Windows: stdout default cp1252 no soporta emojis → cualquier print con
+# 🎙️ crashea el worker entero (UnicodeEncodeError). Forzamos UTF-8 con
+# fallback "replace" para no perder logs si algo no encaja.
+# Se aplica al importar el módulo — es idempotente.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 load_dotenv(find_dotenv())
 

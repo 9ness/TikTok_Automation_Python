@@ -29,8 +29,12 @@ from src.tiktok_shop.config import atlas_api_key, atlas_base_url, atlas_is_confi
 
 
 SUBMIT_TIMEOUT_S = 30
-POLL_INTERVAL_S = 2.0
-POLL_TIMEOUT_S = 900            # 15 min hard cap (Atlas puede tardar 5-10 min en horas pico)
+POLL_INTERVAL_S = 3.0
+# 30 min hard cap. Atlas Standard en horas pico EU puede tardar 12-20 min
+# por clip cuando la cola está saturada. Subido desde 900s tras timeouts
+# reales en producción (clip se quedaba en "processing" → cliente daba
+# timeout pero Atlas seguía renderizando = pago perdido).
+POLL_TIMEOUT_S = 1800
 MAX_RETRIES_TRANSIENT = 3       # 429 / 5xx
 
 
@@ -295,8 +299,10 @@ class AtlasCloudClient:
         poll_interval: float = POLL_INTERVAL_S,
     ) -> AtlasJob:
         """Polling síncrono hasta status terminal o timeout."""
-        deadline = time.time() + timeout_s
+        started = time.time()
+        deadline = started + timeout_s
         last: AtlasJob | None = None
+        last_log_t = started
         while time.time() < deadline:
             try:
                 last = self.poll(job_id)
@@ -318,10 +324,23 @@ class AtlasCloudClient:
                     f"Atlas job {job_id} falló: {last.error or 'sin detalle'}",
                     kind="model_failed",
                 )
+            # Heartbeat cada 60s — útil para diagnosticar jobs que se
+            # quedan en "processing" mucho tiempo (en lugar de fail
+            # silencioso al timeout).
+            now = time.time()
+            if now - last_log_t >= 60:
+                elapsed = int(now - started)
+                print(
+                    f"[Atlas poll] job {job_id[:8]} status={last.status} "
+                    f"elapsed={elapsed}s timeout={timeout_s}s"
+                )
+                last_log_t = now
             time.sleep(poll_interval)
         raise AtlasCloudTransient(
             f"Atlas job {job_id} no terminó en {timeout_s}s (último status: "
-            f"{last.status if last else 'sin respuesta'})"
+            f"{last.status if last else 'sin respuesta'}). El job puede "
+            f"seguir renderizando en Atlas — apunta este ID para reclamar "
+            f"refund si nunca completa."
         )
 
     def download(self, output_url: str, dest_path: str) -> str:

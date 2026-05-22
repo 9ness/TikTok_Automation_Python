@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -95,12 +95,25 @@ export function BulkGenerateDialog({
   basePayload,
   productId,
   tier,
+  initialSmartMode,
+  initialSelectedPresetIds,
+  initialVariantsPerPreset,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   basePayload: EnqueueRequest;
   productId: string;
   tier: string;
+  /** Si el caller abre el diálogo con un modo concreto (batch vs A/B),
+   *  inicializa el toggle smartMode con este valor. Útil cuando el modo
+   *  del AutoVideoCard ya está fijado por el user en la pestaña externa. */
+  initialSmartMode?: boolean;
+  /** Pre-selecciona estos presets (por id). Útil cuando el user ya marcó
+   *  un preset (modo "Variantes A/B" o "Lote") en el AutoVideoCard. */
+  initialSelectedPresetIds?: string[];
+  /** Valor inicial del input "variantes por preset". En modo Variantes
+   *  A/B tiene sentido un default mayor (ej. 3); en Lote suele ser 1. */
+  initialVariantsPerPreset?: number;
 }) {
   const product = useProduct(productId);
   const enqueue = useEnqueueGeneration();
@@ -113,14 +126,30 @@ export function BulkGenerateDialog({
     [presets, tier],
   );
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [variantsPerPreset, setVariantsPerPreset] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(initialSelectedPresetIds ?? []),
+  );
+  const [variantsPerPreset, setVariantsPerPreset] = useState(
+    initialVariantsPerPreset ?? 1,
+  );
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
   // Modo smart variants: en vez de N copias idénticas, llama a Gemini
   // para que genere N variantes A/B (cada una con hipótesis distinta).
-  const [smartMode, setSmartMode] = useState(false);
+  const [smartMode, setSmartMode] = useState(initialSmartMode ?? false);
+
+  // Cuando el dialog se reabre con nuevas props (mode change desde fuera),
+  // resincroniza el estado interno. Sin esto el state queda pegado al
+  // primer mount.
+  useEffect(() => {
+    if (open) {
+      setSelectedIds(new Set(initialSelectedPresetIds ?? []));
+      setSmartMode(initialSmartMode ?? false);
+      setVariantsPerPreset(initialVariantsPerPreset ?? 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const [smartDims, setSmartDims] = useState<Set<VariantDimension>>(
     () => new Set(["text_overlay", "text_overlay_color", "cta_arrow"]),
   );

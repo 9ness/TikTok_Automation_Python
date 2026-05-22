@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -38,6 +38,7 @@ import {
   useDeleteAllVideoPresets,
   useDeleteVideoPreset,
   useGeneratePresets,
+  usePresetGenStatus,
   useUpdateVideoPreset,
 } from "@/lib/queries/products";
 import { useVoices } from "@/lib/queries/voices";
@@ -99,6 +100,34 @@ export function PresetsManager({ product }: { product: Product }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
 
+  // ───── Generación asíncrona con progress + persistencia localStorage ─────
+  const LS_KEY = `preset-gen:${product.id}`;
+  const [activeGenId, setActiveGenId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(LS_KEY);
+  });
+  const genStatus = usePresetGenStatus(product.id, activeGenId, {
+    onDone: () => {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(LS_KEY);
+      }
+      setActiveGenId(null);
+    },
+  });
+  // Toast cuando el polling detecta done/error
+  useEffect(() => {
+    const s = genStatus.data?.stage;
+    if (s === "done") {
+      const cost = genStatus.data?.cost_usd ?? 0;
+      const costStr = cost > 0 ? ` · ≈ $${cost.toFixed(4)} USD` : "";
+      toast.success(
+        `${genStatus.data?.created_count ?? 0} presets generados${costStr}`,
+      );
+    } else if (s === "error") {
+      toast.error(genStatus.data?.error || "Generación falló");
+    }
+  }, [genStatus.data?.stage, genStatus.data?.created_count, genStatus.data?.error, genStatus.data?.cost_usd]);
+
   async function confirmDeleteAll() {
     try {
       const r = await deleteAll.mutateAsync({});
@@ -159,6 +188,10 @@ export function PresetsManager({ product }: { product: Product }) {
     kind: "music" | "scripted" | "both",
     replace = true,                      // por defecto reemplaza — evita duplicados
   ) {
+    if (activeGenId) {
+      toast.error("Ya hay una generación en curso");
+      return;
+    }
     try {
       const r = await generate.mutateAsync({
         kind,
@@ -166,18 +199,13 @@ export function PresetsManager({ product }: { product: Product }) {
         n_scripted: 12,
         replace_existing: replace,
       });
-      const parts: string[] = [];
-      if (r.created_count > 0) {
-        parts.push(
-          `${r.created_count} preset(s) ${replace ? "regenerados" : "añadidos"}`,
-        );
-      } else {
-        parts.push("Sin presets nuevos");
+      // El endpoint ahora es async — guarda gen_id en localStorage para
+      // que un refresh recupere la generación en curso.
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LS_KEY, r.gen_id);
       }
-      if (r.warnings.length > 0) {
-        parts.push(`⚠️ ${r.warnings[0]}`);
-      }
-      toast.success(parts.join(" · "));
+      setActiveGenId(r.gen_id);
+      toast(`Generación iniciada · puedes cambiar de tab sin perder progreso`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Generación falló");
     }
@@ -202,21 +230,75 @@ export function PresetsManager({ product }: { product: Product }) {
               elegirlo y encolar — todo el script, hook, CTA y prompts
               vendrán rellenos.
             </p>
+            <p
+              className="text-[10px] text-muted-foreground/80"
+              title={
+                "Estimación con Gemini 2.5 Flash ($0.30/1M input · $2.50/1M output):\n" +
+                "• Solo música (8 presets): ≈ $0.015 USD\n" +
+                "• Solo scripted (12 presets): ≈ $0.025 USD\n" +
+                "• Ambos (20 presets): ≈ $0.04 USD\n\n" +
+                "Coste real exacto se muestra al terminar la generación."
+              }
+            >
+              💰 Coste aprox. por generación completa (8 música + 12 scripted): ≈{" "}
+              <strong>$0.04 USD</strong> · ~0.04 € · Gemini 2.5 Flash
+            </p>
           </div>
+          {/* Barra de progreso si hay generación en curso */}
+          {activeGenId && genStatus.data && (
+            <div className="space-y-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
+                  <strong>
+                    {{
+                      started: "Iniciando…",
+                      generating_music: "Generando música…",
+                      generating_scripted: "Generando scripted…",
+                      saving: "Guardando…",
+                      done: "✓ Terminado",
+                      error: "Error",
+                    }[genStatus.data.stage] ?? genStatus.data.stage}
+                  </strong>
+                </span>
+                <span className="font-mono">{genStatus.data.percent}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${genStatus.data.percent}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {genStatus.data.created_count} / {genStatus.data.expected_count}{" "}
+                presets
+                {(genStatus.data.cost_usd ?? 0) > 0 && (
+                  <span className="ml-1 text-emerald-700 dark:text-emerald-300">
+                    · ≈ ${(genStatus.data.cost_usd ?? 0).toFixed(4)} USD
+                  </span>
+                )}
+                {" · "}puedes cambiar de pestaña o cerrar el navegador, la
+                generación sigue en el servidor.
+              </p>
+            </div>
+          )}
+
           {/* Botón principal grande — full-width en mobile */}
           <Button
             onClick={() => handleGenerate("both", true)}
-            disabled={generate.isPending}
+            disabled={generate.isPending || !!activeGenId}
             className="w-full bg-emerald-600 hover:bg-emerald-700 sm:w-auto"
           >
-            {generate.isPending ? (
+            {generate.isPending || activeGenId ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Sparkles className="mr-2 h-4 w-4" />
             )}
-            {presets.length > 0
-              ? "Regenerar todos (8 + 12)"
-              : "Generar todos (8 música + 12 scripted)"}
+            {activeGenId
+              ? "Generación en curso…"
+              : presets.length > 0
+                ? "Regenerar todos (8 + 12)"
+                : "Generar todos (8 música + 12 scripted)"}
           </Button>
 
           {/* Secundarios — grid 2 cols mobile, fila desktop */}
@@ -225,7 +307,7 @@ export function PresetsManager({ product }: { product: Product }) {
               variant="outline"
               size="sm"
               onClick={() => handleGenerate("music", true)}
-              disabled={generate.isPending}
+              disabled={generate.isPending || !!activeGenId}
             >
               <Music className="h-3.5 w-3.5" />
               <span className="ml-1.5 text-xs">
@@ -236,7 +318,7 @@ export function PresetsManager({ product }: { product: Product }) {
               variant="outline"
               size="sm"
               onClick={() => handleGenerate("scripted", true)}
-              disabled={generate.isPending}
+              disabled={generate.isPending || !!activeGenId}
             >
               <Mic className="h-3.5 w-3.5" />
               <span className="ml-1.5 text-xs">
@@ -249,7 +331,7 @@ export function PresetsManager({ product }: { product: Product }) {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleGenerate("both", false)}
-                  disabled={generate.isPending}
+                  disabled={generate.isPending || !!activeGenId}
                   className="text-muted-foreground hover:bg-muted"
                   title="Acumula 20 más sin borrar (experimental)"
                 >
@@ -421,8 +503,11 @@ export function PresetsManager({ product }: { product: Product }) {
                 </span>
               )}
             </h3>
-            <span className="hidden text-[10px] text-muted-foreground sm:inline">
-              Sin voz · 8-15s · texto en pantalla + música
+            <span
+              className="hidden text-[10px] text-muted-foreground sm:inline"
+              title="El vídeo sale MUDO. Tras renderizar, lo subes a TikTok y desde la app le añades el trending audio del momento (mejor alcance que cualquier música embebida)."
+            >
+              Sin voz · 8-15s · texto en pantalla · 🎵 audio se añade en TikTok
             </span>
           </div>
           {musicPresets.length === 0 ? (
@@ -464,8 +549,11 @@ export function PresetsManager({ product }: { product: Product }) {
                 </span>
               )}
             </h3>
-            <span className="hidden text-[10px] text-muted-foreground sm:inline">
-              Con voz · creator-style · ángulos de venta
+            <span
+              className="hidden text-[10px] text-muted-foreground sm:inline"
+              title="Vídeo CON voz MiniMax narrando el guion del preset. Subtítulos karaoke automáticos. Sin trending audio nativo (la voz manda)."
+            >
+              🎤 Con voz · creator-style · ángulos de venta
             </span>
           </div>
           {scriptedPresets.length === 0 ? (
@@ -548,6 +636,122 @@ export function PresetsManager({ product }: { product: Product }) {
   );
 }
 
+/** Devuelve fecha-hora corta tipo "21/05 14:23" para el badge de la card.
+ *  Hover muestra el ISO completo via title. Si la fecha es de HOY, muestra
+ *  solo la hora ("hoy 14:23") para que destaque que es reciente. */
+/** Construye la URL pública para servir una foto del producto. Replica
+ *  el patrón de `ProductCard.tsx:pickCoverPhotoUrl`. Devuelve null si
+ *  faltan datos. La URL sirve el archivo ORIGINAL (no recortado/escalado)
+ *  → es la mejor calidad disponible para descargar. */
+function buildPhotoUrl(productId: string, filename: string): string | null {
+  if (!productId || !filename) return null;
+  const base =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
+  return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;
+}
+
+/** Copia texto al portapapeles con feedback toast. Usa la Clipboard API
+ *  moderna; si falla (https only, permisos) hace fallback al textarea
+ *  hack para que también funcione en localhost http. */
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    toast.success("Prompt copiado al portapapeles");
+  } catch (e) {
+    toast.error(
+      e instanceof Error ? `Copia falló: ${e.message}` : "No pude copiar",
+    );
+  }
+}
+
+/** Descarga una foto al disco usando fetch+blob (fuerza descarga incluso
+ *  si el browser intentaría mostrarla inline). Sirve el archivo ORIGINAL
+ *  → calidad máxima. El filename del disco respeta el nombre original. */
+async function downloadPhoto(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Liberar memoria — pequeño delay para que el navegador termine.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (e) {
+    toast.error(
+      e instanceof Error
+        ? `Descarga falló (${filename}): ${e.message}`
+        : `Descarga falló: ${filename}`,
+    );
+  }
+}
+
+/** Descarga secuencialmente todas las fotos del array. Pequeño delay
+ *  entre cada una para que el navegador no agrupe los prompts de
+ *  descarga (algunos bloquean "multiple downloads"). */
+async function downloadAllPhotos(
+  productId: string,
+  filenames: string[],
+): Promise<void> {
+  if (!filenames?.length) return;
+  toast.info(`Descargando ${filenames.length} foto(s)…`);
+  for (let i = 0; i < filenames.length; i++) {
+    const fn = filenames[i];
+    const url = buildPhotoUrl(productId, fn);
+    if (!url) continue;
+    await downloadPhoto(url, fn);
+    // Espacio entre descargas — Chrome/Firefox pueden suprimir si llegan
+    // demasiado seguidas. 250ms va sobrado.
+    if (i < filenames.length - 1) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  toast.success(`Descargadas ${filenames.length} foto(s)`);
+}
+
+/** Convierte `trendy_uplifting` → `Trendy uplifting`, `high-energy_bass` →
+ *  `High energy bass`. Pensado para mostrar enum values generados por
+ *  Gemini de forma legible al humano. */
+function humanize(raw: string): string {
+  if (!raw) return "";
+  const cleaned = raw.replace(/[_\-]+/g, " ").trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+}
+
+function formatPresetDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const today = new Date();
+  const sameDay =
+    d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  if (sameDay) return `hoy ${hh}:${mm}`;
+  const dd = d.getDate().toString().padStart(2, "0");
+  const mo = (d.getMonth() + 1).toString().padStart(2, "0");
+  return `${dd}/${mo} ${hh}:${mm}`;
+}
+
 function FilterChip({
   label,
   active,
@@ -620,6 +824,7 @@ function PresetCard({
     keywords: preset.keywords,
     seedance_prompt: preset.seedance_prompt,
     veo3_prompt: preset.veo3_prompt,
+    veo3_photo_filenames: preset.veo3_photo_filenames ?? [],
     notes: preset.notes,
   }));
 
@@ -1346,6 +1551,27 @@ function PresetCard({
             />
           </Field>
 
+          {/* Selector de fotos para Veo 3 — Gemini ya marcó las suyas, el
+              user puede ajustar. Hasta 3 fotos. Se adjuntan MANUALMENTE
+              al pegar el prompt en Gemini chat / Flow. */}
+          <Field label="Fotos a adjuntar al prompt de Veo 3 (máx 3)">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground">
+                Gemini eligió las que mejor encajan con la escena. El
+                user copia el prompt en Gemini chat / Flow y adjunta
+                estas fotos manualmente.
+              </p>
+              <PhotoChecklist
+                product={product}
+                selected={draft.veo3_photo_filenames ?? []}
+                onChange={(next) =>
+                  setDraft({ ...draft, veo3_photo_filenames: next })
+                }
+                max={3}
+              />
+            </div>
+          </Field>
+
           <div className="flex gap-2 pt-2">
             <Button
               onClick={handleSave}
@@ -1395,6 +1621,19 @@ function PresetCard({
                 </Badge>
               )}
               {(() => {
+                // En música, ignoramos `style` (heredado como "voiceover")
+                // y mostramos "Sin voz" — el vídeo sale mudo, el creator
+                // añade trending audio en TikTok app.
+                if (preset.kind === "music") {
+                  return (
+                    <span
+                      className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+                      title="Vídeo mudo + texto. Añade trending audio al subir a TikTok."
+                    >
+                      🔇 Sin voz
+                    </span>
+                  );
+                }
                 const meta = STYLE_LABEL[preset.style];
                 if (!meta) return null;
                 return (
@@ -1405,7 +1644,7 @@ function PresetCard({
                     )}
                     title={meta.help}
                   >
-                    {meta.label}
+                    🎤 {meta.label}
                   </span>
                 );
               })()}
@@ -1429,10 +1668,19 @@ function PresetCard({
                     : "auto-plano"}
               </span>
               {preset.music_mood && (
-                <span className="text-[10px] text-muted-foreground">
-                  · {preset.music_mood}
+                <span
+                  className="text-[10px] text-muted-foreground"
+                  title={`Mood musical (raw: ${preset.music_mood})`}
+                >
+                  · {humanize(preset.music_mood)}
                 </span>
               )}
+              <span
+                className="ml-auto text-[9px] text-muted-foreground/70"
+                title={`Creado: ${preset.created_at}\nActualizado: ${preset.updated_at}`}
+              >
+                {formatPresetDate(preset.created_at)}
+              </span>
             </div>
             {/* Línea de compatibilidad con los 4 tiers — tachado los no
                 compatibles + tooltip explicando por qué. */}
@@ -1546,14 +1794,104 @@ function PresetCard({
             )}
             {preset.seedance_prompt && (
               <Detail
-                label="Seedance prompt (Standard/Advanced)"
+                label="Seedance prompt (Standard / Advanced / Pro) · ~25 palabras"
                 value={preset.seedance_prompt}
+                hint="Seedance es image-to-video: la foto del producto aporta el contexto visual, el prompt solo describe el movimiento de cámara, acción y luz. Por eso es corto (~20-30 palabras es lo óptimo, no hace falta describir el producto)."
                 mono
               />
             )}
             {preset.veo3_prompt && (
-              <Detail label="Veo 3 prompt" value={preset.veo3_prompt} mono />
+              <div className="rounded border border-violet-500/30 bg-violet-500/5 p-1.5">
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                    🎬 Veo 3 (copy-paste a Gemini chat / Flow)
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 gap-1 px-2 text-[10px]"
+                      onClick={() => copyToClipboard(preset.veo3_prompt)}
+                      title="Copia el prompt al portapapeles"
+                    >
+                      📋 Copiar prompt
+                    </Button>
+                    {preset.veo3_photo_filenames &&
+                      preset.veo3_photo_filenames.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 gap-1 px-2 text-[10px]"
+                          onClick={() =>
+                            downloadAllPhotos(
+                              product.id,
+                              preset.veo3_photo_filenames,
+                            )
+                          }
+                          title="Descarga todas las fotos elegidas al disco (calidad original)"
+                        >
+                          ⬇️ Descargar fotos ({preset.veo3_photo_filenames.length})
+                        </Button>
+                      )}
+                  </div>
+                </div>
+                <Detail
+                  label="Prompt · ~80-120 palabras"
+                  value={preset.veo3_prompt}
+                  hint="Veo 3 NO va por API en este flujo. Copia el prompt y descarga las fotos abajo — pega ambas en Gemini chat / Flow."
+                  mono
+                />
+              </div>
             )}
+            {preset.veo3_photo_filenames &&
+              preset.veo3_photo_filenames.length > 0 && (
+                <div className="rounded border border-violet-500/30 bg-violet-500/5 p-1.5">
+                  <p className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                    📎 Adjuntar al prompt de Veo 3 ({preset.veo3_photo_filenames.length}):
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {preset.veo3_photo_filenames.map((fn) => {
+                      const url = buildPhotoUrl(product.id, fn);
+                      return (
+                        <div
+                          key={fn}
+                          className="group relative flex items-center gap-1 rounded border border-violet-500/30 bg-background p-0.5"
+                          title={`${fn}\n— Click miniatura: ver original.\n— Botón ⬇: descargar al disco.`}
+                        >
+                          {url && (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver foto original en pestaña nueva"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={fn}
+                                className="h-10 w-10 rounded object-cover hover:opacity-80"
+                              />
+                            </a>
+                          )}
+                          <span className="max-w-[120px] truncate text-[9px] text-muted-foreground">
+                            {fn}
+                          </span>
+                          {url && (
+                            <button
+                              type="button"
+                              onClick={() => downloadPhoto(url, fn)}
+                              className="ml-0.5 rounded px-1 text-[10px] text-muted-foreground hover:bg-violet-500/20 hover:text-violet-700 dark:hover:text-violet-300"
+                              title="Descargar esta foto al disco"
+                            >
+                              ⬇
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             <p className="pt-1 text-[10px] text-muted-foreground">
               Source:{" "}
               <span className="font-mono">{preset.source}</span>
@@ -1563,6 +1901,79 @@ function PresetCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Grid de fotos source del producto con checkboxes para que el user
+ *  marque cuáles adjuntar al prompt de Veo 3. Respeta `max` (suelta el
+ *  primer checked si el user marca uno más allá del límite). */
+function PhotoChecklist({
+  product,
+  selected,
+  onChange,
+  max,
+}: {
+  product: Product;
+  selected: string[];
+  onChange: (next: string[]) => void;
+  max: number;
+}) {
+  const sourcePhotos = product.photos.source.filter((p) => !p.deleted);
+  if (sourcePhotos.length === 0) {
+    return (
+      <p className="text-[10px] italic text-muted-foreground">
+        Este producto no tiene fotos source. Sube alguna en el tab Fotos
+        para que Gemini pueda elegirlas.
+      </p>
+    );
+  }
+  const set = new Set(selected);
+  function toggle(fn: string) {
+    if (set.has(fn)) {
+      onChange(selected.filter((x) => x !== fn));
+    } else {
+      // Si ya hay `max` seleccionados, suelta el primero (FIFO).
+      const next = selected.length >= max
+        ? [...selected.slice(1), fn]
+        : [...selected, fn];
+      onChange(next);
+    }
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {sourcePhotos.map((p) => {
+        const url = buildPhotoUrl(product.id, p.filename);
+        const checked = set.has(p.filename);
+        return (
+          <button
+            key={p.filename}
+            type="button"
+            onClick={() => toggle(p.filename)}
+            className={cn(
+              "relative h-16 w-16 overflow-hidden rounded border-2 transition-all",
+              checked
+                ? "border-violet-500 ring-2 ring-violet-500/30"
+                : "border-muted hover:border-muted-foreground/40",
+            )}
+            title={p.filename}
+          >
+            {url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={url}
+                alt={p.filename}
+                className="h-full w-full object-cover"
+              />
+            )}
+            {checked && (
+              <span className="absolute right-0.5 top-0.5 rounded-full bg-violet-500 px-1 text-[9px] font-bold text-white">
+                ✓
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1585,15 +1996,33 @@ function Detail({
   label,
   value,
   mono,
+  hint,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  hint?: string;
 }) {
   return (
     <div>
-      <span className="text-muted-foreground">{label}:</span>{" "}
+      <span className="text-muted-foreground" title={hint}>
+        {label}
+        {hint && (
+          <span
+            className="ml-0.5 cursor-help text-[9px] text-muted-foreground/60"
+            title={hint}
+          >
+            (?)
+          </span>
+        )}
+        :
+      </span>{" "}
       <span className={mono ? "font-mono text-[10px]" : ""}>{value}</span>
+      {hint && (
+        <p className="mt-0.5 text-[10px] italic text-muted-foreground/70">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

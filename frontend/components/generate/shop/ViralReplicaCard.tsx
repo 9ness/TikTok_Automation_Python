@@ -30,6 +30,7 @@ import {
   useReplicateViral,
   useSaveShopPreset,
 } from "@/lib/queries/shopPresets";
+import { useSaveViralVideoPreset } from "@/lib/queries/products";
 
 interface Props {
   userId: string;
@@ -38,21 +39,22 @@ interface Props {
 }
 
 const PRESETS_MODEL: { label: string; value: string; note: string }[] = [
-  { label: "Flash 2.5 · barato (~$0.004)", value: "gemini-2.5-flash", note: "default, suficiente para clasificar" },
-  { label: "Flash 3.5 · mejor (~$0.018)", value: "gemini-3.5-flash", note: "más preciso con transiciones/overlays" },
+  { label: "Flash 3.5 · recomendado (~$0.018)", value: "gemini-3.5-flash", note: "más preciso con transiciones/overlays — default" },
+  { label: "Flash 2.5 · barato (~$0.004)", value: "gemini-2.5-flash", note: "suficiente para clasificación básica" },
   { label: "Pro 2.5 · razonamiento (~$0.017)", value: "gemini-2.5-pro", note: "raramente necesario" },
 ];
 
 export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [targetKind, setTargetKind] = useState<ShopPresetKind>("auto_video");
-  const [model, setModel] = useState<string>("gemini-2.5-flash");
+  const [model, setModel] = useState<string>("gemini-3.5-flash");
   const [customModel, setCustomModel] = useState<string>("");
   const [result, setResult] = useState<ReplicateViralResponse | null>(null);
   const [presetName, setPresetName] = useState<string>("");
 
   const replicate = useReplicateViral();
   const save = useSaveShopPreset(userId, productId, targetKind);
+  const saveAsVideoPreset = useSaveViralVideoPreset(productId);
 
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
@@ -90,9 +92,35 @@ export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
       toast.error("Elige un nombre para el preset.");
       return;
     }
+    // Para auto_video / veo3 + si el backend devolvió `video_preset` (formato
+    // nuevo con prompts Seedance/Veo3, fotos, overlays), lo guardamos como
+    // VideoPreset en el producto — aparece en el grid de presets junto a
+    // los autogen. Para nano_banana (o si no hay video_preset) caemos al
+    // sistema legacy de configuraciones guardadas.
+    const useNewFormat =
+      (targetKind === "auto_video" || targetKind === "veo3") &&
+      result.video_preset !== null &&
+      result.video_preset !== undefined;
     try {
-      await save.mutateAsync({ name: presetName.trim(), config: result.config });
-      toast.success(`Preset '${presetName.trim()}' guardado en modo ${targetKind}.`);
+      if (useNewFormat) {
+        const payload = {
+          ...(result.video_preset as Record<string, unknown>),
+          name: presetName.trim(),
+        };
+        await saveAsVideoPreset.mutateAsync(payload);
+        toast.success(
+          `Preset '${presetName.trim()}' añadido a los presets del producto. ` +
+            `Ya puedes usarlo en /tiktok-shop/generate.`,
+        );
+      } else {
+        await save.mutateAsync({
+          name: presetName.trim(),
+          config: result.config,
+        });
+        toast.success(
+          `Preset '${presetName.trim()}' guardado en modo ${targetKind}.`,
+        );
+      }
       setResult(null);
       setFile(null);
       setPresetName("");
@@ -196,14 +224,24 @@ export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
                 <DetectionGrid detected={result.detected} />
               </div>
 
-              <div className="rounded-md border bg-muted/30 p-3 text-xs">
-                <p className="mb-2 font-semibold uppercase tracking-wider text-muted-foreground">
-                  Config preset (lo que se va a guardar)
-                </p>
-                <pre className="overflow-auto whitespace-pre-wrap break-words text-[10px]">
-                  {JSON.stringify(result.config, null, 2)}
-                </pre>
-              </div>
+              {/* Si target es auto_video / veo3 → mostramos el VideoPreset
+                  completo que se va a persistir (con prompts + fotos). */}
+              {(targetKind === "auto_video" || targetKind === "veo3") &&
+              result.video_preset ? (
+                <VideoPresetPreview
+                  videoPreset={result.video_preset}
+                  productId={productId}
+                />
+              ) : (
+                <div className="rounded-md border bg-muted/30 p-3 text-xs">
+                  <p className="mb-2 font-semibold uppercase tracking-wider text-muted-foreground">
+                    Config preset (lo que se va a guardar)
+                  </p>
+                  <pre className="overflow-auto whitespace-pre-wrap break-words text-[10px]">
+                    {JSON.stringify(result.config, null, 2)}
+                  </pre>
+                </div>
+              )}
 
               <div className="flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs">
                 <span>Coste real del análisis</span>
@@ -239,6 +277,109 @@ export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function VideoPresetPreview({
+  videoPreset,
+  productId,
+}: {
+  videoPreset: Record<string, unknown>;
+  productId: string;
+}) {
+  const vp = videoPreset as {
+    name?: string;
+    kind?: string;
+    angle?: string;
+    style?: string;
+    duration_s?: number;
+    compatible_tiers?: string[];
+    text_overlay?: string;
+    voice_script?: string;
+    seedance_prompt?: string;
+    veo3_prompt?: string;
+    veo3_photo_filenames?: string[];
+  };
+  const photos = vp.veo3_photo_filenames ?? [];
+  return (
+    <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+      <p className="mb-2 font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+        🎯 VideoPreset completo (se guarda en el producto)
+      </p>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        <div className="flex justify-between border-b border-dashed py-0.5">
+          <span className="text-muted-foreground">Kind</span>
+          <strong>
+            {vp.kind === "music" ? "🎵 Música (sin voz)" : "🎤 Scripted"}
+          </strong>
+        </div>
+        <div className="flex justify-between border-b border-dashed py-0.5">
+          <span className="text-muted-foreground">Ángulo</span>
+          <strong>{vp.angle || "—"}</strong>
+        </div>
+        <div className="flex justify-between border-b border-dashed py-0.5">
+          <span className="text-muted-foreground">Estilo</span>
+          <strong>{vp.style}</strong>
+        </div>
+        <div className="flex justify-between border-b border-dashed py-0.5">
+          <span className="text-muted-foreground">Duración</span>
+          <strong>{vp.duration_s}s</strong>
+        </div>
+        <div className="col-span-full flex justify-between border-b border-dashed py-0.5">
+          <span className="text-muted-foreground">Tiers compatibles</span>
+          <strong>{(vp.compatible_tiers ?? []).join(" · ")}</strong>
+        </div>
+      </div>
+
+      {vp.text_overlay && (
+        <p className="mt-2 rounded bg-muted/50 p-1.5 text-[11px] italic">
+          Hook en pantalla: &ldquo;{vp.text_overlay}&rdquo;
+        </p>
+      )}
+      {vp.voice_script && (
+        <div className="mt-1.5">
+          <p className="text-[10px] text-muted-foreground">Guion adaptado:</p>
+          <p className="rounded bg-muted/30 p-1.5 text-[10px]">{vp.voice_script}</p>
+        </div>
+      )}
+      {vp.seedance_prompt && (
+        <div className="mt-1.5">
+          <p className="text-[10px] text-muted-foreground">
+            Seedance prompt (Std/Adv/Pro):
+          </p>
+          <p className="rounded bg-muted/30 p-1.5 font-mono text-[10px]">
+            {vp.seedance_prompt}
+          </p>
+        </div>
+      )}
+      {vp.veo3_prompt && (
+        <div className="mt-1.5">
+          <p className="text-[10px] text-muted-foreground">
+            Veo 3 prompt:
+          </p>
+          <p className="rounded bg-muted/30 p-1.5 font-mono text-[10px]">
+            {vp.veo3_prompt}
+          </p>
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div className="mt-1.5 rounded border border-violet-500/30 bg-violet-500/5 p-1.5">
+          <p className="text-[10px] text-violet-700 dark:text-violet-300">
+            📎 Fotos elegidas para Veo 3 ({photos.length}):
+          </p>
+          <ul className="ml-3 list-disc text-[10px]">
+            {photos.map((fn) => (
+              <li key={fn}>{fn}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="mt-2 text-[10px] italic text-muted-foreground">
+        Al guardar, este preset aparecerá en /tiktok-shop/generate (tab
+        Auto vídeo / Veo 3) listo para encolar — formato idéntico a los
+        autogenerados.
+      </p>
+    </div>
   );
 }
 

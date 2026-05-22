@@ -39,7 +39,8 @@ Schema (SIEMPRE este shape, sin campos extra):
       "compatible_tiers": ["standard", "advanced", "pro", "veo3_prompt_only"],
       "music_mood": "trendy_uplifting",
       "seedance_prompt": "Slow zoom on cream jar held in hand, golden hour light on beige bathroom counter, hand opens lid, soft warm glow",
-      "veo3_prompt": "Cinematic close-up shot of woman's hand holding a beige cream jar in a sunlit modern bathroom, slow camera zoom from medium to detail, golden hour warm light, soft beige tones, no people speaking, only ambient music vibe, 10 seconds"
+      "veo3_prompt": "Cinematic close-up shot of woman's hand holding a beige cream jar in a sunlit modern bathroom, slow camera zoom from medium to detail, golden hour warm light, soft beige tones, no people speaking, only ambient music vibe, 10 seconds",
+      "veo3_photo_filenames": ["packshot_main.jpg", "lifestyle_bathroom.jpg"]
     }
   ],
   "text_overlays_library": [
@@ -93,9 +94,25 @@ Schema (SIEMPRE este shape, sin campos extra):
   hace la cámara con la foto del producto + iluminación + mood.
   Imperativo. Sin frases largas. Para Seedance i2v.
 - `veo3_prompt`: **inglés**, ~50-80 palabras. Descripción rica
-  (ángulo, luz, mood, color, sensación). Veo 3 no usa fotos, así
-  que el prompt debe IMAGINAR la escena entera del producto.
+  (ángulo, luz, mood, color, sensación). El user copia este prompt
+  en Gemini chat / Flow y adjunta MANUALMENTE las fotos que tú
+  elijas en `veo3_photo_filenames` (no van por API). Por eso el
+  prompt puede ser un poco más corto que si fuera puro texto —
+  asume que el modelo ve las fotos.
   Incluye "no narration, ambient music only, [N] seconds" al final.
+- `veo3_photo_filenames`: **array de hasta 3 filenames** de la lista
+  de fotos disponibles que te pasé (las viste como imágenes en
+  este mismo prompt). Elige las que mejor encajen con la escena
+  del `veo3_prompt`:
+    - Si la escena es packshot puro → 1 sola foto: el packshot más
+      limpio.
+    - Si la escena mezcla packshot + entorno (lifestyle/bathroom/
+      kitchen) → 2 fotos: packshot + lifestyle complementaria.
+    - Si la escena es muy variada (transición de detalle a uso) →
+      hasta 3: packshot + lifestyle + textura/detalle.
+    DEBES referenciar el filename EXACTO de la lista que te di,
+    sin paths ni extensiones inventadas. Si no hay fotos
+    disponibles → `[]`.
 
 **Variedad obligatoria entre presets:**
 - Cada preset usa un ángulo DIFERENTE del menú:

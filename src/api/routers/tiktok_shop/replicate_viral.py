@@ -110,15 +110,32 @@ async def replicate_viral(
             details={"path": str(dest)},
         )
 
+    from src.cost_tracking import finalize_and_persist, start_job
     from src.tiktok_shop.pipeline.viral_analyzer import analyze_viral_video
+
+    # Cost tracking: registra el coste real de los Gemini calls del análisis.
+    import uuid as _uuid
+    start_job(
+        job_id=f"viral_{_uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="viral_replica",
+        title=f"Viral replica: {product.slug}",
+        product_id=product_id,
+        user=user.username,
+    )
     try:
         result = analyze_viral_video(
             str(dest),
             target_kind=target_kind,
             same_product=same_product,
             gemini_model=gemini_model,
+            product=product,
         )
     except RuntimeError as e:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
         raise APIError(f"Análisis viral falló: {e}", details={"video": file.filename})
     finally:
         # No conservamos el vídeo del usuario — análisis síncrono, sin
@@ -127,6 +144,10 @@ async def replicate_viral(
         try:
             Path(dest).unlink(missing_ok=True)
         except OSError:
+            pass
+        try:
+            finalize_and_persist()
+        except Exception:
             pass
 
     return ReplicateViralResponse(**result)

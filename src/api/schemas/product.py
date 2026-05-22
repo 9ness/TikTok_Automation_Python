@@ -410,6 +410,9 @@ class VideoPresetResponse(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     seedance_prompt: str = ""
     veo3_prompt: str = ""
+    # Fotos del producto que Gemini eligió para adjuntar a Veo 3 (max 3).
+    # El user las adjunta MANUALMENTE al pegar el prompt en Gemini chat / Flow.
+    veo3_photo_filenames: list[str] = Field(default_factory=list)
     source: str = "manual"
     notes: str = ""
     created_at: str
@@ -426,10 +429,36 @@ class GeneratePresetsRequest(BaseModel):
 
 
 class GeneratePresetsResponse(BaseModel):
+    """Respuesta INMEDIATA del endpoint async. Devuelve el `gen_id` para
+    que el frontend pueda hacer polling del progreso. Los presets reales
+    se persistirán cuando la BackgroundTask termine."""
     product_id: str
-    created_count: int
+    gen_id: str
+    stage: str = "started"
+    # NOTA: `created_count` y `presets` quedan vacíos en la response
+    # inicial. El frontend los obtiene cuando stage="done" via polling
+    # del status endpoint + refetch del producto.
+    created_count: int = 0
     presets: list[VideoPresetResponse] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class PresetGenStatusResponse(BaseModel):
+    """Snapshot del progreso de una generación en curso."""
+    gen_id: str
+    product_id: str
+    kind: str                       # "music" | "scripted" | "both"
+    stage: str                       # started|generating_music|generating_scripted|saving|done|error
+    percent: int                     # 0-100
+    expected_count: int
+    created_count: int
+    warnings: list[str] = Field(default_factory=list)
+    started_at: str
+    ended_at: str | None = None
+    error: str | None = None
+    # Coste acumulado de llamadas a Gemini en USD. Se llena tras cada
+    # stage (music/scripted) leyendo `cost_tracking.get_active()`.
+    cost_usd: float = 0.0
 
 
 class GenerateVariantsRequest(BaseModel):
@@ -471,6 +500,7 @@ class VideoPresetUpdateRequest(BaseModel):
     keywords: list[str] | None = None
     seedance_prompt: str | None = None
     veo3_prompt: str | None = None
+    veo3_photo_filenames: list[str] | None = None
     angle: str | None = None
     notes: str | None = None
     compatible_tiers: list[str] | None = None

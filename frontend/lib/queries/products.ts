@@ -17,6 +17,7 @@ import type {
   GeneratePresetsResponse,
   GenerateVariantsInput,
   GenerateVariantsResponse,
+  PresetGenStatus,
   GoogleImageSearchInput,
   GoogleImageSearchResponse,
   ImportPhotosFromUrlsInput,
@@ -276,6 +277,34 @@ export function useUpdateVideoPreset(productId: string) {
   });
 }
 
+/** Hook de polling del progreso de la generación de presets. */
+export function usePresetGenStatus(
+  productId: string,
+  genId: string | null,
+  options?: { onDone?: () => void },
+) {
+  const qc = useQueryClient();
+  return useQuery<PresetGenStatus>({
+    queryKey: [...productKeys.detail(productId), "preset-gen", genId],
+    queryFn: () =>
+      api.get<PresetGenStatus>(
+        `${ROOT}/${productId}/preset-gen-status/${genId}`,
+      ),
+    enabled: Boolean(genId),
+    refetchInterval: (q) => {
+      const s = q.state.data?.stage;
+      if (s === "done" || s === "error") {
+        // Refresh el producto para que la lista de presets se actualice.
+        qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+        options?.onDone?.();
+        return false;
+      }
+      return 2000;
+    },
+    refetchOnWindowFocus: false,
+  });
+}
+
 /** Genera N variantes A/B de un preset via Gemini. NO persiste — son
  *  one-shot para encolar tests inteligentes. */
 export function useGenerateVariants(productId: string) {
@@ -289,6 +318,23 @@ export function useGenerateVariants(productId: string) {
         `${ROOT}/${productId}/video-presets/${presetId}/generate-variants`,
         input,
       ),
+  });
+}
+
+/** Persiste un VideoPreset generado por el analizador viral en el
+ *  producto. El payload es el dict completo `result.video_preset` que
+ *  devuelve el endpoint replicate-viral. */
+export function useSaveViralVideoPreset(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<VideoPreset, Error, Record<string, unknown>>({
+    mutationFn: (videoPresetPayload) =>
+      api.post<VideoPreset>(
+        `${ROOT}/${productId}/video-presets/save-viral`,
+        videoPresetPayload,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
   });
 }
 

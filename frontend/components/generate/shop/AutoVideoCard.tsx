@@ -27,11 +27,41 @@ import { useVoices } from "@/lib/queries/voices";
 import { BulkGenerateDialog } from "./BulkGenerateDialog";
 import { DEFAULT_OVERLAYS, OverlaysPanel } from "./OverlaysPanel";
 import { PresetControls } from "./PresetControls";
-import { TestBatchPanel } from "./TestBatchPanel";
 import { VideoPresetsPicker } from "./VideoPresetsPicker";
-import { Layers } from "lucide-react";
+import { FlaskConical, Layers, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { VideoPreset } from "@/lib/types/product";
+
+/** 3 modos de generación que el user elige al inicio del flujo:
+ *  - `single`  → 1 preset → 1 vídeo. Click "Generar vídeo".
+ *  - `batch`   → multi-select N presets → 1 vídeo por preset.
+ *  - `variants`→ 1 preset → N variantes A/B (Gemini varía dimensiones).
+ *
+ *  El modo cambia: (a) el comportamiento de VideoPresetsPicker (single
+ *  vs multi-select), (b) la barra de acción principal abajo.
+ */
+type GenMode = "single" | "batch" | "variants";
+
+const MODE_META: Record<GenMode, { label: string; subtitle: string; icon: typeof Target; cls: string }> = {
+  single: {
+    label: "1 vídeo",
+    subtitle: "Selecciona 1 preset → 1 vídeo",
+    icon: Target,
+    cls: "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
+  batch: {
+    label: "Lote",
+    subtitle: "N presets → 1 vídeo c/u",
+    icon: Layers,
+    cls: "border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  },
+  variants: {
+    label: "Variantes A/B",
+    subtitle: "1 preset → N variantes IA",
+    icon: FlaskConical,
+    cls: "border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  },
+};
 
 interface AutoVideoConfig {
   tier: Tier;
@@ -100,7 +130,49 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
   const [activeVideoPresetId, setActiveVideoPresetId] = useState<string | null>(
     null,
   );
+  // Modo de generación (ver `GenMode`). El user lo elige al inicio.
+  const [mode, setMode] = useState<GenMode>("single");
+  // En modo `batch`, IDs de presets marcados. En `single` y `variants`
+  // se usa `activeVideoPresetId`.
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(
+    new Set(),
+  );
+  // En modo `variants`, cuántas variantes generar del preset activo.
+  const [variantsN, setVariantsN] = useState(3);
+  // Open state del BulkGenerateDialog (común para batch/variants).
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSmart, setBulkSmart] = useState(false);
+
+  function toggleBatchPreset(id: string) {
+    setBatchSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearBatch() {
+    setBatchSelectedIds(new Set());
+  }
+
+  function openBatchDialog() {
+    if (batchSelectedIds.size === 0) {
+      toast.error("Marca al menos 1 preset en el grid");
+      return;
+    }
+    setBulkSmart(false);
+    setBulkOpen(true);
+  }
+
+  function openVariantsDialog() {
+    if (!activeVideoPresetId) {
+      toast.error("Selecciona 1 preset primero");
+      return;
+    }
+    setBulkSmart(true);
+    setBulkOpen(true);
+  }
 
   const enqueue = useEnqueueGeneration();
   const openQueue = useDrawerStore((s) => s.openQueue);
@@ -241,9 +313,42 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
           </div>
         )}
 
-        {/* TIER SELECTOR — visible siempre, no en colapsable */}
+        {/* ───── PASO 1 · Modo de generación ───── */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Modelo Seedance</Label>
+          <Label className="text-xs">1 · ¿Qué quieres generar?</Label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(["single", "batch", "variants"] as GenMode[]).map((m) => {
+              const meta = MODE_META[m];
+              const Icon = meta.icon;
+              const isActive = mode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={cn(
+                    "flex flex-col gap-0.5 rounded-md border-2 px-1.5 py-2 text-left text-xs transition-colors",
+                    isActive
+                      ? meta.cls
+                      : "border-muted hover:border-muted-foreground/40",
+                  )}
+                >
+                  <div className="flex items-center gap-1">
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <strong className="text-[11px]">{meta.label}</strong>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground line-clamp-2">
+                    {meta.subtitle}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ───── PASO 2 · Modelo Seedance ───── */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">2 · Modelo Seedance</Label>
           <div className="grid grid-cols-3 gap-1.5">
             {ATLAS_TIERS.map((t) => (
               <button
@@ -264,69 +369,107 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
           </div>
         </div>
 
-        {/* PRESETS DEL PRODUCTO (video_presets) filtrados por tier */}
-        <VideoPresetsPicker
-          productId={productId}
-          tier={config.tier}
-          activePresetId={activeVideoPresetId}
-          onPick={applyVideoPreset}
-          onClear={clearVideoPreset}
-        />
-
-        {/* Presets legacy (configuraciones guardadas con nombre) — solo si
-            el usuario las usa. Las dejo accesibles pero discretas. */}
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-            Configuraciones guardadas (avanzado)
-          </summary>
-          <div className="mt-2">
-            <PresetControls
-              userId={userId}
-              productId={productId}
-              kind="auto_video"
-              selectedName={selectedPreset}
-              onSelectName={setSelectedPreset}
-              currentConfig={config as unknown as Record<string, unknown>}
-              onLoadConfig={applyConfig}
-            />
-          </div>
-        </details>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={generate} disabled={enqueue.isPending} className="flex-1">
-            {enqueue.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Generar vídeo
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Ocultar" : "Configurar"}
-          </Button>
+        {/* ───── PASO 3 · Preset(s) ───── */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">
+            3 · {mode === "batch"
+              ? "Marca los presets que quieras encolar"
+              : mode === "variants"
+                ? "Elige el preset base de las variantes"
+                : "Elige el preset"}
+          </Label>
+          <VideoPresetsPicker
+            productId={productId}
+            tier={config.tier}
+            activePresetId={activeVideoPresetId}
+            onPick={applyVideoPreset}
+            onClear={clearVideoPreset}
+            multiMode={mode === "batch"}
+            selectedIds={mode === "batch" ? batchSelectedIds : undefined}
+            onToggleSelect={mode === "batch" ? toggleBatchPreset : undefined}
+            onSelectAll={
+              mode === "batch"
+                ? (ids) => setBatchSelectedIds(new Set(ids))
+                : undefined
+            }
+          />
         </div>
 
-        {/* Generación masiva — N variantes × M presets */}
-        <div className="flex flex-wrap gap-2">
+        {/* En modo Variantes A/B, input de N variantes (visible solo aquí) */}
+        {mode === "variants" && (
+          <div className="flex items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 p-2">
+            <Label className="text-xs whitespace-nowrap" htmlFor="variants-n">
+              Nº variantes
+            </Label>
+            <Input
+              id="variants-n"
+              type="number"
+              min={2}
+              max={8}
+              value={variantsN}
+              onChange={(e) =>
+                setVariantsN(
+                  Math.max(2, Math.min(8, parseInt(e.target.value) || 2)),
+                )
+              }
+              className="h-7 w-16 text-xs"
+            />
+            <span className="text-[10px] text-muted-foreground">
+              Gemini variará text overlay, color, CTA, voz, mood…
+            </span>
+          </div>
+        )}
+
+        {/* ───── ACCIÓN PRINCIPAL ───── */}
+        <div className="flex flex-wrap items-center gap-2">
+          {mode === "single" && (
+            <Button
+              onClick={generate}
+              disabled={enqueue.isPending || !activeVideoPresetId}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              title={!activeVideoPresetId ? "Elige un preset primero" : ""}
+            >
+              {enqueue.isPending ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-1.5 h-4 w-4" />
+              )}
+              Generar 1 vídeo
+            </Button>
+          )}
+          {mode === "batch" && (
+            <Button
+              onClick={openBatchDialog}
+              disabled={enqueue.isPending || batchSelectedIds.size === 0}
+              className="flex-1 bg-sky-600 hover:bg-sky-700"
+            >
+              <Layers className="mr-1.5 h-4 w-4" />
+              Encolar lote ({batchSelectedIds.size}{" "}
+              {batchSelectedIds.size === 1 ? "vídeo" : "vídeos"})
+            </Button>
+          )}
+          {mode === "variants" && (
+            <Button
+              onClick={openVariantsDialog}
+              disabled={enqueue.isPending || !activeVideoPresetId}
+              className="flex-1 bg-violet-600 hover:bg-violet-700"
+              title={!activeVideoPresetId ? "Elige el preset base primero" : ""}
+            >
+              <FlaskConical className="mr-1.5 h-4 w-4" />
+              Generar {variantsN} variantes A/B
+            </Button>
+          )}
           <Button
-            type="button"
             variant="outline"
             size="sm"
-            onClick={() => setBulkOpen(true)}
-            disabled={enqueue.isPending}
-            className="text-emerald-700 dark:text-emerald-300"
+            onClick={() => setExpanded((v) => !v)}
           >
-            <Layers className="mr-1.5 h-3.5 w-3.5" />
-            Generación masiva (N × presets)
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <span className="ml-1 hidden sm:inline">
+              {expanded ? "Ocultar" : "Avanzado"}
+            </span>
           </Button>
         </div>
-
-        <TestBatchPanel
-          basePayload={currentPayload}
-          estimatedCostPerVideo={estimatedPerVideo}
-          disabled={enqueue.isPending}
-        />
 
         <BulkGenerateDialog
           open={bulkOpen}
@@ -334,10 +477,35 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
           basePayload={currentPayload}
           productId={productId}
           tier={config.tier}
+          initialSmartMode={bulkSmart}
+          initialSelectedPresetIds={
+            bulkSmart
+              ? activeVideoPresetId
+                ? [activeVideoPresetId]
+                : []
+              : Array.from(batchSelectedIds)
+          }
+          initialVariantsPerPreset={bulkSmart ? variantsN : 1}
         />
 
         {expanded && (
           <div className="space-y-3 border-t pt-3">
+            {/* Configuraciones guardadas (legacy) — solo si el user las usa. */}
+            <CollapsibleCard
+              title="Configuraciones guardadas"
+              defaultOpen={false}
+            >
+              <PresetControls
+                userId={userId}
+                productId={productId}
+                kind="auto_video"
+                selectedName={selectedPreset}
+                onSelectName={setSelectedPreset}
+                currentConfig={config as unknown as Record<string, unknown>}
+                onLoadConfig={applyConfig}
+              />
+            </CollapsibleCard>
+
             {/* Estrategia + resolución (el tier ya está fuera del expanded) */}
             <CollapsibleCard title="Estrategia & resolución" defaultOpen>
               <div className="space-y-3">

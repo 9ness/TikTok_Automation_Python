@@ -226,6 +226,13 @@ class VideoPreset(BaseModel):
     seedance_prompt: str = ""
     # Veo 3 (prompt-only): prompt rico y descriptivo de toda la escena.
     veo3_prompt: str = ""
+    # Fotos del producto que Gemini eligió para adjuntar a Veo 3.
+    # Veo 3 NO va por API en este flujo — el user copia el prompt al chat
+    # de Gemini / Flow y adjunta MANUALMENTE estas fotos para dar contexto
+    # visual al modelo. Hasta 3 filenames de `product.photos.source`.
+    # Gemini ve las fotos source al generar el preset y elige las que
+    # mejor encajan con el ángulo/escena del Veo 3 prompt.
+    veo3_photo_filenames: list[str] = Field(default_factory=list)
 
     # ─── META ───
     source: str = "manual"          # "music_bof" | "scripted_bof" | "manual"

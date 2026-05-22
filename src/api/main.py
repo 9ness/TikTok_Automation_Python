@@ -7,6 +7,20 @@ Arrancar en local con:
 from __future__ import annotations
 
 # ============================================================
+# Windows stdout encoding fix: por defecto cp1252 no soporta emojis →
+# cualquier `print("🎙️ ...")` en runners (locutor.py, etc.) crashea la
+# tarea con `UnicodeEncodeError`. Lo arreglamos forzando UTF-8 en stdout
+# / stderr lo antes posible. `errors="replace"` por si algún byte sigue
+# fuera de tabla (no rompe el job).
+# ============================================================
+import sys as _sys
+try:
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+except Exception:
+    pass  # No-op en plataformas/entornos donde reconfigure no aplica
+
+# ============================================================
 # Compat patch: moviepy 1.0.3 usa `Image.ANTIALIAS` que Pillow 10+ eliminó.
 # El equivalente moderno es `Image.LANCZOS`. Hay que parchearlo ANTES de
 # importar moviepy (que se carga indirectamente por los runners). El mismo

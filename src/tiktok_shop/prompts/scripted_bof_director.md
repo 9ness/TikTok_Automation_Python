@@ -66,7 +66,8 @@ Schema (SIEMPRE este shape, sin campos extra):
       "voice_tone": "persuasive",
       "music_mood": "subtle_chill",
       "seedance_prompt": "Person holds cream jar at chest level, looks at camera, soft natural light",
-      "veo3_prompt": "Medium close-up shot of young woman in casual t-shirt holding a beige cream jar at chest level, looking directly at camera with subtle confident smile, soft natural bedroom light, light beige aesthetic background, woman starts speaking naturally (lip-sync from script), ambient indie music, 10 seconds"
+      "veo3_prompt": "Medium close-up shot of young woman in casual t-shirt holding a beige cream jar at chest level, looking directly at camera with subtle confident smile, soft natural bedroom light, light beige aesthetic background, woman starts speaking naturally (lip-sync from script), ambient indie music, 10 seconds",
+      "veo3_photo_filenames": ["packshot_main.jpg", "lifestyle_bathroom.jpg"]
     },
     {
       "name": "Ángulo Ahorro · 12s (voiceover)",
@@ -250,11 +251,25 @@ hasta agotarlos):
   producto (ángulo, luz). El audio del voice_script va por separado
   vía TTS, NO lo describas aquí.
 
-- `veo3_prompt`: **inglés**, ~80-120 palabras. Para Veo 3 prompt-only
-  — descripción RICA: persona, ropa, espacio, luz, mood, acción,
+- `veo3_prompt`: **inglés**, ~80-120 palabras. Para Veo 3 — el user
+  copia este prompt en Gemini chat / Flow y adjunta MANUALMENTE las
+  fotos que tú elijas en `veo3_photo_filenames` (no va por API).
+  Descripción RICA: persona, ropa, espacio, luz, mood, acción,
   ambient sound (música, no narración). El TTS del voice_script va
   por separado, NO lo embebas aquí; pero sí puedes indicar
   "person speaks softly" para que Veo 3 simule lip-sync coherente.
+  Puede ser un poco más corto si las fotos cubren la parte visual.
+
+- `veo3_photo_filenames`: **array de hasta 3 filenames** de la lista
+  de fotos disponibles que te pasé (las viste como imágenes en este
+  mismo prompt). Elige las que mejor encajen con el ángulo / escena
+  del `veo3_prompt`:
+    - Para `style=creator_pov` (persona hablando) → si hay foto de
+      persona usándolo, inclúyela; si no, packshot puro (mejor 1 sola).
+    - Para `style=voiceover` (sin persona en cámara) → 1-3 fotos:
+      packshot + lifestyle + textura/detalle si encajan con el ángulo.
+    DEBES referenciar el filename EXACTO de la lista que te di, sin
+    paths ni extensiones inventadas. Si no hay fotos disponibles → `[]`.
 
 **Estilo del voice_script:**
 - Persuasivo, entretenido, moderno, energía controlada.

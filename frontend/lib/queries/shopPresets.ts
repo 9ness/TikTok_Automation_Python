@@ -97,6 +97,10 @@ export function useDeleteShopPreset(
 export interface ReplicateViralResponse {
   config: Record<string, unknown>;
   detected: Record<string, unknown>;
+  /** VideoPreset completo (con prompts Seedance/Veo3, fotos elegidas,
+   *  overlays, subs, voz, etc.) listo para persistir en product.video_presets.
+   *  Solo se rellena para target_kind=auto_video o veo3. */
+  video_preset: Record<string, unknown> | null;
   cost_breakdown: {
     gemini_usd: number;
     whisper_usd: number;

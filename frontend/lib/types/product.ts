@@ -338,6 +338,10 @@ export interface VideoPreset {
   keywords: string[];
   seedance_prompt: string;
   veo3_prompt: string;
+  /** Fotos del producto que Gemini eligió para adjuntar manualmente al
+   *  prompt de Veo 3 al pegarlo en Gemini chat / Flow. Filenames del
+   *  array `product.photos.source`. Máx 3. */
+  veo3_photo_filenames: string[];
   source: string; // "music_bof" | "scripted_bof" | "manual"
   notes: string;
   created_at: string;
@@ -353,9 +357,30 @@ export interface GeneratePresetsInput {
 
 export interface GeneratePresetsResponse {
   product_id: string;
+  gen_id: string;
+  stage: string;
   created_count: number;
   presets: VideoPreset[];
   warnings: string[];
+}
+
+export interface PresetGenStatus {
+  gen_id: string;
+  product_id: string;
+  kind: string;
+  /** "started" | "generating_music" | "generating_scripted" | "saving"
+   *  | "done" | "error" */
+  stage: string;
+  percent: number;
+  expected_count: number;
+  created_count: number;
+  warnings: string[];
+  started_at: string;
+  ended_at: string | null;
+  error: string | null;
+  /** Coste acumulado en USD de las llamadas a Gemini. Se rellena tras
+   *  cada stage; final cuando stage=done. */
+  cost_usd: number;
 }
 
 export type VideoPresetUpdateInput = Partial<
