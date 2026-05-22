@@ -837,13 +837,41 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
     # Selección de fotos: prefiere `generated`, fallback a `source`.
     photos_list, photos_source = product.photos.best_available()
-    photo_paths = [
-        ph.local_path for ph in photos_list
-        if ph.local_path and os.path.exists(ph.local_path)
-    ]
+    # `local_path` de Redis es la ruta absoluta del entorno DONDE se subió
+    # la foto (Windows local en dev, Linux VPS en prod). Si Redis está
+    # compartido entre entornos (Upstash) el path no existe en el otro
+    # → reconstruimos desde slug + filename usando los helpers de config
+    # que respetan el `TIKTOK_SHOP_ROOT_PATH` del entorno actual.
+    from src.tiktok_shop.config import (
+        product_photos_generated_folder,
+        product_photos_source_folder,
+    )
+
+    def _resolve_photo_path(ph, source: str) -> str | None:
+        # 1) Probamos el local_path persistido tal cual (caso mismo entorno).
+        if ph.local_path and os.path.exists(ph.local_path):
+            return ph.local_path
+        # 2) Reconstruimos desde slug + filename + carpeta del entorno actual.
+        folder = (
+            product_photos_generated_folder(product.slug)
+            if source == "generated"
+            else product_photos_source_folder(product.slug)
+        )
+        candidate = os.path.join(folder, ph.filename)
+        if os.path.exists(candidate):
+            return candidate
+        return None
+
+    photo_paths = []
+    for ph in photos_list:
+        resolved = _resolve_photo_path(ph, photos_source)
+        if resolved:
+            photo_paths.append(resolved)
     if not photo_paths:
         raise RuntimeError(
-            f"El producto {product.slug} no tiene fotos válidas en photos_source ni photos_generated."
+            f"El producto {product.slug} no tiene fotos válidas en "
+            f"photos_source ni photos_generated. Verifica que Drive Desktop "
+            f"está sincronizando TIKTOK_SHOP/_products/{product.slug}/."
         )
 
     model_def = VIDEO_MODELS[tier]
