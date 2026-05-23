@@ -298,6 +298,10 @@ export interface SubtitleStyle {
   max_words_per_line: number;
   uppercase: boolean;
   animation: string;
+  /** Margen lateral en % del ancho del frame por cada lado. 8 = 8% izda
+   *  + 8% dcha → ancho útil 84%. Protege la safe zone TikTok donde
+   *  aparece UI (avatar, music, descripción) al ver vídeos. */
+  margin_x_pct?: number;
 }
 
 export interface CtaArrowStyle {

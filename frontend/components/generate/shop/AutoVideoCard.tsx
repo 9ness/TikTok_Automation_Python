@@ -77,6 +77,9 @@ interface AutoVideoConfig {
   voice_id: string;
   shoppable: boolean;
   overlays: OverlaysConfig;
+  // Subtítulos custom del preset (size_px, color, margin_x_pct, ...).
+  // null → backend usa defaults conservadores. Se popula al aplicar preset.
+  subtitle_style: Record<string, unknown> | null;
 }
 
 const DEFAULT_CONFIG: AutoVideoConfig = {
@@ -91,6 +94,7 @@ const DEFAULT_CONFIG: AutoVideoConfig = {
   voice_id: "Spanish_EnergeticBoy",
   shoppable: false,
   overlays: DEFAULT_OVERLAYS,
+  subtitle_style: null,
 };
 
 const ATLAS_TIERS: { value: Tier; label: string; cost: string }[] = [
@@ -222,6 +226,12 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
           : c.voice_id,
       hook_custom: preset.text_overlay,
       target_audience: preset.angle || c.target_audience,
+      // Subtítulos: pasa el style del preset solo si voz habilitada
+      // (sin voz no hay subs). Música → null para que backend salte.
+      subtitle_style:
+        preset.kind === "scripted" && preset.subtitle_style
+          ? (preset.subtitle_style as unknown as Record<string, unknown>)
+          : null,
       overlays: {
         ...c.overlays,
         cta_arrow: {
@@ -279,6 +289,7 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
     shoppable: config.shoppable,
     ai_disclosure: true,
     overlays: config.overlays,
+    subtitle_style: config.voice_enabled ? config.subtitle_style : null,
   };
 
   // Estimación local (espejo grueso de cost_calculator.py) — solo para preview

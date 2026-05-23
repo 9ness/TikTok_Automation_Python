@@ -1442,6 +1442,24 @@ function PresetCard({
                         }
                       />
                     </Field>
+                    <Field label="Margen lateral % (safe zone TikTok)">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={25}
+                        step={1}
+                        value={subStyle.margin_x_pct ?? 8}
+                        onChange={(e) =>
+                          setSub({
+                            margin_x_pct: Math.max(
+                              0,
+                              Math.min(25, parseInt(e.target.value, 10) || 0),
+                            ),
+                          })
+                        }
+                        title="Margen a cada lado en % del ancho del frame. 8 = ancho útil 84%, deja sitio para la UI nativa de TikTok (avatar, music, etc)."
+                      />
+                    </Field>
                     <Field label="Color texto">
                       <div className="flex gap-1">
                         <input

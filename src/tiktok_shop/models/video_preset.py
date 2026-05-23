@@ -109,7 +109,10 @@ class SubtitleStyle(BaseModel):
     enabled: bool = True
     # Path absoluto a la fuente (registry). Vacío → default del runner.
     font: str = ""
-    size_px: int = 48
+    # Tamaño relativo a 1080p (alto del frame). 42px sobre 1920px de alto
+    # ≈ font_scale 0.022 → ~30px en 720p. Más legible y dentro de safe
+    # zone TikTok. Antes era 48 que en 1080p sale muy grande.
+    size_px: int = 42
     color: str = "#FFFFFF"
     stroke_color: str = "#000000"
     stroke_width: int = 5
@@ -122,6 +125,11 @@ class SubtitleStyle(BaseModel):
     uppercase: bool = False
     # Animación de entrada por palabra (palabra a palabra).
     animation: str = "fade_in"        # ver TEXT_OVERLAY_ANIMATIONS
+    # Margen lateral en % del ancho del frame por cada lado (izda + dcha).
+    # 8 = 8% margen izda + 8% dcha → ancho útil 84%. TikTok añade UI
+    # (avatar, descripción, music) en los bordes; mantener margen evita
+    # que los subs solapen con esos elementos. Mínimo recomendado: 5-10%.
+    margin_x_pct: float = 8.0
 
 
 class CtaArrowStyle(BaseModel):
@@ -143,7 +151,12 @@ class CtaArrowStyle(BaseModel):
     position_y_pct: float = 75.0
     # Tamaño relativo al ancho del frame (10-50%).
     scale_width_pct: float = 25.0
-    rotation_deg: int = 0
+    # Rotación en grados. Default 90 = apunta HACIA ABAJO (al carrito
+    # nativo de TikTok). El asset .mov por defecto apunta a la derecha
+    # (→); +90 = horario lo gira a ↓. Antes era 0 → vídeos generados
+    # tenían la flecha apuntando a la derecha hacia el botón compartir,
+    # no al carrito.
+    rotation_deg: int = 90
     flip_horizontal: bool = False
     flip_vertical: bool = False
     # Cuántos segundos aparece. Default 4s al final del vídeo.

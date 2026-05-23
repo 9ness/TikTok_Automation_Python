@@ -1158,6 +1158,45 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         res_def = RESOLUTIONS.get(gen.resolution, RESOLUTIONS["720p"])
         target_size = (res_def["width"], res_def["height"])
         composed_path = os.path.join(voice_dir, "composed.mp4")
+        # Mapeo subtitle_style (formato VideoPreset) → captions_style
+        # (formato editor.render_karaoke). Si el preset no manda subs
+        # custom, dejamos None → editor usa `_default_caption_style`.
+        # Conversión:
+        #   size_px (sobre 1920px baseline) → font_scale = size_px / 1920
+        #   color → text_color
+        #   uppercase=True → case_mode "UPPERCASE", else "NONE"
+        #   max_words_per_line → max_words_per_chunk
+        #   position bottom_center → y_position_pct 0.70
+        #   margin_x_pct → max_width_pct = 100 - 2*margin_x_pct (en frac)
+        subs_raw = p.get("subtitle_style") or None
+        captions_style_dict = None
+        if subs_raw and bool(subs_raw.get("enabled", True)):
+            size_px = int(subs_raw.get("size_px", 42))
+            font_scale = max(0.018, min(0.080, size_px / 1920.0))
+            margin_x = float(subs_raw.get("margin_x_pct", 8.0))
+            max_w_pct = max(0.50, min(0.96, (100.0 - 2 * margin_x) / 100.0))
+            pos = str(subs_raw.get("position") or "bottom_center")
+            y_pct = {
+                "top_center": 0.18, "top_left": 0.18, "top_right": 0.18,
+                "middle_center": 0.50, "middle_left": 0.50, "middle_right": 0.50,
+                "bottom_center": 0.70, "bottom_left": 0.70, "bottom_right": 0.70,
+            }.get(pos, 0.70)
+            captions_style_dict = {
+                # Mantenemos default font_path; si el preset trae font
+                # custom (path absoluto), lo respetamos.
+                "font_path": str(subs_raw.get("font") or r"C:\Windows\Fonts\impact.ttf"),
+                "font_scale": font_scale,
+                "text_color": str(subs_raw.get("color") or "#FFFFFF"),
+                "stroke_color": str(subs_raw.get("stroke_color") or "#000000"),
+                "stroke_width": int(subs_raw.get("stroke_width", 5)),
+                "pill_enabled": False,  # preset no usa pill por defecto
+                "case_mode": "UPPERCASE" if subs_raw.get("uppercase") else "NONE",
+                "max_words_per_chunk": int(subs_raw.get("max_words_per_line", 3)),
+                "y_position_pct": y_pct,
+                "highlight_color": str(subs_raw.get("highlight_color") or "#FFE066"),
+                "max_width_pct": max_w_pct,  # respeta margen lateral safe zone
+            }
+
         compose_shop_video(
             clip_paths=clip_paths,
             voice_mp3=voice_mp3,
@@ -1171,6 +1210,7 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             # Fase 3: overlays (hook box + CTA flecha) — sin overlays, dict
             # vacío hace que compose_shop_video los salte transparentemente.
             overlays=p.get("overlays") or None,
+            captions_style=captions_style_dict,
             hook_text_fallback=strategy.get("hook_text", "") if isinstance(strategy, dict) else "",
             job_id=job.id,
             temp_folder=p.get("temp_folder", "./temp_work"),

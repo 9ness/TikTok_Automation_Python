@@ -284,9 +284,11 @@ def _parse_cta_arrow_style(raw: Any) -> CtaArrowStyle:
         y = float(raw.get("position_y_pct", 75.0))
         scale = float(raw.get("scale_width_pct", 25.0))
         dur = float(raw.get("duration_seconds", 4.0))
-        rot = int(raw.get("rotation_deg", 0))
+        # Default 90° = apunta abajo (al carrito nativo TikTok). Asset
+        # base de la flecha apunta a la derecha por defecto.
+        rot = int(raw.get("rotation_deg", 90))
     except (TypeError, ValueError):
-        x, y, scale, dur, rot = 50.0, 75.0, 25.0, 4.0, 0
+        x, y, scale, dur, rot = 50.0, 75.0, 25.0, 4.0, 90
     return CtaArrowStyle(
         enabled=bool(raw.get("enabled", False)),
         sticker_file=sticker,
@@ -312,9 +314,9 @@ def _parse_subtitle_style(raw: Any) -> SubtitleStyle:
     if anim not in TEXT_OVERLAY_ANIMATIONS:
         anim = "fade_in"
     try:
-        size = int(raw.get("size_px", 48))
+        size = int(raw.get("size_px", 42))
     except (TypeError, ValueError):
-        size = 48
+        size = 42
     try:
         stroke = int(raw.get("stroke_width", 5))
     except (TypeError, ValueError):
@@ -323,6 +325,10 @@ def _parse_subtitle_style(raw: Any) -> SubtitleStyle:
         max_words = int(raw.get("max_words_per_line", 3))
     except (TypeError, ValueError):
         max_words = 3
+    try:
+        margin_x = float(raw.get("margin_x_pct", 8.0))
+    except (TypeError, ValueError):
+        margin_x = 8.0
     return SubtitleStyle(
         enabled=bool(raw.get("enabled", True)),
         font=str(raw.get("font", ""))[:200],
@@ -335,6 +341,7 @@ def _parse_subtitle_style(raw: Any) -> SubtitleStyle:
         max_words_per_line=max(1, min(8, max_words)),
         uppercase=bool(raw.get("uppercase", False)),
         animation=anim,
+        margin_x_pct=max(0.0, min(25.0, margin_x)),
     )
 
 logger = logging.getLogger("tiktok_shop.preset_generator")

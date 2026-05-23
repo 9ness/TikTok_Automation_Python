@@ -62,6 +62,9 @@ export interface EnqueueRequest {
   clip_photo_overrides?: ClipPhotoOverride[] | null;
   pro_ref_photo_overrides?: number[] | null;
   overlays?: OverlaysConfig | null;
+  /** Estilo de subtítulos del preset (size_px, color, highlight_color,
+   *  margin_x_pct, position, uppercase, etc.). Pass-through al backend. */
+  subtitle_style?: Record<string, unknown> | null;
 }
 
 export interface EnqueueResponse {

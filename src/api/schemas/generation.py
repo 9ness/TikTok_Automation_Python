@@ -128,6 +128,10 @@ class EnqueueRequest(BaseModel):
 
     # Fase 3 — overlays componibles
     overlays: OverlaysConfig | None = None
+    # Fase 4 — estilo de subtítulos del preset (formato VideoPreset.subtitle_style).
+    # Si viene, el runner lo mapea a `captions_style` y lo pasa al editor.
+    # Si no, usa el default conservador (`_default_caption_style`).
+    subtitle_style: dict[str, Any] | None = None
 
     @field_validator("username")
     @classmethod

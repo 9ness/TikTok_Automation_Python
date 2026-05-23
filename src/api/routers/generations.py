@@ -289,6 +289,8 @@ def _build_enqueue_params(payload: EnqueueRequest, user_id: str) -> dict:
         params["n_angles"] = payload.n_angles
     if payload.overlays is not None:
         params["overlays"] = payload.overlays.model_dump()
+    if payload.subtitle_style is not None:
+        params["subtitle_style"] = payload.subtitle_style
     return params
 
 
