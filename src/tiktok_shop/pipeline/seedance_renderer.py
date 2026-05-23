@@ -136,7 +136,7 @@ async def _render_image_to_video(
         last_image_ref = photo_refs[next_ref_idx] if next_ref_idx is not None else None
 
         tasks.append(_run_single_i2v(
-            client=client, model_id=model_id, idx=idx, spec=spec,
+            client=client, model_id=model_id, tier=tier, idx=idx, spec=spec,
             image_ref=photo_refs[ref_idx], last_image_ref=last_image_ref,
             resolution=resolution, out_dir=out_dir, log_callback=log_callback,
         ))
@@ -149,6 +149,7 @@ async def _run_single_i2v(
     *,
     client: AtlasCloudClient,
     model_id: str,
+    tier: str,
     idx: int,
     spec: dict,
     image_ref: str,
@@ -172,6 +173,20 @@ async def _run_single_i2v(
 
     job = await loop.run_in_executor(None, _submit)
     log_callback(f"⏳ Clip {idx+1}: job {job.job_id} encolado, esperando…")
+
+    # Registrar coste Atlas en cuanto se hace submit — Atlas factura al
+    # encolar, no al completar. Si el job timeout o falla luego, igual
+    # te lo cobran. Esto refleja el coste real en el panel de Costes.
+    try:
+        from src.cost_tracking import record_atlas_cloud
+        record_atlas_cloud(
+            seconds=int(spec.get("duration", 5)),
+            tier=tier,
+            resolution=resolution,
+            detail=f"clip {idx+1} · job {job.job_id[:8]}",
+        )
+    except Exception:
+        pass
 
     def _hb(elapsed: int, status: str) -> None:
         # Notifica al runner cada 60s para que aparezca en la UI cuánto
@@ -228,6 +243,18 @@ def _render_pro(
         watermark=False,
     )
     log_callback(f"⏳ Pro job {job.job_id} encolado, esperando…")
+    # Registrar coste Atlas en submit (no en complete) — Atlas factura
+    # al encolar.
+    try:
+        from src.cost_tracking import record_atlas_cloud
+        record_atlas_cloud(
+            seconds=int(spec.get("duration", 15)),
+            tier="pro",
+            resolution=resolution,
+            detail=f"pro ref2v · job {job.job_id[:8]}",
+        )
+    except Exception:
+        pass
 
     def _hb_pro(elapsed: int, status: str) -> None:
         log_callback(
