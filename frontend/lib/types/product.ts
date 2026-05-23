@@ -80,6 +80,9 @@ export interface Product {
   target_audience: string[];
   key_features: string[];
   selling_points: string[];
+  /** Idioma del contenido. "es_ES" (default Spain), "es_LATAM", "en_US",
+   *  "en_UK", "pt_BR", "fr_FR". Afecta voz + guion + subs al generar. */
+  language: string;
   tiktok_shop: TikTokShopMeta;
   photos: ProductPhotos;
   video_config: VideoConfig;
@@ -118,6 +121,8 @@ export interface ProductCreateInput {
   target_audience?: string[];
   key_features?: string[];
   selling_points?: string[];
+  /** Idioma del producto (afecta voz + guion + subs). Default "es_ES". */
+  language?: string;
   tiktok_shop?: Partial<TikTokShopMeta>;
   default_tier?: Tier;
   default_duration?: number;

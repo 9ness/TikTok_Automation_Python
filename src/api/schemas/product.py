@@ -62,6 +62,9 @@ class ProductCreate(BaseModel):
     target_audience: list[str] = Field(default_factory=list)
     key_features: list[str] = Field(default_factory=list)
     selling_points: list[str] = Field(default_factory=list)
+    # Idioma del contenido (afecta voz + guion + subs). Códigos:
+    # "es_ES" Spain (default), "es_LATAM", "en_US", "en_UK", "pt_BR", "fr_FR".
+    language: str = "es_ES"
     tiktok_shop: ProductTikTokShopInput = Field(default_factory=ProductTikTokShopInput)
     default_tier: TierName = DEFAULT_TIER
     default_duration: int = Field(default=DEFAULT_DURATION, ge=5, le=30)
@@ -98,6 +101,7 @@ class ProductUpdate(BaseModel):
     target_audience: list[str] | None = None
     key_features: list[str] | None = None
     selling_points: list[str] | None = None
+    language: str | None = None
     tiktok_shop: ProductTikTokShopInput | None = None
     default_tier: TierName | None = None
     default_duration: int | None = Field(default=None, ge=5, le=30)
@@ -131,6 +135,7 @@ class ProductResponse(BaseModel):
     target_audience: list[str]
     key_features: list[str]
     selling_points: list[str]
+    language: str = "es_ES"
     tiktok_shop: dict[str, Any]
     photos: dict[str, Any]
     video_config: dict[str, Any]

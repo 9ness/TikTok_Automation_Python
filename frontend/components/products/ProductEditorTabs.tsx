@@ -45,6 +45,7 @@ import { PhotoManager } from "./PhotoManager";
 import { PresetsManager } from "./PresetsManager";
 import { TabHint } from "./TabHint";
 import { cn } from "@/lib/utils";
+import { LANGUAGE_OPTIONS } from "@/lib/language";
 
 // Definición de los 5 tabs como tarjetas. Cada tab tiene un `mode`
 // que pinta el borde/fondo según convención del producto:
@@ -233,6 +234,7 @@ function IdentityTab({ product }: { product: Product }) {
     brand: product.brand ?? "",
     category: product.category,
     subcategory: product.subcategory ?? "",
+    language: product.language || "es_ES",
     shop: { ...product.tiktok_shop },
   });
 
@@ -326,6 +328,7 @@ function IdentityTab({ product }: { product: Product }) {
       brand: form.brand.trim() || null,
       category: form.category.trim() || "otros",
       subcategory: form.subcategory.trim() || null,
+      language: form.language,
       tiktok_shop: {
         product_url: form.shop.product_url || null,
         product_id: form.shop.product_id || null,
@@ -362,6 +365,20 @@ function IdentityTab({ product }: { product: Product }) {
           value={form.subcategory}
           onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
         />
+      </FormField>
+      <FormField label="Idioma del contenido">
+        <select
+          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+          value={form.language}
+          onChange={(e) => setForm((f) => ({ ...f, language: e.target.value }))}
+          title="Afecta voz + guion + subtítulos. Regenera presets tras cambiarlo para que se apliquen."
+        >
+          {LANGUAGE_OPTIONS.map((opt) => (
+            <option key={opt.code} value={opt.code}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </FormField>
       <FormField label="Precio EUR">
         <Input

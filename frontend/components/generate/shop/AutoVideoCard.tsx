@@ -19,6 +19,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ApiError } from "@/lib/api";
 import { useEnqueueGeneration } from "@/lib/queries/generations";
+import { useProduct } from "@/lib/queries/products";
+import { defaultVoiceForLanguage } from "@/lib/language";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type { EnqueueRequest, OverlaysConfig, StrategyValue } from "@/lib/types/generation";
 import type { Tier } from "@/lib/types/product";
@@ -174,6 +176,12 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
     setBulkOpen(true);
   }
 
+  // Cargamos el producto para tener su idioma → la voz default sigue al
+  // idioma elegido en la pestaña Identidad (es_ES → Spanish_*, en_US →
+  // English_*…). El user puede sobrescribir con clones.
+  const productQuery = useProduct(productId);
+  const productLanguage = productQuery.data?.language || "es_ES";
+
   const enqueue = useEnqueueGeneration();
   const openQueue = useDrawerStore((s) => s.openQueue);
   const voices = useVoices({ language: "es" });
@@ -203,9 +211,14 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
       strategy: resolvedStrategy,
       duration_seconds: preset.duration_s,
       voice_enabled: preset.kind === "scripted",
+      // Cadena de fallback: voz del preset (si user la fijó al editar) →
+      // default del idioma del producto → voz actual del form. Así un
+      // producto en en_US no usa Spanish_EnergeticBoy por accidente.
       voice_id:
         preset.kind === "scripted"
-          ? preset.voice_id || c.voice_id
+          ? preset.voice_id ||
+            defaultVoiceForLanguage(productLanguage) ||
+            c.voice_id
           : c.voice_id,
       hook_custom: preset.text_overlay,
       target_audience: preset.angle || c.target_audience,

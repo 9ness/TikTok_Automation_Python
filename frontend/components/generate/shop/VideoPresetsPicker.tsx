@@ -347,23 +347,38 @@ function PresetMiniCard({
           >
             🔇 Sin voz
           </span>
+        ) : preset.style === "creator_pov" ? (
+          <span
+            className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"
+            title="Persona hablando a cámara con lip-sync (solo Pro + Veo 3)"
+          >
+            👤 Creator UGC
+          </span>
         ) : (
-          styleMeta && (
-            <span
-              className={cn(
-                "rounded px-1 py-0 text-[9px]",
-                styleMeta.cls,
-              )}
-              title={
-                preset.style === "creator_pov"
-                  ? "Persona hablando a cámara con lip-sync (solo Pro + Veo 3)"
-                  : "Voz en off sobre planos del producto"
-              }
-            >
-              🎤 {styleMeta.label}
-            </span>
-          )
+          <span
+            className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"
+            title="Voz en off sobre planos del producto (sin persona en cámara)"
+          >
+            🎤 Voiceover
+          </span>
         )}
+        {/* Shot style: 1 plano vs multi-toma */}
+        <span
+          className="rounded bg-cyan-500/15 px-1 py-0 text-[9px] text-cyan-700 dark:text-cyan-300"
+          title={
+            preset.shot_style === "single_shot"
+              ? "1 plano continuo (sin cortes)"
+              : preset.shot_style === "multi_shot"
+                ? "Múltiples planos / cortes / cambios"
+                : "Auto — el modelo decide según duración"
+          }
+        >
+          {preset.shot_style === "single_shot"
+            ? "🎬 1 toma"
+            : preset.shot_style === "multi_shot"
+              ? "✂️ Multi-toma"
+              : "🎬 Auto"}
+        </span>
         <span className="text-[9px] text-muted-foreground">
           {preset.duration_s}s
         </span>

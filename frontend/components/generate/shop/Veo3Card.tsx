@@ -497,6 +497,46 @@ function Veo3PresetGrid({
                 <strong className="truncate text-[11px]">{p.name}</strong>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
+                {/* Tipo principal: música (sin voz) vs creator UGC vs voiceover */}
+                {p.kind === "music" ? (
+                  <span
+                    className="rounded bg-sky-500/15 px-1 py-0 text-[9px] text-sky-700 dark:text-sky-300"
+                    title="Vídeo sin voz · solo música + texto en pantalla"
+                  >
+                    🔇 Sin voz
+                  </span>
+                ) : p.style === "creator_pov" ? (
+                  <span
+                    className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"
+                    title="Persona hablando a cámara con lip-sync (UGC)"
+                  >
+                    👤 Creator UGC
+                  </span>
+                ) : (
+                  <span
+                    className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"
+                    title="Voz en off sobre planos del producto (sin persona en cámara)"
+                  >
+                    🎤 Voiceover
+                  </span>
+                )}
+                {/* Shot style: 1 plano continuo vs cortes/multi-toma */}
+                <span
+                  className="rounded bg-cyan-500/15 px-1 py-0 text-[9px] text-cyan-700 dark:text-cyan-300"
+                  title={
+                    p.shot_style === "single_shot"
+                      ? "1 plano continuo (sin cortes)"
+                      : p.shot_style === "multi_shot"
+                        ? "Múltiples planos / cortes / cambios"
+                        : "Auto — el modelo decide según duración"
+                  }
+                >
+                  {p.shot_style === "single_shot"
+                    ? "🎬 1 toma"
+                    : p.shot_style === "multi_shot"
+                      ? "✂️ Multi-toma"
+                      : "🎬 Auto"}
+                </span>
                 {p.angle && (
                   <span className="rounded bg-muted px-1 py-0 text-[9px]">
                     {p.angle}

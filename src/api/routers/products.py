@@ -200,6 +200,7 @@ def create_product(
         target_audience=payload.target_audience,
         key_features=payload.key_features,
         selling_points=payload.selling_points,
+        language=payload.language,
         tiktok_shop=TikTokShopMeta(**payload.tiktok_shop.model_dump()),
         video_config=video_config,
         drive_folder=drive_folder,

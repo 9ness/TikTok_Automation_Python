@@ -30,6 +30,7 @@ import {
   useCreateProduct,
 } from "@/lib/queries/products";
 import type { Tier } from "@/lib/types/product";
+import { LANGUAGE_OPTIONS } from "@/lib/language";
 
 const TIER_OPTIONS: { value: Tier; label: string }[] = [
   { value: "standard", label: "🟢 Standard" },
@@ -80,6 +81,7 @@ export function ProductCreateDialog({
   const [commissionPct, setCommissionPct] = useState<string>("10");
   const [commissionEur, setCommissionEur] = useState<string>("");
   const [tier, setTier] = useState<Tier>("standard");
+  const [language, setLanguage] = useState<string>("es_ES");
 
   const priceNum = parseFloat(priceEur.replace(",", ".")) || 0;
   const pctNum = parseFloat(commissionPct.replace(",", ".")) || 0;
@@ -195,6 +197,7 @@ export function ProductCreateDialog({
         category,
         subcategory: subcategory.trim() || null,
         default_tier: tier,
+        language,
         tiktok_shop: {
           product_url: url.trim() || null,
           commission_rate: pctNum / 100,
@@ -386,7 +389,7 @@ export function ProductCreateDialog({
               )}
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label htmlFor="product-tier">Tier por defecto</Label>
               <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
                 <SelectTrigger id="product-tier">
@@ -395,6 +398,25 @@ export function ProductCreateDialog({
                 <SelectContent>
                   {TIER_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="product-language">Idioma del contenido</Label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger
+                  id="product-language"
+                  title="Afecta voz + guion + subtítulos. Cambiable después en Identidad."
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
                       {opt.label}
                     </SelectItem>
                   ))}

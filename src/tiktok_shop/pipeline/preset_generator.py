@@ -111,6 +111,50 @@ def _resolve_shot_strategy(
 _VALID_TONES = {"energetic", "calm", "persuasive", "serious", "playful"}
 _VALID_BACKGROUNDS = {"none", "black_bar", "blur"}
 
+# Mapping locale → instrucciones para Gemini. Determina el idioma EXACTO
+# del voice_script, hooks, CTA, text_overlay. Default es_ES (España).
+_LANGUAGE_INSTRUCTIONS: dict[str, str] = {
+    "es_ES": (
+        "Idioma: ESPAÑOL DE ESPAÑA (castellano peninsular). Usa 'vosotros' "
+        "no 'ustedes'. Modismos y vocabulario españoles ('flipas', 'súper', "
+        "'currar', 'curro', 'guay', 'tío/tía' con moderación). Acento "
+        "neutro de España. NUNCA mezcles voseo latinoamericano."
+    ),
+    "es_LATAM": (
+        "Idioma: ESPAÑOL LATINOAMERICANO neutro. Usa 'ustedes' no "
+        "'vosotros'. Vocabulario panregional sin localismos fuertes. "
+        "Acento neutro latino (NO Castilla)."
+    ),
+    "en_US": (
+        "Language: AMERICAN ENGLISH. Use American spellings (color, "
+        "favor). Natural, casual TikTok voiceover energy."
+    ),
+    "en_UK": (
+        "Language: BRITISH ENGLISH. Use British spellings (colour, "
+        "favourite). British expressions where natural ('mate', 'brilliant')."
+    ),
+    "pt_BR": (
+        "Idioma: PORTUGUÊS DO BRASIL. Usa vocabulário brasileiro, não "
+        "português europeu."
+    ),
+    "fr_FR": "Langue : FRANÇAIS (France).",
+}
+
+
+def _language_block(product: Any) -> str:
+    """Bloque de instrucciones de idioma para inyectar en el user_prompt
+    de Gemini. Default a es_ES si el producto no tiene `language` o tiene
+    un código no reconocido."""
+    lang = getattr(product, "language", None) or "es_ES"
+    instr = _LANGUAGE_INSTRUCTIONS.get(lang) or _LANGUAGE_INSTRUCTIONS["es_ES"]
+    return (
+        f"\n=== IDIOMA OBLIGATORIO ({lang}) ===\n{instr}\n"
+        f"TODO el contenido (voice_script, hooks_alternatives, cta, "
+        f"oratory_tips, text_overlay, title, keywords) debe estar en "
+        f"este idioma. seedance_prompt y veo3_prompt SIEMPRE en inglés "
+        f"(es lo que el modelo espera)."
+    )
+
 # Máximo de fotos source que pasamos a Gemini como contexto visual al
 # generar presets. Más infla el coste (Gemini cobra por tile) y rara vez
 # aporta: con 6 ya tiene packshot + lifestyle + texture. El user puede
@@ -411,7 +455,8 @@ def _generate_music(
         f"- Precio para hooks de ahorro/comparativa: {_hook_price_suggestion(product) or '(N/A)'}\n"
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
-        f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n\n"
+        f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
+        f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets musicales. Sigue el schema al pie de la letra."
     )
@@ -524,7 +569,8 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
         f"- Precio para hooks de ahorro/comparativa: {_hook_price_suggestion(product) or '(N/A)'}\n"
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
-        f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n\n"
+        f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
+        f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets scripted, cada uno con un ÁNGULO "
         f"distinto del menú. Sigue el schema al pie de la letra."
