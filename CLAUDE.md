@@ -206,6 +206,14 @@ Program máx 5 shoppable/semana (tracker en `services/pilot_tracker.py`).
 # Atlas Cloud (Seedance — los 3 tiers Standard/Advanced/Pro). URL default oficial.
 ATLASCLOUD_API_KEY=...
 # ATLASCLOUD_BASE_URL=https://api.atlascloud.ai/api/v1   # opcional override
+# ATLAS_POLL_TIMEOUT_S=7200                              # default 2h. Sube si Standard
+                                                         #            tier suele tardar más.
+
+# fal.ai — fallback automático de Atlas Cloud. Mismo modelo Seedance pero
+# en otro hosting con queue independiente. Se activa solo si Atlas falla.
+# Si no está configurado, jobs fallidos en Atlas propagan el error.
+# FAL_API_KEY=...
+# FAL_POLL_TIMEOUT_S=1800                                # default 30 min
 
 # === Compartido entre programas ===
 OPENAI_API_KEY=...                   # Presidentes — guion JSON

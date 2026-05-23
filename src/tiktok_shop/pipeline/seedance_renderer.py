@@ -197,13 +197,76 @@ async def _run_single_i2v(
             f"(status={status})…"
         )
 
-    final_job = await loop.run_in_executor(
-        None, lambda: client.wait(job.job_id, on_heartbeat=_hb)
-    )
+    # Espera con fallback a fal.ai si Atlas se queda atascado o timeout.
+    # Solo intenta failover si fal está configurado. Si no, propaga el
+    # error de Atlas tal cual.
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
-    await loop.run_in_executor(
-        None, lambda: client.download(final_job.output_url or "", out_path),
-    )
+    try:
+        final_job = await loop.run_in_executor(
+            None, lambda: client.wait(job.job_id, on_heartbeat=_hb)
+        )
+        await loop.run_in_executor(
+            None, lambda: client.download(final_job.output_url or "", out_path),
+        )
+    except AtlasCloudTransient as e_atlas:
+        from src.tiktok_shop.api.fal_cloud import (
+            FalCloudClient, fal_is_configured, FalCloudError, FalCloudTransient,
+        )
+        if not fal_is_configured():
+            log_callback(
+                f"❌ Clip {idx+1} Atlas timeout/transient y fal.ai NO configurado "
+                f"(define FAL_API_KEY para failover). Propagando error original."
+            )
+            raise
+        log_callback(
+            f"🔁 Clip {idx+1}: Atlas falló ({str(e_atlas)[:120]}). "
+            f"Reintentando en fal.ai (mismo modelo Seedance)…"
+        )
+        fal = FalCloudClient()
+        try:
+            fal_job = await loop.run_in_executor(
+                None,
+                lambda: fal.submit_image_to_video(
+                    tier=tier,
+                    image_url=image_ref,
+                    prompt=spec["prompt"],
+                    duration=int(spec.get("duration", 5)),
+                    resolution=resolution,
+                    aspect_ratio="9:16",
+                    last_image_url=last_image_ref,
+                ),
+            )
+            log_callback(
+                f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…"
+            )
+            # Cost tracking del fallback en submit
+            try:
+                from src.cost_tracking import record_atlas_cloud
+                # Mismo helper — la tarifa por tier es equivalente.
+                record_atlas_cloud(
+                    seconds=int(spec.get("duration", 5)),
+                    tier=tier,
+                    resolution=resolution,
+                    detail=f"FAL fallback clip {idx+1} · req {fal_job.request_id[:8]}",
+                )
+            except Exception:
+                pass
+            await loop.run_in_executor(
+                None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
+            )
+            await loop.run_in_executor(
+                None, lambda: fal.download(fal_job.output_url or "", out_path),
+            )
+            log_callback(f"✅ Clip {idx+1} entregado por fal.ai (failover OK)")
+            return out_path
+        except (FalCloudError, FalCloudTransient) as e_fal:
+            log_callback(
+                f"❌ Clip {idx+1}: Atlas Y fal.ai fallaron. Atlas: "
+                f"{str(e_atlas)[:80]}. fal.ai: {str(e_fal)[:80]}."
+            )
+            raise RuntimeError(
+                f"Ambos proveedores fallaron en clip {idx+1}. Atlas: {e_atlas}. fal.ai: {e_fal}"
+            ) from e_fal
     log_callback(f"✅ Clip {idx+1} descargado: {os.path.basename(out_path)}")
     return out_path
 
