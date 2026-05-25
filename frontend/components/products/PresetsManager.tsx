@@ -145,6 +145,13 @@ export function PresetsManager({ product }: { product: Product }) {
   const [kindFilter, setKindFilter] = useState<"all" | "music" | "scripted">("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [styleFilter, setStyleFilter] = useState<"all" | "voiceover" | "creator_pov">("all");
+  // Filtro por origen del preset:
+  //   "music_bof" / "scripted_bof" → autogen por Gemini director
+  //   "viral_replica" → generado desde Replicar viral (UGC del competidor)
+  //   "manual" → creado/editado a mano
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | "auto" | "viral_replica" | "manual"
+  >("all");
   const [sortBy, setSortBy] = useState<"new" | "old" | "angle" | "duration">("new");
 
   // Aplica filtros + ordena
@@ -156,6 +163,14 @@ export function PresetsManager({ product }: { product: Product }) {
     }
     if (styleFilter !== "all") {
       list = list.filter((p) => p.style === styleFilter);
+    }
+    if (sourceFilter !== "all") {
+      list = list.filter((p) => {
+        if (sourceFilter === "auto") {
+          return p.source === "music_bof" || p.source === "scripted_bof";
+        }
+        return p.source === sourceFilter;
+      });
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -177,7 +192,9 @@ export function PresetsManager({ product }: { product: Product }) {
       return 0;
     });
     return sorted;
-  }, [presets, search, kindFilter, tierFilter, styleFilter, sortBy]);
+  }, [presets, search, kindFilter, tierFilter, styleFilter, sourceFilter, sortBy]);
+
+  const viralCount = presets.filter((p) => p.source === "viral_replica").length;
 
   const musicPresets = presets.filter((p) => p.kind === "music");
   const scriptedPresets = presets.filter((p) => p.kind === "scripted");
@@ -479,6 +496,34 @@ export function PresetsManager({ product }: { product: Product }) {
                   />
                 </>
               )}
+            </div>
+
+            {/* Origen del preset */}
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              <span className="self-center text-muted-foreground">Origen:</span>
+              <FilterChip
+                label="🤖 Auto"
+                active={sourceFilter === "auto"}
+                onClick={() =>
+                  setSourceFilter(sourceFilter === "auto" ? "all" : "auto")
+                }
+              />
+              <FilterChip
+                label={`🎯 Réplica viral${viralCount > 0 ? ` (${viralCount})` : ""}`}
+                active={sourceFilter === "viral_replica"}
+                onClick={() =>
+                  setSourceFilter(
+                    sourceFilter === "viral_replica" ? "all" : "viral_replica",
+                  )
+                }
+              />
+              <FilterChip
+                label={`✏️ Manual${manualCount > 0 ? ` (${manualCount})` : ""}`}
+                active={sourceFilter === "manual"}
+                onClick={() =>
+                  setSourceFilter(sourceFilter === "manual" ? "all" : "manual")
+                }
+              />
             </div>
 
             {filtered.length !== presets.length && (
@@ -1634,6 +1679,24 @@ function PresetCard({
               <strong className="truncate text-sm">{preset.name}</strong>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1">
+              {/* Badge de origen — solo visible para no-autogen (autogen
+                  es el caso 80% y no necesita ruido visual). */}
+              {preset.source === "viral_replica" && (
+                <span
+                  className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-medium text-fuchsia-700 dark:text-fuchsia-300"
+                  title="Preset generado desde Replicar viral (UGC del competidor)"
+                >
+                  🎯 Réplica viral
+                </span>
+              )}
+              {preset.source === "manual" && (
+                <span
+                  className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                  title="Preset creado o editado a mano"
+                >
+                  ✏️ Manual
+                </span>
+              )}
               {preset.angle && (
                 <Badge variant="secondary" className="text-[10px]">
                   {preset.angle}
