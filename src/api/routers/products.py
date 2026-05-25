@@ -527,14 +527,37 @@ def delete_photo(
     photo_id: str,
     repo: Annotated[ProductRepo, Depends(get_product_repo)],
 ) -> Response:
+    """HARD delete: elimina la foto del array source/generated y guarda.
+    Antes era soft-delete (`deleted=true`) pero la UI mostraba la foto
+    de vuelta tras refetch — soft-delete no se reflejaba bien en algún
+    paso de la cadena. Hard delete garantiza desaparición. El archivo en
+    disco se mantiene (no borrado físico) por si hay jobs en cola que la
+    necesitan."""
     product = repo.get(product_id)
     if product is None:
         raise ProductNotFoundError(
             f"Producto '{product_id}' no encontrado.",
             details={"product_id": product_id},
         )
-    photo, _ = _find_photo(product, photo_id)
-    photo.deleted = True
+
+    # Localizar y eliminar de source o generated (lo que matchee).
+    removed = False
+    for i, p in enumerate(product.photos.source):
+        if p.filename == photo_id:
+            product.photos.source.pop(i)
+            removed = True
+            break
+    if not removed:
+        for i, p in enumerate(product.photos.generated):
+            if p.filename == photo_id:
+                product.photos.generated.pop(i)
+                removed = True
+                break
+    if not removed:
+        raise PhotoNotFoundError(
+            f"Foto '{photo_id}' no existe en el producto.",
+            details={"photo_id": photo_id},
+        )
     repo.save(product)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
