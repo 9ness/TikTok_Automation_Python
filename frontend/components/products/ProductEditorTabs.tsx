@@ -46,6 +46,7 @@ import { PresetsManager } from "./PresetsManager";
 import { TabHint } from "./TabHint";
 import { cn } from "@/lib/utils";
 import { LANGUAGE_OPTIONS } from "@/lib/language";
+import { formatLocal } from "@/lib/dates";
 
 // Definición de los 5 tabs como tarjetas. Cada tab tiene un `mode`
 // que pinta el borde/fondo según convención del producto:
@@ -785,7 +786,7 @@ function AnalysisTab({ product }: { product: Product }) {
         </Button>
         {product.last_analyzed_at && (
           <p className="mt-2 text-[10px] text-muted-foreground">
-            Último análisis: {product.last_analyzed_at.slice(0, 19).replace("T", " ")}
+            Último análisis: {formatLocal(product.last_analyzed_at)}
           </p>
         )}
       </div>
