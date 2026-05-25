@@ -289,6 +289,31 @@ def _build_analyzer_context(product: Product) -> str:
     )
 
 
+def _resolve_photo_paths(product: Product) -> list[str]:
+    """Devuelve paths absolutos de las fotos del producto que existan en
+    disco. Resuelve el caso Redis-compartido entre Windows local y Linux
+    VPS: si `local_path` no existe, reconstruye desde slug + filename
+    usando los helpers de config (respetan `TIKTOK_SHOP_ROOT_PATH` del
+    entorno actual). Mismo patrón que `_resolve_photo_path` del runner."""
+    photos_list, source = product.photos.best_available()
+    paths: list[str] = []
+    for ph in photos_list:
+        # 1) Probar el local_path persistido tal cual.
+        if ph.local_path and os.path.exists(ph.local_path):
+            paths.append(ph.local_path)
+            continue
+        # 2) Reconstruir desde slug + filename + carpeta del entorno actual.
+        folder = (
+            product_photos_generated_folder(product.slug)
+            if source == "generated"
+            else product_photos_source_folder(product.slug)
+        )
+        candidate = os.path.join(folder, ph.filename)
+        if os.path.exists(candidate):
+            paths.append(candidate)
+    return paths
+
+
 def _analyze_in_background(product_id: str) -> None:
     """Hook para análisis Gemini async tras crear producto. Importa repo
     aquí para evitar problemas circulares y poder mockear en tests."""
@@ -297,8 +322,7 @@ def _analyze_in_background(product_id: str) -> None:
         product = repo.get(product_id)
         if product is None:
             return
-        photos, _ = product.photos.best_available()
-        photo_paths = [p.local_path for p in photos if p.local_path and os.path.exists(p.local_path)]
+        photo_paths = _resolve_photo_paths(product)
         if not photo_paths:
             return
         from src.tiktok_shop.pipeline.analyzer import analyze_product
@@ -1185,15 +1209,13 @@ def reanalyze_product(
             details={"product_id": product_id},
         )
 
-    photos, _origin = product.photos.best_available()
-    photo_paths = [
-        p.local_path for p in photos
-        if p.local_path and os.path.exists(p.local_path)
-    ]
+    photo_paths = _resolve_photo_paths(product)
     if not photo_paths:
         raise ValidationError(
-            "El producto no tiene fotos disponibles en disco para analizar.",
-            details={"product_id": product_id},
+            "El producto no tiene fotos disponibles en disco para analizar. "
+            "Verifica que Drive Desktop está sincronizando "
+            f"TIKTOK_SHOP/_products/{product.slug}/.",
+            details={"product_id": product_id, "slug": product.slug},
         )
 
     try:
