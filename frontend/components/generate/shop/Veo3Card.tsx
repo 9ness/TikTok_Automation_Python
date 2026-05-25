@@ -96,10 +96,46 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   const [results, setResults] = useState<ResultItem[] | null>(null);
   const [resultsTitle, setResultsTitle] = useState<string>("");
 
+  // Toggles de filtrado equivalentes al picker de Auto vídeo:
+  // - "Solo exclusivos Veo 3": presets que SOLO corren en veo3_prompt_only
+  //   (no en Standard/Advanced/Pro Seedance). Útil para ver lo que
+  //   justifica usar Veo 3 vs Seedance.
+  // - "Solo réplicas virales": presets generados desde el tab Replicar viral.
+  const [showOnlyExclusive, setShowOnlyExclusive] = useState(false);
+  const [showOnlyViralReplica, setShowOnlyViralReplica] = useState(false);
+
   const presets = product.data?.video_presets ?? [];
   // Veo 3 solo lista presets compatibles con `veo3_prompt_only`.
-  const compatibleVeo3 = useMemo(
-    () => presets.filter((p) => p.compatible_tiers.includes("veo3_prompt_only")),
+  const compatibleVeo3 = useMemo(() => {
+    let list = presets.filter((p) =>
+      p.compatible_tiers.includes("veo3_prompt_only"),
+    );
+    if (showOnlyExclusive) {
+      // Excluye presets que también corren en Seedance — deja solo
+      // los exclusivos de Veo 3 (típicamente creator_pov + duraciones largas
+      // con segments).
+      list = list.filter(
+        (p) =>
+          !p.compatible_tiers.includes("standard") &&
+          !p.compatible_tiers.includes("advanced") &&
+          !p.compatible_tiers.includes("pro"),
+      );
+    }
+    if (showOnlyViralReplica) {
+      list = list.filter((p) => p.source === "viral_replica");
+    }
+    return list;
+  }, [presets, showOnlyExclusive, showOnlyViralReplica]);
+
+  // Total réplicas virales para mostrar contador en el toggle (también
+  // sirve para deshabilitar el checkbox si no hay ninguna).
+  const viralReplicaCount = useMemo(
+    () =>
+      presets.filter(
+        (p) =>
+          p.source === "viral_replica" &&
+          p.compatible_tiers.includes("veo3_prompt_only"),
+      ).length,
     [presets],
   );
 
@@ -244,12 +280,63 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                   ? "Elige el preset base"
                   : "Elige el preset"}
             </Label>
+
+            {/* Toggles de filtrado (mismos que en Auto vídeo, adaptados a Veo 3) */}
+            {presets.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyExclusive}
+                    onChange={(e) => setShowOnlyExclusive(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-violet-500"
+                  />
+                  <span title="Muestra solo presets que SOLO corren en Veo 3 (no en Seedance) — típicamente creator_pov UGC o réplicas >10s con segmentos.">
+                    Solo exclusivos de Veo 3
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyViralReplica}
+                    onChange={(e) => setShowOnlyViralReplica(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-fuchsia-500"
+                    disabled={viralReplicaCount === 0}
+                  />
+                  <span title="Muestra solo presets generados desde 'Replicar viral' (los que clonan UGC de competidores).">
+                    🎯 Solo réplicas virales
+                    {viralReplicaCount > 0 && (
+                      <span className="ml-0.5 text-fuchsia-600 dark:text-fuchsia-400">
+                        ({viralReplicaCount})
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
+            )}
+
             {!hasPresets ? (
               <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs">
-                Este producto no tiene presets compatibles con Veo 3. Ve a
-                la página del producto → tab <strong>Presets</strong> →{" "}
-                <strong>Regenerar todos</strong>. Veo 3 solo acepta presets
-                de hasta 10s.
+                {showOnlyViralReplica && viralReplicaCount === 0 ? (
+                  <>
+                    No hay réplicas virales compatibles con Veo 3 en este
+                    producto. Genera una desde el tab{" "}
+                    <strong>Replicar viral</strong>.
+                  </>
+                ) : showOnlyExclusive ? (
+                  <>
+                    No hay presets <strong>exclusivos</strong> de Veo 3.
+                    Todos los presets Veo-compatibles también corren en
+                    Seedance. Desmarca &ldquo;Solo exclusivos&rdquo; para verlos.
+                  </>
+                ) : (
+                  <>
+                    Este producto no tiene presets compatibles con Veo 3.
+                    Ve a la página del producto → tab{" "}
+                    <strong>Presets</strong> →{" "}
+                    <strong>Regenerar todos</strong>.
+                  </>
+                )}
               </div>
             ) : (
               <Veo3PresetGrid
@@ -495,6 +582,14 @@ function Veo3PresetGrid({
                   )}
                 />
                 <strong className="truncate text-[11px]">{p.name}</strong>
+                {p.source === "viral_replica" && (
+                  <span
+                    className="shrink-0 rounded bg-fuchsia-500/15 px-1 py-0 text-[9px] font-medium text-fuchsia-700 dark:text-fuchsia-300"
+                    title="Preset generado desde 'Replicar viral'"
+                  >
+                    🎯
+                  </span>
+                )}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {/* Tipo principal: música (sin voz) vs creator UGC vs voiceover */}
