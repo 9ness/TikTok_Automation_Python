@@ -243,8 +243,22 @@ def _map_to_video_preset(
 
     duration_s = max(5, min(60, _safe_int(raw_preset.get("duration_s"), 12)))
 
+    # veo3_prompt_segments: si duration > 10s, Flow Gemini exige
+    # encadenar N clips de ~8-10s. Saneamos la lista cruda de Gemini
+    # (string → strip + cap) y la usamos como flag para que
+    # `_sanitize_tiers` mantenga `veo3_prompt_only` compatible aunque
+    # `duration_s` > 10.
+    raw_segments = raw_preset.get("veo3_prompt_segments")
+    veo3_segments: list[str] = []
+    if isinstance(raw_segments, list):
+        for seg in raw_segments:
+            txt = _safe_str(seg, "")[:2500]
+            if txt:
+                veo3_segments.append(txt)
+    veo3_segments = veo3_segments[:6]  # safety cap (60s / 10s)
+
     # compatible_tiers: confiamos en lo que Gemini dijo, pero saneamos
-    # contra las reglas duras (Veo3 ≤10s, creator_pov no Std/Adv).
+    # contra las reglas duras (Veo3 ≤10s salvo segments, creator_pov no Std/Adv).
     proposed_tiers = raw_preset.get("compatible_tiers")
     if not isinstance(proposed_tiers, list):
         proposed_tiers = ["standard", "advanced", "pro", "veo3_prompt_only"]
@@ -252,6 +266,7 @@ def _map_to_video_preset(
         [str(t) for t in proposed_tiers],
         duration_s=duration_s,
         style=style,
+        has_veo3_segments=bool(veo3_segments),
     )
 
     # shot_style + strategy con failsafes del modelo
@@ -312,7 +327,8 @@ def _map_to_video_preset(
             str(k)[:60] for k in (raw_preset.get("keywords") or [])
         ][:10],
         "seedance_prompt": _safe_str(raw_preset.get("seedance_prompt"), "")[:500],
-        "veo3_prompt": _safe_str(raw_preset.get("veo3_prompt"), "")[:2000],
+        "veo3_prompt": _safe_str(raw_preset.get("veo3_prompt"), "")[:2500],
+        "veo3_prompt_segments": veo3_segments,
         "veo3_photo_filenames": veo3_photos,
         "source": "viral_replica",
     }

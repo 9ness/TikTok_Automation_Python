@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Upload, Wand2 } from "lucide-react";
+import { Copy, Loader2, Upload, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -298,9 +298,20 @@ function VideoPresetPreview({
     voice_script?: string;
     seedance_prompt?: string;
     veo3_prompt?: string;
+    veo3_prompt_segments?: string[];
     veo3_photo_filenames?: string[];
   };
   const photos = vp.veo3_photo_filenames ?? [];
+  const segments = vp.veo3_prompt_segments ?? [];
+  const hasSegments = segments.length > 0;
+  async function copyText(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copiado al portapapeles.`);
+    } catch {
+      toast.error("No se pudo copiar (revisa permisos del navegador).");
+    }
+  }
   return (
     <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
       <p className="mb-2 font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
@@ -352,15 +363,60 @@ function VideoPresetPreview({
           </p>
         </div>
       )}
-      {vp.veo3_prompt && (
-        <div className="mt-1.5">
+      {hasSegments ? (
+        <div className="mt-2 space-y-1.5 rounded border border-purple-500/30 bg-purple-500/5 p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+            🟣 Veo 3 prompt · {segments.length} segmentos para Flow Gemini
+          </p>
           <p className="text-[10px] text-muted-foreground">
-            Veo 3 prompt:
+            Pega cada uno en orden en Flow Gemini — cada clip dura ~8-10s
+            y mantiene continuidad con el anterior. Total ≈ {vp.duration_s ?? segments.length * 10}s.
           </p>
-          <p className="rounded bg-muted/30 p-1.5 font-mono text-[10px]">
-            {vp.veo3_prompt}
-          </p>
+          {segments.map((seg, i) => (
+            <div
+              key={i}
+              className="rounded bg-muted/30 p-1.5"
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                  Segmento {i + 1} / {segments.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyText(seg, `Segmento ${i + 1}`)}
+                  className="flex items-center gap-1 rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-medium text-purple-700 hover:bg-purple-500/30 dark:text-purple-300"
+                >
+                  <Copy className="h-2.5 w-2.5" />
+                  Copiar
+                </button>
+              </div>
+              <p className="whitespace-pre-wrap font-mono text-[10px] leading-snug">
+                {seg}
+              </p>
+            </div>
+          ))}
         </div>
+      ) : (
+        vp.veo3_prompt && (
+          <div className="mt-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground">
+                Veo 3 prompt (clip único ~8-10s):
+              </p>
+              <button
+                type="button"
+                onClick={() => copyText(vp.veo3_prompt ?? "", "Veo 3 prompt")}
+                className="flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 text-[9px] font-medium hover:bg-muted"
+              >
+                <Copy className="h-2.5 w-2.5" />
+                Copiar
+              </button>
+            </div>
+            <p className="rounded bg-muted/30 p-1.5 font-mono text-[10px]">
+              {vp.veo3_prompt}
+            </p>
+          </div>
+        )
       )}
       {photos.length > 0 && (
         <div className="mt-1.5 rounded border border-violet-500/30 bg-violet-500/5 p-1.5">

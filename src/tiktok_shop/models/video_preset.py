@@ -238,7 +238,16 @@ class VideoPreset(BaseModel):
     # pasa con la foto del producto (movimiento de cámara, acción).
     seedance_prompt: str = ""
     # Veo 3 (prompt-only): prompt rico y descriptivo de toda la escena.
+    # Para `duration_s` ≤ 10s este es EL prompt único (un solo clip Veo 3).
+    # Para `duration_s` > 10s este campo guarda el primer segmento como
+    # fallback / preview; el flujo real es `veo3_prompt_segments[]`.
     veo3_prompt: str = ""
+    # Para vídeos > 10s en Flow Gemini: lista ordenada de N prompts de
+    # ~8-10s que el user pega secuencialmente en Flow para encadenar
+    # clips. Cada segmento mantiene continuidad (mismo personaje,
+    # outfit, setting) pero progresa el guion/acción. Vacío si el
+    # vídeo cabe en un solo clip (`duration_s` ≤ 10s).
+    veo3_prompt_segments: list[str] = Field(default_factory=list)
     # Fotos del producto que Gemini eligió para adjuntar a Veo 3.
     # Veo 3 NO va por API en este flujo — el user copia el prompt al chat
     # de Gemini / Flow y adjunta MANUALMENTE estas fotos para dar contexto

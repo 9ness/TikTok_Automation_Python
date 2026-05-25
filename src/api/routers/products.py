@@ -708,7 +708,15 @@ def get_photo_file(
         ".webp": "image/webp",
         ".gif": "image/gif",
     }.get(ext, "application/octet-stream")
-    return FileResponse(path=str(path), media_type=media_type, filename=path.name)
+    # Cache 1h en navegador — las fotos son inmutables por filename. Sin esto
+    # cada `<img>` o descarga vuelve a pegar contra el VPS (servido desde
+    # Drive sync local = lento).
+    return FileResponse(
+        path=str(path),
+        media_type=media_type,
+        filename=path.name,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 # ---------------------------------------------------------------------------

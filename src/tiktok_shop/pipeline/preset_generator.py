@@ -401,9 +401,17 @@ TIERS_WITHOUT_VEO3 = ["standard", "advanced", "pro"]
 TIERS_INCOMPATIBLE_WITH_CREATOR_POV = ["standard", "advanced"]
 
 
-def _sanitize_tiers(tiers: list[str], *, duration_s: int, style: str) -> list[str]:
+def _sanitize_tiers(
+    tiers: list[str],
+    *,
+    duration_s: int,
+    style: str,
+    has_veo3_segments: bool = False,
+) -> list[str]:
     """Aplica las reglas de compatibilidad reales:
-      - clampa Veo 3 si duration > 10s
+      - clampa Veo 3 si duration > 10s, EXCEPTO cuando el preset trae
+        `veo3_prompt_segments[]` con N chunks de ~10s — en ese caso el
+        flujo Flow Gemini encadena clips manualmente y Veo 3 sigue valido.
       - quita standard/advanced si style=creator_pov (no pueden lip-sync)
       - filtra strings inválidos.
     Si el resultado queda vacío, devuelve los compatibles "más seguros".
@@ -411,7 +419,7 @@ def _sanitize_tiers(tiers: list[str], *, duration_s: int, style: str) -> list[st
     valid = {"standard", "advanced", "pro", "veo3_prompt_only"}
     out = [t for t in tiers if t in valid]
 
-    if duration_s > VEO3_MAX_DURATION_S:
+    if duration_s > VEO3_MAX_DURATION_S and not has_veo3_segments:
         out = [t for t in out if t != "veo3_prompt_only"]
 
     if style == "creator_pov":
@@ -421,7 +429,9 @@ def _sanitize_tiers(tiers: list[str], *, duration_s: int, style: str) -> list[st
         # Fallback razonable: si la regla nos dejó sin tiers, al menos
         # pro siempre puede (con foto de persona o multi-shot)
         out = ["pro"]
-        if duration_s <= VEO3_MAX_DURATION_S and style != "voiceover_required":
+        if (
+            duration_s <= VEO3_MAX_DURATION_S or has_veo3_segments
+        ) and style != "voiceover_required":
             out.append("veo3_prompt_only")
     # De-dup preservando orden
     seen: set[str] = set()

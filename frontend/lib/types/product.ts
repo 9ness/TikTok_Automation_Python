@@ -347,6 +347,10 @@ export interface VideoPreset {
   keywords: string[];
   seedance_prompt: string;
   veo3_prompt: string;
+  /** Para vídeos > 10s: lista ordenada de N prompts de ~8-10s cada uno
+   *  que el user pega secuencialmente en Flow Gemini para encadenar
+   *  clips. Vacío si `duration_s` ≤ 10 (se usa solo `veo3_prompt`). */
+  veo3_prompt_segments: string[];
   /** Fotos del producto que Gemini eligió para adjuntar manualmente al
    *  prompt de Veo 3 al pegarlo en Gemini chat / Flow. Filenames del
    *  array `product.photos.source`. Máx 3. */

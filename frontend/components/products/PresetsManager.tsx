@@ -756,20 +756,29 @@ async function downloadAllPhotos(
   filenames: string[],
 ): Promise<void> {
   if (!filenames?.length) return;
-  toast.info(`Descargando ${filenames.length} foto(s)…`);
+  // Toast persistente con id mientras se descargan — así el user ve que
+  // está en curso aunque la primera foto tarde (servida sin cache desde
+  // Drive sync). Al terminar lo reemplazamos por success.
+  const toastId = `dl-photos-${productId}-${Date.now()}`;
+  toast.loading(`Descargando 0 / ${filenames.length} fotos…`, { id: toastId });
+  let done = 0;
   for (let i = 0; i < filenames.length; i++) {
     const fn = filenames[i];
     if (!fn) continue;
     const url = buildPhotoUrl(productId, fn);
     if (!url) continue;
     await downloadPhoto(url, fn);
+    done++;
+    toast.loading(`Descargando ${done} / ${filenames.length} fotos…`, {
+      id: toastId,
+    });
     // Espacio entre descargas — Chrome/Firefox pueden suprimir si llegan
     // demasiado seguidas. 250ms va sobrado.
     if (i < filenames.length - 1) {
       await new Promise((r) => setTimeout(r, 250));
     }
   }
-  toast.success(`Descargadas ${filenames.length} foto(s)`);
+  toast.success(`Descargadas ${done} foto(s)`, { id: toastId });
 }
 
 /** Convierte `trendy_uplifting` → `Trendy uplifting`, `high-energy_bass` →
@@ -847,6 +856,7 @@ function PresetCard({
   const deleteMut = useDeleteVideoPreset(product.id);
   const updateMut = useUpdateVideoPreset(product.id);
   const [open, setOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // Estado local mientras se edita
   const [draft, setDraft] = useState<VideoPresetUpdateInput>(() => ({
@@ -1887,42 +1897,90 @@ function PresetCard({
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
                   <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
                     🎬 Veo 3 (copy-paste a Gemini chat / Flow)
+                    {preset.veo3_prompt_segments &&
+                      preset.veo3_prompt_segments.length > 0 && (
+                        <> · {preset.veo3_prompt_segments.length} segmentos encadenados</>
+                      )}
                   </span>
                   <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 gap-1 px-2 text-[10px]"
-                      onClick={() => copyToClipboard(preset.veo3_prompt)}
-                      title="Copia el prompt al portapapeles"
-                    >
-                      📋 Copiar prompt
-                    </Button>
+                    {(!preset.veo3_prompt_segments ||
+                      preset.veo3_prompt_segments.length === 0) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 gap-1 px-2 text-[10px]"
+                        onClick={() => copyToClipboard(preset.veo3_prompt)}
+                        title="Copia el prompt al portapapeles"
+                      >
+                        📋 Copiar prompt
+                      </Button>
+                    )}
                     {preset.veo3_photo_filenames &&
                       preset.veo3_photo_filenames.length > 0 && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-6 gap-1 px-2 text-[10px]"
-                          onClick={() =>
-                            downloadAllPhotos(
-                              product.id,
-                              preset.veo3_photo_filenames,
-                            )
-                          }
+                          disabled={downloading}
+                          onClick={async () => {
+                            setDownloading(true);
+                            try {
+                              await downloadAllPhotos(
+                                product.id,
+                                preset.veo3_photo_filenames,
+                              );
+                            } finally {
+                              setDownloading(false);
+                            }
+                          }}
                           title="Descarga todas las fotos elegidas al disco (calidad original)"
                         >
-                          ⬇️ Descargar fotos ({preset.veo3_photo_filenames.length})
+                          {downloading
+                            ? `⏳ Descargando…`
+                            : `⬇️ Descargar fotos (${preset.veo3_photo_filenames.length})`}
                         </Button>
                       )}
                   </div>
                 </div>
-                <Detail
-                  label="Prompt · ~80-120 palabras"
-                  value={preset.veo3_prompt}
-                  hint="Veo 3 NO va por API en este flujo. Copia el prompt y descarga las fotos abajo — pega ambas en Gemini chat / Flow."
-                  mono
-                />
+                {preset.veo3_prompt_segments &&
+                preset.veo3_prompt_segments.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground">
+                      Pega cada segmento en orden en Flow Gemini · cada clip
+                      ~8-10s con continuidad del anterior · total {preset.duration_s}s.
+                    </p>
+                    {preset.veo3_prompt_segments.map((seg, i) => (
+                      <div
+                        key={i}
+                        className="rounded bg-muted/30 p-1.5"
+                      >
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                            Segmento {i + 1} / {preset.veo3_prompt_segments.length}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-5 gap-1 px-1.5 text-[9px]"
+                            onClick={() => copyToClipboard(seg)}
+                          >
+                            📋 Copiar
+                          </Button>
+                        </div>
+                        <p className="whitespace-pre-wrap font-mono text-[10px] leading-snug">
+                          {seg}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Detail
+                    label="Prompt · ~80-120 palabras"
+                    value={preset.veo3_prompt}
+                    hint="Veo 3 NO va por API en este flujo. Copia el prompt y descarga las fotos abajo — pega ambas en Gemini chat / Flow."
+                    mono
+                  />
+                )}
               </div>
             )}
             {preset.veo3_photo_filenames &&

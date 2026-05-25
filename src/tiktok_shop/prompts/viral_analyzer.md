@@ -98,7 +98,8 @@ NO markdown fences, NO explanations outside the JSON.
     "oratory_tips": "<where to pause, emphasis cues, energy curve>",
     "keywords": ["palabra_seo_1", "palabra_seo_2"],
     "seedance_prompt": "<English, ~25 words, image-to-video motion description for Seedance>",
-    "veo3_prompt": "<English, ~80-120 words, rich scene description for Veo 3>",
+    "veo3_prompt": "<English, ~80-120 words, rich scene description for Veo 3 — single 8-10s clip>",
+    "veo3_prompt_segments": ["<segment 1 prompt>", "<segment 2 prompt>", "..."],
     "veo3_photo_filenames": ["<filename1>", "<filename2>"]
   }
 }
@@ -142,10 +143,12 @@ Adapt the formula to the user's product (their name, brand, category, price)
 - **`strategy`**: same logic as `strategy_recommendation`.
 - **`duration_s`**: same as `duration_seconds_recommendation`.
 - **`compatible_tiers`**:
-  - If `duration_s > 10` → exclude `"veo3_prompt_only"` (Veo 3 native cap).
+  - `"veo3_prompt_only"` is ALWAYS included — incluso si `duration_s > 10`,
+    porque el flujo Flow Gemini permite encadenar N clips de 8-10s
+    usando `veo3_prompt_segments` (ver más abajo).
   - If `style=creator_pov` → exclude `"standard"` and `"advanced"`
-    (lip-sync needs person reference).
-  - Otherwise include all 4.
+    (lip-sync needs person reference; Pro + Veo 3 sí lo soportan).
+  - Otherwise include all 4 Seedance tiers + Veo 3.
 
 - **`text_overlay`**: the on-screen text adapted to the user's product. If
   the original said "I lost 5kg with this" → adapt to user's product
@@ -187,17 +190,42 @@ Adapt the formula to the user's product (their name, brand, category, price)
   camera does + product action) for Seedance i2v. The product photo
   carries visual context — don't redescribe the product.
 - **`veo3_prompt`** (English, ~80-120 words): rich scene description for
-  Veo 3. Include camera angle, lighting, mood, color palette (use the
-  colors you detected!), action, ambient sound. Ends with "[N] seconds".
+  ONE Veo 3 clip de 8-10s. Include camera angle, lighting, mood, color
+  palette (use the colors you detected!), action, ambient sound. Si
+  `duration_s ≤ 10` este es EL prompt único y `veo3_prompt_segments`
+  va vacío. Si `duration_s > 10` este campo guarda el PRIMER segmento
+  (fallback/preview); el flujo real lo conduce `veo3_prompt_segments`.
 
   **MANDATORY — LANGUAGE DIRECTIVE:** Read the "DIRECTIVA DE IDIOMA
   PARA EL VÍDEO" block in the user message and APPEND IT VERBATIM at
-  the end of both `seedance_prompt` and `veo3_prompt`. Example for
-  product language es_ES: end veo3_prompt with "...Spoken language:
-  SPANISH from Spain (Castilian European Spanish accent, NOT Latin
-  American). Any on-screen burned-in text must be in European
-  Spanish." Without this, Veo 3 defaults to English voice/text even
-  when the script is in another language.
+  the end of `seedance_prompt`, `veo3_prompt` AND **every entry** in
+  `veo3_prompt_segments`. Example for product language es_ES: ends
+  with "...Spoken language: SPANISH from Spain (Castilian European
+  Spanish accent, NOT Latin American). Any on-screen burned-in text
+  must be in European Spanish." Sin esto, Veo 3 devuelve voz/texto en
+  inglés aunque el guion vaya en otro idioma.
+
+- **`veo3_prompt_segments`** (list de prompts, mismo idioma/estilo
+  que `veo3_prompt`):
+  - Si `duration_s ≤ 10` → `[]` (vacío).
+  - Si `duration_s > 10` → genera `N = ceil(duration_s / 10)` prompts
+    (ej. 20s → 2 prompts, 25-30s → 3 prompts). Cada uno describe
+    ~8-10s del vídeo en orden cronológico.
+  - **Continuidad obligatoria** entre segmentos: misma persona (mismo
+    pelo, mismo outfit, mismo maquillaje), mismo setting/iluminación,
+    misma paleta. Cada prompt arranca recordando explícitamente
+    "Same Spanish creator from previous shot, identical wardrobe and
+    setting" (o equivalente) para que Flow Gemini mantenga al
+    personaje al encadenar clips.
+  - **Progresión del guion**: reparte el `voice_script` (si scripted)
+    o el flujo del hook→demo→CTA (si music) en N partes y haz que
+    cada segmento desarrolle una parte distinta. Segmento 1 = hook +
+    presentación; segmento intermedio = demo/beneficios; segmento
+    final = CTA + producto en pantalla con flecha si aplica.
+  - **Apéndice de transición**: cada segmento empieza con una frase
+    indicando qué continúa del anterior (ej. "Continuing from the
+    previous clip, the creator now picks up..." en seg 2/3).
+  - Aplica la LANGUAGE DIRECTIVE al final de **cada** segmento.
 
 - **`veo3_photo_filenames`**: pick 1-3 filenames from the user's source
   photo list (provided in the user message) that best match the scene

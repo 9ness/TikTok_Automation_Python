@@ -415,6 +415,9 @@ class VideoPresetResponse(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     seedance_prompt: str = ""
     veo3_prompt: str = ""
+    # Para vídeos > 10s: lista de N prompts de ~8-10s cada uno (Flow Gemini
+    # encadenado). Vacío si `duration_s` ≤ 10.
+    veo3_prompt_segments: list[str] = Field(default_factory=list)
     # Fotos del producto que Gemini eligió para adjuntar a Veo 3 (max 3).
     # El user las adjunta MANUALMENTE al pegar el prompt en Gemini chat / Flow.
     veo3_photo_filenames: list[str] = Field(default_factory=list)
@@ -505,6 +508,7 @@ class VideoPresetUpdateRequest(BaseModel):
     keywords: list[str] | None = None
     seedance_prompt: str | None = None
     veo3_prompt: str | None = None
+    veo3_prompt_segments: list[str] | None = None
     veo3_photo_filenames: list[str] | None = None
     angle: str | None = None
     notes: str | None = None
