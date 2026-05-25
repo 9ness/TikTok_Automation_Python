@@ -26,6 +26,18 @@ and extract structured data.
 
 ## Critical rules
 
+- **TRUST THE USER CONTEXT**: if `Extra context` field includes a product
+  name, brand, category, or URL, that is GROUND TRUTH. Your visual
+  inference must match it. NEVER override the user-provided category
+  based purely on what the photo "looks like". Common pitfalls to avoid:
+    - Translucent silicone disc → could be hair patch / nipple cover /
+      kitchen seal / phone grip / earplug. Trust the name.
+    - Beige cream jar → could be skincare / hair / body / food. Trust.
+    - Plastic strip → could be tape / patch / bandage. Trust.
+  If photos appear to contradict the context, prioritize the context
+  in `product_type`, `category`, `suggested_audiences` and `selling_points`.
+  Add a note in `warnings` if you genuinely cannot reconcile.
+
 - If packaging has prominent text/logo → `has_complex_packaging_text: true`.
   This affects which AI model to use (Fast can't recreate complex packaging).
 - If photos are <1024px in any side, watermarked, blurry, or have visible

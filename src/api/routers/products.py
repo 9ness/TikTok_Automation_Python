@@ -238,6 +238,33 @@ def create_product(
     return _to_response(product)
 
 
+def _build_analyzer_context(product: Product) -> str:
+    """Construye el `extra_context` para `analyze_product` con la info
+    que el user ya tiene metida en el producto (nombre, marca, categoría).
+    SIN esto, Gemini Vision solo ve las fotos y aluciña — ej. silicona
+    translúcida → parche capilar. Con esto, ANCLA la inferencia al
+    contexto real del producto."""
+    parts: list[str] = []
+    if product.name:
+        parts.append(f"Product name: {product.name}")
+    if product.brand:
+        parts.append(f"Brand: {product.brand}")
+    if product.category:
+        parts.append(f"Category (user-defined): {product.category}")
+    if product.subcategory:
+        parts.append(f"Subcategory: {product.subcategory}")
+    if product.tiktok_shop and product.tiktok_shop.product_url:
+        parts.append(f"TikTok Shop URL: {product.tiktok_shop.product_url}")
+    if not parts:
+        return ""
+    return (
+        "TRUST this product context over visual inference if conflict. "
+        "Visual cues alone can mislead (e.g. translucent silicone could "
+        "be many things). Use the name/brand/category as ground truth. "
+        + " | ".join(parts)
+    )
+
+
 def _analyze_in_background(product_id: str) -> None:
     """Hook para análisis Gemini async tras crear producto. Importa repo
     aquí para evitar problemas circulares y poder mockear en tests."""
@@ -252,7 +279,10 @@ def _analyze_in_background(product_id: str) -> None:
             return
         from src.tiktok_shop.pipeline.analyzer import analyze_product
 
-        result = analyze_product(photo_paths)
+        result = analyze_product(
+            photo_paths,
+            extra_context=_build_analyzer_context(product),
+        )
         _apply_analysis(product, result)
         repo.save(product)
     except Exception as e:
@@ -1145,7 +1175,10 @@ def reanalyze_product(
     try:
         from src.tiktok_shop.pipeline.analyzer import analyze_product
 
-        result = analyze_product(photo_paths)
+        result = analyze_product(
+            photo_paths,
+            extra_context=_build_analyzer_context(product),
+        )
     except Exception as e:
         raise GeminiError(f"Análisis Gemini falló: {e}", details={"product_id": product_id})
 
