@@ -55,7 +55,7 @@ class ProductCreate(BaseModel):
     """Crea un producto. `slug` es opcional (se deriva de `name` si falta)."""
 
     name: str = Field(..., min_length=1, max_length=200)
-    slug: str | None = Field(default=None, max_length=80)
+    slug: str | None = Field(default=None, max_length=150)
     brand: str | None = None
     category: str = "otros"
     subcategory: str | None = None
@@ -94,7 +94,7 @@ class ProductUpdate(BaseModel):
     """PATCH parcial — todos los campos opcionales."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    slug: str | None = Field(default=None, max_length=80)
+    slug: str | None = Field(default=None, max_length=150)
     brand: str | None = None
     category: str | None = None
     subcategory: str | None = None
