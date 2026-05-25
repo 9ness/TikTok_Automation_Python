@@ -76,7 +76,12 @@ interface ResultItem {
   presetId: string;
   name: string;
   veo3_prompt: string;
+  /** Para vídeos >10s: N prompts (~8-10s cada uno) que el user pega
+   *  secuencialmente en Flow Gemini para encadenar clips. Vacío si
+   *  duration_s ≤ 10. */
+  veo3_prompt_segments?: string[];
   veo3_photo_filenames: string[];
+  duration_s?: number;
   hypothesis?: string;
 }
 
@@ -165,7 +170,9 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
           presetId: p.id,
           name: p.name,
           veo3_prompt: p.veo3_prompt,
+          veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
+          duration_s: p.duration_s,
         },
       ]);
       setResultsTitle("🟣 Prompt Veo 3 listo");
@@ -182,7 +189,9 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
           presetId: p.id,
           name: p.name,
           veo3_prompt: p.veo3_prompt,
+          veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
+          duration_s: p.duration_s,
         }));
       setResults(items);
       setResultsTitle(`🟣 ${items.length} prompts Veo 3 listos`);
@@ -672,13 +681,16 @@ function ResultItemCard({
   index: number;
   productId: string;
 }) {
-  async function copyPrompt() {
+  const segments = item.veo3_prompt_segments ?? [];
+  const hasSegments = segments.length > 0;
+
+  async function copyText(text: string, label: string) {
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(item.veo3_prompt);
+        await navigator.clipboard.writeText(text);
       } else {
         const ta = document.createElement("textarea");
-        ta.value = item.veo3_prompt;
+        ta.value = text;
         ta.style.position = "fixed";
         ta.style.opacity = "0";
         document.body.appendChild(ta);
@@ -686,10 +698,14 @@ function ResultItemCard({
         document.execCommand("copy");
         document.body.removeChild(ta);
       }
-      toast.success("Prompt copiado");
+      toast.success(`${label} copiado`);
     } catch (e) {
       toast.error("No pude copiar");
     }
+  }
+
+  async function copyPrompt() {
+    return copyText(item.veo3_prompt, "Prompt");
   }
 
   async function downloadAll() {
@@ -713,17 +729,24 @@ function ResultItemCard({
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <strong className="truncate text-sm">
           #{index + 1} · {item.name}
+          {hasSegments && (
+            <span className="ml-1 rounded bg-purple-500/15 px-1 py-0 text-[9px] font-medium text-purple-700 dark:text-purple-300">
+              {segments.length} segmentos · {item.duration_s}s
+            </span>
+          )}
         </strong>
         <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 gap-1 px-2 text-[10px]"
-            onClick={copyPrompt}
-          >
-            <Copy className="h-3 w-3" />
-            Copiar prompt
-          </Button>
+          {!hasSegments && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 gap-1 px-2 text-[10px]"
+              onClick={copyPrompt}
+            >
+              <Copy className="h-3 w-3" />
+              Copiar prompt
+            </Button>
+          )}
           {item.veo3_photo_filenames.length > 0 && (
             <Button
               size="sm"
@@ -742,12 +765,48 @@ function ResultItemCard({
           Hipótesis: {item.hypothesis}
         </p>
       )}
-      <Textarea
-        readOnly
-        value={item.veo3_prompt}
-        className="min-h-[110px] font-mono text-[10px]"
-        onFocus={(e) => e.currentTarget.select()}
-      />
+      {hasSegments ? (
+        <div className="space-y-1.5">
+          <p className="text-[10px] text-muted-foreground">
+            Pega cada segmento en orden en Flow Gemini — cada clip ~8-10s
+            con continuidad del anterior. Total ≈ {item.duration_s}s.
+          </p>
+          {segments.map((seg, i) => (
+            <div
+              key={i}
+              className="rounded border border-purple-500/30 bg-purple-500/5 p-1.5"
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                  Segmento {i + 1} / {segments.length}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-5 gap-1 px-1.5 text-[9px]"
+                  onClick={() => copyText(seg, `Segmento ${i + 1}`)}
+                >
+                  <Copy className="h-2.5 w-2.5" />
+                  Copiar
+                </Button>
+              </div>
+              <Textarea
+                readOnly
+                value={seg}
+                className="min-h-[80px] font-mono text-[10px]"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Textarea
+          readOnly
+          value={item.veo3_prompt}
+          className="min-h-[110px] font-mono text-[10px]"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+      )}
       {item.veo3_photo_filenames.length === 0 ? (
         <div className="mt-1.5 rounded border border-amber-500/40 bg-amber-500/5 p-1.5 text-[10px] text-amber-700 dark:text-amber-300">
           ⚠️ Este preset no tiene fotos asignadas. Probablemente se generó
