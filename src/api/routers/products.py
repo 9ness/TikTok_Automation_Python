@@ -909,14 +909,30 @@ def import_photos_from_urls(
     )
 
 
-@router.get(
+@photo_file_router.get(
     "/{product_id}/photo-candidates/{filename}",
     include_in_schema=False,
 )
-def serve_photo_candidate(product_id: str, filename: str):
+def serve_photo_candidate(
+    product_id: str,
+    filename: str,
+    settings: Annotated[APISettings, Depends(get_settings)],
+    api_key: Annotated[str | None, Query()] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+):
     """Sirve los temp files de los candidatos para que la UI los muestre
-    como preview. No autenticado — solo expone temp dir del propio user."""
-    # Sanitización mínima: rechazar paths fuera del temp dir
+    como `<img src>` preview. Vive en `photo_file_router` (sin auth global
+    por header) para aceptar `?api_key=...` query — los <img> no pueden
+    mandar X-API-Key. En producción la API_KEY es obligatoria, en local
+    si APISettings.api_key vacío se sirve sin validar."""
+    # Mismo patrón que get_photo_file: si la app tiene API_KEY definida,
+    # exigir que el caller la mande por header o query.
+    if settings.api_key:
+        provided = x_api_key or api_key
+        if not provided or provided != settings.api_key:
+            raise UnauthorizedError("API key inválida o ausente.")
+
+    # Sanitización: rechazar paths fuera del temp dir.
     if "/" in filename or "\\" in filename or ".." in filename:
         raise ValidationError("filename inválido", details={"filename": filename})
     path = _photo_candidate_dir(product_id) / filename
