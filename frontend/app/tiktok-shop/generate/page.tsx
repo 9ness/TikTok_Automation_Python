@@ -1,9 +1,19 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Check, Package, Settings2, User as UserIcon } from "lucide-react";
+import {
+  Bookmark,
+  Check,
+  Package,
+  Plus,
+  Settings2,
+  User as UserIcon,
+  X,
+  Zap,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { ShopGenerateCards } from "@/components/generate/ShopGenerateCards";
 import { Button } from "@/components/ui/button";
@@ -45,10 +55,22 @@ function ShopGenerateLoading() {
 // al volver al generador no haya que repetir los clicks. URL params
 // (?user_id&product_id) tienen prioridad por si compartimos un link.
 const LS_KEY = "tiktok_shop_generate.last_selection";
+// Lista de "entradas rápidas" — combos user+producto pineados por el user.
+// Se muestran arriba como cards de 1 click.
+const LS_SHORTCUTS_KEY = "tiktok_shop_generate.shortcuts";
+const MAX_SHORTCUTS = 8;
 
 interface LastSelection {
   userId: string;
   productId: string;
+}
+
+interface Shortcut {
+  userId: string;
+  productId: string;
+  /** Timestamp ISO de cuando se creó — sirve para ordenar más recientes
+   *  arriba si crecemos a muchos shortcuts. */
+  created_at: string;
 }
 
 function readLastSelection(): LastSelection | null {
@@ -75,6 +97,39 @@ function writeLastSelection(sel: LastSelection): void {
   }
 }
 
+function readShortcuts(): Shortcut[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_SHORTCUTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (s) =>
+          s &&
+          typeof s.userId === "string" &&
+          typeof s.productId === "string",
+      )
+      .map((s) => ({
+        userId: s.userId,
+        productId: s.productId,
+        created_at: typeof s.created_at === "string" ? s.created_at : new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function writeShortcuts(list: Shortcut[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_SHORTCUTS_KEY, JSON.stringify(list));
+  } catch {
+    /* silencia */
+  }
+}
+
 function ShopGenerateInner() {
   const params = useSearchParams();
   const users = useUsers(
@@ -89,6 +144,12 @@ function ShopGenerateInner() {
   const [userId, setUserId] = useState<string>("");
   const [productId, setProductId] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
+
+  // Cargar shortcuts una sola vez en mount (cliente only — localStorage).
+  useEffect(() => {
+    setShortcuts(readShortcuts());
+  }, []);
 
   const activeUsers = useMemo(
     () => (users.data?.items ?? []).filter((u) => !u.deleted),
@@ -188,7 +249,64 @@ function ShopGenerateInner() {
     setProductId(first?.id ?? "");
   }
 
+  /** Pin del combo actual user+producto como shortcut de 1 click. */
+  const addShortcut = useCallback((): void => {
+    if (!userId || !productId) return;
+    const exists = shortcuts.some(
+      (s) => s.userId === userId && s.productId === productId,
+    );
+    if (exists) {
+      toast.info("Ya tienes esta entrada rápida guardada.");
+      return;
+    }
+    if (shortcuts.length >= MAX_SHORTCUTS) {
+      toast.error(
+        `Máximo ${MAX_SHORTCUTS} entradas rápidas — borra alguna antes.`,
+      );
+      return;
+    }
+    const next: Shortcut[] = [
+      ...shortcuts,
+      { userId, productId, created_at: new Date().toISOString() },
+    ];
+    setShortcuts(next);
+    writeShortcuts(next);
+    toast.success("Entrada rápida guardada.");
+  }, [userId, productId, shortcuts]);
+
+  const removeShortcut = useCallback(
+    (s: Shortcut): void => {
+      const next = shortcuts.filter(
+        (x) => !(x.userId === s.userId && x.productId === s.productId),
+      );
+      setShortcuts(next);
+      writeShortcuts(next);
+    },
+    [shortcuts],
+  );
+
+  function pickShortcut(s: Shortcut): void {
+    // Validamos que ambos siguen vivos y el producto sigue asignado.
+    const user = activeUsers.find((u) => u.id === s.userId);
+    if (!user) {
+      toast.error("Esa cuenta ya no existe. Quita la entrada rápida.");
+      return;
+    }
+    const userAssigned = new Set(user.assigned_products ?? []);
+    if (!userAssigned.has(s.productId)) {
+      toast.error(
+        "Ese producto ya no está asignado a la cuenta. Quita la entrada rápida.",
+      );
+      return;
+    }
+    setUserId(s.userId);
+    setProductId(s.productId);
+  }
+
   const selectedProduct = activeProducts.find((p) => p.id === productId);
+  const currentComboSaved = shortcuts.some(
+    (s) => s.userId === userId && s.productId === productId,
+  );
 
   return (
     <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
@@ -196,7 +314,7 @@ function ShopGenerateInner() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Generador de vídeos</h1>
           <p className="text-sm text-muted-foreground">
-            Elige cuenta y producto en 1 clic — se recuerda tu última selección.
+            Entrada rápida en 1 clic — o elige cuenta y producto a mano.
           </p>
         </div>
         <Link href="/tiktok-shop/generate/advanced">
@@ -206,6 +324,70 @@ function ShopGenerateInner() {
           </Button>
         </Link>
       </header>
+
+      {/* Entradas rápidas: combos user+producto guardados que se aplican
+          en 1 clic. Aparece si hay alguna O si el combo actual no está
+          guardado todavía (para mostrar el botón Guardar). */}
+      {(shortcuts.length > 0 ||
+        (userId && productId && !currentComboSaved)) && (
+        <section className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 font-medium">
+              <Zap className="h-3.5 w-3.5 text-amber-500" />
+              Entradas rápidas
+              {shortcuts.length > 0 && (
+                <span className="text-muted-foreground">
+                  · {shortcuts.length}/{MAX_SHORTCUTS}
+                </span>
+              )}
+            </div>
+            {userId && productId && !currentComboSaved && (
+              <button
+                type="button"
+                onClick={addShortcut}
+                className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                title="Guarda esta combinación cuenta+producto como entrada rápida"
+              >
+                <Plus className="h-3 w-3" />
+                Guardar combo actual
+              </button>
+            )}
+          </div>
+          {shortcuts.length === 0 ? (
+            <p className="rounded-md border border-dashed bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+              <Bookmark className="mr-1 inline h-3 w-3" />
+              Guarda combos cuenta+producto que uses a menudo — aparecerán
+              aquí como tarjetas de 1 clic.
+            </p>
+          ) : (
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {shortcuts.map((s) => {
+                const user = activeUsers.find((u) => u.id === s.userId);
+                const product = activeProducts.find(
+                  (p) => p.id === s.productId,
+                );
+                const stale =
+                  !user ||
+                  !product ||
+                  !(user.assigned_products ?? []).includes(s.productId);
+                const isActive =
+                  s.userId === userId && s.productId === productId;
+                return (
+                  <ShortcutCard
+                    key={`${s.userId}__${s.productId}`}
+                    user={user}
+                    product={product}
+                    stale={stale}
+                    active={isActive}
+                    onClick={() => pickShortcut(s)}
+                    onRemove={() => removeShortcut(s)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Selector de cuenta — chips horizontales */}
       <section className="space-y-1.5">
@@ -426,6 +608,115 @@ function ProductCardChip({
         </p>
       )}
     </button>
+  );
+}
+
+function ShortcutCard({
+  user,
+  product,
+  stale,
+  active,
+  onClick,
+  onRemove,
+}: {
+  user: User | undefined;
+  product: Product | undefined;
+  stale: boolean;
+  active: boolean;
+  onClick: () => void;
+  onRemove: () => void;
+}) {
+  // Si user/product están borrados o el producto ya no está asignado al
+  // user, marcamos la card como "stale" — visualmente apagada + tooltip
+  // explicativo + un X destacado para que el user la limpie.
+  const initials = (user?.username || user?.display_name || "?")
+    .slice(0, 2)
+    .toUpperCase();
+  const firstPhoto = product?.photos?.source?.[0]?.filename;
+  const base =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+    "http://localhost:8000";
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+  const thumb =
+    product && firstPhoto
+      ? `${base}/api/v1/products/${product.id}/photos/${encodeURIComponent(firstPhoto)}/file${qs}`
+      : null;
+
+  const titleText = stale
+    ? "Esta entrada rápida ya no es válida (cuenta o producto borrado/desasignado). Pulsa la X para quitarla."
+    : `Cuenta: @${user?.username ?? "?"} · Producto: ${product?.name ?? "?"}`;
+
+  return (
+    <div
+      className={cn(
+        "group relative flex shrink-0 items-center gap-2 rounded-md border-2 bg-card p-1.5 transition-all",
+        active && !stale && "border-emerald-500 bg-emerald-500/10 shadow-sm",
+        !active && !stale && "border-amber-500/40 hover:border-amber-500",
+        stale && "border-muted opacity-50 grayscale",
+      )}
+      title={titleText}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={stale}
+        className="flex min-w-0 items-center gap-2 text-left disabled:cursor-not-allowed"
+      >
+        {/* Avatar usuario */}
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+            active && !stale
+              ? "bg-emerald-500 text-white"
+              : "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+          )}
+        >
+          {initials}
+        </div>
+        {/* Thumbnail producto */}
+        <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted/40">
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumb}
+              alt={product?.name ?? ""}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <Package className="h-4 w-4" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 pr-1">
+          <p className="truncate text-[11px] font-semibold">
+            @{user?.username ?? "—"}
+          </p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            {stale ? "Combo inválido" : (product?.name ?? "—")}
+          </p>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className={cn(
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
+          stale
+            ? "bg-red-500/20 text-red-700 hover:bg-red-500/40 dark:text-red-300"
+            : "bg-muted/50 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100",
+        )}
+        title="Quitar entrada rápida"
+        aria-label="Quitar entrada rápida"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
