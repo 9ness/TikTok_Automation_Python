@@ -243,7 +243,13 @@ def _build_analyzer_context(product: Product) -> str:
     que el user ya tiene metida en el producto (nombre, marca, categoría).
     SIN esto, Gemini Vision solo ve las fotos y aluciña — ej. silicona
     translúcida → parche capilar. Con esto, ANCLA la inferencia al
-    contexto real del producto."""
+    contexto real del producto.
+
+    Además, si el producto tiene URL TikTok Shop, intenta hacer scrape
+    en best-effort para extraer la descripción real del producto (la
+    misma que pondría el vendedor). Esto da MUCHO más contexto a
+    Gemini que solo el nombre, eliminando casi todas las alucinaciones.
+    """
     parts: list[str] = []
     if product.name:
         parts.append(f"Product name: {product.name}")
@@ -253,14 +259,32 @@ def _build_analyzer_context(product: Product) -> str:
         parts.append(f"Category (user-defined): {product.category}")
     if product.subcategory:
         parts.append(f"Subcategory: {product.subcategory}")
-    if product.tiktok_shop and product.tiktok_shop.product_url:
-        parts.append(f"TikTok Shop URL: {product.tiktok_shop.product_url}")
+
+    # Best-effort: scrape la URL TikTok Shop para coger la descripción.
+    # Timeout corto (~6s) y nunca rompe el análisis si falla. La
+    # descripción suele venir en og:description y es muy descriptiva
+    # ("Pezoneras de silicona invisibles reutilizables triangulares...").
+    url = (product.tiktok_shop.product_url if product.tiktok_shop else "") or ""
+    if url:
+        parts.append(f"TikTok Shop URL: {url}")
+        try:
+            from src.tiktok_shop.utils.url_scraper import scrape_product_url
+            scraped = scrape_product_url(url, use_gemini=False)
+            desc = (scraped.get("description") or "").strip()
+            if desc:
+                # Limitar a 600 chars para no inflar el prompt con HTML largo
+                parts.append(f"Official product description: {desc[:600]}")
+        except Exception:
+            # Scrape opcional, falla silenciosa.
+            pass
+
     if not parts:
         return ""
     return (
         "TRUST this product context over visual inference if conflict. "
         "Visual cues alone can mislead (e.g. translucent silicone could "
-        "be many things). Use the name/brand/category as ground truth. "
+        "be many things). Use the name/brand/category/description as "
+        "ground truth. "
         + " | ".join(parts)
     )
 
