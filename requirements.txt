@@ -16,6 +16,11 @@ requests
 ddgs
 # BeautifulSoup para scraping de URLs TikTok Shop / TikTok / OG tags
 beautifulsoup4
+# OpenCV headless (sin libs GUI, ideal para Docker server). Usado por
+# `viral_analyzer._sample_frames` para muestrear frames de vídeos virales
+# que el user sube en "Replicar viral". Versión headless = ~30MB extra
+# vs ~80MB de opencv-python normal.
+opencv-python-headless>=4.9
 streamlit-authenticator>=0.4.0
 bcrypt
 faster-whisper
