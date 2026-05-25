@@ -361,7 +361,7 @@ function ShopGenerateInner() {
               aquí como tarjetas de 1 clic.
             </p>
           ) : (
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {shortcuts.map((s) => {
                 const user = activeUsers.find((u) => u.id === s.userId);
                 const product = activeProducts.find(
@@ -651,9 +651,9 @@ function ShortcutCard({
   return (
     <div
       className={cn(
-        "group relative flex shrink-0 items-center gap-2 rounded-md border-2 bg-card p-1.5 transition-all",
+        "group relative flex items-stretch gap-2 rounded-md border-2 bg-card p-2 transition-all",
         active && !stale && "border-emerald-500 bg-emerald-500/10 shadow-sm",
-        !active && !stale && "border-amber-500/40 hover:border-amber-500",
+        !active && !stale && "border-amber-500/40 hover:border-amber-500 hover:bg-amber-500/5",
         stale && "border-muted opacity-50 grayscale",
       )}
       title={titleText}
@@ -662,21 +662,10 @@ function ShortcutCard({
         type="button"
         onClick={onClick}
         disabled={stale}
-        className="flex min-w-0 items-center gap-2 text-left disabled:cursor-not-allowed"
+        className="flex min-w-0 flex-1 items-center gap-2.5 text-left disabled:cursor-not-allowed"
       >
-        {/* Avatar usuario */}
-        <div
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
-            active && !stale
-              ? "bg-emerald-500 text-white"
-              : "bg-amber-500/20 text-amber-700 dark:text-amber-300",
-          )}
-        >
-          {initials}
-        </div>
-        {/* Thumbnail producto */}
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted/40">
+        {/* Thumbnail producto (más grande, dominante) */}
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted/40">
           {thumb ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -687,17 +676,34 @@ function ShortcutCard({
             />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">
-              <Package className="h-4 w-4" />
+              <Package className="h-5 w-5" />
             </div>
           )}
+          {/* Avatar overlay esquina inferior-izquierda */}
+          <div
+            className={cn(
+              "absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card text-[8px] font-bold",
+              active && !stale
+                ? "bg-emerald-500 text-white"
+                : "bg-amber-500 text-white",
+            )}
+          >
+            {initials}
+          </div>
         </div>
-        <div className="min-w-0 flex-1 pr-1">
-          <p className="truncate text-[11px] font-semibold">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold text-muted-foreground">
             @{user?.username ?? "—"}
           </p>
-          <p className="truncate text-[10px] text-muted-foreground">
+          <p className="line-clamp-2 text-xs font-medium leading-tight">
             {stale ? "Combo inválido" : (product?.name ?? "—")}
           </p>
+          {active && !stale && (
+            <span className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <Check className="h-2.5 w-2.5" />
+              Activo
+            </span>
+          )}
         </div>
       </button>
       <button
@@ -707,10 +713,10 @@ function ShortcutCard({
           onRemove();
         }}
         className={cn(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
+          "absolute right-1 top-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
           stale
             ? "bg-red-500/20 text-red-700 hover:bg-red-500/40 dark:text-red-300"
-            : "bg-muted/50 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100",
+            : "bg-muted/60 text-muted-foreground opacity-0 hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100",
         )}
         title="Quitar entrada rápida"
         aria-label="Quitar entrada rápida"
