@@ -111,33 +111,48 @@ def _resolve_shot_strategy(
 _VALID_TONES = {"energetic", "calm", "persuasive", "serious", "playful"}
 _VALID_BACKGROUNDS = {"none", "black_bar", "blur"}
 
-# Mapping locale → instrucciones para Gemini. Determina el idioma EXACTO
-# del voice_script, hooks, CTA, text_overlay. Default es_ES (España).
-_LANGUAGE_INSTRUCTIONS: dict[str, str] = {
+# Mapping locale → (instrucciones para el contenido, frase explícita para
+# inyectar en seedance_prompt y veo3_prompt). El segundo string es CRÍTICO:
+# aunque el prompt va en inglés, Veo 3 y Seedance respetan directivas
+# explícitas sobre idioma hablado / texto en pantalla. Sin ello, el modelo
+# inventa textos en inglés y la voz puede sonar a US English en escenas
+# con persona hablando.
+_LANGUAGE_INSTRUCTIONS: dict[str, tuple[str, str]] = {
     "es_ES": (
         "Idioma: ESPAÑOL DE ESPAÑA (castellano peninsular). Usa 'vosotros' "
         "no 'ustedes'. Modismos y vocabulario españoles ('flipas', 'súper', "
         "'currar', 'curro', 'guay', 'tío/tía' con moderación). Acento "
-        "neutro de España. NUNCA mezcles voseo latinoamericano."
+        "neutro de España. NUNCA mezcles voseo latinoamericano.",
+        "Spoken language: SPANISH from Spain (Castilian European Spanish "
+        "accent, NOT Latin American). Any on-screen burned-in text must "
+        "be in European Spanish.",
     ),
     "es_LATAM": (
         "Idioma: ESPAÑOL LATINOAMERICANO neutro. Usa 'ustedes' no "
         "'vosotros'. Vocabulario panregional sin localismos fuertes. "
-        "Acento neutro latino (NO Castilla)."
+        "Acento neutro latino (NO Castilla).",
+        "Spoken language: SPANISH (neutral Latin American accent, NOT "
+        "Castilian). On-screen burned-in text in neutral Latin Spanish.",
     ),
     "en_US": (
         "Language: AMERICAN ENGLISH. Use American spellings (color, "
-        "favor). Natural, casual TikTok voiceover energy."
+        "favor). Natural, casual TikTok voiceover energy.",
+        "Spoken language: AMERICAN ENGLISH. On-screen text in American English.",
     ),
     "en_UK": (
         "Language: BRITISH ENGLISH. Use British spellings (colour, "
-        "favourite). British expressions where natural ('mate', 'brilliant')."
+        "favourite). British expressions where natural ('mate', 'brilliant').",
+        "Spoken language: BRITISH ENGLISH (UK accent). On-screen text in British English.",
     ),
     "pt_BR": (
         "Idioma: PORTUGUÊS DO BRASIL. Usa vocabulário brasileiro, não "
-        "português europeu."
+        "português europeu.",
+        "Spoken language: BRAZILIAN PORTUGUESE. On-screen text in Brazilian Portuguese.",
     ),
-    "fr_FR": "Langue : FRANÇAIS (France).",
+    "fr_FR": (
+        "Langue : FRANÇAIS (France).",
+        "Spoken language: FRENCH (France accent). On-screen text in French.",
+    ),
 }
 
 
@@ -146,13 +161,17 @@ def _language_block(product: Any) -> str:
     de Gemini. Default a es_ES si el producto no tiene `language` o tiene
     un código no reconocido."""
     lang = getattr(product, "language", None) or "es_ES"
-    instr = _LANGUAGE_INSTRUCTIONS.get(lang) or _LANGUAGE_INSTRUCTIONS["es_ES"]
+    instr, prompt_directive = _LANGUAGE_INSTRUCTIONS.get(lang) or _LANGUAGE_INSTRUCTIONS["es_ES"]
     return (
         f"\n=== IDIOMA OBLIGATORIO ({lang}) ===\n{instr}\n"
-        f"TODO el contenido (voice_script, hooks_alternatives, cta, "
-        f"oratory_tips, text_overlay, title, keywords) debe estar en "
-        f"este idioma. seedance_prompt y veo3_prompt SIEMPRE en inglés "
-        f"(es lo que el modelo espera)."
+        f"TODO el contenido en {lang} (voice_script, hooks_alternatives, "
+        f"cta, oratory_tips, text_overlay, title, keywords).\n"
+        f"\n=== DIRECTIVA DE IDIOMA PARA EL VÍDEO (CRÍTICO) ===\n"
+        f"`seedance_prompt` y `veo3_prompt` van EN INGLÉS (es lo que el "
+        f"modelo entiende), PERO debes INCLUIR LITERALMENTE esta frase al "
+        f"final de cada uno:\n  → \"{prompt_directive}\"\n"
+        f"Sin esa frase, Veo 3 puede generar voz/texto en inglés cuando "
+        f"el user quiere {lang}."
     )
 
 # Máximo de fotos source que pasamos a Gemini como contexto visual al

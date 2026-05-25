@@ -100,6 +100,14 @@ Schema (SIEMPRE este shape, sin campos extra):
   prompt puede ser un poco más corto que si fuera puro texto —
   asume que el modelo ve las fotos.
   Incluye "no narration, ambient music only, [N] seconds" al final.
+
+  **OBLIGATORIO — TEXTO EN PANTALLA EN EL IDIOMA DEL PRODUCTO:**
+  Los presets musicales suelen tener `text_overlay` burned-in en la
+  escena. Añade al final del veo3_prompt una nota corta tipo
+  "On-screen text overlay in {idioma del producto}" según la
+  directiva del bloque de idioma. Ejemplo es_ES: "On-screen
+  burned-in text in European Spanish (Spain)." Sin esto Veo 3
+  puede invertirlo a inglés.
 - `veo3_photo_filenames`: **array de hasta 3 filenames** de la lista
   de fotos disponibles que te pasé (las viste como imágenes en
   este mismo prompt). Elige las que mejor encajen con la escena

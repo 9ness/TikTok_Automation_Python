@@ -189,6 +189,16 @@ Adapt the formula to the user's product (their name, brand, category, price)
 - **`veo3_prompt`** (English, ~80-120 words): rich scene description for
   Veo 3. Include camera angle, lighting, mood, color palette (use the
   colors you detected!), action, ambient sound. Ends with "[N] seconds".
+
+  **MANDATORY — LANGUAGE DIRECTIVE:** Read the "DIRECTIVA DE IDIOMA
+  PARA EL VÍDEO" block in the user message and APPEND IT VERBATIM at
+  the end of both `seedance_prompt` and `veo3_prompt`. Example for
+  product language es_ES: end veo3_prompt with "...Spoken language:
+  SPANISH from Spain (Castilian European Spanish accent, NOT Latin
+  American). Any on-screen burned-in text must be in European
+  Spanish." Without this, Veo 3 defaults to English voice/text even
+  when the script is in another language.
+
 - **`veo3_photo_filenames`**: pick 1-3 filenames from the user's source
   photo list (provided in the user message) that best match the scene
   described in `veo3_prompt`. EXACT filenames as given. If no photos

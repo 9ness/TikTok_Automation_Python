@@ -447,6 +447,11 @@ def analyze_viral_video(
                 if len(available_photo_filenames) >= 6:
                     break
 
+            # Bloque de idioma — reusamos el helper del preset_generator
+            # para garantizar la misma instrucción de "Spoken language"
+            # injection en los prompts Veo 3 / Seedance.
+            from src.tiktok_shop.pipeline.preset_generator import _language_block
+            lang_instr = _language_block(product)
             product_block = (
                 f"\n\n=== USER'S PRODUCT CONTEXT (adapt the formula to this) ===\n"
                 f"- Name: {product_name}\n"
@@ -457,6 +462,7 @@ def analyze_viral_video(
                 f"- Target audiences: {', '.join(audiences) or '(generic)'}\n"
                 f"- Key features: {', '.join(features) or '(none defined)'}\n"
                 f"- Selling points: {', '.join(selling) or '(none defined)'}\n"
+                f"{lang_instr}\n"
                 f"\nAvailable source photos for veo3_photo_filenames "
                 f"(pick filenames EXACTLY from this list, max 3):\n"
                 + ("\n".join(f"  - {fn}" for fn in available_photo_filenames)

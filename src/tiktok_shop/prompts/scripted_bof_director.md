@@ -250,6 +250,10 @@ hasta agotarlos):
   Standard/Advanced — describe la escena estática con la foto del
   producto (ángulo, luz). El audio del voice_script va por separado
   vía TTS, NO lo describas aquí.
+  **Si el preset incluye texto burned-in (creator_pov o text_overlay
+  in-video):** añade al final "On-screen text in {idioma}" según la
+  directiva del bloque de idioma. Para Seedance puro de producto sin
+  texto/voz, esto es opcional.
 
 - `veo3_prompt`: **inglés**, ~80-120 palabras. Para Veo 3 — el user
   copia este prompt en Gemini chat / Flow y adjunta MANUALMENTE las
@@ -259,6 +263,15 @@ hasta agotarlos):
   por separado, NO lo embebas aquí; pero sí puedes indicar
   "person speaks softly" para que Veo 3 simule lip-sync coherente.
   Puede ser un poco más corto si las fotos cubren la parte visual.
+
+  **OBLIGATORIO — DIRECTIVA DE IDIOMA:** Lee la "DIRECTIVA DE IDIOMA
+  PARA EL VÍDEO" del bloque de contexto del producto (user message)
+  y AÑADE LITERALMENTE la frase indicada al final del veo3_prompt.
+  Ejemplo para idioma es_ES: el prompt debe terminar con
+  "...Spoken language: SPANISH from Spain (Castilian European Spanish
+  accent, NOT Latin American). Any on-screen burned-in text must be
+  in European Spanish." Sin esta línea Veo 3 puede meter texto/voz
+  en inglés por defecto.
 
 - `veo3_photo_filenames`: **array de hasta 3 filenames** de la lista
   de fotos disponibles que te pasé (las viste como imágenes en este
