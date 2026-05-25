@@ -79,9 +79,17 @@ export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
         gemini_model: effectiveModel,
       });
       setResult(res);
-      // Sugerencia de nombre basada en el filename sin ext.
-      const stem = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
-      setPresetName(`viral_${stem}`);
+      // Sugerencia de nombre: priorizamos el name que ya generó Gemini
+      // ("Réplica · Hook Dolor 30s"), que es legible. Si no existe
+      // (modos legacy auto_video/nano_banana sin video_preset), caemos
+      // al stem del filename como fallback.
+      const geminiName = (res.video_preset as { name?: string } | null)?.name;
+      if (geminiName && geminiName.trim()) {
+        setPresetName(geminiName.trim());
+      } else {
+        const stem = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
+        setPresetName(`viral_${stem}`);
+      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Error analizando el vídeo.");
     }
@@ -250,13 +258,21 @@ export function ViralReplicaCard({ userId, productId, hideTitle }: Props) {
                 </span>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">Nombre del preset</Label>
+              <div className="space-y-1 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
+                <Label className="text-xs font-semibold">
+                  ✏️ Nombre del preset (editable)
+                </Label>
                 <Input
                   value={presetName}
                   onChange={(e) => setPresetName(e.target.value)}
-                  placeholder="ej. viral_competidor_v1"
+                  onFocus={(e) => e.currentTarget.select()}
+                  placeholder="ej. Curviva · pezoneras vestido 30s"
+                  className="font-medium"
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Sugerencia auto-generada por Gemini — click para
+                  reescribirlo a tu gusto. Se guardará así en /tiktok-shop/generate.
+                </p>
               </div>
             </div>
           )}
