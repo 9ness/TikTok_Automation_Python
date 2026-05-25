@@ -435,13 +435,26 @@ def analyze_viral_video(
             selling = getattr(product, "selling_points", []) or []
 
             # Source photos del producto — para que Gemini elija filenames
-            # reales en `veo3_photo_filenames`.
+            # reales en `veo3_photo_filenames`. Fallback Win/Linux: si
+            # local_path no existe (Redis compartido entre entornos),
+            # reconstruimos desde slug + filename.
+            from src.tiktok_shop.config import product_photos_source_folder
             source_photos = getattr(getattr(product, "photos", None), "source", []) or []
             for p in source_photos:
                 if getattr(p, "deleted", False):
                     continue
                 local = getattr(p, "local_path", None)
-                if not local or not os.path.exists(local):
+                resolved = None
+                if local and os.path.exists(local):
+                    resolved = local
+                else:
+                    candidate = os.path.join(
+                        product_photos_source_folder(product.slug),
+                        p.filename,
+                    )
+                    if os.path.exists(candidate):
+                        resolved = candidate
+                if resolved is None:
                     continue
                 available_photo_filenames.append(p.filename)
                 if len(available_photo_filenames) >= 6:

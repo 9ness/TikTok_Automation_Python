@@ -190,16 +190,39 @@ def _collect_product_photos(product) -> tuple[list[str], list[str]]:
     """Devuelve `(filenames, paths)` de hasta `_MAX_PHOTOS_FOR_GEMINI`
     fotos source no borradas del producto que existan en disco. Orden:
     igual que están en `product.photos.source`. Si no hay fotos en disco
-    → devuelve ([], [])."""
+    → devuelve ([], []).
+
+    Resolución de path:
+    1) Probar `local_path` persistido en Redis (ruta del entorno donde
+       se subió la foto — Windows local o Linux VPS).
+    2) Si no existe, reconstruir desde slug + filename usando los
+       helpers de `config.py` que respetan `TIKTOK_SHOP_ROOT_PATH` del
+       entorno actual. Esto permite que Redis compartido entre Win+Linux
+       funcione: Drive Desktop sincroniza la misma carpeta en ambos.
+    """
+    from src.tiktok_shop.config import product_photos_source_folder
+
     filenames: list[str] = []
     paths: list[str] = []
     for p in product.photos.source:
-        if p.deleted or not p.local_path:
+        if p.deleted:
             continue
-        if not os.path.exists(p.local_path):
+        resolved: str | None = None
+        # 1) Path persistido
+        if p.local_path and os.path.exists(p.local_path):
+            resolved = p.local_path
+        else:
+            # 2) Reconstruir desde slug + filename
+            candidate = os.path.join(
+                product_photos_source_folder(product.slug),
+                p.filename,
+            )
+            if os.path.exists(candidate):
+                resolved = candidate
+        if resolved is None:
             continue
         filenames.append(p.filename)
-        paths.append(p.local_path)
+        paths.append(resolved)
         if len(paths) >= _MAX_PHOTOS_FOR_GEMINI:
             break
     return filenames, paths
