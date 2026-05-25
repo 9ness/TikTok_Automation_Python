@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import type { Route } from "next";
 import {
   Bookmark,
   Check,
@@ -732,7 +733,7 @@ function EmptyState({
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed bg-amber-500/5 p-3 text-xs">
       <span className="text-amber-700 dark:text-amber-300">{text}</span>
-      <Link href={href}>
+      <Link href={href as Route}>
         <Button size="sm" variant="outline">
           {cta}
         </Button>
