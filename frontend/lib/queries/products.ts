@@ -142,8 +142,31 @@ export function useDeletePhoto() {
   return useMutation<void, Error, { productId: string; photoId: string }>({
     mutationFn: ({ productId, photoId }) =>
       api.del<void>(`${ROOT}/${productId}/photos/${encodeURIComponent(photoId)}`),
-    onSuccess: (_data, { productId }) => {
+    onSuccess: (_data, { productId, photoId }) => {
+      // Optimistic update: marca deleted=true en la cache inmediatamente
+      // para que la UI esconda la foto sin esperar al refetch. Si el
+      // refetch luego trae un estado distinto, gana el server (correcto).
+      qc.setQueryData<Product>(productKeys.detail(productId), (prev) => {
+        if (!prev) return prev;
+        const markDeleted = (list: typeof prev.photos.source) =>
+          list.map((p) =>
+            p.filename === photoId ? { ...p, deleted: true } : p,
+          );
+        return {
+          ...prev,
+          photos: {
+            ...prev.photos,
+            source: markDeleted(prev.photos.source),
+            generated: markDeleted(prev.photos.generated),
+          },
+        };
+      });
+      // Y además forzamos refetch real para reconciliar con el server.
       qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+      qc.refetchQueries({
+        queryKey: productKeys.detail(productId),
+        exact: true,
+      });
     },
   });
 }
