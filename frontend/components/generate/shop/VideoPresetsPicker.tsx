@@ -76,6 +76,16 @@ export function VideoPresetsPicker({
   //   desbloquea pagar más (p.ej. creator_pov solo en Pro+Veo3).
   const [showOnlyCompatible, setShowOnlyCompatible] = useState(true);
   const [showOnlyExclusive, setShowOnlyExclusive] = useState(false);
+  // Filtro extra: solo presets generados desde Replicar viral. Útil
+  // cuando el user acaba de subir un viral y quiere ir directo a su réplica.
+  const [showOnlyViralReplica, setShowOnlyViralReplica] = useState(false);
+
+  // Cuenta total de réplicas virales — para mostrar en el toggle si
+  // hay alguna (sino el toggle aparece pero vacío al activarlo).
+  const viralReplicaCount = useMemo(
+    () => presets.filter((p) => p.source === "viral_replica").length,
+    [presets],
+  );
 
   const compatible = useMemo(() => {
     let list = presets;
@@ -93,8 +103,11 @@ export function VideoPresetsPicker({
           !cheaper.some((t) => p.compatible_tiers.includes(t)),
       );
     }
+    if (showOnlyViralReplica) {
+      list = list.filter((p) => p.source === "viral_replica");
+    }
     return list;
-  }, [presets, tier, showOnlyCompatible, showOnlyExclusive]);
+  }, [presets, tier, showOnlyCompatible, showOnlyExclusive, showOnlyViralReplica]);
 
   const incompatibleCount = useMemo(
     () => presets.filter((p) => !p.compatible_tiers.includes(tier)).length,
@@ -208,12 +221,35 @@ export function VideoPresetsPicker({
             Solo exclusivos de este tier
           </span>
         </label>
+        <label className="flex cursor-pointer items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={showOnlyViralReplica}
+            onChange={(e) => setShowOnlyViralReplica(e.target.checked)}
+            className="h-3.5 w-3.5 accent-fuchsia-500"
+            disabled={viralReplicaCount === 0}
+          />
+          <span title="Muestra solo presets generados desde 'Replicar viral' (los que clonan UGC de competidores).">
+            🎯 Solo réplicas virales
+            {viralReplicaCount > 0 && (
+              <span className="ml-0.5 text-fuchsia-600 dark:text-fuchsia-400">
+                ({viralReplicaCount})
+              </span>
+            )}
+          </span>
+        </label>
       </div>
 
       {/* Mensaje cuando los filtros dejan 0 presets */}
       {compatible.length === 0 && (
         <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs">
-          {showOnlyExclusive ? (
+          {showOnlyViralReplica && viralReplicaCount === 0 ? (
+            <>
+              No hay réplicas virales en este producto. Genera una desde
+              el tab <strong>Replicar viral</strong> de{" "}
+              <code>/tiktok-shop/generate</code>.
+            </>
+          ) : showOnlyExclusive ? (
             <>
               No hay presets <strong>exclusivos</strong> del tier{" "}
               <strong>{tier}</strong>. Todos los presets de este producto
