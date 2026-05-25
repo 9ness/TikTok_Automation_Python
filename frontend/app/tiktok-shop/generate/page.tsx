@@ -76,6 +76,13 @@ interface Shortcut {
   created_at: string;
 }
 
+/** Renderiza el username con un único '@' delante, sin importar si el
+ *  valor guardado en BD ya lo trae o no. Evita '@@alphabettingclub'. */
+function formatHandle(username: string | undefined | null): string {
+  if (!username) return "—";
+  return `@${username.replace(/^@+/, "")}`;
+}
+
 function readLastSelection(): LastSelection | null {
   if (typeof window === "undefined") return null;
   try {
@@ -421,7 +428,7 @@ function ShopGenerateInner() {
             </span>
             {!pickersOpen && selectedUser && selectedProduct && (
               <span className="ml-1 min-w-0 truncate text-[10px] text-muted-foreground">
-                — actual: @{selectedUser.username} · {selectedProduct.name}
+                — actual: {formatHandle(selectedUser.username)} · {selectedProduct.name}
               </span>
             )}
           </div>
@@ -483,7 +490,7 @@ function ShopGenerateInner() {
             Producto
             {selectedUser && (
               <span className="text-muted-foreground">
-                · {eligibleProducts.length} asignado{eligibleProducts.length === 1 ? "" : "s"} a @{selectedUser.username}
+                · {eligibleProducts.length} asignado{eligibleProducts.length === 1 ? "" : "s"} a {formatHandle(selectedUser.username)}
               </span>
             )}
           </div>
@@ -571,7 +578,7 @@ function UserPill({
         {initials}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold">@{user.username}</p>
+        <p className="truncate text-xs font-semibold">{formatHandle(user.username)}</p>
         <p className="truncate text-[10px] text-muted-foreground">
           {user.niche || "—"} · {productCount} prod
         </p>
@@ -739,7 +746,7 @@ function ShortcutCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold text-muted-foreground">
-            @{user?.username ?? "—"}
+            {formatHandle(user?.username)}
           </p>
           <p className="line-clamp-2 text-xs font-medium leading-tight">
             {stale ? "Combo inválido" : (product?.name ?? "—")}
