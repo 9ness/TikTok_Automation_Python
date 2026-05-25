@@ -7,6 +7,8 @@ import type { Route } from "next";
 import {
   Bookmark,
   Check,
+  ChevronDown,
+  ChevronUp,
   Package,
   Plus,
   Settings2,
@@ -146,11 +148,24 @@ function ShopGenerateInner() {
   const [productId, setProductId] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
+  // Selector manual cuenta+producto colapsado por defecto — la mayoría
+  // de las veces el user entra y elige una entrada rápida, no quiere
+  // ver los pickers completos cada vez.
+  const [pickersOpen, setPickersOpen] = useState(false);
 
   // Cargar shortcuts una sola vez en mount (cliente only — localStorage).
   useEffect(() => {
     setShortcuts(readShortcuts());
   }, []);
+
+  // Auto-abrir el picker manual si no hay selección válida tras hidratar
+  // (primer uso sin shortcuts, o cuentas/productos vacíos). Si ya hay
+  // selección, lo dejamos cerrado — la vista por defecto son shortcuts
+  // + área de generación lista.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!userId || !productId) setPickersOpen(true);
+  }, [hydrated, userId, productId]);
 
   const activeUsers = useMemo(
     () => (users.data?.items ?? []).filter((u) => !u.deleted),
@@ -390,6 +405,34 @@ function ShopGenerateInner() {
         </section>
       )}
 
+      {/* Selección manual cuenta+producto — colapsada por defecto.
+          Click en el header expande ambos pickers a la vez. */}
+      <div className="rounded-md border bg-card">
+        <button
+          type="button"
+          onClick={() => setPickersOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+          aria-expanded={pickersOpen}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <UserIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="text-xs font-medium">
+              {pickersOpen ? "Selección manual" : "Cambiar cuenta o producto"}
+            </span>
+            {!pickersOpen && selectedUser && selectedProduct && (
+              <span className="ml-1 min-w-0 truncate text-[10px] text-muted-foreground">
+                — actual: @{selectedUser.username} · {selectedProduct.name}
+              </span>
+            )}
+          </div>
+          {pickersOpen ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+        </button>
+        {pickersOpen && (
+          <div className="space-y-4 border-t p-3">
       {/* Selector de cuenta — chips horizontales */}
       <section className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
@@ -468,6 +511,9 @@ function ShopGenerateInner() {
           </div>
         )}
       </section>
+          </div>
+        )}
+      </div>
 
       {/* Área de generación cuando hay selección completa */}
       {selectedUser && selectedProduct ? (
