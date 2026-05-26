@@ -279,9 +279,11 @@ export interface TextOverlayStyle {
   stroke_color: string;
   stroke_width: number;
   position: string;
+  /** Override exacto de Y como % del alto del frame (0-100). 12 ≈ top safe. */
+  position_y_pct?: number;
   animation: string;
   uppercase: boolean;
-  background: string; // "none" | "black_bar" | "blur"
+  background: string; // "none" | "black_bar" | "white_bar" | "blur"
   /** Segundos que el hook permanece en pantalla (default 4s = stop-scroll). */
   duration_s: number;
 }
@@ -294,6 +296,11 @@ export interface SubtitleStyle {
   stroke_color: string;
   stroke_width: number;
   position: string;
+  /** Override exacto de Y como % del alto del frame. 75 ≈ bottom safe. */
+  position_y_pct?: number;
+  /** Modo karaoke: "pill" | "color_swap" | "underline" | "box_outline" |
+   *  "glow" | "none" — "none" desactiva el resaltado de palabra activa. */
+  highlight_mode?: string;
   highlight_color: string;
   max_words_per_line: number;
   uppercase: boolean;

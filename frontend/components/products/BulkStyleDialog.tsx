@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2, Paintbrush, Subtitles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -59,6 +59,15 @@ const SUBS_ANIMATIONS = [
   "bounce",
 ] as const;
 
+const SUBS_HIGHLIGHT_MODES = [
+  { value: "pill", label: "Pill (banda color)" },
+  { value: "color_swap", label: "Cambio color" },
+  { value: "underline", label: "Subrayado" },
+  { value: "box_outline", label: "Borde caja" },
+  { value: "glow", label: "Glow / brillo" },
+  { value: "none", label: "Sin destacar (palabra a palabra plano)" },
+] as const;
+
 const SCOPES = [
   { value: "all", label: "Todos los presets" },
   { value: "music", label: "Solo música (sin voz)" },
@@ -83,42 +92,45 @@ function countByScope(product: Product, scope: Scope): number {
  *  aplicar a todos los presets del scope. */
 function pickInitialOverlayStyle(product: Product): TextOverlayStyle {
   const first = product.video_presets?.[0]?.text_overlay_style;
-  return (
-    first ?? {
-      font: "",
-      size_px: 56,
-      color: "#FFFFFF",
-      stroke_color: "#000000",
-      stroke_width: 6,
-      position: "top_center",
-      animation: "fade_in",
-      uppercase: true,
-      background: "none",
-      duration_s: 4.0,
-    }
-  );
+  const base = first ?? {
+    font: "",
+    size_px: 56,
+    color: "#FFFFFF",
+    stroke_color: "#000000",
+    stroke_width: 6,
+    position: "top_center",
+    animation: "fade_in",
+    uppercase: true,
+    background: "none",
+    duration_s: 4.0,
+  };
+  return { ...base, position_y_pct: base.position_y_pct ?? 12.0 };
 }
 
 function pickInitialSubtitleStyle(product: Product): SubtitleStyle {
   const first =
     product.video_presets?.find((p) => p.subtitle_style?.enabled)
       ?.subtitle_style ?? product.video_presets?.[0]?.subtitle_style;
-  return (
-    first ?? {
-      enabled: true,
-      font: "",
-      size_px: 42,
-      color: "#FFFFFF",
-      stroke_color: "#000000",
-      stroke_width: 5,
-      position: "bottom_center",
-      highlight_color: "#FACC15",
-      max_words_per_line: 3,
-      uppercase: false,
-      animation: "fade_in",
-      margin_x_pct: 8.0,
-    }
-  );
+  const base = first ?? {
+    enabled: true,
+    font: "",
+    size_px: 42,
+    color: "#FFFFFF",
+    stroke_color: "#000000",
+    stroke_width: 5,
+    position: "bottom_center",
+    highlight_color: "#FACC15",
+    max_words_per_line: 3,
+    uppercase: false,
+    animation: "fade_in",
+    margin_x_pct: 8.0,
+  };
+  return {
+    ...base,
+    position_y_pct: base.position_y_pct ?? 75.0,
+    highlight_mode: base.highlight_mode ?? "pill",
+    margin_x_pct: base.margin_x_pct ?? 8.0,
+  };
 }
 
 export function BulkStyleDialog({
@@ -232,14 +244,20 @@ export function BulkStyleDialog({
           <TabsContent value="hook" className="mt-3">
             <div className="grid gap-4 md:grid-cols-2">
               <HookForm value={overlay} onChange={setOverlay} />
-              <HookPreview style={overlay} />
+              <HookPreview
+                style={overlay}
+                onYChange={(y) => setOverlay({ ...overlay, position_y_pct: y })}
+              />
             </div>
           </TabsContent>
 
           <TabsContent value="subs" className="mt-3">
             <div className="grid gap-4 md:grid-cols-2">
               <SubsForm value={subs} onChange={setSubs} />
-              <SubsPreview style={subs} />
+              <SubsPreview
+                style={subs}
+                onYChange={(y) => setSubs({ ...subs, position_y_pct: y })}
+              />
             </div>
           </TabsContent>
         </Tabs>
@@ -444,6 +462,23 @@ function HookForm({
             className="h-8"
           />
         </div>
+        <div className="col-span-2 rounded border border-cyan-500/30 bg-cyan-500/5 p-2">
+          <Label className="text-[10px]">
+            Altura exacta Y (% desde arriba): {(value.position_y_pct ?? 12).toFixed(1)}%
+          </Label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={0.5}
+            value={value.position_y_pct ?? 12}
+            onChange={(e) => set("position_y_pct", parseFloat(e.target.value))}
+            className="mt-1 w-full accent-cyan-500"
+          />
+          <p className="mt-0.5 text-[9px] text-muted-foreground">
+            También puedes arrastrar vertical sobre la previsualización.
+          </p>
+        </div>
         <label className="col-span-2 flex cursor-pointer items-center gap-2 rounded border p-1.5">
           <input
             type="checkbox"
@@ -454,10 +489,6 @@ function HookForm({
           <span>UPPERCASE</span>
         </label>
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        La posición (top_center / bottom_center / etc.) NO se aplica
-        masivamente — cada preset mantiene la suya.
-      </p>
     </div>
   );
 }
@@ -545,13 +576,32 @@ function SubsForm({
             className="h-8"
           />
         </div>
-        <div>
-          <Label className="text-[10px]">Highlight palabra activa</Label>
+        <div className="col-span-2">
+          <Label className="text-[10px]">Modo karaoke</Label>
+          <Select
+            value={value.highlight_mode ?? "pill"}
+            onValueChange={(v) => set("highlight_mode", v)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUBS_HIGHLIGHT_MODES.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={cn(value.highlight_mode === "none" && "opacity-40")}>
+          <Label className="text-[10px]">Color palabra activa</Label>
           <Input
             type="color"
             value={value.highlight_color}
             onChange={(e) => set("highlight_color", e.target.value)}
             className="h-8"
+            disabled={value.highlight_mode === "none"}
           />
         </div>
         <div>
@@ -585,6 +635,23 @@ function SubsForm({
             </SelectContent>
           </Select>
         </div>
+        <div className="col-span-2 rounded border border-cyan-500/30 bg-cyan-500/5 p-2">
+          <Label className="text-[10px]">
+            Altura exacta Y (% desde arriba): {(value.position_y_pct ?? 75).toFixed(1)}%
+          </Label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={0.5}
+            value={value.position_y_pct ?? 75}
+            onChange={(e) => set("position_y_pct", parseFloat(e.target.value))}
+            className="mt-1 w-full accent-cyan-500"
+          />
+          <p className="mt-0.5 text-[9px] text-muted-foreground">
+            También puedes arrastrar vertical sobre la previsualización.
+          </p>
+        </div>
         <label className="col-span-2 flex cursor-pointer items-center gap-2 rounded border p-1.5">
           <input
             type="checkbox"
@@ -596,8 +663,9 @@ function SubsForm({
         </label>
       </div>
       <p className="text-[10px] text-muted-foreground">
-        La posición (bottom_center default) NO se aplica masivamente.
-        Tampoco se toca `enabled` — los presets sin subs siguen sin subs.
+        El slot nombrado (top/bottom/middle) NO se toca — sólo la Y exacta
+        sí se aplica masivamente. `enabled` se respeta — los presets sin
+        subs siguen sin subs.
       </p>
     </div>
   );
@@ -610,12 +678,23 @@ function SubsForm({
 function PhoneFrame({
   showSafeZones,
   onToggleSafeZones,
+  onYChange,
   children,
 }: {
   showSafeZones: boolean;
   onToggleSafeZones: () => void;
+  onYChange?: (y: number) => void;
   children: React.ReactNode;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef(false);
+  function updateY(clientY: number): void {
+    if (!onYChange || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const ratio = (clientY - rect.top) / rect.height;
+    const clamped = Math.max(0, Math.min(1, ratio));
+    onYChange(Math.round(clamped * 1000) / 10); // % con 1 decimal
+  }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -637,7 +716,29 @@ function PhoneFrame({
         </Button>
       </div>
       <div
-        className="relative mx-auto overflow-hidden rounded-lg border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950"
+        ref={containerRef}
+        onPointerDown={(e) => {
+          if (!onYChange) return;
+          dragRef.current = true;
+          (e.target as Element).setPointerCapture(e.pointerId);
+          updateY(e.clientY);
+        }}
+        onPointerMove={(e) => {
+          if (!dragRef.current) return;
+          updateY(e.clientY);
+        }}
+        onPointerUp={(e) => {
+          dragRef.current = false;
+          try {
+            (e.target as Element).releasePointerCapture(e.pointerId);
+          } catch {
+            /* noop */
+          }
+        }}
+        className={cn(
+          "relative mx-auto overflow-hidden rounded-lg border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950",
+          onYChange && "cursor-ns-resize touch-none select-none",
+        )}
         style={{ aspectRatio: "9 / 16", maxWidth: "260px", containerType: "size" }}
       >
         <div
@@ -651,6 +752,7 @@ function PhoneFrame({
         {children}
       </div>
       <p className="text-center text-[9px] text-muted-foreground">
+        {onYChange ? "Arrastra vertical para mover · " : ""}
         Render aproximado · proporciones reales del vídeo final
       </p>
     </div>
@@ -695,13 +797,19 @@ function buildStroke(color: string, widthPx: number): string {
     .join(", ");
 }
 
-function HookPreview({ style }: { style: TextOverlayStyle }) {
+function HookPreview({
+  style,
+  onYChange,
+}: {
+  style: TextOverlayStyle;
+  onYChange?: (y: number) => void;
+}) {
   const [showSafe, setShowSafe] = useState(true);
   const selectedFont = useFontByPath(style.font);
   const fontFamily = useFontFamily(selectedFont);
-  // size_px @1080p (h=1920). Convertimos a cqi (% del ancho del container).
   const fontSizeCqi = (style.size_px / 1920) * 100 * (16 / 9);
   const text = style.uppercase ? "TU GANCHO AQUÍ" : "Tu gancho aquí";
+  const yPct = style.position_y_pct ?? 12;
   const bgClass: Record<string, React.CSSProperties> = {
     none: {},
     black_bar: { backgroundColor: "rgba(0,0,0,0.8)", padding: "0.3em 0.5em" },
@@ -712,13 +820,24 @@ function HookPreview({ style }: { style: TextOverlayStyle }) {
     <PhoneFrame
       showSafeZones={showSafe}
       onToggleSafeZones={() => setShowSafe((v) => !v)}
+      onYChange={onYChange}
     >
-      {/* Hook box arriba (12% +  un margen) */}
+      {/* Línea Y indicator */}
+      <div
+        className="pointer-events-none absolute inset-x-0 h-px bg-cyan-400/60"
+        style={{ top: `${yPct}%` }}
+      />
+      <span
+        className="pointer-events-none absolute left-1 z-10 rounded bg-cyan-500/80 px-1 text-[8px] font-medium text-black"
+        style={{ top: `calc(${yPct}% - 7px)` }}
+      >
+        Y={yPct.toFixed(1)}%
+      </span>
       <div
         className="pointer-events-none absolute flex justify-center"
         style={{
           left: "50%",
-          top: "16%",
+          top: `${yPct}%`,
           transform: "translate(-50%, 0)",
           width: "86%",
         }}
@@ -743,7 +862,13 @@ function HookPreview({ style }: { style: TextOverlayStyle }) {
   );
 }
 
-function SubsPreview({ style }: { style: SubtitleStyle }) {
+function SubsPreview({
+  style,
+  onYChange,
+}: {
+  style: SubtitleStyle;
+  onYChange?: (y: number) => void;
+}) {
   const [showSafe, setShowSafe] = useState(true);
   const selectedFont = useFontByPath(style.font);
   const fontFamily = useFontFamily(selectedFont);
@@ -753,16 +878,69 @@ function SubsPreview({ style }: { style: SubtitleStyle }) {
   const activeIdx = Math.min(2, visible.length - 1);
   const marginXPct = style.margin_x_pct ?? 8;
   const maxWidthPct = 100 - marginXPct * 2;
+  const yPct = style.position_y_pct ?? 75;
+  const mode = style.highlight_mode ?? "pill";
+
+  function highlightStyle(active: boolean): React.CSSProperties {
+    if (!active || mode === "none") {
+      return { color: style.color, padding: "0 0.05em" };
+    }
+    const base: React.CSSProperties = { color: style.color, padding: "0 0.05em" };
+    switch (mode) {
+      case "pill":
+        return {
+          ...base,
+          backgroundColor: style.highlight_color,
+          padding: "0.1em 0.25em",
+          borderRadius: "0.1em",
+        };
+      case "color_swap":
+        return { ...base, color: style.highlight_color };
+      case "underline":
+        return {
+          ...base,
+          textDecoration: `underline ${style.highlight_color}`,
+          textUnderlineOffset: "0.15em",
+          textDecorationThickness: "0.1em",
+        };
+      case "box_outline":
+        return {
+          ...base,
+          boxShadow: `inset 0 0 0 0.08em ${style.highlight_color}`,
+          borderRadius: "0.1em",
+          padding: "0.05em 0.15em",
+        };
+      case "glow":
+        return {
+          ...base,
+          textShadow: `0 0 10px ${style.highlight_color}, 0 0 20px ${style.highlight_color}`,
+        };
+      default:
+        return base;
+    }
+  }
+
   return (
     <PhoneFrame
       showSafeZones={showSafe}
       onToggleSafeZones={() => setShowSafe((v) => !v)}
+      onYChange={onYChange}
     >
+      <div
+        className="pointer-events-none absolute inset-x-0 h-px bg-cyan-400/60"
+        style={{ top: `${yPct}%` }}
+      />
+      <span
+        className="pointer-events-none absolute left-1 z-10 rounded bg-cyan-500/80 px-1 text-[8px] font-medium text-black"
+        style={{ top: `calc(${yPct}% - 7px)` }}
+      >
+        Y={yPct.toFixed(1)}%
+      </span>
       <div
         className="pointer-events-none absolute flex flex-wrap items-center justify-center gap-[0.2em] text-center"
         style={{
           left: "50%",
-          top: "75%",
+          top: `${yPct}%`,
           transform: "translate(-50%, -50%)",
           width: `${maxWidthPct}%`,
           fontSize: `${fontSizeCqi}cqi`,
@@ -776,21 +954,8 @@ function SubsPreview({ style }: { style: SubtitleStyle }) {
       >
         {visible.map((w, i) => {
           const renderW = style.uppercase ? w.toUpperCase() : w;
-          const isActive = i === activeIdx;
           return (
-            <span
-              key={i}
-              style={
-                isActive
-                  ? {
-                      backgroundColor: style.highlight_color,
-                      color: style.color,
-                      padding: "0.1em 0.25em",
-                      borderRadius: "0.1em",
-                    }
-                  : undefined
-              }
-            >
+            <span key={i} style={highlightStyle(i === activeIdx)}>
               {renderW}
             </span>
           );

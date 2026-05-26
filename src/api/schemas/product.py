@@ -356,6 +356,7 @@ class TextOverlayStyleSchema(BaseModel):
     stroke_color: str = "#000000"
     stroke_width: int = 6
     position: str = "top_center"
+    position_y_pct: float = 12.0
     animation: str = "fade_in"
     uppercase: bool = True
     background: str = "none"
@@ -370,10 +371,13 @@ class SubtitleStyleSchema(BaseModel):
     stroke_color: str = "#000000"
     stroke_width: int = 5
     position: str = "bottom_center"
+    position_y_pct: float = 75.0
+    highlight_mode: str = "pill"
     highlight_color: str = "#FFE066"
     max_words_per_line: int = 3
     uppercase: bool = False
     animation: str = "fade_in"
+    margin_x_pct: float = 8.0
 
 
 class CtaArrowStyleSchema(BaseModel):

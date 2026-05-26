@@ -1603,6 +1603,9 @@ def bulk_apply_preset_style(
         )
 
     # Campos prohibidos — no se aplican aunque vengan en el payload.
+    # `position` (slot nombrado: top_center/bottom_center/...) sigue
+    # bloqueado para que cada preset mantenga su layout fundamental.
+    # `position_y_pct` SÍ se permite — es el override fino del Y.
     OVERLAY_BLOCKED = {"position"}
     SUBS_BLOCKED = {"position", "enabled"}
 

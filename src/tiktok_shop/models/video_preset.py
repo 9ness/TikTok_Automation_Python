@@ -92,6 +92,10 @@ class TextOverlayStyle(BaseModel):
     stroke_color: str = "#000000"     # contorno
     stroke_width: int = 6             # px
     position: str = "top_center"       # ver TEXT_OVERLAY_POSITIONS
+    # Override exacto de Y como % del alto del frame (0-100). 12 = 12%
+    # desde arriba (justo debajo de la safe zone superior). Si quieres
+    # ignorarlo y usar el slot nombrado, deja 12.0 (matchea top_center).
+    position_y_pct: float = 12.0
     animation: str = "fade_in"         # ver TEXT_OVERLAY_ANIMATIONS
     uppercase: bool = True
     # Fondo del texto: "none" (sin), "black_bar" (banda negra),
@@ -119,7 +123,18 @@ class SubtitleStyle(BaseModel):
     stroke_width: int = 5
     # Posición de los subtítulos en el frame. Mismas opciones que el overlay.
     position: str = "bottom_center"
-    # Karaoke: color de la palabra activa (resaltada al sonar).
+    # Posición vertical exacta como % del alto del frame (0-100). Override
+    # fino sobre el slot nombrado en `position` — útil para mover los
+    # subs unos píxeles arriba/abajo sin cambiar de slot. 75 ≈ banda
+    # inferior-segura de TikTok. Si `position` ya marca slot, `position_y_pct`
+    # tiene prioridad cuando se renderiza.
+    position_y_pct: float = 75.0
+    # Modo de resaltado de la palabra activa (karaoke). "none" desactiva
+    # el karaoke — los subs salen palabra a palabra pero sin destacar la
+    # actual. Opciones: pill, color_swap, underline, box_outline, glow, none.
+    highlight_mode: str = "pill"
+    # Karaoke: color de la palabra activa (resaltada al sonar). Ignorado
+    # cuando `highlight_mode = "none"`.
     highlight_color: str = "#FFE066"
     # Máximo de palabras por línea de subtítulo (chunks).
     max_words_per_line: int = 3
