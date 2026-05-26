@@ -515,6 +515,31 @@ class VideoPresetUpdateRequest(BaseModel):
     compatible_tiers: list[str] | None = None
 
 
+class BulkStyleRequest(BaseModel):
+    """Aplica un patch de estilo VISUAL a TODOS los presets del producto
+    (o a un subconjunto por scope). Sólo se permiten campos visuales —
+    `position` y `position_x_pct`/`position_y_pct` se ignoran en server.
+
+    El cliente envía dicts parciales: sólo las claves presentes se
+    aplican a cada preset; el resto queda intacto. Si el preset no
+    tiene `subtitle_style` (kind=music con subs OFF) el patch de subs
+    se ignora para ese preset — no fuerza a habilitarlos.
+    """
+    # Patch parcial sobre VideoPreset.text_overlay_style (hook box).
+    text_overlay_style: dict[str, Any] | None = None
+    # Patch parcial sobre VideoPreset.subtitle_style (karaoke subs).
+    subtitle_style: dict[str, Any] | None = None
+    # Scope: aplicar a todos los presets, sólo a music, sólo a scripted,
+    # o sólo a réplicas virales. Default 'all'.
+    scope: Literal["all", "music", "scripted", "viral_replica"] = "all"
+
+
+class BulkStyleResponse(BaseModel):
+    updated_count: int
+    skipped_count: int
+    total_presets: int
+
+
 # ---------------------------------------------------------------------------
 # Nano Banana 2 prompt
 # ---------------------------------------------------------------------------

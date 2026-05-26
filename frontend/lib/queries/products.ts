@@ -344,6 +344,35 @@ export function useGenerateVariants(productId: string) {
   });
 }
 
+export interface BulkStyleInput {
+  text_overlay_style?: Record<string, unknown>;
+  subtitle_style?: Record<string, unknown>;
+  scope?: "all" | "music" | "scripted" | "viral_replica";
+}
+
+export interface BulkStyleResult {
+  updated_count: number;
+  skipped_count: number;
+  total_presets: number;
+}
+
+/** Aplica un patch de estilo VISUAL (color, fuente, animación, etc.)
+ *  a TODOS los presets del producto, o a un scope concreto. La
+ *  posición se ignora server-side (whitelist defensiva). */
+export function useBulkApplyPresetStyle(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<BulkStyleResult, Error, BulkStyleInput>({
+    mutationFn: (input) =>
+      api.patch<BulkStyleResult>(
+        `${ROOT}/${productId}/video-presets/bulk-style`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
 /** Persiste un VideoPreset generado por el analizador viral en el
  *  producto. El payload es el dict completo `result.video_preset` que
  *  devuelve el endpoint replicate-viral. */

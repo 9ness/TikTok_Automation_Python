@@ -7,6 +7,7 @@ import {
   Loader2,
   Mic,
   Music,
+  Paintbrush,
   Pencil,
   Save,
   Search,
@@ -42,6 +43,7 @@ import {
   useUpdateVideoPreset,
 } from "@/lib/queries/products";
 import { useVoices } from "@/lib/queries/voices";
+import { BulkStyleDialog } from "./BulkStyleDialog";
 import { TabHint } from "./TabHint";
 
 const TEXT_POSITIONS = [
@@ -99,6 +101,7 @@ export function PresetsManager({ product }: { product: Product }) {
   const presets = product.video_presets ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [bulkStyleOpen, setBulkStyleOpen] = useState(false);
 
   // ───── Generación asíncrona con progress + persistencia localStorage ─────
   const LS_KEY = `preset-gen:${product.id}`;
@@ -353,6 +356,16 @@ export function PresetsManager({ product }: { product: Product }) {
                   title="Acumula 20 más sin borrar (experimental)"
                 >
                   <span className="text-xs">+ Acumular</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkStyleOpen(true)}
+                  className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+                  title="Aplica color, fuente y animación de hook/subs a TODOS los presets en 1 click"
+                >
+                  <Paintbrush className="h-3.5 w-3.5" />
+                  <span className="ml-1.5 text-xs">Estilo masivo</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -626,6 +639,14 @@ export function PresetsManager({ product }: { product: Product }) {
           )}
         </section>
       )}
+
+      {/* Dialog "Estilo masivo" — bulk-apply text_overlay_style / subtitle_style
+          a todos los presets con preview 9:16 */}
+      <BulkStyleDialog
+        product={product}
+        open={bulkStyleOpen}
+        onOpenChange={setBulkStyleOpen}
+      />
 
       {/* AlertDialog "Borrar todos" — estilo del proyecto */}
       <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
