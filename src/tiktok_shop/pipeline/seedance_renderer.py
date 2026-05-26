@@ -145,7 +145,7 @@ async def _render_image_to_video(
     return list(paths)
 
 
-async def _run_single_i2v(
+async def _run_via_atlas(
     *,
     client: AtlasCloudClient,
     model_id: str,
@@ -155,9 +155,11 @@ async def _run_single_i2v(
     image_ref: str,
     last_image_ref: str | None,
     resolution: str,
-    out_dir: str,
+    out_path: str,
     log_callback: LogCallback,
 ) -> str:
+    """Submit + wait + download en Atlas Cloud. Levanta AtlasCloudTransient
+    si la cola se atasca/timeout. El caller decide si reintenta en fal.ai."""
     loop = asyncio.get_event_loop()
 
     def _submit():
@@ -172,11 +174,9 @@ async def _run_single_i2v(
         )
 
     job = await loop.run_in_executor(None, _submit)
-    log_callback(f"⏳ Clip {idx+1}: job {job.job_id} encolado, esperando…")
+    log_callback(f"⏳ Clip {idx+1}: Atlas job {job.job_id} encolado, esperando…")
 
-    # Registrar coste Atlas en cuanto se hace submit — Atlas factura al
-    # encolar, no al completar. Si el job timeout o falla luego, igual
-    # te lo cobran. Esto refleja el coste real en el panel de Costes.
+    # Atlas factura al encolar — registramos coste aquí.
     try:
         from src.cost_tracking import record_atlas_cloud
         record_atlas_cloud(
@@ -189,87 +189,184 @@ async def _run_single_i2v(
         pass
 
     def _hb(elapsed: int, status: str) -> None:
-        # Notifica al runner cada 60s para que aparezca en la UI cuánto
-        # lleva el clip esperando Atlas (Standard tier puede tardar 20+ min
-        # en horas pico).
         log_callback(
-            f"⏳ Clip {idx+1}: {elapsed//60}m{elapsed%60:02d}s "
+            f"⏳ Clip {idx+1} Atlas: {elapsed//60}m{elapsed%60:02d}s "
             f"(status={status})…"
         )
 
-    # Espera con fallback a fal.ai si Atlas se queda atascado o timeout.
-    # Solo intenta failover si fal está configurado. Si no, propaga el
-    # error de Atlas tal cual.
-    out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
+    final_job = await loop.run_in_executor(
+        None, lambda: client.wait(job.job_id, on_heartbeat=_hb)
+    )
+    await loop.run_in_executor(
+        None, lambda: client.download(final_job.output_url or "", out_path),
+    )
+    log_callback(f"✅ Clip {idx+1} entregado por Atlas Cloud")
+    return out_path
+
+
+async def _run_via_fal(
+    *,
+    tier: str,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    last_image_ref: str | None,
+    resolution: str,
+    out_path: str,
+    log_callback: LogCallback,
+    fallback_label: str = "",
+) -> str:
+    """Submit + wait + download en fal.ai. Levanta excepciones FalCloud*
+    si falla. `fallback_label` se añade al detail del coste para distinguir
+    'primario' vs 'fallback de Atlas' en /costs."""
+    from src.tiktok_shop.api.fal_cloud import FalCloudClient
+
+    loop = asyncio.get_event_loop()
+    fal = FalCloudClient()
+    fal_job = await loop.run_in_executor(
+        None,
+        lambda: fal.submit_image_to_video(
+            tier=tier,
+            image_url=image_ref,
+            prompt=spec["prompt"],
+            duration=int(spec.get("duration", 5)),
+            resolution=resolution,
+            aspect_ratio="9:16",
+            last_image_url=last_image_ref,
+        ),
+    )
+    log_callback(f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…")
+
+    # fal también factura al encolar (los webhooks devuelven coste al
+    # completar pero el cargo es inmediato). Registramos al submit.
     try:
-        final_job = await loop.run_in_executor(
-            None, lambda: client.wait(job.job_id, on_heartbeat=_hb)
+        from src.cost_tracking import record_fal_cloud
+        detail = f"clip {idx+1} · req {fal_job.request_id[:8]}"
+        if fallback_label:
+            detail += f" ({fallback_label})"
+        record_fal_cloud(
+            seconds=int(spec.get("duration", 5)),
+            tier=tier,
+            resolution=resolution,
+            detail=detail,
         )
-        await loop.run_in_executor(
-            None, lambda: client.download(final_job.output_url or "", out_path),
+    except Exception:
+        pass
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} fal.ai: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(
+        None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
+    )
+    await loop.run_in_executor(
+        None, lambda: fal.download(fal_job.output_url or "", out_path),
+    )
+    log_callback(f"✅ Clip {idx+1} entregado por fal.ai")
+    return out_path
+
+
+async def _run_single_i2v(
+    *,
+    client: AtlasCloudClient,
+    model_id: str,
+    tier: str,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    last_image_ref: str | None,
+    resolution: str,
+    out_dir: str,
+    log_callback: LogCallback,
+) -> str:
+    """Dispatcher con preferencia de provider por tier:
+
+      - 🟢 standard / 🟡 advanced  → fal.ai PRIMARIO (cola más estable
+        para Seedance Lite); Atlas como fallback si fal cae.
+      - 🔴 pro                     → Atlas Cloud PRIMARIO (donde ha
+        funcionado mejor históricamente); fal como fallback.
+
+    Si fal.ai no está configurado (FAL_API_KEY ausente), todo va por
+    Atlas sin failover.
+    """
+    from src.tiktok_shop.api.fal_cloud import (
+        fal_is_configured, FalCloudError, FalCloudTransient,
+    )
+
+    out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
+    fal_ready = fal_is_configured()
+    prefer_fal = fal_ready and tier in ("standard", "advanced")
+
+    # PRIMARIO = fal.ai (Standard/Advanced cuando FAL configurado)
+    if prefer_fal:
+        try:
+            return await _run_via_fal(
+                tier=tier, idx=idx, spec=spec,
+                image_ref=image_ref, last_image_ref=last_image_ref,
+                resolution=resolution, out_path=out_path,
+                log_callback=log_callback,
+            )
+        except (FalCloudError, FalCloudTransient) as e_fal:
+            log_callback(
+                f"🔁 Clip {idx+1}: fal.ai falló ({str(e_fal)[:120]}). "
+                f"Reintentando en Atlas Cloud…"
+            )
+            try:
+                return await _run_via_atlas(
+                    client=client, model_id=model_id, tier=tier, idx=idx,
+                    spec=spec, image_ref=image_ref, last_image_ref=last_image_ref,
+                    resolution=resolution, out_path=out_path,
+                    log_callback=log_callback,
+                )
+            except AtlasCloudTransient as e_atlas:
+                log_callback(
+                    f"❌ Clip {idx+1}: fal.ai Y Atlas fallaron. "
+                    f"fal: {str(e_fal)[:80]}. Atlas: {str(e_atlas)[:80]}."
+                )
+                raise RuntimeError(
+                    f"Ambos proveedores fallaron en clip {idx+1}. "
+                    f"fal: {e_fal}. Atlas: {e_atlas}"
+                ) from e_atlas
+
+    # PRIMARIO = Atlas Cloud (tier Pro, o sin FAL configurado)
+    try:
+        return await _run_via_atlas(
+            client=client, model_id=model_id, tier=tier, idx=idx,
+            spec=spec, image_ref=image_ref, last_image_ref=last_image_ref,
+            resolution=resolution, out_path=out_path,
+            log_callback=log_callback,
         )
     except AtlasCloudTransient as e_atlas:
-        from src.tiktok_shop.api.fal_cloud import (
-            FalCloudClient, fal_is_configured, FalCloudError, FalCloudTransient,
-        )
-        if not fal_is_configured():
+        if not fal_ready:
             log_callback(
-                f"❌ Clip {idx+1} Atlas timeout/transient y fal.ai NO configurado "
-                f"(define FAL_API_KEY para failover). Propagando error original."
+                f"❌ Clip {idx+1} Atlas timeout y fal.ai NO configurado "
+                f"(define FAL_API_KEY para failover). Propagando error."
             )
             raise
         log_callback(
             f"🔁 Clip {idx+1}: Atlas falló ({str(e_atlas)[:120]}). "
-            f"Reintentando en fal.ai (mismo modelo Seedance)…"
+            f"Reintentando en fal.ai…"
         )
-        fal = FalCloudClient()
         try:
-            fal_job = await loop.run_in_executor(
-                None,
-                lambda: fal.submit_image_to_video(
-                    tier=tier,
-                    image_url=image_ref,
-                    prompt=spec["prompt"],
-                    duration=int(spec.get("duration", 5)),
-                    resolution=resolution,
-                    aspect_ratio="9:16",
-                    last_image_url=last_image_ref,
-                ),
+            return await _run_via_fal(
+                tier=tier, idx=idx, spec=spec,
+                image_ref=image_ref, last_image_ref=last_image_ref,
+                resolution=resolution, out_path=out_path,
+                log_callback=log_callback,
+                fallback_label="fallback Atlas",
             )
-            log_callback(
-                f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…"
-            )
-            # Cost tracking del fallback — helper específico de fal.ai
-            # con su tarifa propia (Pro $0.062/s vs Atlas $0.072/s) y
-            # kind="fal_cloud" → panel /costs diferencia providers.
-            try:
-                from src.cost_tracking import record_fal_cloud
-                record_fal_cloud(
-                    seconds=int(spec.get("duration", 5)),
-                    tier=tier,
-                    resolution=resolution,
-                    detail=f"clip {idx+1} · req {fal_job.request_id[:8]} (fallback Atlas)",
-                )
-            except Exception:
-                pass
-            await loop.run_in_executor(
-                None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
-            )
-            await loop.run_in_executor(
-                None, lambda: fal.download(fal_job.output_url or "", out_path),
-            )
-            log_callback(f"✅ Clip {idx+1} entregado por fal.ai (failover OK)")
-            return out_path
         except (FalCloudError, FalCloudTransient) as e_fal:
             log_callback(
-                f"❌ Clip {idx+1}: Atlas Y fal.ai fallaron. Atlas: "
-                f"{str(e_atlas)[:80]}. fal.ai: {str(e_fal)[:80]}."
+                f"❌ Clip {idx+1}: Atlas Y fal.ai fallaron. "
+                f"Atlas: {str(e_atlas)[:80]}. fal: {str(e_fal)[:80]}."
             )
             raise RuntimeError(
-                f"Ambos proveedores fallaron en clip {idx+1}. Atlas: {e_atlas}. fal.ai: {e_fal}"
+                f"Ambos proveedores fallaron en clip {idx+1}. "
+                f"Atlas: {e_atlas}. fal: {e_fal}"
             ) from e_fal
-    log_callback(f"✅ Clip {idx+1} descargado: {os.path.basename(out_path)}")
-    return out_path
 
 
 # ---------------------------------------------------------------------------
