@@ -94,7 +94,8 @@ class TextOverlayStyle(BaseModel):
     position: str = "top_center"       # ver TEXT_OVERLAY_POSITIONS
     animation: str = "fade_in"         # ver TEXT_OVERLAY_ANIMATIONS
     uppercase: bool = True
-    # Fondo del texto: "none" (sin), "black_bar" (banda negra), "blur".
+    # Fondo del texto: "none" (sin), "black_bar" (banda negra),
+    # "white_bar" (banda blanca, combina con texto negro), "blur".
     background: str = "none"
     # Cuánto tiempo aparece el hook en pantalla. Default 4s = ventana
     # "stop scroll" típica de TikTok. Si quieres que dure todo el vídeo,

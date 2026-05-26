@@ -109,7 +109,7 @@ def _resolve_shot_strategy(
 
 
 _VALID_TONES = {"energetic", "calm", "persuasive", "serious", "playful"}
-_VALID_BACKGROUNDS = {"none", "black_bar", "blur"}
+_VALID_BACKGROUNDS = {"none", "black_bar", "white_bar", "blur"}
 
 # Mapping locale → (instrucciones para el contenido, frase explícita para
 # inyectar en seedance_prompt y veo3_prompt). El segundo string es CRÍTICO:

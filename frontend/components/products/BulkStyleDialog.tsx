@@ -44,7 +44,12 @@ const OVERLAY_ANIMATIONS = [
   "bounce",
 ] as const;
 
-const OVERLAY_BACKGROUNDS = ["none", "black_bar", "blur"] as const;
+const OVERLAY_BACKGROUNDS = [
+  "none",
+  "black_bar",
+  "white_bar",
+  "blur",
+] as const;
 
 const SUBS_ANIMATIONS = [
   "none",
@@ -278,11 +283,66 @@ function HookForm({
   ): void {
     onChange({ ...value, [key]: v });
   }
+  // Combos rápidos de paleta + fondo. 1 click aplica color, stroke
+  // y background a la vez — los más usados para vídeos TikTok.
+  const COMBOS = [
+    {
+      label: "⚪ Blanco/negro",
+      color: "#FFFFFF",
+      stroke_color: "#000000",
+      stroke_width: 6,
+      background: "none",
+    },
+    {
+      label: "⬜ Fondo blanco · texto negro",
+      color: "#000000",
+      stroke_color: "#FFFFFF",
+      stroke_width: 0,
+      background: "white_bar",
+    },
+    {
+      label: "⬛ Fondo negro · texto blanco",
+      color: "#FFFFFF",
+      stroke_color: "#000000",
+      stroke_width: 0,
+      background: "black_bar",
+    },
+    {
+      label: "🟡 Amarillo/negro",
+      color: "#FACC15",
+      stroke_color: "#000000",
+      stroke_width: 8,
+      background: "none",
+    },
+  ];
   return (
     <div className="space-y-3 rounded-md border bg-card p-3 text-xs">
       <p className="font-semibold text-emerald-700 dark:text-emerald-300">
         Estilo del Hook box (texto en pantalla)
       </p>
+      <div>
+        <Label className="text-[10px]">Combos rápidos</Label>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {COMBOS.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() =>
+                onChange({
+                  ...value,
+                  color: c.color,
+                  stroke_color: c.stroke_color,
+                  stroke_width: c.stroke_width,
+                  background: c.background,
+                })
+              }
+              className="rounded border border-muted px-1.5 py-0.5 text-[10px] hover:bg-muted"
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
         <Label className="text-[10px]">Fuente</Label>
         <FontSelector
@@ -644,7 +704,8 @@ function HookPreview({ style }: { style: TextOverlayStyle }) {
   const text = style.uppercase ? "TU GANCHO AQUÍ" : "Tu gancho aquí";
   const bgClass: Record<string, React.CSSProperties> = {
     none: {},
-    black_bar: { backgroundColor: "rgba(0,0,0,0.7)", padding: "0.3em 0.5em" },
+    black_bar: { backgroundColor: "rgba(0,0,0,0.8)", padding: "0.3em 0.5em" },
+    white_bar: { backgroundColor: "rgba(255,255,255,0.95)", padding: "0.3em 0.5em" },
     blur: { backdropFilter: "blur(8px)", padding: "0.3em 0.5em" },
   };
   return (

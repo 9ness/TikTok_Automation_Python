@@ -55,7 +55,7 @@ const TEXT_ANIMATIONS = [
   "none", "fade_in", "slide_up", "slide_down", "pop", "typing",
   "shake", "bounce",
 ];
-const TEXT_BACKGROUNDS = ["none", "black_bar", "blur"];
+const TEXT_BACKGROUNDS = ["none", "black_bar", "white_bar", "blur"];
 const VOICE_TONES = ["energetic", "calm", "persuasive", "serious", "playful"];
 import type {
   Product,
@@ -1297,10 +1297,13 @@ function PresetCard({
                   textTransform: overlayStyle.uppercase ? "uppercase" : "none",
                   backgroundColor:
                     overlayStyle.background === "black_bar"
-                      ? "rgba(0,0,0,0.7)"
-                      : "transparent",
+                      ? "rgba(0,0,0,0.8)"
+                      : overlayStyle.background === "white_bar"
+                        ? "rgba(255,255,255,0.95)"
+                        : "transparent",
                   padding:
-                    overlayStyle.background === "black_bar"
+                    overlayStyle.background === "black_bar" ||
+                    overlayStyle.background === "white_bar"
                       ? "2px 8px"
                       : "0",
                   fontWeight: "bold",
