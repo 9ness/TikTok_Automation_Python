@@ -1539,6 +1539,103 @@ def get_preset_gen_status(
     return PresetGenStatusResponse(**state)
 
 
+# IMPORTANTE: `/bulk-style` debe ir ANTES que `/{preset_id}` porque FastAPI
+# matchea rutas en orden de declaración — si `/{preset_id}` va primero,
+# captura "bulk-style" como un preset_id y devuelve 404.
+@router.patch(
+    "/{product_id}/video-presets/bulk-style",
+    response_model=BulkStyleResponse,
+)
+def bulk_apply_preset_style(
+    product_id: str,
+    payload: BulkStyleRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> BulkStyleResponse:
+    """Aplica un patch de estilo VISUAL a TODOS los presets del producto
+    (o a un scope). NO toca campos de posición — sólo color, fuente,
+    tamaño, animación, etc. Devuelve cuántos presets se modificaron.
+
+    Whitelist defensiva: incluso si el cliente envía `position` o
+    `enabled`, los ignoramos para no romper layouts existentes ni
+    habilitar subs en presets `music`. `position_y_pct` SÍ se permite —
+    es el override fino del Y que el user ajusta en el bulk dialog.
+    """
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    if payload.text_overlay_style is None and payload.subtitle_style is None:
+        raise ValidationError(
+            "Debes enviar text_overlay_style o subtitle_style (o ambos).",
+            details={},
+        )
+
+    OVERLAY_BLOCKED = {"position"}
+    SUBS_BLOCKED = {"position", "enabled"}
+
+    overlay_patch = {
+        k: v
+        for k, v in (payload.text_overlay_style or {}).items()
+        if k not in OVERLAY_BLOCKED
+    }
+    subs_patch = {
+        k: v
+        for k, v in (payload.subtitle_style or {}).items()
+        if k not in SUBS_BLOCKED
+    }
+
+    updated = 0
+    skipped = 0
+    total = len(product.video_presets)
+    for preset in product.video_presets:
+        if payload.scope == "music" and preset.kind != "music":
+            skipped += 1
+            continue
+        if payload.scope == "scripted" and preset.kind != "scripted":
+            skipped += 1
+            continue
+        if (
+            payload.scope == "viral_replica"
+            and getattr(preset, "source", "") != "viral_replica"
+        ):
+            skipped += 1
+            continue
+
+        changed = False
+        if overlay_patch and preset.text_overlay_style is not None:
+            for k, v in overlay_patch.items():
+                if hasattr(preset.text_overlay_style, k):
+                    setattr(preset.text_overlay_style, k, v)
+                    changed = True
+        if subs_patch and preset.subtitle_style is not None:
+            subs_enabled = getattr(preset.subtitle_style, "enabled", False)
+            if preset.kind == "music" and not subs_enabled:
+                skipped += 1
+                continue
+            for k, v in subs_patch.items():
+                if hasattr(preset.subtitle_style, k):
+                    setattr(preset.subtitle_style, k, v)
+                    changed = True
+        if changed:
+            from datetime import datetime, timezone
+            preset.updated_at = datetime.now(timezone.utc).isoformat()
+            updated += 1
+        else:
+            skipped += 1
+
+    if updated > 0:
+        product.touch()
+        repo.save(product)
+    return BulkStyleResponse(
+        updated_count=updated,
+        skipped_count=skipped,
+        total_presets=total,
+    )
+
+
 @router.patch(
     "/{product_id}/video-presets/{preset_id}",
     response_model=VideoPresetResponse,
@@ -1570,106 +1667,6 @@ def update_video_preset(
     product.touch()
     repo.save(product)
     return _preset_to_response(preset)
-
-
-@router.patch(
-    "/{product_id}/video-presets/bulk-style",
-    response_model=BulkStyleResponse,
-)
-def bulk_apply_preset_style(
-    product_id: str,
-    payload: BulkStyleRequest,
-    repo: Annotated[ProductRepo, Depends(get_product_repo)],
-) -> BulkStyleResponse:
-    """Aplica un patch de estilo VISUAL a TODOS los presets del producto
-    (o a un scope). NO toca campos de posición — sólo color, fuente,
-    tamaño, animación, etc. Devuelve cuántos presets se modificaron.
-
-    Whitelist defensiva: incluso si el cliente envía `position`,
-    `position_x_pct`, `position_y_pct` o `enabled`, los ignoramos para
-    no romper layouts existentes ni habilitar subs en presets `music`.
-    """
-    product = repo.get(product_id)
-    if product is None:
-        raise ProductNotFoundError(
-            f"Producto '{product_id}' no encontrado.",
-            details={"product_id": product_id},
-        )
-
-    if payload.text_overlay_style is None and payload.subtitle_style is None:
-        raise ValidationError(
-            "Debes enviar text_overlay_style o subtitle_style (o ambos).",
-            details={},
-        )
-
-    # Campos prohibidos — no se aplican aunque vengan en el payload.
-    # `position` (slot nombrado: top_center/bottom_center/...) sigue
-    # bloqueado para que cada preset mantenga su layout fundamental.
-    # `position_y_pct` SÍ se permite — es el override fino del Y.
-    OVERLAY_BLOCKED = {"position"}
-    SUBS_BLOCKED = {"position", "enabled"}
-
-    overlay_patch = {
-        k: v
-        for k, v in (payload.text_overlay_style or {}).items()
-        if k not in OVERLAY_BLOCKED
-    }
-    subs_patch = {
-        k: v
-        for k, v in (payload.subtitle_style or {}).items()
-        if k not in SUBS_BLOCKED
-    }
-
-    updated = 0
-    skipped = 0
-    total = len(product.video_presets)
-    for preset in product.video_presets:
-        # Scope filter
-        if payload.scope == "music" and preset.kind != "music":
-            skipped += 1
-            continue
-        if payload.scope == "scripted" and preset.kind != "scripted":
-            skipped += 1
-            continue
-        if (
-            payload.scope == "viral_replica"
-            and getattr(preset, "source", "") != "viral_replica"
-        ):
-            skipped += 1
-            continue
-
-        changed = False
-        if overlay_patch and preset.text_overlay_style is not None:
-            for k, v in overlay_patch.items():
-                if hasattr(preset.text_overlay_style, k):
-                    setattr(preset.text_overlay_style, k, v)
-                    changed = True
-        if subs_patch and preset.subtitle_style is not None:
-            # En music, si subs.enabled=False, NO aplicamos cambios
-            # (no queremos forzar subs a vídeos que decidimos sin voz).
-            subs_enabled = getattr(preset.subtitle_style, "enabled", False)
-            if preset.kind == "music" and not subs_enabled:
-                skipped += 1
-                continue
-            for k, v in subs_patch.items():
-                if hasattr(preset.subtitle_style, k):
-                    setattr(preset.subtitle_style, k, v)
-                    changed = True
-        if changed:
-            from datetime import datetime, timezone
-            preset.updated_at = datetime.now(timezone.utc).isoformat()
-            updated += 1
-        else:
-            skipped += 1
-
-    if updated > 0:
-        product.touch()
-        repo.save(product)
-    return BulkStyleResponse(
-        updated_count=updated,
-        skipped_count=skipped,
-        total_presets=total,
-    )
 
 
 @router.post(
