@@ -1,7 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+import {
+  Download,
+  Image as ImageIcon,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +41,75 @@ import { TabHint } from "./TabHint";
 const PHOTO_TYPES: PhotoType[] = ["packshot", "lifestyle", "detail", "in_use", "macro"];
 const ORIGINS: PhotoOrigin[] = ["internet", "own", "tiktok_shop_url"];
 
+/** URL absoluta al endpoint que sirve la foto. Acepta api_key por query
+ *  porque `<img src>` no puede enviar headers. Devuelve null si falta
+ *  productId o filename. */
+function buildPhotoUrl(productId: string, filename: string): string | null {
+  if (!productId || !filename) return null;
+  const base =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
+  return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;
+}
+
+/** Descarga una foto al disco vía fetch+blob (fuerza descarga, evita
+ *  que el browser la abra inline). Mantiene el filename original. */
+async function downloadPhoto(url: string, filename: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+/** Descarga secuencial de N fotos con toast persistente de progreso.
+ *  Pequeño delay entre descargas para que Chrome/Firefox no bloqueen
+ *  "multiple downloads". */
+async function downloadManyPhotos(
+  productId: string,
+  filenames: string[],
+): Promise<void> {
+  if (!filenames?.length) return;
+  const toastId = `dl-photos-${productId}-${Date.now()}`;
+  toast.loading(`Descargando 0 / ${filenames.length} fotos…`, { id: toastId });
+  let done = 0;
+  let errors = 0;
+  for (let i = 0; i < filenames.length; i++) {
+    const fn = filenames[i];
+    if (!fn) continue;
+    const url = buildPhotoUrl(productId, fn);
+    if (!url) {
+      errors++;
+      continue;
+    }
+    try {
+      await downloadPhoto(url, fn);
+      done++;
+    } catch {
+      errors++;
+    }
+    toast.loading(
+      `Descargando ${done} / ${filenames.length} fotos${errors > 0 ? ` (${errors} fallaron)` : ""}…`,
+      { id: toastId },
+    );
+    if (i < filenames.length - 1) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  if (errors > 0) {
+    toast.error(`Descargadas ${done}, fallaron ${errors}`, { id: toastId });
+  } else {
+    toast.success(`Descargadas ${done} foto(s)`, { id: toastId });
+  }
+}
+
 export function PhotoManager({ product }: { product: Product }) {
   return (
     <div className="space-y-6">
@@ -65,6 +140,20 @@ function PhotoSection({
 
   const photos = location === "source" ? product.photos.source : product.photos.generated;
   const visible = photos.filter((p) => !p.deleted);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  async function downloadAll(): Promise<void> {
+    if (visible.length === 0) return;
+    setBulkDownloading(true);
+    try {
+      await downloadManyPhotos(
+        product.id,
+        visible.map((p) => p.filename),
+      );
+    } finally {
+      setBulkDownloading(false);
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -94,9 +183,30 @@ function PhotoSection({
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">{title}</h3>
-          <Badge variant="secondary">{visible.length}</Badge>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">{title}</h3>
+            <Badge variant="secondary">{visible.length}</Badge>
+          </div>
+          {visible.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadAll}
+              disabled={bulkDownloading}
+              className="h-7 gap-1 px-2 text-xs"
+              title="Descarga todas las fotos al disco (calidad original)"
+            >
+              {bulkDownloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {bulkDownloading
+                ? "Descargando…"
+                : `Descargar todas (${visible.length})`}
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -187,6 +297,8 @@ function PhotoRow({
 }) {
   const update = useUpdatePhoto();
   const del = useDeletePhoto();
+  const [downloading, setDownloading] = useState(false);
+  const url = buildPhotoUrl(product.id, photo.filename);
 
   async function changeType(value: string) {
     try {
@@ -213,17 +325,64 @@ function PhotoRow({
     }
   }
 
+  async function handleDownload(): Promise<void> {
+    if (!url) {
+      toast.error("URL de la foto no disponible.");
+      return;
+    }
+    setDownloading(true);
+    try {
+      await downloadPhoto(url, photo.filename);
+      toast.success(`${photo.filename} descargada.`);
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? `Descarga falló: ${e.message}`
+          : "Descarga falló.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
-    <li className="flex items-center gap-3 rounded-md border bg-card/50 p-2">
-      <div className="flex-1 truncate">
+    <li className="flex items-center gap-2 rounded-md border bg-card/50 p-2">
+      {/* Thumbnail clickable que abre el original en pestaña nueva */}
+      <a
+        href={url ?? "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block h-12 w-12 shrink-0 overflow-hidden rounded bg-muted/40 transition-transform hover:scale-105"
+        title="Click: abre el original en pestaña nueva"
+        onClick={(e) => {
+          if (!url) e.preventDefault();
+        }}
+      >
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt={photo.filename}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <ImageIcon className="h-5 w-5" />
+          </div>
+        )}
+      </a>
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{photo.filename}</p>
         <p className="truncate text-xs text-muted-foreground">
           {location === "source" && photo.origin ? photo.origin : ""}
-          {photo.added_at || photo.generated_at ? ` · ${(photo.added_at || photo.generated_at)?.slice(0, 10)}` : ""}
+          {photo.added_at || photo.generated_at
+            ? ` · ${(photo.added_at || photo.generated_at)?.slice(0, 10)}`
+            : ""}
         </p>
       </div>
       <Select value={photo.type ?? undefined} onValueChange={changeType}>
-        <SelectTrigger className="h-8 w-32">
+        <SelectTrigger className="h-8 w-28 shrink-0">
           <SelectValue placeholder="Tipo" />
         </SelectTrigger>
         <SelectContent>
@@ -237,11 +396,29 @@ function PhotoRow({
       <Button
         variant="ghost"
         size="icon"
+        onClick={handleDownload}
+        disabled={downloading || !url}
+        aria-label={`Descargar ${photo.filename}`}
+        title="Descargar al disco (calidad original)"
+      >
+        {downloading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4" />
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={handleDelete}
         disabled={del.isPending}
         aria-label={`Eliminar ${photo.filename}`}
       >
-        {del.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        {del.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Trash2 className="h-4 w-4" />
+        )}
       </Button>
     </li>
   );
