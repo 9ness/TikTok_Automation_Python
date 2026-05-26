@@ -239,15 +239,16 @@ async def _run_single_i2v(
             log_callback(
                 f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…"
             )
-            # Cost tracking del fallback en submit
+            # Cost tracking del fallback — helper específico de fal.ai
+            # con su tarifa propia (Pro $0.062/s vs Atlas $0.072/s) y
+            # kind="fal_cloud" → panel /costs diferencia providers.
             try:
-                from src.cost_tracking import record_atlas_cloud
-                # Mismo helper — la tarifa por tier es equivalente.
-                record_atlas_cloud(
+                from src.cost_tracking import record_fal_cloud
+                record_fal_cloud(
                     seconds=int(spec.get("duration", 5)),
                     tier=tier,
                     resolution=resolution,
-                    detail=f"FAL fallback clip {idx+1} · req {fal_job.request_id[:8]}",
+                    detail=f"clip {idx+1} · req {fal_job.request_id[:8]} (fallback Atlas)",
                 )
             except Exception:
                 pass

@@ -268,6 +268,46 @@ def record_atlas_cloud(
     return cost
 
 
+# Tarifas fal.ai para Seedance i2v — distinto del Atlas (~14-15% más
+# barato en Pro). Lite cubre Standard y Advanced en fal (no diferencia).
+# https://fal.ai/models/fal-ai/bytedance/seedance/v1/lite/image-to-video
+# https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/image-to-video
+_FAL_SEEDANCE_RATES: dict[str, float] = {
+    "standard": 0.018,
+    "advanced": 0.018,  # fal Lite — sin distinción interna
+    "pro":      0.062,
+}
+
+
+def record_fal_cloud(
+    *,
+    seconds: float,
+    tier: str,
+    resolution: str | None = None,
+    detail: str | None = None,
+) -> float:
+    """fal.ai Seedance — fallback de Atlas o primario según config.
+    Registrado como `kind=\"fal_cloud\"` para que el panel /costs lo
+    diferencie de Atlas (provider distinto, tarifa distinta).
+    Aplica multiplicador de resolución igual que Atlas (480p 0.7,
+    720p 1.0, 1080p 1.5)."""
+    try:
+        from src.tiktok_shop.config import RESOLUTION_COST_MULTIPLIER
+        rate = _FAL_SEEDANCE_RATES.get(tier, _FAL_SEEDANCE_RATES["standard"])
+        mult = RESOLUTION_COST_MULTIPLIER.get(resolution or "720p", 1.0)
+        cost = round(rate * seconds * mult, 4)
+    except Exception:
+        cost = 0.0
+    _add_line(CostLine(
+        kind="fal_cloud",
+        units=seconds,
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"tier={tier},res={resolution}",
+    ))
+    return cost
+
+
 def record_gemini(
     *, input_tokens: int, output_tokens: int, model: str, detail: str | None = None,
 ) -> float:
