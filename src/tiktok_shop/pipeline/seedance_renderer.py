@@ -274,30 +274,15 @@ async def _run_via_hailuo(
         HAILUO_STANDARD_MODEL_ID, KLING_V21_STANDARD_MODEL_ID,
         WAN_V22_5B_MODEL_ID, MUSIC_RENDERER_LABELS,
     )
-    from src.tiktok_shop.api.runware_cloud import (
-        RunwareClient, RunwareError, RunwareTransient,
-        HAILUO_02_STD_MODEL_ID as RW_HAILUO,
-        runware_is_configured,
-    )
-
     loop = asyncio.get_event_loop()
     duration = int(spec.get("duration", 6))
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
-    # ---- 0) Runware Hailuo 02 (PRIMARIO si configurado) ----
-    if runware_is_configured():
-        try:
-            return await _run_via_runware_hailuo(
-                idx=idx, spec={**spec, "duration": duration},
-                image_ref=image_ref, out_path=out_path,
-                log_callback=log_callback,
-            )
-        except (RunwareError, RunwareTransient) as e_rw:
-            log_callback(
-                f"🔁 Clip {idx+1}: Runware Hailuo falló ({str(e_rw)[:100]}). "
-                f"Cayendo a fal.ai…"
-            )
-
+    # NOTA: Runware Hailuo 02 SOLO soporta 16:9 horizontal (1366x768
+    # o 1920x1080). Para TikTok necesitamos 9:16 portrait → no sirve.
+    # Investigar Runware Kling 2.1 / Wan 2.5 que sí permiten 9:16
+    # (model AIRs pendientes de verificar). Mientras tanto, chain
+    # fal-only: Hailuo → Kling → Wan, los 3 ya soportan vertical.
     fal = FalCloudClient()
     # ---- 1) Hailuo 02 Standard ----
     try:
