@@ -49,6 +49,7 @@ def render_seedance_clips(
     resolution: str = "720p",
     output_dir: str | None = None,
     log_callback: LogCallback = _noop,
+    kind: str = "scripted",
 ) -> list[str]:
     """Devuelve lista de paths a los MP4 generados.
 
@@ -61,7 +62,30 @@ def render_seedance_clips(
                 {duration, ref_photos_indices, prompt}
         photo_paths: lista de paths LOCALES a las fotos del producto.
         resolution: '480p' / '720p' / '1080p-SR' / '1440p-SR' (según tier).
+        kind: 'scripted' (default — usa Seedance) | 'music' (usa Hailuo 02 Std
+              vía fal.ai, ignorando `tier`). El user lo elige al crear el
+              preset; el dispatcher rutea al modelo apropiado.
     """
+    # Música → Hailuo 02 directo, sin pasar por Atlas/Seedance. El tier
+    # del preset se ignora (todos los music van por el mismo modelo).
+    if kind == "music":
+        from src.tiktok_shop.api.fal_cloud import fal_is_configured
+        if not fal_is_configured():
+            raise AtlasCloudError(
+                "Presets musicales requieren FAL_API_KEY (Hailuo 02 vía fal.ai). "
+                "Define FAL_API_KEY en .env o cambia el preset a kind=scripted.",
+                kind="auth",
+            )
+        if not isinstance(clip_specs, list):
+            raise ValueError("kind=music requiere clip_specs como lista (multi-shot).")
+        out_dir = output_dir or tempfile.mkdtemp(prefix="hailuo_music_")
+        os.makedirs(out_dir, exist_ok=True)
+        return asyncio.run(_render_hailuo_clips(
+            clip_specs=clip_specs, photo_paths=photo_paths,
+            resolution=resolution, out_dir=out_dir,
+            log_callback=log_callback,
+        ))
+
     if tier not in ATLAS_TIERS:
         raise ValueError(f"Tier no soportado por Atlas: {tier}")
 
@@ -143,6 +167,110 @@ async def _render_image_to_video(
 
     paths = await asyncio.gather(*tasks)
     return list(paths)
+
+
+async def _render_hailuo_clips(
+    *,
+    clip_specs: list[dict],
+    photo_paths: list[str],
+    resolution: str,
+    out_dir: str,
+    log_callback: LogCallback,
+) -> list[str]:
+    """Multi-shot music vía Hailuo 02. Cada clip usa una foto distinta
+    sin necesidad de continuidad (vídeos musicales saltan entre planos,
+    no hay personaje). Mapea res del proyecto → res de Hailuo:
+       480p / 720p → 768P (default Hailuo)
+       1080p-SR    → 768P (Hailuo no tiene 1080p en Standard)
+    """
+    n = len(clip_specs)
+    log_callback(f"🎵 Encolando {n} clips music (Hailuo 02 Std) en fal.ai…")
+
+    photo_refs = get_atlas_image_refs(photo_paths, tier="standard")
+    hailuo_res = "768P"  # 512P queda muy bajo; 768P = TikTok ready y mismo coste
+
+    tasks = []
+    for spec in clip_specs:
+        idx = spec["clip_idx"]
+        ref_idx = spec.get("ref_photo_index")
+        if ref_idx is None or not (0 <= ref_idx < len(photo_refs)):
+            ref_idx = idx % len(photo_refs)
+        # Hailuo soporta solo durations 6 y 10. Si el preset pide otra,
+        # forzamos a 6 (lo más común y barato). Avisamos en log si redondea.
+        raw_dur = int(spec.get("duration", 6))
+        clamped_dur = 6 if raw_dur <= 7 else 10
+        if clamped_dur != raw_dur:
+            log_callback(
+                f"⚠️ Clip {idx+1}: duración {raw_dur}s redondeada a {clamped_dur}s "
+                f"(Hailuo 02 solo acepta 6 o 10)."
+            )
+        tasks.append(_run_via_hailuo(
+            idx=idx, spec={**spec, "duration": clamped_dur},
+            image_ref=photo_refs[ref_idx],
+            hailuo_res=hailuo_res, out_dir=out_dir,
+            log_callback=log_callback,
+        ))
+
+    paths = await asyncio.gather(*tasks)
+    return list(paths)
+
+
+async def _run_via_hailuo(
+    *,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    hailuo_res: str,
+    out_dir: str,
+    log_callback: LogCallback,
+) -> str:
+    """Submit + wait + download para 1 clip Hailuo 02 Standard. Sin
+    fallback — si Hailuo cae, propaga el error (el user reintenta luego)."""
+    from src.tiktok_shop.api.fal_cloud import FalCloudClient
+
+    loop = asyncio.get_event_loop()
+    fal = FalCloudClient()
+    duration = int(spec.get("duration", 6))
+    out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
+
+    job = await loop.run_in_executor(
+        None,
+        lambda: fal.submit_hailuo_i2v(
+            image_url=image_ref,
+            prompt=spec["prompt"],
+            duration=duration,
+            resolution=hailuo_res,
+        ),
+    )
+    log_callback(
+        f"⏳ Clip {idx+1} Hailuo req {job.request_id} encolado ({duration}s)…"
+    )
+
+    # Hailuo factura al encolar — registramos coste con tarifa fija.
+    try:
+        from src.cost_tracking import record_hailuo_cloud
+        record_hailuo_cloud(
+            duration_s=duration,
+            resolution=hailuo_res,
+            detail=f"clip {idx+1} · req {job.request_id[:8]}",
+        )
+    except Exception:
+        pass
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} Hailuo: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(
+        None, lambda: fal.wait(job, on_heartbeat=_hb),
+    )
+    await loop.run_in_executor(
+        None, lambda: fal.download(job.output_url or "", out_path),
+    )
+    log_callback(f"✅ Clip {idx+1} entregado por Hailuo 02")
+    return out_path
 
 
 async def _run_via_atlas(

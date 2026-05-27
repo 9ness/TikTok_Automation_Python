@@ -377,12 +377,20 @@ function PresetMiniCard({
           </Badge>
         )}
         {isMusic ? (
-          <span
-            className="rounded bg-sky-500/15 px-1 py-0 text-[9px] text-sky-700 dark:text-sky-300"
-            title="Vídeo mudo + texto en pantalla. Añade trending audio al subir a TikTok."
-          >
-            🔇 Sin voz
-          </span>
+          <>
+            <span
+              className="rounded bg-sky-500/15 px-1 py-0 text-[9px] text-sky-700 dark:text-sky-300"
+              title="Vídeo mudo + texto en pantalla. Añade trending audio al subir a TikTok."
+            >
+              🔇 Sin voz
+            </span>
+            <span
+              className="rounded bg-pink-500/15 px-1 py-0 text-[9px] font-medium text-pink-700 dark:text-pink-300"
+              title="Modelo musical · Hailuo 02 Standard vía fal.ai · ~$0.10/toma · ignora el tier de Seedance"
+            >
+              🎵 Hailuo 02
+            </span>
+          </>
         ) : preset.style === "creator_pov" ? (
           <span
             className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"

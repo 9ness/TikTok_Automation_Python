@@ -1,29 +1,30 @@
-"""Cliente fal.ai — fallback de Atlas Cloud para Seedance i2v.
+"""Cliente fal.ai — provider universal para vídeo i2v.
 
-Cuando Atlas Cloud se queda saturado (jobs Standard/Advanced que no
-completan), el renderer hace failover automático a este cliente.
-fal.ai hospeda los mismos modelos Bytedance Seedance con menor latencia
-y queue independiente.
+Soporta dos familias de modelos:
+1. **Seedance Bytedance** (Lite + Pro) — usado en presets `kind=scripted`
+   con tiers std/adv/pro. Failover de Atlas Cloud cuando se satura.
+2. **MiniMax Hailuo 02 Standard** — usado en presets `kind=music`.
+   Multi-shot vía clips independientes (sin necesidad de continuidad
+   de personaje). $0.10 fijo por clip de 6s. Cola más ligera que
+   Seedance Lite.
 
-Doc oficial: https://fal.ai/models/fal-ai/bytedance/seedance
+Doc oficial:
+  Seedance: https://fal.ai/models/fal-ai/bytedance/seedance
+  Hailuo:   https://fal.ai/models/fal-ai/minimax/hailuo-02/standard
+
   Base URL:  https://queue.fal.run
   Auth:      Authorization: Key {FAL_API_KEY}
   Submit:    POST /{model_id}              → { request_id }
   Status:    GET  /{model_id}/requests/{id}/status
   Result:    GET  /{model_id}/requests/{id}
 
-Pricing (a 2026-05-23):
-  - Seedance Lite i2v: $0.018 / seg de output
-  - Seedance Pro i2v:  $0.062 / seg de output
+Pricing (a 2026-05-25):
+  - Seedance Lite i2v: $0.018 / seg
+  - Seedance Pro  i2v: $0.062 / seg
+  - Hailuo 02 Std 6s : $0.10  fijo / clip
+  - Hailuo 02 Std 10s: $0.17  fijo / clip (estimado)
 
-Mapeo a tiers del proyecto:
-  - standard / advanced → fal-ai/bytedance/seedance/v1/lite/image-to-video
-  - pro                → fal-ai/bytedance/seedance/v1/pro/image-to-video
-
-fal.ai acepta `image_url` en formato:
-  - HTTPS público
-  - data URL base64 (`data:image/jpeg;base64,XXX`)
-Se usa el mismo helper `get_atlas_image_refs` que devuelve base64 inline.
+Acepta `image_url` en formato HTTPS público o data: base64 inline.
 """
 
 from __future__ import annotations
@@ -53,6 +54,10 @@ TIER_TO_FAL_MODEL: dict[str, str] = {
     "pro":      "fal-ai/bytedance/seedance/v1/pro/image-to-video",
 }
 
+# Hailuo 02 Standard — modelo dedicado a presets musicales (sin voz).
+# Devuelve clips de 6s o 10s con camera moves TikTok-style.
+HAILUO_STANDARD_MODEL_ID = "fal-ai/minimax/hailuo-02/standard/image-to-video"
+
 
 class FalCloudError(RuntimeError):
     """Error fal.ai NO retryable (401, 402, mal request)."""
@@ -73,6 +78,10 @@ class FalJob:
     status: str = "IN_QUEUE"
     output_url: str | None = None
     error: str | None = None
+    # Endpoint del modelo en fal.ai. Hace falta para polling/result
+    # porque cada modelo tiene su sub-path. Si vacío, `wait()` lo
+    # resuelve por tier (backwards-compat con código que no lo set).
+    model_id: str = ""
 
 
 def fal_is_configured() -> bool:
@@ -157,7 +166,58 @@ class FalCloudClient:
                 f"fal.ai submit no devolvió request_id: {payload_json}",
                 kind="invalid_response",
             )
-        return FalJob(request_id=request_id, status="IN_QUEUE")
+        return FalJob(request_id=request_id, status="IN_QUEUE", model_id=model_id)
+
+    def submit_hailuo_i2v(
+        self,
+        *,
+        image_url: str,
+        prompt: str,
+        duration: int = 6,
+        resolution: str = "768P",
+        end_image_url: str | None = None,
+        prompt_optimizer: bool = True,
+    ) -> FalJob:
+        """Encola un job i2v Hailuo 02 Standard en fal.ai. Pensado para
+        presets `kind=music`: cada clip es independiente, no necesita
+        continuidad de personaje (los vídeos musicales saltan entre
+        planos del producto, no hay personaje).
+
+        Schema (oficial fal.ai):
+          - prompt        (str, requerido)
+          - image_url     (str, requerido)
+          - duration      ("6" | "10")
+          - resolution    ("512P" | "768P")  ← Hailuo usa P mayúscula
+          - prompt_optimizer (bool)
+          - end_image_url (str opcional, continuidad si la quieres)
+        """
+        if duration not in (6, 10):
+            duration = 6
+        if resolution not in ("512P", "768P"):
+            resolution = "768P"
+        payload: dict = {
+            "prompt": prompt,
+            "image_url": image_url,
+            "duration": str(duration),
+            "resolution": resolution,
+            "prompt_optimizer": prompt_optimizer,
+        }
+        if end_image_url:
+            payload["end_image_url"] = end_image_url
+
+        url = f"{self.base_url}/{HAILUO_STANDARD_MODEL_ID}"
+        payload_json = self._post_with_retry(url, payload)
+        request_id = payload_json.get("request_id") or payload_json.get("requestId")
+        if not request_id:
+            raise FalCloudError(
+                f"fal.ai Hailuo submit no devolvió request_id: {payload_json}",
+                kind="invalid_response",
+            )
+        return FalJob(
+            request_id=request_id,
+            status="IN_QUEUE",
+            model_id=HAILUO_STANDARD_MODEL_ID,
+        )
 
     def _post_with_retry(self, url: str, payload: dict) -> dict:
         last_exc: Exception | None = None
@@ -256,14 +316,19 @@ class FalCloudClient:
     def wait(
         self,
         job: FalJob,
-        tier: str,
+        tier: str = "standard",
         *,
         timeout_s: int = POLL_TIMEOUT_S,
         poll_interval: float = POLL_INTERVAL_S,
         on_heartbeat: Callable[[int, str], None] | None = None,
     ) -> FalJob:
-        """Polling hasta status terminal. Heartbeat cada 60s para UI."""
-        model_id = TIER_TO_FAL_MODEL.get(tier, TIER_TO_FAL_MODEL["standard"])
+        """Polling hasta status terminal. Heartbeat cada 60s para UI.
+
+        Si `job.model_id` está poblado, lo usa (cubre Hailuo + cualquier
+        modelo futuro). Sino cae al mapeo TIER_TO_FAL_MODEL por
+        backwards-compat con código viejo que no setea model_id.
+        """
+        model_id = job.model_id or TIER_TO_FAL_MODEL.get(tier, TIER_TO_FAL_MODEL["standard"])
         started = time.time()
         deadline = started + timeout_s
         last_log_t = started

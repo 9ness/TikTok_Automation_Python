@@ -603,12 +603,20 @@ function Veo3PresetGrid({
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {/* Tipo principal: música (sin voz) vs creator UGC vs voiceover */}
                 {p.kind === "music" ? (
-                  <span
-                    className="rounded bg-sky-500/15 px-1 py-0 text-[9px] text-sky-700 dark:text-sky-300"
-                    title="Vídeo sin voz · solo música + texto en pantalla"
-                  >
-                    🔇 Sin voz
-                  </span>
+                  <>
+                    <span
+                      className="rounded bg-sky-500/15 px-1 py-0 text-[9px] text-sky-700 dark:text-sky-300"
+                      title="Vídeo sin voz · solo música + texto en pantalla"
+                    >
+                      🔇 Sin voz
+                    </span>
+                    <span
+                      className="rounded bg-pink-500/15 px-1 py-0 text-[9px] font-medium text-pink-700 dark:text-pink-300"
+                      title="En modo Auto vídeo se renderiza con Hailuo 02 (no Seedance). Aquí en Veo 3 lo generas a mano con Flow."
+                    >
+                      🎵 Hailuo
+                    </span>
+                  </>
                 ) : p.style === "creator_pov" ? (
                   <span
                     className="rounded bg-violet-500/15 px-1 py-0 text-[9px] text-violet-700 dark:text-violet-300"

@@ -567,6 +567,12 @@ export function PresetsManager({ product }: { product: Product }) {
             >
               Sin voz · 8-15s · texto en pantalla · 🎵 audio se añade en TikTok
             </span>
+            <span
+              className="rounded bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-medium text-pink-700 dark:text-pink-300"
+              title="Los presets musicales se renderizan con Hailuo 02 Standard vía fal.ai (no Seedance). ~$0.10/toma, sin colas largas, multi-shot."
+            >
+              🎵 Hailuo 02
+            </span>
           </div>
           {musicPresets.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -1738,16 +1744,24 @@ function PresetCard({
               )}
               {(() => {
                 // En música, ignoramos `style` (heredado como "voiceover")
-                // y mostramos "Sin voz" — el vídeo sale mudo, el creator
-                // añade trending audio en TikTok app.
+                // y mostramos "Sin voz" + "Hailuo 02" — el vídeo sale
+                // mudo y se renderiza con Hailuo 02 (no Seedance).
                 if (preset.kind === "music") {
                   return (
-                    <span
-                      className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
-                      title="Vídeo mudo + texto. Añade trending audio al subir a TikTok."
-                    >
-                      🔇 Sin voz
-                    </span>
+                    <>
+                      <span
+                        className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+                        title="Vídeo mudo + texto. Añade trending audio al subir a TikTok."
+                      >
+                        🔇 Sin voz
+                      </span>
+                      <span
+                        className="rounded bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-medium text-pink-700 dark:text-pink-300"
+                        title="Modelo musical · Hailuo 02 Standard vía fal.ai · ~$0.10/toma · ignora el tier Seedance"
+                      >
+                        🎵 Hailuo 02
+                      </span>
+                    </>
                   );
                 }
                 const meta = STYLE_LABEL[preset.style];

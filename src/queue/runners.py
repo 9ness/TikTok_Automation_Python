@@ -1141,8 +1141,12 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                 on_log(f"⚠️ No pude generar silencio: {e}. Compose puede fallar.")
                 voice_mp3 = None
 
-        # Atlas render
-        on_progress(0.55, "🎥 Atlas Cloud renderizando clips…")
+        # Video render — música → Hailuo 02, scripted → Seedance (Atlas/fal)
+        preset_kind = "music" if not voice_enabled else "scripted"
+        if preset_kind == "music":
+            on_progress(0.55, "🎵 Hailuo 02 renderizando clips musicales…")
+        else:
+            on_progress(0.55, "🎥 Renderizando clips i2v (Seedance)…")
         from src.tiktok_shop.pipeline.seedance_renderer import render_seedance_clips
         clip_paths = render_seedance_clips(
             tier=tier,
@@ -1151,6 +1155,7 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             resolution=gen.resolution,
             output_dir=voice_dir,
             log_callback=on_log,
+            kind=preset_kind,
         )
 
         # Compose

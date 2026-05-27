@@ -278,6 +278,37 @@ _FAL_SEEDANCE_RATES: dict[str, float] = {
     "pro":      0.062,
 }
 
+# Hailuo 02 Standard cobra precio FIJO por clip (no por segundo).
+# 6s=$0.10, 10s=$0.17 (estimado, puede variar — verificar con fal).
+# https://fal.ai/models/fal-ai/minimax/hailuo-02/standard
+_HAILUO_STANDARD_FLAT_BY_DURATION: dict[int, float] = {
+    6:  0.10,
+    10: 0.17,
+}
+
+
+def record_hailuo_cloud(
+    *,
+    duration_s: int,
+    resolution: str | None = None,
+    detail: str | None = None,
+) -> float:
+    """Hailuo 02 Standard (fal.ai) — usado en presets `kind=music`.
+    Precio FIJO por clip según duración (6s o 10s), independiente de
+    la resolución. Línea separada en /costs como `kind='hailuo_cloud'`."""
+    cost = _HAILUO_STANDARD_FLAT_BY_DURATION.get(
+        duration_s,
+        _HAILUO_STANDARD_FLAT_BY_DURATION[6],  # fallback al precio base
+    )
+    _add_line(CostLine(
+        kind="hailuo_cloud",
+        units=float(duration_s),
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"hailuo_02_std duration={duration_s}s res={resolution}",
+    ))
+    return cost
+
 
 def record_fal_cloud(
     *,
