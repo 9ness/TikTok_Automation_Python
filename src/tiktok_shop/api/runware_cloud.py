@@ -230,6 +230,10 @@ class RunwareClient:
         if resolution not in ("720p", "1080p"):
             resolution = "720p"
         is_portrait = aspect_ratio == "9:16"
+        # Veo Lite acepta SOLO width+height (no resolution string como
+        # creía). El docstring genérico mostraba `resolution: "720p"`
+        # pero el modelo concreto exige las dimensiones reales.
+        # `conflictPa` aparecía cuando mandábamos ambos a la vez.
         if resolution == "720p":
             w, h = (720, 1280) if is_portrait else (1280, 720)
         else:
@@ -243,10 +247,10 @@ class RunwareClient:
             "model": VEO_31_LITE_MODEL_ID,
             "positivePrompt": prompt,
             "duration": duration_s,
-            "resolution": resolution,
+            # SOLO width+height (no `resolution` para evitar conflictPa).
             "width": w,
             "height": h,
-            "frameImages": [{"inputImage": input_image, "frame": "first"}],
+            "frameImages": [{"inputImage": input_image}],
             "outputType": "URL",
             "outputFormat": "MP4",
             "deliveryMethod": "async",
