@@ -48,11 +48,16 @@ MAX_RETRIES_TRANSIENT = 3
 
 
 # Mapeo nuestro tier → model_id en Runware. Para vídeos musicales usamos
-# Hailuo 02 Standard como default. Los otros quedan disponibles para
-# futuras chains de failover dentro de Runware si fuera necesario.
-HAILUO_02_STD_MODEL_ID = "minimax:hailuo@02"
-KLING_21_STD_MODEL_ID = "klingai:kling-video@2-1-standard"
-WAN_25_MODEL_ID = "alibaba:wan@2-5"  # placeholder, verificar exacto
+# Hailuo 02 Standard como default. Runware usa identificadores estilo
+# AIR ("vendor:N@M") que NO son intuitivos — verificados desde el
+# botón "Launch model" del playground de Runware.
+# https://runware.ai/models/minimax-hailuo-02
+HAILUO_02_STD_MODEL_ID = "minimax:3@1"
+# Kling 2.1 y Wan 2.5 quedan como placeholders — verificar AIR cuando
+# se necesiten. Hoy la chain solo usa Hailuo en Runware; los fallbacks
+# Kling y Wan van por fal.ai.
+KLING_21_STD_MODEL_ID = "klingai:5@3"  # placeholder
+WAN_25_MODEL_ID = "alibaba:wan@2-5"     # placeholder
 
 MUSIC_RENDERER_LABELS_RUNWARE: dict[str, str] = {
     HAILUO_02_STD_MODEL_ID: "Hailuo 02 (Runware)",

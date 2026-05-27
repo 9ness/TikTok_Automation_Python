@@ -301,9 +301,11 @@ _WAN_V22_RATE_PER_S: float = 0.05
 # Runware — precios fijos por modelo+duración. Verificar con dashboard
 # tras los primeros jobs reales (pueden variar por demanda/promociones).
 _RUNWARE_RATES: dict[str, dict[int, float]] = {
-    "minimax:hailuo@02": {5: 0.10, 6: 0.10, 10: 0.20},
-    "klingai:kling-video@2-1-standard": {5: 0.14, 10: 0.28},
-    "alibaba:wan@2-5": {5: 0.10, 10: 0.20},
+    # Runware usa identificadores AIR no-intuitivos — verificados con
+    # `/playground/videoInference?modelAIR=...` de cada model card.
+    "minimax:3@1":  {5: 0.10, 6: 0.10, 10: 0.20},  # Hailuo 02 Standard
+    "klingai:5@3":  {5: 0.14, 10: 0.28},            # Kling 2.x (placeholder)
+    "alibaba:wan@2-5": {5: 0.10, 10: 0.20},         # Wan 2.5 (placeholder)
 }
 
 
