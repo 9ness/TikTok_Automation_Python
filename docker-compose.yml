@@ -83,6 +83,16 @@ services:
       - "host.docker.internal:host-gateway"
     expose:
       - "8000"
+    # Graceful shutdown: cuando `docker compose up -d --force-recreate api`
+    # (o el deploy) recrea el container, docker manda SIGTERM y espera
+    # hasta este timeout antes de SIGKILL. El proceso api lo captura en
+    # `lifespan` y llama a `JobQueue.start_draining()` + `wait_for_drain()`
+    # — los workers terminan el job en curso, salen limpios, el proceso
+    # exit, y solo entonces docker arranca el container nuevo. 30 minutos
+    # cubre los jobs más largos (Atlas Standard saturado). Si los jobs
+    # no terminan en 30min, docker hace SIGKILL como hard limit (último
+    # recurso para no bloquear el deploy indefinidamente).
+    stop_grace_period: 1800s
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
       interval: 30s

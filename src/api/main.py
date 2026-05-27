@@ -139,6 +139,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        # Graceful shutdown — el SIGTERM handler en api/queue/queue_init
+        # ya inició el drain de la cola. Aquí solo paramos el watcher de
+        # editor-auto. La JobQueue ya está esperando a que sus workers
+        # terminen el job actual; uvicorn no cierra el proceso hasta que
+        # este `lifespan` retorna, así que el await join de la queue es
+        # quien dicta el tiempo total de shutdown.
         logger.info("API shutting down — parando watcher auto-enqueue…")
         watcher_stop.set()
         try:
@@ -146,6 +152,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except asyncio.TimeoutError:
             logger.warning("watcher no paró en 5s, cancelando")
             watcher_task.cancel()
+
+        # Bloqueamos hasta que TODOS los workers de la JobQueue terminen
+        # su job actual. Sin timeout aquí: docker-compose tiene su propio
+        # `stop_grace_period: 1800s` que actúa como hard limit. Si nuestro
+        # proceso termina antes (queue ya vacía), docker arranca el nuevo
+        # container inmediatamente.
+        try:
+            from src.api.dependencies import get_queue
+            q = get_queue()
+            n_run = q.n_running_jobs()
+            if n_run > 0:
+                logger.info(
+                    "JobQueue: %d job(s) en ejecución — esperando a que "
+                    "terminen antes de cerrar (graceful shutdown)…",
+                    n_run,
+                )
+            q.start_draining()
+            q.wait_for_drain()
+            logger.info("JobQueue: todos los workers cerrados limpiamente.")
+        except Exception as e:
+            logger.warning("Graceful drain falló (no crítico): %s", e)
 
 
 def create_app() -> FastAPI:

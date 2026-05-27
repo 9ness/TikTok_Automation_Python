@@ -79,6 +79,51 @@ class JobQueue:
         with self._lock:
             self._dispatch = dispatch
 
+    # ----------------------------------------------------------
+    # Graceful shutdown (deploy seguro sin matar jobs)
+    # ----------------------------------------------------------
+    def start_draining(self) -> None:
+        """Inicia drain: los workers dejan de aceptar nuevos jobs
+        PENDING pero TERMINAN el que estén ejecutando ahora. El
+        proceso debe llamar `wait_for_drain()` después y luego salir.
+
+        Llamado típicamente desde el SIGTERM handler de api/main.py
+        cuando docker-compose hace recreate. Combinado con
+        `stop_grace_period: 1800s` en docker-compose, garantiza que
+        ningún job se mate a media generación.
+        """
+        with self._cond:
+            if self._stop_event.is_set():
+                return
+            self._stop_event.set()
+            self._cond.notify_all()
+
+    def is_draining(self) -> bool:
+        return self._stop_event.is_set()
+
+    def wait_for_drain(self, timeout: float | None = None) -> bool:
+        """Bloquea hasta que TODOS los workers terminen su job actual
+        y salgan limpiamente. Devuelve True si todos salieron antes
+        del timeout, False si algún worker sigue ocupado. Si `timeout`
+        es None, espera para siempre (sirve para deploys: docker-compose
+        ya tiene su propio stop_grace_period que actúa como hard limit).
+        """
+        deadline = (time.time() + timeout) if timeout is not None else None
+        for t in self._workers:
+            remaining = None
+            if deadline is not None:
+                remaining = max(0.0, deadline - time.time())
+                if remaining == 0:
+                    return False
+            t.join(timeout=remaining)
+            if t.is_alive():
+                return False
+        return True
+
+    def n_running_jobs(self) -> int:
+        with self._lock:
+            return sum(1 for j in self._jobs if j.status == JobStatus.RUNNING)
+
     def enqueue(
         self, mode: JobMode, title: str, params: dict,
         enqueued_by: str | None = None,
