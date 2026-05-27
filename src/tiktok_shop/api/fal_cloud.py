@@ -40,13 +40,14 @@ import requests
 FAL_BASE_URL = "https://queue.fal.run"
 SUBMIT_TIMEOUT_S = 30
 POLL_INTERVAL_S = 3.0
-# 15min default (era 30min). Si fal.ai no arranca el job en 15min,
-# la cola está muerta — fail-fast para que el user reintente luego
-# en vez de esperar 30min en vano. Override con FAL_POLL_TIMEOUT_S.
+# 8min default (era 15min). Como fal.ai cobra al encolar — incluso si
+# el job nunca arranca — fail-fast más agresivo limita el daño. En
+# condiciones normales Hailuo/Kling tardan 1-3min; 8min ya es muy
+# generoso. Override con FAL_POLL_TIMEOUT_S.
 try:
-    POLL_TIMEOUT_S = int(os.environ.get("FAL_POLL_TIMEOUT_S", "900"))
+    POLL_TIMEOUT_S = int(os.environ.get("FAL_POLL_TIMEOUT_S", "480"))
 except ValueError:
-    POLL_TIMEOUT_S = 900
+    POLL_TIMEOUT_S = 480
 MAX_RETRIES_TRANSIENT = 3
 
 
@@ -476,6 +477,25 @@ class FalCloudClient:
             f"fal.ai req {job.request_id} no terminó en {timeout_s/60:.0f}min "
             f"(último status: {last_status})."
         )
+
+    # ----------------------------------------------------------------
+    # CANCEL — best-effort para liberar GPU cuando nuestro timeout salta
+    # ----------------------------------------------------------------
+    def cancel_request(self, model_id: str, request_id: str) -> bool:
+        """Mata el job en fal.ai. fal cobra al encolar (verificado
+        empíricamente) pero a veces devuelve crédito si el job NUNCA
+        empezó a correr en GPU. Best-effort — si falla no propagamos."""
+        if not model_id or not request_id:
+            return False
+        url = f"{self.base_url}/{model_id}/requests/{request_id}/cancel"
+        try:
+            r = requests.put(
+                url, headers=self._headers(content_type=False), timeout=10,
+            )
+            # 200, 202, 204 = cancel aceptado. 404 = ya terminado, ignora.
+            return r.status_code < 400
+        except Exception:
+            return False
 
     # ----------------------------------------------------------------
     # DOWNLOAD

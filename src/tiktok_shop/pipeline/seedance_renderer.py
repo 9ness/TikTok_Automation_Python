@@ -183,6 +183,15 @@ def render_music_clips(
             "Define FAL_API_KEY en .env o cambia el preset a kind=scripted.",
             kind="auth",
         )
+    # Kill-switch para pausar la chain musical cuando fal.ai está mal —
+    # evita seguir tirando dinero por jobs que probablemente se quedan
+    # IN_QUEUE. Activar con `MUSIC_CHAIN_DISABLED=1` en .env del VPS.
+    if (os.environ.get("MUSIC_CHAIN_DISABLED") or "").strip() in ("1", "true", "yes"):
+        raise AtlasCloudError(
+            "Chain musical pausada (MUSIC_CHAIN_DISABLED=1). "
+            "Usa Veo 3 Flow manual mientras tanto, o desactiva el flag.",
+            kind="disabled",
+        )
     if not isinstance(clip_specs, list):
         raise ValueError("kind=music requiere clip_specs como lista (multi-shot).")
     out_dir = output_dir or tempfile.mkdtemp(prefix="music_clips_")
@@ -353,15 +362,21 @@ async def _run_one_fal_job(
     """Submit + wait + download genérico para cualquier modelo fal.
     Devuelve (out_path, renderer_label) en éxito. Levanta FalCloud* en fallo.
 
-    IMPORTANTE: fal.ai cobra solo cuando el job COMPLETA (a diferencia
-    de Atlas que cobra al encolar). Por eso registramos el coste al
-    final, después del download exitoso — si el clip falla en IN_QUEUE
-    o ERROR, NO se registra coste (porque tampoco se cobra realmente).
+    REALIDAD DE FACTURACIÓN (confirmada empíricamente 2026-05-26):
+    fal.ai COBRA AL ENCOLAR, no solo al completar. Si el job se queda
+    IN_QUEUE forever y nuestro timeout salta, el cargo ya se hizo —
+    intentamos cancel best-effort para liberar GPU. Registramos coste
+    AL SUBMIT para que el panel /costs refleje el gasto real.
     """
     job = await loop.run_in_executor(None, submit_fn)
     log_callback(
         f"⏳ Clip {idx+1} {renderer_label} req {job.request_id} encolado…"
     )
+    # Coste registrado al submit — fal ya cobró el slot.
+    try:
+        cost_fn(job.request_id)
+    except Exception:
+        pass
 
     def _hb(elapsed: int, status: str) -> None:
         log_callback(
@@ -369,17 +384,28 @@ async def _run_one_fal_job(
             f"(status={status})…"
         )
 
-    await loop.run_in_executor(
-        None, lambda: fal.wait(job, on_heartbeat=_hb),
-    )
+    try:
+        await loop.run_in_executor(
+            None, lambda: fal.wait(job, on_heartbeat=_hb),
+        )
+    except Exception:
+        # Timeout o fallo del wait — best-effort cancel para liberar la
+        # GPU (a veces fal devuelve crédito si el job nunca empezó).
+        try:
+            await loop.run_in_executor(
+                None, lambda: fal.cancel_request(job.model_id, job.request_id),
+            )
+            log_callback(
+                f"🛑 Clip {idx+1} {renderer_label}: cancel enviado a fal.ai "
+                f"(req {job.request_id[:8]})."
+            )
+        except Exception:
+            pass
+        raise
+
     await loop.run_in_executor(
         None, lambda: fal.download(job.output_url or "", out_path),
     )
-    # Coste solo tras éxito — alineado con la facturación real de fal.ai.
-    try:
-        cost_fn(job.request_id)
-    except Exception:
-        pass
     log_callback(f"✅ Clip {idx+1} entregado por {renderer_label}")
     return out_path, renderer_label
 
@@ -500,17 +526,7 @@ async def _run_via_fal(
         ),
     )
     log_callback(f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…")
-
-    def _hb(elapsed: int, status: str) -> None:
-        log_callback(
-            f"⏳ Clip {idx+1} fal.ai: {elapsed//60}m{elapsed%60:02d}s "
-            f"(status={status})…"
-        )
-
-    await loop.run_in_executor(
-        None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
-    )
-    # fal cobra solo al completar — coste registrado tras éxito (no submit).
+    # Coste al encolar — fal cobra ahí (no al completar como pensaba).
     try:
         from src.cost_tracking import record_fal_cloud
         detail = f"clip {idx+1} · req {fal_job.request_id[:8]}"
@@ -524,6 +540,26 @@ async def _run_via_fal(
         )
     except Exception:
         pass
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} fal.ai: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    try:
+        await loop.run_in_executor(
+            None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
+        )
+    except Exception:
+        # Best-effort cancel para liberar GPU si nuestro timeout saltó.
+        try:
+            await loop.run_in_executor(
+                None, lambda: fal.cancel_request(fal_job.model_id, fal_job.request_id),
+            )
+        except Exception:
+            pass
+        raise
     await loop.run_in_executor(
         None, lambda: fal.download(fal_job.output_url or "", out_path),
     )
