@@ -298,6 +298,14 @@ _KLING_V21_FLAT_BY_DURATION: dict[int, float] = {
 # ~$0.05/segundo con resolución 720p. 5s ≈ $0.25.
 _WAN_V22_RATE_PER_S: float = 0.05
 
+# Runware — precios fijos por modelo+duración. Verificar con dashboard
+# tras los primeros jobs reales (pueden variar por demanda/promociones).
+_RUNWARE_RATES: dict[str, dict[int, float]] = {
+    "minimax:hailuo@02": {5: 0.10, 6: 0.10, 10: 0.20},
+    "klingai:kling-video@2-1-standard": {5: 0.14, 10: 0.28},
+    "alibaba:wan@2-5": {5: 0.10, 10: 0.20},
+}
+
 
 def record_hailuo_cloud(
     *,
@@ -339,6 +347,26 @@ def record_kling_cloud(
         unit_label="seconds",
         cost_usd=cost,
         detail=detail or f"kling_v21_std duration={duration_s}s",
+    ))
+    return cost
+
+
+def record_runware_cloud(
+    *,
+    model_id: str,
+    duration_s: int,
+    detail: str | None = None,
+) -> float:
+    """Runware (cualquier modelo i2v). Línea separada en /costs como
+    `kind='runware_cloud'` con el model_id en el detail."""
+    rates = _RUNWARE_RATES.get(model_id, {})
+    cost = rates.get(duration_s) or rates.get(5) or 0.10
+    _add_line(CostLine(
+        kind="runware_cloud",
+        units=float(duration_s),
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"{model_id} duration={duration_s}s",
     ))
     return cost
 

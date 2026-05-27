@@ -262,21 +262,43 @@ async def _run_via_hailuo(
     out_dir: str,
     log_callback: LogCallback,
 ) -> tuple[str, str]:
-    """Chain de fallback para clip music: Hailuo 02 → Kling 2.1 → Wan 2.2-5b.
+    """Chain de fallback para clip music:
+       Runware Hailuo 02 → fal Hailuo 02 → fal Kling 2.1 → fal Wan 2.2-5b.
 
-    Devuelve (out_path, renderer_label) para que el caller pueda registrar
-    qué modelo acabó generando el clip. Si los 3 fallan, raise."""
+    Runware tiene infraestructura independiente y solo cobra al completar,
+    así que es el primario. Si falla, caemos a la familia fal (3 modelos).
+
+    Devuelve (out_path, renderer_label) para tracking en la UI."""
     from src.tiktok_shop.api.fal_cloud import (
         FalCloudClient, FalCloudError, FalCloudTransient,
         HAILUO_STANDARD_MODEL_ID, KLING_V21_STANDARD_MODEL_ID,
         WAN_V22_5B_MODEL_ID, MUSIC_RENDERER_LABELS,
     )
+    from src.tiktok_shop.api.runware_cloud import (
+        RunwareClient, RunwareError, RunwareTransient,
+        HAILUO_02_STD_MODEL_ID as RW_HAILUO,
+        runware_is_configured,
+    )
 
     loop = asyncio.get_event_loop()
-    fal = FalCloudClient()
     duration = int(spec.get("duration", 6))
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
+    # ---- 0) Runware Hailuo 02 (PRIMARIO si configurado) ----
+    if runware_is_configured():
+        try:
+            return await _run_via_runware_hailuo(
+                idx=idx, spec={**spec, "duration": duration},
+                image_ref=image_ref, out_path=out_path,
+                log_callback=log_callback,
+            )
+        except (RunwareError, RunwareTransient) as e_rw:
+            log_callback(
+                f"🔁 Clip {idx+1}: Runware Hailuo falló ({str(e_rw)[:100]}). "
+                f"Cayendo a fal.ai…"
+            )
+
+    fal = FalCloudClient()
     # ---- 1) Hailuo 02 Standard ----
     try:
         return await _run_one_fal_job(
@@ -346,6 +368,68 @@ async def _run_via_hailuo(
             f"Los 3 providers musicales fallaron en clip {idx+1}. "
             f"Último error (Wan): {e_wan}"
         ) from e_wan
+
+
+async def _run_via_runware_hailuo(
+    *,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    out_path: str,
+    log_callback: LogCallback,
+) -> tuple[str, str]:
+    """Genera 1 clip con Runware Hailuo 02 Standard. Sin internal fallback —
+    si falla, el caller (chain) probará otros providers (fal.ai)."""
+    from src.tiktok_shop.api.runware_cloud import (
+        RunwareClient, HAILUO_02_STD_MODEL_ID,
+    )
+
+    loop = asyncio.get_event_loop()
+    rw = RunwareClient()
+    duration = int(spec.get("duration", 5))
+    # Runware Hailuo acepta 5 o 10 (no 6 como fal). Mapeamos 6→5.
+    if duration not in (5, 10):
+        duration = 5 if duration <= 7 else 10
+
+    job = await loop.run_in_executor(
+        None,
+        lambda: rw.submit_i2v(
+            model_id=HAILUO_02_STD_MODEL_ID,
+            image_ref=image_ref,
+            prompt=spec["prompt"],
+            duration_s=duration,
+            width=1080, height=1920,
+        ),
+    )
+    log_callback(
+        f"⏳ Clip {idx+1} Runware Hailuo task {job.task_uuid[:8]} encolado ({duration}s)…"
+    )
+    # Runware cobra al completar — registramos coste TRAS éxito.
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} Runware: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(
+        None, lambda: rw.wait(job, on_heartbeat=_hb),
+    )
+    await loop.run_in_executor(
+        None, lambda: rw.download(job.output_url or "", out_path),
+    )
+    # Coste tras descarga exitosa (Runware solo cobra completados).
+    try:
+        from src.cost_tracking import record_runware_cloud
+        record_runware_cloud(
+            model_id=HAILUO_02_STD_MODEL_ID,
+            duration_s=duration,
+            detail=f"clip {idx+1} · task {job.task_uuid[:8]}",
+        )
+    except Exception:
+        pass
+    log_callback(f"✅ Clip {idx+1} entregado por Runware Hailuo 02")
+    return out_path, "Hailuo 02 (Runware)"
 
 
 async def _run_one_fal_job(
