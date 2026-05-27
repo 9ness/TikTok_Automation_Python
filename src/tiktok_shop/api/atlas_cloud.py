@@ -33,14 +33,15 @@ from src.tiktok_shop.config import atlas_api_key, atlas_base_url, atlas_is_confi
 SUBMIT_TIMEOUT_S = 30
 POLL_INTERVAL_S = 3.0
 # Hard cap del polling. Atlas Standard en horas pico EU puede tardar
-# 20-40 min por clip cuando la cola está saturada — preferimos esperar
-# antes que cancelar (que cobra crédito sin entregar resultado). Default
-# 2h, configurable con ATLAS_POLL_TIMEOUT_S env var. Si el user quiere
-# cancelar antes, puede hacerlo manualmente desde la UI de cola.
+# 15-25 min cuando la cola está saturada. Si pasa de eso, casi siempre
+# es porque la cola está muerta — fail-fast para que el failover a
+# fal.ai (o el reintento manual del user) entre antes. Default 30min,
+# configurable con ATLAS_POLL_TIMEOUT_S env var. Si quieres restaurar
+# el comportamiento antiguo (esperar 2h) pon ATLAS_POLL_TIMEOUT_S=7200.
 try:
-    POLL_TIMEOUT_S = int(os.environ.get("ATLAS_POLL_TIMEOUT_S", "7200"))
+    POLL_TIMEOUT_S = int(os.environ.get("ATLAS_POLL_TIMEOUT_S", "1800"))
 except ValueError:
-    POLL_TIMEOUT_S = 7200
+    POLL_TIMEOUT_S = 1800
 MAX_RETRIES_TRANSIENT = 3       # 429 / 5xx
 
 

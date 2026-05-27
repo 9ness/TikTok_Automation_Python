@@ -48,17 +48,25 @@ export function JobDetailDialog({ jobId, title, isRunning, open, onOpenChange }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* w-[calc(100vw-1rem)] clamp al viewport en móvil; max-h-[95vh]
           overflow-y-auto para que en móvil el contenido scrollee dentro
-          del dialog en lugar de salirse. p-3 en móvil para no comer ancho. */}
+          del dialog en lugar de salirse. p-2 en móvil para no comer ancho
+          (los logs pueden ser largos). overflow-x-hidden evita que el
+          contenido empuje el dialog más ancho que el viewport. */}
       <DialogContent
         className={
-          "max-h-[95vh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto p-3 sm:p-6"
+          "max-h-[95vh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto overflow-x-hidden p-2 sm:p-6"
         }
       >
-        <DialogHeader>
-          <DialogTitle className="truncate text-sm sm:text-base">
-            <span className="text-muted-foreground">Detalle · </span>
-            <span className="font-mono text-xs sm:text-sm">{jobId.slice(0, 8)}</span>
-            <span className="ml-1 text-muted-foreground">· {title}</span>
+        <DialogHeader className="space-y-0.5">
+          <DialogTitle className="text-sm sm:text-base">
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <span className="text-muted-foreground">Detalle ·</span>
+              <span className="font-mono text-[11px] sm:text-sm">
+                {jobId.slice(0, 8)}
+              </span>
+            </div>
+            <div className="truncate text-[11px] font-normal text-muted-foreground sm:text-sm">
+              {title}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -511,7 +519,7 @@ function LogsView({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="h-[50vh] overflow-y-auto rounded-md border bg-zinc-950 p-2 font-mono text-[10px] leading-relaxed text-zinc-200 sm:h-[55vh] sm:p-3 sm:text-[11px]"
+        className="h-[50vh] w-full max-w-full overflow-x-hidden overflow-y-auto rounded-md border bg-zinc-950 p-1.5 font-mono text-[9px] leading-relaxed text-zinc-200 sm:h-[55vh] sm:p-3 sm:text-[11px]"
       >
         {logs.isLoading && (
           <div className="flex items-center gap-2 text-zinc-400">
@@ -532,8 +540,14 @@ function LogsView({
           </p>
         )}
         {filtered.map((line, i) => (
-          <div key={i} className="whitespace-pre-wrap break-words">
-            <span className="select-none pr-2 text-zinc-600">
+          <div
+            key={i}
+            className="whitespace-pre-wrap break-all sm:break-words"
+          >
+            {/* En móvil ocultamos números de línea para ganar ancho —
+                las líneas largas (hashes, URLs) son ya el cuello de
+                botella. En desktop sí los mostramos. */}
+            <span className="hidden select-none pr-2 text-zinc-600 sm:inline">
               {String(i + 1).padStart(3, " ")}
             </span>
             <span className={lineColor(line)}>{line}</span>
