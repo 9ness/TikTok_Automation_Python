@@ -60,10 +60,11 @@ START_TS=$(date +%s)
 write_status "running" "\"started_at\":${START_TS}"
 
 # ============================================================
-# Función: ¿hay jobs activos en la cola?
-# Lee temp_work/queue_state.json y cuenta pending+running
+# Función: ¿hay jobs RUNNING ahora mismo?
+# Solo cuenta running — los PENDING los hereda el container nuevo,
+# que los procesa con el código nuevo (gracias a graceful shutdown).
 # ============================================================
-count_active_jobs() {
+count_running_jobs() {
     if [[ ! -f "$QUEUE_STATE" ]]; then
         echo "0"
         return
@@ -72,7 +73,7 @@ count_active_jobs() {
 import json, sys
 try:
     data = json.load(open('${QUEUE_STATE}'))
-    n = sum(1 for j in data.get('jobs', []) if j.get('status') in ('pending','running'))
+    n = sum(1 for j in data.get('jobs', []) if j.get('status') == 'running')
     print(n)
 except Exception:
     print(0)
@@ -80,20 +81,32 @@ except Exception:
 }
 
 # ============================================================
-# 1. Esperar a que la cola se vacíe
+# 1. Esperar SOLO a que los RUNNING terminen
 # ============================================================
+# Antes esperábamos también a los PENDING — eso significaba que un
+# push con 5 jobs en cola tardaba 25min en arrancar el deploy. Ahora
+# solo esperamos a los RUNNING porque:
+#   - El graceful shutdown (api/main.py lifespan + docker compose
+#     stop_grace_period 1800s) garantiza que el container viejo no
+#     muere hasta que terminen los running.
+#   - Los PENDING quedan en queue_state.json y el container NUEVO
+#     los coge al arrancar — beneficiándose del código nuevo.
+# Si por seguridad doble-cubrimos: en realidad podríamos saltar este
+# wait entero porque graceful shutdown ya lo hace bien. Lo dejamos
+# como wait corto para minimizar la ventana sin código nuevo y dejar
+# claro en logs cuánto tarda el deploy.
 elapsed=0
 while true; do
-    n_active=$(count_active_jobs)
-    if [[ "$n_active" == "0" ]]; then
-        echo "[deploy_safe] cola vacía — procediendo con deploy"
+    n_running=$(count_running_jobs)
+    if [[ "$n_running" == "0" ]]; then
+        echo "[deploy_safe] sin jobs running — procediendo con deploy"
         break
     fi
     if [[ $elapsed -ge $MAX_WAIT_SEC ]]; then
-        echo "[deploy_safe] ⚠️ TIMEOUT (${MAX_WAIT_SEC}s) — quedan ${n_active} job(s) activos. Procedo igual."
+        echo "[deploy_safe] ⚠️ TIMEOUT (${MAX_WAIT_SEC}s) — quedan ${n_running} job(s) RUNNING. Procedo igual (graceful shutdown los terminará)."
         break
     fi
-    echo "[deploy_safe] ${n_active} job(s) activo(s) — esperando ${POLL_INTERVAL}s (transcurridos ${elapsed}s/${MAX_WAIT_SEC}s)"
+    echo "[deploy_safe] ${n_running} job(s) running — esperando ${POLL_INTERVAL}s (transcurridos ${elapsed}s/${MAX_WAIT_SEC}s)"
     sleep $POLL_INTERVAL
     elapsed=$((elapsed + POLL_INTERVAL))
 done
