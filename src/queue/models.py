@@ -63,6 +63,10 @@ class Job:
     started_at: float | None = None
     finished_at: float | None = None
     duration_seconds: float | None = None  # duración del MP4 final (ffprobe)
+    # Si está poblado y es > now, el worker IGNORA el job hasta esa hora.
+    # Útil para programar a horas valle (madrugada) donde los providers
+    # AI suelen tener cola libre. Se mantiene el job en estado PENDING.
+    scheduled_for: float | None = None
 
     # ---- helpers ----
     @property

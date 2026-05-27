@@ -30,6 +30,10 @@ class ActiveJobResponse(BaseModel):
     error: str | None = None
     result_path: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
+    # Unix timestamp a la que el job se ejecutará. Si está en el futuro
+    # el worker no lo coge hasta esa hora. None = ejecutar inmediato.
+    scheduled_for: float | None = None
+    duration_seconds: float | None = None
 
 
 class QueueStateResponse(BaseModel):

@@ -30,6 +30,9 @@ export interface ActiveJob {
   result_path?: string | null;
   duration_seconds?: number | null;
   params?: Record<string, unknown>;
+  /** Unix timestamp (segundos) a la que el job se ejecutará. Si > now →
+   *  el worker lo ignora hasta esa hora. Null = ejecutar inmediato. */
+  scheduled_for?: number | null;
 }
 
 export interface QueueStateResponse {

@@ -133,6 +133,12 @@ class EnqueueRequest(BaseModel):
     # Si no, usa el default conservador (`_default_caption_style`).
     subtitle_style: dict[str, Any] | None = None
 
+    # Hora ISO 8601 a la que el job debe empezar a ejecutarse. Si está en
+    # el futuro, el job se encola pero el worker NO lo coge hasta esa hora.
+    # Útil para programar a horas valle (madrugada) donde los providers
+    # AI tienen cola despejada. Si None o pasado → ejecuta inmediatamente.
+    scheduled_for: str | None = None
+
     @field_validator("username")
     @classmethod
     def _ensure_at(cls, v: str) -> str:

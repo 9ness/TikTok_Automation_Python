@@ -121,6 +121,27 @@ export function useCancelJob() {
   });
 }
 
+/** Programa o desprograma un job PENDING.
+ *  `scheduled_for`: ISO 8601 string en el futuro → el worker espera a
+ *  esa hora. `null` o pasado → desprograma (ejecuta inmediato). */
+export function useRescheduleJob() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; scheduled_for: number | null },
+    Error,
+    { jobId: string; scheduledForIso: string | null }
+  >({
+    mutationFn: ({ jobId, scheduledForIso }) =>
+      api.patch<{ job_id: string; scheduled_for: number | null }>(
+        `/api/v1/queue/${encodeURIComponent(jobId)}/schedule`,
+        { scheduled_for: scheduledForIso },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+}
+
 /** Reordena un job PENDING en la cola. `direction`:
  *   - "up": sube 1 posición (intercambia con el PENDING anterior)
  *   - "down": baja 1 posición

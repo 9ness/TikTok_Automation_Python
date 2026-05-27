@@ -49,6 +49,8 @@ def _to_response(job: Job) -> ActiveJobResponse:
         error=job.error,
         result_path=job.result_path,
         params=_safe_params(job.params),
+        scheduled_for=getattr(job, "scheduled_for", None),
+        duration_seconds=job.duration_seconds,
     )
 
 
@@ -492,6 +494,49 @@ def reorder_job(
     else:
         queue.move_to_top(job_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# PATCH /queue/{job_id}/schedule — cambia o quita la hora programada
+# ---------------------------------------------------------------------------
+@router.patch(
+    "/{job_id}/schedule",
+    status_code=status.HTTP_200_OK,
+)
+def reschedule_job(
+    job_id: str,
+    payload: dict,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Cambia la hora programada de un job PENDING. Body:
+       { "scheduled_for": "2026-01-15T02:30:00" }  → ISO 8601
+       { "scheduled_for": null }                   → desprogramar (ejecuta ya)
+
+    Solo aplica a jobs en estado PENDING. RUNNING/COMPLETED/FAILED no
+    se pueden reprogramar.
+    """
+    raw = payload.get("scheduled_for") if isinstance(payload, dict) else None
+    scheduled_ts: float | None = None
+    if raw is not None and raw != "":
+        try:
+            from datetime import datetime
+            import time as _t
+            dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            ts = dt.timestamp()
+            # Si la nueva hora está en el pasado (o casi), desprogramamos.
+            scheduled_ts = ts if ts > _t.time() + 30 else None
+        except (ValueError, AttributeError) as e:
+            raise ValidationError(
+                f"scheduled_for inválido — esperado ISO 8601. Error: {e}",
+                details={"scheduled_for": raw},
+            )
+    ok = queue.reschedule(job_id, scheduled_ts)
+    if not ok:
+        raise JobNotFoundError(
+            f"Job '{job_id}' no encontrado o no está en estado PENDING.",
+            details={"job_id": job_id},
+        )
+    return {"job_id": job_id, "scheduled_for": scheduled_ts}
 
 
 # ---------------------------------------------------------------------------

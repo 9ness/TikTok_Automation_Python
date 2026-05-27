@@ -127,13 +127,36 @@ class JobQueue:
     def enqueue(
         self, mode: JobMode, title: str, params: dict,
         enqueued_by: str | None = None,
+        scheduled_for: float | None = None,
     ) -> Job:
-        job = Job(mode=mode, title=title, params=params, enqueued_by=enqueued_by)
+        """Encola un job. Si `scheduled_for` está poblado y es > now,
+        el worker NO lo cogerá hasta esa hora — útil para programar a
+        madrugada cuando los providers AI tienen cola despejada."""
+        job = Job(
+            mode=mode, title=title, params=params,
+            enqueued_by=enqueued_by, scheduled_for=scheduled_for,
+        )
         with self._cond:
             self._jobs.append(job)
             self._save_state_locked()
             self._cond.notify_all()
         return job
+
+    def reschedule(self, job_id: str, scheduled_for: float | None) -> bool:
+        """Cambia la hora programada de un job PENDING. Pasa `None` para
+        desprogramar (ejecutar inmediatamente). Devuelve True si lo cambió."""
+        with self._cond:
+            for j in self._jobs:
+                if j.id == job_id:
+                    if j.status != JobStatus.PENDING:
+                        return False
+                    j.scheduled_for = scheduled_for
+                    self._save_state_locked()
+                    # Notificar workers — si el job pasa a estar disponible
+                    # ahora (scheduled_for=None o <now), uno lo cogerá.
+                    self._cond.notify_all()
+                    return True
+            return False
 
     def cancel(self, job_id: str) -> bool:
         """Cancela un job. Si está en cola → CANCELLED inmediato. Si está
@@ -280,9 +303,17 @@ class JobQueue:
                 # métodos move_up/move_down/move_to_top reordenan la lista
                 # directamente — así el orden visible en la UI == orden
                 # real de ejecución, sin truco de priority field.
+                # Para jobs con `scheduled_for` futuro: los IGNORAMOS hasta
+                # esa hora. El timeout 2s del wait nos hace re-evaluar
+                # frecuentemente sin necesitar timers separados.
                 while not self._stop_event.is_set():
+                    now = time.time()
                     pending = next(
-                        (j for j in self._jobs if j.status == JobStatus.PENDING),
+                        (
+                            j for j in self._jobs
+                            if j.status == JobStatus.PENDING
+                            and (j.scheduled_for is None or j.scheduled_for <= now)
+                        ),
                         None,
                     )
                     if pending is not None:

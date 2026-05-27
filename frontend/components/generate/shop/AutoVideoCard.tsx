@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Send, Timer } from "lucide-react";
 import { toast } from "sonner";
 
+import { SchedulePicker } from "@/components/queue/SchedulePicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
@@ -162,6 +163,9 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
     setBatchSelectedIds(new Set());
   }
 
+  // State para el SchedulePicker (modo single — el botón Programar).
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+
   function openBatchDialog() {
     if (batchSelectedIds.size === 0) {
       toast.error("Marca al menos 1 preset en el grid");
@@ -311,11 +315,17 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
       (RES_MULT[config.resolution] ?? 1) +
     (config.voice_enabled ? config.duration_seconds * 18 * 0.00006 : 0);
 
-  async function generate() {
+  async function generate(scheduledForIso: string | null = null) {
     try {
-      const res = await enqueue.mutateAsync(currentPayload);
+      const payload = scheduledForIso
+        ? { ...currentPayload, scheduled_for: scheduledForIso }
+        : currentPayload;
+      const res = await enqueue.mutateAsync(payload);
+      const when = scheduledForIso
+        ? ` · programado para ${new Date(scheduledForIso).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`
+        : "";
       toast.success(
-        `Encolado · job ${res.job_id.slice(0, 8)} · $${res.estimated_cost.toFixed(2)} estimado`,
+        `Encolado · job ${res.job_id.slice(0, 8)} · $${res.estimated_cost.toFixed(2)} estimado${when}`,
       );
       openQueue();
     } catch (err) {
@@ -447,19 +457,31 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
         {/* ───── ACCIÓN PRINCIPAL ───── */}
         <div className="flex flex-wrap items-center gap-2">
           {mode === "single" && (
-            <Button
-              onClick={generate}
-              disabled={enqueue.isPending || !activeVideoPresetId}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-              title={!activeVideoPresetId ? "Elige un preset primero" : ""}
-            >
-              {enqueue.isPending ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-1.5 h-4 w-4" />
-              )}
-              Generar 1 vídeo
-            </Button>
+            <>
+              <Button
+                onClick={() => generate(null)}
+                disabled={enqueue.isPending || !activeVideoPresetId}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                title={!activeVideoPresetId ? "Elige un preset primero" : ""}
+              >
+                {enqueue.isPending ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-1.5 h-4 w-4" />
+                )}
+                Generar 1 vídeo
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setScheduleDialogOpen(true)}
+                disabled={enqueue.isPending || !activeVideoPresetId}
+                className="border-amber-500/40 hover:bg-amber-500/10"
+                title="Programar para más tarde (ej. madrugada cuando providers AI tienen cola libre)"
+              >
+                <Timer className="mr-1.5 h-4 w-4 text-amber-500" />
+                Programar
+              </Button>
+            </>
           )}
           {mode === "batch" && (
             <Button
@@ -668,6 +690,20 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
           </div>
         )}
       </CardContent>
+
+      {/* Dialog "Programar" — confirma la hora antes de encolar. */}
+      <SchedulePicker
+        open={scheduleDialogOpen}
+        onOpenChange={setScheduleDialogOpen}
+        title="Programar vídeo"
+        description="Encolará el vídeo pero el worker no lo procesará hasta la hora que indiques. Útil para que se ejecute en madrugada (00-08h Spain) cuando los providers AI tienen cola libre."
+        confirmLabel="Encolar programado"
+        busy={enqueue.isPending}
+        onConfirm={async (iso) => {
+          setScheduleDialogOpen(false);
+          await generate(iso);
+        }}
+      />
     </Card>
   );
 }

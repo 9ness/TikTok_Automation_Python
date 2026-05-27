@@ -65,6 +65,11 @@ export interface EnqueueRequest {
   /** Estilo de subtítulos del preset (size_px, color, highlight_color,
    *  margin_x_pct, position, uppercase, etc.). Pass-through al backend. */
   subtitle_style?: Record<string, unknown> | null;
+  /** Hora ISO 8601 a la que el job debe empezar. Si está en el futuro,
+   *  el job se encola pero el worker NO lo coge hasta esa hora. Útil
+   *  para programar a madrugada cuando providers AI tienen cola libre.
+   *  Si null/pasado → ejecuta inmediato. */
+  scheduled_for?: string | null;
 }
 
 export interface EnqueueResponse {

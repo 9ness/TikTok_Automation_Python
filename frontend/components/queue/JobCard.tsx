@@ -23,10 +23,12 @@ import {
   useJobSummary,
   useRemoveJob,
   useReorderJob,
+  useRescheduleJob,
 } from "@/lib/queries/queue";
 import { useQueueStore } from "@/lib/stores/queueStore";
 import { JobDetailDialog } from "./JobDetailDialog";
 import { JobVideoDialog } from "./JobVideoDialog";
+import { SchedulePicker, formatScheduledFor } from "./SchedulePicker";
 import {
   describeJobParams,
   MODE_ICON,
@@ -71,6 +73,14 @@ function statusBadge(job: ActiveJob): {
   spin?: boolean;
 } {
   if (job.status === "pending") {
+    // Si está programado para el futuro, mostramos badge ambar específico.
+    if (job.scheduled_for != null && job.scheduled_for > Date.now() / 1000) {
+      return {
+        label: "Programado",
+        cls: "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+        Icon: Timer,
+      };
+    }
     return {
       label: "En cola",
       cls: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300",
@@ -133,10 +143,17 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const remove = useRemoveJob();
   const deleteWithFile = useDeleteJobWithFile();
   const reorder = useReorderJob();
+  const reschedule = useRescheduleJob();
   const dismissRecentLocal = useQueueStore((s) => s.dismissRecent);
   const [videoOpen, setVideoOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  const isScheduledFuture =
+    job.status === "pending" &&
+    job.scheduled_for != null &&
+    job.scheduled_for > Date.now() / 1000;
 
   async function handleDeleteWithFile() {
     try {
@@ -376,6 +393,24 @@ export function JobCard({ job }: { job: ActiveJob }) {
               >
                 <ChevronDown className="h-3 w-3" />
               </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "h-6 w-6",
+                  isScheduledFuture && "text-amber-600 dark:text-amber-400",
+                )}
+                onClick={() => setScheduleOpen(true)}
+                disabled={reschedule.isPending}
+                aria-label="Programar"
+                title={
+                  isScheduledFuture
+                    ? "Cambiar hora programada"
+                    : "Programar para más tarde"
+                }
+              >
+                <Timer className="h-3 w-3" />
+              </Button>
             </div>
           )}
           {isCancellable && (
@@ -413,6 +448,23 @@ export function JobCard({ job }: { job: ActiveJob }) {
           )}
         </div>
       </div>
+
+      {isScheduledFuture && job.scheduled_for != null && (
+        <div className="mt-1.5 flex items-center justify-between gap-2 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px]">
+          <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+            <Timer className="h-3 w-3" />
+            Se ejecutará <strong>{formatScheduledFor(job.scheduled_for)}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setScheduleOpen(true)}
+            disabled={reschedule.isPending}
+            className="text-[10px] underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            Cambiar
+          </button>
+        </div>
+      )}
 
       {isRunning && (
         <div className="mt-2 space-y-1">
@@ -569,6 +621,32 @@ export function JobCard({ job }: { job: ActiveJob }) {
         isRunning={isRunning}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+      />
+
+      <SchedulePicker
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        initialScheduledFor={job.scheduled_for ?? null}
+        title="Reprogramar job"
+        description={`Cambia la hora a la que este job se ejecutará. Job actual: ${job.title.slice(0, 80)}`}
+        confirmLabel="Guardar"
+        busy={reschedule.isPending}
+        onConfirm={(iso) => {
+          reschedule.mutate(
+            { jobId: job.job_id, scheduledForIso: iso },
+            {
+              onSuccess: () => {
+                toast.success(
+                  iso === null
+                    ? "Job desprogramado — se ejecutará inmediatamente."
+                    : "Hora actualizada.",
+                );
+                setScheduleOpen(false);
+              },
+              onError: (e) => toast.error(`No se pudo reprogramar: ${e.message}`),
+            },
+          );
+        }}
       />
     </div>
   );

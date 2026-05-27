@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -233,7 +234,27 @@ def enqueue_generation(
 
     params = _build_enqueue_params(payload, user.id)
     title = _build_enqueue_title(payload, user.username, product.name)
-    job = queue.enqueue(JobMode.TIKTOK_SHOP, title=title, params=params)
+
+    # Parsear hora programada (ISO 8601 string → unix timestamp). Si
+    # apunta al pasado, lo ignoramos (None) para que ejecute inmediatamente.
+    scheduled_ts: float | None = None
+    if payload.scheduled_for:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(payload.scheduled_for.replace("Z", "+00:00"))
+            ts = dt.timestamp()
+            if ts > time.time() + 30:  # margen 30s para evitar race-conditions
+                scheduled_ts = ts
+        except (ValueError, AttributeError) as e:
+            raise InvalidEnqueueRequestError(
+                f"scheduled_for inválido — esperado ISO 8601 ('2026-01-15T02:30:00'). Error: {e}",
+                details={"scheduled_for": payload.scheduled_for},
+            )
+
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP, title=title, params=params,
+        scheduled_for=scheduled_ts,
+    )
 
     position = _position_in_queue(queue, job.id)
 
