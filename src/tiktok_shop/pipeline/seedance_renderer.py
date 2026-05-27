@@ -351,16 +351,17 @@ async def _run_one_fal_job(
     log_callback: LogCallback,
 ) -> tuple[str, str]:
     """Submit + wait + download genérico para cualquier modelo fal.
-    Devuelve (out_path, renderer_label) en éxito. Levanta FalCloud* en fallo."""
+    Devuelve (out_path, renderer_label) en éxito. Levanta FalCloud* en fallo.
+
+    IMPORTANTE: fal.ai cobra solo cuando el job COMPLETA (a diferencia
+    de Atlas que cobra al encolar). Por eso registramos el coste al
+    final, después del download exitoso — si el clip falla en IN_QUEUE
+    o ERROR, NO se registra coste (porque tampoco se cobra realmente).
+    """
     job = await loop.run_in_executor(None, submit_fn)
     log_callback(
         f"⏳ Clip {idx+1} {renderer_label} req {job.request_id} encolado…"
     )
-    # Registrar coste al submit (los providers facturan al encolar).
-    try:
-        cost_fn(job.request_id)
-    except Exception:
-        pass
 
     def _hb(elapsed: int, status: str) -> None:
         log_callback(
@@ -374,6 +375,11 @@ async def _run_one_fal_job(
     await loop.run_in_executor(
         None, lambda: fal.download(job.output_url or "", out_path),
     )
+    # Coste solo tras éxito — alineado con la facturación real de fal.ai.
+    try:
+        cost_fn(job.request_id)
+    except Exception:
+        pass
     log_callback(f"✅ Clip {idx+1} entregado por {renderer_label}")
     return out_path, renderer_label
 
@@ -495,8 +501,16 @@ async def _run_via_fal(
     )
     log_callback(f"⏳ Clip {idx+1} fal.ai req {fal_job.request_id} encolado…")
 
-    # fal también factura al encolar (los webhooks devuelven coste al
-    # completar pero el cargo es inmediato). Registramos al submit.
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} fal.ai: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(
+        None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
+    )
+    # fal cobra solo al completar — coste registrado tras éxito (no submit).
     try:
         from src.cost_tracking import record_fal_cloud
         detail = f"clip {idx+1} · req {fal_job.request_id[:8]}"
@@ -510,16 +524,6 @@ async def _run_via_fal(
         )
     except Exception:
         pass
-
-    def _hb(elapsed: int, status: str) -> None:
-        log_callback(
-            f"⏳ Clip {idx+1} fal.ai: {elapsed//60}m{elapsed%60:02d}s "
-            f"(status={status})…"
-        )
-
-    await loop.run_in_executor(
-        None, lambda: fal.wait(fal_job, tier=tier, on_heartbeat=_hb),
-    )
     await loop.run_in_executor(
         None, lambda: fal.download(fal_job.output_url or "", out_path),
     )
