@@ -901,6 +901,13 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         generation_status=GenerationStatus.GENERATING,
     )
     gen_repo.save(gen)
+    # Link el gen_id al job → la UI de cola lo usa para hacer lookup
+    # del Generation (cubre clips_renderer y otros campos persistidos).
+    try:
+        if isinstance(job.params, dict):
+            job.params["gen_id"] = gen.id
+    except Exception:
+        pass
 
     try:
         # ================================================================
@@ -1141,22 +1148,39 @@ def run_tiktok_shop(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                 on_log(f"⚠️ No pude generar silencio: {e}. Compose puede fallar.")
                 voice_mp3 = None
 
-        # Video render — música → Hailuo 02, scripted → Seedance (Atlas/fal)
+        # Video render — música → chain Hailuo→Kling→Wan; scripted → Seedance
         preset_kind = "music" if not voice_enabled else "scripted"
         if preset_kind == "music":
-            on_progress(0.55, "🎵 Hailuo 02 renderizando clips musicales…")
+            on_progress(0.55, "🎵 Renderizando clips musicales (chain Hailuo/Kling/Wan)…")
+            from src.tiktok_shop.pipeline.seedance_renderer import render_music_clips
+            clip_paths, clip_renderers = render_music_clips(
+                clip_specs=seedance_specs,
+                photo_paths=photo_paths,
+                resolution=gen.resolution,
+                output_dir=voice_dir,
+                log_callback=on_log,
+            )
+            # Persistimos qué modelo acabó renderizando cada clip — UI
+            # de la cola lo muestra como badge ("🎵 Hailuo 02" o el que sea).
+            try:
+                gen.clips_renderer = clip_renderers
+                from src.tiktok_shop.repos.generation_repo import GenerationRepo
+                GenerationRepo().save(gen)
+            except Exception:
+                pass
+            on_log(f"📦 Modelos usados por clip: {', '.join(clip_renderers)}")
         else:
             on_progress(0.55, "🎥 Renderizando clips i2v (Seedance)…")
-        from src.tiktok_shop.pipeline.seedance_renderer import render_seedance_clips
-        clip_paths = render_seedance_clips(
-            tier=tier,
-            clip_specs=seedance_specs,
-            photo_paths=photo_paths,
-            resolution=gen.resolution,
-            output_dir=voice_dir,
-            log_callback=on_log,
-            kind=preset_kind,
-        )
+            from src.tiktok_shop.pipeline.seedance_renderer import render_seedance_clips
+            clip_paths = render_seedance_clips(
+                tier=tier,
+                clip_specs=seedance_specs,
+                photo_paths=photo_paths,
+                resolution=gen.resolution,
+                output_dir=voice_dir,
+                log_callback=on_log,
+                kind=preset_kind,
+            )
 
         # Compose
         on_progress(0.80, "🎬 Componiendo vídeo final…")

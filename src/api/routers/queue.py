@@ -192,6 +192,23 @@ def get_job_summary(
         "has_diagnostic": False,
     }
 
+    # Para jobs TikTok Shop: lookup del Generation vía gen_id de params
+    # (lo escribe el runner al crear gen). Extraemos campos útiles para
+    # el dialog Resumen — el más importante hoy es `clips_renderer` que
+    # indica qué modelo realmente renderizó cada clip (Hailuo/Kling/Wan).
+    if job.mode.value == "tiktok_shop":
+        gen_id = (job.params or {}).get("gen_id")
+        if isinstance(gen_id, str) and gen_id:
+            try:
+                from src.tiktok_shop.repos import GenerationRepo
+                gen_obj = GenerationRepo().get(gen_id)
+                if gen_obj is not None:
+                    base["tier_used"] = gen_obj.tier_used
+                    base["model_used"] = gen_obj.model_used or None
+                    base["clips_renderer"] = list(gen_obj.clips_renderer or [])
+            except Exception:
+                pass
+
     # Buscar `editor_diagnostic_<job_id>.json` en temp_work (la herramienta
     # silence_cutter lo escribe ahí). Si no existe, devolvemos solo `base`.
     candidate_paths: list[str] = []

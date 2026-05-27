@@ -79,6 +79,12 @@ class VideoGeneration(BaseModel):
         "standard", "advanced", "pro", "veo3_prompt_only", "nano_banana_prompt_only"
     ] = "standard"
     model_used: str = ""  # endpoint Atlas o "" para prompt-only
+    # Para presets `kind=music`: lista de nombres legibles de modelo
+    # usado por cada clip (puede mezclar si hubo failover). Ej:
+    # ["Hailuo 02", "Hailuo 02"] o ["Hailuo 02", "Kling 2.1"] si Hailuo
+    # cayó en el clip 2. Para `kind=scripted` queda vacío — el tracking
+    # ya lo cubre `model_used` (Atlas/fal Seedance).
+    clips_renderer: list[str] = Field(default_factory=list)
     duration_seconds: int = 15
     resolution: str = "720p"
     num_clips: int = 1

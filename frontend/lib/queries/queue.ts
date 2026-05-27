@@ -56,6 +56,12 @@ export interface JobSummaryResponse {
   has_diagnostic: boolean;
   diagnostic_path?: string;
   diagnostic_error?: string;
+  // Solo para mode=tiktok_shop — extraído del Generation linkado
+  tier_used?: string;
+  model_used?: string | null;
+  /** Modelo i2v que realmente renderizó cada clip (puede mezclar si
+   *  hubo failover). Ej: ["Hailuo 02", "Kling 2.1"] o ["Hailuo 02"]. */
+  clips_renderer?: string[];
   // Solo si has_diagnostic === true (editor_auto)
   input_duration_seconds?: number;
   output_duration_seconds_calc?: number;

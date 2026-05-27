@@ -66,25 +66,18 @@ def render_seedance_clips(
               vía fal.ai, ignorando `tier`). El user lo elige al crear el
               preset; el dispatcher rutea al modelo apropiado.
     """
-    # Música → Hailuo 02 directo, sin pasar por Atlas/Seedance. El tier
-    # del preset se ignora (todos los music van por el mismo modelo).
+    # Música → chain Hailuo 02 → Kling 2.1 → Wan 2.2-5b vía fal.ai.
+    # El tier del preset se ignora (todos los music usan los mismos
+    # modelos optimizados para vídeo de producto sin persona).
+    # Devuelve solo paths (los renderers usados se ignoran aquí — el
+    # caller que quiera trackearlos debe llamar `render_music_clips`).
     if kind == "music":
-        from src.tiktok_shop.api.fal_cloud import fal_is_configured
-        if not fal_is_configured():
-            raise AtlasCloudError(
-                "Presets musicales requieren FAL_API_KEY (Hailuo 02 vía fal.ai). "
-                "Define FAL_API_KEY en .env o cambia el preset a kind=scripted.",
-                kind="auth",
-            )
-        if not isinstance(clip_specs, list):
-            raise ValueError("kind=music requiere clip_specs como lista (multi-shot).")
-        out_dir = output_dir or tempfile.mkdtemp(prefix="hailuo_music_")
-        os.makedirs(out_dir, exist_ok=True)
-        return asyncio.run(_render_hailuo_clips(
+        paths, _renderers = render_music_clips(
             clip_specs=clip_specs, photo_paths=photo_paths,
-            resolution=resolution, out_dir=out_dir,
+            resolution=resolution, output_dir=output_dir,
             log_callback=log_callback,
-        ))
+        )
+        return paths
 
     if tier not in ATLAS_TIERS:
         raise ValueError(f"Tier no soportado por Atlas: {tier}")
@@ -169,6 +162,38 @@ async def _render_image_to_video(
     return list(paths)
 
 
+def render_music_clips(
+    *,
+    clip_specs: list[dict],
+    photo_paths: list[str],
+    resolution: str = "720p",
+    output_dir: str | None = None,
+    log_callback: LogCallback = _noop,
+) -> tuple[list[str], list[str]]:
+    """Wrapper público para renderizar clips musicales con tracking del
+    modelo usado. Devuelve `(paths, renderers_per_clip)` para que el
+    runner pueda persistir qué modelo generó qué clip (visible en la UI
+    de la cola). Si hay mezcla por failover, devuelve uno distinto por
+    índice — ej. `["Hailuo 02", "Kling 2.1"]` si el clip 1 falló a Kling.
+    """
+    from src.tiktok_shop.api.fal_cloud import fal_is_configured
+    if not fal_is_configured():
+        raise AtlasCloudError(
+            "Presets musicales requieren FAL_API_KEY (Hailuo/Kling/Wan vía fal.ai). "
+            "Define FAL_API_KEY en .env o cambia el preset a kind=scripted.",
+            kind="auth",
+        )
+    if not isinstance(clip_specs, list):
+        raise ValueError("kind=music requiere clip_specs como lista (multi-shot).")
+    out_dir = output_dir or tempfile.mkdtemp(prefix="music_clips_")
+    os.makedirs(out_dir, exist_ok=True)
+    return asyncio.run(_render_hailuo_clips(
+        clip_specs=clip_specs, photo_paths=photo_paths,
+        resolution=resolution, out_dir=out_dir,
+        log_callback=log_callback,
+    ))
+
+
 async def _render_hailuo_clips(
     *,
     clip_specs: list[dict],
@@ -176,15 +201,17 @@ async def _render_hailuo_clips(
     resolution: str,
     out_dir: str,
     log_callback: LogCallback,
-) -> list[str]:
-    """Multi-shot music vía Hailuo 02. Cada clip usa una foto distinta
-    sin necesidad de continuidad (vídeos musicales saltan entre planos,
-    no hay personaje). Mapea res del proyecto → res de Hailuo:
-       480p / 720p → 768P (default Hailuo)
-       1080p-SR    → 768P (Hailuo no tiene 1080p en Standard)
+) -> tuple[list[str], list[str]]:
+    """Multi-shot music vía Hailuo 02 (con fallback a Kling 2.1 y Wan
+    2.2-5b por clip si Hailuo falla). Devuelve `(paths, renderers)` donde
+    `renderers[i]` = nombre legible del modelo que generó el clip i.
+    Por ejemplo ["Hailuo 02", "Kling 2.1"] si el clip 1 hizo failover.
     """
     n = len(clip_specs)
-    log_callback(f"🎵 Encolando {n} clips music (Hailuo 02 Std) en fal.ai…")
+    log_callback(
+        f"🎵 Encolando {n} clips music (Hailuo 02 → Kling 2.1 → Wan 2.2-5b "
+        f"chain) en fal.ai…"
+    )
 
     photo_refs = get_atlas_image_refs(photo_paths, tier="standard")
     hailuo_res = "768P"  # 512P queda muy bajo; 768P = TikTok ready y mismo coste
@@ -211,8 +238,10 @@ async def _render_hailuo_clips(
             log_callback=log_callback,
         ))
 
-    paths = await asyncio.gather(*tasks)
-    return list(paths)
+    results = await asyncio.gather(*tasks)
+    paths = [r[0] for r in results]
+    renderers = [r[1] for r in results]
+    return paths, renderers
 
 
 async def _run_via_hailuo(
@@ -223,43 +252,119 @@ async def _run_via_hailuo(
     hailuo_res: str,
     out_dir: str,
     log_callback: LogCallback,
-) -> str:
-    """Submit + wait + download para 1 clip Hailuo 02 Standard. Sin
-    fallback — si Hailuo cae, propaga el error (el user reintenta luego)."""
-    from src.tiktok_shop.api.fal_cloud import FalCloudClient
+) -> tuple[str, str]:
+    """Chain de fallback para clip music: Hailuo 02 → Kling 2.1 → Wan 2.2-5b.
+
+    Devuelve (out_path, renderer_label) para que el caller pueda registrar
+    qué modelo acabó generando el clip. Si los 3 fallan, raise."""
+    from src.tiktok_shop.api.fal_cloud import (
+        FalCloudClient, FalCloudError, FalCloudTransient,
+        HAILUO_STANDARD_MODEL_ID, KLING_V21_STANDARD_MODEL_ID,
+        WAN_V22_5B_MODEL_ID, MUSIC_RENDERER_LABELS,
+    )
 
     loop = asyncio.get_event_loop()
     fal = FalCloudClient()
     duration = int(spec.get("duration", 6))
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
-    job = await loop.run_in_executor(
-        None,
-        lambda: fal.submit_hailuo_i2v(
-            image_url=image_ref,
-            prompt=spec["prompt"],
-            duration=duration,
-            resolution=hailuo_res,
-        ),
-    )
-    log_callback(
-        f"⏳ Clip {idx+1} Hailuo req {job.request_id} encolado ({duration}s)…"
-    )
-
-    # Hailuo factura al encolar — registramos coste con tarifa fija.
+    # ---- 1) Hailuo 02 Standard ----
     try:
-        from src.cost_tracking import record_hailuo_cloud
-        record_hailuo_cloud(
-            duration_s=duration,
-            resolution=hailuo_res,
-            detail=f"clip {idx+1} · req {job.request_id[:8]}",
+        return await _run_one_fal_job(
+            fal=fal, loop=loop,
+            submit_fn=lambda: fal.submit_hailuo_i2v(
+                image_url=image_ref, prompt=spec["prompt"],
+                duration=duration, resolution=hailuo_res,
+            ),
+            cost_fn=lambda req_id: _record_music_cost(
+                model_id=HAILUO_STANDARD_MODEL_ID, duration_s=duration,
+                resolution=hailuo_res, idx=idx, req_id=req_id,
+            ),
+            renderer_label=MUSIC_RENDERER_LABELS[HAILUO_STANDARD_MODEL_ID],
+            idx=idx, out_path=out_path, log_callback=log_callback,
         )
+    except (FalCloudError, FalCloudTransient) as e_hailuo:
+        log_callback(
+            f"🔁 Clip {idx+1}: Hailuo falló ({str(e_hailuo)[:100]}). "
+            f"Intentando Kling 2.1…"
+        )
+
+    # ---- 2) Kling 2.1 Standard ----
+    # Kling solo permite 5 o 10s. Si Hailuo era 6s, Kling lo redondea a 5.
+    kling_dur = 5 if duration <= 7 else 10
+    try:
+        return await _run_one_fal_job(
+            fal=fal, loop=loop,
+            submit_fn=lambda: fal.submit_kling_i2v(
+                image_url=image_ref, prompt=spec["prompt"], duration=kling_dur,
+            ),
+            cost_fn=lambda req_id: _record_music_cost(
+                model_id=KLING_V21_STANDARD_MODEL_ID, duration_s=kling_dur,
+                resolution=hailuo_res, idx=idx, req_id=req_id,
+            ),
+            renderer_label=MUSIC_RENDERER_LABELS[KLING_V21_STANDARD_MODEL_ID],
+            idx=idx, out_path=out_path, log_callback=log_callback,
+        )
+    except (FalCloudError, FalCloudTransient) as e_kling:
+        log_callback(
+            f"🔁 Clip {idx+1}: Kling también falló ({str(e_kling)[:100]}). "
+            f"Último intento: Wan 2.2-5b…"
+        )
+
+    # ---- 3) Wan 2.2-5b (último recurso) ----
+    # Wan máx ~6.7s a 24fps. Si pidieron 10s, le pedimos su máximo.
+    wan_dur = min(duration, 6)
+    try:
+        return await _run_one_fal_job(
+            fal=fal, loop=loop,
+            submit_fn=lambda: fal.submit_wan_i2v(
+                image_url=image_ref, prompt=spec["prompt"],
+                duration_s=wan_dur, resolution="720p", aspect_ratio="9:16",
+            ),
+            cost_fn=lambda req_id: _record_music_cost(
+                model_id=WAN_V22_5B_MODEL_ID, duration_s=wan_dur,
+                resolution=hailuo_res, idx=idx, req_id=req_id,
+            ),
+            renderer_label=MUSIC_RENDERER_LABELS[WAN_V22_5B_MODEL_ID],
+            idx=idx, out_path=out_path, log_callback=log_callback,
+        )
+    except (FalCloudError, FalCloudTransient) as e_wan:
+        log_callback(
+            f"❌ Clip {idx+1}: Hailuo, Kling Y Wan fallaron. fal.ai globalmente "
+            f"saturada — reintenta en unas horas o usa Veo 3 Flow."
+        )
+        raise RuntimeError(
+            f"Los 3 providers musicales fallaron en clip {idx+1}. "
+            f"Último error (Wan): {e_wan}"
+        ) from e_wan
+
+
+async def _run_one_fal_job(
+    *,
+    fal,
+    loop,
+    submit_fn,
+    cost_fn,
+    renderer_label: str,
+    idx: int,
+    out_path: str,
+    log_callback: LogCallback,
+) -> tuple[str, str]:
+    """Submit + wait + download genérico para cualquier modelo fal.
+    Devuelve (out_path, renderer_label) en éxito. Levanta FalCloud* en fallo."""
+    job = await loop.run_in_executor(None, submit_fn)
+    log_callback(
+        f"⏳ Clip {idx+1} {renderer_label} req {job.request_id} encolado…"
+    )
+    # Registrar coste al submit (los providers facturan al encolar).
+    try:
+        cost_fn(job.request_id)
     except Exception:
         pass
 
     def _hb(elapsed: int, status: str) -> None:
         log_callback(
-            f"⏳ Clip {idx+1} Hailuo: {elapsed//60}m{elapsed%60:02d}s "
+            f"⏳ Clip {idx+1} {renderer_label}: {elapsed//60}m{elapsed%60:02d}s "
             f"(status={status})…"
         )
 
@@ -269,8 +374,33 @@ async def _run_via_hailuo(
     await loop.run_in_executor(
         None, lambda: fal.download(job.output_url or "", out_path),
     )
-    log_callback(f"✅ Clip {idx+1} entregado por Hailuo 02")
-    return out_path
+    log_callback(f"✅ Clip {idx+1} entregado por {renderer_label}")
+    return out_path, renderer_label
+
+
+def _record_music_cost(
+    *,
+    model_id: str,
+    duration_s: int,
+    resolution: str,
+    idx: int,
+    req_id: str,
+) -> None:
+    """Dispatcher de cost tracking según modelo. Cada uno tiene su
+    helper específico con su tarifa propia → línea separada en /costs."""
+    from src.tiktok_shop.api.fal_cloud import (
+        HAILUO_STANDARD_MODEL_ID, KLING_V21_STANDARD_MODEL_ID, WAN_V22_5B_MODEL_ID,
+    )
+    detail = f"clip {idx+1} · req {req_id[:8]}"
+    if model_id == HAILUO_STANDARD_MODEL_ID:
+        from src.cost_tracking import record_hailuo_cloud
+        record_hailuo_cloud(duration_s=duration_s, resolution=resolution, detail=detail)
+    elif model_id == KLING_V21_STANDARD_MODEL_ID:
+        from src.cost_tracking import record_kling_cloud
+        record_kling_cloud(duration_s=duration_s, detail=detail)
+    elif model_id == WAN_V22_5B_MODEL_ID:
+        from src.cost_tracking import record_wan_cloud
+        record_wan_cloud(duration_s=duration_s, resolution=resolution, detail=detail)
 
 
 async def _run_via_atlas(

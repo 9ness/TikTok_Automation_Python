@@ -57,9 +57,20 @@ TIER_TO_FAL_MODEL: dict[str, str] = {
     "pro":      "fal-ai/bytedance/seedance/v1/pro/image-to-video",
 }
 
-# Hailuo 02 Standard — modelo dedicado a presets musicales (sin voz).
-# Devuelve clips de 6s o 10s con camera moves TikTok-style.
+# Modelos i2v para presets `kind=music`. Se intentan en este orden — si
+# Hailuo se atasca (IN_QUEUE), failover a Kling, luego a Wan. Cada uno
+# en cola distinta de fal.ai → improbable que los 3 caigan a la vez.
 HAILUO_STANDARD_MODEL_ID = "fal-ai/minimax/hailuo-02/standard/image-to-video"
+KLING_V21_STANDARD_MODEL_ID = "fal-ai/kling-video/v2.1/standard/image-to-video"
+WAN_V22_5B_MODEL_ID = "fal-ai/wan/v2.2-5b/image-to-video"
+
+# Nombres legibles que se persisten en `Generation.clips_renderer`
+# para que el frontend muestre qué modelo se usó realmente.
+MUSIC_RENDERER_LABELS: dict[str, str] = {
+    HAILUO_STANDARD_MODEL_ID:     "Hailuo 02",
+    KLING_V21_STANDARD_MODEL_ID:  "Kling 2.1",
+    WAN_V22_5B_MODEL_ID:          "Wan 2.2-5b",
+}
 
 
 class FalCloudError(RuntimeError):
@@ -220,6 +231,100 @@ class FalCloudClient:
             request_id=request_id,
             status="IN_QUEUE",
             model_id=HAILUO_STANDARD_MODEL_ID,
+        )
+
+    def submit_kling_i2v(
+        self,
+        *,
+        image_url: str,
+        prompt: str,
+        duration: int = 5,
+        negative_prompt: str = "blur, distort, and low quality",
+        cfg_scale: float = 0.5,
+    ) -> FalJob:
+        """Encola un job i2v Kling 2.1 Standard en fal.ai. Fallback de
+        Hailuo cuando su cola está saturada. Cola independiente en fal.
+
+        Schema oficial:
+          - prompt          (str, requerido)
+          - image_url       (str, requerido)
+          - duration        ("5" | "10")  ← Kling solo permite estos 2
+          - negative_prompt (str opcional)
+          - cfg_scale       (float opcional)
+        Kling NO acepta aspect_ratio — usa la de la imagen original.
+        Asegúrate de pasar fotos 9:16 si quieres vídeo vertical.
+        """
+        if duration not in (5, 10):
+            duration = 5
+        payload: dict = {
+            "prompt": prompt,
+            "image_url": image_url,
+            "duration": str(duration),
+            "negative_prompt": negative_prompt,
+            "cfg_scale": cfg_scale,
+        }
+        url = f"{self.base_url}/{KLING_V21_STANDARD_MODEL_ID}"
+        payload_json = self._post_with_retry(url, payload)
+        request_id = payload_json.get("request_id") or payload_json.get("requestId")
+        if not request_id:
+            raise FalCloudError(
+                f"fal.ai Kling submit no devolvió request_id: {payload_json}",
+                kind="invalid_response",
+            )
+        return FalJob(
+            request_id=request_id,
+            status="IN_QUEUE",
+            model_id=KLING_V21_STANDARD_MODEL_ID,
+        )
+
+    def submit_wan_i2v(
+        self,
+        *,
+        image_url: str,
+        prompt: str,
+        duration_s: int = 5,
+        resolution: str = "720p",
+        aspect_ratio: str = "9:16",
+    ) -> FalJob:
+        """Encola un job i2v Wan 2.2-5b en fal.ai. Último fallback antes
+        de fallar definitivamente. Wan acepta aspect_ratio 9:16 (a
+        diferencia de Kling), y la duración se controla via num_frames.
+
+        Schema oficial:
+          - image_url     (str, requerido)
+          - prompt        (str, requerido)
+          - num_frames    (17-161, default 81 = ~3.4s a 24fps)
+          - frames_per_second (4-60, default 24)
+          - resolution    ("580p" | "720p")
+          - aspect_ratio  ("auto" | "16:9" | "9:16" | "1:1")
+          - video_quality ("low"|"medium"|"high"|"maximum", default high)
+        """
+        fps = 24
+        # num_frames cap a 161 — eso son ~6.7s a 24fps. Más imposible.
+        num_frames = min(int(duration_s * fps), 161)
+        if num_frames < 17:
+            num_frames = 17
+        payload: dict = {
+            "image_url": image_url,
+            "prompt": prompt,
+            "num_frames": num_frames,
+            "frames_per_second": fps,
+            "resolution": "720p" if resolution not in ("580p", "720p") else resolution,
+            "aspect_ratio": aspect_ratio if aspect_ratio in ("auto", "16:9", "9:16", "1:1") else "9:16",
+            "video_quality": "high",
+        }
+        url = f"{self.base_url}/{WAN_V22_5B_MODEL_ID}"
+        payload_json = self._post_with_retry(url, payload)
+        request_id = payload_json.get("request_id") or payload_json.get("requestId")
+        if not request_id:
+            raise FalCloudError(
+                f"fal.ai Wan submit no devolvió request_id: {payload_json}",
+                kind="invalid_response",
+            )
+        return FalJob(
+            request_id=request_id,
+            status="IN_QUEUE",
+            model_id=WAN_V22_5B_MODEL_ID,
         )
 
     def _post_with_retry(self, url: str, payload: dict) -> dict:

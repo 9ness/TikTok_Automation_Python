@@ -120,6 +120,7 @@ function SummaryView({ jobId, isRunning, open }: { jobId: string; isRunning: boo
 
   // Si no hay diagnóstico (jobs que no son editor_auto), vista mínima.
   if (!s.has_diagnostic) {
+    const renderers = s.clips_renderer ?? [];
     return (
       <div className="space-y-3">
         <MetricGrid
@@ -138,9 +139,57 @@ function SummaryView({ jobId, isRunning, open }: { jobId: string; isRunning: boo
             },
           ]}
         />
-        <p className="text-xs text-muted-foreground">
-          (Resumen detallado disponible solo para jobs de Editor Auto.)
-        </p>
+        {renderers.length > 0 && (
+          <div className="rounded-md border border-pink-500/30 bg-pink-500/5 p-2">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-pink-700 dark:text-pink-300">
+              🎵 Modelos de vídeo usados ({renderers.length} clip{renderers.length === 1 ? "" : "s"})
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {(() => {
+                // Agrupamos contadores: ["Hailuo","Hailuo","Kling"] →
+                // [{model:Hailuo, n:2}, {model:Kling, n:1}]
+                const counts: Record<string, number> = {};
+                for (const r of renderers) counts[r] = (counts[r] ?? 0) + 1;
+                return Object.entries(counts).map(([name, n]) => (
+                  <span
+                    key={name}
+                    className="rounded bg-pink-500/15 px-1.5 py-0.5 text-[11px] font-medium text-pink-700 dark:text-pink-300"
+                    title={`Modelo i2v ${name}, ${n} clip${n === 1 ? "" : "s"}`}
+                  >
+                    {name} × {n}
+                  </span>
+                ));
+              })()}
+            </div>
+            {renderers.length > 1 &&
+              new Set(renderers).size > 1 && (
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Hubo failover: algún modelo no respondió y se completó con otro automáticamente.
+                </p>
+              )}
+          </div>
+        )}
+        {(s.tier_used || s.model_used) && (
+          <div className="rounded-md border bg-muted/30 p-2 text-[11px]">
+            {s.tier_used && (
+              <p>
+                <span className="text-muted-foreground">Tier:</span>{" "}
+                <strong>{s.tier_used}</strong>
+              </p>
+            )}
+            {s.model_used && (
+              <p className="truncate">
+                <span className="text-muted-foreground">Modelo Seedance:</span>{" "}
+                <span className="font-mono text-[10px]">{s.model_used}</span>
+              </p>
+            )}
+          </div>
+        )}
+        {renderers.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            (Resumen detallado disponible solo para jobs de Editor Auto.)
+          </p>
+        )}
         {s.error && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
             {s.error}

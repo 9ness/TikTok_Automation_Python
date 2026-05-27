@@ -286,6 +286,18 @@ _HAILUO_STANDARD_FLAT_BY_DURATION: dict[int, float] = {
     10: 0.17,
 }
 
+# Kling 2.1 Standard — fal.ai pricing oficial.
+# 5s ≈ $0.25, 10s ≈ $0.50. Algo más caro que Hailuo pero distinta cola.
+# https://fal.ai/models/fal-ai/kling-video/v2.1/standard/image-to-video
+_KLING_V21_FLAT_BY_DURATION: dict[int, float] = {
+    5:  0.25,
+    10: 0.50,
+}
+
+# Wan 2.2-5b — el más barato del trío. Precio por número de frames.
+# ~$0.05/segundo con resolución 720p. 5s ≈ $0.25.
+_WAN_V22_RATE_PER_S: float = 0.05
+
 
 def record_hailuo_cloud(
     *,
@@ -306,6 +318,46 @@ def record_hailuo_cloud(
         unit_label="seconds",
         cost_usd=cost,
         detail=detail or f"hailuo_02_std duration={duration_s}s res={resolution}",
+    ))
+    return cost
+
+
+def record_kling_cloud(
+    *,
+    duration_s: int,
+    detail: str | None = None,
+) -> float:
+    """Kling 2.1 Standard (fal.ai) — fallback de Hailuo en presets
+    musicales. Precio fijo por clip 5s o 10s."""
+    cost = _KLING_V21_FLAT_BY_DURATION.get(
+        duration_s,
+        _KLING_V21_FLAT_BY_DURATION[5],
+    )
+    _add_line(CostLine(
+        kind="kling_cloud",
+        units=float(duration_s),
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"kling_v21_std duration={duration_s}s",
+    ))
+    return cost
+
+
+def record_wan_cloud(
+    *,
+    duration_s: int,
+    resolution: str | None = None,
+    detail: str | None = None,
+) -> float:
+    """Wan 2.2-5b (fal.ai) — último fallback en presets musicales.
+    Tarifa por segundo, no por clip. El más barato del trío."""
+    cost = round(_WAN_V22_RATE_PER_S * duration_s, 4)
+    _add_line(CostLine(
+        kind="wan_cloud",
+        units=float(duration_s),
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"wan_v22_5b duration={duration_s}s res={resolution}",
     ))
     return cost
 
