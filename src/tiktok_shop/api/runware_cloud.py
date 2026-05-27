@@ -242,25 +242,21 @@ class RunwareClient:
 
         task_uuid = str(uuid.uuid4())
         input_image = _photo_to_data_url(image_ref)
+        # Payload MÍNIMO. Empíricamente, params extra (outputType,
+        # outputFormat, deliveryMethod, providerSettings) parecen
+        # ralentizar el processing — el modelo Veo Lite se queda >8min
+        # en "processing". Reducimos al mínimo y dejamos los defaults
+        # de Runware. Para el audio: como duración es corta y el user
+        # añadirá audio de TikTok, no nos importa si lo genera o no.
         task: dict = {
             "taskType": "videoInference",
             "taskUUID": task_uuid,
             "model": VEO_31_LITE_MODEL_ID,
             "positivePrompt": prompt,
             "duration": duration_s,
-            # SOLO width+height (no `resolution` para evitar conflictPa).
             "width": w,
             "height": h,
             "frameImages": [{"inputImage": input_image}],
-            "outputType": "URL",
-            "outputFormat": "MP4",
-            "deliveryMethod": "async",
-            # Sin audio nativo (lo añade el user en TikTok con trending audio)
-            "providerSettings": {
-                "google": {
-                    "generateAudio": False,
-                },
-            },
         }
         result = self._post_with_retry([task])
         errors = result.get("errors") or []
