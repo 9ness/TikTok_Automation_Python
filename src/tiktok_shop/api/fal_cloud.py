@@ -40,10 +40,13 @@ import requests
 FAL_BASE_URL = "https://queue.fal.run"
 SUBMIT_TIMEOUT_S = 30
 POLL_INTERVAL_S = 3.0
+# 15min default (era 30min). Si fal.ai no arranca el job en 15min,
+# la cola está muerta — fail-fast para que el user reintente luego
+# en vez de esperar 30min en vano. Override con FAL_POLL_TIMEOUT_S.
 try:
-    POLL_TIMEOUT_S = int(os.environ.get("FAL_POLL_TIMEOUT_S", "1800"))
+    POLL_TIMEOUT_S = int(os.environ.get("FAL_POLL_TIMEOUT_S", "900"))
 except ValueError:
-    POLL_TIMEOUT_S = 1800
+    POLL_TIMEOUT_S = 900
 MAX_RETRIES_TRANSIENT = 3
 
 

@@ -56,16 +56,21 @@ export function JobDetailDialog({ jobId, title, isRunning, open, onOpenChange }:
           "max-h-[95vh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto overflow-x-hidden p-2 sm:p-6"
         }
       >
-        <DialogHeader className="space-y-0.5">
-          <DialogTitle className="text-sm sm:text-base">
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <span className="text-muted-foreground">Detalle ·</span>
-              <span className="font-mono text-[11px] sm:text-sm">
-                {jobId.slice(0, 8)}
-              </span>
-            </div>
-            <div className="truncate text-[11px] font-normal text-muted-foreground sm:text-sm">
-              {title}
+        <DialogHeader className="space-y-0.5 pr-7 sm:pr-10">
+          {/* pr-7 reserva espacio para el botón X de cerrar (Radix lo
+              renderiza absolute top-right). Sin esto el title se solapa
+              o se sale del viewport en mobile. */}
+          <DialogTitle asChild>
+            <div className="min-w-0 max-w-full text-sm sm:text-base">
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+                <span className="text-muted-foreground">Detalle ·</span>
+                <span className="font-mono text-[11px] sm:text-sm">
+                  {jobId.slice(0, 8)}
+                </span>
+              </div>
+              <div className="truncate text-[11px] font-normal text-muted-foreground sm:text-sm">
+                {title}
+              </div>
             </div>
           </DialogTitle>
         </DialogHeader>
