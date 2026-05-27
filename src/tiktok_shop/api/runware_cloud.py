@@ -37,13 +37,14 @@ import requests
 RUNWARE_API_URL = "https://api.runware.ai/v1"
 SUBMIT_TIMEOUT_S = 30
 POLL_INTERVAL_S = 3.0
-# Timeout default 8min (igual que fal.ai). Cobra al COMPLETAR (no al
-# encolar), así que un timeout aquí no cuesta dinero — pero igual no
-# queremos quedarnos colgados eternamente.
+# Timeout default 15min. Runware cobra al COMPLETAR (no al encolar
+# según sus docs — pendiente de verificación empírica), así que un
+# timeout aquí en teoría no cuesta dinero. Veo 3.1 Lite normalmente
+# tarda 1-3min pero en horas pico puede subir a 5-10min.
 try:
-    POLL_TIMEOUT_S = int(os.environ.get("RUNWARE_POLL_TIMEOUT_S", "480"))
+    POLL_TIMEOUT_S = int(os.environ.get("RUNWARE_POLL_TIMEOUT_S", "900"))
 except ValueError:
-    POLL_TIMEOUT_S = 480
+    POLL_TIMEOUT_S = 900
 MAX_RETRIES_TRANSIENT = 3
 
 
