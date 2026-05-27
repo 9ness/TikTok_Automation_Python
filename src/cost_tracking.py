@@ -303,7 +303,13 @@ _WAN_V22_RATE_PER_S: float = 0.05
 _RUNWARE_RATES: dict[str, dict[int, float]] = {
     # Runware usa identificadores AIR no-intuitivos — verificados con
     # `/playground/videoInference?modelAIR=...` de cada model card.
-    "minimax:3@1":  {5: 0.10, 6: 0.10, 10: 0.20},  # Hailuo 02 Standard
+
+    # Veo 3.1 Lite: $0.05/s a 720p · $0.08/s a 1080p. Asumimos 720p
+    # (default barato). Si cambias a 1080p, multiplica × 1.6 o añade
+    # entradas separadas por resolución.
+    "google:veo@3.1-lite": {4: 0.20, 6: 0.30, 8: 0.40},
+
+    "minimax:3@1":  {5: 0.10, 6: 0.10, 10: 0.20},  # Hailuo 02 Std (NO 9:16)
     "klingai:5@3":  {5: 0.14, 10: 0.28},            # Kling 2.x (placeholder)
     "alibaba:wan@2-5": {5: 0.10, 10: 0.20},         # Wan 2.5 (placeholder)
 }

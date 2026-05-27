@@ -274,15 +274,31 @@ async def _run_via_hailuo(
         HAILUO_STANDARD_MODEL_ID, KLING_V21_STANDARD_MODEL_ID,
         WAN_V22_5B_MODEL_ID, MUSIC_RENDERER_LABELS,
     )
+    from src.tiktok_shop.api.runware_cloud import (
+        RunwareClient, RunwareError, RunwareTransient,
+        runware_is_configured,
+    )
+
     loop = asyncio.get_event_loop()
     duration = int(spec.get("duration", 6))
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
-    # NOTA: Runware Hailuo 02 SOLO soporta 16:9 horizontal (1366x768
-    # o 1920x1080). Para TikTok necesitamos 9:16 portrait → no sirve.
-    # Investigar Runware Kling 2.1 / Wan 2.5 que sí permiten 9:16
-    # (model AIRs pendientes de verificar). Mientras tanto, chain
-    # fal-only: Hailuo → Kling → Wan, los 3 ya soportan vertical.
+    # ---- 0) Runware Veo 3.1 Lite (PRIMARIO si configurado) ----
+    # Soporta 9:16 nativo, $0.05/s a 720p. Cola independiente de fal.ai
+    # y cobra SOLO al completar (no por intentos fallidos).
+    if runware_is_configured():
+        try:
+            return await _run_via_runware_veo(
+                idx=idx, spec={**spec, "duration": duration},
+                image_ref=image_ref, out_path=out_path,
+                log_callback=log_callback,
+            )
+        except (RunwareError, RunwareTransient) as e_rw:
+            log_callback(
+                f"🔁 Clip {idx+1}: Runware Veo 3.1 Lite falló "
+                f"({str(e_rw)[:100]}). Cayendo a fal.ai…"
+            )
+
     fal = FalCloudClient()
     # ---- 1) Hailuo 02 Standard ----
     try:
@@ -353,6 +369,70 @@ async def _run_via_hailuo(
             f"Los 3 providers musicales fallaron en clip {idx+1}. "
             f"Último error (Wan): {e_wan}"
         ) from e_wan
+
+
+async def _run_via_runware_veo(
+    *,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    out_path: str,
+    log_callback: LogCallback,
+) -> tuple[str, str]:
+    """Genera 1 clip con Runware Veo 3.1 Lite. Soporta 9:16 portrait,
+    durations 4/6/8s, $0.05/s a 720p. Runware cobra solo al completar."""
+    from src.tiktok_shop.api.runware_cloud import (
+        RunwareClient, VEO_31_LITE_MODEL_ID,
+    )
+
+    loop = asyncio.get_event_loop()
+    rw = RunwareClient()
+    raw_dur = int(spec.get("duration", 6))
+    # Veo Lite acepta solo 4, 6 u 8s. Redondea al más cercano.
+    duration = min((4, 6, 8), key=lambda v: abs(v - raw_dur))
+    if duration != raw_dur:
+        log_callback(
+            f"⚠️ Clip {idx+1}: duración {raw_dur}s redondeada a {duration}s "
+            f"(Veo 3.1 Lite acepta 4, 6 u 8)."
+        )
+
+    job = await loop.run_in_executor(
+        None,
+        lambda: rw.submit_veo31_lite_i2v(
+            image_ref=image_ref,
+            prompt=spec["prompt"],
+            duration_s=duration,
+            resolution="720p",      # 5× más barato que 1080p, calidad TikTok-ready
+            aspect_ratio="9:16",
+        ),
+    )
+    log_callback(
+        f"⏳ Clip {idx+1} Runware Veo 3.1 Lite task {job.task_uuid[:8]} "
+        f"encolado ({duration}s, 720p, 9:16)…"
+    )
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} Veo Lite: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(None, lambda: rw.wait(job, on_heartbeat=_hb))
+    await loop.run_in_executor(
+        None, lambda: rw.download(job.output_url or "", out_path),
+    )
+    # Coste solo tras éxito (Runware no cobra fallos).
+    try:
+        from src.cost_tracking import record_runware_cloud
+        record_runware_cloud(
+            model_id=VEO_31_LITE_MODEL_ID,
+            duration_s=duration,
+            detail=f"clip {idx+1} · task {job.task_uuid[:8]} · 720p 9:16",
+        )
+    except Exception:
+        pass
+    log_callback(f"✅ Clip {idx+1} entregado por Runware Veo 3.1 Lite")
+    return out_path, "Veo 3.1 Lite (Runware)"
 
 
 async def _run_via_runware_hailuo(

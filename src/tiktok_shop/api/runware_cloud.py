@@ -47,17 +47,25 @@ except ValueError:
 MAX_RETRIES_TRANSIENT = 3
 
 
-# Mapeo nuestro tier → model_id en Runware. Para vídeos musicales usamos
-# Hailuo 02 Standard como default. Runware usa identificadores estilo
-# AIR ("vendor:N@M") que NO son intuitivos — verificados desde el
-# botón "Launch model" del playground de Runware.
-# https://runware.ai/models/minimax-hailuo-02
+# Mapeo nuestro tier → model_id en Runware. Identificadores AIR
+# verificados desde docs oficiales de Runware (no inventar).
+# https://runware.ai/docs/models/google-veo-3-1-lite
+# https://runware.ai/docs/models/minimax-hailuo-02
+
+# Veo 3.1 Lite — PRIMARIO para music TikTok. Soporta 9:16 portrait
+# nativo, baratísimo ($0.05/s a 720p), 4-8s, image-to-video.
+VEO_31_LITE_MODEL_ID = "google:veo@3.1-lite"
+
+# Hailuo 02 Std — INUTILIZABLE para TikTok porque solo soporta 16:9
+# horizontal (1366x768 o 1920x1080). Lo mantenemos como constante por
+# si Runware añade portrait en el futuro.
 HAILUO_02_STD_MODEL_ID = "minimax:3@1"
-# Kling 2.1 y Wan 2.5 quedan como placeholders — verificar AIR cuando
-# se necesiten. Hoy la chain solo usa Hailuo en Runware; los fallbacks
-# Kling y Wan van por fal.ai.
-KLING_21_STD_MODEL_ID = "klingai:5@3"  # placeholder
-WAN_25_MODEL_ID = "alibaba:wan@2-5"     # placeholder
+
+# Kling 2.1 / Wan 2.5 — AIRs pendientes de verificar. Sí soportan 9:16
+# nativamente según docs de Kuaishou/Alibaba, pero el modelAIR exacto
+# en Runware aún no se ha encontrado en sus docs.
+KLING_21_STD_MODEL_ID = "klingai:5@3"  # placeholder, NO confirmado
+WAN_25_MODEL_ID = "alibaba:wan@2-5"     # placeholder, NO confirmado
 
 MUSIC_RENDERER_LABELS_RUNWARE: dict[str, str] = {
     HAILUO_02_STD_MODEL_ID: "Hailuo 02 (Runware)",
@@ -190,6 +198,78 @@ class RunwareClient:
                 kind=err.get("code") or "submit_failed",
             )
         return RunwareJob(task_uuid=task_uuid, status="processing", model_id=model_id)
+
+    def submit_veo31_lite_i2v(
+        self,
+        *,
+        image_ref: str,
+        prompt: str,
+        duration_s: int = 6,
+        resolution: str = "720p",
+        aspect_ratio: str = "9:16",
+    ) -> RunwareJob:
+        """Encola un job i2v con Google Veo 3.1 Lite en Runware.
+
+        Soporta 9:16 vertical nativo — perfecto para TikTok. Mucho más
+        barato que Hailuo o Kling ($0.05/s a 720p vs $0.10+/clip de
+        otros modelos) y calidad equivalente o superior.
+
+        Schema (https://runware.ai/docs/models/google-veo-3-1-lite):
+          - model:        google:veo@3.1-lite
+          - duration:     4 | 6 | 8 (segundos)
+          - resolution:   "720p" | "1080p"
+          - frameImages:  [{inputImage: url|base64}] o
+                          [{image: ..., frame: "first"|"last"|"0"|"-1"}]
+
+        Para 9:16 vertical pasamos `width`/`height` 720x1280 (720p) o
+        1080x1920 (1080p) — el modelo respeta orientación.
+        """
+        if duration_s not in (4, 6, 8):
+            # Redondeamos al más cercano de los 3 valores soportados
+            duration_s = min((4, 6, 8), key=lambda v: abs(v - duration_s))
+        if resolution not in ("720p", "1080p"):
+            resolution = "720p"
+        is_portrait = aspect_ratio == "9:16"
+        if resolution == "720p":
+            w, h = (720, 1280) if is_portrait else (1280, 720)
+        else:
+            w, h = (1080, 1920) if is_portrait else (1920, 1080)
+
+        task_uuid = str(uuid.uuid4())
+        input_image = _photo_to_data_url(image_ref)
+        task: dict = {
+            "taskType": "videoInference",
+            "taskUUID": task_uuid,
+            "model": VEO_31_LITE_MODEL_ID,
+            "positivePrompt": prompt,
+            "duration": duration_s,
+            "resolution": resolution,
+            "width": w,
+            "height": h,
+            "frameImages": [{"inputImage": input_image, "frame": "first"}],
+            "outputType": "URL",
+            "outputFormat": "MP4",
+            "deliveryMethod": "async",
+            # Sin audio nativo (lo añade el user en TikTok con trending audio)
+            "providerSettings": {
+                "google": {
+                    "generateAudio": False,
+                },
+            },
+        }
+        result = self._post_with_retry([task])
+        errors = result.get("errors") or []
+        if errors:
+            err = errors[0] if isinstance(errors[0], dict) else {"message": str(errors[0])}
+            raise RunwareError(
+                f"Runware Veo submit error: {err.get('message', err)}",
+                kind=err.get("code") or "submit_failed",
+            )
+        return RunwareJob(
+            task_uuid=task_uuid,
+            status="processing",
+            model_id=VEO_31_LITE_MODEL_ID,
+        )
 
     def _post_with_retry(self, tasks: list[dict]) -> dict:
         last_exc: Exception | None = None
