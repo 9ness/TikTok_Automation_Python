@@ -461,7 +461,7 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
               <Button
                 onClick={() => generate(null)}
                 disabled={enqueue.isPending || !activeVideoPresetId}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 sm:flex-1"
                 title={!activeVideoPresetId ? "Elige un preset primero" : ""}
               >
                 {enqueue.isPending ? (
@@ -475,7 +475,7 @@ export function AutoVideoCard({ userId, username, productId, hideTitle }: Props)
                 variant="outline"
                 onClick={() => setScheduleDialogOpen(true)}
                 disabled={enqueue.isPending || !activeVideoPresetId}
-                className="border-amber-500/40 hover:bg-amber-500/10"
+                className="w-full border-amber-500/40 hover:bg-amber-500/10 sm:w-auto"
                 title="Programar para más tarde (ej. madrugada cuando providers AI tienen cola libre)"
               >
                 <Timer className="mr-1.5 h-4 w-4 text-amber-500" />

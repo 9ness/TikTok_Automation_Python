@@ -450,16 +450,18 @@ export function JobCard({ job }: { job: ActiveJob }) {
       </div>
 
       {isScheduledFuture && job.scheduled_for != null && (
-        <div className="mt-1.5 flex items-center justify-between gap-2 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px]">
-          <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
-            <Timer className="h-3 w-3" />
-            Se ejecutará <strong>{formatScheduledFor(job.scheduled_for)}</strong>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px]">
+          <span className="flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-300">
+            <Timer className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              Se ejecutará <strong>{formatScheduledFor(job.scheduled_for)}</strong>
+            </span>
           </span>
           <button
             type="button"
             onClick={() => setScheduleOpen(true)}
             disabled={reschedule.isPending}
-            className="text-[10px] underline-offset-2 hover:underline disabled:opacity-50"
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-700 underline-offset-2 hover:bg-amber-500/15 hover:underline disabled:opacity-50 dark:text-amber-300"
           >
             Cambiar
           </button>

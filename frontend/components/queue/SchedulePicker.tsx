@@ -146,14 +146,14 @@ export function SchedulePicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-md p-4">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
+      <DialogContent className="w-[calc(100vw-1rem)] max-h-[92vh] max-w-md overflow-y-auto p-3 sm:p-4">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
             <Clock className="h-4 w-4 text-amber-500" />
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-[11px] sm:text-xs">
               {description}
             </DialogDescription>
           )}
@@ -161,16 +161,16 @@ export function SchedulePicker({
 
         <div className="space-y-3">
           <div>
-            <Label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:text-[11px]">
               Atajos rápidos
             </Label>
-            <div className="mt-1 flex flex-wrap gap-1.5">
+            <div className="mt-1 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
               {QUICK_PRESETS.map((p) => (
                 <button
                   key={p.label}
                   type="button"
                   onClick={() => applyQuick(p)}
-                  className="rounded border border-amber-500/40 bg-amber-500/5 px-2 py-1 text-[11px] hover:bg-amber-500/15"
+                  className="rounded border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[11px] hover:bg-amber-500/15 active:bg-amber-500/25 sm:py-1"
                 >
                   {p.label}
                 </button>
@@ -179,7 +179,7 @@ export function SchedulePicker({
           </div>
 
           <div>
-            <Label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:text-[11px]">
               <Calendar className="mr-1 inline h-3 w-3" />
               Fecha y hora exactas (hora local)
             </Label>
@@ -188,7 +188,7 @@ export function SchedulePicker({
               value={value}
               min={minValue}
               onChange={(e) => setValue(e.target.value)}
-              className="mt-1 h-9 text-sm"
+              className="mt-1 h-10 text-sm sm:h-9"
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
               Recomendado: 00-08h hora Spain (madrugada) para evitar cola
@@ -197,14 +197,14 @@ export function SchedulePicker({
           </div>
         </div>
 
-        <DialogFooter className="gap-1 sm:gap-2">
+        <DialogFooter className="flex-col gap-1.5 sm:flex-row sm:gap-2">
           {initialScheduledFor != null && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onConfirm(null)}
               disabled={busy}
-              className="text-xs"
+              className="h-9 w-full text-xs sm:h-8 sm:w-auto"
             >
               <X className="h-3.5 w-3.5" />
               Desprogramar
@@ -215,7 +215,7 @@ export function SchedulePicker({
             size="sm"
             onClick={() => onOpenChange(false)}
             disabled={busy}
-            className="text-xs"
+            className="h-9 w-full text-xs sm:h-8 sm:w-auto"
           >
             Cancelar
           </Button>
@@ -224,7 +224,7 @@ export function SchedulePicker({
             onClick={confirmNow}
             disabled={busy || !value}
             className={cn(
-              "gap-1 bg-amber-600 text-xs hover:bg-amber-700",
+              "h-9 w-full gap-1 bg-amber-600 text-xs hover:bg-amber-700 sm:h-8 sm:w-auto",
               busy && "opacity-60",
             )}
           >
