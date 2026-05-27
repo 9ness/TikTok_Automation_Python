@@ -73,10 +73,11 @@ function statusBadge(job: ActiveJob): {
   spin?: boolean;
 } {
   if (job.status === "pending") {
-    // Si está programado para el futuro, mostramos badge ambar específico.
+    // Si está programado para el futuro, mostramos badge ámbar específico
+    // con la hora de ejecución incrustada — el user lo ve sin abrir la card.
     if (job.scheduled_for != null && job.scheduled_for > Date.now() / 1000) {
       return {
-        label: "Programado",
+        label: `Programado · ${formatScheduledFor(job.scheduled_for)}`,
         cls: "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
         Icon: Timer,
       };
