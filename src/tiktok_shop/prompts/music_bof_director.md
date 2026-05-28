@@ -27,7 +27,7 @@ Schema (SIEMPRE este shape, sin campos extra):
       "cta_arrow_style": {
         "enabled": true,
         "sticker_file": "flecha_roja.mov",
-        "position_x_pct": 50.0,
+        "position_x_pct": 15.0,
         "position_y_pct": 75.0,
         "scale_width_pct": 25.0,
         "duration_seconds": 4.0,
@@ -147,16 +147,17 @@ Schema (SIEMPRE este shape, sin campos extra):
 - Genera curiosidad y empuja a la compra sin parecer agresivo.
 - Frases en presente, segunda persona ("tú"), o impersonales.
 
-**`cta_arrow_style` por preset (flecha al carrito naranja):**
+**`cta_arrow_style` por preset (flecha al botón "Comprar"):**
 
 Cada preset musical también puede llevar flecha CTA al final del
-vídeo (3-4 segundos). Schema:
+vídeo (3-4 segundos). El botón "Comprar ahora" del shop aparece
+abajo-IZQUIERDA en la UI nativa (encima del username). Schema:
 
 ```json
 "cta_arrow_style": {
   "enabled": true,
   "sticker_file": "flecha_roja.mov",
-  "position_x_pct": 50.0,
+  "position_x_pct": 15.0,
   "position_y_pct": 75.0,
   "scale_width_pct": 25.0,
   "duration_seconds": 4.0,

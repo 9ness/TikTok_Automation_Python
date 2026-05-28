@@ -57,7 +57,7 @@ Schema (SIEMPRE este shape, sin campos extra):
       "cta_arrow_style": {
         "enabled": true,
         "sticker_file": "flecha_roja.mov",
-        "position_x_pct": 50.0,
+        "position_x_pct": 15.0,
         "position_y_pct": 75.0,
         "scale_width_pct": 25.0,
         "duration_seconds": 4.0,
@@ -358,7 +358,7 @@ durante los últimos segundos del vídeo. Schema:
 "cta_arrow_style": {
   "enabled": true,
   "sticker_file": "flecha_negra.mov",   // o "flecha_roja.mov"
-  "position_x_pct": 50.0,
+  "position_x_pct": 15.0,
   "position_y_pct": 75.0,
   "scale_width_pct": 25.0,
   "duration_seconds": 4.0,
@@ -378,8 +378,9 @@ durante los últimos segundos del vídeo. Schema:
 - Si tienes dudas → `enabled: true` con `flecha_negra.mov`.
 
 **Reglas comunes:**
-- `position_x_pct: 50` y `position_y_pct: 75` (centro inferior,
-  apunta hacia el carrito naranja que TikTok pone abajo-derecha).
+- `position_x_pct: 15` y `position_y_pct: 75` (parte baja-IZQUIERDA,
+  apunta hacia el botón "Comprar ahora" del shop que TikTok pone
+  abajo-izquierda, encima del username).
 - `scale_width_pct: 25` (no muy grande, no tapa el producto).
 - `duration_seconds: 3-4` (últimos 3-4s del vídeo, momento CTA).
 - `show_at_end: true` SIEMPRE — la flecha es el último gesto antes

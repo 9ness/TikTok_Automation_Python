@@ -80,7 +80,7 @@ NO markdown fences, NO explanations outside the JSON.
     "cta_arrow_style": {
       "enabled": true | false,
       "sticker_file": "flecha_negra.mov | flecha_roja.mov",
-      "position_x_pct": 50.0,
+      "position_x_pct": 15.0,
       "position_y_pct": 75.0,
       "scale_width_pct": 25.0,
       "rotation_deg": 0,
@@ -166,8 +166,9 @@ Adapt the formula to the user's product (their name, brand, category, price)
 - **`cta_arrow_style`**:
   - `enabled=true` if the original had an arrow/sticker pointing to cart.
   - `sticker_file`: `flecha_negra.mov` if dark/sensual product mood, `flecha_roja.mov` if energetic/dramatic.
-  - `position_x_pct=50`, `position_y_pct=75`, `scale_width_pct=25`,
-    `duration_seconds=4`, `show_at_end=true` (safe defaults).
+  - `position_x_pct=15`, `position_y_pct=75`, `scale_width_pct=25`,
+    `duration_seconds=4`, `show_at_end=true` (safe defaults — TikTok Shop
+    "Comprar" button es abajo-IZQUIERDA, no centro).
 - **`music_mood`**: short snake_case descriptor matching the music mood of
   the viral. If no music or audio is mostly voice → use closest match
   describing the OVERALL vibe (e.g. `subtle_chill` for calm products,

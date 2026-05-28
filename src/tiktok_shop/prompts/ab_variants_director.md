@@ -60,7 +60,8 @@ shot_style, strategy, hooks_alternatives, cta).
   overlay en pantalla (`duration_s`: 3s vs 5s vs 8s).
 
 - `cta_arrow` → varía `cta_arrow_style.sticker_file` (flecha_negra vs
-  flecha_roja), `cta_arrow_style.position_x_pct` (45 vs 55), y enabled
+  flecha_roja), `cta_arrow_style.position_x_pct` (10 vs 20 — siempre
+  zona izquierda donde TikTok pone el botón "Comprar"), y enabled
   on/off para testar si la flecha sí ayuda o no.
 
 - `voice_tone` → solo varía `voice_tone` (energetic vs persuasive vs

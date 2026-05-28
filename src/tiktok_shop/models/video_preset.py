@@ -160,10 +160,12 @@ class CtaArrowStyle(BaseModel):
     # Nombre del archivo en TIKTOK_EDITOR/Assets/flechas/.
     # Valores típicos: "flecha_negra.mov", "flecha_roja.mov".
     sticker_file: str = "flecha_negra.mov"
-    # Posición en % del frame (0-100). El carrito de TikTok aparece
-    # abajo en la UI, así que la flecha apunta hacia ahí desde el
-    # centro inferior del vídeo.
-    position_x_pct: float = 50.0
+    # Posición en % del frame (0-100). El botón "Comprar ahora" / carrito
+    # de TikTok Shop aparece abajo-IZQUIERDA en la UI nativa (justo
+    # encima del username, bajo el área de captions). La flecha apunta
+    # hacia ahí desde aproximadamente x=15% (margen izquierdo), y=75%
+    # (parte baja, sin tapar el caption).
+    position_x_pct: float = 15.0
     position_y_pct: float = 75.0
     # Tamaño relativo al ancho del frame (10-50%).
     scale_width_pct: float = 25.0
