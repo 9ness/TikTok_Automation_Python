@@ -85,18 +85,40 @@ def _call_with_key(
     expect_json: bool,
     images: list[str | bytes] | None,
     temperature: float,
+    enable_web_search: bool = False,
+    videos: list[str] | None = None,
 ) -> str:
     """Ejecuta UNA llamada a Gemini con la `api_key` indicada.
 
     NO maneja retries — el caller (`generate_text`) decide la estrategia
     de fallback entre keys + retry on quota dentro de la última key.
+
+    Args:
+        enable_web_search: si True, añade Google Search grounding tool —
+            el modelo busca en internet y cita fuentes. Incompatible con
+            `expect_json=True` (limitación de Gemini API).
+        videos: lista de paths a archivos .mp4 para análisis visual.
+            Gemini 2.5 Pro acepta hasta 20 vídeos por request (cada uno
+            counts como ~258 tokens/seg de duración).
     """
     import google.generativeai as genai
 
     genai.configure(api_key=api_key)
+    # Si habilitamos Google Search grounding, hay que pasarlo como tool.
+    # La sintaxis cambia entre versions del SDK — esta forma es la
+    # compatible con google-generativeai >= 0.7 (Gemini 2.x).
+    tools = None
+    if enable_web_search:
+        tools = [{"google_search_retrieval": {}}]
+        if expect_json:
+            # Limitación de Gemini: no se puede combinar tools + JSON mode.
+            # Pedimos texto plano y el caller parsea/extrae lo que necesite.
+            expect_json = False
+
     model_obj = genai.GenerativeModel(
         model_name=model,
         system_instruction=system_prompt,
+        tools=tools,
     )
 
     parts: list = [user_prompt]
@@ -106,6 +128,9 @@ def _call_with_key(
                 parts.append({"mime_type": _guess_mime(img), "data": Path(img).read_bytes()})
             elif isinstance(img, bytes):
                 parts.append({"mime_type": "image/jpeg", "data": img})
+    if videos:
+        for vid in videos:
+            parts.append({"mime_type": "video/mp4", "data": Path(vid).read_bytes()})
 
     response = model_obj.generate_content(
         parts,
@@ -162,6 +187,8 @@ def generate_text(
     model: str = DEFAULT_MODEL,
     expect_json: bool = False,
     images: list[str | bytes] | None = None,
+    videos: list[str] | None = None,
+    enable_web_search: bool = False,
     temperature: float = 0.8,
     max_retries_on_quota: int = 3,
 ) -> str:
@@ -202,7 +229,9 @@ def generate_text(
                     api_key,
                     system_prompt=system_prompt, user_prompt=user_prompt,
                     model=model, expect_json=expect_json,
-                    images=images, temperature=temperature,
+                    images=images, videos=videos,
+                    enable_web_search=enable_web_search,
+                    temperature=temperature,
                 )
                 # Loguea SIEMPRE qué key acabó devolviendo el resultado.
                 # En éxitos sin fallback, este log permite verificar que se

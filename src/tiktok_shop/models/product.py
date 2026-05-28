@@ -115,6 +115,58 @@ class Hook(BaseModel):
     performance_score: float | None = None  # se actualiza con resultados
 
 
+class ViralVideoSummary(BaseModel):
+    """Resumen de un vídeo viral analizado por Gemini para extraer su fórmula."""
+    url: str                            # https://tiktok.com/...
+    view_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
+    duration_s: float = 0.0
+    hook_text: str = ""                 # hook visible en pantalla seg 0-3
+    hook_category: str = ""             # curiosity, problem, social_proof, ...
+    script_structure: str = ""          # "0-3s hook → 3-8s problem → 8-12s reveal → 12-15s CTA"
+    visual_patterns: list[str] = Field(default_factory=list)  # planos, cortes, transiciones
+    cta_used: str = ""
+    music_mood: str = ""
+
+
+class ResearchContext(BaseModel):
+    """Contexto de investigación profunda del producto.
+
+    Se rellena automáticamente por `research_service.py` al pulsar
+    "Reanalizar producto". Mezcla:
+      - Reviews de Amazon/AliExpress/web marca (Gemini con Google Search)
+      - Top vídeos virales TikTok del producto (Apify + Gemini video analysis)
+      - Comentarios de esos vídeos (Apify) → objeciones reales
+      - Investigación del nicho (Gemini búsqueda)
+
+    Los prompts directores (scripted, music, ab_variants) leen este
+    contexto para generar guiones con autoridad real — usando dolor,
+    objeciones y patrones virales verificados, no inventados.
+    """
+    # Pains/benefits extraídos de reviews reales
+    customer_pains: list[str] = Field(default_factory=list)
+    customer_benefits: list[str] = Field(default_factory=list)
+    objections: list[str] = Field(default_factory=list)
+    # Patrones agregados de los top vídeos TikTok del producto
+    viral_patterns: list[str] = Field(default_factory=list)
+    # Vídeos analizados individualmente (referencia + posible reuso)
+    top_videos: list[ViralVideoSummary] = Field(default_factory=list)
+    # Keywords del nicho para SEO y inspiración
+    niche_keywords: list[str] = Field(default_factory=list)
+    niche_inspiration: list[str] = Field(default_factory=list)
+    # Diferenciadores frente a competencia
+    competitive_diff: list[str] = Field(default_factory=list)
+    # Hooks AGREGADOS desde los vídeos virales (mejor que los inventados)
+    proven_hooks: list[str] = Field(default_factory=list)
+    # Cuándo se hizo (para refrescar cada N días)
+    analyzed_at: str | None = None
+    # Métricas de la investigación (para debug + cost tracking)
+    sources_reviews_count: int = 0      # cuántas reviews leyó Gemini
+    sources_videos_count: int = 0       # cuántos TikToks analizó
+    research_cost_usd: float = 0.0      # coste total del último research
+
+
 class PerformanceHistory(BaseModel):
     """Métricas agregadas del producto. Útil para `tier_selector` cuando
     haya datos reales."""
@@ -151,6 +203,11 @@ class Product(BaseModel):
     # Se crean desde la UI del producto pulsando "Generar" — Gemini usa
     # los prompts music_bof_director.md / scripted_bof_director.md.
     video_presets: list["VideoPreset"] = Field(default_factory=list)
+    # Investigación profunda: reviews + top vídeos TikTok + comentarios.
+    # Se rellena vía `research_service.py` al pulsar "Reanalizar producto".
+    # Los prompts directores leen esto para afinar hooks y guiones con
+    # datos reales del producto + nicho (no inventados).
+    research_context: ResearchContext = Field(default_factory=ResearchContext)
     performance_history: PerformanceHistory = Field(default_factory=PerformanceHistory)
     needs_nano_banana_regeneration: bool = False
     drive_folder: str | None = None

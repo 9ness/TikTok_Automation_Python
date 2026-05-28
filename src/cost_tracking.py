@@ -416,6 +416,34 @@ def record_replicate_cloud(
 _REPLICATE_A40_RATE_PER_S: float = 0.000725
 
 
+def record_apify_cloud(
+    *,
+    items_count: int,
+    queries_count: int = 1,
+    cost_per_query: float = 0.006,
+    cost_per_item: float = 0.0003,
+    detail: str | None = None,
+) -> float:
+    """Apify TikTok scraping (apidojo/tiktok-scraper-api).
+    Default rates: $0.006/query + $0.0003/post (primeros 10-20 gratis,
+    pero ese rebate se ignora aquí — registramos full price para tracking
+    conservador).
+
+    Para `apidojo/tiktok-scraper` (otro actor) la tarifa es $0.30/1000 posts
+    flat → usar cost_per_query=0, cost_per_item=0.0003."""
+    cost = round(
+        cost_per_query * queries_count + cost_per_item * items_count, 5,
+    )
+    _add_line(CostLine(
+        kind="apify_cloud",
+        units=float(items_count),
+        unit_label="items",
+        cost_usd=cost,
+        detail=detail or f"queries={queries_count} items={items_count}",
+    ))
+    return cost
+
+
 def record_replicate_propainter(
     *,
     gpu_seconds: float | None,
