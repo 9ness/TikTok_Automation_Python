@@ -408,8 +408,9 @@ export default function WatermarkRemoverPage() {
           </div>
           <div className="flex items-start gap-1.5 rounded bg-muted/50 px-2 py-1.5 text-[10px] text-muted-foreground sm:text-xs">
             <Info className="mt-0.5 h-3 w-3 flex-shrink-0" />
-            <span>
-              Destino: <code className="text-foreground">{destPath}</code>
+            <span className="min-w-0 flex-1 break-words">
+              Destino:{" "}
+              <code className="break-all text-foreground">{destPath}</code>
             </span>
           </div>
         </CardContent>
@@ -487,16 +488,14 @@ export default function WatermarkRemoverPage() {
             <SelectContent>
               {WATERMARK_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-[10px] text-muted-foreground sm:text-xs">
-                      {opt.note}
-                    </span>
-                  </div>
+                  <span className="font-medium">{opt.label}</span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[10px] leading-snug text-muted-foreground sm:text-xs">
+            {WATERMARK_OPTIONS.find((o) => o.value === watermarkType)?.note}
+          </p>
         </CardContent>
       </Card>
 
