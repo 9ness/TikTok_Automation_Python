@@ -179,18 +179,18 @@ def remove_watermark(
         )
 
     # Compose filter chain: aplica delogo por cada caja.
-    # `band=4` da un fade-out suave de 4px alrededor de la caja → evita
-    # transiciones bruscas visibles entre zona difuminada y resto del
-    # frame (que dejaban un "pico" en el borde con cajas demasiado
-    # ajustadas).
+    # NOTA: el param `band=N` fue removed en ffmpeg modernos (era para
+    # fade-out edge). Compensamos con padding extra en _box_to_pixels
+    # (+6px por lado) — cubre antialiasing del watermark sin necesidad
+    # del fade-out del filtro.
     delogo_filters: list[str] = []
     for box in boxes:
         x, y, w, h = _box_to_pixels(box, width, height)
         delogo_filters.append(
-            f"delogo=x={x}:y={y}:w={w}:h={h}:band=4:show=0"
+            f"delogo=x={x}:y={y}:w={w}:h={h}:show=0"
         )
         log_callback(
-            f"🚿 {box.label} → caja ({x},{y}) {w}×{h}px (band=4)"
+            f"🚿 {box.label} → caja ({x},{y}) {w}×{h}px"
         )
     vfilter = ",".join(delogo_filters)
 
