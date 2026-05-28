@@ -9,18 +9,22 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  MessageSquareText,
   Package,
   Plus,
   Settings2,
+  Sparkles as SparklesIcon,
   User as UserIcon,
+  Video,
   X,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ShopGenerateCards } from "@/components/generate/ShopGenerateCards";
+import { HooksGenerator } from "@/components/hooks/HooksGenerator";
 import { Button } from "@/components/ui/button";
-import { useProducts } from "@/lib/queries/products";
+import { useProduct, useProducts } from "@/lib/queries/products";
 import {
   migrateLocalShortcutsIfNeeded,
   type Shortcut as ServerShortcut,
@@ -129,6 +133,21 @@ function ShopGenerateInner() {
   // de las veces el user entra y elige una entrada rápida, no quiere
   // ver los pickers completos cada vez.
   const [pickersOpen, setPickersOpen] = useState(false);
+
+  // Mode toggle: "videos" (default — pipeline completa con presets) o
+  // "hooks" (generador de hooks copywriting). El user puede saltar entre
+  // ambos con las 2 cards de arriba; comparten el picker cuenta+producto.
+  const LS_MODE_KEY = "tiktok_shop_generate.mode";
+  const [mode, setMode] = useState<"videos" | "hooks">("videos");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(LS_MODE_KEY);
+    if (stored === "hooks" || stored === "videos") setMode(stored);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_MODE_KEY, mode);
+  }, [mode]);
 
   // Migración one-shot: sube shortcuts viejos de localStorage al server.
   useEffect(() => {
@@ -306,18 +325,75 @@ function ShopGenerateInner() {
     <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Generador de vídeos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Generador</h1>
           <p className="text-sm text-muted-foreground">
-            Entrada rápida en 1 clic — o elige cuenta y producto a mano.
+            Elige qué quieres generar: vídeos completos o solo hooks de
+            copywriting.
           </p>
         </div>
-        <Link href="/tiktok-shop/generate/advanced">
-          <Button variant="outline" size="sm">
-            <Settings2 className="h-4 w-4" />
-            Modo avanzado
-          </Button>
-        </Link>
+        {mode === "videos" && (
+          <Link href="/tiktok-shop/generate/advanced">
+            <Button variant="outline" size="sm">
+              <Settings2 className="h-4 w-4" />
+              Modo avanzado
+            </Button>
+          </Link>
+        )}
       </header>
+
+      {/* Mode chooser: 2 tarjetas grandes */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={() => setMode("videos")}
+          className={cn(
+            "flex flex-col items-start gap-1.5 rounded-lg border-2 p-3 text-left transition-colors sm:gap-2 sm:p-4",
+            mode === "videos"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-muted bg-muted/30 hover:border-emerald-500/40 hover:bg-emerald-500/5",
+          )}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Video className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" />
+            <span className="text-sm font-semibold sm:text-base">
+              Vídeos
+            </span>
+            {mode === "videos" && (
+              <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium uppercase text-emerald-700 dark:text-emerald-300 sm:text-[10px]">
+                Activo
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] leading-snug text-muted-foreground sm:text-xs">
+            Pipeline completa: Auto, Veo3, Nano Banana, Replicar Viral
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("hooks")}
+          className={cn(
+            "flex flex-col items-start gap-1.5 rounded-lg border-2 p-3 text-left transition-colors sm:gap-2 sm:p-4",
+            mode === "hooks"
+              ? "border-purple-500 bg-purple-500/10"
+              : "border-muted bg-muted/30 hover:border-purple-500/40 hover:bg-purple-500/5",
+          )}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <MessageSquareText className="h-4 w-4 text-purple-500 sm:h-5 sm:w-5" />
+            <span className="text-sm font-semibold sm:text-base">
+              Hooks
+            </span>
+            {mode === "hooks" && (
+              <span className="ml-1 rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-medium uppercase text-purple-700 dark:text-purple-300 sm:text-[10px]">
+                Activo
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] leading-snug text-muted-foreground sm:text-xs">
+            Copywriting rápido: variantes IA + hooks por tema
+          </p>
+        </button>
+      </div>
 
       {/* Entradas rápidas: combos user+producto guardados que se aplican
           en 1 clic. Aparece si hay alguna O si el combo actual no está
@@ -495,23 +571,52 @@ function ShopGenerateInner() {
 
       {/* Área de generación cuando hay selección completa */}
       {selectedUser && selectedProduct ? (
-        <ShopGenerateCards
-          userId={selectedUser.id}
-          username={selectedUser.username}
-          productId={selectedProduct.id}
-          productName={selectedProduct.name}
-        />
+        mode === "videos" ? (
+          <ShopGenerateCards
+            userId={selectedUser.id}
+            username={selectedUser.username}
+            productId={selectedProduct.id}
+            productName={selectedProduct.name}
+          />
+        ) : (
+          <HooksModeBlock productId={selectedProduct.id} />
+        )
       ) : (
         <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
           <p className="text-sm text-muted-foreground">
             {!selectedUser
               ? "Elige una cuenta para empezar."
-              : "Elige un producto para ver los 4 modos de generación."}
+              : mode === "videos"
+                ? "Elige un producto para ver los 4 modos de generación."
+                : "Elige un producto para generar hooks."}
           </p>
         </div>
       )}
     </div>
   );
+}
+
+/** Carga el producto completo (con video_presets) y monta HooksGenerator. */
+function HooksModeBlock({ productId }: { productId: string }) {
+  const productQ = useProduct(productId);
+  const product = productQ.data;
+  if (productQ.isLoading) {
+    return (
+      <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
+        <p className="text-sm text-muted-foreground">Cargando producto…</p>
+      </div>
+    );
+  }
+  if (!product) {
+    return (
+      <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
+        <p className="text-sm text-muted-foreground">
+          No se pudo cargar el producto.
+        </p>
+      </div>
+    );
+  }
+  return <HooksGenerator product={product} />;
 }
 
 function UserPill({
