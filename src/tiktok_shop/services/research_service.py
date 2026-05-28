@@ -206,7 +206,10 @@ Output STRICTLY in this Markdown structure (no preamble, no explanations):
 
 Be specific. Use real customer language. Avoid generic marketing speak."""
 
-    photos_summary = ", ".join([p.filename for p in (product.photos.imported or [])][:3])
+    # NOTE: ProductPhotos solo tiene `source` y `generated` — no `imported`.
+    # photos_summary se conserva para futuro si se quiere mandar como info,
+    # pero ahora mismo no se inyecta en el user_prompt (Gemini no necesita
+    # los filenames para investigar reviews/web).
     user_prompt = f"""Producto: {product.name}
 Marca: {product.brand or '—'}
 Categoría: {product.category}
