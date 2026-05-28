@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Download,
   FileVideo,
+  FolderOpen,
+  Info,
   Loader2,
   ShieldOff,
   Trash2,
@@ -25,13 +27,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
+import { useProducts } from "@/lib/queries/products";
+import { useUsers } from "@/lib/queries/users";
 import {
   type WatermarkRemoverResponse,
   type WatermarkType,
   useRemoveWatermark,
   watermarkRemoverFileUrl,
 } from "@/lib/queries/watermarkRemover";
-import { cn } from "@/lib/utils";
+
+const LS_KEY = "tiktokshop_watermark_dest_v1";
+
+interface DestSelection {
+  userId: string;
+  productId: string;
+}
 
 interface QueueItem {
   id: string;
@@ -45,7 +55,7 @@ const WATERMARK_OPTIONS: { value: WatermarkType; label: string; note: string }[]
   {
     value: "auto",
     label: "Auto · cubre ambos",
-    note: "Aplica delogo sobre las zonas de Veo Flow y Gemini Chat simultáneamente — seguro si no sabes el origen.",
+    note: "Aplica delogo sobre las zonas de Veo Flow y Gemini Chat — seguro si no sabes el origen.",
   },
   {
     value: "veo_flow",
@@ -59,13 +69,95 @@ const WATERMARK_OPTIONS: { value: WatermarkType; label: string; note: string }[]
   },
 ];
 
+function readDest(): DestSelection | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (p && typeof p.userId === "string" && typeof p.productId === "string") {
+      return p;
+    }
+  } catch {
+    /* corrupted */
+  }
+  return null;
+}
+
+function writeDest(sel: DestSelection): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_KEY, JSON.stringify(sel));
+  } catch {
+    /* silencia */
+  }
+}
+
+function formatHandle(u: string | null | undefined): string {
+  if (!u) return "—";
+  return `@${u.replace(/^@+/, "")}`;
+}
+
 export default function WatermarkRemoverPage() {
+  const usersQ = useUsers({ limit: 200 }, { refetchOnMount: "always" });
+  const productsQ = useProducts({ limit: 200 }, { refetchOnMount: "always" });
+
+  const [userId, setUserId] = useState<string>("");
+  const [productId, setProductId] = useState<string>("");
+  const [hydrated, setHydrated] = useState(false);
+
   const [items, setItems] = useState<QueueItem[]>([]);
   const [watermarkType, setWatermarkType] = useState<WatermarkType>("auto");
   const [running, setRunning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const remove = useRemoveWatermark();
 
+  // Hidrata destino desde localStorage al cargar
+  useEffect(() => {
+    const last = readDest();
+    if (last) {
+      setUserId(last.userId);
+      setProductId(last.productId);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persiste destino cuando cambia (después de hidratar)
+  useEffect(() => {
+    if (!hydrated) return;
+    if (userId && productId) {
+      writeDest({ userId, productId });
+    }
+  }, [hydrated, userId, productId]);
+
+  const users = usersQ.data?.items ?? [];
+  const allProducts = productsQ.data?.items ?? [];
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === userId) ?? null,
+    [users, userId],
+  );
+  const userProducts = useMemo(() => {
+    if (!selectedUser) return [];
+    const assigned = new Set(selectedUser.assigned_products);
+    return allProducts.filter((p) => assigned.has(p.id));
+  }, [allProducts, selectedUser]);
+  const selectedProduct = useMemo(
+    () => userProducts.find((p) => p.id === productId) ?? null,
+    [userProducts, productId],
+  );
+
+  // Si cambia el user, reset product si ya no pertenece al user nuevo
+  useEffect(() => {
+    if (!selectedUser) {
+      setProductId("");
+      return;
+    }
+    if (productId && !userProducts.some((p) => p.id === productId)) {
+      setProductId("");
+    }
+  }, [selectedUser, productId, userProducts]);
+
+  const destReady = Boolean(selectedUser && selectedProduct);
   const totalPending = items.filter((i) => i.status === "pending").length;
   const totalDone = items.filter((i) => i.status === "done").length;
   const totalFailed = items.filter((i) => i.status === "failed").length;
@@ -108,6 +200,8 @@ export default function WatermarkRemoverPage() {
       const result = await remove.mutateAsync({
         file: item.file,
         watermark_type: watermarkType,
+        user_id: destReady ? userId : undefined,
+        product_id: destReady ? productId : undefined,
       });
       setItems((prev) =>
         prev.map((i) =>
@@ -126,9 +220,12 @@ export default function WatermarkRemoverPage() {
 
   async function processAll() {
     if (running) return;
+    if (!destReady) {
+      toast.error("Elige cuenta y producto destino antes de procesar");
+      return;
+    }
     setRunning(true);
     const pending = items.filter((i) => i.status === "pending");
-    // Procesa en paralelo de hasta 3 simultáneos para no saturar el server
     const concurrency = 3;
     const queue = [...pending];
     const workers: Promise<void>[] = [];
@@ -136,31 +233,108 @@ export default function WatermarkRemoverPage() {
       workers.push(
         (async () => {
           while (queue.length > 0) {
-            const item = queue.shift();
-            if (!item) break;
-            await processOne(item);
+            const it = queue.shift();
+            if (!it) break;
+            await processOne(it);
           }
         })(),
       );
     }
     await Promise.all(workers);
     setRunning(false);
-    toast.success(`Procesados ${pending.length} vídeo(s)`);
+    toast.success(`Procesados ${pending.length} vídeo(s) → Drive`);
   }
+
+  const destPath = selectedUser && selectedProduct
+    ? `${formatHandle(selectedUser.username)} / ${selectedProduct.name} / videos/sin_marca/`
+    : "—";
 
   return (
     <div className="container mx-auto max-w-4xl space-y-4 px-3 py-4 sm:px-6 sm:py-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
-            <ShieldOff className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />
-            Quitar marca de agua
-          </h1>
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            Vídeos Veo 3 / Gemini · ffmpeg `delogo` · coste $0
-          </p>
-        </div>
+      <div>
+        <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
+          <ShieldOff className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />
+          Quitar marca de agua
+        </h1>
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          Vídeos Veo 3 / Gemini · ffmpeg `delogo` · coste $0 · auto-guarda en Drive
+        </p>
       </div>
+
+      {/* Selector destino */}
+      <Card>
+        <CardContent className="space-y-2 p-3 sm:p-4">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-amber-500" />
+            <Label className="text-xs font-semibold sm:text-sm">
+              Carpeta destino (Drive)
+            </Label>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <Label className="text-[10px] text-muted-foreground sm:text-xs">
+                Cuenta TikTok
+              </Label>
+              <Select
+                value={userId}
+                onValueChange={setUserId}
+                disabled={running || usersQ.isLoading}
+              >
+                <SelectTrigger className="h-10 text-sm">
+                  <SelectValue
+                    placeholder={
+                      usersQ.isLoading ? "Cargando…" : "Elige cuenta"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {formatHandle(u.username)}
+                      {u.display_name ? ` · ${u.display_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground sm:text-xs">
+                Producto
+              </Label>
+              <Select
+                value={productId}
+                onValueChange={setProductId}
+                disabled={running || !selectedUser || productsQ.isLoading}
+              >
+                <SelectTrigger className="h-10 text-sm">
+                  <SelectValue
+                    placeholder={
+                      !selectedUser
+                        ? "Elige cuenta primero"
+                        : userProducts.length === 0
+                          ? "Sin productos asignados"
+                          : "Elige producto"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {userProducts.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-start gap-1.5 rounded bg-muted/50 px-2 py-1.5 text-[10px] text-muted-foreground sm:text-xs">
+            <Info className="mt-0.5 h-3 w-3 flex-shrink-0" />
+            <span>
+              Destino: <code className="text-foreground">{destPath}</code>
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Selector tipo marca */}
       <Card>
@@ -190,7 +364,7 @@ export default function WatermarkRemoverPage() {
         </CardContent>
       </Card>
 
-      {/* Drop zone / file picker */}
+      {/* Drop zone */}
       <Card>
         <CardContent className="p-3 sm:p-4">
           <div
@@ -211,7 +385,7 @@ export default function WatermarkRemoverPage() {
               Toca o arrastra vídeos aquí
             </p>
             <p className="text-center text-[10px] text-muted-foreground sm:text-xs">
-              .mp4 / .mov / .mkv / .webm — máx 200 MB cada uno
+              .mp4 / .mov / .mkv / .webm — máx 200 MB c/u — múltiples a la vez
             </p>
             <input
               ref={fileInputRef}
@@ -265,7 +439,7 @@ export default function WatermarkRemoverPage() {
             <Button
               size="sm"
               onClick={processAll}
-              disabled={running || totalPending === 0}
+              disabled={running || totalPending === 0 || !destReady}
               className="h-9 flex-1 gap-1 bg-amber-600 text-xs hover:bg-amber-700 sm:h-8 sm:flex-none"
             >
               {running ? (
@@ -276,7 +450,7 @@ export default function WatermarkRemoverPage() {
               ) : (
                 <>
                   <ShieldOff className="h-3.5 w-3.5" />
-                  Procesar {totalPending}
+                  Procesar {totalPending} → Drive
                 </>
               )}
             </Button>
@@ -284,7 +458,13 @@ export default function WatermarkRemoverPage() {
         </div>
       )}
 
-      {/* Lista de vídeos */}
+      {!destReady && items.length > 0 && (
+        <div className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300 sm:text-sm">
+          ⚠️ Elige cuenta y producto antes de procesar.
+        </div>
+      )}
+
+      {/* Lista vídeos */}
       <div className="space-y-2">
         {items.map((item) => (
           <Card key={item.id}>
@@ -300,6 +480,11 @@ export default function WatermarkRemoverPage() {
                     {item.result &&
                       ` → ${(item.result.output_size_bytes / 1024 / 1024).toFixed(2)} MB · ${item.result.processing_seconds}s`}
                   </p>
+                  {item.result?.drive_subdir && (
+                    <p className="truncate text-[10px] text-emerald-700 dark:text-emerald-300 sm:text-xs">
+                      ✓ Drive: {item.result.drive_subdir}
+                    </p>
+                  )}
                   {item.error && (
                     <p className="text-[10px] text-red-600 dark:text-red-400 sm:text-xs">
                       {item.error}
@@ -333,23 +518,27 @@ export default function WatermarkRemoverPage() {
                   </span>
                 )}
 
-                {item.status === "done" && item.result && (
-                  <a
-                    href={watermarkRemoverFileUrl(item.result.output_path)}
-                    download={item.result.output_filename}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 gap-1 text-xs"
+                {/* Si NO se subió a Drive, ofrecer descarga directa */}
+                {item.status === "done" &&
+                  item.result &&
+                  item.result.output_path &&
+                  !item.result.drive_path && (
+                    <a
+                      href={watermarkRemoverFileUrl(item.result.output_path)}
+                      download={item.result.output_filename}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      Descargar
-                    </Button>
-                  </a>
-                )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 text-xs"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Descargar
+                      </Button>
+                    </a>
+                  )}
 
                 <Button
                   size="icon"
@@ -378,11 +567,9 @@ export default function WatermarkRemoverPage() {
             <strong>Coste:</strong> $0 — todo se procesa con ffmpeg en el VPS.
           </p>
           <p>
-            <strong>Drive:</strong> v1 entrega URL de descarga directa. La v2
-            permitirá enviarlos a la carpeta `videos/sin_marca/` de un producto.
-          </p>
-          <p>
-            <strong>Limpieza:</strong> archivos en el server se borran tras 24h.
+            <strong>Destino:</strong> los vídeos se copian a{" "}
+            <code>products/&lt;slug&gt;/videos/sin_marca/</code> del producto
+            seleccionado. La selección se recuerda entre sesiones.
           </p>
         </CardContent>
       </Card>

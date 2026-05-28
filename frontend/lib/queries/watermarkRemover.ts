@@ -16,11 +16,15 @@ export interface WatermarkRemoverResponse {
   output_size_bytes: number;
   processing_seconds: number;
   watermark_type: string;
+  drive_path: string | null;
+  drive_subdir: string | null;
 }
 
 export interface WatermarkRemoverInput {
   file: File;
   watermark_type: WatermarkType;
+  user_id?: string | null;
+  product_id?: string | null;
 }
 
 export function useRemoveWatermark() {
@@ -29,6 +33,8 @@ export function useRemoveWatermark() {
       const fd = new FormData();
       fd.append("file", input.file);
       fd.append("watermark_type", input.watermark_type);
+      if (input.user_id) fd.append("user_id", input.user_id);
+      if (input.product_id) fd.append("product_id", input.product_id);
       return api.post<WatermarkRemoverResponse>(
         "/api/v1/tiktok-shop/watermark-remover/process",
         fd,
