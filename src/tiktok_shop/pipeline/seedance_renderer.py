@@ -218,8 +218,8 @@ async def _render_hailuo_clips(
     """
     n = len(clip_specs)
     log_callback(
-        f"🎵 Encolando {n} clips music (Hailuo 02 → Kling 2.1 → Wan 2.2-5b "
-        f"chain) en fal.ai…"
+        f"🎵 Encolando {n} clips music (Replicate Hailuo → Runware Veo Lite → "
+        f"fal Hailuo → Kling → Wan chain)…"
     )
 
     photo_refs = get_atlas_image_refs(photo_paths, tier="standard")
@@ -316,10 +316,14 @@ async def _run_via_hailuo(
     log_callback: LogCallback,
 ) -> tuple[str, str]:
     """Chain de fallback para clip music:
-       Runware Hailuo 02 → fal Hailuo 02 → fal Kling 2.1 → fal Wan 2.2-5b.
+       Replicate Hailuo 02 → Runware Veo 3.1 Lite → fal Hailuo 02 →
+       fal Kling 2.1 → fal Wan 2.2-5b.
 
-    Runware tiene infraestructura independiente y solo cobra al completar,
-    así que es el primario. Si falla, caemos a la familia fal (3 modelos).
+    Replicate es PRIMARIO (modelos oficiales, infra propia distinta de fal,
+    cobra solo predictions que corren). Si falla, cae a Runware (también
+    distinta cola, cobra solo al completar). Si ambos fallan, cae a la
+    familia fal (3 modelos) — fal cobra al encolar, así que el
+    circuit-breaker protege de pérdidas en cascada.
 
     Devuelve (out_path, renderer_label) para tracking en la UI."""
     from src.tiktok_shop.api.fal_cloud import (
@@ -330,6 +334,9 @@ async def _run_via_hailuo(
     from src.tiktok_shop.api.runware_cloud import (
         RunwareClient, RunwareError, RunwareTransient,
         runware_is_configured,
+    )
+    from src.tiktok_shop.api.replicate_cloud import (
+        ReplicateError, ReplicateTransient, replicate_is_configured,
     )
 
     loop = asyncio.get_event_loop()
@@ -345,7 +352,32 @@ async def _run_via_hailuo(
             f"Se reiniciará tras la ventana de espera."
         )
 
-    # ---- 0) Runware Veo 3.1 Lite (PRIMARIO si configurado) ----
+    # ---- 0) Replicate Hailuo 02 (PRIMARIO si configurado) ----
+    # Modelo oficial Replicate. $0.27/6s a 768p, $0.45/10s. 9:16 nativo.
+    # Cola independiente de fal.ai y de Runware — diversifica el riesgo
+    # de saturación global. Solo cobra predictions que arrancan.
+    if replicate_is_configured() and not _circuit_breaker_skip("replicate_hailuo"):
+        try:
+            result = await _run_via_replicate_hailuo(
+                idx=idx, spec={**spec, "duration": duration},
+                image_ref=image_ref, out_path=out_path,
+                log_callback=log_callback,
+            )
+            _circuit_breaker_record_success("replicate_hailuo")
+            return result
+        except (ReplicateError, ReplicateTransient) as e_rep:
+            _circuit_breaker_record_fail("replicate_hailuo")
+            log_callback(
+                f"🔁 Clip {idx+1}: Replicate Hailuo falló "
+                f"({str(e_rep)[:100]}). Cayendo a Runware Veo. "
+                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará Replicate."
+            )
+    elif _circuit_breaker_skip("replicate_hailuo"):
+        log_callback(
+            f"⏭️ Clip {idx+1}: skip Replicate Hailuo (cooldown circuit-breaker activo)"
+        )
+
+    # ---- 1) Runware Veo 3.1 Lite (fallback si Replicate falla) ----
     # Soporta 9:16 nativo, $0.05/s a 720p. Cola independiente de fal.ai
     # y cobra SOLO al completar (no por intentos fallidos).
     if runware_is_configured() and not _circuit_breaker_skip("runware_veo"):
@@ -471,7 +503,10 @@ async def _run_via_hailuo(
     if e_kling: errs.append(f"Kling={str(e_kling)[:60]}")
     if e_wan: errs.append(f"Wan={str(e_wan)[:60]}")
     cb = _circuit_breaker_status()
-    skipped = [p for p in ("runware_veo", "fal_hailuo", "fal_kling", "fal_wan") if p in cb]
+    skipped = [
+        p for p in ("replicate_hailuo", "runware_veo", "fal_hailuo", "fal_kling", "fal_wan")
+        if p in cb
+    ]
 
     log_callback(
         f"❌ Clip {idx+1}: TODOS los providers musicales fallaron o están en "
@@ -484,6 +519,72 @@ async def _run_via_hailuo(
         f"(todos en cooldown circuit-breaker o fallidos). "
         f"Errores: {' | '.join(errs) if errs else '(todos en cooldown — 0 gasto)'}"
     )
+
+
+async def _run_via_replicate_hailuo(
+    *,
+    idx: int,
+    spec: dict,
+    image_ref: str,
+    out_path: str,
+    log_callback: LogCallback,
+) -> tuple[str, str]:
+    """Genera 1 clip con Replicate Hailuo 02 oficial. Soporta 9:16 nativo,
+    durations 6 o 10s, 768p. $0.27/6s, $0.45/10s. Replicate cobra solo
+    predictions que arrancan (mejor que fal que cobra al encolar)."""
+    from src.tiktok_shop.api.replicate_cloud import (
+        ReplicateClient, HAILUO_02_MODEL,
+    )
+
+    loop = asyncio.get_event_loop()
+    rep = ReplicateClient()
+    raw_dur = int(spec.get("duration", 6))
+    # Hailuo 02 acepta solo 6 o 10s. Mapeamos al más cercano.
+    duration = 6 if raw_dur <= 7 else 10
+    if duration != raw_dur:
+        log_callback(
+            f"⚠️ Clip {idx+1}: duración {raw_dur}s redondeada a {duration}s "
+            f"(Replicate Hailuo 02 solo acepta 6 o 10)."
+        )
+
+    job = await loop.run_in_executor(
+        None,
+        lambda: rep.submit_hailuo02_i2v(
+            image_ref=image_ref,
+            prompt=spec["prompt"],
+            duration_s=duration,
+            resolution="768p",     # TikTok-ready, sweet spot precio/calidad
+            prompt_optimizer=True,
+        ),
+    )
+    log_callback(
+        f"⏳ Clip {idx+1} Replicate Hailuo 02 prediction {job.prediction_id[:8]} "
+        f"encolado ({duration}s, 768p)…"
+    )
+
+    def _hb(elapsed: int, status: str) -> None:
+        log_callback(
+            f"⏳ Clip {idx+1} Replicate Hailuo: {elapsed//60}m{elapsed%60:02d}s "
+            f"(status={status})…"
+        )
+
+    await loop.run_in_executor(None, lambda: rep.wait(job, on_heartbeat=_hb))
+    await loop.run_in_executor(
+        None, lambda: rep.download(job.output_url or "", out_path),
+    )
+    # Coste solo tras éxito (Replicate cobra GPU-seconds — modelos oficiales
+    # tienen precio flat al completar).
+    try:
+        from src.cost_tracking import record_replicate_cloud
+        record_replicate_cloud(
+            model_slug=HAILUO_02_MODEL,
+            duration_s=duration,
+            detail=f"clip {idx+1} · pred {job.prediction_id[:8]} · 768p 9:16",
+        )
+    except Exception:
+        pass
+    log_callback(f"✅ Clip {idx+1} entregado por Replicate Hailuo 02")
+    return out_path, "Hailuo 02 (Replicate)"
 
 
 async def _run_via_runware_veo(

@@ -314,6 +314,14 @@ _RUNWARE_RATES: dict[str, dict[int, float]] = {
     "alibaba:wan@2-5": {5: 0.10, 10: 0.20},         # Wan 2.5 (placeholder)
 }
 
+# Replicate — precios fijos por modelo+duración. Modelos oficiales.
+# Verificado en https://replicate.com/minimax/hailuo-02 (2026-05).
+_REPLICATE_RATES: dict[str, dict[int, float]] = {
+    # Hailuo 02 oficial: $0.27 (6s 768p) · $0.45 (10s 768p).
+    # 1080p ≈ +60% (no lo usamos — 768p TikTok-ready).
+    "minimax/hailuo-02": {6: 0.27, 10: 0.45},
+}
+
 
 def record_hailuo_cloud(
     *,
@@ -375,6 +383,28 @@ def record_runware_cloud(
         unit_label="seconds",
         cost_usd=cost,
         detail=detail or f"{model_id} duration={duration_s}s",
+    ))
+    return cost
+
+
+def record_replicate_cloud(
+    *,
+    model_slug: str,
+    duration_s: int,
+    detail: str | None = None,
+) -> float:
+    """Replicate (modelos oficiales como minimax/hailuo-02). Línea
+    separada en /costs como `kind='replicate_cloud'` con el slug en
+    el detail. Solo registrar TRAS éxito — Replicate solo cobra
+    predictions completadas o que arrancaron GPU."""
+    rates = _REPLICATE_RATES.get(model_slug, {})
+    cost = rates.get(duration_s) or rates.get(6) or 0.27
+    _add_line(CostLine(
+        kind="replicate_cloud",
+        units=float(duration_s),
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=detail or f"{model_slug} duration={duration_s}s",
     ))
     return cost
 
