@@ -357,57 +357,64 @@ def remove_watermark_magic(
     if not in_p.is_file():
         raise WatermarkRemoverError(f"Input no existe: {input_path}")
 
-    # ---- 1) Probar dimensiones + generar máscara ----
+    # ---- 1) Dimensiones + crop region ----
     width, height = _ffprobe_dimensions(input_path)
     log_callback(f"📐 Vídeo {width}×{height}px detectado")
 
-    tmp_dir = tempfile.mkdtemp(prefix="propainter_mask_")
+    # Estrategia "crop + inpaint + composite": ProPainter procesa solo la
+    # esquina inferior-derecha (donde están todos los watermarks). El
+    # resto del frame queda INTACTO a calidad original. Esto evita el
+    # CUDA OOM que ocurre al pasar el frame completo a la GPU A40, y
+    # permite usar fp32 + resize_ratio=1.0 sin perder ni un píxel de
+    # calidad fuera de la zona del watermark.
+    crop_x, crop_y, crop_w, crop_h = _compute_crop_region(width, height)
+    log_callback(
+        f"✂️ Crop esquina inferior-derecha: ({crop_x},{crop_y}) {crop_w}×{crop_h}px "
+        f"(resto del frame intacto)"
+    )
+
+    tmp_dir = tempfile.mkdtemp(prefix="propainter_")
+    crop_video_path = os.path.join(tmp_dir, "crop.mp4")
     mask_path = os.path.join(tmp_dir, "mask.png")
-    generate_mask_png(width, height, watermark_type, mask_path)
-    log_callback(f"🎨 Máscara generada ({watermark_type})")
+    inpainted_crop_path = os.path.join(tmp_dir, "crop_inpainted.mp4")
 
     try:
-        # ---- 2) Encode vídeo + máscara como data URIs ----
-        # NOTA crítica: Replicate Files API devuelve URLs tipo
-        # /v1/files/{id} SIN extension. ProPainter (jd7h) falla doble:
-        # - Mask rechazada por "supports static masks as .jpg or .png"
-        # - Video rechazado internamente con "[Errno 20] Not a directory"
-        #   cuando intenta procesar el archivo descargado de la URL.
-        # Solución: pasar ambos como data:URI base64 inline en el
-        # payload — el mime type del prefijo da al modelo la info que
-        # necesita y no hay download intermedio.
-        # Limitación: payload final puede llegar a ~14MB para vídeos
-        # de 10MB (base64 = +33%). Replicate acepta hasta 256MB.
+        # ---- 2) ffmpeg: recortar zona watermark del vídeo original ----
+        log_callback(f"🎬 Recortando zona watermark con ffmpeg…")
+        _ffmpeg_crop_video(input_path, crop_video_path, crop_x, crop_y, crop_w, crop_h)
+
+        # ---- 3) Generar máscara relativa al crop ----
+        _generate_mask_for_crop(
+            width, height, crop_x, crop_y, crop_w, crop_h,
+            watermark_type, mask_path,
+        )
+        log_callback(f"🎨 Máscara crop-relativa generada ({watermark_type})")
+
+        # ---- 4) Encode crop + máscara como data URIs ----
+        # Replicate Files API devuelve URLs sin extension, lo que rompe
+        # ProPainter (rechaza mask sin .png, falla parsing video).
+        # Solución: data:URI inline. El crop pesa <500KB típicamente,
+        # así que base64 es trivial.
         import base64 as _b64
-        log_callback(f"📦 Encoding vídeo + máscara como data URIs…")
-        with open(input_path, "rb") as _vf:
+        with open(crop_video_path, "rb") as _vf:
             video_b64 = _b64.b64encode(_vf.read()).decode("ascii")
-        video_ext = Path(input_path).suffix.lower().lstrip(".") or "mp4"
-        if video_ext == "mov":
-            video_mime = "video/quicktime"
-        elif video_ext == "mkv":
-            video_mime = "video/x-matroska"
-        elif video_ext == "webm":
-            video_mime = "video/webm"
-        else:
-            video_mime = "video/mp4"
-        video_url = f"data:{video_mime};base64,{video_b64}"
+        video_url = f"data:video/mp4;base64,{video_b64}"
         with open(mask_path, "rb") as _mf:
             mask_b64 = _b64.b64encode(_mf.read()).decode("ascii")
         mask_url = f"data:image/png;base64,{mask_b64}"
         log_callback(
-            f"📦 Vídeo {len(video_b64)/1024/1024:.1f} MB · "
+            f"📦 Crop {len(video_b64)/1024:.1f} KB · "
             f"máscara {len(mask_b64)/1024:.1f} KB (base64)"
         )
 
-        # ---- 3) Crear prediction ----
-        log_callback(f"🪄 Encolando ProPainter…")
+        # ---- 5) Crear prediction ProPainter (full quality, sin downsampling) ----
+        log_callback(f"🪄 Encolando ProPainter en zona watermark…")
         job = pp.submit_propainter(video_url=video_url, mask_url=mask_url)
         log_callback(
             f"⏳ ProPainter prediction {job.prediction_id[:8]} encolado"
         )
 
-        # ---- 4) Polling ----
+        # ---- 6) Polling ----
         def _hb(elapsed: int, status: str) -> None:
             log_callback(
                 f"⏳ ProPainter: {elapsed}s (status={status})…"
@@ -415,14 +422,21 @@ def remove_watermark_magic(
 
         pp.wait(job, on_heartbeat=_hb)
 
-        # ---- 5) Download ----
-        log_callback(f"⬇️ Descargando resultado…")
-        pp.download(job.output_url or "", output_path)
+        # ---- 7) Download crop inpainted ----
+        log_callback(f"⬇️ Descargando crop reconstruido…")
+        pp.download(job.output_url or "", inpainted_crop_path)
 
-        if not Path(output_path).is_file() or Path(output_path).stat().st_size < 1000:
+        if not Path(inpainted_crop_path).is_file() or Path(inpainted_crop_path).stat().st_size < 1000:
             raise WatermarkRemoverError(
-                "ProPainter corrió pero el output está vacío o corrupto"
+                "ProPainter corrió pero el crop output está vacío o corrupto"
             )
+
+        # ---- 8) ffmpeg: composite crop sobre vídeo original ----
+        log_callback(f"🧩 Composing crop reconstruido sobre vídeo original…")
+        _ffmpeg_composite_overlay(
+            input_path, inpainted_crop_path, output_path,
+            crop_x, crop_y,
+        )
 
         out_size_mb = Path(output_path).stat().st_size / (1024 * 1024)
         log_callback(
@@ -431,9 +445,140 @@ def remove_watermark_magic(
         )
         return output_path, job.gpu_seconds
     finally:
-        # Cleanup máscara temp
+        # Cleanup temp files
+        for p in (crop_video_path, mask_path, inpainted_crop_path):
+            try:
+                Path(p).unlink(missing_ok=True)
+            except OSError:
+                pass
         try:
-            Path(mask_path).unlink(missing_ok=True)
             os.rmdir(tmp_dir)
         except OSError:
             pass
+
+
+def _compute_crop_region(width: int, height: int) -> tuple[int, int, int, int]:
+    """Devuelve (x, y, w, h) del crop que cubre la zona donde aparecen
+    los watermarks (esquina inferior-derecha) + contexto suficiente para
+    que ProPainter pueda hacer optical flow.
+
+    Para 9:16 vertical estándar TikTok: bottom-right corner, ~40% del
+    ancho × ~15% del alto. Para 720×1280 da 288×192px (mucho menos que
+    el 720×1280 entero que daba CUDA OOM)."""
+    # Cubre tanto Veo Flow (x: 85-100%, y: 94.5-99.5%) como Gemini Chat
+    # (x: 79-89%, y: 90-96%). Margen extra de ~20% para context temporal.
+    crop_x = int(round(width * 0.55))
+    crop_y = int(round(height * 0.83))
+    crop_w = width - crop_x
+    crop_h = height - crop_y
+    # ffmpeg / libx264 requieren dimensiones pares
+    if crop_w % 2:
+        crop_w -= 1
+    if crop_h % 2:
+        crop_h -= 1
+    # Y coordinates pares también (algunos codecs)
+    if crop_x % 2:
+        crop_x += 1
+        crop_w -= 1
+    if crop_y % 2:
+        crop_y += 1
+        crop_h -= 1
+    return crop_x, crop_y, crop_w, crop_h
+
+
+def _ffmpeg_crop_video(
+    input_path: str, output_path: str,
+    x: int, y: int, w: int, h: int,
+) -> None:
+    """Recorta una región rectangular del vídeo con ffmpeg. Re-encode
+    H264 CRF 18 (sin pérdida visible) para que ProPainter pueda procesar."""
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-vf", f"crop={w}:{h}:{x}:{y}",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        "-an",  # sin audio en el crop — no lo necesitamos
+        output_path,
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=True)
+    except subprocess.CalledProcessError as e:
+        raise WatermarkRemoverError(
+            f"ffmpeg crop falló (exit {e.returncode}): {e.stderr[-400:]}"
+        )
+
+
+def _generate_mask_for_crop(
+    orig_width: int, orig_height: int,
+    crop_x: int, crop_y: int, crop_w: int, crop_h: int,
+    watermark_type: WatermarkType,
+    output_path: str,
+    *, dilation_px: int = 6,
+) -> str:
+    """Genera máscara PNG para el CROP (no para el frame entero). Las
+    coordenadas del watermark se traducen del frame original a relativas
+    al crop."""
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as e:
+        raise WatermarkRemoverError(f"PIL/Pillow no instalado: {e}")
+
+    img = Image.new("L", (crop_w, crop_h), color=0)
+    draw = ImageDraw.Draw(img)
+
+    if watermark_type == "auto":
+        boxes = [WATERMARK_BOXES["veo_flow"], WATERMARK_BOXES["gemini_chat"]]
+    elif watermark_type in WATERMARK_BOXES:
+        boxes = [WATERMARK_BOXES[watermark_type]]
+    else:
+        raise WatermarkRemoverError(f"watermark_type inválido: {watermark_type}")
+
+    for box in boxes:
+        # Coords en frame original
+        ox, oy, ow, oh = _box_to_pixels(box, orig_width, orig_height)
+        # Traducir a relativo al crop
+        cx = ox - crop_x - dilation_px
+        cy = oy - crop_y - dilation_px
+        cw = ow + 2 * dilation_px
+        ch = oh + 2 * dilation_px
+        # Clamp al crop bounds
+        cx = max(0, cx)
+        cy = max(0, cy)
+        if cx + cw > crop_w:
+            cw = crop_w - cx
+        if cy + ch > crop_h:
+            ch = crop_h - cy
+        if cw > 0 and ch > 0:
+            draw.rectangle([cx, cy, cx + cw, cy + ch], fill=255)
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    img.save(output_path, "PNG")
+    return output_path
+
+
+def _ffmpeg_composite_overlay(
+    base_video_path: str, overlay_video_path: str, output_path: str,
+    x: int, y: int,
+) -> None:
+    """Compone el `overlay_video` (crop reconstruido) sobre el
+    `base_video` (original full-res) en la posición (x, y). El audio
+    del original se preserva sin re-encode."""
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", base_video_path,
+        "-i", overlay_video_path,
+        "-filter_complex", f"[0:v][1:v]overlay={x}:{y}:format=auto[outv]",
+        "-map", "[outv]",
+        "-map", "0:a?",  # audio del original (si existe)
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=True)
+    except subprocess.CalledProcessError as e:
+        raise WatermarkRemoverError(
+            f"ffmpeg composite falló (exit {e.returncode}): {e.stderr[-400:]}"
+        )

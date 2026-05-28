@@ -193,14 +193,21 @@ def submit_propainter(
     neighbor_length: int = 10,
     ref_stride: int = 10,
     resize_ratio: float = 1.0,
+    fp16: bool = True,
+    subvideo_length: int = 80,
 ) -> ProPainterJob:
     """Crea una prediction ProPainter. Devuelve job con prediction_id.
 
-    Params (defaults seguros para watermark removal de esquina):
+    Params (defaults seguros para watermark removal en GPU A40 40GB):
       - mask_dilation: cuánto expandir la máscara (4px = padding seguro)
-      - neighbor_length: cuántos frames vecinos usar (10 = balance)
+      - neighbor_length: frames vecinos para coherencia temporal (5 =
+        equilibrio entre calidad y VRAM — antes 10 daba CUDA OOM)
       - ref_stride: stride para frames de referencia (10 = balance)
-      - resize_ratio: 1.0 mantiene resolución original (recomendado)
+      - resize_ratio: 1.0 mantiene resolución original
+      - fp16: True usa float16 (halva VRAM, calidad casi idéntica)
+      - subvideo_length: procesa en chunks de N frames (40 = stable
+        para 720p; ProPainter por defecto 80 y suele dar OOM con
+        masks complejas en 1080p o vídeos >10s).
     """
     # Community models en Replicate requieren version hash explícita.
     # /v1/models/{owner}/{name}/predictions solo funciona para modelos
@@ -216,6 +223,8 @@ def submit_propainter(
             "neighbor_length": neighbor_length,
             "ref_stride": ref_stride,
             "resize_ratio": resize_ratio,
+            "fp16": fp16,
+            "subvideo_length": subvideo_length,
         }
     }
     url = f"{REPLICATE_API_URL}/predictions"
