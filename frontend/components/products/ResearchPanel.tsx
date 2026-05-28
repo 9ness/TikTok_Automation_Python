@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -8,6 +9,7 @@ import {
   FlaskConical,
   Heart,
   Lightbulb,
+  Loader2,
   MessageSquare,
   Quote,
   Search,
@@ -17,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { useProduct } from "@/lib/queries/products";
 import type { Product, ResearchContext } from "@/lib/types/product";
 import { formatLocal } from "@/lib/dates";
 
@@ -78,7 +81,68 @@ function Section({ title, hint, icon: Icon, items, accentColor, emptyHint }: Sec
 }
 
 export function ResearchPanel({ product }: Props) {
-  const rc: ResearchContext | undefined = product.research_context;
+  // Auto-poll cada 10s mientras la investigación esté corriendo (research
+  // empty pero last_analyzed_at reciente → background task en curso).
+  const productQ = useProduct(product.id);
+  const live: Product = (productQ.data as Product | undefined) ?? product;
+  const rc: ResearchContext | undefined = live.research_context;
+
+  // Detectar si la investigación está corriendo en background:
+  //   - photo analysis ya terminó (last_analyzed_at poblado)
+  //   - PERO research_context.analyzed_at NO está poblado todavía
+  //   - Y last_analyzed_at es reciente (<3 min)
+  const lastAnalyzedAt = live.last_analyzed_at
+    ? new Date(live.last_analyzed_at).getTime()
+    : 0;
+  const now = Date.now();
+  const minutesSinceAnalyze = lastAnalyzedAt
+    ? (now - lastAnalyzedAt) / 60000
+    : 999;
+  const researchInProgress =
+    lastAnalyzedAt > 0 &&
+    minutesSinceAnalyze < 3 &&
+    (!rc || !rc.analyzed_at);
+
+  // Polling cada 8s cuando hay investigación en curso
+  useEffect(() => {
+    if (!researchInProgress) return;
+    const id = window.setInterval(() => {
+      productQ.refetch();
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, [researchInProgress, productQ]);
+
+  if (researchInProgress) {
+    return (
+      <Card>
+        <CardContent className="space-y-3 p-4 sm:p-6">
+          <div className="flex items-start gap-3">
+            <Loader2 className="mt-0.5 h-5 w-5 flex-shrink-0 animate-spin text-amber-500" />
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-semibold sm:text-base">
+                🔬 Investigación profunda en curso…
+              </h3>
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Procesando en segundo plano (~60-90s). Puedes cerrar el
+                navegador — el servidor sigue trabajando y los resultados
+                aparecerán aquí cuando vuelvas.
+              </p>
+              <ul className="ml-3 list-disc space-y-0.5 text-[11px] text-muted-foreground sm:text-xs">
+                <li>Gemini buscando reviews en Amazon/AliExpress/foros</li>
+                <li>Apify scrapeando los top 10 vídeos virales TikTok</li>
+                <li>Gemini analizando los 5 mejores vídeos (visual + audio)</li>
+                <li>Agregando patrones + hooks probados</li>
+              </ul>
+              <p className="pt-1 text-[10px] text-muted-foreground sm:text-[11px]">
+                Auto-refresh cada 8s · si pasa más de 3 min sin terminar,
+                pulsa Reanalizar otra vez.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!rc || !rc.analyzed_at) {
     return (

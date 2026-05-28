@@ -1204,12 +1204,54 @@ def commit_imported_photos(
     )
 
 
+def _run_deep_research_background(product_id: str) -> None:
+    """Función ejecutada en background (post-response) que hace la
+    investigación profunda y persiste el resultado. Si falla, loguea y
+    devuelve — el análisis de fotos ya está guardado, así que el
+    producto queda funcional sin research_context.
+
+    CRÍTICO: esta función crea sus PROPIAS instancias de repos. NO usa
+    las de la request original porque esa request ya terminó cuando
+    FastAPI ejecuta BackgroundTasks. Si reusáramos, podríamos hacer
+    operaciones sobre objetos con sesiones cerradas.
+    """
+    try:
+        from src.tiktok_shop.repos import ProductRepo, get_shop_redis
+        from src.tiktok_shop.services.research_service import deep_research_product
+
+        redis = get_shop_redis()
+        repo = ProductRepo(redis)
+        product = repo.get(product_id)
+        if product is None:
+            print(f"[research {product_id[:8]}] producto desapareció, abortando")
+            return
+
+        # Marcar inicio (frontend puede polear este flag para mostrar "investigando…")
+        product.research_context.analyzed_at = None  # invalidar para señalar "running"
+        # Nota: no save() aquí — guardamos solo al final con el resultado.
+
+        print(f"[research {product_id[:8]}] arrancando deep research…")
+        research = deep_research_product(
+            product,
+            max_videos_to_analyze=5,
+            max_tiktok_search_results=10,
+            log_callback=lambda m: print(f"[research {product_id[:8]}] {m}"),
+        )
+        product.research_context = research
+        repo.save(product)
+        print(f"[research {product_id[:8]}] ✅ completado — guardado en Redis")
+    except Exception as e:
+        import traceback
+        print(f"[research {product_id[:8]}] ❌ falló: {e}\n{traceback.format_exc()}")
+
+
 @router.post(
     "/{product_id}/analyze",
     response_model=ReanalyzeResponse,
 )
 def reanalyze_product(
     product_id: str,
+    background_tasks: BackgroundTasks,
     repo: Annotated[ProductRepo, Depends(get_product_repo)],
 ) -> ReanalyzeResponse:
     product = repo.get(product_id)
@@ -1228,6 +1270,9 @@ def reanalyze_product(
             details={"product_id": product_id, "slug": product.slug},
         )
 
+    # Fase 1 (SÍNCRONA): análisis de fotos con Gemini Vision (~5-15s).
+    # El user recibe respuesta inmediata cuando esto termina con la
+    # info básica (key_features, audiences, selling_points).
     try:
         from src.tiktok_shop.pipeline.analyzer import analyze_product
 
@@ -1239,30 +1284,15 @@ def reanalyze_product(
         raise GeminiError(f"Análisis Gemini falló: {e}", details={"product_id": product_id})
 
     _apply_analysis(product, result)
-
-    # ─── Investigación profunda: reviews + TikTok virales + análisis Gemini ───
-    # Adicional al análisis de fotos. Rellena `product.research_context`
-    # con pains/benefits/objections de reviews reales y patrones de los
-    # top vídeos virales de TikTok del producto. Los prompts directores
-    # leen esto al generar guiones para afinar hooks + estructura.
-    # Best-effort: si Apify/Gemini grounded search falla, el análisis
-    # de fotos ya se aplicó arriba, así que el producto queda OK.
-    try:
-        from src.tiktok_shop.services.research_service import deep_research_product
-
-        research = deep_research_product(
-            product,
-            max_videos_to_analyze=5,
-            max_tiktok_search_results=10,
-            log_callback=lambda m: print(f"[research {product.id[:8]}] {m}"),
-        )
-        product.research_context = research
-    except Exception as e:
-        # No abortamos el reanálisis si la research falla. Logueamos y
-        # seguimos — el análisis de fotos ya está aplicado.
-        print(f"[reanalyze {product.id[:8]}] research falló: {e}")
-
     repo.save(product)
+
+    # Fase 2 (BACKGROUND): investigación profunda (~60-90s).
+    # Reviews web + Apify TikTok scraping + Gemini video analysis.
+    # Esto corre DESPUÉS de devolver la response al cliente — sobrevive
+    # al cierre del navegador. El producto se actualiza en Redis cuando
+    # termina; el frontend puede polear con GET /products/{id} para
+    # ver `research_context.analyzed_at` poblado.
+    background_tasks.add_task(_run_deep_research_background, product.id)
 
     return ReanalyzeResponse(
         product_id=product.id,
