@@ -11,6 +11,7 @@ export type JobMode =
   | "copyright"
   | "construccion_pov"
   | "tiktok_shop"
+  | "tiktok_shop_watermark"
   | "editor_auto";
 
 export interface ActiveJob {

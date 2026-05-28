@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   CheckCircle2,
-  Download,
   FileVideo,
   FolderOpen,
   Info,
@@ -17,6 +17,8 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { useDrawerStore } from "@/lib/stores/drawerStore";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,10 +39,8 @@ import {
 import { useUsers } from "@/lib/queries/users";
 import {
   type WatermarkQuality,
-  type WatermarkRemoverResponse,
   type WatermarkType,
-  useRemoveWatermark,
-  watermarkRemoverFileUrl,
+  useEnqueueWatermarkRemoval,
 } from "@/lib/queries/watermarkRemover";
 import { cn } from "@/lib/utils";
 
@@ -56,8 +56,9 @@ interface DestSelection {
 interface QueueItem {
   id: string;
   file: File;
-  status: "pending" | "processing" | "done" | "failed";
-  result?: WatermarkRemoverResponse;
+  status: "pending" | "enqueueing" | "enqueued" | "failed";
+  job_id?: string;
+  position?: number;
   error?: string;
 }
 
@@ -124,7 +125,8 @@ export default function WatermarkRemoverPage() {
   const shortcutsQ = useShortcuts();
   const shortcuts = shortcutsQ.data?.items ?? [];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const remove = useRemoveWatermark();
+  const enqueue = useEnqueueWatermarkRemoval();
+  const openQueue = useDrawerStore((s) => s.openQueue);
 
   // Hidrata destino + calidad + shortcuts desde localStorage al cargar
   useEffect(() => {
@@ -190,12 +192,8 @@ export default function WatermarkRemoverPage() {
 
   const destReady = Boolean(selectedUser && selectedProduct);
   const totalPending = items.filter((i) => i.status === "pending").length;
-  const totalDone = items.filter((i) => i.status === "done").length;
+  const totalEnqueued = items.filter((i) => i.status === "enqueued").length;
   const totalFailed = items.filter((i) => i.status === "failed").length;
-  const totalCostUsd = items.reduce(
-    (acc, i) => acc + (i.result?.cost_usd ?? 0),
-    0,
-  );
   const estimatedCostUsd =
     quality === "magic" ? totalPending * 0.02 : 0;
 
@@ -230,20 +228,27 @@ export default function WatermarkRemoverPage() {
   async function processOne(item: QueueItem): Promise<void> {
     setItems((prev) =>
       prev.map((i) =>
-        i.id === item.id ? { ...i, status: "processing" } : i,
+        i.id === item.id ? { ...i, status: "enqueueing" } : i,
       ),
     );
     try {
-      const result = await remove.mutateAsync({
+      const result = await enqueue.mutateAsync({
         file: item.file,
         watermark_type: watermarkType,
         quality,
-        user_id: destReady ? userId : undefined,
-        product_id: destReady ? productId : undefined,
+        user_id: userId,
+        product_id: productId,
       });
       setItems((prev) =>
         prev.map((i) =>
-          i.id === item.id ? { ...i, status: "done", result } : i,
+          i.id === item.id
+            ? {
+                ...i,
+                status: "enqueued",
+                job_id: result.job_id,
+                position: result.position_in_queue,
+              }
+            : i,
         ),
       );
     } catch (e) {
@@ -280,7 +285,12 @@ export default function WatermarkRemoverPage() {
     }
     await Promise.all(workers);
     setRunning(false);
-    toast.success(`Procesados ${pending.length} vídeo(s) → Drive`);
+    toast.success(
+      `Encolados ${pending.length} vídeo(s) — abre la cola para ver el progreso`,
+      {
+        action: { label: "Ver cola", onClick: openQueue },
+      },
+    );
   }
 
   const destPath = selectedUser && selectedProduct
@@ -289,14 +299,26 @@ export default function WatermarkRemoverPage() {
 
   return (
     <div className="container mx-auto max-w-4xl space-y-4 px-3 py-4 sm:px-6 sm:py-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
-          <ShieldOff className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />
-          Quitar marca de agua
-        </h1>
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          Vídeos Veo 3 / Gemini · ffmpeg `delogo` · coste $0 · auto-guarda en Drive
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
+            <ShieldOff className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />
+            Quitar marca de agua
+          </h1>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Veo 3 / Gemini · va a la cola, se procesa en background · puedes
+            cerrar la web
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openQueue}
+          className="h-8 gap-1 text-xs"
+        >
+          <Activity className="h-3.5 w-3.5" />
+          Ver cola
+        </Button>
       </div>
 
       {/* Selector destino */}
@@ -549,19 +571,14 @@ export default function WatermarkRemoverPage() {
                 {totalPending} pendientes
               </span>
             )}
-            {totalDone > 0 && (
+            {totalEnqueued > 0 && (
               <span className="rounded bg-emerald-500/15 px-2 py-1 text-emerald-700 dark:text-emerald-300">
-                {totalDone} hechos
+                {totalEnqueued} encolados
               </span>
             )}
             {totalFailed > 0 && (
               <span className="rounded bg-red-500/15 px-2 py-1 text-red-700 dark:text-red-300">
                 {totalFailed} fallos
-              </span>
-            )}
-            {totalCostUsd > 0 && (
-              <span className="rounded bg-purple-500/15 px-2 py-1 text-purple-700 dark:text-purple-300">
-                ${totalCostUsd.toFixed(3)} gastados
               </span>
             )}
             {estimatedCostUsd > 0 && totalPending > 0 && (
@@ -590,7 +607,7 @@ export default function WatermarkRemoverPage() {
               {running ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {quality === "magic" ? "ProPainter…" : "Procesando…"}
+                  Encolando…
                 </>
               ) : (
                 <>
@@ -599,7 +616,7 @@ export default function WatermarkRemoverPage() {
                   ) : (
                     <Zap className="h-3.5 w-3.5" />
                   )}
-                  Procesar {totalPending} → Drive
+                  Encolar {totalPending}
                 </>
               )}
             </Button>
@@ -626,16 +643,8 @@ export default function WatermarkRemoverPage() {
                   </p>
                   <p className="text-[10px] text-muted-foreground sm:text-xs">
                     {(item.file.size / 1024 / 1024).toFixed(2)} MB
-                    {item.result &&
-                      ` → ${(item.result.output_size_bytes / 1024 / 1024).toFixed(2)} MB · ${item.result.processing_seconds}s`}
-                    {item.result && item.result.cost_usd > 0 &&
-                      ` · $${item.result.cost_usd.toFixed(3)}`}
+                    {item.job_id && ` · Job #${item.job_id.slice(0, 8)}`}
                   </p>
-                  {item.result?.drive_subdir && (
-                    <p className="truncate text-[10px] text-emerald-700 dark:text-emerald-300 sm:text-xs">
-                      ✓ Drive: {item.result.drive_subdir}
-                    </p>
-                  )}
                   {item.error && (
                     <p className="text-[10px] text-red-600 dark:text-red-400 sm:text-xs">
                       {item.error}
@@ -650,16 +659,16 @@ export default function WatermarkRemoverPage() {
                     En espera
                   </span>
                 )}
-                {item.status === "processing" && (
+                {item.status === "enqueueing" && (
                   <span className="flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300 sm:text-xs">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Procesando
+                    Subiendo
                   </span>
                 )}
-                {item.status === "done" && (
+                {item.status === "enqueued" && (
                   <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300 sm:text-xs">
                     <CheckCircle2 className="h-3 w-3" />
-                    Listo
+                    En cola
                   </span>
                 )}
                 {item.status === "failed" && (
@@ -669,34 +678,24 @@ export default function WatermarkRemoverPage() {
                   </span>
                 )}
 
-                {/* Si NO se subió a Drive, ofrecer descarga directa */}
-                {item.status === "done" &&
-                  item.result &&
-                  item.result.output_path &&
-                  !item.result.drive_path && (
-                    <a
-                      href={watermarkRemoverFileUrl(item.result.output_path)}
-                      download={item.result.output_filename}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 gap-1 text-xs"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Descargar
-                      </Button>
-                    </a>
-                  )}
+                {item.status === "enqueued" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={openQueue}
+                    className="h-8 gap-1 text-xs"
+                  >
+                    <Activity className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                )}
 
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8 text-muted-foreground hover:text-red-500"
                   onClick={() => removeItem(item.id)}
-                  disabled={item.status === "processing"}
+                  disabled={item.status === "enqueueing"}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -715,12 +714,20 @@ export default function WatermarkRemoverPage() {
       <Card className="bg-muted/30">
         <CardContent className="space-y-1 p-3 text-[11px] text-muted-foreground sm:p-4 sm:text-xs">
           <p>
-            <strong>Coste:</strong> $0 — todo se procesa con ffmpeg en el VPS.
+            <strong>Cómo funciona:</strong> al pulsar Encolar, cada vídeo va a
+            la cola principal y se procesa en background. Puedes cerrar la web
+            y volver luego — los jobs siguen corriendo en el servidor.
           </p>
           <p>
-            <strong>Destino:</strong> los vídeos se copian a{" "}
-            <code>products/&lt;slug&gt;/videos/sin_marca/</code> del producto
-            seleccionado. La selección se recuerda entre sesiones.
+            <strong>Destino:</strong>{" "}
+            <code className="break-all">
+              products/&lt;slug&gt;/videos/sin_marca/&lt;N&gt;_clean.mp4
+            </code>{" "}
+            — N es el siguiente número libre (1, 2, 3, …).
+          </p>
+          <p>
+            <strong>Ver progreso:</strong> botón "Ver cola" arriba o pestaña
+            global de cola del menú.
           </p>
         </CardContent>
       </Card>

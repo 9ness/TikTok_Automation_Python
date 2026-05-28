@@ -24,6 +24,7 @@ export type Program = "tiktok_shop" | "creator_reward" | "editor_auto";
 
 export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   tiktok_shop: "tiktok_shop",
+  tiktok_shop_watermark: "tiktok_shop",
   presidents: "creator_reward",
   pronosticos: "creator_reward",
   copyright: "creator_reward",
@@ -46,6 +47,7 @@ export const PROGRAM_ICON: Record<Program, LucideIcon> = {
 
 export const SUBMODULE_LABEL: Record<JobMode, string> = {
   tiktok_shop: "Shop",
+  tiktok_shop_watermark: "Sin marca",
   presidents: "Presidentes",
   pronosticos: "Pronósticos",
   copyright: "Quitar Copy",
@@ -56,6 +58,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
   tiktok_shop: ShoppingBag,
+  tiktok_shop_watermark: ShieldOff,
   presidents: Crown,
   pronosticos: BarChart3,
   copyright: ShieldOff,
@@ -119,6 +122,10 @@ export function describeJobParams(
     case "editor_auto":
       if (params.user_name) out.push(String(params.user_name));
       if (params.tool_count) out.push(`${params.tool_count} tool(s)`);
+      break;
+    case "tiktok_shop_watermark":
+      if (params.watermark_type) out.push(String(params.watermark_type));
+      if (params.quality) out.push(String(params.quality));
       break;
   }
   return out;

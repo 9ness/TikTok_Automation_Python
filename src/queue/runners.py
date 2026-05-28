@@ -19,6 +19,7 @@ import shutil
 import time
 import traceback
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 
 from proglog import ProgressBarLogger
@@ -1455,6 +1456,116 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
 
 # ============================================================
+# RUNNER: TIKTOK SHOP WATERMARK REMOVER
+# ============================================================
+def run_tiktok_shop_watermark(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Quita marca de agua Veo 3 / Gemini de un vídeo y lo guarda en
+    `<user>/products/<slug>/videos/sin_marca/<N>_clean.mp4`.
+
+    Params requeridos:
+      - input_path: path absoluto al vídeo (en temp_root)
+      - user_id: TikTok user id (para resolver folder destino)
+      - product_id: product id (para resolver folder destino)
+      - watermark_type: "veo_flow" | "gemini_chat" | "auto"
+      - quality: "fast" (delogo) | "magic" (ProPainter)
+    """
+    from src.tiktok_shop.config import user_videos_folder
+    from src.tiktok_shop.pipeline.watermark_remover import (
+        next_clean_filename,
+        remove_watermark,
+        remove_watermark_magic,
+    )
+    from src.tiktok_shop.repos import ProductRepo, UserRepo, get_shop_redis
+
+    p = job.params
+    input_path = p["input_path"]
+    user_id = p["user_id"]
+    product_id = p["product_id"]
+    watermark_type = p.get("watermark_type", "auto")
+    quality = p.get("quality", "magic")
+
+    on_progress(0.05, "🔎 Resolviendo destino…")
+    redis = get_shop_redis()
+    user = UserRepo(redis).get(user_id)
+    if user is None:
+        raise RuntimeError(f"Usuario '{user_id}' no existe")
+    product = ProductRepo(redis).get(product_id)
+    if product is None:
+        raise RuntimeError(f"Producto '{product_id}' no existe")
+
+    dest_folder = Path(user_videos_folder(user.username, product.slug)) / "sin_marca"
+    dest_folder.mkdir(parents=True, exist_ok=True)
+    filename = next_clean_filename(dest_folder)
+    dest_path = dest_folder / filename
+    on_log(f"📁 Destino: {dest_path}")
+
+    # Procesado a temp (para borrar el input local tras OK)
+    import tempfile as _tmp
+    tmp_out = _tmp.NamedTemporaryFile(
+        prefix="wm_out_", suffix=".mp4", delete=False,
+    )
+    tmp_out.close()
+    tmp_out_path = tmp_out.name
+
+    try:
+        if quality == "magic":
+            on_progress(0.10, "🪄 ProPainter (Replicate)…")
+            on_log("🪄 Magic Eraser via Replicate ProPainter — esto puede tardar 1-2min")
+
+            def _hb(elapsed: int, status: str) -> None:
+                # Progreso aproximado entre 0.10 y 0.90 según tiempo
+                # esperado (~90s)
+                pct = 0.10 + min(0.80, elapsed / 120.0)
+                on_progress(pct, f"🪄 ProPainter {elapsed}s ({status})")
+
+            # remove_watermark_magic ya hace log internamente; nuestro
+            # on_log lo recibe directamente. Para heartbeat de progreso
+            # usamos un wrapper si fuera necesario — por ahora delegamos.
+            _, gpu_seconds = remove_watermark_magic(
+                input_path, tmp_out_path,
+                watermark_type=watermark_type,
+                log_callback=on_log,
+            )
+
+            # Cost tracking
+            try:
+                from src.cost_tracking import record_replicate_propainter
+                # Estimación duración del vídeo (cara, omitimos por ahora)
+                vid_dur = float(p.get("video_duration_s") or 10.0)
+                record_replicate_propainter(
+                    gpu_seconds=gpu_seconds,
+                    video_duration_s=vid_dur,
+                    detail=f"{watermark_type} · {Path(input_path).name}",
+                )
+            except Exception as e:
+                on_log(f"⚠️ cost tracking falló: {e}")
+        else:
+            on_progress(0.20, "⚡ ffmpeg delogo…")
+            remove_watermark(
+                input_path, tmp_out_path,
+                watermark_type=watermark_type,
+                log_callback=on_log,
+            )
+
+        on_progress(0.92, "📤 Copiando a Drive…")
+        shutil.copy2(tmp_out_path, dest_path)
+        on_log(f"✅ Guardado en {dest_path}")
+        on_progress(1.0, "✅ Listo")
+        return str(dest_path)
+    finally:
+        # Limpia temp output
+        try:
+            Path(tmp_out_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+        # Limpia input temp (ya no lo necesitamos)
+        try:
+            Path(input_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+# ============================================================
 # Dispatch
 # ============================================================
 _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
@@ -1464,6 +1575,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.COPYRIGHT: run_copyright,
     JobMode.CONSTRUCCION_POV: run_construccion_pov,
     JobMode.TIKTOK_SHOP: run_tiktok_shop,
+    JobMode.TIKTOK_SHOP_WATERMARK: run_tiktok_shop_watermark,
     JobMode.EDITOR_AUTO: run_editor_auto,
 }
 
@@ -1475,6 +1587,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.COPYRIGHT: "creator_reward",
     JobMode.CONSTRUCCION_POV: "creator_reward",
     JobMode.TIKTOK_SHOP: "tiktok_shop",
+    JobMode.TIKTOK_SHOP_WATERMARK: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
 }
 

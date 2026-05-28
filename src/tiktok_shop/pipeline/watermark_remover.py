@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -39,6 +40,27 @@ def _noop(_msg: str) -> None: ...
 
 
 WatermarkType = Literal["veo_flow", "gemini_chat", "auto"]
+
+
+def next_clean_filename(folder: str | Path) -> str:
+    """Devuelve el siguiente nombre `<N>_clean.mp4` disponible en `folder`.
+    Si la carpeta no existe o está vacía → `1_clean.mp4`. Si ya hay
+    `1_clean.mp4` y `3_clean.mp4`, devuelve `4_clean.mp4` (toma max+1
+    para no reusar números obsoletos por archivos borrados manualmente)."""
+    folder_p = Path(folder)
+    if not folder_p.is_dir():
+        return "1_clean.mp4"
+    pattern = re.compile(r"^(\d+)_clean\.mp4$", re.IGNORECASE)
+    nums: list[int] = []
+    for entry in folder_p.iterdir():
+        m = pattern.match(entry.name)
+        if m:
+            try:
+                nums.append(int(m.group(1)))
+            except ValueError:
+                pass
+    next_n = (max(nums) + 1) if nums else 1
+    return f"{next_n}_clean.mp4"
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,7 @@ class JobMode(str, Enum):
     COPYRIGHT = "copyright"
     CONSTRUCCION_POV = "construccion_pov"
     TIKTOK_SHOP = "tiktok_shop"
+    TIKTOK_SHOP_WATERMARK = "tiktok_shop_watermark"
     EDITOR_AUTO = "editor_auto"
 
 
@@ -40,6 +41,7 @@ MODE_LABELS = {
     JobMode.COPYRIGHT: "🛡️ Quitar Copy",
     JobMode.CONSTRUCCION_POV: "🏗️ Construcción POV",
     JobMode.TIKTOK_SHOP: "🛒 TikTok Shop",
+    JobMode.TIKTOK_SHOP_WATERMARK: "🚿 Sin marca (TikTok Shop)",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
 }
 
