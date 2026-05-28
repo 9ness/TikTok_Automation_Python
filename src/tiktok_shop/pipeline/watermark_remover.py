@@ -129,11 +129,25 @@ def _ffprobe_dimensions(input_path: str) -> tuple[int, int]:
 def _box_to_pixels(box: WatermarkBox, width: int, height: int) -> tuple[int, int, int, int]:
     """Convierte WatermarkBox % a (x, y, w, h) en píxeles. Añade padding
     de seguridad (+6px en cada lado) — cubre antialiasing, puntas
-    brillantes y descendentes que se pasan del bounding visible."""
-    x = max(0, int(round(width * box.x_pct / 100.0)) - 6)
-    y = max(0, int(round(height * box.y_pct / 100.0)) - 6)
-    w = min(width - x, int(round(width * box.w_pct / 100.0)) + 12)
-    h = min(height - y, int(round(height * box.h_pct / 100.0)) + 12)
+    brillantes y descendentes que se pasan del bounding visible.
+
+    ffmpeg `delogo` requiere que la caja tenga ≥1px de borde dentro del
+    frame (necesario para interpolación). Es decir x≥1, y≥1, x+w<width,
+    y+h<height (estricto, no <=). Si la caja toca el borde, ffmpeg
+    aborta con 'Could not open encoder before EOF'. Clampamos al margen
+    seguro de 1px."""
+    # Mínimo 1px desde el borde superior/izquierdo (delogo necesita
+    # vecinos para interpolar).
+    x = max(1, int(round(width * box.x_pct / 100.0)) - 6)
+    y = max(1, int(round(height * box.y_pct / 100.0)) - 6)
+    w = int(round(width * box.w_pct / 100.0)) + 12
+    h = int(round(height * box.h_pct / 100.0)) + 12
+    # Clamp para que x+w < width Y y+h < height (estricto).
+    # Dejamos 1px de margen del borde derecho/inferior.
+    if x + w >= width:
+        w = width - x - 1
+    if y + h >= height:
+        h = height - y - 1
     # delogo necesita w >= 4 y h >= 4 (mínimo del filtro).
     w = max(4, w)
     h = max(4, h)
