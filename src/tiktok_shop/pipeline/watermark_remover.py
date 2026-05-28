@@ -367,22 +367,37 @@ def remove_watermark_magic(
     log_callback(f"🎨 Máscara generada ({watermark_type})")
 
     try:
-        # ---- 2) Subir vídeo a Replicate Files API ----
-        # NOTA importante: Replicate Files API devuelve URLs sin extension
-        # (/v1/files/{id}). El modelo ProPainter (jd7h) chequea la
-        # extension de la máscara explicitamente y rechaza URLs sin .png
-        # con error "ProPainter via cog only supports static masks as
-        # .jpg or .png". Solución: pasar la máscara como data:URI base64.
-        # El vídeo SÍ funciona via Files API (el modelo es más permisivo).
-        # Máscara es pequeña (<10KB), data URI es perfecto.
-        log_callback(f"⬆️ Subiendo vídeo a Replicate Files API…")
-        video_url = pp.upload_file(input_path)
+        # ---- 2) Encode vídeo + máscara como data URIs ----
+        # NOTA crítica: Replicate Files API devuelve URLs tipo
+        # /v1/files/{id} SIN extension. ProPainter (jd7h) falla doble:
+        # - Mask rechazada por "supports static masks as .jpg or .png"
+        # - Video rechazado internamente con "[Errno 20] Not a directory"
+        #   cuando intenta procesar el archivo descargado de la URL.
+        # Solución: pasar ambos como data:URI base64 inline en el
+        # payload — el mime type del prefijo da al modelo la info que
+        # necesita y no hay download intermedio.
+        # Limitación: payload final puede llegar a ~14MB para vídeos
+        # de 10MB (base64 = +33%). Replicate acepta hasta 256MB.
         import base64 as _b64
+        log_callback(f"📦 Encoding vídeo + máscara como data URIs…")
+        with open(input_path, "rb") as _vf:
+            video_b64 = _b64.b64encode(_vf.read()).decode("ascii")
+        video_ext = Path(input_path).suffix.lower().lstrip(".") or "mp4"
+        if video_ext == "mov":
+            video_mime = "video/quicktime"
+        elif video_ext == "mkv":
+            video_mime = "video/x-matroska"
+        elif video_ext == "webm":
+            video_mime = "video/webm"
+        else:
+            video_mime = "video/mp4"
+        video_url = f"data:{video_mime};base64,{video_b64}"
         with open(mask_path, "rb") as _mf:
             mask_b64 = _b64.b64encode(_mf.read()).decode("ascii")
         mask_url = f"data:image/png;base64,{mask_b64}"
         log_callback(
-            f"🎨 Máscara encoded como data URI ({len(mask_b64)/1024:.1f} KB)"
+            f"📦 Vídeo {len(video_b64)/1024/1024:.1f} MB · "
+            f"máscara {len(mask_b64)/1024:.1f} KB (base64)"
         )
 
         # ---- 3) Crear prediction ----
