@@ -105,11 +105,15 @@ def _call_with_key(
 
     genai.configure(api_key=api_key)
     # Si habilitamos Google Search grounding, hay que pasarlo como tool.
-    # La sintaxis cambia entre versions del SDK — esta forma es la
-    # compatible con google-generativeai >= 0.7 (Gemini 2.x).
+    # Gemini 2.x renombró "google_search_retrieval" (Gemini 1.5) a
+    # "google_search" (Gemini 2.x). Esto da error 400 "tool not supported"
+    # si lo enviamos al modelo equivocado. Modelos:
+    #   - gemini-1.5-*: google_search_retrieval
+    #   - gemini-2.*:   google_search
+    # Como ahora usamos 2.5 Pro/Flash, mandamos siempre google_search.
     tools = None
     if enable_web_search:
-        tools = [{"google_search_retrieval": {}}]
+        tools = [{"google_search": {}}]
         if expect_json:
             # Limitación de Gemini: no se puede combinar tools + JSON mode.
             # Pedimos texto plano y el caller parsea/extrae lo que necesite.

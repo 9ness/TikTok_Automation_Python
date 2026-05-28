@@ -158,16 +158,17 @@ def search_tiktok_videos(
     if log_callback:
         log_callback(f"🔎 Apify: buscando '{query}' en TikTok (limit={limit})…")
 
-    # Input schema verificado en apidojo/tiktok-scraper.
-    # Las keys cambian entre actors — si cambiamos actor habrá que adaptar.
+    # Input schema verificado contra apidojo/tiktok-scraper (input-schema
+    # web doc + run-failed errors). Fields correctos:
+    #   - keywords: array (NO "searchQueries")
+    #   - maxItems: int (NO "resultsPerPage")
+    #   - sortType: "RELEVANCE" | "MOST_LIKED" | "MOST_RECENT"
+    #   - location: country code (ES, US, ...)
     input_data = {
-        "searchQueries": [query],
-        "resultsPerPage": min(limit, 30),
-        "shouldDownloadVideos": False,   # solo metadata, descargaremos por nuestra cuenta
-        "shouldDownloadCovers": False,
-        "shouldDownloadSubtitles": False,
-        "shouldDownloadSlideshowImages": False,
-        "proxyCountryCode": "ES",        # geo ES para más relevancia España
+        "keywords": [query],
+        "maxItems": min(limit, 30),
+        "sortType": "MOST_LIKED" if sort_by == "popular" else "MOST_RECENT",
+        "location": "ES",
     }
     items = _run_actor_sync(TIKTOK_SCRAPER_ACTOR, input_data)
     if not isinstance(items, list):
