@@ -90,13 +90,22 @@ def deep_research_product(
     proven_hooks: list[str] = []
 
     if apify_cloud.apify_is_configured():
+        # TikTok no encuentra resultados con queries largas tipo
+        # "UMAY cinta de correr doméstica 2,5HP, protege tus rodillas, ...".
+        # Acortamos a una query searchable: brand + primeras palabras clave.
+        # Quitamos comas y dejamos máx 8 palabras significativas.
+        raw = (product.name or "").replace(",", " ").replace(".", " ")
+        words = [w for w in raw.split() if len(w) > 2][:8]
+        if product.brand and product.brand.lower() not in raw.lower():
+            words = [product.brand] + words[:7]
+        tiktok_query = " ".join(words) or product.name
         log_callback(
             f"🎬 Fase 2/3: buscando top {max_tiktok_search_results} vídeos "
-            f"virales en TikTok via Apify…"
+            f"en TikTok con query: '{tiktok_query}'…"
         )
         try:
             apify_results = apify_cloud.search_tiktok_videos(
-                query=product.name,
+                query=tiktok_query,
                 limit=max_tiktok_search_results,
                 sort_by="popular",
                 log_callback=log_callback,
@@ -206,21 +215,30 @@ Output STRICTLY in this Markdown structure (no preamble, no explanations):
 
 Be specific. Use real customer language. Avoid generic marketing speak."""
 
-    # NOTE: ProductPhotos solo tiene `source` y `generated` — no `imported`.
-    # photos_summary se conserva para futuro si se quiere mandar como info,
-    # pero ahora mismo no se inyecta en el user_prompt (Gemini no necesita
-    # los filenames para investigar reviews/web).
+    # Datos del producto que pasamos a Gemini para que investigue mejor.
+    # Cuanta más info concreta tenga (URL TikTok Shop, precio, selling
+    # points), mejor entiende el contexto y encuentra reviews relevantes.
+    tts = getattr(product, "tiktok_shop", None)
+    tiktok_url = getattr(tts, "product_url", None) if tts else None
+    price_eur = getattr(tts, "price_eur", None) if tts else None
+    selling_points = getattr(product, "selling_points", []) or []
+
     user_prompt = f"""Producto: {product.name}
 Marca: {product.brand or '—'}
 Categoría: {product.category}
 Subcategoría: {product.subcategory or '—'}
+Precio: {f'{price_eur} €' if price_eur else '—'}
+URL TikTok Shop: {tiktok_url or '—'}
 Audiencia: {', '.join(product.target_audience) if product.target_audience else '—'}
 Key features actuales: {', '.join(product.key_features) if product.key_features else '—'}
+Selling points: {', '.join(selling_points) if selling_points else '—'}
 Idioma target: {product.language}
 
 Investiga este producto en la web y devuelve los listados estructurados.
-Si el producto es para mercado español (es_*), las pains/benefits/objections
-deben estar en español natural (no traducciones literales del inglés)."""
+Usa la URL de TikTok Shop si la tienes para ver fotos del producto real y
+así buscar mejor. Si el producto es para mercado español (es_*), las
+pains/benefits/objections deben estar en español natural (no traducciones
+literales del inglés)."""
 
     log_callback("  🌐 Gemini buscando en Amazon/AliExpress/foros con Web Search…")
     try:
