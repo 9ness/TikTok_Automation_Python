@@ -218,8 +218,8 @@ async def _render_hailuo_clips(
     """
     n = len(clip_specs)
     log_callback(
-        f"🎵 Encolando {n} clips music (Replicate Hailuo → Runware Veo Lite → "
-        f"fal Hailuo → Kling → Wan chain)…"
+        f"🎵 Encolando {n} clips music (Runware Veo Lite → fal Hailuo → "
+        f"Kling → Wan → [Replicate Hailuo] chain · cap 6s/clip)…"
     )
 
     photo_refs = get_atlas_image_refs(photo_paths, tier="standard")
@@ -316,14 +316,24 @@ async def _run_via_hailuo(
     log_callback: LogCallback,
 ) -> tuple[str, str]:
     """Chain de fallback para clip music:
-       Replicate Hailuo 02 → Runware Veo 3.1 Lite → fal Hailuo 02 →
-       fal Kling 2.1 → fal Wan 2.2-5b.
+       Runware Veo 3.1 Lite → fal Hailuo 02 → fal Kling 2.1 →
+       fal Wan 2.2-5b → Replicate Hailuo 02.
 
-    Replicate es PRIMARIO (modelos oficiales, infra propia distinta de fal,
-    cobra solo predictions que corren). Si falla, cae a Runware (también
-    distinta cola, cobra solo al completar). Si ambos fallan, cae a la
-    familia fal (3 modelos) — fal cobra al encolar, así que el
-    circuit-breaker protege de pérdidas en cascada.
+    Runware Veo Lite es PRIMARIO porque (1) tiene la familia Veo de Google
+    que respeta mejor prompts complejos, (2) cobra SOLO al completar (no
+    quema dinero en intentos fallidos como fal) y (3) $0.30 por clip 6s
+    es el sweet spot precio/calidad.
+
+    fal va detrás porque cobra al encolar pero su Hailuo a $0.10/6s es lo
+    más barato si funciona — circuit-breaker protege de pérdidas en cascada.
+
+    Replicate Hailuo queda al FINAL como último recurso. Es caro flat
+    ($0.45 para 10s) y suele producir output mediocre con prompts genéricos
+    — solo lo usamos si nada más funciona. Se puede deshabilitar con
+    `REPLICATE_DISABLED=1` en .env para evitarlo del todo.
+
+    Duración: forzamos clamp a 6s en la chain musical — TikTok consume
+    clips cortos mejor, y es ~40% más barato que 10s en todos los modelos.
 
     Devuelve (out_path, renderer_label) para tracking en la UI."""
     from src.tiktok_shop.api.fal_cloud import (
@@ -340,7 +350,15 @@ async def _run_via_hailuo(
     )
 
     loop = asyncio.get_event_loop()
-    duration = int(spec.get("duration", 6))
+    # Forzamos máx 6s para todos los providers — TikTok va mejor con clips
+    # cortos y es ~40% más barato que 10s. Si el spec pide más, capamos.
+    raw_duration = int(spec.get("duration", 6))
+    duration = min(raw_duration, 6)
+    if duration != raw_duration:
+        log_callback(
+            f"💰 Clip {idx+1}: duración {raw_duration}s capada a {duration}s "
+            f"(cap musical para ahorrar costes — TikTok va mejor con clips cortos)."
+        )
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
     # Log estado del circuit breaker — providers en cooldown se saltarán.
@@ -352,32 +370,7 @@ async def _run_via_hailuo(
             f"Se reiniciará tras la ventana de espera."
         )
 
-    # ---- 0) Replicate Hailuo 02 (PRIMARIO si configurado) ----
-    # Modelo oficial Replicate. $0.27/6s a 768p, $0.45/10s. 9:16 nativo.
-    # Cola independiente de fal.ai y de Runware — diversifica el riesgo
-    # de saturación global. Solo cobra predictions que arrancan.
-    if replicate_is_configured() and not _circuit_breaker_skip("replicate_hailuo"):
-        try:
-            result = await _run_via_replicate_hailuo(
-                idx=idx, spec={**spec, "duration": duration},
-                image_ref=image_ref, out_path=out_path,
-                log_callback=log_callback,
-            )
-            _circuit_breaker_record_success("replicate_hailuo")
-            return result
-        except (ReplicateError, ReplicateTransient) as e_rep:
-            _circuit_breaker_record_fail("replicate_hailuo")
-            log_callback(
-                f"🔁 Clip {idx+1}: Replicate Hailuo falló "
-                f"({str(e_rep)[:100]}). Cayendo a Runware Veo. "
-                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará Replicate."
-            )
-    elif _circuit_breaker_skip("replicate_hailuo"):
-        log_callback(
-            f"⏭️ Clip {idx+1}: skip Replicate Hailuo (cooldown circuit-breaker activo)"
-        )
-
-    # ---- 1) Runware Veo 3.1 Lite (fallback si Replicate falla) ----
+    # ---- 1) Runware Veo 3.1 Lite (PRIMARIO) ----
     # Soporta 9:16 nativo, $0.05/s a 720p. Cola independiente de fal.ai
     # y cobra SOLO al completar (no por intentos fallidos).
     if runware_is_configured() and not _circuit_breaker_skip("runware_veo"):
@@ -497,11 +490,52 @@ async def _run_via_hailuo(
             f"⏭️ Clip {idx+1}: skip fal Wan (cooldown circuit-breaker)"
         )
 
+    # ---- 4) Replicate Hailuo 02 (ÚLTIMO RECURSO) ----
+    # CARO ($0.27/6s, $0.45/10s) y suele dar output mediocre con prompts
+    # genéricos. Solo lo usamos si TODO lo anterior falló. Kill-switch:
+    # `REPLICATE_DISABLED=1` en .env para saltárselo siempre.
+    e_replicate: Exception | None = None
+    replicate_disabled = (os.environ.get("REPLICATE_DISABLED") or "").strip() in (
+        "1", "true", "yes",
+    )
+    if (
+        replicate_is_configured()
+        and not replicate_disabled
+        and not _circuit_breaker_skip("replicate_hailuo")
+    ):
+        try:
+            log_callback(
+                f"⚠️ Clip {idx+1}: probando Replicate Hailuo como ÚLTIMO recurso "
+                f"(${'0.27' if duration <= 6 else '0.45'} flat — calidad variable)…"
+            )
+            result = await _run_via_replicate_hailuo(
+                idx=idx, spec={**spec, "duration": duration},
+                image_ref=image_ref, out_path=out_path,
+                log_callback=log_callback,
+            )
+            _circuit_breaker_record_success("replicate_hailuo")
+            return result
+        except (ReplicateError, ReplicateTransient) as e:
+            e_replicate = e
+            _circuit_breaker_record_fail("replicate_hailuo")
+            log_callback(
+                f"❌ Clip {idx+1}: Replicate Hailuo también falló ({str(e)[:80]})."
+            )
+    elif replicate_disabled:
+        log_callback(
+            f"⏭️ Clip {idx+1}: Replicate deshabilitado (REPLICATE_DISABLED=1)"
+        )
+    elif _circuit_breaker_skip("replicate_hailuo"):
+        log_callback(
+            f"⏭️ Clip {idx+1}: skip Replicate Hailuo (cooldown circuit-breaker)"
+        )
+
     # ---- TODOS los providers fallaron o están en cooldown ----
     errs = []
     if e_hailuo: errs.append(f"Hailuo={str(e_hailuo)[:60]}")
     if e_kling: errs.append(f"Kling={str(e_kling)[:60]}")
     if e_wan: errs.append(f"Wan={str(e_wan)[:60]}")
+    if e_replicate: errs.append(f"Replicate={str(e_replicate)[:60]}")
     cb = _circuit_breaker_status()
     skipped = [
         p for p in ("replicate_hailuo", "runware_veo", "fal_hailuo", "fal_kling", "fal_wan")
