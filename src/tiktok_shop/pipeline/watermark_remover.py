@@ -224,9 +224,141 @@ def remove_watermark_to_temp(
             log_callback=log_callback,
         )
     except Exception:
-        # Si falla, limpiamos el temp
         try:
             os.unlink(tmp.name)
         except OSError:
             pass
         raise
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Magic Eraser via ProPainter (Replicate)
+# ═══════════════════════════════════════════════════════════════════════
+def generate_mask_png(
+    width: int,
+    height: int,
+    watermark_type: WatermarkType,
+    output_path: str,
+    *,
+    dilation_px: int = 6,
+) -> str:
+    """Genera una PNG máscara para ProPainter: negro (preserva) excepto en
+    las zonas del watermark donde es blanco (zona a inpaintear).
+
+    `dilation_px` añade margen de seguridad alrededor de la caja para
+    asegurar que cubre el watermark completamente (mejor reconstrucción)."""
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as e:
+        raise WatermarkRemoverError(
+            f"PIL/Pillow no instalado: {e}. Necesario para ProPainter mask."
+        )
+
+    img = Image.new("L", (width, height), color=0)  # negro
+    draw = ImageDraw.Draw(img)
+
+    if watermark_type == "auto":
+        boxes = [WATERMARK_BOXES["veo_flow"], WATERMARK_BOXES["gemini_chat"]]
+    elif watermark_type in WATERMARK_BOXES:
+        boxes = [WATERMARK_BOXES[watermark_type]]
+    else:
+        raise WatermarkRemoverError(
+            f"watermark_type inválido: {watermark_type}"
+        )
+
+    for box in boxes:
+        x, y, w, h = _box_to_pixels(box, width, height)
+        # Expansión adicional para ProPainter (gradiente fuerte)
+        x = max(0, x - dilation_px)
+        y = max(0, y - dilation_px)
+        w = min(width - x, w + 2 * dilation_px)
+        h = min(height - y, h + 2 * dilation_px)
+        draw.rectangle([x, y, x + w, y + h], fill=255)
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    img.save(output_path, "PNG")
+    return output_path
+
+
+def remove_watermark_magic(
+    input_path: str,
+    output_path: str,
+    *,
+    watermark_type: WatermarkType = "auto",
+    log_callback: LogCallback = _noop,
+) -> tuple[str, float | None]:
+    """Magic Eraser via ProPainter en Replicate. Devuelve
+    (output_path, gpu_seconds) — gpu_seconds para tracking de coste real.
+
+    Coste típico (Nvidia A40 @ $0.000725/s, ~2× realtime):
+      - 10s clip: ~$0.015
+      - 30s clip: ~$0.045
+
+    Mucho mejor calidad que `delogo` (que solo difumina). ProPainter usa
+    optical flow temporal — reconstruye lo que había detrás del watermark
+    tomando información de frames adyacentes.
+    """
+    from src.tiktok_shop.api import replicate_propainter as pp
+
+    if not pp.replicate_propainter_is_configured():
+        raise WatermarkRemoverError(
+            "REPLICATE_API_TOKEN no configurada — Magic Eraser no disponible. "
+            "Usa modo `fast` (delogo) o configura el token."
+        )
+
+    in_p = Path(input_path)
+    if not in_p.is_file():
+        raise WatermarkRemoverError(f"Input no existe: {input_path}")
+
+    # ---- 1) Probar dimensiones + generar máscara ----
+    width, height = _ffprobe_dimensions(input_path)
+    log_callback(f"📐 Vídeo {width}×{height}px detectado")
+
+    tmp_dir = tempfile.mkdtemp(prefix="propainter_mask_")
+    mask_path = os.path.join(tmp_dir, "mask.png")
+    generate_mask_png(width, height, watermark_type, mask_path)
+    log_callback(f"🎨 Máscara generada ({watermark_type})")
+
+    try:
+        # ---- 2) Subir vídeo + máscara a Replicate Files API ----
+        log_callback(f"⬆️ Subiendo vídeo + máscara a Replicate…")
+        video_url = pp.upload_file(input_path)
+        mask_url = pp.upload_file(mask_path)
+
+        # ---- 3) Crear prediction ----
+        log_callback(f"🪄 Encolando ProPainter…")
+        job = pp.submit_propainter(video_url=video_url, mask_url=mask_url)
+        log_callback(
+            f"⏳ ProPainter prediction {job.prediction_id[:8]} encolado"
+        )
+
+        # ---- 4) Polling ----
+        def _hb(elapsed: int, status: str) -> None:
+            log_callback(
+                f"⏳ ProPainter: {elapsed}s (status={status})…"
+            )
+
+        pp.wait(job, on_heartbeat=_hb)
+
+        # ---- 5) Download ----
+        log_callback(f"⬇️ Descargando resultado…")
+        pp.download(job.output_url or "", output_path)
+
+        if not Path(output_path).is_file() or Path(output_path).stat().st_size < 1000:
+            raise WatermarkRemoverError(
+                "ProPainter corrió pero el output está vacío o corrupto"
+            )
+
+        out_size_mb = Path(output_path).stat().st_size / (1024 * 1024)
+        log_callback(
+            f"✅ Magic Eraser OK · {out_size_mb:.2f} MB · "
+            f"GPU={job.gpu_seconds or 'n/a'}s"
+        )
+        return output_path, job.gpu_seconds
+    finally:
+        # Cleanup máscara temp
+        try:
+            Path(mask_path).unlink(missing_ok=True)
+            os.rmdir(tmp_dir)
+        except OSError:
+            pass

@@ -9,10 +9,12 @@ import {
   Info,
   Loader2,
   ShieldOff,
+  Sparkles,
   Trash2,
   Upload,
   X,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,13 +32,16 @@ import { ApiError } from "@/lib/api";
 import { useProducts } from "@/lib/queries/products";
 import { useUsers } from "@/lib/queries/users";
 import {
+  type WatermarkQuality,
   type WatermarkRemoverResponse,
   type WatermarkType,
   useRemoveWatermark,
   watermarkRemoverFileUrl,
 } from "@/lib/queries/watermarkRemover";
+import { cn } from "@/lib/utils";
 
 const LS_KEY = "tiktokshop_watermark_dest_v1";
+const LS_QUALITY_KEY = "tiktokshop_watermark_quality_v1";
 
 interface DestSelection {
   userId: string;
@@ -108,16 +113,21 @@ export default function WatermarkRemoverPage() {
 
   const [items, setItems] = useState<QueueItem[]>([]);
   const [watermarkType, setWatermarkType] = useState<WatermarkType>("auto");
+  const [quality, setQuality] = useState<WatermarkQuality>("magic");
   const [running, setRunning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const remove = useRemoveWatermark();
 
-  // Hidrata destino desde localStorage al cargar
+  // Hidrata destino + calidad desde localStorage al cargar
   useEffect(() => {
     const last = readDest();
     if (last) {
       setUserId(last.userId);
       setProductId(last.productId);
+    }
+    if (typeof window !== "undefined") {
+      const q = window.localStorage.getItem(LS_QUALITY_KEY);
+      if (q === "fast" || q === "magic") setQuality(q);
     }
     setHydrated(true);
   }, []);
@@ -129,6 +139,14 @@ export default function WatermarkRemoverPage() {
       writeDest({ userId, productId });
     }
   }, [hydrated, userId, productId]);
+
+  // Persiste preferencia de calidad
+  useEffect(() => {
+    if (!hydrated) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LS_QUALITY_KEY, quality);
+    }
+  }, [hydrated, quality]);
 
   const users = usersQ.data?.items ?? [];
   const allProducts = productsQ.data?.items ?? [];
@@ -161,6 +179,12 @@ export default function WatermarkRemoverPage() {
   const totalPending = items.filter((i) => i.status === "pending").length;
   const totalDone = items.filter((i) => i.status === "done").length;
   const totalFailed = items.filter((i) => i.status === "failed").length;
+  const totalCostUsd = items.reduce(
+    (acc, i) => acc + (i.result?.cost_usd ?? 0),
+    0,
+  );
+  const estimatedCostUsd =
+    quality === "magic" ? totalPending * 0.02 : 0;
 
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -200,6 +224,7 @@ export default function WatermarkRemoverPage() {
       const result = await remove.mutateAsync({
         file: item.file,
         watermark_type: watermarkType,
+        quality,
         user_id: destReady ? userId : undefined,
         product_id: destReady ? productId : undefined,
       });
@@ -336,6 +361,63 @@ export default function WatermarkRemoverPage() {
         </CardContent>
       </Card>
 
+      {/* Selector calidad */}
+      <Card>
+        <CardContent className="space-y-2 p-3 sm:p-4">
+          <Label className="text-xs sm:text-sm">Calidad del borrado</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setQuality("magic")}
+              disabled={running}
+              className={cn(
+                "flex flex-col items-start gap-1 rounded-lg border-2 p-3 text-left transition-colors",
+                quality === "magic"
+                  ? "border-purple-500 bg-purple-500/10"
+                  : "border-muted bg-muted/30 hover:bg-muted/50",
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-purple-500" />
+                <span className="text-xs font-semibold sm:text-sm">
+                  Magic Eraser
+                </span>
+                <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-medium uppercase text-purple-700 dark:text-purple-300 sm:text-[10px]">
+                  Recomendado
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground sm:text-xs">
+                ProPainter IA · ~$0.015-0.04/clip · imperceptible
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuality("fast")}
+              disabled={running}
+              className={cn(
+                "flex flex-col items-start gap-1 rounded-lg border-2 p-3 text-left transition-colors",
+                quality === "fast"
+                  ? "border-amber-500 bg-amber-500/10"
+                  : "border-muted bg-muted/30 hover:bg-muted/50",
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-semibold sm:text-sm">
+                  Rápida
+                </span>
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium uppercase text-emerald-700 dark:text-emerald-300 sm:text-[10px]">
+                  Gratis
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground sm:text-xs">
+                ffmpeg delogo · $0 · deja blur leve
+              </p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Selector tipo marca */}
       <Card>
         <CardContent className="space-y-2 p-3 sm:p-4">
@@ -424,6 +506,16 @@ export default function WatermarkRemoverPage() {
                 {totalFailed} fallos
               </span>
             )}
+            {totalCostUsd > 0 && (
+              <span className="rounded bg-purple-500/15 px-2 py-1 text-purple-700 dark:text-purple-300">
+                ${totalCostUsd.toFixed(3)} gastados
+              </span>
+            )}
+            {estimatedCostUsd > 0 && totalPending > 0 && (
+              <span className="rounded bg-muted px-2 py-1 text-muted-foreground">
+                ~${estimatedCostUsd.toFixed(2)} pendiente
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <Button
@@ -445,11 +537,15 @@ export default function WatermarkRemoverPage() {
               {running ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Procesando…
+                  {quality === "magic" ? "ProPainter…" : "Procesando…"}
                 </>
               ) : (
                 <>
-                  <ShieldOff className="h-3.5 w-3.5" />
+                  {quality === "magic" ? (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" />
+                  )}
                   Procesar {totalPending} → Drive
                 </>
               )}
@@ -479,6 +575,8 @@ export default function WatermarkRemoverPage() {
                     {(item.file.size / 1024 / 1024).toFixed(2)} MB
                     {item.result &&
                       ` → ${(item.result.output_size_bytes / 1024 / 1024).toFixed(2)} MB · ${item.result.processing_seconds}s`}
+                    {item.result && item.result.cost_usd > 0 &&
+                      ` · $${item.result.cost_usd.toFixed(3)}`}
                   </p>
                   {item.result?.drive_subdir && (
                     <p className="truncate text-[10px] text-emerald-700 dark:text-emerald-300 sm:text-xs">

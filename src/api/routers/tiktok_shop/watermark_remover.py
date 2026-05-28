@@ -40,6 +40,7 @@ from src.tiktok_shop.config import user_videos_folder
 from src.tiktok_shop.pipeline.watermark_remover import (
     WatermarkRemoverError,
     remove_watermark,
+    remove_watermark_magic,
 )
 from src.tiktok_shop.repos import ProductRepo, UserRepo
 
@@ -54,6 +55,7 @@ router = APIRouter(
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
 _MAX_VIDEO_BYTES = 200 * 1024 * 1024  # 200 MB — vídeos Veo de 10s son <10MB
 _WATERMARK_TYPES = {"veo_flow", "gemini_chat", "auto"}
+_QUALITY_VALUES = {"fast", "magic"}
 
 
 class WatermarkRemoverResponse(BaseModel):
@@ -70,6 +72,8 @@ class WatermarkRemoverResponse(BaseModel):
     output_size_bytes: int
     processing_seconds: float
     watermark_type: str
+    quality: str = "fast"
+    cost_usd: float = 0.0            # 0 para fast, ~0.015 para magic
     drive_path: str | None = None    # path Drive si se guardó allí
     drive_subdir: str | None = None  # relativo a TIKTOK_SHOP root (display)
 
@@ -83,6 +87,10 @@ async def process_video(
         Literal["veo_flow", "gemini_chat", "auto"],
         Form(description="Tipo de marca de agua a eliminar"),
     ] = "auto",
+    quality: Annotated[
+        Literal["fast", "magic"],
+        Form(description="fast=delogo gratis (deja blur leve) · magic=ProPainter ~$0.015/clip (magic eraser real)"),
+    ] = "magic",
     user_id: Annotated[
         str | None,
         Form(description="Username TikTok destino — si se pasa con product_id, guarda en Drive"),
@@ -148,11 +156,36 @@ async def process_video(
 
     # ---------- Procesar ----------
     started = time.time()
+    cost_usd = 0.0
+    gpu_seconds: float | None = None
     try:
-        remove_watermark(
-            str(in_path), str(out_path),
-            watermark_type=watermark_type,
-        )
+        if quality == "magic":
+            # Magic Eraser via ProPainter (Replicate) — cobra ~$0.015/10s
+            _, gpu_seconds = remove_watermark_magic(
+                str(in_path), str(out_path),
+                watermark_type=watermark_type,
+            )
+            # Cost tracking
+            try:
+                from src.cost_tracking import record_replicate_propainter
+                from src.tiktok_shop.pipeline.watermark_remover import _ffprobe_dimensions
+                # Duración real del vídeo (para estimación si gpu_seconds=None)
+                # Sin embargo no exponemos ffprobe_duration. Usamos size hint.
+                vid_dur = max(5.0, len(contents) / (1024 * 1024) * 1.0)  # rough
+                cost_usd = record_replicate_propainter(
+                    gpu_seconds=gpu_seconds,
+                    video_duration_s=vid_dur,
+                    detail=f"{watermark_type} · {file.filename}",
+                )
+            except Exception as e:
+                print(f"[watermark_remover] cost tracking falló: {e}")
+        else:
+            # Fast: delogo gratis (deja blur leve)
+            remove_watermark(
+                str(in_path), str(out_path),
+                watermark_type=watermark_type,
+            )
+            cost_usd = 0.0
     except WatermarkRemoverError as e:
         try:
             in_path.unlink(missing_ok=True)
@@ -160,7 +193,7 @@ async def process_video(
             pass
         raise ValidationError(
             f"Error procesando el vídeo: {e}",
-            details={"watermark_type": watermark_type},
+            details={"watermark_type": watermark_type, "quality": quality},
         )
     finally:
         try:
@@ -210,6 +243,8 @@ async def process_video(
         output_size_bytes=output_size,
         processing_seconds=elapsed,
         watermark_type=watermark_type,
+        quality=quality,
+        cost_usd=round(cost_usd, 4),
         drive_path=drive_path_str,
         drive_subdir=drive_subdir_display,
     )

@@ -409,6 +409,39 @@ def record_replicate_cloud(
     return cost
 
 
+# Replicate ProPainter — billing per GPU-second en A40.
+# Hardware oficial: $0.000725/sec (https://replicate.com/pricing).
+# Coste real = predict_time × rate. Si no recibimos predict_time
+# del response, estimamos como 2× video duration.
+_REPLICATE_A40_RATE_PER_S: float = 0.000725
+
+
+def record_replicate_propainter(
+    *,
+    gpu_seconds: float | None,
+    video_duration_s: float,
+    model_slug: str = "cjwbw/propainter",
+    detail: str | None = None,
+) -> float:
+    """ProPainter en Replicate — magic eraser para watermarks.
+    Cobro por GPU-second. Si `gpu_seconds` viene del response (Replicate
+    lo expone en `metrics.predict_time`), usa ese valor real. Si no,
+    estima como 2× duración del vídeo (~realtime en A40)."""
+    seconds = gpu_seconds if gpu_seconds is not None else max(2 * video_duration_s, 5.0)
+    cost = round(_REPLICATE_A40_RATE_PER_S * seconds, 5)
+    _add_line(CostLine(
+        kind="replicate_propainter",
+        units=seconds,
+        unit_label="gpu_seconds",
+        cost_usd=cost,
+        detail=detail or (
+            f"{model_slug} · video={video_duration_s:.1f}s · "
+            f"gpu={seconds:.1f}s"
+        ),
+    ))
+    return cost
+
+
 def record_wan_cloud(
     *,
     duration_s: int,
