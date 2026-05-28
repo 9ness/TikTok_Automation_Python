@@ -29,6 +29,7 @@ from .editor_auto import (
 from .tiktok_shop import (
     presets_router as tiktok_shop_presets_router,
     replicate_viral_router as tiktok_shop_replicate_viral_router,
+    shortcuts_router as tiktok_shop_shortcuts_router,
     watermark_remover_router as tiktok_shop_watermark_remover_router,
 )
 from .stats import router as stats_router
@@ -72,5 +73,6 @@ __all__ = [
     "editor_auto_referrals_router",
     "tiktok_shop_presets_router",
     "tiktok_shop_replicate_viral_router",
+    "tiktok_shop_shortcuts_router",
     "tiktok_shop_watermark_remover_router",
 ]

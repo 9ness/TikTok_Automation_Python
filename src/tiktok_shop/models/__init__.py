@@ -9,6 +9,7 @@ from .video_generation import (
 )
 from .video_preset import VideoPreset, SUGGESTED_ANGLES, make_preset_id
 from .voice import VoiceClone
+from .shortcut import OperatorShortcut
 
 __all__ = [
     "TikTokUser",
@@ -33,4 +34,5 @@ __all__ = [
     "VideoCost",
     "VoiceUsed",
     "VoiceClone",
+    "OperatorShortcut",
 ]

@@ -3,6 +3,7 @@ from .user_repo import UserRepo
 from .product_repo import ProductRepo
 from .generation_repo import GenerationRepo
 from .voice_repo import VoiceRepo
+from .shortcut_repo import ShortcutRepo
 
 __all__ = [
     "ShopRedis",
@@ -11,4 +12,5 @@ __all__ = [
     "ProductRepo",
     "GenerationRepo",
     "VoiceRepo",
+    "ShortcutRepo",
 ]

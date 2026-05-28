@@ -21,6 +21,13 @@ import { toast } from "sonner";
 import { ShopGenerateCards } from "@/components/generate/ShopGenerateCards";
 import { Button } from "@/components/ui/button";
 import { useProducts } from "@/lib/queries/products";
+import {
+  migrateLocalShortcutsIfNeeded,
+  type Shortcut as ServerShortcut,
+  useCreateShortcut,
+  useDeleteShortcut,
+  useShortcuts,
+} from "@/lib/queries/shortcuts";
 import { useUsers } from "@/lib/queries/users";
 import type { Product } from "@/lib/types/product";
 import type { User } from "@/lib/types/user";
@@ -59,8 +66,7 @@ function ShopGenerateLoading() {
 // (?user_id&product_id) tienen prioridad por si compartimos un link.
 const LS_KEY = "tiktok_shop_generate.last_selection";
 // Lista de "entradas rápidas" — combos user+producto pineados por el user.
-// Se muestran arriba como cards de 1 click.
-const LS_SHORTCUTS_KEY = "tiktok_shop_generate.shortcuts";
+// Antes vivía en localStorage; ahora server-side (sync entre PC/móvil).
 const MAX_SHORTCUTS = 8;
 
 interface LastSelection {
@@ -68,13 +74,6 @@ interface LastSelection {
   productId: string;
 }
 
-interface Shortcut {
-  userId: string;
-  productId: string;
-  /** Timestamp ISO de cuando se creó — sirve para ordenar más recientes
-   *  arriba si crecemos a muchos shortcuts. */
-  created_at: string;
-}
 
 /** Renderiza el username con un único '@' delante, sin importar si el
  *  valor guardado en BD ya lo trae o no. Evita '@@alphabettingclub'. */
@@ -107,39 +106,6 @@ function writeLastSelection(sel: LastSelection): void {
   }
 }
 
-function readShortcuts(): Shortcut[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LS_SHORTCUTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (s) =>
-          s &&
-          typeof s.userId === "string" &&
-          typeof s.productId === "string",
-      )
-      .map((s) => ({
-        userId: s.userId,
-        productId: s.productId,
-        created_at: typeof s.created_at === "string" ? s.created_at : new Date().toISOString(),
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function writeShortcuts(list: Shortcut[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_SHORTCUTS_KEY, JSON.stringify(list));
-  } catch {
-    /* silencia */
-  }
-}
-
 function ShopGenerateInner() {
   const params = useSearchParams();
   const users = useUsers(
@@ -154,15 +120,22 @@ function ShopGenerateInner() {
   const [userId, setUserId] = useState<string>("");
   const [productId, setProductId] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
-  const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
+  // Shortcuts server-side (Redis) — sincronizados entre PC y móvil.
+  const shortcutsQ = useShortcuts();
+  const shortcuts = shortcutsQ.data?.items ?? [];
+  const createShortcut = useCreateShortcut();
+  const deleteShortcut = useDeleteShortcut();
   // Selector manual cuenta+producto colapsado por defecto — la mayoría
   // de las veces el user entra y elige una entrada rápida, no quiere
   // ver los pickers completos cada vez.
   const [pickersOpen, setPickersOpen] = useState(false);
 
-  // Cargar shortcuts una sola vez en mount (cliente only — localStorage).
+  // Migración one-shot: sube shortcuts viejos de localStorage al server.
   useEffect(() => {
-    setShortcuts(readShortcuts());
+    migrateLocalShortcutsIfNeeded().then((n) => {
+      if (n > 0) shortcutsQ.refetch();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-abrir el picker manual si no hay selección válida tras hidratar
@@ -276,7 +249,7 @@ function ShopGenerateInner() {
   const addShortcut = useCallback((): void => {
     if (!userId || !productId) return;
     const exists = shortcuts.some(
-      (s) => s.userId === userId && s.productId === productId,
+      (s) => s.user_id === userId && s.product_id === productId,
     );
     if (exists) {
       toast.info("Ya tienes esta entrada rápida guardada.");
@@ -288,47 +261,45 @@ function ShopGenerateInner() {
       );
       return;
     }
-    const next: Shortcut[] = [
-      ...shortcuts,
-      { userId, productId, created_at: new Date().toISOString() },
-    ];
-    setShortcuts(next);
-    writeShortcuts(next);
-    toast.success("Entrada rápida guardada.");
-  }, [userId, productId, shortcuts]);
+    createShortcut.mutate(
+      { user_id: userId, product_id: productId },
+      {
+        onSuccess: () => toast.success("Entrada rápida guardada."),
+        onError: (e) => toast.error(`Error guardando: ${e.message}`),
+      },
+    );
+  }, [userId, productId, shortcuts, createShortcut]);
 
   const removeShortcut = useCallback(
-    (s: Shortcut): void => {
-      const next = shortcuts.filter(
-        (x) => !(x.userId === s.userId && x.productId === s.productId),
-      );
-      setShortcuts(next);
-      writeShortcuts(next);
+    (s: ServerShortcut): void => {
+      deleteShortcut.mutate(s.id, {
+        onError: (e) => toast.error(`Error borrando: ${e.message}`),
+      });
     },
-    [shortcuts],
+    [deleteShortcut],
   );
 
-  function pickShortcut(s: Shortcut): void {
+  function pickShortcut(s: ServerShortcut): void {
     // Validamos que ambos siguen vivos y el producto sigue asignado.
-    const user = activeUsers.find((u) => u.id === s.userId);
+    const user = activeUsers.find((u) => u.id === s.user_id);
     if (!user) {
       toast.error("Esa cuenta ya no existe. Quita la entrada rápida.");
       return;
     }
     const userAssigned = new Set(user.assigned_products ?? []);
-    if (!userAssigned.has(s.productId)) {
+    if (!userAssigned.has(s.product_id)) {
       toast.error(
         "Ese producto ya no está asignado a la cuenta. Quita la entrada rápida.",
       );
       return;
     }
-    setUserId(s.userId);
-    setProductId(s.productId);
+    setUserId(s.user_id);
+    setProductId(s.product_id);
   }
 
   const selectedProduct = activeProducts.find((p) => p.id === productId);
   const currentComboSaved = shortcuts.some(
-    (s) => s.userId === userId && s.productId === productId,
+    (s) => s.user_id === userId && s.product_id === productId,
   );
 
   return (
@@ -385,19 +356,19 @@ function ShopGenerateInner() {
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {shortcuts.map((s) => {
-                const user = activeUsers.find((u) => u.id === s.userId);
+                const user = activeUsers.find((u) => u.id === s.user_id);
                 const product = activeProducts.find(
-                  (p) => p.id === s.productId,
+                  (p) => p.id === s.product_id,
                 );
                 const stale =
                   !user ||
                   !product ||
-                  !(user.assigned_products ?? []).includes(s.productId);
+                  !(user.assigned_products ?? []).includes(s.product_id);
                 const isActive =
-                  s.userId === userId && s.productId === productId;
+                  s.user_id === userId && s.product_id === productId;
                 return (
                   <ShortcutCard
-                    key={`${s.userId}__${s.productId}`}
+                    key={s.id}
                     user={user}
                     product={product}
                     stale={stale}
