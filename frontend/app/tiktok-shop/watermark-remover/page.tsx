@@ -353,16 +353,16 @@ export default function WatermarkRemoverPage() {
                         setProductId(s.product_id);
                       }}
                       className={cn(
-                        "flex flex-col items-start gap-0.5 rounded-md border px-2.5 py-2 text-left transition-colors",
+                        "flex w-full min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-md border px-2.5 py-2 text-left transition-colors",
                         active
                           ? "border-amber-500 bg-amber-500/10"
                           : "border-muted bg-muted/30 hover:bg-muted/60",
                       )}
                     >
-                      <span className="truncate text-[11px] font-semibold sm:text-xs">
+                      <span className="block w-full truncate text-[11px] font-semibold sm:text-xs">
                         {formatHandle(u.username)}
                       </span>
-                      <span className="truncate text-[10px] text-muted-foreground sm:text-[11px]">
+                      <span className="block w-full truncate text-[10px] text-muted-foreground sm:text-[11px]">
                         {p.name}
                       </span>
                     </button>
@@ -381,7 +381,7 @@ export default function WatermarkRemoverPage() {
                 onValueChange={setUserId}
                 disabled={running || usersQ.isLoading}
               >
-                <SelectTrigger className="h-10 text-sm">
+                <SelectTrigger className="h-10 max-w-full text-sm [&>span]:truncate">
                   <SelectValue
                     placeholder={
                       usersQ.isLoading ? "Cargando…" : "Elige cuenta"
@@ -391,8 +391,10 @@ export default function WatermarkRemoverPage() {
                 <SelectContent>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
-                      {formatHandle(u.username)}
-                      {u.display_name ? ` · ${u.display_name}` : ""}
+                      <span className="block max-w-[18rem] truncate sm:max-w-[24rem]">
+                        {formatHandle(u.username)}
+                        {u.display_name ? ` · ${u.display_name}` : ""}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -407,7 +409,7 @@ export default function WatermarkRemoverPage() {
                 onValueChange={setProductId}
                 disabled={running || !selectedUser || productsQ.isLoading}
               >
-                <SelectTrigger className="h-10 text-sm">
+                <SelectTrigger className="h-10 max-w-full text-sm [&>span]:truncate">
                   <SelectValue
                     placeholder={
                       !selectedUser
@@ -421,7 +423,9 @@ export default function WatermarkRemoverPage() {
                 <SelectContent>
                   {userProducts.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.name}
+                      <span className="block max-w-[18rem] truncate sm:max-w-[24rem]">
+                        {p.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
