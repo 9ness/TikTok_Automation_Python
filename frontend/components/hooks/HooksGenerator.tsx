@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ChevronDown,
   ChevronRight,
   Copy,
   Loader2,
   MessageSquareText,
+  RefreshCw,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -27,6 +30,7 @@ import {
   useGenerateThemedHooks,
   type HookVariant,
 } from "@/lib/queries/hooks";
+import { useGeneratePresets } from "@/lib/queries/products";
 import type { Product, VideoPreset } from "@/lib/types/product";
 import { cn } from "@/lib/utils";
 
@@ -38,20 +42,184 @@ function copyToClipboard(text: string) {
     .catch(() => toast.error("No se pudo copiar"));
 }
 
-/** Generador completo de hooks: temáticos + existentes con variantes.
- *  Requiere que el caller le pase el `product` ya cargado. */
+/** Generador completo de hooks. Todo en tarjetas colapsables. */
 export function HooksGenerator({ product }: { product: Product }) {
   return (
     <div className="space-y-3">
-      <ThemedHooksGenerator product={product} />
+      <RegenerateBanner product={product} />
+      <CollapsibleCard
+        title="Crear hooks orientados a tema"
+        subtitle="Textarea libre + Gemini genera N hooks nuevos"
+        icon={Sparkles}
+        accent="purple"
+        defaultOpen={false}
+      >
+        <ThemedHooksGenerator product={product} />
+      </CollapsibleCard>
+
       <ExistingHooksSection product={product} />
     </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────────
-   Temáticos
-   ─────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────
+   CollapsibleCard genérica
+   ───────────────────────────────────────────────────────────────── */
+function CollapsibleCard({
+  title,
+  subtitle,
+  icon: Icon,
+  accent,
+  badge,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: typeof Sparkles;
+  accent: "purple" | "amber" | "emerald" | "pink";
+  badge?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const accents = {
+    purple: {
+      border: "border-purple-500/40",
+      icon: "text-purple-500",
+      activeBg: "bg-purple-500/5",
+    },
+    amber: {
+      border: "border-amber-500/40",
+      icon: "text-amber-500",
+      activeBg: "bg-amber-500/5",
+    },
+    emerald: {
+      border: "border-emerald-500/40",
+      icon: "text-emerald-500",
+      activeBg: "bg-emerald-500/5",
+    },
+    pink: {
+      border: "border-pink-500/40",
+      icon: "text-pink-500",
+      activeBg: "bg-pink-500/5",
+    },
+  };
+  const a = accents[accent];
+
+  return (
+    <Card className={cn(a.border, open && a.activeBg)}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 p-3 text-left transition-colors hover:bg-muted/40 sm:p-4"
+      >
+        {open ? (
+          <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        )}
+        <Icon className={cn("h-4 w-4 flex-shrink-0", a.icon)} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-xs font-semibold sm:text-sm">{title}</h3>
+            {badge && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] uppercase text-muted-foreground sm:text-[10px]">
+                {badge}
+              </span>
+            )}
+          </div>
+          {subtitle && (
+            <p className="truncate text-[10px] text-muted-foreground sm:text-[11px]">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      </button>
+      {open && <CardContent className="space-y-3 pt-0 sm:p-4 sm:pt-0">{children}</CardContent>}
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Banner para regenerar presets cuando hay research_context nuevo
+   ───────────────────────────────────────────────────────────────── */
+function RegenerateBanner({ product }: { product: Product }) {
+  const rc = product.research_context;
+  const generateMut = useGeneratePresets(product.id);
+
+  // Solo mostramos el banner si hay research_context Y hay presets antiguos.
+  if (!rc || !rc.analyzed_at || (product.video_presets ?? []).length === 0) {
+    return null;
+  }
+
+  // Detectar si los presets son anteriores al último research
+  // (comparamos analyzed_at del research con created_at del último preset).
+  const researchTime = new Date(rc.analyzed_at).getTime();
+  const presetTimes = (product.video_presets ?? [])
+    .map((p) => (p.created_at ? new Date(p.created_at).getTime() : 0))
+    .filter((t) => t > 0);
+  const newestPreset = presetTimes.length > 0 ? Math.max(...presetTimes) : 0;
+  const presetsStale = researchTime > newestPreset;
+
+  if (!presetsStale) return null;
+
+  function onRegenerate() {
+    if (
+      !window.confirm(
+        "Esto regenerará TODOS los presets usando la investigación más reciente. Los presets actuales serán reemplazados. ¿Continuar?",
+      )
+    ) {
+      return;
+    }
+    generateMut.mutate(
+      { kind: "both", n_music: 8, n_scripted: 12, replace_existing: true },
+      {
+        onSuccess: () => toast.success("Presets regenerados con investigación nueva"),
+        onError: (e) => toast.error(`Error: ${e.message}`),
+      },
+    );
+  }
+
+  return (
+    <Card className="border-amber-500/40 bg-amber-500/5">
+      <CardContent className="flex flex-wrap items-center gap-3 p-3 sm:p-4">
+        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold sm:text-sm">
+            Tienes investigación nueva sin aplicar a tus presets
+          </p>
+          <p className="text-[10px] text-muted-foreground sm:text-xs">
+            Los hooks actuales son anteriores al último análisis. Regenera
+            para que usen dolores reales + patrones virales detectados.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={onRegenerate}
+          disabled={generateMut.isPending}
+          className="h-8 gap-1 bg-amber-600 text-xs hover:bg-amber-700"
+        >
+          {generateMut.isPending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Regenerando…
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Regenerar hooks
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Temáticos (colapsable)
+   ───────────────────────────────────────────────────────────────── */
 function ThemedHooksGenerator({ product }: { product: Product }) {
   const [theme, setTheme] = useState("");
   const [n, setN] = useState<number>(10);
@@ -66,102 +234,93 @@ function ThemedHooksGenerator({ product }: { product: Product }) {
   }
 
   return (
-    <Card className="border-purple-500/40">
-      <CardContent className="space-y-3 p-3 sm:p-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-purple-500" />
-          <h2 className="text-sm font-semibold sm:text-base">
-            Crear hooks orientados a un tema
-          </h2>
-        </div>
-        <p className="text-[11px] text-muted-foreground sm:text-xs">
-          Escribe el tema/contexto y Gemini genera N hooks nuevos del producto
-          orientados a eso. Usa research_context si está disponible para
-          afinar.
-        </p>
-        <Textarea
-          value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-          placeholder="ej. orientados a verano y vacaciones · para regalar a la pareja · dramáticos · para edad >40 · antes de ir al gym"
-          rows={2}
-          maxLength={300}
-          className="text-sm"
-          disabled={mutation.isPending}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground sm:text-xs">
-              Nº hooks:
-            </Label>
-            <Select
-              value={String(n)}
-              onValueChange={(v) => setN(Number(v))}
-              disabled={mutation.isPending}
-            >
-              <SelectTrigger className="h-8 w-20 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[5, 10, 15, 20].map((v) => (
-                  <SelectItem key={v} value={String(v)}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            onClick={onGenerate}
-            disabled={mutation.isPending || !theme.trim()}
-            className="h-9 gap-1 bg-purple-600 text-xs hover:bg-purple-700 sm:h-8"
+    <div className="space-y-3 p-3 pt-0 sm:p-4 sm:pt-0">
+      <p className="text-[11px] text-muted-foreground sm:text-xs">
+        Escribe el tema/contexto y Gemini genera N hooks nuevos del producto
+        orientados a eso.
+      </p>
+      <Textarea
+        value={theme}
+        onChange={(e) => setTheme(e.target.value)}
+        placeholder="ej. orientados a verano y vacaciones · para regalar a la pareja · dramáticos · para edad >40"
+        rows={2}
+        maxLength={300}
+        className="text-sm"
+        disabled={mutation.isPending}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Label className="text-[10px] text-muted-foreground sm:text-xs">
+            Nº hooks:
+          </Label>
+          <Select
+            value={String(n)}
+            onValueChange={(v) => setN(Number(v))}
+            disabled={mutation.isPending}
           >
-            {mutation.isPending ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generando…
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-3.5 w-3.5" />
-                Generar {n}
-              </>
-            )}
-          </Button>
-        </div>
-
-        {mutation.data && (
-          <div className="space-y-2 pt-2">
-            {mutation.data.theme_interpretation && (
-              <p className="rounded bg-muted/30 px-2 py-1.5 text-[10px] italic text-muted-foreground sm:text-[11px]">
-                Interpretación: {mutation.data.theme_interpretation}
-              </p>
-            )}
-            <div className="space-y-1.5">
-              {mutation.data.hooks.map((h, i) => (
-                <HookRow
-                  key={i}
-                  text={h.text}
-                  meta={h.angle}
-                  hint={h.rationale}
-                  productId={product.id}
-                />
+            <SelectTrigger className="h-8 w-20 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 15, 20].map((v) => (
+                <SelectItem key={v} value={String(v)}>
+                  {v}
+                </SelectItem>
               ))}
-            </div>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          onClick={onGenerate}
+          disabled={mutation.isPending || !theme.trim()}
+          className="h-9 gap-1 bg-purple-600 text-xs hover:bg-purple-700 sm:h-8"
+        >
+          {mutation.isPending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Generando…
+            </>
+          ) : (
+            <>
+              <Wand2 className="h-3.5 w-3.5" />
+              Generar {n}
+            </>
+          )}
+        </Button>
+      </div>
+
+      {mutation.data && (
+        <div className="space-y-2 pt-2">
+          {mutation.data.theme_interpretation && (
+            <p className="rounded bg-muted/30 px-2 py-1.5 text-[10px] italic text-muted-foreground sm:text-[11px]">
+              Interpretación: {mutation.data.theme_interpretation}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            {mutation.data.hooks.map((h, i) => (
+              <HookRow
+                key={i}
+                text={h.text}
+                meta={h.angle}
+                hint={h.rationale}
+                productId={product.id}
+              />
+            ))}
           </div>
-        )}
-        {mutation.error && (
-          <p className="text-xs text-red-600 dark:text-red-400">
-            Error: {mutation.error.message}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+      {mutation.error && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          Error: {mutation.error.message}
+        </p>
+      )}
+    </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────────
-   Existentes — agrupados por preset
-   ─────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────
+   Existentes — agrupados por kind+angle, todos colapsados
+   ───────────────────────────────────────────────────────────────── */
 function ExistingHooksSection({ product }: { product: Product }) {
   const presets: VideoPreset[] = product.video_presets ?? [];
 
@@ -190,49 +349,51 @@ function ExistingHooksSection({ product }: { product: Product }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold sm:text-base">
           <MessageSquareText className="h-4 w-4 text-amber-500" />
           Hooks de tus presets ({presets.length})
         </h2>
         <span className="text-[10px] text-muted-foreground sm:text-xs">
-          {groups.length} grupos
+          {groups.length} grupo(s)
         </span>
       </div>
 
-      {groups.map((g) => (
-        <Card key={`${g.kind}-${g.angle}`}>
-          <CardContent className="space-y-2 p-3 sm:p-4">
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase sm:text-[10px]",
-                  g.kind === "music"
-                    ? "bg-pink-500/20 text-pink-700 dark:text-pink-300"
-                    : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
-                )}
-              >
-                {g.kind}
-              </span>
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase text-amber-700 dark:text-amber-300 sm:text-[10px]">
-                {g.angle}
-              </span>
-              <span className="ml-auto text-[10px] text-muted-foreground sm:text-xs">
-                {g.presets.length} preset(s)
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
+      {groups.map((g) => {
+        const subtitle = `${g.presets.length} preset(s) · ${countMainHooks(g.presets)} hook(s)`;
+        return (
+          <CollapsibleCard
+            key={`${g.kind}-${g.angle}`}
+            title={`${g.kind} · ${g.angle}`}
+            subtitle={subtitle}
+            icon={MessageSquareText}
+            accent={g.kind === "music" ? "pink" : "emerald"}
+            defaultOpen={false}
+          >
+            <div className="space-y-1.5 p-3 pt-0 sm:p-4 sm:pt-0">
               {g.presets.map((p) => (
-                <PresetHooksBlock key={p.id} preset={p} productId={product.id} />
+                <PresetHooksBlock
+                  key={p.id}
+                  preset={p}
+                  productId={product.id}
+                />
               ))}
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          </CollapsibleCard>
+        );
+      })}
     </div>
   );
+}
+
+function countMainHooks(presets: VideoPreset[]): number {
+  return presets.reduce((acc, p) => {
+    // SOLO contamos el hook principal (text_overlay). hooks_alternatives
+    // son variantes pre-generadas que el user no quiere ver — debe pulsar
+    // "+variantes" para generarlas on-demand.
+    return acc + (p.text_overlay && p.text_overlay.trim() ? 1 : 0);
+  }, 0);
 }
 
 function PresetHooksBlock({
@@ -242,48 +403,25 @@ function PresetHooksBlock({
   preset: VideoPreset;
   productId: string;
 }) {
-  const hooks: { text: string; label: string }[] = [];
-  if (preset.text_overlay && preset.text_overlay.trim()) {
-    hooks.push({ text: preset.text_overlay.trim(), label: "principal" });
-  }
-  for (const h of preset.hooks_alternatives ?? []) {
-    if (h && h.trim()) hooks.push({ text: h.trim(), label: "alt" });
-  }
-  if (preset.title && preset.title.trim()) {
-    hooks.push({ text: preset.title.trim(), label: "title" });
-  }
-  const seen = new Set<string>();
-  const dedup = hooks.filter((h) => {
-    const key = h.text.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  if (dedup.length === 0) return null;
+  // SOLO mostramos el hook PRINCIPAL (text_overlay) — no las
+  // hooks_alternatives (esas son variantes pre-generadas y el user las
+  // quiere generar bajo demanda con el botón "+variantes").
+  const mainHook = (preset.text_overlay || "").trim();
+  if (!mainHook) return null;
 
   return (
     <div className="rounded border bg-muted/20 p-2">
       <p className="mb-1 truncate text-[10px] font-semibold text-muted-foreground sm:text-[11px]">
         {preset.name || preset.id?.slice(0, 8)}
       </p>
-      <div className="space-y-1">
-        {dedup.map((h, i) => (
-          <HookRow
-            key={i}
-            text={h.text}
-            meta={h.label}
-            productId={productId}
-          />
-        ))}
-      </div>
+      <HookRow text={mainHook} productId={productId} />
     </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────
    HookRow genérico con copy + +variantes
-   ─────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 function HookRow({
   text,
   meta,
