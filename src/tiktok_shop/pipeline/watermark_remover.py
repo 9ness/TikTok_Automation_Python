@@ -78,15 +78,19 @@ class WatermarkBox:
 # tocar el código.
 WATERMARK_BOXES: dict[str, WatermarkBox] = {
     # Veo Flow: texto "Veo" blanco en esquina inferior-derecha.
-    # Frame 720×1280 → x≈635, y≈1230, w≈70, h≈35.
+    # Coords como TOP-LEFT del bounding box (no centro). Frame 720×1280:
+    # texto aprox bounding (615, 1215) tamaño 80×40. Margen extra de
+    # seguridad por descendentes (letras g/j) y antialiasing.
     "veo_flow": WatermarkBox(
-        x_pct=88.0, y_pct=96.0, w_pct=10.0, h_pct=3.0,
+        x_pct=85.0, y_pct=94.5, w_pct=14.0, h_pct=5.0,
         label="Veo Flow",
     ),
     # Gemini Chat: estrella sparkle 4-puntas (logo Gemini).
-    # Frame 720×1280 → x≈595, y≈1175, w≈45, h≈45.
+    # Frame 720×1280: star center ≈(605, 1190), tamaño star+puntas ≈60×60.
+    # Top-left → (575, 1160). Margen extra por puntas brillantes que se
+    # extienden con anti-aliasing.
     "gemini_chat": WatermarkBox(
-        x_pct=83.0, y_pct=92.0, w_pct=6.5, h_pct=3.5,
+        x_pct=79.0, y_pct=90.0, w_pct=10.0, h_pct=6.0,
         label="Gemini Chat",
     ),
 }
@@ -123,12 +127,13 @@ def _ffprobe_dimensions(input_path: str) -> tuple[int, int]:
 
 
 def _box_to_pixels(box: WatermarkBox, width: int, height: int) -> tuple[int, int, int, int]:
-    """Convierte WatermarkBox % a (x, y, w, h) en píxeles. Añade pequeño
-    padding (+2px en cada lado) para asegurar cobertura completa."""
-    x = max(0, int(round(width * box.x_pct / 100.0)) - 2)
-    y = max(0, int(round(height * box.y_pct / 100.0)) - 2)
-    w = min(width - x, int(round(width * box.w_pct / 100.0)) + 4)
-    h = min(height - y, int(round(height * box.h_pct / 100.0)) + 4)
+    """Convierte WatermarkBox % a (x, y, w, h) en píxeles. Añade padding
+    de seguridad (+6px en cada lado) — cubre antialiasing, puntas
+    brillantes y descendentes que se pasan del bounding visible."""
+    x = max(0, int(round(width * box.x_pct / 100.0)) - 6)
+    y = max(0, int(round(height * box.y_pct / 100.0)) - 6)
+    w = min(width - x, int(round(width * box.w_pct / 100.0)) + 12)
+    h = min(height - y, int(round(height * box.h_pct / 100.0)) + 12)
     # delogo necesita w >= 4 y h >= 4 (mínimo del filtro).
     w = max(4, w)
     h = max(4, h)
@@ -174,12 +179,18 @@ def remove_watermark(
         )
 
     # Compose filter chain: aplica delogo por cada caja.
+    # `band=4` da un fade-out suave de 4px alrededor de la caja → evita
+    # transiciones bruscas visibles entre zona difuminada y resto del
+    # frame (que dejaban un "pico" en el borde con cajas demasiado
+    # ajustadas).
     delogo_filters: list[str] = []
     for box in boxes:
         x, y, w, h = _box_to_pixels(box, width, height)
-        delogo_filters.append(f"delogo=x={x}:y={y}:w={w}:h={h}:show=0")
+        delogo_filters.append(
+            f"delogo=x={x}:y={y}:w={w}:h={h}:band=4:show=0"
+        )
         log_callback(
-            f"🚿 {box.label} → caja ({x},{y}) {w}×{h}px"
+            f"🚿 {box.label} → caja ({x},{y}) {w}×{h}px (band=4)"
         )
     vfilter = ",".join(delogo_filters)
 
