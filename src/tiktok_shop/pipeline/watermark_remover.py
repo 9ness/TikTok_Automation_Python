@@ -367,10 +367,23 @@ def remove_watermark_magic(
     log_callback(f"🎨 Máscara generada ({watermark_type})")
 
     try:
-        # ---- 2) Subir vídeo + máscara a Replicate Files API ----
-        log_callback(f"⬆️ Subiendo vídeo + máscara a Replicate…")
+        # ---- 2) Subir vídeo a Replicate Files API ----
+        # NOTA importante: Replicate Files API devuelve URLs sin extension
+        # (/v1/files/{id}). El modelo ProPainter (jd7h) chequea la
+        # extension de la máscara explicitamente y rechaza URLs sin .png
+        # con error "ProPainter via cog only supports static masks as
+        # .jpg or .png". Solución: pasar la máscara como data:URI base64.
+        # El vídeo SÍ funciona via Files API (el modelo es más permisivo).
+        # Máscara es pequeña (<10KB), data URI es perfecto.
+        log_callback(f"⬆️ Subiendo vídeo a Replicate Files API…")
         video_url = pp.upload_file(input_path)
-        mask_url = pp.upload_file(mask_path)
+        import base64 as _b64
+        with open(mask_path, "rb") as _mf:
+            mask_b64 = _b64.b64encode(_mf.read()).decode("ascii")
+        mask_url = f"data:image/png;base64,{mask_b64}"
+        log_callback(
+            f"🎨 Máscara encoded como data URI ({len(mask_b64)/1024:.1f} KB)"
+        )
 
         # ---- 3) Crear prediction ----
         log_callback(f"🪄 Encolando ProPainter…")
