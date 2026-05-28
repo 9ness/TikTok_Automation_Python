@@ -253,6 +253,59 @@ async def _render_hailuo_clips(
     return paths, renderers
 
 
+# ═════════════════════════════════════════════════════════════════════
+# Circuit-breaker para providers del chain musical
+# ═════════════════════════════════════════════════════════════════════
+# Si un provider falla, marcamos su timestamp aquí. Las próximas N min
+# saltamos ese provider sin pegarle (= sin gastar dinero en fal que
+# cobra al encolar). Si pasa la ventana, se resetea y se vuelve a probar.
+#
+# Esto SOLO aplica al chain musical (Runware Veo Lite → fal Hailuo →
+# Kling → Wan). El chain de Seedance scripted no lo usa (su lógica de
+# fallback es distinta — un job a la vez, no batch).
+#
+# Memoria del proceso — si se reinicia el container, se resetea (efecto
+# deseado: tras un deploy queremos reintentar todos los providers).
+_PROVIDER_LAST_FAIL: dict[str, float] = {}
+_CIRCUIT_BREAKER_COOLDOWN_S = 30 * 60   # 30min — ventana de espera tras un fallo
+
+
+def _circuit_breaker_skip(provider: str) -> bool:
+    """Devuelve True si debemos saltarnos este provider porque falló
+    recientemente. Llamar ANTES de hacer submit a evitar el cargo."""
+    import time as _t
+    last_fail = _PROVIDER_LAST_FAIL.get(provider)
+    if last_fail is None:
+        return False
+    elapsed = _t.time() - last_fail
+    return elapsed < _CIRCUIT_BREAKER_COOLDOWN_S
+
+
+def _circuit_breaker_record_fail(provider: str) -> None:
+    """Marca el provider como 'recently failed' — los próximos 30min
+    se saltará en la chain sin pegarle."""
+    import time as _t
+    _PROVIDER_LAST_FAIL[provider] = _t.time()
+
+
+def _circuit_breaker_record_success(provider: str) -> None:
+    """Resetea el cooldown del provider — el siguiente job podrá usarlo."""
+    _PROVIDER_LAST_FAIL.pop(provider, None)
+
+
+def _circuit_breaker_status() -> dict[str, float]:
+    """Para logging/debugging — devuelve providers en cooldown con
+    segundos restantes. Vacío = todo OK."""
+    import time as _t
+    now = _t.time()
+    out = {}
+    for p, t in _PROVIDER_LAST_FAIL.items():
+        remaining = _CIRCUIT_BREAKER_COOLDOWN_S - (now - t)
+        if remaining > 0:
+            out[p] = round(remaining, 0)
+    return out
+
+
 async def _run_via_hailuo(
     *,
     idx: int,
@@ -283,92 +336,154 @@ async def _run_via_hailuo(
     duration = int(spec.get("duration", 6))
     out_path = os.path.join(out_dir, f"clip_{idx}.mp4")
 
+    # Log estado del circuit breaker — providers en cooldown se saltarán.
+    cb_status = _circuit_breaker_status()
+    if cb_status:
+        cooldown_str = ", ".join(f"{p}={int(s/60)}min" for p, s in cb_status.items())
+        log_callback(
+            f"⚠️ Circuit-breaker activo (skipping): {cooldown_str}. "
+            f"Se reiniciará tras la ventana de espera."
+        )
+
     # ---- 0) Runware Veo 3.1 Lite (PRIMARIO si configurado) ----
     # Soporta 9:16 nativo, $0.05/s a 720p. Cola independiente de fal.ai
     # y cobra SOLO al completar (no por intentos fallidos).
-    if runware_is_configured():
+    if runware_is_configured() and not _circuit_breaker_skip("runware_veo"):
         try:
-            return await _run_via_runware_veo(
+            result = await _run_via_runware_veo(
                 idx=idx, spec={**spec, "duration": duration},
                 image_ref=image_ref, out_path=out_path,
                 log_callback=log_callback,
             )
+            _circuit_breaker_record_success("runware_veo")
+            return result
         except (RunwareError, RunwareTransient) as e_rw:
+            _circuit_breaker_record_fail("runware_veo")
             log_callback(
                 f"🔁 Clip {idx+1}: Runware Veo 3.1 Lite falló "
-                f"({str(e_rw)[:100]}). Cayendo a fal.ai…"
+                f"({str(e_rw)[:100]}). Cayendo a fal.ai. "
+                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará Runware Veo."
             )
+    elif _circuit_breaker_skip("runware_veo"):
+        log_callback(
+            f"⏭️ Clip {idx+1}: skip Runware Veo (cooldown circuit-breaker activo)"
+        )
 
     fal = FalCloudClient()
-    # ---- 1) Hailuo 02 Standard ----
-    try:
-        return await _run_one_fal_job(
-            fal=fal, loop=loop,
-            submit_fn=lambda: fal.submit_hailuo_i2v(
-                image_url=image_ref, prompt=spec["prompt"],
-                duration=duration, resolution=hailuo_res,
-            ),
-            cost_fn=lambda req_id: _record_music_cost(
-                model_id=HAILUO_STANDARD_MODEL_ID, duration_s=duration,
-                resolution=hailuo_res, idx=idx, req_id=req_id,
-            ),
-            renderer_label=MUSIC_RENDERER_LABELS[HAILUO_STANDARD_MODEL_ID],
-            idx=idx, out_path=out_path, log_callback=log_callback,
-        )
-    except (FalCloudError, FalCloudTransient) as e_hailuo:
+    e_hailuo: Exception | None = None
+    e_kling: Exception | None = None
+    e_wan: Exception | None = None
+
+    # ---- 1) fal Hailuo 02 Standard (skip si circuit-breaker) ----
+    if not _circuit_breaker_skip("fal_hailuo"):
+        try:
+            result = await _run_one_fal_job(
+                fal=fal, loop=loop,
+                submit_fn=lambda: fal.submit_hailuo_i2v(
+                    image_url=image_ref, prompt=spec["prompt"],
+                    duration=duration, resolution=hailuo_res,
+                ),
+                cost_fn=lambda req_id: _record_music_cost(
+                    model_id=HAILUO_STANDARD_MODEL_ID, duration_s=duration,
+                    resolution=hailuo_res, idx=idx, req_id=req_id,
+                ),
+                renderer_label=MUSIC_RENDERER_LABELS[HAILUO_STANDARD_MODEL_ID],
+                idx=idx, out_path=out_path, log_callback=log_callback,
+            )
+            _circuit_breaker_record_success("fal_hailuo")
+            return result
+        except (FalCloudError, FalCloudTransient) as e:
+            e_hailuo = e
+            _circuit_breaker_record_fail("fal_hailuo")
+            log_callback(
+                f"🔁 Clip {idx+1}: fal Hailuo falló ({str(e)[:100]}). "
+                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará."
+            )
+    else:
         log_callback(
-            f"🔁 Clip {idx+1}: Hailuo falló ({str(e_hailuo)[:100]}). "
-            f"Intentando Kling 2.1…"
+            f"⏭️ Clip {idx+1}: skip fal Hailuo (cooldown circuit-breaker)"
         )
 
-    # ---- 2) Kling 2.1 Standard ----
-    # Kling solo permite 5 o 10s. Si Hailuo era 6s, Kling lo redondea a 5.
+    # ---- 2) fal Kling 2.1 Standard (skip si circuit-breaker) ----
     kling_dur = 5 if duration <= 7 else 10
-    try:
-        return await _run_one_fal_job(
-            fal=fal, loop=loop,
-            submit_fn=lambda: fal.submit_kling_i2v(
-                image_url=image_ref, prompt=spec["prompt"], duration=kling_dur,
-            ),
-            cost_fn=lambda req_id: _record_music_cost(
-                model_id=KLING_V21_STANDARD_MODEL_ID, duration_s=kling_dur,
-                resolution=hailuo_res, idx=idx, req_id=req_id,
-            ),
-            renderer_label=MUSIC_RENDERER_LABELS[KLING_V21_STANDARD_MODEL_ID],
-            idx=idx, out_path=out_path, log_callback=log_callback,
-        )
-    except (FalCloudError, FalCloudTransient) as e_kling:
+    if not _circuit_breaker_skip("fal_kling"):
+        try:
+            result = await _run_one_fal_job(
+                fal=fal, loop=loop,
+                submit_fn=lambda: fal.submit_kling_i2v(
+                    image_url=image_ref, prompt=spec["prompt"], duration=kling_dur,
+                ),
+                cost_fn=lambda req_id: _record_music_cost(
+                    model_id=KLING_V21_STANDARD_MODEL_ID, duration_s=kling_dur,
+                    resolution=hailuo_res, idx=idx, req_id=req_id,
+                ),
+                renderer_label=MUSIC_RENDERER_LABELS[KLING_V21_STANDARD_MODEL_ID],
+                idx=idx, out_path=out_path, log_callback=log_callback,
+            )
+            _circuit_breaker_record_success("fal_kling")
+            return result
+        except (FalCloudError, FalCloudTransient) as e:
+            e_kling = e
+            _circuit_breaker_record_fail("fal_kling")
+            log_callback(
+                f"🔁 Clip {idx+1}: fal Kling falló ({str(e)[:100]}). "
+                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará."
+            )
+    else:
         log_callback(
-            f"🔁 Clip {idx+1}: Kling también falló ({str(e_kling)[:100]}). "
-            f"Último intento: Wan 2.2-5b…"
+            f"⏭️ Clip {idx+1}: skip fal Kling (cooldown circuit-breaker)"
         )
 
-    # ---- 3) Wan 2.2-5b (último recurso) ----
-    # Wan máx ~6.7s a 24fps. Si pidieron 10s, le pedimos su máximo.
+    # ---- 3) fal Wan 2.2-5b (skip si circuit-breaker) ----
     wan_dur = min(duration, 6)
-    try:
-        return await _run_one_fal_job(
-            fal=fal, loop=loop,
-            submit_fn=lambda: fal.submit_wan_i2v(
-                image_url=image_ref, prompt=spec["prompt"],
-                duration_s=wan_dur, resolution="720p", aspect_ratio="9:16",
-            ),
-            cost_fn=lambda req_id: _record_music_cost(
-                model_id=WAN_V22_5B_MODEL_ID, duration_s=wan_dur,
-                resolution=hailuo_res, idx=idx, req_id=req_id,
-            ),
-            renderer_label=MUSIC_RENDERER_LABELS[WAN_V22_5B_MODEL_ID],
-            idx=idx, out_path=out_path, log_callback=log_callback,
-        )
-    except (FalCloudError, FalCloudTransient) as e_wan:
+    if not _circuit_breaker_skip("fal_wan"):
+        try:
+            result = await _run_one_fal_job(
+                fal=fal, loop=loop,
+                submit_fn=lambda: fal.submit_wan_i2v(
+                    image_url=image_ref, prompt=spec["prompt"],
+                    duration_s=wan_dur, resolution="720p", aspect_ratio="9:16",
+                ),
+                cost_fn=lambda req_id: _record_music_cost(
+                    model_id=WAN_V22_5B_MODEL_ID, duration_s=wan_dur,
+                    resolution=hailuo_res, idx=idx, req_id=req_id,
+                ),
+                renderer_label=MUSIC_RENDERER_LABELS[WAN_V22_5B_MODEL_ID],
+                idx=idx, out_path=out_path, log_callback=log_callback,
+            )
+            _circuit_breaker_record_success("fal_wan")
+            return result
+        except (FalCloudError, FalCloudTransient) as e:
+            e_wan = e
+            _circuit_breaker_record_fail("fal_wan")
+            log_callback(
+                f"❌ Clip {idx+1}: fal Wan también falló ({str(e)[:80]}). "
+                f"Próximos {_CIRCUIT_BREAKER_COOLDOWN_S//60}min se saltará."
+            )
+    else:
         log_callback(
-            f"❌ Clip {idx+1}: Hailuo, Kling Y Wan fallaron. fal.ai globalmente "
-            f"saturada — reintenta en unas horas o usa Veo 3 Flow."
+            f"⏭️ Clip {idx+1}: skip fal Wan (cooldown circuit-breaker)"
         )
-        raise RuntimeError(
-            f"Los 3 providers musicales fallaron en clip {idx+1}. "
-            f"Último error (Wan): {e_wan}"
-        ) from e_wan
+
+    # ---- TODOS los providers fallaron o están en cooldown ----
+    errs = []
+    if e_hailuo: errs.append(f"Hailuo={str(e_hailuo)[:60]}")
+    if e_kling: errs.append(f"Kling={str(e_kling)[:60]}")
+    if e_wan: errs.append(f"Wan={str(e_wan)[:60]}")
+    cb = _circuit_breaker_status()
+    skipped = [p for p in ("runware_veo", "fal_hailuo", "fal_kling", "fal_wan") if p in cb]
+
+    log_callback(
+        f"❌ Clip {idx+1}: TODOS los providers musicales fallaron o están en "
+        f"cooldown. {'Fallidos: ' + ', '.join(errs) if errs else ''} "
+        f"{'En cooldown: ' + ', '.join(skipped) if skipped else ''}. "
+        f"Reintenta en {_CIRCUIT_BREAKER_COOLDOWN_S//60}min o usa Veo 3 Flow."
+    )
+    raise RuntimeError(
+        f"Clip {idx+1}: no hay provider musical disponible "
+        f"(todos en cooldown circuit-breaker o fallidos). "
+        f"Errores: {' | '.join(errs) if errs else '(todos en cooldown — 0 gasto)'}"
+    )
 
 
 async def _run_via_runware_veo(
