@@ -42,10 +42,20 @@ import { cn } from "@/lib/utils";
 
 const LS_KEY = "tiktokshop_watermark_dest_v1";
 const LS_QUALITY_KEY = "tiktokshop_watermark_quality_v1";
+// Mismo key que /tiktok-shop/generate — compartimos las entradas rápidas
+// (cuenta+producto que el user usa frecuentemente). Si añade/edita
+// shortcuts en cualquiera de las dos páginas, ambas los ven.
+const LS_SHORTCUTS_KEY = "tiktok_shop_generate.shortcuts";
 
 interface DestSelection {
   userId: string;
   productId: string;
+}
+
+interface Shortcut {
+  userId: string;
+  productId: string;
+  created_at: string;
 }
 
 interface QueueItem {
@@ -98,6 +108,30 @@ function writeDest(sel: DestSelection): void {
   }
 }
 
+function readShortcuts(): Shortcut[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_SHORTCUTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (s) =>
+          s &&
+          typeof s.userId === "string" &&
+          typeof s.productId === "string",
+      )
+      .map((s) => ({
+        userId: s.userId,
+        productId: s.productId,
+        created_at: typeof s.created_at === "string" ? s.created_at : new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 function formatHandle(u: string | null | undefined): string {
   if (!u) return "—";
   return `@${u.replace(/^@+/, "")}`;
@@ -115,10 +149,11 @@ export default function WatermarkRemoverPage() {
   const [watermarkType, setWatermarkType] = useState<WatermarkType>("auto");
   const [quality, setQuality] = useState<WatermarkQuality>("magic");
   const [running, setRunning] = useState(false);
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const remove = useRemoveWatermark();
 
-  // Hidrata destino + calidad desde localStorage al cargar
+  // Hidrata destino + calidad + shortcuts desde localStorage al cargar
   useEffect(() => {
     const last = readDest();
     if (last) {
@@ -129,6 +164,7 @@ export default function WatermarkRemoverPage() {
       const q = window.localStorage.getItem(LS_QUALITY_KEY);
       if (q === "fast" || q === "magic") setQuality(q);
     }
+    setShortcuts(readShortcuts());
     setHydrated(true);
   }, []);
 
@@ -295,6 +331,47 @@ export default function WatermarkRemoverPage() {
               Carpeta destino (Drive)
             </Label>
           </div>
+
+          {/* Entradas rápidas — mismo localStorage que /generate */}
+          {shortcuts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-[11px]">
+                Entradas rápidas
+              </Label>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {shortcuts.map((s) => {
+                  const u = users.find((x) => x.id === s.userId);
+                  const p = allProducts.find((x) => x.id === s.productId);
+                  if (!u || !p) return null;
+                  const active = s.userId === userId && s.productId === productId;
+                  return (
+                    <button
+                      key={`${s.userId}_${s.productId}`}
+                      type="button"
+                      disabled={running}
+                      onClick={() => {
+                        setUserId(s.userId);
+                        setProductId(s.productId);
+                      }}
+                      className={cn(
+                        "flex flex-col items-start gap-0.5 rounded-md border px-2.5 py-2 text-left transition-colors",
+                        active
+                          ? "border-amber-500 bg-amber-500/10"
+                          : "border-muted bg-muted/30 hover:bg-muted/60",
+                      )}
+                    >
+                      <span className="truncate text-[11px] font-semibold sm:text-xs">
+                        {formatHandle(u.username)}
+                      </span>
+                      <span className="truncate text-[10px] text-muted-foreground sm:text-[11px]">
+                        {p.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <Label className="text-[10px] text-muted-foreground sm:text-xs">
