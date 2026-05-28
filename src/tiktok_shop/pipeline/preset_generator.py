@@ -156,6 +156,52 @@ _LANGUAGE_INSTRUCTIONS: dict[str, tuple[str, str]] = {
 }
 
 
+def _research_block(product: Any) -> str:
+    """Bloque RESEARCH CONTEXT con datos REALES de reviews y TikToks
+    virales del producto. Se inyecta en el user_prompt de los directores
+    (music, scripted, ab_variants) para que los guiones se basen en
+    insights verificados, no en invenciones del modelo.
+
+    Si el producto no tiene research_context (campo vacío), devuelve
+    string vacío — el director funciona como antes."""
+    rc = getattr(product, "research_context", None)
+    if rc is None:
+        return ""
+    pains = list(getattr(rc, "customer_pains", []) or [])
+    benefits = list(getattr(rc, "customer_benefits", []) or [])
+    objections = list(getattr(rc, "objections", []) or [])
+    proven_hooks = list(getattr(rc, "proven_hooks", []) or [])
+    viral_patterns = list(getattr(rc, "viral_patterns", []) or [])
+    keywords = list(getattr(rc, "niche_keywords", []) or [])
+    competitive = list(getattr(rc, "competitive_diff", []) or [])
+    if not any([pains, benefits, objections, proven_hooks, viral_patterns]):
+        return ""
+
+    def _list(items: list[str], cap: int = 10) -> str:
+        return "\n".join(f"  - {x}" for x in items[:cap]) if items else "  (vacío)"
+
+    return (
+        "\n=== RESEARCH CONTEXT (DATOS REALES — ÚSALOS) ===\n"
+        "Esta investigación se sacó de reviews reales (Amazon/AliExpress/foros) "
+        "y de los top vídeos virales del producto en TikTok. USA estos datos "
+        "como base — no inventes pains/objections genéricos cuando tienes los "
+        "reales aquí abajo.\n\n"
+        f"DOLORES REALES de clientes (úsalos en hooks problem_solution + voice_script):\n{_list(pains)}\n\n"
+        f"BENEFICIOS que la gente menciona en reviews positivas (úsalos en hooks deseo + cierres):\n{_list(benefits)}\n\n"
+        f"OBJECIONES reales que aparecen en comentarios (RESPÓNDELAS en el body del script para neutralizar dudas antes de que las tenga el viewer):\n{_list(objections)}\n\n"
+        f"HOOKS PROBADOS de vídeos que YA viralizaron con este producto/nicho (inspírate, adáptalos al producto del user — NO copies literal):\n{_list(proven_hooks)}\n\n"
+        f"PATRONES VIRALES detectados en los top vídeos (estructura, planos, transiciones — replica lo que funciona):\n{_list(viral_patterns)}\n\n"
+        f"KEYWORDS SEO del nicho (intégralos en `keywords` del preset + title):\n{_list(keywords, cap=15)}\n\n"
+        f"DIFERENCIADORES vs competidores (úsalos en hooks de comparativa):\n{_list(competitive)}\n\n"
+        "Reglas:\n"
+        "- Si un preset usa ángulo `dolor` → tira de DOLORES REALES.\n"
+        "- Si usa `prueba_social` → cita objeciones que neutralizan dudas.\n"
+        "- Si usa `comparativa` → usa DIFERENCIADORES.\n"
+        "- Las variantes A/B deben explorar pains/objections DISTINTAS entre sí.\n"
+        "- Mantén el TONO real de la gente (no marketing speak)."
+    )
+
+
 def _language_block(product: Any) -> str:
     """Bloque de instrucciones de idioma para inyectar en el user_prompt
     de Gemini. Default a es_ES si el producto no tiene `language` o tiene
@@ -515,6 +561,7 @@ def _generate_music(
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
+        f"{_research_block(product)}\n"
         f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets musicales. Sigue el schema al pie de la letra."
@@ -629,6 +676,7 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
         f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
+        f"{_research_block(product)}\n"
         f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets scripted, cada uno con un ÁNGULO "

@@ -1239,6 +1239,29 @@ def reanalyze_product(
         raise GeminiError(f"Análisis Gemini falló: {e}", details={"product_id": product_id})
 
     _apply_analysis(product, result)
+
+    # ─── Investigación profunda: reviews + TikTok virales + análisis Gemini ───
+    # Adicional al análisis de fotos. Rellena `product.research_context`
+    # con pains/benefits/objections de reviews reales y patrones de los
+    # top vídeos virales de TikTok del producto. Los prompts directores
+    # leen esto al generar guiones para afinar hooks + estructura.
+    # Best-effort: si Apify/Gemini grounded search falla, el análisis
+    # de fotos ya se aplicó arriba, así que el producto queda OK.
+    try:
+        from src.tiktok_shop.services.research_service import deep_research_product
+
+        research = deep_research_product(
+            product,
+            max_videos_to_analyze=5,
+            max_tiktok_search_results=10,
+            log_callback=lambda m: print(f"[research {product.id[:8]}] {m}"),
+        )
+        product.research_context = research
+    except Exception as e:
+        # No abortamos el reanálisis si la research falla. Logueamos y
+        # seguimos — el análisis de fotos ya está aplicado.
+        print(f"[reanalyze {product.id[:8]}] research falló: {e}")
+
     repo.save(product)
 
     return ReanalyzeResponse(
