@@ -37,7 +37,7 @@ MAX_RETRIES_TRANSIENT = 2
 
 # Actor IDs — verificados en apify.com/store. Permite override via env.
 TIKTOK_SCRAPER_ACTOR = os.environ.get(
-    "APIFY_TIKTOK_SEARCH_ACTOR", "apidojo/tiktok-scraper",
+    "APIFY_TIKTOK_SEARCH_ACTOR", "clockworks/tiktok-scraper",
 )
 
 
@@ -158,17 +158,22 @@ def search_tiktok_videos(
     if log_callback:
         log_callback(f"🔎 Apify: buscando '{query}' en TikTok (limit={limit})…")
 
-    # Input schema verificado contra apidojo/tiktok-scraper (input-schema
-    # web doc + run-failed errors). Fields correctos:
-    #   - keywords: array (NO "searchQueries")
-    #   - maxItems: int (NO "resultsPerPage")
-    #   - sortType: "RELEVANCE" | "MOST_LIKED" | "MOST_RECENT"
-    #   - location: country code (ES, US, ...)
+    # Input schema clockworks/tiktok-scraper (verificado live 2026-05):
+    #   - searchQueries: array de keywords
+    #   - resultsPerPage: int
+    #   - shouldDownloadVideos/Covers/Subtitles/SlideshowImages: bool
+    #     (false porque solo queremos metadata; el MP4 lo bajamos aparte)
+    #   - proxyCountryCode: ES/US/...
+    # NOTA: apidojo/tiktok-scraper devuelve {noResults: true} para
+    # cualquier query (broken upstream), por eso usamos clockworks.
     input_data = {
-        "keywords": [query],
-        "maxItems": min(limit, 30),
-        "sortType": "MOST_LIKED" if sort_by == "popular" else "MOST_RECENT",
-        "location": "ES",
+        "searchQueries": [query],
+        "resultsPerPage": min(limit, 30),
+        "shouldDownloadVideos": False,
+        "shouldDownloadCovers": False,
+        "shouldDownloadSubtitles": False,
+        "shouldDownloadSlideshowImages": False,
+        "proxyCountryCode": "ES",
     }
     items = _run_actor_sync(TIKTOK_SCRAPER_ACTOR, input_data)
     if not isinstance(items, list):
