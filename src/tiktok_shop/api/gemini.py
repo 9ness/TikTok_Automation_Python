@@ -76,6 +76,81 @@ def is_configured() -> bool:
 # ---------------------------------------------------------------------------
 # Llamada cruda a Gemini con UNA key
 # ---------------------------------------------------------------------------
+def _call_rest_grounded(
+    api_key: str,
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    temperature: float,
+) -> str:
+    """Llama Gemini via REST directo con google_search grounding habilitado.
+
+    El SDK legacy `google.generativeai` NO soporta el tool `google_search`
+    para modelos Gemini 2.x (solo `google_search_retrieval` para 1.5 que
+    ya no existe). Como fallback, llamamos REST con el formato 2.x.
+
+    Endpoint:
+      POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}
+    Body:
+      {
+        "contents": [{"role":"user", "parts":[{"text": ...}]}],
+        "systemInstruction": {"parts":[{"text": ...}]},
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"temperature": 0.4}
+      }
+    """
+    import requests
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}"
+        f":generateContent?key={api_key}"
+    )
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": user_prompt}]}
+        ],
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "tools": [{"google_search": {}}],
+        "generationConfig": {
+            "temperature": temperature,
+            # Sin response_mime_type: tools + JSON no son combinables.
+        },
+    }
+    r = requests.post(url, json=payload, timeout=180)
+    if r.status_code == 429:
+        # Replica el error format del SDK para que _is_quota_error lo detecte
+        raise RuntimeError(
+            f"429 RESOURCE_EXHAUSTED: {r.text[:300]}"
+        )
+    if r.status_code >= 400:
+        raise RuntimeError(
+            f"Gemini REST {r.status_code}: {r.text[:500]}"
+        )
+    data = r.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return ""
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+
+    # Cost tracking via usageMetadata
+    try:
+        usage = data.get("usageMetadata") or {}
+        input_tokens = int(usage.get("promptTokenCount") or 0)
+        output_tokens = int(usage.get("candidatesTokenCount") or 0)
+        if input_tokens or output_tokens:
+            from src.cost_tracking import record_gemini
+            record_gemini(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                model=model,
+            )
+    except Exception as e:
+        log_warning(_LOGGER_NAME, "cost tracking REST falló", error=str(e))
+
+    return text.strip()
+
+
 def _call_with_key(
     api_key: str,
     *,
@@ -101,29 +176,31 @@ def _call_with_key(
             Gemini 2.5 Pro acepta hasta 20 vídeos por request (cada uno
             counts como ~258 tokens/seg de duración).
     """
+    # Si habilitamos Google Search grounding, NO podemos usar la library
+    # legacy `google.generativeai` (no soporta el tool google_search para
+    # Gemini 2.x; el SDK nuevo es `google-genai`). Como wrapper, llamamos
+    # REST directo con el formato correcto. El cost tracking se hace
+    # dentro del helper.
+    if enable_web_search:
+        return _call_rest_grounded(
+            api_key,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model,
+            temperature=temperature,
+        )
+
     import google.generativeai as genai
 
     genai.configure(api_key=api_key)
-    # Si habilitamos Google Search grounding, hay que pasarlo como tool.
-    # Gemini 2.x renombró "google_search_retrieval" (Gemini 1.5) a
-    # "google_search" (Gemini 2.x). Esto da error 400 "tool not supported"
-    # si lo enviamos al modelo equivocado. Modelos:
-    #   - gemini-1.5-*: google_search_retrieval
-    #   - gemini-2.*:   google_search
-    # Como ahora usamos 2.5 Pro/Flash, mandamos siempre google_search.
     tools = None
-    if enable_web_search:
-        tools = [{"google_search": {}}]
-        if expect_json:
-            # Limitación de Gemini: no se puede combinar tools + JSON mode.
-            # Pedimos texto plano y el caller parsea/extrae lo que necesite.
-            expect_json = False
 
     model_obj = genai.GenerativeModel(
         model_name=model,
         system_instruction=system_prompt,
         tools=tools,
     )
+    _ = tools  # tools queda en None al no haber web_search; el modelo se inicia sin tools
 
     parts: list = [user_prompt]
     if images:
