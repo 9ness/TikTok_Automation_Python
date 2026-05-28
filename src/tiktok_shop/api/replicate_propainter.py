@@ -44,8 +44,11 @@ except ValueError:
     POLL_TIMEOUT_S = 900
 
 PROPAINTER_MODEL = os.environ.get(
-    "REPLICATE_PROPAINTER_MODEL", "cjwbw/propainter",
+    "REPLICATE_PROPAINTER_MODEL", "zsxkib/propainter",
 )
+# Cache de version hash del modelo (Replicate community models requieren
+# version explícita en /predictions). Fetcheamos on-demand y cacheamos.
+_VERSION_CACHE: dict[str, str] = {}
 
 UPLOAD_TIMEOUT_S = 300  # vídeos pueden ser hasta 200MB
 
@@ -142,6 +145,46 @@ def _guess_mime(suffix: str) -> str:
     }.get(s, "application/octet-stream")
 
 
+def _fetch_latest_version(model_slug: str) -> str:
+    """Obtiene el hash de la última versión del modelo. Cachea para
+    no consultar en cada submit. Community models REQUIEREN version
+    hash al crear predictions (a diferencia de modelos oficiales)."""
+    cached = _VERSION_CACHE.get(model_slug)
+    if cached:
+        return cached
+    url = f"{REPLICATE_API_URL}/models/{model_slug}"
+    try:
+        r = requests.get(url, headers=_headers(), timeout=SUBMIT_TIMEOUT_S)
+    except (requests.Timeout, requests.ConnectionError) as e:
+        raise ReplicateProPainterTransient(f"fetch version network: {e}")
+    if r.status_code == 404:
+        raise ReplicateProPainterError(
+            f"Modelo '{model_slug}' no existe en Replicate. Verifica el "
+            f"slug — prueba 'zsxkib/propainter' o configura "
+            f"REPLICATE_PROPAINTER_MODEL en .env del VPS.",
+            status_code=404, kind="model_not_found",
+        )
+    if r.status_code in (401, 403):
+        raise ReplicateProPainterError(
+            f"Replicate auth fallo al fetch model ({r.status_code})",
+            status_code=r.status_code, kind="auth",
+        )
+    if r.status_code >= 400:
+        raise ReplicateProPainterError(
+            f"Replicate fetch model {r.status_code}: {r.text[:300]}",
+            status_code=r.status_code, kind="invalid_request",
+        )
+    data = r.json()
+    version = (data.get("latest_version") or {}).get("id")
+    if not version:
+        raise ReplicateProPainterError(
+            f"Modelo '{model_slug}' sin latest_version — posiblemente sin "
+            f"build publicado."
+        )
+    _VERSION_CACHE[model_slug] = version
+    return version
+
+
 def submit_propainter(
     *,
     video_url: str,
@@ -159,7 +202,13 @@ def submit_propainter(
       - ref_stride: stride para frames de referencia (10 = balance)
       - resize_ratio: 1.0 mantiene resolución original (recomendado)
     """
+    # Community models en Replicate requieren version hash explícita.
+    # /v1/models/{owner}/{name}/predictions solo funciona para modelos
+    # OFICIALES (los publicados por @replicate). Para community usamos
+    # /v1/predictions con `version` field.
+    version = _fetch_latest_version(PROPAINTER_MODEL)
     payload = {
+        "version": version,
         "input": {
             "video": video_url,
             "mask": mask_url,
@@ -169,7 +218,7 @@ def submit_propainter(
             "resize_ratio": resize_ratio,
         }
     }
-    url = f"{REPLICATE_API_URL}/models/{PROPAINTER_MODEL}/predictions"
+    url = f"{REPLICATE_API_URL}/predictions"
     try:
         r = requests.post(
             url, headers=_headers(), json=payload, timeout=SUBMIT_TIMEOUT_S,
