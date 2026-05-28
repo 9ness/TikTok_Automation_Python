@@ -321,23 +321,35 @@ def _analyze_top_videos(
     tmp_dir = tempfile.mkdtemp(prefix="research_videos_")
     video_paths: list[str] = []
 
+    # Índice del summary que sí pudimos descargar — usado para mapear
+    # per_video del análisis Gemini de vuelta al summary correcto.
+    downloaded_indexes: list[int] = []
     try:
-        # Descargar todos los MP4
+        # SIEMPRE creamos el summary con metadata Apify (URL, views, likes)
+        # aunque no podamos descargar el MP4 — la UI necesita las URLs.
         for idx, item in enumerate(apify_items):
             meta = apify_cloud.extract_video_metadata(item)
+            if not meta.get("url"):
+                continue  # sin URL TikTok no sirve ni para UI
+            summary = ViralVideoSummary(
+                url=meta["url"],
+                view_count=meta["view_count"],
+                like_count=meta["like_count"],
+                comment_count=meta["comment_count"],
+                duration_s=meta["duration_s"],
+            )
+            summaries.append(summary)
+            summary_idx = len(summaries) - 1
+
+            # Intentar descarga para análisis Gemini (opcional)
             if not meta.get("mp4_url"):
+                log_callback(f"  📋 Vídeo {idx+1} sin mp4_url — solo metadata")
                 continue
             try:
                 dest = os.path.join(tmp_dir, f"viral_{idx}.mp4")
                 apify_cloud.download_tiktok_video(meta["mp4_url"], dest)
                 video_paths.append(dest)
-                summaries.append(ViralVideoSummary(
-                    url=meta["url"],
-                    view_count=meta["view_count"],
-                    like_count=meta["like_count"],
-                    comment_count=meta["comment_count"],
-                    duration_s=meta["duration_s"],
-                ))
+                downloaded_indexes.append(summary_idx)
                 log_callback(
                     f"  ⬇️ Vídeo {idx+1} descargado · "
                     f"{meta['view_count']:,} views · {meta['duration_s']:.0f}s"
@@ -347,8 +359,11 @@ def _analyze_top_videos(
                 continue
 
         if not video_paths:
-            log_callback("  ❌ No se pudo descargar ningún vídeo")
-            return [], [], []
+            log_callback(
+                f"  ⚠️ No se pudo descargar ningún vídeo — guardando "
+                f"{len(summaries)} URLs sin análisis Gemini"
+            )
+            return summaries, [], []
 
         # Análisis BATCH con Gemini (todos los vídeos en una sola llamada)
         log_callback(
@@ -359,18 +374,23 @@ def _analyze_top_videos(
         )
         analysis = _parse_video_analysis(patterns_text)
 
-        # Aplicar per-video data al summary
+        # Aplicar per-video data al summary correcto (los analizados son
+        # un subset de summaries — mapeo vía downloaded_indexes).
         per_video = analysis.get("per_video", [])
         for i, vid_data in enumerate(per_video):
-            if i < len(summaries) and isinstance(vid_data, dict):
-                summaries[i].hook_text = str(vid_data.get("hook_text", ""))[:200]
-                summaries[i].hook_category = str(vid_data.get("hook_category", ""))[:50]
-                summaries[i].script_structure = str(vid_data.get("structure", ""))[:300]
-                summaries[i].visual_patterns = [
-                    str(v)[:120] for v in (vid_data.get("visual_patterns") or [])
-                ][:5]
-                summaries[i].cta_used = str(vid_data.get("cta", ""))[:120]
-                summaries[i].music_mood = str(vid_data.get("music_mood", ""))[:50]
+            if i >= len(downloaded_indexes) or not isinstance(vid_data, dict):
+                continue
+            target = downloaded_indexes[i]
+            if target >= len(summaries):
+                continue
+            summaries[target].hook_text = str(vid_data.get("hook_text", ""))[:200]
+            summaries[target].hook_category = str(vid_data.get("hook_category", ""))[:50]
+            summaries[target].script_structure = str(vid_data.get("structure", ""))[:300]
+            summaries[target].visual_patterns = [
+                str(v)[:120] for v in (vid_data.get("visual_patterns") or [])
+            ][:5]
+            summaries[target].cta_used = str(vid_data.get("cta", ""))[:120]
+            summaries[target].music_mood = str(vid_data.get("music_mood", ""))[:50]
 
         viral_patterns = [
             str(p)[:200] for p in (analysis.get("aggregated_patterns") or [])

@@ -166,10 +166,14 @@ def search_tiktok_videos(
     #   - proxyCountryCode: ES/US/...
     # NOTA: apidojo/tiktok-scraper devuelve {noResults: true} para
     # cualquier query (broken upstream), por eso usamos clockworks.
+    # NOTA: shouldDownloadVideos=True → Apify proxy descarga el MP4 a
+    # su key-value store y devuelve URLs en `mediaUrls`. Más fiable que
+    # videoMeta.downloadAddr (TikTok CDN rechaza descargas externas sin
+    # User-Agent/Referer correctos). Coste extra negligible.
     input_data = {
         "searchQueries": [query],
         "resultsPerPage": min(limit, 30),
-        "shouldDownloadVideos": False,
+        "shouldDownloadVideos": True,
         "shouldDownloadCovers": False,
         "shouldDownloadSubtitles": False,
         "shouldDownloadSlideshowImages": False,
@@ -203,10 +207,19 @@ def extract_video_metadata(item: dict[str, Any]) -> dict[str, Any]:
     video_meta = item.get("videoMeta") or {}
     music = item.get("music") or {}
     author = item.get("authorMeta") or {}
+    # clockworks con shouldDownloadVideos=True expone `mediaUrls[0]` →
+    # URL proxied de Apify (estable). Fallbacks por compat.
+    media_urls = item.get("mediaUrls") or []
+    mp4_url = (
+        (media_urls[0] if media_urls else "")
+        or item.get("videoUrl")
+        or video_meta.get("downloadAddr")
+        or ""
+    )
     return {
         "tiktok_id": str(item.get("id") or ""),
         "url": item.get("webVideoUrl") or "",
-        "mp4_url": item.get("videoUrl") or video_meta.get("downloadAddr") or "",
+        "mp4_url": mp4_url,
         "caption": item.get("text") or "",
         "hashtags": [h.get("name", "") for h in (item.get("hashtags") or []) if isinstance(h, dict)],
         "view_count": int(item.get("playCount") or 0),
