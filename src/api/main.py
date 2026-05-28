@@ -73,6 +73,7 @@ from src.api.routers import (
     subs_auto_router,
     tiktok_shop_presets_router,
     tiktok_shop_replicate_viral_router,
+    tiktok_shop_watermark_remover_router,
     users_router,
     voices_router,
     voices_sample_router,
@@ -232,6 +233,7 @@ def create_app() -> FastAPI:
     app.include_router(editor_auto_referrals_router)
     app.include_router(tiktok_shop_presets_router)
     app.include_router(tiktok_shop_replicate_viral_router)
+    app.include_router(tiktok_shop_watermark_remover_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)
