@@ -80,6 +80,7 @@ const NAV: NavGroup[] = [
       { href: "/tiktok-shop/products", label: "Productos", icon: Package },
       { href: "/tiktok-shop/users", label: "Usuarios", icon: Users },
       { href: "/tiktok-shop/generate", label: "Generador", icon: Sparkles },
+      { href: "/tiktok-shop/hooks", label: "Hooks", icon: Captions },
       { href: "/tiktok-shop/history", label: "Histórico", icon: History },
       { href: "/tiktok-shop/voices", label: "Voces", icon: Mic },
       { href: "/tiktok-shop/watermark-remover", label: "Sin marca", icon: ShieldOff },

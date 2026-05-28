@@ -27,6 +27,7 @@ from .editor_auto import (
     users_router as editor_auto_users_router,
 )
 from .tiktok_shop import (
+    hooks_router as tiktok_shop_hooks_router,
     presets_router as tiktok_shop_presets_router,
     replicate_viral_router as tiktok_shop_replicate_viral_router,
     shortcuts_router as tiktok_shop_shortcuts_router,
@@ -71,6 +72,7 @@ __all__ = [
     "editor_auto_plans_router",
     "editor_auto_subscriptions_router",
     "editor_auto_referrals_router",
+    "tiktok_shop_hooks_router",
     "tiktok_shop_presets_router",
     "tiktok_shop_replicate_viral_router",
     "tiktok_shop_shortcuts_router",
