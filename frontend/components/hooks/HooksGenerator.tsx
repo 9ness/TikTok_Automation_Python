@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   RefreshCw,
   Sparkles,
+  Star,
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,8 +27,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useAddFavoriteHook,
+  useDeleteFavoriteHook,
+  useFavoriteHooks,
   useGenerateHookVariants,
   useGenerateThemedHooks,
+  type FavoriteHook,
   type HookVariant,
 } from "@/lib/queries/hooks";
 import { useGeneratePresets } from "@/lib/queries/products";
@@ -44,9 +49,22 @@ function copyToClipboard(text: string) {
 
 /** Generador completo de hooks. Todo en tarjetas colapsables. */
 export function HooksGenerator({ product }: { product: Product }) {
+  const favoritesQ = useFavoriteHooks(product.id);
+  const favoritesList = favoritesQ.data?.items ?? [];
+  const favoritesSet = useMemo(
+    () => new Set(favoritesList.map((f) => f.text.trim().toLowerCase())),
+    [favoritesList],
+  );
+
   return (
     <div className="space-y-3">
-      <RegenerateBanner product={product} />
+      <RegenerateBanner product={product} favoritesCount={favoritesList.length} />
+
+      <FavoritesSection
+        product={product}
+        favorites={favoritesList}
+      />
+
       <CollapsibleCard
         title="Crear hooks orientados a tema"
         subtitle="Textarea libre + Gemini genera N hooks nuevos"
@@ -54,11 +72,52 @@ export function HooksGenerator({ product }: { product: Product }) {
         accent="purple"
         defaultOpen={false}
       >
-        <ThemedHooksGenerator product={product} />
+        <ThemedHooksGenerator product={product} favoritesSet={favoritesSet} />
       </CollapsibleCard>
 
-      <ExistingHooksSection product={product} />
+      <ExistingHooksSection product={product} favoritesSet={favoritesSet} />
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Sección Favoritos (top)
+   ───────────────────────────────────────────────────────────────── */
+function FavoritesSection({
+  product,
+  favorites,
+}: {
+  product: Product;
+  favorites: FavoriteHook[];
+}) {
+  if (favorites.length === 0) return null;
+  return (
+    <CollapsibleCard
+      title="Hooks favoritos"
+      subtitle="Protegidos contra regeneración · se usan como inspiración al regenerar presets"
+      icon={Star}
+      accent="amber"
+      badge={String(favorites.length)}
+      defaultOpen={true}
+    >
+      <div className="space-y-1.5 p-3 pt-0 sm:p-4 sm:pt-0">
+        {favorites.map((f, i) => (
+          <div key={i} className="rounded border bg-amber-500/5 p-2">
+            {f.notes && (
+              <p className="mb-1 text-[10px] italic text-muted-foreground sm:text-[11px]">
+                {f.notes}
+              </p>
+            )}
+            <HookRow
+              text={f.text}
+              meta={f.angle || undefined}
+              productId={product.id}
+              isFavorite
+            />
+          </div>
+        ))}
+      </div>
+    </CollapsibleCard>
   );
 }
 
@@ -144,7 +203,13 @@ function CollapsibleCard({
 /* ─────────────────────────────────────────────────────────────────
    Banner para regenerar presets cuando hay research_context nuevo
    ───────────────────────────────────────────────────────────────── */
-function RegenerateBanner({ product }: { product: Product }) {
+function RegenerateBanner({
+  product,
+  favoritesCount,
+}: {
+  product: Product;
+  favoritesCount: number;
+}) {
   const rc = product.research_context;
   const generateMut = useGeneratePresets(product.id);
 
@@ -192,6 +257,11 @@ function RegenerateBanner({ product }: { product: Product }) {
           <p className="text-[10px] text-muted-foreground sm:text-xs">
             Los hooks actuales son anteriores al último análisis. Regenera
             para que usen dolores reales + patrones virales detectados.
+            {favoritesCount > 0 && (
+              <span className="ml-1 font-medium text-amber-700 dark:text-amber-300">
+                ⭐ Tus {favoritesCount} favoritos NO se borrarán.
+              </span>
+            )}
           </p>
         </div>
         <Button
@@ -220,7 +290,13 @@ function RegenerateBanner({ product }: { product: Product }) {
 /* ─────────────────────────────────────────────────────────────────
    Temáticos (colapsable)
    ───────────────────────────────────────────────────────────────── */
-function ThemedHooksGenerator({ product }: { product: Product }) {
+function ThemedHooksGenerator({
+  product,
+  favoritesSet,
+}: {
+  product: Product;
+  favoritesSet: Set<string>;
+}) {
   const [theme, setTheme] = useState("");
   const [n, setN] = useState<number>(10);
   const mutation = useGenerateThemedHooks();
@@ -304,6 +380,7 @@ function ThemedHooksGenerator({ product }: { product: Product }) {
                 meta={h.angle}
                 hint={h.rationale}
                 productId={product.id}
+                isFavorite={favoritesSet.has(h.text.trim().toLowerCase())}
               />
             ))}
           </div>
@@ -321,7 +398,13 @@ function ThemedHooksGenerator({ product }: { product: Product }) {
 /* ─────────────────────────────────────────────────────────────────
    Existentes — agrupados por kind+angle, todos colapsados
    ───────────────────────────────────────────────────────────────── */
-function ExistingHooksSection({ product }: { product: Product }) {
+function ExistingHooksSection({
+  product,
+  favoritesSet,
+}: {
+  product: Product;
+  favoritesSet: Set<string>;
+}) {
   const presets: VideoPreset[] = product.video_presets ?? [];
 
   const groups = useMemo(() => {
@@ -377,6 +460,7 @@ function ExistingHooksSection({ product }: { product: Product }) {
                   key={p.id}
                   preset={p}
                   productId={product.id}
+                  favoritesSet={favoritesSet}
                 />
               ))}
             </div>
@@ -399,22 +483,29 @@ function countMainHooks(presets: VideoPreset[]): number {
 function PresetHooksBlock({
   preset,
   productId,
+  favoritesSet,
 }: {
   preset: VideoPreset;
   productId: string;
+  favoritesSet: Set<string>;
 }) {
-  // SOLO mostramos el hook PRINCIPAL (text_overlay) — no las
-  // hooks_alternatives (esas son variantes pre-generadas y el user las
-  // quiere generar bajo demanda con el botón "+variantes").
   const mainHook = (preset.text_overlay || "").trim();
   if (!mainHook) return null;
+  const isFav = favoritesSet.has(mainHook.toLowerCase());
 
   return (
     <div className="rounded border bg-muted/20 p-2">
       <p className="mb-1 truncate text-[10px] font-semibold text-muted-foreground sm:text-[11px]">
         {preset.name || preset.id?.slice(0, 8)}
       </p>
-      <HookRow text={mainHook} productId={productId} />
+      <HookRow
+        text={mainHook}
+        productId={productId}
+        isFavorite={isFav}
+        sourcePresetId={preset.id}
+        sourceAngle={preset.angle}
+        sourceKind={preset.kind}
+      />
     </div>
   );
 }
@@ -427,14 +518,24 @@ function HookRow({
   meta,
   hint,
   productId,
+  isFavorite = false,
+  sourcePresetId,
+  sourceAngle,
+  sourceKind,
 }: {
   text: string;
   meta?: string;
   hint?: string;
   productId: string;
+  isFavorite?: boolean;
+  sourcePresetId?: string;
+  sourceAngle?: string;
+  sourceKind?: string;
 }) {
   const [showVariants, setShowVariants] = useState(false);
   const variantsMut = useGenerateHookVariants();
+  const addFav = useAddFavoriteHook();
+  const delFav = useDeleteFavoriteHook();
   const [n] = useState(5);
 
   function onCopy() {
@@ -444,9 +545,35 @@ function HookRow({
     variantsMut.mutate({ productId, hook: text, n });
     setShowVariants(true);
   }
+  function onToggleFavorite() {
+    if (isFavorite) {
+      delFav.mutate(
+        { productId, text },
+        { onSuccess: () => toast.success("Quitado de favoritos") },
+      );
+    } else {
+      addFav.mutate(
+        {
+          productId,
+          text,
+          angle: sourceAngle || meta || "",
+          kind: sourceKind || "",
+          source_preset_id: sourcePresetId,
+        },
+        { onSuccess: () => toast.success("Guardado en favoritos ⭐") },
+      );
+    }
+  }
 
   return (
-    <div className="rounded border border-muted bg-card p-2 text-[11px] sm:text-xs">
+    <div
+      className={cn(
+        "rounded border p-2 text-[11px] sm:text-xs",
+        isFavorite
+          ? "border-amber-500/40 bg-amber-500/5"
+          : "border-muted bg-card",
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="break-words font-medium text-foreground">{text}</p>
@@ -462,6 +589,23 @@ function HookRow({
           )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onToggleFavorite}
+            disabled={addFav.isPending || delFav.isPending}
+            title={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+            className={cn(
+              "h-7 w-7 p-0",
+              isFavorite
+                ? "text-amber-500 hover:text-amber-600"
+                : "text-muted-foreground hover:text-amber-500",
+            )}
+          >
+            <Star
+              className={cn("h-3.5 w-3.5", isFavorite && "fill-current")}
+            />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -508,6 +652,24 @@ function HookRow({
                   </p>
                 )}
               </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  addFav.mutate(
+                    {
+                      productId,
+                      text: v.text,
+                      angle: variantsMut.data?.angle_detected || "",
+                    },
+                    { onSuccess: () => toast.success("Guardado en favoritos ⭐") },
+                  )
+                }
+                title="Marcar como favorito"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-amber-500"
+              >
+                <Star className="h-3 w-3" />
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"

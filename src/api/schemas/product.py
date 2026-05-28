@@ -146,6 +146,9 @@ class ProductResponse(BaseModel):
     # Investigación profunda (pains, benefits, objections, viral_patterns,
     # top_videos, etc). Se rellena al pulsar "Reanalizar producto".
     research_context: dict[str, Any] = Field(default_factory=dict)
+    # Hooks marcados como favoritos por el operador. Sobreviven a la
+    # regeneración de presets y se usan como proven_hooks extras.
+    favorite_hooks: list[dict[str, Any]] = Field(default_factory=list)
     performance_history: dict[str, Any]
     needs_nano_banana_regeneration: bool = False
     drive_folder: str | None = None

@@ -165,15 +165,33 @@ def _research_block(product: Any) -> str:
     Si el producto no tiene research_context (campo vacío), devuelve
     string vacío — el director funciona como antes."""
     rc = getattr(product, "research_context", None)
-    if rc is None:
-        return ""
-    pains = list(getattr(rc, "customer_pains", []) or [])
-    benefits = list(getattr(rc, "customer_benefits", []) or [])
-    objections = list(getattr(rc, "objections", []) or [])
-    proven_hooks = list(getattr(rc, "proven_hooks", []) or [])
-    viral_patterns = list(getattr(rc, "viral_patterns", []) or [])
-    keywords = list(getattr(rc, "niche_keywords", []) or [])
-    competitive = list(getattr(rc, "competitive_diff", []) or [])
+    pains: list[str] = []
+    benefits: list[str] = []
+    objections: list[str] = []
+    proven_hooks: list[str] = []
+    viral_patterns: list[str] = []
+    keywords: list[str] = []
+    competitive: list[str] = []
+    if rc is not None:
+        pains = list(getattr(rc, "customer_pains", []) or [])
+        benefits = list(getattr(rc, "customer_benefits", []) or [])
+        objections = list(getattr(rc, "objections", []) or [])
+        proven_hooks = list(getattr(rc, "proven_hooks", []) or [])
+        viral_patterns = list(getattr(rc, "viral_patterns", []) or [])
+        keywords = list(getattr(rc, "niche_keywords", []) or [])
+        competitive = list(getattr(rc, "competitive_diff", []) or [])
+
+    # Inyectar favoritos del operador como proven_hooks extras — son hooks
+    # que el user ha marcado explícitamente porque ya le han funcionado
+    # o le gustan especialmente. Prepended para que Gemini los priorice.
+    favorites = list(getattr(product, "favorite_hooks", []) or [])
+    if favorites:
+        fav_texts = [getattr(f, "text", "").strip() for f in favorites if getattr(f, "text", "").strip()]
+        # Quitar duplicados y poner al principio
+        existing_norm = {p.lower() for p in proven_hooks}
+        prepend = [t for t in fav_texts if t.lower() not in existing_norm]
+        proven_hooks = prepend + proven_hooks
+
     if not any([pains, benefits, objections, proven_hooks, viral_patterns]):
         return ""
 

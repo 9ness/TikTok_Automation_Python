@@ -115,6 +115,23 @@ class Hook(BaseModel):
     performance_score: float | None = None  # se actualiza con resultados
 
 
+class FavoriteHook(BaseModel):
+    """Hook marcado como favorito por el operador. Sobrevive a la
+    regeneración de presets — se almacena en `Product.favorite_hooks`
+    independientemente del array `video_presets`.
+
+    Cuando se regeneran presets con `replace_existing=True`, los
+    favoritos NO se tocan. Además los prompts directores los reciben
+    como `proven_hooks` extras, así los presets nuevos se inspiran
+    también en los favoritos del user (no solo en la investigación)."""
+    text: str                            # el hook literal
+    angle: str = ""                      # ángulo detectado (urgencia, dolor, ...)
+    kind: str = ""                       # kind del preset original (music/scripted)
+    source_preset_id: str | None = None  # preset de donde vino (si vino de uno)
+    notes: str = ""                      # comentario libre del user
+    saved_at: str = Field(default_factory=_now_iso)
+
+
 class ViralVideoSummary(BaseModel):
     """Resumen de un vídeo viral analizado por Gemini para extraer su fórmula."""
     url: str                            # https://tiktok.com/...
@@ -199,6 +216,10 @@ class Product(BaseModel):
     photos: ProductPhotos = Field(default_factory=ProductPhotos)
     video_config: VideoConfig = Field(default_factory=VideoConfig)
     hooks_library: list[Hook] = Field(default_factory=list)
+    # Hooks marcados como favoritos por el operador. Sobreviven a la
+    # regeneración de presets. Los prompts directores los usan como
+    # `proven_hooks` extras al regenerar.
+    favorite_hooks: list[FavoriteHook] = Field(default_factory=list)
     # Presets de vídeo precocinados (blueprints clickables en /generate).
     # Se crean desde la UI del producto pulsando "Generar" — Gemini usa
     # los prompts music_bof_director.md / scripted_bof_director.md.
