@@ -43,6 +43,7 @@ import { HooksEditor } from "./HooksEditor";
 import { NanoBananaPromptDialog } from "./NanoBananaPromptDialog";
 import { PhotoManager } from "./PhotoManager";
 import { PresetsManager } from "./PresetsManager";
+import { ResearchHighlights } from "./ResearchHighlights";
 import { ResearchPanel } from "./ResearchPanel";
 import { TabHint } from "./TabHint";
 import { cn } from "@/lib/utils";
@@ -518,31 +519,46 @@ function AudienceTab({ product }: { product: Product }) {
 
   return (
     <div className="space-y-4">
-      <FormField label="Audiencia objetivo (una por línea)">
-        <Textarea
-          rows={4}
-          value={form.target_audience}
-          onChange={(e) => setForm((f) => ({ ...f, target_audience: e.target.value }))}
-        />
-      </FormField>
-      <FormField label="Key features (una por línea)">
-        <Textarea
-          rows={4}
-          value={form.key_features}
-          onChange={(e) => setForm((f) => ({ ...f, key_features: e.target.value }))}
-        />
-      </FormField>
-      <FormField label="Selling points (uno por línea)">
-        <Textarea
-          rows={4}
-          value={form.selling_points}
-          onChange={(e) => setForm((f) => ({ ...f, selling_points: e.target.value }))}
-        />
-      </FormField>
-      <Button onClick={save} disabled={update.isPending}>
-        {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-        Guardar audiencia
-      </Button>
+      {/* Highlights del research_context — cards click-to-expand con
+          videos analizados, dolores, beneficios, etc. Sobre los campos
+          editables porque son los datos más densos y valiosos. */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold sm:text-base">
+          📊 Highlights de la investigación
+        </h3>
+        <ResearchHighlights product={product} />
+      </div>
+
+      <div className="space-y-4 border-t pt-4">
+        <h3 className="text-sm font-semibold sm:text-base">
+          ✏️ Editar (autoejecutado por Análisis, edítalo si quieres ajustar)
+        </h3>
+        <FormField label="Audiencia objetivo (una por línea)">
+          <Textarea
+            rows={4}
+            value={form.target_audience}
+            onChange={(e) => setForm((f) => ({ ...f, target_audience: e.target.value }))}
+          />
+        </FormField>
+        <FormField label="Key features (una por línea)">
+          <Textarea
+            rows={4}
+            value={form.key_features}
+            onChange={(e) => setForm((f) => ({ ...f, key_features: e.target.value }))}
+          />
+        </FormField>
+        <FormField label="Selling points (uno por línea)">
+          <Textarea
+            rows={4}
+            value={form.selling_points}
+            onChange={(e) => setForm((f) => ({ ...f, selling_points: e.target.value }))}
+          />
+        </FormField>
+        <Button onClick={save} disabled={update.isPending}>
+          {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Guardar audiencia
+        </Button>
+      </div>
     </div>
   );
 }
@@ -776,7 +792,9 @@ function AnalysisTab({ product }: { product: Product }) {
   return (
     <div className="space-y-4">
       <div className="rounded-md border p-4">
-        <h3 className="font-semibold">Re-analizar producto</h3>
+        <h3 className="font-semibold">
+          {product.last_analyzed_at ? "Re-analizar producto" : "Analizar producto"}
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Hace todo en una llamada:
         </p>
@@ -792,7 +810,8 @@ function AnalysisTab({ product }: { product: Product }) {
         </p>
         <Button className="mt-3" onClick={handleReanalyze} disabled={reanalyze.isPending}>
           {reanalyze.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          <Sparkles className="h-4 w-4" /> Re-analizar
+          <Sparkles className="h-4 w-4" />
+          {product.last_analyzed_at ? "Re-analizar" : "Analizar"}
         </Button>
         {product.last_analyzed_at && (
           <p className="mt-2 text-[10px] text-muted-foreground">
