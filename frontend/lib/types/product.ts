@@ -70,6 +70,36 @@ export interface PerformanceHistory {
   promoted_to_pro_at: string | null;
 }
 
+export interface ViralVideoSummary {
+  url: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  duration_s: number;
+  hook_text: string;
+  hook_category: string;
+  script_structure: string;
+  visual_patterns: string[];
+  cta_used: string;
+  music_mood: string;
+}
+
+export interface ResearchContext {
+  customer_pains: string[];
+  customer_benefits: string[];
+  objections: string[];
+  viral_patterns: string[];
+  top_videos: ViralVideoSummary[];
+  niche_keywords: string[];
+  niche_inspiration: string[];
+  competitive_diff: string[];
+  proven_hooks: string[];
+  analyzed_at: string | null;
+  sources_reviews_count: number;
+  sources_videos_count: number;
+  research_cost_usd: number;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -90,6 +120,9 @@ export interface Product {
   /** Presets de vídeo precocinados (música + scripted). Generables con
    *  Gemini desde el tab Presets del producto. */
   video_presets: VideoPreset[];
+  /** Investigación profunda: reviews + top vídeos TikTok + comentarios.
+   *  Se rellena al pulsar "Reanalizar producto". Vacío por defecto. */
+  research_context: ResearchContext;
   /** "high" | "medium" | "low" | "" — última evaluación de calidad
    *  de las fotos source por Gemini Vision. */
   photos_quality_assessment: string;

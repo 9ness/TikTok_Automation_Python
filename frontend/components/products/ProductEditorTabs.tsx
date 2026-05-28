@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  FlaskConical,
   Image as ImageIcon,
   Link2,
   Loader2,
@@ -43,6 +44,7 @@ import { HooksEditor } from "./HooksEditor";
 import { NanoBananaPromptDialog } from "./NanoBananaPromptDialog";
 import { PhotoManager } from "./PhotoManager";
 import { PresetsManager } from "./PresetsManager";
+import { ResearchPanel } from "./ResearchPanel";
 import { TabHint } from "./TabHint";
 import { cn } from "@/lib/utils";
 import { LANGUAGE_OPTIONS } from "@/lib/language";
@@ -89,6 +91,13 @@ const PRODUCT_TABS: {
     icon: Target,
     mode: "auto",
     hint: "Auto-rellenada por Análisis",
+  },
+  {
+    value: "research",
+    title: "Investigación",
+    icon: FlaskConical,
+    mode: "auto",
+    hint: "Reviews + TikToks virales",
   },
   {
     value: "presets",
@@ -191,6 +200,7 @@ export function ProductEditorTabs({ product }: { product: Product }) {
         {active === "photos" && <PhotoManager product={product} />}
         {active === "analysis" && <AnalysisTab product={product} />}
         {active === "audience" && <AudienceTab product={product} />}
+        {active === "research" && <ResearchPanel product={product} />}
         {active === "presets" && <PresetsManager product={product} />}
       </div>
     </div>
