@@ -44,7 +44,7 @@ except ValueError:
     POLL_TIMEOUT_S = 900
 
 PROPAINTER_MODEL = os.environ.get(
-    "REPLICATE_PROPAINTER_MODEL", "zsxkib/propainter",
+    "REPLICATE_PROPAINTER_MODEL", "jd7h/propainter",
 )
 # Cache de version hash del modelo (Replicate community models requieren
 # version explícita en /predictions). Fetcheamos on-demand y cacheamos.
