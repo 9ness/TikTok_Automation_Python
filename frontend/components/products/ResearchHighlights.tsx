@@ -3,8 +3,11 @@
 import { useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Clock,
   ExternalLink,
   Eye,
   Heart,
@@ -130,8 +133,23 @@ export function ResearchHighlights({ product }: Props) {
     return null;
   }
 
+  // Detectar análisis parcial: hubo videos en Apify pero Gemini no extrajo
+  // patterns/hooks (downloads fallaron) → análisis incompleto.
+  const analyzedVideos = rc.top_videos.filter((v) => v.hook_text).length;
+  const totalVideos = rc.top_videos.length;
+  const isPartial = totalVideos > 0 && analyzedVideos < totalVideos;
+  const isFullySuccess = totalVideos > 0 && analyzedVideos === totalVideos;
+
   return (
     <div className="space-y-2">
+      <StatusBanner
+        analyzedAt={rc.analyzed_at}
+        cost={rc.research_cost_usd}
+        analyzedVideos={analyzedVideos}
+        totalVideos={totalVideos}
+        isPartial={isPartial}
+        isFullySuccess={isFullySuccess}
+      />
       {/* Grid de tarjetas — click para expandir */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {cards.map((c) => {
@@ -175,6 +193,76 @@ export function ResearchHighlights({ product }: Props) {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function StatusBanner({
+  analyzedAt,
+  cost,
+  analyzedVideos,
+  totalVideos,
+  isPartial,
+  isFullySuccess,
+}: {
+  analyzedAt: string | null;
+  cost: number;
+  analyzedVideos: number;
+  totalVideos: number;
+  isPartial: boolean;
+  isFullySuccess: boolean;
+}) {
+  const relativeTime = (() => {
+    if (!analyzedAt) return "—";
+    const d = new Date(analyzedAt);
+    const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diffMin < 1) return "hace menos de 1 min";
+    if (diffMin < 60) return `hace ${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `hace ${diffH}h`;
+    const diffD = Math.floor(diffH / 24);
+    return `hace ${diffD}d`;
+  })();
+
+  const absoluteTime = analyzedAt
+    ? new Date(analyzedAt).toLocaleString("es-ES", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+
+  const Icon = isFullySuccess ? CheckCircle2 : isPartial ? AlertTriangle : AlertCircle;
+  const accent = isFullySuccess
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    : isPartial
+      ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      : "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400";
+  const status = isFullySuccess
+    ? "Análisis completo"
+    : isPartial
+      ? `Parcial: ${analyzedVideos}/${totalVideos} vídeos analizados`
+      : totalVideos === 0
+        ? "Sin vídeos virales — Apify falló"
+        : "Análisis incompleto";
+
+  return (
+    <div className={cn("flex items-center gap-2 rounded-lg border-2 px-3 py-2", accent)}>
+      <Icon className="h-4 w-4 flex-shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold sm:text-sm">{status}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground sm:text-[11px]">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-2.5 w-2.5" />
+            {relativeTime}
+          </span>
+          <span>·</span>
+          <span className="font-mono">{absoluteTime}</span>
+          <span>·</span>
+          <span>${cost.toFixed(3)}</span>
+        </p>
+      </div>
     </div>
   );
 }
