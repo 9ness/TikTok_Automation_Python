@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  FlaskConical,
   Image as ImageIcon,
   Link2,
   Loader2,
@@ -91,13 +90,6 @@ const PRODUCT_TABS: {
     icon: Target,
     mode: "auto",
     hint: "Auto-rellenada por Análisis",
-  },
-  {
-    value: "research",
-    title: "Investigación",
-    icon: FlaskConical,
-    mode: "auto",
-    hint: "Reviews + TikToks virales",
   },
   {
     value: "presets",
@@ -200,7 +192,6 @@ export function ProductEditorTabs({ product }: { product: Product }) {
         {active === "photos" && <PhotoManager product={product} />}
         {active === "analysis" && <AnalysisTab product={product} />}
         {active === "audience" && <AudienceTab product={product} />}
-        {active === "research" && <ResearchPanel product={product} />}
         {active === "presets" && <PresetsManager product={product} />}
       </div>
     </div>
@@ -785,10 +776,19 @@ function AnalysisTab({ product }: { product: Product }) {
   return (
     <div className="space-y-4">
       <div className="rounded-md border p-4">
-        <h3 className="font-semibold">Re-analizar con Gemini Vision</h3>
+        <h3 className="font-semibold">Re-analizar producto</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Lee las fotos del producto y actualiza audiencias, key features,
-          selling points y evaluación de calidad. Coste ~$0.003 (3 fotos).
+          Hace todo en una llamada:
+        </p>
+        <ul className="mt-1 ml-4 list-disc text-xs text-muted-foreground sm:text-sm">
+          <li>Gemini Vision lee las fotos → audiencias, features, packaging</li>
+          <li>Gemini Web Search → reviews Amazon/AliExpress (pains, benefits, objections)</li>
+          <li>Apify TikTok → top 10 vídeos virales del producto</li>
+          <li>Gemini analiza los 5 mejores vídeos (visual + audio) → patrones</li>
+        </ul>
+        <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
+          Coste ~$0.15. El paso 1 (fotos) es síncrono; los 2-4 corren en
+          background — puedes cerrar el navegador.
         </p>
         <Button className="mt-3" onClick={handleReanalyze} disabled={reanalyze.isPending}>
           {reanalyze.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -905,6 +905,14 @@ function AnalysisTab({ product }: { product: Product }) {
       </div>
 
       <NanoBananaPromptDialog product={product} open={nanoOpen} onOpenChange={setNanoOpen} />
+
+      {/* Investigación profunda (reviews + TikTok) — se rellena con el
+          mismo botón Re-analizar de arriba. Aparece como sección
+          adicional aquí dentro para no duplicar tabs. */}
+      <div className="border-t pt-4">
+        <h3 className="mb-2 text-sm font-semibold">🔬 Investigación profunda</h3>
+        <ResearchPanel product={product} />
+      </div>
     </div>
   );
 }
