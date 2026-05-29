@@ -52,24 +52,40 @@ const MIN_COMMISSIONS = [
   { value: 20, label: "Comisión ≥ 20%" },
 ];
 
+// Mercados TikTok Shop. España por defecto.
+const REGIONS = [
+  { value: "ES", label: "🇪🇸 España" },
+  { value: "US", label: "🇺🇸 EE.UU." },
+  { value: "GB", label: "🇬🇧 Reino Unido" },
+  { value: "IT", label: "🇮🇹 Italia" },
+  { value: "FR", label: "🇫🇷 Francia" },
+  { value: "DE", label: "🇩🇪 Alemania" },
+  { value: "MX", label: "🇲🇽 México" },
+];
+
 export default function DiscoverPage() {
   const [keyword, setKeyword] = useState("");
+  // País del mercado — se aplica al pulsar Buscar / Top ventas (no antes).
+  const [region, setRegion] = useState("ES");
   // Orden + comisión son filtros LOCALES — cambiarlos NO re-llama a la API.
   const [sort, setSort] = useState("sales");
   const [minCommission, setMinCommission] = useState(0);
-  // `submitted` (keyword) solo cambia al pulsar Buscar → 1 request por búsqueda.
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  // Acciones confirmadas (incluyen país) → cada cambio = 1 request.
+  const [submitted, setSubmitted] = useState<{ kw: string; region: string } | null>(null);
+  const [topReq, setTopReq] = useState<{ region: string } | null>(null);
   // Modo activo: búsqueda por keyword o ranking cruzado "Top ventas".
   const [mode, setMode] = useState<"search" | "top">("search");
-  const [topEnabled, setTopEnabled] = useState(false);
 
-  // La búsqueda SOLO depende de la keyword → 1 llamada por búsqueda.
   const searchQ = useDiscoverProducts({
-    keyword: submitted ?? "",
+    keyword: submitted?.kw ?? "",
+    region: submitted?.region ?? "ES",
     limit: 10,
     enabled: mode === "search" && Boolean(submitted),
   });
-  const topQ = useTopSellers({ enabled: mode === "top" && topEnabled });
+  const topQ = useTopSellers({
+    region: topReq?.region ?? "ES",
+    enabled: mode === "top" && Boolean(topReq),
+  });
   const q = mode === "top" ? topQ : searchQ;
 
   function runSearch(kw: string) {
@@ -78,7 +94,7 @@ export default function DiscoverPage() {
       return;
     }
     setMode("search");
-    setSubmitted(kw.trim());
+    setSubmitted({ kw: kw.trim(), region });
   }
   function onSearch() {
     runSearch(keyword);
@@ -89,8 +105,7 @@ export default function DiscoverPage() {
   }
   function onTopSellers() {
     setMode("top");
-    setTopEnabled(true);
-    topQ.refetch?.();
+    setTopReq({ region });
   }
 
   const data = q.data;
@@ -171,8 +186,20 @@ export default function DiscoverPage() {
             </div>
           </div>
 
-          {/* Filtros: orden + comisión mínima */}
+          {/* Filtros: país + orden + comisión mínima */}
           <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="h-9 flex-1 rounded-md border bg-background px-2 text-xs sm:max-w-[10rem]"
+              title="Mercado — se aplica al buscar"
+            >
+              {REGIONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
@@ -250,7 +277,7 @@ export default function DiscoverPage() {
         </Card>
       )}
 
-      {!submitted && !topEnabled && (
+      {!submitted && !topReq && (
         <Card className="bg-muted/30">
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
             Escribe un producto o nicho y pulsa <b>Buscar</b>, o pulsa{" "}
