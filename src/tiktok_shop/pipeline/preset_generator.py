@@ -832,6 +832,46 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
     return presets
 
 
+def _fruit_mode_directive(
+    n: int, *, ab_mode: bool, fruit_hint: str, angle_hint: str,
+) -> str:
+    """Instrucción final para el fruit director según el modo:
+    - normal/lote: N historias ORIGINALES y distintas (varía todo).
+    - A/B: N versiones que MANTIENEN fruta + enfoque y varían SOLO el
+      gancho inicial y el escenario (para testear qué hook engancha más).
+    `fruit_hint`/`angle_hint` fijan la fruta/enfoque base si vienen dados.
+    """
+    fruit = fruit_hint.strip()
+    angle = angle_hint.strip()
+    if ab_mode:
+        fruit_line = (
+            f"la MISMA fruta protagonista ({fruit})" if fruit
+            else "la MISMA fruta protagonista (elígela tú una vez y mantenla)"
+        )
+        angle_line = (
+            f"el MISMO enfoque ({angle})" if angle
+            else "el MISMO enfoque (elígelo tú una vez y mantenlo)"
+        )
+        return (
+            f"MODO A/B TEST: genera EXACTAMENTE {n} versiones que usan {fruit_line} "
+            f"y {angle_line}. Varía SOLO el GANCHO inicial y el ESCENARIO entre "
+            f"ellas (mismo personaje y producto). El objetivo es testear qué hook "
+            f"y ambiente enganchan más. Sigue el schema JSON al pie de la letra."
+        )
+    # Normal / lote
+    hints = []
+    if fruit:
+        hints.append(f"usa preferentemente la fruta protagonista: {fruit}")
+    if angle:
+        hints.append(f"prioriza el enfoque: {angle}")
+    hint_str = (" (" + "; ".join(hints) + ")") if hints else ""
+    return (
+        f"Genera EXACTAMENTE {n} mini-historias de fruta ORIGINALES y DISTINTAS "
+        f"entre sí (varía fruta, enfoque y ambiente){hint_str}. Sigue el schema "
+        f"JSON al pie de la letra."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Fruit story director — mini-historias virales con personajes de fruta.
 # Solo prompt Veo 3 (el user lo pega en Gemini/Veo 3 con las fotos). Cada
@@ -839,7 +879,14 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
 # compatible solo con veo3_prompt_only. La voz/diálogo va dentro del propio
 # prompt Veo 3 (el modelo genera el audio), así que voice_id queda None.
 # ---------------------------------------------------------------------------
-def _generate_fruit(product: Product, *, n: int = 10) -> list[VideoPreset]:
+def _generate_fruit(
+    product: Product,
+    *,
+    n: int = 10,
+    ab_mode: bool = False,
+    fruit_hint: str = "",
+    angle_hint: str = "",
+) -> list[VideoPreset]:
     system = load_system_prompt("fruit_story_director.md")
     photo_filenames, photo_paths = _collect_product_photos(product)
     photos_block = (
@@ -865,9 +912,7 @@ def _generate_fruit(product: Product, *, n: int = 10) -> list[VideoPreset]:
         f"{_research_block(product)}\n"
         f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
-        f"Genera EXACTAMENTE {n} mini-historias de fruta ORIGINALES y "
-        f"DISTINTAS entre sí (varía fruta, enfoque y ambiente). Sigue el "
-        f"schema JSON al pie de la letra."
+        f"{_fruit_mode_directive(n, ab_mode=ab_mode, fruit_hint=fruit_hint, angle_hint=angle_hint)}"
     )
 
     result = generate_json(

@@ -449,6 +449,24 @@ class GeneratePresetsRequest(BaseModel):
     replace_existing: bool = False
 
 
+class GenerateFruitRequest(BaseModel):
+    """Generación SÍNCRONA de presets fruta desde el generador Veo 3.
+    Un solo call a Gemini devuelve los N (no encola)."""
+    generation: Literal["single", "batch", "ab"] = "batch"
+    n: int = Field(default=10, ge=1, le=20)
+    fruit_hint: str | None = None        # fruta base (forzada)
+    narrative_angle: str | None = None   # enfoque base (dramatico/chismoso/…)
+    # Por defecto reemplaza las fruta anteriores (source=fruit_story).
+    replace_existing: bool = True
+
+
+class GenerateFruitResponse(BaseModel):
+    product_id: str
+    created_count: int
+    presets: list[VideoPresetResponse] = Field(default_factory=list)
+    cost_usd: float = 0.0
+
+
 class GeneratePresetsResponse(BaseModel):
     """Respuesta INMEDIATA del endpoint async. Devuelve el `gen_id` para
     que el frontend pueda hacer polling del progreso. Los presets reales

@@ -44,6 +44,8 @@ from src.api.schemas.product import (
     BulkStyleResponse,
     CommitImportedPhotosRequest,
     CommitImportedPhotosResponse,
+    GenerateFruitRequest,
+    GenerateFruitResponse,
     GeneratePresetsRequest,
     GeneratePresetsResponse,
     GenerateVariantsRequest,
@@ -1613,6 +1615,75 @@ def _generate_presets_background(
             finalize_and_persist()
         except Exception:
             pass
+
+
+@router.post(
+    "/{product_id}/video-presets/generate-fruit",
+    response_model=GenerateFruitResponse,
+)
+def generate_fruit_presets(
+    product_id: str,
+    payload: GenerateFruitRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> GenerateFruitResponse:
+    """SÍNCRONO. Genera presets fruta (variant=fruit_story) en un solo call
+    a Gemini y los devuelve (para mostrarlos en el generador) además de
+    guardarlos en el producto. Modos:
+      - single → 1 historia · batch → N · ab → N versiones mismo personaje/enfoque
+        variando gancho+escena.
+    Reemplaza las fruta anteriores si `replace_existing` (default true).
+    """
+    from src.cost_tracking import finalize_and_persist, get_active, start_job
+    from src.tiktok_shop.pipeline.preset_generator import _generate_fruit
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    n = 1 if payload.generation == "single" else payload.n
+    ab = payload.generation == "ab"
+
+    start_job(
+        job_id=f"fruit_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="preset_generation",
+        title=f"Fruit presets: {product.slug} · {payload.generation}",
+        product_id=product_id,
+    )
+    presets = []
+    cost = 0.0
+    try:
+        presets = _generate_fruit(
+            product,
+            n=n,
+            ab_mode=ab,
+            fruit_hint=payload.fruit_hint or "",
+            angle_hint=payload.narrative_angle or "",
+        )
+        if payload.replace_existing:
+            product.video_presets = [
+                p for p in product.video_presets if p.source != "fruit_story"
+            ]
+        product.video_presets.extend(presets)
+        product.touch()
+        repo.save(product)
+        job = get_active()
+        cost = float(job.total_usd) if job is not None else 0.0
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+    return GenerateFruitResponse(
+        product_id=product_id,
+        created_count=len(presets),
+        presets=[_preset_to_response(p) for p in presets],
+        cost_usd=cost,
+    )
 
 
 @router.post(

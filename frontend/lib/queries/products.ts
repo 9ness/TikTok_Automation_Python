@@ -13,6 +13,8 @@ import type {
   AnalyzeUrlPreviewResponse,
   CommitImportedPhotosInput,
   CommitImportedPhotosResponse,
+  GenerateFruitInput,
+  GenerateFruitResponse,
   GeneratePresetsInput,
   GeneratePresetsResponse,
   GenerateVariantsInput,
@@ -307,6 +309,22 @@ export function useGeneratePresets(productId: string) {
     mutationFn: (input) =>
       api.post<GeneratePresetsResponse>(
         `${ROOT}/${productId}/video-presets/generate`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+
+/** Genera presets fruta SÍNCRONO (single/batch/ab) desde el generador Veo 3.
+ *  Devuelve los presets creados (para mostrarlos) y los guarda en el producto. */
+export function useGenerateFruit(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<GenerateFruitResponse, Error, GenerateFruitInput>({
+    mutationFn: (input) =>
+      api.post<GenerateFruitResponse>(
+        `${ROOT}/${productId}/video-presets/generate-fruit`,
         input,
       ),
     onSuccess: () => {

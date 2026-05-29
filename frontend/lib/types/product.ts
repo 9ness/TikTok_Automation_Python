@@ -444,6 +444,22 @@ export interface GeneratePresetsResponse {
   warnings: string[];
 }
 
+export interface GenerateFruitInput {
+  /** single = 1 historia · batch = N · ab = N versiones mismo personaje/enfoque */
+  generation: "single" | "batch" | "ab";
+  n?: number;
+  fruit_hint?: string | null;
+  narrative_angle?: string | null;
+  replace_existing?: boolean;
+}
+
+export interface GenerateFruitResponse {
+  product_id: string;
+  created_count: number;
+  presets: VideoPreset[];
+  cost_usd: number;
+}
+
 export interface PresetGenStatus {
   gen_id: string;
   product_id: string;

@@ -32,11 +32,11 @@ import {
   usePreviewNanoBananaPrompt,
   usePreviewVeo3Prompt,
 } from "@/lib/queries/generations";
-import { useProducts } from "@/lib/queries/products";
+import { useGenerateFruit, useProducts } from "@/lib/queries/products";
 import { useUsers } from "@/lib/queries/users";
 import { useVoices } from "@/lib/queries/voices";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
-import type { Product, Tier } from "@/lib/types/product";
+import type { Product, Tier, VideoPreset } from "@/lib/types/product";
 import type {
   ClipPhotoOverride,
   EnqueueRequest,
@@ -122,6 +122,8 @@ interface WizardForm {
   fruitMode: boolean;
   fruitHint: string;
   narrativeAngle: string;
+  /** Tipo de generación fruta: 1 prompt, lote (10), o variantes A/B (4). */
+  fruitGenType: "single" | "batch" | "ab";
 }
 
 const PROMPT_ONLY_TIERS: Tier[] = ["veo3_prompt_only", "nano_banana_prompt_only"];
@@ -157,15 +159,21 @@ export function GeneratorWizard() {
     fruitMode: false,
     fruitHint: "",
     narrativeAngle: "",
+    fruitGenType: "single",
   });
   const enqueue = useEnqueueGeneration();
   const previewVeo3 = usePreviewVeo3Prompt();
   const previewNanoBanana = usePreviewNanoBananaPrompt();
+  const generateFruit = useGenerateFruit(form.productId);
   const openQueue = useDrawerStore((s) => s.openQueue);
 
   const [promptModal, setPromptModal] = useState<
     | { kind: "veo3" | "nano_banana"; prompt: string; meta?: string }
     | null
+  >(null);
+  // Modal con el lote de presets fruta generados (single/batch/ab).
+  const [fruitModal, setFruitModal] = useState<
+    { presets: VideoPreset[]; meta: string } | null
   >(null);
 
   function patch<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
@@ -187,6 +195,36 @@ export function GeneratorWizard() {
     // Veo3 / Nano Banana → endpoints síncronos, NO encolar. Mostramos el
     // prompt en modal copyable. El resto (Atlas Seedance) sí pasa por la cola.
     if (form.tier === "veo3_prompt_only") {
+      // Modo fruta → endpoint dedicado (genera image+video prompts, guarda
+      // como presets fruta del producto y los muestra). single/batch/ab.
+      if (form.fruitMode) {
+        try {
+          const res = await generateFruit.mutateAsync({
+            generation: form.fruitGenType,
+            n: form.fruitGenType === "batch" ? 10 : form.fruitGenType === "ab" ? 4 : 1,
+            fruit_hint: form.fruitHint.trim() || null,
+            narrative_angle: form.narrativeAngle || null,
+          });
+          if (res.created_count === 0) {
+            toast.error("No se generó ninguna historia de fruta, reintenta.");
+          } else {
+            const label =
+              form.fruitGenType === "batch"
+                ? "Lote"
+                : form.fruitGenType === "ab"
+                  ? "Variantes A/B"
+                  : "1 historia";
+            setFruitModal({
+              presets: res.presets,
+              meta: `🍉 ${label} · ${res.created_count} guardada(s) en Presets · ≈ $${res.cost_usd.toFixed(4)}`,
+            });
+            toast.success(`${res.created_count} historia(s) fruta · guardadas en Presets`);
+          }
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : "Error generando fruta.");
+        }
+        return;
+      }
       try {
         const res = await previewVeo3.mutateAsync({
           username: form.username,
@@ -194,16 +232,11 @@ export function GeneratorWizard() {
           hook_category: form.hookCategory,
           hook_custom: form.hookCustom.trim() || null,
           target_audience: form.targetAudience.trim() || "Generalista",
-          fruit_mode: form.fruitMode,
-          fruit_hint: form.fruitMode ? form.fruitHint.trim() || null : null,
-          narrative_angle: form.fruitMode ? form.narrativeAngle || null : null,
         });
         setPromptModal({
           kind: "veo3",
           prompt: res.prompt,
-          meta: form.fruitMode
-            ? `🍉 Personaje fruta · estilo: ${res.style}`
-            : `Hook: "${res.hook_text}" · estilo: ${res.style}`,
+          meta: `Hook: "${res.hook_text}" · estilo: ${res.style}`,
         });
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Error generando prompt Veo 3.");
@@ -253,7 +286,10 @@ export function GeneratorWizard() {
 
   const isPromptOnly = PROMPT_ONLY_TIERS.includes(form.tier);
   const submitPending =
-    enqueue.isPending || previewVeo3.isPending || previewNanoBanana.isPending;
+    enqueue.isPending ||
+    previewVeo3.isPending ||
+    previewNanoBanana.isPending ||
+    generateFruit.isPending;
 
   return (
     <div className="space-y-6">
@@ -324,6 +360,67 @@ export function GeneratorWizard() {
             <Button onClick={copyPromptToClipboard} disabled={!promptModal?.prompt}>
               <Copy className="h-4 w-4" />
               Copiar prompt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal con el lote de historias de fruta generadas (single/batch/ab).
+          Ya están guardadas en Presets; aquí se muestran para copiar al vuelo. */}
+      <Dialog open={fruitModal !== null} onOpenChange={(o) => !o && setFruitModal(null)}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>🍉 Historias de fruta generadas</DialogTitle>
+            <DialogDescription>
+              {fruitModal?.meta}. Cada una: Paso 1 (imagen Nano Banana) + Paso 2
+              (animar en Flow). También están en la pestaña Presets del producto.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {fruitModal?.presets.map((p, i) => (
+              <div key={p.id} className="rounded-md border p-2">
+                <p className="mb-1.5 text-xs font-semibold">
+                  {i + 1}. {p.name}
+                  {p.angle ? (
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      · {p.angle}
+                    </span>
+                  ) : null}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.image_prompt && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-[10px]"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(p.image_prompt);
+                        toast.success("Prompt de imagen copiado");
+                      }}
+                    >
+                      🍉 Copiar imagen (Paso 1)
+                    </Button>
+                  )}
+                  {p.veo3_prompt && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-[10px]"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(p.veo3_prompt);
+                        toast.success("Prompt de vídeo copiado");
+                      }}
+                    >
+                      🎬 Copiar vídeo (Paso 2)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFruitModal(null)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -816,7 +913,26 @@ function StepReview({ form, patch }: StepProps) {
             />
           </div>
           {form.fruitMode && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label className="text-[10px]">Generar</Label>
+                <Select
+                  value={form.fruitGenType}
+                  onValueChange={(v) =>
+                    patch("fruitGenType", v as WizardForm["fruitGenType"])
+                  }
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">1 historia</SelectItem>
+                    <SelectItem value="batch">📦 Lote (10 historias)</SelectItem>
+                    <SelectItem value="ab">🔀 Variantes A/B (4 · mismo enfoque, distintos hooks)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-[10px]">Enfoque</Label>
                 <Select
@@ -845,6 +961,7 @@ function StepReview({ form, patch }: StepProps) {
                   placeholder="vacío = la elige la IA"
                   className="h-9 text-xs"
                 />
+              </div>
               </div>
             </div>
           )}
