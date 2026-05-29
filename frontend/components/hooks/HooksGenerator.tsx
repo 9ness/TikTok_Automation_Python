@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -301,12 +301,60 @@ function ThemedHooksGenerator({
   const [n, setN] = useState<number>(10);
   const mutation = useGenerateThemedHooks();
 
+  // Persistimos los hooks generados por tema (localStorage por producto)
+  // para que NO se pierdan al salir/recargar — se recuperan en una tarjeta.
+  const LS_KEY = `tiktok_shop_themed_hooks.${product.id}`;
+  const [saved, setSaved] = useState<{
+    theme: string;
+    theme_interpretation: string;
+    hooks: { text: string; angle: string; rationale: string }[];
+    savedAt: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(LS_KEY);
+      if (raw) setSaved(JSON.parse(raw));
+    } catch {
+      /* ignora */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]);
+
   function onGenerate() {
     if (!theme.trim()) {
       toast.error("Escribe un tema o contexto");
       return;
     }
-    mutation.mutate({ productId: product.id, theme: theme.trim(), n });
+    mutation.mutate(
+      { productId: product.id, theme: theme.trim(), n },
+      {
+        onSuccess: (data) => {
+          const payload = {
+            theme: theme.trim(),
+            theme_interpretation: data.theme_interpretation,
+            hooks: data.hooks,
+            savedAt: Date.now(),
+          };
+          setSaved(payload);
+          try {
+            window.localStorage.setItem(LS_KEY, JSON.stringify(payload));
+          } catch {
+            /* ignora */
+          }
+        },
+      },
+    );
+  }
+
+  function onClearThemed() {
+    setSaved(null);
+    try {
+      window.localStorage.removeItem(LS_KEY);
+    } catch {
+      /* ignora */
+    }
   }
 
   return (
@@ -365,15 +413,40 @@ function ThemedHooksGenerator({
         </Button>
       </div>
 
-      {mutation.data && (
+      {saved && saved.hooks.length > 0 && (
         <div className="space-y-2 pt-2">
-          {mutation.data.theme_interpretation && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+              {saved.hooks.length} hooks · tema: “{saved.theme}”
+              <span className="ml-1 font-normal text-muted-foreground">
+                ({new Date(saved.savedAt).toLocaleString("es-ES", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })})
+              </span>
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearThemed}
+              className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              Borrar
+            </Button>
+          </div>
+          {saved.theme_interpretation && (
             <p className="rounded bg-muted/30 px-2 py-1.5 text-[10px] italic text-muted-foreground sm:text-[11px]">
-              Interpretación: {mutation.data.theme_interpretation}
+              Interpretación: {saved.theme_interpretation}
             </p>
           )}
+          <p className="text-[10px] text-muted-foreground">
+            Marca ⭐ los que quieras conservar — sobreviven aunque generes
+            otros. Esta lista se guarda en este dispositivo.
+          </p>
           <div className="space-y-1.5">
-            {mutation.data.hooks.map((h, i) => (
+            {saved.hooks.map((h, i) => (
               <HookRow
                 key={i}
                 text={h.text}
