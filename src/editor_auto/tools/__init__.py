@@ -15,6 +15,7 @@ Para añadir una herramienta nueva:
 from __future__ import annotations
 
 from .base import BaseTool, ToolContext, ToolDescriptor
+from .photo_insert import PhotoInsertTool
 from .silence_cutter import SilenceCutterTool
 from .silence_cutter_scripted import SilenceCutterScriptedTool
 from .sticker_arrow import StickerArrowTool
@@ -26,6 +27,7 @@ REGISTRY: dict[str, BaseTool] = {
     SilenceCutterTool.tool_id: SilenceCutterTool(),
     SilenceCutterScriptedTool.tool_id: SilenceCutterScriptedTool(),
     StickerArrowTool.tool_id: StickerArrowTool(),
+    PhotoInsertTool.tool_id: PhotoInsertTool(),
 }
 
 

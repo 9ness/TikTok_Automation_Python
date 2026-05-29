@@ -236,6 +236,7 @@ TOOL_SUBS_AUTO = "subs_auto"
 TOOL_SILENCE_CUTTER = "silence_cutter"
 TOOL_SILENCE_CUTTER_SCRIPTED = "silence_cutter_scripted"
 TOOL_STICKER_ARROW = "sticker_arrow"
+TOOL_PHOTO_INSERT = "photo_insert"
 
 # Grupos de herramientas mutuamente excluyentes — el validador del repo
 # rechaza un `tool_flow` que tenga dos tools del mismo grupo. Ambos
@@ -261,6 +262,9 @@ TOOL_POSITION_WEIGHTS: dict[str, int] = {
     # 80: sticker overlay después de cortes (timestamps ya estables) y
     # antes de subs (90) para que los subtítulos queden ENCIMA del sticker
     # si colisionan — la legibilidad del texto prima sobre la flecha.
+    # 70: fotos de famosos/marcas después de cortes (timestamps estables) y
+    # antes de flecha (80) y subs (90) para que esos queden ENCIMA de la foto.
+    TOOL_PHOTO_INSERT: 70,
     TOOL_STICKER_ARROW: 80,
     TOOL_SUBS_AUTO: 90,
 }
