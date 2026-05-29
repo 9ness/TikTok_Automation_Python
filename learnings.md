@@ -38,3 +38,5 @@
 <!-- Test retry -->
 
 <!-- Test auto-deploy v3 - after NoNewPrivileges fix -->
+
+- Apify clockworks/tiktok-scraper: usar `shouldDownloadVideos:true` → MP4 en su key-value store (`mediaUrls[0]`); esas URLs dan 403 sin `?token=APIFY_API_TOKEN`. Descargar directo de TikTok CDN (downloadAddr) da 403/404. Algunos records dan 404 (actor no los subió) → degradar saltando ese video.
