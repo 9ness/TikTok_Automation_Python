@@ -63,11 +63,20 @@ Veo 3 interprets these incorrectly and produces inconsistent results:
 ## MODE: fruit_character (mini-historia viral de frutas)
 
 Cuando el user message empieza con `MODE: fruit_character`, IGNORA el flujo
-normal y escribe una **mini-historia de 8 segundos** protagonizada por
-**personajes con cuerpo humano hiperrealista y CABEZA DE FRUTA realista**
-(fotorealista, bien integrada al cuello, NO dibujo animado). Es el trend viral
-de "fruta dramática" de TikTok: surrealista, cómico o chismoso, pero que VENDE
-el producto de verdad.
+normal y escribe una **mini-historia de 8 segundos** de **ANIMACIÓN 3D estilo
+Pixar / Illumination** protagonizada por **personajes fruta-persona**: cuerpo
+humanoide estilizado y animado (con ropa) y por cabeza una **fruta con CARA de
+dibujo** (ojos grandes expresivos, cejas, boca). Es el trend viral de "fruta
+dramática" de TikTok: surrealista, cómico o chismoso, pero que VENDE el producto.
+
+### ESTILO VISUAL OBLIGATORIO (lo más importante)
+
+- **Animación 3D CGI estilo Pixar/Illumination** ("Gru/Mi villano favorito"):
+  brillante, colorido, exagerado. **NUNCA fotorrealista ni imagen real.**
+- **TODOS los personajes son frutas-persona** con cara de dibujo. El prompt
+  debe describir cada uno como `a [FRUIT]-headed character (cartoon face)`.
+- **PROHIBIDO**: humanos reales, caras humanas, frutas fotorrealistas sin cara,
+  fruta suelta sin cuerpo, cabezas humanas. El producto sí se renderiza fiel.
 
 ### Casting de fruta — ACIERTA por color + semántica
 
@@ -111,18 +120,18 @@ frases máximo + la frase de CTA). Tono natural y exagerado-divertido. Ej:
 
 ### Formato del prompt en este modo
 
-- Estructura libre pero cinematográfica; describe personajes, acción por beats,
-  ambiente, iluminación y el/los diálogos entre comillas.
+- Empieza SIEMPRE por `[STYLE]: 3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look.`
+- Describe cada personaje como `a [FRUIT]-headed character (cartoon face, big eyes)` con cuerpo humanoide animado y ropa.
 - **UN solo plano continuo** (cámara con un movimiento suave; nada de cortes).
-- Hasta **130 palabras** (este modo necesita más que los 100 normales).
+- Hasta **140 palabras**.
 - Cierra SIEMPRE con: `9:16 vertical format, 8 seconds, single continuous shot.`
-- NEGATIVE al final: `deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters`.
-- Mantén `ai_disclosure` implícito (es claramente AI/surreal, no engaña).
+- NEGATIVE al final: `live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters`.
+- Mantén `ai_disclosure` implícito (es claramente AI/animado, no engaña).
 
 ### Few-shot fruit_character (bronceador, enfoque chismoso)
 
 ```
-[SCENE]: poolside on a sunny day, turquoise water, palm shadows. A confident man with a glossy ripe-MANGO head lounges by the pool, golden-tan skin, holding a bottle of "Fresly" tanning cream with a clearly readable orange label. [BEAT 1] he smoothly applies the cream over his arms, smiling. [BEAT 2] two elegant women with strawberry and peach heads turn, jaws dropping, one gasps "¿pero cómo te has puesto tan moreno?". [BEAT 3] the mango man winks and says "con Fresly... está en el carrito naranja". [CAMERA]: slow dolly-in over 8 seconds. [LIGHTING]: warm golden-hour sun, soft glow. [NEGATIVE]: deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.
+[STYLE]: 3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look. [SCENE]: sunny poolside, turquoise water, palm shadows. A confident MANGO-HEADED character (ripe mango as head with big cartoon eyes and a wide grin, on a stylized animated human body in swim shorts) lounges holding a bottle of "Fresly" tanning cream, orange label clearly readable. [BEAT 1] he smooths the cream over his arms, glowing tan. [BEAT 2] a STRAWBERRY-HEADED woman and a PEACH-HEADED woman (cartoon faces) turn, jaws dropping, one whispers "¿pero cómo te has puesto tan moreno?". [BEAT 3] the mango character winks "con Fresly... está en el carrito naranja". [CAMERA]: slow dolly-in. [LIGHTING]: warm golden-hour sun. [NEGATIVE]: live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.
 ```
 
 ## Few-shot — un prompt Veo 3 ideal
