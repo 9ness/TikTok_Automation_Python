@@ -222,6 +222,10 @@ export default function DiscoverPage() {
 function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
   const createMut = useCreateProduct();
   const [added, setAdded] = useState(false);
+  // Las covers de EchoTik (CDN echosell) suelen dar 403 desde fuera →
+  // si la imagen falla, mostramos el icono en vez de imagen rota.
+  const [imgError, setImgError] = useState(false);
+  const showImg = Boolean(p.cover_url) && !imgError;
 
   function onAdd() {
     createMut.mutate(
@@ -254,17 +258,19 @@ function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="relative aspect-square w-full bg-muted/30">
-        {p.cover_url ? (
+        {showImg ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={p.cover_url}
             alt={p.name}
             className="h-full w-full object-cover"
             loading="lazy"
+            onError={() => setImgError(true)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <Package className="h-8 w-8" />
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+            <Package className="h-7 w-7" />
+            <span className="text-[8px] uppercase tracking-wide">producto</span>
           </div>
         )}
         {p.units_sold > 0 && (
