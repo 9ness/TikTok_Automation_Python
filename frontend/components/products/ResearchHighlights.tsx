@@ -379,6 +379,13 @@ function VideoList({ items }: { items: ViralVideoSummary[] }) {
   return <VideoCards items={items} />;
 }
 
+function countryFlag(code: string): string {
+  const flags: Record<string, string> = {
+    US: "🇺🇸", GB: "🇬🇧", ES: "🇪🇸", MX: "🇲🇽", BR: "🇧🇷", FR: "🇫🇷",
+  };
+  return flags[code] || "🌍";
+}
+
 function VideoCards({ items }: { items: ViralVideoSummary[] }) {
   return (
     <div className="space-y-1.5">
@@ -392,6 +399,11 @@ function VideoCards({ items }: { items: ViralVideoSummary[] }) {
         >
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground sm:text-[11px]">
             <div className="flex flex-wrap items-center gap-1.5">
+              {v.country && v.country !== "ES" && (
+                <span className="rounded bg-blue-500/15 px-1.5 font-medium text-blue-700 dark:text-blue-300">
+                  {countryFlag(v.country)} {v.country}
+                </span>
+              )}
               <span className="font-mono">
                 {v.view_count.toLocaleString()} views
               </span>

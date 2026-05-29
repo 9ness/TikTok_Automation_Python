@@ -144,6 +144,7 @@ def search_tiktok_videos(
     *,
     limit: int = 10,
     sort_by: str = "popular",
+    country: str = "ES",
     log_callback: Callable[[str], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Busca vídeos TikTok por keyword y devuelve los top `limit` ordenados
@@ -163,7 +164,9 @@ def search_tiktok_videos(
         log_callback: opcional, recibe mensajes de progreso
     """
     if log_callback:
-        log_callback(f"🔎 Apify: buscando '{query}' en TikTok (limit={limit})…")
+        log_callback(
+            f"🔎 Apify: buscando '{query}' en TikTok [{country}] (limit={limit})…"
+        )
 
     # Input schema clockworks/tiktok-scraper (verificado live 2026-05):
     #   - searchQueries: array de keywords
@@ -184,7 +187,7 @@ def search_tiktok_videos(
         "shouldDownloadCovers": False,
         "shouldDownloadSubtitles": False,
         "shouldDownloadSlideshowImages": False,
-        "proxyCountryCode": "ES",
+        "proxyCountryCode": country,
     }
     items = _run_actor_sync(TIKTOK_SCRAPER_ACTOR, input_data)
     if not isinstance(items, list):

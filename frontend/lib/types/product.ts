@@ -83,6 +83,7 @@ export interface ViralVideoSummary {
   cta_used: string;
   music_mood: string;
   traffic_type?: string; // "organic" | "paid" | ""
+  country?: string; // "ES" | "US" | "GB" | ...
   music_id?: string;
   music_title?: string;
   music_author?: string;

@@ -152,6 +152,10 @@ class ViralVideoSummary(BaseModel):
     # qué engancha orgánicamente. NO es dato de ventas (TikTok no lo expone
     # públicamente para ES) — es un proxy por ratio de interacción.
     traffic_type: str = ""
+    # País del que viene el vídeo (ES/US/GB/...). Cuando el nicho en España
+    # es pequeño, ampliamos a otros mercados y Gemini adapta la fórmula al
+    # español. "" = ES por defecto.
+    country: str = ""
     # Audio/sonido del vídeo (extraído de Apify musicMeta). El sonido es
     # uno de los mayores drivers de viralidad en TikTok — capturamos el
     # ID para poder reutilizar el MISMO audio trending del nicho.

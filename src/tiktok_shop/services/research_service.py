@@ -56,10 +56,18 @@ def deep_research_product(
     *,
     max_videos_to_analyze: int = 5,
     max_tiktok_search_results: int = 10,
+    extra_markets: list[str] | None = None,
     log_callback: LogCallback = _noop,
 ) -> ResearchContext:
     """Investiga el producto en web + TikTok y devuelve ResearchContext
-    relleno. No persiste — el caller decide cuándo guardar."""
+    relleno. No persiste — el caller decide cuándo guardar.
+
+    `extra_markets`: países extra (ej. ["US","GB"]) que se buscan ADEMÁS
+    del mercado nativo cuando éste tiene pocos vídeos virales. Permite
+    sacar fórmulas ganadoras de mercados grandes (US/UK) y adaptarlas a
+    España. Si None, default ["US","GB"]."""
+    if extra_markets is None:
+        extra_markets = ["US", "GB"]
     started = time.time()
     cost_estimate = 0.0
     log_callback(f"🔬 Iniciando investigación profunda de '{product.name}'…")
@@ -104,15 +112,18 @@ def deep_research_product(
         if product.brand and product.brand.lower() not in raw.lower():
             words = [product.brand] + words[:7]
         tiktok_query = " ".join(words) or product.name
+        home_country = _home_country(product.language)
         log_callback(
             f"🎬 Fase 2/4: buscando top {max_tiktok_search_results} vídeos "
-            f"en TikTok con query: '{tiktok_query}'…"
+            f"en TikTok [{home_country}] con query: '{tiktok_query}'…"
         )
         try:
-            apify_results = apify_cloud.search_tiktok_videos(
-                query=tiktok_query,
+            apify_results, apify_queries = _multi_market_search(
+                tiktok_query,
+                home_country=home_country,
+                extra_markets=extra_markets,
                 limit=max_tiktok_search_results,
-                sort_by="popular",
+                min_home_organic=max_videos_to_analyze,
                 log_callback=log_callback,
             )
 
@@ -121,8 +132,8 @@ def deep_research_product(
                 from src.cost_tracking import record_apify_cloud
                 record_apify_cloud(
                     items_count=len(apify_results),
-                    queries_count=1,
-                    detail=f"tiktok search '{product.name}'",
+                    queries_count=apify_queries,
+                    detail=f"tiktok search '{product.name}' x{apify_queries} markets",
                 )
             except Exception:
                 pass
@@ -438,6 +449,7 @@ def _analyze_top_videos(
                 comment_count=meta["comment_count"],
                 duration_s=meta["duration_s"],
                 traffic_type=traffic_type,
+                country=str(item.get("_market") or ""),
                 music_id=meta.get("music_id", ""),
                 music_title=meta.get("music_name", ""),
                 music_author=meta.get("music_author", ""),
@@ -566,6 +578,10 @@ No inventes. Si no ves un patrón claro, deja la lista vacía. Sé específico �
 - Nombre: {product.name}
 - Categoría: {product.category}
 - Idioma target: {product.language}{context_line}
+- OJO: algunos vídeos pueden ser de OTROS MERCADOS (US/UK, en inglés).
+  Extrae su FÓRMULA (estructura, planos, ritmo, tipo de hook, CTA) que es
+  universal, pero los `proven_hooks` ADÁPTALOS al español natural de
+  España (NO traduzcas literal — reescribe como lo diría un español).
 
 Analiza los {len(video_paths)} vídeos en orden y devuelve el JSON estructurado."""
 
@@ -595,6 +611,105 @@ def _parse_video_analysis(text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
     return {}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Búsqueda multi-mercado (España + US/UK como fallback de nicho pequeño)
+# ═════════════════════════════════════════════════════════════════════
+_LANG_TO_COUNTRY = {
+    "es_ES": "ES", "es_LATAM": "MX", "en_US": "US", "en_UK": "GB",
+    "pt_BR": "BR", "fr_FR": "FR",
+}
+
+
+def _home_country(language: str | None) -> str:
+    return _LANG_TO_COUNTRY.get(language or "es_ES", "ES")
+
+
+def _count_usable_organic(items: list[dict[str, Any]], min_eng: float = 2.0) -> int:
+    """Cuántos vídeos del set tienen engagement orgánico decente."""
+    n = 0
+    for it in items:
+        m = apify_cloud.extract_video_metadata(it)
+        v = int(m.get("view_count") or 0)
+        if v <= 0:
+            continue
+        eng = (
+            int(m.get("like_count") or 0)
+            + int(m.get("comment_count") or 0)
+            + int(m.get("share_count") or 0)
+        )
+        if eng / v * 100.0 >= min_eng:
+            n += 1
+    return n
+
+
+def _multi_market_search(
+    query: str,
+    *,
+    home_country: str,
+    extra_markets: list[str],
+    limit: int,
+    min_home_organic: int,
+    log_callback: LogCallback,
+) -> tuple[list[dict[str, Any]], int]:
+    """Busca en el mercado nativo y, si éste tiene POCOS vídeos virales
+    orgánicos, amplía a los mercados extra (US/UK) para sacar fórmulas
+    ganadoras de mercados grandes y adaptarlas a España.
+
+    Cada item se etiqueta con `_market` (país). Dedup por id/url.
+    Devuelve (items_combinados, n_queries_lanzadas) para el cost tracking."""
+    def _tag(items: list[dict[str, Any]], market: str) -> list[dict[str, Any]]:
+        for it in items:
+            it["_market"] = market
+        return items
+
+    seen: set[str] = set()
+    combined: list[dict[str, Any]] = []
+
+    def _add(items: list[dict[str, Any]]) -> None:
+        for it in items:
+            key = str(it.get("id") or it.get("webVideoUrl") or "")
+            if key and key not in seen:
+                seen.add(key)
+                combined.append(it)
+
+    queries = 0
+    # 1) Mercado nativo
+    home = _tag(apify_cloud.search_tiktok_videos(
+        query=query, limit=limit, sort_by="popular",
+        country=home_country, log_callback=log_callback,
+    ), home_country)
+    queries += 1
+    _add(home)
+
+    # 2) ¿Nicho pequeño en casa? Amplía a mercados grandes.
+    home_organic = _count_usable_organic(home)
+    if home_organic < min_home_organic and extra_markets:
+        log_callback(
+            f"  🌍 Solo {home_organic} vídeos orgánicos en {home_country} — "
+            f"amplío a {', '.join(extra_markets)} para sacar fórmulas top y "
+            f"adaptarlas a España"
+        )
+        for market in extra_markets:
+            if market == home_country:
+                continue
+            try:
+                extra = _tag(apify_cloud.search_tiktok_videos(
+                    query=query, limit=limit, sort_by="popular",
+                    country=market, log_callback=log_callback,
+                ), market)
+                queries += 1
+                _add(extra)
+            except Exception as e:
+                log_callback(f"  ⚠️ Búsqueda {market} falló ({e}) — sigo")
+    else:
+        log_callback(
+            f"  ✓ {home_organic} vídeos orgánicos en {home_country} — "
+            f"suficiente, no amplío a otros mercados"
+        )
+
+    return combined, queries
 
 
 # ═════════════════════════════════════════════════════════════════════
