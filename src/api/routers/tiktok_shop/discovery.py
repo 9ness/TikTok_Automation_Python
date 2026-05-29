@@ -142,9 +142,24 @@ def discover_products(
     )
 
 
-# Nichos que se escanean para el ranking cruzado "Top ventas". Términos
-# comerciales en español que devuelven productos variados del mercado ES.
-_TOP_NICHES = ["belleza", "fitness", "cocina", "hogar", "salud", "tecnología"]
+# Nichos que se escanean para el ranking cruzado "Top ventas". Las
+# keywords deben ir EN EL IDIOMA del mercado — buscar "cocina" en US
+# devuelve productos en español, no los top reales de EE.UU.
+_TOP_NICHES_ES = ["belleza", "fitness", "cocina", "hogar", "salud", "tecnología"]
+_TOP_NICHES_EN = ["beauty", "fitness", "kitchen", "home", "health", "gadgets"]
+_TOP_NICHES_BY_REGION = {
+    "ES": _TOP_NICHES_ES,
+    "MX": _TOP_NICHES_ES,
+    "US": _TOP_NICHES_EN,
+    "GB": _TOP_NICHES_EN,
+    "IT": ["bellezza", "fitness", "cucina", "casa", "salute", "gadget"],
+    "FR": ["beauté", "fitness", "cuisine", "maison", "santé", "gadgets"],
+    "DE": ["beauty", "fitness", "küche", "haushalt", "gesundheit", "gadgets"],
+}
+
+
+def _niches_for(region: str) -> list[str]:
+    return _TOP_NICHES_BY_REGION.get(region.upper(), _TOP_NICHES_EN)
 
 
 @router.get("/top-sellers", response_model=DiscoveryResponse)
@@ -165,16 +180,17 @@ def top_sellers(
             items=[], hint="EchoTik no configurado.",
         )
 
+    niches = _niches_for(region)
     start_job(
         job_id=f"topsellers_{uuid.uuid4().hex[:12]}",
         program="tiktok_shop",
         mode="product_discovery",
-        title=f"Top sellers [{region}] x{len(_TOP_NICHES)} nichos",
+        title=f"Top sellers [{region}] x{len(niches)} nichos",
         user=operator or None,
     )
     merged: dict[str, dict[str, Any]] = {}
     try:
-        for niche in _TOP_NICHES:
+        for niche in niches:
             for p in echotik_cloud.search_products(niche, region=region, limit=10):
                 pid = p.get("product_id")
                 if not pid:
