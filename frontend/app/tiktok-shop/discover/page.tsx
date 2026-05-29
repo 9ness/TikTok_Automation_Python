@@ -174,7 +174,7 @@ export default function DiscoverPage() {
                 disabled={topQ.isFetching}
                 variant="outline"
                 className="h-10 flex-1 gap-1 border-orange-500/50 px-3 text-orange-600 hover:bg-orange-500/10 dark:text-orange-400 sm:flex-none"
-                title="Ranking cruzado de lo más vendido (escanea ~6 nichos · ~6 consultas)"
+                title="Ranking real de lo más vendido del país (ordenado por ventas)"
               >
                 {topQ.isFetching ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -239,9 +239,9 @@ export default function DiscoverPage() {
           </div>
 
           <p className="text-[10px] text-muted-foreground sm:text-[11px]">
-            🇪🇸 Datos reales de ventas en España. <b>Búsqueda</b> = 1 consulta ·
-            <b> 🔥 Top ventas</b> = ~6 (escanea nichos) · ordenar/filtrar después
-            es <b>gratis</b>.
+            🇪🇸 Datos reales de ventas. <b>Búsqueda</b> por keyword = 1 consulta ·
+            <b> 🔥 Top ventas</b> = ranking real del país por ventas ·
+            ordenar/filtrar después es <b>gratis</b>.
           </p>
         </CardContent>
       </Card>

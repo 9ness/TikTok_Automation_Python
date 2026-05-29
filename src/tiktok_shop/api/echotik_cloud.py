@@ -170,6 +170,61 @@ def search_products(
 
 
 # ═════════════════════════════════════════════════════════════════════
+# Ranking REAL de productos más vendidos (por ventas, no por keyword)
+# ═════════════════════════════════════════════════════════════════════
+def get_product_ranklist(
+    *,
+    region: str = "ES",
+    date: str,
+    rank_field: int = 1,   # 1 = por unidades vendidas (verificado)
+    rank_type: int = 1,    # 1 = ranking diario (el que tiene datos en ES)
+    category_id: str | None = None,
+    limit: int = 10,
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Ranking REAL de lo más vendido en un mercado/fecha, ordenado por
+    ventas descendente (endpoint /product/ranklist). `date` = 'YYYY-MM-DD'.
+    Devuelve el mismo shape normalizado que search_products."""
+    if not echotik_is_configured():
+        return []
+    params: dict[str, Any] = {
+        "region": region, "date": date, "page_num": 1,
+        "page_size": min(limit, 10),
+        "product_rank_field": rank_field, "rank_type": rank_type,
+    }
+    if category_id:
+        params["category_id"] = category_id
+    data = _get("product/ranklist", params, log_callback=log_callback)
+    if not isinstance(data, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for p in data:
+        pid = str(p.get("product_id") or "")
+        out.append({
+            "product_id": pid,
+            "name": p.get("product_name") or "",
+            "cover_url": _first_cover_url(p.get("cover_url")),
+            "tiktok_url": f"https://www.tiktok.com/view/product/{pid}" if pid else "",
+            "units_sold": int(p.get("total_sale_cnt") or 0),
+            "units_sold_7d": 0,
+            "units_sold_30d": 0,
+            "gmv": float(p.get("total_sale_gmv_amt") or 0),
+            "gmv_30d": 0.0,
+            "video_count": int(p.get("total_video_cnt") or 0),
+            "video_sale_count": 0,
+            "influencer_count": int(p.get("total_ifl_cnt") or 0),
+            "rating": float(p.get("product_rating") or 0),
+            "review_count": int(p.get("review_count") or 0),
+            "min_price": float(p.get("min_price") or 0),
+            "max_price": float(p.get("max_price") or 0),
+            "commission_pct": _to_pct(p.get("product_commission_rate")),
+            "category_id": str(p.get("category_id") or ""),
+            "region": p.get("region") or region,
+        })
+    return out
+
+
+# ═════════════════════════════════════════════════════════════════════
 # Vídeos de un producto con ventas POR VÍDEO
 # ═════════════════════════════════════════════════════════════════════
 def get_product_videos(

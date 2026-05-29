@@ -180,38 +180,43 @@ def top_sellers(
             items=[], hint="EchoTik no configurado.",
         )
 
-    niches = _niches_for(region)
+    from datetime import datetime, timedelta, timezone
+
     start_job(
         job_id=f"topsellers_{uuid.uuid4().hex[:12]}",
         program="tiktok_shop",
         mode="product_discovery",
-        title=f"Top sellers [{region}] x{len(niches)} nichos",
+        title=f"Top sellers ranklist [{region}]",
         user=operator or None,
     )
-    merged: dict[str, dict[str, Any]] = {}
+    products: list[dict[str, Any]] = []
+    used_date = ""
     try:
-        for niche in niches:
-            for p in echotik_cloud.search_products(niche, region=region, limit=10):
-                pid = p.get("product_id")
-                if not pid:
-                    continue
-                # Nos quedamos con la entrada de más ventas si se repite.
-                if pid not in merged or (p.get("units_sold") or 0) > (
-                    merged[pid].get("units_sold") or 0
-                ):
-                    merged[pid] = p
+        # El ranking diario va con 1-2 días de retraso. Probamos desde
+        # ayer hacia atrás hasta encontrar un día con datos (máx 4 intentos).
+        now = datetime.now(timezone.utc)
+        for back in range(1, 5):
+            date = (now - timedelta(days=back)).strftime("%Y-%m-%d")
+            res = echotik_cloud.get_product_ranklist(
+                region=region, date=date, limit=min(limit, 10),
+            )
+            if res:
+                products = res
+                used_date = date
+                break
     finally:
         try:
             finalize_and_persist()
         except Exception:
             pass
 
-    products = sorted(
-        merged.values(), key=lambda p: p.get("units_sold") or 0, reverse=True,
-    )[:limit]
     items = [DiscoveredProduct(**p) for p in products]
+    hint = (
+        f"Top ventas reales de {region} · {used_date}"
+        if items else
+        f"Sin ranking disponible para {region} estos días."
+    )
     return DiscoveryResponse(
         configured=True, region=region, query="🔥 Top ventas",
-        sort="sales", items=items,
-        hint="" if items else "Sin datos de ventas en este momento.",
+        sort="sales", items=items, hint=hint,
     )
