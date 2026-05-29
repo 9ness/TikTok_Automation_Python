@@ -140,3 +140,62 @@ def discover_products(
         configured=True, region=region, query=keyword, sort=sort,
         items=items, hint=hint,
     )
+
+
+# Nichos que se escanean para el ranking cruzado "Top ventas". Términos
+# comerciales en español que devuelven productos variados del mercado ES.
+_TOP_NICHES = ["belleza", "fitness", "cocina", "hogar", "salud", "tecnología"]
+
+
+@router.get("/top-sellers", response_model=DiscoveryResponse)
+def top_sellers(
+    operator: Annotated[str, Depends(get_current_user)],
+    region: str = Query(default="ES"),
+    limit: int = Query(default=30, ge=1, le=60),
+) -> DiscoveryResponse:
+    """Ranking cruzado de lo más vendido: escanea N nichos (1 request c/u),
+    junta, dedup por product_id y ordena por unidades vendidas. La API no
+    expone un ranking global, así que lo construimos sumando nichos."""
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.api import echotik_cloud
+
+    if not echotik_cloud.echotik_is_configured():
+        return DiscoveryResponse(
+            configured=False, region=region, query="top-sellers", sort="sales",
+            items=[], hint="EchoTik no configurado.",
+        )
+
+    start_job(
+        job_id=f"topsellers_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="product_discovery",
+        title=f"Top sellers [{region}] x{len(_TOP_NICHES)} nichos",
+        user=operator or None,
+    )
+    merged: dict[str, dict[str, Any]] = {}
+    try:
+        for niche in _TOP_NICHES:
+            for p in echotik_cloud.search_products(niche, region=region, limit=10):
+                pid = p.get("product_id")
+                if not pid:
+                    continue
+                # Nos quedamos con la entrada de más ventas si se repite.
+                if pid not in merged or (p.get("units_sold") or 0) > (
+                    merged[pid].get("units_sold") or 0
+                ):
+                    merged[pid] = p
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+    products = sorted(
+        merged.values(), key=lambda p: p.get("units_sold") or 0, reverse=True,
+    )[:limit]
+    items = [DiscoveredProduct(**p) for p in products]
+    return DiscoveryResponse(
+        configured=True, region=region, query="🔥 Top ventas",
+        sort="sales", items=items,
+        hint="" if items else "Sin datos de ventas en este momento.",
+    )

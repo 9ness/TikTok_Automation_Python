@@ -46,6 +46,23 @@ export interface DiscoveryParams {
   enabled?: boolean;
 }
 
+export function useTopSellers(params: {
+  region?: string;
+  enabled?: boolean;
+}) {
+  const { region = "ES", enabled } = params;
+  return useQuery<DiscoveryResponse>({
+    queryKey: ["discovery-top", region],
+    queryFn: () =>
+      api.get<DiscoveryResponse>(
+        `/api/v1/tiktok-shop/discovery/top-sellers?region=${region}&limit=30`,
+      ),
+    enabled: Boolean(enabled),
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+}
+
 export function useDiscoverProducts(params: DiscoveryParams) {
   const {
     keyword,

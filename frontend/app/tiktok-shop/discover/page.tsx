@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Check,
   ExternalLink,
+  Flame,
   Loader2,
   Package,
   Plus,
@@ -20,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   useDiscoverProducts,
+  useTopSellers,
   type DiscoveredProduct,
 } from "@/lib/queries/discovery";
 import { useCreateProduct } from "@/lib/queries/products";
@@ -57,19 +59,25 @@ export default function DiscoverPage() {
   const [minCommission, setMinCommission] = useState(0);
   // `submitted` (keyword) solo cambia al pulsar Buscar → 1 request por búsqueda.
   const [submitted, setSubmitted] = useState<string | null>(null);
+  // Modo activo: búsqueda por keyword o ranking cruzado "Top ventas".
+  const [mode, setMode] = useState<"search" | "top">("search");
+  const [topEnabled, setTopEnabled] = useState(false);
 
   // La búsqueda SOLO depende de la keyword → 1 llamada por búsqueda.
-  const q = useDiscoverProducts({
+  const searchQ = useDiscoverProducts({
     keyword: submitted ?? "",
     limit: 10,
-    enabled: Boolean(submitted),
+    enabled: mode === "search" && Boolean(submitted),
   });
+  const topQ = useTopSellers({ enabled: mode === "top" && topEnabled });
+  const q = mode === "top" ? topQ : searchQ;
 
   function runSearch(kw: string) {
     if (!kw.trim()) {
       toast.error("Escribe qué producto o nicho buscar (ej. 'cinta de correr')");
       return;
     }
+    setMode("search");
     setSubmitted(kw.trim());
   }
   function onSearch() {
@@ -78,6 +86,11 @@ export default function DiscoverPage() {
   function onNiche(niche: string) {
     setKeyword(niche);
     runSearch(niche);
+  }
+  function onTopSellers() {
+    setMode("top");
+    setTopEnabled(true);
+    topQ.refetch?.();
   }
 
   const data = q.data;
@@ -128,18 +141,34 @@ export default function DiscoverPage() {
               placeholder="ej. cinta de correr, perfume, organizador cocina…"
               className="h-10 flex-1 text-sm"
             />
-            <Button
-              onClick={onSearch}
-              disabled={q.isFetching}
-              className="h-10 gap-1 px-4"
-            >
-              {q.isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Buscar
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={onSearch}
+                disabled={searchQ.isFetching}
+                className="h-10 flex-1 gap-1 px-4 sm:flex-none"
+              >
+                {searchQ.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Buscar
+              </Button>
+              <Button
+                onClick={onTopSellers}
+                disabled={topQ.isFetching}
+                variant="outline"
+                className="h-10 flex-1 gap-1 border-orange-500/50 px-3 text-orange-600 hover:bg-orange-500/10 dark:text-orange-400 sm:flex-none"
+                title="Ranking cruzado de lo más vendido (escanea ~6 nichos · ~6 consultas)"
+              >
+                {topQ.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Flame className="h-4 w-4" />
+                )}
+                Top ventas
+              </Button>
+            </div>
           </div>
 
           {/* Filtros: orden + comisión mínima */}
@@ -183,8 +212,9 @@ export default function DiscoverPage() {
           </div>
 
           <p className="text-[10px] text-muted-foreground sm:text-[11px]">
-            🇪🇸 Datos reales de ventas en España. Cada <b>búsqueda</b> gasta 1
-            consulta; ordenar y filtrar por comisión después es <b>gratis</b>.
+            🇪🇸 Datos reales de ventas en España. <b>Búsqueda</b> = 1 consulta ·
+            <b> 🔥 Top ventas</b> = ~6 (escanea nichos) · ordenar/filtrar después
+            es <b>gratis</b>.
           </p>
         </CardContent>
       </Card>
@@ -220,10 +250,11 @@ export default function DiscoverPage() {
         </Card>
       )}
 
-      {!submitted && (
+      {!submitted && !topEnabled && (
         <Card className="bg-muted/30">
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
-            Escribe un producto o nicho y pulsa Buscar para ver qué vende en ES.
+            Escribe un producto o nicho y pulsa <b>Buscar</b>, o pulsa{" "}
+            <b>🔥 Top ventas</b> para ver lo más vendido en ES ahora mismo.
           </CardContent>
         </Card>
       )}
