@@ -406,6 +406,7 @@ function ExistingHooksSection({
   favoritesSet: Set<string>;
 }) {
   const presets: VideoPreset[] = product.video_presets ?? [];
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const byKey = new Map<string, VideoPreset[]>();
@@ -416,7 +417,7 @@ function ExistingHooksSection({
     }
     return Array.from(byKey.entries()).map(([key, arr]) => {
       const [kind, angle] = key.split("__");
-      return { kind, angle, presets: arr };
+      return { key, kind, angle, presets: arr };
     });
   }, [presets]);
 
@@ -431,6 +432,8 @@ function ExistingHooksSection({
     );
   }
 
+  const activeGroup = groups.find((g) => g.key === openKey);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -443,30 +446,73 @@ function ExistingHooksSection({
         </span>
       </div>
 
-      {groups.map((g) => {
-        const subtitle = `${g.presets.length} preset(s) · ${countMainHooks(g.presets)} hook(s)`;
-        return (
-          <CollapsibleCard
-            key={`${g.kind}-${g.angle}`}
-            title={`${g.kind} · ${g.angle}`}
-            subtitle={subtitle}
-            icon={MessageSquareText}
-            accent={g.kind === "music" ? "pink" : "emerald"}
-            defaultOpen={false}
-          >
-            <div className="space-y-1.5 p-3 pt-0 sm:p-4 sm:pt-0">
-              {g.presets.map((p) => (
-                <PresetHooksBlock
-                  key={p.id}
-                  preset={p}
-                  productId={product.id}
-                  favoritesSet={favoritesSet}
-                />
-              ))}
-            </div>
-          </CollapsibleCard>
-        );
-      })}
+      {/* Grid de tarjetas compactas — 2 cols móvil / 3 sm / 4 lg */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {groups.map((g) => {
+          const isOpen = g.key === openKey;
+          const isMusic = g.kind === "music";
+          const accent = isMusic
+            ? "border-pink-500/40 text-pink-500"
+            : "border-emerald-500/40 text-emerald-500";
+          return (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setOpenKey(isOpen ? null : g.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border-2 p-2 text-left transition-colors hover:bg-muted/50 sm:p-3",
+                accent,
+                isOpen && "bg-muted/50 ring-1 ring-current ring-offset-1",
+              )}
+            >
+              <MessageSquareText className="h-4 w-4 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[10px] font-semibold sm:text-[11px]">
+                  {g.kind} · {g.angle}
+                </p>
+                <p className="text-[9px] text-muted-foreground sm:text-[10px]">
+                  {countMainHooks(g.presets)} hook
+                  {countMainHooks(g.presets) === 1 ? "" : "s"}
+                </p>
+              </div>
+              {isOpen ? (
+                <ChevronDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Panel expandido full-width — solo del grupo activo */}
+      {activeGroup && (
+        <Card
+          className={
+            activeGroup.kind === "music"
+              ? "border-pink-500/40"
+              : "border-emerald-500/40"
+          }
+        >
+          <CardContent className="space-y-1.5 p-3 sm:p-4">
+            <p className="text-xs font-semibold sm:text-sm">
+              {activeGroup.kind} · {activeGroup.angle}
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                ({activeGroup.presets.length} preset
+                {activeGroup.presets.length === 1 ? "" : "s"})
+              </span>
+            </p>
+            {activeGroup.presets.map((p) => (
+              <PresetHooksBlock
+                key={p.id}
+                preset={p}
+                productId={product.id}
+                favoritesSet={favoritesSet}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
