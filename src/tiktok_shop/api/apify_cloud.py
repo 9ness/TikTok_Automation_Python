@@ -30,9 +30,11 @@ import requests
 
 
 APIFY_API_URL = "https://api.apify.com/v2"
-SUBMIT_TIMEOUT_S = 180  # Apify "run-sync" puede tardar 30-60s
+# Fail-fast: si Apify se encola/cuelga, mejor abortar pronto que dejar al
+# usuario 9 min con el spinner. 120s/intento × 1 reintento = máx ~4 min.
+SUBMIT_TIMEOUT_S = 120
 POLL_INTERVAL_S = 5.0
-MAX_RETRIES_TRANSIENT = 2
+MAX_RETRIES_TRANSIENT = 1
 
 
 # Actor IDs — verificados en apify.com/store. Permite override via env.

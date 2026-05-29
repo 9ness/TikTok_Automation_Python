@@ -1245,13 +1245,31 @@ def _run_deep_research_background(product_id: str) -> None:
             product_id=product_id,
         )
 
+        # Guardamos los datos virales previos por si Apify falla este run —
+        # así NO perdemos vídeos/sonidos/comentarios ya obtenidos.
+        prev = product.research_context
+
         print(f"[research {product_id[:8]}] arrancando deep research…")
         research = deep_research_product(
             product,
             max_videos_to_analyze=5,       # 5 por bucket → 5 orgánicos + 5 pagados
-            max_tiktok_search_results=25,  # más candidatos para poder separar bien
+            max_tiktok_search_results=12,  # suficiente para separar; menos carga Apify
             log_callback=lambda m: print(f"[research {product_id[:8]}] {m}"),
         )
+
+        # Si Apify no dio vídeos este run pero antes SÍ había → conservar los
+        # datos virales viejos (no regresar a vacío por un fallo transitorio).
+        if not research.top_videos and prev and prev.top_videos:
+            print(f"[research {product_id[:8]}] ⚠️ Apify sin vídeos — conservo los previos")
+            research.top_videos = prev.top_videos
+            research.trending_sounds = prev.trending_sounds
+            research.viral_patterns = research.viral_patterns or prev.viral_patterns
+            research.proven_hooks = research.proven_hooks or prev.proven_hooks
+            research.audience_questions = (
+                research.audience_questions or prev.audience_questions
+            )
+            research.sources_videos_count = prev.sources_videos_count
+
         research.research_in_progress = False
         product.research_context = research
         repo.save(product)
