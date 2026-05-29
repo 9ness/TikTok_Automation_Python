@@ -119,6 +119,9 @@ interface WizardForm {
   voiceId: string;
   clipPhotoOverrides: ClipPhotoOverride[];
   nanoBananaAngles: number;
+  fruitMode: boolean;
+  fruitHint: string;
+  narrativeAngle: string;
 }
 
 const PROMPT_ONLY_TIERS: Tier[] = ["veo3_prompt_only", "nano_banana_prompt_only"];
@@ -151,6 +154,9 @@ export function GeneratorWizard() {
     voiceId: "Spanish_EnergeticBoy",
     clipPhotoOverrides: [],
     nanoBananaAngles: 5,
+    fruitMode: false,
+    fruitHint: "",
+    narrativeAngle: "",
   });
   const enqueue = useEnqueueGeneration();
   const previewVeo3 = usePreviewVeo3Prompt();
@@ -188,11 +194,16 @@ export function GeneratorWizard() {
           hook_category: form.hookCategory,
           hook_custom: form.hookCustom.trim() || null,
           target_audience: form.targetAudience.trim() || "Generalista",
+          fruit_mode: form.fruitMode,
+          fruit_hint: form.fruitMode ? form.fruitHint.trim() || null : null,
+          narrative_angle: form.fruitMode ? form.narrativeAngle || null : null,
         });
         setPromptModal({
           kind: "veo3",
           prompt: res.prompt,
-          meta: `Hook: "${res.hook_text}" · estilo: ${res.style}`,
+          meta: form.fruitMode
+            ? `🍉 Personaje fruta · estilo: ${res.style}`
+            : `Hook: "${res.hook_text}" · estilo: ${res.style}`,
         });
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Error generando prompt Veo 3.");
@@ -787,6 +798,56 @@ function StepReview({ form, patch }: StepProps) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {form.tier === "veo3_prompt_only" && (
+        <div className="space-y-3 rounded-md border border-orange-500/40 bg-orange-500/5 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <Label className="text-xs font-semibold">🍉 Personaje de fruta</Label>
+              <p className="text-[10px] text-muted-foreground">
+                Mini-historia viral: cabezas de fruta + drama/chisme + CTA al carrito.
+              </p>
+            </div>
+            <Switch
+              checked={form.fruitMode}
+              onCheckedChange={(v) => patch("fruitMode", v)}
+            />
+          </div>
+          {form.fruitMode && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-[10px]">Enfoque</Label>
+                <Select
+                  value={form.narrativeAngle || "auto"}
+                  onValueChange={(v) =>
+                    patch("narrativeAngle", v === "auto" ? "" : v)
+                  }
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">🤖 Que elija la IA</SelectItem>
+                    <SelectItem value="dramatico">🎭 Dramático</SelectItem>
+                    <SelectItem value="chismoso">👀 Chismoso</SelectItem>
+                    <SelectItem value="comico-burla">😂 Cómico / burla</SelectItem>
+                    <SelectItem value="aspiracional">✨ Aspiracional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Fruta (opcional)</Label>
+                <Input
+                  value={form.fruitHint}
+                  onChange={(e) => patch("fruitHint", e.target.value)}
+                  placeholder="vacío = la elige la IA"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

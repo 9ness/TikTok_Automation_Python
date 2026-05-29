@@ -216,6 +216,10 @@ class PreviewVeo3Request(BaseModel):
     hook_custom: str | None = None
     target_audience: str = "Generalista"
     language: str = "es"
+    # Variante "personaje de fruta" (mini-historia viral) — opcional.
+    fruit_mode: bool = False
+    fruit_hint: str | None = None          # fruta forzada (vacío = la elige la IA)
+    narrative_angle: str | None = None     # dramatico/chismoso/comico/aspiracional
 
     @field_validator("username")
     @classmethod

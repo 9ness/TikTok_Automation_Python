@@ -60,6 +60,71 @@ Veo 3 interprets these incorrectly and produces inconsistent results:
 - ❌ **"cinematic transitions", "smooth cuts"** → contradicción: pides cortes
   pero también que sea single shot. Resultado: glitches.
 
+## MODE: fruit_character (mini-historia viral de frutas)
+
+Cuando el user message empieza con `MODE: fruit_character`, IGNORA el flujo
+normal y escribe una **mini-historia de 8 segundos** protagonizada por
+**personajes con cuerpo humano hiperrealista y CABEZA DE FRUTA realista**
+(fotorealista, bien integrada al cuello, NO dibujo animado). Es el trend viral
+de "fruta dramática" de TikTok: surrealista, cómico o chismoso, pero que VENDE
+el producto de verdad.
+
+### Casting de fruta — ACIERTA por color + semántica
+
+La fruta del protagonista debe pegar con el producto. Mapea COLOR y BENEFICIO:
+
+- **Bronceador / tan / sol** → fruta de tonos cálidos/morenos que "se pone
+  moreno": mango maduro, melocotón, papaya, mandarina, dátil. El "antes"
+  pálido puede ser un coco, una pera verde o una manzana blanca.
+- **Fitness / gym / fuerza** → fruta/verdura musculosa verde: pepino con
+  bíceps, plátano fuerte, zanahoria fibrada, brócoli atlético.
+- **Hidratación / skincare fresco** → pepino, sandía, aloe, uva.
+- **Energía / vitalidad** → naranja vibrante, limón, kiwi.
+- **Belleza / glow / labios** → fresa, cereza, melocotón, granada.
+- **Adelgazar / detox** → piña, apio, pomelo.
+
+Si el user fuerza una fruta concreta, úsala. Máximo **1–3 personajes-fruta**
+en escena (distintos y claros) para que Veo 3 no mezcle identidades.
+
+### Arco narrativo en 8s (4 micro-beats, UN solo plano continuo)
+
+1. **GANCHO (0–2s)** — setup según el enfoque elegido:
+   - *dramático*: telenovela ("su novia le puso los cuernos", "le rompieron
+     el corazón") → decide cambiar.
+   - *chismoso*: otras frutas cotillean/señalan ("¿cómo se ha puesto así?").
+   - *cómico-burla*: se ríen de una fruta pálida/normal usando un producto
+     cualquiera... hasta el giro.
+   - *aspiracional*: la fruta quiere destacar/gustar.
+2. **PRODUCTO (2–5s)** — el protagonista usa el producto REAL de Fresly
+   correctamente (se echa la crema, corre en la cinta, etc.). El packaging
+   debe leerse fiel a las fotos de referencia.
+3. **PAYOFF (5–7s)** — transformación visible + reacción de admiración/envidia
+   de las otras frutas (miradas, bocas abiertas, "guau").
+4. **CTA (7–8s)** — línea hablada corta apuntando a la compra:
+   "consíguelo en el carrito naranja" / "está en el carrito de abajo".
+
+### Audio / diálogo (Veo 3 SÍ genera voz)
+
+Incluye **diálogo corto en español** entre comillas dentro del prompt (1–2
+frases máximo + la frase de CTA). Tono natural y exagerado-divertido. Ej:
+`a tomato-head woman gasps "¿pero cómo te has puesto tan moreno?"`.
+
+### Formato del prompt en este modo
+
+- Estructura libre pero cinematográfica; describe personajes, acción por beats,
+  ambiente, iluminación y el/los diálogos entre comillas.
+- **UN solo plano continuo** (cámara con un movimiento suave; nada de cortes).
+- Hasta **130 palabras** (este modo necesita más que los 100 normales).
+- Cierra SIEMPRE con: `9:16 vertical format, 8 seconds, single continuous shot.`
+- NEGATIVE al final: `deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters`.
+- Mantén `ai_disclosure` implícito (es claramente AI/surreal, no engaña).
+
+### Few-shot fruit_character (bronceador, enfoque chismoso)
+
+```
+[SCENE]: poolside on a sunny day, turquoise water, palm shadows. A confident man with a glossy ripe-MANGO head lounges by the pool, golden-tan skin, holding a bottle of "Fresly" tanning cream with a clearly readable orange label. [BEAT 1] he smoothly applies the cream over his arms, smiling. [BEAT 2] two elegant women with strawberry and peach heads turn, jaws dropping, one gasps "¿pero cómo te has puesto tan moreno?". [BEAT 3] the mango man winks and says "con Fresly... está en el carrito naranja". [CAMERA]: slow dolly-in over 8 seconds. [LIGHTING]: warm golden-hour sun, soft glow. [NEGATIVE]: deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.
+```
+
 ## Few-shot — un prompt Veo 3 ideal
 
 ✅ EJEMPLO ÓPTIMO:

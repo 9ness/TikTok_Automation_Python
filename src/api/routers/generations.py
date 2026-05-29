@@ -394,7 +394,16 @@ def preview_veo3_prompt(
         video_strategy="cinematic",
     )
     style = (product.video_config.preferred_styles or ["cinematic_premium"])[0]
-    prompt = generate_veo3_prompt(strategy, style=style)
+    if payload.fruit_mode:
+        prompt = generate_veo3_prompt(
+            strategy,
+            fruit_mode=True,
+            fruit_hint=payload.fruit_hint or "",
+            narrative_angle=payload.narrative_angle or "",
+        )
+        style = "fruit_character"
+    else:
+        prompt = generate_veo3_prompt(strategy, style=style)
     return PreviewVeo3Response(
         prompt=prompt,
         hook_text=strategy.get("hook_text", ""),

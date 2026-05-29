@@ -97,6 +97,9 @@ export interface PreviewVeo3Request {
   hook_custom?: string | null;
   target_audience?: string;
   language?: string;
+  fruit_mode?: boolean;
+  fruit_hint?: string | null;
+  narrative_angle?: string | null;
 }
 
 export interface PreviewVeo3Response {
