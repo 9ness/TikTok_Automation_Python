@@ -113,6 +113,7 @@ export interface ResearchContext {
   proven_hooks: string[];
   audience_questions?: string[];
   trending_sounds?: TrendingSound[];
+  research_in_progress?: boolean;
   analyzed_at: string | null;
   sources_reviews_count: number;
   sources_videos_count: number;

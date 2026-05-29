@@ -216,6 +216,10 @@ class ResearchContext(BaseModel):
     audience_questions: list[str] = Field(default_factory=list)
     # Sonidos/audios trending del nicho (agregados de los top vídeos).
     trending_sounds: list[TrendingSound] = Field(default_factory=list)
+    # True mientras el deep research corre en background (lo pone el
+    # runner al arrancar y lo limpia al terminar). El frontend lo usa
+    # para mostrar spinner "investigando…" y auto-refrescar.
+    research_in_progress: bool = False
     # Cuándo se hizo (para refrescar cada N días)
     analyzed_at: str | None = None
     # Métricas de la investigación (para debug + cost tracking)

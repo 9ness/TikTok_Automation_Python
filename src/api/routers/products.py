@@ -1228,9 +1228,11 @@ def _run_deep_research_background(product_id: str) -> None:
             print(f"[research {product_id[:8]}] producto desapareció, abortando")
             return
 
-        # Marcar inicio (frontend puede polear este flag para mostrar "investigando…")
-        product.research_context.analyzed_at = None  # invalidar para señalar "running"
-        # Nota: no save() aquí — guardamos solo al final con el resultado.
+        # Marcar inicio EN REDIS para que el frontend muestre spinner y
+        # auto-refresque hasta que termine. Mantenemos los datos viejos
+        # visibles, solo activamos el flag de "investigando".
+        product.research_context.research_in_progress = True
+        repo.save(product)
 
         # Cost tracking: abrir job para que record_gemini / record_apify_cloud
         # acumulen el coste REAL de las fases (web search + vídeo + comentarios).
@@ -1250,12 +1252,23 @@ def _run_deep_research_background(product_id: str) -> None:
             max_tiktok_search_results=25,  # más candidatos para poder separar bien
             log_callback=lambda m: print(f"[research {product_id[:8]}] {m}"),
         )
+        research.research_in_progress = False
         product.research_context = research
         repo.save(product)
         print(f"[research {product_id[:8]}] ✅ completado — guardado en Redis")
     except Exception as e:
         import traceback
         print(f"[research {product_id[:8]}] ❌ falló: {e}\n{traceback.format_exc()}")
+        # Limpiar el flag para no dejar el spinner colgado para siempre.
+        try:
+            from src.tiktok_shop.repos import ProductRepo as _PR
+            _repo = _PR()
+            _p = _repo.get(product_id)
+            if _p is not None:
+                _p.research_context.research_in_progress = False
+                _repo.save(_p)
+        except Exception:
+            pass
     finally:
         # Persistir el coste acumulado (aunque falle a medias, registramos
         # lo gastado hasta el punto de fallo).

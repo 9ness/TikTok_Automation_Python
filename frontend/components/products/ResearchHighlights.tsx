@@ -13,6 +13,7 @@ import {
   Heart,
   HelpCircle,
   Lightbulb,
+  Loader2,
   MessageSquare,
   Music,
   Quote,
@@ -51,7 +52,9 @@ export function ResearchHighlights({ product }: Props) {
   const rc: ResearchContext | undefined = product.research_context;
   const [openKey, setOpenKey] = useState<string | null>(null);
 
-  if (!rc || !rc.analyzed_at) {
+  const researching = Boolean(rc?.research_in_progress);
+
+  if (!rc || (!rc.analyzed_at && !researching)) {
     return (
       <Card className="bg-muted/30">
         <CardContent className="p-3 text-center text-xs text-muted-foreground sm:text-sm">
@@ -152,8 +155,23 @@ export function ResearchHighlights({ product }: Props) {
     },
   ].filter((c) => c.count > 0);
 
+  // Banner de "investigando…" mientras corre el deep research en background.
+  const researchingBanner = researching ? (
+    <div className="flex items-center gap-2 rounded-lg border-2 border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-cyan-700 dark:text-cyan-300">
+      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold sm:text-sm">Investigando el producto…</p>
+        <p className="text-[10px] text-muted-foreground sm:text-[11px]">
+          Buscando reviews, vídeos virales, comentarios y sonidos (~1-2 min).
+          Esta página se actualiza sola al terminar.
+        </p>
+      </div>
+    </div>
+  ) : null;
+
   if (cards.length === 0) {
-    return null;
+    // Sin datos aún: si está investigando, muestra solo el spinner.
+    return researchingBanner;
   }
 
   // Detectar análisis parcial: hubo videos en Apify pero Gemini no extrajo
@@ -165,6 +183,7 @@ export function ResearchHighlights({ product }: Props) {
 
   return (
     <div className="space-y-2">
+      {researchingBanner}
       <StatusBanner
         analyzedAt={rc.analyzed_at}
         cost={rc.research_cost_usd}

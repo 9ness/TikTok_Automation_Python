@@ -80,6 +80,10 @@ export function useProduct(id: string | null | undefined) {
     queryKey: productKeys.detail(id ?? ""),
     queryFn: () => api.get<Product>(`${ROOT}/${id}`),
     enabled: Boolean(id),
+    // Mientras el deep research corre en background, refrescar cada 8s
+    // para que el spinner desaparezca y aparezcan los datos al terminar.
+    refetchInterval: (q) =>
+      q.state.data?.research_context?.research_in_progress ? 8000 : false,
   });
 }
 
