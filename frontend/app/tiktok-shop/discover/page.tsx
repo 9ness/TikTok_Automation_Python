@@ -30,30 +30,57 @@ const SORTS = [
   { value: "sales_30d", label: "Ventas último mes" },
   { value: "sales_7d", label: "Ventas última semana" },
   { value: "gmv", label: "Más facturación (€)" },
+  { value: "commission", label: "Mejor comisión (%)" },
   { value: "price_desc", label: "Precio ↓" },
   { value: "price_asc", label: "Precio ↑" },
+];
+
+// Nichos rápidos — rellenan la keyword en 1 toque (no hay taxonomía de
+// categorías en la API, así que usamos búsquedas por nicho en español).
+const NICHES = [
+  "Belleza", "Maquillaje", "Cuidado facial", "Fitness", "Hogar",
+  "Cocina", "Mascotas", "Tecnología", "Moda", "Salud", "Bebé", "Coche",
+];
+
+const MIN_COMMISSIONS = [
+  { value: 0, label: "Comisión: cualquiera" },
+  { value: 5, label: "Comisión ≥ 5%" },
+  { value: 10, label: "Comisión ≥ 10%" },
+  { value: 15, label: "Comisión ≥ 15%" },
+  { value: 20, label: "Comisión ≥ 20%" },
 ];
 
 export default function DiscoverPage() {
   const [keyword, setKeyword] = useState("");
   const [sort, setSort] = useState("sales");
+  const [minCommission, setMinCommission] = useState(0);
   // `submitted` solo cambia al pulsar Buscar → 1 request por búsqueda.
-  const [submitted, setSubmitted] = useState<{ kw: string; sort: string } | null>(
-    null,
-  );
+  const [submitted, setSubmitted] = useState<{
+    kw: string;
+    sort: string;
+    minCommission: number;
+  } | null>(null);
 
   const q = useDiscoverProducts({
     keyword: submitted?.kw ?? "",
     sort: submitted?.sort ?? "sales",
+    minCommission: submitted?.minCommission ?? 0,
     enabled: Boolean(submitted),
   });
 
-  function onSearch() {
-    if (!keyword.trim()) {
+  function runSearch(kw: string) {
+    if (!kw.trim()) {
       toast.error("Escribe qué producto o nicho buscar (ej. 'cinta de correr')");
       return;
     }
-    setSubmitted({ kw: keyword.trim(), sort });
+    setSubmitted({ kw: kw.trim(), sort, minCommission });
+  }
+  function onSearch() {
+    runSearch(keyword);
+  }
+  function onNiche(niche: string) {
+    setKeyword(niche);
+    runSearch(niche);
   }
 
   const data = q.data;
@@ -80,35 +107,63 @@ export default function DiscoverPage() {
               placeholder="ej. cinta de correr, perfume, organizador cocina…"
               className="h-10 flex-1 text-sm"
             />
-            <div className="flex gap-2">
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="h-10 flex-1 rounded-md border bg-background px-2 text-xs sm:w-44 sm:flex-none"
-              >
-                {SORTS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <Button
-                onClick={onSearch}
-                disabled={q.isFetching}
-                className="h-10 gap-1 px-4"
-              >
-                {q.isFetching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                Buscar
-              </Button>
-            </div>
+            <Button
+              onClick={onSearch}
+              disabled={q.isFetching}
+              className="h-10 gap-1 px-4"
+            >
+              {q.isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              Buscar
+            </Button>
           </div>
+
+          {/* Filtros: orden + comisión mínima */}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="h-9 flex-1 rounded-md border bg-background px-2 text-xs"
+            >
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  Ordenar: {s.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={minCommission}
+              onChange={(e) => setMinCommission(Number(e.target.value))}
+              className="h-9 flex-1 rounded-md border bg-background px-2 text-xs"
+            >
+              {MIN_COMMISSIONS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chips de nicho — búsqueda en 1 toque */}
+          <div className="flex flex-wrap gap-1.5">
+            {NICHES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onNiche(n)}
+                className="rounded-full border bg-muted/40 px-2.5 py-1 text-[10px] font-medium transition-colors hover:border-emerald-500/60 hover:bg-emerald-500/10 sm:text-[11px]"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
           <p className="text-[10px] text-muted-foreground sm:text-[11px]">
-            🇪🇸 Datos reales de ventas en España · ordena por ventas, facturación
-            o precio. Cada búsqueda gasta 1 consulta.
+            🇪🇸 Datos reales de ventas en España · ordena por ventas, comisión o
+            precio · filtra por comisión mínima. Cada búsqueda gasta 1 consulta.
           </p>
         </CardContent>
       </Card>
@@ -238,6 +293,11 @@ function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground sm:text-[10px]">
           <span className="font-semibold text-foreground">{priceLabel}</span>
+          {p.commission_pct > 0 && (
+            <span className="rounded bg-amber-500/15 px-1 font-semibold text-amber-700 dark:text-amber-300">
+              {p.commission_pct}% com.
+            </span>
+          )}
           {p.gmv > 0 && (
             <span className="inline-flex items-center gap-0.5">
               <TrendingUp className="h-2.5 w-2.5" />

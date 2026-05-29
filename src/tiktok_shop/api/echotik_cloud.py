@@ -143,7 +143,7 @@ def search_products(
             "review_count": int(p.get("review_count") or 0),
             "min_price": float(p.get("min_price") or 0),
             "max_price": float(p.get("max_price") or 0),
-            "commission_rate": p.get("product_commission_rate"),
+            "commission_pct": _to_pct(p.get("product_commission_rate")),
             "category_id": str(p.get("category_id") or ""),
             "region": p.get("region") or region,
         })
@@ -207,6 +207,17 @@ def get_product_videos(
         sold = sum(1 for x in out if x["units_sold"] > 0)
         log_callback(f"  ✓ {len(out)} vídeos ({sold} con ventas registradas)")
     return out
+
+
+def _to_pct(rate: Any) -> float:
+    """Normaliza product_commission_rate a porcentaje. La API lo da como
+    fracción (0.1 → 10%). Tolerante a string/None/0."""
+    try:
+        v = float(rate)
+    except (TypeError, ValueError):
+        return 0.0
+    # Si viene como fracción (<=1) lo pasamos a %, si ya viene como % (>1) tal cual.
+    return round(v * 100, 1) if v <= 1 else round(v, 1)
 
 
 def _first_cover_url(raw: Any) -> str:

@@ -44,7 +44,7 @@ class DiscoveredProduct(BaseModel):
     review_count: int
     min_price: float
     max_price: float
-    commission_rate: Any | None
+    commission_pct: float
     category_id: str
     region: str
 
@@ -63,6 +63,7 @@ _SORT_KEYS = {
     "sales_7d": "units_sold_7d",
     "sales_30d": "units_sold_30d",
     "gmv": "gmv",
+    "commission": "commission_pct",
     "price_asc": "min_price",
     "price_desc": "max_price",
     "rating": "rating",
@@ -76,6 +77,8 @@ def discover_products(
     category_id: str = Query(default=""),
     region: str = Query(default="ES"),
     sort: str = Query(default="sales"),
+    min_commission: float = Query(default=0, ge=0, le=100),
+    max_price: float = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=30),
 ) -> DiscoveryResponse:
     """Busca productos en EchoTik por keyword/categoría y los devuelve
@@ -115,6 +118,12 @@ def discover_products(
             finalize_and_persist()
         except Exception:
             pass
+
+    # Filtros client-side (sobre datos reales del page devuelto).
+    if min_commission > 0:
+        products = [p for p in products if (p.get("commission_pct") or 0) >= min_commission]
+    if max_price > 0:
+        products = [p for p in products if 0 < (p.get("min_price") or 0) <= max_price]
 
     sort_key = _SORT_KEYS.get(sort, "units_sold")
     reverse = sort != "price_asc"
