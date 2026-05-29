@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -52,19 +52,16 @@ const MIN_COMMISSIONS = [
 
 export default function DiscoverPage() {
   const [keyword, setKeyword] = useState("");
+  // Orden + comisión son filtros LOCALES — cambiarlos NO re-llama a la API.
   const [sort, setSort] = useState("sales");
   const [minCommission, setMinCommission] = useState(0);
-  // `submitted` solo cambia al pulsar Buscar → 1 request por búsqueda.
-  const [submitted, setSubmitted] = useState<{
-    kw: string;
-    sort: string;
-    minCommission: number;
-  } | null>(null);
+  // `submitted` (keyword) solo cambia al pulsar Buscar → 1 request por búsqueda.
+  const [submitted, setSubmitted] = useState<string | null>(null);
 
+  // La búsqueda SOLO depende de la keyword → 1 llamada por búsqueda.
   const q = useDiscoverProducts({
-    keyword: submitted?.kw ?? "",
-    sort: submitted?.sort ?? "sales",
-    minCommission: submitted?.minCommission ?? 0,
+    keyword: submitted ?? "",
+    limit: 30,
     enabled: Boolean(submitted),
   });
 
@@ -73,7 +70,7 @@ export default function DiscoverPage() {
       toast.error("Escribe qué producto o nicho buscar (ej. 'cinta de correr')");
       return;
     }
-    setSubmitted({ kw: kw.trim(), sort, minCommission });
+    setSubmitted(kw.trim());
   }
   function onSearch() {
     runSearch(keyword);
@@ -84,7 +81,31 @@ export default function DiscoverPage() {
   }
 
   const data = q.data;
-  const items = data?.items ?? [];
+  // Orden + filtro de comisión aplicados en el cliente sobre el resultado
+  // ya cargado → instantáneo y SIN gastar llamadas.
+  const items = useMemo(() => {
+    const list = [...(data?.items ?? [])];
+    const filtered =
+      minCommission > 0
+        ? list.filter((p) => (p.commission_pct ?? 0) >= minCommission)
+        : list;
+    const key: Record<string, keyof typeof filtered[number]> = {
+      sales: "units_sold",
+      sales_30d: "units_sold_30d",
+      sales_7d: "units_sold_7d",
+      gmv: "gmv",
+      commission: "commission_pct",
+      price_desc: "max_price",
+      price_asc: "min_price",
+    };
+    const k = key[sort] ?? "units_sold";
+    filtered.sort((a, b) => {
+      const av = (a[k] as number) || 0;
+      const bv = (b[k] as number) || 0;
+      return sort === "price_asc" ? av - bv : bv - av;
+    });
+    return filtered;
+  }, [data?.items, sort, minCommission]);
 
   return (
     <div className="container mx-auto space-y-4 p-3 sm:p-6 md:p-10">
@@ -162,8 +183,8 @@ export default function DiscoverPage() {
           </div>
 
           <p className="text-[10px] text-muted-foreground sm:text-[11px]">
-            🇪🇸 Datos reales de ventas en España · ordena por ventas, comisión o
-            precio · filtra por comisión mínima. Cada búsqueda gasta 1 consulta.
+            🇪🇸 Datos reales de ventas en España. Cada <b>búsqueda</b> gasta 1
+            consulta; ordenar y filtrar por comisión después es <b>gratis</b>.
           </p>
         </CardContent>
       </Card>
