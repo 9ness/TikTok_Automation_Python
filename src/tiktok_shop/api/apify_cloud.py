@@ -241,11 +241,19 @@ def download_tiktok_video(
     mp4_url: str, dest_path: str,
     *, timeout_s: int = 120,
 ) -> str:
-    """Descarga el MP4 del TikTok a disk. Las URLs MP4 que devuelve
-    Apify son temporales (CDN TikTok con expiry ~6h) — descargar
-    inmediatamente tras la búsqueda."""
+    """Descarga el MP4 del TikTok a disk.
+
+    Con shouldDownloadVideos=True, clockworks guarda el MP4 en su
+    key-value store de Apify (URL `https://api.apify.com/v2/key-value-
+    stores/.../records/...mp4`) que requiere `?token=` para acceder
+    (403 sin él). Para esas URLs añadimos el token automáticamente.
+    """
     if not mp4_url:
         raise ApifyError("mp4_url vacío — el actor no devolvió downloadAddr")
+    # URLs del key-value store de Apify requieren auth con el token.
+    if "api.apify.com" in mp4_url and "token=" not in mp4_url:
+        sep = "&" if "?" in mp4_url else "?"
+        mp4_url = f"{mp4_url}{sep}token={_api_token()}"
     try:
         r = requests.get(mp4_url, timeout=timeout_s, stream=True)
     except (requests.Timeout, requests.ConnectionError) as e:
