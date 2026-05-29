@@ -40,7 +40,9 @@ from typing import Any, Callable
 
 from src.tiktok_shop.api import apify_cloud, gemini
 from src.tiktok_shop.models import Product
-from src.tiktok_shop.models.product import ResearchContext, ViralVideoSummary
+from src.tiktok_shop.models.product import (
+    ResearchContext, TrendingSound, ViralVideoSummary,
+)
 
 
 LogCallback = Callable[[str], None]
@@ -88,6 +90,9 @@ def deep_research_product(
     top_videos: list[ViralVideoSummary] = []
     viral_patterns: list[str] = []
     proven_hooks: list[str] = []
+    trending_sounds: list[TrendingSound] = []
+    audience_questions: list[str] = []
+    comments_count = 0
 
     if apify_cloud.apify_is_configured():
         # TikTok no encuentra resultados con queries largas tipo
@@ -100,7 +105,7 @@ def deep_research_product(
             words = [product.brand] + words[:7]
         tiktok_query = " ".join(words) or product.name
         log_callback(
-            f"🎬 Fase 2/3: buscando top {max_tiktok_search_results} vídeos "
+            f"🎬 Fase 2/4: buscando top {max_tiktok_search_results} vídeos "
             f"en TikTok con query: '{tiktok_query}'…"
         )
         try:
@@ -110,9 +115,8 @@ def deep_research_product(
                 sort_by="popular",
                 log_callback=log_callback,
             )
-            cost_estimate += 0.008
 
-            # Cost tracking
+            # Cost tracking (real — el job activo lo acumula)
             try:
                 from src.cost_tracking import record_apify_cloud
                 record_apify_cloud(
@@ -122,6 +126,16 @@ def deep_research_product(
                 )
             except Exception:
                 pass
+
+            # Agregamos sonidos trending de TODOS los resultados (no solo
+            # los analizados) — más muestra = mejor señal de qué audio
+            # está reventando en el nicho.
+            trending_sounds = _aggregate_trending_sounds(apify_results)
+            if trending_sounds:
+                log_callback(
+                    f"  🎵 {len(trending_sounds)} sonidos trending detectados "
+                    f"(top: {trending_sounds[0].title or trending_sounds[0].music_id})"
+                )
 
             # Tomamos top max_videos_to_analyze para análisis visual con Gemini.
             # Más caro pero mucho más útil que solo metadata.
@@ -134,7 +148,45 @@ def deep_research_product(
             top_videos, viral_patterns, proven_hooks = _analyze_top_videos(
                 videos_to_analyze, product, log_callback=log_callback,
             )
-            cost_estimate += 0.02 * len(videos_to_analyze)
+
+            # ════════════════════════════════════════════════════════════
+            # FASE 3: comentarios de los top vídeos → preguntas/objeciones
+            # reales del público (más afiladas que las reviews de Amazon).
+            # ════════════════════════════════════════════════════════════
+            top_urls = [v.url for v in top_videos[:3] if v.url]
+            if top_urls:
+                log_callback(
+                    f"💬 Fase 3/4: comentarios de los top {len(top_urls)} vídeos…"
+                )
+                try:
+                    comments = apify_cloud.scrape_tiktok_comments(
+                        top_urls,
+                        max_comments_per_video=30,
+                        log_callback=log_callback,
+                    )
+                    comments_count = len(comments)
+                    try:
+                        from src.cost_tracking import record_apify_cloud
+                        record_apify_cloud(
+                            items_count=comments_count,
+                            queries_count=len(top_urls),
+                            detail=f"comments '{product.name}'",
+                        )
+                    except Exception:
+                        pass
+                    if comments:
+                        extra_obj, audience_questions = _analyze_comments(
+                            comments, product, log_callback=log_callback,
+                        )
+                        # Fusionar objeciones de comentarios con las de reviews
+                        # (sin duplicar por texto normalizado).
+                        seen = {o.strip().lower() for o in objections}
+                        for o in extra_obj:
+                            if o.strip().lower() not in seen:
+                                objections.append(o)
+                                seen.add(o.strip().lower())
+                except Exception as e:
+                    log_callback(f"  ⚠️ Comentarios fallaron ({e}) — sigo")
         except apify_cloud.ApifyError as e:
             log_callback(f"⚠️ Apify falló ({e}) — sigo sin patrones virales")
         except Exception as e:
@@ -146,28 +198,43 @@ def deep_research_product(
         )
 
     # ════════════════════════════════════════════════════════════════
-    # FASE 3: ensamblar ResearchContext
+    # FASE 4: ensamblar ResearchContext
     # ════════════════════════════════════════════════════════════════
     elapsed = time.time() - started
+
+    # Coste REAL del job activo (Gemini + Apify trackeados). Si no hay
+    # tracker (call directa en test), cae al estimado heurístico.
+    real_cost = cost_estimate
+    try:
+        from src.cost_tracking import get_active
+        job = get_active()
+        if job is not None and job.total_usd > 0:
+            real_cost = job.total_usd
+    except Exception:
+        pass
+
     log_callback(
         f"✅ Investigación completada en {elapsed:.1f}s · "
-        f"coste estimado ~${cost_estimate:.3f}"
+        f"coste real ~${real_cost:.3f}"
     )
 
     return ResearchContext(
         customer_pains=customer_pains[:15],
         customer_benefits=customer_benefits[:15],
-        objections=objections[:10],
+        objections=objections[:15],
         viral_patterns=viral_patterns[:10],
         top_videos=top_videos,
         niche_keywords=niche_keywords[:20],
         niche_inspiration=niche_inspiration[:10],
         competitive_diff=competitive_diff[:10],
         proven_hooks=proven_hooks[:15],
+        audience_questions=audience_questions[:15],
+        trending_sounds=trending_sounds[:8],
         analyzed_at=datetime.now(timezone.utc).isoformat(),
         sources_reviews_count=len(customer_pains) + len(customer_benefits),
         sources_videos_count=len(top_videos),
-        research_cost_usd=round(cost_estimate, 4),
+        sources_comments_count=comments_count,
+        research_cost_usd=round(real_cost, 4),
     )
 
 
@@ -337,6 +404,11 @@ def _analyze_top_videos(
                 like_count=meta["like_count"],
                 comment_count=meta["comment_count"],
                 duration_s=meta["duration_s"],
+                music_id=meta.get("music_id", ""),
+                music_title=meta.get("music_name", ""),
+                music_author=meta.get("music_author", ""),
+                music_is_original=bool(meta.get("music_is_original", False)),
+                music_url=meta.get("music_url", ""),
             )
             summaries.append(summary)
             summary_idx = len(summaries) - 1
@@ -479,3 +551,107 @@ def _parse_video_analysis(text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
     return {}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Fase 2b: agregación de sonidos trending
+# ═════════════════════════════════════════════════════════════════════
+def _aggregate_trending_sounds(
+    apify_results: list[dict[str, Any]],
+) -> list[TrendingSound]:
+    """Cuenta cuántos de los top vídeos usan el mismo `music_id` y ordena
+    por (frecuencia, views totales). El sonido más repetido en los vídeos
+    virales del nicho es el que el operador debería montar.
+
+    Ignora sonidos originales (musicOriginal=True) sin id reutilizable —
+    esos son del creador y no se pueden montar."""
+    by_id: dict[str, TrendingSound] = {}
+    for item in apify_results:
+        meta = apify_cloud.extract_video_metadata(item)
+        mid = (meta.get("music_id") or "").strip()
+        if not mid:
+            continue
+        views = int(meta.get("view_count") or 0)
+        if mid in by_id:
+            s = by_id[mid]
+            s.used_count += 1
+            s.total_views += views
+        else:
+            by_id[mid] = TrendingSound(
+                music_id=mid,
+                title=meta.get("music_name", ""),
+                author=meta.get("music_author", ""),
+                is_original=bool(meta.get("music_is_original", False)),
+                url=meta.get("music_url", ""),
+                used_count=1,
+                total_views=views,
+            )
+    sounds = list(by_id.values())
+    # Prioriza sonidos que se repiten; a igualdad, los de más views.
+    sounds.sort(key=lambda s: (s.used_count, s.total_views), reverse=True)
+    return sounds
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Fase 3: análisis de comentarios → objeciones + preguntas reales
+# ═════════════════════════════════════════════════════════════════════
+def _analyze_comments(
+    comments: list[dict[str, Any]],
+    product: Product,
+    *, log_callback: LogCallback,
+) -> tuple[list[str], list[str]]:
+    """Pasa los comentarios (texto + likes) a Gemini para extraer:
+      - objections: dudas/frenos de compra reales
+      - questions: preguntas que el público hace (y que el vídeo debería
+        responder para neutralizar fricción)
+    Devuelve (objections, questions)."""
+    # Top 50 comentarios por likes — suficiente señal sin inflar el prompt.
+    top = comments[:50]
+    joined = "\n".join(
+        f"- ({c['like_count']}❤) {c['text']}" for c in top if c.get("text")
+    )
+    if not joined.strip():
+        return [], []
+
+    system_prompt = """Eres un analista de conversión de TikTok Shop. Te paso comentarios REALES de vídeos virales de un producto. Tu tarea: extraer la voz del cliente.
+
+DEVUELVE JSON EXACTO:
+{
+  "objections": ["freno/duda de compra real que aparece en los comentarios (ej. 'dudan de si hace mucho ruido')", ...],
+  "questions": ["pregunta literal o parafraseada que el público hace y que un buen vídeo debería responder", ...]
+}
+
+Reglas:
+- Máx 10 objections y 10 questions, las MÁS repetidas o con más likes.
+- En el idioma del producto (español si es ES).
+- NO inventes. Si el comentario no aporta, ignóralo.
+- Sé específico: 'no saben si cabe en piso pequeño' mejor que 'dudas de tamaño'."""
+
+    user_prompt = f"""Producto: {product.name}
+Categoría: {product.category}
+Idioma target: {product.language}
+
+Comentarios (ordenados por likes):
+{joined[:6000]}
+
+Extrae objections + questions en JSON."""
+
+    log_callback(f"  🧠 Gemini analizando {len(top)} comentarios…")
+    try:
+        text = gemini.generate_text(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model="gemini-2.5-flash",   # flash basta para extraer de texto
+            expect_json=True,
+            temperature=0.3,
+        )
+        data = _parse_video_analysis(text)
+        objections = [str(o)[:200] for o in (data.get("objections") or [])][:10]
+        questions = [str(q)[:200] for q in (data.get("questions") or [])][:10]
+        log_callback(
+            f"  ✓ {len(objections)} objeciones · {len(questions)} preguntas reales"
+        )
+        return objections, questions
+    except Exception as e:
+        log_callback(f"  ⚠️ Análisis de comentarios falló: {e}")
+        return [], []

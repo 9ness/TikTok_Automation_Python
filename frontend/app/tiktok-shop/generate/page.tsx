@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import {
+  BarChart3,
   Bookmark,
   Check,
   ChevronDown,
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 
 import { ShopGenerateCards } from "@/components/generate/ShopGenerateCards";
 import { HooksGenerator } from "@/components/hooks/HooksGenerator";
+import { PerformanceTracker } from "@/components/performance/PerformanceTracker";
 import { Button } from "@/components/ui/button";
 import { useProduct, useProducts } from "@/lib/queries/products";
 import {
@@ -138,11 +140,13 @@ function ShopGenerateInner() {
   // "hooks" (generador de hooks copywriting). El user puede saltar entre
   // ambos con las 2 cards de arriba; comparten el picker cuenta+producto.
   const LS_MODE_KEY = "tiktok_shop_generate.mode";
-  const [mode, setMode] = useState<"videos" | "hooks">("videos");
+  const [mode, setMode] = useState<"videos" | "hooks" | "rendimiento">("videos");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(LS_MODE_KEY);
-    if (stored === "hooks" || stored === "videos") setMode(stored);
+    if (stored === "hooks" || stored === "videos" || stored === "rendimiento") {
+      setMode(stored);
+    }
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -341,8 +345,8 @@ function ShopGenerateInner() {
         )}
       </header>
 
-      {/* Mode chooser: 2 tarjetas grandes */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      {/* Mode chooser: 3 tarjetas */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => setMode("videos")}
@@ -391,6 +395,31 @@ function ShopGenerateInner() {
           </div>
           <p className="text-[10px] leading-snug text-muted-foreground sm:text-xs">
             Copywriting rápido: variantes IA + hooks por tema
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("rendimiento")}
+          className={cn(
+            "flex flex-col items-start gap-1.5 rounded-lg border-2 p-3 text-left transition-colors sm:gap-2 sm:p-4",
+            mode === "rendimiento"
+              ? "border-cyan-500 bg-cyan-500/10"
+              : "border-muted bg-muted/30 hover:border-cyan-500/40 hover:bg-cyan-500/5",
+          )}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <BarChart3 className="h-4 w-4 text-cyan-500 sm:h-5 sm:w-5" />
+            <span className="text-sm font-semibold sm:text-base">
+              Rendimiento
+            </span>
+            {mode === "rendimiento" && (
+              <span className="ml-1 rounded bg-cyan-500/20 px-1.5 py-0.5 text-[9px] font-medium uppercase text-cyan-700 dark:text-cyan-300 sm:text-[10px]">
+                Activo
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] leading-snug text-muted-foreground sm:text-xs">
+            Vídeos publicados + métricas reales → el motor aprende qué vende
           </p>
         </button>
       </div>
@@ -578,8 +607,10 @@ function ShopGenerateInner() {
             productId={selectedProduct.id}
             productName={selectedProduct.name}
           />
-        ) : (
+        ) : mode === "hooks" ? (
           <HooksModeBlock productId={selectedProduct.id} />
+        ) : (
+          <PerformanceModeBlock productId={selectedProduct.id} />
         )
       ) : (
         <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
@@ -588,7 +619,9 @@ function ShopGenerateInner() {
               ? "Elige una cuenta para empezar."
               : mode === "videos"
                 ? "Elige un producto para ver los 4 modos de generación."
-                : "Elige un producto para generar hooks."}
+                : mode === "hooks"
+                  ? "Elige un producto para generar hooks."
+                  : "Elige un producto para ver su rendimiento real."}
           </p>
         </div>
       )}
@@ -617,6 +650,29 @@ function HooksModeBlock({ productId }: { productId: string }) {
     );
   }
   return <HooksGenerator product={product} />;
+}
+
+/** Carga el producto completo y monta el tracker de rendimiento. */
+function PerformanceModeBlock({ productId }: { productId: string }) {
+  const productQ = useProduct(productId);
+  const product = productQ.data;
+  if (productQ.isLoading) {
+    return (
+      <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
+        <p className="text-sm text-muted-foreground">Cargando producto…</p>
+      </div>
+    );
+  }
+  if (!product) {
+    return (
+      <div className="rounded-md border border-dashed bg-muted/30 p-10 text-center">
+        <p className="text-sm text-muted-foreground">
+          No se pudo cargar el producto.
+        </p>
+      </div>
+    );
+  }
+  return <PerformanceTracker product={product} />;
 }
 
 function UserPill({

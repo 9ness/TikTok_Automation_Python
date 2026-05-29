@@ -39,6 +39,13 @@ MAX_RETRIES_TRANSIENT = 2
 TIKTOK_SCRAPER_ACTOR = os.environ.get(
     "APIFY_TIKTOK_SEARCH_ACTOR", "clockworks/tiktok-scraper",
 )
+# Actor de comentarios — separado del scraper de búsqueda. Recibe URLs
+# de vídeos y devuelve sus comentarios (texto + likes). Lo usamos para
+# extraer objeciones/preguntas REALES del público (más afiladas que las
+# reviews de Amazon porque vienen del propio canal TikTok).
+TIKTOK_COMMENTS_ACTOR = os.environ.get(
+    "APIFY_TIKTOK_COMMENTS_ACTOR", "clockworks/tiktok-comments-scraper",
+)
 
 
 class ApifyError(RuntimeError):
@@ -201,11 +208,24 @@ def search_tiktok_videos(
     return items
 
 
+def _first_music_url(music: dict[str, Any]) -> str:
+    """Devuelve la primera URL de preview del audio. clockworks puede dar
+    `playUrl` (str) o `playUrlList` (list). Tolerante a ambos."""
+    pu = music.get("playUrl")
+    if isinstance(pu, str) and pu:
+        return pu
+    lst = music.get("playUrlList")
+    if isinstance(lst, list) and lst:
+        return str(lst[0])
+    return ""
+
+
 def extract_video_metadata(item: dict[str, Any]) -> dict[str, Any]:
     """Normaliza el dict del actor a un shape interno simple para
     consumir desde el research_service. Tolerante a campos faltantes."""
     video_meta = item.get("videoMeta") or {}
-    music = item.get("music") or {}
+    # clockworks expone el audio en `musicMeta`; otros actores en `music`.
+    music = item.get("musicMeta") or item.get("music") or {}
     author = item.get("authorMeta") or {}
     # clockworks con shouldDownloadVideos=True expone `mediaUrls[0]` →
     # URL proxied de Apify (estable). Fallbacks por compat.
@@ -229,12 +249,107 @@ def extract_video_metadata(item: dict[str, Any]) -> dict[str, Any]:
         "duration_s": float(video_meta.get("duration") or 0),
         "width": int(video_meta.get("width") or 0),
         "height": int(video_meta.get("height") or 0),
+        # Audio/sonido — clave para viralidad TikTok. clockworks musicMeta:
+        # {musicName, musicAuthor, musicId, musicOriginal, playUrl}.
+        "music_id": str(music.get("musicId") or music.get("id") or ""),
         "music_name": music.get("musicName") or music.get("name") or "",
         "music_author": music.get("musicAuthor") or music.get("authorName") or "",
+        "music_is_original": bool(music.get("musicOriginal") or music.get("original") or False),
+        "music_url": _first_music_url(music),
         "author_name": author.get("name") or "",
         "author_followers": int(author.get("fans") or 0),
         "created_at": item.get("createTimeISO") or "",
     }
+
+
+def scrape_tiktok_comments(
+    video_urls: list[str],
+    *,
+    max_comments_per_video: int = 30,
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Scrape los comentarios de N vídeos TikTok via Apify.
+
+    Devuelve lista de dicts normalizados: {text, like_count, video_url,
+    reply_count}. Los comentarios con más likes son los que mejor
+    representan las dudas/objeciones del público.
+
+    Args:
+        video_urls: URLs de vídeos TikTok (https://www.tiktok.com/@x/video/123)
+        max_comments_per_video: tope por vídeo (más = más coste Apify)
+        log_callback: opcional, mensajes de progreso
+    """
+    urls = [u for u in (video_urls or []) if u]
+    if not urls:
+        return []
+    if log_callback:
+        log_callback(
+            f"💬 Apify: scraping comentarios de {len(urls)} vídeos "
+            f"(máx {max_comments_per_video}/vídeo)…"
+        )
+    # Input schema clockworks/tiktok-comments-scraper:
+    #   postURLs: array de URLs de vídeo
+    #   commentsPerPost: int
+    #   maxRepliesPerComment: int (0 = sin replies, más barato)
+    input_data = {
+        "postURLs": urls,
+        "commentsPerPost": max_comments_per_video,
+        "maxRepliesPerComment": 0,
+    }
+    try:
+        items = _run_actor_sync(TIKTOK_COMMENTS_ACTOR, input_data)
+    except (ApifyError, ApifyTransient) as e:
+        if log_callback:
+            log_callback(f"  ⚠️ Apify comments falló ({e}) — sigo sin comentarios")
+        return []
+    if not isinstance(items, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        text = (it.get("text") or it.get("comment") or "").strip()
+        if not text:
+            continue
+        out.append({
+            "text": text,
+            "like_count": int(it.get("diggCount") or it.get("likesCount") or 0),
+            "reply_count": int(it.get("replyCommentTotal") or it.get("repliesCount") or 0),
+            "video_url": it.get("videoWebUrl") or it.get("postUrl") or "",
+        })
+    # Orden por likes desc — los comentarios con más likes resumen las
+    # dudas/objeciones que más comparte el público.
+    out.sort(key=lambda c: c["like_count"], reverse=True)
+    if log_callback:
+        log_callback(f"  ✓ {len(out)} comentarios recogidos")
+    return out
+
+
+def fetch_videos_by_url(
+    video_urls: list[str],
+    *,
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Recupera metadata actual (views/likes/comments/shares) de vídeos
+    TikTok concretos por su URL. Usado por el feedback loop de rendimiento
+    para refrescar las métricas de los vídeos que el operador ya publicó.
+
+    Devuelve los items crudos del actor (pásalos por extract_video_metadata)."""
+    urls = [u for u in (video_urls or []) if u]
+    if not urls:
+        return []
+    if log_callback:
+        log_callback(f"📊 Apify: refrescando métricas de {len(urls)} vídeos…")
+    input_data = {
+        "postURLs": urls,
+        "resultsPerPage": len(urls),
+        "shouldDownloadVideos": False,
+        "shouldDownloadCovers": False,
+        "shouldDownloadSubtitles": False,
+        "shouldDownloadSlideshowImages": False,
+    }
+    items = _run_actor_sync(TIKTOK_SCRAPER_ACTOR, input_data)
+    return items if isinstance(items, list) else []
 
 
 def download_tiktok_video(

@@ -1215,6 +1215,8 @@ def _run_deep_research_background(product_id: str) -> None:
     FastAPI ejecuta BackgroundTasks. Si reusáramos, podríamos hacer
     operaciones sobre objetos con sesiones cerradas.
     """
+    from src.cost_tracking import finalize_and_persist, start_job
+
     try:
         from src.tiktok_shop.repos import ProductRepo, get_shop_redis
         from src.tiktok_shop.services.research_service import deep_research_product
@@ -1230,6 +1232,17 @@ def _run_deep_research_background(product_id: str) -> None:
         product.research_context.analyzed_at = None  # invalidar para señalar "running"
         # Nota: no save() aquí — guardamos solo al final con el resultado.
 
+        # Cost tracking: abrir job para que record_gemini / record_apify_cloud
+        # acumulen el coste REAL de las fases (web search + vídeo + comentarios).
+        # Sin esto, _add_line es no-op y el coste no aparece en /costs.
+        start_job(
+            job_id=f"research_{product_id[:12]}_{uuid.uuid4().hex[:6]}",
+            program="tiktok_shop",
+            mode="deep_research",
+            title=f"Deep research: {product.slug}",
+            product_id=product_id,
+        )
+
         print(f"[research {product_id[:8]}] arrancando deep research…")
         research = deep_research_product(
             product,
@@ -1243,6 +1256,13 @@ def _run_deep_research_background(product_id: str) -> None:
     except Exception as e:
         import traceback
         print(f"[research {product_id[:8]}] ❌ falló: {e}\n{traceback.format_exc()}")
+    finally:
+        # Persistir el coste acumulado (aunque falle a medias, registramos
+        # lo gastado hasta el punto de fallo).
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
 
 
 @router.post(

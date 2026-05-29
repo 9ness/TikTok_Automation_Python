@@ -82,6 +82,21 @@ export interface ViralVideoSummary {
   visual_patterns: string[];
   cta_used: string;
   music_mood: string;
+  music_id?: string;
+  music_title?: string;
+  music_author?: string;
+  music_is_original?: boolean;
+  music_url?: string;
+}
+
+export interface TrendingSound {
+  music_id: string;
+  title: string;
+  author: string;
+  is_original: boolean;
+  url: string;
+  used_count: number;
+  total_views: number;
 }
 
 export interface ResearchContext {
@@ -94,9 +109,12 @@ export interface ResearchContext {
   niche_inspiration: string[];
   competitive_diff: string[];
   proven_hooks: string[];
+  audience_questions?: string[];
+  trending_sounds?: TrendingSound[];
   analyzed_at: string | null;
   sources_reviews_count: number;
   sources_videos_count: number;
+  sources_comments_count?: number;
   research_cost_usd: number;
 }
 

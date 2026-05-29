@@ -11,8 +11,10 @@ import {
   ExternalLink,
   Eye,
   Heart,
+  HelpCircle,
   Lightbulb,
   MessageSquare,
+  Music,
   Quote,
   Search,
   Target,
@@ -21,7 +23,12 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { Product, ResearchContext, ViralVideoSummary } from "@/lib/types/product";
+import type {
+  Product,
+  ResearchContext,
+  TrendingSound,
+  ViralVideoSummary,
+} from "@/lib/types/product";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -94,6 +101,22 @@ export function ResearchHighlights({ product }: Props) {
       count: rc.proven_hooks.length,
       accent: "text-purple-500 border-purple-500/40",
       data: () => <SimpleList items={rc.proven_hooks} />,
+    },
+    {
+      key: "questions",
+      icon: HelpCircle,
+      title: "Preguntas público",
+      count: rc.audience_questions?.length ?? 0,
+      accent: "text-teal-500 border-teal-500/40",
+      data: () => <SimpleList items={rc.audience_questions ?? []} />,
+    },
+    {
+      key: "sounds",
+      icon: Music,
+      title: "Sonidos trending",
+      count: rc.trending_sounds?.length ?? 0,
+      accent: "text-fuchsia-500 border-fuchsia-500/40",
+      data: () => <SoundList items={rc.trending_sounds ?? []} />,
     },
     {
       key: "patterns",
@@ -279,6 +302,46 @@ function SimpleList({ items }: { items: string[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function SoundList({ items }: { items: TrendingSound[] }) {
+  return (
+    <div className="space-y-1.5">
+      {items.map((s, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 rounded border bg-muted/20 p-2"
+        >
+          <Music className="h-3.5 w-3.5 flex-shrink-0 text-fuchsia-500" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-medium sm:text-xs">
+              {s.title || s.music_id || "Sonido"}
+              {s.is_original && (
+                <span className="ml-1 rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">
+                  original
+                </span>
+              )}
+            </p>
+            <p className="text-[9px] text-muted-foreground sm:text-[10px]">
+              {s.author ? `${s.author} · ` : ""}en {s.used_count} vídeo
+              {s.used_count === 1 ? "" : "s"} · {s.total_views.toLocaleString()} views
+            </p>
+          </div>
+          {s.url && (
+            <a
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 text-fuchsia-500 hover:text-fuchsia-400"
+              title="Escuchar sonido"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

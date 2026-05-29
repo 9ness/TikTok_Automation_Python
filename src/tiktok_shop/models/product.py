@@ -145,6 +145,29 @@ class ViralVideoSummary(BaseModel):
     visual_patterns: list[str] = Field(default_factory=list)  # planos, cortes, transiciones
     cta_used: str = ""
     music_mood: str = ""
+    # Audio/sonido del vídeo (extraído de Apify musicMeta). El sonido es
+    # uno de los mayores drivers de viralidad en TikTok — capturamos el
+    # ID para poder reutilizar el MISMO audio trending del nicho.
+    music_id: str = ""                  # TikTok music id (reutilizable al subir)
+    music_title: str = ""               # nombre de la canción/sonido
+    music_author: str = ""              # autor del sonido
+    music_is_original: bool = False     # True si es sonido original del creador
+    music_url: str = ""                 # playUrl (preview del audio)
+
+
+class TrendingSound(BaseModel):
+    """Sonido/audio trending agregado de los top vídeos del nicho.
+
+    Se construye contando cuántos de los top vídeos virales usan el mismo
+    `music_id`. El operador puede reutilizar el mismo sonido al subir su
+    vídeo (TikTok prioriza vídeos que montan sonidos en tendencia)."""
+    music_id: str = ""
+    title: str = ""
+    author: str = ""
+    is_original: bool = False
+    url: str = ""
+    used_count: int = 1                 # en cuántos top vídeos aparece
+    total_views: int = 0                # suma de views de los vídeos que lo usan
 
 
 class ResearchContext(BaseModel):
@@ -176,12 +199,19 @@ class ResearchContext(BaseModel):
     competitive_diff: list[str] = Field(default_factory=list)
     # Hooks AGREGADOS desde los vídeos virales (mejor que los inventados)
     proven_hooks: list[str] = Field(default_factory=list)
+    # Preguntas/dudas REALES sacadas de los comentarios de los vídeos
+    # virales (Apify comments scraper). Son las objeciones más afiladas
+    # porque vienen del propio canal (TikTok), no de reviews de Amazon.
+    audience_questions: list[str] = Field(default_factory=list)
+    # Sonidos/audios trending del nicho (agregados de los top vídeos).
+    trending_sounds: list[TrendingSound] = Field(default_factory=list)
     # Cuándo se hizo (para refrescar cada N días)
     analyzed_at: str | None = None
     # Métricas de la investigación (para debug + cost tracking)
     sources_reviews_count: int = 0      # cuántas reviews leyó Gemini
     sources_videos_count: int = 0       # cuántos TikToks analizó
-    research_cost_usd: float = 0.0      # coste total del último research
+    sources_comments_count: int = 0     # cuántos comentarios analizó
+    research_cost_usd: float = 0.0      # coste total REAL del último research
 
 
 class PerformanceHistory(BaseModel):

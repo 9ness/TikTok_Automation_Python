@@ -10,6 +10,7 @@ from .video_generation import (
 from .video_preset import VideoPreset, SUGGESTED_ANGLES, make_preset_id
 from .voice import VoiceClone
 from .shortcut import OperatorShortcut
+from .performance import PublishedVideo, parse_tiktok_video_id
 
 __all__ = [
     "TikTokUser",
@@ -35,4 +36,6 @@ __all__ = [
     "VoiceUsed",
     "VoiceClone",
     "OperatorShortcut",
+    "PublishedVideo",
+    "parse_tiktok_video_id",
 ]

@@ -40,3 +40,5 @@
 <!-- Test auto-deploy v3 - after NoNewPrivileges fix -->
 
 - Apify clockworks/tiktok-scraper: usar `shouldDownloadVideos:true` → MP4 en su key-value store (`mediaUrls[0]`); esas URLs dan 403 sin `?token=APIFY_API_TOKEN`. Descargar directo de TikTok CDN (downloadAddr) da 403/404. Algunos records dan 404 (actor no los subió) → degradar saltando ese video.
+- Cost tracking en BackgroundTasks: las `record_*` son no-op sin `start_job` activo en ese thread. El deep research corría en background sin `start_job` → Gemini+Apify no se registraban. Fix: envolver el background con `start_job`/`finalize_and_persist`. El `research_cost_usd` ahora sale de `get_active().total_usd` (real), no de un estimado hardcoded.
+- Research motor TikTok Shop ampliado: comentarios de vídeos virales (actor `clockworks/tiktok-comments-scraper`, input `postURLs`) → Gemini extrae `audience_questions`+objeciones reales; `musicMeta` de clockworks agrega `trending_sounds` (dedupe por musicId). Feedback loop `PublishedVideo` (repo `published:`) → `winning_angles_block` inyecta ángulos ganadores en `_research_block` de preset_generator.

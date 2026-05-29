@@ -172,6 +172,8 @@ def _research_block(product: Any) -> str:
     viral_patterns: list[str] = []
     keywords: list[str] = []
     competitive: list[str] = []
+    audience_questions: list[str] = []
+    trending_sounds: list[Any] = []
     if rc is not None:
         pains = list(getattr(rc, "customer_pains", []) or [])
         benefits = list(getattr(rc, "customer_benefits", []) or [])
@@ -180,6 +182,8 @@ def _research_block(product: Any) -> str:
         viral_patterns = list(getattr(rc, "viral_patterns", []) or [])
         keywords = list(getattr(rc, "niche_keywords", []) or [])
         competitive = list(getattr(rc, "competitive_diff", []) or [])
+        audience_questions = list(getattr(rc, "audience_questions", []) or [])
+        trending_sounds = list(getattr(rc, "trending_sounds", []) or [])
 
     # Inyectar favoritos del operador como proven_hooks extras — son hooks
     # que el user ha marcado explícitamente porque ya le han funcionado
@@ -198,6 +202,43 @@ def _research_block(product: Any) -> str:
     def _list(items: list[str], cap: int = 10) -> str:
         return "\n".join(f"  - {x}" for x in items[:cap]) if items else "  (vacío)"
 
+    # Preguntas reales del público (comentarios de los vídeos virales).
+    questions_block = ""
+    if audience_questions:
+        questions_block = (
+            f"PREGUNTAS REALES del público (sacadas de COMENTARIOS de los vídeos "
+            f"virales — respóndelas en el guion para eliminar fricción de compra):\n"
+            f"{_list(audience_questions)}\n\n"
+        )
+
+    # Sonidos trending del nicho (sugerencia de audio al subir el vídeo).
+    sounds_block = ""
+    if trending_sounds:
+        sound_lines = []
+        for s in trending_sounds[:5]:
+            title = getattr(s, "title", "") or getattr(s, "music_id", "")
+            used = getattr(s, "used_count", 1)
+            sound_lines.append(f"  - {title} (en {used} vídeos top del nicho)")
+        sounds_block = (
+            "SONIDOS TRENDING del nicho (sugiere en `oratory_tips`/notas que el "
+            "operador monte uno de estos audios al subir — TikTok prioriza vídeos "
+            "con sonidos en tendencia):\n" + "\n".join(sound_lines) + "\n\n"
+        )
+
+    # Feedback loop: ángulos ganadores reales del operador para ESTE producto.
+    winning_block = ""
+    pid = getattr(product, "id", None)
+    if pid:
+        try:
+            from src.tiktok_shop.repos import PublishedVideoRepo
+            from src.tiktok_shop.services.performance_service import (
+                winning_angles_block,
+            )
+            published = PublishedVideoRepo().list_by_product(pid)
+            winning_block = winning_angles_block(published)
+        except Exception:
+            winning_block = ""
+
     return (
         "\n=== RESEARCH CONTEXT (DATOS REALES — ÚSALOS) ===\n"
         "Esta investigación se sacó de reviews reales (Amazon/AliExpress/foros) "
@@ -207,10 +248,13 @@ def _research_block(product: Any) -> str:
         f"DOLORES REALES de clientes (úsalos en hooks problem_solution + voice_script):\n{_list(pains)}\n\n"
         f"BENEFICIOS que la gente menciona en reviews positivas (úsalos en hooks deseo + cierres):\n{_list(benefits)}\n\n"
         f"OBJECIONES reales que aparecen en comentarios (RESPÓNDELAS en el body del script para neutralizar dudas antes de que las tenga el viewer):\n{_list(objections)}\n\n"
+        f"{questions_block}"
         f"HOOKS PROBADOS de vídeos que YA viralizaron con este producto/nicho (inspírate, adáptalos al producto del user — NO copies literal):\n{_list(proven_hooks)}\n\n"
         f"PATRONES VIRALES detectados en los top vídeos (estructura, planos, transiciones — replica lo que funciona):\n{_list(viral_patterns)}\n\n"
+        f"{sounds_block}"
         f"KEYWORDS SEO del nicho (intégralos en `keywords` del preset + title):\n{_list(keywords, cap=15)}\n\n"
         f"DIFERENCIADORES vs competidores (úsalos en hooks de comparativa):\n{_list(competitive)}\n\n"
+        f"{winning_block}"
         "Reglas:\n"
         "- Si un preset usa ángulo `dolor` → tira de DOLORES REALES.\n"
         "- Si usa `prueba_social` → cita objeciones que neutralizan dudas.\n"
