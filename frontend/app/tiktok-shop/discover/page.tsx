@@ -84,6 +84,7 @@ export default function DiscoverPage() {
   // Resultado mostrado — persistido en localStorage (instantáneo, mismo
   // dispositivo) + servidor/Redis (cross-device PC↔móvil).
   const [result, setResult] = useState<DiscoveryResponse | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [restored, setRestored] = useState(false);
   const lastServer = useLastDiscovery();
   const saveLast = useSaveLastDiscovery();
@@ -108,6 +109,7 @@ export default function DiscoverPage() {
       if (raw) {
         const s = JSON.parse(raw);
         if (s.result) setResult(s.result);
+        if (s.savedAt) setSavedAt(s.savedAt);
         if (s.keyword) setKeyword(s.keyword);
         if (s.region) setRegion(s.region);
         if (s.sort) setSort(s.sort);
@@ -137,6 +139,7 @@ export default function DiscoverPage() {
     }
     if ((s.savedAt || 0) >= localAt) {
       setResult(s.result);
+      setSavedAt(s.savedAt || null);
       if (s.keyword) setKeyword(s.keyword);
       if (s.region) setRegion(s.region);
       if (s.sort) setSort(s.sort);
@@ -149,13 +152,15 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (q.data) {
       setResult(q.data);
+      const now = Date.now();
+      setSavedAt(now);
       const payload = {
         result: q.data,
         keyword,
         region,
         sort,
         minCommission,
-        savedAt: Date.now(),
+        savedAt: now,
       };
       try {
         window.localStorage.setItem(LS_KEY, JSON.stringify(payload));
@@ -169,6 +174,7 @@ export default function DiscoverPage() {
 
   function onClear() {
     setResult(null);
+    setSavedAt(null);
     setSubmitted(null);
     setTopReq(null);
     setKeyword("");
@@ -384,8 +390,15 @@ export default function DiscoverPage() {
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-muted-foreground sm:text-xs">
             {items.length} resultado{items.length === 1 ? "" : "s"}
-            {data?.query ? ` · ${data.query}` : ""} · guardado en este
-            dispositivo
+            {data?.query ? ` · ${data.query}` : ""}
+            {savedAt
+              ? ` · actualizado ${new Date(savedAt).toLocaleString("es-ES", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}`
+              : ""}
           </p>
           <Button
             variant="ghost"
