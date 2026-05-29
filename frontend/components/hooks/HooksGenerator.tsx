@@ -56,6 +56,37 @@ export function HooksGenerator({ product }: { product: Product }) {
     [favoritesList],
   );
 
+  // Hooks por tema generados — persisten en localStorage por producto y se
+  // muestran en su PROPIA tarjeta (no dentro del generador), así no se
+  // pierden y se ven claramente.
+  const [themed, setThemed] = useState<ThemedSaved | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(themedKey(product.id));
+      setThemed(raw ? JSON.parse(raw) : null);
+    } catch {
+      setThemed(null);
+    }
+  }, [product.id]);
+
+  function onThemedGenerated(payload: ThemedSaved) {
+    setThemed(payload);
+    try {
+      window.localStorage.setItem(themedKey(product.id), JSON.stringify(payload));
+    } catch {
+      /* ignora */
+    }
+  }
+  function onThemedClear() {
+    setThemed(null);
+    try {
+      window.localStorage.removeItem(themedKey(product.id));
+    } catch {
+      /* ignora */
+    }
+  }
+
   return (
     <div className="space-y-3">
       <RegenerateBanner product={product} favoritesCount={favoritesList.length} />
@@ -70,10 +101,62 @@ export function HooksGenerator({ product }: { product: Product }) {
         subtitle="Textarea libre + Gemini genera N hooks nuevos"
         icon={Sparkles}
         accent="purple"
-        defaultOpen={false}
+        defaultOpen={!themed}
       >
-        <ThemedHooksGenerator product={product} favoritesSet={favoritesSet} />
+        <ThemedHooksGenerator product={product} onGenerated={onThemedGenerated} />
       </CollapsibleCard>
+
+      {/* Tarjeta propia con los hooks por tema generados (persistente). */}
+      {themed && themed.hooks.length > 0 && (
+        <CollapsibleCard
+          title={`Hooks por tema: "${themed.theme}"`}
+          subtitle={`${themed.hooks.length} hooks · ${new Date(
+            themed.savedAt,
+          ).toLocaleString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })} · guardado en este dispositivo`}
+          icon={Sparkles}
+          accent="purple"
+          badge={String(themed.hooks.length)}
+          defaultOpen={true}
+        >
+          <div className="space-y-1.5 p-3 pt-0 sm:p-4 sm:pt-0">
+            {themed.theme_interpretation && (
+              <p className="rounded bg-muted/30 px-2 py-1.5 text-[10px] italic text-muted-foreground sm:text-[11px]">
+                Interpretación: {themed.theme_interpretation}
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Marca ⭐ los que quieras conservar permanentemente (van a
+              favoritos, cross-device). El resto se guarda aquí en este
+              dispositivo.
+            </p>
+            {themed.hooks.map((h, i) => (
+              <HookRow
+                key={i}
+                text={h.text}
+                meta={h.angle}
+                hint={h.rationale}
+                productId={product.id}
+                isFavorite={favoritesSet.has(h.text.trim().toLowerCase())}
+              />
+            ))}
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onThemedClear}
+                className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Borrar estos hooks
+              </Button>
+            </div>
+          </div>
+        </CollapsibleCard>
+      )}
 
       <ExistingHooksSection product={product} favoritesSet={favoritesSet} />
     </div>
@@ -290,37 +373,27 @@ function RegenerateBanner({
 /* ─────────────────────────────────────────────────────────────────
    Temáticos (colapsable)
    ───────────────────────────────────────────────────────────────── */
+interface ThemedSaved {
+  theme: string;
+  theme_interpretation: string;
+  hooks: { text: string; angle: string; rationale: string }[];
+  savedAt: number;
+}
+
+function themedKey(productId: string) {
+  return `tiktok_shop_themed_hooks.${productId}`;
+}
+
 function ThemedHooksGenerator({
   product,
-  favoritesSet,
+  onGenerated,
 }: {
   product: Product;
-  favoritesSet: Set<string>;
+  onGenerated: (payload: ThemedSaved) => void;
 }) {
   const [theme, setTheme] = useState("");
   const [n, setN] = useState<number>(10);
   const mutation = useGenerateThemedHooks();
-
-  // Persistimos los hooks generados por tema (localStorage por producto)
-  // para que NO se pierdan al salir/recargar — se recuperan en una tarjeta.
-  const LS_KEY = `tiktok_shop_themed_hooks.${product.id}`;
-  const [saved, setSaved] = useState<{
-    theme: string;
-    theme_interpretation: string;
-    hooks: { text: string; angle: string; rationale: string }[];
-    savedAt: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(LS_KEY);
-      if (raw) setSaved(JSON.parse(raw));
-    } catch {
-      /* ignora */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.id]);
 
   function onGenerate() {
     if (!theme.trim()) {
@@ -331,30 +404,16 @@ function ThemedHooksGenerator({
       { productId: product.id, theme: theme.trim(), n },
       {
         onSuccess: (data) => {
-          const payload = {
+          onGenerated({
             theme: theme.trim(),
             theme_interpretation: data.theme_interpretation,
             hooks: data.hooks,
             savedAt: Date.now(),
-          };
-          setSaved(payload);
-          try {
-            window.localStorage.setItem(LS_KEY, JSON.stringify(payload));
-          } catch {
-            /* ignora */
-          }
+          });
+          toast.success(`${data.hooks.length} hooks guardados en su tarjeta ⬇️`);
         },
       },
     );
-  }
-
-  function onClearThemed() {
-    setSaved(null);
-    try {
-      window.localStorage.removeItem(LS_KEY);
-    } catch {
-      /* ignora */
-    }
   }
 
   return (
@@ -413,52 +472,6 @@ function ThemedHooksGenerator({
         </Button>
       </div>
 
-      {saved && saved.hooks.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
-              {saved.hooks.length} hooks · tema: “{saved.theme}”
-              <span className="ml-1 font-normal text-muted-foreground">
-                ({new Date(saved.savedAt).toLocaleString("es-ES", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })})
-              </span>
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClearThemed}
-              className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
-            >
-              Borrar
-            </Button>
-          </div>
-          {saved.theme_interpretation && (
-            <p className="rounded bg-muted/30 px-2 py-1.5 text-[10px] italic text-muted-foreground sm:text-[11px]">
-              Interpretación: {saved.theme_interpretation}
-            </p>
-          )}
-          <p className="text-[10px] text-muted-foreground">
-            Marca ⭐ los que quieras conservar — sobreviven aunque generes
-            otros. Esta lista se guarda en este dispositivo.
-          </p>
-          <div className="space-y-1.5">
-            {saved.hooks.map((h, i) => (
-              <HookRow
-                key={i}
-                text={h.text}
-                meta={h.angle}
-                hint={h.rationale}
-                productId={product.id}
-                isFavorite={favoritesSet.has(h.text.trim().toLowerCase())}
-              />
-            ))}
-          </div>
-        </div>
-      )}
       {mutation.error && (
         <p className="text-xs text-red-600 dark:text-red-400">
           Error: {mutation.error.message}
