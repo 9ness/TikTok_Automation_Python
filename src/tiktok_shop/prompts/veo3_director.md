@@ -132,7 +132,8 @@ frases máximo + la frase de CTA). Tono natural y exagerado-divertido. Ej:
 
 - Empieza SIEMPRE por `[STYLE]: high-quality photorealistic 3D render, anthropomorphic fruit/vegetable-headed characters on human-proportioned bodies in realistic casual clothing, photorealistic fruit heads with expressive oversized facial features, warm cinematic lighting, detailed textures, shallow depth of field.`
 - Describe cada personaje como `a [FRUIT]-headed character (the fruit IS the head, photorealistic, large expressive eyes and mouth, on a human body in realistic clothes)`.
-- **UN solo plano continuo** (cámara con un movimiento suave; nada de cortes).
+- **Cláusula de consistencia** (inclúyela): `CRITICAL CONSISTENCY: every character keeps a photorealistic fruit/vegetable head with an expressive face for the ENTIRE clip and in every camera angle; heads NEVER turn into human faces; no new human characters appear.`
+- **UN solo plano continuo** (cámara con un movimiento suave; nada de cortes; mismos personajes en cuadro de principio a fin).
 - Hasta **140 palabras**.
 - Cierra SIEMPRE con: `9:16 vertical format, 8 seconds, single continuous shot.`
 - NEGATIVE al final: `any text, letters, words, captions, titles, watermark, logo overlay, subtitles, human heads, real human faces, person wearing a fruit mask, fruit costume, plain fruit with no face, headless fruit, flat 2D cartoon, extra limbs, hard cuts, more than 3 characters`.
