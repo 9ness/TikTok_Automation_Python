@@ -27,6 +27,10 @@ services:
     image: tiktok-api:latest
     container_name: tiktok-api
     restart: unless-stopped
+    # docker-init (tini) como PID 1: reenvía señales al proceso hijo y
+    # reapea zombies. Combinado con el `exec uvicorn` del Dockerfile,
+    # garantiza que SIGTERM llegue a uvicorn y el graceful shutdown corra.
+    init: true
     env_file: .env
     environment:
       # Forzar host/port correctos dentro del container, independientes de .env.

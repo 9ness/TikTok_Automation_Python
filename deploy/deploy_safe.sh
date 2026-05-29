@@ -319,7 +319,8 @@ dc() {
 if [[ "$NEEDS_API_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🐳 cambios en API/deps detectados — rebuild api…"
     write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_api\""
-    if ! dc up -d --build api; then
+    # --no-deps: recrea SOLO api, no arrastra web (depende de api).
+    if ! dc up -d --build --no-deps api; then
         echo "[deploy_safe] ❌ rebuild api falló"
         write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"docker_api_build_failed\""
         exit 1
@@ -330,7 +331,8 @@ fi
 if [[ "$NEEDS_WEB_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🐳 cambios en frontend detectados — rebuild web…"
     write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_web\""
-    if ! dc up -d --build web; then
+    # --no-deps: recrea SOLO web, sin tocar api (que ya corre el código nuevo).
+    if ! dc up -d --build --no-deps web; then
         echo "[deploy_safe] ❌ rebuild web falló"
         write_status "failed" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"error\":\"docker_web_build_failed\""
         exit 1

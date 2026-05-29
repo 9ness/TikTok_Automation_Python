@@ -115,4 +115,10 @@ ENV API_WORKERS=1 \
     API_HOST=0.0.0.0 \
     API_PORT=8000
 
-CMD ["sh", "-c", "uvicorn src.api.main:app --host ${API_HOST} --port ${API_PORT} --workers ${API_WORKERS}"]
+# `exec` es CRÍTICO: sin él, `sh` queda como PID 1 y NO reenvía el SIGTERM
+# que manda docker al recrear el container → uvicorn nunca recibe la señal,
+# ignora el graceful shutdown y docker acaba haciéndole SIGKILL al agotar
+# `stop_grace_period` (hasta 30 min de deploy colgado). Con `exec`, uvicorn
+# reemplaza a `sh` y pasa a ser PID 1 → recibe SIGTERM directo → el lifespan
+# drena la cola (instantáneo si no hay jobs) y el proceso sale al momento.
+CMD ["sh", "-c", "exec uvicorn src.api.main:app --host ${API_HOST} --port ${API_PORT} --workers ${API_WORKERS} --timeout-graceful-shutdown 1800"]
