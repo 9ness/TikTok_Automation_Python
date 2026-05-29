@@ -87,6 +87,22 @@ export function useProduct(id: string | null | undefined) {
   });
 }
 
+/** Lanza SOLO el deep research (Audiencia) sin re-analizar fotos. */
+export function useRunDeepResearch(id: string) {
+  const qc = useQueryClient();
+  return useMutation<{ product_id: string; status: string }, Error, void>({
+    mutationFn: () =>
+      api.post<{ product_id: string; status: string }>(
+        `${ROOT}/${id}/deep-research`,
+        {},
+      ),
+    onSuccess: () => {
+      // Refetch para captar research_in_progress=true → spinner + polling.
+      qc.invalidateQueries({ queryKey: productKeys.detail(id) });
+    },
+  });
+}
+
 export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation<Product, Error, ProductCreateInput>({

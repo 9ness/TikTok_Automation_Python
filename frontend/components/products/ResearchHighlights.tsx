@@ -17,13 +17,17 @@ import {
   MessageSquare,
   Music,
   Quote,
+  RefreshCw,
   Search,
   Target,
   TrendingUp,
   Video,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useRunDeepResearch } from "@/lib/queries/products";
 import type {
   Product,
   ResearchContext,
@@ -51,14 +55,37 @@ interface CategoryCard {
 export function ResearchHighlights({ product }: Props) {
   const rc: ResearchContext | undefined = product.research_context;
   const [openKey, setOpenKey] = useState<string | null>(null);
-
+  const researchMut = useRunDeepResearch(product.id);
   const researching = Boolean(rc?.research_in_progress);
+
+  function onReinvestigate() {
+    researchMut.mutate(undefined, {
+      onSuccess: () =>
+        toast.success("Investigando… se actualiza sola al terminar (~1-2 min)"),
+      onError: (e) => toast.error(`Error: ${e.message}`),
+    });
+  }
+
+  const reinvestigateBtn = (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={onReinvestigate}
+      disabled={researching || researchMut.isPending}
+      className="h-7 gap-1 text-[11px]"
+      title="Vuelve a investigar reviews/vídeos/sonidos sin re-analizar fotos"
+    >
+      <RefreshCw className={researching ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
+      {researching ? "Investigando…" : "Re-investigar"}
+    </Button>
+  );
 
   if (!rc || (!rc.analyzed_at && !researching)) {
     return (
       <Card className="bg-muted/30">
-        <CardContent className="p-3 text-center text-xs text-muted-foreground sm:text-sm">
-          Sin investigación todavía. Ve a la tab Análisis y pulsa Analizar.
+        <CardContent className="flex flex-col items-center gap-2 p-4 text-center text-xs text-muted-foreground sm:text-sm">
+          <p>Sin investigación todavía.</p>
+          {reinvestigateBtn}
         </CardContent>
       </Card>
     );
@@ -183,6 +210,7 @@ export function ResearchHighlights({ product }: Props) {
 
   return (
     <div className="space-y-2">
+      <div className="flex items-center justify-end">{reinvestigateBtn}</div>
       {researchingBanner}
       <StatusBanner
         analyzedAt={rc.analyzed_at}

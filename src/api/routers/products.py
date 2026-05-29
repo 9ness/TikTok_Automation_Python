@@ -1341,6 +1341,27 @@ def reanalyze_product(
 
 
 # ---------------------------------------------------------------------------
+# POST /products/{id}/deep-research — SOLO la investigación (Audiencia),
+# sin re-analizar fotos. Ahorra el coste de Gemini Vision cuando solo
+# quieres refrescar reviews/vídeos/sonidos/comentarios.
+# ---------------------------------------------------------------------------
+@router.post("/{product_id}/deep-research", status_code=status.HTTP_202_ACCEPTED)
+def run_deep_research(
+    product_id: str,
+    background_tasks: BackgroundTasks,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> dict[str, str]:
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    background_tasks.add_task(_run_deep_research_background, product.id)
+    return {"product_id": product.id, "status": "research_started"}
+
+
+# ---------------------------------------------------------------------------
 # POST /products/{id}/nano-banana-prompt
 # ---------------------------------------------------------------------------
 @router.post(
