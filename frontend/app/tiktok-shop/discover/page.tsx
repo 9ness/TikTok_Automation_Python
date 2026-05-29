@@ -276,6 +276,17 @@ function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
       ? `${p.min_price.toFixed(0)}-${p.max_price.toFixed(0)}€`
       : `${(p.min_price || p.max_price || 0).toFixed(0)}€`;
 
+  // Comisión en € = precio medio × % comisión (idea aproximada por venta).
+  const basePrice =
+    p.min_price && p.max_price
+      ? (p.min_price + p.max_price) / 2
+      : p.min_price || p.max_price || 0;
+  const commEur = (basePrice * (p.commission_pct || 0)) / 100;
+  const commLabel =
+    p.commission_pct > 0
+      ? `${p.commission_pct}%${commEur > 0 ? ` (${commEur.toFixed(2)}€)` : ""}`
+      : "";
+
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="relative aspect-square w-full bg-muted/30">
@@ -320,9 +331,9 @@ function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground sm:text-[10px]">
           <span className="font-semibold text-foreground">{priceLabel}</span>
-          {p.commission_pct > 0 && (
+          {commLabel && (
             <span className="rounded bg-amber-500/15 px-1 font-semibold text-amber-700 dark:text-amber-300">
-              {p.commission_pct}% com.
+              {commLabel} com.
             </span>
           )}
           {p.gmv > 0 && (
@@ -346,6 +357,18 @@ function DiscoverCard({ product: p }: { product: DiscoveredProduct }) {
             </span>
           )}
         </div>
+
+        {p.tiktok_url && (
+          <a
+            href={p.tiktok_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 hover:underline dark:text-cyan-400 sm:text-[10px]"
+          >
+            <ExternalLink className="h-2.5 w-2.5" />
+            Ver en TikTok Shop
+          </a>
+        )}
 
         <Button
           size="sm"
