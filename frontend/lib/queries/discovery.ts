@@ -2,7 +2,7 @@
  * Descubrimiento de productos (EchoTik) — qué se vende de verdad en ES.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
@@ -44,6 +44,28 @@ export interface DiscoveryParams {
   maxPrice?: number;
   limit?: number;
   enabled?: boolean;
+}
+
+/** Última búsqueda guardada en servidor (cross-device). */
+export function useLastDiscovery() {
+  return useQuery<{ found: boolean; data: Record<string, unknown> | null }>({
+    queryKey: ["discovery-last"],
+    queryFn: () =>
+      api.get<{ found: boolean; data: Record<string, unknown> | null }>(
+        "/api/v1/tiktok-shop/discovery/last",
+      ),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useSaveLastDiscovery() {
+  return useMutation<{ ok: boolean }, Error, Record<string, unknown>>({
+    mutationFn: (payload) =>
+      api.post<{ ok: boolean }>("/api/v1/tiktok-shop/discovery/last", {
+        payload,
+      }),
+  });
 }
 
 export function useTopSellers(params: {

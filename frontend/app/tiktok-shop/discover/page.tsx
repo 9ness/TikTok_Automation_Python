@@ -21,6 +21,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   useDiscoverProducts,
+  useLastDiscovery,
+  useSaveLastDiscovery,
   useTopSellers,
   type DiscoveredProduct,
   type DiscoveryResponse,
@@ -79,10 +81,12 @@ export default function DiscoverPage() {
   // Modo activo: búsqueda por keyword o ranking cruzado "Top ventas".
   const [mode, setMode] = useState<"search" | "top">("search");
 
-  // Resultado mostrado — persistido en localStorage para que al recargar
-  // (o volver) se mantenga sin gastar otra llamada.
+  // Resultado mostrado — persistido en localStorage (instantáneo, mismo
+  // dispositivo) + servidor/Redis (cross-device PC↔móvil).
   const [result, setResult] = useState<DiscoveryResponse | null>(null);
   const [restored, setRestored] = useState(false);
+  const lastServer = useLastDiscovery();
+  const saveLast = useSaveLastDiscovery();
 
   const searchQ = useDiscoverProducts({
     keyword: submitted?.kw ?? "",
@@ -115,25 +119,50 @@ export default function DiscoverPage() {
     setRestored(true);
   }, []);
 
-  // Cuando llega un resultado nuevo de la API → guardarlo + persistir.
+  // Cargar la última búsqueda del SERVIDOR (cross-device). Gana sobre
+  // localStorage solo si es más reciente.
+  useEffect(() => {
+    const s = lastServer.data?.data as
+      | { result?: DiscoveryResponse; keyword?: string; region?: string;
+          sort?: string; minCommission?: number; savedAt?: number }
+      | null
+      | undefined;
+    if (!s || !s.result) return;
+    let localAt = 0;
+    try {
+      const raw = window.localStorage.getItem(LS_KEY);
+      if (raw) localAt = JSON.parse(raw).savedAt || 0;
+    } catch {
+      /* ignora */
+    }
+    if ((s.savedAt || 0) >= localAt) {
+      setResult(s.result);
+      if (s.keyword) setKeyword(s.keyword);
+      if (s.region) setRegion(s.region);
+      if (s.sort) setSort(s.sort);
+      if (typeof s.minCommission === "number") setMinCommission(s.minCommission);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastServer.data]);
+
+  // Cuando llega un resultado nuevo de la API → persistir local + servidor.
   useEffect(() => {
     if (q.data) {
       setResult(q.data);
+      const payload = {
+        result: q.data,
+        keyword,
+        region,
+        sort,
+        minCommission,
+        savedAt: Date.now(),
+      };
       try {
-        window.localStorage.setItem(
-          LS_KEY,
-          JSON.stringify({
-            result: q.data,
-            keyword,
-            region,
-            sort,
-            minCommission,
-            savedAt: Date.now(),
-          }),
-        );
+        window.localStorage.setItem(LS_KEY, JSON.stringify(payload));
       } catch {
         /* localStorage lleno — ignora */
       }
+      saveLast.mutate(payload as unknown as Record<string, unknown>);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.data]);
@@ -148,6 +177,8 @@ export default function DiscoverPage() {
     } catch {
       /* ignora */
     }
+    // Vaciar también el guardado en servidor (cross-device).
+    saveLast.mutate({ result: null, savedAt: Date.now() });
   }
 
   function runSearch(kw: string) {

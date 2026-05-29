@@ -145,6 +145,49 @@ def discover_products(
 # Nichos que se escanean para el ranking cruzado "Top ventas". Las
 # keywords deben ir EN EL IDIOMA del mercado — buscar "cocina" en US
 # devuelve productos en español, no los top reales de EE.UU.
+# ──────────────────────────────────────────────────────────────────
+# Última búsqueda persistida en servidor (Redis) → cross-device
+# ──────────────────────────────────────────────────────────────────
+class SaveLastRequest(BaseModel):
+    payload: dict[str, Any]
+
+
+def _last_key(operator: str) -> str:
+    return f"discovery_last:{operator or 'default'}"
+
+
+@router.get("/last")
+def get_last_discovery(
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Devuelve la última búsqueda guardada del operador (cross-device).
+    No gasta consultas EchoTik — solo lee Redis."""
+    from src.tiktok_shop.repos.redis_base import get_shop_redis
+
+    try:
+        r = get_shop_redis()
+        data = r.get_json(_last_key(operator))
+        return {"found": bool(data), "data": data or None}
+    except Exception:
+        return {"found": False, "data": None}
+
+
+@router.post("/last")
+def save_last_discovery(
+    body: SaveLastRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict[str, bool]:
+    """Guarda la última búsqueda del operador en Redis (se sobrescribe)."""
+    from src.tiktok_shop.repos.redis_base import get_shop_redis
+
+    try:
+        r = get_shop_redis()
+        r.set_json(_last_key(operator), body.payload)
+        return {"ok": True}
+    except Exception:
+        return {"ok": False}
+
+
 _TOP_NICHES_ES = ["belleza", "fitness", "cocina", "hogar", "salud", "tecnología"]
 _TOP_NICHES_EN = ["beauty", "fitness", "kitchen", "home", "health", "gadgets"]
 _TOP_NICHES_BY_REGION = {
