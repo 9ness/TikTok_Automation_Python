@@ -155,11 +155,20 @@ export function PresetsManager({ product }: { product: Product }) {
   const [sourceFilter, setSourceFilter] = useState<
     "all" | "auto" | "viral_replica" | "manual"
   >("all");
+  // Variante creativa: catálogo normal vs mini-historias de fruta (Veo 3).
+  const [variantFilter, setVariantFilter] = useState<
+    "all" | "original" | "fruit_story"
+  >("all");
   const [sortBy, setSortBy] = useState<"new" | "old" | "angle" | "duration">("new");
+
+  const presetVariant = (p: VideoPreset) => p.variant || "original";
 
   // Aplica filtros + ordena
   const filtered = useMemo(() => {
     let list = presets;
+    if (variantFilter !== "all") {
+      list = list.filter((p) => (p.variant || "original") === variantFilter);
+    }
     if (kindFilter !== "all") list = list.filter((p) => p.kind === kindFilter);
     if (tierFilter !== "all") {
       list = list.filter((p) => p.compatible_tiers.includes(tierFilter));
@@ -195,17 +204,25 @@ export function PresetsManager({ product }: { product: Product }) {
       return 0;
     });
     return sorted;
-  }, [presets, search, kindFilter, tierFilter, styleFilter, sourceFilter, sortBy]);
+  }, [presets, search, kindFilter, tierFilter, styleFilter, sourceFilter, variantFilter, sortBy]);
 
   const viralCount = presets.filter((p) => p.source === "viral_replica").length;
+  const fruitCount = presets.filter((p) => presetVariant(p) === "fruit_story").length;
+  const originalCount = presets.length - fruitCount;
 
-  const musicPresets = presets.filter((p) => p.kind === "music");
-  const scriptedPresets = presets.filter((p) => p.kind === "scripted");
+  // Las secciones (música/scripted) respetan el filtro de variante para que
+  // los contadores y estados vacíos sean coherentes.
+  const scopedPresets =
+    variantFilter === "all"
+      ? presets
+      : presets.filter((p) => presetVariant(p) === variantFilter);
+  const musicPresets = scopedPresets.filter((p) => p.kind === "music");
+  const scriptedPresets = scopedPresets.filter((p) => p.kind === "scripted");
   const filteredMusic = filtered.filter((p) => p.kind === "music");
   const filteredScripted = filtered.filter((p) => p.kind === "scripted");
 
   async function handleGenerate(
-    kind: "music" | "scripted" | "both",
+    kind: "music" | "scripted" | "both" | "fruit",
     replace = true,                      // por defecto reemplaza — evita duplicados
   ) {
     if (activeGenId) {
@@ -217,8 +234,12 @@ export function PresetsManager({ product }: { product: Product }) {
         kind,
         n_music: 8,
         n_scripted: 12,
+        n_fruit: 10,
         replace_existing: replace,
       });
+      // Al generar fruta, salta a esa vista para que el user las vea al
+      // terminar (también deja "Original" a un click).
+      if (kind === "fruit") setVariantFilter("fruit_story");
       // El endpoint ahora es async — guarda gen_id en localStorage para
       // que un refresh recupere la generación en curso.
       if (typeof window !== "undefined") {
@@ -275,6 +296,7 @@ export function PresetsManager({ product }: { product: Product }) {
                       started: "Iniciando…",
                       generating_music: "Generando música…",
                       generating_scripted: "Generando scripted…",
+                      generating_fruit: "Generando historias de fruta…",
                       saving: "Guardando…",
                       done: "✓ Terminado",
                       error: "Error",
@@ -343,6 +365,19 @@ export function PresetsManager({ product }: { product: Product }) {
               <Mic className="h-3.5 w-3.5" />
               <span className="ml-1.5 text-xs">
                 {scriptedPresets.length > 0 ? "Scripted" : "Solo scripted"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleGenerate("fruit", true)}
+              disabled={generate.isPending || !!activeGenId}
+              className="border-orange-500/40 text-orange-700 hover:bg-orange-500/10 dark:text-orange-300"
+              title="Genera 10 mini-historias virales con personajes de cabeza de fruta (solo prompt Veo 3 para pegar en Gemini)"
+            >
+              <span className="text-sm">🍉</span>
+              <span className="ml-1.5 text-xs">
+                {fruitCount > 0 ? "Versión fruta" : "Generar fruta"}
               </span>
             </Button>
             {presets.length > 0 && (
@@ -429,13 +464,36 @@ export function PresetsManager({ product }: { product: Product }) {
               </select>
             </div>
 
+            {/* Variante: catálogo original vs mini-historias de fruta */}
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              <span className="self-center text-muted-foreground">Versión:</span>
+              <FilterChip
+                label="Todas"
+                active={variantFilter === "all"}
+                onClick={() => setVariantFilter("all")}
+                count={presets.length}
+              />
+              <FilterChip
+                label="🎬 Original"
+                active={variantFilter === "original"}
+                onClick={() => setVariantFilter("original")}
+                count={originalCount}
+              />
+              <FilterChip
+                label="🍉 Fruta"
+                active={variantFilter === "fruit_story"}
+                onClick={() => setVariantFilter("fruit_story")}
+                count={fruitCount}
+              />
+            </div>
+
             {/* Tipo: 3 chips siempre visibles */}
             <div className="flex flex-wrap gap-1 text-[10px]">
               <FilterChip
                 label="Todos"
                 active={kindFilter === "all"}
                 onClick={() => setKindFilter("all")}
-                count={presets.length}
+                count={scopedPresets.length}
               />
               <FilterChip
                 label="🎵 Música"
@@ -1719,6 +1777,14 @@ function PresetCard({
               <strong className="truncate text-sm">{preset.name}</strong>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1">
+              {(preset.variant || "original") === "fruit_story" && (
+                <span
+                  className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:text-orange-300"
+                  title="Mini-historia viral con personaje de fruta · solo prompt Veo 3"
+                >
+                  🍉 Historia fruta
+                </span>
+              )}
               {/* Badge de origen — solo visible para no-autogen (autogen
                   es el caso 80% y no necesita ruido visual). */}
               {preset.source === "viral_replica" && (

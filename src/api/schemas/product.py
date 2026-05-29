@@ -352,7 +352,7 @@ class GoogleImageSearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Video presets (blueprints precocinados de vídeo por producto)
 # ---------------------------------------------------------------------------
-PresetKindRequest = Literal["music", "scripted", "both"]
+PresetKindRequest = Literal["music", "scripted", "both", "fruit"]
 
 
 class TextOverlayStyleSchema(BaseModel):
@@ -432,6 +432,7 @@ class VideoPresetResponse(BaseModel):
     # El user las adjunta MANUALMENTE al pegar el prompt en Gemini chat / Flow.
     veo3_photo_filenames: list[str] = Field(default_factory=list)
     source: str = "manual"
+    variant: str = "original"   # "original" | "fruit_story"
     notes: str = ""
     created_at: str
     updated_at: str
@@ -441,8 +442,9 @@ class GeneratePresetsRequest(BaseModel):
     kind: PresetKindRequest = "both"
     n_music: int = Field(default=8, ge=1, le=20)
     n_scripted: int = Field(default=12, ge=1, le=20)
+    n_fruit: int = Field(default=10, ge=1, le=20)
     # Si true, reemplaza los presets autogenerados anteriores del mismo
-    # `source` (music_bof/scripted_bof). Los manuales nunca se tocan.
+    # `source` (music_bof/scripted_bof/fruit_story). Los manuales nunca se tocan.
     replace_existing: bool = False
 
 

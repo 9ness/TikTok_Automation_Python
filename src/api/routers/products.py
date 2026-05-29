@@ -1473,6 +1473,7 @@ def _generate_presets_background(
     kind: str,
     n_music: int,
     n_scripted: int,
+    n_fruit: int,
     replace_existing: bool,
 ) -> None:
     """Función que corre en BackgroundTasks. Actualiza el tracker en
@@ -1484,6 +1485,7 @@ def _generate_presets_background(
     """
     from src.cost_tracking import finalize_and_persist, get_active, start_job
     from src.tiktok_shop.pipeline.preset_generator import (
+        _generate_fruit,
         _generate_music,
         _generate_scripted,
     )
@@ -1556,6 +1558,22 @@ def _generate_presets_background(
             except Exception as e:
                 all_warnings.append(f"Scripted director falló: {e}")
 
+        # ── Fruta (mini-historias Veo 3) ──
+        if kind == "fruit":
+            preset_gen_tracker.update(
+                gen_id, stage="generating_fruit", percent=10,
+            )
+            try:
+                fruit_presets = _generate_fruit(product, n=n_fruit)
+                all_presets.extend(fruit_presets)
+                preset_gen_tracker.update(
+                    gen_id, percent=90,
+                    created_count=len(all_presets),
+                    cost_usd=_current_cost(),
+                )
+            except Exception as e:
+                all_warnings.append(f"Fruit director falló: {e}")
+
         # ── Persistir ──
         preset_gen_tracker.update(gen_id, stage="saving", percent=95)
         if replace_existing:
@@ -1564,6 +1582,8 @@ def _generate_presets_background(
                 sources_to_drop.add("music_bof")
             if kind in ("scripted", "both"):
                 sources_to_drop.add("scripted_bof")
+            if kind == "fruit":
+                sources_to_drop.add("fruit_story")
             product.video_presets = [
                 p for p in product.video_presets if p.source not in sources_to_drop
             ]
@@ -1616,6 +1636,8 @@ def generate_video_presets(
         expected += payload.n_music
     if payload.kind in ("scripted", "both"):
         expected += payload.n_scripted
+    if payload.kind == "fruit":
+        expected += payload.n_fruit
 
     gen_id = preset_gen_tracker.create(
         product_id=product_id,
@@ -1630,6 +1652,7 @@ def generate_video_presets(
         kind=payload.kind,
         n_music=payload.n_music,
         n_scripted=payload.n_scripted,
+        n_fruit=payload.n_fruit,
         replace_existing=payload.replace_existing,
     )
 

@@ -416,16 +416,19 @@ export interface VideoPreset {
    *  prompt de Veo 3 al pegarlo en Gemini chat / Flow. Filenames del
    *  array `product.photos.source`. Máx 3. */
   veo3_photo_filenames: string[];
-  source: string; // "music_bof" | "scripted_bof" | "manual"
+  source: string; // "music_bof" | "scripted_bof" | "fruit_story" | "manual"
+  /** "original" (vídeo normal) | "fruit_story" (mini-historia de fruta Veo 3) */
+  variant: string;
   notes: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface GeneratePresetsInput {
-  kind?: "music" | "scripted" | "both";
+  kind?: "music" | "scripted" | "both" | "fruit";
   n_music?: number;
   n_scripted?: number;
+  n_fruit?: number;
   replace_existing?: boolean;
 }
 

@@ -275,7 +275,12 @@ class VideoPreset(BaseModel):
     veo3_photo_filenames: list[str] = Field(default_factory=list)
 
     # ─── META ───
-    source: str = "manual"          # "music_bof" | "scripted_bof" | "manual"
+    source: str = "manual"          # "music_bof" | "scripted_bof" | "fruit_story" | "manual"
+    # Variante creativa del preset. "original" = vídeo normal del producto.
+    # "fruit_story" = mini-historia viral con personajes de cabeza de fruta
+    # (solo prompt Veo 3 para pegar en Gemini). Permite separar en la UI
+    # entre catálogo original y catálogo fruta.
+    variant: str = "original"       # "original" | "fruit_story"
     notes: str = ""                 # notas libres del admin
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)

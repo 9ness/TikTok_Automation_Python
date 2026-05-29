@@ -551,7 +551,7 @@ def _sanitize_tiers(
     return deduped
 
 
-PresetKind = Literal["music", "scripted", "both"]
+PresetKind = Literal["music", "scripted", "both", "fruit"]
 
 
 def generate_presets(
@@ -560,6 +560,7 @@ def generate_presets(
     kind: PresetKind = "both",
     n_music: int = 8,
     n_scripted: int = 12,
+    n_fruit: int = 10,
 ) -> tuple[list[VideoPreset], list[str]]:
     """Llama a Gemini con uno o ambos directores y devuelve presets.
 
@@ -588,6 +589,14 @@ def generate_presets(
         except Exception as e:
             logger.warning("[preset_gen] scripted falló: %s", e)
             warnings.append(f"Scripted director falló: {e}")
+
+    if kind == "fruit":
+        try:
+            fruit_presets = _generate_fruit(product, n=n_fruit)
+            out.extend(fruit_presets)
+        except Exception as e:
+            logger.warning("[preset_gen] fruit falló: %s", e)
+            warnings.append(f"Fruit director falló: {e}")
 
     return out, warnings
 
@@ -819,6 +828,97 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
             presets.append(preset)
         except Exception as e:
             logger.warning("[preset_gen.scripted] item inválido ignorado: %s", e)
+            continue
+    return presets
+
+
+# ---------------------------------------------------------------------------
+# Fruit story director — mini-historias virales con personajes de fruta.
+# Solo prompt Veo 3 (el user lo pega en Gemini/Veo 3 con las fotos). Cada
+# preset es kind="scripted" + variant="fruit_story" + source="fruit_story",
+# compatible solo con veo3_prompt_only. La voz/diálogo va dentro del propio
+# prompt Veo 3 (el modelo genera el audio), así que voice_id queda None.
+# ---------------------------------------------------------------------------
+def _generate_fruit(product: Product, *, n: int = 10) -> list[VideoPreset]:
+    system = load_system_prompt("fruit_story_director.md")
+    photo_filenames, photo_paths = _collect_product_photos(product)
+    photos_block = (
+        "Fotos del producto disponibles (te las paso como imágenes en este "
+        "mismo prompt, en el MISMO ORDEN):\n"
+        + "\n".join(f"  - {fn}" for fn in photo_filenames)
+        + "\n\nPara CADA preset elige hasta 3 filenames de esta lista en "
+          "`veo3_photo_filenames` (DEBES referenciarlos EXACTAMENTE).\n"
+    ) if photo_filenames else (
+        "El producto no tiene fotos source disponibles — deja "
+        "`veo3_photo_filenames: []` en cada preset.\n"
+    )
+    user_prompt = (
+        f"Contexto del producto:\n"
+        f"- Nombre: {product.name}\n"
+        f"- Marca: {product.brand or '(sin marca)'}\n"
+        f"- Categoría: {product.category}"
+        f"{' / ' + product.subcategory if product.subcategory else ''}\n"
+        f"- Precio real: {_fmt_price(product)}\n"
+        f"- Audiencia objetivo: {', '.join(product.target_audience) or '(genérico)'}\n"
+        f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
+        f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
+        f"{_research_block(product)}\n"
+        f"{_language_block(product)}\n\n"
+        f"{photos_block}\n"
+        f"Genera EXACTAMENTE {n} mini-historias de fruta ORIGINALES y "
+        f"DISTINTAS entre sí (varía fruta, enfoque y ambiente). Sigue el "
+        f"schema JSON al pie de la letra."
+    )
+
+    result = generate_json(
+        system_prompt=system, user_prompt=user_prompt,
+        model=DEFAULT_MODEL, temperature=1.0,
+        images=photo_paths or None,
+    )
+    if not isinstance(result, dict):
+        return []
+
+    presets_raw = result.get("presets") or []
+    presets: list[VideoPreset] = []
+    for p in presets_raw:
+        if not isinstance(p, dict):
+            continue
+        try:
+            # Veo 3 = 8s nativo single-shot. Forzamos invariantes.
+            concept = str(p.get("concept", "")).strip()
+            fruit = str(p.get("fruit", "")).strip()
+            notes_parts = [x for x in (f"🍉 {fruit}" if fruit else "", concept) if x]
+            preset = VideoPreset(
+                id=make_preset_id(),
+                kind="scripted",
+                variant="fruit_story",
+                name=str(p.get("name", "Historia de fruta"))[:120],
+                angle=str(p.get("angle", ""))[:30],
+                style="creator_pov",     # personaje hablando a cámara
+                shot_style="single_shot",
+                strategy="cinematic",
+                duration_s=8,
+                title=str(p.get("name", ""))[:200],
+                voice_script=str(p.get("voice_script", ""))[:2000],
+                text_overlay=str(p.get("text_overlay", ""))[:200],
+                text_overlay_style=_parse_overlay_style(p.get("text_overlay_style")),
+                subtitle_style=SubtitleStyle(enabled=False),
+                cta_arrow_style=_parse_cta_arrow_style(p.get("cta_arrow_style")),
+                music_mood="",
+                voice_id=None,
+                voice_tone="playful",
+                seedance_prompt="",      # fruta = solo Veo 3
+                veo3_prompt=str(p.get("veo3_prompt", ""))[:2500],
+                veo3_photo_filenames=_sanitize_veo3_photo_filenames(
+                    p.get("veo3_photo_filenames"), available=photo_filenames,
+                ),
+                compatible_tiers=["veo3_prompt_only"],
+                source="fruit_story",
+                notes=" · ".join(notes_parts)[:500],
+            )
+            presets.append(preset)
+        except Exception as e:
+            logger.warning("[preset_gen.fruit] item inválido ignorado: %s", e)
             continue
     return presets
 
