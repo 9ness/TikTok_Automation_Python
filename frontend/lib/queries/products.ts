@@ -97,8 +97,21 @@ export function useRunDeepResearch(id: string) {
         {},
       ),
     onSuccess: () => {
-      // Refetch para captar research_in_progress=true → spinner + polling.
-      qc.invalidateQueries({ queryKey: productKeys.detail(id) });
+      // Optimista: marcamos research_in_progress=true en el cache YA, sin
+      // esperar al backend (que lo pone en background tras el 202). Esto
+      // muestra el spinner al instante y activa el refetchInterval de
+      // useProduct (8s) → se actualiza solo cuando el server lo termine.
+      qc.setQueryData<Product>(productKeys.detail(id), (old) =>
+        old
+          ? {
+              ...old,
+              research_context: {
+                ...old.research_context,
+                research_in_progress: true,
+              },
+            }
+          : old,
+      );
     },
   });
 }
