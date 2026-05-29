@@ -228,12 +228,28 @@ def submit_propainter(
         }
     }
     url = f"{REPLICATE_API_URL}/predictions"
-    try:
-        r = requests.post(
-            url, headers=_headers(), json=payload, timeout=SUBMIT_TIMEOUT_S,
-        )
-    except (requests.Timeout, requests.ConnectionError) as e:
-        raise ReplicateProPainterTransient(f"submit network: {e}")
+    # Replicate limita a 6 req/min (ráfaga 1) si la cuenta tiene <$5 de
+    # crédito. Reintentamos el 429 esperando el `retry-after` (o ~12s) en
+    # vez de fallar — así la cola procesa los vídeos en serie, más lento
+    # pero sin perder ninguno. SOLUCIÓN REAL: recargar ≥$5 en Replicate.
+    _MAX_429_RETRIES = 8
+    r = None
+    for attempt in range(_MAX_429_RETRIES + 1):
+        try:
+            r = requests.post(
+                url, headers=_headers(), json=payload, timeout=SUBMIT_TIMEOUT_S,
+            )
+        except (requests.Timeout, requests.ConnectionError) as e:
+            raise ReplicateProPainterTransient(f"submit network: {e}")
+        if r.status_code != 429:
+            break
+        if attempt >= _MAX_429_RETRIES:
+            raise ReplicateProPainterTransient(
+                f"submit HTTP 429 tras {_MAX_429_RETRIES} reintentos "
+                f"(¿cuenta Replicate con <$5 de crédito?): {r.text[:150]}"
+            )
+        wait_s = _retry_after_seconds(r) or 12
+        time.sleep(min(wait_s, 30))
     if r.status_code == 401:
         raise ReplicateProPainterError(
             "Replicate token inválido (401)",
@@ -249,7 +265,7 @@ def submit_propainter(
             f"ProPainter validation: {r.text[:300]}",
             status_code=422, kind="invalid_request",
         )
-    if r.status_code >= 500 or r.status_code == 429:
+    if r.status_code >= 500:
         raise ReplicateProPainterTransient(
             f"submit HTTP {r.status_code}: {r.text[:200]}"
         )
@@ -263,6 +279,18 @@ def submit_propainter(
         prediction_id=data["id"],
         status=data.get("status", "starting"),
     )
+
+
+def _retry_after_seconds(resp: "requests.Response") -> float | None:
+    """Lee el header Retry-After (segundos) de una respuesta 429. None si
+    no viene o no es parseable."""
+    val = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
+    if not val:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 
 def poll(job: ProPainterJob) -> ProPainterJob:
