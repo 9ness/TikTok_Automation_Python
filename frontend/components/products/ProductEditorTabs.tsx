@@ -44,7 +44,6 @@ import { NanoBananaPromptDialog } from "./NanoBananaPromptDialog";
 import { PhotoManager } from "./PhotoManager";
 import { PresetsManager } from "./PresetsManager";
 import { ResearchHighlights } from "./ResearchHighlights";
-import { ResearchPanel } from "./ResearchPanel";
 import { TabHint } from "./TabHint";
 import { cn } from "@/lib/utils";
 import { LANGUAGE_OPTIONS } from "@/lib/language";
@@ -924,14 +923,8 @@ function AnalysisTab({ product }: { product: Product }) {
       </div>
 
       <NanoBananaPromptDialog product={product} open={nanoOpen} onOpenChange={setNanoOpen} />
-
-      {/* Investigación profunda (reviews + TikTok) — se rellena con el
-          mismo botón Re-analizar de arriba. Aparece como sección
-          adicional aquí dentro para no duplicar tabs. */}
-      <div className="border-t pt-4">
-        <h3 className="mb-2 text-sm font-semibold">🔬 Investigación profunda</h3>
-        <ResearchPanel product={product} />
-      </div>
+      {/* La investigación profunda (cards research) vive solo en la tab
+          Audiencia — no la duplicamos aquí. */}
     </div>
   );
 }
