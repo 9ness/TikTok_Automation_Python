@@ -19,6 +19,7 @@ import {
   Mic,
   Package,
   Scissors,
+  Search,
   Settings,
   ShieldOff,
   ShoppingBag,
@@ -77,7 +78,8 @@ const NAV: NavGroup[] = [
     basePath: "/tiktok-shop",
     icon: ShoppingBag,
     items: [
-      { href: "/tiktok-shop/products", label: "Productos", icon: Package },
+      { href: "/tiktok-shop/discover", label: "Buscar Productos", icon: Search },
+      { href: "/tiktok-shop/products", label: "Mis productos", icon: Package },
       { href: "/tiktok-shop/users", label: "Usuarios", icon: Users },
       { href: "/tiktok-shop/generate", label: "Generador", icon: Sparkles },
       { href: "/tiktok-shop/history", label: "Histórico", icon: History },

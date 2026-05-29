@@ -104,33 +104,47 @@ def search_products(
     *,
     region: str = "ES",
     limit: int = 10,
+    category_id: str | None = None,
     log_callback: Callable[[str], None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Busca productos por keyword en un mercado y los devuelve normalizados
-    con sus ventas. Ordenados por unidades vendidas desc."""
-    if not echotik_is_configured() or not keyword.strip():
+    """Busca productos por keyword/categoría en un mercado y los devuelve
+    normalizados con sus ventas. Ordenados por unidades vendidas desc."""
+    if not echotik_is_configured() or (not keyword.strip() and not category_id):
         return []
     if log_callback:
         log_callback(f"🛒 EchoTik: buscando '{keyword}' en [{region}]…")
-    data = _get(
-        "product/list",
-        {"keyword": keyword, "region": region, "page_num": 1, "page_size": min(limit, 20)},
-        log_callback=log_callback,
-    )
+    params: dict[str, Any] = {
+        "region": region, "page_num": 1, "page_size": min(limit, 30),
+    }
+    if keyword.strip():
+        params["keyword"] = keyword.strip()
+    if category_id:
+        params["category_id"] = category_id
+    data = _get("product/list", params, log_callback=log_callback)
     if not isinstance(data, list):
         return []
     out: list[dict[str, Any]] = []
     for p in data:
+        pid = str(p.get("product_id") or "")
         out.append({
-            "product_id": str(p.get("product_id") or ""),
+            "product_id": pid,
             "name": p.get("product_name") or "",
+            "cover_url": _first_cover_url(p.get("cover_url")),
+            "tiktok_url": f"https://www.tiktok.com/view/product/{pid}" if pid else "",
             "units_sold": int(p.get("total_sale_cnt") or 0),
+            "units_sold_7d": int(p.get("total_sale_7d_cnt") or 0),
+            "units_sold_30d": int(p.get("total_sale_30d_cnt") or 0),
             "gmv": float(p.get("total_sale_gmv_amt") or 0),
+            "gmv_30d": float(p.get("total_sale_gmv_30d_amt") or 0),
             "video_count": int(p.get("total_video_cnt") or 0),
             "video_sale_count": int(p.get("total_video_sale_cnt") or 0),
+            "influencer_count": int(p.get("total_ifl_cnt") or 0),
+            "rating": float(p.get("product_rating") or 0),
+            "review_count": int(p.get("review_count") or 0),
             "min_price": float(p.get("min_price") or 0),
             "max_price": float(p.get("max_price") or 0),
             "commission_rate": p.get("product_commission_rate"),
+            "category_id": str(p.get("category_id") or ""),
             "region": p.get("region") or region,
         })
     out.sort(key=lambda x: x["units_sold"], reverse=True)
@@ -193,6 +207,23 @@ def get_product_videos(
         sold = sum(1 for x in out if x["units_sold"] > 0)
         log_callback(f"  ✓ {len(out)} vídeos ({sold} con ventas registradas)")
     return out
+
+
+def _first_cover_url(raw: Any) -> str:
+    """cover_url viene como string JSON: '[{"url":"...","index":0}]'.
+    Devuelve la primera url, o "" si no parsea."""
+    if not raw:
+        return ""
+    if isinstance(raw, str):
+        try:
+            arr = json.loads(raw)
+            if isinstance(arr, list) and arr:
+                return str(arr[0].get("url") or "")
+        except (ValueError, AttributeError):
+            return raw if raw.startswith("http") else ""
+    if isinstance(raw, list) and raw:
+        return str(raw[0].get("url") or "") if isinstance(raw[0], dict) else ""
+    return ""
 
 
 def _build_tiktok_url(user_id: Any, video_id: str) -> str:
