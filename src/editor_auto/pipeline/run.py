@@ -217,6 +217,26 @@ def _preflight_check(enabled_steps) -> tuple[list[str], list[str]]:
             # fuentes son archivos bundle, sin deps externas).
             pass
 
+        elif tool_id == "photo_insert":
+            # Todas las deps son BLANDAS — si faltan, la tool hace no-op
+            # (no inserta fotos) pero NO rompe el pipeline.
+            try:
+                import faster_whisper  # noqa: F401
+            except ImportError as e:
+                warnings.append(
+                    f"photo_insert: faster-whisper no disponible ({e}) — "
+                    f"no se podrán detectar nombres, no se insertarán fotos"
+                )
+            try:
+                from src.editor_auto.api import gemini_client
+                if not gemini_client.is_configured():
+                    warnings.append(
+                        "photo_insert: Gemini no configurado — no se "
+                        "detectarán famosos/marcas (no se insertarán fotos)"
+                    )
+            except Exception as e:
+                warnings.append(f"photo_insert: Gemini no importable ({e})")
+
         else:
             errors.append(
                 f"Tool '{tool_id}' desconocida (no registrada en REGISTRY)"
