@@ -29,6 +29,12 @@ from typing import Callable
 from .models import Job, JobMode, JobStatus
 
 
+# Modos que NO pueden correr en paralelo entre sí (máx 1 RUNNING a la vez),
+# aunque haya varios workers. Quitar-marca usa Replicate ProPainter, que con
+# <$5 de crédito limita a ráfaga de 1 req → 2 jobs simultáneos dan 429.
+_EXCLUSIVE_MODES: set[JobMode] = {JobMode.TIKTOK_SHOP_WATERMARK}
+
+
 _PERSIST_FILENAME = "queue_state.json"
 
 
@@ -308,11 +314,22 @@ class JobQueue:
                 # frecuentemente sin necesitar timers separados.
                 while not self._stop_event.is_set():
                     now = time.time()
+                    # Modos EXCLUSIVOS: máx 1 corriendo a la vez (aunque haya
+                    # varios workers). Ej. quitar-marca usa Replicate, que con
+                    # poco crédito limita a ráfaga de 1 → 2 en paralelo = 429.
+                    running_exclusive = {
+                        j.mode for j in self._jobs
+                        if j.status == JobStatus.RUNNING and j.mode in _EXCLUSIVE_MODES
+                    }
                     pending = next(
                         (
                             j for j in self._jobs
                             if j.status == JobStatus.PENDING
                             and (j.scheduled_for is None or j.scheduled_for <= now)
+                            and not (
+                                j.mode in _EXCLUSIVE_MODES
+                                and j.mode in running_exclusive
+                            )
                         ),
                         None,
                     )
