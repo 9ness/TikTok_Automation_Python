@@ -192,20 +192,59 @@ def search_tiktok_videos(
             log_callback(f"⚠️ Apify devolvió shape inesperado: {type(items)}")
         return []
 
-    # Sort: si pedimos popular, ordena por playCount desc.
+    # Sort: para "popular" usamos un VIRAL SCORE que premia engagement
+    # real (likes/comments/shares), no views crudas. Motivo: los vídeos
+    # con muchas views pero pocos likes suelen ser ADS promocionados
+    # (reach comprado, cero resonancia) — son malos modelos para copiar.
+    # Un vídeo que de verdad funcionó tiene alto engagement.
     if sort_by == "popular":
-        items.sort(key=lambda x: int(x.get("playCount") or 0), reverse=True)
+        items.sort(key=_viral_score, reverse=True)
     elif sort_by == "recent":
         items.sort(key=lambda x: x.get("createTimeISO") or "", reverse=True)
 
     # Trim a limit
     items = items[:limit]
     if log_callback:
+        best = items[0] if items else {}
+        be = _engagement_rate(best)
         log_callback(
-            f"✅ Apify: {len(items)} vídeos encontrados. "
-            f"Top views: {max((int(x.get('playCount') or 0) for x in items), default=0):,}"
+            f"✅ Apify: {len(items)} vídeos (orden: viral score = engagement). "
+            f"Top: {int(best.get('playCount') or 0):,} views · "
+            f"{int(best.get('diggCount') or 0):,} likes ({be:.1f}% eng)"
         )
     return items
+
+
+def _engagement_rate(item: dict[str, Any]) -> float:
+    """(likes+comments+shares)/views en %. 0 si no hay views."""
+    views = int(item.get("playCount") or 0)
+    if views <= 0:
+        return 0.0
+    eng = (
+        int(item.get("diggCount") or 0)
+        + int(item.get("commentCount") or 0)
+        + int(item.get("shareCount") or 0)
+    )
+    return eng / views * 100.0
+
+
+def _viral_score(item: dict[str, Any]) -> float:
+    """Score que premia resonancia REAL, no reach comprado.
+
+    Pondera shares (señal nº1 de viralidad) > comments > likes, y añade
+    una fracción mínima de views para no quedarnos solo con vídeos
+    pequeños de nicho. Un vídeo de 50k views/8k likes puntúa mucho más
+    que uno de 300k views/400 likes (típico ad)."""
+    views = int(item.get("playCount") or 0)
+    likes = int(item.get("diggCount") or 0)
+    comments = int(item.get("commentCount") or 0)
+    shares = int(item.get("shareCount") or 0)
+    # Engagement absoluto pesado por tipo de interacción.
+    engagement = likes + comments * 3 + shares * 5
+    # Bonus pequeño por reach (1 punto por cada 1000 views) para desempatar
+    # entre dos vídeos de engagement parecido.
+    reach_bonus = views * 0.001
+    return engagement + reach_bonus
 
 
 def _first_music_url(music: dict[str, Any]) -> str:
