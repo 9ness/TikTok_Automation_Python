@@ -1246,8 +1246,8 @@ def _run_deep_research_background(product_id: str) -> None:
         print(f"[research {product_id[:8]}] arrancando deep research…")
         research = deep_research_product(
             product,
-            max_videos_to_analyze=5,
-            max_tiktok_search_results=10,
+            max_videos_to_analyze=5,       # 5 por bucket → 5 orgánicos + 5 pagados
+            max_tiktok_search_results=25,  # más candidatos para poder separar bien
             log_callback=lambda m: print(f"[research {product_id[:8]}] {m}"),
         )
         product.research_context = research

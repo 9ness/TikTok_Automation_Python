@@ -137,17 +137,46 @@ def deep_research_product(
                     f"(top: {trending_sounds[0].title or trending_sounds[0].music_id})"
                 )
 
-            # Tomamos top max_videos_to_analyze para análisis visual con Gemini.
-            # Más caro pero mucho más útil que solo metadata.
-            videos_to_analyze = apify_results[:max_videos_to_analyze]
+            # Split paid vs organic por engagement rate. Como TikTok no
+            # expone ventas por vídeo (sobre todo en ES), usamos el ratio
+            # de interacción como proxy: ads = muchas views/poco engagement,
+            # orgánico = engagement alto. Analizamos ambos buckets para
+            # extraer las DOS fórmulas por separado.
+            paid_items, organic_items = _split_paid_organic(
+                apify_results, n_each=max_videos_to_analyze,
+            )
             log_callback(
-                f"  ✓ {len(apify_results)} encontrados, analizando los top "
-                f"{len(videos_to_analyze)} con Gemini video…"
+                f"  ✓ {len(apify_results)} encontrados → "
+                f"{len(organic_items)} orgánicos + {len(paid_items)} pagados "
+                f"para analizar con Gemini"
             )
 
-            top_videos, viral_patterns, proven_hooks = _analyze_top_videos(
-                videos_to_analyze, product, log_callback=log_callback,
-            )
+            org_v, org_p, org_h = ([], [], [])
+            paid_v, paid_p, paid_h = ([], [], [])
+            if organic_items:
+                org_v, org_p, org_h = _analyze_top_videos(
+                    organic_items, product, log_callback=log_callback,
+                    traffic_type="organic",
+                )
+            if paid_items:
+                paid_v, paid_p, paid_h = _analyze_top_videos(
+                    paid_items, product, log_callback=log_callback,
+                    traffic_type="paid",
+                )
+            # Orgánicos primero (mejor señal de fórmula que convierte).
+            top_videos = org_v + paid_v
+            # Dedup de patrones/hooks preservando orden (orgánico primero).
+            def _dedup(seq: list[str]) -> list[str]:
+                seen: set[str] = set()
+                out: list[str] = []
+                for x in seq:
+                    k = x.strip().lower()
+                    if k and k not in seen:
+                        seen.add(k)
+                        out.append(x)
+                return out
+            viral_patterns = _dedup(org_p + paid_p)
+            proven_hooks = _dedup(org_h + paid_h)
 
             # ════════════════════════════════════════════════════════════
             # FASE 3: comentarios de los top vídeos → preguntas/objeciones
@@ -381,9 +410,13 @@ def _analyze_top_videos(
     apify_items: list[dict[str, Any]],
     product: Product,
     *, log_callback: LogCallback,
+    traffic_type: str = "",
 ) -> tuple[list[ViralVideoSummary], list[str], list[str]]:
     """Descarga los top N vídeos y los analiza con Gemini 2.5 Pro.
-    Devuelve (resúmenes, patrones agregados, hooks probados)."""
+    Devuelve (resúmenes, patrones agregados, hooks probados).
+
+    `traffic_type` ("organic"/"paid") se etiqueta en cada summary y se
+    pasa a Gemini como contexto para que contraste las dos fórmulas."""
     summaries: list[ViralVideoSummary] = []
     tmp_dir = tempfile.mkdtemp(prefix="research_videos_")
     video_paths: list[str] = []
@@ -404,6 +437,7 @@ def _analyze_top_videos(
                 like_count=meta["like_count"],
                 comment_count=meta["comment_count"],
                 duration_s=meta["duration_s"],
+                traffic_type=traffic_type,
                 music_id=meta.get("music_id", ""),
                 music_title=meta.get("music_name", ""),
                 music_author=meta.get("music_author", ""),
@@ -438,11 +472,16 @@ def _analyze_top_videos(
             return summaries, [], []
 
         # Análisis BATCH con Gemini (todos los vídeos en una sola llamada)
+        label = {"organic": "ORGÁNICOS (engagement alto)",
+                 "paid": "de ALCANCE PAGADO (views altas, engagement bajo)"}.get(
+            traffic_type, "")
         log_callback(
-            f"  🧠 Gemini 2.5 Pro analizando {len(video_paths)} vídeos juntos…"
+            f"  🧠 Gemini 2.5 Pro analizando {len(video_paths)} vídeos "
+            f"{label or 'juntos'}…"
         )
         patterns_text = _gemini_batch_video_analysis(
             video_paths, product, log_callback=log_callback,
+            traffic_label=label,
         )
         analysis = _parse_video_analysis(patterns_text)
 
@@ -486,7 +525,7 @@ def _analyze_top_videos(
 
 def _gemini_batch_video_analysis(
     video_paths: list[str], product: Product,
-    *, log_callback: LogCallback,
+    *, log_callback: LogCallback, traffic_label: str = "",
 ) -> str:
     """Manda los N vídeos a Gemini en una sola llamada pidiendo análisis
     individual + patrones agregados."""
@@ -518,10 +557,15 @@ DEVUELVE JSON con esta estructura exacta:
 
 No inventes. Si no ves un patrón claro, deja la lista vacía. Sé específico — describe planos, transiciones, timing, NO uses adjetivos vagos."""
 
+    context_line = (
+        f"\n- IMPORTANTE: estos vídeos son {traffic_label}. "
+        "Analiza qué fórmula usan específicamente para este tipo de tráfico."
+        if traffic_label else ""
+    )
     user_prompt = f"""Producto del que son estos vídeos:
 - Nombre: {product.name}
 - Categoría: {product.category}
-- Idioma target: {product.language}
+- Idioma target: {product.language}{context_line}
 
 Analiza los {len(video_paths)} vídeos en orden y devuelve el JSON estructurado."""
 
@@ -551,6 +595,70 @@ def _parse_video_analysis(text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
     return {}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Split paid (ads) vs organic por engagement rate
+# ═════════════════════════════════════════════════════════════════════
+def _split_paid_organic(
+    apify_results: list[dict[str, Any]],
+    *,
+    n_each: int = 5,
+    organic_min_eng: float = 2.0,   # % — engagement alto = resonó orgánico
+    paid_max_eng: float = 1.0,      # % — engagement bajo = views compradas
+    min_views_paid: int = 3000,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Separa los resultados en dos buckets usando el engagement rate como
+    proxy de pagado/orgánico (TikTok no expone ventas por vídeo en ES).
+
+    Devuelve (paid_items, organic_items):
+      - organic: engagement ≥ organic_min_eng, ordenados por engagement abs
+        (likes+comments+shares) desc → top n_each.
+      - paid: engagement < paid_max_eng y views ≥ min_views_paid, ordenados
+        por views desc → top n_each.
+    Los vídeos en la zona ambigua (1-2%) se asignan a organic si falta
+    cupo, para no desperdiciar candidatos cuando el nicho es pequeño."""
+    scored = []
+    for it in apify_results:
+        meta = apify_cloud.extract_video_metadata(it)
+        views = int(meta.get("view_count") or 0)
+        if views <= 0 or not meta.get("url"):
+            continue
+        eng_abs = (
+            int(meta.get("like_count") or 0)
+            + int(meta.get("comment_count") or 0)
+            + int(meta.get("share_count") or 0)
+        )
+        er = eng_abs / views * 100.0
+        scored.append({"item": it, "views": views, "eng_abs": eng_abs, "er": er})
+
+    organic = sorted(
+        [s for s in scored if s["er"] >= organic_min_eng],
+        key=lambda s: s["eng_abs"], reverse=True,
+    )
+    paid = sorted(
+        [s for s in scored if s["er"] < paid_max_eng and s["views"] >= min_views_paid],
+        key=lambda s: s["views"], reverse=True,
+    )
+
+    organic_items = [s["item"] for s in organic[:n_each]]
+    paid_items = [s["item"] for s in paid[:n_each]]
+
+    # Si el nicho es pequeño y no llenamos organic, rellenamos con los
+    # ambiguos (1-2%) por engagement, sin pisar los que ya están en paid.
+    if len(organic_items) < n_each:
+        used = {id(x) for x in organic_items} | {id(x) for x in paid_items}
+        ambiguous = sorted(
+            [s for s in scored
+             if paid_max_eng <= s["er"] < organic_min_eng
+             and id(s["item"]) not in used],
+            key=lambda s: s["eng_abs"], reverse=True,
+        )
+        for s in ambiguous:
+            if len(organic_items) >= n_each:
+                break
+            organic_items.append(s["item"])
+    return paid_items, organic_items
 
 
 # ═════════════════════════════════════════════════════════════════════

@@ -346,6 +346,40 @@ function SoundList({ items }: { items: TrendingSound[] }) {
 }
 
 function VideoList({ items }: { items: ViralVideoSummary[] }) {
+  const organic = items.filter((v) => v.traffic_type === "organic");
+  const paid = items.filter((v) => v.traffic_type === "paid");
+  const untagged = items.filter(
+    (v) => v.traffic_type !== "organic" && v.traffic_type !== "paid",
+  );
+
+  // Si hay split paid/organic, mostramos dos grupos con cabecera.
+  if (organic.length > 0 || paid.length > 0) {
+    return (
+      <div className="space-y-3">
+        {organic.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
+              🌱 Virales orgánicos ({organic.length}) — qué engancha solo
+            </p>
+            <VideoCards items={organic} />
+          </div>
+        )}
+        {paid.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase text-orange-600 dark:text-orange-400 sm:text-[11px]">
+              💸 Alcance pagado ({paid.length}) — qué se escala con ads
+            </p>
+            <VideoCards items={paid} />
+          </div>
+        )}
+        {untagged.length > 0 && <VideoCards items={untagged} />}
+      </div>
+    );
+  }
+  return <VideoCards items={items} />;
+}
+
+function VideoCards({ items }: { items: ViralVideoSummary[] }) {
   return (
     <div className="space-y-1.5">
       {items.map((v, i) => (

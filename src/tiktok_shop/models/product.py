@@ -145,6 +145,13 @@ class ViralVideoSummary(BaseModel):
     visual_patterns: list[str] = Field(default_factory=list)  # planos, cortes, transiciones
     cta_used: str = ""
     music_mood: str = ""
+    # Clasificación de tráfico inferida por engagement rate:
+    #   "organic" → engagement alto (resonó de verdad)
+    #   "paid"    → muchas views pero engagement bajo (probable ad/boost)
+    # Permite separar las dos fórmulas: qué convierte con presupuesto vs
+    # qué engancha orgánicamente. NO es dato de ventas (TikTok no lo expone
+    # públicamente para ES) — es un proxy por ratio de interacción.
+    traffic_type: str = ""
     # Audio/sonido del vídeo (extraído de Apify musicMeta). El sonido es
     # uno de los mayores drivers de viralidad en TikTok — capturamos el
     # ID para poder reutilizar el MISMO audio trending del nicho.
