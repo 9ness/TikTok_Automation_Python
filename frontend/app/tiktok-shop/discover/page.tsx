@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -23,9 +23,12 @@ import {
   useDiscoverProducts,
   useTopSellers,
   type DiscoveredProduct,
+  type DiscoveryResponse,
 } from "@/lib/queries/discovery";
 import { useCreateProduct } from "@/lib/queries/products";
 import { cn } from "@/lib/utils";
+
+const LS_KEY = "tiktok_shop_discover.last";
 
 const SORTS = [
   { value: "sales", label: "Más vendidos (total)" },
@@ -76,6 +79,11 @@ export default function DiscoverPage() {
   // Modo activo: búsqueda por keyword o ranking cruzado "Top ventas".
   const [mode, setMode] = useState<"search" | "top">("search");
 
+  // Resultado mostrado — persistido en localStorage para que al recargar
+  // (o volver) se mantenga sin gastar otra llamada.
+  const [result, setResult] = useState<DiscoveryResponse | null>(null);
+  const [restored, setRestored] = useState(false);
+
   const searchQ = useDiscoverProducts({
     keyword: submitted?.kw ?? "",
     region: submitted?.region ?? "ES",
@@ -87,6 +95,60 @@ export default function DiscoverPage() {
     enabled: mode === "top" && Boolean(topReq),
   });
   const q = mode === "top" ? topQ : searchQ;
+
+  // Restaurar última búsqueda al montar (localStorage).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(LS_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.result) setResult(s.result);
+        if (s.keyword) setKeyword(s.keyword);
+        if (s.region) setRegion(s.region);
+        if (s.sort) setSort(s.sort);
+        if (typeof s.minCommission === "number") setMinCommission(s.minCommission);
+      }
+    } catch {
+      /* corrupto — ignora */
+    }
+    setRestored(true);
+  }, []);
+
+  // Cuando llega un resultado nuevo de la API → guardarlo + persistir.
+  useEffect(() => {
+    if (q.data) {
+      setResult(q.data);
+      try {
+        window.localStorage.setItem(
+          LS_KEY,
+          JSON.stringify({
+            result: q.data,
+            keyword,
+            region,
+            sort,
+            minCommission,
+            savedAt: Date.now(),
+          }),
+        );
+      } catch {
+        /* localStorage lleno — ignora */
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.data]);
+
+  function onClear() {
+    setResult(null);
+    setSubmitted(null);
+    setTopReq(null);
+    setKeyword("");
+    try {
+      window.localStorage.removeItem(LS_KEY);
+    } catch {
+      /* ignora */
+    }
+  }
 
   function runSearch(kw: string) {
     if (!kw.trim()) {
@@ -108,7 +170,7 @@ export default function DiscoverPage() {
     setTopReq({ region });
   }
 
-  const data = q.data;
+  const data = result;
   // Orden + filtro de comisión aplicados en el cliente sobre el resultado
   // ya cargado → instantáneo y SIN gastar llamadas.
   const items = useMemo(() => {
@@ -277,13 +339,32 @@ export default function DiscoverPage() {
         </Card>
       )}
 
-      {!submitted && !topReq && (
+      {restored && !result && !q.isFetching && (
         <Card className="bg-muted/30">
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
             Escribe un producto o nicho y pulsa <b>Buscar</b>, o pulsa{" "}
-            <b>🔥 Top ventas</b> para ver lo más vendido en ES ahora mismo.
+            <b>🔥 Top ventas</b> para ver lo más vendido ahora mismo.
           </CardContent>
         </Card>
+      )}
+
+      {/* Cabecera de resultados + Limpiar */}
+      {items.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-muted-foreground sm:text-xs">
+            {items.length} resultado{items.length === 1 ? "" : "s"}
+            {data?.query ? ` · ${data.query}` : ""} · guardado en este
+            dispositivo
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClear}
+            className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Limpiar
+          </Button>
+        </div>
       )}
 
       {/* Grid de resultados — 2 cols móvil / 3 sm / 4 lg */}
