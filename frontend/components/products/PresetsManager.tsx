@@ -2009,8 +2009,45 @@ function PresetCard({
                 mono
               />
             )}
+            {/* Fruit story: flujo 2 pasos — primero imagen Nano Banana, luego
+                animar esa imagen en Flow con el prompt de vídeo. */}
+            {(preset.variant || "original") === "fruit_story" &&
+              preset.image_prompt && (
+                <div className="rounded border border-orange-500/40 bg-orange-500/5 p-1.5">
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
+                    <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
+                      🍉 Paso 1 · Imagen del personaje (Nano Banana)
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 gap-1 px-2 text-[10px]"
+                      onClick={() => copyToClipboard(preset.image_prompt)}
+                    >
+                      📋 Copiar prompt imagen
+                    </Button>
+                  </div>
+                  <p className="mb-1 text-[10px] leading-snug text-muted-foreground">
+                    En <strong>Gemini → Nano Banana</strong>: pega este prompt{" "}
+                    <strong>+ adjunta la foto del producto</strong> → genera la
+                    imagen del personaje fruta (estilo Pixar). Esa imagen es la
+                    referencia para el Paso 2.
+                  </p>
+                  <p className="whitespace-pre-wrap break-words font-mono text-[10px] leading-snug">
+                    {preset.image_prompt}
+                  </p>
+                </div>
+              )}
+
             {preset.veo3_prompt && (
               <div className="rounded border border-violet-500/30 bg-violet-500/5 p-1.5">
+                {(preset.variant || "original") === "fruit_story" && (
+                  <p className="mb-1 rounded bg-violet-500/10 p-1 text-[10px] leading-snug text-violet-700 dark:text-violet-300">
+                    🎬 <strong>Paso 2 · Animar en Flow</strong>: crea un vídeo
+                    image-to-video, sube la imagen del Paso 1 como fotograma de
+                    referencia y pega este prompt. Mantiene el estilo y la anima.
+                  </p>
+                )}
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
                   <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
                     🎬 Veo 3 (copy-paste a Gemini chat / Flow)

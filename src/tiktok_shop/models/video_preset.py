@@ -255,6 +255,12 @@ class VideoPreset(BaseModel):
     # Seedance i2v (Standard/Advanced): prompt corto describiendo qué
     # pasa con la foto del producto (movimiento de cámara, acción).
     seedance_prompt: str = ""
+    # Prompt de IMAGEN (Nano Banana / Gemini imagen) para crear el FOTOGRAMA
+    # de referencia del personaje antes de animar. Lo usan los presets
+    # `variant="fruit_story"`: el user genera esta imagen (estilo Pixar) en
+    # Gemini, y luego la anima con `veo3_prompt` en Flow (image-to-video).
+    # Vacío en presets normales (no necesitan keyframe).
+    image_prompt: str = ""
     # Veo 3 (prompt-only): prompt rico y descriptivo de toda la escena.
     # Para `duration_s` ≤ 10s este es EL prompt único (un solo clip Veo 3).
     # Para `duration_s` > 10s este campo guarda el primer segmento como

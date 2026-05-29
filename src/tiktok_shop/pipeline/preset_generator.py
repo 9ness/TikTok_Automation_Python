@@ -908,6 +908,8 @@ def _generate_fruit(product: Product, *, n: int = 10) -> list[VideoPreset]:
                 voice_id=None,
                 voice_tone="playful",
                 seedance_prompt="",      # fruta = solo Veo 3
+                # Keyframe Nano Banana (paso 1) + animación (paso 2).
+                image_prompt=str(p.get("image_prompt", ""))[:2000],
                 veo3_prompt=str(p.get("veo3_prompt", ""))[:2500],
                 veo3_photo_filenames=_sanitize_veo3_photo_filenames(
                     p.get("veo3_photo_filenames"), available=photo_filenames,

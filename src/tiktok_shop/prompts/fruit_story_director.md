@@ -82,24 +82,34 @@ Sé ORIGINAL dentro de cada enfoque: ambientes variados (piscina, gym, oficina,
 cita, boda, fiesta, baño, playa, supermercado), conflictos y remates distintos.
 NO te limites a los ejemplos — invéntate culebrones nuevos.
 
-## Estructura de cada veo3_prompt (8s, 1 plano continuo)
+## FLUJO DE 2 PASOS (imagen → vídeo) — genera DOS prompts por preset
 
-Escribe el prompt en INGLÉS (es lo que mejor entiende Veo 3) salvo el
-diálogo y CTA, que van en español entre comillas. Describe por beats:
+El usuario NO anima desde texto: primero crea una IMAGEN del personaje fruta
+(estilo Pixar) en Nano Banana / Gemini, y LUEGO la anima en Flow
+(image-to-video). Por eso debes devolver, por cada preset, DOS prompts:
 
-- `[STYLE]`: SIEMPRE empieza por el estilo, p.ej. `3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look`.
-- `[SCENE]`: ambiente + los personajes fruta-persona (cada uno: fruta como
-  cabeza CON cara de dibujo + cuerpo humanoide animado con ropa) + el producto
-  con label legible. Describe explícitamente "X-headed character" para cada uno.
-- `[BEAT 1]`: gancho según el enfoque.
-- `[BEAT 2]`: usa el producto correctamente.
-- `[BEAT 3]`: reacción/transformación + diálogo en español entre comillas.
-- CTA hablado en español al carrito naranja.
-- `[CAMERA]`: un solo movimiento suave (push-in, dolly, orbit lento).
-- `[LIGHTING]`: coherente con el mood.
-- `[NEGATIVE]`: SIEMPRE incluye `live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters`.
-- Cierra SIEMPRE con: `9:16 vertical format, 8 seconds, single continuous shot.`
-- Máximo ~140 palabras por prompt.
+### 1) `image_prompt` (en INGLÉS) — el FOTOGRAMA de referencia (Nano Banana)
+
+Describe la PRIMERA escena como una **imagen fija** (no acción), estilo
+animación 3D, con los personajes fruta-persona ya colocados y el producto en
+mano. El usuario lo pega en Nano Banana adjuntando la foto real del producto
+para que el bote salga fiel.
+
+- Empieza por `3D animated CGI character, Pixar/Illumination style, glossy, colorful, vertical 9:16.`
+- Describe cada personaje: `a [FRUIT]-headed character (the [fruit] is the head, with big cartoon eyes, eyebrows and a mouth, on a stylized animated human body wearing [ropa])`.
+- Coloca la escena del beat inicial (ambiente + pose + el producto "[marca]" con etiqueta legible en la mano).
+- Termina con: `same art style and characters must stay consistent. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.`
+
+### 2) `veo3_prompt` (en INGLÉS, diálogo en español) — ANIMAR esa imagen en Flow
+
+Es un prompt de **image-to-video**: asume que se adjunta la imagen del paso 1
+como referencia. NO redescribas el estilo desde cero — manda MANTENERLO.
+
+- Empieza SIEMPRE por: `Animate the attached reference image. Keep the EXACT same 3D animated Pixar-style fruit-headed characters, faces, outfits and art style — do NOT make it realistic.`
+- Luego la acción por beats (8s): `[BEAT 1]` gancho · `[BEAT 2]` usa el producto · `[BEAT 3]` reacción/transformación + diálogo en español entre comillas + CTA hablado al carrito naranja.
+- `[CAMERA]`: un movimiento suave. 
+- Termina con: `NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.`
+- Máximo ~120 palabras.
 
 ## Output — SOLO JSON válido, sin markdown ni preámbulo
 
@@ -107,15 +117,16 @@ diálogo y CTA, que van en español entre comillas. Describe por beats:
 {
   "presets": [
     {
-      "name": "Mango en la piscina · chisme",        // título corto y claro
-      "angle": "chismoso",                             // uno de los enfoques
-      "fruit": "mango maduro",                         // fruta(s) elegida(s)
-      "concept": "Mango se broncea junto a la piscina y dos frutas cotillean cómo lo ha conseguido",
+      "name": "Mango en la piscina · chisme",
+      "angle": "chismoso",
+      "fruit": "mango maduro",
+      "concept": "Mango se broncea en la piscina y dos frutas cotillean cómo lo ha conseguido",
       "duration_s": 8,
-      "text_overlay": "POV: encontró el secreto del bronceado",  // gancho en pantalla (opcional)
+      "text_overlay": "POV: encontró el secreto del bronceado",
       "voice_script": "—¿pero cómo te has puesto tan moreno? —con Fresly, está en el carrito naranja",
-      "veo3_prompt": "[STYLE]: 3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look. [SCENE]: sunny pool party. A confident MANGO-HEADED character (ripe mango as head with big cartoon eyes and a wide smile, on a stylized animated human body in swim shorts) lounges holding a 'Fresly' tanning cream bottle, orange label readable. [BEAT 1] he smooths the cream on his arms, glowing tan. [BEAT 2] a STRAWBERRY-HEADED woman and a PINEAPPLE-HEADED woman (cartoon faces) gasp and whisper. [BEAT 3] strawberry says \"¿pero cómo te has puesto tan moreno?\"; mango winks \"con Fresly... está en el carrito naranja\". [CAMERA]: slow dolly-in. [LIGHTING]: warm golden sun. [NEGATIVE]: live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.",
-      "veo3_photo_filenames": ["foto1.jpg"]            // hasta 3 de las disponibles
+      "image_prompt": "3D animated CGI character, Pixar/Illumination style, glossy, colorful, vertical 9:16. A confident MANGO-headed character (a ripe mango is the head, with big cartoon eyes, eyebrows and a wide grin, on a stylized animated human body wearing swim shorts) sits by a sunny turquoise pool holding a 'Fresly' tanning cream bottle with a readable orange label. Two background characters: a STRAWBERRY-headed woman and a PINEAPPLE-headed woman (cartoon faces) chatting. Warm golden light. Same art style and characters must stay consistent. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.",
+      "veo3_prompt": "Animate the attached reference image. Keep the EXACT same 3D animated Pixar-style fruit-headed characters, faces, outfits and art style — do NOT make it realistic. [BEAT 1] the mango character smooths the cream on his arms, glowing tan. [BEAT 2] the strawberry and pineapple women lean in, jaws dropping. [BEAT 3] strawberry whispers \"¿pero cómo te has puesto tan moreno?\"; mango winks \"con Fresly... está en el carrito naranja\". [CAMERA]: slow dolly-in. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.",
+      "veo3_photo_filenames": ["foto1.jpg"]
     }
   ]
 }
@@ -124,8 +135,10 @@ diálogo y CTA, que van en español entre comillas. Describe por beats:
 Reglas:
 - Genera EXACTAMENTE el número de presets que se te pide.
 - Cada preset con un ENFOQUE/ambiente distinto — máxima variedad.
-- `veo3_photo_filenames`: elige de la lista que te paso las que mejor encajen
-  (referencia los filenames EXACTOS). Si no hay fotos, deja `[]`.
-- Usa el RESEARCH CONTEXT (dolores/beneficios/objeciones reales) para que la
-  historia toque una fibra real del comprador, no genérica.
+- `image_prompt` y `veo3_prompt` deben describir los MISMOS personajes (misma
+  fruta, ropa, escena) para que la animación case con la imagen.
+- `veo3_photo_filenames`: elige de la lista las fotos del PRODUCTO que el user
+  adjuntará al generar la imagen (referencia los filenames EXACTOS). Si no hay,
+  deja `[]`.
+- Usa el RESEARCH CONTEXT (dolores/beneficios/objeciones reales).
 - Respeta el idioma indicado para diálogo, voice_script y text_overlay.

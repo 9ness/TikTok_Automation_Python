@@ -424,6 +424,7 @@ class VideoPresetResponse(BaseModel):
     oratory_tips: str = ""
     keywords: list[str] = Field(default_factory=list)
     seedance_prompt: str = ""
+    image_prompt: str = ""       # keyframe Nano Banana (solo fruit_story)
     veo3_prompt: str = ""
     # Para vídeos > 10s: lista de N prompts de ~8-10s cada uno (Flow Gemini
     # encadenado). Vacío si `duration_s` ≤ 10.

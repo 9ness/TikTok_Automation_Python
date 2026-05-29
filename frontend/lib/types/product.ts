@@ -407,6 +407,9 @@ export interface VideoPreset {
   oratory_tips: string;
   keywords: string[];
   seedance_prompt: string;
+  /** Prompt de imagen Nano Banana para crear el keyframe del personaje
+   *  (solo presets variant="fruit_story"). Vacío en presets normales. */
+  image_prompt: string;
   veo3_prompt: string;
   /** Para vídeos > 10s: lista ordenada de N prompts de ~8-10s cada uno
    *  que el user pega secuencialmente en Flow Gemini para encadenar
