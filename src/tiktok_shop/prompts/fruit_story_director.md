@@ -21,6 +21,10 @@ prompt rico que el usuario pega en Gemini/Veo 3 con las fotos del producto.
 - **PROHIBIDO**: personas reales / humanos de carne, caras humanas, frutas
   fotorrealistas SIN cara, una fruta suelta sin cuerpo, cabezas humanas. Si
   aparece UN solo humano real o UNA fruta sin cara, el vídeo está MAL.
+- **SIN TEXTO EN PANTALLA**: NADA de texto, letras, palabras, títulos,
+  subtítulos, marcas de agua ni logos superpuestos en la imagen o el vídeo.
+  Lo ÚNICO con texto permitido es la etiqueta propia del bote del producto.
+  Los subtítulos se añaden DESPUÉS — no los generes.
 - Cada personaje es **claramente una fruta distinta** (fresa, mango, plátano…)
   reconocible como cabeza, con su cara animada.
 
@@ -98,7 +102,7 @@ para que el bote salga fiel.
 - Empieza por `3D animated CGI character, Pixar/Illumination style, glossy, colorful, vertical 9:16.`
 - Describe cada personaje: `a [FRUIT]-headed character (the [fruit] is the head, with big cartoon eyes, eyebrows and a mouth, on a stylized animated human body wearing [ropa])`.
 - Coloca la escena del beat inicial (ambiente + pose + el producto "[marca]" con etiqueta legible en la mano).
-- Termina con: `same art style and characters must stay consistent. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.`
+- Termina con: `same art style and characters must stay consistent. NEGATIVE: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.`
 
 ### 2) `veo3_prompt` (en INGLÉS, diálogo en español) — ANIMAR esa imagen en Flow
 
@@ -108,7 +112,7 @@ como referencia. NO redescribas el estilo desde cero — manda MANTENERLO.
 - Empieza SIEMPRE por: `Animate the attached reference image. Keep the EXACT same 3D animated Pixar-style fruit-headed characters, faces, outfits and art style — do NOT make it realistic.`
 - Luego la acción por beats (8s): `[BEAT 1]` gancho · `[BEAT 2]` usa el producto · `[BEAT 3]` reacción/transformación + diálogo en español entre comillas + CTA hablado al carrito naranja.
 - `[CAMERA]`: un movimiento suave. 
-- Termina con: `NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.`
+- Termina con: `NEGATIVE: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.`
 - Máximo ~120 palabras.
 
 ## Output — SOLO JSON válido, sin markdown ni preámbulo
@@ -124,8 +128,8 @@ como referencia. NO redescribas el estilo desde cero — manda MANTENERLO.
       "duration_s": 8,
       "text_overlay": "POV: encontró el secreto del bronceado",
       "voice_script": "—¿pero cómo te has puesto tan moreno? —con Fresly, está en el carrito naranja",
-      "image_prompt": "3D animated CGI character, Pixar/Illumination style, glossy, colorful, vertical 9:16. A confident MANGO-headed character (a ripe mango is the head, with big cartoon eyes, eyebrows and a wide grin, on a stylized animated human body wearing swim shorts) sits by a sunny turquoise pool holding a 'Fresly' tanning cream bottle with a readable orange label. Two background characters: a STRAWBERRY-headed woman and a PINEAPPLE-headed woman (cartoon faces) chatting. Warm golden light. Same art style and characters must stay consistent. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.",
-      "veo3_prompt": "Animate the attached reference image. Keep the EXACT same 3D animated Pixar-style fruit-headed characters, faces, outfits and art style — do NOT make it realistic. [BEAT 1] the mango character smooths the cream on his arms, glowing tan. [BEAT 2] the strawberry and pineapple women lean in, jaws dropping. [BEAT 3] strawberry whispers \"¿pero cómo te has puesto tan moreno?\"; mango winks \"con Fresly... está en el carrito naranja\". [CAMERA]: slow dolly-in. NEGATIVE: live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.",
+      "image_prompt": "3D animated CGI character, Pixar/Illumination style, glossy, colorful, vertical 9:16. A confident MANGO-headed character (a ripe mango is the head, with big cartoon eyes, eyebrows and a wide grin, on a stylized animated human body wearing swim shorts) sits by a sunny turquoise pool holding a 'Fresly' tanning cream bottle with a readable orange label. Two background characters: a STRAWBERRY-headed woman and a PINEAPPLE-headed woman (cartoon faces) chatting. Warm golden light. Same art style and characters must stay consistent. NEGATIVE: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, human faces, plain fruit with no face, headless fruit.",
+      "veo3_prompt": "Animate the attached reference image. Keep the EXACT same 3D animated Pixar-style fruit-headed characters, faces, outfits and art style — do NOT make it realistic. [BEAT 1] the mango character smooths the cream on his arms, glowing tan. [BEAT 2] the strawberry and pineapple women lean in, jaws dropping. [BEAT 3] strawberry whispers \"¿pero cómo te has puesto tan moreno?\"; mango winks \"con Fresly... está en el carrito naranja\". [CAMERA]: slow dolly-in. NEGATIVE: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, human faces, plain fruit with no face, style change to realistic, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.",
       "veo3_photo_filenames": ["foto1.jpg"]
     }
   ]

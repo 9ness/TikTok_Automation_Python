@@ -77,6 +77,8 @@ dramática" de TikTok: surrealista, cómico o chismoso, pero que VENDE el produc
   debe describir cada uno como `a [FRUIT]-headed character (cartoon face)`.
 - **PROHIBIDO**: humanos reales, caras humanas, frutas fotorrealistas sin cara,
   fruta suelta sin cuerpo, cabezas humanas. El producto sí se renderiza fiel.
+- **SIN TEXTO**: nada de texto/letras/títulos/subtítulos/marcas de agua/logos
+  superpuestos (solo la etiqueta del propio bote). Los subtítulos van después.
 
 ### Casting de fruta — ACIERTA por color + semántica
 
@@ -125,13 +127,13 @@ frases máximo + la frase de CTA). Tono natural y exagerado-divertido. Ej:
 - **UN solo plano continuo** (cámara con un movimiento suave; nada de cortes).
 - Hasta **140 palabras**.
 - Cierra SIEMPRE con: `9:16 vertical format, 8 seconds, single continuous shot.`
-- NEGATIVE al final: `live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters`.
+- NEGATIVE al final: `any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, hard cuts, more than 3 characters`.
 - Mantén `ai_disclosure` implícito (es claramente AI/animado, no engaña).
 
 ### Few-shot fruit_character (bronceador, enfoque chismoso)
 
 ```
-[STYLE]: 3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look. [SCENE]: sunny poolside, turquoise water, palm shadows. A confident MANGO-HEADED character (ripe mango as head with big cartoon eyes and a wide grin, on a stylized animated human body in swim shorts) lounges holding a bottle of "Fresly" tanning cream, orange label clearly readable. [BEAT 1] he smooths the cream over his arms, glowing tan. [BEAT 2] a STRAWBERRY-HEADED woman and a PEACH-HEADED woman (cartoon faces) turn, jaws dropping, one whispers "¿pero cómo te has puesto tan moreno?". [BEAT 3] the mango character winks "con Fresly... está en el carrito naranja". [CAMERA]: slow dolly-in. [LIGHTING]: warm golden-hour sun. [NEGATIVE]: live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, illegible packaging text, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.
+[STYLE]: 3D animated CGI, Pixar/Illumination style, glossy and colorful, exaggerated cartoon look. [SCENE]: sunny poolside, turquoise water, palm shadows. A confident MANGO-HEADED character (ripe mango as head with big cartoon eyes and a wide grin, on a stylized animated human body in swim shorts) lounges holding a bottle of "Fresly" tanning cream, orange label clearly readable. [BEAT 1] he smooths the cream over his arms, glowing tan. [BEAT 2] a STRAWBERRY-HEADED woman and a PEACH-HEADED woman (cartoon faces) turn, jaws dropping, one whispers "¿pero cómo te has puesto tan moreno?". [BEAT 3] the mango character winks "con Fresly... está en el carrito naranja". [CAMERA]: slow dolly-in. [LIGHTING]: warm golden-hour sun. [NEGATIVE]: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, live-action, real humans, photorealistic people, realistic photography, human faces, plain fruit with no face, headless fruit, deformed fruit heads, extra limbs, hard cuts, more than 3 characters. 9:16 vertical format, 8 seconds, single continuous shot.
 ```
 
 ## Few-shot — un prompt Veo 3 ideal
