@@ -7,6 +7,10 @@ import {
   StickerPreview9x16,
   type StickerPreviewConfig,
 } from "@/components/editor-auto/StickerPreview9x16";
+import {
+  PhotoPreview9x16,
+  type PhotoPreviewConfig,
+} from "@/components/editor-auto/PhotoPreview9x16";
 import { SubsPreview9x16, type SubsPreviewConfig } from "@/components/editor-auto/SubsPreview9x16";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -267,7 +271,17 @@ function StepCard({
         flip_vertical: Boolean(step.config.flip_vertical ?? false),
       }
     : null;
-  const hasPreview = Boolean(subsPreviewConfig || stickerPreviewConfig);
+  const isPhotoInsert = tool.tool_id === "photo_insert";
+  const photoPreviewConfig: PhotoPreviewConfig | null = isPhotoInsert
+    ? {
+        position_x_pct: Number(step.config.position_x_pct ?? 50),
+        position_y_pct: Number(step.config.position_y_pct ?? 28),
+        scale_width_pct: Number(step.config.scale_width_pct ?? 38),
+      }
+    : null;
+  const hasPreview = Boolean(
+    subsPreviewConfig || stickerPreviewConfig || photoPreviewConfig,
+  );
   return (
     <div className="rounded-md border bg-card/50">
       <div className="flex items-center gap-2 p-2">
@@ -334,6 +348,18 @@ function StepCard({
                   onRotationChange={(deg) =>
                     onConfigChange("rotation_deg", deg)
                   }
+                />
+              </div>
+            )}
+            {photoPreviewConfig && (
+              <div className="lg:sticky lg:top-4 lg:h-fit">
+                <PhotoPreview9x16
+                  config={photoPreviewConfig}
+                  onPositionChange={(x, y) => {
+                    onConfigChange("position_x_pct", x);
+                    onConfigChange("position_y_pct", y);
+                  }}
+                  onScaleChange={(s) => onConfigChange("scale_width_pct", s)}
                 />
               </div>
             )}

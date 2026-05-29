@@ -95,7 +95,11 @@ def _transcode_to_apng(src_path: str) -> str:
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", src_path,
-        "-vf", "fps=15,scale=200:-1:flags=lanczos",
+        # `-2` (no `-1`): fuerza altura PAR. Con `-1` algunos assets dan
+        # altura impar y el encoder APNG falla → preview en blanco (caso
+        # flecha roja). `format=rgba` garantiza canal alpha aunque el
+        # source no lo declare explícito.
+        "-vf", "fps=15,scale=200:-2:flags=lanczos,format=rgba",
         "-plays", "0",          # loop infinito en APNG
         "-f", "apng",
         out,
