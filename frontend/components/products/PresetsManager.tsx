@@ -123,9 +123,22 @@ export function PresetsManager({ product }: { product: Product }) {
     if (s === "done") {
       const cost = genStatus.data?.cost_usd ?? 0;
       const costStr = cost > 0 ? ` · ≈ $${cost.toFixed(4)} USD` : "";
-      toast.success(
-        `${genStatus.data?.created_count ?? 0} presets generados${costStr}`,
-      );
+      const created = genStatus.data?.created_count ?? 0;
+      const warns = genStatus.data?.warnings ?? [];
+      if (created === 0) {
+        // No se creó nada → muestra el motivo (warning del director) en vez
+        // de un "0 presets" silencioso.
+        toast.error(
+          warns.length > 0
+            ? `No se generó ningún preset · ${warns[0]}`
+            : "No se generó ningún preset (el modelo no devolvió resultados, reintenta).",
+        );
+      } else {
+        toast.success(`${created} presets generados${costStr}`);
+        if (warns.length > 0) {
+          toast.warning(`Aviso: ${warns[0]}`);
+        }
+      }
     } else if (s === "error") {
       toast.error(genStatus.data?.error || "Generación falló");
     }

@@ -162,6 +162,7 @@ def _call_with_key(
     temperature: float,
     enable_web_search: bool = False,
     videos: list[str] | None = None,
+    max_output_tokens: int = 8192,
 ) -> str:
     """Ejecuta UNA llamada a Gemini con la `api_key` indicada.
 
@@ -218,6 +219,11 @@ def _call_with_key(
         generation_config={
             "temperature": temperature,
             "response_mime_type": "application/json" if expect_json else "text/plain",
+            # Sin esto, gemini-2.5-flash trunca el output a ~8K tokens por
+            # defecto → respuestas JSON grandes (lotes de presets) salen
+            # cortadas y json.loads peta. Es un CAP, no un objetivo: solo
+            # se factura el output real.
+            "max_output_tokens": max_output_tokens,
         },
     )
     text = (response.text or "").strip()
@@ -272,6 +278,7 @@ def generate_text(
     enable_web_search: bool = False,
     temperature: float = 0.8,
     max_retries_on_quota: int = 3,
+    max_output_tokens: int = 8192,
 ) -> str:
     """Llama a Gemini con fallback automático entre keys (free → paid → legacy).
 
@@ -313,6 +320,7 @@ def generate_text(
                     images=images, videos=videos,
                     enable_web_search=enable_web_search,
                     temperature=temperature,
+                    max_output_tokens=max_output_tokens,
                 )
                 # Loguea SIEMPRE qué key acabó devolviendo el resultado.
                 # En éxitos sin fallback, este log permite verificar que se
@@ -381,12 +389,18 @@ def generate_json(
     model: str = DEFAULT_MODEL,
     images: list[str | bytes] | None = None,
     temperature: float = 0.7,
+    max_output_tokens: int = 32768,
 ) -> Any:
     """Igual que `generate_text` pero parsea JSON y lo devuelve. Lanza
-    `ValueError` si el modelo devuelve algo no parseable."""
+    `ValueError` si el modelo devuelve algo no parseable.
+
+    `max_output_tokens` default alto (32K) porque los callers de JSON suelen
+    pedir lotes grandes (presets, variantes) que con el cap default (8K) se
+    truncaban y reventaban el parseo."""
     raw = generate_text(
         system_prompt, user_prompt,
         model=model, expect_json=True, images=images, temperature=temperature,
+        max_output_tokens=max_output_tokens,
     )
     try:
         return json.loads(raw)

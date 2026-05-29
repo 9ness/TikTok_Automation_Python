@@ -42,25 +42,31 @@ mezcle identidades.
 
 ## Enfoques narrativos — VARÍALOS entre presets (no repitas)
 
-Reparte el lote entre estos enfoques (y combina/inventa variantes):
+⭐ **PRIORIDAD MÁXIMA — los que MÁS viralizan**: el **cotilleo/chisme** y la
+**infidelidad/drama de pareja**. La gente se engancha al salseo. Dedica
+**~la mitad del lote** a estos dos (mezclados con el producto), y reparte el
+resto entre los demás para tener variedad que luego testeamos:
 
-1. **dramático** — telenovela: le rompen el corazón / le ponen los cuernos /
-   la rechazan → usa el producto → renace y todos lo miran.
-2. **chismoso** — frutas cotillean señalando: "¿cómo se ha puesto así?" →
-   se revela el producto como secreto.
-3. **cómico-burla** — se ríen de una fruta pálida/normal usando algo
-   cualquiera → giro: otra fruta usa el producto y se lleva toda la
-   admiración.
-4. **aspiracional** — la fruta quiere destacar/gustar/ganar → el producto la
+1. **infidelidad / drama de pareja** ⭐ — le ponen los cuernos, pilla a su
+   pareja-fruta con otra, ruptura dramática → se transforma con el producto y
+   vuelve despampanante; el ex se arrepiente / las demás lo miran. Telenovela
+   pura, emoción exagerada.
+2. **chismoso / salseo** ⭐ — frutas cotilleando entre susurros y miradas:
+   "¿te has enterado de...?", "¿cómo se ha puesto así?" → el chisme gira en
+   torno al secreto (el producto). Tono de corrillo, voz bajita y picante.
+3. **dramático** — le rompen el corazón / la humillan / la rechazan → usa el
+   producto → renace y todos la miran.
+4. **cómico-burla** — se ríen de una fruta pálida/normal usando algo
+   cualquiera → giro: otra fruta usa el producto y se lleva la admiración.
+5. **aspiracional** — la fruta quiere destacar/gustar/ganar → el producto la
    convierte en la estrella.
-5. **competición / reto** — dos frutas compiten, gana la que usa el producto.
-6. **transformación shock** — antes/después brutal con reacción exagerada.
-7. **rutina diaria / POV** — "un día en la vida" de la fruta con el producto.
+6. **competición / reto** — dos frutas compiten, gana la que usa el producto.
+7. **transformación shock** — antes/después brutal con reacción exagerada.
 8. **secreto revelado** — confiesa a cámara su truco (el producto).
 
-Sé ORIGINAL: ambientes variados (piscina, gym, oficina, cita, fiesta, baño,
-playa, supermercado), conflictos variados, remates con humor o drama. NO
-te limites a los ejemplos.
+Sé ORIGINAL dentro de cada enfoque: ambientes variados (piscina, gym, oficina,
+cita, boda, fiesta, baño, playa, supermercado), conflictos y remates distintos.
+NO te limites a los ejemplos — invéntate culebrones nuevos.
 
 ## Estructura de cada veo3_prompt (8s, 1 plano continuo)
 

@@ -1,0 +1,1 @@
+- Fruit presets devolvían 0: faltaba max_output_tokens en Gemini → JSON de 10 historias largas se truncaba (~8k) → generate_json ValueError tragado en warnings del tracker. Fix: max_output_tokens (generate_text 8192 / generate_json 32768) + log warnings a stdout + toast.error si created_count=0 + prompt prioriza cotilleo/infidelidad

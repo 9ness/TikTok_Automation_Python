@@ -1591,6 +1591,15 @@ def _generate_presets_background(
         product.touch()
         repo.save(product)
 
+        # Visibilidad: si hubo warnings (p.ej. director falló / JSON inválido)
+        # los logueamos a stdout — antes solo iban al tracker (que expira) y
+        # un "0 presets" quedaba sin rastro para depurar.
+        if all_warnings:
+            logging.getLogger("api.products").warning(
+                "preset_gen %s (kind=%s) terminó con %d preset(s) y warnings: %s",
+                gen_id, kind, len(all_presets), " | ".join(all_warnings),
+            )
+
         preset_gen_tracker.update(
             gen_id, stage="done", percent=100,
             created_count=len(all_presets), warnings=all_warnings,
