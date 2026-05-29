@@ -113,18 +113,30 @@ def search_products(
         return []
     if log_callback:
         log_callback(f"🛒 EchoTik: buscando '{keyword}' en [{region}]…")
-    params: dict[str, Any] = {
-        "region": region, "page_num": 1, "page_size": min(limit, 30),
-    }
-    if keyword.strip():
-        params["keyword"] = keyword.strip()
-    if category_id:
-        params["category_id"] = category_id
-    data = _get("product/list", params, log_callback=log_callback)
-    if not isinstance(data, list):
-        return []
+
+    # EchoTik impone page_size MÁXIMO 10. Para devolver hasta `limit`
+    # productos paginamos (cada página = 1 request). Cap defensivo a 50.
+    PAGE = 10
+    target = min(limit, 50)
+    pages = (target + PAGE - 1) // PAGE
+    raw: list[dict[str, Any]] = []
+    for page_num in range(1, pages + 1):
+        params: dict[str, Any] = {
+            "region": region, "page_num": page_num, "page_size": PAGE,
+        }
+        if keyword.strip():
+            params["keyword"] = keyword.strip()
+        if category_id:
+            params["category_id"] = category_id
+        data = _get("product/list", params, log_callback=log_callback)
+        if not isinstance(data, list) or not data:
+            break  # sin más resultados o error → paramos
+        raw.extend(data)
+        if len(data) < PAGE:
+            break  # última página
+
     out: list[dict[str, Any]] = []
-    for p in data:
+    for p in raw[:target]:
         pid = str(p.get("product_id") or "")
         out.append({
             "product_id": pid,
@@ -176,7 +188,7 @@ def get_product_videos(
         log_callback(f"  🎯 EchoTik: vídeos con ventas del producto {product_id}…")
     data = _get(
         "product/video/list",
-        {"product_id": product_id, "region": region, "page_num": 1, "page_size": min(limit, 30)},
+        {"product_id": product_id, "region": region, "page_num": 1, "page_size": min(limit, 10)},
         log_callback=log_callback,
     )
     if not isinstance(data, list):

@@ -61,7 +61,7 @@ export default function DiscoverPage() {
   // La búsqueda SOLO depende de la keyword → 1 llamada por búsqueda.
   const q = useDiscoverProducts({
     keyword: submitted ?? "",
-    limit: 30,
+    limit: 10,
     enabled: Boolean(submitted),
   });
 
