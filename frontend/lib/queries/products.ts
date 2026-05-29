@@ -355,6 +355,13 @@ export function usePresetGenStatus(
         options?.onDone?.();
         return false;
       }
+      // Abandonar generaciones colgadas (>15 min sin terminar) — p.ej. si
+      // el contenedor se reinició a mitad. Evita spinner zombie eterno.
+      const startedAt = q.state.data?.started_at;
+      if (startedAt && Date.now() - new Date(startedAt).getTime() > 900_000) {
+        options?.onDone?.();
+        return false;
+      }
       return 2000;
     },
     refetchOnWindowFocus: false,
