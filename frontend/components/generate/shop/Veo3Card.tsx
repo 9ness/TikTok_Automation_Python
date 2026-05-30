@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProduct } from "@/lib/queries/products";
-import { useGenerateVariants } from "@/lib/queries/products";
+import { useGenerateFruit, useGenerateVariants } from "@/lib/queries/products";
 import type { VideoPreset } from "@/lib/types/product";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +75,9 @@ interface Props {
 interface ResultItem {
   presetId: string;
   name: string;
+  /** Prompt para generar el FOTOGRAMA en Nano Banana (Paso 1). Solo en
+   *  historias de fruta (flujo imagen→vídeo). Vacío en presets normales. */
+  image_prompt?: string;
   veo3_prompt: string;
   /** Para vídeos >10s: N prompts (~8-10s cada uno) que el user pega
    *  secuencialmente en Flow Gemini para encadenar clips. Vacío si
@@ -88,6 +91,19 @@ interface ResultItem {
 export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   const product = useProduct(productId);
   const generateVariants = useGenerateVariants(productId);
+  const generateFruit = useGenerateFruit(productId);
+
+  // Modo de trabajo: "presets" (selecciona presets ya generados) o
+  // "fruit" (crea historia(s) de fruta nuevas con Gemini → prompt imagen
+  // Nano Banana + prompt vídeo Veo3). El usuario alterna arriba del todo.
+  const [workMode, setWorkMode] = useState<"presets" | "fruit">("presets");
+  // Sub-opciones del modo fruta.
+  const [fruitGenType, setFruitGenType] = useState<"single" | "batch" | "ab">(
+    "single",
+  );
+  const [fruitAngle, setFruitAngle] = useState<string>("");
+  const [fruitHint, setFruitHint] = useState<string>("");
+  const [fruitTheme, setFruitTheme] = useState<string>("");
 
   const [mode, setMode] = useState<GenMode>("single");
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -229,6 +245,41 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
     }
   }
 
+  // Genera historia(s) de fruta: 1 call a Gemini → presets fruit_story
+  // (image_prompt + veo3_prompt) que se guardan en el producto y se
+  // muestran en el dialog para copiar al vuelo.
+  async function runFruit() {
+    const n = fruitGenType === "batch" ? 10 : fruitGenType === "ab" ? 4 : 1;
+    try {
+      toast(`Generando ${n} historia(s) de fruta…`);
+      const res = await generateFruit.mutateAsync({
+        generation: fruitGenType,
+        n,
+        fruit_hint: fruitHint.trim() || null,
+        narrative_angle: fruitAngle || null,
+        custom_theme: fruitTheme.trim() || null,
+      });
+      if (res.created_count === 0 || res.presets.length === 0) {
+        toast.error("No se generó ninguna historia de fruta, reintenta.");
+        return;
+      }
+      const items: ResultItem[] = res.presets.map((p) => ({
+        presetId: p.id,
+        name: p.name,
+        image_prompt: p.image_prompt,
+        veo3_prompt: p.veo3_prompt,
+        veo3_prompt_segments: p.veo3_prompt_segments ?? [],
+        veo3_photo_filenames: p.veo3_photo_filenames ?? [],
+        duration_s: p.duration_s,
+      }));
+      setResults(items);
+      setResultsTitle(`🍉 ${items.length} historia(s) de fruta · guardadas en Presets`);
+      toast.success(`${items.length} historia(s) fruta · en Presets del producto`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Generación fruta falló");
+    }
+  }
+
   const hasPresets = compatibleVeo3.length > 0;
 
   return (
@@ -246,6 +297,60 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
             </div>
           )}
 
+          {/* PASO 0 · Modo de trabajo: usar presets vs crear fruta */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">¿Qué quieres hacer?</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setWorkMode("presets")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                  workMode === "presets"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "border-muted hover:border-muted-foreground/40",
+                )}
+              >
+                <strong className="text-[11px]">📋 Usar presets</strong>
+                <span className="text-[9px] text-muted-foreground line-clamp-2">
+                  Copiar prompts de presets ya generados
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkMode("fruit")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                  workMode === "fruit"
+                    ? "border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300"
+                    : "border-muted hover:border-muted-foreground/40",
+                )}
+              >
+                <strong className="text-[11px]">🍉 Crear fruta</strong>
+                <span className="text-[9px] text-muted-foreground line-clamp-2">
+                  Mini-historia viral nueva (foto + vídeo)
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {workMode === "fruit" && (
+            <FruitBlock
+              genType={fruitGenType}
+              setGenType={setFruitGenType}
+              angle={fruitAngle}
+              setAngle={setFruitAngle}
+              fruitHint={fruitHint}
+              setFruitHint={setFruitHint}
+              theme={fruitTheme}
+              setTheme={setFruitTheme}
+              onGenerate={runFruit}
+              pending={generateFruit.isPending}
+            />
+          )}
+
+          {workMode === "presets" && (
+          <>
           {/* PASO 1 · Modo */}
           <div className="space-y-1.5">
             <Label className="text-xs">1 · ¿Qué quieres generar?</Label>
@@ -430,8 +535,10 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
               </span>
             </Button>
           </div>
+          </>
+          )}
 
-          {expanded && (
+          {workMode === "presets" && expanded && (
             <div className="space-y-3 border-t pt-3">
               <p className="text-[10px] text-muted-foreground">
                 Configuraciones guardadas (legacy). Solo si las usas:
@@ -485,6 +592,117 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// =============================================================
+// Bloque modo fruta: gen type + enfoque + fruta + "Tu idea" + generar
+// =============================================================
+function FruitBlock({
+  genType,
+  setGenType,
+  angle,
+  setAngle,
+  fruitHint,
+  setFruitHint,
+  theme,
+  setTheme,
+  onGenerate,
+  pending,
+}: {
+  genType: "single" | "batch" | "ab";
+  setGenType: (v: "single" | "batch" | "ab") => void;
+  angle: string;
+  setAngle: (v: string) => void;
+  fruitHint: string;
+  setFruitHint: (v: string) => void;
+  theme: string;
+  setTheme: (v: string) => void;
+  onGenerate: () => void | Promise<void>;
+  pending?: boolean;
+}) {
+  const GEN_OPTS: { v: "single" | "batch" | "ab"; label: string; sub: string }[] = [
+    { v: "single", label: "1 historia", sub: "1 prompt" },
+    { v: "batch", label: "📦 Lote", sub: "10 historias" },
+    { v: "ab", label: "🔀 A/B", sub: "4 · mismo enfoque" },
+  ];
+  return (
+    <div className="space-y-2.5 rounded-md border border-orange-500/40 bg-orange-500/5 p-3">
+      <div className="space-y-1.5">
+        <Label className="text-xs">1 · ¿Cuántas?</Label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {GEN_OPTS.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => setGenType(o.v)}
+              className={cn(
+                "flex flex-col gap-0.5 rounded-md border-2 px-1.5 py-2 text-left text-xs transition-colors",
+                genType === o.v
+                  ? "border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                  : "border-muted hover:border-muted-foreground/40",
+              )}
+            >
+              <strong className="text-[11px]">{o.label}</strong>
+              <span className="text-[9px] text-muted-foreground">{o.sub}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-[11px]">Enfoque</Label>
+          <select
+            value={angle || "auto"}
+            onChange={(e) => setAngle(e.target.value === "auto" ? "" : e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+          >
+            <option value="auto">🤖 Que elija la IA</option>
+            <option value="infiel">💔 Infiel / drama de pareja</option>
+            <option value="chismoso">👀 Chismoso</option>
+            <option value="dramatico">🎭 Dramático</option>
+            <option value="comico-burla">😂 Cómico / burla</option>
+            <option value="aspiracional">✨ Aspiracional</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[11px]">Fruta (opcional)</Label>
+          <Input
+            value={fruitHint}
+            onChange={(e) => setFruitHint(e.target.value)}
+            placeholder="vacío = la elige la IA"
+            className="h-9 text-xs"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-[11px]">💡 Tu idea / tema (opcional)</Label>
+        <Textarea
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          placeholder="Escribe la escena que quieres y la IA la convierte en personajes-fruta + prompt foto y vídeo. Ej: una pareja en la cama; ella dice que desde que tienen este ventilador él es un fresco y se va con todas; él dice que es la mejor compra del verano."
+          className="min-h-[72px] text-xs"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Si lo rellenas, la historia se construye sobre tu idea (en lote/AB genera variaciones de ella).
+        </p>
+      </div>
+
+      <Button
+        onClick={() => void onGenerate()}
+        disabled={pending}
+        className="w-full bg-orange-600 hover:bg-orange-700"
+      >
+        {pending ? (
+          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+        ) : (
+          <Sparkles className="mr-1.5 h-4 w-4" />
+        )}
+        Generar prompts (foto + vídeo)
+      </Button>
+    </div>
   );
 }
 
@@ -743,7 +961,18 @@ function ResultItemCard({
             </span>
           )}
         </strong>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
+          {item.image_prompt && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 gap-1 px-2 text-[10px]"
+              onClick={() => copyText(item.image_prompt!, "Prompt imagen")}
+            >
+              <Copy className="h-3 w-3" />
+              🍉 Imagen (Paso 1)
+            </Button>
+          )}
           {!hasSegments && (
             <Button
               size="sm"
@@ -752,7 +981,7 @@ function ResultItemCard({
               onClick={copyPrompt}
             >
               <Copy className="h-3 w-3" />
-              Copiar prompt
+              {item.image_prompt ? "🎬 Vídeo (Paso 2)" : "Copiar prompt"}
             </Button>
           )}
           {item.veo3_photo_filenames.length > 0 && (
