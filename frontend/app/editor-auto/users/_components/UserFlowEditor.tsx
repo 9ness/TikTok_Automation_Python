@@ -318,6 +318,9 @@ function ConfigField({
   if (field.type === "select_sticker") {
     return <StickerPickerField id={id} field={field} value={value} onChange={onChange} />;
   }
+  if (field.type === "multi_select_sticker") {
+    return <MultiStickerPickerField field={field} value={value} onChange={onChange} />;
+  }
   if (field.type === "preset_picker") {
     return (
       <PresetPickerField
@@ -595,6 +598,55 @@ function StickerPickerField({
           <code className="break-all">{stickers.data?.folder}</code>.
         </p>
       )}
+    </div>
+  );
+}
+
+function MultiStickerPickerField({
+  field,
+  value,
+  onChange,
+}: {
+  field: ConfigSchemaField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const stickers = useArrowStickers();
+  const items = stickers.data?.files ?? [];
+  const selected: string[] = Array.isArray(value) ? value.map(String) : [];
+  const toggle = (fn: string) => {
+    onChange(
+      selected.includes(fn)
+        ? selected.filter((x) => x !== fn)
+        : [...selected, fn],
+    );
+  };
+  return (
+    <div className="space-y-1">
+      <Label>{field.label}</Label>
+      <div className="space-y-1 rounded border bg-background p-2">
+        {stickers.isLoading && (
+          <p className="text-xs text-muted-foreground">cargando…</p>
+        )}
+        {!stickers.isLoading && items.length === 0 && (
+          <p className="text-[10px] text-muted-foreground">Sin flechas disponibles.</p>
+        )}
+        {items.map((s) => (
+          <label key={s.filename} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={selected.includes(s.filename)}
+              onChange={() => toggle(s.filename)}
+              className="h-4 w-4"
+            />
+            {prettyFilename(s.filename)}
+          </label>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        Marca varias flechas entre las que el sistema elegirá (por contraste o
+        al azar, según el modo de arriba).
+      </p>
     </div>
   );
 }

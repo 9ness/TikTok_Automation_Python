@@ -72,6 +72,16 @@ class StickerArrowTool:
             # vía GET /api/v1/editor-auto/stickers/arrows. Si está vacío,
             # la tool falla limpio en run().
             "sticker_file": "",
+            # Selección de flecha:
+            #   "fixed"        → usa siempre `sticker_file`.
+            #   "auto_contrast"→ entre `sticker_file` + `candidate_stickers`,
+            #                    elige la que MÁS contrasta con el fondo del
+            #                    vídeo en la zona del CTA (negra sobre fondo
+            #                    claro / roja-clara sobre fondo oscuro).
+            #   "random"       → aleatoria entre el pool de candidatas.
+            "color_mode": "fixed",
+            # Flechas extra candidatas (filenames) para auto_contrast/random.
+            "candidate_stickers": [],
             # Posición del CENTRO del sticker como % del frame. 0,0 = top-left.
             "position_x_pct": 50.0,   # centro horizontal
             "position_y_pct": 80.0,   # parte baja (típico CTA "abajo")
@@ -119,8 +129,15 @@ class StickerArrowTool:
     def config_schema(self) -> list[dict[str, Any]]:
         return [
             {"key": "sticker_file",
-             "label": "Sticker (archivo en Assets/flechas/)",
+             "label": "Flecha por defecto (archivo en Assets/flechas/)",
              "type": "select_sticker"},   # widget custom en frontend
+            {"key": "color_mode",
+             "label": "Selección de flecha (fixed=la elegida · auto_contrast=mejor contraste con el fondo · random=aleatoria entre candidatas)",
+             "type": "select",
+             "options": ["fixed", "auto_contrast", "random"]},
+            {"key": "candidate_stickers",
+             "label": "Flechas candidatas (para auto-contraste / aleatoria)",
+             "type": "multi_select_sticker"},
             {"key": "position_x_pct",
              "label": "Posición X (% desde la izquierda)",
              "type": "float", "min": 0.0, "max": 100.0, "step": 1.0},
@@ -312,6 +329,45 @@ class StickerArrowTool:
             f"(source={source})"
         )
 
+        # 3.b) Selección de flecha por modo (fixed / auto_contrast / random).
+        # `sticker_path` ya apunta a la flecha por defecto; lo sobrescribimos
+        # si el modo lo pide.
+        color_mode = str(config.get("color_mode", "fixed")).lower().strip()
+        if color_mode in ("auto_contrast", "random") and windows:
+            pool: list[str] = [sticker_path]
+            for c in (config.get("candidate_stickers") or []):
+                p = _resolve_sticker_path(str(c))
+                if p and p not in pool:
+                    pool.append(p)
+            if len(pool) > 1:
+                if color_mode == "random":
+                    import random
+                    sticker_path = random.choice(pool)
+                    ctx.on_log(
+                        f"[sticker_arrow] 🎲 random → {os.path.basename(sticker_path)} "
+                        f"(de {len(pool)} candidatas)"
+                    )
+                else:  # auto_contrast
+                    lum = _region_luminance(
+                        input_path,
+                        t=windows[0][0] + 0.1,
+                        px_pct=float(config.get("position_x_pct", 50.0)),
+                        py_pct=float(config.get("position_y_pct", 80.0)),
+                        scale_pct=float(config.get("scale_width_pct", 25.0)),
+                        ctx=ctx,
+                    )
+                    want = "dark" if (lum is not None and lum > 140) else "light"
+                    chosen = next(
+                        (p for p in pool if _arrow_tone(os.path.basename(p)) == want),
+                        None,
+                    ) or pool[0]
+                    sticker_path = chosen
+                    lum_str = f"{lum:.0f}" if lum is not None else "?"
+                    ctx.on_log(
+                        f"[sticker_arrow] 🎨 auto-contraste: fondo luminancia={lum_str}/255 "
+                        f"→ quiero flecha '{want}' → {os.path.basename(sticker_path)}"
+                    )
+
         # 4) FFmpeg overlay
         ctx.on_progress(0.65, "🎬 Aplicando overlay…")
         # `rotation_deg` ∈ [0, 359]. Múltiplos de 90 usan `transpose`
@@ -357,6 +413,61 @@ def _resolve_sticker_path(filename: str) -> str | None:
     if ext not in STICKER_EXTS:
         return None
     return candidate
+
+
+def _arrow_tone(filename: str) -> str:
+    """Infiere el TONO de la flecha por su nombre: 'dark' (negra/oscura) o
+    'light' (roja/blanca/amarilla/clara — destaca sobre fondos oscuros)."""
+    low = filename.lower()
+    dark_kw = ("negr", "black", "oscur", "dark", "gris", "gray", "grey")
+    if any(k in low for k in dark_kw):
+        return "dark"
+    return "light"
+
+
+def _region_luminance(
+    *, input_path: str, t: float, px_pct: float, py_pct: float,
+    scale_pct: float, ctx: ToolContext,
+) -> float | None:
+    """Extrae 1 frame en el segundo `t`, recorta la zona donde irá la flecha
+    (centro px/py, lado ~scale%) y devuelve la luminancia media 0..255.
+    None si falla (el caller cae a la flecha por defecto)."""
+    try:
+        from PIL import Image
+        tmp = os.path.join(
+            ctx.temp_folder, f"arrow_lum_{ctx.job_id}_{int(time.time()*1000)}.png"
+        )
+        os.makedirs(ctx.temp_folder, exist_ok=True)
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-ss", f"{max(0.0, t):.3f}", "-i", input_path,
+            "-frames:v", "1", tmp,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=60)
+        if proc.returncode != 0 or not os.path.isfile(tmp):
+            return None
+        img = Image.open(tmp).convert("RGB")
+        W, H = img.size
+        cx = (px_pct / 100.0) * W
+        cy = (py_pct / 100.0) * H
+        half = max(8.0, (scale_pct / 100.0) * W / 2.0)
+        box = (
+            int(max(0, cx - half)), int(max(0, cy - half)),
+            int(min(W, cx + half)), int(min(H, cy + half)),
+        )
+        crop = img.crop(box)
+        # Media RGB → luminancia perceptual.
+        px = crop.resize((16, 16)).getdata()
+        n = len(px) or 1
+        lum = sum(0.299 * r + 0.587 * g + 0.114 * b for r, g, b in px) / n
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return float(lum)
+    except Exception as e:
+        ctx.on_log(f"[sticker_arrow] luminancia falló ({e}) — uso flecha por defecto.")
+        return None
 
 
 def _probe_duration(path: str) -> float:
