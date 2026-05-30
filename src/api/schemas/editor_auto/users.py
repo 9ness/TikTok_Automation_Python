@@ -54,6 +54,8 @@ class EditorUserResponse(BaseModel):
     daily_video_limit_override: int | None = None
     window_start_hour_override: int | None = None
     window_end_hour_override: int | None = None
+    output_released_on: str | None = None
+    auto_revoke_output_daily: bool = True
     # Billing
     subscription: SubscriptionResponse | None = None
     usage: UsageResponse | None = None

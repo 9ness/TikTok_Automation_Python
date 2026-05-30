@@ -255,6 +255,29 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           )}
           ✅ Marcar vídeos del día como listos (compartir salida + avisar por email)
         </Button>
+        {(() => {
+          const rel = user.data?.output_released_on;
+          const today = new Date().toISOString().slice(0, 10);
+          if (rel && rel === today) {
+            return (
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                🔓 Acceso a salida ACTIVO hoy · se revoca solo al cambiar de día.
+              </p>
+            );
+          }
+          if (rel) {
+            return (
+              <p className="text-[10px] text-muted-foreground">
+                🔒 Acceso de un día anterior — se revocará en el próximo ciclo.
+              </p>
+            );
+          }
+          return (
+            <p className="text-[10px] text-muted-foreground">
+              🔒 Carpeta salida sin acceso compartido ahora mismo.
+            </p>
+          );
+        })()}
 
         {/* Tabs por carpeta */}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">

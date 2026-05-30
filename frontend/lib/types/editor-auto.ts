@@ -172,6 +172,10 @@ export interface EditorUser {
   daily_video_limit_override: number | null;
   window_start_hour_override: number | null;
   window_end_hour_override: number | null;
+  /** Fecha UTC (YYYY-MM-DD) en que se compartió la carpeta salida. Al
+   *  cambiar de día se revoca el acceso si auto_revoke_output_daily. */
+  output_released_on: string | null;
+  auto_revoke_output_daily: boolean;
   subscription: Subscription | null;
   usage: UsageStats | null;
   referral_code: string | null;

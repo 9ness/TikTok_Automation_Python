@@ -242,6 +242,60 @@ def _enqueue_one(user, filename: str) -> bool:
         return False
 
 
+def _utc_today() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _maybe_revoke_output(repo, user, today: str) -> bool:
+    """Si el acceso a `salida` se concedió un día ANTERIOR y el usuario tiene
+    `auto_revoke_output_daily`, revoca ese acceso para sus known_share_emails.
+    Así, al cambiar de día, el admin vuelve a controlar cuándo se ven los
+    vídeos. Devuelve True si revocó algo. Nunca rompe."""
+    if not getattr(user, "auto_revoke_output_daily", True):
+        return False
+    rel = getattr(user, "output_released_on", None)
+    if not rel or rel == today:
+        return False
+    from src.editor_auto.services import drive_sharing
+    if not drive_sharing.is_configured():
+        return False
+    emails = {
+        e.strip().lower()
+        for e in (user.known_share_emails or [])
+        if e and "@" in e
+    }
+    revoked = 0
+    try:
+        shares = drive_sharing.list_shares(user.name)
+        for p in (shares.get("salida") or []):
+            pe = (p.get("email") or "").strip().lower()
+            pid = p.get("id") or p.get("permission_id")
+            if pe and pe in emails and pid:
+                try:
+                    drive_sharing.revoke_permission(user.name, "salida", pid)
+                    revoked += 1
+                except Exception as e:
+                    logger.warning(
+                        "[auto_revoke] revoke %s/%s falló: %s", user.name, pe, e,
+                    )
+    except Exception as e:
+        logger.warning("[auto_revoke] list_shares %s falló: %s", user.name, e)
+        return False
+    # Limpiar el flag (ya no hay acceso del día pendiente de revocar).
+    user.output_released_on = None
+    try:
+        repo.save(user)
+    except Exception:
+        pass
+    if revoked:
+        logger.info(
+            "[auto_revoke] %s: revocado acceso a salida de %d email(s) "
+            "(cambió el día)", user.name, revoked,
+        )
+    return revoked > 0
+
+
 def _scan_once() -> dict[str, int]:
     """Una pasada completa: itera usuarios y encola sus vídeos pendientes.
 
@@ -252,9 +306,17 @@ def _scan_once() -> dict[str, int]:
 
     repo = UserRepo()
     users = repo.list_all() or []
+    today = _utc_today()
     encolados_per_user: dict[str, int] = {}
     for u in users:
-        if u.deleted or not getattr(u, "auto_enqueue", False):
+        if u.deleted:
+            continue
+        # Revocar acceso a salida si cambió el día (independiente de auto_enqueue).
+        try:
+            _maybe_revoke_output(repo, u, today)
+        except Exception as e:
+            logger.warning("[auto_revoke] tick %s falló: %s", u.name, e)
+        if not getattr(u, "auto_enqueue", False):
             continue
         pending = _list_pending_videos(u)
         if not pending:

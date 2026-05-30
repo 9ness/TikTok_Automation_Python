@@ -76,6 +76,13 @@ class EditorUser(BaseModel):
     # del plan. Permite p.ej. "este cliente solo de 10:00 a 15:00".
     window_start_hour_override: int | None = None
     window_end_hour_override: int | None = None
+    # ─── Acceso a la carpeta de salida (controlado por día) ───
+    # Fecha UTC (YYYY-MM-DD) en que se "marcó día listo" y se compartió la
+    # carpeta salida. Si `auto_revoke_output_daily`, al cambiar de día el
+    # watcher revoca el acceso → el admin vuelve a controlar cuándo ve los
+    # vídeos. None = sin acceso compartido pendiente de revocar.
+    output_released_on: str | None = None
+    auto_revoke_output_daily: bool = True
     # Billing — opcional. `subscription=None` significa "user de prueba"
     # (sin cuotas ni ventana horaria). Útil para QA, betas internos, demos.
     subscription: Subscription | None = None

@@ -98,6 +98,8 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         daily_video_limit_override=u.daily_video_limit_override,
         window_start_hour_override=u.window_start_hour_override,
         window_end_hour_override=u.window_end_hour_override,
+        output_released_on=u.output_released_on,
+        auto_revoke_output_daily=u.auto_revoke_output_daily,
         subscription=sub_dto,
         usage=usage_dto,
         referral_code=u.referral_code,
@@ -326,6 +328,12 @@ def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
         count=(payload.count if payload else None),
         folder_link=folder_link,
     )
+    # Registrar el día del acceso para que el watcher lo revoque al cambiar
+    # de día (si auto_revoke_output_daily). Solo si se compartió algo.
+    if result["shared"]:
+        u.output_released_on = datetime.now(timezone.utc).date().isoformat()
+        repo.save(u)
+        result["output_released_on"] = u.output_released_on
     return result
 
 
