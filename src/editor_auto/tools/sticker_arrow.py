@@ -612,7 +612,7 @@ def _apply_overlay_ffmpeg(
         "-stream_loop", "-1", "-i", sticker_path,
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
         "-c:a", "copy",
         "-shortest",        # detener cuando se acaba el input de vídeo
         "-movflags", "+faststart",

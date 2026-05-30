@@ -345,7 +345,7 @@ def _extract_entities(
         raw = result.get("inserts") if isinstance(result, dict) else None
         if not isinstance(raw, list):
             return []
-        out: list[dict] = []
+        parsed: list[dict] = []
         seen: set[str] = set()
         for it in raw:
             if not isinstance(it, dict):
@@ -359,13 +359,14 @@ def _extract_entities(
             except (TypeError, ValueError):
                 continue
             seen.add(label.lower())
-            out.append({
+            parsed.append({
                 "label": label, "search_query": query,
                 "t_start": t_start, "type": str(it.get("type", "")),
             })
-            if len(out) >= max_n:
-                break
-        return out
+        # Ordenar por TIEMPO y capar: con max=1 se queda la PRIMERA mención
+        # del vídeo (ej. "Elsa Pataky" al inicio), no una posterior.
+        parsed.sort(key=lambda x: x["t_start"])
+        return parsed[:max_n]
     except Exception as e:
         ctx.on_log(f"[photo_insert] ⚠️ Detección de entidades falló ({e}).")
         return []
@@ -466,7 +467,7 @@ def _apply_photo_overlays_ffmpeg(
     cmd += [
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
         "-c:a", "copy",
         "-shortest", "-movflags", "+faststart",
         output_path,

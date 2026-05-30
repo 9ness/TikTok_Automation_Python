@@ -74,7 +74,10 @@ class SilenceCutterTool:
         return {
             "vad_enabled": True,
             "min_silence_ms": 500,
-            "padding_ms": 100,
+            # Margen que se conserva alrededor de cada tramo de voz. 150ms
+            # evita comerse el final de las palabras al cortar (antes 100).
+            # Súbelo más (180-220) si aún recorta finales.
+            "padding_ms": 150,
             # Capa de detección por amplitud (ffmpeg silencedetect) — captura
             # "ejem ejem" con boca cerrada y respiraciones que Silero VAD
             # clasifica falsamente como voz. NO usa modelo, solo dB threshold.
@@ -2049,16 +2052,19 @@ def _video_encoder_args() -> list[str]:
             "-preset", "p4",
             "-tune", "hq",
             "-rc", "vbr",
-            "-cq", "22",
+            # cq 19 ≈ crf 18 libx264: prioriza calidad (el cliente no quiere
+            # perder nitidez). Sube algo el peso del archivo, asumido.
+            "-cq", "19",
             "-b:v", "0",
             "-pix_fmt", "yuv420p",
         ]
-    # CPU fallback — veryfast es ~5x más rápido que medium y casi indistinguible
-    # visualmente con crf 22 para contenido TikTok 1080p.
+    # CPU fallback. crf 18 = calidad alta (casi sin pérdida visible) para no
+    # degradar el vídeo del cliente. `medium` da mejor compresión que veryfast
+    # a igual crf, manteniendo la calidad sin disparar demasiado el tiempo.
     return [
         "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "22",
+        "-preset", "medium",
+        "-crf", "18",
         "-pix_fmt", "yuv420p",
     ]
 
