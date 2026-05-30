@@ -704,6 +704,18 @@ class SilenceCutterTool:
                 f"[silence_cutter] 🛡️ Protección de palabras (guard "
                 f"{int(_WORD_GUARD_S*1000)}ms): {n_before} → {len(merged_cuts)} cortes"
             )
+        # Ajuste FINAL al silencio real (amplitud) — el guard por Whisper no
+        # basta porque Whisper cierra palabras hasta ~400ms pronto. La
+        # amplitud dice dónde hay audio de verdad → ningún corte empieza/acaba
+        # dentro de una palabra audible.
+        if amp_cuts:
+            n_pre_amp = len(merged_cuts)
+            merged_cuts = _clamp_cuts_to_silence_edges(merged_cuts, amp_cuts)
+            merged_cuts = _merge_intervals(merged_cuts)
+            ctx.on_log(
+                f"[silence_cutter] 🔊 Bordes ajustados al silencio real "
+                f"(amplitud): {n_pre_amp} → {len(merged_cuts)} cortes"
+            )
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
         keep_intervals = [
             (a, b) for (a, b) in keep_intervals
@@ -1343,6 +1355,38 @@ def _protect_word_boundaries(
         ne = e if next_start is None else min(e, next_start - guard_s)
         if ne - ns > 0.05:
             out.append((ns, ne))
+    return out
+
+
+def _clamp_cuts_to_silence_edges(
+    cuts: list[tuple[float, float]],
+    silences: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Ajusta los BORDES de cada corte al silencio REAL medido por amplitud.
+
+    Los timestamps de Whisper marcan el fin de palabra hasta ~400ms PRONTO
+    (ej. 'resultado' que Whisper cierra en 34.44 pero el audio suena hasta
+    34.88). Por eso el word-guard basado en Whisper no basta. La amplitud
+    (RMS por debajo de umbral) sí dice dónde HAY audio de verdad. Para cada
+    corte que solapa una zona de silencio real, lo recortamos para que NO
+    empiece antes de que el audio sea silencio ni acabe después. Si la
+    amplitud no detectó silencio en esa zona, dejamos el corte como estaba
+    (ya pasó por el word-guard)."""
+    if not cuts or not silences:
+        return cuts
+    sil = _merge_intervals(list(silences))
+    out: list[tuple[float, float]] = []
+    for s, e in cuts:
+        overlapping = [(a, b) for (a, b) in sil if b > s and a < e]
+        if overlapping:
+            sil_lo = min(a for a, _ in overlapping)
+            sil_hi = max(b for _, b in overlapping)
+            ns = max(s, sil_lo)   # no cortar antes de que empiece el silencio real
+            ne = min(e, sil_hi)   # no cortar después de que acabe el silencio real
+            if ne - ns > 0.05:
+                out.append((ns, ne))
+        else:
+            out.append((s, e))
     return out
 
 
