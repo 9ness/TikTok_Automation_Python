@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 
 from datetime import datetime, timezone
 
@@ -269,6 +270,63 @@ def update_user(
         print(f"[editor_auto.users] ensure_user_folders falló en PATCH: {e}")
     repo.save(u)
     return _to_response(u)
+
+
+class ReleaseDayRequest(BaseModel):
+    count: int | None = None          # nº de vídeos del día (para el email)
+    emails: list[str] | None = None   # override; default = known_share_emails
+
+
+@router.post("/{user_id}/release-day")
+def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
+    """Marca los vídeos del día como LISTOS: da acceso a la carpeta de
+    salida a los emails conocidos del usuario y les manda un email
+    'tus vídeos del día están listos'. Idempotente.
+
+    Si Drive no está configurado → solo intenta el email. Si SMTP no está
+    configurado → solo comparte la carpeta. Nunca rompe.
+    """
+    repo = UserRepo()
+    u = repo.get(user_id)
+    if u is None:
+        raise UserNotFoundError(
+            f"Usuario no encontrado: {user_id}", details={"user_id": user_id},
+        )
+    emails = list(payload.emails) if (payload and payload.emails) else list(u.known_share_emails)
+    emails = [e.strip() for e in emails if e and "@" in e]
+    result: dict = {"shared": [], "share_errors": [], "emails": emails, "email": None}
+    if not emails:
+        result["warning"] = (
+            "el usuario no tiene emails conocidos a los que dar acceso "
+            "(comparte la carpeta con su email al menos una vez)"
+        )
+        return result
+
+    from src.editor_auto.services import drive_sharing, email_notify
+
+    folder_link: str | None = None
+    if drive_sharing.is_configured():
+        for email in emails:
+            try:
+                drive_sharing.share_folders(u.name, email, folders=["salida"], notify=False)
+                result["shared"].append(email)
+            except Exception as e:
+                result["share_errors"].append(f"{email}: {e}")
+        try:
+            fid = drive_sharing._subfolder_id(u.name, "salida")  # noqa: SLF001
+            folder_link = f"https://drive.google.com/drive/folders/{fid}"
+        except Exception:
+            folder_link = None
+    else:
+        result["share_errors"].append("Drive sharing no configurado")
+
+    result["email"] = email_notify.send_videos_ready(
+        to=emails,
+        client_name=u.display_name or u.name,
+        count=(payload.count if payload else None),
+        folder_link=folder_link,
+    )
+    return result
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
