@@ -90,8 +90,9 @@ def _reset_if_needed(user: EditorUser) -> bool:
     return modified
 
 
-def _in_window(plan: Plan) -> tuple[bool, int]:
-    """¿Estamos dentro de la ventana horaria del plan?
+def _in_window(plan: Plan, user: EditorUser | None = None) -> tuple[bool, int]:
+    """¿Estamos dentro de la ventana horaria? Usa el override del usuario
+    si está, si no la del plan.
 
     Devuelve (ok, segundos_hasta_proxima_apertura).
     """
@@ -99,6 +100,11 @@ def _in_window(plan: Plan) -> tuple[bool, int]:
     h = now.hour
     start = plan.processing_window_start_hour
     end = plan.processing_window_end_hour
+    if user is not None:
+        if user.window_start_hour_override is not None:
+            start = int(user.window_start_hour_override)
+        if user.window_end_hour_override is not None:
+            end = int(user.window_end_hour_override)
 
     # Caso normal: start < end (ej. 8→18)
     if start < end:
@@ -204,8 +210,13 @@ def check_can_enqueue(
     # Reset diario/mensual
     _reset_if_needed(user)
 
-    # Límite diario
-    if plan.daily_video_limit > 0 and user.usage.daily_videos_used >= plan.daily_video_limit:
+    # Límite diario — el override por usuario gana al del plan.
+    eff_daily = (
+        user.daily_video_limit_override
+        if user.daily_video_limit_override is not None
+        else plan.daily_video_limit
+    )
+    if eff_daily > 0 and user.usage.daily_videos_used >= eff_daily:
         # Cuántos segundos hasta medianoche UTC
         now = _now_utc()
         from datetime import timedelta
@@ -217,7 +228,7 @@ def check_can_enqueue(
             ok=False, kind="daily_limit",
             message=(
                 f"cuota diaria agotada ({user.usage.daily_videos_used}/"
-                f"{plan.daily_video_limit}). Se restablece a medianoche UTC."
+                f"{eff_daily}). Se restablece a medianoche UTC."
             ),
             retry_after_seconds=secs,
         )
@@ -236,7 +247,7 @@ def check_can_enqueue(
         )
 
     # Ventana horaria
-    in_win, retry = _in_window(plan)
+    in_win, retry = _in_window(plan, user)
     if not in_win:
         h = _now_utc().hour
         return QuotaDecision(
@@ -265,7 +276,7 @@ def check_can_enqueue(
         ok=True, kind="ok",
         message=(
             f"plan {plan.slug} — "
-            f"{user.usage.daily_videos_used + 1}/{plan.daily_video_limit or '∞'} hoy"
+            f"{user.usage.daily_videos_used + 1}/{eff_daily or '∞'} hoy"
         ),
     )
 

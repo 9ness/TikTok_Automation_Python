@@ -93,6 +93,10 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         drive_folder=user_folder(u.name) if u.name else None,
         output_folder=user_output_folder(u.name) if u.name else None,
         auto_enqueue=u.auto_enqueue,
+        auto_enqueue_delay_minutes=u.auto_enqueue_delay_minutes,
+        daily_video_limit_override=u.daily_video_limit_override,
+        window_start_hour_override=u.window_start_hour_override,
+        window_end_hour_override=u.window_end_hour_override,
         subscription=sub_dto,
         usage=usage_dto,
         referral_code=u.referral_code,
@@ -244,6 +248,18 @@ def update_user(
         u.tool_flow = _validate_steps(payload.tool_flow)
     if payload.auto_enqueue is not None:
         u.auto_enqueue = bool(payload.auto_enqueue)
+    if payload.auto_enqueue_delay_minutes is not None:
+        u.auto_enqueue_delay_minutes = max(0, int(payload.auto_enqueue_delay_minutes))
+    if payload.daily_video_limit_override is not None:
+        # -1 = limpiar override (usar el del plan).
+        v = int(payload.daily_video_limit_override)
+        u.daily_video_limit_override = None if v < 0 else v
+    if payload.window_start_hour_override is not None:
+        v = int(payload.window_start_hour_override)
+        u.window_start_hour_override = None if v < 0 else max(0, min(23, v))
+    if payload.window_end_hour_override is not None:
+        v = int(payload.window_end_hour_override)
+        u.window_end_hour_override = None if v < 0 else max(0, min(23, v))
     # Asegurar carpetas en Drive — idempotente. Cubre el caso de users
     # creados antes de que `resolve_editor_root` supiera autodetectar el
     # padre del Drive (entonces cayeron al fallback local).

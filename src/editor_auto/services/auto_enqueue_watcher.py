@@ -76,13 +76,19 @@ def _list_pending_videos(user) -> list[dict[str, Any]]:
         return []
     now = time.time()
     is_scripted = _user_has_scripted(user)
+    # Cuenta atrás por usuario: el vídeo debe llevar al menos
+    # `auto_enqueue_delay_minutes` en entrada/ antes de auto-encolarse.
+    # Siempre respeta el min-age global anti-uploads-en-curso. El admin
+    # puede saltarse la cuenta atrás con "Encolar ya" (endpoint manual).
+    user_delay_s = max(0, int(getattr(user, "auto_enqueue_delay_minutes", 0) or 0)) * 60
+    min_age = max(MIN_FILE_AGE_S, user_delay_s)
     out: list[dict[str, Any]] = []
     for f in files:
         mtime = float(f.get("modified_at") or 0.0)
         if mtime <= 0:
             continue
         age = now - mtime
-        if age < MIN_FILE_AGE_S:
+        if age < min_age:
             continue
         # Scripted + sin companion → margen extra para que llegue el .txt
         if is_scripted and not f.get("script") and age < SCRIPTED_NO_COMPANION_AGE_S:

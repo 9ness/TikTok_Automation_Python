@@ -63,6 +63,19 @@ class EditorUser(BaseModel):
     # Drive → en <1 minuto el job arranca. Vídeos con mtime < 30s se
     # ignoran para no encolar uploads aún en progreso.
     auto_enqueue: bool = False
+    # ─── Overrides por usuario (ganan al plan) ───
+    # Cuenta atrás antes de encolar AUTOMÁTICAMENTE un vídeo nuevo: el vídeo
+    # debe llevar al menos estos minutos en la carpeta entrada/ antes de que
+    # el watcher lo coja. El admin puede "Encolar ya" a mano para saltárselo.
+    # 0 = solo el min-age global anti-uploads-en-curso.
+    auto_enqueue_delay_minutes: int = 0
+    # Máximo de vídeos/día para ESTE usuario (cuenta atrás, reset a medianoche
+    # UTC). None = usar el del plan. 0 = ilimitado.
+    daily_video_limit_override: int | None = None
+    # Ventana horaria propia (UTC). None en cualquiera de los dos = usar la
+    # del plan. Permite p.ej. "este cliente solo de 10:00 a 15:00".
+    window_start_hour_override: int | None = None
+    window_end_hour_override: int | None = None
     # Billing — opcional. `subscription=None` significa "user de prueba"
     # (sin cuotas ni ventana horaria). Útil para QA, betas internos, demos.
     subscription: Subscription | None = None

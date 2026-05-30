@@ -33,6 +33,12 @@ class EditorUserUpdateRequest(BaseModel):
     description: str | None = None
     tool_flow: list[ToolStepIn] | None = None
     auto_enqueue: bool | None = None
+    # Overrides por usuario (None = no tocar). Para limpiar un override a
+    # "usar el del plan" se manda -1 en los int-nullable (lo traduce el handler).
+    auto_enqueue_delay_minutes: int | None = None
+    daily_video_limit_override: int | None = None
+    window_start_hour_override: int | None = None
+    window_end_hour_override: int | None = None
 
 
 class EditorUserResponse(BaseModel):
@@ -44,6 +50,10 @@ class EditorUserResponse(BaseModel):
     drive_folder: str | None
     output_folder: str | None
     auto_enqueue: bool = False
+    auto_enqueue_delay_minutes: int = 0
+    daily_video_limit_override: int | None = None
+    window_start_hour_override: int | None = None
+    window_end_hour_override: int | None = None
     # Billing
     subscription: SubscriptionResponse | None = None
     usage: UsageResponse | None = None
