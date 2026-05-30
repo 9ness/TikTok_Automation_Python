@@ -64,9 +64,10 @@ _MIN_REMAINING_S = 0.10        # sub-cuts más cortos tras trim se descartan
 # empezar a menos de esto tras el fin de una palabra ni acabar a menos de esto
 # antes del inicio de la siguiente. Los timestamps de Whisper marcan el fin de
 # palabra un poco PRONTO (se come la consonante final, ej. la "n" de "bien"),
-# así que sin este guard los cortes clipan finales de palabra. 120ms es
-# imperceptible como pausa pero preserva el audio real de la palabra.
-_WORD_GUARD_S = 0.12
+# así que sin este guard los cortes clipan finales de palabra. 150ms es
+# imperceptible como pausa pero preserva el audio real de la palabra con
+# margen de sobra (objetivo: NUNCA comerse una palabra).
+_WORD_GUARD_S = 0.15
 
 
 class SilenceCutterTool:
