@@ -13,6 +13,8 @@ import type {
   AnalyzeUrlPreviewResponse,
   CommitImportedPhotosInput,
   CommitImportedPhotosResponse,
+  ExtendFruitInput,
+  ExtendFruitResponse,
   GenerateFruitInput,
   GenerateFruitResponse,
   GeneratePresetsInput,
@@ -330,6 +332,20 @@ export function useGenerateFruit(productId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
     },
+  });
+}
+
+export function useExtendFruit(productId: string) {
+  return useMutation<
+    ExtendFruitResponse,
+    Error,
+    { presetId: string; input: ExtendFruitInput }
+  >({
+    mutationFn: ({ presetId, input }) =>
+      api.post<ExtendFruitResponse>(
+        `${ROOT}/${productId}/video-presets/${presetId}/extend-fruit`,
+        input,
+      ),
   });
 }
 

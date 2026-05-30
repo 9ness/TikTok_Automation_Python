@@ -30,7 +30,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProduct } from "@/lib/queries/products";
-import { useGenerateFruit, useGenerateVariants } from "@/lib/queries/products";
+import {
+  useExtendFruit,
+  useGenerateFruit,
+  useGenerateVariants,
+} from "@/lib/queries/products";
 import type { VideoPreset } from "@/lib/types/product";
 import { cn } from "@/lib/utils";
 
@@ -92,15 +96,19 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   const product = useProduct(productId);
   const generateVariants = useGenerateVariants(productId);
   const generateFruit = useGenerateFruit(productId);
+  const extendFruit = useExtendFruit(productId);
 
   // Modo de trabajo: "presets" (selecciona presets ya generados) o
   // "fruit" (crea historia(s) de fruta nuevas con Gemini → prompt imagen
   // Nano Banana + prompt vídeo Veo3). El usuario alterna arriba del todo.
   const [workMode, setWorkMode] = useState<"presets" | "fruit">("presets");
-  // Dentro del modo fruta: usar presets de fruta ya creados, o crear nuevos.
-  const [fruitSubMode, setFruitSubMode] = useState<"existing" | "create">(
-    "existing",
-  );
+  // Dentro del modo fruta: usar presets de fruta ya creados, crear nuevos,
+  // o alargar una historia existente a 2/3 partes continuas.
+  const [fruitSubMode, setFruitSubMode] = useState<
+    "existing" | "create" | "extend"
+  >("existing");
+  // Nº de partes al alargar (2 ≈ 20s, 3 ≈ 30s).
+  const [extendParts, setExtendParts] = useState<2 | 3>(2);
   // Sub-opciones de "crear fruta".
   const [fruitGenType, setFruitGenType] = useState<"single" | "batch" | "ab">(
     "single",
@@ -308,8 +316,47 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
     }
   }
 
+  // Alarga la historia de fruta seleccionada a N partes continuas. Devuelve
+  // N pares (image_prompt + veo3_prompt) que el user genera por separado y
+  // une en un vídeo de N×10s. Las mostramos en el dialog como N "partes".
+  async function runExtend() {
+    if (!activePresetId) {
+      toast.error("Elige el preset de fruta a alargar");
+      return;
+    }
+    const base = fruitPresets.find((p) => p.id === activePresetId);
+    if (!base) return;
+    try {
+      toast(`Alargando a ${extendParts} partes (~${extendParts * 10}s)…`);
+      const res = await extendFruit.mutateAsync({
+        presetId: activePresetId,
+        input: { parts: extendParts },
+      });
+      if (res.parts.length === 0) {
+        toast.error("No se pudo alargar la historia, reintenta.");
+        return;
+      }
+      const total = res.parts.length;
+      const items: ResultItem[] = res.parts.map((pt) => ({
+        presetId: `${base.id}-p${pt.part}`,
+        name: `${base.name} · Parte ${pt.part}/${total}${pt.beat ? ` — ${pt.beat}` : ""}`,
+        image_prompt: pt.image_prompt,
+        veo3_prompt: pt.veo3_prompt,
+        veo3_photo_filenames: res.photo_filenames ?? [],
+      }));
+      setResults(items);
+      setResultsTitle(
+        `🍉 Historia alargada · ${total} partes (~${total * 10}s) · únelas en orden`,
+      );
+      toast.success(`${total} partes listas · genera y une en orden`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Alargar historia falló");
+    }
+  }
+
   // ¿Mostrar el flujo de selección de presets? Sí en modo "Usar presets"
-  // y en "Usar fruta → existentes". El modo "crear fruta" muestra FruitBlock.
+  // y en "Usar fruta → existentes". "crear" muestra FruitBlock, "extend"
+  // su propio bloque con grid de selección única.
   const showPicker =
     workMode === "presets" ||
     (workMode === "fruit" && fruitSubMode === "existing");
@@ -367,9 +414,10 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
             </div>
           </div>
 
-          {/* Sub-selector del modo fruta: presets ya creados vs crear nuevo */}
+          {/* Sub-selector del modo fruta: presets ya creados / crear nuevo /
+              alargar una historia a 2-3 partes continuas */}
           {workMode === "fruit" && (
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => setFruitSubMode("existing")}
@@ -381,13 +429,13 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                 )}
               >
                 <strong className="text-[11px]">
-                  🍉 Presets de fruta
+                  🍉 Presets
                   {fruitPresets.length > 0 && (
                     <span className="ml-1 font-normal">({fruitPresets.length})</span>
                   )}
                 </strong>
                 <span className="text-[9px] text-muted-foreground line-clamp-2">
-                  Usar historias de fruta ya generadas
+                  Historias de fruta ya generadas
                 </span>
               </button>
               <button
@@ -400,9 +448,24 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                     : "border-muted hover:border-muted-foreground/40",
                 )}
               >
-                <strong className="text-[11px]">✨ Crear con mi idea</strong>
+                <strong className="text-[11px]">✨ Crear idea</strong>
                 <span className="text-[9px] text-muted-foreground line-clamp-2">
                   Mini-historia nueva (foto + vídeo)
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFruitSubMode("extend")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                  fruitSubMode === "extend"
+                    ? "border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                    : "border-muted hover:border-muted-foreground/40",
+                )}
+              >
+                <strong className="text-[11px]">⏱️ Alargar</strong>
+                <span className="text-[9px] text-muted-foreground line-clamp-2">
+                  A 20s / 30s (2-3 partes)
                 </span>
               </button>
             </div>
@@ -421,6 +484,75 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
               onGenerate={runFruit}
               pending={generateFruit.isPending}
             />
+          )}
+
+          {workMode === "fruit" && fruitSubMode === "extend" && (
+            <div className="space-y-2.5 rounded-md border border-orange-500/40 bg-orange-500/5 p-3">
+              <div className="space-y-1">
+                <Label className="text-xs">1 · Elige la historia de fruta a alargar</Label>
+                {fruitPresets.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                    No hay presets de fruta. Usa <strong>✨ Crear idea</strong>{" "}
+                    para generar alguna primero.
+                  </div>
+                ) : (
+                  <Veo3PresetGrid
+                    presets={fruitPresets}
+                    multiMode={false}
+                    activeId={activePresetId}
+                    selectedIds={batchSelectedIds}
+                    onPickSingle={(id) => setActivePresetId(id)}
+                    onToggleBatch={toggleBatch}
+                    onSelectAll={setAllBatch}
+                  />
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">2 · Duración total</Label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([2, 3] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setExtendParts(n)}
+                      className={cn(
+                        "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                        extendParts === n
+                          ? "border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                          : "border-muted hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <strong className="text-[11px]">
+                        {n === 2 ? "≈ 20 segundos" : "≈ 30 segundos"}
+                      </strong>
+                      <span className="text-[9px] text-muted-foreground">
+                        {n} partes de ~10s
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground">
+                Genera {extendParts} pares (imagen + vídeo) con continuidad entre
+                partes. Crea cada imagen en Nano Banana, anímala en Flow y une los{" "}
+                {extendParts} clips en orden.
+              </p>
+
+              <Button
+                onClick={() => void runExtend()}
+                disabled={extendFruit.isPending || !activePresetId}
+                className="w-full bg-orange-600 hover:bg-orange-700"
+              >
+                {extendFruit.isPending ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                )}
+                Alargar a {extendParts} partes
+              </Button>
+            </div>
           )}
 
           {showPicker && (

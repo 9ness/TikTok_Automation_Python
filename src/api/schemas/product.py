@@ -470,6 +470,29 @@ class GenerateFruitResponse(BaseModel):
     cost_usd: float = 0.0
 
 
+class ExtendFruitRequest(BaseModel):
+    """Alargar una historia de fruta (de ~10s) a N partes continuas que el
+    user genera por separado y une en un solo vídeo de N×10s."""
+    parts: int = Field(default=2, ge=2, le=3)
+
+
+class FruitStoryPart(BaseModel):
+    part: int
+    beat: str = ""
+    image_prompt: str = ""    # keyframe Nano Banana de esta parte
+    veo3_prompt: str = ""     # animación Flow de esta parte
+
+
+class ExtendFruitResponse(BaseModel):
+    product_id: str
+    preset_id: str
+    parts: list[FruitStoryPart] = Field(default_factory=list)
+    # Fotos del producto a adjuntar al generar la imagen de CADA parte
+    # (mismas en todas, para que el bote salga fiel y coherente).
+    photo_filenames: list[str] = Field(default_factory=list)
+    cost_usd: float = 0.0
+
+
 class GeneratePresetsResponse(BaseModel):
     """Respuesta INMEDIATA del endpoint async. Devuelve el `gen_id` para
     que el frontend pueda hacer polling del progreso. Los presets reales

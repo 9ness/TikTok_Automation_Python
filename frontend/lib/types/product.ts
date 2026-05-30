@@ -462,6 +462,27 @@ export interface GenerateFruitResponse {
   cost_usd: number;
 }
 
+export interface ExtendFruitInput {
+  /** 2 (≈20s) o 3 (≈30s) partes continuas. */
+  parts: 2 | 3;
+}
+
+export interface FruitStoryPart {
+  part: number;
+  beat: string;
+  image_prompt: string;
+  veo3_prompt: string;
+}
+
+export interface ExtendFruitResponse {
+  product_id: string;
+  preset_id: string;
+  parts: FruitStoryPart[];
+  /** Fotos del producto a adjuntar en CADA parte (mismas en todas). */
+  photo_filenames: string[];
+  cost_usd: number;
+}
+
 export interface PresetGenStatus {
   gen_id: string;
   product_id: string;

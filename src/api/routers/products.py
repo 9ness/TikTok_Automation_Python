@@ -44,6 +44,9 @@ from src.api.schemas.product import (
     BulkStyleResponse,
     CommitImportedPhotosRequest,
     CommitImportedPhotosResponse,
+    ExtendFruitRequest,
+    ExtendFruitResponse,
+    FruitStoryPart,
     GenerateFruitRequest,
     GenerateFruitResponse,
     GeneratePresetsRequest,
@@ -1683,6 +1686,73 @@ def generate_fruit_presets(
         product_id=product_id,
         created_count=len(presets),
         presets=[_preset_to_response(p) for p in presets],
+        cost_usd=cost,
+    )
+
+
+@router.post(
+    "/{product_id}/video-presets/{preset_id}/extend-fruit",
+    response_model=ExtendFruitResponse,
+)
+def extend_fruit_preset(
+    product_id: str,
+    preset_id: str,
+    payload: ExtendFruitRequest,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> ExtendFruitResponse:
+    """SÍNCRONO. Alarga una historia de fruta (variant=fruit_story) a N
+    partes continuas (~10s c/u) con un call a Gemini. NO persiste — devuelve
+    los N pares (image_prompt + veo3_prompt) para que el user genere cada
+    parte y las una en un vídeo de N×10s. Mismas fotos del producto en todas.
+    """
+    from src.cost_tracking import finalize_and_persist, get_active, start_job
+    from src.tiktok_shop.pipeline.preset_generator import extend_fruit_story
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+
+    preset = next(
+        (p for p in product.video_presets if p.id == preset_id), None,
+    )
+    if preset is None:
+        raise ProductNotFoundError(
+            f"Preset '{preset_id}' no encontrado en el producto.",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+    if getattr(preset, "variant", "") != "fruit_story":
+        raise ValidationError(
+            "Solo se pueden alargar presets de fruta (variant=fruit_story).",
+            details={"preset_id": preset_id, "variant": getattr(preset, "variant", "")},
+        )
+
+    start_job(
+        job_id=f"fruit_ext_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="preset_generation",
+        title=f"Alargar fruta: {product.slug} · {payload.parts} partes",
+        product_id=product_id,
+    )
+    parts: list[dict] = []
+    cost = 0.0
+    try:
+        parts = extend_fruit_story(product, preset, n_parts=payload.parts)
+        job = get_active()
+        cost = float(job.total_usd) if job is not None else 0.0
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+    return ExtendFruitResponse(
+        product_id=product_id,
+        preset_id=preset_id,
+        parts=[FruitStoryPart(**p) for p in parts],
+        photo_filenames=list(preset.veo3_photo_filenames or []),
         cost_usd=cost,
     )
 

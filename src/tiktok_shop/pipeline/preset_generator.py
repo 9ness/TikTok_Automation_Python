@@ -1010,6 +1010,75 @@ def _generate_fruit(
 
 
 # ---------------------------------------------------------------------------
+# Fruit story extender — alarga una historia de 10s a N partes continuas.
+# Devuelve una lista de dicts {part, beat, image_prompt, veo3_prompt} para
+# que el user genere cada parte por separado (imagen → vídeo) y las una.
+# No persiste nada: el caller decide. Nunca lanza por item inválido.
+# ---------------------------------------------------------------------------
+def extend_fruit_story(
+    product: Product,
+    preset: VideoPreset,
+    *,
+    n_parts: int = 2,
+) -> list[dict[str, Any]]:
+    n_parts = max(2, min(3, int(n_parts)))
+    system = load_system_prompt("fruit_story_extender.md")
+    _photo_filenames, photo_paths = _collect_product_photos(product)
+
+    notes = getattr(preset, "notes", "") or ""
+    user_prompt = (
+        f"Contexto del producto:\n"
+        f"- Nombre: {product.name}\n"
+        f"- Marca: {product.brand or '(sin marca)'}\n"
+        f"- Categoría: {product.category}"
+        f"{' / ' + product.subcategory if product.subcategory else ''}\n"
+        f"- Precio real: {_fmt_price(product)}\n"
+        f"{_language_block(product)}\n\n"
+        f"=== HISTORIA ORIGINAL (pensada para 1 clip de ~10s) — ALÁRGALA ===\n"
+        f"- Título: {preset.name}\n"
+        f"- Enfoque: {preset.angle or '(libre)'}\n"
+        f"- Notas (fruta/concepto): {notes or '(sin notas)'}\n"
+        f"- Diálogo/guion original: {preset.voice_script or '(sin guion)'}\n"
+        f"- image_prompt original (keyframe):\n{preset.image_prompt or '(vacío)'}\n"
+        f"- veo3_prompt original (animación):\n{preset.veo3_prompt or '(vacío)'}\n\n"
+        f"Genera EXACTAMENTE {n_parts} partes continuas (~10s cada una) que, "
+        f"unidas en orden, formen un único vídeo de ~{n_parts * 10}s. Conserva "
+        f"la fruta, el casting, la ropa y el escenario de la historia original. "
+        f"El CTA al carrito naranja va SOLO en la última parte. Sigue el schema "
+        f"JSON al pie de la letra."
+    )
+
+    result = generate_json(
+        system_prompt=system, user_prompt=user_prompt,
+        model=DEFAULT_MODEL, temperature=0.9,
+        images=photo_paths or None,
+    )
+    if not isinstance(result, dict):
+        return []
+
+    parts_raw = result.get("parts") or []
+    parts: list[dict[str, Any]] = []
+    for i, p in enumerate(parts_raw):
+        if not isinstance(p, dict):
+            continue
+        try:
+            idx = _clamp_int(p.get("part"), 1, n_parts, i + 1)
+            parts.append({
+                "part": idx,
+                "beat": str(p.get("beat", ""))[:300],
+                "image_prompt": str(p.get("image_prompt", ""))[:2000],
+                "veo3_prompt": str(p.get("veo3_prompt", ""))[:2500],
+            })
+        except Exception as e:
+            logger.warning("[preset_gen.extend] parte inválida ignorada: %s", e)
+            continue
+    # Ordena por índice de parte por si Gemini las devuelve desordenadas y
+    # recorta al número pedido.
+    parts.sort(key=lambda x: x["part"])
+    return parts[:n_parts]
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 def _fmt_price(product: Product) -> str:
