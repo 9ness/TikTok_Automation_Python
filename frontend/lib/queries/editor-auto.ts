@@ -335,15 +335,49 @@ export function useEnqueueEditorAuto() {
   return useMutation<
     EditorAutoEnqueueResponse,
     Error,
-    { userId: string; file: File; script?: string }
+    { userId: string; file: File; script?: string; onProgress?: (pct: number) => void }
   >({
-    mutationFn: ({ userId, file, script }) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("user_id", userId);
-      if (script && script.trim()) fd.append("script", script.trim());
-      return api.post<EditorAutoEnqueueResponse>(ENQUEUE_ROOT, fd);
-    },
+    // XHR (no fetch) para tener progreso REAL de subida — fetch no expone
+    // `upload.onprogress`. Así el operador ve avanzar la barra y no parece
+    // colgado en vídeos pesados.
+    mutationFn: ({ userId, file, script, onProgress }) =>
+      new Promise<EditorAutoEnqueueResponse>((resolve, reject) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("user_id", userId);
+        if (script && script.trim()) fd.append("script", script.trim());
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${api.baseUrl}${ENQUEUE_ROOT}`);
+        const key = process.env.NEXT_PUBLIC_API_KEY;
+        if (key) xhr.setRequestHeader("X-API-Key", key);
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText) as EditorAutoEnqueueResponse);
+            } catch {
+              reject(new Error("Respuesta inválida del servidor"));
+            }
+          } else {
+            let msg = `Error ${xhr.status}`;
+            try {
+              const j = JSON.parse(xhr.responseText);
+              const d = j.detail ?? j.message;
+              msg = typeof d === "string" ? d : (d?.message ?? msg);
+            } catch {
+              /* keep default */
+            }
+            reject(new Error(msg));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Error de red durante la subida"));
+        xhr.send(fd);
+      }),
   });
 }
 

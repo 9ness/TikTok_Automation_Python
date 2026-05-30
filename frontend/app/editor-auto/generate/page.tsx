@@ -39,6 +39,7 @@ export default function EditorAutoGeneratePage() {
   const [file, setFile] = useState<File | null>(null);
   const [script, setScript] = useState<string>("");
   const [lastJob, setLastJob] = useState<EditorAutoEnqueueResponse | null>(null);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
 
   // Mapeo tool_id → metadata (display_name) en cliente para mostrar
   // nombres human-friendly en vez de los slugs técnicos.
@@ -63,14 +64,20 @@ export default function EditorAutoGeneratePage() {
 
   const handleSubmit = async () => {
     if (!userId || !file) return;
-    const res = await enqueue.mutateAsync({
-      userId,
-      file,
-      script: needsScript ? script : undefined,
-    });
-    setLastJob(res);
-    setFile(null);
-    setScript("");
+    setUploadPct(0);
+    try {
+      const res = await enqueue.mutateAsync({
+        userId,
+        file,
+        script: needsScript ? script : undefined,
+        onProgress: (pct) => setUploadPct(pct),
+      });
+      setLastJob(res);
+      setFile(null);
+      setScript("");
+    } finally {
+      setUploadPct(null);
+    }
   };
 
   return (
@@ -164,8 +171,34 @@ export default function EditorAutoGeneratePage() {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              Encolar generación
+              {enqueue.isPending
+                ? uploadPct !== null && uploadPct < 100
+                  ? `Subiendo… ${uploadPct}%`
+                  : "Procesando…"
+                : "Encolar generación"}
             </Button>
+
+            {/* Barra de progreso de subida + aviso de no recargar */}
+            {enqueue.isPending && (
+              <div className="space-y-1.5 rounded-md border border-brand-cyan/30 bg-brand-cyan/5 p-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-gradient-to-r from-brand-cyan to-brand-violet transition-all duration-300"
+                    style={{ width: `${uploadPct ?? 0}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {uploadPct !== null && uploadPct < 100
+                    ? `Subiendo vídeo… ${uploadPct}% · ⚠️ NO recargues ni cierres esta página hasta el 100%.`
+                    : "Vídeo subido — encolando en el servidor…"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  💡 Para vídeos muy pesados, súbelos a la carpeta{" "}
+                  <strong>entrada/</strong> de Drive y encólalos desde el panel
+                  del usuario — ese flujo sí sobrevive a recargas.
+                </p>
+              </div>
+            )}
             {enqueue.isError && (
               <p className="text-xs text-destructive">
                 {(enqueue.error as Error).message}
