@@ -59,6 +59,14 @@ _MERGE_TOLERANCE_S = 0.08      # cuts separados por <80ms se fusionan → sin sl
 # silencios ≥1s que Silero sí detectaba.
 _SAFETY_PAD_S = 0.03
 _MIN_REMAINING_S = 0.10        # sub-cuts más cortos tras trim se descartan
+# Margen INTOCABLE alrededor de cada palabra al aplicar CUALQUIER corte. Tras
+# fusionar todos los cortes (IA, gap, acústica, silero…), ningún corte puede
+# empezar a menos de esto tras el fin de una palabra ni acabar a menos de esto
+# antes del inicio de la siguiente. Los timestamps de Whisper marcan el fin de
+# palabra un poco PRONTO (se come la consonante final, ej. la "n" de "bien"),
+# así que sin este guard los cortes clipan finales de palabra. 120ms es
+# imperceptible como pausa pero preserva el audio real de la palabra.
+_WORD_GUARD_S = 0.12
 
 
 class SilenceCutterTool:
@@ -682,6 +690,19 @@ class SilenceCutterTool:
 
         cuts_only = [(s, e) for (s, e, _) in cuts_with_source]
         merged_cuts = _merge_intervals(cuts_only)
+        # Protección de palabras: ningún corte clipa el final/inicio de una
+        # palabra (guard de _WORD_GUARD_S). Se aplica sobre clean_words
+        # (sin fantasmas) tras fusionar — cubre TODAS las fuentes de corte.
+        n_before = len(merged_cuts)
+        if clean_words:
+            merged_cuts = _protect_word_boundaries(
+                merged_cuts, clean_words, _WORD_GUARD_S,
+            )
+            merged_cuts = _merge_intervals(merged_cuts)  # re-merge por si encogieron
+            ctx.on_log(
+                f"[silence_cutter] 🛡️ Protección de palabras (guard "
+                f"{int(_WORD_GUARD_S*1000)}ms): {n_before} → {len(merged_cuts)} cortes"
+            )
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
         keep_intervals = [
             (a, b) for (a, b) in keep_intervals
@@ -691,6 +712,7 @@ class SilenceCutterTool:
         total_cut_s = sum(b - a for a, b in merged_cuts)
         diagnostic["final"] = {
             "cuts_by_source": _count_by_source(cuts_with_source),
+            "word_guard_ms": int(_WORD_GUARD_S * 1000),
             "n_cuts_merged": len(merged_cuts),
             "n_keep_intervals": len(keep_intervals),
             "total_cut_s": round(total_cut_s, 3),
@@ -1293,6 +1315,36 @@ def _count_by_source(cuts_with_source: list[tuple[float, float, str]]) -> dict[s
 # ---------------------------------------------------------------------------
 # Amplitude-based silence detect (ffmpeg silencedetect)
 # ---------------------------------------------------------------------------
+def _protect_word_boundaries(
+    cuts: list[tuple[float, float]],
+    words: list[dict],
+    guard_s: float,
+) -> list[tuple[float, float]]:
+    """Recorta cada cut para que NUNCA clipe una palabra: el cut no empieza
+    hasta `guard_s` después del fin de la palabra previa, ni acaba hasta
+    `guard_s` antes del inicio de la siguiente. Aplica a la lista YA fusionada
+    de todas las fuentes de corte (IA, gap, acústica, silero…), así ninguna
+    puede comerse el final/inicio de una palabra por timestamps imprecisos
+    de Whisper. Cuts que quedan vacíos tras el guard se descartan."""
+    if not cuts or not words or guard_s <= 0:
+        return cuts
+    ends = sorted(float(w["end"]) for w in words if "end" in w)
+    starts = sorted(float(w["start"]) for w in words if "start" in w)
+    out: list[tuple[float, float]] = []
+    for s, e in cuts:
+        # Fin de palabra más a la derecha que cae antes del final del cut →
+        # el cut debe empezar después de ella + guard.
+        prev_end = max((x for x in ends if x <= e), default=None)
+        # Inicio de palabra más a la izquierda que cae después del inicio del
+        # cut → el cut debe acabar antes de ella - guard.
+        next_start = min((x for x in starts if x >= s), default=None)
+        ns = s if prev_end is None else max(s, prev_end + guard_s)
+        ne = e if next_start is None else min(e, next_start - guard_s)
+        if ne - ns > 0.05:
+            out.append((ns, ne))
+    return out
+
+
 def _compute_inter_word_gap_cuts(
     words: list[dict],
     *,
