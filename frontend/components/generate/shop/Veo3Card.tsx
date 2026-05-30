@@ -97,7 +97,11 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   // "fruit" (crea historia(s) de fruta nuevas con Gemini → prompt imagen
   // Nano Banana + prompt vídeo Veo3). El usuario alterna arriba del todo.
   const [workMode, setWorkMode] = useState<"presets" | "fruit">("presets");
-  // Sub-opciones del modo fruta.
+  // Dentro del modo fruta: usar presets de fruta ya creados, o crear nuevos.
+  const [fruitSubMode, setFruitSubMode] = useState<"existing" | "create">(
+    "existing",
+  );
+  // Sub-opciones de "crear fruta".
   const [fruitGenType, setFruitGenType] = useState<"single" | "batch" | "ab">(
     "single",
   );
@@ -126,10 +130,14 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   const [showOnlyViralReplica, setShowOnlyViralReplica] = useState(false);
 
   const presets = product.data?.video_presets ?? [];
-  // Veo 3 solo lista presets compatibles con `veo3_prompt_only`.
+  // Veo 3 solo lista presets compatibles con `veo3_prompt_only`. Separamos
+  // los presets de FRUTA (variant=fruit_story) del resto: los normales van
+  // al modo "Usar presets" y los de fruta al modo "Usar fruta → existentes".
   const compatibleVeo3 = useMemo(() => {
-    let list = presets.filter((p) =>
-      p.compatible_tiers.includes("veo3_prompt_only"),
+    let list = presets.filter(
+      (p) =>
+        p.compatible_tiers.includes("veo3_prompt_only") &&
+        p.variant !== "fruit_story",
     );
     if (showOnlyExclusive) {
       // Excluye presets que también corren en Seedance — deja solo
@@ -147,6 +155,18 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
     }
     return list;
   }, [presets, showOnlyExclusive, showOnlyViralReplica]);
+
+  // Presets de fruta ya generados para este producto (variant=fruit_story).
+  const fruitPresets = useMemo(
+    () => presets.filter((p) => p.variant === "fruit_story"),
+    [presets],
+  );
+
+  // Lista sobre la que operan el grid + single/batch/variants según el modo.
+  const activeList =
+    workMode === "fruit" && fruitSubMode === "existing"
+      ? fruitPresets
+      : compatibleVeo3;
 
   // Total réplicas virales para mostrar contador en el toggle (también
   // sirve para deshabilitar el checkbox si no hay ninguna).
@@ -179,19 +199,22 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         toast.error("Elige un preset");
         return;
       }
-      const p = compatibleVeo3.find((x) => x.id === activePresetId);
+      const p = activeList.find((x) => x.id === activePresetId);
       if (!p) return;
       setResults([
         {
           presetId: p.id,
           name: p.name,
+          image_prompt: p.image_prompt,
           veo3_prompt: p.veo3_prompt,
           veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
           duration_s: p.duration_s,
         },
       ]);
-      setResultsTitle("🟣 Prompt Veo 3 listo");
+      setResultsTitle(
+        workMode === "fruit" ? "🍉 Prompt de fruta listo" : "🟣 Prompt Veo 3 listo",
+      );
       return;
     }
     if (mode === "batch") {
@@ -199,18 +222,23 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         toast.error("Marca al menos 1 preset");
         return;
       }
-      const items: ResultItem[] = compatibleVeo3
+      const items: ResultItem[] = activeList
         .filter((p) => batchSelectedIds.has(p.id))
         .map((p) => ({
           presetId: p.id,
           name: p.name,
+          image_prompt: p.image_prompt,
           veo3_prompt: p.veo3_prompt,
           veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
           duration_s: p.duration_s,
         }));
       setResults(items);
-      setResultsTitle(`🟣 ${items.length} prompts Veo 3 listos`);
+      setResultsTitle(
+        workMode === "fruit"
+          ? `🍉 ${items.length} prompts de fruta`
+          : `🟣 ${items.length} prompts Veo 3 listos`,
+      );
       return;
     }
     // variants
@@ -280,7 +308,12 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
     }
   }
 
-  const hasPresets = compatibleVeo3.length > 0;
+  // ¿Mostrar el flujo de selección de presets? Sí en modo "Usar presets"
+  // y en "Usar fruta → existentes". El modo "crear fruta" muestra FruitBlock.
+  const showPicker =
+    workMode === "presets" ||
+    (workMode === "fruit" && fruitSubMode === "existing");
+  const hasPresets = activeList.length > 0;
 
   return (
     <>
@@ -326,15 +359,56 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                     : "border-muted hover:border-muted-foreground/40",
                 )}
               >
-                <strong className="text-[11px]">🍉 Crear fruta</strong>
+                <strong className="text-[11px]">🍉 Usar fruta</strong>
                 <span className="text-[9px] text-muted-foreground line-clamp-2">
-                  Mini-historia viral nueva (foto + vídeo)
+                  Presets de fruta o crear con tu idea
                 </span>
               </button>
             </div>
           </div>
 
+          {/* Sub-selector del modo fruta: presets ya creados vs crear nuevo */}
           {workMode === "fruit" && (
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFruitSubMode("existing")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                  fruitSubMode === "existing"
+                    ? "border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                    : "border-muted hover:border-muted-foreground/40",
+                )}
+              >
+                <strong className="text-[11px]">
+                  🍉 Presets de fruta
+                  {fruitPresets.length > 0 && (
+                    <span className="ml-1 font-normal">({fruitPresets.length})</span>
+                  )}
+                </strong>
+                <span className="text-[9px] text-muted-foreground line-clamp-2">
+                  Usar historias de fruta ya generadas
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFruitSubMode("create")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-md border-2 px-2 py-2 text-left text-xs transition-colors",
+                  fruitSubMode === "create"
+                    ? "border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300"
+                    : "border-muted hover:border-muted-foreground/40",
+                )}
+              >
+                <strong className="text-[11px]">✨ Crear con mi idea</strong>
+                <span className="text-[9px] text-muted-foreground line-clamp-2">
+                  Mini-historia nueva (foto + vídeo)
+                </span>
+              </button>
+            </div>
+          )}
+
+          {workMode === "fruit" && fruitSubMode === "create" && (
             <FruitBlock
               genType={fruitGenType}
               setGenType={setFruitGenType}
@@ -349,7 +423,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
             />
           )}
 
-          {workMode === "presets" && (
+          {showPicker && (
           <>
           {/* PASO 1 · Modo */}
           <div className="space-y-1.5">
@@ -395,8 +469,9 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                   : "Elige el preset"}
             </Label>
 
-            {/* Toggles de filtrado (mismos que en Auto vídeo, adaptados a Veo 3) */}
-            {presets.length > 0 && (
+            {/* Toggles de filtrado (mismos que en Auto vídeo, adaptados a Veo 3).
+                Solo en modo "Usar presets" — no aplican a presets de fruta. */}
+            {workMode === "presets" && presets.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 text-[11px]">
                 <label className="flex cursor-pointer items-center gap-1.5">
                   <input
@@ -431,7 +506,13 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
 
             {!hasPresets ? (
               <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs">
-                {showOnlyViralReplica && viralReplicaCount === 0 ? (
+                {workMode === "fruit" ? (
+                  <>
+                    Este producto no tiene presets de fruta todavía. Usa{" "}
+                    <strong>✨ Crear con mi idea</strong> arriba para generar
+                    historias de fruta nuevas (se guardan aquí).
+                  </>
+                ) : showOnlyViralReplica && viralReplicaCount === 0 ? (
                   <>
                     No hay réplicas virales compatibles con Veo 3 en este
                     producto. Genera una desde el tab{" "}
@@ -454,7 +535,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
               </div>
             ) : (
               <Veo3PresetGrid
-                presets={compatibleVeo3}
+                presets={activeList}
                 multiMode={mode === "batch"}
                 activeId={activePresetId}
                 selectedIds={batchSelectedIds}
@@ -528,12 +609,14 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                 Generar {variantsN} variantes A/B
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              <span className="ml-1 hidden sm:inline">
-                {expanded ? "Ocultar" : "Avanzado"}
-              </span>
-            </Button>
+            {workMode === "presets" && (
+              <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
+                {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <span className="ml-1 hidden sm:inline">
+                  {expanded ? "Ocultar" : "Avanzado"}
+                </span>
+              </Button>
+            )}
           </div>
           </>
           )}
