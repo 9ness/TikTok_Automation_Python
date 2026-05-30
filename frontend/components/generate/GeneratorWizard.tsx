@@ -194,39 +194,48 @@ export function GeneratorWizard() {
     setStep((s) => Math.max(0, s - 1));
   }
 
+  // Modo fruta → endpoint dedicado (genera image+video prompts, guarda
+  // como presets fruta del producto y los muestra). single/batch/ab.
+  // Reutilizable: botón directo en el paso Tier + submit del último paso.
+  async function generateFruitPrompts() {
+    if (!form.productId) {
+      toast.error("Selecciona un producto primero (paso 1).");
+      return;
+    }
+    try {
+      const res = await generateFruit.mutateAsync({
+        generation: form.fruitGenType,
+        n: form.fruitGenType === "batch" ? 10 : form.fruitGenType === "ab" ? 4 : 1,
+        fruit_hint: form.fruitHint.trim() || null,
+        narrative_angle: form.narrativeAngle || null,
+        custom_theme: form.fruitTheme.trim() || null,
+      });
+      if (res.created_count === 0) {
+        toast.error("No se generó ninguna historia de fruta, reintenta.");
+      } else {
+        const label =
+          form.fruitGenType === "batch"
+            ? "Lote"
+            : form.fruitGenType === "ab"
+              ? "Variantes A/B"
+              : "1 historia";
+        setFruitModal({
+          presets: res.presets,
+          meta: `🍉 ${label} · ${res.created_count} guardada(s) en Presets · ≈ $${res.cost_usd.toFixed(4)}`,
+        });
+        toast.success(`${res.created_count} historia(s) fruta · guardadas en Presets`);
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Error generando fruta.");
+    }
+  }
+
   async function submit() {
     // Veo3 / Nano Banana → endpoints síncronos, NO encolar. Mostramos el
     // prompt en modal copyable. El resto (Atlas Seedance) sí pasa por la cola.
     if (form.tier === "veo3_prompt_only") {
-      // Modo fruta → endpoint dedicado (genera image+video prompts, guarda
-      // como presets fruta del producto y los muestra). single/batch/ab.
       if (form.fruitMode) {
-        try {
-          const res = await generateFruit.mutateAsync({
-            generation: form.fruitGenType,
-            n: form.fruitGenType === "batch" ? 10 : form.fruitGenType === "ab" ? 4 : 1,
-            fruit_hint: form.fruitHint.trim() || null,
-            narrative_angle: form.narrativeAngle || null,
-            custom_theme: form.fruitTheme.trim() || null,
-          });
-          if (res.created_count === 0) {
-            toast.error("No se generó ninguna historia de fruta, reintenta.");
-          } else {
-            const label =
-              form.fruitGenType === "batch"
-                ? "Lote"
-                : form.fruitGenType === "ab"
-                  ? "Variantes A/B"
-                  : "1 historia";
-            setFruitModal({
-              presets: res.presets,
-              meta: `🍉 ${label} · ${res.created_count} guardada(s) en Presets · ≈ $${res.cost_usd.toFixed(4)}`,
-            });
-            toast.success(`${res.created_count} historia(s) fruta · guardadas en Presets`);
-          }
-        } catch (err) {
-          toast.error(err instanceof ApiError ? err.message : "Error generando fruta.");
-        }
+        await generateFruitPrompts();
         return;
       }
       try {
@@ -302,7 +311,14 @@ export function GeneratorWizard() {
       <Card>
         <CardContent className="space-y-4 p-6">
           {step === 0 && <StepUserProduct form={form} patch={patch} />}
-          {step === 1 && <StepTier form={form} patch={patch} />}
+          {step === 1 && (
+            <StepTier
+              form={form}
+              patch={patch}
+              onGenerateFruit={generateFruitPrompts}
+              fruitPending={generateFruit.isPending}
+            />
+          )}
           {step === 2 && <StepStrategy form={form} patch={patch} />}
           {step === 3 && <StepDuration form={form} patch={patch} />}
           {step === 4 && <StepPhotos form={form} patch={patch} />}
@@ -628,35 +644,176 @@ function pickProductCoverUrl(product: Product): string | null {
   return `${base}/api/v1/products/${product.id}/photos/${encodeURIComponent(photo.filename)}/file${qs}`;
 }
 
-function StepTier({ form, patch }: StepProps) {
+function StepTier({
+  form,
+  patch,
+  onGenerateFruit,
+  fruitPending,
+}: StepProps & {
+  onGenerateFruit?: () => void | Promise<void>;
+  fruitPending?: boolean;
+}) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {TIERS.map((t) => {
-        const active = form.tier === t.value;
-        return (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => {
-              patch("tier", t.value);
-              const allowed = RESOLUTIONS_BY_TIER[t.value] ?? ["720p"];
-              if (!allowed.includes(form.resolution)) {
-                patch("resolution", allowed[0]!);
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        {TIERS.map((t) => {
+          const active = form.tier === t.value;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => {
+                patch("tier", t.value);
+                const allowed = RESOLUTIONS_BY_TIER[t.value] ?? ["720p"];
+                if (!allowed.includes(form.resolution)) {
+                  patch("resolution", allowed[0]!);
+                }
+              }}
+              className={cn(
+                "rounded-md border p-4 text-left transition-colors",
+                active ? "border-primary bg-primary/5" : "hover:bg-accent/50",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">{t.label}</span>
+                <Badge variant="outline">{t.cost}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{t.tooltip}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {form.tier === "veo3_prompt_only" && (
+        <FruitModeBlock
+          form={form}
+          patch={patch}
+          onGenerate={onGenerateFruit}
+          pending={fruitPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// Bloque de modo fruta (selector normal/fruta + opciones + "Tu idea" +
+// botón generar). Vive en el paso Tier para que el user lo configure y
+// genere los prompts (foto Nano Banana + vídeo Veo3) sin recorrer el resto
+// del wizard. `onGenerate` dispara la generación síncrona.
+function FruitModeBlock({
+  form,
+  patch,
+  onGenerate,
+  pending,
+}: StepProps & {
+  onGenerate?: () => void | Promise<void>;
+  pending?: boolean;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border border-orange-500/40 bg-orange-500/5 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <Label className="text-xs font-semibold">¿Qué quieres hacer?</Label>
+          <p className="text-[10px] text-muted-foreground">
+            {form.fruitMode
+              ? "🍉 Modo fruta: mini-historia viral con cabezas de fruta + drama/chisme + CTA."
+              : "Modo normal: prompt Veo3 a partir de un hook (continúa con «Siguiente»)."}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground">Normal</span>
+          <Switch
+            checked={form.fruitMode}
+            onCheckedChange={(v) => patch("fruitMode", v)}
+          />
+          <span className="text-[10px] font-medium">🍉 Frutas</span>
+        </div>
+      </div>
+      {form.fruitMode && (
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label className="text-[10px]">Generar</Label>
+            <Select
+              value={form.fruitGenType}
+              onValueChange={(v) =>
+                patch("fruitGenType", v as WizardForm["fruitGenType"])
               }
-            }}
-            className={cn(
-              "rounded-md border p-4 text-left transition-colors",
-              active ? "border-primary bg-primary/5" : "hover:bg-accent/50",
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{t.label}</span>
-              <Badge variant="outline">{t.cost}</Badge>
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="single">1 historia</SelectItem>
+                <SelectItem value="batch">📦 Lote (10 historias)</SelectItem>
+                <SelectItem value="ab">🔀 Variantes A/B (4 · mismo enfoque, distintos hooks)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-[10px]">Enfoque</Label>
+              <Select
+                value={form.narrativeAngle || "auto"}
+                onValueChange={(v) =>
+                  patch("narrativeAngle", v === "auto" ? "" : v)
+                }
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">🤖 Que elija la IA</SelectItem>
+                  <SelectItem value="infiel">💔 Infiel / drama de pareja</SelectItem>
+                  <SelectItem value="chismoso">👀 Chismoso</SelectItem>
+                  <SelectItem value="dramatico">🎭 Dramático</SelectItem>
+                  <SelectItem value="comico-burla">😂 Cómico / burla</SelectItem>
+                  <SelectItem value="aspiracional">✨ Aspiracional</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t.tooltip}</p>
-          </button>
-        );
-      })}
+            <div className="space-y-1">
+              <Label className="text-[10px]">Fruta (opcional)</Label>
+              <Input
+                value={form.fruitHint}
+                onChange={(e) => patch("fruitHint", e.target.value)}
+                placeholder="vacío = la elige la IA"
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">💡 Tu idea / tema (opcional)</Label>
+            <Textarea
+              value={form.fruitTheme}
+              onChange={(e) => patch("fruitTheme", e.target.value)}
+              placeholder="Escribe la escena que quieres y la IA la convierte en personajes-fruta + prompt foto y vídeo. Ej: una pareja en la cama; ella dice que desde que tienen este ventilador él es un fresco y se va con todas; él dice que es la mejor compra del verano."
+              className="min-h-[72px] text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Si lo rellenas, la historia se construye sobre tu idea (en lote/AB genera variaciones de ella).
+            </p>
+          </div>
+          {onGenerate && (
+            <Button
+              className="w-full"
+              onClick={() => void onGenerate()}
+              disabled={pending || !form.productId}
+            >
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Generar prompts (foto + vídeo)
+            </Button>
+          )}
+          {!form.productId && (
+            <p className="text-[10px] text-amber-600">
+              Selecciona cuenta y producto en el paso 1 antes de generar.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -902,86 +1059,9 @@ function StepReview({ form, patch }: StepProps) {
         </div>
       )}
 
-      {form.tier === "veo3_prompt_only" && (
-        <div className="space-y-3 rounded-md border border-orange-500/40 bg-orange-500/5 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <Label className="text-xs font-semibold">🍉 Personaje de fruta</Label>
-              <p className="text-[10px] text-muted-foreground">
-                Mini-historia viral: cabezas de fruta + drama/chisme + CTA al carrito.
-              </p>
-            </div>
-            <Switch
-              checked={form.fruitMode}
-              onCheckedChange={(v) => patch("fruitMode", v)}
-            />
-          </div>
-          {form.fruitMode && (
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <Label className="text-[10px]">Generar</Label>
-                <Select
-                  value={form.fruitGenType}
-                  onValueChange={(v) =>
-                    patch("fruitGenType", v as WizardForm["fruitGenType"])
-                  }
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single">1 historia</SelectItem>
-                    <SelectItem value="batch">📦 Lote (10 historias)</SelectItem>
-                    <SelectItem value="ab">🔀 Variantes A/B (4 · mismo enfoque, distintos hooks)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-[10px]">Enfoque</Label>
-                <Select
-                  value={form.narrativeAngle || "auto"}
-                  onValueChange={(v) =>
-                    patch("narrativeAngle", v === "auto" ? "" : v)
-                  }
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">🤖 Que elija la IA</SelectItem>
-                    <SelectItem value="infiel">💔 Infiel / drama de pareja</SelectItem>
-                    <SelectItem value="chismoso">👀 Chismoso</SelectItem>
-                    <SelectItem value="dramatico">🎭 Dramático</SelectItem>
-                    <SelectItem value="comico-burla">😂 Cómico / burla</SelectItem>
-                    <SelectItem value="aspiracional">✨ Aspiracional</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px]">Fruta (opcional)</Label>
-                <Input
-                  value={form.fruitHint}
-                  onChange={(e) => patch("fruitHint", e.target.value)}
-                  placeholder="vacío = la elige la IA"
-                  className="h-9 text-xs"
-                />
-              </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px]">💡 Tu idea / tema (opcional)</Label>
-                <Textarea
-                  value={form.fruitTheme}
-                  onChange={(e) => patch("fruitTheme", e.target.value)}
-                  placeholder="Escribe la escena que quieres y la IA la convierte en personajes-fruta + prompt foto y vídeo. Ej: una pareja en la cama; ella dice que desde que tienen este ventilador él es un fresco y se va con todas; él dice que es la mejor compra del verano."
-                  className="min-h-[72px] text-xs"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Si lo rellenas, la historia se construye sobre tu idea (en lote/AB genera variaciones de ella).
-                </p>
-              </div>
-            </div>
-          )}
+      {form.tier === "veo3_prompt_only" && form.fruitMode && (
+        <div className="rounded-md border border-orange-500/40 bg-orange-500/5 p-3 text-[10px] text-muted-foreground">
+          🍉 Modo fruta activo — configúralo y genera en el paso «Tier».
         </div>
       )}
 
