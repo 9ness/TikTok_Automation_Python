@@ -456,6 +456,9 @@ class GenerateFruitRequest(BaseModel):
     n: int = Field(default=10, ge=1, le=20)
     fruit_hint: str | None = None        # fruta base (forzada)
     narrative_angle: str | None = None   # enfoque base (dramatico/chismoso/…)
+    # Idea/escena escrita por el user. Si viene, la historia se construye
+    # sobre este tema (convertido a personajes-fruta) en vez de inventar.
+    custom_theme: str | None = Field(default=None, max_length=2000)
     # Por defecto reemplaza las fruta anteriores (source=fruit_story).
     replace_existing: bool = True
 

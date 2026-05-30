@@ -450,6 +450,8 @@ export interface GenerateFruitInput {
   n?: number;
   fruit_hint?: string | null;
   narrative_angle?: string | null;
+  /** Idea/escena escrita por el user; la historia se construye sobre esto. */
+  custom_theme?: string | null;
   replace_existing?: boolean;
 }
 

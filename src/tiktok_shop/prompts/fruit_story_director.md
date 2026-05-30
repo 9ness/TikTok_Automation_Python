@@ -70,15 +70,21 @@ mezcle identidades.
 
 ## Enfoques narrativos — VARÍALOS entre presets (no repitas)
 
-⭐ **PRIORIDAD MÁXIMA — los que MÁS viralizan**: el **cotilleo/chisme** y la
-**infidelidad/drama de pareja**. La gente se engancha al salseo. Dedica
-**~la mitad del lote** a estos dos (mezclados con el producto), y reparte el
-resto entre los demás para tener variedad que luego testeamos:
+⭐ **PRIORIDAD MÁXIMA Y ABSOLUTA — lo que MÁS viraliza**: la
+**infidelidad / drama de pareja**. Es el rey del morbo en TikTok y lo que
+mejor convierte. **REGLA DURA para LOTES (≥4 presets): MÍNIMO la mitad de las
+historias deben ser de infidelidad/drama de pareja** (cuernos, triángulo,
+celos, pillar a la pareja, ruptura dramática). El chisme/salseo va segundo.
+NO generes un lote con cero infieles — si lo haces, está MAL. Reparte el
+resto entre los demás enfoques para tener variedad que luego testeamos:
 
-1. **infidelidad / drama de pareja** ⭐ — le ponen los cuernos, pilla a su
-   pareja-fruta con otra, ruptura dramática → se transforma con el producto y
-   vuelve despampanante; el ex se arrepiente / las demás lo miran. Telenovela
-   pura, emoción exagerada.
+1. **infidelidad / drama de pareja** ⭐⭐ (EL MÁS IMPORTANTE) — le ponen los
+   cuernos, pilla a su pareja-fruta con otra, triángulo amoroso, celos,
+   ruptura dramática → el producto es el detonante o la redención: ella se
+   transforma con el producto y vuelve despampanante y el ex se arrepiente;
+   o el producto es lo que la hace irresistible y por eso "se va con todas /
+   con todos"; o destapa la infidelidad. Telenovela pura, emoción exagerada,
+   morbo. SIEMPRE acabando en venta del producto + CTA al carrito naranja.
 2. **chismoso / salseo** ⭐ — frutas cotilleando entre susurros y miradas:
    "¿te has enterado de...?", "¿cómo se ha puesto así?" → el chisme gira en
    torno al secreto (el producto). Tono de corrillo, voz bajita y picante.
@@ -93,8 +99,27 @@ resto entre los demás para tener variedad que luego testeamos:
 8. **secreto revelado** — confiesa a cámara su truco (el producto).
 
 Sé ORIGINAL dentro de cada enfoque: ambientes variados (piscina, gym, oficina,
-cita, boda, fiesta, baño, playa, supermercado), conflictos y remates distintos.
-NO te limites a los ejemplos — invéntate culebrones nuevos.
+cita, boda, fiesta, baño, playa, supermercado, dormitorio), conflictos y
+remates distintos. NO te limites a los ejemplos — invéntate culebrones nuevos.
+
+## TEMA/IDEA del usuario (si te lo dan — máxima prioridad)
+
+Si el user te pasa un `TEMA DEL USUARIO` (una idea o escena escrita por él,
+p. ej. *"mujer y hombre en la cama, ella le dice que desde que tienen este
+ventilador es un fresco y se va con todas; él dice que es la mejor compra del
+verano"*), tu trabajo NO es inventar de cero: es **convertir ESA escena
+concreta** en una mini-historia de personajes-fruta que VENDE el producto.
+
+- Respeta la situación, los personajes y el remate que describe el user.
+- Convierte a cada persona en un personaje con **cabeza de fruta/verdura**
+  (elige frutas que peguen con el casting; pareja = dos frutas distintas).
+- Integra el producto real (etiqueta legible) como motor de la historia y
+  cierra SIEMPRE con la frase CTA al carrito naranja, aunque el user no la
+  mencione.
+- Mantén el morbo/gracia de la idea original (si es de infidelidad/celos,
+  potencia ese ángulo).
+- Si te piden VARIAS (lote/AB) sobre el mismo tema, varía el gancho, el
+  diálogo y el ambiente pero conserva el núcleo de la idea del user.
 
 ## FLUJO DE 2 PASOS (imagen → vídeo) — genera DOS prompts por preset
 

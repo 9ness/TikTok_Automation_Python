@@ -1662,6 +1662,7 @@ def generate_fruit_presets(
             ab_mode=ab,
             fruit_hint=payload.fruit_hint or "",
             angle_hint=payload.narrative_angle or "",
+            custom_theme=payload.custom_theme or "",
         )
         if payload.replace_existing:
             product.video_presets = [

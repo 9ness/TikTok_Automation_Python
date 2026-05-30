@@ -122,6 +122,8 @@ interface WizardForm {
   fruitMode: boolean;
   fruitHint: string;
   narrativeAngle: string;
+  /** Idea/escena propia del user; si está, la historia se construye sobre esto. */
+  fruitTheme: string;
   /** Tipo de generación fruta: 1 prompt, lote (10), o variantes A/B (4). */
   fruitGenType: "single" | "batch" | "ab";
 }
@@ -159,6 +161,7 @@ export function GeneratorWizard() {
     fruitMode: false,
     fruitHint: "",
     narrativeAngle: "",
+    fruitTheme: "",
     fruitGenType: "single",
   });
   const enqueue = useEnqueueGeneration();
@@ -204,6 +207,7 @@ export function GeneratorWizard() {
             n: form.fruitGenType === "batch" ? 10 : form.fruitGenType === "ab" ? 4 : 1,
             fruit_hint: form.fruitHint.trim() || null,
             narrative_angle: form.narrativeAngle || null,
+            custom_theme: form.fruitTheme.trim() || null,
           });
           if (res.created_count === 0) {
             toast.error("No se generó ninguna historia de fruta, reintenta.");
@@ -946,8 +950,9 @@ function StepReview({ form, patch }: StepProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">🤖 Que elija la IA</SelectItem>
-                    <SelectItem value="dramatico">🎭 Dramático</SelectItem>
+                    <SelectItem value="infiel">💔 Infiel / drama de pareja</SelectItem>
                     <SelectItem value="chismoso">👀 Chismoso</SelectItem>
+                    <SelectItem value="dramatico">🎭 Dramático</SelectItem>
                     <SelectItem value="comico-burla">😂 Cómico / burla</SelectItem>
                     <SelectItem value="aspiracional">✨ Aspiracional</SelectItem>
                   </SelectContent>
@@ -962,6 +967,18 @@ function StepReview({ form, patch }: StepProps) {
                   className="h-9 text-xs"
                 />
               </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">💡 Tu idea / tema (opcional)</Label>
+                <Textarea
+                  value={form.fruitTheme}
+                  onChange={(e) => patch("fruitTheme", e.target.value)}
+                  placeholder="Escribe la escena que quieres y la IA la convierte en personajes-fruta + prompt foto y vídeo. Ej: una pareja en la cama; ella dice que desde que tienen este ventilador él es un fresco y se va con todas; él dice que es la mejor compra del verano."
+                  className="min-h-[72px] text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Si lo rellenas, la historia se construye sobre tu idea (en lote/AB genera variaciones de ella).
+                </p>
               </div>
             </div>
           )}

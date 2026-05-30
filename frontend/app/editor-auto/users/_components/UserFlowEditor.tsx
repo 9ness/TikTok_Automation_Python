@@ -3,15 +3,7 @@
 import { ArrowDown, ChevronDown, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import {
-  StickerPreview9x16,
-  type StickerPreviewConfig,
-} from "@/components/editor-auto/StickerPreview9x16";
-import {
-  PhotoPreview9x16,
-  type PhotoPreviewConfig,
-} from "@/components/editor-auto/PhotoPreview9x16";
-import { SubsPreview9x16, type SubsPreviewConfig } from "@/components/editor-auto/SubsPreview9x16";
+import { FlowPreview9x16 } from "@/components/editor-auto/FlowPreview9x16";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +92,16 @@ export function UserFlowEditor({ userId }: { userId: string }) {
     );
   };
 
+  // Update por tool_id — lo usa el preview centralizado (cada tool visual
+  // aparece una sola vez en el flujo).
+  const updateConfigByToolId = (toolId: string, key: string, value: unknown) => {
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.tool_id === toolId ? { ...s, config: { ...s.config, [key]: value } } : s,
+      ),
+    );
+  };
+
   const applyPresetToStep = (idx: number, presetCfg: Record<string, unknown>) => {
     setSteps(
       steps.map((s, i) =>
@@ -155,6 +157,16 @@ export function UserFlowEditor({ userId }: { userId: string }) {
               )}
             </div>
           </div>
+
+          {/* Previsualización 9:16 centralizada de TODO el flujo */}
+          {steps.some((s) => s.enabled) && (
+            <div className="rounded-md border bg-muted/20 p-3">
+              <FlowPreview9x16
+                steps={steps}
+                onConfigChange={updateConfigByToolId}
+              />
+            </div>
+          )}
 
           {steps.length > 0 && (
             <div className="space-y-3">
@@ -238,50 +250,8 @@ function StepCard({
   onApplyPreset: (config: Record<string, unknown>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // Si la tool es `subs_auto`, las claves de su config_schema coinciden con
-  // las que pinta el preview (font_path, highlight_*, text_color, etc.) →
-  // basta con castear `step.config` a `SubsPreviewConfig`.
-  const isSubsAuto = tool.tool_id === "subs_auto";
-  const subsPreviewConfig: SubsPreviewConfig | null = isSubsAuto
-    ? {
-        font_path: String(step.config.font_path ?? ""),
-        highlight_mode: String(step.config.highlight_mode ?? "pill"),
-        highlight_color: String(step.config.highlight_color ?? "#BB0808"),
-        text_color: String(step.config.text_color ?? "#FFFFFF"),
-        stroke_color: String(step.config.stroke_color ?? "#000000"),
-        stroke_width: Number(step.config.stroke_width ?? 3),
-        case_mode: String(step.config.case_mode ?? "UPPERCASE"),
-        font_scale: Number(step.config.font_scale ?? 0.045),
-        max_words: Number(step.config.max_words ?? 3),
-        y_position: Number(step.config.y_position ?? 0.78),
-        max_width: Number(step.config.max_width ?? 0.85),
-      }
-    : null;
-  const isStickerArrow = tool.tool_id === "sticker_arrow";
-  const stickerPreviewConfig: StickerPreviewConfig | null = isStickerArrow
-    ? {
-        sticker_file: String(step.config.sticker_file ?? ""),
-        position_x_pct: Number(step.config.position_x_pct ?? 50),
-        position_y_pct: Number(step.config.position_y_pct ?? 80),
-        scale_width_pct: Number(step.config.scale_width_pct ?? 25),
-        // `rotation_deg` puede llegar como string del select; normalizamos
-        // a number aquí para que el preview CSS lo aplique sin parsear.
-        rotation_deg: Number(step.config.rotation_deg ?? 0),
-        flip_horizontal: Boolean(step.config.flip_horizontal ?? false),
-        flip_vertical: Boolean(step.config.flip_vertical ?? false),
-      }
-    : null;
-  const isPhotoInsert = tool.tool_id === "photo_insert";
-  const photoPreviewConfig: PhotoPreviewConfig | null = isPhotoInsert
-    ? {
-        position_x_pct: Number(step.config.position_x_pct ?? 50),
-        position_y_pct: Number(step.config.position_y_pct ?? 28),
-        scale_width_pct: Number(step.config.scale_width_pct ?? 38),
-      }
-    : null;
-  const hasPreview = Boolean(
-    subsPreviewConfig || stickerPreviewConfig || photoPreviewConfig,
-  );
+  // Previews ahora son CENTRALIZADOS (FlowPreview9x16 arriba del flujo);
+  // cada tarjeta solo muestra su formulario de config.
   return (
     <div className="rounded-md border bg-card/50">
       <div className="flex items-center gap-2 p-2">
@@ -312,57 +282,16 @@ function StepCard({
       {open && (
         <div className="border-t bg-muted/30 p-3">
           <p className="mb-3 text-xs text-muted-foreground">{tool.description}</p>
-          <div
-            className={
-              hasPreview ? "grid gap-4 lg:grid-cols-[1fr_280px]" : "space-y-3"
-            }
-          >
-            <div className="space-y-3">
-              {tool.config_schema.map((field) => (
-                <ConfigField
-                  key={field.key}
-                  field={field}
-                  value={step.config[field.key] as unknown}
-                  onChange={(v) => onConfigChange(field.key, v)}
-                  onApplyPreset={onApplyPreset}
-                />
-              ))}
-            </div>
-            {subsPreviewConfig && (
-              <div className="lg:sticky lg:top-4 lg:h-fit">
-                <SubsPreview9x16
-                  config={subsPreviewConfig}
-                  onYChange={(y) => onConfigChange("y_position", y)}
-                />
-              </div>
-            )}
-            {stickerPreviewConfig && (
-              <div className="lg:sticky lg:top-4 lg:h-fit">
-                <StickerPreview9x16
-                  config={stickerPreviewConfig}
-                  onPositionChange={(x, y) => {
-                    onConfigChange("position_x_pct", x);
-                    onConfigChange("position_y_pct", y);
-                  }}
-                  onScaleChange={(s) => onConfigChange("scale_width_pct", s)}
-                  onRotationChange={(deg) =>
-                    onConfigChange("rotation_deg", deg)
-                  }
-                />
-              </div>
-            )}
-            {photoPreviewConfig && (
-              <div className="lg:sticky lg:top-4 lg:h-fit">
-                <PhotoPreview9x16
-                  config={photoPreviewConfig}
-                  onPositionChange={(x, y) => {
-                    onConfigChange("position_x_pct", x);
-                    onConfigChange("position_y_pct", y);
-                  }}
-                  onScaleChange={(s) => onConfigChange("scale_width_pct", s)}
-                />
-              </div>
-            )}
+          <div className="space-y-3">
+            {tool.config_schema.map((field) => (
+              <ConfigField
+                key={field.key}
+                field={field}
+                value={step.config[field.key] as unknown}
+                onChange={(v) => onConfigChange(field.key, v)}
+                onApplyPreset={onApplyPreset}
+              />
+            ))}
           </div>
         </div>
       )}

@@ -834,15 +834,53 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
 
 def _fruit_mode_directive(
     n: int, *, ab_mode: bool, fruit_hint: str, angle_hint: str,
+    custom_theme: str = "",
 ) -> str:
     """Instrucción final para el fruit director según el modo:
+    - tema propio: convierte la idea del user en historia(s) de fruta.
     - normal/lote: N historias ORIGINALES y distintas (varía todo).
     - A/B: N versiones que MANTIENEN fruta + enfoque y varían SOLO el
       gancho inicial y el escenario (para testear qué hook engancha más).
     `fruit_hint`/`angle_hint` fijan la fruta/enfoque base si vienen dados.
+    `custom_theme` (si viene) tiene prioridad: la historia se construye
+    sobre esa idea concreta del user.
     """
     fruit = fruit_hint.strip()
     angle = angle_hint.strip()
+    theme = custom_theme.strip()
+
+    # ── Tema/idea propia del user (máxima prioridad) ──
+    if theme:
+        hints = []
+        if fruit:
+            hints.append(f"usa preferentemente la fruta protagonista: {fruit}")
+        if angle:
+            hints.append(f"enfoque base: {angle}")
+        hint_str = (" (" + "; ".join(hints) + ")") if hints else ""
+        if n <= 1:
+            count_line = (
+                "Genera EXACTAMENTE 1 mini-historia de fruta basada en ESA idea."
+            )
+        elif ab_mode:
+            count_line = (
+                f"Genera EXACTAMENTE {n} variantes A/B de ESA misma idea: "
+                f"mismo núcleo y personajes, varía SOLO el gancho inicial, el "
+                f"diálogo y el ambiente (para testear qué versión engancha más)."
+            )
+        else:
+            count_line = (
+                f"Genera EXACTAMENTE {n} mini-historias de fruta que desarrollen "
+                f"ESA idea desde ángulos distintos (varía gancho, diálogo y "
+                f"ambiente pero conserva el núcleo de la idea)."
+            )
+        return (
+            f"=== TEMA DEL USUARIO (máxima prioridad — construye la historia "
+            f"sobre esto) ===\n{theme}\n\n"
+            f"Convierte a los personajes en cabezas de fruta/verdura, integra el "
+            f"producto como motor de la historia y cierra con el CTA al carrito "
+            f"naranja{hint_str}. {count_line} Sigue el schema JSON al pie de la letra."
+        )
+
     if ab_mode:
         fruit_line = (
             f"la MISMA fruta protagonista ({fruit})" if fruit
@@ -886,6 +924,7 @@ def _generate_fruit(
     ab_mode: bool = False,
     fruit_hint: str = "",
     angle_hint: str = "",
+    custom_theme: str = "",
 ) -> list[VideoPreset]:
     system = load_system_prompt("fruit_story_director.md")
     photo_filenames, photo_paths = _collect_product_photos(product)
@@ -912,7 +951,7 @@ def _generate_fruit(
         f"{_research_block(product)}\n"
         f"{_language_block(product)}\n\n"
         f"{photos_block}\n"
-        f"{_fruit_mode_directive(n, ab_mode=ab_mode, fruit_hint=fruit_hint, angle_hint=angle_hint)}"
+        f"{_fruit_mode_directive(n, ab_mode=ab_mode, fruit_hint=fruit_hint, angle_hint=angle_hint, custom_theme=custom_theme)}"
     )
 
     result = generate_json(
