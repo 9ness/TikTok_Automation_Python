@@ -282,10 +282,12 @@ export interface EnqueueFromEntradaInput {
 }
 
 export interface EnqueueFromEntradaResponse {
-  job_id: string;
-  title: string;
+  /** El encolado real (move pesado + creación del job) corre en segundo
+   *  plano en el servidor → la respuesta es inmediata y sobrevive a que
+   *  recargues la página. El job aparece en la cola en unos segundos. */
+  status: string; // "encolando"
   filename: string;
-  moved: MoveFileResponse;
+  message: string;
 }
 
 // Google Drive sharing — fase 2 con Service Account

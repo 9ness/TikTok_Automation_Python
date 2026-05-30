@@ -20,13 +20,14 @@ admite headers custom (mismo patrón que fonts/stickers).
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from src.api.config import APISettings, get_settings
@@ -37,6 +38,8 @@ from src.editor_auto.repos import UserRepo
 from src.editor_auto.services import folder_manager
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode
+
+logger = logging.getLogger("editor_auto.folders")
 
 
 router = APIRouter(
@@ -215,6 +218,7 @@ def delete_user_file(
 def enqueue_from_entrada(
     user_id: str,
     payload: Annotated[dict, Body(...)],
+    background: BackgroundTasks,
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> dict[str, Any]:
     """Encola un vídeo que ya está en `entrada/` del usuario.
@@ -262,17 +266,13 @@ def enqueue_from_entrada(
         if companion:
             script = companion
 
-    # 1+2. mover entrada → cola (incluye companion .txt si existe)
-    try:
-        move_result = folder_manager.move_file(
-            u.name, "entrada", "cola", filename,
+    # Validación rápida: el archivo debe existir en entrada/ (así no
+    # devolvemos 202 para un fichero inexistente).
+    entrada_path = os.path.join(user_subfolder(u.name, "entrada"), filename)
+    if not os.path.exists(entrada_path):
+        raise ValidationError(
+            f"El archivo '{filename}' no está en entrada/ de '{u.name}'."
         )
-    except (folder_manager.FolderError, ValueError) as e:
-        raise ValidationError(str(e))
-
-    # 3. crear job apuntando al path real en cola/
-    final_filename = move_result["filename_new"]
-    input_path = os.path.join(user_subfolder(u.name, "cola"), final_filename)
 
     try:
         from src.utils import load_config
@@ -282,27 +282,66 @@ def enqueue_from_entrada(
         temp_folder = "./temp_work"
 
     tools_used = [s.tool_id for s in enabled]
-    title = f"{u.name} · {final_filename} · {len(enabled)} tool(s)"
-    params: dict[str, Any] = {
-        "user_id": u.id,
-        "user_name": u.name,
-        "input_path": input_path,
-        "temp_folder": temp_folder,
-        "tool_count": len(enabled),
-        "tools_used": tools_used,
-        "script": script if needs_script else None,
-        # Flag para el runner: gestiona el ciclo cola→recuperacion (OK)
-        # o cola→entrada (fallo). Sin este flag (caso upload directo),
-        # el runner deja los temps como antes.
-        "source": "entrada",
-        "source_filename": final_filename,
-    }
-    job = queue.enqueue(JobMode.EDITOR_AUTO, title=title, params=params)
+    enabled_count = len(enabled)
+    script_final = script if needs_script else None
+
+    # El MOVE entrada→cola de un vídeo pesado por rclone puede tardar
+    # MINUTOS (copia sobre el FUSE mount). Hacerlo síncrono bloqueaba el
+    # request y recargar la página perdía el encolado. Lo hacemos en
+    # BackgroundTask: el server completa el move + crea el job pase lo que
+    # pase con la conexión del cliente. Devolvemos 202 al instante.
+    def _move_and_enqueue() -> None:
+        try:
+            move_result = folder_manager.move_file(
+                u.name, "entrada", "cola", filename,
+            )
+        except Exception as e:
+            logger.warning(
+                "[enqueue-bg] move entrada→cola falló para %s/%s: %s — "
+                "el archivo se queda en entrada/ para reintentar.",
+                u.name, filename, e,
+            )
+            return
+        final_filename = move_result["filename_new"]
+        input_path = os.path.join(user_subfolder(u.name, "cola"), final_filename)
+        params: dict[str, Any] = {
+            "user_id": u.id,
+            "user_name": u.name,
+            "input_path": input_path,
+            "temp_folder": temp_folder,
+            "tool_count": enabled_count,
+            "tools_used": tools_used,
+            "script": script_final,
+            "source": "entrada",
+            "source_filename": final_filename,
+        }
+        try:
+            job = queue.enqueue(
+                JobMode.EDITOR_AUTO,
+                title=f"{u.name} · {final_filename} · {enabled_count} tool(s)",
+                params=params,
+            )
+            logger.info(
+                "[enqueue-bg] %s/%s → job %s encolado", u.name, final_filename, job.id,
+            )
+        except Exception as e:
+            logger.warning(
+                "[enqueue-bg] crear job falló para %s/%s: %s — devuelvo a entrada/.",
+                u.name, final_filename, e,
+            )
+            try:
+                folder_manager.move_file(u.name, "cola", "entrada", final_filename)
+            except Exception:
+                pass
+
+    background.add_task(_move_and_enqueue)
     return {
-        "job_id": job.id,
-        "title": title,
-        "filename": final_filename,
-        "moved": move_result,
+        "status": "encolando",
+        "filename": filename,
+        "message": (
+            "Encolando en segundo plano (puede tardar en vídeos pesados). "
+            "Aparecerá en la cola en breve — puedes recargar la página."
+        ),
     }
 
 

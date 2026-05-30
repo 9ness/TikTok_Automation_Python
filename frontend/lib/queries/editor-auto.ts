@@ -444,13 +444,18 @@ export function useEnqueueFromEntrada(userId: string) {
           input,
         ),
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
-        qc.invalidateQueries({
-          queryKey: editorAutoKeys.userFolderCounts(userId),
-        });
-        qc.invalidateQueries({
-          queryKey: editorAutoKeys.globalFolderCounts(),
-        });
+        // El move entrada→cola + creación del job corren en SEGUNDO PLANO
+        // (vídeos pesados tardan). Refrescamos ya y otra vez con retraso
+        // para que el archivo salga de entrada/ y aparezca el job en la cola
+        // cuando el move termine, sin que el operador tenga que recargar.
+        const refresh = () => {
+          qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
+          qc.invalidateQueries({ queryKey: editorAutoKeys.userFolderCounts(userId) });
+          qc.invalidateQueries({ queryKey: editorAutoKeys.globalFolderCounts() });
+        };
+        refresh();
+        setTimeout(refresh, 8000);
+        setTimeout(refresh, 30000);
       },
     },
   );
