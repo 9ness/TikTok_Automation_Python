@@ -20,7 +20,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -45,8 +45,10 @@ import {
   useEnqueueFromEntrada,
   useForgetKnownEmail,
   useMoveUserFile,
+  useReleaseDay,
   useRevokeUserShare,
   useSharingStatus,
+  useUpdateEditorUser,
   useUserFolders,
   useUserShares,
   userFilePreviewUrl,
@@ -105,7 +107,24 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   const del = useDeleteUserFile(userId);
   const enqueue = useEnqueueFromEntrada(userId);
 
+  const update = useUpdateEditorUser(userId);
+  const release = useReleaseDay(userId);
+
   const [active, setActive] = useState<FolderName>("entrada");
+  // Config por usuario (delay + máx/día). Sync desde el server al cargar.
+  const [delayMin, setDelayMin] = useState("");
+  const [maxDay, setMaxDay] = useState("");
+  useEffect(() => {
+    if (user.data) {
+      setDelayMin(String(user.data.auto_enqueue_delay_minutes ?? 0));
+      setMaxDay(
+        user.data.daily_video_limit_override == null
+          ? ""
+          : String(user.data.daily_video_limit_override),
+      );
+    }
+  }, [user.data?.id, user.data?.auto_enqueue_delay_minutes, user.data?.daily_video_limit_override]);
+
   const counts = folders.data?.counts ?? {
     entrada: 0,
     cola: 0,
@@ -113,6 +132,37 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
     salida: 0,
   };
   const items = folders.data?.folders[active] ?? [];
+  const usedToday = user.data?.usage?.daily_videos_used ?? 0;
+
+  function saveConfig() {
+    const d = Math.max(0, parseInt(delayMin || "0", 10) || 0);
+    const m = maxDay.trim() === "" ? -1 : Math.max(0, parseInt(maxDay, 10) || 0);
+    update.mutate(
+      { auto_enqueue_delay_minutes: d, daily_video_limit_override: m },
+      {
+        onSuccess: () => toast.success("Ajustes guardados"),
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
+
+  async function markDayReady() {
+    try {
+      const r = await release.mutateAsync(undefined);
+      if (r.warning) {
+        toast.warning(r.warning);
+      } else {
+        const emailNote = r.email?.ok
+          ? ` · email enviado (${r.email.sent})`
+          : r.email?.error
+            ? ` · email no enviado: ${r.email.error}`
+            : "";
+        toast.success(`Carpeta compartida con ${r.shared.length} email(s)${emailNote}`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    }
+  }
 
   return (
     <Card>
@@ -141,6 +191,71 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Config por usuario: delay de encolado + máx vídeos/día */}
+        <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-2.5">
+          <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+            ⚙️ Ajustes de encolado (vacío = sin restricción)
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">
+                ⏱ Delay auto-encolado (min)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={delayMin}
+                onChange={(e) => setDelayMin(e.target.value)}
+                placeholder="0"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">
+                🎬 Máx vídeos/día
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={maxDay}
+                onChange={(e) => setMaxDay(e.target.value)}
+                placeholder="sin límite"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={saveConfig} disabled={update.isPending} className="h-7">
+              {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar ajustes"}
+            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              Hoy: <strong>{usedToday}</strong>
+              {maxDay.trim() !== "" ? ` / ${maxDay}` : ""} vídeo(s)
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            El delay es la cuenta atrás antes de auto-encolar un vídeo nuevo
+            (puedes encolar a mano antes desde la pestaña entrada). El máx/día
+            se resetea a medianoche.
+          </p>
+        </div>
+
+        {/* Marcar día listo: comparte salida + email aviso */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={markDayReady}
+          disabled={release.isPending}
+          className="w-full border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+        >
+          {release.isPending ? (
+            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Mail className="mr-2 h-3.5 w-3.5" />
+          )}
+          ✅ Marcar vídeos del día como listos (compartir salida + avisar por email)
+        </Button>
+
         {/* Tabs por carpeta */}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {FOLDERS.map((f) => (

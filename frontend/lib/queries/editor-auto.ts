@@ -303,6 +303,22 @@ export function useUpdateEditorUser(id: string) {
   });
 }
 
+export interface ReleaseDayResult {
+  shared: string[];
+  share_errors: string[];
+  emails: string[];
+  email: { ok: boolean; sent: number; error: string | null } | null;
+  warning?: string;
+}
+
+/** "Marcar día listo": comparte la carpeta salida + email "vídeos listos". */
+export function useReleaseDay(id: string) {
+  return useMutation<ReleaseDayResult, Error, { count?: number } | void>({
+    mutationFn: (input) =>
+      api.post<ReleaseDayResult>(`${USERS_ROOT}/${id}/release-day`, input ?? {}),
+  });
+}
+
 export function useDeleteEditorUser() {
   const qc = useQueryClient();
   return useMutation<void, Error, { id: string; hard?: boolean }>({

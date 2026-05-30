@@ -175,8 +175,33 @@ def check_can_enqueue(
     Mutates user.usage en caso de reset perezoso (caller debe persistir
     si el resultado es ok y se acaba encolando — usar register_enqueue).
     """
-    # Test user — sin sub = bypass total
+    # Sin plan: por defecto SIN restricciones. PERO si el admin puso un
+    # `daily_video_limit_override` por usuario, lo respetamos igualmente
+    # (caso "configuro máx/día sin asignar plan todavía"). El delay de
+    # encolado es independiente — lo aplica el watcher por usuario.
     if user.subscription is None:
+        ov = user.daily_video_limit_override
+        if ov is not None and ov > 0:
+            _reset_if_needed(user)
+            if user.usage.daily_videos_used >= ov:
+                now = _now_utc()
+                from datetime import timedelta
+                tomorrow = (now + timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0,
+                )
+                secs = int((tomorrow - now).total_seconds())
+                return QuotaDecision(
+                    ok=False, kind="daily_limit",
+                    message=(
+                        f"cuota diaria agotada ({user.usage.daily_videos_used}/"
+                        f"{ov}). Se restablece a medianoche UTC."
+                    ),
+                    retry_after_seconds=secs,
+                )
+            return QuotaDecision(
+                ok=True, kind="ok",
+                message=f"sin plan · {user.usage.daily_videos_used + 1}/{ov} hoy",
+            )
         return QuotaDecision(
             ok=True, kind="ok", message="user de prueba (sin plan, sin cuotas)",
         )

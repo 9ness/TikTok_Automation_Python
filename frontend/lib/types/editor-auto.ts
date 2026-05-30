@@ -164,6 +164,14 @@ export interface EditorUser {
   /** Si true, un watcher del backend encola automáticamente los vídeos
    *  nuevos en entrada/ del usuario. Polling cada 30s. */
   auto_enqueue: boolean;
+  /** Cuenta atrás (min) antes de auto-encolar un vídeo nuevo. 0 = sin
+   *  espera extra (solo el min-age global anti-uploads). */
+  auto_enqueue_delay_minutes: number;
+  /** Máx vídeos/día para este usuario (cuenta atrás). null = sin límite
+   *  propio (usa el del plan, o ilimitado si no tiene plan). */
+  daily_video_limit_override: number | null;
+  window_start_hour_override: number | null;
+  window_end_hour_override: number | null;
   subscription: Subscription | null;
   usage: UsageStats | null;
   referral_code: string | null;
@@ -187,6 +195,11 @@ export interface EditorUserUpdateInput {
   description?: string;
   tool_flow?: ToolStep[];
   auto_enqueue?: boolean;
+  auto_enqueue_delay_minutes?: number;
+  /** -1 = limpiar override (sin límite propio). */
+  daily_video_limit_override?: number;
+  window_start_hour_override?: number;
+  window_end_hour_override?: number;
 }
 
 export interface EditorAutoEnqueueResponse {
