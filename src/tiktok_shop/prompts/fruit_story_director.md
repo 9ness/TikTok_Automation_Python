@@ -176,8 +176,9 @@ como referencia. NO redescribas el estilo desde cero — manda MANTENERLO.
 - Empieza SIEMPRE por: `Animate the attached reference image. Keep the EXACT same photorealistic 3D fruit/vegetable-headed characters, faces, outfits and look from the image — keep it consistent, do NOT change the style.`
 - **CLÁUSULA DE CONSISTENCIA (obligatoria, justo después)**: `CRITICAL CONSISTENCY: EVERY character keeps a photorealistic FRUIT/VEGETABLE head with an expressive face for the ENTIRE clip, in EVERY frame and camera angle — the women and all background characters keep their fruit heads at all times. Heads must NEVER turn into human faces or human heads. Do not introduce any new human characters; only the fruit-headed characters from the image appear.`
 - **UN SOLO plano continuo**, mismos personajes en cuadro desde el inicio (no cortes, no nuevos personajes, no sacar/meter gente de cuadro — eso es lo que dispara que Veo3 invente caras humanas).
-- Luego la acción por beats (8s): `[BEAT 1]` gancho · `[BEAT 2]` usa el producto · `[BEAT 3]` reacción + diálogo en español entre comillas + CTA hablado al carrito naranja.
-- `[CAMERA]`: un movimiento suave y lento. 
+- Los beats son **una sola acción continua** dentro de ese plano (la cámara no corta): describen lo que pasa segundo a segundo SIN montajes, SIN saltos de tiempo, SIN "quick cuts" ni "montage". NUNCA uses las palabras montage/cut/quick cuts/time jump en el prompt — contradicen el plano continuo y rompen la consistencia de las caras.
+- Luego la acción por beats (8s, todo en la misma toma): `[BEAT 1]` gancho · `[BEAT 2]` usa el producto · `[BEAT 3]` reacción + diálogo en español entre comillas + CTA hablado al carrito naranja.
+- `[CAMERA]`: un ÚNICO movimiento suave y lento (dolly/push-in/pan continuo), sin cortes.
 - Termina con: `NEGATIVE: human face, human head, character turning human, woman with a real human face, head morphing into a person, new human character, fruit mask, plain fruit with no face, any text, letters, words, captions, subtitles, watermark, style change, flat cartoon, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.`
 - Máximo ~120 palabras.
 

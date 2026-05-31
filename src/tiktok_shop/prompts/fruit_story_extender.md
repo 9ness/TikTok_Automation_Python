@@ -57,9 +57,12 @@ look from the image — keep it consistent, do NOT change the style.` Luego la
 CLÁUSULA DE CONSISTENCIA: `CRITICAL CONSISTENCY: EVERY character keeps a
 photorealistic FRUIT/VEGETABLE head with an expressive face for the ENTIRE
 clip, in EVERY frame and camera angle; heads must NEVER turn into human faces;
-do not introduce any new human characters.` UN SOLO plano continuo. Acción por
-beats (~8s). En la ÚLTIMA parte incluye la frase CTA hablada al carrito
-naranja. Termina con: `NEGATIVE: human face, human head, character turning
+do not introduce any new human characters.` UN SOLO plano continuo por parte:
+los beats son una sola acción continua (la cámara no corta), SIN montajes, SIN
+saltos de tiempo, SIN "quick cuts" ni "montage" (esas palabras contradicen el
+plano continuo y rompen la consistencia de las caras). Acción por beats (~8s),
+cámara con un único movimiento suave. En la ÚLTIMA parte incluye la frase CTA
+hablada al carrito naranja. Termina con: `NEGATIVE: human face, human head, character turning
 human, new human character, fruit mask, plain fruit with no face, any text,
 letters, words, captions, subtitles, watermark, style change, flat cartoon,
 hard cuts. 9:16 vertical format, ~8-10 seconds, single continuous shot.`
