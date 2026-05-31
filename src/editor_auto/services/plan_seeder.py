@@ -130,6 +130,66 @@ BASE_PLANS: list[dict] = [
         "sort_order": 30,
     },
     {
+        "slug": "esencial_10",
+        "name": "Esencial 10 · 10 vídeos/día",
+        "description": (
+            "Volumen básico. 10 vídeos/día (≈300/mes) con edición esencial "
+            "(corte de silencios + subtítulos + flecha CTA). Pensado para "
+            "creadores que suben 10-12 al día y quieren entrega ágil sin "
+            "complicaciones. Las herramientas se ajustan por el operador."
+        ),
+        "daily_video_limit": 10,
+        "monthly_video_limit": None,
+        "allowed_tools": [],  # sin gating — el operador configura el flujo
+        "processing_window_start_hour": 8,
+        "processing_window_end_hour": 20,
+        "spacing_minutes": 12,
+        "queue_priority": 40,
+        "queue_delay_minutes": 0,
+        "support_level": "email",
+        "features": [
+            "🎬 10 vídeos/día (≈300 vídeos/mes)",
+            "🕐 Horario 8:00-20:00 (12 h al día)",
+            "⏱ Espaciado 12 min entre vídeos",
+            "🛠 Edición básica: corte de silencios + subtítulos + flecha CTA",
+            "💬 Soporte por email (respuesta 24 h)",
+            "⚡ Prioridad normal en cola",
+        ],
+        "price_eur_monthly": 349.0,
+        "price_eur_setup_once": 0.0,
+        "sort_order": 32,
+    },
+    {
+        "slug": "esencial_15",
+        "name": "Esencial 15 · 15 vídeos/día",
+        "description": (
+            "Volumen alto básico. 15 vídeos/día (≈450/mes) con edición "
+            "esencial (corte de silencios + subtítulos + flecha CTA). Mejor "
+            "precio por vídeo que el de 10 — pensado como salto natural para "
+            "quien sube 12-15 al día."
+        ),
+        "daily_video_limit": 15,
+        "monthly_video_limit": None,
+        "allowed_tools": [],  # sin gating
+        "processing_window_start_hour": 8,
+        "processing_window_end_hour": 21,
+        "spacing_minutes": 10,
+        "queue_priority": 45,
+        "queue_delay_minutes": 0,
+        "support_level": "email",
+        "features": [
+            "🎬 15 vídeos/día (≈450 vídeos/mes) — mejor precio por vídeo",
+            "🕐 Horario 8:00-21:00 (13 h al día)",
+            "⏱ Espaciado 10 min entre vídeos (entrega ágil)",
+            "🛠 Edición básica: corte de silencios + subtítulos + flecha CTA",
+            "💬 Soporte por email (respuesta 24 h)",
+            "⚡ Prioridad normal-alta en cola",
+        ],
+        "price_eur_monthly": 429.0,
+        "price_eur_setup_once": 0.0,
+        "sort_order": 34,
+    },
+    {
         "slug": "studio",
         "name": "Studio · 10 vídeos/día",
         "description": (
