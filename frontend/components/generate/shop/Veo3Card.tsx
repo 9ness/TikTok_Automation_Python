@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -29,6 +29,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  deleteFruitExtension,
+  loadFruitExtensions,
+  saveFruitExtension,
+  type SavedFruitExtension,
+} from "@/lib/fruitExtensions";
 import { useProduct } from "@/lib/queries/products";
 import {
   useExtendFruit,
@@ -109,6 +115,11 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   >("existing");
   // Nº de partes al alargar (2 ≈ 20s, 3 ≈ 30s).
   const [extendParts, setExtendParts] = useState<2 | 3>(2);
+  // Extensiones (20s/30s) guardadas en localStorage, indexadas por preset
+  // base. Sobreviven a recargas (incl. móvil) y se purgan en cascada.
+  const [savedExt, setSavedExt] = useState<Record<string, SavedFruitExtension>>(
+    {},
+  );
   // Sub-opciones de "crear fruta".
   const [fruitGenType, setFruitGenType] = useState<"single" | "batch" | "ab">(
     "single",
@@ -175,6 +186,18 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
     workMode === "fruit" && fruitSubMode === "existing"
       ? fruitPresets
       : compatibleVeo3;
+
+  // Carga las extensiones guardadas del producto y purga huérfanas (preset
+  // base ya no existe = se regeneraron los presets) + caducadas.
+  useEffect(() => {
+    if (!productId) {
+      setSavedExt({});
+      return;
+    }
+    setSavedExt(
+      loadFruitExtensions(productId, fruitPresets.map((p) => p.id)),
+    );
+  }, [productId, fruitPresets]);
 
   // Total réplicas virales para mostrar contador en el toggle (también
   // sirve para deshabilitar el checkbox si no hay ninguna).
@@ -336,22 +359,37 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         toast.error("No se pudo alargar la historia, reintenta.");
         return;
       }
-      const total = res.parts.length;
-      const items: ResultItem[] = res.parts.map((pt) => ({
-        presetId: `${base.id}-p${pt.part}`,
-        name: `${base.name} · Parte ${pt.part}/${total}${pt.beat ? ` — ${pt.beat}` : ""}`,
-        image_prompt: pt.image_prompt,
-        veo3_prompt: pt.veo3_prompt,
-        veo3_photo_filenames: res.photo_filenames ?? [],
-      }));
-      setResults(items);
-      setResultsTitle(
-        `🍉 Historia alargada · ${total} partes (~${total * 10}s) · únelas en orden`,
-      );
-      toast.success(`${total} partes listas · genera y une en orden`);
+      // Persiste en localStorage para reusar / sobrevivir recargas.
+      const ext: SavedFruitExtension = {
+        presetId: base.id,
+        presetName: base.name,
+        parts: res.parts,
+        photo_filenames: res.photo_filenames ?? [],
+        createdAt: Date.now(),
+      };
+      setSavedExt(saveFruitExtension(productId, ext));
+      openExtension(ext);
+      toast.success(`${res.parts.length} partes listas · guardadas · une en orden`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Alargar historia falló");
     }
+  }
+
+  // Abre una extensión (recién generada o guardada) en el dialog de resultados,
+  // una "parte" por ResultItem (Paso 1 imagen + Paso 2 vídeo).
+  function openExtension(ext: SavedFruitExtension) {
+    const total = ext.parts.length;
+    const items: ResultItem[] = ext.parts.map((pt) => ({
+      presetId: `${ext.presetId}-p${pt.part}`,
+      name: `${ext.presetName} · Parte ${pt.part}/${total}${pt.beat ? ` — ${pt.beat}` : ""}`,
+      image_prompt: pt.image_prompt,
+      veo3_prompt: pt.veo3_prompt,
+      veo3_photo_filenames: ext.photo_filenames ?? [],
+    }));
+    setResults(items);
+    setResultsTitle(
+      `🍉 Historia alargada · ${total} partes (~${total * 10}s) · únelas en orden`,
+    );
   }
 
   // ¿Mostrar el flujo de selección de presets? Sí en modo "Usar presets"
@@ -540,6 +578,20 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                 {extendParts} clips en orden.
               </p>
 
+              {/* Si el preset elegido ya tiene una extensión guardada, ofrece
+                  abrirla sin gastar otra generación. */}
+              {activePresetId && savedExt[activePresetId] && (
+                <button
+                  type="button"
+                  onClick={() => openExtension(savedExt[activePresetId]!)}
+                  className="w-full rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                >
+                  📂 Ver guardado (
+                  {savedExt[activePresetId]!.parts.length} partes · ≈
+                  {savedExt[activePresetId]!.parts.length * 10}s) — sin regenerar
+                </button>
+              )}
+
               <Button
                 onClick={() => void runExtend()}
                 disabled={extendFruit.isPending || !activePresetId}
@@ -550,8 +602,51 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                 ) : (
                   <Sparkles className="mr-1.5 h-4 w-4" />
                 )}
-                Alargar a {extendParts} partes
+                {activePresetId && savedExt[activePresetId]
+                  ? `Re-alargar a ${extendParts} partes`
+                  : `Alargar a ${extendParts} partes`}
               </Button>
+
+              {/* Lista de extensiones guardadas (reusar / sobrevive recargas) */}
+              {Object.keys(savedExt).length > 0 && (
+                <div className="space-y-1 border-t border-orange-500/20 pt-2">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    💾 Alargadas guardadas (en este dispositivo)
+                  </p>
+                  {Object.values(savedExt)
+                    .sort((a, b) => b.createdAt - a.createdAt)
+                    .map((ext) => (
+                      <div
+                        key={ext.presetId}
+                        className="flex items-center gap-1.5 rounded border border-muted bg-background p-1"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openExtension(ext)}
+                          className="min-w-0 flex-1 text-left text-[11px] hover:text-orange-600 dark:hover:text-orange-300"
+                          title={ext.presetName}
+                        >
+                          <span className="truncate">{ext.presetName}</span>
+                          <span className="ml-1 text-[9px] text-muted-foreground">
+                            · {ext.parts.length} partes (~{ext.parts.length * 10}s)
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSavedExt(
+                              deleteFruitExtension(productId, ext.presetId),
+                            )
+                          }
+                          className="shrink-0 rounded px-1 text-[10px] text-muted-foreground hover:bg-red-500/20 hover:text-red-600"
+                          title="Borrar esta guardada"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
