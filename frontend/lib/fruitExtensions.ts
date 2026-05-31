@@ -16,6 +16,8 @@ export interface SavedFruitExtension {
   presetId: string;
   presetName: string;
   parts: FruitStoryPart[];
+  /** 3 ganchos de texto para el vídeo unido. */
+  text_hooks?: string[];
   photo_filenames: string[];
   createdAt: number; // epoch ms
 }

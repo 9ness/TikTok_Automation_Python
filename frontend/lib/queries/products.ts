@@ -15,6 +15,7 @@ import type {
   CommitImportedPhotosResponse,
   ExtendFruitInput,
   ExtendFruitResponse,
+  GenerateFruitHooksResponse,
   GenerateFruitInput,
   GenerateFruitResponse,
   GeneratePresetsInput,
@@ -346,6 +347,20 @@ export function useExtendFruit(productId: string) {
         `${ROOT}/${productId}/video-presets/${presetId}/extend-fruit`,
         input,
       ),
+  });
+}
+
+export function useGenerateFruitHooks(productId: string) {
+  const qc = useQueryClient();
+  return useMutation<GenerateFruitHooksResponse, Error, { presetId: string }>({
+    mutationFn: ({ presetId }) =>
+      api.post<GenerateFruitHooksResponse>(
+        `${ROOT}/${productId}/video-presets/${presetId}/generate-hooks`,
+        {},
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
   });
 }
 

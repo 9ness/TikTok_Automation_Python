@@ -35,6 +35,35 @@ of field, medium shot.`
   subtítulos, marcas de agua ni logos superpuestos. Lo ÚNICO con texto
   permitido es la etiqueta propia del bote del producto. Los subtítulos se
   añaden DESPUÉS — no los generes.
+
+## GANCHO DE TEXTO (`text_hooks`) — el texto que va en pantalla al inicio
+
+Genera SIEMPRE **3 opciones** de gancho de texto (el rótulo que aparece en el
+primer segundo del vídeo). REGLA DE ORO: **el gancho plantea el PROBLEMA o la
+CURIOSIDAD; el producto es la respuesta que viene DESPUÉS**. Si el gancho
+enseña o nombra el producto, mata la curiosidad y el espectador se va.
+
+Reglas obligatorias de cada gancho:
+- Máximo **6-8 palabras**, **una sola línea**.
+- **Segunda persona** o formato **"POV:"** — háblale al espectador, no narres
+  la historia.
+- Plantea un **problema que sienta el espectador** o una **curiosidad** que le
+  obligue a seguir viendo.
+- **NO menciones el producto, su nombre ni la marca.**
+- **NO** tono de anuncio ni sinopsis ("El ventilador que…").
+- Tono natural, **español de España** (respeta el idioma indicado si es otro).
+- Como mucho **1 emoji** al final.
+
+Da las 3 mezclando ángulos: **1 de problema-real** (atrae a quien tiene ese
+dolor — mejor para vender), **1 de curiosidad**, **1 con puntito de drama**
+(más views).
+
+Ejemplos (producto = ventilador):
+- MAL (sinopsis): "El ventilador que reavivó la llama y los celos"
+- MAL (nombra producto): "Este ventilador silencioso te cambia el verano"
+- BIEN: "POV: llevas una semana sin dormir del calor 🥵"
+- BIEN: "Tu cuarto es un horno y no sabes por qué"
+- BIEN: "Mi vecina duerme fresca y yo me derrito 😮‍💨"
 - Cada personaje es **claramente una fruta/verdura distinta** (calabacín,
   melocotón, plátano, piña, fresa…) reconocible como cabeza, con su cara.
 
@@ -164,6 +193,7 @@ como referencia. NO redescribas el estilo desde cero — manda MANTENERLO.
       "concept": "Mango se broncea en la piscina y dos frutas cotillean cómo lo ha conseguido",
       "duration_s": 8,
       "text_overlay": "POV: encontró el secreto del bronceado",
+      "text_hooks": ["POV: llevas todo el verano pálido 🥵", "Tu amiga vuelve morena y tú no sabes cómo", "Todos preguntan su secreto y no lo suelta 👀"],
       "voice_script": "—¿pero cómo te has puesto tan moreno? —con Fresly, está en el carrito naranja",
       "image_prompt": "high-quality photorealistic 3D render, anthropomorphic fruit-headed characters on human-proportioned bodies in realistic casual clothing, photorealistic fruit heads with expressive oversized facial features, warm cinematic lighting, detailed textures, shallow depth of field, vertical 9:16. A confident MANGO-headed character (the ripe mango IS the head, photorealistic, with large expressive eyes and a grin, on a human body wearing open shirt and swim shorts) sits by a sunny turquoise pool holding a 'Fresly' tanning cream bottle with a readable orange label. Behind him a STRAWBERRY-headed woman and a PINEAPPLE-headed woman in summer dresses chat. Consistent characters and style. NEGATIVE: any text, letters, words, captions, titles, watermark, logo overlay, subtitles, human heads, real human faces, person wearing a fruit mask, fruit costume, plain fruit with no face, headless fruit, flat 2D cartoon.",
       "veo3_prompt": "Animate the attached reference image. Keep the EXACT same photorealistic 3D fruit-headed characters, faces, outfits and look from the image — do NOT change the style. CRITICAL CONSISTENCY: every character keeps a photorealistic FRUIT head with an expressive face for the ENTIRE clip and in every camera angle; the strawberry and pineapple women keep their fruit heads at all times; heads must NEVER turn into human faces; do not add any new human characters. Single continuous shot, same characters in frame. [BEAT 1] the mango character smooths the cream on his arms, glowing tan. [BEAT 2] the strawberry and pineapple women lean in, jaws dropping. [BEAT 3] strawberry whispers \"¿pero cómo te has puesto tan moreno?\"; mango winks \"con Fresly... está en el carrito naranja\". [CAMERA]: slow dolly-in. NEGATIVE: human face, human head, character turning human, woman with a real human face, head morphing into a person, new human character, fruit mask, plain fruit with no face, any text, letters, words, captions, subtitles, watermark, style change, flat cartoon, hard cuts. 9:16 vertical format, 8 seconds, single continuous shot.",

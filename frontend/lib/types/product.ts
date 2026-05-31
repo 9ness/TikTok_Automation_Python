@@ -394,6 +394,9 @@ export interface VideoPreset {
   duration_s: number;
   compatible_tiers: string[];
   text_overlay: string;
+  /** 3 opciones de gancho de texto (overlay 1er segundo). Solo se rellena
+   *  en presets de fruta (variant="fruit_story"). */
+  text_hooks?: string[];
   text_overlay_style: TextOverlayStyle;
   subtitle_style: SubtitleStyle;
   cta_arrow_style: CtaArrowStyle;
@@ -462,6 +465,13 @@ export interface GenerateFruitResponse {
   cost_usd: number;
 }
 
+export interface GenerateFruitHooksResponse {
+  product_id: string;
+  preset_id: string;
+  text_hooks: string[];
+  cost_usd: number;
+}
+
 export interface ExtendFruitInput {
   /** 2 (≈20s) o 3 (≈30s) partes continuas. */
   parts: 2 | 3;
@@ -478,6 +488,8 @@ export interface ExtendFruitResponse {
   product_id: string;
   preset_id: string;
   parts: FruitStoryPart[];
+  /** 3 ganchos de texto para el vídeo unido. */
+  text_hooks: string[];
   /** Fotos del producto a adjuntar en CADA parte (mismas en todas). */
   photo_filenames: string[];
   cost_usd: number;

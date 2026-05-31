@@ -223,6 +223,11 @@ class VideoPreset(BaseModel):
     # Texto que aparece en pantalla. Para music_only es EL gancho.
     # Para scripted puede ser el título visible o vacío.
     text_overlay: str = ""
+    # Opciones de GANCHO de texto (overlay del 1er segundo) para que el
+    # operador elija/pruebe. Usado en `variant="fruit_story"`: 3 ganchos
+    # que plantean problema/curiosidad SIN nombrar el producto (el producto
+    # se revela después). El operador copia el que prefiera al subir.
+    text_hooks: list[str] = Field(default_factory=list)
     # Estilo visual del overlay (fuente, posición, color, animación…).
     # Vive en el preset porque distintos ángulos quedan mejor con
     # estilos distintos (urgencia con shake rojo, ahorro con verde, etc).

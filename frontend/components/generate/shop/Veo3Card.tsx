@@ -39,6 +39,7 @@ import { useProduct } from "@/lib/queries/products";
 import {
   useExtendFruit,
   useGenerateFruit,
+  useGenerateFruitHooks,
   useGenerateVariants,
 } from "@/lib/queries/products";
 import type { VideoPreset } from "@/lib/types/product";
@@ -88,6 +89,8 @@ interface ResultItem {
   /** Prompt para generar el FOTOGRAMA en Nano Banana (Paso 1). Solo en
    *  historias de fruta (flujo imagen→vídeo). Vacío en presets normales. */
   image_prompt?: string;
+  /** 3 ganchos de texto (overlay 1er segundo) — solo en historias de fruta. */
+  text_hooks?: string[];
   veo3_prompt: string;
   /** Para vídeos >10s: N prompts (~8-10s cada uno) que el user pega
    *  secuencialmente en Flow Gemini para encadenar clips. Vacío si
@@ -237,6 +240,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
           presetId: p.id,
           name: p.name,
           image_prompt: p.image_prompt,
+          text_hooks: p.text_hooks ?? [],
           veo3_prompt: p.veo3_prompt,
           veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
@@ -259,6 +263,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
           presetId: p.id,
           name: p.name,
           image_prompt: p.image_prompt,
+          text_hooks: p.text_hooks ?? [],
           veo3_prompt: p.veo3_prompt,
           veo3_prompt_segments: p.veo3_prompt_segments ?? [],
           veo3_photo_filenames: p.veo3_photo_filenames ?? [],
@@ -326,6 +331,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         presetId: p.id,
         name: p.name,
         image_prompt: p.image_prompt,
+        text_hooks: p.text_hooks ?? [],
         veo3_prompt: p.veo3_prompt,
         veo3_prompt_segments: p.veo3_prompt_segments ?? [],
         veo3_photo_filenames: p.veo3_photo_filenames ?? [],
@@ -364,6 +370,7 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
         presetId: base.id,
         presetName: base.name,
         parts: res.parts,
+        text_hooks: res.text_hooks ?? [],
         photo_filenames: res.photo_filenames ?? [],
         createdAt: Date.now(),
       };
@@ -379,10 +386,12 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
   // una "parte" por ResultItem (Paso 1 imagen + Paso 2 vídeo).
   function openExtension(ext: SavedFruitExtension) {
     const total = ext.parts.length;
-    const items: ResultItem[] = ext.parts.map((pt) => ({
+    const items: ResultItem[] = ext.parts.map((pt, i) => ({
       presetId: `${ext.presetId}-p${pt.part}`,
       name: `${ext.presetName} · Parte ${pt.part}/${total}${pt.beat ? ` — ${pt.beat}` : ""}`,
       image_prompt: pt.image_prompt,
+      // El gancho va en pantalla al inicio del vídeo unido → en la Parte 1.
+      text_hooks: i === 0 ? (ext.text_hooks ?? []) : [],
       veo3_prompt: pt.veo3_prompt,
       veo3_photo_filenames: ext.photo_filenames ?? [],
     }));
@@ -890,6 +899,20 @@ export function Veo3Card({ userId, username, productId, hideTitle }: Props) {
                 item={r}
                 index={idx}
                 productId={productId}
+                // Solo presets de fruta REALES (id existe) permiten generar
+                // ganchos — no las partes de "alargar" (id sintético -pN).
+                canGenerateHooks={fruitPresets.some((fp) => fp.id === r.presetId)}
+                onHooksUpdated={(hooks) =>
+                  setResults((prev) =>
+                    prev
+                      ? prev.map((it) =>
+                          it.presetId === r.presetId
+                            ? { ...it, text_hooks: hooks }
+                            : it,
+                        )
+                      : prev,
+                  )
+                }
               />
             ))}
           </div>
@@ -1212,13 +1235,32 @@ function ResultItemCard({
   item,
   index,
   productId,
+  canGenerateHooks,
+  onHooksUpdated,
 }: {
   item: ResultItem;
   index: number;
   productId: string;
+  canGenerateHooks?: boolean;
+  onHooksUpdated?: (hooks: string[]) => void;
 }) {
   const segments = item.veo3_prompt_segments ?? [];
   const hasSegments = segments.length > 0;
+  const generateHooks = useGenerateFruitHooks(productId);
+
+  async function runGenerateHooks() {
+    try {
+      const res = await generateHooks.mutateAsync({ presetId: item.presetId });
+      if (res.text_hooks.length === 0) {
+        toast.error("No se generaron ganchos, reintenta.");
+        return;
+      }
+      onHooksUpdated?.(res.text_hooks);
+      toast.success(`${res.text_hooks.length} ganchos generados`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudieron generar ganchos");
+    }
+  }
 
   async function copyText(text: string, label: string) {
     try {
@@ -1311,6 +1353,57 @@ function ResultItemCard({
         <p className="mb-1 text-[10px] italic text-violet-700 dark:text-violet-300">
           Hipótesis: {item.hypothesis}
         </p>
+      )}
+      {((item.text_hooks && item.text_hooks.length > 0) || canGenerateHooks) && (
+        <div className="mb-1.5 rounded border border-orange-500/30 bg-orange-500/5 p-1.5">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold text-orange-700 dark:text-orange-300">
+              ✍️ Gancho de texto (elige 1, va en pantalla al inicio)
+            </p>
+            {canGenerateHooks && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 shrink-0 gap-1 px-2 text-[10px]"
+                onClick={runGenerateHooks}
+                disabled={generateHooks.isPending}
+              >
+                {generateHooks.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {item.text_hooks && item.text_hooks.length > 0
+                  ? "Regenerar"
+                  : "Generar 3 ganchos"}
+              </Button>
+            )}
+          </div>
+          {item.text_hooks && item.text_hooks.length > 0 ? (
+            <div className="space-y-1">
+              {item.text_hooks.map((h, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="min-w-0 flex-1 break-words text-[11px]">
+                    {h}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 shrink-0 gap-1 px-2 text-[10px]"
+                    onClick={() => copyText(h, "Gancho")}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copiar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">
+              Sin ganchos aún — pulsa &ldquo;Generar 3 ganchos&rdquo;.
+            </p>
+          )}
+        </div>
       )}
       {hasSegments ? (
         <div className="space-y-1.5">

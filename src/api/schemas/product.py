@@ -411,6 +411,7 @@ class VideoPresetResponse(BaseModel):
     duration_s: int
     compatible_tiers: list[str]
     text_overlay: str = ""
+    text_hooks: list[str] = Field(default_factory=list)
     text_overlay_style: TextOverlayStyleSchema = Field(default_factory=TextOverlayStyleSchema)
     subtitle_style: SubtitleStyleSchema = Field(default_factory=SubtitleStyleSchema)
     cta_arrow_style: CtaArrowStyleSchema = Field(default_factory=CtaArrowStyleSchema)
@@ -470,6 +471,14 @@ class GenerateFruitResponse(BaseModel):
     cost_usd: float = 0.0
 
 
+class GenerateFruitHooksResponse(BaseModel):
+    """3 ganchos de texto generados (y persistidos) para un preset de fruta."""
+    product_id: str
+    preset_id: str
+    text_hooks: list[str] = Field(default_factory=list)
+    cost_usd: float = 0.0
+
+
 class ExtendFruitRequest(BaseModel):
     """Alargar una historia de fruta (de ~10s) a N partes continuas que el
     user genera por separado y une en un solo vídeo de N×10s."""
@@ -487,6 +496,8 @@ class ExtendFruitResponse(BaseModel):
     product_id: str
     preset_id: str
     parts: list[FruitStoryPart] = Field(default_factory=list)
+    # 3 ganchos de texto (overlay 1er segundo) para el vídeo unido.
+    text_hooks: list[str] = Field(default_factory=list)
     # Fotos del producto a adjuntar al generar la imagen de CADA parte
     # (mismas en todas, para que el bote salga fiel y coherente).
     photo_filenames: list[str] = Field(default_factory=list)

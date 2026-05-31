@@ -985,6 +985,9 @@ def _generate_fruit(
                 title=str(p.get("name", ""))[:200],
                 voice_script=str(p.get("voice_script", ""))[:2000],
                 text_overlay=str(p.get("text_overlay", ""))[:200],
+                text_hooks=[
+                    str(h)[:120] for h in (p.get("text_hooks") or []) if str(h).strip()
+                ][:3],
                 text_overlay_style=_parse_overlay_style(p.get("text_overlay_style")),
                 subtitle_style=SubtitleStyle(enabled=False),
                 cta_arrow_style=_parse_cta_arrow_style(p.get("cta_arrow_style")),
@@ -1020,7 +1023,7 @@ def extend_fruit_story(
     preset: VideoPreset,
     *,
     n_parts: int = 2,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[str]]:
     n_parts = max(2, min(3, int(n_parts)))
     system = load_system_prompt("fruit_story_extender.md")
     _photo_filenames, photo_paths = _collect_product_photos(product)
@@ -1054,7 +1057,11 @@ def extend_fruit_story(
         images=photo_paths or None,
     )
     if not isinstance(result, dict):
-        return []
+        return [], []
+
+    text_hooks = [
+        str(h)[:120] for h in (result.get("text_hooks") or []) if str(h).strip()
+    ][:3]
 
     parts_raw = result.get("parts") or []
     parts: list[dict[str, Any]] = []
@@ -1075,7 +1082,38 @@ def extend_fruit_story(
     # Ordena por índice de parte por si Gemini las devuelve desordenadas y
     # recorta al número pedido.
     parts.sort(key=lambda x: x["part"])
-    return parts[:n_parts]
+    return parts[:n_parts], text_hooks
+
+
+# ---------------------------------------------------------------------------
+# Fruit hooks — genera (o regenera) los 3 ganchos de texto de una historia
+# de fruta ya creada. Devuelve la lista de hooks (máx 3). No persiste — el
+# caller decide. Nunca lanza por item inválido.
+# ---------------------------------------------------------------------------
+def generate_fruit_hooks(product: Product, preset: VideoPreset) -> list[str]:
+    system = load_system_prompt("fruit_hooks.md")
+    notes = getattr(preset, "notes", "") or ""
+    user_prompt = (
+        f"Producto: {product.name}"
+        f"{' (' + product.brand + ')' if product.brand else ''} — "
+        f"categoría {product.category}.\n"
+        f"{_language_block(product)}\n\n"
+        f"=== HISTORIA DE FRUTA (genera 3 ganchos para ella) ===\n"
+        f"- Título: {preset.name}\n"
+        f"- Enfoque: {preset.angle or '(libre)'}\n"
+        f"- Notas (fruta/concepto): {notes or '(sin notas)'}\n"
+        f"- Diálogo/guion: {preset.voice_script or '(sin guion)'}\n\n"
+        f"Devuelve EXACTAMENTE 3 ganchos siguiendo la regla de oro y el schema."
+    )
+    result = generate_json(
+        system_prompt=system, user_prompt=user_prompt,
+        model=DEFAULT_MODEL, temperature=1.0,
+    )
+    if not isinstance(result, dict):
+        return []
+    return [
+        str(h)[:120] for h in (result.get("text_hooks") or []) if str(h).strip()
+    ][:3]
 
 
 # ---------------------------------------------------------------------------

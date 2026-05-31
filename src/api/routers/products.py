@@ -47,6 +47,7 @@ from src.api.schemas.product import (
     ExtendFruitRequest,
     ExtendFruitResponse,
     FruitStoryPart,
+    GenerateFruitHooksResponse,
     GenerateFruitRequest,
     GenerateFruitResponse,
     GeneratePresetsRequest,
@@ -1737,9 +1738,12 @@ def extend_fruit_preset(
         product_id=product_id,
     )
     parts: list[dict] = []
+    text_hooks: list[str] = []
     cost = 0.0
     try:
-        parts = extend_fruit_story(product, preset, n_parts=payload.parts)
+        parts, text_hooks = extend_fruit_story(
+            product, preset, n_parts=payload.parts,
+        )
         job = get_active()
         cost = float(job.total_usd) if job is not None else 0.0
     finally:
@@ -1752,7 +1756,69 @@ def extend_fruit_preset(
         product_id=product_id,
         preset_id=preset_id,
         parts=[FruitStoryPart(**p) for p in parts],
+        text_hooks=text_hooks,
         photo_filenames=list(preset.veo3_photo_filenames or []),
+        cost_usd=cost,
+    )
+
+
+@router.post(
+    "/{product_id}/video-presets/{preset_id}/generate-hooks",
+    response_model=GenerateFruitHooksResponse,
+)
+def generate_fruit_hooks_endpoint(
+    product_id: str,
+    preset_id: str,
+    repo: Annotated[ProductRepo, Depends(get_product_repo)],
+) -> GenerateFruitHooksResponse:
+    """SÍNCRONO. Genera (o regenera) los 3 ganchos de texto de un preset de
+    fruta y los PERSISTE en el preset. Devuelve los 3 ganchos."""
+    from src.cost_tracking import finalize_and_persist, get_active, start_job
+    from src.tiktok_shop.pipeline.preset_generator import generate_fruit_hooks
+
+    product = repo.get(product_id)
+    if product is None:
+        raise ProductNotFoundError(
+            f"Producto '{product_id}' no encontrado.",
+            details={"product_id": product_id},
+        )
+    preset = next(
+        (p for p in product.video_presets if p.id == preset_id), None,
+    )
+    if preset is None:
+        raise ProductNotFoundError(
+            f"Preset '{preset_id}' no encontrado en el producto.",
+            details={"product_id": product_id, "preset_id": preset_id},
+        )
+
+    start_job(
+        job_id=f"fruit_hooks_{uuid.uuid4().hex[:12]}",
+        program="tiktok_shop",
+        mode="preset_generation",
+        title=f"Ganchos fruta: {product.slug}",
+        product_id=product_id,
+    )
+    hooks: list[str] = []
+    cost = 0.0
+    try:
+        hooks = generate_fruit_hooks(product, preset)
+        if hooks:
+            preset.text_hooks = hooks
+            preset.updated_at = _now_iso()
+            product.touch()
+            repo.save(product)
+        job = get_active()
+        cost = float(job.total_usd) if job is not None else 0.0
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+    return GenerateFruitHooksResponse(
+        product_id=product_id,
+        preset_id=preset_id,
+        text_hooks=hooks,
         cost_usd=cost,
     )
 

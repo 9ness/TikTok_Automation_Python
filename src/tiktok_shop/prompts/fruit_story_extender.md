@@ -65,10 +65,22 @@ letters, words, captions, subtitles, watermark, style change, flat cartoon,
 hard cuts. 9:16 vertical format, ~8-10 seconds, single continuous shot.`
 Máximo ~120 palabras por parte.
 
+## GANCHO DE TEXTO (`text_hooks`) — 3 opciones para el vídeo unido
+
+Da **3 opciones** de gancho de texto (el rótulo del primer segundo de la
+historia ya unida). REGLA DE ORO: **plantea el PROBLEMA o la CURIOSIDAD; el
+producto es la respuesta que viene DESPUÉS** — NO nombres el producto/marca.
+Máximo 6-8 palabras, una línea, 2ª persona o "POV:", tono natural español de
+España, máx 1 emoji. Mezcla: 1 de problema-real, 1 de curiosidad, 1 con
+puntito de drama. Ej BIEN: "POV: llevas una semana sin dormir del calor 🥵".
+Ej MAL: "El ventilador que reavivó la llama" (sinopsis) / "Este ventilador te
+cambia el verano" (nombra producto).
+
 ## Output — SOLO JSON válido, sin markdown ni preámbulo
 
 ```json
 {
+  "text_hooks": ["POV: llevas una semana sin dormir del calor 🥵", "Tu cuarto es un horno y no sabes por qué", "Mi pareja duerme fresca y yo me derrito 😮‍💨"],
   "parts": [
     {
       "part": 1,
