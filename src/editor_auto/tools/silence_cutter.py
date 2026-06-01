@@ -497,16 +497,45 @@ class SilenceCutterTool:
                 ctx.on_log(f"[silence_cutter] ⚠️ RMS speech falló ({e}).")
 
             user_threshold = float(config.get("amplitude_noise_db", -30.0))
-            if speech_rms_db is not None:
-                # 15dB por debajo del RMS de voz → captura silencios reales
-                # incluso con ruido ambiente, sin cortar voz.
+            # Medimos el SUELO DE RUIDO real (RMS en los huecos entre palabras).
+            # Anclar a la voz (`speech_rms - 15`) fallaba en grabaciones de mala
+            # SNR (voz bajita + ruido de sala): si la voz va a -36dB el modelo
+            # daba -51dB y se capaba a -30, pero el silencio de sala estaba a
+            # ~-27dB (POR ENCIMA de -30) → no se detectaba NADA y quedaban
+            # silencios sin cortar. El suelo de ruido medido + margen sí encuentra
+            # las pausas en cualquier grabación.
+            noise_floor_db: float | None = None
+            try:
+                noise_floor_db = _measure_noise_floor_db(tmp_audio, words)
+            except Exception as e:
+                ctx.on_log(f"[silence_cutter] ⚠️ Suelo de ruido falló ({e}).")
+
+            if noise_floor_db is not None:
+                # Umbral justo por encima del ruido de sala. Cap a -18dB para no
+                # arriesgarnos a cortar picos de voz; la continuidad mínima
+                # (min_duration) + word-guard protegen la voz real.
+                auto_threshold = min(noise_floor_db + 6.0, -18.0)
+                # Nunca por debajo del suelo histórico -51 (silencios de verdad
+                # en grabaciones limpias quedan muy abajo).
+                noise_db = max(auto_threshold, -51.0)
+                amp_diag["noise_floor_db"] = round(noise_floor_db, 2)
+                amp_diag["auto_threshold_db"] = round(auto_threshold, 2)
+                if speech_rms_db is not None:
+                    amp_diag["speech_rms_db"] = round(speech_rms_db, 2)
+                ctx.on_log(
+                    f"[silence_cutter] Suelo ruido @ {noise_floor_db:.1f}dB "
+                    f"(voz @ {speech_rms_db if speech_rms_db is not None else float('nan'):.1f}dB) "
+                    f"→ umbral silencio {noise_db:.1f}dB"
+                )
+            elif speech_rms_db is not None:
+                # Fallback al modelo antiguo si no hay huecos medibles.
                 auto_threshold = speech_rms_db - 15.0
                 noise_db = max(auto_threshold, user_threshold)
                 amp_diag["speech_rms_db"] = round(speech_rms_db, 2)
                 amp_diag["auto_threshold_db"] = round(auto_threshold, 2)
                 ctx.on_log(
-                    f"[silence_cutter] Voz medida @ {speech_rms_db:.1f}dB → "
-                    f"umbral silencio adaptativo {noise_db:.1f}dB"
+                    f"[silence_cutter] Voz @ {speech_rms_db:.1f}dB → "
+                    f"umbral adaptativo {noise_db:.1f}dB (fallback sin suelo)"
                 )
             else:
                 noise_db = user_threshold
@@ -1671,6 +1700,76 @@ def _measure_speech_rms_db(
     # Mediana es robusta a outliers
     values.sort()
     return values[len(values) // 2]
+
+
+def _measure_noise_floor_db(
+    audio_path: str,
+    words: list[dict],
+    *,
+    max_gaps_sampled: int = 24,
+    min_gap_s: float = 0.35,
+) -> float | None:
+    """Mide el RMS del audio en los HUECOS entre palabras Whisper (el "ruido
+    de sala"). Es la referencia correcta para calibrar el umbral de silencio:
+    el silencio hay que detectarlo JUSTO por encima de este suelo, no a partir
+    del volumen de voz (que falla en grabaciones de mala SNR donde la voz es
+    casi tan baja como el ruido).
+
+    Usa un percentil bajo (p25) de los RMS de los huecos → robusto frente a
+    huecos contaminados por respiraciones o cola de palabra.
+
+    Devuelve dB o None si no hay huecos medibles.
+    """
+    if not words or len(words) < 2:
+        return None
+    gaps: list[tuple[float, float]] = []
+    for i in range(len(words) - 1):
+        try:
+            ge = float(words[i]["end"])
+            gs = float(words[i + 1]["start"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if gs - ge >= min_gap_s:
+            # Recortamos 80ms a cada lado para no medir la cola/inicio de la voz.
+            gaps.append((ge + 0.08, gs - 0.08))
+    gaps = [(a, b) for (a, b) in gaps if b - a > 0.05]
+    if not gaps:
+        return None
+    step = max(1, len(gaps) // max_gaps_sampled)
+    sampled = gaps[::step][:max_gaps_sampled]
+    selects = [f"between(t,{a:.3f},{b:.3f})" for a, b in sampled]
+    select_expr = "+".join(selects)
+    cmd = [
+        "ffmpeg", "-hide_banner", "-nostats",
+        "-i", audio_path,
+        "-af",
+        f"aselect='{select_expr}',astats=metadata=1:reset=1,"
+        f"ametadata=mode=print:key=lavfi.astats.Overall.RMS_level",
+        "-f", "null", "-",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, timeout=180, text=True,
+            encoding="utf-8", errors="ignore",
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    values: list[float] = []
+    for line in (proc.stderr or "").splitlines() + (proc.stdout or "").splitlines():
+        if "RMS_level=" in line:
+            try:
+                v = float(line.split("RMS_level=")[1].strip().split()[0])
+                if v > -200:  # filtra -inf (silencio absoluto)
+                    values.append(v)
+            except (IndexError, ValueError):
+                continue
+    if not values:
+        return None
+    values.sort()
+    # Percentil 25 → suelo representativo sin dejarse arrastrar por huecos
+    # ruidosos (respiración fuerte) que subirían el umbral de más.
+    idx = max(0, int(len(values) * 0.25) - 1)
+    return values[idx]
 
 
 def _run_silencedetect(
