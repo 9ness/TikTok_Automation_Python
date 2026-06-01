@@ -497,45 +497,40 @@ class SilenceCutterTool:
                 ctx.on_log(f"[silence_cutter] ⚠️ RMS speech falló ({e}).")
 
             user_threshold = float(config.get("amplitude_noise_db", -30.0))
-            # Medimos el SUELO DE RUIDO real (RMS en los huecos entre palabras).
-            # Anclar a la voz (`speech_rms - 15`) fallaba en grabaciones de mala
-            # SNR (voz bajita + ruido de sala): si la voz va a -36dB el modelo
-            # daba -51dB y se capaba a -30, pero el silencio de sala estaba a
-            # ~-27dB (POR ENCIMA de -30) → no se detectaba NADA y quedaban
-            # silencios sin cortar. El suelo de ruido medido + margen sí encuentra
-            # las pausas en cualquier grabación.
-            noise_floor_db: float | None = None
+            # Umbral anclado a la MEDIA real de la pista (volumedetect). En
+            # grabaciones de mala SNR (voz bajita + ruido de sala) las pausas a
+            # cortar quedan SOLO ~10dB por encima de la media: p.ej. media -35dB
+            # → pausas ~-27dB, que con un umbral fijo de -30 NO se detectaban
+            # (quedaban por encima) y dejaban silencios sin cortar. mean+10
+            # sigue al nivel real de cada grabación y coincide con el umbral del
+            # auditor (-25 para esta clienta). Se acota para no cortar voz
+            # (cap -24) ni inventar silencios en pistas limpias (piso -45).
+            mean_vol_db: float | None = None
             try:
-                noise_floor_db = _measure_noise_floor_db(tmp_audio, words)
+                mean_vol_db = _measure_mean_volume_db(tmp_audio)
             except Exception as e:
-                ctx.on_log(f"[silence_cutter] ⚠️ Suelo de ruido falló ({e}).")
+                ctx.on_log(f"[silence_cutter] ⚠️ volumedetect falló ({e}).")
 
-            if noise_floor_db is not None:
-                # Umbral justo por encima del ruido de sala. Cap a -18dB para no
-                # arriesgarnos a cortar picos de voz; la continuidad mínima
-                # (min_duration) + word-guard protegen la voz real.
-                auto_threshold = min(noise_floor_db + 6.0, -18.0)
-                # Nunca por debajo del suelo histórico -51 (silencios de verdad
-                # en grabaciones limpias quedan muy abajo).
-                noise_db = max(auto_threshold, -51.0)
-                amp_diag["noise_floor_db"] = round(noise_floor_db, 2)
+            if mean_vol_db is not None:
+                auto_threshold = mean_vol_db + 10.0
+                noise_db = min(max(auto_threshold, -45.0), -24.0)
+                amp_diag["mean_volume_db"] = round(mean_vol_db, 2)
                 amp_diag["auto_threshold_db"] = round(auto_threshold, 2)
                 if speech_rms_db is not None:
                     amp_diag["speech_rms_db"] = round(speech_rms_db, 2)
                 ctx.on_log(
-                    f"[silence_cutter] Suelo ruido @ {noise_floor_db:.1f}dB "
-                    f"(voz @ {speech_rms_db if speech_rms_db is not None else float('nan'):.1f}dB) "
+                    f"[silence_cutter] Media pista @ {mean_vol_db:.1f}dB "
                     f"→ umbral silencio {noise_db:.1f}dB"
                 )
             elif speech_rms_db is not None:
-                # Fallback al modelo antiguo si no hay huecos medibles.
+                # Fallback al modelo antiguo si volumedetect falla.
                 auto_threshold = speech_rms_db - 15.0
                 noise_db = max(auto_threshold, user_threshold)
                 amp_diag["speech_rms_db"] = round(speech_rms_db, 2)
                 amp_diag["auto_threshold_db"] = round(auto_threshold, 2)
                 ctx.on_log(
                     f"[silence_cutter] Voz @ {speech_rms_db:.1f}dB → "
-                    f"umbral adaptativo {noise_db:.1f}dB (fallback sin suelo)"
+                    f"umbral adaptativo {noise_db:.1f}dB (fallback sin media)"
                 )
             else:
                 noise_db = user_threshold
@@ -1702,49 +1697,18 @@ def _measure_speech_rms_db(
     return values[len(values) // 2]
 
 
-def _measure_noise_floor_db(
-    audio_path: str,
-    words: list[dict],
-    *,
-    max_gaps_sampled: int = 24,
-    min_gap_s: float = 0.35,
-) -> float | None:
-    """Mide el RMS del audio en los HUECOS entre palabras Whisper (el "ruido
-    de sala"). Es la referencia correcta para calibrar el umbral de silencio:
-    el silencio hay que detectarlo JUSTO por encima de este suelo, no a partir
-    del volumen de voz (que falla en grabaciones de mala SNR donde la voz es
-    casi tan baja como el ruido).
+def _measure_mean_volume_db(audio_path: str) -> float | None:
+    """Mide la media RMS global de la pista con `volumedetect` (1 pasada).
 
-    Usa un percentil bajo (p25) de los RMS de los huecos → robusto frente a
-    huecos contaminados por respiraciones o cola de palabra.
-
-    Devuelve dB o None si no hay huecos medibles.
+    Es la referencia para calibrar el umbral de silencio adaptativo: las
+    pausas a cortar quedan ~10dB por encima de la media en grabaciones de
+    mala SNR. Devuelve dB o None si no se puede medir.
     """
-    if not words or len(words) < 2:
-        return None
-    gaps: list[tuple[float, float]] = []
-    for i in range(len(words) - 1):
-        try:
-            ge = float(words[i]["end"])
-            gs = float(words[i + 1]["start"])
-        except (KeyError, ValueError, TypeError):
-            continue
-        if gs - ge >= min_gap_s:
-            # Recortamos 80ms a cada lado para no medir la cola/inicio de la voz.
-            gaps.append((ge + 0.08, gs - 0.08))
-    gaps = [(a, b) for (a, b) in gaps if b - a > 0.05]
-    if not gaps:
-        return None
-    step = max(1, len(gaps) // max_gaps_sampled)
-    sampled = gaps[::step][:max_gaps_sampled]
-    selects = [f"between(t,{a:.3f},{b:.3f})" for a, b in sampled]
-    select_expr = "+".join(selects)
     cmd = [
         "ffmpeg", "-hide_banner", "-nostats",
         "-i", audio_path,
-        "-af",
-        f"aselect='{select_expr}',astats=metadata=1:reset=1,"
-        f"ametadata=mode=print:key=lavfi.astats.Overall.RMS_level",
+        "-ac", "1", "-ar", "16000",
+        "-af", "volumedetect",
         "-f", "null", "-",
     ]
     try:
@@ -1754,22 +1718,13 @@ def _measure_noise_floor_db(
         )
     except subprocess.TimeoutExpired:
         return None
-    values: list[float] = []
     for line in (proc.stderr or "").splitlines() + (proc.stdout or "").splitlines():
-        if "RMS_level=" in line:
+        if "mean_volume:" in line:
             try:
-                v = float(line.split("RMS_level=")[1].strip().split()[0])
-                if v > -200:  # filtra -inf (silencio absoluto)
-                    values.append(v)
+                return float(line.split("mean_volume:")[1].strip().split()[0])
             except (IndexError, ValueError):
-                continue
-    if not values:
-        return None
-    values.sort()
-    # Percentil 25 → suelo representativo sin dejarse arrastrar por huecos
-    # ruidosos (respiración fuerte) que subirían el umbral de más.
-    idx = max(0, int(len(values) * 0.25) - 1)
-    return values[idx]
+                return None
+    return None
 
 
 def _run_silencedetect(
