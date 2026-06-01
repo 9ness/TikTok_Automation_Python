@@ -63,7 +63,7 @@ class ProductCreate(BaseModel):
     key_features: list[str] = Field(default_factory=list)
     selling_points: list[str] = Field(default_factory=list)
     # Idioma del contenido (afecta voz + guion + subs). Códigos:
-    # "es_ES" Spain (default), "es_LATAM", "en_US", "en_UK", "pt_BR", "fr_FR".
+    # "es_ES" Spain (default), "es_LATAM", "en_US", "en_UK", "pt_BR", "fr_FR", "it_IT".
     language: str = "es_ES"
     tiktok_shop: ProductTikTokShopInput = Field(default_factory=ProductTikTokShopInput)
     default_tier: TierName = DEFAULT_TIER

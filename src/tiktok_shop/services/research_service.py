@@ -618,7 +618,7 @@ def _parse_video_analysis(text: str) -> dict[str, Any]:
 # ═════════════════════════════════════════════════════════════════════
 _LANG_TO_COUNTRY = {
     "es_ES": "ES", "es_LATAM": "MX", "en_US": "US", "en_UK": "GB",
-    "pt_BR": "BR", "fr_FR": "FR",
+    "pt_BR": "BR", "fr_FR": "FR", "it_IT": "IT",
 }
 
 

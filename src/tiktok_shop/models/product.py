@@ -255,7 +255,7 @@ class Product(BaseModel):
     # - El prompt que Gemini usa al generar presets (voice_script, text_overlay)
     # - La voz default sugerida (Spanish_* MiniMax si es*, English_* si en*)
     # - Subtítulos burned-in en su idioma
-    # Códigos soportados: "es_ES" (Spain), "es_LATAM", "en_US", "en_UK", "pt_BR", "fr_FR"
+    # Códigos soportados: "es_ES" (Spain), "es_LATAM", "en_US", "en_UK", "pt_BR", "fr_FR", "it_IT"
     language: str = "es_ES"
     tiktok_shop: TikTokShopMeta = Field(default_factory=TikTokShopMeta)
     photos: ProductPhotos = Field(default_factory=ProductPhotos)

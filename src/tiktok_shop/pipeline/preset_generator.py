@@ -113,10 +113,10 @@ _VALID_BACKGROUNDS = {"none", "black_bar", "white_bar", "blur"}
 
 # Mapping locale → (instrucciones para el contenido, frase explícita para
 # inyectar en seedance_prompt y veo3_prompt). El segundo string es CRÍTICO:
-# aunque el prompt va en inglés, Veo 3 y Seedance respetan directivas
-# explícitas sobre idioma hablado / texto en pantalla. Sin ello, el modelo
-# inventa textos en inglés y la voz puede sonar a US English en escenas
-# con persona hablando.
+# fija el idioma HABLADO. NO pedimos texto en pantalla — el modelo NO debe
+# quemar texto/letras/subtítulos en el vídeo (sale mal); los hooks, overlays
+# y subtítulos los añade nuestro editor DESPUÉS. La cláusula de "no on-screen
+# text" la añade `_language_block` de forma universal.
 _LANGUAGE_INSTRUCTIONS: dict[str, tuple[str, str]] = {
     "es_ES": (
         "Idioma: ESPAÑOL DE ESPAÑA (castellano peninsular). Usa 'vosotros' "
@@ -124,36 +124,50 @@ _LANGUAGE_INSTRUCTIONS: dict[str, tuple[str, str]] = {
         "'currar', 'curro', 'guay', 'tío/tía' con moderación). Acento "
         "neutro de España. NUNCA mezcles voseo latinoamericano.",
         "Spoken language: SPANISH from Spain (Castilian European Spanish "
-        "accent, NOT Latin American). Any on-screen burned-in text must "
-        "be in European Spanish.",
+        "accent, NOT Latin American).",
     ),
     "es_LATAM": (
         "Idioma: ESPAÑOL LATINOAMERICANO neutro. Usa 'ustedes' no "
         "'vosotros'. Vocabulario panregional sin localismos fuertes. "
         "Acento neutro latino (NO Castilla).",
         "Spoken language: SPANISH (neutral Latin American accent, NOT "
-        "Castilian). On-screen burned-in text in neutral Latin Spanish.",
+        "Castilian).",
     ),
     "en_US": (
         "Language: AMERICAN ENGLISH. Use American spellings (color, "
         "favor). Natural, casual TikTok voiceover energy.",
-        "Spoken language: AMERICAN ENGLISH. On-screen text in American English.",
+        "Spoken language: AMERICAN ENGLISH.",
     ),
     "en_UK": (
         "Language: BRITISH ENGLISH. Use British spellings (colour, "
         "favourite). British expressions where natural ('mate', 'brilliant').",
-        "Spoken language: BRITISH ENGLISH (UK accent). On-screen text in British English.",
+        "Spoken language: BRITISH ENGLISH (UK accent).",
     ),
     "pt_BR": (
         "Idioma: PORTUGUÊS DO BRASIL. Usa vocabulário brasileiro, não "
         "português europeu.",
-        "Spoken language: BRAZILIAN PORTUGUESE. On-screen text in Brazilian Portuguese.",
+        "Spoken language: BRAZILIAN PORTUGUESE.",
     ),
     "fr_FR": (
         "Langue : FRANÇAIS (France).",
-        "Spoken language: FRENCH (France accent). On-screen text in French.",
+        "Spoken language: FRENCH (France accent).",
+    ),
+    "it_IT": (
+        "Lingua: ITALIANO (Italia). Usa espressioni e vocabolario italiani "
+        "naturali, tono da TikTok. Accento italiano standard.",
+        "Spoken language: ITALIAN (Italy accent).",
     ),
 }
+
+# Cláusula universal que prohíbe al modelo de vídeo renderizar texto en
+# pantalla. Se añade SIEMPRE a la directiva (todos los idiomas). El texto
+# (hooks/overlays/subtítulos) lo pone nuestro editor después, no el modelo.
+_NO_ONSCREEN_TEXT_DIRECTIVE = (
+    "Do NOT render or burn any on-screen text, letters, words, captions, "
+    "titles or subtitles inside the video — the only text allowed is the "
+    "product's own label on the packaging. All overlays/subtitles are added "
+    "later in editing."
+)
 
 
 def _research_block(product: Any) -> str:
@@ -270,16 +284,22 @@ def _language_block(product: Any) -> str:
     un código no reconocido."""
     lang = getattr(product, "language", None) or "es_ES"
     instr, prompt_directive = _LANGUAGE_INSTRUCTIONS.get(lang) or _LANGUAGE_INSTRUCTIONS["es_ES"]
+    # La directiva inyectada combina idioma hablado + prohibición universal
+    # de texto en pantalla (el modelo NO quema texto; los overlays/subs los
+    # pone el editor después).
+    full_directive = f"{prompt_directive} {_NO_ONSCREEN_TEXT_DIRECTIVE}"
     return (
         f"\n=== IDIOMA OBLIGATORIO ({lang}) ===\n{instr}\n"
-        f"TODO el contenido en {lang} (voice_script, hooks_alternatives, "
-        f"cta, oratory_tips, text_overlay, title, keywords).\n"
-        f"\n=== DIRECTIVA DE IDIOMA PARA EL VÍDEO (CRÍTICO) ===\n"
+        f"TODO el contenido textual del preset (voice_script, hooks_alternatives, "
+        f"cta, oratory_tips, text_overlay, text_hooks, title, keywords) en {lang}. "
+        f"Ese texto es para hooks/overlays/subtítulos que añadimos en edición — "
+        f"NO para quemarlo en el vídeo.\n"
+        f"\n=== DIRECTIVA PARA EL VÍDEO (CRÍTICO) ===\n"
         f"`seedance_prompt` y `veo3_prompt` van EN INGLÉS (es lo que el "
         f"modelo entiende), PERO debes INCLUIR LITERALMENTE esta frase al "
-        f"final de cada uno:\n  → \"{prompt_directive}\"\n"
-        f"Sin esa frase, Veo 3 puede generar voz/texto en inglés cuando "
-        f"el user quiere {lang}."
+        f"final de cada uno:\n  → \"{full_directive}\"\n"
+        f"Fija la voz hablada en {lang} y evita que el modelo renderice "
+        f"texto en pantalla."
     )
 
 # Máximo de fotos source que pasamos a Gemini como contexto visual al

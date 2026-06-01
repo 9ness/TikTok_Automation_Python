@@ -132,7 +132,7 @@ export interface Product {
   key_features: string[];
   selling_points: string[];
   /** Idioma del contenido. "es_ES" (default Spain), "es_LATAM", "en_US",
-   *  "en_UK", "pt_BR", "fr_FR". Afecta voz + guion + subs al generar. */
+   *  "en_UK", "pt_BR", "fr_FR", "it_IT". Afecta voz + guion + subs al generar. */
   language: string;
   tiktok_shop: TikTokShopMeta;
   photos: ProductPhotos;

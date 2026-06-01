@@ -8,6 +8,7 @@ export const LANGUAGE_OPTIONS = [
   { code: "en_UK", label: "🇬🇧 English (UK)", short: "EN UK" },
   { code: "pt_BR", label: "🇧🇷 Português (Brasil)", short: "PT BR" },
   { code: "fr_FR", label: "🇫🇷 Français (France)", short: "FR" },
+  { code: "it_IT", label: "🇮🇹 Italiano (Italia)", short: "IT" },
 ] as const;
 
 export type LanguageCode = (typeof LANGUAGE_OPTIONS)[number]["code"];
@@ -22,6 +23,7 @@ export const DEFAULT_VOICE_BY_LANGUAGE: Record<string, string> = {
   en_UK: "English_EnergeticBoy",
   pt_BR: "Spanish_EnergeticBoy",         // MiniMax no tiene PT preset estable
   fr_FR: "English_EnergeticBoy",         // fallback inglés hasta tener clones FR
+  it_IT: "English_EnergeticBoy",         // fallback multilingüe hasta tener clones IT
 };
 
 /** Devuelve el label corto para mostrar en badges/header. */
