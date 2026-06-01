@@ -112,6 +112,13 @@ If nothing matches the patterns, return `{"cuts": [], "summary": "Clean transcri
 
 - Word indices must be valid (`0 ≤ idx < total_words`).
 - Cuts must NOT overlap with each other.
+- **The cut range must contain ONLY the words you REMOVE.** `end_word_idx` is
+  the LAST word of the first attempt — the word right BEFORE the kept version
+  begins. NEVER let the range include any word that also appears in your
+  `kept_version`. Wrong: cut 80-99 keep "…cogid más os los voy a enseñar" when
+  words 90-99 ARE "cogid más os los voy a enseñar" (you'd delete what you keep).
+  Right: cut 80-89, the kept words 90+ stay. Cutting a connecting verb/subject
+  that the following sentence needs is a BUG.
 - BE PRECISE: if you're not 90% sure something is a restart, skip it. We
   prefer leaving 1 false-start than cutting a legitimate sentence.
 - A clean transcript with intentional repetitions returns 0 cuts. Don't

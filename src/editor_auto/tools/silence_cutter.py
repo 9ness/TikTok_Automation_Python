@@ -1290,7 +1290,50 @@ def _ai_false_starts_consensus(
         "total_unique": len(seen),
     }
 
-    intervals = [(v["t_start"], v["t_end"]) for v in seen.values()]
+    # Reconciliación de cortes que SE SOLAPAN entre modelos. La unión ciega
+    # (coger el rango más ancho) hacía que un modelo con end_word_idx demasiado
+    # largo se comiera palabras que el OTRO (y su propio kept_version) quería
+    # conservar → frases rotas ("os los voy a [enseñar]…"). Regla:
+    #   · false-start / repetición / paráfrasis  → INTERSECCIÓN (conservador:
+    #     solo el trozo en que ambos coinciden = el primer intento, sin tocar
+    #     lo que viene después).
+    #   · redundant_restatement (cierre/CTA/precio repetido) → UNIÓN (sí
+    #     queremos quitar todo el bloque redundante entero).
+    recs: list[dict] = []
+    for v in seen.values():
+        raw = v["raw"]
+        recs.append({
+            "i0": int(raw.get("start_word_idx", -999)),
+            "i1": int(raw.get("end_word_idx", -999)),
+            "t0": v["t_start"], "t1": v["t_end"],
+            "kind": str(raw.get("kind", "")),
+        })
+    recs.sort(key=lambda r: (r["i0"], r["i1"]))
+    clusters: list[dict] = []
+    for r in recs:
+        if clusters and r["i0"] <= clusters[-1]["max_i1"]:
+            clusters[-1]["members"].append(r)
+            clusters[-1]["max_i1"] = max(clusters[-1]["max_i1"], r["i1"])
+        else:
+            clusters.append({"members": [r], "max_i1": r["i1"]})
+
+    intervals: list[tuple[float, float]] = []
+    for c in clusters:
+        ms = c["members"]
+        if len(ms) == 1:
+            intervals.append((ms[0]["t0"], ms[0]["t1"]))
+            continue
+        if any(m["kind"] == "redundant_restatement" for m in ms):
+            intervals.append((min(m["t0"] for m in ms), max(m["t1"] for m in ms)))
+        else:
+            lo = max(m["t0"] for m in ms)
+            hi = min(m["t1"] for m in ms)
+            if hi - lo > 0.02:
+                intervals.append((lo, hi))
+            else:
+                # sin solape temporal real → el corte más corto (conservador)
+                shortest = min(ms, key=lambda m: m["t1"] - m["t0"])
+                intervals.append((shortest["t0"], shortest["t1"]))
     return intervals, diag
 
 
