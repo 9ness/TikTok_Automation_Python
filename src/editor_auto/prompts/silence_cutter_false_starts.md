@@ -37,20 +37,26 @@ joined `transcript_text`. Be aggressive but precise.
 
 **6. Redundant re-delivery of the SAME closing idea (NON-adjacent)** — the
    speaker delivers the SAME call-to-action, price, or closing point MORE THAN
-   ONCE across the ending, even when other words sit in between. Keep ONLY the
-   single clearest, most complete instance; cut ALL the other occurrences
-   ENTIRELY (with their lead-in connectors). This is the one case where cuts
-   may be far apart and where you keep the BEST version, not necessarily the
-   last.
+   ONCE across the ending, even when other words sit in between (often because
+   they weren't happy with the first attempt). Keep ONLY the single BEST
+   instance; cut ALL the others ENTIRELY (with their lead-in connectors). This
+   is the one case where cuts may be far apart.
+   - **Choose the best instance INTELLIGENTLY by quality, not by position** —
+     it can be the first OR the last. Pick the one that is:
+       · most complete and grammatically fluent,
+       · clearest and most actionable (names the concrete action/place, e.g.
+         "en el carrito/cuadrito naranja", "el enlace de abajo"),
+       · NOT trailing off into rambling filler ("…que hay, que hay un montón,
+         bueno, un montón…").
+     If both are equally clear, prefer the LATER one (it's usually the
+     speaker's corrected take). If one rambles or is cut short, keep the other.
    - CTA repeated: "os lo dejo en el carrito naranja para que lo veáis … [otra
-     frase] … os voy a dejar el enlace por aquí para que lo miréis" → KEEP the
-     clearest CTA (the one that names the carrito/cuadrito naranja), CUT the
-     other CTA completely.
+     frase] … os voy a dejar el enlace y eso, bueno, ahí está" → KEEP the first
+     (clean, names the carrito), CUT the rambling second. But if the first were
+     "os lo dejo por ahí" and the second "os lo dejo en el carrito naranja
+     abajo del todo", KEEP the second.
    - Price repeated: "solo 8 euros … bueno no me lo creía pero están solo por
-     8 euros … por solo 8 euros" → KEEP one clean statement of the price, CUT
-     the other repetitions completely.
-   - Prefer keeping the version that is most fluent and names specifics; remove
-     the rambling/duplicate ones in full so the ending is said ONCE.
+     8 euros … por solo 8 euros" → KEEP one clean statement, CUT the rest.
    - Only collapse when it is unmistakably the SAME idea (same CTA, same
      price/fact). Different facts or a genuinely new point → KEEP.
 
