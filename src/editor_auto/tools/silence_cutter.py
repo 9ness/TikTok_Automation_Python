@@ -1968,15 +1968,21 @@ def _drop_words_inside_silences(
     words: list[dict],
     silences: list[tuple[float, float]],
     *,
-    min_inside_ratio: float = 0.8,
+    flank_s: float = 0.2,
 ) -> tuple[list[dict], list[dict]]:
     """Separa palabras AUDIBLES de palabras FANTASMA por amplitud.
 
-    Una palabra cuyo span temporal cae (≥`min_inside_ratio`) DENTRO de una
-    zona medida como silencio por amplitud es inaudible (Whisper la alucinó
-    o le puso un timestamp erróneo en un hueco real). Cortarla no pierde
-    audio. Las quitamos de la lista que protege los cortes para que el
-    silencio acústico real no se fragmente alrededor de palabras-fantasma.
+    Una palabra es FANTASMA solo si está ENTERAMENTE dentro de un silencio
+    medido por amplitud Y ese silencio la rodea por AMBOS lados con margen
+    `flank_s` (queda "varada" en mitad de un silencio largo → Whisper la
+    alucinó o le puso timestamp erróneo en un hueco real, es inaudible).
+
+    El flanqueo por ambos lados es CLAVE: una palabra real dicha muy bajo al
+    final de una frase (voz floja) tiene silencio SOLO después, no antes —
+    NO debe contar como fantasma o claparíamos el cierre real (p.ej. el
+    precio "8 euros" final de una creadora que habla bajito). Las fantasma
+    de verdad (palabras sueltas en mitad de una pausa) sí tienen silencio a
+    ambos lados.
 
     Returns: (voiced_words, ghost_words).
     """
@@ -1991,15 +1997,12 @@ def _drop_words_inside_silences(
         except (KeyError, ValueError, TypeError):
             voiced.append(w)
             continue
-        dur = max(1e-6, we - ws)
-        inside = 0.0
-        for a, b in sil:
-            if b <= ws:
-                continue
-            if a >= we:
-                break
-            inside += min(we, b) - max(ws, a)
-        if inside / dur >= min_inside_ratio:
+        # ¿Hay un silencio que contenga la palabra con margen a ambos lados?
+        flanked = any(
+            a <= ws - flank_s and b >= we + flank_s
+            for a, b in sil
+        )
+        if flanked:
             ghosts.append(w)
         else:
             voiced.append(w)
