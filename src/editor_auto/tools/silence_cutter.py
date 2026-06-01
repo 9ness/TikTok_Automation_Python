@@ -564,11 +564,31 @@ class SilenceCutterTool:
             silero_cuts, high_confidence_threshold_s=0.8,
         )
 
+        # Palabras-fantasma POR AMPLITUD: Whisper a veces coloca palabras
+        # reales (no "uh/um", que Silero sí caza) con timestamps erróneos
+        # DENTRO de un silencio acústico medido (voz bajita / mala SNR). Si
+        # el span de la palabra está casi todo por debajo del umbral de
+        # silencio, es inaudible → la quitamos de las listas de protección
+        # para que el corte acústico no se fragmente a su alrededor y deje el
+        # silencio sin cortar.
+        voiced_words = clean_words
+        if amp_cuts and clean_words:
+            voiced_words, amp_ghosts = _drop_words_inside_silences(
+                clean_words, amp_cuts,
+            )
+            if amp_ghosts:
+                ctx.on_log(
+                    f"[silence_cutter] 👻 {len(amp_ghosts)} palabra(s) "
+                    f"fantasma por amplitud (dentro de silencio real, "
+                    f"inaudibles) — no protegen cortes: "
+                    + ", ".join(f"'{w.get('word')}'" for w in amp_ghosts[:8])
+                )
+
         # Cuts NORMAL (Silero <0.8s + amplitude) → pasan por el trim de
         # palabras para no cortar voz por error en gaps pequeños.
         acoustic_normal_raw = silero_normal + amp_cuts
         acoustic_filtered = _trim_cuts_to_avoid_words(
-            acoustic_normal_raw, words=clean_words, pad_s=_SAFETY_PAD_S,
+            acoustic_normal_raw, words=voiced_words, pad_s=_SAFETY_PAD_S,
             min_remaining_s=_MIN_REMAINING_S,
         )
         # Aplicar AMBOS sets de cuts
@@ -716,12 +736,15 @@ class SilenceCutterTool:
         cuts_only = [(s, e) for (s, e, _) in cuts_with_source]
         merged_cuts = _merge_intervals(cuts_only)
         # Protección de palabras: ningún corte clipa el final/inicio de una
-        # palabra (guard de _WORD_GUARD_S). Se aplica sobre clean_words
-        # (sin fantasmas) tras fusionar — cubre TODAS las fuentes de corte.
+        # palabra (guard de _WORD_GUARD_S). Se aplica sobre voiced_words
+        # (sin fantasmas Silero NI fantasmas por amplitud) tras fusionar —
+        # cubre TODAS las fuentes de corte. Usar voiced_words evita que una
+        # palabra inaudible dentro de un silencio real proteja (y deje sin
+        # cortar) ese silencio.
         n_before = len(merged_cuts)
-        if clean_words:
+        if voiced_words:
             merged_cuts = _protect_word_boundaries(
-                merged_cuts, clean_words, _WORD_GUARD_S,
+                merged_cuts, voiced_words, _WORD_GUARD_S,
             )
             merged_cuts = _merge_intervals(merged_cuts)  # re-merge por si encogieron
             ctx.on_log(
@@ -1939,6 +1962,48 @@ def _split_silero_cuts_by_confidence(
         else:
             normal.append((s, e))
     return high, normal
+
+
+def _drop_words_inside_silences(
+    words: list[dict],
+    silences: list[tuple[float, float]],
+    *,
+    min_inside_ratio: float = 0.8,
+) -> tuple[list[dict], list[dict]]:
+    """Separa palabras AUDIBLES de palabras FANTASMA por amplitud.
+
+    Una palabra cuyo span temporal cae (≥`min_inside_ratio`) DENTRO de una
+    zona medida como silencio por amplitud es inaudible (Whisper la alucinó
+    o le puso un timestamp erróneo en un hueco real). Cortarla no pierde
+    audio. Las quitamos de la lista que protege los cortes para que el
+    silencio acústico real no se fragmente alrededor de palabras-fantasma.
+
+    Returns: (voiced_words, ghost_words).
+    """
+    if not words or not silences:
+        return list(words), []
+    sil = _merge_intervals(list(silences))
+    voiced: list[dict] = []
+    ghosts: list[dict] = []
+    for w in words:
+        try:
+            ws = float(w["start"]); we = float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            voiced.append(w)
+            continue
+        dur = max(1e-6, we - ws)
+        inside = 0.0
+        for a, b in sil:
+            if b <= ws:
+                continue
+            if a >= we:
+                break
+            inside += min(we, b) - max(ws, a)
+        if inside / dur >= min_inside_ratio:
+            ghosts.append(w)
+        else:
+            voiced.append(w)
+    return voiced, ghosts
 
 
 def _trim_cuts_to_avoid_words(
