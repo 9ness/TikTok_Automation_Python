@@ -302,6 +302,51 @@ def _language_block(product: Any) -> str:
         f"texto en pantalla."
     )
 
+# Palabras clave que marcan un producto como ropa íntima / muy ajustada /
+# baño — categorías donde Veo 3 y los filtros de contenido rechazan personas
+# si la escena parece sugerente. ES + EN + IT (mercado italiano).
+_SENSITIVE_APPAREL_KEYWORDS = (
+    "ropa interior", "calzoncillo", "calzoncillos", "boxer", "boxers", "brief",
+    "briefs", "slip", "tanga", "thong", "braga", "bragas", "panty", "panties",
+    "lenceria", "lencería", "lingerie", "sujetador", "bra", "underwear",
+    "intimo", "íntimo", "intimates", "mutande", "intimo uomo", "biancheria",
+    "bikini", "bañador", "banador", "swimwear", "swimsuit", "costume da bagno",
+    "calzamaglia", "leggings", "medias", "pantimedias",
+)
+
+
+def _sensitive_apparel_block(product: Any) -> str:
+    """Si el producto es ropa íntima/ajustada/baño, devuelve una guía para
+    que el director enmarque los prompts de vídeo como ANUNCIO COMERCIAL
+    tasteful (cintura para abajo / sin cara, foco en la prenda, NO sexual) y
+    así Veo 3 NO rechace la generación. Vacío si no aplica."""
+    haystack = " ".join(
+        str(getattr(product, f, "") or "").lower()
+        for f in ("name", "category", "subcategory", "brand")
+    )
+    if not any(k in haystack for k in _SENSITIVE_APPAREL_KEYWORDS):
+        return ""
+    return (
+        "\n=== ROPA ÍNTIMA / AJUSTADA — EVITA QUE Veo 3 RECHACE EL VÍDEO ===\n"
+        "Este producto es ropa interior/íntima/baño. Veo 3 y los filtros de "
+        "contenido RECHAZAN personas en ropa interior si la escena parece "
+        "sugerente. Para que SÍ genere:\n"
+        "- Enfoca SIEMPRE como ANUNCIO COMERCIAL de moda/textil, elegante y NO "
+        "sexual (catálogo, publicidad de marca de ropa interior).\n"
+        "- Muestra a la persona de CINTURA PARA ABAJO o plano medio del torso, "
+        "con la CARA FUERA DE CUADRO (sin primeros planos de cara) — el foco es "
+        "la PRENDA: ajuste, tejido, comodidad.\n"
+        "- Pose neutra y natural (de pie, caminando), luz de estudio/lifestyle "
+        "limpia. NADA de poses insinuantes ni primeros planos del cuerpo.\n"
+        "- En `seedance_prompt` y `veo3_prompt` incluye LITERALMENTE al final "
+        "esta frase de seguridad:\n"
+        "  → \"Tasteful commercial underwear/apparel advertisement, model shown "
+        "from the waist down or mid-torso with the face out of frame, focus on "
+        "the garment fit and fabric, neutral confident pose, clean studio "
+        "lighting, fully non-sexual, non-explicit, modest, no nudity.\"\n"
+    )
+
+
 # Máximo de fotos source que pasamos a Gemini como contexto visual al
 # generar presets. Más infla el coste (Gemini cobra por tile) y rara vez
 # aporta: con 6 ya tiene packshot + lifestyle + texture. El user puede
@@ -653,7 +698,8 @@ def _generate_music(
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
         f"{_research_block(product)}\n"
-        f"{_language_block(product)}\n\n"
+        f"{_language_block(product)}\n"
+        f"{_sensitive_apparel_block(product)}\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets musicales. Sigue el schema al pie de la letra."
     )
@@ -768,7 +814,8 @@ def _generate_scripted(product: Product, *, n: int = 12) -> list[VideoPreset]:
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
         f"{_research_block(product)}\n"
-        f"{_language_block(product)}\n\n"
+        f"{_language_block(product)}\n"
+        f"{_sensitive_apparel_block(product)}\n"
         f"{photos_block}\n"
         f"Genera EXACTAMENTE {n} presets scripted, cada uno con un ÁNGULO "
         f"distinto del menú. Sigue el schema al pie de la letra."
@@ -969,7 +1016,8 @@ def _generate_fruit(
         f"- Key features: {', '.join(product.key_features) or '(sin definir)'}\n"
         f"- Selling points: {', '.join(product.selling_points) or '(sin definir)'}\n"
         f"{_research_block(product)}\n"
-        f"{_language_block(product)}\n\n"
+        f"{_language_block(product)}\n"
+        f"{_sensitive_apparel_block(product)}\n"
         f"{photos_block}\n"
         f"{_fruit_mode_directive(n, ab_mode=ab_mode, fruit_hint=fruit_hint, angle_hint=angle_hint, custom_theme=custom_theme)}"
     )
@@ -1056,7 +1104,8 @@ def extend_fruit_story(
         f"- Categoría: {product.category}"
         f"{' / ' + product.subcategory if product.subcategory else ''}\n"
         f"- Precio real: {_fmt_price(product)}\n"
-        f"{_language_block(product)}\n\n"
+        f"{_language_block(product)}\n"
+        f"{_sensitive_apparel_block(product)}\n"
         f"=== HISTORIA ORIGINAL (pensada para 1 clip de ~10s) — ALÁRGALA ===\n"
         f"- Título: {preset.name}\n"
         f"- Enfoque: {preset.angle or '(libre)'}\n"
