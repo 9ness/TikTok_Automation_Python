@@ -488,6 +488,7 @@ class SilenceCutterTool:
         # -30dB fijo si la medición falla.
         amp_cuts: list[tuple[float, float]] = []
         amp_diag: dict[str, Any] = {"enabled": amp_on}
+        mean_vol_db: float | None = None  # nivel global → decide normalización
         if amp_on:
             ctx.on_progress(0.42, "📉 Calibrando umbral por amplitud…")
             speech_rms_db: float | None = None
@@ -505,7 +506,6 @@ class SilenceCutterTool:
             # sigue al nivel real de cada grabación y coincide con el umbral del
             # auditor (-25 para esta clienta). Se acota para no cortar voz
             # (cap -24) ni inventar silencios en pistas limpias (piso -45).
-            mean_vol_db: float | None = None
             try:
                 mean_vol_db = _measure_mean_volume_db(tmp_audio)
             except Exception as e:
@@ -800,6 +800,22 @@ class SilenceCutterTool:
         )
 
         # 9) Aplicar cortes con FFmpeg directo (autorotate nativo respeta rotation)
+        # Normalización de loudness: SOLO si la pista viene baja (auto). Sube
+        # grabaciones flojas a -16 LUFS para que se OIGAN (creadoras que graban
+        # bajito). No toca a quien ya graba a buen nivel → general y seguro.
+        # Override manual con config `audio_normalize` (None = auto por nivel).
+        norm_cfg = config.get("audio_normalize", None)
+        if norm_cfg is None:
+            normalize_audio = mean_vol_db is not None and mean_vol_db < -24.0
+        else:
+            normalize_audio = bool(norm_cfg)
+        if normalize_audio:
+            ctx.on_log(
+                f"[silence_cutter] 🔊 Audio bajo (media "
+                f"{mean_vol_db if mean_vol_db is not None else float('nan'):.1f}dB) "
+                f"→ normalizo a -16 LUFS para que se oiga."
+            )
+        diagnostic["final"]["audio_normalized"] = normalize_audio
         ctx.on_progress(0.72, "✂️ Aplicando cortes con FFmpeg…")
         _apply_cuts_ffmpeg(
             input_path=input_path,
@@ -809,6 +825,7 @@ class SilenceCutterTool:
             output_aspect=config.get("output_aspect", "9:16"),
             log=ctx.on_log,
             on_progress=lambda f: ctx.on_progress(0.72 + f * 0.25, "✂️ Renderizando…"),
+            normalize_audio=normalize_audio,
         )
 
         # 10) Auditoría post-render — analizar el MP4 final con silencedetect
@@ -1968,7 +1985,7 @@ def _drop_words_inside_silences(
     words: list[dict],
     silences: list[tuple[float, float]],
     *,
-    flank_s: float = 0.2,
+    flank_s: float = 0.05,
 ) -> tuple[list[dict], list[dict]]:
     """Separa palabras AUDIBLES de palabras FANTASMA por amplitud.
 
@@ -2327,6 +2344,7 @@ def _apply_cuts_ffmpeg(
     output_aspect: str,
     log,
     on_progress,
+    normalize_audio: bool = False,
 ) -> None:
     """Concatena los `keep_intervals` con un filter_complex de FFmpeg.
 
@@ -2379,10 +2397,20 @@ def _apply_cuts_ffmpeg(
         filter_parts.append(audio_filter)
         concat_inputs.append(f"[v{i}][a{i}]")
 
+    # Etiqueta de salida de audio: si normalizamos, encadenamos loudnorm
+    # (EBU R128 → -16 LUFS) DESPUÉS del concat para que TODA la pista quede a
+    # loudness estándar y se oiga (grabaciones bajitas que antes "no se oían").
+    # Se aplica al output final, una sola vez, tras unir los segmentos.
+    a_out = "[outa]"
+    norm_part = ""
+    if normalize_audio:
+        norm_part = ";[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]"
+        a_out = "[outa_norm]"
+
     concat_filter = (
         "".join(concat_inputs) + f"concat=n={n}:v=1:a=1[outv][outa]"
     )
-    filter_complex = ";".join(filter_parts) + ";" + concat_filter
+    filter_complex = ";".join(filter_parts) + ";" + concat_filter + norm_part
 
     # Duración esperada del output (suma de keep_intervals) → ms para que el
     # progress callback sepa contra qué comparar `out_time_ms` y dar % real.
@@ -2393,7 +2421,7 @@ def _apply_cuts_ffmpeg(
         "-i", input_path,
         "-filter_complex", filter_complex,
         "-map", "[outv]",
-        "-map", "[outa]",
+        "-map", a_out,
         *_video_encoder_args(),
         "-c:a", "aac",
         "-b:a", "192k",
