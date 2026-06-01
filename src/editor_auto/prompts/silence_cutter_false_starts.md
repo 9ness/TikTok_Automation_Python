@@ -35,6 +35,25 @@ joined `transcript_text`. Be aggressive but precise.
    - "es muy bu— es muy bueno" → cut "es muy bu—"
    - "te re— te recomiendo" → cut "te re—"
 
+**6. Redundant re-delivery of the SAME closing idea (NON-adjacent)** — the
+   speaker delivers the SAME call-to-action, price, or closing point MORE THAN
+   ONCE across the ending, even when other words sit in between. Keep ONLY the
+   single clearest, most complete instance; cut ALL the other occurrences
+   ENTIRELY (with their lead-in connectors). This is the one case where cuts
+   may be far apart and where you keep the BEST version, not necessarily the
+   last.
+   - CTA repeated: "os lo dejo en el carrito naranja para que lo veáis … [otra
+     frase] … os voy a dejar el enlace por aquí para que lo miréis" → KEEP the
+     clearest CTA (the one that names the carrito/cuadrito naranja), CUT the
+     other CTA completely.
+   - Price repeated: "solo 8 euros … bueno no me lo creía pero están solo por
+     8 euros … por solo 8 euros" → KEEP one clean statement of the price, CUT
+     the other repetitions completely.
+   - Prefer keeping the version that is most fluent and names specifics; remove
+     the rambling/duplicate ones in full so the ending is said ONCE.
+   - Only collapse when it is unmistakably the SAME idea (same CTA, same
+     price/fact). Different facts or a genuinely new point → KEEP.
+
 ## Anti-patterns (DO NOT cut)
 
 - **Intentional emphasis repetition**: "muy, muy bueno", "siempre, siempre"
@@ -74,7 +93,9 @@ ONLY valid JSON. No preamble, no markdown fences:
 Rules for cut entries:
 - `start_word_idx` and `end_word_idx` are INCLUSIVE indices into `words[]`.
 - `kind` ∈ {"exact_repetition", "paraphrased_restart", "wrong_then_correct",
-  "abandoned_phrase", "stuttered_word"}.
+  "abandoned_phrase", "stuttered_word", "redundant_restatement"}.
+  Use "redundant_restatement" for Pattern 6 (same CTA/price/closing said more
+  than once across the ending — keep the clearest, cut the rest).
 - `first_attempt` and `kept_version` are short text snippets to show the
   operator WHY you made each cut. Useful for debugging/iteration.
 - `reason` is one short sentence in Spanish explaining the decision.
