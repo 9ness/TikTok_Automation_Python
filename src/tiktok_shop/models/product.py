@@ -30,6 +30,14 @@ def slugify(name: str) -> str:
     s = re.sub(r"ñ", "n", s)
     s = re.sub(r"[^a-z0-9]+", "_", s)
     s = s.strip("_")
+    # Cap de longitud: nombres de producto largos generaban slugs de 150+
+    # chars que (a) rompían el max_length del schema al re-guardar y (b) son
+    # malos como nombre de carpeta. Cortamos a 120 en frontera de palabra.
+    if len(s) > 120:
+        s = s[:120]
+        if "_" in s:
+            s = s[: s.rfind("_")]
+        s = s.strip("_")
     return s or "producto"
 
 
