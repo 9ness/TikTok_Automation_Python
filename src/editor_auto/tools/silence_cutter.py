@@ -1345,12 +1345,12 @@ def _protect_word_boundaries(
     starts = sorted(float(w["start"]) for w in words if "start" in w)
     out: list[tuple[float, float]] = []
     for s, e in cuts:
-        # Fin de palabra más a la derecha que cae antes del final del cut →
-        # el cut debe empezar después de ella + guard.
-        prev_end = max((x for x in ends if x <= e), default=None)
-        # Inicio de palabra más a la izquierda que cae después del inicio del
-        # cut → el cut debe acabar antes de ella - guard.
-        next_start = min((x for x in starts if x >= s), default=None)
+        # CLAVE: la palabra PREVIA es la que termina antes del INICIO del cut
+        # (end <= s), y la SIGUIENTE la que empieza después del FINAL del cut
+        # (start >= e). Usar <=e / >=s cogía una palabra de DENTRO del gap y
+        # encogía/eliminaba cortes legítimos (bug que dejaba silencios).
+        prev_end = max((x for x in ends if x <= s), default=None)
+        next_start = min((x for x in starts if x >= e), default=None)
         ns = s if prev_end is None else max(s, prev_end + guard_s)
         ne = e if next_start is None else min(e, next_start - guard_s)
         if ne - ns > 0.05:
@@ -1374,6 +1374,13 @@ def _clamp_cuts_to_silence_edges(
     (ya pasó por el word-guard)."""
     if not cuts or not silences:
         return cuts
+    # Recorte MÁXIMO permitido por borde. Solo ajustamos el borde si es un
+    # recorte PEQUEÑO (proteger la cola/inicio de una palabra por imprecisión
+    # de Whisper, ~<500ms). Si la amplitud diría que hay que encoger MUCHO,
+    # es que está infra-detectando (audio bajito / ruido de sala por encima
+    # del umbral) → NO nos fiamos y mantenemos el corte completo, para no
+    # dejar silencios grandes sin cortar.
+    _MAX_EDGE_SHRINK_S = 0.5
     sil = _merge_intervals(list(silences))
     out: list[tuple[float, float]] = []
     for s, e in cuts:
@@ -1381,8 +1388,12 @@ def _clamp_cuts_to_silence_edges(
         if overlapping:
             sil_lo = min(a for a, _ in overlapping)
             sil_hi = max(b for _, b in overlapping)
-            ns = max(s, sil_lo)   # no cortar antes de que empiece el silencio real
-            ne = min(e, sil_hi)   # no cortar después de que acabe el silencio real
+            ns = s
+            if sil_lo > s and (sil_lo - s) <= _MAX_EDGE_SHRINK_S:
+                ns = sil_lo   # empezar donde el audio se calla de verdad
+            ne = e
+            if sil_hi < e and (e - sil_hi) <= _MAX_EDGE_SHRINK_S:
+                ne = sil_hi   # acabar donde el audio vuelve de verdad
             if ne - ns > 0.05:
                 out.append((ns, ne))
         else:
