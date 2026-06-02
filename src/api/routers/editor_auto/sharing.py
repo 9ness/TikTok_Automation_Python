@@ -112,7 +112,9 @@ def create_user_share(
     u = _user_or_raise(user_id)
     email = _validate_email(payload.get("email") or "")
     folders = payload.get("folders") or None
-    role = (payload.get("role") or "reader").strip()
+    # Sin role explícito → None → cada carpeta recibe el rol que necesita
+    # (entrada=writer para subir, salida=reader para descargar).
+    role = (payload.get("role") or "").strip() or None
     notify = bool(payload.get("notify", True))
     try:
         results = drive_sharing.share_folders(

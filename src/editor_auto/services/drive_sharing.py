@@ -46,6 +46,19 @@ DRIVE_USERS_FOLDER = "Usuarios"
 SHAREABLE_FOLDERS = {"entrada", "cola", "recuperacion", "salida"}
 DEFAULT_SHARE_FOLDERS = ("entrada", "salida")
 
+# Rol que NECESITA cada carpeta según su función:
+#  - `entrada`: el cliente SUBE sus vídeos → necesita ESCRITURA (writer). Con
+#    solo lectura no puede subir nada.
+#  - `salida`: el cliente solo DESCARGA el vídeo editado → con lectura basta.
+#  - `cola`/`recuperacion`: internas; si se comparten, lectura.
+# Se usa cuando no se pasa un `role` explícito → cada carpeta recibe el suyo.
+_FOLDER_DEFAULT_ROLE = {
+    "entrada": "writer",
+    "cola": "reader",
+    "recuperacion": "reader",
+    "salida": "reader",
+}
+
 
 class DriveSharingError(Exception):
     """Error de operación Drive (autenticación, folder not found,
@@ -213,7 +226,7 @@ def share_folders(
     username: str,
     email: str,
     folders: list[str] | None = None,
-    role: str = "reader",
+    role: str | None = None,
     notify: bool = True,
 ) -> list[dict[str, Any]]:
     """Comparte las subcarpetas indicadas de `username` con `email`.
@@ -222,11 +235,18 @@ def share_folders(
     necesita ver). Devuelve lista de permissions creados — uno por
     carpeta, con `{folder, permission_id, role, email}`.
 
+    `role`:
+      - None (default) → cada carpeta recibe el rol que NECESITA según su
+        función (`entrada` writer para que el cliente pueda SUBIR, `salida`
+        reader porque solo DESCARGA). Es lo correcto en el 99% de los casos.
+      - "reader"/"commenter"/"writer" → fuerza ESE rol en todas las carpetas
+        (override manual).
+
     Si el email ya tiene acceso a alguna carpeta, la API devuelve un
     permiso existente — no falla. `notify=False` evita el email
     automático de Drive (útil para re-shares silenciosos).
     """
-    if role not in ("reader", "commenter", "writer"):
+    if role is not None and role not in ("reader", "commenter", "writer"):
         raise DriveSharingError(f"Role no permitido: {role!r}")
     targets = folders or list(DEFAULT_SHARE_FOLDERS)
     invalid = [f for f in targets if f not in SHAREABLE_FOLDERS]
@@ -238,7 +258,9 @@ def share_folders(
     results: list[dict[str, Any]] = []
     for folder in targets:
         folder_id = _subfolder_id(username, folder)
-        body = {"type": "user", "role": role, "emailAddress": email}
+        # Rol efectivo: el forzado, o el que necesita la carpeta por su función.
+        eff_role = role or _FOLDER_DEFAULT_ROLE.get(folder, "reader")
+        body = {"type": "user", "role": eff_role, "emailAddress": email}
         try:
             perm = svc.permissions().create(
                 fileId=folder_id,
@@ -256,7 +278,7 @@ def share_folders(
             "folder_id": folder_id,
             "permission_id": perm.get("id"),
             "email": perm.get("emailAddress", email),
-            "role": perm.get("role", role),
+            "role": perm.get("role", eff_role),
             "type": perm.get("type", "user"),
             "display_name": perm.get("displayName"),
         })
