@@ -187,6 +187,38 @@ def user_recovery_folder(username: str) -> str:
     return os.path.join(user_folder(username), "recuperacion")
 
 
+_VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
+
+
+def count_output_videos_today(username: str) -> int | None:
+    """Cuenta los vídeos en `salida/` MODIFICADOS hoy (fecha local).
+
+    Sirve para el aviso "vídeos del día listos": refleja lo realmente editado
+    HOY, ignorando archivos que se quedaran de días anteriores sin borrar.
+    Devuelve el nº, o None si la carpeta no existe / no se puede leer.
+    """
+    from datetime import datetime
+    folder = user_output_folder(username)
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return None
+    today = datetime.now().date()
+    n = 0
+    for name in names:
+        if os.path.splitext(name)[1].lower() not in _VIDEO_EXTS:
+            continue
+        try:
+            mtime = datetime.fromtimestamp(
+                os.path.getmtime(os.path.join(folder, name))
+            ).date()
+        except OSError:
+            continue
+        if mtime == today:
+            n += 1
+    return n
+
+
 # Slugs canónicos de las 4 carpetas — el frontend los usa como IDs en
 # las URLs y los validamos contra esta whitelist en el backend.
 USER_FOLDERS = ("entrada", "cola", "recuperacion", "salida")

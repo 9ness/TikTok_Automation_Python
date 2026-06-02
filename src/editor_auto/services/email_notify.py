@@ -19,6 +19,7 @@ import logging
 import os
 import smtplib
 import ssl
+from datetime import datetime
 from email.message import EmailMessage
 
 logger = logging.getLogger("editor_auto.email_notify")
@@ -78,13 +79,18 @@ def send_videos_ready(
 ) -> dict:
     """Email 'tus vídeos del día están listos'."""
     nice = client_name or "Hola"
-    if count and count > 1:
-        n_txt = f"Tus {count} vídeos"
-    elif count == 1:
-        n_txt = "Tu vídeo"
+    if count == 1:
+        n_txt, verbo, adj = "Tu vídeo", "está", "editado y listo"
+    elif count and count > 1:
+        n_txt, verbo, adj = f"Tus {count} vídeos", "están", "editados y listos"
     else:
-        n_txt = "Tus vídeos"
-    verbo = "está" if count == 1 else "están"
+        n_txt, verbo, adj = "Tus vídeos", "están", "editados y listos"
+
+    # Fecha en español para el asunto (distingue el aviso de cada día).
+    _MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+              "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    _hoy = datetime.now()
+    fecha = f"{_hoy.day} de {_MESES[_hoy.month - 1]}"
 
     # Botón con gradiente de marca (cyan → violeta del logo). Fallback de color
     # sólido para clientes que no renderizan gradientes.
@@ -100,7 +106,7 @@ def send_videos_ready(
         if folder_link else ""
     )
     link_txt = f"\nTus vídeos: {folder_link}\n" if folder_link else ""
-    subject = "✅ Tus vídeos del día ya están listos"
+    subject = f"✅ Tus vídeos del {fecha} ya están listos"
 
     html = (
         '<div style="margin:0;padding:0;background:#f4f5f7">'
@@ -119,7 +125,7 @@ def send_videos_ready(
         f'¡Hola {nice}! 👋</h1>'
         f'<p style="margin:0 0 6px;font-size:15px;color:#374151;line-height:1.5">'
         f'<strong>{n_txt}</strong> del día de hoy ya {verbo} '
-        f'<strong>editados y listos</strong> en tu carpeta de Drive.</p>'
+        f'<strong>{adj}</strong> en tu carpeta de Drive.</p>'
         f'{button}'
         '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;line-height:1.5">'
         'Échales un vistazo y, si quieres que ajustemos algo, respóndenos a '
@@ -131,7 +137,7 @@ def send_videos_ready(
         '</table></td></tr></table></div>'
     )
     text = (
-        f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} editados y listos "
+        f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} {adj} "
         f"en tu carpeta de Drive.{link_txt}\n"
         f"Si quieres que ajustemos algo, responde a este correo.\n\nNeBulabs AI"
     )

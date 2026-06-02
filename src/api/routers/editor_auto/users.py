@@ -322,10 +322,17 @@ def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
     else:
         result["share_errors"].append("Drive sharing no configurado")
 
+    # Nº de vídeos = los realmente editados HOY en salida (ignora leftovers de
+    # días anteriores). Fallback al count del payload si no se puede contar.
+    from src.editor_auto import config as _ea_config
+    count_today = _ea_config.count_output_videos_today(u.name)
+    if count_today is None:
+        count_today = payload.count if payload else None
+    result["videos_today"] = count_today
     result["email"] = email_notify.send_videos_ready(
         to=emails,
         client_name=u.display_name or u.name,
-        count=(payload.count if payload else None),
+        count=count_today,
         folder_link=folder_link,
     )
     # Registrar el día del acceso para que el watcher lo revoque al cambiar
