@@ -6,7 +6,7 @@ inseguras). Config por env:
 
     EDITOR_SMTP_USER=nebulabsaimedia@gmail.com
     EDITOR_SMTP_APP_PASSWORD=xxxxxxxxxxxxxxxx   # 16 chars de la app password
-    EDITOR_SMTP_FROM_NAME=NeBulabs AI           # opcional (nombre remitente)
+    EDITOR_SMTP_FROM_NAME=Nebulabs Media           # opcional (nombre remitente)
 
 Si no está configurado, `is_configured()` devuelve False y los callers
 deben hacer no-op (compartir carpeta sin email). NUNCA lanza al caller:
@@ -38,7 +38,7 @@ def _password() -> str:
 
 
 def _from_name() -> str:
-    return (os.getenv("EDITOR_SMTP_FROM_NAME") or "NeBulabs AI").strip()
+    return (os.getenv("EDITOR_SMTP_FROM_NAME") or "Nebulabs Media").strip()
 
 
 def is_configured() -> bool:
@@ -118,8 +118,8 @@ def send_videos_ready(
         '<tr><td style="background:#06b6d4;'
         'background:linear-gradient(90deg,#06b6d4,#7c3aed);padding:20px 28px">'
         '<span style="color:#ffffff;font-size:18px;font-weight:700;'
-        'letter-spacing:.5px">NeBulabs'
-        '<span style="opacity:.85;font-weight:500"> AI</span></span></td></tr>'
+        'letter-spacing:.5px">Nebulabs'
+        '<span style="opacity:.85;font-weight:500"> Media</span></span></td></tr>'
         '<tr><td style="padding:28px">'
         f'<h1 style="margin:0 0 12px;font-size:20px;color:#111827">'
         f'¡Hola {nice}! 👋</h1>'
@@ -133,13 +133,13 @@ def send_videos_ready(
         '</td></tr>'
         '<tr><td style="background:#0f172a;padding:16px 28px">'
         '<span style="color:#94a3b8;font-size:12px">'
-        'NeBulabs AI · Edición de vídeo</span></td></tr>'
+        'Nebulabs Media · Edición de vídeo</span></td></tr>'
         '</table></td></tr></table></div>'
     )
     text = (
         f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} {adj} "
         f"en tu carpeta de Drive.{link_txt}\n"
-        f"Si quieres que ajustemos algo, responde a este correo.\n\nNeBulabs AI"
+        f"Si quieres que ajustemos algo, responde a este correo.\n\nNebulabs Media"
     )
     return _send(recipients_subject(to), subject, html, text)
 
