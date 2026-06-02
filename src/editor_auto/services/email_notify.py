@@ -78,28 +78,62 @@ def send_videos_ready(
 ) -> dict:
     """Email 'tus vídeos del día están listos'."""
     nice = client_name or "Hola"
-    n_txt = f"{count} vídeo(s)" if count else "Tus vídeos"
-    link_html = (
-        f'<p><a href="{folder_link}" '
-        f'style="background:#10b981;color:#fff;padding:10px 18px;'
-        f'border-radius:8px;text-decoration:none;display:inline-block">'
-        f'Ver mis vídeos</a></p>'
+    if count and count > 1:
+        n_txt = f"Tus {count} vídeos"
+    elif count == 1:
+        n_txt = "Tu vídeo"
+    else:
+        n_txt = "Tus vídeos"
+    verbo = "está" if count == 1 else "están"
+
+    # Botón con gradiente de marca (cyan → violeta del logo). Fallback de color
+    # sólido para clientes que no renderizan gradientes.
+    button = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" '
+        'style="margin:20px 0 4px"><tr>'
+        '<td style="border-radius:10px;background:#06b6d4;'
+        'background:linear-gradient(90deg,#06b6d4,#7c3aed)">'
+        f'<a href="{folder_link}" style="display:inline-block;padding:13px 28px;'
+        'font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;'
+        'border-radius:10px">Ver mis vídeos →</a>'
+        '</td></tr></table>'
         if folder_link else ""
     )
-    link_txt = f"\nCarpeta: {folder_link}\n" if folder_link else ""
-    subject = "✅ Tus vídeos del día están listos"
+    link_txt = f"\nTus vídeos: {folder_link}\n" if folder_link else ""
+    subject = "✅ Tus vídeos del día ya están listos"
+
     html = (
-        f"<div style='font-family:sans-serif;font-size:15px;color:#111'>"
-        f"<p>Hola {nice},</p>"
-        f"<p><strong>{n_txt} ya están editados y disponibles</strong> en tu "
-        f"carpeta de salida de Drive.</p>"
-        f"{link_html}"
-        f"<p style='color:#666;font-size:13px'>NeBulabs AI · edición automática</p>"
-        f"</div>"
+        '<div style="margin:0;padding:0;background:#f4f5f7">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="background:#f4f5f7;padding:24px 0"><tr><td align="center">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="max-width:480px;background:#ffffff;border-radius:16px;'
+        'overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
+        '<tr><td style="background:#06b6d4;'
+        'background:linear-gradient(90deg,#06b6d4,#7c3aed);padding:20px 28px">'
+        '<span style="color:#ffffff;font-size:18px;font-weight:700;'
+        'letter-spacing:.5px">NeBulabs'
+        '<span style="opacity:.85;font-weight:500"> AI</span></span></td></tr>'
+        '<tr><td style="padding:28px">'
+        f'<h1 style="margin:0 0 12px;font-size:20px;color:#111827">'
+        f'¡Hola {nice}! 👋</h1>'
+        f'<p style="margin:0 0 6px;font-size:15px;color:#374151;line-height:1.5">'
+        f'<strong>{n_txt}</strong> del día de hoy ya {verbo} '
+        f'<strong>editados y listos</strong> en tu carpeta de Drive.</p>'
+        f'{button}'
+        '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;line-height:1.5">'
+        'Échales un vistazo y, si quieres que ajustemos algo, respóndenos a '
+        'este correo. 🙌</p>'
+        '</td></tr>'
+        '<tr><td style="background:#0f172a;padding:16px 28px">'
+        '<span style="color:#94a3b8;font-size:12px">'
+        'NeBulabs AI · Edición de vídeo</span></td></tr>'
+        '</table></td></tr></table></div>'
     )
     text = (
-        f"Hola {nice},\n\n{n_txt} ya están editados y disponibles en tu "
-        f"carpeta de salida de Drive.{link_txt}\n\nNeBulabs AI"
+        f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} editados y listos "
+        f"en tu carpeta de Drive.{link_txt}\n"
+        f"Si quieres que ajustemos algo, responde a este correo.\n\nNeBulabs AI"
     )
     return _send(recipients_subject(to), subject, html, text)
 
