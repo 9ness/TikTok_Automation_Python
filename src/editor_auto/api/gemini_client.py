@@ -43,6 +43,7 @@ def analyze_transcript_json(
     user_payload: dict,
     model: str = "gemini-2.5-pro",
     temperature: float = 0.0,
+    max_output_tokens: int = 32768,
 ) -> Any:
     """Llama a Gemini con el system prompt + payload JSON, espera un JSON
     estructurado de vuelta. Registra coste estimado vía cost_tracking.
@@ -60,6 +61,7 @@ def analyze_transcript_json(
         model=model,
         expect_json=True,
         temperature=temperature,
+        max_output_tokens=max_output_tokens,
     )
 
     # Cost tracking — estimación por chars/token. Gemini no devuelve usage
