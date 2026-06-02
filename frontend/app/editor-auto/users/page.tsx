@@ -67,7 +67,7 @@ export default function EditorAutoUsersPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Usuarios — Editor Auto</h1>
         <p className="text-sm text-muted-foreground">
@@ -82,7 +82,7 @@ export default function EditorAutoUsersPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         {/* Columna izquierda: crear + listar */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <CollapsibleCard
             title={
               <span className="flex items-center gap-2">
@@ -186,7 +186,7 @@ export default function EditorAutoUsersPage() {
         </div>
 
         {/* Columna derecha: tabs Flujo / Carpetas del usuario seleccionado */}
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {selectedUserId ? (
             <>
               <div className="flex gap-1.5 rounded-md border bg-card/30 p-1">
@@ -282,7 +282,7 @@ function UserListItem({
     >
       <button
         type="button"
-        className="flex-1 text-left"
+        className="min-w-0 flex-1 text-left"
         onClick={onSelect}
       >
         <div className="flex flex-wrap items-center gap-2">

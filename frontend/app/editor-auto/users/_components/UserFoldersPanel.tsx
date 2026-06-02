@@ -185,7 +185,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="break-all text-xs text-muted-foreground">
           {folders.data?.user_name &&
             `Drive: TIKTOK_EDITOR/Usuarios/${folders.data.user_name}/`}
         </p>

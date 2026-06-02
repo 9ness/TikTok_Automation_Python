@@ -28,7 +28,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <LoginGate>
             <div className="flex min-h-screen flex-col md:flex-row">
               <Sidebar />
-              <main className="flex-1 overflow-y-auto bg-background">{children}</main>
+              {/* min-w-0 → permite que la columna flex encoja en desktop;
+                  overflow-x-hidden → red de seguridad móvil: ningún hijo ancho
+                  desborda la página entera (el scroll horizontal interno de
+                  tablas/etc. sigue funcionando dentro de su propio contenedor). */}
+              <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
+                {children}
+              </main>
             </div>
           </LoginGate>
         </Providers>
