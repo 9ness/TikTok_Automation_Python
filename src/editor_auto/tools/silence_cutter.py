@@ -1154,6 +1154,50 @@ def _parse_false_starts_cuts(
     return intervals
 
 
+def _clamp_cut_by_kept_version(
+    i0: int, i1: int, kept_version: str, words: list[dict],
+) -> tuple[int, int] | None:
+    """Recorta el corte [i0..i1] para que NO incluya palabras que su propio
+    `kept_version` dice conservar.
+
+    Quita de la COLA del corte la mayor secuencia de palabras que coincide con
+    el PREFIJO de `kept_version` (= el contenido que reaparece y debe quedarse).
+    Devuelve (i0, i1') recortado, o None si el corte entero coincide con su
+    kept_version (no hay nada real que cortar).
+
+    Robusto para:
+      - false-start / over-cut: "…cogid más os los voy a enseñar" donde el
+        kept_version vuelve a contener esas palabras → se recortan.
+      - repetición "A A B" con kept "A B…": la cola "A B" (2ª instancia) casa
+        el prefijo del kept → se recorta → el corte queda en la 1ª "A".
+      - redundant_restatement: su kept_version es la instancia ANTERIOR (no la
+        cola del corte) → no casa → corte intacto (se quita el bloque entero).
+    """
+    if i0 < 0 or i1 < i0 or i1 >= len(words):
+        return (i0, i1)
+
+    def _norm(s: str) -> list[str]:
+        return re.sub(r"[^\w\sáéíóúñü]", " ", (s or "").lower()).split()
+
+    kt = _norm(kept_version)
+    if not kt:
+        return (i0, i1)
+    try:
+        cut_words = [_norm(words[i]["word"])[0] if _norm(words[i]["word"]) else ""
+                     for i in range(i0, i1 + 1)]
+    except (KeyError, IndexError, TypeError):
+        return (i0, i1)
+
+    n = len(cut_words)
+    best = 0  # nº de palabras de cola a recortar
+    for k in range(1, min(n, len(kt)) + 1):
+        if cut_words[n - k:] == kt[:k]:
+            best = k
+    if best >= n:
+        return None  # todo el corte es contenido conservado
+    return (i0, i1 - best)
+
+
 def _ai_false_starts_openai(
     *, words: list[dict], language: str, model: str, log,
 ) -> tuple[list[tuple[float, float, dict]], dict | None]:
@@ -1290,50 +1334,35 @@ def _ai_false_starts_consensus(
         "total_unique": len(seen),
     }
 
-    # Reconciliación de cortes que SE SOLAPAN entre modelos. La unión ciega
-    # (coger el rango más ancho) hacía que un modelo con end_word_idx demasiado
-    # largo se comiera palabras que el OTRO (y su propio kept_version) quería
-    # conservar → frases rotas ("os los voy a [enseñar]…"). Regla:
-    #   · false-start / repetición / paráfrasis  → INTERSECCIÓN (conservador:
-    #     solo el trozo en que ambos coinciden = el primer intento, sin tocar
-    #     lo que viene después).
-    #   · redundant_restatement (cierre/CTA/precio repetido) → UNIÓN (sí
-    #     queremos quitar todo el bloque redundante entero).
-    recs: list[dict] = []
+    # Recorte por kept_version: los LLM a veces devuelven un rango que incluye
+    # parte (o todo) de las palabras que ELLOS MISMOS dicen conservar
+    # (kept_version), provocando frases rotas ("os los voy a [enseñar]…") o
+    # repeticiones a medias ("es un tejido así / es un tejido así"). Recortamos
+    # de la COLA del corte la mayor secuencia que coincide con el PREFIJO del
+    # kept_version (= el contenido que vuelve a empezar y debe quedarse). Así
+    # el corte queda solo en el PRIMER intento. Si el corte coincide entero con
+    # su kept_version → se anula (no había nada real que cortar). Funciona igual
+    # para repeticiones (quita la 1ª instancia, conserva la 2ª + continuación) y
+    # protege el redundant_restatement (su kept_version es la instancia ANTERIOR,
+    # no coincide con la cola → no se recorta, se quita el bloque entero).
+    intervals: list[tuple[float, float]] = []
     for v in seen.values():
         raw = v["raw"]
-        recs.append({
-            "i0": int(raw.get("start_word_idx", -999)),
-            "i1": int(raw.get("end_word_idx", -999)),
-            "t0": v["t_start"], "t1": v["t_end"],
-            "kind": str(raw.get("kind", "")),
-        })
-    recs.sort(key=lambda r: (r["i0"], r["i1"]))
-    clusters: list[dict] = []
-    for r in recs:
-        if clusters and r["i0"] <= clusters[-1]["max_i1"]:
-            clusters[-1]["members"].append(r)
-            clusters[-1]["max_i1"] = max(clusters[-1]["max_i1"], r["i1"])
+        i0 = int(raw.get("start_word_idx", -999))
+        i1 = int(raw.get("end_word_idx", -999))
+        clamped = _clamp_cut_by_kept_version(
+            i0, i1, raw.get("kept_version", ""), words,
+        )
+        if clamped is None:
+            continue  # el corte era todo "kept" → nada que cortar
+        ni0, ni1 = clamped
+        if ni0 == i0 and ni1 == i1:
+            intervals.append((v["t_start"], v["t_end"]))
         else:
-            clusters.append({"members": [r], "max_i1": r["i1"]})
-
-    intervals: list[tuple[float, float]] = []
-    for c in clusters:
-        ms = c["members"]
-        if len(ms) == 1:
-            intervals.append((ms[0]["t0"], ms[0]["t1"]))
-            continue
-        if any(m["kind"] == "redundant_restatement" for m in ms):
-            intervals.append((min(m["t0"] for m in ms), max(m["t1"] for m in ms)))
-        else:
-            lo = max(m["t0"] for m in ms)
-            hi = min(m["t1"] for m in ms)
-            if hi - lo > 0.02:
-                intervals.append((lo, hi))
-            else:
-                # sin solape temporal real → el corte más corto (conservador)
-                shortest = min(ms, key=lambda m: m["t1"] - m["t0"])
-                intervals.append((shortest["t0"], shortest["t1"]))
+            try:
+                intervals.append((float(words[ni0]["start"]), float(words[ni1]["end"])))
+            except (IndexError, KeyError, ValueError, TypeError):
+                intervals.append((v["t_start"], v["t_end"]))
     return intervals, diag
 
 
