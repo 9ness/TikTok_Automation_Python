@@ -616,6 +616,30 @@ class SilenceCutterTool:
                 f"sub-cuts tras recortar bordes (de {len(acoustic_normal_raw)} brutos)"
             )
 
+        # 6c) LIMPIEZA HOLÍSTICA (Gemini, 1 pasada sobre el guion entero).
+        # Es el remover de CONTENIDO autoritativo: ve toda la transcripción y
+        # decide qué conservar (una instancia de cada repetición/CTA/precio,
+        # sin falsos inicios, frases enteras). Sustituye el pegado frágil de
+        # cortes parciales (ngram + pasada 2) que oscilaba entre over-cut y
+        # dejar repeticiones. Si funciona, desactivamos ngram y pasada 2.
+        holistic_ok = False
+        holistic_on = bool(config.get("ai_holistic_clean", True))
+        holistic_diag: dict[str, Any] = {"enabled": holistic_on}
+        if holistic_on and words:
+            ctx.on_progress(0.56, "🧠 Limpieza holística del guion (Gemini)…")
+            hol_intervals, hol_diag = _ai_holistic_clean_removes(
+                words=words,
+                language=config.get("ai_language", "es"),
+                model=config.get("gemini_model", "gemini-2.5-pro"),
+                log=ctx.on_log,
+            )
+            holistic_diag.update(hol_diag)
+            if hol_intervals:
+                holistic_ok = True
+                for s, e in hol_intervals:
+                    cuts_with_source.append((s, e, "ai_holistic"))
+        diagnostic["phases"]["ai_holistic"] = holistic_diag
+
         # 7) IA — frases sucias, false-starts, gaps mid-phrase
         ai_diag: dict[str, Any] = {"enabled": ai_on}
         ai_cuts: list[tuple[float, float]] = []
@@ -651,8 +675,8 @@ class SilenceCutterTool:
         # Cubre el caso "esto costaba esto costaba" que la pasada 2 IA a
         # veces ignora (GPT-4o no es determinístico: mismo input → resultado
         # distinto entre runs). Esto SIEMPRE detecta repeticiones literales.
-        ngram_diag: dict[str, Any] = {"enabled": True}
-        if clean_words:
+        ngram_diag: dict[str, Any] = {"enabled": not holistic_ok}
+        if clean_words and not holistic_ok:
             ngram_cuts_detailed = _detect_repeated_ngrams(
                 clean_words, min_n=2, max_n=6, max_gap_between_grams_s=0.6,
             )
@@ -685,7 +709,7 @@ class SilenceCutterTool:
         # 2.5 Pro y hacemos UNIÓN de cuts. Los LLMs son no-determinísticos
         # (mismo input → resultado distinto), pero rara vez los DOS fallan
         # a la vez. Coste extra Gemini ~$0.003. Total pass 2 ~$0.015.
-        ai_pass2_on = bool(config.get("ai_false_starts_pass2", True))
+        ai_pass2_on = bool(config.get("ai_false_starts_pass2", True)) and not holistic_ok
         ai_pass2_diag: dict[str, Any] = {"enabled": ai_pass2_on}
         if ai_pass2_on and words:
             ctx.on_progress(0.62, "🤖 Pasada 2: GPT-4o + Gemini 2.5 Pro…")
@@ -1154,48 +1178,106 @@ def _parse_false_starts_cuts(
     return intervals
 
 
-def _clamp_cut_by_kept_version(
-    i0: int, i1: int, kept_version: str, words: list[dict],
-) -> tuple[int, int] | None:
-    """Recorta el corte [i0..i1] para que NO incluya palabras que su propio
-    `kept_version` dice conservar.
+def _ai_holistic_clean_removes(
+    *,
+    words: list[dict],
+    language: str,
+    model: str,
+    log,
+) -> tuple[list[tuple[float, float]], dict]:
+    """Limpieza HOLÍSTICA del guion en UNA pasada de Gemini.
 
-    Quita de la COLA del corte la mayor secuencia de palabras que coincide con
-    el PREFIJO de `kept_version` (= el contenido que reaparece y debe quedarse).
-    Devuelve (i0, i1') recortado, o None si el corte entero coincide con su
-    kept_version (no hay nada real que cortar).
+    En vez de pegar cortes parciales (que oscilaban entre over-cut y dejar
+    repeticiones por la ambigüedad de los rangos), le damos a Gemini la
+    transcripción ENTERA y nos devuelve los tramos a CONSERVAR (`keep_spans`).
+    El modelo ve todo el guion → decide coherente: una sola instancia de cada
+    repetición/CTA/precio, sin falsos inicios, frases enteras. Cortamos el
+    complemento.
 
-    Robusto para:
-      - false-start / over-cut: "…cogid más os los voy a enseñar" donde el
-        kept_version vuelve a contener esas palabras → se recortan.
-      - repetición "A A B" con kept "A B…": la cola "A B" (2ª instancia) casa
-        el prefijo del kept → se recorta → el corte queda en la 1ª "A".
-      - redundant_restatement: su kept_version es la instancia ANTERIOR (no la
-        cola del corte) → no casa → corte intacto (se quita el bloque entero).
+    Devuelve (remove_intervals_tiempo, diag). Si algo falla o el resultado no
+    pasa validación, devuelve ([], diag con error) para que el caller use el
+    pipeline antiguo como fallback.
     """
-    if i0 < 0 or i1 < i0 or i1 >= len(words):
-        return (i0, i1)
-
-    def _norm(s: str) -> list[str]:
-        return re.sub(r"[^\w\sáéíóúñü]", " ", (s or "").lower()).split()
-
-    kt = _norm(kept_version)
-    if not kt:
-        return (i0, i1)
+    diag: dict[str, Any] = {"model": model}
+    n = len(words)
+    if n < 4:
+        diag["skipped"] = "pocas palabras"
+        return [], diag
     try:
-        cut_words = [_norm(words[i]["word"])[0] if _norm(words[i]["word"]) else ""
-                     for i in range(i0, i1 + 1)]
-    except (KeyError, IndexError, TypeError):
-        return (i0, i1)
-
-    n = len(cut_words)
-    best = 0  # nº de palabras de cola a recortar
-    for k in range(1, min(n, len(kt)) + 1):
-        if cut_words[n - k:] == kt[:k]:
-            best = k
-    if best >= n:
-        return None  # todo el corte es contenido conservado
-    return (i0, i1 - best)
+        from src.editor_auto.api.gemini_client import is_configured, analyze_transcript_json
+        if not is_configured():
+            diag["skipped"] = "no API key"
+            return [], diag
+        prompt_path = (
+            Path(__file__).resolve().parent.parent
+            / "prompts" / "silence_cutter_clean_script.md"
+        )
+        system_prompt = prompt_path.read_text(encoding="utf-8")
+        payload = _build_false_starts_payload(words, language)
+        result = analyze_transcript_json(
+            system_prompt=system_prompt, user_payload=payload,
+            model=model, temperature=0.0,
+        )
+        raw_spans = (result or {}).get("keep_spans") or []
+        diag["removed_summary"] = (result or {}).get("removed_summary")
+        # Validar + normalizar keep_spans
+        keep: list[tuple[int, int]] = []
+        for sp in raw_spans:
+            try:
+                a, b = int(sp[0]), int(sp[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            a = max(0, min(a, n - 1)); b = max(0, min(b, n - 1))
+            if b >= a:
+                keep.append((a, b))
+        keep.sort()
+        # Merge solapados/adyacentes
+        merged_keep: list[list[int]] = []
+        for a, b in keep:
+            if merged_keep and a <= merged_keep[-1][1] + 1:
+                merged_keep[-1][1] = max(merged_keep[-1][1], b)
+            else:
+                merged_keep.append([a, b])
+        kept_words = sum(b - a + 1 for a, b in merged_keep)
+        diag["n_keep_spans"] = len(merged_keep)
+        diag["kept_words"] = kept_words
+        diag["total_words"] = n
+        # GUARDA: nunca confiar en un resultado que borra >70% de las palabras
+        # (probable alucinación) ni uno vacío → fallback al pipeline antiguo.
+        if not merged_keep or kept_words < n * 0.30:
+            diag["rejected"] = f"keep={kept_words}/{n} (<30%) → fallback"
+            return [], diag
+        # Complemento = tramos a QUITAR (en índices de palabra)
+        remove_idx: list[tuple[int, int]] = []
+        cursor = 0
+        for a, b in merged_keep:
+            if a > cursor:
+                remove_idx.append((cursor, a - 1))
+            cursor = b + 1
+        if cursor <= n - 1:
+            remove_idx.append((cursor, n - 1))
+        # A tiempo (solo cortes INTERNOS de contenido; head/tail los maneja
+        # auto_trim). Cada quita va del fin de la palabra previa al inicio de la
+        # siguiente conservada, para no clipar palabras vecinas.
+        intervals: list[tuple[float, float]] = []
+        for a, b in remove_idx:
+            try:
+                t0 = float(words[a]["start"]); t1 = float(words[b]["end"])
+            except (KeyError, IndexError, ValueError, TypeError):
+                continue
+            if t1 - t0 > 0.05:
+                intervals.append((t0, t1))
+        diag["n_remove_intervals"] = len(intervals)
+        log(
+            f"[silence_cutter] 🧠 Limpieza holística Gemini: conserva "
+            f"{kept_words}/{n} palabras en {len(merged_keep)} tramos · "
+            f"{len(intervals)} quitas de contenido"
+        )
+        return intervals, diag
+    except Exception as e:  # noqa: BLE001
+        diag["error"] = f"{type(e).__name__}: {e}"
+        log(f"[silence_cutter] ⚠️ Limpieza holística falló: {e} → fallback")
+        return [], diag
 
 
 def _ai_false_starts_openai(
@@ -1334,35 +1416,7 @@ def _ai_false_starts_consensus(
         "total_unique": len(seen),
     }
 
-    # Recorte por kept_version: los LLM a veces devuelven un rango que incluye
-    # parte (o todo) de las palabras que ELLOS MISMOS dicen conservar
-    # (kept_version), provocando frases rotas ("os los voy a [enseñar]…") o
-    # repeticiones a medias ("es un tejido así / es un tejido así"). Recortamos
-    # de la COLA del corte la mayor secuencia que coincide con el PREFIJO del
-    # kept_version (= el contenido que vuelve a empezar y debe quedarse). Así
-    # el corte queda solo en el PRIMER intento. Si el corte coincide entero con
-    # su kept_version → se anula (no había nada real que cortar). Funciona igual
-    # para repeticiones (quita la 1ª instancia, conserva la 2ª + continuación) y
-    # protege el redundant_restatement (su kept_version es la instancia ANTERIOR,
-    # no coincide con la cola → no se recorta, se quita el bloque entero).
-    intervals: list[tuple[float, float]] = []
-    for v in seen.values():
-        raw = v["raw"]
-        i0 = int(raw.get("start_word_idx", -999))
-        i1 = int(raw.get("end_word_idx", -999))
-        clamped = _clamp_cut_by_kept_version(
-            i0, i1, raw.get("kept_version", ""), words,
-        )
-        if clamped is None:
-            continue  # el corte era todo "kept" → nada que cortar
-        ni0, ni1 = clamped
-        if ni0 == i0 and ni1 == i1:
-            intervals.append((v["t_start"], v["t_end"]))
-        else:
-            try:
-                intervals.append((float(words[ni0]["start"]), float(words[ni1]["end"])))
-            except (IndexError, KeyError, ValueError, TypeError):
-                intervals.append((v["t_start"], v["t_end"]))
+    intervals = [(v["t_start"], v["t_end"]) for v in seen.values()]
     return intervals, diag
 
 
