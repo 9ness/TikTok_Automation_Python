@@ -28,6 +28,22 @@ kept will be removed from the video).
 - Redundant re-statements of the SAME call-to-action or price spread across the
   ending — keep the single best one.
 
+## The ENDING matters most (read carefully)
+
+- The video must **end on a COMPLETE sentence/clause** — the LAST kept span has
+  to finish at a natural end, NEVER mid-phrase (e.g. ending on "…todos los
+  estampados que hay, que hay," is WRONG — it sounds unfinished).
+- Pick ONE closing (the CTA and/or final price) and keep it **WHOLE and clean**:
+  the chosen CTA must include its complete action ("…os lo dejo en el cuadrito
+  naranja para que lo veáis" — all of it), and if she ends naming the price
+  ("…por 8 euros") keep that final beat so the video closes well.
+- Drop the OTHER closings, but never truncate the one you keep.
+- Remove internal stutters even INSIDE a part you keep, by splitting the span:
+  "que hay, que hay" → keep one "que hay"; "os los voy a enseñar… este con
+  florecitas, este con florecitas blancas" → keep "os los voy a enseñar… este
+  con florecitas blancas" (one instance), but KEEP the verb "enseñar" — never
+  leave "os los voy a [nada]".
+
 ## Output format
 
 ONLY valid JSON, no markdown fences, no preamble:
