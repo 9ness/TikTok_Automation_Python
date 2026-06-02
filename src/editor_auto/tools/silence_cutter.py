@@ -1178,100 +1178,133 @@ def _parse_false_starts_cuts(
     return intervals
 
 
+def _holistic_keep_idxset(
+    words: list[dict], *, language: str, model: str, log, label: str,
+) -> set[int] | None:
+    """UNA pasada de Gemini sobre `words`: devuelve el CONJUNTO de índices
+    (0..len-1) a CONSERVAR, o None si falla / resultado inválido.
+
+    El modelo ve la transcripción entera y devuelve `keep_spans` (tramos a
+    conservar). Aquí solo parseamos/validamos → set de índices. El caller
+    decide guardas y conversión a tiempo.
+    """
+    n = len(words)
+    if n < 4:
+        return set(range(n))
+    from src.editor_auto.api.gemini_client import is_configured, analyze_transcript_json
+    if not is_configured():
+        return None
+    prompt_path = (
+        Path(__file__).resolve().parent.parent
+        / "prompts" / "silence_cutter_clean_script.md"
+    )
+    system_prompt = prompt_path.read_text(encoding="utf-8")
+    payload = _build_false_starts_payload(words, language)
+    result = analyze_transcript_json(
+        system_prompt=system_prompt, user_payload=payload,
+        model=model, temperature=0.0,
+    )
+    raw_spans = (result or {}).get("keep_spans") or []
+    keep: set[int] = set()
+    for sp in raw_spans:
+        try:
+            a, b = int(sp[0]), int(sp[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        a = max(0, min(a, n - 1)); b = max(0, min(b, n - 1))
+        for i in range(a, b + 1):
+            keep.add(i)
+    if not keep:
+        return None
+    log(
+        f"[silence_cutter]   ↳ {label}: conserva {len(keep)}/{n} palabras "
+        f"({(result or {}).get('removed_summary') or ''})"[:160]
+    )
+    return keep
+
+
 def _ai_holistic_clean_removes(
     *,
     words: list[dict],
     language: str,
     model: str,
     log,
+    double_check: bool = True,
 ) -> tuple[list[tuple[float, float]], dict]:
-    """Limpieza HOLÍSTICA del guion en UNA pasada de Gemini.
+    """Limpieza HOLÍSTICA del guion con Gemini, con DOBLE REVISIÓN.
 
     En vez de pegar cortes parciales (que oscilaban entre over-cut y dejar
-    repeticiones por la ambigüedad de los rangos), le damos a Gemini la
-    transcripción ENTERA y nos devuelve los tramos a CONSERVAR (`keep_spans`).
-    El modelo ve todo el guion → decide coherente: una sola instancia de cada
-    repetición/CTA/precio, sin falsos inicios, frases enteras. Cortamos el
-    complemento.
+    repeticiones por la ambigüedad de los rangos), Gemini ve la transcripción
+    ENTERA y devuelve qué CONSERVAR. Como un editor humano:
+      · Pasada 1: limpia el guion (una instancia de cada repetición/CTA/precio,
+        sin falsos inicios, frases enteras).
+      · Pasada 2 (revisión): re-revisa SOLO lo que sobrevivió → caza lo que la
+        1ª se dejó (los LLM varían entre ejecuciones). Resultado final = lo que
+        AMBAS conservan.
 
-    Devuelve (remove_intervals_tiempo, diag). Si algo falla o el resultado no
-    pasa validación, devuelve ([], diag con error) para que el caller use el
-    pipeline antiguo como fallback.
+    Devuelve (remove_intervals_tiempo, diag). Si falla o intenta borrar >70%
+    (alucinación), devuelve ([], diag) → el caller usa el pipeline antiguo.
     """
-    diag: dict[str, Any] = {"model": model}
+    diag: dict[str, Any] = {"model": model, "double_check": double_check}
     n = len(words)
     if n < 4:
         diag["skipped"] = "pocas palabras"
         return [], diag
     try:
-        from src.editor_auto.api.gemini_client import is_configured, analyze_transcript_json
-        if not is_configured():
-            diag["skipped"] = "no API key"
+        keep1 = _holistic_keep_idxset(
+            words, language=language, model=model, log=log, label="revisión 1",
+        )
+        if keep1 is None:
+            diag["rejected"] = "pasada 1 sin resultado → fallback"
             return [], diag
-        prompt_path = (
-            Path(__file__).resolve().parent.parent
-            / "prompts" / "silence_cutter_clean_script.md"
-        )
-        system_prompt = prompt_path.read_text(encoding="utf-8")
-        payload = _build_false_starts_payload(words, language)
-        result = analyze_transcript_json(
-            system_prompt=system_prompt, user_payload=payload,
-            model=model, temperature=0.0,
-        )
-        raw_spans = (result or {}).get("keep_spans") or []
-        diag["removed_summary"] = (result or {}).get("removed_summary")
-        # Validar + normalizar keep_spans
-        keep: list[tuple[int, int]] = []
-        for sp in raw_spans:
+        final_keep = keep1
+        diag["kept_pass1"] = len(keep1)
+        if double_check and len(keep1) >= 4:
+            # 2ª revisión SOLO sobre las palabras supervivientes.
+            sub_idx = sorted(keep1)
+            sub_words = [words[i] for i in sub_idx]
             try:
-                a, b = int(sp[0]), int(sp[1])
-            except (TypeError, ValueError, IndexError):
-                continue
-            a = max(0, min(a, n - 1)); b = max(0, min(b, n - 1))
-            if b >= a:
-                keep.append((a, b))
-        keep.sort()
-        # Merge solapados/adyacentes
-        merged_keep: list[list[int]] = []
-        for a, b in keep:
-            if merged_keep and a <= merged_keep[-1][1] + 1:
-                merged_keep[-1][1] = max(merged_keep[-1][1], b)
-            else:
-                merged_keep.append([a, b])
-        kept_words = sum(b - a + 1 for a, b in merged_keep)
-        diag["n_keep_spans"] = len(merged_keep)
+                keep2 = _holistic_keep_idxset(
+                    sub_words, language=language, model=model, log=log,
+                    label="revisión 2",
+                )
+            except Exception as e:  # noqa: BLE001
+                keep2 = None
+                log(f"[silence_cutter]   ↳ revisión 2 falló ({e}); uso solo la 1ª")
+            if keep2 is not None:
+                # keep2 son índices en sub_words → mapear a índices originales
+                final_keep = {sub_idx[j] for j in keep2 if 0 <= j < len(sub_idx)}
+                diag["kept_pass2"] = len(final_keep)
+
+        kept_words = len(final_keep)
         diag["kept_words"] = kept_words
         diag["total_words"] = n
-        # GUARDA: nunca confiar en un resultado que borra >70% de las palabras
-        # (probable alucinación) ni uno vacío → fallback al pipeline antiguo.
-        if not merged_keep or kept_words < n * 0.30:
+        if kept_words < n * 0.30:
             diag["rejected"] = f"keep={kept_words}/{n} (<30%) → fallback"
             return [], diag
-        # Complemento = tramos a QUITAR (en índices de palabra)
-        remove_idx: list[tuple[int, int]] = []
-        cursor = 0
-        for a, b in merged_keep:
-            if a > cursor:
-                remove_idx.append((cursor, a - 1))
-            cursor = b + 1
-        if cursor <= n - 1:
-            remove_idx.append((cursor, n - 1))
-        # A tiempo (solo cortes INTERNOS de contenido; head/tail los maneja
-        # auto_trim). Cada quita va del fin de la palabra previa al inicio de la
-        # siguiente conservada, para no clipar palabras vecinas.
+
+        # Complemento = tramos a QUITAR (índices contiguos NO conservados).
         intervals: list[tuple[float, float]] = []
-        for a, b in remove_idx:
-            try:
-                t0 = float(words[a]["start"]); t1 = float(words[b]["end"])
-            except (KeyError, IndexError, ValueError, TypeError):
+        i = 0
+        while i < n:
+            if i in final_keep:
+                i += 1
                 continue
-            if t1 - t0 > 0.05:
-                intervals.append((t0, t1))
+            j = i
+            while j < n and j not in final_keep:
+                j += 1
+            # quitar [i, j-1]
+            try:
+                t0 = float(words[i]["start"]); t1 = float(words[j - 1]["end"])
+                if t1 - t0 > 0.05:
+                    intervals.append((t0, t1))
+            except (KeyError, IndexError, ValueError, TypeError):
+                pass
+            i = j
         diag["n_remove_intervals"] = len(intervals)
         log(
-            f"[silence_cutter] 🧠 Limpieza holística Gemini: conserva "
-            f"{kept_words}/{n} palabras en {len(merged_keep)} tramos · "
-            f"{len(intervals)} quitas de contenido"
+            f"[silence_cutter] 🧠 Limpieza holística (doble revisión): conserva "
+            f"{kept_words}/{n} palabras · {len(intervals)} quitas de contenido"
         )
         return intervals, diag
     except Exception as e:  # noqa: BLE001
