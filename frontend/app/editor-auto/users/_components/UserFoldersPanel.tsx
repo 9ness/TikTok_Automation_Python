@@ -246,14 +246,19 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           size="sm"
           onClick={markDayReady}
           disabled={release.isPending}
-          className="w-full border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+          className="h-auto min-h-9 w-full items-center whitespace-normal py-2 text-center text-xs leading-snug border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
         >
           {release.isPending ? (
-            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="mr-2 h-3.5 w-3.5 shrink-0 animate-spin" />
           ) : (
-            <Mail className="mr-2 h-3.5 w-3.5" />
+            <Mail className="mr-2 h-3.5 w-3.5 shrink-0" />
           )}
-          ✅ Marcar vídeos del día como listos (compartir salida + avisar por email)
+          <span>
+            ✅ Marcar vídeos del día como listos{" "}
+            <span className="text-emerald-600/70 dark:text-emerald-400/70">
+              (comparte salida + avisa por email)
+            </span>
+          </span>
         </Button>
         {(() => {
           const rel = user.data?.output_released_on;
