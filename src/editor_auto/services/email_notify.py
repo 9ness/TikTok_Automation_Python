@@ -128,8 +128,10 @@ def send_videos_ready(
         f'<strong>{adj}</strong> en tu carpeta de Drive.</p>'
         f'{button}'
         '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;line-height:1.5">'
-        'Échales un vistazo y, si quieres que ajustemos algo, respóndenos a '
-        'este correo. 🙌</p>'
+        '¿Tienes alguna duda? Escríbenos respondiendo a este correo o por '
+        '<a href="https://wa.me/34631543618" '
+        'style="color:#0ea5e9;font-weight:700;text-decoration:none">WhatsApp</a>. '
+        '¡Gracias por confiar en nosotros! 🙌</p>'
         '</td></tr>'
         '<tr><td style="background:#0f172a;padding:16px 28px">'
         '<span style="color:#94a3b8;font-size:12px">'
@@ -139,7 +141,8 @@ def send_videos_ready(
     text = (
         f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} {adj} "
         f"en tu carpeta de Drive.{link_txt}\n"
-        f"Si quieres que ajustemos algo, responde a este correo.\n\nNebulabs Media"
+        f"¿Alguna duda? Escríbenos respondiendo a este correo o por WhatsApp: "
+        f"https://wa.me/34631543618\n\n¡Gracias por confiar en nosotros!\n\nNebulabs Media"
     )
     return _send(recipients_subject(to), subject, html, text)
 
