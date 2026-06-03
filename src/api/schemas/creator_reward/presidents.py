@@ -60,6 +60,9 @@ class PresidentsNumbersConfig(BaseModel):
     real es por vídeo (`PresidentsEnqueueItem.numbers_variant`)."""
 
     font_choice: str = "Impact"  # nombre amigable; el router lo mapea a path
+    # El #1 es el misterio del vídeo (silueta) → en la lista se muestra como
+    # incógnita, nunca el nombre real.
+    mystery_text: str = "???"
     # Header (gancho fijo todo el vídeo)
     header_text: str = ""  # vacío → usa el hook_box_text del guion
     header_y_position: float = Field(default=0.07, ge=0.0, le=1.0)

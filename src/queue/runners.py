@@ -545,6 +545,7 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                 )
                 numbers_style = {
                     **DEFAULT_NUMBERS_STYLE,
+                    "mystery_text": p.get("numbers_mystery_text", "???"),
                     "header_text": p.get("numbers_header_text", ""),
                     "header_y_position": p.get("numbers_header_y_position", 0.07),
                     "header_font_scale": p.get("numbers_header_font_scale", 0.024),

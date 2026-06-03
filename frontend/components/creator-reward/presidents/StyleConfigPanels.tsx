@@ -321,16 +321,29 @@ export function NumbersConfigPanel({
         previsualización.
       </p>
 
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">
-          Texto del header (vacío = usa el gancho del guion)
-        </Label>
-        <Input
-          className="h-9"
-          value={value.header_text}
-          onChange={(e) => patch("header_text", e.target.value)}
-          placeholder="Top 5 Worst US Presidents"
-        />
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            Texto del header (vacío = usa el gancho del guion)
+          </Label>
+          <Input
+            className="h-9"
+            value={value.header_text}
+            onChange={(e) => patch("header_text", e.target.value)}
+            placeholder="Top 5 Worst US Presidents"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            Texto del #1 (incógnita)
+          </Label>
+          <Input
+            className="h-9 w-28"
+            value={value.mystery_text}
+            onChange={(e) => patch("mystery_text", e.target.value)}
+            placeholder="???"
+          />
+        </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

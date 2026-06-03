@@ -76,6 +76,7 @@ const DEFAULT_HOOK: PresidentsHookConfig = {
 
 const DEFAULT_NUMBERS: PresidentsNumbersConfig = {
   font_choice: "Impact",
+  mystery_text: "???",
   header_text: "",
   header_y_position: 0.07,
   header_font_scale: 0.024,
@@ -152,6 +153,8 @@ function flatToNested(flat: Record<string, unknown>): {
   if (n("hook_font_scale") !== undefined) hook.font_scale = n("hook_font_scale");
 
   if (s("numbers_font_choice")) numbers.font_choice = s("numbers_font_choice");
+  if (s("numbers_mystery_text") !== undefined)
+    numbers.mystery_text = s("numbers_mystery_text");
   if (s("numbers_header_text") !== undefined)
     numbers.header_text = s("numbers_header_text");
   if (n("numbers_header_y_position") !== undefined)
@@ -223,6 +226,7 @@ function nestedToFlat(
     hook_text_color: hook.text_color,
     hook_font_scale: hook.font_scale,
     numbers_font_choice: numbers.font_choice,
+    numbers_mystery_text: numbers.mystery_text,
     numbers_header_text: numbers.header_text,
     numbers_header_y_position: numbers.header_y_position,
     numbers_header_font_scale: numbers.header_font_scale,
@@ -452,6 +456,7 @@ export default function PresidentsPage() {
             numbers={numbers}
             numbersActive={numbersActive}
             topCount={previewTopCount}
+            onNumbersChange={(patch) => setNumbers({ ...numbers, ...patch })}
           />
           <Button
             onClick={submit}

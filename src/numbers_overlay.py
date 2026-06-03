@@ -24,6 +24,9 @@ from src.text_hook import _load_font, render_hook_box
 
 DEFAULT_NUMBERS_STYLE = {
     "font_path": r"C:\Windows\Fonts\impact.ttf",
+    # El #1 (puesto 1) es el misterio: en la lista se muestra como incógnita,
+    # nunca el nombre real. Es el último en revelarse (countdown 5→1).
+    "mystery_text": "???",
     # Header (gancho fijo todo el vídeo)
     "header_text": "",                 # vacío → usa el hook_box_text del guion
     "header_y_position": 0.07,         # centro vertical del header (0=arriba)
@@ -145,10 +148,14 @@ def add_numbers_overlay_to_video(
             .set_position((list_x, num_y))
         )
 
-        # Nombre (aparece en reveal_time y permanece)
+        # Nombre (aparece en reveal_time y permanece). El #1 es el misterio
+        # del vídeo → se muestra como incógnita, nunca el nombre real.
         r = reveal_by_puesto.get(slot)
         if r:
-            name_txt = str(r["name"]).replace("_", " ").strip()
+            if slot == 1:
+                name_txt = str(s.get("mystery_text") or "???").strip() or "???"
+            else:
+                name_txt = str(r["name"]).replace("_", " ").strip()
             name_img = _render_text(
                 name_txt, name_size, s["name_color"], font_path,
                 s["name_stroke_color"], int(s["name_stroke_width"]),

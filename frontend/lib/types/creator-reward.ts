@@ -59,6 +59,8 @@ export interface PresidentsHookConfig {
 
 export interface PresidentsNumbersConfig {
   font_choice: string;
+  // El #1 es el misterio del vídeo → en la lista se muestra como incógnita.
+  mystery_text: string;
   // Header (gancho fijo todo el vídeo)
   header_text: string; // vacío → usa el hook_box_text del guion
   header_y_position: number;

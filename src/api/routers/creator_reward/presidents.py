@@ -155,6 +155,7 @@ def enqueue_presidents(
             # Variante NÚMEROS (toggle por vídeo + estilo global del lote)
             "numbers_variant": item.numbers_variant,
             "numbers_font_path": numbers_font_path,
+            "numbers_mystery_text": payload.numbers.mystery_text,
             "numbers_header_text": payload.numbers.header_text,
             "numbers_header_y_position": payload.numbers.header_y_position,
             "numbers_header_font_scale": payload.numbers.header_font_scale,

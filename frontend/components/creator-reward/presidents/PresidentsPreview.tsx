@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export function PresidentsPreview({
   numbers,
   numbersActive = false,
   topCount = 5,
+  onNumbersChange,
   className,
 }: {
   subs: PresidentsSubsConfig;
@@ -36,10 +37,52 @@ export function PresidentsPreview({
   numbers?: PresidentsNumbersConfig;
   numbersActive?: boolean;
   topCount?: number;
+  onNumbersChange?: (patch: Partial<PresidentsNumbersConfig>) => void;
   className?: string;
 }) {
   const [showSafeZones, setShowSafeZones] = useState(true);
   const showNumbers = numbersActive && !!numbers;
+
+  const frameRef = useRef<HTMLDivElement>(null);
+  const dragTarget = useRef<"list" | "header" | null>(null);
+
+  function clamp01(v: number) {
+    return Math.max(0, Math.min(1, v));
+  }
+  function pointerToPct(clientX: number, clientY: number) {
+    const rect = frameRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      x: clamp01((clientX - rect.left) / rect.width),
+      y: clamp01((clientY - rect.top) / rect.height),
+    };
+  }
+  function applyDrag(clientX: number, clientY: number) {
+    if (!onNumbersChange || !dragTarget.current) return;
+    const p = pointerToPct(clientX, clientY);
+    if (!p) return;
+    if (dragTarget.current === "list") {
+      onNumbersChange({
+        list_x_position: Number(p.x.toFixed(3)),
+        list_y_position: Number(p.y.toFixed(3)),
+      });
+    } else {
+      onNumbersChange({ header_y_position: Number(p.y.toFixed(3)) });
+    }
+  }
+  function startDrag(target: "list" | "header", e: React.PointerEvent) {
+    if (!onNumbersChange) return;
+    e.stopPropagation();
+    dragTarget.current = target;
+    frameRef.current?.setPointerCapture(e.pointerId);
+    applyDrag(e.clientX, e.clientY);
+  }
+  function handleFrameMove(e: React.PointerEvent) {
+    if (dragTarget.current) applyDrag(e.clientX, e.clientY);
+  }
+  function endDrag() {
+    dragTarget.current = null;
+  }
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -61,7 +104,14 @@ export function PresidentsPreview({
       </div>
 
       <div
-        className="relative mx-auto overflow-hidden rounded-lg border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950"
+        ref={frameRef}
+        onPointerMove={handleFrameMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className={cn(
+          "relative mx-auto overflow-hidden rounded-lg border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950",
+          showNumbers && onNumbersChange && "touch-none select-none",
+        )}
         style={{
           aspectRatio: "9 / 16",
           maxWidth: "320px",
@@ -88,6 +138,8 @@ export function PresidentsPreview({
             numbers={numbers}
             topCount={topCount}
             showLabel={showSafeZones}
+            draggable={!!onNumbersChange}
+            onStartDrag={startDrag}
           />
         )}
 
@@ -103,7 +155,9 @@ export function PresidentsPreview({
       </div>
 
       <p className="text-center text-[10px] text-muted-foreground">
-        Vista aproximada · el render final puede variar ligeramente
+        {showNumbers && onNumbersChange
+          ? "Arrastra la lista o el header para posicionarlos · tamaños en el panel"
+          : "Vista aproximada · el render final puede variar ligeramente"}
       </p>
     </div>
   );
@@ -362,16 +416,22 @@ const SAMPLE_HOOK_TEXT = "Did the most Damage to the America";
 // ---------------------------------------------------------------------------
 // Variante NÚMEROS — header fijo + lista 1..N que se rellena
 // ---------------------------------------------------------------------------
-const SAMPLE_NAMES = ["Buchanan", "Harding", "A. Johnson", "Pierce", "???"];
+// El #1 es el misterio (se revela el último) → muestra la incógnita. Los
+// demás (slots 2..N) usan apellidos de muestra para ver el layout.
+const SAMPLE_SURNAMES = ["Buchanan", "Harding", "A. Johnson", "Pierce", "Tyler"];
 
 function NumbersOverlayPreview({
   numbers,
   topCount,
   showLabel,
+  draggable,
+  onStartDrag,
 }: {
   numbers: PresidentsNumbersConfig;
   topCount: number;
   showLabel: boolean;
+  draggable?: boolean;
+  onStartDrag?: (target: "list" | "header", e: React.PointerEvent) => void;
 }) {
   const fonts = useFonts();
   const entry: FontItem | null =
@@ -421,9 +481,10 @@ function NumbersOverlayPreview({
         </span>
       )}
 
-      {/* Header fijo */}
+      {/* Header fijo (arrastrable verticalmente) */}
       <div
-        className="absolute"
+        className={cn("absolute", draggable && "cursor-grab active:cursor-grabbing")}
+        onPointerDown={draggable ? (e) => onStartDrag?.("header", e) : undefined}
         style={{
           left: "50%",
           top: `${headerYPct}%`,
@@ -459,14 +520,22 @@ function NumbersOverlayPreview({
         </div>
       </div>
 
-      {/* Lista de números + nombres */}
+      {/* Lista de números + nombres (arrastra cualquier fila para mover) */}
       {slots.map((slot) => {
         const rowYPct = listYPct + (slot - 1) * spacingPct;
-        const name = SAMPLE_NAMES[slot - 1] ?? "???";
+        // El #1 (slot 1) es la incógnita; el resto, apellidos de muestra.
+        const name =
+          slot === 1
+            ? numbers.mystery_text.trim() || "???"
+            : SAMPLE_SURNAMES[slot - 2] ?? "Doe";
         return (
           <div
             key={slot}
-            className="absolute flex items-center gap-[0.3em]"
+            onPointerDown={draggable ? (e) => onStartDrag?.("list", e) : undefined}
+            className={cn(
+              "absolute flex items-center gap-[0.3em]",
+              draggable && "cursor-grab active:cursor-grabbing",
+            )}
             style={{
               left: `${listXPct}%`,
               top: `${rowYPct}%`,

@@ -60,6 +60,7 @@ describe("useEnqueuePresidents", () => {
       },
       numbers: {
         font_choice: "Impact",
+        mystery_text: "???",
         header_text: "",
         header_y_position: 0.07,
         header_font_scale: 0.024,
