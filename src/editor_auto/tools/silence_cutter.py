@@ -838,6 +838,42 @@ class SilenceCutterTool:
             ctx.on_progress(1.0, "✅ Sin cortes (passthrough)")
             return output_path
 
+        # 7c) PROTECCIÓN DEL CIERRE — el vídeo nunca debe terminar TRUNCADO a
+        # media frase. Una capa de palabras (AI/holistic/ngram) puede marcar el
+        # cierre real (CTA final) como repetición y comerse las últimas
+        # palabras (p.ej. acabar en "...el día 7" y borrar "...la tuya").
+        # Quirúrgico: clipamos SOLO los cortes que llegan hasta la última
+        # palabra HABLADA — quedan recortando únicamente el silencio posterior.
+        # Los dedups INTERNOS (false-starts en mitad del cierre) NO se tocan
+        # porque no alcanzan el final.
+        if bool(config.get("protect_closing", True)) and voiced_words:
+            last_word_end = max(float(w["end"]) for w in voiced_words)
+            tail_eps = 0.2  # un corte que acaba a <0.2s del final = se come el cierre
+            n_pre_close = len(cuts_with_source)
+            protected = False
+            new_cws: list[tuple[float, float, str]] = []
+            for s, e, src in cuts_with_source:
+                if s < last_word_end - 0.05 and e >= last_word_end - tail_eps:
+                    # se come voz final → recortar solo el silencio tras ella
+                    if e > last_word_end:
+                        new_cws.append((last_word_end, e, src))
+                    protected = True
+                else:
+                    new_cws.append((s, e, src))
+            cuts_with_source = new_cws
+            if protected:
+                diagnostic["phases"]["closing_protection"] = {
+                    "enabled": True,
+                    "last_word_end": round(last_word_end, 3),
+                    "cuts_before": n_pre_close,
+                    "cuts_after": len(cuts_with_source),
+                }
+                ctx.on_log(
+                    f"[silence_cutter] 🛡️ Cierre protegido: un corte se comía "
+                    f"la última frase (fin voz {last_word_end:.1f}s) → "
+                    f"restaurada (evita truncar el CTA final)."
+                )
+
         cuts_only = [(s, e) for (s, e, _) in cuts_with_source]
         merged_cuts = _merge_intervals(cuts_only)
         # Protección de palabras: ningún corte clipa el final/inicio de una
