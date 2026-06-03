@@ -336,14 +336,18 @@ class SilenceCutterTool:
                 "preview_last_5": [w.get("word") for w in words[-5:]],
             }
 
-        # 3b) FILLERS ESTIRADOS — palabra corta ("la"/"y"/"eh"/risa) que dura
-        # MUCHO = Whisper etiquetando un sonido no-hablado (risa, "ehh", micro
-        # lejos). Ninguna palabra real dura >1.5s. Cortarlas es determinista y
-        # seguro (una palabra normal de 0.1-0.6s jamás dispara).
+        # 3b) FILLERS ESTIRADOS — palabra que dura ANORMALMENTE mucho. A veces
+        # es un sonido no-hablado etiquetado como palabra ("la"/risa), PERO a
+        # veces es una palabra REAL cuyo final Whisper estiró metiéndole el
+        # silencio de después ("adidas" 0.5s + 2.8s de silencio absorbido).
+        # Por eso NO las cortamos enteras (borraría la palabra real). En su
+        # lugar las DESPROTEGEMOS: la capa de amplitud cortará solo el trozo
+        # realmente SILENCIOSO dentro del span (mantiene la palabra, quita el
+        # silencio/relleno). Seguro: nunca borra voz audible.
+        stretched_spans: list[tuple[float, float]] = []
         if words and bool(config.get("cut_stretched_fillers", True)):
             sf = _detect_stretched_fillers(words)
-            for s, e, tok, dur in sf:
-                cuts_with_source.append((s, e, "stretched_filler"))
+            stretched_spans = [(s, e) for s, e, _t, _d in sf]
             diagnostic["phases"]["stretched_fillers"] = {
                 "n": len(sf),
                 "preview": [
@@ -353,8 +357,9 @@ class SilenceCutterTool:
             }
             if sf:
                 ctx.on_log(
-                    f"[silence_cutter] 🗣️✂ {len(sf)} relleno(s) estirado(s) "
-                    f"(palabra corta muy larga = risa/ruido): "
+                    f"[silence_cutter] 🗣️ {len(sf)} palabra(s) estirada(s) "
+                    f"(posible risa/silencio absorbido) → desprotegidas para que "
+                    f"la amplitud limpie el silencio: "
                     + ", ".join(f"'{t}'({d:.1f}s)" for _, _, t, d in sf[:6])
                 )
 
@@ -648,6 +653,17 @@ class SilenceCutterTool:
                     f"inaudibles) — no protegen cortes: "
                     + ", ".join(f"'{w.get('word')}'" for w in amp_ghosts[:8])
                 )
+        # Palabras ESTIRADAS → fuera de la protección, para que la amplitud
+        # corte el silencio absorbido dentro de su span (mantiene la voz real).
+        if stretched_spans:
+            def _is_stretched(w: dict) -> bool:
+                try:
+                    ws = float(w["start"]); we = float(w["end"])
+                except (KeyError, ValueError, TypeError):
+                    return False
+                return any(abs(ws - a) < 0.01 and abs(we - b) < 0.01
+                           for a, b in stretched_spans)
+            voiced_words = [w for w in voiced_words if not _is_stretched(w)]
 
         # Cuts NORMAL (Silero <0.8s + amplitude) → pasan por el trim de
         # palabras para no cortar voz por error en gaps pequeños.
