@@ -45,13 +45,23 @@ def _get_whisper_model(model_size: str = "base"):
         return _WHISPER_MODEL
     from faster_whisper import WhisperModel
 
+    # `WHISPER_CPU_THREADS` (opcional) limita los hilos de ctranslate2 en CPU.
+    # Default sin definir = comportamiento por defecto de ctranslate2 (no toca
+    # otros nichos). El editor_auto lo fija a "1" en su subproceso para EVITAR
+    # el deadlock multi-hilo de ctranslate2/int8 en este CPU (más lento pero
+    # nunca se cuelga).
+    import os as _os
+    _cpu_threads = int(_os.environ.get("WHISPER_CPU_THREADS", "0") or "0")
+    _cpu_kw = {"cpu_threads": _cpu_threads} if _cpu_threads > 0 else {}
+
     # Intento GPU primero (si hay CUDA), fallback a CPU
     try:
         _WHISPER_MODEL = WhisperModel(model_size, device="cuda", compute_type="float16")
         print(f"🎙️ faster-whisper cargado en GPU (modelo: {model_size})")
     except Exception:
-        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
-        print(f"🎙️ faster-whisper cargado en CPU (modelo: {model_size})")
+        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8", **_cpu_kw)
+        _t = f" · {_cpu_threads} hilo(s)" if _cpu_threads > 0 else ""
+        print(f"🎙️ faster-whisper cargado en CPU (modelo: {model_size}{_t})")
     _WHISPER_MODEL_SIZE = model_size
     return _WHISPER_MODEL
 

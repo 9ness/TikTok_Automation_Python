@@ -320,7 +320,7 @@ class SilenceCutterTool:
                     model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es"),
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
-                    timeout_s=int(config.get("whisper_timeout_s", 600)),
+                    timeout_s=int(config.get("whisper_timeout_s", 1200)),
                     fallback_model=str(config.get("whisper_fallback_model", "small")),
                 )
                 ctx.on_log(f"[silence_cutter] Whisper · {len(words)} palabras")
@@ -1085,9 +1085,12 @@ def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language:
     ctranslate2/OpenMP se pueda MATAR sin envenenar el worker principal."""
     try:
         import os as _os
-        # Mitiga el deadlock de ctranslate2/OpenMP en CPU: limita los hilos
-        # ANTES de importar el motor (debe ir antes de faster-whisper).
-        _os.environ.setdefault("OMP_NUM_THREADS", "4")
+        # EVITA el deadlock de ctranslate2/OpenMP en CPU: 1 solo hilo, fijado
+        # ANTES de importar el motor (debe ir antes de faster-whisper). En este
+        # box el modo multi-hilo cuelga ctranslate2/int8 de forma consistente
+        # con ciertos audios → single-thread es más lento pero NUNCA se cuelga.
+        _os.environ["OMP_NUM_THREADS"] = "1"
+        _os.environ["WHISPER_CPU_THREADS"] = "1"
         from src.subtitles_only import transcribe_with_reference
         words = transcribe_with_reference(
             audio_path,
