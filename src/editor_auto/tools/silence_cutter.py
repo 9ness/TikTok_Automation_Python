@@ -1164,47 +1164,81 @@ def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language:
 
 def _transcribe(
     audio_path: str, *, model_size: str, language: str, on_progress,
-    timeout_s: int = 600, fallback_model: str = "small",
+    timeout_s: int = 1200, fallback_model: str = "small", retries: int = 1,
 ) -> list[dict]:
     """Transcribe con Whisper, robusto a deadlocks de ctranslate2.
 
-    Estrategia: intenta el modelo configurado (p.ej. large-v3) en un
-    subproceso con timeout. Si se CUELGA (timeout), reintenta con un modelo
-    MÁS LIGERO (`fallback_model`, p.ej. `small`), que casi nunca deadlockea
-    → así obtenemos transcripción REAL en vez de un corte degradado. Para
-    ficheros normales (que no se cuelgan) se usa el modelo bueno sin penalti.
+    El deadlock de ctranslate2/int8 en CPU es FLAKY (a veces cuelga, a veces
+    no, con el MISMO audio). Estrategia:
+      1) Intenta el modelo bueno (large-v3) en subproceso con watchdog por
+         INACTIVIDAD de CPU — detecta el cuelgue en ~2-3min (no espera el
+         timeout entero de 20min).
+      2) Si cuelga, REINTENTA large-v3 `retries` veces (proceso fresco; al
+         ser flaky suele pasar a la 2ª) → conserva la calidad del modelo bueno.
+      3) Solo si sigue colgado cae a `fallback_model` (small), rápido y que
+         casi nunca deadlockea → transcripción REAL en vez de corte degradado.
     """
-    try:
-        return _run_whisper_once(
-            audio_path, model_size=model_size, language=language,
-            on_progress=on_progress, timeout_s=timeout_s,
-        )
-    except TimeoutError:
-        if fallback_model and fallback_model != model_size:
-            if on_progress:
+    attempts = [model_size] * (1 + max(0, retries))
+    last_err: Exception | None = None
+    for i, m in enumerate(attempts):
+        try:
+            if i > 0 and on_progress:
                 on_progress(
                     0.1,
-                    f"⚠️ Whisper {model_size} colgado — reintento con {fallback_model}…",
+                    f"⚠️ Whisper {m} colgado — reintento {i} (proceso fresco)…",
                 )
             return _run_whisper_once(
-                audio_path, model_size=fallback_model, language=language,
-                on_progress=on_progress, timeout_s=max(300, timeout_s // 2),
+                audio_path, model_size=m, language=language,
+                on_progress=on_progress, timeout_s=timeout_s,
             )
-        raise
+        except TimeoutError as e:
+            last_err = e
+            continue
+    # Tras agotar reintentos de large → fallback a un modelo ligero.
+    if fallback_model and fallback_model != model_size:
+        if on_progress:
+            on_progress(
+                0.1,
+                f"⚠️ Whisper {model_size} colgado {len(attempts)}× — "
+                f"caigo a {fallback_model} (rápido)…",
+            )
+        return _run_whisper_once(
+            audio_path, model_size=fallback_model, language=language,
+            on_progress=on_progress, timeout_s=max(300, timeout_s // 2),
+        )
+    raise last_err or TimeoutError("Whisper colgado sin fallback")
+
+
+def _proc_cpu_ticks(pid: int) -> int | None:
+    """utime+stime (jiffies) del proceso vía /proc/<pid>/stat. None si no se
+    puede leer (no-Linux). Robusto a espacios en el nombre (comm entre paréntesis)."""
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8") as f:
+            data = f.read()
+        after = data[data.rfind(")") + 2:].split()
+        # tras comm, el campo 3 (state) es after[0] → utime=campo14=after[11],
+        # stime=campo15=after[12]
+        return int(after[11]) + int(after[12])
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _run_whisper_once(
     audio_path: str, *, model_size: str, language: str, on_progress,
-    timeout_s: int = 600,
+    timeout_s: int = 1200, stall_s: int = 150, warmup_s: int = 60,
 ) -> list[dict]:
-    """UNA pasada de Whisper en SUBPROCESO `spawn` con timeout.
+    """UNA pasada de Whisper en SUBPROCESO `spawn` con watchdog por CPU.
 
-    El subproceso (sin heredar hilos/locks de la api) se puede MATAR al pasar
-    el timeout → un deadlock de ctranslate2 nunca atasca la cola. Lanza
-    TimeoutError si se cuelga; fallback a llamada directa solo si el entorno
-    no soporta spawn.
+    El subproceso (sin heredar hilos/locks de la api) se puede MATAR → un
+    deadlock de ctranslate2 nunca atasca la cola. El watchdog mira el TIEMPO
+    DE CPU del hijo: si tras el warm-up deja de avanzar durante `stall_s`,
+    es un deadlock (todos los hilos dormidos a ~0% CPU) → mata y lanza
+    TimeoutError SIN esperar el `timeout_s` entero. Un trabajo SANO consume
+    CPU sin parar, así que nunca se le mata por lento. Fallback a llamada
+    directa solo si el entorno no soporta spawn.
     """
     import multiprocessing as mp
+    import time
 
     def _direct() -> list[dict]:
         from src.subtitles_only import transcribe_with_reference
@@ -1229,17 +1263,34 @@ def _run_whisper_once(
 
     if on_progress:
         on_progress(0.1, "🎙️ Whisper transcribiendo…")
-    p.join(timeout_s)
+
+    t0 = time.monotonic()
+    last_cpu = _proc_cpu_ticks(p.pid) or 0
+    last_active = t0
+    reason: str | None = None
+    while True:
+        p.join(5)
+        if not p.is_alive():
+            break
+        now = time.monotonic()
+        cpu = _proc_cpu_ticks(p.pid)
+        if cpu is not None and cpu > last_cpu + 2:  # avanzó CPU → vivo y trabajando
+            last_cpu = cpu
+            last_active = now
+        elapsed = now - t0
+        if elapsed > warmup_s and (now - last_active) > stall_s:
+            reason = f"estancado (sin CPU {stall_s}s — deadlock)"
+            break
+        if elapsed > timeout_s:
+            reason = f"superó {timeout_s}s"
+            break
+
     if p.is_alive():
-        # TIMEOUT = deadlock real → matar y NO reintentar directo (re-colgaría).
         p.terminate()
         p.join(5)
         if p.is_alive():
             p.kill()
-        raise TimeoutError(
-            f"Whisper superó {timeout_s}s (probable deadlock) — abortado "
-            f"para no atascar la cola"
-        )
+        raise TimeoutError(f"Whisper {model_size} {reason} — abortado")
     try:
         kind, payload = q.get_nowait() if not q.empty() else ("err", "sin resultado")
     except Exception:  # noqa: BLE001
