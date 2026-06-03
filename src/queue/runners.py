@@ -1510,6 +1510,9 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     # y no se toca nada (compat con flujo anterior).
     source = p.get("source")
     source_filename = p.get("source_filename")
+    # Retoque MANUAL (editor de retoque): tramos a conservar + output a pisar.
+    manual_keep_intervals = p.get("manual_keep_intervals")
+    output_override = p.get("output_override")
 
     on_log(f"[editor_auto] user_id={user_id} · input={os.path.basename(input_path)}")
     if source == "entrada" and source_filename:
@@ -1531,6 +1534,8 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             # `<stem>_editado.mp4` en lugar del timestamped legacy.
             source_filename=source_filename
             if source == "entrada" else None,
+            manual_keep_intervals=manual_keep_intervals,
+            output_override=output_override,
         )
     except Exception:
         # Fallo del pipeline: devolver el input a `entrada/` para que el

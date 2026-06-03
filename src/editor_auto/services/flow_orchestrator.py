@@ -58,6 +58,7 @@ def run_flow(
     on_log: LogFn,
     on_progress: ProgressFn,
     script: str | None = None,
+    manual_keep_intervals: list | None = None,
 ) -> str:
     """Ejecuta el flujo completo del usuario sobre `input_video_path` y
     deja el resultado en `final_output_path`.
@@ -124,6 +125,12 @@ def run_flow(
             merged_config = {**tool.default_config(), **(step.config or {})}
             if step.tool_id == TOOL_SILENCE_CUTTER_SCRIPTED and script:
                 merged_config["script"] = script
+            # Retoque MANUAL: el operador pasó los tramos a conservar → el
+            # cortador de silencios los aplica saltando la detección.
+            if manual_keep_intervals and step.tool_id in (
+                "silence_cutter", TOOL_SILENCE_CUTTER_SCRIPTED,
+            ):
+                merged_config["manual_keep_intervals"] = manual_keep_intervals
 
             ctx = ToolContext(
                 user_id=user.id,

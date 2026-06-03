@@ -259,6 +259,8 @@ def run_editor_auto_pipeline(
     on_progress: ProgressFn,
     script: str | None = None,
     source_filename: str | None = None,
+    manual_keep_intervals: list | None = None,
+    output_override: str | None = None,
 ) -> str:
     """Pipeline completo. Devuelve la ruta absoluta del MP4 final en Drive.
 
@@ -316,7 +318,13 @@ def run_editor_auto_pipeline(
     #     aunque el input sea .mov/.webm — el encoder estabiliza a H264).
     #   - sin source_filename (upload directo) → timestamped legacy.
     # Si ya existe un editado del mismo día con ese nombre, dedup `_2`/`_3`.
-    if source_filename:
+    if output_override:
+        # Retoque MANUAL: REEMPLAZA el vídeo de salida existente con el MISMO
+        # nombre (sin dedup). El editor manual pasa la ruta del output a pisar.
+        final_output_path = output_override
+        base_name = os.path.basename(output_override)
+        on_log(f"[editor_auto] Output (reemplazo manual): {base_name}")
+    elif source_filename:
         stem = os.path.splitext(os.path.basename(source_filename))[0]
         base_name = f"{stem}_editado.mp4"
         # Dedup si ya hay un editado con ese nombre
@@ -326,11 +334,13 @@ def run_editor_auto_pipeline(
             candidate = f"{stem}_editado_{n}.mp4"
             n += 1
         base_name = candidate
+        final_output_path = os.path.join(out_folder, base_name)
+        on_log(f"[editor_auto] Output filename: {base_name}")
     else:
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         base_name = f"{ts}_editor_{job_id}.mp4"
-    final_output_path = os.path.join(out_folder, base_name)
-    on_log(f"[editor_auto] Output filename: {base_name}")
+        final_output_path = os.path.join(out_folder, base_name)
+        on_log(f"[editor_auto] Output filename: {base_name}")
 
     # Output intermedio en temp_folder (lo movemos a Drive al terminar
     # para que un fallo a mitad de render no contamine Drive).
@@ -350,6 +360,7 @@ def run_editor_auto_pipeline(
         on_log=on_log,
         on_progress=on_progress,
         script=script,
+        manual_keep_intervals=manual_keep_intervals,
     )
 
     # Mover a Drive sincronizado (copy + cleanup, NO move para que un fallo

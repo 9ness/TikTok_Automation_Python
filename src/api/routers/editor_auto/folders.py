@@ -20,8 +20,10 @@ admite headers custom (mismo patrón que fonts/stickers).
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -380,3 +382,154 @@ def preview_user_file(
         media_type=_VIDEO_MIME.get(ext, "application/octet-stream"),
         filename=os.path.basename(filename),
     )
+
+
+# ---------------------------------------------------------------------------
+# Editor de RETOQUE manual — proyecto editable + re-render que reemplaza salida
+# ---------------------------------------------------------------------------
+def _strip_editado(output_filename: str) -> str:
+    """`IMG_9750_editado.mp4` / `..._editado_2.mp4` → `IMG_9750` (stem original)."""
+    stem = os.path.splitext(output_filename)[0]
+    return re.sub(r"_editado(_\d+)?$", "", stem)
+
+
+def _find_original_in_recovery(user_name: str, output_filename: str) -> str | None:
+    """Localiza el vídeo ORIGINAL en `recuperacion/` que dio lugar a este
+    output (por stem). El editor manual re-renderiza desde el original."""
+    rec = user_subfolder(user_name, "recuperacion")
+    base = _strip_editado(output_filename)
+    try:
+        for f in os.listdir(rec):
+            if f.startswith("."):
+                continue
+            if os.path.splitext(f)[0] == base:
+                return f
+    except OSError:
+        return None
+    return None
+
+
+@router.get(
+    "/users/{user_id}/output/editproject",
+    dependencies=[Depends(get_current_user)],
+)
+def get_output_editproject(
+    user_id: str,
+    filename: Annotated[str, Query(...)],
+) -> dict[str, Any]:
+    """Devuelve el 'proyecto editable' de un vídeo de salida: palabras
+    (transcripción), tramos conservados y duración, + el nombre del original
+    en recuperacion (para que el editor lo reproduzca y re-renderice)."""
+    u = _user_or_raise(user_id)
+    salida = user_subfolder(u.name, "salida")
+    if not os.path.exists(os.path.join(salida, filename)):
+        raise ValidationError(f"'{filename}' no está en salida/ de '{u.name}'.")
+    original = _find_original_in_recovery(u.name, filename)
+    data: dict[str, Any] = {
+        "output_filename": filename,
+        "original_filename": original,
+        "has_project": False,
+        "words": [],
+        "keep_intervals": [],
+        "video_duration_s": 0.0,
+    }
+    proj_path = os.path.join(salida, ".editproj", f"{filename}.json")
+    if os.path.exists(proj_path):
+        try:
+            with open(proj_path, encoding="utf-8") as f:
+                proj = json.load(f)
+            data["has_project"] = True
+            data["words"] = proj.get("words", [])
+            data["keep_intervals"] = proj.get("keep_intervals", [])
+            data["video_duration_s"] = proj.get("video_duration_s", 0.0)
+        except Exception:  # noqa: BLE001
+            pass
+    return data
+
+
+@router.post(
+    "/users/{user_id}/output/manual-render",
+    dependencies=[Depends(get_current_user)],
+)
+def manual_render_output(
+    user_id: str,
+    payload: Annotated[dict, Body(...)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict[str, Any]:
+    """Re-renderiza un vídeo de salida con los tramos a CONSERVAR dados por el
+    operador (retoque manual) y REEMPLAZA el de salida (mismo nombre).
+
+    Body: `{filename, keep_intervals: [[start,end], ...]}`.
+    Encola un job EDITOR_AUTO con `manual_keep_intervals` (el cutter salta la
+    detección) + `output_override` (pisa el output). El original se queda en
+    recuperacion (no se toca). Async → devuelve job_id para hacer polling.
+    """
+    u = _user_or_raise(user_id)
+    filename = (payload.get("filename") or "").strip()
+    raw = payload.get("keep_intervals") or []
+    if not filename:
+        raise ValidationError("Falta 'filename'.")
+    intervals: list[list[float]] = []
+    for it in raw:
+        try:
+            a, b = float(it[0]), float(it[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if b - a > 0.02:
+            intervals.append([round(a, 3), round(b, 3)])
+    if not intervals:
+        raise ValidationError("'keep_intervals' vacío o inválido.")
+
+    salida = user_subfolder(u.name, "salida")
+    out_path = os.path.join(salida, filename)
+    if not os.path.exists(out_path):
+        raise ValidationError(f"'{filename}' no está en salida/ de '{u.name}'.")
+    original = _find_original_in_recovery(u.name, filename)
+    if not original:
+        raise ValidationError(
+            f"No encuentro el vídeo original en recuperacion/ para '{filename}'. "
+            f"Es necesario para re-renderizar (no se borre de recuperacion)."
+        )
+    input_path = os.path.join(user_subfolder(u.name, "recuperacion"), original)
+
+    try:
+        from src.utils import load_config
+        temp_folder = load_config()["paths"]["temp_folder"]
+    except Exception:  # noqa: BLE001
+        temp_folder = "./temp_work"
+
+    enabled = [s for s in u.tool_flow if s.enabled]
+    params: dict[str, Any] = {
+        "user_id": u.id,
+        "user_name": u.name,
+        "input_path": input_path,
+        "temp_folder": temp_folder,
+        "manual_keep_intervals": intervals,
+        "output_override": out_path,
+        "tool_count": len(enabled),
+        "tools_used": [s.tool_id for s in enabled],
+        # sin `source` → el runner NO toca recuperacion (el original se queda).
+    }
+    job = queue.enqueue(
+        JobMode.EDITOR_AUTO,
+        title=f"{u.name} · {filename} · ✂️ retoque manual",
+        params=params,
+    )
+    # Actualiza el proyecto editable con los nuevos tramos (la próxima vez que
+    # se abra el editor parte de aquí).
+    try:
+        proj_dir = os.path.join(salida, ".editproj")
+        os.makedirs(proj_dir, exist_ok=True)
+        pp = os.path.join(proj_dir, f"{filename}.json")
+        proj = {}
+        if os.path.exists(pp):
+            with open(pp, encoding="utf-8") as f:
+                proj = json.load(f)
+        proj["keep_intervals"] = intervals
+        with open(pp, "w", encoding="utf-8") as f:
+            json.dump(proj, f, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        pass
+
+    logger.info("[manual-render] %s/%s → job %s", u.name, filename, job.id)
+    return {"status": "renderizando", "job_id": job.id, "filename": filename}
