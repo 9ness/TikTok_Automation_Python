@@ -347,3 +347,20 @@ export interface CreateShareResponse {
     display_name: string | null;
   }[];
 }
+
+// --- Editor de retoque manual ---
+export interface EditWord {
+  idx: number;
+  word: string;
+  start: number;
+  end: number;
+}
+
+export interface OutputEditProject {
+  output_filename: string;
+  original_filename: string | null;
+  has_project: boolean;
+  words: EditWord[];
+  keep_intervals: [number, number][];
+  video_duration_s: number;
+}

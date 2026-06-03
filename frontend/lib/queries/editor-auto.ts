@@ -14,6 +14,7 @@ import type {
   GlobalFolderCountsResponse,
   MoveFileInput,
   MoveFileResponse,
+  OutputEditProject,
   Plan,
   PlanCreateInput,
   PlanUpdateInput,
@@ -576,6 +577,43 @@ export function useForgetKnownEmail(userId: string) {
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userSharesKey(userId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Editor de retoque manual — proyecto editable + re-render
+// ---------------------------------------------------------------------------
+export function useOutputEditProject(
+  userId: string | null | undefined,
+  filename: string | null | undefined,
+) {
+  return useQuery<OutputEditProject>({
+    queryKey: [...editorAutoKeys.all, "editproject", userId ?? "", filename ?? ""],
+    queryFn: () =>
+      api.get<OutputEditProject>(
+        `${USERS_ROOT}/${encodeURIComponent(userId!)}/output/editproject?filename=${encodeURIComponent(filename!)}`,
+      ),
+    enabled: Boolean(userId && filename),
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+export function useManualRender(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { status: string; job_id: string; filename: string },
+    Error,
+    { filename: string; keep_intervals: [number, number][] }
+  >({
+    mutationFn: (input) =>
+      api.post(
+        `${USERS_ROOT}/${encodeURIComponent(userId)}/output/manual-render`,
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.userFolders(userId) });
     },
   });
 }

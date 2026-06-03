@@ -60,6 +60,9 @@ import type {
 } from "@/lib/types/editor-auto";
 import { cn } from "@/lib/utils";
 
+import { ManualEditor } from "@/components/editor-auto/ManualEditor";
+import { Sparkles } from "lucide-react";
+
 
 interface FolderMeta {
   id: FolderName;
@@ -111,6 +114,8 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   const release = useReleaseDay(userId);
 
   const [active, setActive] = useState<FolderName>("entrada");
+  // Vídeo de salida abierto en el editor de retoque manual (overlay).
+  const [retouching, setRetouching] = useState<string | null>(null);
   // Config por usuario (delay + máx/día). Sync desde el server al cargar.
   const [delayMin, setDelayMin] = useState("");
   const [maxDay, setMaxDay] = useState("");
@@ -165,6 +170,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -356,6 +362,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
                 onEnqueue={(script) =>
                   enqueue.mutate({ filename: f.filename, script })
                 }
+                onRetouch={() => setRetouching(f.filename)}
                 disabled={move.isPending || del.isPending || enqueue.isPending}
               />
             ))}
@@ -373,6 +380,14 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
         <SharingSection userId={userId} userName={user.data?.name ?? ""} />
       </CardContent>
     </Card>
+    {retouching && (
+      <ManualEditor
+        userId={userId}
+        filename={retouching}
+        onClose={() => setRetouching(null)}
+      />
+    )}
+    </>
   );
 }
 
@@ -713,6 +728,7 @@ function FileRow({
   onMove,
   onDelete,
   onEnqueue,
+  onRetouch,
   disabled,
 }: {
   file: FolderFile;
@@ -720,6 +736,7 @@ function FileRow({
   onMove: (dst: FolderName) => void;
   onDelete: () => void;
   onEnqueue: (script: string) => void;
+  onRetouch?: () => void;
   disabled: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -798,15 +815,27 @@ function FileRow({
         )}
 
         {file.folder === "salida" && (
-          <a
-            href={userFilePreviewUrl(userId, file.folder, file.filename)}
-            download={file.filename}
-            className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs hover:bg-accent"
-            title="Descargar MP4 final"
-          >
-            <Download className="h-3 w-3" />
-            Descargar
-          </a>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 border-brand-cyan/40 text-brand-cyan hover:bg-brand-cyan/10"
+              onClick={onRetouch}
+              title="Retocar manualmente (quitar silencios/palabras) y reemplazar"
+            >
+              <Sparkles className="h-3 w-3" />
+              Retocar
+            </Button>
+            <a
+              href={userFilePreviewUrl(userId, file.folder, file.filename)}
+              download={file.filename}
+              className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs hover:bg-accent"
+              title="Descargar MP4 final"
+            >
+              <Download className="h-3 w-3" />
+              Descargar
+            </a>
+          </>
         )}
 
         {/* Borrar disponible en TODAS las carpetas. En cola/ es peligroso
