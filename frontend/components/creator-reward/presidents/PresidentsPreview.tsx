@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useFonts, useFontFamily, type FontItem } from "@/lib/queries/fonts";
 import type {
   PresidentsHookConfig,
+  PresidentsNumbersConfig,
   PresidentsSubsConfig,
 } from "@/lib/types/creator-reward";
 import { cn } from "@/lib/utils";
@@ -25,13 +26,20 @@ import { cn } from "@/lib/utils";
 export function PresidentsPreview({
   subs,
   hook,
+  numbers,
+  numbersActive = false,
+  topCount = 5,
   className,
 }: {
   subs: PresidentsSubsConfig;
   hook: PresidentsHookConfig;
+  numbers?: PresidentsNumbersConfig;
+  numbersActive?: boolean;
+  topCount?: number;
   className?: string;
 }) {
   const [showSafeZones, setShowSafeZones] = useState(true);
+  const showNumbers = numbersActive && !!numbers;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -74,8 +82,17 @@ export function PresidentsPreview({
         {/* OVERLAY ZONAS SEGURAS TIKTOK */}
         {showSafeZones && <SafeZonesOverlay maxWidthPct={subs.max_width * 100} />}
 
-        {/* HOOK BOX (live) */}
-        {hook.enabled && (
+        {/* VARIANTE NÚMEROS (header fijo + lista) — sustituye al hook */}
+        {showNumbers && numbers && (
+          <NumbersOverlayPreview
+            numbers={numbers}
+            topCount={topCount}
+            showLabel={showSafeZones}
+          />
+        )}
+
+        {/* HOOK BOX (live) — oculto si la variante números está activa */}
+        {hook.enabled && !showNumbers && (
           <HookBoxPreview hook={hook} showLabel={showSafeZones} />
         )}
 
@@ -341,6 +358,149 @@ function highlightStyle(
 // Hook box — caja compacta blanca con borde rojo brillante + glow (CapCut)
 // ---------------------------------------------------------------------------
 const SAMPLE_HOOK_TEXT = "Did the most Damage to the America";
+
+// ---------------------------------------------------------------------------
+// Variante NÚMEROS — header fijo + lista 1..N que se rellena
+// ---------------------------------------------------------------------------
+const SAMPLE_NAMES = ["Buchanan", "Harding", "A. Johnson", "Pierce", "???"];
+
+function NumbersOverlayPreview({
+  numbers,
+  topCount,
+  showLabel,
+}: {
+  numbers: PresidentsNumbersConfig;
+  topCount: number;
+  showLabel: boolean;
+}) {
+  const fonts = useFonts();
+  const entry: FontItem | null =
+    fonts.data?.items.find((f) => f.name === numbers.font_choice) ?? null;
+  const family = useFontFamily(entry);
+  const weight =
+    entry?.source === "bundled"
+      ? "normal"
+      : FONT_WEIGHT_BY_NAME[numbers.font_choice] ?? 900;
+
+  const headerYPct = numbers.header_y_position * 100;
+  const headerSizeCqi = numbers.header_font_scale * 100 * (16 / 9);
+  const listXPct = numbers.list_x_position * 100;
+  const listYPct = numbers.list_y_position * 100;
+  const spacingPct = numbers.list_line_spacing * 100;
+  const numSizeCqi = numbers.number_font_scale * 100 * (16 / 9);
+  const nameSizeCqi = numbers.name_font_scale * 100 * (16 / 9);
+
+  const strokeEm = numbers.name_stroke_width / 80;
+  const nameShadow =
+    numbers.name_stroke_width > 0
+      ? (
+          [
+            [-1, -1], [0, -1], [1, -1],
+            [-1, 0], [1, 0],
+            [-1, 1], [0, 1], [1, 1],
+          ] as [number, number][]
+        )
+          .map(
+            ([dx, dy]) =>
+              `${(dx * strokeEm).toFixed(3)}em ${(dy * strokeEm).toFixed(3)}em 0 ${numbers.name_stroke_color}`,
+          )
+          .join(", ")
+      : "none";
+
+  const slots = Array.from({ length: Math.max(1, topCount) }, (_, i) => i + 1);
+
+  return (
+    <>
+      {showLabel && (
+        <span
+          className="pointer-events-none absolute left-1 z-10 -translate-y-1/2 rounded bg-amber-500/80 px-1 py-0.5 text-[8px] font-medium text-black"
+          style={{ top: `${listYPct}%` }}
+        >
+          lista X={numbers.list_x_position.toFixed(2)} Y=
+          {numbers.list_y_position.toFixed(2)}
+        </span>
+      )}
+
+      {/* Header fijo */}
+      <div
+        className="absolute"
+        style={{
+          left: "50%",
+          top: `${headerYPct}%`,
+          transform: "translate(-50%, -50%)",
+          maxWidth: "90%",
+        }}
+      >
+        <div className="relative inline-block">
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              backgroundColor: numbers.header_shadow_color,
+              transform: "translate(-0.3em, 0.3em)",
+            }}
+          />
+          <div
+            className="relative whitespace-nowrap text-center font-bold"
+            style={{
+              backgroundColor: numbers.header_box_color,
+              color: numbers.header_text_color,
+              borderRadius: 0,
+              padding: "0.3em 0.6em",
+              fontSize: `${headerSizeCqi}cqi`,
+              fontFamily: family,
+              fontWeight: weight,
+              fontSynthesis: "none",
+              lineHeight: 1.15,
+            }}
+          >
+            {numbers.header_text.trim() || "Top 5 Worst US Presidents"}
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de números + nombres */}
+      {slots.map((slot) => {
+        const rowYPct = listYPct + (slot - 1) * spacingPct;
+        const name = SAMPLE_NAMES[slot - 1] ?? "???";
+        return (
+          <div
+            key={slot}
+            className="absolute flex items-center gap-[0.3em]"
+            style={{
+              left: `${listXPct}%`,
+              top: `${rowYPct}%`,
+              transform: "translateY(-50%)",
+              fontFamily: family,
+              fontWeight: weight,
+              fontSynthesis: "none",
+              lineHeight: 1,
+            }}
+          >
+            <span
+              style={{
+                color: numbers.number_color,
+                fontSize: `${numSizeCqi}cqi`,
+                textShadow: nameShadow,
+              }}
+            >
+              {slot}.
+            </span>
+            <span
+              style={{
+                color: numbers.name_color,
+                fontSize: `${nameSizeCqi}cqi`,
+                textShadow: nameShadow,
+              }}
+            >
+              {name}
+            </span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 function HookBoxPreview({
   hook,

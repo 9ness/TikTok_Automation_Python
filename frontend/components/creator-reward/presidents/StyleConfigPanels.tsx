@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { useFonts } from "@/lib/queries/fonts";
 import type {
   PresidentsHookConfig,
+  PresidentsNumbersConfig,
   PresidentsSubsConfig,
 } from "@/lib/types/creator-reward";
 
@@ -285,6 +286,179 @@ export function HookConfigPanel({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+export function NumbersConfigPanel({
+  value,
+  onChange,
+}: {
+  value: PresidentsNumbersConfig;
+  onChange: (next: PresidentsNumbersConfig) => void;
+}) {
+  function patch<K extends keyof PresidentsNumbersConfig>(
+    key: K,
+    v: PresidentsNumbersConfig[K],
+  ) {
+    onChange({ ...value, [key]: v });
+  }
+
+  const fonts = useFonts();
+  const fontEntries = fonts.data?.items ?? [];
+  const currentPath =
+    fontEntries.find((f) => f.name === value.font_choice)?.path ?? "";
+  function setFontByPath(path: string) {
+    const entry = fontEntries.find((f) => f.path === path);
+    patch("font_choice", entry?.name ?? value.font_choice);
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Estilo de la variante números (header fijo + lista que se rellena). Se
+        activa por vídeo desde el editor de arriba. Posiciona arrastrando en la
+        previsualización.
+      </p>
+
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">
+          Texto del header (vacío = usa el gancho del guion)
+        </Label>
+        <Input
+          className="h-9"
+          value={value.header_text}
+          onChange={(e) => patch("header_text", e.target.value)}
+          placeholder="Top 5 Worst US Presidents"
+        />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <Field label="Fuente">
+          <FontSelector value={currentPath} onChange={setFontByPath} />
+        </Field>
+
+        {/* Header */}
+        <Field label="Header Y">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            className="h-9"
+            value={value.header_y_position}
+            onChange={(e) => patch("header_y_position", Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Header tamaño">
+          <Input
+            type="number"
+            step="0.002"
+            min="0.01"
+            max="0.1"
+            className="h-9"
+            value={value.header_font_scale}
+            onChange={(e) => patch("header_font_scale", Number(e.target.value))}
+          />
+        </Field>
+        <ColorField
+          label="Header texto"
+          value={value.header_text_color}
+          onChange={(v) => patch("header_text_color", v)}
+        />
+        <ColorField
+          label="Header caja"
+          value={value.header_box_color}
+          onChange={(v) => patch("header_box_color", v)}
+        />
+        <ColorField
+          label="Header sombra"
+          value={value.header_shadow_color}
+          onChange={(v) => patch("header_shadow_color", v)}
+        />
+
+        {/* Lista */}
+        <Field label="Lista X">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            className="h-9"
+            value={value.list_x_position}
+            onChange={(e) => patch("list_x_position", Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Lista Y">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            className="h-9"
+            value={value.list_y_position}
+            onChange={(e) => patch("list_y_position", Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Separación filas">
+          <Input
+            type="number"
+            step="0.005"
+            min="0.02"
+            max="0.5"
+            className="h-9"
+            value={value.list_line_spacing}
+            onChange={(e) => patch("list_line_spacing", Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Tamaño número">
+          <Input
+            type="number"
+            step="0.002"
+            min="0.01"
+            max="0.2"
+            className="h-9"
+            value={value.number_font_scale}
+            onChange={(e) => patch("number_font_scale", Number(e.target.value))}
+          />
+        </Field>
+        <Field label="Tamaño nombre">
+          <Input
+            type="number"
+            step="0.002"
+            min="0.01"
+            max="0.2"
+            className="h-9"
+            value={value.name_font_scale}
+            onChange={(e) => patch("name_font_scale", Number(e.target.value))}
+          />
+        </Field>
+        <ColorField
+          label="Color número"
+          value={value.number_color}
+          onChange={(v) => patch("number_color", v)}
+        />
+        <ColorField
+          label="Color nombre"
+          value={value.name_color}
+          onChange={(v) => patch("name_color", v)}
+        />
+        <ColorField
+          label="Nombre stroke"
+          value={value.name_stroke_color}
+          onChange={(v) => patch("name_stroke_color", v)}
+        />
+        <Field label="Stroke width">
+          <Input
+            type="number"
+            min="0"
+            max="10"
+            className="h-9"
+            value={value.name_stroke_width}
+            onChange={(e) => patch("name_stroke_width", Number(e.target.value))}
+          />
+        </Field>
+      </div>
     </div>
   );
 }

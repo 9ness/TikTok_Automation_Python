@@ -110,13 +110,15 @@ def enqueue_presidents(
     cfg.setdefault("video_settings", {})["resolution"] = _safe_resolution(payload.resolution)
 
     subs_font_path = _resolve_font_choice(payload.subs.font_choice)
+    numbers_font_path = _resolve_font_choice(payload.numbers.font_choice)
 
     jobs_info: list[dict[str, Any]] = []
     for item in payload.items:
         topic = (item.topic or "").strip() or None
         title_prefix = f"{item.prefix} {item.top_count}"
         topic_display = topic or "🎲 Aleatorio"
-        title = f"{title_prefix} · {topic_display} · top {item.top_count}"
+        variant_tag = " · 🔢 números" if item.numbers_variant else ""
+        title = f"{title_prefix} · {topic_display} · top {item.top_count}{variant_tag}"
 
         params: dict[str, Any] = {
             "config": cfg,
@@ -150,6 +152,24 @@ def enqueue_presidents(
             "hook_box_color": payload.hook.box_color,
             "hook_text_color": payload.hook.text_color,
             "hook_font_scale": payload.hook.font_scale,
+            # Variante NÚMEROS (toggle por vídeo + estilo global del lote)
+            "numbers_variant": item.numbers_variant,
+            "numbers_font_path": numbers_font_path,
+            "numbers_header_text": payload.numbers.header_text,
+            "numbers_header_y_position": payload.numbers.header_y_position,
+            "numbers_header_font_scale": payload.numbers.header_font_scale,
+            "numbers_header_text_color": payload.numbers.header_text_color,
+            "numbers_header_box_color": payload.numbers.header_box_color,
+            "numbers_header_shadow_color": payload.numbers.header_shadow_color,
+            "numbers_list_x_position": payload.numbers.list_x_position,
+            "numbers_list_y_position": payload.numbers.list_y_position,
+            "numbers_list_line_spacing": payload.numbers.list_line_spacing,
+            "numbers_number_font_scale": payload.numbers.number_font_scale,
+            "numbers_name_font_scale": payload.numbers.name_font_scale,
+            "numbers_number_color": payload.numbers.number_color,
+            "numbers_name_color": payload.numbers.name_color,
+            "numbers_name_stroke_color": payload.numbers.name_stroke_color,
+            "numbers_name_stroke_width": payload.numbers.name_stroke_width,
         }
         job = queue.enqueue(JobMode.PRESIDENTS, title=title, params=params)
         jobs_info.append({

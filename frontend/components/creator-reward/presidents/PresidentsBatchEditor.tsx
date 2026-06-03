@@ -30,6 +30,7 @@ const emptyItem = (): PresidentsItem => ({
   top_count: 5,
   include_history: true,
   include_hook: true,
+  numbers_variant: false,
 });
 
 export function PresidentsBatchEditor({
@@ -172,10 +173,26 @@ export function PresidentsBatchEditor({
               </label>
             </div>
 
+            <label className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-sm">
+              <Switch
+                checked={current.numbers_variant}
+                onCheckedChange={(v) => patch({ numbers_variant: v })}
+                className="mt-0.5"
+              />
+              <span>
+                🔢 Variante números
+                <span className="block text-xs text-muted-foreground">
+                  Header fijo + lista 1–{current.top_count} que se rellena al
+                  decir cada presidente. Sustituye al hook box.
+                </span>
+              </span>
+            </label>
+
             <p className="text-xs text-muted-foreground">
               📢 {current.prefix} {current.top_count}{" "}
               {current.topic?.trim() || "[tema aleatorio]"}
               {current.include_history && " in US history"}
+              {current.numbers_variant && " · 🔢 números"}
             </p>
           </CardContent>
         </Card>

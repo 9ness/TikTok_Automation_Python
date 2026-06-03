@@ -21,6 +21,8 @@ export interface PresidentsItem {
   top_count: TopCount;
   include_history: boolean;
   include_hook: boolean;
+  // Variante NÚMEROS: header fijo + lista 1..N que se rellena.
+  numbers_variant: boolean;
 }
 
 export interface PresidentsSubsConfig {
@@ -55,6 +57,27 @@ export interface PresidentsHookConfig {
   font_scale: number;
 }
 
+export interface PresidentsNumbersConfig {
+  font_choice: string;
+  // Header (gancho fijo todo el vídeo)
+  header_text: string; // vacío → usa el hook_box_text del guion
+  header_y_position: number;
+  header_font_scale: number;
+  header_text_color: string;
+  header_box_color: string;
+  header_shadow_color: string;
+  // Lista de números
+  list_x_position: number;
+  list_y_position: number;
+  list_line_spacing: number;
+  number_font_scale: number;
+  name_font_scale: number;
+  number_color: string;
+  name_color: string;
+  name_stroke_color: string;
+  name_stroke_width: number;
+}
+
 export interface PresidentsEnqueueRequest {
   items: PresidentsItem[];
   creative_mode: boolean;
@@ -62,6 +85,7 @@ export interface PresidentsEnqueueRequest {
   resolution: ResolutionLabel;
   subs: PresidentsSubsConfig;
   hook: PresidentsHookConfig;
+  numbers: PresidentsNumbersConfig;
 }
 
 export interface PresidentsBatchEnqueueResponse {

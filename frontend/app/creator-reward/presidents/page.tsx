@@ -12,6 +12,7 @@ import { PresetManager } from "@/components/creator-reward/presidents/PresetMana
 import { PresidentsPreview } from "@/components/creator-reward/presidents/PresidentsPreview";
 import {
   HookConfigPanel,
+  NumbersConfigPanel,
   SubsConfigPanel,
 } from "@/components/creator-reward/presidents/StyleConfigPanels";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import type {
   EngineVersion,
   PresidentsHookConfig,
   PresidentsItem,
+  PresidentsNumbersConfig,
   PresidentsSubsConfig,
   ResolutionLabel,
 } from "@/lib/types/creator-reward";
@@ -72,6 +74,25 @@ const DEFAULT_HOOK: PresidentsHookConfig = {
   font_scale: 0.02,
 };
 
+const DEFAULT_NUMBERS: PresidentsNumbersConfig = {
+  font_choice: "Impact",
+  header_text: "",
+  header_y_position: 0.07,
+  header_font_scale: 0.024,
+  header_text_color: "#0B0B0B",
+  header_box_color: "#FFFFFF",
+  header_shadow_color: "#1E01C4",
+  list_x_position: 0.07,
+  list_y_position: 0.32,
+  list_line_spacing: 0.105,
+  number_font_scale: 0.044,
+  name_font_scale: 0.036,
+  number_color: "#FFD400",
+  name_color: "#FFFFFF",
+  name_stroke_color: "#000000",
+  name_stroke_width: 3,
+};
+
 const RESOLUTIONS: ResolutionLabel[] = [
   "1080p (Lento)",
   "720p (Medio)",
@@ -84,6 +105,7 @@ const RESOLUTIONS: ResolutionLabel[] = [
 function flatToNested(flat: Record<string, unknown>): {
   subs?: Partial<PresidentsSubsConfig>;
   hook?: Partial<PresidentsHookConfig>;
+  numbers?: Partial<PresidentsNumbersConfig>;
   creativeMode?: boolean;
   engine?: EngineVersion;
   resolution?: ResolutionLabel;
@@ -94,6 +116,7 @@ function flatToNested(flat: Record<string, unknown>): {
   }
   const subs: Partial<PresidentsSubsConfig> = {};
   const hook: Partial<PresidentsHookConfig> = {};
+  const numbers: Partial<PresidentsNumbersConfig> = {};
   const s = (k: string) => (typeof flat[k] === "string" ? (flat[k] as string) : undefined);
   const n = (k: string) => (typeof flat[k] === "number" ? (flat[k] as number) : undefined);
   const b = (k: string) => (typeof flat[k] === "boolean" ? (flat[k] as boolean) : undefined);
@@ -128,9 +151,36 @@ function flatToNested(flat: Record<string, unknown>): {
   if (s("hook_text_color")) hook.text_color = s("hook_text_color");
   if (n("hook_font_scale") !== undefined) hook.font_scale = n("hook_font_scale");
 
+  if (s("numbers_font_choice")) numbers.font_choice = s("numbers_font_choice");
+  if (s("numbers_header_text") !== undefined)
+    numbers.header_text = s("numbers_header_text");
+  if (n("numbers_header_y_position") !== undefined)
+    numbers.header_y_position = n("numbers_header_y_position");
+  if (n("numbers_header_font_scale") !== undefined)
+    numbers.header_font_scale = n("numbers_header_font_scale");
+  if (s("numbers_header_text_color")) numbers.header_text_color = s("numbers_header_text_color");
+  if (s("numbers_header_box_color")) numbers.header_box_color = s("numbers_header_box_color");
+  if (s("numbers_header_shadow_color")) numbers.header_shadow_color = s("numbers_header_shadow_color");
+  if (n("numbers_list_x_position") !== undefined)
+    numbers.list_x_position = n("numbers_list_x_position");
+  if (n("numbers_list_y_position") !== undefined)
+    numbers.list_y_position = n("numbers_list_y_position");
+  if (n("numbers_list_line_spacing") !== undefined)
+    numbers.list_line_spacing = n("numbers_list_line_spacing");
+  if (n("numbers_number_font_scale") !== undefined)
+    numbers.number_font_scale = n("numbers_number_font_scale");
+  if (n("numbers_name_font_scale") !== undefined)
+    numbers.name_font_scale = n("numbers_name_font_scale");
+  if (s("numbers_number_color")) numbers.number_color = s("numbers_number_color");
+  if (s("numbers_name_color")) numbers.name_color = s("numbers_name_color");
+  if (s("numbers_name_stroke_color")) numbers.name_stroke_color = s("numbers_name_stroke_color");
+  if (n("numbers_name_stroke_width") !== undefined)
+    numbers.name_stroke_width = n("numbers_name_stroke_width");
+
   return {
     subs,
     hook,
+    numbers,
     creativeMode: b("creative_mode"),
     engine: s("engine_version") as EngineVersion | undefined,
     resolution: s("resolution") as ResolutionLabel | undefined,
@@ -140,6 +190,7 @@ function flatToNested(flat: Record<string, unknown>): {
 function nestedToFlat(
   subs: PresidentsSubsConfig,
   hook: PresidentsHookConfig,
+  numbers: PresidentsNumbersConfig,
   creativeMode: boolean,
   engine: EngineVersion,
   resolution: ResolutionLabel,
@@ -171,6 +222,22 @@ function nestedToFlat(
     hook_box_color: hook.box_color,
     hook_text_color: hook.text_color,
     hook_font_scale: hook.font_scale,
+    numbers_font_choice: numbers.font_choice,
+    numbers_header_text: numbers.header_text,
+    numbers_header_y_position: numbers.header_y_position,
+    numbers_header_font_scale: numbers.header_font_scale,
+    numbers_header_text_color: numbers.header_text_color,
+    numbers_header_box_color: numbers.header_box_color,
+    numbers_header_shadow_color: numbers.header_shadow_color,
+    numbers_list_x_position: numbers.list_x_position,
+    numbers_list_y_position: numbers.list_y_position,
+    numbers_list_line_spacing: numbers.list_line_spacing,
+    numbers_number_font_scale: numbers.number_font_scale,
+    numbers_name_font_scale: numbers.name_font_scale,
+    numbers_number_color: numbers.number_color,
+    numbers_name_color: numbers.name_color,
+    numbers_name_stroke_color: numbers.name_stroke_color,
+    numbers_name_stroke_width: numbers.name_stroke_width,
     creative_mode: creativeMode,
     engine_version: engine,
     resolution,
@@ -202,17 +269,22 @@ export default function PresidentsPage() {
     "presidents.hook.v2",
     DEFAULT_HOOK,
   );
+  const [numbers, setNumbers] = useLocalStorageState<PresidentsNumbersConfig>(
+    "presidents.numbers.v1",
+    DEFAULT_NUMBERS,
+  );
 
   // Para PresetManager: enviar flat al guardar (compatible con Streamlit).
   const flatConfig = useMemo(
-    () => nestedToFlat(subs, hook, creativeMode, engine, resolution),
-    [subs, hook, creativeMode, engine, resolution],
+    () => nestedToFlat(subs, hook, numbers, creativeMode, engine, resolution),
+    [subs, hook, numbers, creativeMode, engine, resolution],
   );
 
   function loadPreset(loaded: Record<string, unknown>) {
     const n = flatToNested(loaded);
     if (n.subs) setSubs({ ...DEFAULT_SUBS, ...n.subs });
     if (n.hook) setHook({ ...DEFAULT_HOOK, ...n.hook });
+    if (n.numbers) setNumbers({ ...DEFAULT_NUMBERS, ...n.numbers });
     if (typeof n.creativeMode === "boolean") setCreativeMode(n.creativeMode);
     if (n.resolution) setResolution(n.resolution);
     if (n.engine) setEngine(n.engine);
@@ -235,11 +307,18 @@ export default function PresidentsPage() {
   function resetStyles() {
     setSubs(DEFAULT_SUBS);
     setHook(DEFAULT_HOOK);
+    setNumbers(DEFAULT_NUMBERS);
     setCreativeMode(false);
     setEngine("v2_estable");
     setResolution("1080p (Lento)");
     toast.success("Estilos restablecidos a defaults.");
   }
+
+  // La previsualización de la variante números refleja el primer vídeo que
+  // la tenga activada (o el primero del lote).
+  const numbersItem = items.find((it) => it.numbers_variant);
+  const numbersActive = Boolean(numbersItem);
+  const previewTopCount = numbersItem?.top_count ?? items[0]?.top_count ?? 5;
 
   async function submit() {
     if (items.length === 0) return;
@@ -251,6 +330,7 @@ export default function PresidentsPage() {
         resolution,
         subs,
         hook,
+        numbers,
       });
       toast.success(`${res.total_enqueued} vídeo(s) encolados.`);
       openQueue();
@@ -352,10 +432,27 @@ export default function PresidentsPage() {
           >
             <HookConfigPanel value={hook} onChange={setHook} />
           </CollapsibleCard>
+
+          <CollapsibleCard
+            title="🔢 Variante números"
+            subtitle={
+              numbersActive
+                ? `Activa · ${numbers.font_choice} · lista X=${numbers.list_x_position.toFixed(2)}`
+                : "Actívala por vídeo arriba"
+            }
+          >
+            <NumbersConfigPanel value={numbers} onChange={setNumbers} />
+          </CollapsibleCard>
         </div>
 
         <div className="space-y-3 lg:sticky lg:top-6">
-          <PresidentsPreview subs={subs} hook={hook} />
+          <PresidentsPreview
+            subs={subs}
+            hook={hook}
+            numbers={numbers}
+            numbersActive={numbersActive}
+            topCount={previewTopCount}
+          />
           <Button
             onClick={submit}
             disabled={!canSubmit}

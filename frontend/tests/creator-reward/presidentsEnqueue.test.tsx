@@ -24,7 +24,7 @@ describe("useEnqueuePresidents", () => {
     const { result } = renderHook(() => useEnqueuePresidents(), { wrapper });
 
     result.current.mutate({
-      items: [{ topic: "worst", prefix: "The", top_count: 5, include_history: true, include_hook: true }],
+      items: [{ topic: "worst", prefix: "The", top_count: 5, include_history: true, include_hook: true, numbers_variant: false }],
       creative_mode: false,
       engine_version: "v2_estable",
       resolution: "1080p (Lento)",
@@ -57,6 +57,24 @@ describe("useEnqueuePresidents", () => {
         box_color: "#fff",
         text_color: "#000",
         font_scale: 0.02,
+      },
+      numbers: {
+        font_choice: "Impact",
+        header_text: "",
+        header_y_position: 0.07,
+        header_font_scale: 0.024,
+        header_text_color: "#0B0B0B",
+        header_box_color: "#FFFFFF",
+        header_shadow_color: "#1E01C4",
+        list_x_position: 0.07,
+        list_y_position: 0.32,
+        list_line_spacing: 0.105,
+        number_font_scale: 0.044,
+        name_font_scale: 0.036,
+        number_color: "#FFD400",
+        name_color: "#FFFFFF",
+        name_stroke_color: "#000000",
+        name_stroke_width: 3,
       },
     });
 

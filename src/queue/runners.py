@@ -83,9 +83,10 @@ def _render_presidents_video_headless(
     engine_version: str,
     progress_lo: float,
     progress_hi: float,
-) -> str:
-    """Versión sin Streamlit de generate_video_pipeline. Devuelve la
-    ruta del MP4 generado."""
+) -> tuple[str, list[dict]]:
+    """Versión sin Streamlit de generate_video_pipeline. Devuelve la ruta del
+    MP4 generado + `reveals` (lista {puesto, name, reveal_time} para la
+    variante números, con el instante en que arranca cada segmento)."""
     from moviepy.editor import (
         AudioFileClip, CompositeAudioClip, concatenate_videoclips,
     )
@@ -125,6 +126,8 @@ def _render_presidents_video_headless(
     clips = []
     token = False
     revealed_presidents = []
+    reveals: list[dict] = []
+    cum_dur = 0.0
     n_segments = max(1, len(final_audio_order))
 
     # Construcción de segmentos: 60% del rango destinado a esta fase
@@ -134,9 +137,10 @@ def _render_presidents_video_headless(
     for i, aud in enumerate(final_audio_order):
         try:
             name = os.path.splitext(os.path.basename(aud))[0]
+            is_intro = "intro" in name.lower()
             try:
                 parts = name.split("_")
-                if "intro" in name.lower():
+                if is_intro:
                     puesto, presi = 1, "Intro"
                 elif len(parts) >= 2:
                     puesto = int(parts[0])
@@ -158,6 +162,15 @@ def _render_presidents_video_headless(
             )
             revealed_presidents.append(presi)
             if seg:
+                # Reveal de la variante números: el nombre aparece cuando
+                # arranca su segmento (la intro no cuenta como presidente).
+                if not is_intro and puesto and puesto >= 1:
+                    reveals.append({
+                        "puesto": int(puesto),
+                        "name": presi,
+                        "reveal_time": float(cum_dur),
+                    })
+                cum_dur += seg.duration
                 clips.append(seg)
         except Exception as e:
             on_log(f"❌ Error creando segmento {os.path.basename(aud)}: {e}")
@@ -237,7 +250,7 @@ def _render_presidents_video_headless(
         remove_temp=True,
         ffmpeg_params=["-pix_fmt", "yuv420p"],
     )
-    return out_path
+    return out_path, reveals
 
 
 # ============================================================
@@ -247,19 +260,24 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     p = job.params
     config = p["config"]
 
+    # La variante números sustituye al hook box animado.
+    numbers_variant = bool(p.get("numbers_variant"))
+    hook_active = bool(p.get("hook_enabled")) and not numbers_variant
+
     # Pesos de los pasos
     w_script = 0.05
     w_audio = 0.15
     w_video = 0.50
     w_subs = 0.20 if p.get("subs_enabled") else 0.0
-    w_hook = 0.10 if p.get("hook_enabled") else 0.0
-    w_total = w_script + w_audio + w_video + w_subs + w_hook
+    w_hook = 0.10 if hook_active else 0.0
+    w_numbers = 0.10 if numbers_variant else 0.0
+    w_total = w_script + w_audio + w_video + w_subs + w_hook + w_numbers
     cum = []
     acc = 0.0
-    for w in (w_script, w_audio, w_video, w_subs, w_hook):
+    for w in (w_script, w_audio, w_video, w_subs, w_hook, w_numbers):
         acc += w / w_total
         cum.append(acc)
-    # cum[0..4] = pct acumulado tras: guion, audio, video, subs, hook
+    # cum[0..5] = pct acumulado tras: guion, audio, video, subs, hook, números
 
     # ----- 1+2. GUIÓN + AUDIO con auto-calibración de palabras -----
     # Calibra target_total_words por tipo de vídeo para clavar 60-65s.
@@ -383,7 +401,7 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         on_progress(cum[1], "🎬 Renderizando vídeo…")
 
         # ----- 3. VÍDEO -----
-        final_video_path = _render_presidents_video_headless(
+        final_video_path, numbers_reveals = _render_presidents_video_headless(
             src_folder=audio_output_folder,
             output_folder=config["paths"]["output_folder"],
             config=config,
@@ -477,8 +495,8 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                 print(f"[Presidents/SUBS] Detalle: {traceback.format_exc()}")
             on_progress(cum[3], "🎣 Añadiendo hook…")
 
-        # ----- 5. HOOK (opcional) -----
-        if p.get("hook_enabled"):
+        # ----- 5. HOOK (opcional; se omite en la variante números) -----
+        if hook_active:
             try:
                 from src.text_hook import (
                     DEFAULT_HOOK_STYLE, add_text_hook_to_video,
@@ -510,6 +528,58 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             except Exception as e:
                 on_log(f"❌ Error hook: {e}")
             on_progress(cum[4], "🎉 Finalizando…")
+
+        # ----- 6. VARIANTE NÚMEROS (opcional; sustituye al hook box) -----
+        if numbers_variant:
+            on_progress(cum[4], "🔢 Aplicando variante números…")
+            try:
+                from src.numbers_overlay import (
+                    DEFAULT_NUMBERS_STYLE, add_numbers_overlay_to_video,
+                )
+
+                header_text = (
+                    (p.get("numbers_header_text") or "").strip()
+                    or (script_data.get("hook_box_text") or "").strip()
+                    or (script_data.get("video_title") or "").strip()
+                    or "Top US Presidents"
+                )
+                numbers_style = {
+                    **DEFAULT_NUMBERS_STYLE,
+                    "header_text": p.get("numbers_header_text", ""),
+                    "header_y_position": p.get("numbers_header_y_position", 0.07),
+                    "header_font_scale": p.get("numbers_header_font_scale", 0.024),
+                    "header_text_color": p.get("numbers_header_text_color", "#0B0B0B"),
+                    "header_box_color": p.get("numbers_header_box_color", "#FFFFFF"),
+                    "header_shadow_color": p.get("numbers_header_shadow_color", "#1E01C4"),
+                    "list_x_position": p.get("numbers_list_x_position", 0.07),
+                    "list_y_position": p.get("numbers_list_y_position", 0.32),
+                    "list_line_spacing": p.get("numbers_list_line_spacing", 0.105),
+                    "number_font_scale": p.get("numbers_number_font_scale", 0.044),
+                    "name_font_scale": p.get("numbers_name_font_scale", 0.036),
+                    "number_color": p.get("numbers_number_color", "#FFD400"),
+                    "name_color": p.get("numbers_name_color", "#FFFFFF"),
+                    "name_stroke_color": p.get("numbers_name_stroke_color", "#000000"),
+                    "name_stroke_width": p.get("numbers_name_stroke_width", 3),
+                }
+                if p.get("numbers_font_path"):
+                    numbers_style["font_path"] = p["numbers_font_path"]
+
+                on_log(
+                    f"🔢 Variante números: {len(numbers_reveals)} nombres, "
+                    f"top {p.get('top_count', 5)}"
+                )
+                tmp_out = final_video_path + ".tmp.mp4"
+                add_numbers_overlay_to_video(
+                    final_video_path, header_text, numbers_reveals,
+                    p.get("top_count", 5), numbers_style, tmp_out,
+                    log_callback=on_log,
+                )
+                os.replace(tmp_out, final_video_path)
+                on_log("✅ Variante números aplicada")
+            except Exception as e:
+                on_log(f"❌ Error variante números: {e}")
+                print(f"[Presidents/NUMBERS] {traceback.format_exc()}")
+            on_progress(cum[5], "🎉 Finalizando…")
 
         on_progress(1.0, "✅ Vídeo completado")
         return final_video_path
