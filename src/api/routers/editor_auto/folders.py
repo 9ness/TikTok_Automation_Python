@@ -433,7 +433,11 @@ def get_output_editproject(
         "keep_intervals": [],
         "video_duration_s": 0.0,
     }
-    proj_path = os.path.join(salida, ".editproj", f"{filename}.json")
+    # `.editproj` a nivel de usuario (hermano de salida). Fallback al sitio
+    # antiguo (dentro de salida) para proyectos generados antes del cambio.
+    proj_path = os.path.join(os.path.dirname(salida), ".editproj", f"{filename}.json")
+    if not os.path.exists(proj_path):
+        proj_path = os.path.join(salida, ".editproj", f"{filename}.json")
     if os.path.exists(proj_path):
         try:
             with open(proj_path, encoding="utf-8") as f:
@@ -518,7 +522,7 @@ def manual_render_output(
     # Actualiza el proyecto editable con los nuevos tramos (la próxima vez que
     # se abra el editor parte de aquí).
     try:
-        proj_dir = os.path.join(salida, ".editproj")
+        proj_dir = os.path.join(os.path.dirname(salida), ".editproj")
         os.makedirs(proj_dir, exist_ok=True)
         pp = os.path.join(proj_dir, f"{filename}.json")
         proj = {}

@@ -377,7 +377,10 @@ def run_editor_auto_pipeline(
     try:
         proj_src = os.path.join(temp_folder, f"editproject_{job_id}.json")
         if os.path.exists(proj_src):
-            proj_dir = os.path.join(out_folder, ".editproj")
+            # `.editproj` a nivel de USUARIO (hermano de salida), NO dentro de
+            # salida: así no ensucia la carpeta ni la ve el cliente (solo se
+            # comparte `salida`). out_folder == .../<user>/salida.
+            proj_dir = os.path.join(os.path.dirname(out_folder), ".editproj")
             os.makedirs(proj_dir, exist_ok=True)
             shutil.copyfile(proj_src, os.path.join(proj_dir, f"{base_name}.json"))
             os.remove(proj_src)
