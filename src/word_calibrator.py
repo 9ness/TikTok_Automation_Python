@@ -33,11 +33,21 @@ UPSTASH_URL = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
 
 PREFIX = "tiktokCR:words:"
+CPS_PREFIX = "tiktokCR:cps:"  # caracteres-por-segundo medidos (gate pre-TTS)
 
 # Rango de duración aceptable (segundos)
 TARGET_MIN_S = 60.0
 TARGET_MAX_S = 65.0
 TARGET_MID_S = 62.0  # punto al que apunta el ajuste proporcional
+
+# Gate pre-TTS: estimamos la duración por nº de caracteres del guion ANTES de
+# gastar TTS. Solo sintetizamos audio cuando la estimación cae en esta banda.
+# Los reintentos de guion (OpenAI) cuestan ~$0.0004 — casi gratis.
+EST_GATE_LO_S = 60.0
+EST_GATE_HI_S = 66.0
+DEFAULT_CPS = 16.0  # chars/seg inicial (se auto-ajusta tras cada TTS real)
+CPS_MIN, CPS_MAX = 8.0, 30.0
+CPS_EMA_ALPHA = 0.3  # suavizado exponencial al actualizar
 
 # Límites duros del calibrador (evita explosiones por ruido)
 ABS_MIN_WORDS = 120
@@ -119,6 +129,62 @@ def save_target_words(type_key: str, target_words: int, last_dur_s: float) -> bo
     except Exception as e:
         print(f"[word_calibrator] save error: {e}")
         return False
+
+
+def get_cps(type_key: str, default: float = DEFAULT_CPS) -> float:
+    """Lee los caracteres-por-segundo medidos (gate pre-TTS) o el default."""
+    if not _is_available() or not type_key:
+        return default
+    key = CPS_PREFIX + type_key
+    try:
+        r = requests.get(f"{UPSTASH_URL}/get/{_enc(key)}", headers=_headers(), timeout=10)
+        if r.status_code != 200:
+            return default
+        result = r.json().get("result")
+        if result is None:
+            return default
+        val = float(json.loads(result).get("cps") or default)
+        return max(CPS_MIN, min(CPS_MAX, val))
+    except Exception as e:
+        print(f"[word_calibrator] get_cps error: {e}")
+        return default
+
+
+def save_cps(type_key: str, chars: int, dur_s: float) -> float:
+    """Actualiza el cps medido (EMA) a partir de chars reales / duración real
+    del TTS. Devuelve el nuevo cps (acotado). No-op si Upstash no está."""
+    if dur_s <= 0 or chars <= 0:
+        return get_cps(type_key)
+    measured = max(CPS_MIN, min(CPS_MAX, chars / dur_s))
+    prev = get_cps(type_key)
+    new_cps = max(CPS_MIN, min(CPS_MAX, prev + CPS_EMA_ALPHA * (measured - prev)))
+    if _is_available() and type_key:
+        try:
+            body = json.dumps({
+                "cps": round(new_cps, 3),
+                "last_chars": int(chars),
+                "last_dur_s": round(float(dur_s), 2),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }, ensure_ascii=False)
+            requests.post(
+                f"{UPSTASH_URL}/set/{_enc(CPS_PREFIX + type_key)}",
+                headers=_headers(), data=body.encode("utf-8"), timeout=10,
+            )
+        except Exception as e:
+            print(f"[word_calibrator] save_cps error: {e}")
+    return new_cps
+
+
+def estimate_duration_s(chars: int, cps: float) -> float:
+    """Duración estimada (s) de un guion por su nº de caracteres."""
+    if cps <= 0:
+        cps = DEFAULT_CPS
+    return float(chars) / cps
+
+
+def estimate_in_gate(est_s: float) -> bool:
+    """True si la duración estimada cae en la banda para gastar TTS."""
+    return EST_GATE_LO_S <= est_s <= EST_GATE_HI_S
 
 
 def adjust_target_words(current: int, dur_s: float) -> int:

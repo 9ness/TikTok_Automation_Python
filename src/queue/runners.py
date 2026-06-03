@@ -292,87 +292,128 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         creative_mode=p.get("creative_mode", False),
     )
     target_words = wc.get_target_words(type_key)
+    cps = wc.get_cps(type_key)
     on_log(
         f"🎯 Calibración tipo='{type_key}' → target inicial: {target_words} "
-        f"palabras (rango {wc.TARGET_MIN_S:.0f}-{wc.TARGET_MAX_S:.0f}s)"
+        f"palabras · cps≈{cps:.1f} (gate {wc.EST_GATE_LO_S:.0f}-{wc.EST_GATE_HI_S:.0f}s "
+        f"estimados antes de gastar TTS)"
     )
 
-    MAX_ATTEMPTS = p.get("calibration_max_attempts", 5)
+    # Reintentos de TTS (caro) — el gate de guion ya deja la longitud cerca,
+    # así que con 2 basta. Reintentos de GUION (barato, ~$0.0004) hasta 8.
+    MAX_TTS_ATTEMPTS = p.get("calibration_max_attempts", 2)
+    MAX_SCRIPT_TRIES = p.get("calibration_script_tries", 8)
     script_data = None
     txt_output = None
     audio_output_folder = None
     total_dur = 0.0
     success_in_range = False
 
-    try:
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            on_log(
-                f"📝 [Intento {attempt}/{MAX_ATTEMPTS}] Generando guion "
-                f"con OpenAI (target {target_words} palabras)…"
-            )
-            script_data = guionista.generate_script(
-                user_topic=p.get("topic"),
-                creative_mode=p.get("creative_mode", False),
-                title_prefix=p.get("title_prefix", "The 5"),
-                include_history=p.get("include_history", True),
-                include_hook=p.get("include_hook", True),
-                top_count=p.get("top_count", 5),
-                target_total_words=target_words,
-            )
-            txt_output = guionista.save_scripts_to_txt(
-                script_data, top_count=p.get("top_count", 5)
-            )
-            on_log("✅ Guion listo")
-            on_progress(cum[0], f"🎙️ TTS (intento {attempt})…")
+    def _count_script_chars(folder: str) -> int:
+        """Suma de caracteres de los .txt (lo que MiniMax facturará)."""
+        total = 0
+        try:
+            for fn in os.listdir(folder):
+                if fn.lower().endswith(".txt"):
+                    with open(os.path.join(folder, fn), "r", encoding="utf-8") as fh:
+                        total += len(fh.read().strip())
+        except Exception:
+            pass
+        return total
 
-            # ----- AUDIO -----
+    try:
+        for tts_attempt in range(1, MAX_TTS_ATTEMPTS + 1):
+            # ----- Búsqueda BARATA de guion (sin TTS): regenera hasta que la
+            # duración ESTIMADA por nº de caracteres caiga en la banda gate.
+            best = None     # (script_data, txt_output, chars, est) más cercano
+            chosen = None   # guion que cae dentro del gate
+            for s_try in range(1, MAX_SCRIPT_TRIES + 1):
+                sd = guionista.generate_script(
+                    user_topic=p.get("topic"),
+                    creative_mode=p.get("creative_mode", False),
+                    title_prefix=p.get("title_prefix", "The 5"),
+                    include_history=p.get("include_history", True),
+                    include_hook=p.get("include_hook", True),
+                    top_count=p.get("top_count", 5),
+                    target_total_words=target_words,
+                )
+                to = guionista.save_scripts_to_txt(sd, top_count=p.get("top_count", 5))
+                chars = _count_script_chars(to)
+                est = wc.estimate_duration_s(chars, cps)
+                on_log(
+                    f"📝 [TTS {tts_attempt}/{MAX_TTS_ATTEMPTS} · guion "
+                    f"{s_try}/{MAX_SCRIPT_TRIES}] {chars} chars ≈ {est:.0f}s "
+                    f"(cps {cps:.1f}, target {target_words}w)"
+                )
+                if wc.estimate_in_gate(est):
+                    if best is not None and best[1] != to:
+                        shutil.rmtree(best[1], ignore_errors=True)
+                    chosen = (sd, to, chars, est)
+                    break
+                # Guarda el más cercano al medio; descarta el resto al vuelo.
+                if best is None or abs(est - wc.TARGET_MID_S) < abs(best[3] - wc.TARGET_MID_S):
+                    if best is not None:
+                        shutil.rmtree(best[1], ignore_errors=True)
+                    best = (sd, to, chars, est)
+                else:
+                    shutil.rmtree(to, ignore_errors=True)
+                # Nudge barato del target de palabras usando la estimación.
+                target_words = wc.adjust_target_words(target_words, est)
+
+            sel = chosen or best
+            if not sel:
+                raise RuntimeError("No se pudo generar guion para calibración")
+            script_data, txt_output, sel_chars, sel_est = sel
+            on_log(
+                (f"✅ Guion en rango estimado ({sel_est:.0f}s)"
+                 if chosen else
+                 f"⚠️ Ningún guion cayó en banda; uso el más cercano ({sel_est:.0f}s)")
+                + " — sintetizando audio"
+            )
+            on_progress(cum[0], f"🎙️ TTS (intento {tts_attempt})…")
+
+            # ----- AUDIO (caro) — una sola tanda por intento de TTS -----
             audio_output_folder = locutor.generate_audios_from_text_folder(
                 txt_output, config["paths"]["resources_library"]
             )
             if not audio_output_folder:
                 raise RuntimeError("No se generaron audios MiniMax")
             total_dur = wc.measure_audio_folder_duration(audio_output_folder)
+            # Auto-ajuste del cps con la medición REAL → mejora el gate futuro.
+            cps = wc.save_cps(type_key, sel_chars, total_dur)
             on_log(
-                f"⏱️ Duración total audios: {total_dur:.1f}s "
-                f"(objetivo {wc.TARGET_MIN_S:.0f}-{wc.TARGET_MAX_S:.0f}s)"
+                f"⏱️ Duración real: {total_dur:.1f}s (estimada {sel_est:.0f}s) "
+                f"· cps→{cps:.1f}"
             )
 
             in_range, next_target = wc.calibration_decision(
                 type_key, target_words, total_dur
             )
-            if in_range:
+            # Aceptamos cualquier vídeo ≥ mínimo (60s) — el gate ya lo dejó
+            # cerca del minuto. Solo re-sintetizamos si quedó CORTO (no monetiza).
+            if total_dur >= wc.TARGET_MIN_S:
+                success_in_range = in_range
                 on_log(
-                    f"✅ Duración OK ({total_dur:.1f}s). Calibración guardada "
-                    f"({target_words} palabras para '{type_key}')."
+                    f"✅ Duración OK ({total_dur:.1f}s). "
+                    + ("En sweet spot 60-65s." if in_range else "Aceptable (≥60s).")
                 )
-                success_in_range = True
                 break
 
-            if attempt == MAX_ATTEMPTS:
-                # Si la duración final está POR DEBAJO del mínimo (60s) no se
-                # acepta — un vídeo corto no monetiza. Si está por ENCIMA (66s+)
-                # se tolera: videos largos son menos críticos.
-                if total_dur < wc.TARGET_MIN_S:
-                    on_log(
-                        f"❌ Máximo de intentos ({MAX_ATTEMPTS}) alcanzado y "
-                        f"duración {total_dur:.1f}s sigue debajo del mínimo "
-                        f"({wc.TARGET_MIN_S:.0f}s). Calibrador guardó target "
-                        f"{next_target} para futuros intentos."
-                    )
-                    raise RuntimeError(
-                        f"Duración final {total_dur:.1f}s < {wc.TARGET_MIN_S:.0f}s mínimo "
-                        f"tras {MAX_ATTEMPTS} intentos. Reintenta el job — el calibrador "
-                        f"ha aprendido y debería converger."
-                    )
+            if tts_attempt == MAX_TTS_ATTEMPTS:
                 on_log(
-                    f"⚠️ Máximo de intentos alcanzado. Duración {total_dur:.1f}s "
-                    f"está por encima del rango pero es aceptable. Continuando."
+                    f"❌ Tras {MAX_TTS_ATTEMPTS} tandas TTS, duración "
+                    f"{total_dur:.1f}s < {wc.TARGET_MIN_S:.0f}s mínimo. "
+                    f"Calibrador guardó target {next_target}."
                 )
-                break
+                raise RuntimeError(
+                    f"Duración final {total_dur:.1f}s < {wc.TARGET_MIN_S:.0f}s mínimo "
+                    f"tras {MAX_TTS_ATTEMPTS} tandas TTS. Reintenta — el calibrador "
+                    f"ha aprendido y debería converger."
+                )
 
             on_log(
-                f"🔄 Fuera de rango. Reajustando {target_words} → {next_target} "
-                f"palabras y regenerando…"
+                f"🔄 Vídeo corto ({total_dur:.1f}s). Reajustando "
+                f"{target_words}→{next_target} palabras y regenerando…"
             )
             target_words = next_target
             # Limpia temporales del intento fallido antes de reintentar
@@ -537,10 +578,13 @@ def run_presidents(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
                     DEFAULT_NUMBERS_STYLE, add_numbers_overlay_to_video,
                 )
 
+                # Header de la variante números: preferimos el título COMPLETO
+                # ("The 5 Worst Presidents…") sobre el hook_box_text corto
+                # ("Worst Presidents"), que quedaba pobre como cabecera.
                 header_text = (
                     (p.get("numbers_header_text") or "").strip()
-                    or (script_data.get("hook_box_text") or "").strip()
                     or (script_data.get("video_title") or "").strip()
+                    or (script_data.get("hook_box_text") or "").strip()
                     or "Top US Presidents"
                 )
                 numbers_style = {
