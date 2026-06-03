@@ -80,6 +80,11 @@ export interface JobSummaryResponse {
   ai_cuts_by_reason?: Record<string, number>;
   quality_score?: number | null;
   quality_verdict?: string | null;
+  needs_requeue?: boolean;
+  transcription_ok?: boolean;
+  n_loose_words?: number;
+  loose_words_preview?: string[];
+  n_surviving_stretched?: number;
   n_silences_remaining?: number;
   silences_remaining_preview?: RemainingSilencePreview[];
   tools_used?: string[] | null;

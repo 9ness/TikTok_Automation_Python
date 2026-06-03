@@ -950,6 +950,7 @@ class SilenceCutterTool:
                 output_path,
                 keep_intervals=keep_intervals,
                 words=words,
+                stretched_spans=stretched_spans,
             )
             diagnostic["audit"] = audit
             score = audit.get("quality_score")
@@ -958,6 +959,26 @@ class SilenceCutterTool:
                 ctx.on_log(
                     f"[silence_cutter] 🏆 Quality score: {score}/100 — {verdict}"
                 )
+                # Aviso de FALLO REAL → conviene reencolar (no es solo estética)
+                if audit.get("needs_requeue"):
+                    bits = []
+                    if not audit.get("transcription_ok", True):
+                        bits.append("SIN transcripción")
+                    if audit.get("n_loose_words"):
+                        lw = ", ".join(
+                            f"'{p['text']}'"
+                            for p in audit.get("loose_words_preview", [])[:4]
+                        )
+                        bits.append(f"{audit['n_loose_words']} palabra(s) suelta(s): {lw}")
+                    if audit.get("n_surviving_stretched"):
+                        bits.append(
+                            f"{audit['n_surviving_stretched']} relleno(s) estirado(s) sin cortar"
+                        )
+                    motivo = " · ".join(bits) if bits else "score bajo"
+                    ctx.on_log(
+                        f"[silence_cutter] 🚩 REENCOLAR recomendado "
+                        f"({score}/100): {motivo}"
+                    )
                 n_internal = audit.get("n_internal_silences", 0)
                 if n_internal > 0:
                     ctx.on_log(
@@ -1952,17 +1973,25 @@ def _post_render_audit(
     noise_db: float = -25.0,
     keep_intervals: list[tuple[float, float]] | None = None,
     words: list[dict] | None = None,
+    stretched_spans: list[tuple[float, float]] | None = None,
 ) -> dict:
-    """Re-analiza el MP4 final con silencedetect para detectar silencios
-    largos remanentes. Devuelve un dict con métricas para diagnóstico.
+    """Re-analiza el MP4 final y puntúa la CALIDAD REAL del vídeo (0-100).
 
     Si se pasan `keep_intervals` y `words`, cada silencio remanente se
     enriquece con su posición en el INPUT y las palabras vecinas en el
     transcript — así sabemos exactamente entre qué frases falló.
 
-    Quality score (0-100):
-      - 100 = ningún silencio ≥ threshold remanente.
-      - Penalización -10 por cada silencio remanente (mínimo 0).
+    Quality score (0-100) — pondera FALLOS REALES que se notan en el vídeo
+    por encima de silencios imperfectos:
+      - Transcripción FALLIDA (0 palabras con vídeo largo) → cap 30 + reencolar:
+        sin transcripción el corte es solo-acústico y el score es ciego.
+      - Palabra suelta (clip diminuto que es solo un relleno tipo 'y'/'la')
+        → −12 c/u: artefacto audible/visible.
+      - Relleno estirado superviviente (un 'la'/risa de 2s que NO se cortó)
+        → −12 c/u.
+      - Silencio interno sin cortar exacto → −3 c/u (menor; "no pasa nada").
+    `needs_requeue` = True si la transcripción falló o el score < 90 → aviso
+    al operador de que hubo un fallo REAL y conviene reencolar.
     """
     audit: dict[str, Any] = {
         "long_silence_threshold_s": long_silence_threshold_s,
@@ -2015,7 +2044,30 @@ def _post_render_audit(
             if s > 0.5 and (output_duration == 0 or e < output_duration - 0.5)
         ]
         n_internal = len(internal_silences)
-        score = max(0, 100 - n_internal * 10)
+
+        # --- Señales de FALLO REAL (lo que se nota en el vídeo) ---------------
+        n_words = len(words or [])
+        # Transcripción fallida: 0 palabras con vídeo de duración real → el
+        # corte fue solo-acústico (ciego a palabras) → el score sería engañoso.
+        degraded = n_words == 0 and output_duration > 12.0
+        # Palabras sueltas: clips diminutos que son solo relleno (un 'y'/'la'
+        # colgado entre dos cortes) — artefacto audible.
+        loose_words = _detect_loose_words(words or [], keep_intervals or [])
+        # Rellenos estirados que NO se cortaron (siguen audibles en el corte).
+        surviving_stretched = _surviving_stretched_spans(
+            stretched_spans or [], keep_intervals or [],
+        )
+
+        n_loose = len(loose_words)
+        n_surv = len(surviving_stretched)
+        score = 100
+        score -= 12 * n_loose
+        score -= 12 * n_surv
+        score -= 3 * n_internal          # silencios = menor
+        score = max(0, min(100, score))
+        if degraded:
+            score = min(score, 30)
+        needs_requeue = bool(degraded or score < 90)
 
         # Enriquecer cada silencio remanente con su posición en el INPUT
         # y las palabras vecinas — así el operador ve EXACTAMENTE entre qué
@@ -2044,25 +2096,96 @@ def _post_render_audit(
 
         audit.update({
             "output_duration_s": round(output_duration, 3),
+            "n_words": n_words,
+            "transcription_ok": not degraded,
             "n_silences_remaining": len(remaining),
             "n_internal_silences": n_internal,
             "internal_silences_preview": enriched,
+            "n_loose_words": n_loose,
+            "loose_words_preview": loose_words[:10],
+            "n_surviving_stretched": n_surv,
+            "surviving_stretched_preview": surviving_stretched[:10],
             "quality_score": score,
-            "verdict": _verdict_for_score(score),
+            "needs_requeue": needs_requeue,
+            "verdict": _verdict_for_score(score, degraded=degraded),
         })
     except Exception as e:
         audit["error"] = f"{type(e).__name__}: {e}"
     return audit
 
 
-def _verdict_for_score(score: int) -> str:
+def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
+    if degraded:
+        return "FALLO — sin transcripción (corte ciego). REENCOLAR"
     if score >= 90:
-        return "EXCELENTE — sin silencios largos remanentes"
+        return "EXCELENTE — sin fallos reales detectados"
     if score >= 70:
-        return "BIEN — algún silencio pequeño remanente"
+        return "BIEN — algún detalle menor"
     if score >= 50:
-        return "REGULAR — varios silencios largos sin cortar"
-    return "MAL — quedan muchos silencios. Revisar diagnóstico"
+        return "REGULAR — hay fallos visibles. Mejor REENCOLAR"
+    return "MAL — varios fallos reales. REENCOLAR"
+
+
+def _detect_loose_words(
+    words: list[dict],
+    keep_intervals: list[tuple[float, float]],
+    *,
+    max_seg_s: float = 0.85,
+    pad_s: float = 0.08,
+) -> list[dict]:
+    """Detecta 'palabras sueltas': un clip diminuto que quedó en el corte
+    final cuyo ÚNICO contenido es 1-2 rellenos cortos ('y', 'la', 'eh'...).
+
+    Es el artefacto que más se nota: una palabra colgada entre dos cortes,
+    sin frase alrededor. Un segmento normal (una frase) dura >0.85s y trae
+    palabras de contenido → no dispara. Solo penaliza fragmentos-basura.
+    """
+    if not words or not keep_intervals:
+        return []
+    loose: list[dict] = []
+    for s, e in keep_intervals:
+        if (e - s) > max_seg_s:
+            continue
+        seg = [
+            w for w in words
+            if float(w.get("start", 0)) >= s - pad_s
+            and float(w.get("end", 0)) <= e + pad_s
+        ]
+        if not seg or len(seg) > 2:
+            continue
+        toks = [
+            re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+            for w in seg
+        ]
+        if all((t in _FILLER_TOKENS or len(t) <= 2) for t in toks if t):
+            loose.append({
+                "start": round(s, 2), "end": round(e, 2),
+                "text": " ".join(t for t in toks if t) or "·",
+            })
+    return loose
+
+
+def _surviving_stretched_spans(
+    stretched_spans: list[tuple[float, float]],
+    keep_intervals: list[tuple[float, float]],
+    *,
+    min_overlap_s: float = 0.4,
+) -> list[dict]:
+    """Rellenos estirados (un 'la'/risa de ~2s) que NO se cortaron: siguen
+    solapando una zona conservada ≥ `min_overlap_s` → audibles en el corte."""
+    if not stretched_spans or not keep_intervals:
+        return []
+    surv: list[dict] = []
+    for a, b in stretched_spans:
+        ov = sum(
+            max(0.0, min(b, e) - max(a, s)) for s, e in keep_intervals
+        )
+        if ov >= min_overlap_s:
+            surv.append({
+                "start": round(a, 2), "end": round(b, 2),
+                "dur": round(b - a, 2), "overlap_s": round(ov, 2),
+            })
+    return surv
 
 
 def _measure_speech_rms_db(

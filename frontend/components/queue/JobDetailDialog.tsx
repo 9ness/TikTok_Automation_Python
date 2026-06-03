@@ -238,7 +238,15 @@ function SummaryView({ jobId, isRunning, open }: { jobId: string; isRunning: boo
 
       {/* Quality score */}
       {score != null && (
-        <QualityCard score={score} verdict={s.quality_verdict ?? ""} />
+        <QualityCard
+          score={score}
+          verdict={s.quality_verdict ?? ""}
+          needsRequeue={s.needs_requeue ?? false}
+          transcriptionOk={s.transcription_ok ?? true}
+          nLooseWords={s.n_loose_words ?? 0}
+          looseWordsPreview={s.loose_words_preview ?? []}
+          nSurvivingStretched={s.n_surviving_stretched ?? 0}
+        />
       )}
 
       {/* Breakdown de cortes */}
@@ -439,7 +447,23 @@ function MetricGrid({
   );
 }
 
-function QualityCard({ score, verdict }: { score: number; verdict: string }) {
+function QualityCard({
+  score,
+  verdict,
+  needsRequeue = false,
+  transcriptionOk = true,
+  nLooseWords = 0,
+  looseWordsPreview = [],
+  nSurvivingStretched = 0,
+}: {
+  score: number;
+  verdict: string;
+  needsRequeue?: boolean;
+  transcriptionOk?: boolean;
+  nLooseWords?: number;
+  looseWordsPreview?: string[];
+  nSurvivingStretched?: number;
+}) {
   const color =
     score >= 90
       ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/5"
@@ -449,26 +473,58 @@ function QualityCard({ score, verdict }: { score: number; verdict: string }) {
           ? "text-amber-500 border-amber-500/40 bg-amber-500/5"
           : "text-destructive border-destructive/40 bg-destructive/10";
 
+  // Motivos del fallo real (para el aviso de reencolar)
+  const reasons: string[] = [];
+  if (!transcriptionOk) reasons.push("sin transcripción (corte ciego)");
+  if (nLooseWords > 0)
+    reasons.push(
+      `${nLooseWords} palabra(s) suelta(s)${
+        looseWordsPreview.length
+          ? `: ${looseWordsPreview.map((w) => `"${w}"`).join(", ")}`
+          : ""
+      }`,
+    );
+  if (nSurvivingStretched > 0)
+    reasons.push(`${nSurvivingStretched} relleno(s) estirado(s) sin cortar`);
+
   return (
-    <div
-      className={`flex items-center gap-2 rounded-md border p-2 sm:gap-3 sm:p-3 ${color}`}
-    >
-      {score >= 90 ? (
-        <Sparkles className="h-5 w-5 shrink-0" />
-      ) : score < 50 ? (
-        <AlertTriangle className="h-5 w-5 shrink-0" />
-      ) : (
-        <CheckCircle2 className="h-5 w-5 shrink-0" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-bold tabular-nums sm:text-2xl">
-            {score}
-          </span>
-          <span className="text-xs text-muted-foreground sm:text-sm">/100</span>
+    <div className="space-y-2">
+      <div
+        className={`flex items-center gap-2 rounded-md border p-2 sm:gap-3 sm:p-3 ${color}`}
+      >
+        {score >= 90 ? (
+          <Sparkles className="h-5 w-5 shrink-0" />
+        ) : score < 50 ? (
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+        ) : (
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-bold tabular-nums sm:text-2xl">
+              {score}
+            </span>
+            <span className="text-xs text-muted-foreground sm:text-sm">
+              /100
+            </span>
+          </div>
+          <p className="break-words text-[11px] sm:text-xs">{verdict}</p>
         </div>
-        <p className="break-words text-[11px] sm:text-xs">{verdict}</p>
       </div>
+
+      {needsRequeue && (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive sm:p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0 flex-1 text-[11px] sm:text-xs">
+            <p className="font-semibold">Fallo real detectado — mejor reencolar</p>
+            {reasons.length > 0 && (
+              <p className="break-words text-muted-foreground">
+                {reasons.join(" · ")}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

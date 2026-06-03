@@ -286,6 +286,13 @@ def get_job_summary(
     # Quality + silencios remanentes
     quality_score = audit.get("quality_score")
     quality_verdict = audit.get("verdict")
+    needs_requeue = bool(audit.get("needs_requeue", False))
+    transcription_ok = bool(audit.get("transcription_ok", True))
+    n_loose_words = int(audit.get("n_loose_words", 0))
+    loose_words_preview = [
+        p.get("text") for p in (audit.get("loose_words_preview") or [])[:6]
+    ]
+    n_surviving_stretched = int(audit.get("n_surviving_stretched", 0))
     n_remaining = int(audit.get("n_internal_silences", 0))
     remaining_preview = []
     for s in (audit.get("internal_silences_preview") or [])[:5]:
@@ -317,6 +324,11 @@ def get_job_summary(
         "ai_cuts_by_reason": ai_cuts_by_reason,
         "quality_score": quality_score,
         "quality_verdict": quality_verdict,
+        "needs_requeue": needs_requeue,
+        "transcription_ok": transcription_ok,
+        "n_loose_words": n_loose_words,
+        "loose_words_preview": loose_words_preview,
+        "n_surviving_stretched": n_surviving_stretched,
         "n_silences_remaining": n_remaining,
         "silences_remaining_preview": remaining_preview,
         "tools_used": job.params.get("tools_used") if job.params else None,
