@@ -361,4 +361,17 @@ def run_editor_auto_pipeline(
     except OSError:
         pass
 
+    # Reubicar el "proyecto editable" (si el cutter lo escribió) junto al
+    # output, indexado por su nombre, para que el editor manual lo cargue.
+    try:
+        proj_src = os.path.join(temp_folder, f"editproject_{job_id}.json")
+        if os.path.exists(proj_src):
+            proj_dir = os.path.join(out_folder, ".editproj")
+            os.makedirs(proj_dir, exist_ok=True)
+            shutil.copyfile(proj_src, os.path.join(proj_dir, f"{base_name}.json"))
+            os.remove(proj_src)
+            on_log(f"[editor_auto] 📝 Proyecto editable guardado para {base_name}")
+    except OSError:
+        pass
+
     return final_output_path

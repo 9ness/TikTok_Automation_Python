@@ -251,6 +251,47 @@ class SilenceCutterTool:
             "phases": {},
         }
 
+        # 0) MODO MANUAL — el editor manual del operador pasa los tramos a
+        # CONSERVAR ya decididos. Saltamos TODA la detección (whisper/silero/
+        # amplitud/IA/holístico) y renderizamos directamente esos intervalos.
+        # Las tools posteriores (subs/flecha) se re-alinean solas sobre el
+        # resultado. Es lo que usa el re-render del retoque manual.
+        manual_keep = config.get("manual_keep_intervals")
+        if manual_keep:
+            video_duration, video_rotation = _ffprobe_meta(input_path)
+            keep_intervals = _merge_intervals([
+                (float(a), float(b)) for a, b in manual_keep
+                if float(b) - float(a) >= _MIN_KEEP_SEGMENT_S
+            ])
+            if not keep_intervals:
+                keep_intervals = [(0.0, video_duration)]
+            ctx.on_log(
+                f"[silence_cutter] ✋ Modo MANUAL: {len(keep_intervals)} tramo(s) "
+                f"dados por el operador (sin detección automática)."
+            )
+            norm_cfg = config.get("audio_normalize", None)
+            if norm_cfg is None:
+                try:
+                    mv = _measure_mean_volume_db(input_path)
+                    normalize_audio = mv is not None and mv < -24.0
+                except Exception:  # noqa: BLE001
+                    normalize_audio = False
+            else:
+                normalize_audio = bool(norm_cfg)
+            ctx.on_progress(0.4, "✂️ Aplicando cortes manuales…")
+            _apply_cuts_ffmpeg(
+                input_path=input_path,
+                output_path=output_path,
+                keep_intervals=keep_intervals,
+                rotation=video_rotation,
+                output_aspect=config.get("output_aspect", "9:16"),
+                log=ctx.on_log,
+                on_progress=lambda f: ctx.on_progress(0.4 + f * 0.6, "✂️ Renderizando…"),
+                normalize_audio=normalize_audio,
+            )
+            ctx.on_progress(1.0, "✅ Cortes manuales aplicados")
+            return output_path
+
         # 1) Extraer audio
         ctx.on_progress(0.05, "🔊 Extrayendo audio…")
         tmp_dir = Path(ctx.temp_folder)
@@ -793,6 +834,13 @@ class SilenceCutterTool:
             if (b - a) >= _MIN_KEEP_SEGMENT_S
         ]
 
+        # Proyecto editable — para el retoque manual: input original, palabras
+        # Whisper y los tramos conservados. run.py lo coloca junto al output.
+        _write_edit_project(
+            ctx, input_path=input_path, words=words,
+            keep_intervals=keep_intervals, video_duration=video_duration,
+        )
+
         total_cut_s = sum(b - a for a, b in merged_cuts)
         diagnostic["final"] = {
             "cuts_by_source": _count_by_source(cuts_with_source),
@@ -900,6 +948,44 @@ class SilenceCutterTool:
 
         ctx.on_progress(1.0, "✅ Cortes aplicados")
         return output_path
+
+
+def _write_edit_project(
+    ctx, *, input_path: str, words: list[dict],
+    keep_intervals: list[tuple[float, float]], video_duration: float,
+) -> None:
+    """Persiste el 'proyecto editable' (retoque manual) en `temp_folder`.
+
+    Contiene lo que el editor manual necesita: el input ORIGINAL, las palabras
+    Whisper (idx/word/start/end) y los tramos conservados por el algoritmo.
+    `run.py` lo reubica junto al output (`salida/.editproj/<output>.json`).
+    Best-effort: nunca rompe el job.
+    """
+    try:
+        proj = {
+            "input_path": input_path,
+            "video_duration_s": round(float(video_duration), 3),
+            "keep_intervals": [
+                [round(float(a), 3), round(float(b), 3)] for a, b in keep_intervals
+            ],
+            "words": [
+                {
+                    "idx": i,
+                    "word": str(w.get("word", "")).strip(),
+                    "start": round(float(w["start"]), 3),
+                    "end": round(float(w["end"]), 3),
+                }
+                for i, w in enumerate(words)
+                if "start" in w and "end" in w
+            ],
+        }
+        out = Path(ctx.temp_folder) / f"editproject_{ctx.job_id}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump(proj, f, ensure_ascii=False)
+        ctx.on_log(f"[silence_cutter] 📝 Proyecto editable → {out.name}")
+    except Exception as e:  # noqa: BLE001
+        ctx.on_log(f"[silence_cutter] ⚠️ No se pudo escribir proyecto editable: {e}")
 
 
 # ---------------------------------------------------------------------------
