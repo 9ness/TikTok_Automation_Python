@@ -336,6 +336,28 @@ class SilenceCutterTool:
                 "preview_last_5": [w.get("word") for w in words[-5:]],
             }
 
+        # 3b) FILLERS ESTIRADOS — palabra corta ("la"/"y"/"eh"/risa) que dura
+        # MUCHO = Whisper etiquetando un sonido no-hablado (risa, "ehh", micro
+        # lejos). Ninguna palabra real dura >1.5s. Cortarlas es determinista y
+        # seguro (una palabra normal de 0.1-0.6s jamás dispara).
+        if words and bool(config.get("cut_stretched_fillers", True)):
+            sf = _detect_stretched_fillers(words)
+            for s, e, tok, dur in sf:
+                cuts_with_source.append((s, e, "stretched_filler"))
+            diagnostic["phases"]["stretched_fillers"] = {
+                "n": len(sf),
+                "preview": [
+                    {"word": t, "dur": round(d, 2), "start": round(s, 2)}
+                    for s, e, t, d in sf[:10]
+                ],
+            }
+            if sf:
+                ctx.on_log(
+                    f"[silence_cutter] 🗣️✂ {len(sf)} relleno(s) estirado(s) "
+                    f"(palabra corta muy larga = risa/ruido): "
+                    + ", ".join(f"'{t}'({d:.1f}s)" for _, _, t, d in sf[:6])
+                )
+
         # 4) Silero VAD PRIMERO — es la fuente de verdad para silencios.
         # Va antes de cualquier cálculo basado en palabras porque después
         # necesitamos sus silence_intervals para detectar palabras fantasma.
@@ -2324,6 +2346,46 @@ def _split_silero_cuts_by_confidence(
         else:
             normal.append((s, e))
     return high, normal
+
+
+_FILLER_TOKENS = {
+    "la", "le", "lo", "el", "y", "o", "e", "a", "eh", "ah", "oh", "uh", "um",
+    "mm", "mmm", "hmm", "ya", "ja", "je", "ji", "jo", "ju", "jaja", "jeje",
+    "uy", "ay", "aja", "eeh", "aah", "ehh", "este", "esto", "pues",
+}
+
+
+def _detect_stretched_fillers(
+    words: list[dict],
+    *,
+    hard_s: float = 1.8,
+    soft_s: float = 1.0,
+    soft_max_chars: int = 3,
+) -> list[tuple[float, float, str, float]]:
+    """Detecta 'rellenos estirados': una palabra que dura ANORMALMENTE mucho.
+
+    Ninguna palabra real dura >1.5s; cuando Whisper marca un token corto
+    ("la"/"y"/"eh"/risa) durante 1.5-2s+ es porque está etiquetando un sonido
+    NO hablado (risa, "ehh", micro lejos, ruido). Cortarlas es determinista y
+    seguro: una palabra normal (0.1-0.6s) jamás dispara.
+
+    Returns: lista (start, end, token, dur).
+    """
+    out: list[tuple[float, float, str, float]] = []
+    for w in words:
+        try:
+            s = float(w["start"]); e = float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        dur = e - s
+        if dur < soft_s:
+            continue
+        tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+        if dur >= hard_s:
+            out.append((s, e, tok or "·", dur))
+        elif len(tok) <= soft_max_chars or tok in _FILLER_TOKENS:
+            out.append((s, e, tok or "·", dur))
+    return out
 
 
 def _drop_words_inside_silences(
