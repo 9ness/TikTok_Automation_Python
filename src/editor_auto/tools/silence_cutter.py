@@ -320,7 +320,8 @@ class SilenceCutterTool:
                     model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es"),
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
-                    timeout_s=int(config.get("whisper_timeout_s", 900)),
+                    timeout_s=int(config.get("whisper_timeout_s", 600)),
+                    fallback_model=str(config.get("whisper_fallback_model", "small")),
                 )
                 ctx.on_log(f"[silence_cutter] Whisper · {len(words)} palabras")
             except Exception as e:
@@ -1065,15 +1066,45 @@ def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language:
 
 def _transcribe(
     audio_path: str, *, model_size: str, language: str, on_progress,
-    timeout_s: int = 900,
+    timeout_s: int = 600, fallback_model: str = "small",
 ) -> list[dict]:
-    """Transcribe con Whisper en un SUBPROCESO con timeout.
+    """Transcribe con Whisper, robusto a deadlocks de ctranslate2.
 
-    Por qué subproceso: faster-whisper/ctranslate2 a veces se DEADLOCKEA en
-    CPU (hilos dormidos, 0% CPU) y, al correr dentro del proceso api, un
-    hilo colgado no se puede matar y atasca la cola entera para siempre. En
-    subproceso `spawn` (sin heredar hilos/locks de la api) podemos matarlo al
-    pasar el timeout → el job degrada (sin palabras) pero NUNCA atasca la cola.
+    Estrategia: intenta el modelo configurado (p.ej. large-v3) en un
+    subproceso con timeout. Si se CUELGA (timeout), reintenta con un modelo
+    MÁS LIGERO (`fallback_model`, p.ej. `small`), que casi nunca deadlockea
+    → así obtenemos transcripción REAL en vez de un corte degradado. Para
+    ficheros normales (que no se cuelgan) se usa el modelo bueno sin penalti.
+    """
+    try:
+        return _run_whisper_once(
+            audio_path, model_size=model_size, language=language,
+            on_progress=on_progress, timeout_s=timeout_s,
+        )
+    except TimeoutError:
+        if fallback_model and fallback_model != model_size:
+            if on_progress:
+                on_progress(
+                    0.1,
+                    f"⚠️ Whisper {model_size} colgado — reintento con {fallback_model}…",
+                )
+            return _run_whisper_once(
+                audio_path, model_size=fallback_model, language=language,
+                on_progress=on_progress, timeout_s=max(300, timeout_s // 2),
+            )
+        raise
+
+
+def _run_whisper_once(
+    audio_path: str, *, model_size: str, language: str, on_progress,
+    timeout_s: int = 600,
+) -> list[dict]:
+    """UNA pasada de Whisper en SUBPROCESO `spawn` con timeout.
+
+    El subproceso (sin heredar hilos/locks de la api) se puede MATAR al pasar
+    el timeout → un deadlock de ctranslate2 nunca atasca la cola. Lanza
+    TimeoutError si se cuelga; fallback a llamada directa solo si el entorno
+    no soporta spawn.
     """
     import multiprocessing as mp
 
