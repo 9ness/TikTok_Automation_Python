@@ -320,6 +320,7 @@ class SilenceCutterTool:
                     model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es"),
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
+                    timeout_s=int(config.get("whisper_timeout_s", 900)),
                 )
                 ctx.on_log(f"[silence_cutter] Whisper · {len(words)} palabras")
             except Exception as e:
@@ -1039,17 +1040,85 @@ def _ffprobe_meta(input_path: str) -> tuple[float, int]:
 # ---------------------------------------------------------------------------
 # Whisper transcribe (faster-whisper local, sin coste)
 # ---------------------------------------------------------------------------
-def _transcribe(audio_path: str, *, model_size: str, language: str, on_progress) -> list[dict]:
-    from src.subtitles_only import transcribe_with_reference
+def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language: str) -> None:
+    """Corre en un PROCESO hijo (spawn). Transcribe y devuelve las palabras
+    por la Queue. Aislado del proceso api para que un deadlock de
+    ctranslate2/OpenMP se pueda MATAR sin envenenar el worker principal."""
+    try:
+        import os as _os
+        # Mitiga el deadlock de ctranslate2/OpenMP en CPU: limita los hilos
+        # ANTES de importar el motor (debe ir antes de faster-whisper).
+        _os.environ.setdefault("OMP_NUM_THREADS", "4")
+        from src.subtitles_only import transcribe_with_reference
+        words = transcribe_with_reference(
+            audio_path,
+            reference_script=None,
+            model_size=model_size,
+            language=language or None,
+            audio_type="speech",
+            progress_callback=None,  # no cruza procesos; progreso coarse en el padre
+        )
+        q.put(("ok", words))
+    except Exception as e:  # noqa: BLE001
+        q.put(("err", f"{type(e).__name__}: {e}"))
 
-    return transcribe_with_reference(
-        audio_path,
-        reference_script=None,
-        model_size=model_size,
-        language=language or None,
-        audio_type="speech",
-        progress_callback=on_progress,
-    )
+
+def _transcribe(
+    audio_path: str, *, model_size: str, language: str, on_progress,
+    timeout_s: int = 900,
+) -> list[dict]:
+    """Transcribe con Whisper en un SUBPROCESO con timeout.
+
+    Por qué subproceso: faster-whisper/ctranslate2 a veces se DEADLOCKEA en
+    CPU (hilos dormidos, 0% CPU) y, al correr dentro del proceso api, un
+    hilo colgado no se puede matar y atasca la cola entera para siempre. En
+    subproceso `spawn` (sin heredar hilos/locks de la api) podemos matarlo al
+    pasar el timeout → el job degrada (sin palabras) pero NUNCA atasca la cola.
+    """
+    import multiprocessing as mp
+
+    def _direct() -> list[dict]:
+        from src.subtitles_only import transcribe_with_reference
+        return transcribe_with_reference(
+            audio_path, reference_script=None, model_size=model_size,
+            language=language or None, audio_type="speech",
+            progress_callback=on_progress,
+        )
+
+    try:
+        mpctx = mp.get_context("spawn")
+        q = mpctx.Queue()
+        p = mpctx.Process(
+            target=_transcribe_subprocess_worker,
+            args=(q, audio_path, model_size, language),
+            daemon=True,
+        )
+        p.start()
+    except Exception:  # noqa: BLE001
+        # El entorno no soporta spawn → llamada directa (comportamiento antiguo).
+        return _direct()
+
+    if on_progress:
+        on_progress(0.1, "🎙️ Whisper transcribiendo…")
+    p.join(timeout_s)
+    if p.is_alive():
+        # TIMEOUT = deadlock real → matar y NO reintentar directo (re-colgaría).
+        p.terminate()
+        p.join(5)
+        if p.is_alive():
+            p.kill()
+        raise TimeoutError(
+            f"Whisper superó {timeout_s}s (probable deadlock) — abortado "
+            f"para no atascar la cola"
+        )
+    try:
+        kind, payload = q.get_nowait() if not q.empty() else ("err", "sin resultado")
+    except Exception:  # noqa: BLE001
+        kind, payload = "err", "queue vacía"
+    if kind == "ok":
+        return payload
+    # El subproceso terminó con error (no timeout) → fallback directo.
+    return _direct()
 
 
 # ---------------------------------------------------------------------------
