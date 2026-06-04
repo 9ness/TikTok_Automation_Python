@@ -28,6 +28,28 @@ kept will be removed from the video).
 - Redundant re-statements of the SAME call-to-action or price spread across the
   ending — keep the single best one.
 
+## RE-TAKES / RESTARTS — cut the first attempt, keep the last (IMPORTANT)
+
+This is the #1 fix. The speaker very often **re-says the SAME phrase** within a
+short window — keep ONLY the final, cleanest full version and DELETE the first
+attempt entirely. This applies even when:
+
+- **A word changes** between attempts (it's still the same re-take):
+  "aprovecha que ahora **están**… aprovecha que ahora **estamos** con las ofertas"
+  → KEEP only "aprovecha que ahora estamos con las ofertas". Remove the first.
+- **There's an aside/interruption in the middle** (a comment about the mic or
+  camera, "a ver", "mira", "espera", "perdón", a stumble) and then she
+  **re-starts the same phrase**: remove the first attempt AND the aside, keep the
+  clean re-statement.
+  "la marca de fajas colombianas por excelencia… made in Colombia, por si no se
+  ha escuchado que me deja el micro ahí… la marca de fajas colombianas por
+  excelencia" → KEEP one clean "la marca de fajas colombianas por excelencia".
+
+Rule of thumb: if removing a span leaves the monologue reading the SAME (because
+the phrase is said again right after), that span is a re-take → remove it. Two
+near-verbatim copies of the same phrase within ~15s = a re-take, NOT emphasis.
+Do NOT keep both. (Genuinely different mentions far apart in the pitch are fine.)
+
 ## The ENDING matters most (read carefully)
 
 - The video must **end on a COMPLETE sentence/clause** — the LAST kept span has
@@ -60,9 +82,10 @@ Rules:
 - Spans must be sorted, non-overlapping, and use VALID indices
   (`0 ≤ idx < total_words`).
 - The kept spans, concatenated in order, must form a coherent monologue.
-- Be decisive but SAFE: when unsure whether something is unique, KEEP it. We
-  prefer leaving one extra phrase over deleting real content or breaking a
-  sentence.
+- Be decisive but SAFE: when unsure whether something is **unique content**,
+  KEEP it — we prefer leaving one extra UNIQUE phrase over deleting real info.
+  BUT this safety does NOT apply to near-verbatim re-takes/restarts: when the
+  same phrase is clearly said twice, always cut the first and keep the last.
 - Do NOT keep trailing rambling that just repeats earlier points.
 
 If the transcript is already clean (no repetition/false starts), keep
