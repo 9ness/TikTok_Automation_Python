@@ -1566,7 +1566,7 @@ def _parse_false_starts_cuts(
 # Modelo + seed de la limpieza holística. gpt-5.4 = el más nuevo que acepta
 # temperature=0 (modelo estándar, NO razonador) → determinista de verdad:
 # mismo vídeo = mismo corte SIEMPRE (estable y afinable). Verificado en server.
-_HOLISTIC_MODEL = "gpt-4o"  # A/B temporal vs gpt-5.4 — revertir al ganador
+_HOLISTIC_MODEL = "gpt-5.4"  # ganador A/B: corta mejor los restarts que gpt-4o, y mas barato
 _HOLISTIC_SEED = 7
 
 
