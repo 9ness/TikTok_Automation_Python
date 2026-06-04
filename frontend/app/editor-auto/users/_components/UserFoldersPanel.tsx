@@ -20,7 +20,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -849,15 +849,56 @@ function FileRow({
         />
       </div>
       {previewOpen && (
-        <div className="mt-2 overflow-hidden rounded-md bg-black">
-          <video
-            src={userFilePreviewUrl(userId, file.folder, file.filename)}
-            controls
-            className="mx-auto block max-h-[50vh] w-full"
-          />
-        </div>
+        <PreviewVideo
+          src={userFilePreviewUrl(userId, file.folder, file.filename)}
+        />
       )}
     </li>
+  );
+}
+
+/** Reproductor de previsualización con selector de velocidad (1x/1.5x/2x)
+ *  para repasar los vídeos más rápido. */
+function PreviewVideo({ src }: { src: string }) {
+  const SPEEDS = [1, 1.5, 2] as const;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [speed, setSpeed] = useState<number>(1);
+
+  function applySpeed(s: number) {
+    setSpeed(s);
+    const v = videoRef.current;
+    if (v) v.playbackRate = s;
+  }
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-md bg-black">
+      <video
+        ref={videoRef}
+        src={src}
+        controls
+        onLoadedMetadata={(e) => {
+          (e.currentTarget as HTMLVideoElement).playbackRate = speed;
+        }}
+        className="mx-auto block max-h-[50vh] w-full"
+      />
+      <div className="flex items-center justify-center gap-1 bg-black/80 px-2 py-1.5">
+        <span className="mr-1 text-[10px] text-white/60">Velocidad</span>
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => applySpeed(s)}
+            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              speed === s
+                ? "bg-white text-black"
+                : "bg-white/15 text-white hover:bg-white/25"
+            }`}
+          >
+            {s}x
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

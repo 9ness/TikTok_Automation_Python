@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Film, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,15 @@ export function VideoModal({
     ? `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`
     : null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Velocidad de reproducción — para repasar vídeos más rápido (1x / 1.5x / 2x).
+  const SPEEDS = [1, 1.5, 2] as const;
+  const [speed, setSpeed] = useState<number>(1);
+
+  function applySpeed(s: number) {
+    setSpeed(s);
+    const v = videoRef.current;
+    if (v) v.playbackRate = s;
+  }
 
   // Volumen por defecto al abrir. Se aplica en cuanto el video monta y
   // cada vez que se reabre — el atributo `volume` HTML no es respetado
@@ -45,8 +54,11 @@ export function VideoModal({
   useEffect(() => {
     if (!open) return;
     const v = videoRef.current;
-    if (v) v.volume = DEFAULT_VOLUME;
-  }, [open, videoUrl]);
+    if (v) {
+      v.volume = DEFAULT_VOLUME;
+      v.playbackRate = speed;
+    }
+  }, [open, videoUrl, speed]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -130,13 +142,33 @@ export function VideoModal({
               playsInline
               onLoadedMetadata={(e) => {
                 // Defensa adicional por si el useEffect corre antes que el
-                // metadata cargue (en algunos navegadores `volume` antes de
-                // loadedmetadata no persiste).
-                (e.currentTarget as HTMLVideoElement).volume = DEFAULT_VOLUME;
+                // metadata cargue (en algunos navegadores `volume`/`playbackRate`
+                // antes de loadedmetadata no persisten).
+                const el = e.currentTarget as HTMLVideoElement;
+                el.volume = DEFAULT_VOLUME;
+                el.playbackRate = speed;
               }}
               className="w-full"
               style={{ aspectRatio: "9 / 16", display: "block" }}
             />
+            {/* Velocidad de reproducción — repasar más rápido */}
+            <div className="flex items-center justify-center gap-1 bg-black/80 px-2 py-1.5">
+              <span className="mr-1 text-[10px] text-white/60">Velocidad</span>
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => applySpeed(s)}
+                  className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                    speed === s
+                      ? "bg-white text-black"
+                      : "bg-white/15 text-white hover:bg-white/25"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div
