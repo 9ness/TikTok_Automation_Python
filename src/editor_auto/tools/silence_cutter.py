@@ -1544,6 +1544,11 @@ def _parse_false_starts_cuts(
     return intervals
 
 
+# Seed fijo para la limpieza holística (GPT-4o) → resultado repetible entre
+# ejecuciones: el MISMO vídeo se edita IGUAL siempre (estable y afinable).
+_HOLISTIC_SEED = 7
+
+
 def _holistic_keep_idxset(
     words: list[dict], *, language: str, model: str, log, label: str,
 ) -> set[int] | None:
@@ -1557,19 +1562,28 @@ def _holistic_keep_idxset(
     n = len(words)
     if n < 4:
         return set(range(n))
-    from src.editor_auto.api.gemini_client import is_configured, analyze_transcript_json
-    if not is_configured():
-        return None
+    from src.editor_auto.api import openai_client, gemini_client
     prompt_path = (
         Path(__file__).resolve().parent.parent
         / "prompts" / "silence_cutter_clean_script.md"
     )
     system_prompt = prompt_path.read_text(encoding="utf-8")
     payload = _build_false_starts_payload(words, language)
-    result = analyze_transcript_json(
-        system_prompt=system_prompt, user_payload=payload,
-        model=model, temperature=0.0,
-    )
+    # DETERMINISTA: GPT-4o + `seed` fijo + temp 0 → mismo input = mismo
+    # resultado SIEMPRE (estable y AFINABLE). Gemini 2.5 Pro es "thinking" →
+    # varía aunque temp=0, por eso solo se usa como fallback si no hay OpenAI.
+    if openai_client.is_configured():
+        result = openai_client.analyze_transcript_json(
+            system_prompt=system_prompt, user_payload=payload,
+            model="gpt-4o", temperature=0.0, seed=_HOLISTIC_SEED,
+        )
+    elif gemini_client.is_configured():
+        result = gemini_client.analyze_transcript_json(
+            system_prompt=system_prompt, user_payload=payload,
+            model=model, temperature=0.0,
+        )
+    else:
+        return None
     raw_spans = (result or {}).get("keep_spans") or []
     keep: set[int] = set()
     for sp in raw_spans:

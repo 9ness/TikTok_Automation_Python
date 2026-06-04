@@ -28,9 +28,13 @@ def analyze_transcript_json(
     user_payload: dict,
     model: str = DEFAULT_MODEL,
     temperature: float = 0.2,
+    seed: int | None = None,
 ) -> Any:
     """Llama a OpenAI Chat con `response_format=json_object` y devuelve el
     JSON parseado. Registra el coste vía `cost_tracking.record_openai_chat`.
+
+    `seed` (opcional) → salida CASI determinista (mismo input + seed + temp 0
+    = mismo resultado), clave para que el editor sea estable y repetible.
 
     Lanza `RuntimeError` si OpenAI no está configurada, `ValueError` si la
     respuesta no es JSON parseable.
@@ -43,6 +47,9 @@ def analyze_transcript_json(
     from openai import OpenAI
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    kwargs: dict[str, Any] = {}
+    if seed is not None:
+        kwargs["seed"] = int(seed)
     response = client.chat.completions.create(
         model=model,
         temperature=temperature,
@@ -51,6 +58,7 @@ def analyze_transcript_json(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
         ],
+        **kwargs,
     )
 
     # Cost tracking — usa tokens reales del provider
