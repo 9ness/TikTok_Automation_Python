@@ -322,7 +322,7 @@ class SilenceCutterTool:
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
                     timeout_s=int(config.get("whisper_timeout_s", 1200)),
                     fallback_model=str(config.get("whisper_fallback_model", "small")),
-                    primary_threads=int(config.get("whisper_cpu_threads", 4)),
+                    primary_threads=int(config.get("whisper_cpu_threads", 1)),
                 )
                 ctx.on_log(f"[silence_cutter] Whisper · {len(words)} palabras")
             except Exception as e:
@@ -1185,10 +1185,10 @@ def _transcribe(
     el timeout entero), así que el escalado no cuesta 20min por intento.
     """
     primary_threads = max(1, int(primary_threads))
-    # (modelo, hilos): rápido → seguro. Si primary ya es 1, no duplicamos.
-    plan: list[tuple[str, int]] = [(model_size, primary_threads)]
-    if primary_threads > 1:
-        plan.append((model_size, 1))
+    # (modelo, hilos): 2 intentos de large antes del fallback. Si primary>1, el
+    # 2º baja a 1 hilo (más seguro); si primary ya es 1, el 2º es un REINTENTO
+    # (proceso fresco; el deadlock flaky suele pasar a la 2ª).
+    plan: list[tuple[str, int]] = [(model_size, primary_threads), (model_size, 1)]
     last_err: Exception | None = None
     for i, (m, th) in enumerate(plan):
         try:
