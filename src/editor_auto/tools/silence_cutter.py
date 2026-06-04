@@ -363,6 +363,26 @@ class SilenceCutterTool:
                     f"la amplitud limpie el silencio: "
                     + ", ".join(f"'{t}'({d:.1f}s)" for _, _, t, d in sf[:6])
                 )
+            # CORTE DETERMINISTA de la cola de FILLERS alargados — para que esos
+            # "aaa"/"laaa"/"eeeh" de relleno NO sobrevivan según el humor de la
+            # IA (hacían que el score variara 85↔97). Solo tokens de relleno
+            # CONOCIDOS (`_FILLER_TOKENS`) claramente alargados (≥1.2s): jamás
+            # toca palabras reales (p.ej. "adidas" 3.3s NO está en la lista).
+            # Conserva 0.15s de cabeza (sin clic) y corta el resto.
+            if bool(config.get("cut_stretched_filler_tails", True)):
+                _KEEP_HEAD = 0.15
+                n_tail = 0
+                for s, e, tok, dur in sf:
+                    if tok in _FILLER_TOKENS and dur >= 1.2:
+                        cut_s = s + _KEEP_HEAD
+                        if e - cut_s > 0.3:
+                            cuts_with_source.append((cut_s, e, "stretched_filler"))
+                            n_tail += 1
+                if n_tail:
+                    ctx.on_log(
+                        f"[silence_cutter] ✂️ {n_tail} cola(s) de filler alargado "
+                        f"cortada(s) determinísticamente (consistencia de score)."
+                    )
 
         # 4) Silero VAD PRIMERO — es la fuente de verdad para silencios.
         # Va antes de cualquier cálculo basado en palabras porque después
