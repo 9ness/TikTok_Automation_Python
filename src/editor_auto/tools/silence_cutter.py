@@ -839,42 +839,6 @@ class SilenceCutterTool:
             ctx.on_progress(1.0, "✅ Sin cortes (passthrough)")
             return output_path
 
-        # 7b-bis) PROTECCIÓN DE CONTENIDO PEGADO — un corte de IA/dedup nunca
-        # debe EMPEZAR en mitad de voz continua. Si una palabra de contenido
-        # (p.ej. "naranja") quedó pegada SIN pausa al false-start que se quita,
-        # cortar ahí se la comería. Movemos el inicio del corte al primer
-        # SILENCIO real dentro del span → conserva la palabra pegada (a costa de
-        # dejar parte del tartamudeo). Si no hay silencio en el span, no se corta.
-        if bool(config.get("protect_glued_content", True)) and amp_cuts:
-            _AI_SRCS = {"ai_holistic", "ai", "ngram_repetition", "ai_pass2"}
-            _sil = _merge_intervals(list(amp_cuts))
-
-            def _start_in_sil(t: float) -> bool:
-                return any(a - 0.06 <= t <= b + 0.06 for a, b in _sil)
-
-            adj = dropped = 0
-            glued_cws: list[tuple[float, float, str]] = []
-            for s, e, src in cuts_with_source:
-                if src in _AI_SRCS and not _start_in_sil(s):
-                    nxt = [a for a, b in _sil if s + 0.02 < a < e - 0.05]
-                    if nxt:
-                        s = min(nxt)          # mover inicio al silencio → conserva lo pegado
-                        adj += 1
-                    else:
-                        dropped += 1          # sin silencio en el span → no cortar
-                        continue
-                glued_cws.append((s, e, src))
-            if adj or dropped:
-                cuts_with_source = glued_cws
-                diagnostic["phases"]["glued_content_protection"] = {
-                    "enabled": True, "cuts_moved": adj, "cuts_dropped": dropped,
-                }
-                ctx.on_log(
-                    f"[silence_cutter] 🛡️ Contenido pegado protegido: "
-                    f"{adj} corte(s) movido(s) a silencio, {dropped} no cortado(s) "
-                    f"(evita comerse palabras pegadas como 'naranja')."
-                )
-
         # 7c) PROTECCIÓN DEL CIERRE — el vídeo nunca debe terminar TRUNCADO a
         # media frase. Una capa de palabras (AI/holistic/ngram) puede marcar el
         # cierre real (CTA final) como repetición y comerse las últimas
