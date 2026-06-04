@@ -79,6 +79,11 @@ def _resolve_gemini_rates(model: str) -> tuple[float, float]:
 _OPENAI_CHAT_RATES: dict[str, tuple[float, float]] = {
     "gpt-4o-mini": (OPENAI_GPT4O_MINI_INPUT_PER_1M, OPENAI_GPT4O_MINI_OUTPUT_PER_1M),
     "gpt-4o":      (OPENAI_GPT4O_INPUT_PER_1M, OPENAI_GPT4O_OUTPUT_PER_1M),
+    "gpt-4.1":     (2.00, 8.00),
+    # gpt-5.x — usado por el holistic determinista del editor. Tarifas
+    # estimadas (tier GPT-5); calibrar con el coste real del panel /costs.
+    "gpt-5.4":     (1.25, 10.00),
+    "gpt-5":       (1.25, 10.00),
 }
 
 

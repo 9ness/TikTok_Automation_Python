@@ -1544,8 +1544,10 @@ def _parse_false_starts_cuts(
     return intervals
 
 
-# Seed fijo para la limpieza holística (GPT-4o) → resultado repetible entre
-# ejecuciones: el MISMO vídeo se edita IGUAL siempre (estable y afinable).
+# Modelo + seed de la limpieza holística. gpt-5.4 = el más nuevo que acepta
+# temperature=0 (modelo estándar, NO razonador) → determinista de verdad:
+# mismo vídeo = mismo corte SIEMPRE (estable y afinable). Verificado en server.
+_HOLISTIC_MODEL = "gpt-5.4"
 _HOLISTIC_SEED = 7
 
 
@@ -1575,7 +1577,7 @@ def _holistic_keep_idxset(
     if openai_client.is_configured():
         result = openai_client.analyze_transcript_json(
             system_prompt=system_prompt, user_payload=payload,
-            model="gpt-4o", temperature=0.0, seed=_HOLISTIC_SEED,
+            model=_HOLISTIC_MODEL, temperature=0.0, seed=_HOLISTIC_SEED,
         )
     elif gemini_client.is_configured():
         result = gemini_client.analyze_transcript_json(
