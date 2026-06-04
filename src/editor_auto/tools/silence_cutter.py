@@ -2178,9 +2178,17 @@ def _post_render_audit(
 
         n_loose = len(loose_words)
         n_surv = len(surviving_stretched)
+        # Penalización del estirado superviviente PROPORCIONAL a cuánto sobrevive:
+        # un residuo corto (<1s, apenas perceptible) penaliza poco (−6); uno
+        # largo (≥1s, claramente audible) penaliza fuerte (−12). Refleja la
+        # severidad real (un "aaa" de 0.6s no es un fallo gordo).
+        surv_penalty = sum(
+            12 if float(s.get("overlap_s", 0)) >= 1.0 else 6
+            for s in surviving_stretched
+        )
         score = 100
         score -= 12 * n_loose
-        score -= 12 * n_surv
+        score -= surv_penalty
         score -= 3 * n_internal          # silencios = menor
         score = max(0, min(100, score))
         if degraded:
