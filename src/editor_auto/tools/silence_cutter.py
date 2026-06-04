@@ -3017,6 +3017,7 @@ def _apply_cuts_ffmpeg(
     # imperceptible para voz humana pero suaviza la transición y limpia
     # cualquier cola de audio que FFmpeg no recorta limpio.
     _FADE_S = 0.02
+    _FADE_TAIL_S = 0.15  # fade-out del cierre — mata el residuo tras la última palabra
 
     filter_parts: list[str] = []
     concat_inputs: list[str] = []
@@ -3026,15 +3027,21 @@ def _apply_cuts_ffmpeg(
             f"setpts=PTS-STARTPTS{extra_vf}[v{i}]"
         )
         seg_dur = end - start
+        # Fade-out del ÚLTIMO segmento más largo (~150ms): desvanece la cola
+        # tras la última palabra → mata cualquier residuo/clic/"du" del cierre
+        # (cola de boca, artefacto del corte, lookahead de loudnorm) sin clipar
+        # la palabra. El resto de segmentos usan el micro-fade de 20ms.
+        is_last = (i == len(keep_intervals) - 1)
+        fade_out_d = _FADE_TAIL_S if (is_last and seg_dur >= 0.35) else _FADE_S
         # Solo aplicamos fades si el segmento es lo suficientemente largo
         # para no comerse contenido (mínimo 100ms para 20+20ms de fades).
         if seg_dur >= 0.10:
-            fade_out_start = seg_dur - _FADE_S
+            fade_out_start = seg_dur - fade_out_d
             audio_filter = (
                 f"[0:a]atrim=start={start:.3f}:end={end:.3f},"
                 f"asetpts=PTS-STARTPTS,"
                 f"afade=t=in:st=0:d={_FADE_S},"
-                f"afade=t=out:st={fade_out_start:.3f}:d={_FADE_S}[a{i}]"
+                f"afade=t=out:st={fade_out_start:.3f}:d={fade_out_d}[a{i}]"
             )
         else:
             audio_filter = (
