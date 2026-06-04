@@ -105,8 +105,11 @@ class StickerArrowTool:
             "match_strategy": "last",
             # Cuánto antes del keyword aparece el sticker (s).
             "lead_seconds": 1.0,
-            # Cuánto se mantiene visible (s).
+            # Cuánto se mantiene visible (s). Ignorado si `extend_to_end`=True.
             "duration_seconds": 3.5,
+            # Si True: una vez aparece, la flecha se queda hasta el FINAL del
+            # vídeo (ignora `duration_seconds`). Útil para CTA persistente.
+            "extend_to_end": False,
             # Fallback si no hay keyword: aparece en los últimos N s del vídeo.
             "fallback_last_seconds": 4.0,
             # Solo buscar keyword en el último X% del vídeo (anti-falso-positivo).
@@ -168,8 +171,11 @@ class StickerArrowTool:
              "label": "Aparece N segundos ANTES del gatillo",
              "type": "float", "min": 0.0, "max": 5.0, "step": 0.1},
             {"key": "duration_seconds",
-             "label": "Duración visible (s)",
+             "label": "Duración visible (s) — ignorado si 'dura hasta el final'",
              "type": "float", "min": 0.5, "max": 15.0, "step": 0.5},
+            {"key": "extend_to_end",
+             "label": "Una vez aparece, dura hasta el FINAL del vídeo",
+             "type": "bool"},
             {"key": "fallback_last_seconds",
              "label": "Fallback: últimos N segundos si no hay gatillo",
              "type": "float", "min": 1.0, "max": 15.0, "step": 0.5},
@@ -304,11 +310,12 @@ class StickerArrowTool:
         # 3) Calcular ventana(s) del overlay
         lead = max(0.0, float(config.get("lead_seconds", 1.0)))
         dur_overlay = max(0.5, float(config.get("duration_seconds", 3.5)))
+        extend_to_end = bool(config.get("extend_to_end", False))
         windows: list[tuple[float, float]] = []
         if keyword_matches:
             for m in keyword_matches:
                 ws = max(0.0, float(m["start"]) - lead)
-                we = min(duration, ws + dur_overlay)
+                we = duration if extend_to_end else min(duration, ws + dur_overlay)
                 if we > ws:
                     windows.append((ws, we))
             source = "keyword"
@@ -317,6 +324,11 @@ class StickerArrowTool:
             ws = max(0.0, duration - fallback)
             windows.append((ws, duration))
             source = "fallback"
+        if extend_to_end:
+            ctx.on_log(
+                "[sticker_arrow] 'extend_to_end' activo → la flecha se queda "
+                "hasta el final del vídeo."
+            )
         # Mergeamos ventanas solapadas (p. ej. dos matches separados por
         # menos de `duration_seconds` ⇒ una sola ventana extendida) para
         # que ffmpeg no haga overlays redundantes.
