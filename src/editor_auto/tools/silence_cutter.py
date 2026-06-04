@@ -777,10 +777,15 @@ class SilenceCutterTool:
         # Cubre el caso "esto costaba esto costaba" que la pasada 2 IA a
         # veces ignora (GPT-4o no es determinístico: mismo input → resultado
         # distinto entre runs). Esto SIEMPRE detecta repeticiones literales.
-        ngram_diag: dict[str, Any] = {"enabled": not holistic_ok}
-        if clean_words and not holistic_ok:
+        # N-gram SIEMPRE (determinista + gratis): red de seguridad para
+        # repeticiones LITERALES que el holistic IA se deje (p.ej. "aprovecha
+        # que ahora… aprovecha que ahora"). Antes solo corría si el holistic
+        # fallaba, y por eso se colaban restarts literales. gap 1.0s capta el
+        # restart aunque haya un micro-relleno entre las dos copias.
+        ngram_diag: dict[str, Any] = {"enabled": True}
+        if clean_words:
             ngram_cuts_detailed = _detect_repeated_ngrams(
-                clean_words, min_n=2, max_n=6, max_gap_between_grams_s=0.6,
+                clean_words, min_n=2, max_n=6, max_gap_between_grams_s=1.0,
             )
             ngram_diag["n_cuts"] = len(ngram_cuts_detailed)
             ngram_diag["cuts"] = ngram_cuts_detailed[:15]
