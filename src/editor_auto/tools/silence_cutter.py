@@ -322,6 +322,7 @@ class SilenceCutterTool:
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
                     timeout_s=int(config.get("whisper_timeout_s", 1200)),
                     fallback_model=str(config.get("whisper_fallback_model", "small")),
+                    primary_threads=int(config.get("whisper_cpu_threads", 4)),
                 )
                 ctx.on_log(f"[silence_cutter] Whisper · {len(words)} palabras")
             except Exception as e:
@@ -1136,18 +1137,22 @@ def _ffprobe_meta(input_path: str) -> tuple[float, int]:
 # ---------------------------------------------------------------------------
 # Whisper transcribe (faster-whisper local, sin coste)
 # ---------------------------------------------------------------------------
-def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language: str) -> None:
+def _transcribe_subprocess_worker(
+    q, audio_path: str, model_size: str, language: str, cpu_threads: int = 1,
+) -> None:
     """Corre en un PROCESO hijo (spawn). Transcribe y devuelve las palabras
     por la Queue. Aislado del proceso api para que un deadlock de
-    ctranslate2/OpenMP se pueda MATAR sin envenenar el worker principal."""
+    ctranslate2/OpenMP se pueda MATAR sin envenenar el worker principal.
+
+    `cpu_threads` = hilos de cómputo de ctranslate2 (su propio pool). Multi-hilo
+    es más rápido pero el deadlock de ctranslate2/int8 es flaky → el watchdog +
+    escalado de hilos (en `_transcribe`) lo cubren. `OMP_NUM_THREADS=1` SIEMPRE
+    para evitar el OpenMP anidado (la causa típica del cuelgue)."""
     try:
         import os as _os
-        # EVITA el deadlock de ctranslate2/OpenMP en CPU: 1 solo hilo, fijado
-        # ANTES de importar el motor (debe ir antes de faster-whisper). En este
-        # box el modo multi-hilo cuelga ctranslate2/int8 de forma consistente
-        # con ciertos audios → single-thread es más lento pero NUNCA se cuelga.
+        # Fijado ANTES de importar el motor (debe ir antes de faster-whisper).
         _os.environ["OMP_NUM_THREADS"] = "1"
-        _os.environ["WHISPER_CPU_THREADS"] = "1"
+        _os.environ["WHISPER_CPU_THREADS"] = str(max(1, int(cpu_threads)))
         from src.subtitles_only import transcribe_with_reference
         words = transcribe_with_reference(
             audio_path,
@@ -1164,47 +1169,52 @@ def _transcribe_subprocess_worker(q, audio_path: str, model_size: str, language:
 
 def _transcribe(
     audio_path: str, *, model_size: str, language: str, on_progress,
-    timeout_s: int = 1200, fallback_model: str = "small", retries: int = 1,
+    timeout_s: int = 1200, fallback_model: str = "small",
+    primary_threads: int = 4,
 ) -> list[dict]:
     """Transcribe con Whisper, robusto a deadlocks de ctranslate2.
 
     El deadlock de ctranslate2/int8 en CPU es FLAKY (a veces cuelga, a veces
-    no, con el MISMO audio). Estrategia:
-      1) Intenta el modelo bueno (large-v3) en subproceso con watchdog por
-         INACTIVIDAD de CPU — detecta el cuelgue en ~2-3min (no espera el
-         timeout entero de 20min).
-      2) Si cuelga, REINTENTA large-v3 `retries` veces (proceso fresco; al
-         ser flaky suele pasar a la 2ª) → conserva la calidad del modelo bueno.
-      3) Solo si sigue colgado cae a `fallback_model` (small), rápido y que
-         casi nunca deadlockea → transcripción REAL en vez de corte degradado.
+    no, con el MISMO audio) y más probable con MÁS hilos. Estrategia de
+    ESCALADO de hilos (rápido→seguro→ligero):
+      1) large-v3 a `primary_threads` hilos → RÁPIDO (multi-core).
+      2) Si el watchdog lo mata por deadlock, reintenta large-v3 a 1 HILO →
+         más lento pero casi nunca se cuelga; conserva la calidad del modelo.
+      3) Si aún cuelga, cae a `fallback_model` (small) a 1 hilo → garantizado.
+    El watchdog por inactividad de CPU detecta el cuelgue en ~2-3min (no espera
+    el timeout entero), así que el escalado no cuesta 20min por intento.
     """
-    attempts = [model_size] * (1 + max(0, retries))
+    primary_threads = max(1, int(primary_threads))
+    # (modelo, hilos): rápido → seguro. Si primary ya es 1, no duplicamos.
+    plan: list[tuple[str, int]] = [(model_size, primary_threads)]
+    if primary_threads > 1:
+        plan.append((model_size, 1))
     last_err: Exception | None = None
-    for i, m in enumerate(attempts):
+    for i, (m, th) in enumerate(plan):
         try:
             if i > 0 and on_progress:
                 on_progress(
                     0.1,
-                    f"⚠️ Whisper {m} colgado — reintento {i} (proceso fresco)…",
+                    f"⚠️ Whisper {m} colgado — reintento a {th} hilo(s) (más seguro)…",
                 )
             return _run_whisper_once(
                 audio_path, model_size=m, language=language,
-                on_progress=on_progress, timeout_s=timeout_s,
+                on_progress=on_progress, timeout_s=timeout_s, cpu_threads=th,
             )
         except TimeoutError as e:
             last_err = e
             continue
-    # Tras agotar reintentos de large → fallback a un modelo ligero.
+    # Tras agotar large-v3 (multi y 1 hilo) → fallback a modelo ligero, 1 hilo.
     if fallback_model and fallback_model != model_size:
         if on_progress:
             on_progress(
                 0.1,
-                f"⚠️ Whisper {model_size} colgado {len(attempts)}× — "
-                f"caigo a {fallback_model} (rápido)…",
+                f"⚠️ Whisper {model_size} colgado — caigo a {fallback_model} (rápido)…",
             )
         return _run_whisper_once(
             audio_path, model_size=fallback_model, language=language,
             on_progress=on_progress, timeout_s=max(300, timeout_s // 2),
+            cpu_threads=1,
         )
     raise last_err or TimeoutError("Whisper colgado sin fallback")
 
@@ -1226,6 +1236,7 @@ def _proc_cpu_ticks(pid: int) -> int | None:
 def _run_whisper_once(
     audio_path: str, *, model_size: str, language: str, on_progress,
     timeout_s: int = 1200, stall_s: int = 150, warmup_s: int = 60,
+    cpu_threads: int = 1,
 ) -> list[dict]:
     """UNA pasada de Whisper en SUBPROCESO `spawn` con watchdog por CPU.
 
@@ -1253,7 +1264,7 @@ def _run_whisper_once(
         q = mpctx.Queue()
         p = mpctx.Process(
             target=_transcribe_subprocess_worker,
-            args=(q, audio_path, model_size, language),
+            args=(q, audio_path, model_size, language, cpu_threads),
             daemon=True,
         )
         p.start()
