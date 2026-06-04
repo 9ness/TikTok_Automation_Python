@@ -1460,42 +1460,56 @@ def _detect_repeated_ngrams(
 
     # Más grande primero — preferimos detectar "esto costaba doce" que
     # solo "costaba doce".
+    # `max_interrupt`: nº de palabras que pueden ir ENTRE las dos copias del
+    # n-grama y aun así contar como restart. Cubre el caso "aprovecha que ahora
+    # ESTÁN aprovecha que ahora estamos" (1 palabra interpuesta) — un re-take
+    # típico que el ngram inmediato (0 interpuestas) se dejaba.
+    max_interrupt = 2
     for n in range(max_n, min_n - 1, -1):
         i = 0
         while i <= len(words) - 2 * n:
-            if any(j in used for j in range(i, i + 2 * n)):
+            if any(j in used for j in range(i, i + n)):
                 i += 1
                 continue
             gram_a = normalized[i : i + n]
-            gram_b = normalized[i + n : i + 2 * n]
             if not all(g for g in gram_a):  # n-grama con palabra vacía → skip
                 i += 1
                 continue
-            if gram_a != gram_b:
+            matched = False
+            for k in range(0, max_interrupt + 1):  # k palabras interpuestas
+                b0 = i + n + k
+                if b0 + n > len(words):
+                    break
+                if any(j in used for j in range(i, b0 + n)):
+                    continue
+                if normalized[b0 : b0 + n] != gram_a:
+                    continue
+                # Gap temporal entre fin de la 1ª copia y arranque de la 2ª
+                # (incluye las palabras interpuestas) — pequeño = re-take real.
+                t_a_end = float(words[i + n - 1]["end"])
+                t_b_start = float(words[b0]["start"])
+                if t_b_start - t_a_end > max_gap_between_grams_s:
+                    continue
+                # Cortar el PRIMER intento + las palabras interpuestas [i .. b0-1];
+                # conservar la 2ª copia (la buena).
+                cuts.append({
+                    "start_word_idx": i,
+                    "end_word_idx": b0 - 1,
+                    "kind": "ngram_restart",
+                    "first_attempt": " ".join(words[j]["word"] for j in range(i, b0)),
+                    "kept_version": " ".join(
+                        words[j]["word"] for j in range(b0, b0 + n)
+                    ),
+                    "reason": f"N-grama de {n} repetido (restart, {k} interpuestas)",
+                    "n": n,
+                })
+                for j in range(i, b0 + n):
+                    used.add(j)
+                i = b0 + n
+                matched = True
+                break
+            if not matched:
                 i += 1
-                continue
-            # Verifica que el gap entre ambos n-gramas no sea demasiado
-            # grande — si son frases distintas separadas por mucho tiempo,
-            # no es una repetición sino una mención legítima.
-            t_a_end = float(words[i + n - 1]["end"])
-            t_b_start = float(words[i + n]["start"])
-            if t_b_start - t_a_end > max_gap_between_grams_s:
-                i += 1
-                continue
-            cuts.append({
-                "start_word_idx": i,
-                "end_word_idx": i + n - 1,
-                "kind": "exact_ngram_repetition",
-                "first_attempt": " ".join(words[j]["word"] for j in range(i, i + n)),
-                "kept_version": " ".join(
-                    words[j]["word"] for j in range(i + n, i + 2 * n)
-                ),
-                "reason": f"N-grama de {n} palabras repetido consecutivamente",
-                "n": n,
-            })
-            for j in range(i, i + 2 * n):
-                used.add(j)
-            i += n  # avanzar el cursor más allá del par para no detectar overlaps
     return sorted(cuts, key=lambda c: c["start_word_idx"])
 
 

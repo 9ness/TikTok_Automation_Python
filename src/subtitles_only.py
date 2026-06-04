@@ -83,6 +83,12 @@ def transcribe_with_reference(
         "word_timestamps": True,
         "language": language,
         "vad_filter": not vad_off,
+        # DETERMINISMO: temperatura 0 SIN fallback (por defecto faster-whisper
+        # usa (0, 0.2, 0.4…) y reintenta a temp más alta si un segmento falla
+        # un umbral → transcripción distinta entre runs del MISMO audio). Con
+        # un único 0.0, la transcripción es repetible → el editor da el mismo
+        # corte siempre (estable y afinable).
+        "temperature": 0.0,
         # TTS mantiene `condition_on_previous_text=True` para coherencia entre
         # chunks (todo el guion es una narración continua). Música lo desactiva
         # porque el VAD off + condicionamiento puede atascar a Whisper en bridges.
