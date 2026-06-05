@@ -41,13 +41,17 @@ import { UserFoldersPanel } from "./_components/UserFoldersPanel";
 import { UserWebAccountPanel } from "./_components/UserWebAccountPanel";
 
 type RightTab = "flow" | "folders" | "billing";
-type UserFilter = "all" | "trial" | "plan" | "admin";
+type UserFilter = "all" | "standard" | "plus" | "pro" | "admin" | "manual";
 
-// Categoría del usuario según su cuenta web / suscripción.
-function userKind(u: EditorUser): "admin" | "plan" | "trial" {
-  if (u.web_account?.role === "admin") return "admin";
-  if (u.subscription || u.web_account?.plan_id) return "plan";
-  return "trial"; // sin plan ni suscripción = prueba
+// Categoría del usuario según el ROL de su cuenta web. Sin cuenta web =
+// "manual" (usuario interno creado a mano en el panel).
+function userKind(u: EditorUser): Exclude<UserFilter, "all"> {
+  const role = u.web_account?.role;
+  if (!u.web_account) return "manual";
+  if (role === "admin") return "admin";
+  if (role === "pro") return "pro";
+  if (role === "plus") return "plus";
+  return "standard";
 }
 
 function matchesFilter(u: EditorUser, f: UserFilter): boolean {
@@ -185,17 +189,15 @@ export default function EditorAutoUsersPage() {
               {/* Filtro por tipo */}
               {(() => {
                 const all = users.data ?? [];
-                const counts = {
-                  all: all.length,
-                  trial: all.filter((u) => userKind(u) === "trial").length,
-                  plan: all.filter((u) => userKind(u) === "plan").length,
-                  admin: all.filter((u) => userKind(u) === "admin").length,
-                };
+                const c = (k: Exclude<UserFilter, "all">) =>
+                  all.filter((u) => userKind(u) === k).length;
                 const tabs: { id: UserFilter; label: string }[] = [
-                  { id: "all", label: `Todos (${counts.all})` },
-                  { id: "trial", label: `Prueba (${counts.trial})` },
-                  { id: "plan", label: `Con plan (${counts.plan})` },
-                  { id: "admin", label: `Admin (${counts.admin})` },
+                  { id: "all", label: `Todos (${all.length})` },
+                  { id: "standard", label: `Estándar (${c("standard")})` },
+                  { id: "plus", label: `Plus (${c("plus")})` },
+                  { id: "pro", label: `Pro (${c("pro")})` },
+                  { id: "admin", label: `Admin (${c("admin")})` },
+                  { id: "manual", label: `Manual (${c("manual")})` },
                 ];
                 return (
                   <div className="flex flex-wrap gap-1.5 pb-1">

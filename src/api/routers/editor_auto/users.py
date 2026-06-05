@@ -393,9 +393,28 @@ def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
 
 @router.get("/web-accounts/all", response_model=list[WebAccountResponse])
 def list_web_accounts() -> list[WebAccountResponse]:
-    """Todas las cuentas registradas en la web de cliente (para vincular)."""
+    """Todas las cuentas registradas en la web de cliente.
+
+    Auto-provisiona (idempotente) el EditorUser de cada cuenta verificada
+    no-admin, así el cliente aparece en Usuarios sin que el admin pulse nada.
+    """
+    from src.editor_auto.services.provision_service import provision_from_web
     repo = get_web_account_repo()
-    return [_web_account_dto(a) for a in repo.list_all() if a]  # type: ignore[misc]
+    out: list[WebAccountResponse] = []
+    for a in repo.list_all():
+        if not a:
+            continue
+        email = (a.get("email") or "").strip().lower()
+        # Solo cuentas reales (email verificado) y que no sean admin.
+        if email and a.get("role") != "admin" and a.get("emailVerified"):
+            try:
+                provision_from_web(email)
+            except Exception as e:
+                print(f"[editor_auto.users] auto-provision falló para {email}: {e}")
+        dto = _web_account_dto(a)
+        if dto:
+            out.append(dto)
+    return out
 
 
 @router.post("/web-accounts/provision", response_model=EditorUserResponse,
