@@ -114,3 +114,4 @@
 - "Failed to fetch" al subir desde web = preflight CORS 400: el contenedor api corria con API_CORS_ORIGINS viejo aunque .env estaba bien. Fix: docker compose up -d --force-recreate --no-deps api (restart NO recarga env, recreate si).
 - Drive (drive_uploads): NO usar googleapiclient/httplib2 en endpoints concurrentes (no thread-safe + sin timeout) -> deadlock agota el threadpool y el server da 502 (CPU/RAM libres). Fix: cliente requests.Session con timeout duro.
 - APIError no aceptaba status_code= (era atributo de clase) -> cada APIError(...,status_code=409) en web_upload crasheaba con TypeError 500 = "fallo al subir". Fix: __init__ acepta status_code/code override.
+- CORS regresiona en cada auto-deploy: el webhook recrea el contenedor con el DEFAULT de docker-compose (no propaga API_CORS_ORIGINS del .env) -> navegador recibe respuesta sin ACAO -> "Failed to fetch". Fix: meter los origenes web en el DEFAULT de docker-compose.yml.

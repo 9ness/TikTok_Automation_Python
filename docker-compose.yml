@@ -36,8 +36,12 @@ services:
       # Forzar host/port correctos dentro del container, independientes de .env.
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
-      # CORS abierto al dominio público (Caddy reescribe Origin).
-      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost,https://${DOMAIN:-localhost}}
+      # CORS abierto al dominio público (Caddy reescribe Origin). Incluimos los
+      # orígenes de la web de cliente (nebulabs-media) en el DEFAULT para que
+      # sobrevivan a cada deploy aunque el webhook no propague API_CORS_ORIGINS
+      # del .env — sin esto el navegador recibe respuestas sin ACAO y la web
+      # falla con "Failed to fetch".
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost,https://${DOMAIN:-localhost},https://nebulabsmedia.com,https://www.nebulabsmedia.com,https://nebulabs-media.vercel.app}
       # temp_work y api_uploads viven dentro del volumen persistido.
       API_TEMP_ROOT: "/app/temp_work"
       # Paths de assets DENTRO del container — el `.env` del host puede tener
