@@ -430,6 +430,20 @@ export function useApproveVideo() {
   });
 }
 
+/** Re-edita un vídeo (nuevo intento) si el resultado no convence. */
+export function useRequeueVideo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; job_id: string },
+    Error,
+    { user_id: string; day: string; source: string; filename?: string }
+  >({
+    mutationFn: (b) => api.post(`${WEB_ADMIN_ROOT}/requeue`, b),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "pending-approvals"] }),
+  });
+}
+
 /** URL del stream de un vídeo de salida para el reproductor admin (auth por query). */
 export function adminStreamUrl(userId: string, day: string, file: string): string {
   const key = process.env.NEXT_PUBLIC_API_KEY ?? "";

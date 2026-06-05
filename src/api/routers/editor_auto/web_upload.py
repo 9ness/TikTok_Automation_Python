@@ -614,6 +614,63 @@ def web_admin_approve(
     return {"ok": True, "approved": payload.approve}
 
 
+class RequeueRequest(BaseModel):
+    user_id: str
+    day: str
+    source: str
+    filename: str | None = None
+
+
+@router.post("/admin/requeue")
+def web_admin_requeue(
+    _: Annotated[str, Depends(get_current_user)],
+    payload: RequeueRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Re-edita un vídeo del día (nuevo intento). Útil si el resultado no te
+    convence: re-encola el original de entrada/<día>/ y el cliente lo ve
+    'en cola/editando' otra vez. Quita su aprobación previa si la tenía."""
+    if not is_valid_day(payload.day):
+        raise ValidationError("Día inválido.", details={"day": payload.day})
+    user = UserRepo().get(payload.user_id)
+    if user is None:
+        raise UserNotFoundError("Usuario no encontrado.", details={"user_id": payload.user_id})
+
+    src = _safe_name(payload.source)
+    mount_path = Path(user_input_day_folder(user.name, payload.day)) / src
+    if not os.path.exists(mount_path):
+        raise UserNotFoundError(
+            "No encuentro el vídeo original para re-editar.",
+            details={"source": payload.source},
+        )
+    try:
+        job_id = _enqueue_video(queue, user, mount_path, payload.day)
+    except APIError:
+        raise
+
+    # Apuntar la meta del día al NUEVO job para este source (web_output lo sigue).
+    jobs = _get_day_jobs(user.id, payload.day)
+    found = False
+    for m in jobs:
+        if m.get("filename") == src:
+            m["job_id"] = job_id
+            found = True
+    if not found:
+        jobs.append({"filename": src, "job_id": job_id})
+    _save_day_jobs(user.id, payload.day, jobs)
+
+    # El nuevo intento debe volver a "pendiente de aprobar": quita la aprobación
+    # del output anterior (mismo nombre `<stem>_editado.mp4`).
+    if payload.filename:
+        _unapprove_output(user.id, payload.day, _safe_name(payload.filename))
+    # Permite reenviar el email de "listos" cuando se vuelva a completar.
+    try:
+        get_editor_redis().delete(f"{_NOTIFIED_KEY}{user.id}:{payload.day}")
+    except Exception:
+        pass
+    return {"ok": True, "job_id": job_id}
+
+
 @router.get("/admin/stream")
 def web_admin_stream(
     user_id: str,

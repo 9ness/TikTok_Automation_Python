@@ -35,6 +35,7 @@ import {
   useEditorUsers,
   usePendingApprovals,
   useProvisionFromWeb,
+  useRequeueVideo,
   useToggleApproval,
   useUpdateCutoff,
   useUpdateEditorUser,
@@ -621,6 +622,7 @@ function ApprovalSetting() {
 function PendingApprovalsCard() {
   const pending = usePendingApprovals();
   const approve = useApproveVideo();
+  const requeue = useRequeueVideo();
   const items = pending.data?.pending ?? [];
 
   if (!items.length) return null;
@@ -650,22 +652,41 @@ function PendingApprovalsCard() {
                 src={adminStreamUrl(it.user_id, it.day, it.filename)}
                 className="mx-auto aspect-[9/16] max-h-[50vh] w-auto rounded-lg bg-black"
               />
-              <Button
-                size="sm"
-                className="w-full"
-                disabled={approve.isPending}
-                onClick={() =>
-                  approve.mutate(
-                    { user_id: it.user_id, day: it.day, filename: it.filename, approve: true },
-                    {
-                      onSuccess: () => toast.success("Vídeo aprobado — ya lo ve el cliente."),
-                      onError: (e) => toast.error((e as Error).message),
-                    },
-                  )
-                }
-              >
-                <CheckCircle2 className="h-4 w-4" /> Aprobar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  disabled={approve.isPending || requeue.isPending}
+                  onClick={() =>
+                    approve.mutate(
+                      { user_id: it.user_id, day: it.day, filename: it.filename, approve: true },
+                      {
+                        onSuccess: () => toast.success("Vídeo aprobado — ya lo ve el cliente."),
+                        onError: (e) => toast.error((e as Error).message),
+                      },
+                    )
+                  }
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Aprobar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={approve.isPending || requeue.isPending}
+                  onClick={() =>
+                    requeue.mutate(
+                      { user_id: it.user_id, day: it.day, source: it.source ?? "", filename: it.filename },
+                      {
+                        onSuccess: () => toast.success("Reencolado — se está re-editando."),
+                        onError: (e) => toast.error((e as Error).message),
+                      },
+                    )
+                  }
+                >
+                  <Wand2 className="h-4 w-4" /> Reencolar
+                </Button>
+              </div>
             </div>
           ))}
         </div>
