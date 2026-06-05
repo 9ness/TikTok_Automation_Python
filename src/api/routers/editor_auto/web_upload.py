@@ -52,8 +52,17 @@ from src.queue.models import JobMode, JobStatus
 router = APIRouter(prefix="/api/v1/editor-auto/web", tags=["editor-auto · web"])
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
-_MAX_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB
+_MAX_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB por archivo
 _VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
+
+# ─── Límites anti-abuso (servidor privado) ───
+_CHUNK = 1024 * 1024                 # 1 MB — streaming a disco (no cargar en RAM)
+_MAX_FILES_PER_DAY = 50              # tope duro de vídeos por día/usuario
+_MAX_BYTES_PER_DAY = 8 * 1024 * 1024 * 1024   # 8 GB acumulados por día/usuario
+_MIN_FREE_DISK = 5 * 1024 * 1024 * 1024        # exige ≥5 GB libres para aceptar
+_RATE_MAX = 40                       # nº máx de subidas…
+_RATE_WINDOW_S = 300                 # …por ventana (5 min) y usuario
+_RATE_KEY = "webrate:"
 
 _SENT_DAYS_KEY = "webdays_sent:"  # set por usuario de días ya mandados a edición
 _JOBS_KEY = "webday_jobs:"        # JSON [{job_id, filename}] de cada día enviado
@@ -114,6 +123,46 @@ def _lock_day(user_id: str, day: str) -> None:
     get_editor_redis().sadd(f"{_SENT_DAYS_KEY}{user_id}", day)
 
 
+def _rate_check(email: str) -> None:
+    """Rate-limit fijo por ventana y usuario. Lanza 429 si se excede.
+
+    Frena flooding aunque el atacante tenga una sesión válida (el ticket está
+    ligado al email). Ventana fija con INCR+EXPIRE en Redis."""
+    r = get_editor_redis()
+    if not r.is_available():
+        return  # sin Redis no bloqueamos (degradación limpia)
+    bucket = int(time.time()) // _RATE_WINDOW_S
+    key = f"{_RATE_KEY}{email}:{bucket}"
+    n = r.incr(key)
+    if n == 1:
+        r.expire(key, _RATE_WINDOW_S + 5)
+    if n > _RATE_MAX:
+        raise APIError(
+            "Demasiadas subidas en poco tiempo. Espera unos minutos.",
+            status_code=429,
+            details={"retry_after_seconds": _RATE_WINDOW_S},
+        )
+
+
+def _day_total_bytes(folder: str) -> int:
+    total = 0
+    try:
+        for n in os.listdir(folder):
+            p = os.path.join(folder, n)
+            if os.path.isfile(p):
+                total += os.path.getsize(p)
+    except OSError:
+        pass
+    return total
+
+
+def _disk_free(path: str) -> int:
+    try:
+        return shutil.disk_usage(path).free
+    except OSError:
+        return _MIN_FREE_DISK  # si no se puede medir, no bloqueamos
+
+
 def _list_day_videos(username: str, day: str) -> list[dict[str, Any]]:
     folder = user_input_day_folder(username, day)
     out: list[dict[str, Any]] = []
@@ -152,6 +201,9 @@ async def web_upload(
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición y está bloqueado.", status_code=409)
 
+    # Anti-flood por usuario.
+    _rate_check(claims.email)
+
     filename = (file.filename or "").lower()
     ext = next((e for e in _ALLOWED_VIDEO_EXTS if filename.endswith(e)), "")
     if not ext:
@@ -159,22 +211,50 @@ async def web_upload(
             f"Formato no soportado. Acepta: {', '.join(sorted(_ALLOWED_VIDEO_EXTS))}.",
             details={"filename": file.filename},
         )
-    contents = await file.read()
-    if not contents:
-        raise ValidationError("Archivo vacío.")
-    if len(contents) > _MAX_VIDEO_BYTES:
-        raise ValidationError(
-            f"El vídeo pesa {len(contents) / 1024 / 1024:.1f} MB, máximo "
-            f"{_MAX_VIDEO_BYTES / 1024 / 1024:.0f} MB."
-        )
 
     folder = user_input_day_folder(user.name, day)
     Path(folder).mkdir(parents=True, exist_ok=True)
+
+    # Tope de nº de vídeos por día.
+    if len(_list_day_videos(user.name, day)) >= _MAX_FILES_PER_DAY:
+        raise APIError(
+            f"Límite de {_MAX_FILES_PER_DAY} vídeos por día alcanzado.",
+            status_code=409,
+        )
+    # Guarda de disco — no aceptar si queda poco espacio.
+    if _disk_free(folder) < _MIN_FREE_DISK:
+        raise APIError("Almacenamiento temporalmente lleno. Inténtalo más tarde.", status_code=507)
+
+    day_used = _day_total_bytes(folder)
+    # Streaming a disco en chunks (sin cargar el vídeo entero en RAM). Aborta
+    # si supera el tope por archivo o el acumulado del día.
     dest = Path(folder) / f"{int(time.time())}_{_safe_name(file.filename or 'video' + ext)}"
+    written = 0
     try:
-        dest.write_bytes(contents)
+        with open(dest, "wb") as out:
+            while True:
+                chunk = await file.read(_CHUNK)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > _MAX_VIDEO_BYTES:
+                    raise APIError(
+                        f"El vídeo supera el máximo de {_MAX_VIDEO_BYTES // 1024 // 1024} MB.",
+                        status_code=413,
+                    )
+                if day_used + written > _MAX_BYTES_PER_DAY:
+                    raise APIError("Has superado el espacio disponible para este día.", status_code=413)
+                out.write(chunk)
+    except APIError:
+        dest.unlink(missing_ok=True)
+        raise
     except OSError as e:
+        dest.unlink(missing_ok=True)
         raise APIError(f"No se pudo guardar el archivo: {e}")
+
+    if written == 0:
+        dest.unlink(missing_ok=True)
+        raise ValidationError("Archivo vacío.")
 
     return {"ok": True, "filename": dest.name, "videos": _list_day_videos(user.name, day)}
 

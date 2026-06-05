@@ -48,6 +48,11 @@
 # al sitio principal de arriba.
 api.nebulabsmedia.com {
 	encode gzip
+	# Defensa en profundidad: rechaza cuerpos > 600 MB antes de llegar a la
+	# app (el límite por archivo en la app es 500 MB).
+	request_body {
+		max_size 600MB
+	}
 	# Todas las rutas → FastAPI (REST + WS). El navegador del cliente sube
 	# a /api/v1/editor-auto/web/* con el ticket firmado.
 	reverse_proxy api:8000

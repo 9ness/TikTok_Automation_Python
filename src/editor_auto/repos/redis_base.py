@@ -121,6 +121,20 @@ class EditorRedis:
         result = self._get(f"smembers/{self._enc(self._full_key(key))}")
         return list(result or [])
 
+    def incr(self, key: str) -> int:
+        """INCR atómico (crea la key a 1 si no existe). 0 si Redis no está."""
+        result = self._get(f"incr/{self._enc(self._full_key(key))}")
+        try:
+            return int(result)
+        except (TypeError, ValueError):
+            return 0
+
+    def expire(self, key: str, seconds: int) -> bool:
+        result = self._get(
+            f"expire/{self._enc(self._full_key(key))}/{int(seconds)}"
+        )
+        return bool(result)
+
 
 _INSTANCE: EditorRedis | None = None
 
