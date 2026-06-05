@@ -39,6 +39,7 @@ from src.editor_auto.config import (
     day_send_open,
     is_valid_day,
     send_cutoff_hour,
+    send_cutoff_minute,
     user_input_day_folder,
     user_output_day_folder,
 )
@@ -173,7 +174,7 @@ def web_upload_url(
         raise APIError("Este día ya se mandó a edición y está bloqueado.", status_code=409)
     if not day_send_open(day):
         raise APIError(
-            f"El cierre para este día fue a las {send_cutoff_hour()}:00. "
+            f"El cierre para este día fue a las {send_cutoff_hour()}:{send_cutoff_minute():02d}. "
             f"Programa para otro día.",
             status_code=409,
         )
@@ -322,7 +323,7 @@ def web_send_to_edit(
         raise APIError("Este día ya se mandó a edición.", status_code=409)
     if not day_send_open(day):
         raise APIError(
-            f"El cierre para este día fue a las {send_cutoff_hour()}:00. "
+            f"El cierre para este día fue a las {send_cutoff_hour()}:{send_cutoff_minute():02d}. "
             f"Programa para otro día.",
             status_code=409,
         )
