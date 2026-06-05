@@ -25,24 +25,28 @@ import time
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+import json
+
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_queue
 from src.api.exceptions import APIError, UserNotFoundError, ValidationError
 from src.api.temp_storage import upload_subdir
-from src.api.web_ticket import TicketClaims, require_web_ticket
+from src.api.web_ticket import TicketClaims, require_web_ticket, verify_ticket
 from src.editor_auto.config import (
     TOOL_SILENCE_CUTTER_SCRIPTED,
     is_valid_day,
     user_input_day_folder,
+    user_output_day_folder,
 )
 from src.editor_auto.models import EditorUser
 from src.editor_auto.repos import UserRepo
 from src.editor_auto.repos.redis_base import get_editor_redis
 from src.editor_auto.services import quota_service
 from src.queue.manager import JobQueue
-from src.queue.models import JobMode
+from src.queue.models import JobMode, JobStatus
 
 
 router = APIRouter(prefix="/api/v1/editor-auto/web", tags=["editor-auto · web"])
@@ -52,6 +56,37 @@ _MAX_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB
 _VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
 
 _SENT_DAYS_KEY = "webdays_sent:"  # set por usuario de días ya mandados a edición
+_JOBS_KEY = "webday_jobs:"        # JSON [{job_id, filename}] de cada día enviado
+_MIN_SCORE = 90                   # umbral de calidad para mostrar al cliente
+
+
+def _save_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
+    get_editor_redis().set_json(f"{_JOBS_KEY}{user_id}:{day}", jobs)
+
+
+def _get_day_jobs(user_id: str, day: str) -> list[dict]:
+    data = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
+    return data if isinstance(data, list) else []
+
+
+def _job_score(job) -> int | None:
+    """Lee el quality_score del diagnóstico del job (si existe)."""
+    params = getattr(job, "params", None) or {}
+    paths = []
+    tf = params.get("temp_folder")
+    if isinstance(tf, str):
+        paths.append(os.path.join(tf, f"editor_diagnostic_{job.id}.json"))
+    paths.append(os.path.join(os.getcwd(), "temp_work", f"editor_diagnostic_{job.id}.json"))
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    diag = json.load(f)
+                score = (diag.get("audit") or {}).get("quality_score")
+                return int(score) if score is not None else None
+            except Exception:
+                return None
+    return None
 
 
 def _resolve_user(claims: TicketClaims) -> EditorUser:
@@ -294,5 +329,76 @@ def web_send_to_edit(
     # editable para reintentar más tarde.
     if enqueued:
         _lock_day(user.id, day)
+        _save_day_jobs(user.id, day, enqueued)
 
     return {"day": day, "enqueued": enqueued, "errors": errors, "locked": bool(enqueued)}
+
+
+# ─────────────────────────── Salida (vídeos editados) ───────────────────────────
+
+@router.get("/output")
+def web_output(
+    claims: Annotated[TicketClaims, Depends(require_web_ticket)],
+    day: str,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Estado de la edición del día: progreso + vídeos LISTOS (score ≥ 90).
+
+    El cliente solo debería descargar cuando `all_done` es True (todos los
+    vídeos del día terminaron de editarse)."""
+    if not is_valid_day(day):
+        raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
+    user = _resolve_user(claims)
+    jobs_meta = _get_day_jobs(user.id, day)
+    by_id = {j.id: j for j in queue.get_all()}
+    terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+
+    videos: list[dict] = []
+    ready = 0
+    done = 0
+    for m in jobs_meta:
+        job = by_id.get(m.get("job_id"))
+        st = job.status if job else None
+        score = _job_score(job) if (job and job.status == JobStatus.COMPLETED) else None
+        if job and job.status in terminal:
+            done += 1
+        out_name = (
+            os.path.basename(job.result_path)
+            if (job and job.result_path) else None
+        )
+        is_ready = bool(
+            job and job.status == JobStatus.COMPLETED and out_name
+            and (score is None or score >= _MIN_SCORE)
+        )
+        if is_ready:
+            ready += 1
+        videos.append({
+            "source": m.get("filename"),
+            "filename": out_name,
+            "score": score,
+            "ready": is_ready,
+            "status": st.value if st else "unknown",
+        })
+
+    all_done = bool(jobs_meta) and done == len(jobs_meta)
+    return {"day": day, "total": len(jobs_meta), "ready": ready, "all_done": all_done, "videos": videos}
+
+
+@router.get("/download")
+def web_download(
+    day: str,
+    file: str,
+    ticket: Annotated[str, Query(...)],
+) -> FileResponse:
+    """Descarga un vídeo editado de `salida/<día>/`. El ticket va por query
+    porque un `<a download>` no puede enviar cabeceras."""
+    claims = verify_ticket(ticket)
+    if not is_valid_day(day):
+        raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
+    user = _resolve_user(claims)
+    folder = user_output_day_folder(user.name, day)
+    safe = _safe_name(file)
+    path = os.path.join(folder, safe)
+    if not os.path.exists(path):
+        raise UserNotFoundError("Vídeo no encontrado.", details={"file": file})
+    return FileResponse(path, media_type="video/mp4", filename=safe)
