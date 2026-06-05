@@ -41,12 +41,26 @@ import { UserFoldersPanel } from "./_components/UserFoldersPanel";
 import { UserWebAccountPanel } from "./_components/UserWebAccountPanel";
 
 type RightTab = "flow" | "folders" | "billing";
+type UserFilter = "all" | "trial" | "plan" | "admin";
+
+// Categoría del usuario según su cuenta web / suscripción.
+function userKind(u: EditorUser): "admin" | "plan" | "trial" {
+  if (u.web_account?.role === "admin") return "admin";
+  if (u.subscription || u.web_account?.plan_id) return "plan";
+  return "trial"; // sin plan ni suscripción = prueba
+}
+
+function matchesFilter(u: EditorUser, f: UserFilter): boolean {
+  if (f === "all") return true;
+  return userKind(u) === f;
+}
 
 export default function EditorAutoUsersPage() {
   const users = useEditorUsers();
   const createUser = useCreateEditorUser();
   const deleteUser = useDeleteEditorUser();
 
+  const [userFilter, setUserFilter] = useState<UserFilter>("all");
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
@@ -168,6 +182,41 @@ export default function EditorAutoUsersPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* Filtro por tipo */}
+              {(() => {
+                const all = users.data ?? [];
+                const counts = {
+                  all: all.length,
+                  trial: all.filter((u) => userKind(u) === "trial").length,
+                  plan: all.filter((u) => userKind(u) === "plan").length,
+                  admin: all.filter((u) => userKind(u) === "admin").length,
+                };
+                const tabs: { id: UserFilter; label: string }[] = [
+                  { id: "all", label: `Todos (${counts.all})` },
+                  { id: "trial", label: `Prueba (${counts.trial})` },
+                  { id: "plan", label: `Con plan (${counts.plan})` },
+                  { id: "admin", label: `Admin (${counts.admin})` },
+                ];
+                return (
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {tabs.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setUserFilter(t.id)}
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                          userFilter === t.id
+                            ? "border-emerald-500 bg-emerald-500/10 text-foreground"
+                            : "border-border text-muted-foreground hover:bg-accent/40",
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
               {users.isLoading && (
                 <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
               )}
@@ -176,15 +225,24 @@ export default function EditorAutoUsersPage() {
                   Aún no hay usuarios. Crea el primero.
                 </p>
               )}
-              {(users.data ?? []).map((u) => (
-                <UserListItem
-                  key={u.id}
-                  user={u}
-                  selected={u.id === selectedUserId}
-                  onSelect={() => setSelectedUserId(u.id)}
-                  onDelete={() => deleteUser.mutate({ id: u.id })}
-                />
-              ))}
+              {(users.data ?? [])
+                .filter((u) => matchesFilter(u, userFilter))
+                .map((u) => (
+                  <UserListItem
+                    key={u.id}
+                    user={u}
+                    selected={u.id === selectedUserId}
+                    onSelect={() => setSelectedUserId(u.id)}
+                    onDelete={() => deleteUser.mutate({ id: u.id })}
+                  />
+                ))}
+              {!users.isLoading &&
+                (users.data ?? []).filter((u) => matchesFilter(u, userFilter)).length === 0 &&
+                (users.data ?? []).length > 0 && (
+                  <p className="py-2 text-center text-xs text-muted-foreground">
+                    Ningún usuario en esta categoría.
+                  </p>
+                )}
             </CardContent>
           </Card>
 
@@ -354,6 +412,17 @@ function UserListItem({
               · {user.usage.daily_videos_used}/{user.usage.daily_limit} hoy
             </span>
           )}
+          {/* Vídeos de prueba restantes (cuenta web sin plan) */}
+          {user.web_account &&
+            !user.web_account.plan_id &&
+            user.web_account.role !== "admin" && (
+              <span
+                className="ml-1 font-medium text-amber-600 dark:text-amber-400"
+                title="Vídeos de prueba que le quedan"
+              >
+                · {user.web_account.trial_videos} prueba
+              </span>
+            )}
           {salida > 0 && ` · ${salida} en salida`}
         </div>
       </button>
