@@ -43,6 +43,9 @@ _PRESET_STYLES: dict[str, dict] = {
 }
 _DEFAULT_PRESET_ID = "classic"
 
+# Únicas flechas reales en Assets/flechas (el preflight valida contra esto).
+_ALLOWED_ARROWS = {"flecha_roja.mov", "flecha_negra.mov"}
+
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
 # Se resuelve con fonts_registry.find_by_path (primer match disponible).
 _FONT_CANDIDATES: dict[str, list[str]] = {
@@ -130,8 +133,14 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
 
     if arr.get("enabled"):
         rot = int(_f(arr.get("rotation"), 0)) % 360
+        # Saneo: solo existen estas flechas reales. Valores viejos/ inválidos
+        # (p.ej. "simple" de presets SVG antiguos) caen a flecha_roja.mov, si no
+        # el preflight aborta el job ("'simple' no está en Assets/flechas").
+        shape = str(arr.get("shapeId") or "").strip()
+        if shape not in _ALLOWED_ARROWS:
+            shape = "flecha_roja.mov"
         arrow_overrides = {
-            "sticker_file": str(arr.get("shapeId") or "flecha_roja.mov"),
+            "sticker_file": shape,
             "color_mode": "fixed",
             "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
             "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
