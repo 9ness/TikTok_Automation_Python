@@ -183,6 +183,32 @@ def list_users(include_deleted: bool = False) -> list[EditorUserResponse]:
     return [_to_response(u) for u in users]
 
 
+class SettingsResponse(BaseModel):
+    send_cutoff_hour: int
+
+
+class CutoffRequest(BaseModel):
+    send_cutoff_hour: int
+
+
+# IMPORTANTE: rutas estáticas ANTES de "/{user_id}" o este las captura (404).
+@router.get("/settings", response_model=SettingsResponse)
+def get_settings() -> SettingsResponse:
+    """Ajustes globales del Editor Auto (hora de cierre de envíos…)."""
+    from src.editor_auto.config import send_cutoff_hour
+    return SettingsResponse(send_cutoff_hour=send_cutoff_hour())
+
+
+@router.patch("/settings/cutoff", response_model=SettingsResponse)
+def set_cutoff(payload: CutoffRequest) -> SettingsResponse:
+    """Cambia la hora de cierre diaria (0-23, Europe/Madrid). Se guarda en Redis."""
+    from src.editor_auto.config import set_send_cutoff_hour
+    if not 0 <= payload.send_cutoff_hour <= 23:
+        raise ValidationError("La hora debe estar entre 0 y 23.", details={"hour": payload.send_cutoff_hour})
+    h = set_send_cutoff_hour(payload.send_cutoff_hour)
+    return SettingsResponse(send_cutoff_hour=h)
+
+
 @router.get("/{user_id}", response_model=EditorUserResponse)
 def get_user(user_id: str) -> EditorUserResponse:
     repo = UserRepo()
@@ -390,30 +416,6 @@ def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
 # ───────────────────────────── Cuentas web ──────────────────────────────
 # Puente con nebulabs-media: el admin gestiona rol/plan/ban de la cuenta web
 # (datos en `nebulabs:user:*`) desde el panel de configuración, por email.
-
-class SettingsResponse(BaseModel):
-    send_cutoff_hour: int
-
-
-class CutoffRequest(BaseModel):
-    send_cutoff_hour: int
-
-
-@router.get("/settings", response_model=SettingsResponse)
-def get_settings() -> SettingsResponse:
-    """Ajustes globales del Editor Auto (hora de cierre de envíos…)."""
-    from src.editor_auto.config import send_cutoff_hour
-    return SettingsResponse(send_cutoff_hour=send_cutoff_hour())
-
-
-@router.patch("/settings/cutoff", response_model=SettingsResponse)
-def set_cutoff(payload: CutoffRequest) -> SettingsResponse:
-    """Cambia la hora de cierre diaria (0-23, Europe/Madrid). Se guarda en Redis."""
-    from src.editor_auto.config import set_send_cutoff_hour
-    if not 0 <= payload.send_cutoff_hour <= 23:
-        raise ValidationError("La hora debe estar entre 0 y 23.", details={"hour": payload.send_cutoff_hour})
-    h = set_send_cutoff_hour(payload.send_cutoff_hour)
-    return SettingsResponse(send_cutoff_hour=h)
 
 
 @router.get("/web-accounts/all", response_model=list[WebAccountResponse])
