@@ -12,3 +12,14 @@
 ## ✅ Done
 
 - [2026-05-18] Nicho 4 Construcción POV completo: JobMode + runner + pipeline (Gemini video → MiniMax → anti-copy + subs karaoke) + endpoints `/construccion-pov/enqueue` y `/voices/clone|sample|delete` + sidebar nav + página `/creator-reward/construccion-pov` + hub `/creator-reward/tools/voices` + 40 presets EN MiniMax.
+
+## 🔜 Reintento IA con feedback (<90) — DISEÑO APROBADO, pendiente implementar+validar
+- Cuando un vídeo web sale <90 (audit `needs_requeue`), re-encolar máx **2** veces (3 totales).
+- En cada reintento, inyectar en el prompt de GPT-4o (pass2 de `silence_cutter`) los fallos
+  concretos del audit anterior (loose_words_preview, surviving_stretched_preview,
+  internal_silences con contexto) → "estos rellenos/palabras quedaron sin cortar, córtalos".
+- Quedarse con el MEJOR intento (mayor quality_score).
+- Tocar: runners.run_editor_auto (re-enqueue guardado a jobs web), run.py (param retry_feedback
+  → inyectar en config del step silence_cutter), silence_cutter (consumir retry_feedback en prompt),
+  web_upload.web_output (best-of por source via retry_group), setting flag auto_retry (default OFF).
+- VALIDAR con un clip real que dé <90 antes de activar el flag.
