@@ -186,14 +186,36 @@ def is_valid_day(day: str) -> bool:
         return False
 
 
+SETTINGS_CUTOFF_KEY = "settings:send_cutoff_hour"
+
+
 def send_cutoff_hour() -> int:
     """Hora de cierre (0-23) para mandar vídeos a edición de un día. Tras esta
     hora, ese día ya no admite envíos (no se garantiza entrega el mismo día).
-    Configurable con SEND_CUTOFF_HOUR (default 12). Zona Europe/Madrid."""
+    Zona Europe/Madrid.
+
+    Orden de prioridad: (1) Redis (editable desde el panel de config),
+    (2) env SEND_CUTOFF_HOUR, (3) default 12. Si Redis falla, degrada limpio.
+    """
+    try:
+        from src.editor_auto.repos.redis_base import get_editor_redis
+        v = get_editor_redis().get_str(SETTINGS_CUTOFF_KEY)
+        if v is not None and str(v).strip() != "":
+            return max(0, min(23, int(v)))
+    except Exception:
+        pass
     try:
         return max(0, min(23, int(os.getenv("SEND_CUTOFF_HOUR", "12"))))
     except ValueError:
         return 12
+
+
+def set_send_cutoff_hour(hour: int) -> int:
+    """Guarda la hora de cierre en Redis (0-23). Devuelve el valor aplicado."""
+    h = max(0, min(23, int(hour)))
+    from src.editor_auto.repos.redis_base import get_editor_redis
+    get_editor_redis().set_str(SETTINGS_CUTOFF_KEY, str(h))
+    return h
 
 
 def day_send_open(day: str) -> bool:

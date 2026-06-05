@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Clock,
   CreditCard,
   FolderOpen,
   Globe,
@@ -26,8 +27,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateEditorUser,
   useDeleteEditorUser,
+  useEditorSettings,
   useEditorUsers,
   useProvisionFromWeb,
+  useUpdateCutoff,
   useUpdateEditorUser,
   useUserFolderCounts,
   useWebAccounts,
@@ -101,6 +104,8 @@ export default function EditorAutoUsersPage() {
           con subcarpetas <code>entrada/</code> y <code>salida/</code>.
         </p>
       </header>
+
+      <CutoffSetting />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         {/* Columna izquierda: crear + listar */}
@@ -492,6 +497,57 @@ function UserListItem({
         <Trash2 className="h-3.5 w-3.5 text-destructive" />
       </Button>
     </div>
+  );
+}
+
+function CutoffSetting() {
+  const settings = useEditorSettings();
+  const update = useUpdateCutoff();
+  const [hour, setHour] = useState<string>("");
+
+  const current = settings.data?.send_cutoff_hour;
+  const value = hour !== "" ? hour : current != null ? String(current) : "";
+
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center gap-3 py-3">
+        <Clock className="h-4 w-4 shrink-0 text-red-400" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Hora de cierre de envíos</p>
+          <p className="text-xs text-muted-foreground">
+            Los clientes solo pueden mandar a edición un día antes de esta hora
+            (Europe/Madrid). Tras el cierre, ese día se bloquea.
+          </p>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Input
+            type="number"
+            min={0}
+            max={23}
+            value={value}
+            onChange={(e) => setHour(e.target.value)}
+            className="w-20"
+            placeholder="12"
+          />
+          <span className="text-sm text-muted-foreground">:00</span>
+          <Button
+            size="sm"
+            disabled={update.isPending || value === "" || Number(value) === current}
+            onClick={() =>
+              update.mutate(Math.max(0, Math.min(23, Number(value))), {
+                onSuccess: (d) => {
+                  toast.success(`Cierre actualizado a las ${d.send_cutoff_hour}:00.`);
+                  setHour("");
+                },
+                onError: (e) => toast.error((e as Error).message),
+              })
+            }
+          >
+            {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -354,6 +354,27 @@ function patchJSON<T>(url: string, body: unknown): Promise<T> {
   });
 }
 
+/** Ajustes globales del Editor Auto (hora de cierre de envíos…). */
+export function useEditorSettings() {
+  return useQuery<{ send_cutoff_hour: number }>({
+    queryKey: [...editorAutoKeys.all, "settings"] as const,
+    queryFn: () => api.get<{ send_cutoff_hour: number }>(`${USERS_ROOT}/settings`),
+  });
+}
+
+/** Cambia la hora de cierre diaria de envíos (0-23). */
+export function useUpdateCutoff() {
+  const qc = useQueryClient();
+  return useMutation<{ send_cutoff_hour: number }, Error, number>({
+    mutationFn: (hour) =>
+      patchJSON<{ send_cutoff_hour: number }>(`${USERS_ROOT}/settings/cutoff`, {
+        send_cutoff_hour: hour,
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "settings"] }),
+  });
+}
+
 /** Todas las cuentas registradas en la web (para el selector de vinculación). */
 export function useWebAccounts(enabled = true) {
   return useQuery<WebAccount[]>({
