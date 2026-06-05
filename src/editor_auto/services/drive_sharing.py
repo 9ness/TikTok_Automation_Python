@@ -111,6 +111,29 @@ def _service():
         return svc
 
 
+_creds_cache: dict[str, Any] = {"v": None}
+
+
+def access_token() -> str:
+    """Token OAuth de la Service Account (refrescado). Lo usa el broker de
+    subida directa a Drive para crear sesiones resumable que el navegador
+    del cliente sube directamente (los bytes no pasan por el VPS)."""
+    path = os.getenv("GOOGLE_SA_KEY_PATH")
+    if not path or not os.path.isfile(path):
+        raise DriveSharingError("GOOGLE_SA_KEY_PATH no configurada.")
+    creds = _creds_cache["v"]
+    if creds is None:
+        from google.oauth2 import service_account
+        creds = service_account.Credentials.from_service_account_file(
+            path, scopes=["https://www.googleapis.com/auth/drive"],
+        )
+        _creds_cache["v"] = creds
+    if not creds.valid:
+        from google.auth.transport.requests import Request
+        creds.refresh(Request())
+    return creds.token
+
+
 def sa_email() -> str | None:
     """Email del SA según la JSON — útil para mostrarlo en la UI
     ("compartido por nebulabs-editor@…") y para diagnóstico."""

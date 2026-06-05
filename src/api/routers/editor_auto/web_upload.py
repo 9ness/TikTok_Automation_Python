@@ -1,39 +1,38 @@
-"""Endpoints para la web de cliente (nebulabs-media) — subida directa al box.
+"""Endpoints para la web de cliente (nebulabs-media) — subida DIRECTA a Drive.
 
-El cliente sube vídeos desde su navegador DIRECTAMENTE a este box (los bytes
-NO pasan por Vercel). Se autentica con un ticket firmado (HS256, secreto
-compartido `WEB_UPLOAD_SECRET`) que emite la web. El box resuelve el
-EditorUser por `account_email` y guarda en `entrada/<día>/`.
+El cliente sube los vídeos DIRECTAMENTE a Google Drive (los bytes no pasan ni
+por Vercel ni por el VPS): el box solo emite una URL de subida resumable con
+la Service Account, y el navegador sube a Google con % de progreso. El
+rclone-mount del box ve el archivo on-demand y el runner lo procesa solo al
+editar — así se reserva la potencia del servidor para el procesamiento.
+
+Auth con ticket firmado (HS256, secreto compartido `WEB_UPLOAD_SECRET`). El
+box resuelve el EditorUser por `account_email`.
 
 Flujo:
-  1. POST /web/upload        — sube un vídeo al día elegido (borrador).
-  2. GET  /web/day           — lista los vídeos del día + si está bloqueado.
-  3. POST /web/send-to-edit  — encola TODOS los vídeos del día y lo bloquea.
-  4. DELETE /web/file        — borra un vídeo del día (solo si no bloqueado).
-
-Aislado de la auth X-API-Key existente: usa `require_web_ticket`. No toca el
-watcher (los vídeos viven en subcarpeta `entrada/<día>/`, que el watcher no
-escanea) — el encolado es manual al pulsar "Mandar a edición".
+  1. POST /web/upload-url    — emite URL de subida directa a Drive (entrada/<día>/)
+  2. GET  /web/day           — lista los vídeos del día (fuente de verdad: Drive)
+  3. POST /web/delete-file   — borra un vídeo del día (si no bloqueado)
+  4. POST /web/send-to-edit  — encola TODOS los vídeos del día y lo bloquea
+  5. GET  /web/output        — estado de la edición + vídeos listos (score ≥ 90)
+  6. GET  /web/download      — descarga un vídeo editado de salida/<día>/
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
-import shutil
 import time
 from pathlib import Path
 from typing import Annotated, Any
 
-import json
-
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_queue
 from src.api.exceptions import APIError, UserNotFoundError, ValidationError
-from src.api.temp_storage import upload_subdir
 from src.api.web_ticket import TicketClaims, require_web_ticket, verify_ticket
 from src.editor_auto.config import (
     TOOL_SILENCE_CUTTER_SCRIPTED,
@@ -44,7 +43,7 @@ from src.editor_auto.config import (
 from src.editor_auto.models import EditorUser
 from src.editor_auto.repos import UserRepo
 from src.editor_auto.repos.redis_base import get_editor_redis
-from src.editor_auto.services import quota_service
+from src.editor_auto.services import drive_uploads, quota_service
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -52,54 +51,19 @@ from src.queue.models import JobMode, JobStatus
 router = APIRouter(prefix="/api/v1/editor-auto/web", tags=["editor-auto · web"])
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
-_MAX_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB por archivo
-_VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
 
 # ─── Límites anti-abuso (servidor privado) ───
-_CHUNK = 1024 * 1024                 # 1 MB — streaming a disco (no cargar en RAM)
 _MAX_FILES_PER_DAY = 50              # tope duro de vídeos por día/usuario
-_MAX_BYTES_PER_DAY = 8 * 1024 * 1024 * 1024   # 8 GB acumulados por día/usuario
-_MIN_FREE_DISK = 5 * 1024 * 1024 * 1024        # exige ≥5 GB libres para aceptar
-_RATE_MAX = 40                       # nº máx de subidas…
+_RATE_MAX = 60                       # nº máx de URLs de subida emitidas…
 _RATE_WINDOW_S = 300                 # …por ventana (5 min) y usuario
+
+_SENT_DAYS_KEY = "webdays_sent:"
+_JOBS_KEY = "webday_jobs:"
 _RATE_KEY = "webrate:"
-
-_SENT_DAYS_KEY = "webdays_sent:"  # set por usuario de días ya mandados a edición
-_JOBS_KEY = "webday_jobs:"        # JSON [{job_id, filename}] de cada día enviado
-_MIN_SCORE = 90                   # umbral de calidad para mostrar al cliente
-
-
-def _save_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
-    get_editor_redis().set_json(f"{_JOBS_KEY}{user_id}:{day}", jobs)
-
-
-def _get_day_jobs(user_id: str, day: str) -> list[dict]:
-    data = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
-    return data if isinstance(data, list) else []
-
-
-def _job_score(job) -> int | None:
-    """Lee el quality_score del diagnóstico del job (si existe)."""
-    params = getattr(job, "params", None) or {}
-    paths = []
-    tf = params.get("temp_folder")
-    if isinstance(tf, str):
-        paths.append(os.path.join(tf, f"editor_diagnostic_{job.id}.json"))
-    paths.append(os.path.join(os.getcwd(), "temp_work", f"editor_diagnostic_{job.id}.json"))
-    for p in paths:
-        if os.path.exists(p):
-            try:
-                with open(p, encoding="utf-8") as f:
-                    diag = json.load(f)
-                score = (diag.get("audit") or {}).get("quality_score")
-                return int(score) if score is not None else None
-            except Exception:
-                return None
-    return None
+_MIN_SCORE = 90
 
 
 def _resolve_user(claims: TicketClaims) -> EditorUser:
-    """EditorUser vinculado al email del ticket. 404 si no existe vínculo."""
     user = UserRepo().get_by_account_email(claims.email)
     if user is None or user.deleted:
         raise UserNotFoundError(
@@ -124,13 +88,9 @@ def _lock_day(user_id: str, day: str) -> None:
 
 
 def _rate_check(email: str) -> None:
-    """Rate-limit fijo por ventana y usuario. Lanza 429 si se excede.
-
-    Frena flooding aunque el atacante tenga una sesión válida (el ticket está
-    ligado al email). Ventana fija con INCR+EXPIRE en Redis."""
     r = get_editor_redis()
     if not r.is_available():
-        return  # sin Redis no bloqueamos (degradación limpia)
+        return
     bucket = int(time.time()) // _RATE_WINDOW_S
     key = f"{_RATE_KEY}{email}:{bucket}"
     n = r.incr(key)
@@ -144,56 +104,61 @@ def _rate_check(email: str) -> None:
         )
 
 
-def _day_total_bytes(folder: str) -> int:
-    total = 0
-    try:
-        for n in os.listdir(folder):
-            p = os.path.join(folder, n)
-            if os.path.isfile(p):
-                total += os.path.getsize(p)
-    except OSError:
-        pass
-    return total
+def _require_drive() -> None:
+    if not drive_uploads.is_configured():
+        raise APIError(
+            "La subida no está disponible (Drive no configurado en el servidor).",
+            status_code=503,
+        )
 
 
-def _disk_free(path: str) -> int:
-    try:
-        return shutil.disk_usage(path).free
-    except OSError:
-        return _MIN_FREE_DISK  # si no se puede medir, no bloqueamos
+def _save_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
+    get_editor_redis().set_json(f"{_JOBS_KEY}{user_id}:{day}", jobs)
 
 
-def _list_day_videos(username: str, day: str) -> list[dict[str, Any]]:
-    folder = user_input_day_folder(username, day)
-    out: list[dict[str, Any]] = []
-    try:
-        names = sorted(os.listdir(folder))
-    except OSError:
-        return out
-    for name in names:
-        if os.path.splitext(name)[1].lower() not in _VIDEO_EXTS:
-            continue
-        p = os.path.join(folder, name)
-        try:
-            size = os.path.getsize(p)
-        except OSError:
-            size = 0
-        out.append({"filename": name, "size_bytes": size})
-    return out
+def _get_day_jobs(user_id: str, day: str) -> list[dict]:
+    data = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
+    return data if isinstance(data, list) else []
 
 
-# ─────────────────────────── Subir ───────────────────────────
+def _job_score(job) -> int | None:
+    params = getattr(job, "params", None) or {}
+    paths = []
+    tf = params.get("temp_folder")
+    if isinstance(tf, str):
+        paths.append(os.path.join(tf, f"editor_diagnostic_{job.id}.json"))
+    paths.append(os.path.join(os.getcwd(), "temp_work", f"editor_diagnostic_{job.id}.json"))
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    diag = json.load(f)
+                score = (diag.get("audit") or {}).get("quality_score")
+                return int(score) if score is not None else None
+            except Exception:
+                return None
+    return None
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED)
-async def web_upload(
+
+# ─────────────────────────── Emitir URL de subida ───────────────────────────
+
+class UploadUrlRequest(BaseModel):
+    day: str
+    filename: str
+
+
+@router.post("/upload-url", status_code=status.HTTP_201_CREATED)
+def web_upload_url(
     claims: Annotated[TicketClaims, Depends(require_web_ticket)],
-    file: Annotated[UploadFile, File(...)],
-    day: Annotated[str, Form(...)],
+    payload: UploadUrlRequest,
+    request: Request,
 ) -> dict:
-    """Sube un vídeo del cliente al día indicado (`entrada/<día>/`)."""
+    """Devuelve una URL de subida resumable a Drive para `entrada/<día>/`.
+    El navegador sube los bytes directamente a Google (no al VPS)."""
+    _require_drive()
+    day = payload.day
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
-    # El ticket fija el día permitido — no se puede subir a otro.
     if claims.day and claims.day != day:
         raise ValidationError("El ticket no autoriza este día.", details={"day": day})
 
@@ -201,62 +166,32 @@ async def web_upload(
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición y está bloqueado.", status_code=409)
 
-    # Anti-flood por usuario.
     _rate_check(claims.email)
 
-    filename = (file.filename or "").lower()
-    ext = next((e for e in _ALLOWED_VIDEO_EXTS if filename.endswith(e)), "")
+    name = _safe_name(payload.filename)
+    ext = next((e for e in _ALLOWED_VIDEO_EXTS if name.lower().endswith(e)), "")
     if not ext:
         raise ValidationError(
             f"Formato no soportado. Acepta: {', '.join(sorted(_ALLOWED_VIDEO_EXTS))}.",
-            details={"filename": file.filename},
+            details={"filename": payload.filename},
         )
 
-    folder = user_input_day_folder(user.name, day)
-    Path(folder).mkdir(parents=True, exist_ok=True)
-
-    # Tope de nº de vídeos por día.
-    if len(_list_day_videos(user.name, day)) >= _MAX_FILES_PER_DAY:
-        raise APIError(
-            f"Límite de {_MAX_FILES_PER_DAY} vídeos por día alcanzado.",
-            status_code=409,
-        )
-    # Guarda de disco — no aceptar si queda poco espacio.
-    if _disk_free(folder) < _MIN_FREE_DISK:
-        raise APIError("Almacenamiento temporalmente lleno. Inténtalo más tarde.", status_code=507)
-
-    day_used = _day_total_bytes(folder)
-    # Streaming a disco en chunks (sin cargar el vídeo entero en RAM). Aborta
-    # si supera el tope por archivo o el acumulado del día.
-    dest = Path(folder) / f"{int(time.time())}_{_safe_name(file.filename or 'video' + ext)}"
-    written = 0
+    # Tope de nº de vídeos por día (cuenta en Drive).
     try:
-        with open(dest, "wb") as out:
-            while True:
-                chunk = await file.read(_CHUNK)
-                if not chunk:
-                    break
-                written += len(chunk)
-                if written > _MAX_VIDEO_BYTES:
-                    raise APIError(
-                        f"El vídeo supera el máximo de {_MAX_VIDEO_BYTES // 1024 // 1024} MB.",
-                        status_code=413,
-                    )
-                if day_used + written > _MAX_BYTES_PER_DAY:
-                    raise APIError("Has superado el espacio disponible para este día.", status_code=413)
-                out.write(chunk)
+        if len(drive_uploads.list_day_files(user.name, day)) >= _MAX_FILES_PER_DAY:
+            raise APIError(f"Límite de {_MAX_FILES_PER_DAY} vídeos por día alcanzado.", status_code=409)
+        folder_id = drive_uploads.ensure_day_folder(user.name, day)
+        origin = request.headers.get("origin")
+        final_name = f"{int(time.time())}_{name}"
+        upload_url = drive_uploads.init_resumable_session(
+            folder_id, final_name, mime="video/mp4", origin=origin,
+        )
     except APIError:
-        dest.unlink(missing_ok=True)
         raise
-    except OSError as e:
-        dest.unlink(missing_ok=True)
-        raise APIError(f"No se pudo guardar el archivo: {e}")
+    except Exception as e:
+        raise APIError(f"No se pudo preparar la subida a Drive: {e}", status_code=502)
 
-    if written == 0:
-        dest.unlink(missing_ok=True)
-        raise ValidationError("Archivo vacío.")
-
-    return {"ok": True, "filename": dest.name, "videos": _list_day_videos(user.name, day)}
+    return {"ok": True, "upload_url": upload_url, "filename": final_name}
 
 
 # ─────────────────────────── Estado del día ───────────────────────────
@@ -266,14 +201,14 @@ def web_day(
     claims: Annotated[TicketClaims, Depends(require_web_ticket)],
     day: str,
 ) -> dict:
-    """Lista los vídeos subidos para un día y si está bloqueado."""
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
+    _require_drive()
     user = _resolve_user(claims)
     return {
         "day": day,
         "locked": _day_locked(user.id, day),
-        "videos": _list_day_videos(user.name, day),
+        "videos": drive_uploads.list_day_files(user.name, day),
     }
 
 
@@ -289,21 +224,16 @@ def web_delete_file(
     claims: Annotated[TicketClaims, Depends(require_web_ticket)],
     payload: DeleteFileRequest,
 ) -> dict:
-    """Borra un vídeo del día (solo si el día NO está bloqueado)."""
     if not is_valid_day(payload.day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": payload.day})
+    _require_drive()
     user = _resolve_user(claims)
     if _day_locked(user.id, payload.day):
         raise APIError("El día está bloqueado; no se pueden borrar vídeos.", status_code=409)
-    folder = user_input_day_folder(user.name, payload.day)
-    target = Path(folder) / _safe_name(payload.filename)
-    if not target.exists():
+    ok = drive_uploads.delete_day_file(user.name, payload.day, _safe_name(payload.filename))
+    if not ok:
         raise UserNotFoundError("Vídeo no encontrado.", details={"filename": payload.filename})
-    try:
-        target.unlink()
-    except OSError as e:
-        raise APIError(f"No se pudo borrar: {e}")
-    return {"ok": True, "videos": _list_day_videos(user.name, payload.day)}
+    return {"ok": True, "videos": drive_uploads.list_day_files(user.name, payload.day)}
 
 
 # ─────────────────────────── Mandar a edición ───────────────────────────
@@ -312,20 +242,17 @@ class SendToEditRequest(BaseModel):
     day: str
 
 
-def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path, day: str) -> str:
-    """Copia el vídeo a temp y lo encola con el flujo del usuario. Devuelve job_id.
-
-    Replica la lógica de `enqueue_editor_auto` (quota + params) para no tocar
-    el original en Drive — el runner trabaja sobre la copia en temp_work.
-    """
+def _enqueue_video(queue: JobQueue, user: EditorUser, mount_path: Path, day: str) -> str:
+    """Encola un vídeo leyéndolo DIRECTO del rclone-mount (input_path = ruta
+    del mount). El runner lee on-demand al procesar — sin copia previa que
+    descargue bytes durante el send-to-edit."""
     enabled = [s for s in user.tool_flow if s.enabled]
     if not enabled:
         raise APIError(
-            "Tu cuenta aún no tiene un flujo de edición configurado. Contacta con soporte.",
+            "Tu cuenta aún no tiene un flujo de edición configurado. Configura tu estilo.",
             status_code=409,
         )
     if any(s.tool_id == TOOL_SILENCE_CUTTER_SCRIPTED for s in enabled):
-        # El modo guionizado no aplica a la subida web (no hay guion del cliente).
         raise APIError("Tu flujo requiere guion; no compatible con subida web.", status_code=409)
 
     decision = quota_service.check_can_enqueue(user, tool_ids=[s.tool_id for s in enabled])
@@ -341,11 +268,6 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path, day: str) 
             details={"kind": decision.kind, "retry_after_seconds": decision.retry_after_seconds},
         )
 
-    ext = src_path.suffix.lower()
-    folder = upload_subdir("editor_auto")
-    dest = folder / f"editor_web_{user.name}_{int(time.time()*1000)}{ext}"
-    shutil.copyfile(src_path, dest)
-
     try:
         from src.utils import load_config
         temp_folder = load_config()["paths"]["temp_folder"]
@@ -353,18 +275,17 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path, day: str) 
         temp_folder = "./temp_work"
 
     tools_used = [s.tool_id for s in enabled]
-    title = f"{user.name} · {src_path.name} · {len(enabled)} tool(s)"
+    title = f"{user.name} · {mount_path.name} · {len(enabled)} tool(s)"
     params: dict[str, Any] = {
         "user_id": user.id,
         "user_name": user.name,
-        "input_path": str(dest),
+        "input_path": str(mount_path),
         "temp_folder": temp_folder,
         "tool_count": len(enabled),
         "tools_used": tools_used,
         "script": "",
-        # Subida web: salida agrupada por día + nombre limpio del original.
         "output_subdir": day,
-        "source_filename": src_path.name,
+        "source_filename": mount_path.name,
     }
     job = queue.enqueue(JobMode.EDITOR_AUTO, title=title, params=params)
     try:
@@ -380,42 +301,36 @@ def web_send_to_edit(
     payload: SendToEditRequest,
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> dict:
-    """Encola TODOS los vídeos del día y bloquea ese día (ya no se toca)."""
     day = payload.day
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
+    _require_drive()
     user = _resolve_user(claims)
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición.", status_code=409)
 
-    # Sincroniza el flujo de edición con el estilo ACTUAL del cliente (web) —
-    # así la subida aplica siempre el estilo que configuró, sin intervención
-    # del admin. El estilo vive en la cuenta web (nebulabs:user.styleConfig).
+    # Sincroniza el flujo de edición con el estilo ACTUAL del cliente (web).
     from src.editor_auto.repos.web_account_repo import get_web_account_repo
     from src.editor_auto.services.style_mapper import build_tool_flow
     account = get_web_account_repo().get(user.account_email)
     user.tool_flow = build_tool_flow((account or {}).get("styleConfig"))
     UserRepo().save(user)
 
-    videos = _list_day_videos(user.name, day)
+    videos = drive_uploads.list_day_files(user.name, day)
     if not videos:
         raise ValidationError("No hay vídeos para este día.", details={"day": day})
 
-    folder = user_input_day_folder(user.name, day)
     enqueued: list[dict] = []
     errors: list[dict] = []
     for v in videos:
-        src = Path(folder) / v["filename"]
+        mount_path = Path(user_input_day_folder(user.name, day)) / v["filename"]
         try:
-            job_id = _enqueue_video(queue, user, src, day)
+            job_id = _enqueue_video(queue, user, mount_path, day)
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
             errors.append({"filename": v["filename"], "error": e.message})
-            # Si falla por cuota, paramos (los siguientes también fallarán).
             break
 
-    # Solo bloqueamos si se encoló algo. Si todo falló (cuota), el día sigue
-    # editable para reintentar más tarde.
     if enqueued:
         _lock_day(user.id, day)
         _save_day_jobs(user.id, day, enqueued)
@@ -431,10 +346,6 @@ def web_output(
     day: str,
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> dict:
-    """Estado de la edición del día: progreso + vídeos LISTOS (score ≥ 90).
-
-    El cliente solo debería descargar cuando `all_done` es True (todos los
-    vídeos del día terminaron de editarse)."""
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     user = _resolve_user(claims)
@@ -451,10 +362,7 @@ def web_output(
         score = _job_score(job) if (job and job.status == JobStatus.COMPLETED) else None
         if job and job.status in terminal:
             done += 1
-        out_name = (
-            os.path.basename(job.result_path)
-            if (job and job.result_path) else None
-        )
+        out_name = os.path.basename(job.result_path) if (job and job.result_path) else None
         is_ready = bool(
             job and job.status == JobStatus.COMPLETED and out_name
             and (score is None or score >= _MIN_SCORE)
@@ -479,8 +387,7 @@ def web_download(
     file: str,
     ticket: Annotated[str, Query(...)],
 ) -> FileResponse:
-    """Descarga un vídeo editado de `salida/<día>/`. El ticket va por query
-    porque un `<a download>` no puede enviar cabeceras."""
+    """Descarga un vídeo editado de `salida/<día>/` (lee del rclone-mount)."""
     claims = verify_ticket(ticket)
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
