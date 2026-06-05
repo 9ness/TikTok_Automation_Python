@@ -398,68 +398,22 @@ def list_web_accounts() -> list[WebAccountResponse]:
     return [_web_account_dto(a) for a in repo.list_all() if a]  # type: ignore[misc]
 
 
-def _unique_user_name(base: str) -> str:
-    """Slug de nombre de carpeta único (sin acentos/espacios). Añade sufijo si choca."""
-    import re
-    import unicodedata
-    s = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
-    s = re.sub(r"[^A-Za-z0-9._-]+", "_", s).strip("_") or "cliente"
-    repo = UserRepo()
-    if repo.get_by_name(s) is None:
-        return s
-    n = 2
-    while repo.get_by_name(f"{s}_{n}") is not None:
-        n += 1
-    return f"{s}_{n}"
-
-
 @router.post("/web-accounts/provision", response_model=EditorUserResponse,
              status_code=status.HTTP_201_CREATED)
 def provision_from_web(payload: ProvisionFromWebRequest) -> EditorUserResponse:
-    """Crea un EditorUser (sin herramientas) a partir de una cuenta web y lo
-    vincula por email. Si ya existe uno vinculado, lo devuelve (idempotente).
-    Así el cliente registrado en la web aparece en el panel de config listo
-    para configurarle el flujo de herramientas."""
+    """Crea (o devuelve) el EditorUser vinculado a una cuenta web por email.
+    Idempotente. El mismo servicio se usa para la auto-provisión de la subida
+    web, así que el botón manual y el automático comparten lógica."""
+    from src.editor_auto.services.provision_service import provision_from_web as _provision
     email = payload.email.strip().lower()
     if "@" not in email:
         raise ValidationError("Email inválido.", details={"email": email})
-
-    repo = UserRepo()
-    existing = repo.get_by_account_email(email)
-    if existing is not None and not existing.deleted:
-        return _to_response(existing)
-
-    account = get_web_account_repo().get(email)
-    if account is None:
+    user = _provision(email)
+    if user is None:
         raise UserNotFoundError(
             "No existe una cuenta web con ese email (¿ha entrado el cliente en la web?).",
             details={"email": email},
         )
-
-    # Prioriza el username único que el cliente eligió en la web; si no, cae
-    # al nombre de Google / parte local del email. _unique_user_name añade
-    # sufijo solo si por lo que sea ya existe un EditorUser con ese nombre.
-    web_username = (account.get("username") or "").strip()
-    web_name = (account.get("name") or email.split("@")[0]).strip()
-    name = _unique_user_name(web_username or web_name or email.split("@")[0])
-    try:
-        ensure_user_folders(name)
-    except OSError as e:
-        print(f"[editor_auto.users] ensure_user_folders falló en provision: {e}")
-
-    # Flujo derivado del estilo que el cliente configuró en la web (si lo hizo).
-    from src.editor_auto.services.style_mapper import build_tool_flow
-    tool_flow = build_tool_flow(account.get("styleConfig"))
-
-    user = EditorUser(
-        name=name,
-        display_name=web_name or name,
-        description="Creado desde la web de cliente",
-        tool_flow=tool_flow,
-        account_email=email,
-        drive_folder=user_folder(name),
-    )
-    repo.save(user)
     return _to_response(user)
 
 

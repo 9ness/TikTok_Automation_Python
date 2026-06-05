@@ -64,7 +64,11 @@ _MIN_SCORE = 90
 
 
 def _resolve_user(claims: TicketClaims) -> EditorUser:
-    user = UserRepo().get_by_account_email(claims.email)
+    # Auto-provisión: si aún no existe el EditorUser vinculado a este email,
+    # se crea solo a partir de la cuenta web (idempotente). Así el cliente no
+    # depende de que el admin pulse "Crear usuario" en el panel.
+    from src.editor_auto.services.provision_service import provision_from_web
+    user = provision_from_web(claims.email)
     if user is None or user.deleted:
         raise UserNotFoundError(
             "No hay una cuenta de edición vinculada a este email. Contacta con soporte.",
