@@ -24,20 +24,46 @@ from typing import Any
 from src.editor_auto.models import ToolStep
 from src.editor_auto.tools import REGISTRY
 
-# El presetId de la web YA es el nombre EXACTO del preset del motor (la web usa
-# los 9 presets reales), así que se pasa directo. Validamos contra esta lista.
-_REAL_PRESETS = {
-    "🔴 TikTok Classic (Impact + píldora)",
-    "🎤 Karaoke Color Swap (Arial Black)",
-    "📏 Underline News (Bahnschrift)",
-    "🟦 Box Outline (Impact)",
-    "💫 Neon Glow (Impact halo)",
-    "🎮 Comic Pop (rosa)",
-    "⚽ Stadium Yellow (Impact swap)",
-    "🟫 Slab Heritage (Rockwell)",
-    "📃 Phrase Static (sin marca por palabra)",
+# Mapa presetId (web `SUB_PRESETS`) → claves visuales del motor `subs_auto`.
+# La web define 10 estilos con CSS aproximado; aquí los reproducimos con las
+# claves reales del render (text_color/stroke/highlight_mode/pill…). El motor
+# lee estas claves directamente, así que el resultado coincide con la web.
+# highlight_mode ∈ {pill, color_swap, underline, box_outline, glow, none}.
+_PRESET_STYLES: dict[str, dict] = {
+    "classic":     {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False},
+    "yellow":      {"text": "#FFE600", "hl": "#FFE600", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False},
+    "pill-black":  {"text": "#FFFFFF", "hl": "#000000", "stroke": "#000000", "sw": 0, "mode": "pill",       "pill": True},
+    "pill-white":  {"text": "#000000", "hl": "#FFFFFF", "stroke": "#FFFFFF", "sw": 0, "mode": "pill",       "pill": True},
+    "neon":        {"text": "#FF3EA5", "hl": "#FF3EA5", "stroke": "#000000", "sw": 0, "mode": "glow",       "pill": False},
+    "cyan-glow":   {"text": "#22D3EE", "hl": "#22D3EE", "stroke": "#000000", "sw": 0, "mode": "glow",       "pill": False},
+    "hard-shadow": {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 3, "mode": "none",       "pill": False},
+    "thick":       {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 4, "mode": "none",       "pill": False},
+    "impact":      {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False, "case": "UPPERCASE"},
+    "gradient":    {"text": "#22D3EE", "hl": "#A855F7", "stroke": "#000000", "sw": 1, "mode": "color_swap", "pill": False},
 }
-_DEFAULT_PRESET = "🔴 TikTok Classic (Impact + píldora)"
+_DEFAULT_PRESET_ID = "classic"
+
+# Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
+# Se resuelve con fonts_registry.find_by_path (primer match disponible).
+_FONT_CANDIDATES: dict[str, list[str]] = {
+    "sans":      ["calibri.ttf", "segoeui.ttf", "arial.ttf"],
+    "black":     ["ariblk.ttf", "impact.ttf", "arialbd.ttf"],
+    "rounded":   ["trebucbd.ttf", "trebuc.ttf", "segoeui.ttf"],
+    "serif":     ["georgiab.ttf", "georgia.ttf", "times.ttf"],
+    "mono":      ["consolab.ttf", "consola.ttf"],
+    "handwrite": ["comicbd.ttf", "comic.ttf"],
+}
+
+
+def _resolve_font_path(font_id: str | None, fallback: str) -> str:
+    """Resuelve fontId web → path absoluto de fuente del servidor."""
+    from src.fonts_registry import find_by_path
+
+    for cand in _FONT_CANDIDATES.get(font_id or "", []):
+        entry = find_by_path(cand)
+        if entry:
+            return str(entry["path"])
+    return fallback
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -79,16 +105,25 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     ]
 
     mode = "phrase" if sub.get("mode") == "phrase" else "word"
-    # presetId ya es el nombre real del preset; si no es válido, default.
     pid = sub.get("presetId")
-    preset = pid if pid in _REAL_PRESETS else _DEFAULT_PRESET
+    ps = _PRESET_STYLES.get(pid, _PRESET_STYLES[_DEFAULT_PRESET_ID])
     y = _clamp(_f(sub.get("y"), 0.78), 0.05, 0.95)
     font_scale = round(_clamp(0.045 * _f(sub.get("scale"), 1.0), 0.02, 0.10), 4)
+
+    base_subs = _with_defaults("subs_auto", {})
+    font_path = _resolve_font_path(sub.get("fontId"), base_subs.get("font_path", ""))
     subs_overrides = {
-        "preset_name": preset,
+        "font_path": font_path,
+        "text_color": ps["text"],
+        "highlight_color": ps["hl"],
+        "stroke_color": ps["stroke"],
+        "stroke_width": int(ps["sw"]),
+        "highlight_mode": ps["mode"],
+        "pill_enabled": bool(ps["pill"]),
+        "case_mode": ps.get("case", "None"),
         "y_position": y,
         "font_scale": font_scale,
-        # "una palabra" fuerza 1; "varias" deja el natural del preset (4).
+        # "una palabra" fuerza 1; "varias" usa 4.
         "max_words": 1 if mode == "word" else 4,
     }
     steps.append(ToolStep(tool_id="subs_auto", enabled=True, config=_with_defaults("subs_auto", subs_overrides)))
