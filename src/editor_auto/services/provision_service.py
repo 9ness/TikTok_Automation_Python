@@ -45,11 +45,19 @@ def provision_from_web(email: str) -> EditorUser | None:
         return None
 
     repo = UserRepo()
+    account = get_web_account_repo().get(email)
     existing = repo.get_by_account_email(email)
     if existing is not None and not existing.deleted:
+        # Re-sincroniza el flujo con el estilo ACTUAL de la web (fuente de
+        # verdad) — así el preview del panel refleja lo que el cliente eligió
+        # sin esperar a un "Mandar a edición".
+        if account is not None:
+            new_flow = build_tool_flow(account.get("styleConfig"))
+            if [s.model_dump() for s in existing.tool_flow] != [s.model_dump() for s in new_flow]:
+                existing.tool_flow = new_flow
+                repo.save(existing)
         return existing
 
-    account = get_web_account_repo().get(email)
     if account is None:
         return None
 
