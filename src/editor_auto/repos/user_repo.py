@@ -10,6 +10,7 @@ from .redis_base import EditorRedis, get_editor_redis
 class UserRepo:
     INDEX_KEY = "user:index"
     NAME_INDEX = "user:by_name:"
+    ACCOUNT_EMAIL_INDEX = "user:by_account_email:"
 
     def __init__(self, redis: EditorRedis | None = None):
         self.r = redis or get_editor_redis()
@@ -24,7 +25,22 @@ class UserRepo:
         self.r.sadd(self.INDEX_KEY, user.id)
         if user.name:
             self.r.set_str(f"{self.NAME_INDEX}{user.name}", user.id)
+        # Índice por email de cuenta web (puente con nebulabs-media). Permite
+        # al box resolver el EditorUser desde el ticket firmado de la web.
+        if user.account_email:
+            self.r.set_str(
+                f"{self.ACCOUNT_EMAIL_INDEX}{user.account_email.strip().lower()}",
+                user.id,
+            )
         return user
+
+    def get_by_account_email(self, email: str) -> EditorUser | None:
+        if not email:
+            return None
+        uid = self.r.get_str(f"{self.ACCOUNT_EMAIL_INDEX}{email.strip().lower()}")
+        if not uid:
+            return None
+        return self.get(uid)
 
     def get(self, user_id: str) -> EditorUser | None:
         data = self.r.get_json(self._key(user_id))

@@ -7,6 +7,7 @@ from .stickers import router as stickers_router
 from .subscriptions import router as subscriptions_router
 from .tools import router as tools_router
 from .users import router as users_router
+from .web_upload import router as web_upload_router
 
 __all__ = [
     "enqueue_router",
@@ -18,4 +19,5 @@ __all__ = [
     "plans_router",
     "subscriptions_router",
     "referrals_router",
+    "web_upload_router",
 ]

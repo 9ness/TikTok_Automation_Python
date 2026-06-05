@@ -25,6 +25,7 @@ from .editor_auto import (
     subscriptions_router as editor_auto_subscriptions_router,
     tools_router as editor_auto_tools_router,
     users_router as editor_auto_users_router,
+    web_upload_router as editor_auto_web_upload_router,
 )
 from .tiktok_shop import (
     discovery_router as tiktok_shop_discovery_router,
@@ -74,6 +75,7 @@ __all__ = [
     "editor_auto_plans_router",
     "editor_auto_subscriptions_router",
     "editor_auto_referrals_router",
+    "editor_auto_web_upload_router",
     "tiktok_shop_discovery_router",
     "tiktok_shop_hooks_router",
     "tiktok_shop_performance_router",

@@ -173,6 +173,31 @@ def user_input_folder(username: str) -> str:
     return os.path.join(user_folder(username), "entrada")
 
 
+def is_valid_day(day: str) -> bool:
+    """Valida que `day` sea una fecha YYYY-MM-DD (defensa path-traversal)."""
+    import re
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day or ""):
+        return False
+    from datetime import datetime
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def user_input_day_folder(username: str, day: str) -> str:
+    """Subcarpeta de `entrada/` por DÍA de publicación (`entrada/<YYYY-MM-DD>/`).
+
+    Los clientes de la web suben aquí sus vídeos para un día concreto. El
+    watcher de auto-encolado NO escanea subcarpetas, así que estos vídeos
+    quedan en "borrador" hasta que el cliente pulsa "Mandar a edición" (que
+    los encola explícitamente). Lanza ValueError si `day` no es una fecha."""
+    if not is_valid_day(day):
+        raise ValueError(f"Día inválido (esperado YYYY-MM-DD): {day!r}")
+    return os.path.join(user_input_folder(username), day)
+
+
 def user_queue_folder(username: str) -> str:
     """Carpeta de cola — al encolar un vídeo desde `entrada/`, se MUEVE
     aquí para `lockearlo` (el cliente no debería tocar archivos en
