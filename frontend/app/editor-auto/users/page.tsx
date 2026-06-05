@@ -365,7 +365,7 @@ function UserListItem({
                 user.web_account.role === "admin" && "border-brand-violet/60 text-brand-violet",
                 user.web_account.role === "pro" && "border-violet-500/60 text-violet-500",
                 user.web_account.role === "plus" && "border-blue-500/60 text-blue-500",
-                user.web_account.role === "standard" && "border-emerald-500/60 text-emerald-600 dark:text-emerald-400",
+                user.web_account.role === "standard" && "border-slate-400/60 text-slate-500 dark:text-slate-400",
               )}
               title={`Rol web: ${user.web_account.role}`}
             >
