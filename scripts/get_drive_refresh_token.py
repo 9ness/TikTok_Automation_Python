@@ -29,6 +29,11 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
 def main() -> int:
+    # Consola de Windows (cp1252) no encodea emojis → forzamos UTF-8.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except Exception:
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--client-id", required=True)
     ap.add_argument("--client-secret", required=True)
@@ -54,12 +59,12 @@ def main() -> int:
     creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
 
     if not creds.refresh_token:
-        print("\n⚠️ No se obtuvo refresh_token. Revoca el acceso en "
+        print("\n[!] No se obtuvo refresh_token. Revoca el acceso en "
               "https://myaccount.google.com/permissions y reintenta.")
         return 1
 
     print("\n" + "=" * 60)
-    print("✅ REFRESH TOKEN (pégalo en el .env del box):")
+    print("REFRESH TOKEN (pegalo en el .env del box):")
     print("\nDRIVE_OAUTH_REFRESH_TOKEN=" + creds.refresh_token)
     print("=" * 60)
     print("\nTambién necesitas en el .env del box:")
