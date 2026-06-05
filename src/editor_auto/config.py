@@ -198,6 +198,15 @@ def user_input_day_folder(username: str, day: str) -> str:
     return os.path.join(user_input_folder(username), day)
 
 
+def user_output_day_folder(username: str, day: str) -> str:
+    """Subcarpeta de `salida/` por DÍA (`salida/<YYYY-MM-DD>/`) — espejo de
+    `entrada/<día>/`. El cliente ve sus vídeos editados agrupados por día.
+    Lanza ValueError si `day` no es una fecha."""
+    if not is_valid_day(day):
+        raise ValueError(f"Día inválido (esperado YYYY-MM-DD): {day!r}")
+    return os.path.join(user_output_folder(username), day)
+
+
 def user_queue_folder(username: str) -> str:
     """Carpeta de cola — al encolar un vídeo desde `entrada/`, se MUEVE
     aquí para `lockearlo` (el cliente no debería tocar archivos en

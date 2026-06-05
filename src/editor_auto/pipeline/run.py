@@ -261,6 +261,7 @@ def run_editor_auto_pipeline(
     source_filename: str | None = None,
     manual_keep_intervals: list | None = None,
     output_override: str | None = None,
+    output_subdir: str | None = None,
 ) -> str:
     """Pipeline completo. Devuelve la ruta absoluta del MP4 final en Drive.
 
@@ -311,6 +312,12 @@ def run_editor_auto_pipeline(
 
     # Carpetas del usuario en Drive — 4 carpetas: entrada/cola/recuperacion/salida
     _, _, _, _, out_folder = ensure_user_folders(user.name)
+    # Subcarpeta por DÍA (subida web): salida/<YYYY-MM-DD>/ para no amontonar
+    # los vídeos de distintos días. Solo cuando el job lo indica; el flujo del
+    # admin (sin output_subdir) sigue escribiendo en salida/ plano.
+    if output_subdir and not output_override:
+        out_folder = os.path.join(out_folder, output_subdir)
+        Path(out_folder).mkdir(parents=True, exist_ok=True)
     on_log(f"[editor_auto] Output folder: {out_folder}")
 
     # Naming del MP4 final:

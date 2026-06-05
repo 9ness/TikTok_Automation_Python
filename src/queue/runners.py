@@ -1513,6 +1513,9 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     # Retoque MANUAL (editor de retoque): tramos a conservar + output a pisar.
     manual_keep_intervals = p.get("manual_keep_intervals")
     output_override = p.get("output_override")
+    # Subida web: subcarpeta de salida por día + nombre limpio del original.
+    output_subdir = p.get("output_subdir")
+    web_source_filename = p.get("source_filename") if source != "entrada" else None
 
     on_log(f"[editor_auto] user_id={user_id} · input={os.path.basename(input_path)}")
     if source == "entrada" and source_filename:
@@ -1531,11 +1534,12 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             on_progress=on_progress,
             script=script,
             # Pasamos el filename original para que el output se llame
-            # `<stem>_editado.mp4` en lugar del timestamped legacy.
-            source_filename=source_filename
-            if source == "entrada" else None,
+            # `<stem>_editado.mp4` en lugar del timestamped legacy. Para la
+            # subida web (source != "entrada") usamos `web_source_filename`.
+            source_filename=(source_filename if source == "entrada" else web_source_filename),
             manual_keep_intervals=manual_keep_intervals,
             output_override=output_override,
+            output_subdir=output_subdir,
         )
     except Exception:
         # Fallo del pipeline: devolver el input a `entrada/` para que el

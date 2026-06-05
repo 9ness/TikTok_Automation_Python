@@ -197,7 +197,7 @@ class SendToEditRequest(BaseModel):
     day: str
 
 
-def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path) -> str:
+def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path, day: str) -> str:
     """Copia el vídeo a temp y lo encola con el flujo del usuario. Devuelve job_id.
 
     Replica la lógica de `enqueue_editor_auto` (quota + params) para no tocar
@@ -247,6 +247,9 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, src_path: Path) -> str:
         "tool_count": len(enabled),
         "tools_used": tools_used,
         "script": "",
+        # Subida web: salida agrupada por día + nombre limpio del original.
+        "output_subdir": day,
+        "source_filename": src_path.name,
     }
     job = queue.enqueue(JobMode.EDITOR_AUTO, title=title, params=params)
     try:
@@ -280,7 +283,7 @@ def web_send_to_edit(
     for v in videos:
         src = Path(folder) / v["filename"]
         try:
-            job_id = _enqueue_video(queue, user, src)
+            job_id = _enqueue_video(queue, user, src, day)
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
             errors.append({"filename": v["filename"], "error": e.message})
