@@ -185,28 +185,36 @@ def list_users(include_deleted: bool = False) -> list[EditorUserResponse]:
 
 class SettingsResponse(BaseModel):
     send_cutoff_hour: int
+    send_cutoff_minute: int = 0
 
 
 class CutoffRequest(BaseModel):
     send_cutoff_hour: int
+    send_cutoff_minute: int = 0
 
 
 # IMPORTANTE: rutas estáticas ANTES de "/{user_id}" o este las captura (404).
 @router.get("/settings", response_model=SettingsResponse)
 def get_settings() -> SettingsResponse:
     """Ajustes globales del Editor Auto (hora de cierre de envíos…)."""
-    from src.editor_auto.config import send_cutoff_hour
-    return SettingsResponse(send_cutoff_hour=send_cutoff_hour())
+    from src.editor_auto.config import send_cutoff_hour, send_cutoff_minute
+    return SettingsResponse(
+        send_cutoff_hour=send_cutoff_hour(),
+        send_cutoff_minute=send_cutoff_minute(),
+    )
 
 
 @router.patch("/settings/cutoff", response_model=SettingsResponse)
 def set_cutoff(payload: CutoffRequest) -> SettingsResponse:
-    """Cambia la hora de cierre diaria (0-23, Europe/Madrid). Se guarda en Redis."""
-    from src.editor_auto.config import set_send_cutoff_hour
+    """Cambia la hora:minuto de cierre diaria (Europe/Madrid). Se guarda en Redis."""
+    from src.editor_auto.config import set_send_cutoff_hour, set_send_cutoff_minute
     if not 0 <= payload.send_cutoff_hour <= 23:
         raise ValidationError("La hora debe estar entre 0 y 23.", details={"hour": payload.send_cutoff_hour})
+    if not 0 <= payload.send_cutoff_minute <= 59:
+        raise ValidationError("El minuto debe estar entre 0 y 59.", details={"minute": payload.send_cutoff_minute})
     h = set_send_cutoff_hour(payload.send_cutoff_hour)
-    return SettingsResponse(send_cutoff_hour=h)
+    mm = set_send_cutoff_minute(payload.send_cutoff_minute)
+    return SettingsResponse(send_cutoff_hour=h, send_cutoff_minute=mm)
 
 
 @router.get("/{user_id}", response_model=EditorUserResponse)

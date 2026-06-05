@@ -187,6 +187,31 @@ def is_valid_day(day: str) -> bool:
 
 
 SETTINGS_CUTOFF_KEY = "settings:send_cutoff_hour"
+SETTINGS_CUTOFF_MIN_KEY = "settings:send_cutoff_minute"
+
+
+def send_cutoff_minute() -> int:
+    """Minuto de cierre (0-59) que acompaña a `send_cutoff_hour`. Default 0.
+    Orden: Redis → env SEND_CUTOFF_MINUTE → 0."""
+    try:
+        from src.editor_auto.repos.redis_base import get_editor_redis
+        v = get_editor_redis().get_str(SETTINGS_CUTOFF_MIN_KEY)
+        if v is not None and str(v).strip() != "":
+            return max(0, min(59, int(v)))
+    except Exception:
+        pass
+    try:
+        return max(0, min(59, int(os.getenv("SEND_CUTOFF_MINUTE", "0"))))
+    except ValueError:
+        return 0
+
+
+def set_send_cutoff_minute(minute: int) -> int:
+    """Guarda el minuto de cierre en Redis (0-59). Devuelve el valor aplicado."""
+    mm = max(0, min(59, int(minute)))
+    from src.editor_auto.repos.redis_base import get_editor_redis
+    get_editor_redis().set_str(SETTINGS_CUTOFF_MIN_KEY, str(mm))
+    return mm
 
 
 def send_cutoff_hour() -> int:
@@ -232,7 +257,7 @@ def day_send_open(day: str) -> bool:
         tz = None
     now = datetime.now(tz)  # type: ignore[arg-type]
     y, m, d = (int(x) for x in day.split("-"))
-    cutoff = datetime(y, m, d, send_cutoff_hour(), 0, 0, tzinfo=tz)  # type: ignore[arg-type]
+    cutoff = datetime(y, m, d, send_cutoff_hour(), send_cutoff_minute(), 0, tzinfo=tz)  # type: ignore[arg-type]
     return now < cutoff
 
 

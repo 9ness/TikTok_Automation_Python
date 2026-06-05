@@ -354,21 +354,27 @@ function patchJSON<T>(url: string, body: unknown): Promise<T> {
   });
 }
 
-/** Ajustes globales del Editor Auto (hora de cierre de envíos…). */
+export interface EditorSettings {
+  send_cutoff_hour: number;
+  send_cutoff_minute: number;
+}
+
+/** Ajustes globales del Editor Auto (hora:minuto de cierre de envíos…). */
 export function useEditorSettings() {
-  return useQuery<{ send_cutoff_hour: number }>({
+  return useQuery<EditorSettings>({
     queryKey: [...editorAutoKeys.all, "settings"] as const,
-    queryFn: () => api.get<{ send_cutoff_hour: number }>(`${USERS_ROOT}/settings`),
+    queryFn: () => api.get<EditorSettings>(`${USERS_ROOT}/settings`),
   });
 }
 
-/** Cambia la hora de cierre diaria de envíos (0-23). */
+/** Cambia la hora:minuto de cierre diaria de envíos. */
 export function useUpdateCutoff() {
   const qc = useQueryClient();
-  return useMutation<{ send_cutoff_hour: number }, Error, number>({
-    mutationFn: (hour) =>
-      patchJSON<{ send_cutoff_hour: number }>(`${USERS_ROOT}/settings/cutoff`, {
+  return useMutation<EditorSettings, Error, { hour: number; minute: number }>({
+    mutationFn: ({ hour, minute }) =>
+      patchJSON<EditorSettings>(`${USERS_ROOT}/settings/cutoff`, {
         send_cutoff_hour: hour,
+        send_cutoff_minute: minute,
       }),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "settings"] }),

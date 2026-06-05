@@ -504,9 +504,14 @@ function CutoffSetting() {
   const settings = useEditorSettings();
   const update = useUpdateCutoff();
   const [hour, setHour] = useState<string>("");
+  const [minute, setMinute] = useState<string>("");
 
-  const current = settings.data?.send_cutoff_hour;
-  const value = hour !== "" ? hour : current != null ? String(current) : "";
+  const curHour = settings.data?.send_cutoff_hour;
+  const curMin = settings.data?.send_cutoff_minute ?? 0;
+  const hVal = hour !== "" ? hour : curHour != null ? String(curHour) : "";
+  const mVal = minute !== "" ? minute : curHour != null ? String(curMin) : "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const unchanged = Number(hVal) === curHour && Number(mVal || 0) === curMin;
 
   return (
     <Card>
@@ -524,23 +529,41 @@ function CutoffSetting() {
             type="number"
             min={0}
             max={23}
-            value={value}
+            value={hVal}
             onChange={(e) => setHour(e.target.value)}
-            className="w-20"
+            className="w-16"
             placeholder="12"
           />
-          <span className="text-sm text-muted-foreground">:00</span>
+          <span className="text-sm text-muted-foreground">:</span>
+          <Input
+            type="number"
+            min={0}
+            max={59}
+            value={mVal}
+            onChange={(e) => setMinute(e.target.value)}
+            className="w-16"
+            placeholder="00"
+          />
           <Button
             size="sm"
-            disabled={update.isPending || value === "" || Number(value) === current}
+            disabled={update.isPending || hVal === "" || unchanged}
             onClick={() =>
-              update.mutate(Math.max(0, Math.min(23, Number(value))), {
-                onSuccess: (d) => {
-                  toast.success(`Cierre actualizado a las ${d.send_cutoff_hour}:00.`);
-                  setHour("");
+              update.mutate(
+                {
+                  hour: Math.max(0, Math.min(23, Number(hVal))),
+                  minute: Math.max(0, Math.min(59, Number(mVal || 0))),
                 },
-                onError: (e) => toast.error((e as Error).message),
-              })
+                {
+                  onSuccess: (d) => {
+                    toast.success(
+                      `Cierre actualizado a las ${d.send_cutoff_hour}:${pad(d.send_cutoff_minute)}.`,
+                    );
+                    setHour("");
+                    setMinute("");
+                  },
+                  onError: (e) => toast.error((e as Error).message),
+                },
+              )
             }
           >
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
