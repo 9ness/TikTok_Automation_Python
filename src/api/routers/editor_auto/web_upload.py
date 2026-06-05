@@ -52,7 +52,7 @@ from src.queue.models import JobMode, JobStatus
 
 router = APIRouter(prefix="/api/v1/editor-auto/web", tags=["editor-auto · web"])
 
-_ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
+_ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm"}
 
 # ─── Límites anti-abuso (servidor privado) ───
 _MAX_FILES_PER_DAY = 50              # tope duro de vídeos por día/usuario
