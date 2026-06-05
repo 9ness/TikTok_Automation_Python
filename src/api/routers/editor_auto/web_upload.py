@@ -36,7 +36,9 @@ from src.api.exceptions import APIError, UserNotFoundError, ValidationError
 from src.api.web_ticket import TicketClaims, require_web_ticket, verify_ticket
 from src.editor_auto.config import (
     TOOL_SILENCE_CUTTER_SCRIPTED,
+    day_send_open,
     is_valid_day,
+    send_cutoff_hour,
     user_input_day_folder,
     user_output_day_folder,
 )
@@ -169,6 +171,12 @@ def web_upload_url(
     user = _resolve_user(claims)
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición y está bloqueado.", status_code=409)
+    if not day_send_open(day):
+        raise APIError(
+            f"El cierre para este día fue a las {send_cutoff_hour()}:00. "
+            f"Programa para otro día.",
+            status_code=409,
+        )
 
     _rate_check(claims.email)
 
@@ -312,6 +320,12 @@ def web_send_to_edit(
     user = _resolve_user(claims)
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición.", status_code=409)
+    if not day_send_open(day):
+        raise APIError(
+            f"El cierre para este día fue a las {send_cutoff_hour()}:00. "
+            f"Programa para otro día.",
+            status_code=409,
+        )
 
     # Sincroniza el flujo de edición con el estilo ACTUAL del cliente (web).
     from src.editor_auto.repos.web_account_repo import get_web_account_repo

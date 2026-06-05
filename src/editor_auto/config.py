@@ -186,6 +186,34 @@ def is_valid_day(day: str) -> bool:
         return False
 
 
+def send_cutoff_hour() -> int:
+    """Hora de cierre (0-23) para mandar vídeos a edición de un día. Tras esta
+    hora, ese día ya no admite envíos (no se garantiza entrega el mismo día).
+    Configurable con SEND_CUTOFF_HOUR (default 12). Zona Europe/Madrid."""
+    try:
+        return max(0, min(23, int(os.getenv("SEND_CUTOFF_HOUR", "12"))))
+    except ValueError:
+        return 12
+
+
+def day_send_open(day: str) -> bool:
+    """¿Sigue ABIERTO el envío a edición para `day`? Cierre a `send_cutoff_hour`
+    (Europe/Madrid). Hoy tras el cierre → cerrado; futuros → abiertos; pasados
+    → cerrados."""
+    if not is_valid_day(day):
+        return False
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        tz: object | None = ZoneInfo("Europe/Madrid")
+    except Exception:
+        tz = None
+    now = datetime.now(tz)  # type: ignore[arg-type]
+    y, m, d = (int(x) for x in day.split("-"))
+    cutoff = datetime(y, m, d, send_cutoff_hour(), 0, 0, tzinfo=tz)  # type: ignore[arg-type]
+    return now < cutoff
+
+
 def user_input_day_folder(username: str, day: str) -> str:
     """Subcarpeta de `entrada/` por DÍA de publicación (`entrada/<YYYY-MM-DD>/`).
 
