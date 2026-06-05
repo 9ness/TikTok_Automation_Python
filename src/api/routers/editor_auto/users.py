@@ -436,8 +436,12 @@ def provision_from_web(payload: ProvisionFromWebRequest) -> EditorUserResponse:
             details={"email": email},
         )
 
+    # Prioriza el username único que el cliente eligió en la web; si no, cae
+    # al nombre de Google / parte local del email. _unique_user_name añade
+    # sufijo solo si por lo que sea ya existe un EditorUser con ese nombre.
+    web_username = (account.get("username") or "").strip()
     web_name = (account.get("name") or email.split("@")[0]).strip()
-    name = _unique_user_name(web_name or email.split("@")[0])
+    name = _unique_user_name(web_username or web_name or email.split("@")[0])
     try:
         ensure_user_folders(name)
     except OSError as e:
