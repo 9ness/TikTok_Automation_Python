@@ -24,20 +24,19 @@ from typing import Any
 from src.editor_auto.models import ToolStep
 from src.editor_auto.tools import REGISTRY
 
-# preset web → preset visual real (subtitles_only). Aproximado.
-_PRESET_MAP = {
-    "classic": "🔴 TikTok Classic (Impact + píldora)",
-    "yellow": "⚽ Stadium Yellow (Impact swap)",
-    "impact": "🔴 TikTok Classic (Impact + píldora)",
-    "thick": "🟦 Box Outline (Impact)",
-    "hard-shadow": "🟦 Box Outline (Impact)",
-    "neon": "💫 Neon Glow (Impact halo)",
-    "cyan-glow": "💫 Neon Glow (Impact halo)",
-    "gradient": "💫 Neon Glow (Impact halo)",
-    "pill-black": "🔴 TikTok Classic (Impact + píldora)",
-    "pill-white": "🔴 TikTok Classic (Impact + píldora)",
+# El presetId de la web YA es el nombre EXACTO del preset del motor (la web usa
+# los 9 presets reales), así que se pasa directo. Validamos contra esta lista.
+_REAL_PRESETS = {
+    "🔴 TikTok Classic (Impact + píldora)",
+    "🎤 Karaoke Color Swap (Arial Black)",
+    "📏 Underline News (Bahnschrift)",
+    "🟦 Box Outline (Impact)",
+    "💫 Neon Glow (Impact halo)",
+    "🎮 Comic Pop (rosa)",
+    "⚽ Stadium Yellow (Impact swap)",
+    "🟫 Slab Heritage (Rockwell)",
+    "📃 Phrase Static (sin marca por palabra)",
 }
-_PHRASE_PRESET = "📃 Phrase Static (sin marca por palabra)"
 _DEFAULT_PRESET = "🔴 TikTok Classic (Impact + píldora)"
 
 
@@ -80,15 +79,17 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     ]
 
     mode = "phrase" if sub.get("mode") == "phrase" else "word"
-    preset = _PHRASE_PRESET if mode == "phrase" else _PRESET_MAP.get(sub.get("presetId"), _DEFAULT_PRESET)
+    # presetId ya es el nombre real del preset; si no es válido, default.
+    pid = sub.get("presetId")
+    preset = pid if pid in _REAL_PRESETS else _DEFAULT_PRESET
     y = _clamp(_f(sub.get("y"), 0.78), 0.05, 0.95)
     font_scale = round(_clamp(0.045 * _f(sub.get("scale"), 1.0), 0.02, 0.10), 4)
     subs_overrides = {
         "preset_name": preset,
         "y_position": y,
         "font_scale": font_scale,
+        # "una palabra" fuerza 1; "varias" deja el natural del preset (4).
         "max_words": 1 if mode == "word" else 4,
-        "case_mode": "UPPERCASE" if mode == "word" else "None",
     }
     steps.append(ToolStep(tool_id="subs_auto", enabled=True, config=_with_defaults("subs_auto", subs_overrides)))
 
