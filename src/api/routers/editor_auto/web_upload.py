@@ -65,6 +65,7 @@ _JOBS_KEY = "webday_jobs:"
 _RATE_KEY = "webrate:"
 _APPROVED_KEY = "webday_approved:"      # set de out-filenames aprobados por user/día
 _SENT_INDEX_KEY = "web_sent_index"       # set global de "{user_id}:{day}" (para el admin)
+_NOTIFIED_KEY = "webday_notified:"       # flag "ya enviado email de listos" por user/día
 _MIN_SCORE = 90
 
 
@@ -112,6 +113,57 @@ def _approve_output(user_id: str, day: str, out_name: str) -> None:
 
 def _unapprove_output(user_id: str, day: str, out_name: str) -> None:
     get_editor_redis().srem(f"{_APPROVED_KEY}{user_id}:{day}", out_name)
+
+
+def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
+    """Si el cliente activó el aviso por email y el día YA está completo para él
+    (todos los vídeos resueltos: aprobados o caídos, ninguno pendiente), envía
+    el email 'tus vídeos están listos' una sola vez. Nunca lanza."""
+    try:
+        from src.editor_auto.config import manual_approval_enabled
+        from src.editor_auto.repos.web_account_repo import get_web_account_repo
+        from src.editor_auto.services import email_notify
+
+        r = get_editor_redis()
+        notified_key = f"{_NOTIFIED_KEY}{user.id}:{day}"
+        if r.get_str(notified_key):
+            return  # ya avisado
+        acc = get_web_account_repo().get(user.account_email) or {}
+        if not acc.get("notifyEmail"):
+            return
+        email = (acc.get("email") or user.account_email or "").strip()
+        if not email or not email_notify.is_configured():
+            return
+
+        gate = manual_approval_enabled()
+        approved = _approved_set(user.id, day)
+        by_id = {j.id: j for j in queue.get_all()}
+        terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+        jobs_meta = _get_day_jobs(user.id, day)
+        ready = 0
+        for m in jobs_meta:
+            job = by_id.get(m.get("job_id"))
+            if not (job and job.status in terminal):
+                return  # aún hay trabajos en curso → no avisar
+            out_name = os.path.basename(job.result_path) if job.result_path else None
+            score = _job_score(job) if job.status == JobStatus.COMPLETED else None
+            passed = bool(job.status == JobStatus.COMPLETED and out_name and (score is None or score >= _MIN_SCORE))
+            is_approved = (not gate) or (out_name in approved if out_name else False)
+            if passed and not is_approved:
+                return  # hay vídeos buenos pendientes de aprobar → aún no
+            if passed and is_approved:
+                ready += 1
+        if ready <= 0:
+            return
+        name = acc.get("username") or acc.get("name") or user.name
+        res = email_notify.send_videos_ready(
+            to=[email], client_name=name, count=ready,
+            folder_link=os.getenv("EDITOR_WEB_PANEL_URL", "https://nebulabsmedia.com/panel"),
+        )
+        if res.get("ok"):
+            r.set_str(notified_key, "1")
+    except Exception:
+        pass
 
 
 def _user_has_plan(user: EditorUser) -> bool:
@@ -457,6 +509,10 @@ def web_output(
     # aprobados o caídos). Con gate, si hay pendientes de revisión, no es "listo".
     all_terminal = bool(jobs_meta) and done == len(jobs_meta)
     all_done = all_terminal and review == 0
+    # Fallback de aviso por email para el caso gate-OFF (sin paso de aprobación):
+    # cuando el día queda completo. Idempotente (flag webday_notified).
+    if all_done and ready > 0:
+        _maybe_notify_ready(user, day, queue)
     return {
         "day": day,
         "total": len(jobs_meta),
@@ -541,13 +597,18 @@ def web_admin_pending(
 def web_admin_approve(
     _: Annotated[str, Depends(get_current_user)],
     payload: ApproveRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> dict:
-    """Aprueba (o revoca) un vídeo para que el cliente lo vea."""
+    """Aprueba (o revoca) un vídeo para que el cliente lo vea. Al aprobar, si el
+    día queda completo y el cliente activó el aviso, le manda el email."""
     if not is_valid_day(payload.day):
         raise ValidationError("Día inválido.", details={"day": payload.day})
     out = _safe_name(payload.filename)
     if payload.approve:
         _approve_output(payload.user_id, payload.day, out)
+        user = UserRepo().get(payload.user_id)
+        if user is not None:
+            _maybe_notify_ready(user, payload.day, queue)
     else:
         _unapprove_output(payload.user_id, payload.day, out)
     return {"ok": True, "approved": payload.approve}
