@@ -356,7 +356,22 @@ function UserListItem({
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{user.display_name || user.name}</span>
-          {user.subscription ? (
+          {user.web_account ? (
+            // Cuenta web: mostramos el ROL (estándar/plus/pro/admin).
+            <Badge
+              variant="outline"
+              className={cn(
+                "px-1.5 text-[10px] capitalize",
+                user.web_account.role === "admin" && "border-brand-violet/60 text-brand-violet",
+                user.web_account.role === "pro" && "border-violet-500/60 text-violet-500",
+                user.web_account.role === "plus" && "border-blue-500/60 text-blue-500",
+                user.web_account.role === "standard" && "border-emerald-500/60 text-emerald-600 dark:text-emerald-400",
+              )}
+              title={`Rol web: ${user.web_account.role}`}
+            >
+              {user.web_account.role === "standard" ? "estándar" : user.web_account.role}
+            </Badge>
+          ) : user.subscription ? (
             <Badge
               variant="default"
               className="gap-1 bg-emerald-600/90 px-1.5 text-[10px] text-white hover:bg-emerald-600"
@@ -369,7 +384,7 @@ function UserListItem({
             <Badge
               variant="outline"
               className="px-1.5 text-[10px]"
-              title="Sin plan asignado — modo prueba (sin cuotas)"
+              title="Usuario interno (sin cuenta web) — modo prueba"
             >
               prueba
             </Badge>
