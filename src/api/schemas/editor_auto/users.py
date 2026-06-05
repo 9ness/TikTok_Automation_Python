@@ -55,6 +55,15 @@ class WebAccountResponse(BaseModel):
     banned: bool = False
     created_at: str | None = None
     last_login_at: str | None = None
+    # id del EditorUser vinculado (si existe). None = aún sin usuario de
+    # edición → el admin puede crearlo con "provision-from-web".
+    linked_editor_user_id: str | None = None
+    linked_editor_user_name: str | None = None
+
+
+class ProvisionFromWebRequest(BaseModel):
+    """Crea (o reutiliza) un EditorUser a partir de una cuenta web por email."""
+    email: str
 
 
 class WebAccountRoleRequest(BaseModel):

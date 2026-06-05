@@ -363,6 +363,19 @@ export function useWebAccounts(enabled = true) {
   });
 }
 
+/** Crea (y vincula) un EditorUser a partir de una cuenta web por email. */
+export function useProvisionFromWeb() {
+  const qc = useQueryClient();
+  return useMutation<EditorUser, Error, { email: string }>({
+    mutationFn: ({ email }) =>
+      api.post<EditorUser>(`${WEB_ACCOUNTS_ROOT}/provision`, { email }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorAutoKeys.users() });
+      qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "web-accounts"] });
+    },
+  });
+}
+
 /** Cambia rol/plan/ban de una cuenta web. Invalida la lista de users para
  *  refrescar el `web_account` embebido en la tarjeta. */
 export function useUpdateWebAccount() {

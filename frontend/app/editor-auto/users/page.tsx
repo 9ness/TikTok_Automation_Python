@@ -27,10 +27,12 @@ import {
   useCreateEditorUser,
   useDeleteEditorUser,
   useEditorUsers,
+  useProvisionFromWeb,
   useUpdateEditorUser,
   useUserFolderCounts,
+  useWebAccounts,
 } from "@/lib/queries/editor-auto";
-import type { EditorUser } from "@/lib/types/editor-auto";
+import type { EditorUser, WebAccount } from "@/lib/types/editor-auto";
 import { cn } from "@/lib/utils";
 
 import { UserBillingPanel } from "./_components/UserBillingPanel";
@@ -185,6 +187,8 @@ export default function EditorAutoUsersPage() {
               ))}
             </CardContent>
           </Card>
+
+          <WebAccountsCard onSelectUser={(id) => setSelectedUserId(id)} />
         </div>
 
         {/* Columna derecha: tabs Flujo / Carpetas del usuario seleccionado */}
@@ -401,6 +405,107 @@ function UserListItem({
       >
         <Trash2 className="h-3.5 w-3.5 text-destructive" />
       </Button>
+    </div>
+  );
+}
+
+function WebAccountsCard({ onSelectUser }: { onSelectUser: (id: string) => void }) {
+  const accounts = useWebAccounts();
+  const provision = useProvisionFromWeb();
+  const list = accounts.data ?? [];
+
+  return (
+    <CollapsibleCard
+      title={
+        <span className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-sky-500" />
+          Cuentas web ({list.length})
+        </span>
+      }
+    >
+      <p className="mb-3 text-xs text-muted-foreground">
+        Personas registradas en la web (nebulabsmedia.com). Crea su usuario de
+        edición para configurarle el flujo de herramientas.
+      </p>
+      {accounts.isLoading && (
+        <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+      )}
+      {!accounts.isLoading && list.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Aún no hay cuentas web registradas.
+        </p>
+      )}
+      <div className="space-y-2">
+        {list.map((a) => (
+          <WebAccountRow
+            key={a.email}
+            account={a}
+            provisioning={provision.isPending}
+            onProvision={() =>
+              provision.mutate(
+                { email: a.email },
+                {
+                  onSuccess: (u) => {
+                    toast.success(`Usuario de edición creado: ${u.name}`);
+                    onSelectUser(u.id);
+                  },
+                  onError: (e) => toast.error((e as Error).message),
+                },
+              )
+            }
+            onOpen={() =>
+              a.linked_editor_user_id && onSelectUser(a.linked_editor_user_id)
+            }
+          />
+        ))}
+      </div>
+    </CollapsibleCard>
+  );
+}
+
+function WebAccountRow({
+  account,
+  provisioning,
+  onProvision,
+  onOpen,
+}: {
+  account: WebAccount;
+  provisioning: boolean;
+  onProvision: () => void;
+  onOpen: () => void;
+}) {
+  const a = account;
+  const linked = Boolean(a.linked_editor_user_id);
+  const planLabel = a.role === "admin" ? "admin" : a.plan_id ?? "prueba";
+  return (
+    <div className="flex items-center gap-2 rounded-md border p-2 text-sm">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-xs font-bold text-sky-600">
+        {(a.name || a.email).charAt(0).toUpperCase()}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate font-medium">{a.name || a.email.split("@")[0]}</span>
+          <Badge variant="outline" className="px-1.5 text-[10px]">{planLabel}</Badge>
+          {a.banned && (
+            <Badge className="bg-red-500/90 px-1.5 text-[10px] text-white">baneado</Badge>
+          )}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{a.email}</p>
+      </div>
+      {linked ? (
+        <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={onOpen}>
+          Abrir
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          className="h-7 shrink-0 text-xs"
+          disabled={provisioning}
+          onClick={onProvision}
+        >
+          {provisioning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Crear usuario"}
+        </Button>
+      )}
     </div>
   );
 }

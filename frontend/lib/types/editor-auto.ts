@@ -204,6 +204,9 @@ export interface WebAccount {
   banned: boolean;
   created_at: string | null;
   last_login_at: string | null;
+  /** EditorUser vinculado por email (si existe). null = sin provisionar. */
+  linked_editor_user_id: string | null;
+  linked_editor_user_name: string | null;
 }
 
 export interface EditorUserCreateInput {
