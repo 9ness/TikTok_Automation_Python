@@ -523,6 +523,47 @@ def web_output(
     }
 
 
+@router.get("/days-summary")
+def web_days_summary(
+    claims: Annotated[TicketClaims, Depends(require_web_ticket)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Resumen de estado por día (para colorear el calendario del cliente):
+    cada día enviado → {total, ready, review, in_progress, all_done}."""
+    from src.editor_auto.config import manual_approval_enabled
+
+    user = _resolve_user(claims)
+    gate = manual_approval_enabled()
+    by_id = {j.id: j for j in queue.get_all()}
+    terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+    days: dict[str, dict] = {}
+    for day in (get_editor_redis().smembers(f"{_SENT_DAYS_KEY}{user.id}") or []):
+        if not is_valid_day(day):
+            continue
+        approved = _approved_set(user.id, day)
+        jobs_meta = _get_day_jobs(user.id, day)
+        total = len(jobs_meta)
+        ready = review = done = 0
+        for m in jobs_meta:
+            job = by_id.get(m.get("job_id"))
+            if job and job.status in terminal:
+                done += 1
+            out_name = os.path.basename(job.result_path) if (job and job.result_path) else None
+            passed = bool(job and job.status == JobStatus.COMPLETED and out_name
+                          and (_job_score(job) is None or (_job_score(job) or 0) >= _MIN_SCORE))
+            is_approved = (not gate) or (out_name in approved if out_name else False)
+            if passed and is_approved:
+                ready += 1
+            elif passed and not is_approved:
+                review += 1
+        all_done = total > 0 and done == total and review == 0
+        days[day] = {
+            "total": total, "ready": ready, "review": review,
+            "in_progress": total - done, "all_done": all_done,
+        }
+    return {"days": days}
+
+
 @router.get("/download")
 def web_download(
     day: str,
