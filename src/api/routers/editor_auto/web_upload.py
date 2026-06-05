@@ -31,7 +31,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.api.dependencies import get_queue
+from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import APIError, UserNotFoundError, ValidationError
 from src.api.web_ticket import TicketClaims, require_web_ticket, verify_ticket
 from src.editor_auto.config import (
@@ -63,6 +63,8 @@ _RATE_WINDOW_S = 300                 # …por ventana (5 min) y usuario
 _SENT_DAYS_KEY = "webdays_sent:"
 _JOBS_KEY = "webday_jobs:"
 _RATE_KEY = "webrate:"
+_APPROVED_KEY = "webday_approved:"      # set de out-filenames aprobados por user/día
+_SENT_INDEX_KEY = "web_sent_index"       # set global de "{user_id}:{day}" (para el admin)
 _MIN_SCORE = 90
 
 
@@ -91,7 +93,35 @@ def _day_locked(user_id: str, day: str) -> bool:
 
 
 def _lock_day(user_id: str, day: str) -> None:
-    get_editor_redis().sadd(f"{_SENT_DAYS_KEY}{user_id}", day)
+    r = get_editor_redis()
+    r.sadd(f"{_SENT_DAYS_KEY}{user_id}", day)
+    # Índice global para que el panel admin liste días con salida pendiente.
+    r.sadd(_SENT_INDEX_KEY, f"{user_id}:{day}")
+
+
+def _approved_set(user_id: str, day: str) -> set[str]:
+    try:
+        return set(get_editor_redis().smembers(f"{_APPROVED_KEY}{user_id}:{day}") or [])
+    except Exception:
+        return set()
+
+
+def _approve_output(user_id: str, day: str, out_name: str) -> None:
+    get_editor_redis().sadd(f"{_APPROVED_KEY}{user_id}:{day}", out_name)
+
+
+def _unapprove_output(user_id: str, day: str, out_name: str) -> None:
+    get_editor_redis().srem(f"{_APPROVED_KEY}{user_id}:{day}", out_name)
+
+
+def _user_has_plan(user: EditorUser) -> bool:
+    """True si la cuenta web vinculada tiene un plan (no solo prueba)."""
+    try:
+        from src.editor_auto.repos.web_account_repo import get_web_account_repo
+        acc = get_web_account_repo().get(user.account_email) or {}
+        return bool(acc.get("planId"))
+    except Exception:
+        return False
 
 
 def _rate_check(email: str) -> None:
@@ -367,13 +397,28 @@ def web_output(
 ) -> dict:
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
+    from src.editor_auto.config import manual_approval_enabled
+
     user = _resolve_user(claims)
     jobs_meta = _get_day_jobs(user.id, day)
-    by_id = {j.id: j for j in queue.get_all()}
+    all_jobs = queue.get_all()
+    by_id = {j.id: j for j in all_jobs}
     terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+
+    # Posición en cola: solo para clientes con PLAN (en prueba lo controla el
+    # admin). Rank entre los PENDING en orden de encolado (1 = el siguiente).
+    show_queue_pos = _user_has_plan(user)
+    pos_map: dict[str, int] = {}
+    if show_queue_pos:
+        pending = [j for j in all_jobs if j.status == JobStatus.PENDING]
+        pos_map = {j.id: i + 1 for i, j in enumerate(pending)}
+
+    gate = manual_approval_enabled()
+    approved = _approved_set(user.id, day)
 
     videos: list[dict] = []
     ready = 0
+    review = 0
     done = 0
     for m in jobs_meta:
         job = by_id.get(m.get("job_id"))
@@ -382,22 +427,44 @@ def web_output(
         if job and job.status in terminal:
             done += 1
         out_name = os.path.basename(job.result_path) if (job and job.result_path) else None
-        is_ready = bool(
+        passed = bool(
             job and job.status == JobStatus.COMPLETED and out_name
             and (score is None or score >= _MIN_SCORE)
         )
+        # Con gate ON, el vídeo solo es visible al cliente si el admin lo aprobó.
+        is_approved = (not gate) or (out_name in approved if out_name else False)
+        is_ready = passed and is_approved
         if is_ready:
             ready += 1
+        elif passed and not is_approved:
+            review += 1  # listo pero pendiente de revisión del equipo
+
+        running = bool(job and job.status == JobStatus.RUNNING)
+        queue_pos = pos_map.get(m.get("job_id")) if (job and job.status == JobStatus.PENDING) else None
+
         videos.append({
             "source": m.get("filename"),
-            "filename": out_name,
+            "filename": out_name if is_ready else None,
             "score": score,
             "ready": is_ready,
+            "in_review": bool(passed and not is_approved),
+            "running": running,
+            "queue_position": queue_pos,
             "status": st.value if st else "unknown",
         })
 
-    all_done = bool(jobs_meta) and done == len(jobs_meta)
-    return {"day": day, "total": len(jobs_meta), "ready": ready, "all_done": all_done, "videos": videos}
+    # all_done para el cliente = todos terminados Y (sin gate o todos resueltos:
+    # aprobados o caídos). Con gate, si hay pendientes de revisión, no es "listo".
+    all_terminal = bool(jobs_meta) and done == len(jobs_meta)
+    all_done = all_terminal and review == 0
+    return {
+        "day": day,
+        "total": len(jobs_meta),
+        "ready": ready,
+        "review": review,
+        "all_done": all_done,
+        "videos": videos,
+    }
 
 
 @router.get("/download")
@@ -417,3 +484,95 @@ def web_download(
     if not os.path.exists(path):
         raise UserNotFoundError("Vídeo no encontrado.", details={"file": file})
     return FileResponse(path, media_type="video/mp4", filename=safe)
+
+
+# ═══════════════════════ ADMIN — aprobación manual (API key) ═══════════════════════
+
+class ApproveRequest(BaseModel):
+    user_id: str
+    day: str
+    filename: str
+    approve: bool = True
+
+
+@router.get("/admin/pending")
+def web_admin_pending(
+    _: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Lista los vídeos TERMINADOS y ≥90 que esperan tu aprobación (gate ON).
+    El admin los revisa con el reproductor y los aprueba uno a uno."""
+    r = get_editor_redis()
+    by_id = {j.id: j for j in queue.get_all()}
+    repo = UserRepo()
+    items: list[dict] = []
+    for entry in (r.smembers(_SENT_INDEX_KEY) or []):
+        try:
+            uid, day = entry.rsplit(":", 1)
+        except ValueError:
+            continue
+        if not is_valid_day(day):
+            continue
+        user = repo.get(uid)
+        uname = user.name if user else uid
+        approved = _approved_set(uid, day)
+        for m in _get_day_jobs(uid, day):
+            job = by_id.get(m.get("job_id"))
+            if not (job and job.status == JobStatus.COMPLETED and job.result_path):
+                continue
+            out_name = os.path.basename(job.result_path)
+            score = _job_score(job)
+            if score is not None and score < _MIN_SCORE:
+                continue  # los <90 no se ofrecen al cliente (irán a reedición)
+            if out_name in approved:
+                continue
+            items.append({
+                "user_id": uid,
+                "user_name": uname,
+                "day": day,
+                "source": m.get("filename"),
+                "filename": out_name,
+                "score": score,
+            })
+    return {"pending": items, "count": len(items)}
+
+
+@router.post("/admin/approve")
+def web_admin_approve(
+    _: Annotated[str, Depends(get_current_user)],
+    payload: ApproveRequest,
+) -> dict:
+    """Aprueba (o revoca) un vídeo para que el cliente lo vea."""
+    if not is_valid_day(payload.day):
+        raise ValidationError("Día inválido.", details={"day": payload.day})
+    out = _safe_name(payload.filename)
+    if payload.approve:
+        _approve_output(payload.user_id, payload.day, out)
+    else:
+        _unapprove_output(payload.user_id, payload.day, out)
+    return {"ok": True, "approved": payload.approve}
+
+
+@router.get("/admin/stream")
+def web_admin_stream(
+    user_id: str,
+    day: str,
+    file: str,
+    key: Annotated[str | None, Query()] = None,
+) -> FileResponse:
+    """Stream del vídeo de salida para el reproductor del panel admin. Auth por
+    query `key` (un <video src> no puede mandar headers) validada contra API_KEY."""
+    from src.api.config import get_settings as _get_api_settings
+    api_key = _get_api_settings().api_key
+    if api_key and key != api_key:
+        from src.api.exceptions import UnauthorizedError
+        raise UnauthorizedError("API key inválida o ausente.")
+    if not is_valid_day(day):
+        raise ValidationError("Día inválido.", details={"day": day})
+    user = UserRepo().get(user_id)
+    if user is None:
+        raise UserNotFoundError("Usuario no encontrado.", details={"user_id": user_id})
+    path = os.path.join(user_output_day_folder(user.name, day), _safe_name(file))
+    if not os.path.exists(path):
+        raise UserNotFoundError("Vídeo no encontrado.", details={"file": file})
+    return FileResponse(path, media_type="video/mp4", filename=_safe_name(file))

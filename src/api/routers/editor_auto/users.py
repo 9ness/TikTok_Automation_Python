@@ -186,6 +186,7 @@ def list_users(include_deleted: bool = False) -> list[EditorUserResponse]:
 class SettingsResponse(BaseModel):
     send_cutoff_hour: int
     send_cutoff_minute: int = 0
+    manual_approval: bool = True
 
 
 class CutoffRequest(BaseModel):
@@ -193,14 +194,40 @@ class CutoffRequest(BaseModel):
     send_cutoff_minute: int = 0
 
 
+class ApprovalRequest(BaseModel):
+    manual_approval: bool
+
+
 # IMPORTANTE: rutas estáticas ANTES de "/{user_id}" o este las captura (404).
 @router.get("/settings", response_model=SettingsResponse)
 def get_settings() -> SettingsResponse:
-    """Ajustes globales del Editor Auto (hora de cierre de envíos…)."""
-    from src.editor_auto.config import send_cutoff_hour, send_cutoff_minute
+    """Ajustes globales del Editor Auto (hora de cierre de envíos, aprobación…)."""
+    from src.editor_auto.config import (
+        manual_approval_enabled,
+        send_cutoff_hour,
+        send_cutoff_minute,
+    )
     return SettingsResponse(
         send_cutoff_hour=send_cutoff_hour(),
         send_cutoff_minute=send_cutoff_minute(),
+        manual_approval=manual_approval_enabled(),
+    )
+
+
+@router.patch("/settings/approval", response_model=SettingsResponse)
+def set_approval(payload: ApprovalRequest) -> SettingsResponse:
+    """Activa/desactiva la aprobación manual del admin antes de mostrar vídeos."""
+    from src.editor_auto.config import (
+        manual_approval_enabled,
+        send_cutoff_hour,
+        send_cutoff_minute,
+        set_manual_approval,
+    )
+    set_manual_approval(payload.manual_approval)
+    return SettingsResponse(
+        send_cutoff_hour=send_cutoff_hour(),
+        send_cutoff_minute=send_cutoff_minute(),
+        manual_approval=manual_approval_enabled(),
     )
 
 

@@ -188,6 +188,27 @@ def is_valid_day(day: str) -> bool:
 
 SETTINGS_CUTOFF_KEY = "settings:send_cutoff_hour"
 SETTINGS_CUTOFF_MIN_KEY = "settings:send_cutoff_minute"
+SETTINGS_APPROVAL_KEY = "settings:manual_approval"
+
+
+def manual_approval_enabled() -> bool:
+    """¿Hay aprobación manual del admin antes de que el cliente vea sus vídeos?
+    Default True (fase beta). Redis → env MANUAL_APPROVAL → True."""
+    try:
+        from src.editor_auto.repos.redis_base import get_editor_redis
+        v = get_editor_redis().get_str(SETTINGS_APPROVAL_KEY)
+        if v is not None and str(v).strip() != "":
+            return str(v).strip() not in ("0", "false", "False", "no")
+    except Exception:
+        pass
+    return os.getenv("MANUAL_APPROVAL", "1").strip() not in ("0", "false", "False", "no")
+
+
+def set_manual_approval(enabled: bool) -> bool:
+    """Guarda el flag de aprobación manual en Redis. Devuelve el valor aplicado."""
+    from src.editor_auto.repos.redis_base import get_editor_redis
+    get_editor_redis().set_str(SETTINGS_APPROVAL_KEY, "1" if enabled else "0")
+    return bool(enabled)
 
 
 def send_cutoff_minute() -> int:

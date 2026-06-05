@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CheckCircle2,
   Clock,
   CreditCard,
   FolderOpen,
@@ -8,6 +9,7 @@ import {
   Inbox,
   Loader2,
   Plus,
+  ShieldCheck,
   Trash2,
   Users as UsersIcon,
   Wand2,
@@ -27,9 +29,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateEditorUser,
   useDeleteEditorUser,
+  adminStreamUrl,
+  useApproveVideo,
   useEditorSettings,
   useEditorUsers,
+  usePendingApprovals,
   useProvisionFromWeb,
+  useToggleApproval,
   useUpdateCutoff,
   useUpdateEditorUser,
   useUserFolderCounts,
@@ -106,6 +112,8 @@ export default function EditorAutoUsersPage() {
       </header>
 
       <CutoffSetting />
+      <ApprovalSetting />
+      <PendingApprovalsCard />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
         {/* Columna izquierda: crear + listar */}
@@ -568,6 +576,98 @@ function CutoffSetting() {
           >
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
           </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ApprovalSetting() {
+  const settings = useEditorSettings();
+  const toggle = useToggleApproval();
+  const on = settings.data?.manual_approval ?? true;
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center gap-3 py-3">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-brand-violet" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Aprobación manual antes de entregar</p>
+          <p className="text-xs text-muted-foreground">
+            Si está activo, los vídeos terminados (≥90) quedan retenidos hasta que
+            tú los apruebas abajo. Si lo desactivas, se muestran al cliente solos.
+          </p>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Switch
+            checked={on}
+            disabled={toggle.isPending || settings.isLoading}
+            onCheckedChange={(v) =>
+              toggle.mutate(v, {
+                onSuccess: (d) =>
+                  toast.success(
+                    d.manual_approval ? "Aprobación manual activada." : "Aprobación manual desactivada.",
+                  ),
+                onError: (e) => toast.error((e as Error).message),
+              })
+            }
+          />
+          <span className="text-sm text-muted-foreground">{on ? "Activa" : "Inactiva"}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PendingApprovalsCard() {
+  const pending = usePendingApprovals();
+  const approve = useApproveVideo();
+  const items = pending.data?.pending ?? [];
+
+  if (!items.length) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Inbox className="h-4 w-4 text-amber-500" />
+          Pendientes de aprobar ({items.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((it) => (
+            <div key={`${it.user_id}-${it.day}-${it.filename}`} className="space-y-2 rounded-xl border border-border p-2">
+              <div className="flex items-center justify-between gap-2 px-1 text-xs">
+                <span className="truncate font-semibold">{it.user_name}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {it.day}{it.score != null ? ` · ${it.score}/100` : ""}
+                </span>
+              </div>
+              <video
+                controls
+                playsInline
+                preload="none"
+                src={adminStreamUrl(it.user_id, it.day, it.filename)}
+                className="mx-auto aspect-[9/16] max-h-[50vh] w-auto rounded-lg bg-black"
+              />
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={approve.isPending}
+                onClick={() =>
+                  approve.mutate(
+                    { user_id: it.user_id, day: it.day, filename: it.filename, approve: true },
+                    {
+                      onSuccess: () => toast.success("Vídeo aprobado — ya lo ve el cliente."),
+                      onError: (e) => toast.error((e as Error).message),
+                    },
+                  )
+                }
+              >
+                <CheckCircle2 className="h-4 w-4" /> Aprobar
+              </Button>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

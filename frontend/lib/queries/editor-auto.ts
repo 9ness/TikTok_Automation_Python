@@ -357,7 +357,10 @@ function patchJSON<T>(url: string, body: unknown): Promise<T> {
 export interface EditorSettings {
   send_cutoff_hour: number;
   send_cutoff_minute: number;
+  manual_approval: boolean;
 }
+
+const WEB_ADMIN_ROOT = "/api/v1/editor-auto/web/admin";
 
 /** Ajustes globales del Editor Auto (hora:minuto de cierre de envíos…). */
 export function useEditorSettings() {
@@ -379,6 +382,59 @@ export function useUpdateCutoff() {
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "settings"] }),
   });
+}
+
+/** Activa/desactiva la aprobación manual antes de mostrar vídeos al cliente. */
+export function useToggleApproval() {
+  const qc = useQueryClient();
+  return useMutation<EditorSettings, Error, boolean>({
+    mutationFn: (enabled) =>
+      patchJSON<EditorSettings>(`${USERS_ROOT}/settings/approval`, {
+        manual_approval: enabled,
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "settings"] }),
+  });
+}
+
+export interface PendingApproval {
+  user_id: string;
+  user_name: string;
+  day: string;
+  source: string | null;
+  filename: string;
+  score: number | null;
+}
+
+/** Vídeos terminados (≥90) pendientes de aprobación del admin. */
+export function usePendingApprovals() {
+  return useQuery<{ pending: PendingApproval[]; count: number }>({
+    queryKey: [...editorAutoKeys.all, "pending-approvals"] as const,
+    queryFn: () => api.get(`${WEB_ADMIN_ROOT}/pending`),
+    refetchInterval: 20_000,
+  });
+}
+
+/** Aprueba (o revoca) un vídeo para que el cliente lo vea. */
+export function useApproveVideo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; approved: boolean },
+    Error,
+    { user_id: string; day: string; filename: string; approve?: boolean }
+  >({
+    mutationFn: (b) =>
+      api.post(`${WEB_ADMIN_ROOT}/approve`, { approve: true, ...b }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "pending-approvals"] }),
+  });
+}
+
+/** URL del stream de un vídeo de salida para el reproductor admin (auth por query). */
+export function adminStreamUrl(userId: string, day: string, file: string): string {
+  const key = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  const qs = new URLSearchParams({ user_id: userId, day, file, key }).toString();
+  return `${api.baseUrl}${WEB_ADMIN_ROOT}/stream?${qs}`;
 }
 
 /** Todas las cuentas registradas en la web (para el selector de vinculación). */
