@@ -39,25 +39,8 @@
 	}
 }
 
-# ── API pública para la web de cliente (nebulabs-media) ──
-# Subdominio dedicado que expone SOLO el FastAPI (subida/estado/descarga con
-# ticket firmado). Caddy obtiene cert HTTPS automático vía Let's Encrypt.
-# REQUISITO: registro DNS  A  api.nebulabsmedia.com → IP pública del VPS
-# (62.238.19.31), con puertos 80/443 abiertos (ya lo están para Caddy).
-# Hasta que el DNS resuelva, Caddy reintenta el cert en background sin afectar
-# al sitio principal de arriba.
-api.nebulabsmedia.com {
-	encode gzip
-	# Defensa en profundidad: rechaza cuerpos > 600 MB antes de llegar a la
-	# app (el límite por archivo en la app es 500 MB).
-	request_body {
-		max_size 600MB
-	}
-	# Todas las rutas → FastAPI (REST + WS). El navegador del cliente sube
-	# a /api/v1/editor-auto/web/* con el ticket firmado.
-	reverse_proxy api:8000
-	log {
-		output stdout
-		format json
-	}
-}
+# NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
+# URL pública existente del box (Tailscale Funnel / el mismo {$DOMAIN}), en la
+# ruta /api/*. No hace falta un subdominio dedicado por ahora. Si en el futuro
+# se quiere `api.nebulabsmedia.com`, mover el DNS a un proveedor que no haga
+# catch-all (p. ej. Cloudflare) y reañadir aquí un bloque reverse_proxy api:8000.
