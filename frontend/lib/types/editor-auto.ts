@@ -176,6 +176,10 @@ export interface EditorUser {
    *  cambiar de día se revoca el acceso si auto_revoke_output_daily. */
   output_released_on: string | null;
   auto_revoke_output_daily: boolean;
+  /** Email de la cuenta web (nebulabs-media) vinculada. null = sin cuenta. */
+  account_email: string | null;
+  /** Datos de la cuenta web (rol/plan/trial) si está vinculada. */
+  web_account: WebAccount | null;
   subscription: Subscription | null;
   usage: UsageStats | null;
   referral_code: string | null;
@@ -184,6 +188,22 @@ export interface EditorUser {
   deleted: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type WebAccountRole = "standard" | "plus" | "pro" | "admin";
+
+/** Cuenta registrada en la web de cliente (nebulabs-media), leída de Redis
+ *  con prefijo `nebulabs:`. El puente con EditorUser es el email. */
+export interface WebAccount {
+  email: string;
+  name: string;
+  picture: string | null;
+  role: WebAccountRole;
+  plan_id: string | null;
+  trial_videos: number;
+  banned: boolean;
+  created_at: string | null;
+  last_login_at: string | null;
 }
 
 export interface EditorUserCreateInput {
@@ -204,6 +224,8 @@ export interface EditorUserUpdateInput {
   daily_video_limit_override?: number;
   window_start_hour_override?: number;
   window_end_hour_override?: number;
+  /** Email de la cuenta web a vincular. "" = desvincular. */
+  account_email?: string;
 }
 
 export interface EditorAutoEnqueueResponse {

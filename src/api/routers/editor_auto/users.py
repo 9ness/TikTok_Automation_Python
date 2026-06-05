@@ -17,6 +17,12 @@ from src.api.schemas.editor_auto import (
     ToolStepIn,
     UsageResponse,
 )
+from src.api.schemas.editor_auto.users import (
+    WebAccountBanRequest,
+    WebAccountPlanRequest,
+    WebAccountResponse,
+    WebAccountRoleRequest,
+)
 from src.editor_auto.config import (
     TOOL_EXCLUSIVE_GROUPS,
     ensure_user_folders,
@@ -25,7 +31,25 @@ from src.editor_auto.config import (
 )
 from src.editor_auto.models import EditorUser, ReferralUse, ToolStep
 from src.editor_auto.repos import PlanRepo, ReferralRepo, UserRepo
+from src.editor_auto.repos.web_account_repo import get_web_account_repo
 from src.editor_auto.tools import REGISTRY
+
+
+def _web_account_dto(account: dict | None) -> WebAccountResponse | None:
+    """Mapea el JSON crudo de `nebulabs:user:*` (camelCase del front) al DTO."""
+    if not account:
+        return None
+    return WebAccountResponse(
+        email=account.get("email", ""),
+        name=account.get("name", ""),
+        picture=account.get("picture"),
+        role=account.get("role", "standard"),
+        plan_id=account.get("planId"),
+        trial_videos=int(account.get("trialVideos") or 0),
+        banned=bool(account.get("banned")),
+        created_at=account.get("createdAt"),
+        last_login_at=account.get("lastLoginAt"),
+    )
 
 
 router = APIRouter(
@@ -100,6 +124,10 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         window_end_hour_override=u.window_end_hour_override,
         output_released_on=u.output_released_on,
         auto_revoke_output_daily=u.auto_revoke_output_daily,
+        account_email=u.account_email,
+        web_account=_web_account_dto(
+            get_web_account_repo().get(u.account_email)
+        ) if u.account_email else None,
         subscription=sub_dto,
         usage=usage_dto,
         referral_code=u.referral_code,
@@ -263,6 +291,15 @@ def update_user(
     if payload.window_end_hour_override is not None:
         v = int(payload.window_end_hour_override)
         u.window_end_hour_override = None if v < 0 else max(0, min(23, v))
+    if payload.account_email is not None:
+        # "" = desvincular. Si no, normaliza y valida que sea un email.
+        em = payload.account_email.strip().lower()
+        if em and "@" not in em:
+            raise ValidationError(
+                f"Email de cuenta web inválido: '{em}'",
+                details={"account_email": em},
+            )
+        u.account_email = em or None
     # Asegurar carpetas en Drive — idempotente. Cubre el caso de users
     # creados antes de que `resolve_editor_root` supiera autodetectar el
     # padre del Drive (entonces cayeron al fallback local).
@@ -342,6 +379,46 @@ def release_day(user_id: str, payload: ReleaseDayRequest | None = None) -> dict:
         repo.save(u)
         result["output_released_on"] = u.output_released_on
     return result
+
+
+# ───────────────────────────── Cuentas web ──────────────────────────────
+# Puente con nebulabs-media: el admin gestiona rol/plan/ban de la cuenta web
+# (datos en `nebulabs:user:*`) desde el panel de configuración, por email.
+
+@router.get("/web-accounts/all", response_model=list[WebAccountResponse])
+def list_web_accounts() -> list[WebAccountResponse]:
+    """Todas las cuentas registradas en la web de cliente (para vincular)."""
+    repo = get_web_account_repo()
+    return [_web_account_dto(a) for a in repo.list_all() if a]  # type: ignore[misc]
+
+
+def _web_or_404(account: dict | None, email: str) -> WebAccountResponse:
+    if account is None:
+        raise UserNotFoundError(
+            f"Cuenta web no encontrada: {email}", details={"email": email},
+        )
+    return _web_account_dto(account)  # type: ignore[return-value]
+
+
+@router.get("/web-accounts/{email}", response_model=WebAccountResponse)
+def get_web_account(email: str) -> WebAccountResponse:
+    return _web_or_404(get_web_account_repo().get(email), email)
+
+
+@router.patch("/web-accounts/{email}/role", response_model=WebAccountResponse)
+def set_web_account_role(email: str, payload: WebAccountRoleRequest) -> WebAccountResponse:
+    return _web_or_404(get_web_account_repo().set_role(email, payload.role), email)
+
+
+@router.patch("/web-accounts/{email}/plan", response_model=WebAccountResponse)
+def set_web_account_plan(email: str, payload: WebAccountPlanRequest) -> WebAccountResponse:
+    plan_id = (payload.plan_id or "").strip() or None
+    return _web_or_404(get_web_account_repo().set_plan(email, plan_id), email)
+
+
+@router.patch("/web-accounts/{email}/ban", response_model=WebAccountResponse)
+def set_web_account_ban(email: str, payload: WebAccountBanRequest) -> WebAccountResponse:
+    return _web_or_404(get_web_account_repo().set_banned(email, payload.banned), email)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

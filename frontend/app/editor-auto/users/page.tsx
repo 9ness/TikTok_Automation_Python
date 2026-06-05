@@ -3,6 +3,7 @@
 import {
   CreditCard,
   FolderOpen,
+  Globe,
   Inbox,
   Loader2,
   Plus,
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { UserBillingPanel } from "./_components/UserBillingPanel";
 import { UserFlowEditor } from "./_components/UserFlowEditor";
 import { UserFoldersPanel } from "./_components/UserFoldersPanel";
+import { UserWebAccountPanel } from "./_components/UserWebAccountPanel";
 
 type RightTab = "flow" | "folders" | "billing";
 
@@ -237,7 +239,10 @@ export default function EditorAutoUsersPage() {
                 <UserFoldersPanel userId={selectedUserId} />
               )}
               {rightTab === "billing" && (
-                <UserBillingPanel userId={selectedUserId} />
+                <div className="space-y-3">
+                  <UserBillingPanel userId={selectedUserId} />
+                  <UserWebAccountPanel userId={selectedUserId} />
+                </div>
               )}
             </>
           ) : (
@@ -313,6 +318,18 @@ function UserListItem({
             >
               <Zap className="h-2.5 w-2.5" />
               auto
+            </Badge>
+          )}
+          {user.account_email && (
+            <Badge
+              variant="default"
+              className="gap-1 bg-sky-500/90 px-1.5 text-[10px] text-white hover:bg-sky-500"
+              title={`Cuenta web vinculada: ${user.account_email}${
+                user.web_account ? "" : " (pendiente de login)"
+              }`}
+            >
+              <Globe className="h-2.5 w-2.5" />
+              web
             </Badge>
           )}
           {entrada > 0 && (

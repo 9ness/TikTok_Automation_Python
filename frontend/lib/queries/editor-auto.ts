@@ -24,6 +24,8 @@ import type {
   ToolDescriptor,
   UserFolderCountsResponse,
   UserFoldersResponse,
+  WebAccount,
+  WebAccountRole,
 } from "@/lib/types/editor-auto";
 
 const USERS_ROOT = "/api/v1/editor-auto/users";
@@ -327,6 +329,65 @@ export function useDeleteEditorUser() {
       api.del<void>(`${USERS_ROOT}/${id}${hard ? "?hard=true" : ""}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: editorAutoKeys.users() }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Cuentas web (nebulabs-media) — gestión por email desde el panel
+// ---------------------------------------------------------------------------
+const WEB_ACCOUNTS_ROOT = `${USERS_ROOT}/web-accounts`;
+
+function patchJSON<T>(url: string, body: unknown): Promise<T> {
+  return fetch(`${api.baseUrl}${url}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(process.env.NEXT_PUBLIC_API_KEY
+        ? { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY }
+        : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify(body),
+  }).then(async (r) => {
+    if (!r.ok) throw new Error(await r.text());
+    return r.json() as Promise<T>;
+  });
+}
+
+/** Todas las cuentas registradas en la web (para el selector de vinculación). */
+export function useWebAccounts(enabled = true) {
+  return useQuery<WebAccount[]>({
+    queryKey: [...editorAutoKeys.all, "web-accounts"] as const,
+    queryFn: () => api.get<WebAccount[]>(`${WEB_ACCOUNTS_ROOT}/all`),
+    enabled,
+  });
+}
+
+/** Cambia rol/plan/ban de una cuenta web. Invalida la lista de users para
+ *  refrescar el `web_account` embebido en la tarjeta. */
+export function useUpdateWebAccount() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: editorAutoKeys.users() });
+    qc.invalidateQueries({ queryKey: [...editorAutoKeys.all, "web-accounts"] });
+  };
+  return {
+    setRole: useMutation<WebAccount, Error, { email: string; role: WebAccountRole }>({
+      mutationFn: ({ email, role }) =>
+        patchJSON<WebAccount>(`${WEB_ACCOUNTS_ROOT}/${encodeURIComponent(email)}/role`, { role }),
+      onSuccess: invalidate,
+    }),
+    setPlan: useMutation<WebAccount, Error, { email: string; plan_id: string | null }>({
+      mutationFn: ({ email, plan_id }) =>
+        patchJSON<WebAccount>(`${WEB_ACCOUNTS_ROOT}/${encodeURIComponent(email)}/plan`, { plan_id }),
+      onSuccess: invalidate,
+    }),
+    setBan: useMutation<WebAccount, Error, { email: string; banned: boolean }>({
+      mutationFn: ({ email, banned }) =>
+        patchJSON<WebAccount>(`${WEB_ACCOUNTS_ROOT}/${encodeURIComponent(email)}/ban`, { banned }),
+      onSuccess: invalidate,
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------

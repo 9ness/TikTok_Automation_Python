@@ -48,6 +48,10 @@ class EditorUser(BaseModel):
     name: str                      # nombre carpeta (sin @ — esto no es TikTok)
     display_name: str = ""
     description: str = ""
+    # Email de la CUENTA WEB (nebulabs-media) vinculada a este usuario. Es el
+    # puente con el front de cliente: `nebulabs:user:{account_email}` guarda su
+    # auth/rol/plan/trial. None = usuario solo de config (sin cuenta web).
+    account_email: str | None = None
     tool_flow: list[ToolStep] = Field(default_factory=list)
     drive_folder: str | None = None     # path local Drive sincronizado
     # Lista de emails conocidos a los que se les ha dado acceso a alguna

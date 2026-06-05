@@ -39,6 +39,34 @@ class EditorUserUpdateRequest(BaseModel):
     daily_video_limit_override: int | None = None
     window_start_hour_override: int | None = None
     window_end_hour_override: int | None = None
+    # Email de la cuenta web (nebulabs-media) a vincular. "" = desvincular.
+    account_email: str | None = None
+
+
+class WebAccountResponse(BaseModel):
+    """Cuenta web (nebulabs-media) vinculada — leída de `nebulabs:user:*`."""
+
+    email: str
+    name: str = ""
+    picture: str | None = None
+    role: str = "standard"          # standard | plus | pro | admin
+    plan_id: str | None = None      # id de tarifa contratada (o None = trial)
+    trial_videos: int = 0
+    banned: bool = False
+    created_at: str | None = None
+    last_login_at: str | None = None
+
+
+class WebAccountRoleRequest(BaseModel):
+    role: str = Field(..., pattern="^(standard|plus|pro|admin)$")
+
+
+class WebAccountPlanRequest(BaseModel):
+    plan_id: str | None = None      # None/"" = solo trial
+
+
+class WebAccountBanRequest(BaseModel):
+    banned: bool
 
 
 class EditorUserResponse(BaseModel):
@@ -56,6 +84,9 @@ class EditorUserResponse(BaseModel):
     window_end_hour_override: int | None = None
     output_released_on: str | None = None
     auto_revoke_output_daily: bool = True
+    # Puente con la web de cliente (nebulabs-media)
+    account_email: str | None = None
+    web_account: "WebAccountResponse | None" = None
     # Billing
     subscription: SubscriptionResponse | None = None
     usage: UsageResponse | None = None
