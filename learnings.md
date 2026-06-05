@@ -110,3 +110,7 @@
 - A/B holistic gpt-5.4 vs gpt-4o (ambos temp0, mismo transcript): gpt-5.4=97 (corta el restart "aprovecha que ahora estan"), gpt-4o=94 (lo deja doble). Ganador gpt-5.4: mejor calidad + input mas barato ($1.25 vs $2.50/1M). Fijado gpt-5.4.
 
 - Web→box upload: ticket HS256 firmado (WEB_UPLOAD_SECRET compartido), bytes directos al box (fuera de Vercel), streaming a disco + topes/día + rate-limit Redis. styleConfig(web)→tool_flow vía style_mapper (silence_cutter+subs_auto+sticker_arrow), sincronizado en send-to-edit. salida/<dia>/ espejo de entrada/<dia>/.
+- FastAPI: ruta estatica (GET /settings) tapada por /{user_id} si se declara despues -> 404. Declarar rutas literales ANTES de las parametrizadas.
+- "Failed to fetch" al subir desde web = preflight CORS 400: el contenedor api corria con API_CORS_ORIGINS viejo aunque .env estaba bien. Fix: docker compose up -d --force-recreate --no-deps api (restart NO recarga env, recreate si).
+- Drive (drive_uploads): googleapiclient/httplib2 sin timeout -> list_day_files colgaba el request /day para siempre (+_lock global encadenaba a todos). Fix: AuthorizedHttp con httplib2.Http(timeout) + sesion con timeout en refresh.
+- APIError no aceptaba status_code= (era atributo de clase) -> cada APIError(...,status_code=409) en web_upload crasheaba con TypeError 500 = "fallo al subir". Fix: __init__ acepta status_code/code override.

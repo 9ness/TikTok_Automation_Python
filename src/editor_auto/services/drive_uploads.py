@@ -25,6 +25,10 @@ import requests
 
 DRIVE_ROOT_NAME = os.getenv("DRIVE_EDITOR_ROOT_NAME", "TIKTOK_EDITOR")
 DRIVE_USERS_FOLDER = "Usuarios"
+# Timeout DURO (s) de toda llamada HTTP a Drive. googleapiclient (httplib2) NO
+# trae timeout por defecto → un cuelgue de red bloquea el request para siempre
+# (y, por el _lock global, encadena a TODOS). Con timeout, falla rápido y libera.
+_HTTP_TIMEOUT_S = int(os.getenv("DRIVE_HTTP_TIMEOUT_S", "25"))
 _SCOPE = "https://www.googleapis.com/auth/drive"
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
 _RESUMABLE_URL = (
@@ -73,9 +77,37 @@ def _creds():
 def access_token() -> str:
     creds = _creds()
     if not creds.valid:
-        from google.auth.transport.requests import Request
-        creds.refresh(Request())
+        import google.auth.transport.requests as gatr
+        # Sesión con timeout efectivo: el refresh hace POST al token endpoint;
+        # sin timeout colgaría indefinido.
+        creds.refresh(gatr.Request(session=_TimeoutSession()))
     return creds.token
+
+
+class _TimeoutSession:
+    """Callable estilo requests.Session que inyecta timeout en cada request
+    (google.auth.transport.requests.Request espera un objeto con .request())."""
+
+    def __init__(self) -> None:
+        import requests as _rq
+        self._s = _rq.Session()
+
+    def request(self, *args: Any, **kwargs: Any):
+        # Forzar timeout aunque el caller pase None (google.auth lo hace).
+        if not kwargs.get("timeout"):
+            kwargs["timeout"] = _HTTP_TIMEOUT_S
+        return self._s.request(*args, **kwargs)
+
+
+def _authed_http():
+    """httplib2.Http CON timeout, autorizado con las credenciales OAuth.
+    Garantiza que NINGUNA llamada de googleapiclient cuelgue para siempre."""
+    import google_auth_httplib2
+    import httplib2
+
+    return google_auth_httplib2.AuthorizedHttp(
+        _creds(), http=httplib2.Http(timeout=_HTTP_TIMEOUT_S)
+    )
 
 
 def _service():
@@ -85,7 +117,7 @@ def _service():
         if _svc_cache["v"] is not None:
             return _svc_cache["v"]
         from googleapiclient.discovery import build
-        svc = build("drive", "v3", credentials=_creds(), cache_discovery=False)
+        svc = build("drive", "v3", http=_authed_http(), cache_discovery=False)
         _svc_cache["v"] = svc
         return svc
 

@@ -20,10 +20,23 @@ class APIError(Exception):
     status_code: int = 500
     code: str = "internal_error"
 
-    def __init__(self, message: str, *, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        details: dict[str, Any] | None = None,
+        status_code: int | None = None,
+        code: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details or {}
+        # Permitir override por instancia (los call-sites pasan status_code=409,
+        # etc.). Sin esto, APIError("...", status_code=409) lanzaba TypeError.
+        if status_code is not None:
+            self.status_code = status_code
+        if code is not None:
+            self.code = code
 
 
 class ProductNotFoundError(APIError):
