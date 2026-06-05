@@ -388,6 +388,15 @@ def web_send_to_edit(
     if _day_locked(user.id, day):
         raise APIError("Este día ya se mandó a edición.", status_code=409)
 
+    # Sincroniza el flujo de edición con el estilo ACTUAL del cliente (web) —
+    # así la subida aplica siempre el estilo que configuró, sin intervención
+    # del admin. El estilo vive en la cuenta web (nebulabs:user.styleConfig).
+    from src.editor_auto.repos.web_account_repo import get_web_account_repo
+    from src.editor_auto.services.style_mapper import build_tool_flow
+    account = get_web_account_repo().get(user.account_email)
+    user.tool_flow = build_tool_flow((account or {}).get("styleConfig"))
+    UserRepo().save(user)
+
     videos = _list_day_videos(user.name, day)
     if not videos:
         raise ValidationError("No hay vídeos para este día.", details={"day": day})

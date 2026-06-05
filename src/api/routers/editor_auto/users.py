@@ -443,11 +443,15 @@ def provision_from_web(payload: ProvisionFromWebRequest) -> EditorUserResponse:
     except OSError as e:
         print(f"[editor_auto.users] ensure_user_folders falló en provision: {e}")
 
+    # Flujo derivado del estilo que el cliente configuró en la web (si lo hizo).
+    from src.editor_auto.services.style_mapper import build_tool_flow
+    tool_flow = build_tool_flow(account.get("styleConfig"))
+
     user = EditorUser(
         name=name,
         display_name=web_name or name,
         description="Creado desde la web de cliente",
-        tool_flow=[],
+        tool_flow=tool_flow,
         account_email=email,
         drive_folder=user_folder(name),
     )
