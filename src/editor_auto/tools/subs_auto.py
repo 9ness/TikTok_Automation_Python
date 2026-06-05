@@ -246,11 +246,18 @@ class SubsAutoTool:
             "max_width_pct": config.get("max_width", 0.85),
             "sync_offset_ms": config.get("sync_offset", 0),
         }
+        # Evita que la ÚLTIMA palabra quede CONGELADA hasta el final del vídeo
+        # cuando hay cola sin voz (el habla acaba antes que el vídeo). Cap del
+        # último subtítulo = fin de la última palabra + 1s de margen.
+        last_word_end = max((float(w.get("end", 0) or 0) for w in words), default=0.0)
+        last_chunk_max_end = last_word_end + 1.0 if last_word_end > 0 else None
+
         render_subtitles_on_video(
             input_path, words, style, output_path,
             quality_settings=quality,
             log_callback=ctx.on_log,
             logger=None,
+            last_chunk_max_end=last_chunk_max_end,
         )
         ctx.on_progress(1.0, "✅ Subtítulos aplicados")
         return output_path
