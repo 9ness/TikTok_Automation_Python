@@ -37,9 +37,15 @@ _RESUMABLE_URL = (
 )
 _VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
 
+_DRIVE_API = "https://www.googleapis.com/drive/v3/files"
+
 _lock = threading.Lock()
 _creds_cache: dict[str, Any] = {"v": None}
-_svc_cache: dict[str, Any] = {"v": None}
+# requests.Session compartida: thread-safe para requests independientes y con
+# pool de conexiones. Reemplaza a googleapiclient/httplib2 (NO thread-safe, su
+# objeto compartido entre requests concurrentes del panel deadlockeaba y
+# agotaba el threadpool → el server parecía "caído").
+_session_cache: dict[str, Any] = {"v": None}
 
 
 def is_configured() -> bool:
@@ -74,52 +80,52 @@ def _creds():
         return creds
 
 
-def access_token() -> str:
-    creds = _creds()
-    if not creds.valid:
-        import google.auth.transport.requests as gatr
-        # Sesión con timeout efectivo: el refresh hace POST al token endpoint;
-        # sin timeout colgaría indefinido.
-        creds.refresh(gatr.Request(session=_TimeoutSession()))
-    return creds.token
-
-
 class _TimeoutSession:
-    """Callable estilo requests.Session que inyecta timeout en cada request
-    (google.auth.transport.requests.Request espera un objeto con .request())."""
+    """requests.Session-like que fuerza timeout en cada request. Usado tanto
+    para el refresh OAuth como para las llamadas a la Drive API. Sin timeout,
+    una llamada colgada bloquearía el worker para siempre."""
 
     def __init__(self) -> None:
         import requests as _rq
         self._s = _rq.Session()
 
     def request(self, *args: Any, **kwargs: Any):
-        # Forzar timeout aunque el caller pase None (google.auth lo hace).
         if not kwargs.get("timeout"):
             kwargs["timeout"] = _HTTP_TIMEOUT_S
         return self._s.request(*args, **kwargs)
 
+    def get(self, url: str, **kwargs: Any):
+        return self.request("GET", url, **kwargs)
 
-def _authed_http():
-    """httplib2.Http CON timeout, autorizado con las credenciales OAuth.
-    Garantiza que NINGUNA llamada de googleapiclient cuelgue para siempre."""
-    import google_auth_httplib2
-    import httplib2
+    def post(self, url: str, **kwargs: Any):
+        return self.request("POST", url, **kwargs)
 
-    return google_auth_httplib2.AuthorizedHttp(
-        _creds(), http=httplib2.Http(timeout=_HTTP_TIMEOUT_S)
-    )
+    def delete(self, url: str, **kwargs: Any):
+        return self.request("DELETE", url, **kwargs)
+
+    def close(self) -> None:
+        self._s.close()
 
 
-def _service():
-    if _svc_cache["v"] is not None:
-        return _svc_cache["v"]
+def _session() -> "_TimeoutSession":
+    if _session_cache["v"] is not None:
+        return _session_cache["v"]
     with _lock:
-        if _svc_cache["v"] is not None:
-            return _svc_cache["v"]
-        from googleapiclient.discovery import build
-        svc = build("drive", "v3", http=_authed_http(), cache_discovery=False)
-        _svc_cache["v"] = svc
-        return svc
+        if _session_cache["v"] is None:
+            _session_cache["v"] = _TimeoutSession()
+        return _session_cache["v"]
+
+
+def access_token() -> str:
+    creds = _creds()
+    if not creds.valid:
+        import google.auth.transport.requests as gatr
+        creds.refresh(gatr.Request(session=_TimeoutSession()))
+    return creds.token
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {access_token()}"}
 
 
 def _esc(s: str) -> str:
@@ -127,18 +133,22 @@ def _esc(s: str) -> str:
 
 
 def _find_child(parent_id: str | None, name: str) -> str | None:
-    svc = _service()
     q = (
         f"name = '{_esc(name)}' and trashed = false "
         f"and mimeType = 'application/vnd.google-apps.folder'"
     )
     if parent_id:
         q += f" and '{parent_id}' in parents"
-    res = svc.files().list(
-        q=q, fields="files(id,name)", pageSize=10,
-        supportsAllDrives=True, includeItemsFromAllDrives=True,
-    ).execute()
-    files = res.get("files", [])
+    r = _session().get(
+        _DRIVE_API,
+        headers=_auth_headers(),
+        params={
+            "q": q, "fields": "files(id,name)", "pageSize": 10,
+            "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
+        },
+    )
+    r.raise_for_status()
+    files = r.json().get("files", [])
     return files[0]["id"] if files else None
 
 
@@ -156,10 +166,15 @@ def _entrada_id(username: str) -> str | None:
 
 
 def _create_folder(parent_id: str, name: str) -> str:
-    svc = _service()
     meta = {"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]}
-    created = svc.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
-    return created["id"]
+    r = _session().post(
+        _DRIVE_API,
+        headers={**_auth_headers(), "Content-Type": "application/json"},
+        params={"fields": "id", "supportsAllDrives": "true"},
+        json=meta,
+    )
+    r.raise_for_status()
+    return r.json()["id"]
 
 
 def ensure_day_folder(username: str, day: str) -> str:
@@ -204,14 +219,19 @@ def list_day_files(username: str, day: str) -> list[dict[str, Any]]:
     fid = _day_folder_id(username, day)
     if not fid:
         return []
-    svc = _service()
-    res = svc.files().list(
-        q=f"'{fid}' in parents and trashed = false",
-        fields="files(id,name,size,mimeType)",
-        supportsAllDrives=True, includeItemsFromAllDrives=True, pageSize=200,
-    ).execute()
+    r = _session().get(
+        _DRIVE_API,
+        headers=_auth_headers(),
+        params={
+            "q": f"'{fid}' in parents and trashed = false",
+            "fields": "files(id,name,size,mimeType)",
+            "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
+            "pageSize": 200,
+        },
+    )
+    r.raise_for_status()
     out: list[dict[str, Any]] = []
-    for f in res.get("files", []):
+    for f in r.json().get("files", []):
         name = f.get("name", "")
         if name.lower().endswith(_VIDEO_EXTS):
             out.append({"id": f["id"], "filename": name, "size_bytes": int(f.get("size") or 0)})
@@ -221,6 +241,11 @@ def list_day_files(username: str, day: str) -> list[dict[str, Any]]:
 def delete_day_file(username: str, day: str, filename: str) -> bool:
     for f in list_day_files(username, day):
         if f["filename"] == filename:
-            _service().files().delete(fileId=f["id"], supportsAllDrives=True).execute()
+            r = _session().delete(
+                f"{_DRIVE_API}/{f['id']}",
+                headers=_auth_headers(),
+                params={"supportsAllDrives": "true"},
+            )
+            r.raise_for_status()
             return True
     return False
