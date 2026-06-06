@@ -110,6 +110,11 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     mode = "phrase" if sub.get("mode") == "phrase" else "word"
     pid = sub.get("presetId")
     ps = _PRESET_STYLES.get(pid, _PRESET_STYLES[_DEFAULT_PRESET_ID])
+    # Formato de mayúsculas elegido por el cliente (botón "Formato" tipo TikTok).
+    # "none" = respeta el caso natural del preset; el resto lo fuerza.
+    _CASE_MAP = {"upper": "UPPERCASE", "lower": "lowercase", "title": "Title Case", "none": None}
+    case_choice = _CASE_MAP.get(str(sub.get("caseMode") or "none"))
+    case_mode = case_choice if case_choice is not None else ps.get("case", "None")
     y = _clamp(_f(sub.get("y"), 0.78), 0.05, 0.95)
     font_scale = round(_clamp(0.045 * _f(sub.get("scale"), 1.0), 0.02, 0.10), 4)
 
@@ -123,7 +128,7 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
         "stroke_width": int(ps["sw"]),
         "highlight_mode": ps["mode"],
         "pill_enabled": bool(ps["pill"]),
-        "case_mode": ps.get("case", "None"),
+        "case_mode": case_mode,
         "y_position": y,
         "font_scale": font_scale,
         # "una palabra" fuerza 1; "varias" usa 4.
