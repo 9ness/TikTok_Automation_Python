@@ -590,7 +590,10 @@ def web_download(
     path = os.path.join(folder, safe)
     if not os.path.exists(path):
         raise UserNotFoundError("Vídeo no encontrado.", details={"file": file})
-    return FileResponse(path, media_type="video/mp4", filename=safe)
+    # Nombre de descarga limpio: quita el prefijo timestamp del upload
+    # (1780695599_IMG_9750_editado.mp4 → IMG_9750_editado.mp4).
+    nice = re.sub(r"^\d{8,}_", "", safe) or safe
+    return FileResponse(path, media_type="video/mp4", filename=nice)
 
 
 # ═══════════════════════ ADMIN — aprobación manual (API key) ═══════════════════════
