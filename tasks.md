@@ -23,3 +23,8 @@
   → inyectar en config del step silence_cutter), silence_cutter (consumir retry_feedback en prompt),
   web_upload.web_output (best-of por source via retry_group), setting flag auto_retry (default OFF).
 - VALIDAR con un clip real que dé <90 antes de activar el flag.
+
+## ⏸️ Reintentos <90 — APARCADO (decisión)
+- NO tocar el motor de silencios con reintentos por ahora.
+- Mientras: <90 se gestiona MANUALMENTE (revisar/aprobar o avisar y mejorar a mano).
+- Retomar solo con el "cambio grande" del motor, validándolo con un clip real <90.
