@@ -118,3 +118,4 @@
 - Aprobacion manual (gate beta): web_output retiene vídeos hasta admin aprueba (Redis webday_approved); endpoints /web/admin/{pending,approve,stream}; stream auth por query key (video src no manda headers); posicion en cola solo para planes.
 - subs_auto: ultima palabra se congelaba hasta el final del video (render extiende ultimo chunk a video_duration). Fix: pasar last_chunk_max_end = fin_ultima_palabra + 1s.
 - Trial visible (nebulabs:user.trialVideos) no se descontaba al usar video; ahora send-to-edit lo resta por video encolado (solo sin plan). Es distinto de la cuota interna del box (quota_service).
+- Herramientas base opcionales: styleConfig.cuts.enabled + subtitle.enabled (+ arrow.enabled) -> build_tool_flow las incluye condicionalmente. El cliente puede quitar subs/cortes aunque sean base.

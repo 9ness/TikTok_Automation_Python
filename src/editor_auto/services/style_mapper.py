@@ -120,10 +120,19 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     style = style or {}
     sub = style.get("subtitle") or {}
     arr = style.get("arrow") or {}
+    cuts = style.get("cuts") or {}
 
-    steps: list[ToolStep] = [
-        ToolStep(tool_id="silence_cutter", enabled=True, config=_with_defaults("silence_cutter", {})),
-    ]
+    # Cada herramienta base es OPCIONAL: el cliente puede desactivarla aunque
+    # venga incluida (default = activada si no se indica lo contrario).
+    steps: list[ToolStep] = []
+    if cuts.get("enabled", True):
+        steps.append(ToolStep(tool_id="silence_cutter", enabled=True, config=_with_defaults("silence_cutter", {})))
+
+    if not sub.get("enabled", True):
+        # Subtítulos desactivados → no añadimos subs_auto. (La flecha se evalúa abajo.)
+        if arr.get("enabled"):
+            steps.append(_build_arrow_step(arr))
+        return steps
 
     mode = "phrase" if sub.get("mode") == "phrase" else "word"
     pid = sub.get("presetId")
@@ -164,21 +173,26 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     steps.append(ToolStep(tool_id="subs_auto", enabled=True, config=_with_defaults("subs_auto", subs_overrides)))
 
     if arr.get("enabled"):
-        rot = int(_f(arr.get("rotation"), 0)) % 360
-        # Saneo: solo existen estas flechas reales. Valores viejos/ inválidos
-        # (p.ej. "simple" de presets SVG antiguos) caen a flecha_roja.mov, si no
-        # el preflight aborta el job ("'simple' no está en Assets/flechas").
-        shape = str(arr.get("shapeId") or "").strip()
-        if shape not in _ALLOWED_ARROWS:
-            shape = "flecha_roja.mov"
-        arrow_overrides = {
-            "sticker_file": shape,
-            "color_mode": "fixed",
-            "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
-            "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
-            "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),
-            "rotation_deg": rot,
-        }
-        steps.append(ToolStep(tool_id="sticker_arrow", enabled=True, config=_with_defaults("sticker_arrow", arrow_overrides)))
+        steps.append(_build_arrow_step(arr))
 
     return steps
+
+
+def _build_arrow_step(arr: dict) -> ToolStep:
+    """ToolStep de la flecha CTA con saneo de la flecha elegida."""
+    rot = int(_f(arr.get("rotation"), 0)) % 360
+    # Saneo: solo existen estas flechas reales. Valores viejos/ inválidos
+    # (p.ej. "simple" de presets SVG antiguos) caen a flecha_roja.mov, si no
+    # el preflight aborta el job ("'simple' no está en Assets/flechas").
+    shape = str(arr.get("shapeId") or "").strip()
+    if shape not in _ALLOWED_ARROWS:
+        shape = "flecha_roja.mov"
+    arrow_overrides = {
+        "sticker_file": shape,
+        "color_mode": "fixed",
+        "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
+        "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
+        "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),
+        "rotation_deg": rot,
+    }
+    return ToolStep(tool_id="sticker_arrow", enabled=True, config=_with_defaults("sticker_arrow", arrow_overrides))
