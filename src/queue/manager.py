@@ -35,6 +35,17 @@ from .models import Job, JobMode, JobStatus
 _EXCLUSIVE_MODES: set[JobMode] = {JobMode.TIKTOK_SHOP_WATERMARK}
 
 
+def _is_client_edit_job(job: Job) -> bool:
+    """True si es una edición de un CLIENTE de la web (Editor Auto con subcarpeta
+    de día). Esos van DESPUÉS de los jobs de admin (Presidentes, Pronósticos…),
+    que tienen prioridad en la cola."""
+    is_editor = (
+        str(job.mode) == "JobMode.EDITOR_AUTO"
+        or getattr(job.mode, "value", None) == "editor_auto"
+    )
+    return is_editor and bool((job.params or {}).get("output_subdir"))
+
+
 _PERSIST_FILENAME = "queue_state.json"
 
 
@@ -321,18 +332,23 @@ class JobQueue:
                         j.mode for j in self._jobs
                         if j.status == JobStatus.RUNNING and j.mode in _EXCLUSIVE_MODES
                     }
+                    eligible = [
+                        j for j in self._jobs
+                        if j.status == JobStatus.PENDING
+                        and (j.scheduled_for is None or j.scheduled_for <= now)
+                        and not (
+                            j.mode in _EXCLUSIVE_MODES
+                            and j.mode in running_exclusive
+                        )
+                    ]
+                    # PRIORIDAD: los jobs de ADMIN (todo lo que NO es edición web
+                    # de cliente) se eligen ANTES que las ediciones de clientes
+                    # pendientes — así Presidentes/Pronósticos/etc. no esperan
+                    # detrás de la cola de clientes. Dentro de cada grupo se
+                    # respeta el orden de la lista (FIFO + reorden manual).
                     pending = next(
-                        (
-                            j for j in self._jobs
-                            if j.status == JobStatus.PENDING
-                            and (j.scheduled_for is None or j.scheduled_for <= now)
-                            and not (
-                                j.mode in _EXCLUSIVE_MODES
-                                and j.mode in running_exclusive
-                            )
-                        ),
-                        None,
-                    )
+                        (j for j in eligible if not _is_client_edit_job(j)), None,
+                    ) or (eligible[0] if eligible else None)
                     if pending is not None:
                         break
                     self._cond.wait(timeout=2.0)

@@ -120,3 +120,4 @@
 - Trial visible (nebulabs:user.trialVideos) no se descontaba al usar video; ahora send-to-edit lo resta por video encolado (solo sin plan). Es distinto de la cuota interna del box (quota_service).
 - Herramientas base opcionales: styleConfig.cuts.enabled + subtitle.enabled (+ arrow.enabled) -> build_tool_flow las incluye condicionalmente. El cliente puede quitar subs/cortes aunque sean base.
 - Reinicio NO rompe vídeos web: _reset_orphans re-encola (PENDING) los jobs editor_auto de subida web (output_subdir, sin guion), máx 2 reanudaciones; el resto FAILED. El input sigue en Drive, se reanuda solo.
+- Cola: jobs de admin (todo lo que NO es edición web de cliente = EDITOR_AUTO con output_subdir) tienen PRIORIDAD sobre las ediciones de clientes pendientes. 1 worker, no satura; solo cambia el orden. Helper _is_client_edit_job en manager.py.
