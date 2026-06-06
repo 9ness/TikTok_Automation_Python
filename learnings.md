@@ -119,3 +119,4 @@
 - subs_auto: ultima palabra se congelaba hasta el final del video (render extiende ultimo chunk a video_duration). Fix: pasar last_chunk_max_end = fin_ultima_palabra + 1s.
 - Trial visible (nebulabs:user.trialVideos) no se descontaba al usar video; ahora send-to-edit lo resta por video encolado (solo sin plan). Es distinto de la cuota interna del box (quota_service).
 - Herramientas base opcionales: styleConfig.cuts.enabled + subtitle.enabled (+ arrow.enabled) -> build_tool_flow las incluye condicionalmente. El cliente puede quitar subs/cortes aunque sean base.
+- Reinicio NO rompe vídeos web: _reset_orphans re-encola (PENDING) los jobs editor_auto de subida web (output_subdir, sin guion), máx 2 reanudaciones; el resto FAILED. El input sigue en Drive, se reanuda solo.

@@ -433,7 +433,30 @@ class JobQueue:
         orphan_jobs: list = []
         with self._lock:
             for j in self._jobs:
-                if j.status == JobStatus.RUNNING:
+                if j.status != JobStatus.RUNNING:
+                    continue
+                p = j.params or {}
+                is_editor = (
+                    str(j.mode) == "JobMode.EDITOR_AUTO"
+                    or getattr(j.mode, "value", None) == "editor_auto"
+                )
+                # Subida WEB (tiene output_subdir, sin guion): el input sigue en
+                # Drive → lo RE-ENCOLAMOS para que se reanude solo tras el
+                # reinicio (máx 2 reanudaciones, anti-bucle). Así un reinicio
+                # NO rompe los vídeos de los clientes.
+                is_web = is_editor and bool(p.get("output_subdir")) and not (p.get("script") or "").strip()
+                resumes = int(p.get("_resume_count", 0) or 0)
+                if is_web and resumes < 2:
+                    p["_resume_count"] = resumes + 1
+                    j.params = p
+                    j.status = JobStatus.PENDING
+                    j.progress = 0.0
+                    j.progress_label = "🔁 Reanudado tras reinicio"
+                    j.error = None
+                    j.started_at = None
+                    j.finished_at = None
+                    changed = True
+                else:
                     j.status = JobStatus.FAILED
                     j.error = "Interrumpido (la app se reinició mientras procesaba)"
                     j.progress_label = "❌ Interrumpido por reinicio"
