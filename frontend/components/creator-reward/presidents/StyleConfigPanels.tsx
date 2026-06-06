@@ -447,10 +447,36 @@ export function NumbersConfigPanel({
           />
         </Field>
         <ColorField
-          label="Color número"
+          label="Color base nº (4,5…)"
           value={value.number_color}
           onChange={(v) => patch("number_color", v)}
         />
+        <label className="flex items-end gap-2 pb-1 text-sm">
+          <Switch
+            checked={value.number_medal_colors}
+            onCheckedChange={(v) => patch("number_medal_colors", v)}
+          />
+          <span>Medallas 1/2/3</span>
+        </label>
+        {value.number_medal_colors && (
+          <>
+            <ColorField
+              label="#1 Oro"
+              value={value.number_color_gold}
+              onChange={(v) => patch("number_color_gold", v)}
+            />
+            <ColorField
+              label="#2 Plata"
+              value={value.number_color_silver}
+              onChange={(v) => patch("number_color_silver", v)}
+            />
+            <ColorField
+              label="#3 Bronce"
+              value={value.number_color_bronze}
+              onChange={(v) => patch("number_color_bronze", v)}
+            />
+          </>
+        )}
         <ColorField
           label="Color nombre"
           value={value.name_color}

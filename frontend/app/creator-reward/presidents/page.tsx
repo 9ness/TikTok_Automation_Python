@@ -88,7 +88,11 @@ const DEFAULT_NUMBERS: PresidentsNumbersConfig = {
   list_line_spacing: 0.105,
   number_font_scale: 0.044,
   name_font_scale: 0.036,
-  number_color: "#FFD400",
+  number_color: "#FFFFFF",
+  number_medal_colors: true,
+  number_color_gold: "#FFD700",
+  number_color_silver: "#C0C0C0",
+  number_color_bronze: "#CD7F32",
   name_color: "#FFFFFF",
   name_stroke_color: "#000000",
   name_stroke_width: 3,
@@ -175,6 +179,11 @@ function flatToNested(flat: Record<string, unknown>): {
   if (n("numbers_name_font_scale") !== undefined)
     numbers.name_font_scale = n("numbers_name_font_scale");
   if (s("numbers_number_color")) numbers.number_color = s("numbers_number_color");
+  if (b("numbers_number_medal_colors") !== undefined)
+    numbers.number_medal_colors = b("numbers_number_medal_colors");
+  if (s("numbers_number_color_gold")) numbers.number_color_gold = s("numbers_number_color_gold");
+  if (s("numbers_number_color_silver")) numbers.number_color_silver = s("numbers_number_color_silver");
+  if (s("numbers_number_color_bronze")) numbers.number_color_bronze = s("numbers_number_color_bronze");
   if (s("numbers_name_color")) numbers.name_color = s("numbers_name_color");
   if (s("numbers_name_stroke_color")) numbers.name_stroke_color = s("numbers_name_stroke_color");
   if (n("numbers_name_stroke_width") !== undefined)
@@ -239,6 +248,10 @@ function nestedToFlat(
     numbers_number_font_scale: numbers.number_font_scale,
     numbers_name_font_scale: numbers.name_font_scale,
     numbers_number_color: numbers.number_color,
+    numbers_number_medal_colors: numbers.number_medal_colors,
+    numbers_number_color_gold: numbers.number_color_gold,
+    numbers_number_color_silver: numbers.number_color_silver,
+    numbers_number_color_bronze: numbers.number_color_bronze,
     numbers_name_color: numbers.name_color,
     numbers_name_stroke_color: numbers.name_stroke_color,
     numbers_name_stroke_width: numbers.name_stroke_width,

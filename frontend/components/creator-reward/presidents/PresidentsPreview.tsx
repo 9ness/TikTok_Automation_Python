@@ -528,6 +528,15 @@ function NumbersOverlayPreview({
           slot === 1
             ? numbers.mystery_text.trim() || "???"
             : SAMPLE_SURNAMES[slot - 2] ?? "Doe";
+        // Color del número: medalla (1/2/3) o color base (4,5,…).
+        const numColor =
+          numbers.number_medal_colors && slot <= 3
+            ? slot === 1
+              ? numbers.number_color_gold
+              : slot === 2
+                ? numbers.number_color_silver
+                : numbers.number_color_bronze
+            : numbers.number_color;
         return (
           <div
             key={slot}
@@ -548,7 +557,7 @@ function NumbersOverlayPreview({
           >
             <span
               style={{
-                color: numbers.number_color,
+                color: numColor,
                 fontSize: `${numSizeCqi}cqi`,
                 textShadow: nameShadow,
               }}

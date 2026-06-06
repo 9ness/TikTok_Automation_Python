@@ -40,7 +40,13 @@ DEFAULT_NUMBERS_STYLE = {
     "list_line_spacing": 0.105,        # separación vertical entre filas (pct alto)
     "number_font_scale": 0.044,
     "name_font_scale": 0.036,
-    "number_color": "#FFD400",
+    # Color base de los números (puestos 4,5,…). Los puestos 1/2/3 usan
+    # oro/plata/bronce si `number_medal_colors` está activo.
+    "number_color": "#FFFFFF",
+    "number_medal_colors": True,
+    "number_color_gold": "#FFD700",     # #1
+    "number_color_silver": "#C0C0C0",   # #2
+    "number_color_bronze": "#CD7F32",   # #3
     "name_color": "#FFFFFF",
     "name_stroke_color": "#000000",
     "name_stroke_width": 3,
@@ -132,12 +138,23 @@ def add_numbers_overlay_to_video(
 
     reveal_by_puesto = {int(r["puesto"]): r for r in (reveals or [])}
 
+    medal = {
+        1: s.get("number_color_gold", "#FFD700"),
+        2: s.get("number_color_silver", "#C0C0C0"),
+        3: s.get("number_color_bronze", "#CD7F32"),
+    }
+
     for slot in range(1, int(top_count) + 1):
         row_center_y = list_y + (slot - 1) * spacing
 
+        # Color del número: medalla (1/2/3) o color base (4,5,…).
+        num_color = s["number_color"]
+        if s.get("number_medal_colors") and slot in medal:
+            num_color = medal[slot]
+
         # Número (persistente, visible desde el inicio)
         num_img = _render_text(
-            f"{slot}.", num_size, s["number_color"], font_path,
+            f"{slot}.", num_size, num_color, font_path,
             s["name_stroke_color"], int(s["name_stroke_width"]),
         )
         num_np = np.array(num_img)

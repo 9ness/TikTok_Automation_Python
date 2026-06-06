@@ -74,7 +74,11 @@ export interface PresidentsNumbersConfig {
   list_line_spacing: number;
   number_font_scale: number;
   name_font_scale: number;
-  number_color: string;
+  number_color: string; // base (puestos 4,5,…)
+  number_medal_colors: boolean; // 1/2/3 = oro/plata/bronce
+  number_color_gold: string; // #1
+  number_color_silver: string; // #2
+  number_color_bronze: string; // #3
   name_color: string;
   name_stroke_color: string;
   name_stroke_width: number;

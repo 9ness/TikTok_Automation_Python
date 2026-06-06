@@ -76,7 +76,13 @@ class PresidentsNumbersConfig(BaseModel):
     list_line_spacing: float = Field(default=0.105, gt=0.0, le=0.5)
     number_font_scale: float = Field(default=0.044, gt=0.0, le=0.2)
     name_font_scale: float = Field(default=0.036, gt=0.0, le=0.2)
-    number_color: str = "#FFD400"
+    # Color de los números. Con `number_medal_colors` los puestos 1/2/3 usan
+    # oro/plata/bronce y el resto (4,5,…) usa `number_color`.
+    number_color: str = "#FFFFFF"
+    number_medal_colors: bool = True
+    number_color_gold: str = "#FFD700"     # #1
+    number_color_silver: str = "#C0C0C0"   # #2
+    number_color_bronze: str = "#CD7F32"   # #3
     name_color: str = "#FFFFFF"
     name_stroke_color: str = "#000000"
     name_stroke_width: int = Field(default=3, ge=0, le=10)
