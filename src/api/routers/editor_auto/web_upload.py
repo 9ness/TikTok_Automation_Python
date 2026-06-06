@@ -300,11 +300,12 @@ def web_day(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     _require_drive()
     user = _resolve_user(claims)
-    return {
-        "day": day,
-        "locked": _day_locked(user.id, day),
-        "videos": drive_uploads.list_day_files(user.name, day),
-    }
+    locked = _day_locked(user.id, day)
+    # Si el día ya está bloqueado (mandado a edición), el cliente muestra la
+    # SALIDA (output), no los borradores de entrada → nos saltamos el listado
+    # de Drive (lento, ~2-3s) y respondemos al instante.
+    videos = [] if locked else drive_uploads.list_day_files(user.name, day)
+    return {"day": day, "locked": locked, "videos": videos}
 
 
 # ─────────────────────────── Borrar (borrador) ───────────────────────────
