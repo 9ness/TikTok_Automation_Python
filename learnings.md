@@ -117,3 +117,4 @@
 - CORS regresiona en cada auto-deploy: el webhook recrea el contenedor con el DEFAULT de docker-compose (no propaga API_CORS_ORIGINS del .env) -> navegador recibe respuesta sin ACAO -> "Failed to fetch". Fix: meter los origenes web en el DEFAULT de docker-compose.yml.
 - Aprobacion manual (gate beta): web_output retiene vídeos hasta admin aprueba (Redis webday_approved); endpoints /web/admin/{pending,approve,stream}; stream auth por query key (video src no manda headers); posicion en cola solo para planes.
 - subs_auto: ultima palabra se congelaba hasta el final del video (render extiende ultimo chunk a video_duration). Fix: pasar last_chunk_max_end = fin_ultima_palabra + 1s.
+- Trial visible (nebulabs:user.trialVideos) no se descontaba al usar video; ahora send-to-edit lo resta por video encolado (solo sin plan). Es distinto de la cuota interna del box (quota_service).

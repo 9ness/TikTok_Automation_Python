@@ -435,6 +435,15 @@ def web_send_to_edit(
     if enqueued:
         _lock_day(user.id, day)
         _save_day_jobs(user.id, day, enqueued)
+        # Descuenta los vídeos de prueba (solo clientes SIN plan). El contador
+        # visible (web "Prueba · N" + panel config) vive en la cuenta web.
+        if not (account or {}).get("planId"):
+            try:
+                repo = get_web_account_repo()
+                cur = int((account or {}).get("trialVideos") or 0)
+                repo.set_trial_videos(user.account_email, max(0, cur - len(enqueued)))
+            except Exception:
+                pass
 
     return {"day": day, "enqueued": enqueued, "errors": errors, "locked": bool(enqueued)}
 
