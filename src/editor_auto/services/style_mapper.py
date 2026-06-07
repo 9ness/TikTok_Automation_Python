@@ -49,8 +49,11 @@ _PRESET_STYLES: dict[str, dict] = {
 }
 _DEFAULT_PRESET_ID = "clean"
 
-# Únicas flechas reales en Assets/flechas (el preflight valida contra esto).
-_ALLOWED_ARROWS = {"flecha_roja.mov", "flecha_negra.mov"}
+# Flechas reales en Assets/flechas (el preflight valida contra esto).
+_ALLOWED_ARROWS = {
+    "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
+    "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
+}
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
 # Se resuelve con fonts_registry.find_by_path (primer match disponible).
