@@ -227,6 +227,31 @@ def _append_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
     _save_day_jobs(user_id, day, cur)
 
 
+def _user_plan(user: EditorUser):
+    """Plan activo del usuario (o None si trial/sin plan)."""
+    sub = user.subscription
+    if sub and sub.status in ("active", "trial"):
+        from src.editor_auto.repos import PlanRepo
+        return PlanRepo().get(sub.plan_id)
+    return None
+
+
+def _effective_daily_limit(user: EditorUser, plan) -> int:
+    """Límite de vídeos/día efectivo. 0 = ilimitado. El override por usuario
+    gana al del plan."""
+    if user.daily_video_limit_override is not None:
+        return max(0, int(user.daily_video_limit_override))
+    return int(plan.daily_video_limit) if plan else 0
+
+
+def _day_processing_start(day: str, start_hour: int) -> float:
+    """Epoch (UTC) en que ABRE la ventana de procesamiento de `day`. Los vídeos
+    programados para un día futuro no se editan hasta este momento."""
+    from datetime import datetime, timezone
+    y, m, d = (int(x) for x in day.split("-"))
+    return datetime(y, m, d, max(0, min(23, start_hour)), 0, 0, tzinfo=timezone.utc).timestamp()
+
+
 def _get_day_jobs(user_id: str, day: str) -> list[dict]:
     data = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
     return data if isinstance(data, list) else []
@@ -374,10 +399,17 @@ class SendToEditRequest(BaseModel):
     day: str
 
 
-def _enqueue_video(queue: JobQueue, user: EditorUser, mount_path: Path, day: str) -> str:
+def _enqueue_video(
+    queue: JobQueue, user: EditorUser, mount_path: Path, day: str,
+    *, plan=None, scheduled_for: float | None = None,
+) -> str:
     """Encola un vídeo leyéndolo DIRECTO del rclone-mount (input_path = ruta
     del mount). El runner lee on-demand al procesar — sin copia previa que
-    descargue bytes durante el send-to-edit."""
+    descargue bytes durante el send-to-edit.
+
+    `scheduled_for` (epoch UTC) difiere la edición hasta que abra la ventana del
+    día programado: el worker ignora el job hasta esa hora y luego coge los del
+    día por orden de llegada (FIFO). None = editar cuanto antes."""
     enabled = [s for s in user.tool_flow if s.enabled]
     if not enabled:
         raise APIError(
@@ -387,18 +419,17 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, mount_path: Path, day: str
     if any(s.tool_id == TOOL_SILENCE_CUTTER_SCRIPTED for s in enabled):
         raise APIError("Tu flujo requiere guion; no compatible con subida web.", status_code=409)
 
-    decision = quota_service.check_can_enqueue(user, tool_ids=[s.tool_id for s in enabled])
-    if not decision.ok:
-        sc_map = {
-            "no_subscription": 402, "inactive_subscription": 402, "tool_not_allowed": 402,
-            "daily_limit": 429, "monthly_limit": 429, "outside_window": 425,
-            "spacing": 425, "promo_exhausted": 402,
-        }
-        raise APIError(
-            decision.message,
-            status_code=sc_map.get(decision.kind, 429),
-            details={"kind": decision.kind, "retry_after_seconds": decision.retry_after_seconds},
-        )
+    # Validación de acceso (la CUOTA por día la controla el caller con el
+    # recuento de jobs del día; aquí solo subscripción + tools permitidas).
+    if user.subscription and user.subscription.status not in ("active", "trial"):
+        raise APIError("Tu suscripción no está activa.", status_code=402)
+    tools_used = [s.tool_id for s in enabled]
+    if plan and plan.allowed_tools:
+        for tid in tools_used:
+            if tid not in plan.allowed_tools:
+                raise APIError(
+                    f"Tu plan no incluye la herramienta '{tid}'.", status_code=402,
+                )
 
     try:
         from src.utils import load_config
@@ -406,7 +437,6 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, mount_path: Path, day: str
     except Exception:
         temp_folder = "./temp_work"
 
-    tools_used = [s.tool_id for s in enabled]
     title = f"{user.name} · {mount_path.name} · {len(enabled)} tool(s)"
     params: dict[str, Any] = {
         "user_id": user.id,
@@ -419,11 +449,16 @@ def _enqueue_video(queue: JobQueue, user: EditorUser, mount_path: Path, day: str
         "output_subdir": day,
         "source_filename": mount_path.name,
     }
-    job = queue.enqueue(JobMode.EDITOR_AUTO, title=title, params=params)
-    try:
-        quota_service.register_enqueue(user)
-    except Exception:
-        pass
+    job = queue.enqueue(
+        JobMode.EDITOR_AUTO, title=title, params=params, scheduled_for=scheduled_for,
+    )
+    # Solo contamos contra la cuota rolling "de hoy" cuando se edita YA (hoy);
+    # los programados a futuro cuentan por su propio día (recuento de day_jobs).
+    if scheduled_for is None:
+        try:
+            quota_service.register_enqueue(user)
+        except Exception:
+            pass
     return job.id
 
 
@@ -460,12 +495,35 @@ def web_send_to_edit(
     if not videos:
         raise ValidationError("No hay vídeos nuevos para mandar a edición.", details={"day": day})
 
+    # Programación diferida: los vídeos de un día se editan cuando ABRE la
+    # ventana de procesamiento de ese día (no al pulsar el botón). Si el día ya
+    # está abierto (hoy, dentro de ventana), `scheduled_for=None` → se editan
+    # cuanto antes, por orden de llegada (FIFO en la cola).
+    plan = _user_plan(user)
+    start_hour = plan.processing_window_start_hour if plan else 0
+    sched_epoch = _day_processing_start(day, start_hour)
+    scheduled_for = sched_epoch if sched_epoch > time.time() else None
+
+    # Cuota por DÍA del plan (cuenta los ya programados para ese día).
+    eff_daily = _effective_daily_limit(user, plan)
+    already = len(_get_day_jobs(user.id, day))
+    remaining = (eff_daily - already) if eff_daily > 0 else None
+
     enqueued: list[dict] = []
     errors: list[dict] = []
     for v in videos:
+        if remaining is not None and len(enqueued) >= remaining:
+            errors.append({
+                "filename": v["filename"],
+                "error": (
+                    f"Has alcanzado tu límite de {eff_daily} vídeos para este día. "
+                    f"Programa el resto para otro día."
+                ),
+            })
+            break
         mount_path = Path(user_input_day_folder(user.name, day)) / v["filename"]
         try:
-            job_id = _enqueue_video(queue, user, mount_path, day)
+            job_id = _enqueue_video(queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for)
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
             errors.append({"filename": v["filename"], "error": e.message})
@@ -542,6 +600,10 @@ def web_output(
 
         running = bool(job and job.status == JobStatus.RUNNING)
         queue_pos = pos_map.get(m.get("job_id")) if (job and job.status == JobStatus.PENDING) else None
+        # Programado a futuro: PENDING con scheduled_for que aún no llegó → se
+        # editará cuando abra la ventana de su día (no está "en cola" todavía).
+        sched = getattr(job, "scheduled_for", None) if job else None
+        is_scheduled = bool(job and job.status == JobStatus.PENDING and sched and sched > time.time())
 
         videos.append({
             "source": m.get("filename"),
@@ -550,7 +612,8 @@ def web_output(
             "ready": is_ready,
             "in_review": bool(passed and not is_approved),
             "running": running,
-            "queue_position": queue_pos,
+            "queue_position": None if is_scheduled else queue_pos,
+            "scheduled": is_scheduled,
             "status": st.value if st else "unknown",
         })
 
