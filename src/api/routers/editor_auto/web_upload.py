@@ -61,6 +61,7 @@ _RATE_MAX = 60                       # nº máx de URLs de subida emitidas…
 _RATE_WINDOW_S = 300                 # …por ventana (5 min) y usuario
 
 _SENT_DAYS_KEY = "webdays_sent:"
+_SENT_FILES_KEY = "webday_sentfiles:"   # set de filenames de ENTRADA ya encolados por user/día
 _JOBS_KEY = "webday_jobs:"
 _RATE_KEY = "webrate:"
 _APPROVED_KEY = "webday_approved:"      # set de out-filenames aprobados por user/día
@@ -98,6 +99,20 @@ def _lock_day(user_id: str, day: str) -> None:
     r.sadd(f"{_SENT_DAYS_KEY}{user_id}", day)
     # Índice global para que el panel admin liste días con salida pendiente.
     r.sadd(_SENT_INDEX_KEY, f"{user_id}:{day}")
+
+
+def _sent_files(user_id: str, day: str) -> set[str]:
+    """Filenames de entrada ya mandados a edición este día (no se re-encolan)."""
+    try:
+        return set(get_editor_redis().smembers(f"{_SENT_FILES_KEY}{user_id}:{day}") or [])
+    except Exception:
+        return set()
+
+
+def _mark_files_sent(user_id: str, day: str, names: list[str]) -> None:
+    r = get_editor_redis()
+    for n in names:
+        r.sadd(f"{_SENT_FILES_KEY}{user_id}:{day}", n)
 
 
 def _approved_set(user_id: str, day: str) -> set[str]:
@@ -205,6 +220,13 @@ def _save_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
     get_editor_redis().set_json(f"{_JOBS_KEY}{user_id}:{day}", jobs)
 
 
+def _append_day_jobs(user_id: str, day: str, jobs: list[dict]) -> None:
+    """Añade trabajos a los ya registrados del día (envíos incrementales)."""
+    cur = _get_day_jobs(user_id, day)
+    cur.extend(jobs)
+    _save_day_jobs(user_id, day, cur)
+
+
 def _get_day_jobs(user_id: str, day: str) -> list[dict]:
     data = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
     return data if isinstance(data, list) else []
@@ -252,8 +274,6 @@ def web_upload_url(
         raise ValidationError("El ticket no autoriza este día.", details={"day": day})
 
     user = _resolve_user(claims)
-    if _day_locked(user.id, day):
-        raise APIError("Este día ya se mandó a edición y está bloqueado.", status_code=409)
     if not day_send_open(day):
         raise APIError(
             f"El cierre para este día fue a las {send_cutoff_hour()}:{send_cutoff_minute():02d}. "
@@ -300,12 +320,23 @@ def web_day(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     _require_drive()
     user = _resolve_user(claims)
-    locked = _day_locked(user.id, day)
-    # Si el día ya está bloqueado (mandado a edición), el cliente muestra la
-    # SALIDA (output), no los borradores de entrada → nos saltamos el listado
-    # de Drive (lento, ~2-3s) y respondemos al instante.
-    videos = [] if locked else drive_uploads.list_day_files(user.name, day)
-    return {"day": day, "locked": locked, "videos": videos}
+    # Envíos incrementales: el día ya NO se bloquea por completo al primer envío.
+    # Listamos solo los BORRADORES (subidos pero aún no mandados a edición); los
+    # ya enviados se siguen en /output. El día acepta más subidas mientras no
+    # pase el cierre y no se alcance el tope diario.
+    sent = _sent_files(user.id, day)
+    all_files = drive_uploads.list_day_files(user.name, day)
+    drafts = [v for v in all_files if v.get("filename") not in sent]
+    has_jobs = bool(_get_day_jobs(user.id, day))
+    open_day = day_send_open(day) and len(all_files) < _MAX_FILES_PER_DAY
+    return {
+        "day": day,
+        # `locked` se conserva por compat: el cliente nuevo usa `open`/`has_jobs`.
+        "locked": not open_day and not drafts,
+        "open": open_day,
+        "has_jobs": has_jobs,
+        "videos": drafts,
+    }
 
 
 # ─────────────────────────── Borrar (borrador) ───────────────────────────
@@ -324,12 +355,17 @@ def web_delete_file(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": payload.day})
     _require_drive()
     user = _resolve_user(claims)
-    if _day_locked(user.id, payload.day):
-        raise APIError("El día está bloqueado; no se pueden borrar vídeos.", status_code=409)
-    ok = drive_uploads.delete_day_file(user.name, payload.day, _safe_name(payload.filename))
+    name = _safe_name(payload.filename)
+    # Solo se pueden borrar BORRADORES (no enviados). Los ya mandados a edición
+    # están en proceso y no se tocan.
+    if payload.filename in _sent_files(user.id, payload.day) or name in _sent_files(user.id, payload.day):
+        raise APIError("Este vídeo ya se mandó a edición; no se puede borrar.", status_code=409)
+    ok = drive_uploads.delete_day_file(user.name, payload.day, name)
     if not ok:
         raise UserNotFoundError("Vídeo no encontrado.", details={"filename": payload.filename})
-    return {"ok": True, "videos": drive_uploads.list_day_files(user.name, payload.day)}
+    sent = _sent_files(user.id, payload.day)
+    drafts = [v for v in drive_uploads.list_day_files(user.name, payload.day) if v.get("filename") not in sent]
+    return {"ok": True, "videos": drafts}
 
 
 # ─────────────────────────── Mandar a edición ───────────────────────────
@@ -402,8 +438,6 @@ def web_send_to_edit(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     _require_drive()
     user = _resolve_user(claims)
-    if _day_locked(user.id, day):
-        raise APIError("Este día ya se mandó a edición.", status_code=409)
     if not day_send_open(day):
         raise APIError(
             f"El cierre para este día fue a las {send_cutoff_hour()}:{send_cutoff_minute():02d}. "
@@ -418,9 +452,13 @@ def web_send_to_edit(
     user.tool_flow = build_tool_flow((account or {}).get("styleConfig"))
     UserRepo().save(user)
 
-    videos = drive_uploads.list_day_files(user.name, day)
+    # Envíos incrementales: solo mandamos los borradores NUEVOS (no enviados
+    # antes este día). Así el cliente puede mandar 1 ahora y el resto luego,
+    # hasta agotar su cuota del plan o el cierre del día.
+    sent = _sent_files(user.id, day)
+    videos = [v for v in drive_uploads.list_day_files(user.name, day) if v.get("filename") not in sent]
     if not videos:
-        raise ValidationError("No hay vídeos para este día.", details={"day": day})
+        raise ValidationError("No hay vídeos nuevos para mandar a edición.", details={"day": day})
 
     enqueued: list[dict] = []
     errors: list[dict] = []
@@ -434,8 +472,9 @@ def web_send_to_edit(
             break
 
     if enqueued:
-        _lock_day(user.id, day)
-        _save_day_jobs(user.id, day, enqueued)
+        _lock_day(user.id, day)  # indexa el día para el panel admin / summary
+        _append_day_jobs(user.id, day, enqueued)
+        _mark_files_sent(user.id, day, [e["filename"] for e in enqueued])
         # Descuenta los vídeos de prueba (solo clientes SIN plan). El contador
         # visible (web "Prueba · N" + panel config) vive en la cuenta web.
         if not (account or {}).get("planId"):
