@@ -618,13 +618,16 @@ def web_download(
     day: str,
     file: str,
     ticket: Annotated[str, Query(...)],
+    source: Annotated[bool, Query()] = False,
 ) -> FileResponse:
-    """Descarga un vídeo editado de `salida/<día>/` (lee del rclone-mount)."""
+    """Sirve un vídeo del rclone-mount. Por defecto el editado de `salida/<día>/`;
+    con `source=true`, el borrador subido de `entrada/<día>/` (para previsualizar
+    lo que el cliente acaba de subir antes de mandarlo a edición)."""
     claims = verify_ticket(ticket)
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     user = _resolve_user(claims)
-    folder = user_output_day_folder(user.name, day)
+    folder = user_input_day_folder(user.name, day) if source else user_output_day_folder(user.name, day)
     safe = _safe_name(file)
     path = os.path.join(folder, safe)
     if not os.path.exists(path):
