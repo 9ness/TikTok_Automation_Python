@@ -527,6 +527,9 @@ _ARROW_COLORS: dict[str, tuple[int, int, int]] = {
     "flecha_bob_roja.mov": (230, 40, 40),
     "flecha_triple_blanca.mov": (245, 245, 245),
     "flecha_triple_roja.mov": (230, 40, 40),
+    "flecha_izq_roja.mov": (230, 40, 40),
+    "flecha_izq_amarilla.mov": (253, 224, 71),
+    "flecha_abajo_triple_blanca.mov": (245, 245, 245),
 }
 
 

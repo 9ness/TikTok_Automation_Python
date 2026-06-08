@@ -64,6 +64,8 @@ _ALLOWED_ARROWS = _SMART_POOL | {
     "flecha_pulse_blanca.mov", "flecha_pulse_roja.mov",
     "flecha_bob_blanca.mov", "flecha_bob_roja.mov",
     "flecha_triple_blanca.mov", "flecha_triple_roja.mov",
+    "flecha_izq_roja.mov", "flecha_izq_amarilla.mov",
+    "flecha_abajo_triple_blanca.mov",
 }
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
