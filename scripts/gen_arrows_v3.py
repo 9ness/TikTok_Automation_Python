@@ -77,23 +77,40 @@ def _wave(p, k):
     ph = (p - k / 3.0) % 1.0
     return AMP * (0.5 - 0.5 * math.cos(2 * math.pi * ph))
 
-# Triple derecha (chevrons marchando a la derecha)
-chev = _shape_rgba(_chevron(SS / 2, SS / 2, int(0.20 * SS), int(0.42 * SS)), WHITE)
-gapx = int(0.19 * SS)
-def triple_right(c, p):
-    for k in range(3):
-        _paste(c, chev, dx=(k - 1) * gapx + _wave(p, k))
-_render("flecha_triple_blanca", triple_right)
+def _crop(img):
+    return img.crop(img.getbbox())
 
-# Triple abajo (flechas hacia abajo marchando hacia abajo)
+
+def _row(name, sprite, vertical):
+    """3 sprites en fila que LLENAN el frame (recorta al contenido y escala
+    para que el grupo ocupe ~88% del ancho). `vertical`=motion hacia abajo."""
+    sp = _crop(sprite)
+    fill = 0.88 * SS
+    gap = int(0.02 * SS)
+    ew = int((fill - 2 * gap) / 3)
+    eh = int(ew * sp.height / sp.width)
+    # límite vertical (deja sitio al wave) para que no se salga
+    maxh = int(0.80 * SS)
+    if eh > maxh:
+        eh = maxh; ew = int(eh * sp.width / sp.height)
+    sp = sp.resize((ew, eh), Image.LANCZOS)
+    step = ew + gap
+
+    def frame_fn(c, p):
+        for k in range(3):
+            d = _wave(p, k)
+            cx = SS / 2 + (k - 1) * step + (0 if vertical else d)
+            cy = SS / 2 + (d if vertical else 0)
+            c.alpha_composite(sp, (int(cx - ew / 2), int(cy - eh / 2)))
+    _render(name, frame_fn)
+
+
+# Triple derecha (chevrons marchando a la derecha) y triple abajo (flechas abajo)
+chev = _shape_rgba(_chevron(SS / 2, SS / 2, int(0.30 * SS), int(0.64 * SS)), WHITE)
+_row("flecha_triple_blanca", chev, vertical=False)
+
 arrow = _shape_rgba(_arrow_right(SS / 2, SS / 2, int(0.46 * SS), int(0.30 * SS)), WHITE)
 down = arrow.rotate(-90, expand=True)
-dw = int(0.26 * SS)
-down = down.resize((dw, int(dw * down.height / down.width)), Image.LANCZOS)
-gapxx = int(0.30 * SS)
-def triple_down(c, p):
-    for k in range(3):
-        _paste(c, down, dx=(k - 1) * gapxx, dy=_wave(p, k))
-_render("flecha_abajo_triple_blanca", triple_down)
+_row("flecha_abajo_triple_blanca", down, vertical=True)
 
 print("DONE", sorted(os.listdir(OUT)))
