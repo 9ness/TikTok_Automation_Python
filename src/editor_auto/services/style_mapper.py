@@ -147,6 +147,10 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     case_mode = case_choice if case_choice is not None else ps.get("case", "None")
     y = _clamp(_f(sub.get("y"), 0.78), 0.05, 0.95)
     font_scale = round(_clamp(0.045 * _f(sub.get("scale"), 1.0), 0.02, 0.10), 4)
+    # Ancho máx. de la caja de subtítulos (fracción del ancho del vídeo). Lo
+    # elige el cliente con las asas laterales / slider. Más ancho = más
+    # palabras por línea antes de saltar.
+    max_width = round(_clamp(_f(sub.get("width"), 0.8), 0.3, 1.0), 3)
 
     base_subs = _with_defaults("subs_auto", {})
     # Fuente: la del fontId elegido; si no resuelve, la tipografía propia del
@@ -175,6 +179,8 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
         # Animación de entrada: pop (escala+fade) SOLO en "una palabra"; en
         # "varias" no animamos (solo cambia el resaltado de la palabra activa).
         "entrance_anim": "pop" if mode == "word" else "none",
+        # Ancho de la caja → max_width del motor (subs_auto / subtitles_only).
+        "max_width": max_width,
     }
     steps.append(ToolStep(tool_id="subs_auto", enabled=True, config=_with_defaults("subs_auto", subs_overrides)))
 
