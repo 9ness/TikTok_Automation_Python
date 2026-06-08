@@ -376,16 +376,11 @@ class StickerArrowTool:
                         # mejor) → usa toda la variedad de formas/colores sin
                         # perder visibilidad.
                         import random
-                        scored = [
-                            (p, _contrast_ratio(
-                                _ARROW_COLORS.get(os.path.basename(p).lower(), (255, 255, 255)), bg))
-                            for p in pool
-                        ]
+                        scored = [(p, _contrast_ratio(_repr_color(p, ctx), bg)) for p in pool]
                         best = max(s for _, s in scored)
                         eligible = [p for p, s in scored if s >= best * 0.82]
                         sticker_path = random.choice(eligible)
-                        ratio = _contrast_ratio(
-                            _ARROW_COLORS.get(os.path.basename(sticker_path).lower(), (255, 255, 255)), bg)
+                        ratio = _contrast_ratio(_repr_color(sticker_path, ctx), bg)
                         ctx.on_log(
                             f"[sticker_arrow] ✨ inteligente: fondo RGB="
                             f"({bg[0]:.0f},{bg[1]:.0f},{bg[2]:.0f}) → "
@@ -601,6 +596,45 @@ def _region_avg_rgb(
     except Exception as e:
         ctx.on_log(f"[sticker_arrow] color medio falló ({e}) — uso flecha por defecto.")
         return None
+
+
+_REPR_COLOR_CACHE: dict[str, tuple[int, int, int]] = {}
+
+
+def _repr_color(path: str, ctx: ToolContext) -> tuple[int, int, int]:
+    """Color representativo de una flecha. Usa el mapa conocido si existe; si
+    no (flecha NUEVA), lo CALCULA del propio asset (media de los píxeles
+    opacos). Así el modo Inteligente funciona con flechas futuras sin tocar
+    código. Cachea por path."""
+    base = os.path.basename(path).lower()
+    if base in _ARROW_COLORS:
+        return _ARROW_COLORS[base]
+    if path in _REPR_COLOR_CACHE:
+        return _REPR_COLOR_CACHE[path]
+    color: tuple[int, int, int] = (255, 255, 255)
+    try:
+        from PIL import Image
+        os.makedirs(ctx.temp_folder, exist_ok=True)
+        tmp = os.path.join(ctx.temp_folder, f"arrowc_{ctx.job_id}_{int(time.time()*1000)}.png")
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", path,
+             "-frames:v", "1", tmp], capture_output=True, timeout=40)
+        if proc.returncode == 0 and os.path.isfile(tmp):
+            img = Image.open(tmp).convert("RGBA").resize((24, 24))
+            rs = gs = bs = n = 0
+            for r, g, b, a in img.getdata():
+                if a > 40:
+                    rs += r; gs += g; bs += b; n += 1
+            if n:
+                color = (rs // n, gs // n, bs // n)
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+    except Exception as e:
+        ctx.on_log(f"[sticker_arrow] color auto de {base} falló ({e}); uso blanco.")
+    _REPR_COLOR_CACHE[path] = color
+    return color
 
 
 def _best_contrast_arrow(pool: list[str], bg_rgb: tuple[float, float, float]) -> str:

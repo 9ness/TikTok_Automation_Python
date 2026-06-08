@@ -49,9 +49,12 @@ _PRESET_STYLES: dict[str, dict] = {
 }
 _DEFAULT_PRESET_ID = "clean"
 
-# Pool del modo INTELIGENTE (auto) = TODAS las flechas visibles en el selector.
-# El motor elige por contraste con el fondo (con variedad de forma/color).
-_SMART_POOL = {
+# Extensiones de sticker válidas (mismas que acepta sticker_arrow).
+_ARROW_EXTS = (".mov", ".webm", ".gif", ".apng", ".png")
+
+# Fallback estático por si la carpeta de Assets no está accesible en el momento
+# (rclone mount caído). En condiciones normales se usa el listado real.
+_KNOWN_ARROWS = {
     "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
     "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
     "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
@@ -60,14 +63,26 @@ _SMART_POOL = {
     "flecha_abajo_triple_blanca.mov",
 }
 
-# Flechas reales válidas en Assets/flechas (el preflight valida contra esto):
-# las visibles + estilos ocultos (pulso/rebote/triple roja) que siguen como
-# assets aunque ya no se ofrezcan.
-_ALLOWED_ARROWS = _SMART_POOL | {
-    "flecha_pulse_blanca.mov", "flecha_pulse_roja.mov",
-    "flecha_bob_blanca.mov", "flecha_bob_roja.mov",
-    "flecha_triple_roja.mov",
-}
+
+def _list_arrow_files() -> set[str]:
+    """Escanea `Assets/flechas/` y devuelve las flechas OFRECIBLES. Así las
+    flechas nuevas que se añadan en el futuro entran solas (selector manual y
+    modo Inteligente) sin tocar código. Excluye fuentes/backups (*_source*,
+    *_original*). Si el escaneo falla, cae al set estático conocido."""
+    import os
+    from src.editor_auto.config import arrows_folder
+    out: set[str] = set()
+    try:
+        for fn in os.listdir(arrows_folder()):
+            low = fn.lower()
+            if not low.endswith(_ARROW_EXTS):
+                continue
+            if "_source" in low or "_original" in low or "_backup" in low:
+                continue
+            out.add(fn)
+    except OSError:
+        pass
+    return out or set(_KNOWN_ARROWS)
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
 # Se resuelve con fonts_registry.find_by_path (primer match disponible).
@@ -213,7 +228,8 @@ def _build_arrow_step(arr: dict) -> ToolStep:
     rot = int(_f(arr.get("rotation"), 0)) % 360
     shape = str(arr.get("shapeId") or "").strip()
     smart = shape == "auto"
-    if not smart and shape not in _ALLOWED_ARROWS:
+    available = _list_arrow_files()
+    if not smart and shape not in available:
         # Valores viejos/ inválidos (p.ej. "simple" de presets SVG antiguos)
         # caen a flecha_roja.mov, si no el preflight aborta el job.
         shape = "flecha_roja.mov"
@@ -221,7 +237,9 @@ def _build_arrow_step(arr: dict) -> ToolStep:
         # En smart usamos una por defecto pero el motor la sobrescribe.
         "sticker_file": "flecha_roja.mov" if smart else shape,
         "color_mode": "smart" if smart else "fixed",
-        "candidate_stickers": sorted(_SMART_POOL) if smart else [],
+        # Candidatas del modo Inteligente = TODAS las flechas reales de la
+        # carpeta (las nuevas entran solas).
+        "candidate_stickers": sorted(available) if smart else [],
         "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
         "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
         "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),
