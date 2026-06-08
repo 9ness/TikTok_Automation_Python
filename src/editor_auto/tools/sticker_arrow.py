@@ -345,7 +345,7 @@ class StickerArrowTool:
         # `sticker_path` ya apunta a la flecha por defecto; lo sobrescribimos
         # si el modo lo pide.
         color_mode = str(config.get("color_mode", "fixed")).lower().strip()
-        if color_mode in ("auto_contrast", "random") and windows:
+        if color_mode in ("auto_contrast", "random", "smart") and windows:
             pool: list[str] = [sticker_path]
             for c in (config.get("candidate_stickers") or []):
                 p = _resolve_sticker_path(str(c))
@@ -359,6 +359,32 @@ class StickerArrowTool:
                         f"[sticker_arrow] 🎲 random → {os.path.basename(sticker_path)} "
                         f"(de {len(pool)} candidatas)"
                     )
+                elif color_mode == "smart":
+                    # Inteligente: elige la flecha (forma+color) de MÁS contraste
+                    # real (WCAG) con el color medio del fondo en la zona del CTA.
+                    bg = _region_avg_rgb(
+                        input_path=input_path,
+                        t=windows[0][0] + 0.1,
+                        px_pct=float(config.get("position_x_pct", 50.0)),
+                        py_pct=float(config.get("position_y_pct", 80.0)),
+                        scale_pct=float(config.get("scale_width_pct", 25.0)),
+                        ctx=ctx,
+                    )
+                    if bg is not None:
+                        sticker_path = _best_contrast_arrow(pool, bg)
+                        ratio = _contrast_ratio(
+                            _ARROW_COLORS.get(os.path.basename(sticker_path).lower(), (255, 255, 255)),
+                            bg,
+                        )
+                        ctx.on_log(
+                            f"[sticker_arrow] ✨ inteligente: fondo RGB="
+                            f"({bg[0]:.0f},{bg[1]:.0f},{bg[2]:.0f}) → "
+                            f"{os.path.basename(sticker_path)} (contraste {ratio:.1f}:1)"
+                        )
+                    else:
+                        ctx.on_log(
+                            "[sticker_arrow] ✨ inteligente: sin lectura de fondo → flecha por defecto."
+                        )
                 else:  # auto_contrast
                     lum = _region_luminance(
                         input_path,
@@ -480,6 +506,91 @@ def _region_luminance(
     except Exception as e:
         ctx.on_log(f"[sticker_arrow] luminancia falló ({e}) — uso flecha por defecto.")
         return None
+
+
+# Color representativo de cada flecha (para el modo "smart": elegir la de
+# MÁS contraste real con el fondo, no solo claro/oscuro). RGB aproximado del
+# trazo de cada asset.
+_ARROW_COLORS: dict[str, tuple[int, int, int]] = {
+    "flecha_roja.mov": (239, 45, 45),
+    "flecha_negra.mov": (20, 20, 20),
+    "flecha_blanca.mov": (245, 245, 245),
+    "flecha_amarilla.mov": (253, 224, 71),
+    "flecha_cyan.mov": (34, 211, 238),
+    "flecha_verde.mov": (34, 197, 94),
+}
+
+
+def _rel_luminance(rgb: tuple[float, float, float]) -> float:
+    """Luminancia relativa WCAG (0..1) de un color sRGB."""
+    def _lin(c: float) -> float:
+        c = c / 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = rgb
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def _contrast_ratio(c1: tuple[float, float, float], c2: tuple[float, float, float]) -> float:
+    """Ratio de contraste WCAG (1..21) entre dos colores."""
+    l1, l2 = _rel_luminance(c1), _rel_luminance(c2)
+    hi, lo = max(l1, l2), min(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _region_avg_rgb(
+    *, input_path: str, t: float, px_pct: float, py_pct: float,
+    scale_pct: float, ctx: ToolContext,
+) -> tuple[float, float, float] | None:
+    """Color medio (R,G,B 0..255) de la zona donde irá la flecha. None si falla."""
+    try:
+        from PIL import Image
+        tmp = os.path.join(
+            ctx.temp_folder, f"arrow_rgb_{ctx.job_id}_{int(time.time()*1000)}.png"
+        )
+        os.makedirs(ctx.temp_folder, exist_ok=True)
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-ss", f"{max(0.0, t):.3f}", "-i", input_path,
+            "-frames:v", "1", tmp,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=60)
+        if proc.returncode != 0 or not os.path.isfile(tmp):
+            return None
+        img = Image.open(tmp).convert("RGB")
+        W, H = img.size
+        cx = (px_pct / 100.0) * W
+        cy = (py_pct / 100.0) * H
+        half = max(8.0, (scale_pct / 100.0) * W / 2.0)
+        box = (
+            int(max(0, cx - half)), int(max(0, cy - half)),
+            int(min(W, cx + half)), int(min(H, cy + half)),
+        )
+        px = img.crop(box).resize((16, 16)).getdata()
+        n = len(px) or 1
+        r = sum(p[0] for p in px) / n
+        g = sum(p[1] for p in px) / n
+        b = sum(p[2] for p in px) / n
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return (r, g, b)
+    except Exception as e:
+        ctx.on_log(f"[sticker_arrow] color medio falló ({e}) — uso flecha por defecto.")
+        return None
+
+
+def _best_contrast_arrow(pool: list[str], bg_rgb: tuple[float, float, float]) -> str:
+    """Devuelve la flecha del pool con MÁS contraste WCAG contra el fondo."""
+    best, best_ratio = pool[0], -1.0
+    for p in pool:
+        color = _ARROW_COLORS.get(os.path.basename(p).lower())
+        if color is None:
+            continue
+        ratio = _contrast_ratio(color, bg_rgb)
+        if ratio > best_ratio:
+            best, best_ratio = p, ratio
+    return best
 
 
 def _probe_duration(path: str) -> float:

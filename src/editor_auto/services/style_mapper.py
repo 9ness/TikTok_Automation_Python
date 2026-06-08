@@ -191,17 +191,23 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
 
 
 def _build_arrow_step(arr: dict) -> ToolStep:
-    """ToolStep de la flecha CTA con saneo de la flecha elegida."""
+    """ToolStep de la flecha CTA con saneo de la flecha elegida.
+
+    shapeId == "auto" → modo INTELIGENTE: el motor elige la flecha (forma+
+    color) de más contraste con el fondo en la zona del CTA, entre todas las
+    flechas disponibles."""
     rot = int(_f(arr.get("rotation"), 0)) % 360
-    # Saneo: solo existen estas flechas reales. Valores viejos/ inválidos
-    # (p.ej. "simple" de presets SVG antiguos) caen a flecha_roja.mov, si no
-    # el preflight aborta el job ("'simple' no está en Assets/flechas").
     shape = str(arr.get("shapeId") or "").strip()
-    if shape not in _ALLOWED_ARROWS:
+    smart = shape == "auto"
+    if not smart and shape not in _ALLOWED_ARROWS:
+        # Valores viejos/ inválidos (p.ej. "simple" de presets SVG antiguos)
+        # caen a flecha_roja.mov, si no el preflight aborta el job.
         shape = "flecha_roja.mov"
     arrow_overrides = {
-        "sticker_file": shape,
-        "color_mode": "fixed",
+        # En smart usamos una por defecto pero el motor la sobrescribe.
+        "sticker_file": "flecha_roja.mov" if smart else shape,
+        "color_mode": "smart" if smart else "fixed",
+        "candidate_stickers": sorted(_ALLOWED_ARROWS) if smart else [],
         "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
         "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
         "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),
