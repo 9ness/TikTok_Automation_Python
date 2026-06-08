@@ -487,7 +487,14 @@ def web_send_to_edit(
     from src.editor_auto.repos.web_account_repo import get_web_account_repo
     from src.editor_auto.services.style_mapper import build_tool_flow
     account = get_web_account_repo().get(user.account_email)
-    user.tool_flow = build_tool_flow((account or {}).get("styleConfig"))
+    plan = _user_plan(user)
+    tool_flow = build_tool_flow((account or {}).get("styleConfig"))
+    # El plan limita las herramientas: si el estilo del cliente incluye una tool
+    # que su plan NO cubre (p.ej. sticker_arrow en Starter), la DESCARTAMOS en
+    # silencio en vez de fallar el envío — el vídeo se edita con las permitidas.
+    if plan and plan.allowed_tools:
+        tool_flow = [s for s in tool_flow if s.tool_id in plan.allowed_tools]
+    user.tool_flow = tool_flow
     UserRepo().save(user)
 
     # Envíos incrementales: solo mandamos los borradores NUEVOS (no enviados
@@ -502,7 +509,6 @@ def web_send_to_edit(
     # ventana de procesamiento de ese día (no al pulsar el botón). Si el día ya
     # está abierto (hoy, dentro de ventana), `scheduled_for=None` → se editan
     # cuanto antes, por orden de llegada (FIFO en la cola).
-    plan = _user_plan(user)
     start_hour = plan.processing_window_start_hour if plan else 0
     sched_epoch = _day_processing_start(day, start_hour)
     scheduled_for = sched_epoch if sched_epoch > time.time() else None
