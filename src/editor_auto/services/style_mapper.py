@@ -49,10 +49,21 @@ _PRESET_STYLES: dict[str, dict] = {
 }
 _DEFAULT_PRESET_ID = "clean"
 
-# Flechas reales en Assets/flechas (el preflight valida contra esto).
-_ALLOWED_ARROWS = {
+# Pool del modo INTELIGENTE (auto): flechas SIMPLES — entre estas elige el
+# motor la de más contraste con el fondo. No incluye los estilos animados para
+# no cambiar la FORMA que espera el cliente (solo el color).
+_SMART_POOL = {
     "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
     "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
+}
+
+# Flechas reales válidas en Assets/flechas (el preflight valida contra esto):
+# simples + estilos animados (avanza/pulso/rebote/triple, en blanca y roja).
+_ALLOWED_ARROWS = _SMART_POOL | {
+    "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
+    "flecha_pulse_blanca.mov", "flecha_pulse_roja.mov",
+    "flecha_bob_blanca.mov", "flecha_bob_roja.mov",
+    "flecha_triple_blanca.mov", "flecha_triple_roja.mov",
 }
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
@@ -207,7 +218,7 @@ def _build_arrow_step(arr: dict) -> ToolStep:
         # En smart usamos una por defecto pero el motor la sobrescribe.
         "sticker_file": "flecha_roja.mov" if smart else shape,
         "color_mode": "smart" if smart else "fixed",
-        "candidate_stickers": sorted(_ALLOWED_ARROWS) if smart else [],
+        "candidate_stickers": sorted(_SMART_POOL) if smart else [],
         "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
         "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
         "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),

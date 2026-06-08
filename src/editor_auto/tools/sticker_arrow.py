@@ -518,6 +518,15 @@ _ARROW_COLORS: dict[str, tuple[int, int, int]] = {
     "flecha_amarilla.mov": (253, 224, 71),
     "flecha_cyan.mov": (34, 211, 238),
     "flecha_verde.mov": (34, 197, 94),
+    # Estilos animados (avanza/pulso/rebote/triple), blanca y roja.
+    "flecha_avanza_blanca.mov": (245, 245, 245),
+    "flecha_avanza_roja.mov": (230, 40, 40),
+    "flecha_pulse_blanca.mov": (245, 245, 245),
+    "flecha_pulse_roja.mov": (230, 40, 40),
+    "flecha_bob_blanca.mov": (245, 245, 245),
+    "flecha_bob_roja.mov": (230, 40, 40),
+    "flecha_triple_blanca.mov": (245, 245, 245),
+    "flecha_triple_roja.mov": (230, 40, 40),
 }
 
 
