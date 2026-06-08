@@ -353,11 +353,12 @@ def web_day(
     all_files = drive_uploads.list_day_files(user.name, day)
     drafts = [v for v in all_files if v.get("filename") not in sent]
     has_jobs = bool(_get_day_jobs(user.id, day))
-    open_day = day_send_open(day) and len(all_files) < _MAX_FILES_PER_DAY
+    # Envío en UNA tanda: el día acepta subidas hasta que se manda a edición.
+    # Tras el primer envío (has_jobs) queda cerrado — no se mandan más tandas.
+    open_day = day_send_open(day) and len(all_files) < _MAX_FILES_PER_DAY and not has_jobs
     return {
         "day": day,
-        # `locked` se conserva por compat: el cliente nuevo usa `open`/`has_jobs`.
-        "locked": not open_day and not drafts,
+        "locked": not open_day,
         "open": open_day,
         "has_jobs": has_jobs,
         "videos": drafts,
@@ -473,6 +474,8 @@ def web_send_to_edit(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     _require_drive()
     user = _resolve_user(claims)
+    if _get_day_jobs(user.id, day):
+        raise APIError("Este día ya se mandó a edición.", status_code=409)
     if not day_send_open(day):
         raise APIError(
             f"El cierre para este día fue a las {send_cutoff_hour()}:{send_cutoff_minute():02d}. "
