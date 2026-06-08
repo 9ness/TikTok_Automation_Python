@@ -707,6 +707,36 @@ def get_video_duration(video_path: str) -> float:
     return float(frames / fps)
 
 
+_POP_DUR_S = 0.16  # ~5 frames @30fps — duración del pop de entrada
+
+
+def _ease_out_cubic(p: float) -> float:
+    return 1.0 - (1.0 - p) ** 3
+
+
+def _apply_pop_in(clip, dur: float):
+    """Pop de entrada (escala 0.82→1.0 + fade-in) en los primeros ~160 ms.
+
+    Pensado para subtítulos de UNA palabra: cada palabra "entra" con un toque
+    tipo TikTok. Tras la ventana del pop la escala queda fija en 1.0. Si algo
+    falla (resize/mask), devuelve el clip sin animar (defensivo)."""
+    pop = min(_POP_DUR_S, max(0.0, dur * 0.9))
+    if pop <= 0.01:
+        return clip
+
+    def _scale(t):
+        if t >= pop:
+            return 1.0
+        return 0.82 + 0.18 * _ease_out_cubic(t / pop)
+
+    try:
+        out = clip.resize(_scale)
+        out = out.crossfadein(pop)
+        return out
+    except Exception:
+        return clip
+
+
 def render_subtitles_on_video(
     video_path: str,
     words: list[dict],
@@ -812,6 +842,8 @@ def render_subtitles_on_video(
                 .set_duration(chunk_end - chunk_start)
                 .set_position(("center", y_top_px))
             )
+            if s.get("entrance_anim") == "pop":
+                clip = _apply_pop_in(clip, chunk_end - chunk_start)
             overlays.append(clip)
             continue
 
@@ -842,6 +874,8 @@ def render_subtitles_on_video(
                 .set_duration(dur)
                 .set_position(("center", y_top_px))
             )
+            if s.get("entrance_anim") == "pop":
+                clip = _apply_pop_in(clip, dur)
             overlays.append(clip)
 
     if log_callback:

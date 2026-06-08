@@ -172,6 +172,9 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
         "font_scale": font_scale,
         # "una palabra" fuerza 1; "varias" usa 4.
         "max_words": 1 if mode == "word" else 4,
+        # Animación de entrada: pop (escala+fade) SOLO en "una palabra"; en
+        # "varias" no animamos (solo cambia el resaltado de la palabra activa).
+        "entrance_anim": "pop" if mode == "word" else "none",
     }
     steps.append(ToolStep(tool_id="subs_auto", enabled=True, config=_with_defaults("subs_auto", subs_overrides)))
 

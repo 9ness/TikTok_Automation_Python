@@ -81,6 +81,9 @@ class SubsAutoTool:
             "pill_enabled": preset.get("pill_enabled", True),
             "max_width": preset.get("max_width_pct", 0.85),
             "sync_offset": 0,
+            # Animación de entrada por palabra. "pop" = escala+fade (~160ms),
+            # pensado para subtítulos de UNA palabra. "none" = sin animación.
+            "entrance_anim": "none",
         }
 
     def config_schema(self) -> list[dict[str, Any]]:
@@ -245,6 +248,7 @@ class SubsAutoTool:
             "pill_enabled": config.get("pill_enabled", True),
             "max_width_pct": config.get("max_width", 0.85),
             "sync_offset_ms": config.get("sync_offset", 0),
+            "entrance_anim": config.get("entrance_anim", "none"),
         }
         # Evita que la ÚLTIMA palabra quede CONGELADA hasta el final del vídeo
         # cuando hay cola sin voz (el habla acaba antes que el vídeo). Cap del
