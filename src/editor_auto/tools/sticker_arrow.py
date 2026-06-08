@@ -371,15 +371,26 @@ class StickerArrowTool:
                         ctx=ctx,
                     )
                     if bg is not None:
-                        sticker_path = _best_contrast_arrow(pool, bg)
+                        # Puntúa TODAS las candidatas por contraste con el fondo
+                        # y elige al azar entre las que contrastan bien (≥82% del
+                        # mejor) → usa toda la variedad de formas/colores sin
+                        # perder visibilidad.
+                        import random
+                        scored = [
+                            (p, _contrast_ratio(
+                                _ARROW_COLORS.get(os.path.basename(p).lower(), (255, 255, 255)), bg))
+                            for p in pool
+                        ]
+                        best = max(s for _, s in scored)
+                        eligible = [p for p, s in scored if s >= best * 0.82]
+                        sticker_path = random.choice(eligible)
                         ratio = _contrast_ratio(
-                            _ARROW_COLORS.get(os.path.basename(sticker_path).lower(), (255, 255, 255)),
-                            bg,
-                        )
+                            _ARROW_COLORS.get(os.path.basename(sticker_path).lower(), (255, 255, 255)), bg)
                         ctx.on_log(
                             f"[sticker_arrow] ✨ inteligente: fondo RGB="
                             f"({bg[0]:.0f},{bg[1]:.0f},{bg[2]:.0f}) → "
-                            f"{os.path.basename(sticker_path)} (contraste {ratio:.1f}:1)"
+                            f"{os.path.basename(sticker_path)} (contraste {ratio:.1f}:1, "
+                            f"{len(eligible)}/{len(pool)} candidatas válidas)"
                         )
                     else:
                         ctx.on_log(

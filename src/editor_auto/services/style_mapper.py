@@ -49,23 +49,24 @@ _PRESET_STYLES: dict[str, dict] = {
 }
 _DEFAULT_PRESET_ID = "clean"
 
-# Pool del modo INTELIGENTE (auto): flechas SIMPLES — entre estas elige el
-# motor la de más contraste con el fondo. No incluye los estilos animados para
-# no cambiar la FORMA que espera el cliente (solo el color).
+# Pool del modo INTELIGENTE (auto) = TODAS las flechas visibles en el selector.
+# El motor elige por contraste con el fondo (con variedad de forma/color).
 _SMART_POOL = {
     "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
     "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
+    "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
+    "flecha_triple_blanca.mov",
+    "flecha_3d_roja.mov", "flecha_3d_amarilla.mov",
+    "flecha_abajo_triple_blanca.mov",
 }
 
 # Flechas reales válidas en Assets/flechas (el preflight valida contra esto):
-# simples + estilos animados (avanza/pulso/rebote/triple, en blanca y roja).
+# las visibles + estilos ocultos (pulso/rebote/triple roja) que siguen como
+# assets aunque ya no se ofrezcan.
 _ALLOWED_ARROWS = _SMART_POOL | {
-    "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
     "flecha_pulse_blanca.mov", "flecha_pulse_roja.mov",
     "flecha_bob_blanca.mov", "flecha_bob_roja.mov",
-    "flecha_triple_blanca.mov", "flecha_triple_roja.mov",
-    "flecha_3d_roja.mov", "flecha_3d_amarilla.mov",
-    "flecha_abajo_triple_blanca.mov",
+    "flecha_triple_roja.mov",
 }
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
