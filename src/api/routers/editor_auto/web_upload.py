@@ -659,6 +659,18 @@ def web_output(
     # aprobados o caídos). Con gate, si hay pendientes de revisión, no es "listo".
     all_terminal = bool(jobs_meta) and done == len(jobs_meta)
     all_done = all_terminal and review == 0
+    # ENTREGA TODO-O-NADA: no mostrar NINGÚN vídeo como listo/descargable hasta
+    # que TODO el lote del día esté resuelto (con gate: todos aprobados; sin
+    # gate: todos ≥90). Así el cliente nunca recibe 1 de 2 — ve el día completo
+    # de golpe, junto con el email. Hasta entonces, los ya terminados se
+    # muestran "en revisión" (no descargables).
+    if not all_done:
+        for v in videos:
+            if v["ready"] or v["in_review"]:
+                v["ready"] = False
+                v["filename"] = None
+                v["in_review"] = True
+        ready = 0
     # Fallback de aviso por email para el caso gate-OFF (sin paso de aprobación):
     # cuando el día queda completo. Idempotente (flag webday_notified).
     if all_done and ready > 0:
