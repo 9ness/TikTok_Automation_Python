@@ -2301,10 +2301,6 @@ def _post_render_audit(
             stretched_spans or [], keep_intervals or [],
         )
 
-        # Palabras partidas por un corte (suena 'media palabra' — el artefacto
-        # que reportó el cliente). El audit antes era ciego a esto → daba 94/100.
-        word_fragments = _detect_word_fragments(words or [], keep_intervals or [])
-        n_frags = len(word_fragments)
         n_loose = len(loose_words)
         n_surv = len(surviving_stretched)
         # Penalización del estirado superviviente PROPORCIONAL a cuánto sobrevive:
@@ -2317,7 +2313,6 @@ def _post_render_audit(
         )
         score = 100
         score -= 12 * n_loose
-        score -= 12 * n_frags            # palabra partida = fallo claro
         score -= surv_penalty
         score -= 3 * n_internal          # silencios = menor
         score = max(0, min(100, score))
@@ -2359,8 +2354,6 @@ def _post_render_audit(
             "internal_silences_preview": enriched,
             "n_loose_words": n_loose,
             "loose_words_preview": loose_words[:10],
-            "n_word_fragments": n_frags,
-            "word_fragments_preview": word_fragments[:10],
             "n_surviving_stretched": n_surv,
             "surviving_stretched_preview": surviving_stretched[:10],
             "quality_score": score,
@@ -2460,42 +2453,6 @@ def _detect_loose_words(
                 "text": " ".join(t for t in toks if t) or "·",
             })
     return loose
-
-
-def _detect_word_fragments(
-    words: list[dict],
-    keep_intervals: list[tuple[float, float]],
-    *,
-    min_kept_s: float = 0.06,
-    min_cut_s: float = 0.4,
-) -> list[dict]:
-    """Palabras que un corte PARTIÓ: parte de la palabra quedó conservada y
-    una porción GRANDE (>`min_cut_s`) cayó en un corte (y se conserva <50%).
-    En el output suena 'media palabra' (artefacto que reportó el cliente: el
-    'es-' de 'esto' estirada).
-
-    Conservador para no dar falsos positivos por la imprecisión de los
-    timestamps de Whisper (alarga/acorta el cierre de palabra hasta ~400ms):
-    exige que se haya cortado >0.4s de la palabra y que se conserve <50%.
-    Un corte limpio (word-guard) deja cada palabra íntegra → 0 disparos."""
-    if not words or not keep_intervals:
-        return []
-    frags: list[dict] = []
-    for w in words:
-        ws = float(w.get("start", 0.0)); we = float(w.get("end", 0.0))
-        dur = we - ws
-        if dur <= 0.12:
-            continue  # palabras muy cortas: timestamps poco fiables
-        covered = sum(
-            max(0.0, min(we, e) - max(ws, s)) for s, e in keep_intervals
-        )
-        if covered >= min_kept_s and covered < dur * 0.5 and (dur - covered) > min_cut_s:
-            frags.append({
-                "start": round(ws, 2), "end": round(we, 2),
-                "word": str(w.get("word", "")), "kept_s": round(covered, 2),
-                "dur_s": round(dur, 2),
-            })
-    return frags
 
 
 def _surviving_stretched_spans(
