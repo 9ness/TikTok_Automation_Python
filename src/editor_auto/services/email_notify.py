@@ -147,6 +147,51 @@ def send_videos_ready(
     return _send(recipients_subject(to), subject, html, text)
 
 
+def send_unsent_reminder(
+    *, to: list[str], client_name: str, count: int, cutoff_label: str,
+    panel_link: str | None = None,
+) -> dict:
+    """Recordatorio 'tienes vídeos subidos SIN mandar a edición' antes del cierre."""
+    nice = client_name or "Hola"
+    n_txt = "1 vídeo subido" if count == 1 else f"{count} vídeos subidos"
+    link = panel_link or "https://nebulabsmedia.com/panel"
+    subject = f"⏰ Tienes {n_txt} sin mandar a edición"
+    button = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 4px"><tr>'
+        '<td style="border-radius:10px;background:#06b6d4;background:linear-gradient(90deg,#06b6d4,#7c3aed)">'
+        f'<a href="{link}" style="display:inline-block;padding:13px 28px;font-size:15px;'
+        'font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">'
+        'Mandar a edición →</a></td></tr></table>'
+    )
+    html = (
+        '<div style="margin:0;padding:0;background:#f4f5f7">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0"><tr><td align="center">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
+        '<tr><td style="background:#06b6d4;background:linear-gradient(90deg,#06b6d4,#7c3aed);padding:20px 28px">'
+        '<span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.5px">Nebulabs'
+        '<span style="opacity:.85;font-weight:500"> Media</span></span></td></tr>'
+        '<tr><td style="padding:28px">'
+        f'<h1 style="margin:0 0 12px;font-size:20px;color:#111827">¡Hola {nice}! 👋</h1>'
+        f'<p style="margin:0 0 6px;font-size:15px;color:#374151;line-height:1.5">'
+        f'Tienes <strong>{n_txt}</strong> de hoy que aún <strong>no has mandado a edición</strong>. '
+        f'Mándalos antes del cierre (<strong>{cutoff_label}</strong>) para recibirlos hoy.</p>'
+        f'{button}'
+        '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;line-height:1.5">'
+        'Si no los mandas, los moveremos a un próximo día disponible para que no se pierdan.</p>'
+        '</td></tr>'
+        '<tr><td style="background:#0f172a;padding:16px 28px">'
+        '<span style="color:#94a3b8;font-size:12px">Nebulabs Media · Edición de vídeo</span></td></tr>'
+        '</table></td></tr></table></div>'
+    )
+    text = (
+        f"¡Hola {nice}!\n\nTienes {n_txt} de hoy SIN mandar a edición. "
+        f"Mándalos antes del cierre ({cutoff_label}) para recibirlos hoy: {link}\n\n"
+        f"Si no, los moveremos a un próximo día disponible para que no se pierdan.\n\nNebulabs Media"
+    )
+    return _send(recipients_subject(to), subject, html, text)
+
+
 def recipients_subject(to: list[str]) -> list[str]:
     """Normaliza la lista de destinatarios (helper trivial, dedup)."""
     seen: set[str] = set()

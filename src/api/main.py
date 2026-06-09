@@ -138,13 +138,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # VPS 24/7. Se gestiona con un stop_event para cierre limpio.
     import asyncio
     from src.editor_auto.services.auto_enqueue_watcher import watcher_loop
+    from src.editor_auto.services.draft_sweeper import sweeper_loop
 
     watcher_stop = asyncio.Event()
     watcher_task = asyncio.create_task(watcher_loop(watcher_stop))
 
+    # Editor Auto · sweeper de borradores sin enviar (arrastra al próximo día
+    # con hueco / recuerda antes del cierre / borra tras la gracia).
+    sweeper_stop = asyncio.Event()
+    sweeper_task = asyncio.create_task(sweeper_loop(sweeper_stop))
+
     try:
         yield
     finally:
+        sweeper_stop.set()
+        try:
+            await asyncio.wait_for(sweeper_task, timeout=5)
+        except asyncio.TimeoutError:
+            sweeper_task.cancel()
         # Graceful shutdown — el SIGTERM handler en api/queue/queue_init
         # ya inició el drain de la cola. Aquí solo paramos el watcher de
         # editor-auto. La JobQueue ya está esperando a que sus workers
