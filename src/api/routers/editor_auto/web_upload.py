@@ -115,6 +115,27 @@ def _mark_files_sent(user_id: str, day: str, names: list[str]) -> None:
         r.sadd(f"{_SENT_FILES_KEY}{user_id}:{day}", n)
 
 
+_CARRIED_KEY = "webday_carried:"  # set de filenames movidos AQUÍ por el sweeper
+
+
+def _carried_files(user_id: str, day: str) -> set[str]:
+    """Borradores que el sweeper MOVIÓ a este día (para avisar al cliente)."""
+    try:
+        return set(get_editor_redis().smembers(f"{_CARRIED_KEY}{user_id}:{day}") or [])
+    except Exception:
+        return set()
+
+
+def _clear_carried(user_id: str, day: str, names: list[str]) -> None:
+    """Quita la marca de 'movido' (al enviarse o borrarse → ya no es aviso)."""
+    r = get_editor_redis()
+    for n in names:
+        try:
+            r.srem(f"{_CARRIED_KEY}{user_id}:{day}", n)
+        except Exception:
+            pass
+
+
 def _approved_set(user_id: str, day: str) -> set[str]:
     try:
         return set(get_editor_redis().smembers(f"{_APPROVED_KEY}{user_id}:{day}") or [])
@@ -353,6 +374,10 @@ def web_day(
     all_files = drive_uploads.list_day_files(user.name, day)
     drafts = [v for v in all_files if v.get("filename") not in sent]
     has_jobs = bool(_get_day_jobs(user.id, day))
+    # Borradores que el sweeper MOVIÓ a este día (para avisar al cliente). Solo
+    # los que siguen como borradores presentes.
+    draft_names = {v.get("filename") for v in drafts}
+    carried = sorted(_carried_files(user.id, day) & draft_names)
     # Envío en UNA tanda: el día acepta subidas hasta que se manda a edición.
     # Tras el primer envío (has_jobs) queda cerrado — no se mandan más tandas.
     open_day = day_send_open(day) and len(all_files) < _MAX_FILES_PER_DAY and not has_jobs
@@ -362,6 +387,7 @@ def web_day(
         "open": open_day,
         "has_jobs": has_jobs,
         "videos": drafts,
+        "carried": carried,
     }
 
 
@@ -389,6 +415,7 @@ def web_delete_file(
     ok = drive_uploads.delete_day_file(user.name, payload.day, name)
     if not ok:
         raise UserNotFoundError("Vídeo no encontrado.", details={"filename": payload.filename})
+    _clear_carried(user.id, payload.day, [name])
     sent = _sent_files(user.id, payload.day)
     drafts = [v for v in drive_uploads.list_day_files(user.name, payload.day) if v.get("filename") not in sent]
     return {"ok": True, "videos": drafts}
@@ -541,7 +568,9 @@ def web_send_to_edit(
     if enqueued:
         _lock_day(user.id, day)  # indexa el día para el panel admin / summary
         _append_day_jobs(user.id, day, enqueued)
-        _mark_files_sent(user.id, day, [e["filename"] for e in enqueued])
+        names = [e["filename"] for e in enqueued]
+        _mark_files_sent(user.id, day, names)
+        _clear_carried(user.id, day, names)  # ya enviados → quitar aviso de movido
         # Descuenta los vídeos de prueba (solo clientes SIN plan). El contador
         # visible (web "Prueba · N" + panel config) vive en la cuenta web.
         if not (account or {}).get("planId"):

@@ -192,6 +192,61 @@ def send_unsent_reminder(
     return _send(recipients_subject(to), subject, html, text)
 
 
+def _day_label(iso: str) -> str:
+    """'2026-06-09' → '9 jun'."""
+    _M = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    try:
+        y, m, d = (int(x) for x in iso.split("-"))
+        return f"{d} {_M[m - 1]}"
+    except Exception:
+        return iso
+
+
+def send_drafts_moved(
+    *, to: list[str], client_name: str, count: int, target_days: list[str],
+    panel_link: str | None = None,
+) -> dict:
+    """Email 'movimos tus vídeos sin enviar a otros días' (no se pierden)."""
+    nice = client_name or "Hola"
+    n_txt = "1 vídeo" if count == 1 else f"{count} vídeos"
+    days_txt = ", ".join(_day_label(d) for d in target_days) or "un próximo día"
+    link = panel_link or "https://nebulabsmedia.com/panel"
+    subject = f"📦 Movimos {n_txt} sin enviar a otro día"
+    button = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 4px"><tr>'
+        '<td style="border-radius:10px;background:#06b6d4;background:linear-gradient(90deg,#06b6d4,#7c3aed)">'
+        f'<a href="{link}" style="display:inline-block;padding:13px 28px;font-size:15px;'
+        'font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">'
+        'Ver mis vídeos →</a></td></tr></table>'
+    )
+    html = (
+        '<div style="margin:0;padding:0;background:#f4f5f7">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0"><tr><td align="center">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
+        '<tr><td style="background:#06b6d4;background:linear-gradient(90deg,#06b6d4,#7c3aed);padding:20px 28px">'
+        '<span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.5px">Nebulabs'
+        '<span style="opacity:.85;font-weight:500"> Media</span></span></td></tr>'
+        '<tr><td style="padding:28px">'
+        f'<h1 style="margin:0 0 12px;font-size:20px;color:#111827">¡Hola {nice}! 👋</h1>'
+        f'<p style="margin:0 0 6px;font-size:15px;color:#374151;line-height:1.5">'
+        f'Tenías <strong>{n_txt}</strong> subidos que no llegaste a mandar a edición. '
+        f'Para que no se pierdan, los hemos movido a <strong>{days_txt}</strong>.</p>'
+        '<p style="margin:6px 0 0;font-size:15px;color:#374151;line-height:1.5">'
+        'Entra en tu panel, ábrelos en ese día y pulsa <strong>“Mandar a edición”</strong> cuando quieras.</p>'
+        f'{button}'
+        '</td></tr>'
+        '<tr><td style="background:#0f172a;padding:16px 28px">'
+        '<span style="color:#94a3b8;font-size:12px">Nebulabs Media · Edición de vídeo</span></td></tr>'
+        '</table></td></tr></table></div>'
+    )
+    text = (
+        f"¡Hola {nice}!\n\nTenías {n_txt} subidos sin mandar a edición. Para que no se "
+        f"pierdan, los movimos a {days_txt}. Ábrelos en ese día y pulsa 'Mandar a edición': {link}\n\nNebulabs Media"
+    )
+    return _send(recipients_subject(to), subject, html, text)
+
+
 def recipients_subject(to: list[str]) -> list[str]:
     """Normaliza la lista de destinatarios (helper trivial, dedup)."""
     seen: set[str] = set()

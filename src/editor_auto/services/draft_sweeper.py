@@ -52,6 +52,8 @@ EXTS = (".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm")
 
 _SENT_KEY = "webday_sentfiles:"
 _REMIND_KEY = "webday_reminded:"
+_CARRIED_KEY = "webday_carried:"        # set de filenames movidos AL día {uid}:{day}
+_CARRY_MAILED_KEY = "webday_carry_mailed:"  # flag email de movidos por día
 
 
 def _tz():
@@ -108,14 +110,17 @@ def _next_open_day_with_space(user, start: date, cap: int) -> str | None:
     return None
 
 
-def _carry_and_clean(user, log) -> None:
+def _carry_and_clean(user, log) -> list[tuple[str, str, str]]:
+    """Procesa días pasados del usuario. Devuelve la lista de movimientos
+    (filename, from_day, to_day) para poder avisar al cliente."""
+    moves: list[tuple[str, str, str]] = []
     today = _today()
     cap = _day_cap(user)
     inp = user_input_folder(user.name)
     try:
         days = os.listdir(inp)
     except OSError:
-        return
+        return moves
     now = time.time()
     for dayname in days:
         if not is_valid_day(dayname):
@@ -157,9 +162,15 @@ def _carry_and_clean(user, log) -> None:
                 continue  # colisión rara: lo dejamos para no pisar nada
             try:
                 shutil.move(path, dst)
+                try:
+                    get_editor_redis().sadd(f"{_CARRIED_KEY}{user.id}:{target}", f)
+                except Exception:
+                    pass
+                moves.append((f, dayname, target))
                 log(f"[draft_sweeper] ➡️ arrastrado {user.name}: {dayname}/{f} → {target}/")
             except OSError as e:
                 log(f"[draft_sweeper] no pude mover {f}: {e}")
+    return moves
 
 
 def _maybe_remind(user, log) -> None:
@@ -209,6 +220,40 @@ def _maybe_remind(user, log) -> None:
         log(f"[draft_sweeper] recordatorio falló para {user.name}: {e}")
 
 
+def _notify_carry(user, moves: list[tuple[str, str, str]], log) -> None:
+    """Email 'movimos tus vídeos sin enviar a otros días' (una vez al día)."""
+    r = get_editor_redis()
+    today = _today().isoformat()
+    flag = f"{_CARRY_MAILED_KEY}{user.id}:{today}"
+    try:
+        if r.get_str(flag):
+            return
+    except Exception:
+        pass
+    try:
+        from src.editor_auto.repos.web_account_repo import get_web_account_repo
+        from src.editor_auto.services import email_notify
+        if not email_notify.is_configured():
+            return
+        acc = get_web_account_repo().get(user.account_email) or {}
+        email = (acc.get("email") or user.account_email or "").strip()
+        if not email:
+            return
+        target_days = sorted({to for _, _, to in moves})
+        res = email_notify.send_drafts_moved(
+            to=[email],
+            client_name=acc.get("username") or acc.get("name") or user.name,
+            count=len(moves),
+            target_days=target_days,
+            panel_link=os.getenv("EDITOR_WEB_PANEL_URL", "https://nebulabsmedia.com/panel"),
+        )
+        if res.get("ok"):
+            r.set_str(flag, "1")
+            log(f"[draft_sweeper] ✉️ aviso de {len(moves)} movidos enviado a {user.name}")
+    except Exception as e:
+        log(f"[draft_sweeper] no pude avisar de movidos a {user.name}: {e}")
+
+
 def sweep(log=logger.info) -> None:
     try:
         users = UserRepo().list_all()
@@ -219,9 +264,15 @@ def sweep(log=logger.info) -> None:
         if getattr(user, "deleted", False) or not getattr(user, "account_email", None):
             continue
         try:
-            _carry_and_clean(user, log)
+            moves = _carry_and_clean(user, log)
         except Exception as e:
+            moves = []
             log(f"[draft_sweeper] carry/clean falló {user.name}: {e}")
+        if moves:
+            try:
+                _notify_carry(user, moves, log)
+            except Exception as e:
+                log(f"[draft_sweeper] aviso de movidos falló {user.name}: {e}")
         try:
             _maybe_remind(user, log)
         except Exception as e:
