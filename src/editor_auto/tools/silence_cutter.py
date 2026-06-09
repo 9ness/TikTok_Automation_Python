@@ -854,11 +854,8 @@ class SilenceCutterTool:
                 )
         diagnostic["phases"]["ai_pass2_false_starts"] = ai_pass2_diag
 
-        # Cleanup audio temporal
-        try:
-            os.remove(tmp_audio)
-        except OSError:
-            pass
+        # NOTA: tmp_audio se borra MÁS ABAJO — el refinado de bordes al valle
+        # de energía real (_refine_cut_edges_to_valley) aún lo necesita.
 
         # 8) Merge final + invertir → keep_intervals
         if not cuts_with_source:
@@ -869,6 +866,10 @@ class SilenceCutterTool:
             }
             _write_diagnostic(diagnostic, ctx)
             ctx.on_log("[silence_cutter] No hay cortes a aplicar → passthrough.")
+            try:
+                os.remove(tmp_audio)
+            except OSError:
+                pass
             _passthrough_with_format(
                 input_path, output_path, video_rotation,
                 output_aspect=config.get("output_aspect", "9:16"),
@@ -931,6 +932,23 @@ class SilenceCutterTool:
                 f"[silence_cutter] 🛡️ Protección de palabras (guard "
                 f"{int(_WORD_GUARD_S*1000)}ms): {n_before} → {len(merged_cuts)} cortes"
             )
+            # Refinado de bordes en HABLA CONTIGUA (palabra eliminada pegada a
+            # la buena, sin silencio entre medias): Whisper marca los límites
+            # ~100-300ms ANTES del audio real, así que cortar exactamente en
+            # next_start deja la COLA de la palabra mala ("...zó" antes de
+            # "esto costaba"). Aquí movemos ese borde al VALLE de energía real
+            # (mínimo RMS) entre ambas palabras → corte limpio sin residuo.
+            try:
+                merged_cuts, n_refined = _refine_cut_edges_to_valley(
+                    merged_cuts, voiced_words or words, tmp_audio,
+                )
+                if n_refined:
+                    ctx.on_log(
+                        f"[silence_cutter] 🎯 {n_refined} borde(s) afinados al "
+                        f"valle de energía real (habla contigua)"
+                    )
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Refinado de bordes falló: {e}")
         # Ajuste FINAL al silencio real (amplitud) — el guard por Whisper no
         # basta porque Whisper cierra palabras hasta ~400ms pronto. La
         # amplitud dice dónde hay audio de verdad → ningún corte empieza/acaba
@@ -943,6 +961,12 @@ class SilenceCutterTool:
                 f"[silence_cutter] 🔊 Bordes ajustados al silencio real "
                 f"(amplitud): {n_pre_amp} → {len(merged_cuts)} cortes"
             )
+        # Cleanup audio temporal (ya no se necesita tras el refinado de bordes)
+        try:
+            os.remove(tmp_audio)
+        except OSError:
+            pass
+
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
         # Absorbe micro-islas de keep (fragmentos de palabra / cabezas de
         # relleno) que el merge de cortes deja entre dos cortes y suenan como
@@ -2104,6 +2128,100 @@ def _protect_word_boundaries(
         if ne - ns > 0.05:
             out.append((ns, ne))
     return out
+
+
+def _refine_cut_edges_to_valley(
+    cuts: list[tuple[float, float]],
+    words: list[dict],
+    audio_path: str,
+    *,
+    search_back_s: float = 0.12,
+    search_fwd_max_s: float = 0.28,
+) -> tuple[list[tuple[float, float]], int]:
+    """Afinado del borde FINAL de cortes en habla CONTIGUA (una palabra
+    eliminada pegada a la palabra buena siguiente, sin silencio entre medias).
+
+    Whisper marca los límites de palabra ~100-300ms ANTES del audio real, así
+    que un corte que acaba exactamente en `next_start` conserva la COLA de la
+    palabra eliminada (residuo tipo "...zó" antes de "esto costaba"). Aquí
+    medimos la energía real (RMS por ventanas de 20ms) alrededor del borde y
+    movemos el final del corte al MÍNIMO de energía (el valle entre palabras).
+
+    Solo actúa cuando: (a) una palabra eliminada termina justo en el borde, y
+    (b) una palabra conservada empieza justo ahí (caso contiguo). La búsqueda
+    hacia delante se limita al 40% de la duración de la palabra buena → nunca
+    se come su onset. Devuelve (cuts_refinados, n_refinados)."""
+    if not cuts or not words or not audio_path or not os.path.exists(audio_path):
+        return cuts, 0
+    spans = [
+        (float(w["start"]), float(w["end"]))
+        for w in words if "start" in w and "end" in w
+    ]
+    # Candidatos: borde final del corte = inicio de palabra conservada Y hay
+    # palabra eliminada (dentro del corte) terminando pegada a ese borde.
+    candidates: list[int] = []
+    for i, (s, e) in enumerate(cuts):
+        nxt = next((sp for sp in spans if abs(sp[0] - e) <= 0.03), None)
+        if nxt is None:
+            continue
+        removed_at_edge = any(
+            ws >= s - 0.01 and abs(we - e) <= 0.10 for ws, we in spans
+        )
+        if removed_at_edge:
+            candidates.append(i)
+    if not candidates:
+        return cuts, 0
+
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate()
+            n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            n_frames = wf.getnframes()
+            raw = wf.readframes(n_frames)
+    except Exception:
+        return cuts, 0
+    if sampwidth != 2:
+        return cuts, 0  # solo PCM 16-bit (lo que escribe moviepy)
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+
+    win = max(1, int(0.020 * sr))   # ventana RMS 20ms
+    hop = max(1, int(0.005 * sr))   # paso 5ms
+    out = list(cuts)
+    n_ref = 0
+    for i in candidates:
+        s, e = out[i]
+        nxt = next((sp for sp in spans if abs(sp[0] - e) <= 0.03), None)
+        if nxt is None:
+            continue
+        # Hasta el 60% del span Whisper de la palabra buena: como Whisper marca
+        # el inicio PRONTO (incluye cola de la palabra previa), esto no llega
+        # a su onset real, pero da ventana suficiente para encontrar el valle.
+        fwd = min(search_fwd_max_s, 0.6 * max(0.0, nxt[1] - nxt[0]))
+        lo = max(0.0, e - search_back_s)
+        hi = e + fwd
+        i0 = int(lo * sr); i1 = min(len(audio), int(hi * sr))
+        if i1 - i0 < win * 2:
+            continue
+        best_t = None
+        best_rms = None
+        pos = i0
+        while pos + win <= i1:
+            seg = audio[pos:pos + win]
+            rms = float(np.sqrt(np.mean(seg * seg)))
+            if best_rms is None or rms < best_rms:
+                best_rms = rms
+                best_t = (pos + win / 2) / sr
+            pos += hop
+        if best_t is not None and best_t > s + 0.05 and abs(best_t - e) > 0.01:
+            out[i] = (s, best_t)
+            n_ref += 1
+    return out, n_ref
 
 
 def _clamp_cuts_to_silence_edges(
