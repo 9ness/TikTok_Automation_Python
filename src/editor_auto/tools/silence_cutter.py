@@ -2057,6 +2057,10 @@ def _protect_word_boundaries(
         return cuts
     ends = sorted(float(w["end"]) for w in words if "end" in w)
     starts = sorted(float(w["start"]) for w in words if "start" in w)
+    word_spans = [
+        (float(w["start"]), float(w["end"]))
+        for w in words if "start" in w and "end" in w
+    ]
     out: list[tuple[float, float]] = []
     for s, e in cuts:
         # CLAVE: la palabra PREVIA es la que termina antes del INICIO del cut
@@ -2066,7 +2070,21 @@ def _protect_word_boundaries(
         prev_end = max((x for x in ends if x <= s), default=None)
         next_start = min((x for x in starts if x >= e), default=None)
         ns = s if prev_end is None else max(s, prev_end + guard_s)
-        ne = e if next_start is None else min(e, next_start - guard_s)
+        # Backoff del borde final: normalmente retrocede `guard_s` antes del
+        # inicio de la palabra siguiente (Whisper marca el inicio bien, así que
+        # protege su onset). PERO si una palabra ELIMINADA (dentro del cut)
+        # termina justo en `e` y la palabra buena empieza pegada (habla contigua,
+        # sin silencio), ese backoff solo conserva la COLA de la palabra mala
+        # (residuo tipo "...empezó" antes de "esto costaba"). En ese caso el
+        # corte acaba en el inicio de la palabra buena (no la clipa) y se elimina
+        # la cola mala. Los cortes de SILENCIO no cumplen la condición → intactos.
+        if next_start is None:
+            ne = e
+        else:
+            removed_word_ends_at_e = any(
+                ws >= s - 0.01 and abs(we - e) <= 0.06 for ws, we in word_spans
+            )
+            ne = min(e, next_start) if removed_word_ends_at_e else min(e, next_start - guard_s)
         if ne - ns > 0.05:
             out.append((ns, ne))
     return out
