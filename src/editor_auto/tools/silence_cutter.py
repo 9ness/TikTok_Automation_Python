@@ -923,6 +923,7 @@ class SilenceCutterTool:
         # palabra inaudible dentro de un silencio real proteja (y deje sin
         # cortar) ese silencio.
         n_before = len(merged_cuts)
+        n_refined_edges = 0
         if voiced_words:
             merged_cuts = _protect_word_boundaries(
                 merged_cuts, voiced_words, _WORD_GUARD_S,
@@ -942,6 +943,7 @@ class SilenceCutterTool:
                 merged_cuts, n_refined = _refine_cut_edges_to_valley(
                     merged_cuts, voiced_words or words, tmp_audio,
                 )
+                n_refined_edges = n_refined
                 if n_refined:
                     ctx.on_log(
                         f"[silence_cutter] 🎯 {n_refined} borde(s) afinados al "
@@ -1000,6 +1002,7 @@ class SilenceCutterTool:
             "n_cuts_merged": len(merged_cuts),
             "n_keep_intervals": len(keep_intervals),
             "keep_islands_absorbed": len(absorbed_islands),
+            "boundary_edges_refined": n_refined_edges,
             "total_cut_s": round(total_cut_s, 3),
             "kept_duration_s": round(video_duration - total_cut_s, 3),
             "preview_merged_cuts": [
