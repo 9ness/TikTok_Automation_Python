@@ -51,6 +51,7 @@ _TRIAL_DAY_CAP = 3           # tope/día razonable para usuarios en prueba
 EXTS = (".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm")
 
 _SENT_KEY = "webday_sentfiles:"
+_JOBS_KEY = "webday_jobs:"               # meta de jobs encolados por user/día
 _REMIND_KEY = "webday_reminded:"
 _CARRIED_KEY = "webday_carried:"        # set de filenames movidos AL día {uid}:{day}
 _CARRY_MAILED_KEY = "webday_carry_mailed:"  # flag email de movidos por día
@@ -73,6 +74,25 @@ def _sent_files(user_id: str, day: str) -> set[str]:
         return set(get_editor_redis().smembers(f"{_SENT_KEY}{user_id}:{day}") or [])
     except Exception:
         return set()
+
+
+def _enqueued_files(user_id: str, day: str) -> set[str]:
+    """Filenames que YA tienen un job ese día (encolados por CUALQUIER vía:
+    web, admin o watcher). El flujo web marca `webday_sentfiles`, pero admin/
+    watcher NO — así que sin esto el sweeper trataría un original ya editado
+    como 'borrador sin enviar' y lo arrastraría/duplicaría."""
+    try:
+        meta = get_editor_redis().get_json(f"{_JOBS_KEY}{user_id}:{day}")
+        if isinstance(meta, list):
+            return {m.get("filename") for m in meta if isinstance(m, dict) and m.get("filename")}
+    except Exception:
+        pass
+    return set()
+
+
+def _processed_files(user_id: str, day: str) -> set[str]:
+    """Conjunto de archivos que NO deben tocarse: enviados (web) o con job."""
+    return _sent_files(user_id, day) | _enqueued_files(user_id, day)
 
 
 def _is_video(name: str) -> bool:
@@ -131,7 +151,7 @@ def _carry_and_clean(user, log) -> list[tuple[str, str, str]]:
             continue
         if d >= today:
             continue  # días actuales/futuros: siguen abiertos, no se tocan
-        sent = _sent_files(user.id, dayname)
+        sent = _processed_files(user.id, dayname)
         folder = user_input_day_folder(user.name, dayname)
         try:
             files = os.listdir(folder)
@@ -190,7 +210,7 @@ def _maybe_remind(user, log) -> None:
             return
     except Exception:
         pass
-    sent = _sent_files(user.id, ds)
+    sent = _processed_files(user.id, ds)
     try:
         drafts = [f for f in os.listdir(user_input_day_folder(user.name, ds)) if _is_video(f) and f not in sent]
     except OSError:
