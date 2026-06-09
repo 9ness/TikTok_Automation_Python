@@ -755,6 +755,15 @@ def web_admin_pending(
 ) -> dict:
     """Lista los vídeos TERMINADOS y ≥90 que esperan tu aprobación (gate ON).
     El admin los revisa con el reproductor y los aprueba uno a uno."""
+    from src.editor_auto.config import manual_approval_enabled
+
+    # Con el gate INACTIVO no se retiene nada: los vídeos ya se entregan al
+    # cliente solos, así que no hay "pendientes de aprobar". (Antes la lista
+    # ignoraba el toggle y mostraba terminados-no-aprobados aunque ya estuvieran
+    # entregados, lo que confundía.)
+    if not manual_approval_enabled():
+        return {"pending": [], "count": 0, "gate": False}
+
     r = get_editor_redis()
     by_id = {j.id: j for j in queue.get_all()}
     repo = UserRepo()
@@ -787,7 +796,7 @@ def web_admin_pending(
                 "filename": out_name,
                 "score": score,
             })
-    return {"pending": items, "count": len(items)}
+    return {"pending": items, "count": len(items), "gate": True}
 
 
 @router.post("/admin/approve")
