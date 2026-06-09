@@ -816,7 +816,13 @@ class SilenceCutterTool:
         # 2.5 Pro y hacemos UNIÓN de cuts. Los LLMs son no-determinísticos
         # (mismo input → resultado distinto), pero rara vez los DOS fallan
         # a la vez. Coste extra Gemini ~$0.003. Total pass 2 ~$0.015.
-        ai_pass2_on = bool(config.get("ai_false_starts_pass2", True)) and not holistic_ok
+        # NOTA: antes esto llevaba `and not holistic_ok`, que APAGABA la pasada 2
+        # cuando el holístico devolvía cortes (lo normal). Eso dejaba pasar
+        # false-starts/auto-correcciones (regresión: "estocost"). El holístico
+        # NO garantiza pillar false-starts, así que la pasada 2 corre SIEMPRE
+        # (igual que ya se hizo con el n-gram). El sobre-corte queda contenido
+        # por el guardarraíl anti-huérfano del holístico + word-guard + cierre.
+        ai_pass2_on = bool(config.get("ai_false_starts_pass2", True))
         ai_pass2_diag: dict[str, Any] = {"enabled": ai_pass2_on}
         if ai_pass2_on and words:
             ctx.on_progress(0.62, "🤖 Pasada 2: GPT-4o + Gemini 2.5 Pro…")
@@ -931,6 +937,19 @@ class SilenceCutterTool:
                 f"(amplitud): {n_pre_amp} → {len(merged_cuts)} cortes"
             )
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
+        # Absorbe micro-islas de keep (fragmentos de palabra / cabezas de
+        # relleno) que el merge de cortes deja entre dos cortes y suenan como
+        # media palabra o mini-corte raro. Conservador: una palabra de
+        # contenido dentro la protege (respuestas cortas legítimas).
+        min_keep_island_s = float(config.get("min_keep_island_s", 0.28))
+        keep_intervals, absorbed_islands = _absorb_keep_islands(
+            keep_intervals, voiced_words or words, min_keep_s=min_keep_island_s,
+        )
+        if absorbed_islands:
+            ctx.on_log(
+                f"[silence_cutter] 🧹 {len(absorbed_islands)} micro-isla(s) de keep "
+                f"(<{int(min_keep_island_s*1000)}ms, sin contenido) absorbidas"
+            )
         keep_intervals = [
             (a, b) for (a, b) in keep_intervals
             if (b - a) >= _MIN_KEEP_SEGMENT_S
@@ -949,6 +968,7 @@ class SilenceCutterTool:
             "word_guard_ms": int(_WORD_GUARD_S * 1000),
             "n_cuts_merged": len(merged_cuts),
             "n_keep_intervals": len(keep_intervals),
+            "keep_islands_absorbed": len(absorbed_islands),
             "total_cut_s": round(total_cut_s, 3),
             "kept_duration_s": round(video_duration - total_cut_s, 3),
             "preview_merged_cuts": [
@@ -1624,6 +1644,63 @@ def _holistic_keep_idxset(
     return keep
 
 
+def _reanex_orphan_phrases(
+    words: list[dict],
+    keep: set[int],
+    *,
+    max_gap_s: float = 0.7,
+    max_reanex_words: int = 6,
+) -> tuple[set[int], int]:
+    """Evita que el holístico deje una palabra de CONTENIDO suelta separada de
+    su frase. Si una 'isla' conservada es UNA sola palabra de contenido y viene
+    inmediatamente precedida por un tramo BORRADO de la MISMA frase (sin
+    puntuación fuerte ni pausa real entre medias), re-anexa ese tramo al keep
+    → reconstruye la frase ("no lo dejes" [borrado] + "pasar" [isla] → entera).
+
+    Solo AÑADE índices al keep (nunca corta más) → imposible que sobre-corte.
+    Muy targeted (1 sola palabra de contenido huérfana) para no deshacer
+    false-starts legítimos (esos dejan una FRASE entera, no 1 palabra)."""
+    n = len(words)
+    if not keep or n == 0:
+        return keep, 0
+
+    def _tok(i: int) -> str:
+        return re.sub(r"[^\wáéíóúñü]", "", str(words[i].get("word", "")).lower())
+
+    def _is_content(i: int) -> bool:
+        t = _tok(i)
+        return bool(t) and t not in _FILLER_TOKENS and len(t) > 2
+
+    keep = set(keep)
+    reverts = 0
+    i = 0
+    while i < n:
+        if i not in keep:
+            i += 1
+            continue
+        a = i
+        while i < n and i in keep:
+            i += 1
+        b = i - 1  # isla conservada [a, b]
+        n_content = sum(1 for k in range(a, b + 1) if _is_content(k))
+        if n_content != 1 or (b - a) > 1:
+            continue  # solo islas de 1 palabra de contenido (huérfana real)
+        if a - 1 < 0 or (a - 1) in keep:
+            continue  # no hay tramo borrado justo antes
+        la = a - 1
+        while la - 1 >= 0 and (la - 1) not in keep:
+            la -= 1
+        if (a - la) > max_reanex_words:
+            continue  # tramo borrado largo = corte legítimo, no una frase partida
+        gap = float(words[a].get("start", 0.0)) - float(words[a - 1].get("end", 0.0))
+        last_removed = str(words[a - 1].get("word", ""))
+        if gap < max_gap_s and not re.search(r"[.!?;]\s*$", last_removed):
+            for k in range(la, a):
+                keep.add(k)
+            reverts += 1
+    return keep, reverts
+
+
 def _ai_holistic_clean_removes(
     *,
     words: list[dict],
@@ -1683,6 +1760,19 @@ def _ai_holistic_clean_removes(
         if kept_words < n * 0.30:
             diag["rejected"] = f"keep={kept_words}/{n} (<30%) → fallback"
             return [], diag
+
+        # Guardarraíl anti-huérfano: si el holístico dejó una palabra de
+        # contenido suelta separada de su frase (borró "no lo dejes" y conservó
+        # "pasar"), re-anexa el tramo borrado contiguo de la misma frase. Solo
+        # añade al keep → nunca sobre-corta.
+        final_keep, n_orphan_reverts = _reanex_orphan_phrases(words, final_keep)
+        if n_orphan_reverts:
+            diag["orphan_reverts"] = n_orphan_reverts
+            diag["kept_words"] = len(final_keep)
+            log(
+                f"[silence_cutter]   ↳ {n_orphan_reverts} frase(s) re-anexada(s) "
+                f"(evita dejar 1 palabra suelta sin su frase)"
+            )
 
         # Complemento = tramos a QUITAR (índices contiguos NO conservados).
         intervals: list[tuple[float, float]] = []
@@ -2211,6 +2301,10 @@ def _post_render_audit(
             stretched_spans or [], keep_intervals or [],
         )
 
+        # Palabras partidas por un corte (suena 'media palabra' — el artefacto
+        # que reportó el cliente). El audit antes era ciego a esto → daba 94/100.
+        word_fragments = _detect_word_fragments(words or [], keep_intervals or [])
+        n_frags = len(word_fragments)
         n_loose = len(loose_words)
         n_surv = len(surviving_stretched)
         # Penalización del estirado superviviente PROPORCIONAL a cuánto sobrevive:
@@ -2223,6 +2317,7 @@ def _post_render_audit(
         )
         score = 100
         score -= 12 * n_loose
+        score -= 12 * n_frags            # palabra partida = fallo claro
         score -= surv_penalty
         score -= 3 * n_internal          # silencios = menor
         score = max(0, min(100, score))
@@ -2264,6 +2359,8 @@ def _post_render_audit(
             "internal_silences_preview": enriched,
             "n_loose_words": n_loose,
             "loose_words_preview": loose_words[:10],
+            "n_word_fragments": n_frags,
+            "word_fragments_preview": word_fragments[:10],
             "n_surviving_stretched": n_surv,
             "surviving_stretched_preview": surviving_stretched[:10],
             "quality_score": score,
@@ -2285,6 +2382,45 @@ def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
     if score >= 50:
         return "REGULAR — hay fallos visibles. Mejor REENCOLAR"
     return "MAL — varios fallos reales. REENCOLAR"
+
+
+def _absorb_keep_islands(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    min_keep_s: float = 0.28,
+) -> tuple[list[tuple[float, float]], list[dict]]:
+    """Descarta 'micro-islas' de keep muy cortas (<`min_keep_s`) que NO
+    contienen ninguna palabra de CONTENIDO real (token no-filler y len>2).
+
+    Son fragmentos de palabra / cabezas de relleno / slivers que el merge de
+    cortes deja entre dos cortes y suenan como media palabra o "mini-corte
+    raro". Conservador y agnóstico al origen (los crea tanto `_KEEP_HEAD` de
+    fillers estirados como el merge de cortes solapados): una palabra de
+    contenido cuyo CENTRO caiga dentro de la isla la protege, así que una
+    respuesta corta legítima en conversación (>min_keep_s o con contenido)
+    nunca se elimina. Devuelve (keeps_filtrados, islas_absorbidas)."""
+    if not keep_intervals:
+        return keep_intervals, []
+    kept: list[tuple[float, float]] = []
+    absorbed: list[dict] = []
+    for a, b in keep_intervals:
+        if (b - a) >= min_keep_s:
+            kept.append((a, b))
+            continue
+        has_content = False
+        for w in (words or []):
+            center = (float(w.get("start", 0.0)) + float(w.get("end", 0.0))) / 2.0
+            if a <= center <= b:
+                tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+                if tok and tok not in _FILLER_TOKENS and len(tok) > 2:
+                    has_content = True
+                    break
+        if has_content:
+            kept.append((a, b))
+        else:
+            absorbed.append({"start": round(a, 3), "end": round(b, 3), "dur": round(b - a, 3)})
+    return kept, absorbed
 
 
 def _detect_loose_words(
@@ -2324,6 +2460,42 @@ def _detect_loose_words(
                 "text": " ".join(t for t in toks if t) or "·",
             })
     return loose
+
+
+def _detect_word_fragments(
+    words: list[dict],
+    keep_intervals: list[tuple[float, float]],
+    *,
+    min_kept_s: float = 0.06,
+    min_cut_s: float = 0.4,
+) -> list[dict]:
+    """Palabras que un corte PARTIÓ: parte de la palabra quedó conservada y
+    una porción GRANDE (>`min_cut_s`) cayó en un corte (y se conserva <50%).
+    En el output suena 'media palabra' (artefacto que reportó el cliente: el
+    'es-' de 'esto' estirada).
+
+    Conservador para no dar falsos positivos por la imprecisión de los
+    timestamps de Whisper (alarga/acorta el cierre de palabra hasta ~400ms):
+    exige que se haya cortado >0.4s de la palabra y que se conserve <50%.
+    Un corte limpio (word-guard) deja cada palabra íntegra → 0 disparos."""
+    if not words or not keep_intervals:
+        return []
+    frags: list[dict] = []
+    for w in words:
+        ws = float(w.get("start", 0.0)); we = float(w.get("end", 0.0))
+        dur = we - ws
+        if dur <= 0.12:
+            continue  # palabras muy cortas: timestamps poco fiables
+        covered = sum(
+            max(0.0, min(we, e) - max(ws, s)) for s, e in keep_intervals
+        )
+        if covered >= min_kept_s and covered < dur * 0.5 and (dur - covered) > min_cut_s:
+            frags.append({
+                "start": round(ws, 2), "end": round(we, 2),
+                "word": str(w.get("word", "")), "kept_s": round(covered, 2),
+                "dur_s": round(dur, 2),
+            })
+    return frags
 
 
 def _surviving_stretched_spans(

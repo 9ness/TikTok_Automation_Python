@@ -65,6 +65,10 @@ Do NOT keep both. (Genuinely different mentions far apart in the pitch are fine.
   florecitas, este con florecitas blancas" → keep "os los voy a enseñar… este
   con florecitas blancas" (one instance), but KEEP the verb "enseñar" — never
   leave "os los voy a [nada]".
+- **NEVER strand a single word from its phrase.** Cut a clause WHOLE or keep it
+  WHOLE — never delete "no lo dejes" and keep only "pasar". If you drop a phrase,
+  its LAST word goes with it. Every kept span must read as a clause, never one
+  orphan word left dangling right after a deletion.
 
 ## Output format
 
