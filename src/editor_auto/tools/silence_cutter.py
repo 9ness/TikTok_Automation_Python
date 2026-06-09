@@ -104,7 +104,11 @@ class SilenceCutterTool:
             "inter_word_gap_threshold_s": 0.5,
             "inter_word_gap_keep_ms": 200,  # cuánta pausa natural conservar
             "ai_clean_enabled": True,
-            "ai_model": "gpt-4o",
+            # gpt-5.4 (no-razonador, acepta temp 0 + seed) en TODAS las pasadas
+            # → análisis DETERMINISTA: mismo vídeo = mismo corte siempre. Mejor
+            # que gpt-4o y casi mismo precio. Gemini queda fuera por ser
+            # "thinking" (varía aunque temp=0 → rompe la consistencia).
+            "ai_model": "gpt-5.4",
             "ai_language": "es",
             # Pasada 2 IA — especialista en false-starts. Cada modelo es
             # toggleable independientemente para balancear coste/fiabilidad:
@@ -124,7 +128,10 @@ class SilenceCutterTool:
             # salvó). Si quieres bajar costes, desactiva uno de los dos
             # toggles en la config UI.
             "ai_pass2_openai_enabled": True,
-            "ai_pass2_gemini_enabled": True,
+            # Gemini DESACTIVADO: es "thinking" (no determinista, varía aunque
+            # temp=0) → rompe la consistencia. La pasada 2 corre solo con
+            # gpt-5.4 (temp 0 + seed) = mismo resultado siempre.
+            "ai_pass2_gemini_enabled": False,
             "gemini_model": "gemini-2.5-pro",
             # `large-v3` por defecto — máxima precisión. ~3-5x más lento
             # que `small` y ~6-8GB RAM (vs ~1GB). El operador puede bajar
@@ -1723,7 +1730,14 @@ def _ai_holistic_clean_removes(
     Devuelve (remove_intervals_tiempo, diag). Si falla o intenta borrar >70%
     (alucinación), devuelve ([], diag) → el caller usa el pipeline antiguo.
     """
-    diag: dict[str, Any] = {"model": model, "double_check": double_check}
+    # El modelo REAL del holístico es `_HOLISTIC_MODEL` (gpt-5.4) cuando OpenAI
+    # está configurado; `model` (gemini) solo es fallback si no hay OpenAI. Antes
+    # el diag etiquetaba 'gemini-2.5-pro' aunque corriera gpt-5.4 → confuso.
+    from src.editor_auto.api import openai_client
+    diag: dict[str, Any] = {
+        "model": _HOLISTIC_MODEL if openai_client.is_configured() else model,
+        "double_check": double_check,
+    }
     n = len(words)
     if n < 4:
         diag["skipped"] = "pocas palabras"
@@ -1818,6 +1832,7 @@ def _ai_false_starts_openai(
         user_payload=payload,
         model=model,
         temperature=0.0,
+        seed=_HOLISTIC_SEED,  # determinista: mismo input = mismos cortes
     )
     intervals = _parse_false_starts_cuts(
         result, words, log, provider="OpenAI",
@@ -2001,7 +2016,8 @@ def _ai_cleanup_cuts_with_raw(
         system_prompt=system_prompt,
         user_payload=payload,
         model=model,
-        temperature=0.2,
+        temperature=0.0,           # determinista (antes 0.2)
+        seed=_HOLISTIC_SEED,       # mismo input = mismos cortes siempre
     )
     cuts_raw = result.get("cuts", []) if isinstance(result, dict) else []
     if isinstance(result, dict) and result.get("summary"):
@@ -2991,7 +3007,8 @@ def _ai_cleanup_cuts(
         system_prompt=system_prompt,
         user_payload=payload,
         model=model,
-        temperature=0.2,
+        temperature=0.0,           # determinista (antes 0.2)
+        seed=_HOLISTIC_SEED,       # mismo input = mismos cortes siempre
     )
     cuts_raw = result.get("cuts", []) if isinstance(result, dict) else []
     if isinstance(result, dict) and result.get("summary"):
