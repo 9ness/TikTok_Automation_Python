@@ -169,6 +169,22 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
     }
   }
 
+  // Límite diario del PLAN (null = sin plan/prueba, 0 = plan ilimitado, >0 = N).
+  // El campo "Máx vídeos/día" es un OVERRIDE: vacío => se usa este del plan.
+  const planLimit = user.data?.usage?.daily_limit;
+  const maxPlaceholder =
+    planLimit == null
+      ? "sin límite (prueba)"
+      : planLimit === 0
+        ? "ilimitado (plan)"
+        : `según plan: ${planLimit}`;
+  const effLimitLabel =
+    maxDay.trim() !== ""
+      ? maxDay
+      : planLimit && planLimit > 0
+        ? String(planLimit)
+        : null;
+
   return (
     <>
     <Card>
@@ -200,7 +216,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
         {/* Config por usuario: delay de encolado + máx vídeos/día */}
         <div className="space-y-2 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-2.5">
           <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
-            ⚙️ Ajustes de encolado (vacío = sin restricción)
+            ⚙️ Ajustes de encolado (máx/día vacío = usa el límite del plan)
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -225,7 +241,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
                 min={0}
                 value={maxDay}
                 onChange={(e) => setMaxDay(e.target.value)}
-                placeholder="sin límite"
+                placeholder={maxPlaceholder}
                 className="h-8 text-sm"
               />
             </div>
@@ -236,7 +252,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             </Button>
             <span className="text-[11px] text-muted-foreground">
               Hoy: <strong>{usedToday}</strong>
-              {maxDay.trim() !== "" ? ` / ${maxDay}` : ""} vídeo(s)
+              {effLimitLabel ? ` / ${effLimitLabel}` : ""} vídeo(s)
             </span>
           </div>
           <p className="text-[10px] text-muted-foreground">
