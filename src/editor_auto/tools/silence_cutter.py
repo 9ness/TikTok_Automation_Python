@@ -3218,7 +3218,8 @@ _DANGLING_TAIL_TOKENS = {
     "unos", "unas", "mi", "tu", "su", "sus", "me", "te", "se", "le", "les",
     "lo", "como", "si", "cuando", "aunque", "entonces", "tan", "para",
     "por", "mas", "más", "ni", "ya", "es", "son", "esta", "este", "esto",
-    "está", "osea",
+    "está", "osea", "están", "estan", "estás", "estaba", "estaban", "era",
+    "eran", "muy",
 }
 
 
@@ -3359,12 +3360,17 @@ def _refine_keep_edges_to_valley(
                 if v is not None and abs(v - na) > 0.01:
                     na, n_ref = v, n_ref + 1
             # TAIL — última palabra clipada o arranque de la cortada colándose.
+            # SOLO hacia delante desde lw_e: Whisper cierra las palabras PRONTO
+            # (la cola real suena después de lw_e), así que buscar antes de
+            # lw_e clipaba la palabra buena ('cintur|', 'rayadito|s'). El valle
+            # real está entre la cola verdadera (>lw_e) y el onset de la
+            # siguiente (>next_start).
             if nxt is not None and (nxt[0] - lw_e) < contig_s:
                 v = _valley(
-                    lw_e - min(0.15, 0.3 * max(0.05, lw_e - lw_s)),
+                    lw_e,
                     nxt[0] + min(0.25, 0.4 * max(0.05, nxt[1] - nxt[0])),
                 )
-                if v is not None and abs(v - nb) > 0.01:
+                if v is not None and v > lw_e and abs(v - nb) > 0.01:
                     nb, n_ref = v, n_ref + 1
         if nb - na > 0.05:
             out.append((max(0.0, na), nb))
@@ -3400,12 +3406,23 @@ def _ai_completeness_review(
         seg_words.append(
             [s for s in spans if a - 1e-3 <= (s[0] + s[1]) / 2 <= b + 1e-3]
         )
+    # SOLO son revisables los segmentos seguidos de un SALTO real de contenido
+    # (>2s de hueco en el input) o el último. Si el siguiente keep está pegado
+    # (corte de silencio/tartamudeo a <2s), el habla CONTINÚA la misma frase
+    # al otro lado del corte — un final "a medias" ahí es normal y recortarlo
+    # mutila la frase ("la cintura es muy muy | muy elástica").
+    reviewable: set[int] = set()
+    for k in range(len(keep_intervals)):
+        if k == len(keep_intervals) - 1:
+            reviewable.add(k)
+        elif keep_intervals[k + 1][0] - keep_intervals[k][1] > 2.0:
+            reviewable.add(k)
     segments = [
         {"i": k, "text": " ".join(s[2] for s in sw)}
-        for k, sw in enumerate(seg_words) if sw
+        for k, sw in enumerate(seg_words) if sw and k in reviewable
     ]
     if not segments:
-        return keep_intervals, {"skipped": "sin segmentos"}
+        return keep_intervals, {"skipped": "sin segmentos revisables"}
     system = (
         "Eres un editor de vídeo profesional. Te paso los SEGMENTOS de habla "
         "que quedarán en el vídeo final, en orden; entre segmento y segmento "
@@ -3435,12 +3452,14 @@ def _ai_completeness_review(
     out = list(keep_intervals)
     applied = 0
     for f in fixes:
+        if applied >= 3:  # cap global: nunca más de 3 recortes por vídeo
+            break
         try:
             i = int(f.get("i"))
             n = int(f.get("drop_last_words", 0))
         except (TypeError, ValueError):
             continue
-        if not (0 <= i < len(out)) or n <= 0:
+        if not (0 <= i < len(out)) or n <= 0 or i not in reviewable:
             continue
         sw = seg_words[i] if i < len(seg_words) else []
         # Caps: máx 8 palabras, máx 40% del segmento, deja ≥3 palabras.
