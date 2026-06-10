@@ -818,6 +818,72 @@ def web_admin_pending(
     return {"pending": items, "count": len(items), "gate": True}
 
 
+@router.get("/admin/user-pipeline")
+def web_admin_user_pipeline(
+    user_id: str,
+    _: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Estado de edición de un usuario WEB clasificado para el admin:
+
+      · `in_process` — mandados a edición pero AÚN NO disponibles al cliente:
+        en cola, editándose, o terminados pendientes de aprobar (gate ON) /
+        re-edición (score <90).
+      · `ready` — entregados (aprobados con gate, o ≥90 con gate OFF) → el
+        cliente YA los ve.
+
+    El estado real del flujo web vive en la COLA (jobs), no en carpetas, por eso
+    el panel de carpetas no basta para verlo. NO incluye los 'sin empezar'
+    (borradores sin enviar): esos se ven en la carpeta Entrada (pendientes)."""
+    from src.editor_auto.config import manual_approval_enabled
+
+    r = get_editor_redis()
+    by_id = {j.id: j for j in queue.get_all()}
+    gate = manual_approval_enabled()
+    terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+    in_process: list[dict] = []
+    ready: list[dict] = []
+    days = sorted(r.smembers(f"{_SENT_DAYS_KEY}{user_id}") or [], reverse=True)
+    for day in days:
+        if not is_valid_day(day):
+            continue
+        approved = _approved_set(user_id, day)
+        for m in _get_day_jobs(user_id, day):
+            job = by_id.get(m.get("job_id"))
+            src = m.get("filename")
+            if job is None:
+                continue
+            out_name = os.path.basename(job.result_path) if job.result_path else None
+            score = _job_score(job) if job.status == JobStatus.COMPLETED else None
+            base = {"day": day, "source": src, "filename": out_name, "score": score}
+            if job.status == JobStatus.RUNNING:
+                in_process.append({**base, "state": "editing", "label": "Editándose"})
+            elif job.status == JobStatus.PENDING:
+                sched = getattr(job, "scheduled_for", None)
+                if sched and sched > time.time():
+                    in_process.append({**base, "state": "scheduled", "label": "Programado"})
+                else:
+                    in_process.append({**base, "state": "queued", "label": "En cola"})
+            elif job.status == JobStatus.COMPLETED and out_name:
+                passed = score is None or score >= _MIN_SCORE
+                is_approved = (not gate) or (out_name in approved)
+                if passed and is_approved:
+                    ready.append({**base, "state": "delivered", "label": "Entregado"})
+                elif passed and not is_approved:
+                    in_process.append({**base, "state": "review", "label": "En revisión"})
+                else:
+                    in_process.append({**base, "state": "requeue", "label": "Re-edición (<90)"})
+            elif job.status in terminal:  # FAILED / CANCELLED
+                in_process.append({**base, "state": "failed", "label": "Fallido"})
+    return {
+        "in_process": in_process,
+        "ready": ready,
+        "n_in_process": len(in_process),
+        "n_ready": len(ready),
+        "gate": gate,
+    }
+
+
 @router.post("/admin/approve")
 def web_admin_approve(
     _: Annotated[str, Depends(get_current_user)],

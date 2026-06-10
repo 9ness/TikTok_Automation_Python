@@ -51,6 +51,7 @@ import {
   useUpdateEditorUser,
   useUserFolders,
   useUserShares,
+  useWebUserPipeline,
   userFilePreviewUrl,
 } from "@/lib/queries/editor-auto";
 import type {
@@ -173,6 +174,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   // gobierna el flujo web — ocultamos las herramientas del flujo manual
   // (compartir Drive, marcar día listo) que aquí ya no aplican.
   const isWebUser = Boolean(user.data?.account_email);
+  const pipeline = useWebUserPipeline(userId, isWebUser);
 
   // Límite diario del PLAN (null = sin plan/prueba, 0 = plan ilimitado, >0 = N).
   // El campo "Máx vídeos/día" es un OVERRIDE: vacío => se usa este del plan.
@@ -319,6 +321,68 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             🌐 Usuario web: la entrega (aprobación, vídeos listos y email) la
             gobierna la web — no hace falta compartir carpetas ni marcar el día.
           </p>
+        )}
+
+        {/* Estado de edición (usuarios web): 3 fases claras. El estado real
+            vive en la cola, no en carpetas. */}
+        {isWebUser && (
+          <div className="space-y-2 rounded-md border border-border bg-card/40 p-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Estado de edición
+            </p>
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                <p className="text-lg font-bold text-amber-500">{counts.entrada}</p>
+                <p className="text-[10px] leading-tight text-muted-foreground">Sin empezar</p>
+              </div>
+              <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2">
+                <p className="text-lg font-bold text-sky-500">{pipeline.data?.n_in_process ?? "·"}</p>
+                <p className="text-[10px] leading-tight text-muted-foreground">En proceso</p>
+              </div>
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
+                <p className="text-lg font-bold text-emerald-500">{pipeline.data?.n_ready ?? "·"}</p>
+                <p className="text-[10px] leading-tight text-muted-foreground">Entregados</p>
+              </div>
+            </div>
+            {/* Detalle de los que están en proceso (aún no los ve el cliente) */}
+            {(pipeline.data?.in_process?.length ?? 0) > 0 && (
+              <ul className="space-y-1 pt-0.5">
+                {pipeline.data!.in_process.map((it, i) => (
+                  <li
+                    key={`${it.day}-${it.source}-${i}`}
+                    className="flex items-center justify-between gap-2 rounded border border-border/60 bg-background/40 px-2 py-1 text-[11px]"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="text-muted-foreground">{it.day}</span>{" "}
+                      {(it.source ?? "").replace(/^\d{8,}_/, "")}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        it.state === "editing" && "bg-sky-500/15 text-sky-500",
+                        it.state === "queued" && "bg-slate-500/15 text-slate-400",
+                        it.state === "scheduled" && "bg-violet-500/15 text-violet-400",
+                        it.state === "review" && "bg-amber-500/15 text-amber-500",
+                        it.state === "requeue" && "bg-orange-500/15 text-orange-500",
+                        it.state === "failed" && "bg-red-500/15 text-red-500",
+                      )}
+                    >
+                      {it.state === "editing" && (
+                        <Loader2 className="mr-1 inline h-2.5 w-2.5 animate-spin" />
+                      )}
+                      {it.label}
+                      {it.score != null ? ` · ${it.score}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              <strong>Sin empezar</strong>: subidos y aún no mandados a edición ·{" "}
+              <strong>En proceso</strong>: editándose o pendientes de aprobar (el cliente
+              aún no los ve) · <strong>Entregados</strong>: ya disponibles para el cliente.
+            </p>
+          </div>
         )}
 
         {/* Tabs por carpeta */}

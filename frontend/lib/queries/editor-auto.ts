@@ -415,6 +415,32 @@ export function usePendingApprovals() {
   });
 }
 
+export interface PipelineItem {
+  day: string;
+  source: string | null;
+  filename: string | null;
+  score: number | null;
+  state: string;
+  label: string;
+}
+
+/** Pipeline de edición de un usuario WEB: en proceso vs entregados. El
+ *  estado real vive en la cola (jobs), no en carpetas. */
+export function useWebUserPipeline(userId: string | null | undefined, isWeb: boolean) {
+  return useQuery<{
+    in_process: PipelineItem[];
+    ready: PipelineItem[];
+    n_in_process: number;
+    n_ready: number;
+    gate: boolean;
+  }>({
+    queryKey: [...editorAutoKeys.all, "web-pipeline", userId] as const,
+    queryFn: () => api.get(`${WEB_ADMIN_ROOT}/user-pipeline?user_id=${userId}`),
+    enabled: Boolean(userId) && isWeb,
+    refetchInterval: 15_000,
+  });
+}
+
 /** Aprueba (o revoca) un vídeo para que el cliente lo vea. */
 export function useApproveVideo() {
   const qc = useQueryClient();
