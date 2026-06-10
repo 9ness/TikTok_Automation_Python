@@ -3020,12 +3020,21 @@ def _deep_audit_compare(
                 break
     # 2) Evidencia FUERTE para penalizar (la varianza típica es de 1 palabra):
     #    · sobrante: ≥2 tokens (frase residual/duplicado) o 1 token ≥6 chars
-    #      ("estocost"); 1 palabra corta suelta = varianza → ignorar.
+    #      ("estocost"); 1 palabra corta suelta = varianza → ignorar. ADEMÁS
+    #      debe tocar ≥1 palabra de CONTENIDO real — un bloque de solo
+    #      funcionales/tartamudeo ("está aquí aquí", "que que") es varianza de
+    #      Whisper en habla repetida, NO un residuo real.
     #    · pérdida: bloque ≥3 tokens con ≥1 palabra de contenido ("no lo
     #      dejes"), o ≥2 palabras de contenido; 1 palabra suelta = varianza.
+    def _has_content(text: str) -> bool:
+        return any(
+            len(t) > 2 and t not in _FILLER_TOKENS and t not in _AUDIT_STOPWORDS
+            for t in text.split()
+        )
     inserted = [
         b for b in inserted
-        if b["n_toks"] >= 2 or len(b["text"].replace(" ", "")) >= 6
+        if (b["n_toks"] >= 2 or len(b["text"].replace(" ", "")) >= 6)
+        and _has_content(b["text"])
     ]
     missing = [
         b for b in missing
@@ -3620,8 +3629,11 @@ _AUDIT_STOPWORDS = {
     "que", "de", "la", "el", "los", "las", "un", "una", "unos", "unas",
     "con", "por", "en", "es", "son", "se", "lo", "le", "les", "su", "sus",
     "y", "o", "u", "a", "al", "del", "me", "te", "nos", "mi", "tu", "no",
-    "ya", "mas", "más", "hay", "ha", "he", "si", "sí", "ni", "muy", "este",
-    "esta", "esto", "esos", "esas", "como", "para", "pero", "porque",
+    "ya", "mas", "más", "hay", "ha", "he", "has", "si", "sí", "ni", "muy",
+    "este", "esta", "está", "están", "estás", "esto", "estos", "estas",
+    "esos", "esas", "eso", "esa", "ese", "como", "cómo", "para", "pero",
+    "porque", "aquí", "aqui", "ahí", "ahi", "allí", "alli", "así", "asi",
+    "tan", "todo", "toda", "todos", "todas", "qué", "sus", "les", "soy",
 }
 
 
