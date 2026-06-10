@@ -2672,25 +2672,52 @@ def _deep_audit_compare(
             if difflib.SequenceMatcher(None, a, b).ratio() >= 0.7:
                 continue
         if op in ("replace", "delete"):
-            # Falta lo esperado: solo penaliza palabras FUERTES de contenido.
-            miss = [
-                expected[k]["tok"] for k in range(i1, i2)
+            toks = [expected[k]["tok"] for k in range(i1, i2)]
+            n_strong_content = sum(
+                1 for k in range(i1, i2)
                 if expected[k]["strong"]
                 and expected[k]["tok"] not in _FILLER_TOKENS
                 and len(expected[k]["tok"]) > 2
-            ]
-            if miss:
-                missing.append({"text": " ".join(miss)})
+            )
+            missing.append({
+                "text": " ".join(toks),
+                "n_toks": len(toks),
+                "n_strong_content": n_strong_content,
+            })
         if op in ("replace", "insert"):
             extra = [out_toks[k] for k in range(j1, j2)]
-            txt = " ".join(extra)
-            # Bloques minúsculos (1-2 chars) suelen ser ruido de Whisper, no
-            # un residuo audible → ignorar. "estocost"/"esto" duplicado pasan.
-            if len(txt.replace(" ", "")) >= 3:
-                inserted.append({
-                    "text": txt,
-                    "output_t": round(out_times[j1], 2) if j1 < len(out_times) else None,
-                })
+            inserted.append({
+                "text": " ".join(extra),
+                "n_toks": len(extra),
+                "output_t": round(out_times[j1], 2) if j1 < len(out_times) else None,
+            })
+
+    # ── Filtros anti-falso-positivo ─────────────────────────────────────────
+    # 1) Emparejar VARIANTES: Whisper re-interpreta palabras cerca de los
+    #    bordes de corte (contexto distinto) → "bebida" puede salir como
+    #    "beber"/"vida". Un missing y un inserted con similitud ≥0.6 se
+    #    cancelan mutuamente (es la misma palabra oída distinto, no un fallo).
+    import difflib as _dl
+    for m in list(missing):
+        for ins in list(inserted):
+            if _dl.SequenceMatcher(None, m["text"], ins["text"]).ratio() >= 0.6:
+                missing.remove(m)
+                inserted.remove(ins)
+                break
+    # 2) Evidencia FUERTE para penalizar (la varianza típica es de 1 palabra):
+    #    · sobrante: ≥2 tokens (frase residual/duplicado) o 1 token ≥6 chars
+    #      ("estocost"); 1 palabra corta suelta = varianza → ignorar.
+    #    · pérdida: bloque ≥3 tokens con ≥1 palabra de contenido ("no lo
+    #      dejes"), o ≥2 palabras de contenido; 1 palabra suelta = varianza.
+    inserted = [
+        b for b in inserted
+        if b["n_toks"] >= 2 or len(b["text"].replace(" ", "")) >= 6
+    ]
+    missing = [
+        b for b in missing
+        if (b["n_toks"] >= 3 and b["n_strong_content"] >= 1)
+        or b["n_strong_content"] >= 2
+    ]
 
     return {
         "model": model_size,
