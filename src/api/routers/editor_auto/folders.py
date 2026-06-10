@@ -71,6 +71,68 @@ def _user_or_raise(user_id: str):
     return u
 
 
+# Claves Redis del flujo web (mismas que web_upload). Un vídeo de `entrada/`
+# que ya tiene job o está en sentfiles YA fue mandado a edición → no es un
+# "pendiente" aunque su archivo siga en Drive (el flujo web lo lee in-place).
+_WEB_SENT_KEY = "webday_sentfiles:"
+_WEB_JOBS_KEY = "webday_jobs:"
+
+
+def _processed_entrada_names(user_id: str, days: set[str]) -> dict[str, set[str]]:
+    """Por día, los filenames de `entrada/` YA enviados a edición."""
+    from src.editor_auto.repos.redis_base import get_editor_redis
+    r = get_editor_redis()
+    out: dict[str, set[str]] = {}
+    for d in days:
+        names: set[str] = set()
+        try:
+            names |= set(r.smembers(f"{_WEB_SENT_KEY}{user_id}:{d}") or [])
+        except Exception:
+            pass
+        try:
+            meta = r.get_json(f"{_WEB_JOBS_KEY}{user_id}:{d}")
+            if isinstance(meta, list):
+                names |= {
+                    m.get("filename") for m in meta
+                    if isinstance(m, dict) and m.get("filename")
+                }
+        except Exception:
+            pass
+        out[d] = names
+    return out
+
+
+def _pending_entrada(items: list[dict[str, Any]], user_id: str) -> list[dict[str, Any]]:
+    """Filtra de `entrada/` los vídeos de día YA mandados a edición → solo
+    quedan los PENDIENTES (subidos pero sin enviar). Los items sin `day`
+    (flujo manual: subida plana) se mantienen tal cual."""
+    day_items = [it for it in items if it.get("day")]
+    if not day_items:
+        return items  # flujo manual o sin días → nada que filtrar
+    processed = _processed_entrada_names(user_id, {it["day"] for it in day_items})
+    out: list[dict[str, Any]] = []
+    for it in items:
+        d = it.get("day")
+        if d:
+            fn = str(it.get("filename", ""))
+            base = fn.split("/", 1)[1] if "/" in fn else fn
+            if base in processed.get(d, set()):
+                continue  # ya editado → no es pendiente
+        out.append(it)
+    return out
+
+
+def _user_counts(u) -> dict[str, int]:
+    """Conteos por carpeta con `entrada` ya filtrada a solo-pendientes."""
+    counts = folder_manager.count_files(u.name)
+    try:
+        items = folder_manager.list_files(u.name, "entrada")
+        counts["entrada"] = len(_pending_entrada(items, u.id))
+    except Exception:
+        pass
+    return counts
+
+
 # ---------------------------------------------------------------------------
 # Listados (auth normal — header)
 # ---------------------------------------------------------------------------
@@ -86,6 +148,10 @@ def list_user_folders(user_id: str) -> dict[str, Any]:
     counts: dict[str, int] = {}
     for folder in USER_FOLDERS:
         items = folder_manager.list_files(u.name, folder)
+        # `entrada/` muestra SOLO pendientes (sin enviar) — lo ya editado no
+        # es accionable aquí y solo estorba al admin.
+        if folder == "entrada":
+            items = _pending_entrada(items, u.id)
         by_folder[folder] = items
         counts[folder] = len(items)
     return {
@@ -107,7 +173,7 @@ def user_folder_counts(user_id: str) -> dict[str, Any]:
     return {
         "user_id": u.id,
         "user_name": u.name,
-        "counts": folder_manager.count_files(u.name),
+        "counts": _user_counts(u),
     }
 
 
@@ -149,7 +215,7 @@ def global_folder_counts() -> dict[str, Any]:
     # N usuarios secuencial sería N × ~0.5-1s; en paralelo ≈ max() ~1s.
     def _count_one(u) -> tuple[Any, dict[str, int]]:
         try:
-            return u, folder_manager.count_files(u.name)
+            return u, _user_counts(u)
         except Exception:
             return u, {f: 0 for f in USER_FOLDERS}
 
