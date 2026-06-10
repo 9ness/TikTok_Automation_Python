@@ -1000,6 +1000,10 @@ class SilenceCutterTool:
             (a, b) for (a, b) in keep_intervals
             if (b - a) >= _MIN_KEEP_SEGMENT_S
         ]
+        # Ajuste FINAL a palabras completas: elimina slivers del arranque de la
+        # palabra cortada siguiente ('to'/'queto') y evita partir la última
+        # palabra (final 'montó'). Es la última autoridad sobre los bordes.
+        keep_intervals = _snap_keeps_to_words(keep_intervals, voiced_words or words)
 
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
@@ -1221,6 +1225,7 @@ class SilenceCutterTool:
                     new_keeps = [
                         (a, b) for a, b in new_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S
                     ]
+                    new_keeps = _snap_keeps_to_words(new_keeps, voiced_words or words)
                     kept_now = sum(b - a for a, b in new_keeps)
                     kept_before = sum(b - a for a, b in best_keeps)
                     if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
@@ -3082,6 +3087,54 @@ def _count_word_fallos(audit: dict | None) -> int:
     usuario; los silencios de más NO cuentan aquí (son tolerables)."""
     deep = (audit or {}).get("deep") or {}
     return len(deep.get("inserted_blocks") or []) + len(deep.get("missing_blocks") or [])
+
+
+def _snap_keeps_to_words(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    head_pad: float = 0.04,
+    tail_pad: float = 0.10,
+) -> list[tuple[float, float]]:
+    """Ajusta cada keep a PALABRAS COMPLETAS. Paso FINAL determinista sobre los
+    keeps ya calculados que GARANTIZA que el borde de un keep nunca:
+      · incluya el arranque de la palabra cortada siguiente (sliver tipo
+        'to'/'pa'/'queto' que se oye colgando tras la última palabra buena), ni
+      · parta a media la última palabra conservada (final 'montó' en vez de
+        'montón' → vídeo que 'termina mal').
+    Para cada keep: recorta el inicio al onset de la 1ª palabra cuyo centro cae
+    dentro (sin invadir la palabra previa cortada) y lleva el final al fin de la
+    última (sin invadir la siguiente cortada). Limpia los slivers que dejen
+    valley/word-guard/merge, sea cual sea su origen. Un keep sin ninguna palabra
+    dentro se deja intacto (silencios intencionales no se tocan)."""
+    if not keep_intervals or not words:
+        return keep_intervals
+    spans = sorted(
+        (float(w["start"]), float(w["end"]))
+        for w in words if "start" in w and "end" in w
+    )
+    if not spans:
+        return keep_intervals
+    out: list[tuple[float, float]] = []
+    for a, b in keep_intervals:
+        inside = [(ws, we) for ws, we in spans if a - 0.001 <= (ws + we) / 2 <= b + 0.001]
+        if not inside:
+            out.append((a, b))
+            continue
+        fw_s, lw_e = inside[0][0], inside[-1][1]
+        prev_end = max((we for ws, we in spans if we <= fw_s + 0.001), default=None)
+        next_start = min((ws for ws, we in spans if ws >= lw_e - 0.001), default=None)
+        na = fw_s - head_pad
+        if prev_end is not None and prev_end > na:
+            na = prev_end            # no arrastrar la cola de la palabra previa cortada
+        na = min(na, fw_s)           # nunca empezar tras el onset de la 1ª palabra buena
+        nb = lw_e + tail_pad
+        if next_start is not None and next_start < nb:
+            nb = next_start          # no colar el arranque de la palabra siguiente cortada
+        nb = max(nb, lw_e)           # nunca cortar antes del fin de la última (no partir)
+        if nb - na > 0.05:
+            out.append((max(0.0, na), nb))
+    return _merge_intervals(out)
 
 
 def _derive_self_heal_actions(
