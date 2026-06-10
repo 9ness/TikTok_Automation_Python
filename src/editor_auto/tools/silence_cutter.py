@@ -1069,6 +1069,57 @@ class SilenceCutterTool:
                 stretched_spans=stretched_spans,
             )
             diagnostic["audit"] = audit
+
+            # 10b) AUDIT PROFUNDO — re-transcribe el RESULTADO final y lo
+            # compara palabra a palabra contra lo que DEBÍA quedar (los words
+            # dentro de los keeps). Detecta lo que el audit acústico no ve:
+            # residuos de false-start ("estocost"), palabras duplicadas y
+            # palabras buenas perdidas. Texto contra texto → sin falsos
+            # positivos de timestamps. Cuesta ~1-3 min más por vídeo (Whisper
+            # sobre el output) — calidad > velocidad.
+            if (
+                bool(config.get("deep_audit_enabled", True))
+                and words and keep_intervals
+                and audit.get("transcription_ok", True)
+            ):
+                ctx.on_progress(0.985, "🔬 Audit profundo: re-transcribiendo el resultado…")
+                try:
+                    deep = _deep_audit_compare(
+                        output_path,
+                        words=words,
+                        keep_intervals=keep_intervals,
+                        language=config.get("ai_language", "es"),
+                        model_size=config.get("whisper_model_size", "large-v3"),
+                        cpu_threads=int(config.get("whisper_cpu_threads", 1)),
+                        log=ctx.on_log,
+                    )
+                    audit["deep"] = deep
+                    pen = 8 * len(deep.get("inserted_blocks", []) or [])
+                    pen += 8 * len(deep.get("missing_blocks", []) or [])
+                    if pen and audit.get("quality_score") is not None:
+                        new_score = max(0, int(audit["quality_score"]) - pen)
+                        audit["quality_score"] = new_score
+                        audit["needs_requeue"] = bool(audit.get("needs_requeue")) or new_score < 90
+                        audit["verdict"] = _verdict_for_score(new_score)
+                        for b in (deep.get("inserted_blocks") or [])[:3]:
+                            ctx.on_log(
+                                f"[silence_cutter] 🚩 audit profundo: audio SOBRANTE "
+                                f"'{b.get('text')}' (~{b.get('output_t')}s del output)"
+                            )
+                        for b in (deep.get("missing_blocks") or [])[:3]:
+                            ctx.on_log(
+                                f"[silence_cutter] 🚩 audit profundo: palabra PERDIDA "
+                                f"'{b.get('text')}'"
+                            )
+                    else:
+                        ctx.on_log(
+                            "[silence_cutter] 🔬 Audit profundo: el resultado dice "
+                            "exactamente lo que debía — sin residuos ni pérdidas."
+                        )
+                except Exception as e:  # noqa: BLE001
+                    audit["deep"] = {"error": f"{type(e).__name__}: {e}"}
+                    ctx.on_log(f"[silence_cutter] ⚠️ Audit profundo falló (no bloquea): {e}")
+
             score = audit.get("quality_score")
             verdict = audit.get("verdict", "?")
             if score is not None:
@@ -2518,6 +2569,137 @@ def _post_render_audit(
     except Exception as e:
         audit["error"] = f"{type(e).__name__}: {e}"
     return audit
+
+
+def _deep_audit_compare(
+    output_path: str,
+    *,
+    words: list[dict],
+    keep_intervals: list[tuple[float, float]],
+    language: str,
+    model_size: str,
+    cpu_threads: int = 1,
+    log=None,
+) -> dict:
+    """AUDIT PROFUNDO: re-transcribe el OUTPUT final con el mismo Whisper del
+    pipeline y lo alinea token a token contra la secuencia ESPERADA (las
+    palabras del input cuyo span cae dentro de los keeps).
+
+    Detecta lo que el audit acústico no puede ver:
+      · `inserted_blocks` — audio que NO debía estar (residuo de false-start
+        tipo "estocost", palabra duplicada que sobrevivió a medias).
+      · `missing_blocks` — palabras de contenido que DEBÍAN quedar y no suenan
+        (sobre-corte).
+
+    Tolerancias anti-falso-positivo:
+      · Palabras con solape parcial (8-60% del span en keeps) son INCIERTAS:
+        alinean si aparecen pero no penalizan si faltan (los timestamps de
+        Whisper en bordes no son fiables).
+      · Variantes de transcripción ("aprovecha"/"aprovecho", splits tipo
+        "porque"/"por que") se aceptan por similitud difusa (ratio ≥ 0.7).
+      · Solo penalizan faltas de palabras FUERTES de contenido (no fillers).
+    """
+    import difflib
+    import tempfile
+
+    def _norm(s: str) -> str:
+        return re.sub(r"[^\wáéíóúñü]", "", str(s).lower())
+
+    # 1) Secuencia esperada con tiers por solape del span en los keeps.
+    expected: list[dict] = []  # {tok, strong}
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        dur = max(1e-6, we - ws)
+        ov = sum(max(0.0, min(we, e) - max(ws, s)) for s, e in keep_intervals)
+        frac = ov / dur
+        tok = _norm(w.get("word", ""))
+        if not tok:
+            continue
+        if frac >= 0.6:
+            expected.append({"tok": tok, "strong": True})
+        elif frac >= 0.08:
+            expected.append({"tok": tok, "strong": False})
+    if not expected:
+        return {"skipped": "sin palabras esperadas"}
+
+    # 2) Transcribir el OUTPUT (mismo motor/modelo que el input → mismo
+    # vocabulario y formato de números; comparación estable).
+    tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        ext = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+             "-i", output_path, "-ac", "1", "-ar", "16000", "-vn", tmp_wav],
+            capture_output=True, timeout=180,
+        )
+        if ext.returncode != 0:
+            return {"error": "ffmpeg extract failed"}
+        out_words = _transcribe(
+            tmp_wav, model_size=model_size, language=language,
+            on_progress=None, timeout_s=900, fallback_model="small",
+            primary_threads=max(1, int(cpu_threads)),
+        )
+    finally:
+        try:
+            os.remove(tmp_wav)
+        except OSError:
+            pass
+    if not out_words:
+        return {"error": "transcripción del output vacía"}
+
+    out_toks = []
+    out_times = []
+    for w in out_words:
+        tok = _norm(w.get("word", ""))
+        if tok:
+            out_toks.append(tok)
+            out_times.append(float(w.get("start", 0.0)))
+
+    exp_toks = [e["tok"] for e in expected]
+    sm = difflib.SequenceMatcher(None, exp_toks, out_toks, autojunk=False)
+    inserted: list[dict] = []
+    missing: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            continue
+        if op == "replace":
+            # ¿Variante de transcripción del mismo audio? ("aprovecha" vs
+            # "aprovecho", "porque" vs "por que"). Compara los bloques unidos.
+            a = " ".join(exp_toks[i1:i2])
+            b = " ".join(out_toks[j1:j2])
+            if difflib.SequenceMatcher(None, a, b).ratio() >= 0.7:
+                continue
+        if op in ("replace", "delete"):
+            # Falta lo esperado: solo penaliza palabras FUERTES de contenido.
+            miss = [
+                expected[k]["tok"] for k in range(i1, i2)
+                if expected[k]["strong"]
+                and expected[k]["tok"] not in _FILLER_TOKENS
+                and len(expected[k]["tok"]) > 2
+            ]
+            if miss:
+                missing.append({"text": " ".join(miss)})
+        if op in ("replace", "insert"):
+            extra = [out_toks[k] for k in range(j1, j2)]
+            txt = " ".join(extra)
+            # Bloques minúsculos (1-2 chars) suelen ser ruido de Whisper, no
+            # un residuo audible → ignorar. "estocost"/"esto" duplicado pasan.
+            if len(txt.replace(" ", "")) >= 3:
+                inserted.append({
+                    "text": txt,
+                    "output_t": round(out_times[j1], 2) if j1 < len(out_times) else None,
+                })
+
+    return {
+        "model": model_size,
+        "n_expected": len(exp_toks),
+        "n_output_words": len(out_toks),
+        "match_ratio": round(sm.ratio(), 3),
+        "inserted_blocks": inserted[:10],
+        "missing_blocks": missing[:10],
+    }
 
 
 def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
