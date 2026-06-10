@@ -324,6 +324,9 @@ def get_job_summary(
         "ai_cuts_by_reason": ai_cuts_by_reason,
         "quality_score": quality_score,
         "quality_verdict": quality_verdict,
+        # Auto-corrección: intentos y mejora de score por reintento
+        # (p.ej. [{"attempt":1,"score_before":94,"score_after":100,...}]).
+        "self_heal": diag.get("self_heal"),
         "needs_requeue": needs_requeue,
         "transcription_ok": transcription_ok,
         "n_loose_words": n_loose_words,

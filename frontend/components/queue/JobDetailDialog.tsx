@@ -249,6 +249,34 @@ function SummaryView({ jobId, isRunning, open }: { jobId: string; isRunning: boo
         />
       )}
 
+      {/* Auto-corrección: mejora de score por reintento */}
+      {s.self_heal?.history && s.self_heal.history.length > 0 && (
+        <section className="space-y-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            🩹 Auto-corrección ({s.self_heal.attempts} intento{(s.self_heal.attempts ?? 0) > 1 ? "s" : ""} · objetivo ≥{s.self_heal.target ?? 95})
+          </h4>
+          {s.self_heal.history.map((h) => (
+            <div key={h.attempt} className="text-xs">
+              <span className="font-mono font-semibold">
+                #{h.attempt}: {h.score_before ?? "?"} → {h.score_after ?? "?"}
+              </span>
+              <span className="ml-2 text-muted-foreground">
+                {[
+                  h.n_residue_cuts ? `${h.n_residue_cuts} sobrante(s) cortado(s)` : null,
+                  h.n_guarded_cuts ? `${h.n_guarded_cuts} corte(s) correctivo(s)` : null,
+                  h.n_restores ? `${h.n_restores} tramo(s) restaurado(s)` : null,
+                ].filter(Boolean).join(" · ")}
+              </span>
+              {h.actions && h.actions.length > 0 && (
+                <div className="mt-0.5 break-words text-[11px] text-muted-foreground">
+                  {h.actions.join(" · ")}
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* Breakdown de cortes */}
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

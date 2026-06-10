@@ -80,6 +80,20 @@ export interface JobSummaryResponse {
   ai_cuts_by_reason?: Record<string, number>;
   quality_score?: number | null;
   quality_verdict?: string | null;
+  /** Auto-corrección: intentos con score antes→después por reintento. */
+  self_heal?: {
+    target?: number;
+    attempts?: number;
+    history?: {
+      attempt: number;
+      score_before?: number | null;
+      score_after?: number | null;
+      n_residue_cuts?: number;
+      n_guarded_cuts?: number;
+      n_restores?: number;
+      actions?: string[];
+    }[];
+  } | null;
   needs_requeue?: boolean;
   transcription_ok?: boolean;
   n_loose_words?: number;
