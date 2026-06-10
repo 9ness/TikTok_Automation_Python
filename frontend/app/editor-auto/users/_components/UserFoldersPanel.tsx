@@ -328,11 +328,17 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
         {isWebUser && (
           <div className="space-y-2 rounded-md border border-border bg-card/40 p-2.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Estado de edición
+              Estado de edición · hoy
             </p>
             <div className="grid grid-cols-3 gap-1.5 text-center">
               <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
-                <p className="text-lg font-bold text-amber-500">{counts.entrada}</p>
+                <p className="text-lg font-bold text-amber-500">
+                  {pipeline.data
+                    ? (folders.data?.folders?.entrada ?? []).filter(
+                        (f) => f.day === pipeline.data!.day,
+                      ).length
+                    : "·"}
+                </p>
                 <p className="text-[10px] leading-tight text-muted-foreground">Sin empezar</p>
               </div>
               <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2">
@@ -378,9 +384,10 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
               </ul>
             )}
             <p className="text-[10px] text-muted-foreground">
-              <strong>Sin empezar</strong>: subidos y aún no mandados a edición ·{" "}
-              <strong>En proceso</strong>: editándose o pendientes de aprobar (el cliente
-              aún no los ve) · <strong>Entregados</strong>: ya disponibles para el cliente.
+              Solo <strong>hoy</strong>. <strong>Sin empezar</strong>: subidos y aún no
+              mandados a edición · <strong>En proceso</strong>: editándose o pendientes de
+              aprobar (el cliente aún no los ve) · <strong>Entregados</strong>: ya
+              disponibles para el cliente.
             </p>
           </div>
         )}

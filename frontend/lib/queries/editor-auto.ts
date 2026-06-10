@@ -428,6 +428,7 @@ export interface PipelineItem {
  *  estado real vive en la cola (jobs), no en carpetas. */
 export function useWebUserPipeline(userId: string | null | undefined, isWeb: boolean) {
   return useQuery<{
+    day: string;
     in_process: PipelineItem[];
     ready: PipelineItem[];
     n_in_process: number;

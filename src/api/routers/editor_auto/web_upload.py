@@ -823,28 +823,35 @@ def web_admin_user_pipeline(
     user_id: str,
     _: Annotated[str, Depends(get_current_user)],
     queue: Annotated[JobQueue, Depends(get_queue)],
+    day: str | None = None,
 ) -> dict:
-    """Estado de edición de un usuario WEB clasificado para el admin:
+    """Estado de edición de un usuario WEB clasificado para el admin, acotado
+    a UN día (por defecto HOY — Europe/Madrid):
 
       · `in_process` — mandados a edición pero AÚN NO disponibles al cliente:
         en cola, editándose, o terminados pendientes de aprobar (gate ON) /
         re-edición (score <90).
-      · `ready` — entregados (aprobados con gate, o ≥90 con gate OFF) → el
-        cliente YA los ve.
+      · `ready` — entregados ese día (aprobados con gate, o ≥90 con gate OFF).
 
-    El estado real del flujo web vive en la COLA (jobs), no en carpetas, por eso
-    el panel de carpetas no basta para verlo. NO incluye los 'sin empezar'
-    (borradores sin enviar): esos se ven en la carpeta Entrada (pendientes)."""
+    Acotar a HOY tiene sentido para el admin: "qué pasa hoy con este usuario".
+    El estado real del flujo web vive en la COLA (jobs), no en carpetas."""
+    from datetime import datetime
     from src.editor_auto.config import manual_approval_enabled
+    try:
+        from zoneinfo import ZoneInfo
+        _tz = ZoneInfo("Europe/Madrid")
+    except Exception:
+        _tz = None
 
+    target_day = day if (day and is_valid_day(day)) else datetime.now(_tz).date().isoformat()
     r = get_editor_redis()
     by_id = {j.id: j for j in queue.get_all()}
     gate = manual_approval_enabled()
     terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
     in_process: list[dict] = []
     ready: list[dict] = []
-    days = sorted(r.smembers(f"{_SENT_DAYS_KEY}{user_id}") or [], reverse=True)
-    for day in days:
+    sent_days = set(r.smembers(f"{_SENT_DAYS_KEY}{user_id}") or [])
+    for day in ([target_day] if target_day in sent_days else []):
         if not is_valid_day(day):
             continue
         approved = _approved_set(user_id, day)
@@ -876,6 +883,7 @@ def web_admin_user_pipeline(
             elif job.status in terminal:  # FAILED / CANCELLED
                 in_process.append({**base, "state": "failed", "label": "Fallido"})
     return {
+        "day": target_day,
         "in_process": in_process,
         "ready": ready,
         "n_in_process": len(in_process),
