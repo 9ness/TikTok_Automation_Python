@@ -2984,6 +2984,7 @@ def _deep_audit_compare(
                 1 for k in range(i1, i2)
                 if expected[k]["strong"]
                 and expected[k]["tok"] not in _FILLER_TOKENS
+                and expected[k]["tok"] not in _AUDIT_STOPWORDS
                 and len(expected[k]["tok"]) > 2
             )
             missing.append({
@@ -3606,6 +3607,21 @@ _FILLER_TOKENS = {
     "la", "le", "lo", "el", "y", "o", "e", "a", "eh", "ah", "oh", "uh", "um",
     "mm", "mmm", "hmm", "ya", "ja", "je", "ji", "jo", "ju", "jaja", "jeje",
     "uy", "ay", "aja", "eeh", "aah", "ehh", "este", "esto", "pues",
+}
+
+# Palabras funcionales (artículos, preposiciones, conjunciones, pronombres
+# cortos) que NO cuentan como "contenido perdido" en el AUDIT PROFUNDO. Si una
+# de estas falta/cambia en la re-transcripción suele ser varianza de Whisper o
+# un tartamudeo del original ("…estampados que hay que hay un montón…"), NO un
+# sobre-corte real. Las pérdidas que de verdad importan son nombres/verbos/
+# adjetivos (euros, precioso, estampados…). Solo se usa para el conteo de
+# contenido del audit — no afecta a la detección de cortes.
+_AUDIT_STOPWORDS = {
+    "que", "de", "la", "el", "los", "las", "un", "una", "unos", "unas",
+    "con", "por", "en", "es", "son", "se", "lo", "le", "les", "su", "sus",
+    "y", "o", "u", "a", "al", "del", "me", "te", "nos", "mi", "tu", "no",
+    "ya", "mas", "más", "hay", "ha", "he", "si", "sí", "ni", "muy", "este",
+    "esta", "esto", "esos", "esas", "como", "para", "pero", "porque",
 }
 
 
