@@ -23,6 +23,7 @@ Reglas:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -104,31 +105,48 @@ def _script_companion(dir_path: str, video_name: str) -> dict[str, Any] | None:
     return None
 
 
+_DAY_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def list_files(username: str, folder: str) -> list[dict[str, Any]]:
     """Lista los vídeos de una carpeta del usuario, ordenados por
     `modified_at` descendente. Cada vídeo lleva `script` (dict con
     `filename`+`size_bytes`+`modified_at`) si existe `<stem>.txt` al
     lado, o `None` en caso contrario. Los `.txt` NO aparecen como
-    items separados — son metadatos del vídeo."""
+    items separados — son metadatos del vídeo.
+
+    Incluye también los vídeos dentro de SUBCARPETAS DE DÍA (el flujo
+    web organiza entrada/salida por `YYYY-MM-DD/`): esos entran con
+    `filename = "YYYY-MM-DD/archivo.mp4"` y campo `day`, para que el
+    panel admin los VEA (antes los días salían a 0)."""
     dir_path = user_subfolder(username, folder)
     if not os.path.isdir(dir_path):
         return []
     files: list[dict[str, Any]] = []
-    for name in os.listdir(dir_path):
-        ext = os.path.splitext(name)[1].lower()
-        if ext not in VIDEO_EXTS:
-            continue
-        full = os.path.join(dir_path, name)
-        if not os.path.isfile(full):
-            continue
-        meta = _stat(full)
-        files.append({
-            "filename": name,
-            "folder": folder,
-            "ext": ext,
-            "script": _script_companion(dir_path, name),
-            **meta,
-        })
+
+    def _scan(scan_dir: str, prefix: str, day: str | None) -> None:
+        for name in os.listdir(scan_dir):
+            full = os.path.join(scan_dir, name)
+            if day is None and os.path.isdir(full) and _DAY_DIR_RE.match(name):
+                _scan(full, f"{name}/", name)  # un solo nivel de día
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in VIDEO_EXTS or not os.path.isfile(full):
+                continue
+            meta = _stat(full)
+            files.append({
+                "filename": f"{prefix}{name}",
+                "folder": folder,
+                "ext": ext,
+                "day": day,
+                "script": _script_companion(scan_dir, name),
+                **meta,
+            })
+
+    try:
+        _scan(dir_path, "", None)
+    except OSError:
+        pass
     files.sort(key=lambda f: f["modified_at"], reverse=True)
     return files
 
@@ -172,13 +190,25 @@ def count_files(username: str) -> dict[str, int]:
 
 def resolve_file(username: str, folder: str, filename: str) -> str:
     """Path absoluto al archivo (para servirlo o pasarlo al pipeline).
-    Valida y comprueba existencia — lanza `FolderError` si no existe."""
-    base = _validate_filename(filename)
+    Valida y comprueba existencia — lanza `FolderError` si no existe.
+
+    Acepta también `YYYY-MM-DD/archivo.mp4` (subcarpeta de día del flujo
+    web) — el prefijo de día se valida estricto contra el patrón de fecha,
+    así que no abre path traversal."""
+    day: str | None = None
+    name = filename or ""
+    if "/" in name:
+        head, _, tail = name.partition("/")
+        if _DAY_DIR_RE.match(head):
+            day, name = head, tail
+    base = _validate_filename(name)
     dir_path = user_subfolder(username, folder)
+    if day:
+        dir_path = os.path.join(dir_path, day)
     path = os.path.join(dir_path, base)
     if not os.path.isfile(path):
         raise FolderError(
-            f"Archivo no encontrado en {folder}/: {base}"
+            f"Archivo no encontrado en {folder}/: {filename}"
         )
     return path
 

@@ -251,6 +251,8 @@ export interface FolderFile {
   filename: string;
   folder: FolderName;
   ext: string;
+  /** Subcarpeta de día (flujo web), p.ej. "2026-06-09"; null si está plano. */
+  day?: string | null;
   size_bytes: number;
   modified_at: number; // epoch seconds
   // Si en la misma carpeta existe `<stem>.txt`, el backend lo asocia

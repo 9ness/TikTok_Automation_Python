@@ -169,6 +169,11 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
     }
   }
 
+  // Usuario VINCULADO A LA WEB: su entrega (aprobación, "listos", email) la
+  // gobierna el flujo web — ocultamos las herramientas del flujo manual
+  // (compartir Drive, marcar día listo) que aquí ya no aplican.
+  const isWebUser = Boolean(user.data?.account_email);
+
   // Límite diario del PLAN (null = sin plan/prueba, 0 = plan ilimitado, >0 = N).
   // El campo "Máx vídeos/día" es un OVERRIDE: vacío => se usa este del plan.
   const planLimit = user.data?.usage?.daily_limit;
@@ -262,7 +267,10 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           </p>
         </div>
 
-        {/* Marcar día listo: comparte salida + email aviso */}
+        {/* Marcar día listo: comparte salida + email aviso — SOLO flujo
+            manual. Los usuarios web reciben sus vídeos por la web (aprobación
+            + email automático), así que esto no aplica. */}
+        {!isWebUser && (<>
         <Button
           variant="outline"
           size="sm"
@@ -305,6 +313,13 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             </p>
           );
         })()}
+        </>)}
+        {isWebUser && (
+          <p className="rounded-md border border-brand-cyan/30 bg-brand-cyan/5 p-2 text-[11px] text-muted-foreground">
+            🌐 Usuario web: la entrega (aprobación, vídeos listos y email) la
+            gobierna la web — no hace falta compartir carpetas ni marcar el día.
+          </p>
+        )}
 
         {/* Tabs por carpeta */}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -392,8 +407,11 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           </p>
         )}
 
-        {/* Sección de sharing con emails concretos (Google Drive) */}
-        <SharingSection userId={userId} userName={user.data?.name ?? ""} />
+        {/* Sección de sharing con emails concretos (Google Drive) — solo
+            flujo manual; los usuarios web entran por la propia web. */}
+        {!isWebUser && (
+          <SharingSection userId={userId} userName={user.data?.name ?? ""} />
+        )}
       </CardContent>
     </Card>
     {retouching && (
@@ -757,6 +775,14 @@ function FileRow({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const hasScript = Boolean(file.script);
+  // Vídeo dentro de una subcarpeta de DÍA (flujo web: entrada/2026-06-09/…).
+  // Se previsualiza y descarga, pero las acciones de mover/encolar/borrar
+  // quedan fuera: ese ciclo lo gobierna la web (cola, aprobación, entrega).
+  const inDayFolder = file.filename.includes("/");
+  const dayLabel = inDayFolder ? file.filename.split("/")[0] : null;
+  const shownName = inDayFolder
+    ? file.filename.split("/").slice(1).join("/")
+    : file.filename;
   return (
     <li className="rounded-md border bg-card/40 p-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -764,8 +790,16 @@ function FileRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium">
-              {file.filename}
+              {shownName}
             </span>
+            {dayLabel && (
+              <span
+                className="inline-flex shrink-0 items-center rounded bg-brand-cyan/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-brand-cyan"
+                title={`Día del flujo web: ${dayLabel}`}
+              >
+                📅 {dayLabel}
+              </span>
+            )}
             {hasScript && (
               <span
                 className="inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-violet-600 dark:text-violet-300"
@@ -795,7 +829,7 @@ function FileRow({
           )}
         </Button>
 
-        {file.folder === "entrada" && (
+        {file.folder === "entrada" && !inDayFolder && (
           <EnqueueAction
             filename={file.filename}
             scriptCompanion={file.script?.filename ?? null}
@@ -804,7 +838,7 @@ function FileRow({
           />
         )}
 
-        {file.folder === "recuperacion" && (
+        {file.folder === "recuperacion" && !inDayFolder && (
           <MoveAction
             label="Re-editar"
             icon={ArrowLeft}
@@ -819,7 +853,7 @@ function FileRow({
             procesa). PERO si un job se interrumpió (deploy/crash) el
             archivo se queda huérfano en cola — añadimos esta acción
             manual para que el admin lo recupere sin SSH. */}
-        {file.folder === "cola" && (
+        {file.folder === "cola" && !inDayFolder && (
           <MoveAction
             label="Devolver a entrada"
             icon={ArrowLeft}
@@ -832,16 +866,18 @@ function FileRow({
 
         {file.folder === "salida" && (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 border-brand-cyan/40 text-brand-cyan hover:bg-brand-cyan/10"
-              onClick={onRetouch}
-              title="Retocar manualmente (quitar silencios/palabras) y reemplazar"
-            >
-              <Sparkles className="h-3 w-3" />
-              Retocar
-            </Button>
+            {!inDayFolder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 border-brand-cyan/40 text-brand-cyan hover:bg-brand-cyan/10"
+                onClick={onRetouch}
+                title="Retocar manualmente (quitar silencios/palabras) y reemplazar"
+              >
+                <Sparkles className="h-3 w-3" />
+                Retocar
+              </Button>
+            )}
             <a
               href={userFilePreviewUrl(userId, file.folder, file.filename)}
               download={file.filename}
@@ -856,13 +892,16 @@ function FileRow({
 
         {/* Borrar disponible en TODAS las carpetas. En cola/ es peligroso
             si hay un job activo procesándolo, pero útil cuando el job
-            crasheó y dejó basura — la confirmación deja claro el riesgo. */}
-        <DeleteAction
-          filename={file.filename}
-          folder={file.folder}
-          onAction={onDelete}
-          disabled={disabled}
-        />
+            crasheó y dejó basura — la confirmación deja claro el riesgo.
+            Los archivos de día (flujo web) NO se borran desde aquí. */}
+        {!inDayFolder && (
+          <DeleteAction
+            filename={file.filename}
+            folder={file.folder}
+            onAction={onDelete}
+            disabled={disabled}
+          />
+        )}
       </div>
       {previewOpen && (
         <PreviewVideo
