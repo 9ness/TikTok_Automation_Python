@@ -1111,13 +1111,22 @@ class SilenceCutterTool:
                             log=ctx.on_log,
                         )
                         audit["deep"] = deep
-                        pen = 8 * len(deep.get("inserted_blocks", []) or [])
-                        pen += 8 * len(deep.get("missing_blocks", []) or [])
-                        if pen and audit.get("quality_score") is not None:
-                            new_score = max(0, int(audit["quality_score"]) - pen)
+                        n_ins = len(deep.get("inserted_blocks", []) or [])
+                        n_mis = len(deep.get("missing_blocks", []) or [])
+                        nfallos = n_ins + n_mis
+                        audit["n_word_fallos"] = nfallos
+                        if audit.get("quality_score") is not None:
+                            new_score = max(0, int(audit["quality_score"]) - 8 * nfallos)
                             audit["quality_score"] = new_score
-                            audit["needs_requeue"] = bool(audit.get("needs_requeue")) or new_score < 90
+                            # CLAVE: cualquier fallo de PALABRA (sobrante/perdida)
+                            # marca needs_requeue → NO se entrega aunque el score
+                            # quede ≥90 (un solo fallo deja 92 y antes pasaba el
+                            # filtro). Los silencios NO marcan esto: son tolerables.
+                            audit["needs_requeue"] = (
+                                bool(audit.get("needs_requeue")) or nfallos > 0
+                            )
                             audit["verdict"] = _verdict_for_score(new_score)
+                        if nfallos:
                             for b in (deep.get("inserted_blocks") or [])[:3]:
                                 ctx.on_log(
                                     f"[silence_cutter] 🚩 audit profundo: audio SOBRANTE "
@@ -1168,7 +1177,7 @@ class SilenceCutterTool:
                 tried_kinds: set[str] = set()
                 while (
                     len(heal_hist) < heal_max
-                    and best_score < heal_target
+                    and (best_score < heal_target or _count_word_fallos(best_audit) > 0)
                     and best_audit.get("transcription_ok", True)
                 ):
                     residue_cuts, guarded_cuts, restores = _derive_self_heal_actions(
@@ -1253,18 +1262,29 @@ class SilenceCutterTool:
                             f"({e}); conservo el mejor render."
                         )
                         break
-                    # Audita el candidato (tmp) y SOLO lo acepta si mejora el score.
+                    # Audita el candidato (tmp). PRIORIDAD: eliminar fallos de
+                    # PALABRA (sobrantes/perdidas) — es lo GRAVE. Un silencio de
+                    # más es tolerable. Por eso aceptamos el candidato si REDUCE
+                    # los fallos de palabra AUNQUE el score total baje un poco
+                    # (restaurar una palabra perdida puede dejar un mini-silencio);
+                    # a igualdad de fallos de palabra, preferimos mayor score.
                     prev_best = best_score
+                    prev_fallos = _count_word_fallos(best_audit)
                     cand_audit = _full_audit(new_keeps, audit_path=tmp_out)
                     cand_score = cand_audit.get("quality_score")
-                    accepted = isinstance(cand_score, int) and cand_score > prev_best
+                    cand_fallos = _count_word_fallos(cand_audit)
+                    accepted = isinstance(cand_score, int) and (
+                        cand_fallos < prev_fallos
+                        or (cand_fallos == prev_fallos and cand_score > prev_best)
+                    )
                     if accepted:
                         os.replace(tmp_out, output_path)
                         best_keeps, best_audit, best_score = new_keeps, cand_audit, cand_score
                         diagnostic["audit"] = best_audit
                         ctx.on_log(
                             f"[silence_cutter] 🩹 Corrección ACEPTADA ({kind}): "
-                            f"{prev_best} → {cand_score}/100"
+                            f"fallos_palabra {prev_fallos}→{cand_fallos} · "
+                            f"score {prev_best}→{cand_score}/100"
                         )
                     else:
                         try:
@@ -1273,11 +1293,13 @@ class SilenceCutterTool:
                             pass
                         ctx.on_log(
                             f"[silence_cutter] 🩹 Corrección DESCARTADA ({kind}): "
-                            f"{prev_best} → {cand_score} (no mejora) — conservo el mejor."
+                            f"fallos_palabra {prev_fallos}→{cand_fallos} · "
+                            f"score {prev_best}→{cand_score} — conservo el mejor."
                         )
                     heal_hist.append({
                         "attempt": attempt, "kind": kind, "accepted": accepted,
                         "score_before": prev_best, "score_after": cand_score,
+                        "word_fallos_before": prev_fallos, "word_fallos_after": cand_fallos,
                         "n_residue_cuts": len(rcuts), "n_guarded_cuts": len(gcuts),
                         "n_restores": len(restores_a),
                         "actions": [w for _, _, w in (r_cuts_a + g_cuts_a + restores_a)][:8],
@@ -3052,6 +3074,14 @@ def _subtract_intervals(
         if cur < kb:
             out.append((cur, kb))
     return [(a, b) for a, b in out if (b - a) > 1e-3]
+
+
+def _count_word_fallos(audit: dict | None) -> int:
+    """Nº de fallos de PALABRA del audit profundo: sobrantes (audio que no
+    debía sonar) + perdidas (palabras sobre-cortadas). Es lo GRAVE para el
+    usuario; los silencios de más NO cuentan aquí (son tolerables)."""
+    deep = (audit or {}).get("deep") or {}
+    return len(deep.get("inserted_blocks") or []) + len(deep.get("missing_blocks") or [])
 
 
 def _derive_self_heal_actions(

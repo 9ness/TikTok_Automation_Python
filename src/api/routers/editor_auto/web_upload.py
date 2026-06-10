@@ -183,7 +183,7 @@ def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
                 return  # aún hay trabajos en curso → no avisar
             out_name = os.path.basename(job.result_path) if job.result_path else None
             score = _job_score(job) if job.status == JobStatus.COMPLETED else None
-            passed = bool(job.status == JobStatus.COMPLETED and out_name and (score is None or score >= _MIN_SCORE))
+            passed = bool(job.status == JobStatus.COMPLETED and out_name and _job_deliverable(job, score))
             is_approved = (not gate) or (out_name in approved if out_name else False)
             if passed and not is_approved:
                 return  # hay vídeos buenos pendientes de aprobar → aún no
@@ -278,7 +278,9 @@ def _get_day_jobs(user_id: str, day: str) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
-def _job_score(job) -> int | None:
+def _read_audit(job) -> dict | None:
+    """Lee el `audit` del diagnostic JSON del job (score, needs_requeue,
+    fallos de palabra). None si no hay diagnostic."""
     params = getattr(job, "params", None) or {}
     paths = []
     tf = params.get("temp_folder")
@@ -290,11 +292,33 @@ def _job_score(job) -> int | None:
             try:
                 with open(p, encoding="utf-8") as f:
                     diag = json.load(f)
-                score = (diag.get("audit") or {}).get("quality_score")
-                return int(score) if score is not None else None
+                return diag.get("audit") or {}
             except Exception:
                 return None
     return None
+
+
+def _job_score(job) -> int | None:
+    audit = _read_audit(job)
+    if not audit:
+        return None
+    score = audit.get("quality_score")
+    return int(score) if score is not None else None
+
+
+def _job_deliverable(job, score: int | None) -> bool:
+    """El render es entregable al cliente si:
+      · pasa el score mínimo (calidad acústica / pocos silencios), Y
+      · NO tiene fallos de PALABRA marcados (needs_requeue): un sobrante o una
+        palabra perdida RETIENE la entrega aunque el score quede ≥90 (un solo
+        fallo deja 92 y antes se entregaba). Los silencios no marcan esto.
+    Si no hay diagnostic (score None) no bloqueamos por audit."""
+    if score is not None and score < _MIN_SCORE:
+        return False
+    audit = _read_audit(job)
+    if audit and audit.get("needs_requeue"):
+        return False
+    return True
 
 
 # ─────────────────────────── Emitir URL de subida ───────────────────────────
@@ -633,7 +657,7 @@ def web_output(
         out_name = os.path.basename(job.result_path) if (job and job.result_path) else None
         passed = bool(
             job and job.status == JobStatus.COMPLETED and out_name
-            and (score is None or score >= _MIN_SCORE)
+            and _job_deliverable(job, score)
         )
         # Con gate ON, el vídeo solo es visible al cliente si el admin lo aprobó.
         is_approved = (not gate) or (out_name in approved if out_name else False)
@@ -719,7 +743,7 @@ def web_days_summary(
                 done += 1
             out_name = os.path.basename(job.result_path) if (job and job.result_path) else None
             passed = bool(job and job.status == JobStatus.COMPLETED and out_name
-                          and (_job_score(job) is None or (_job_score(job) or 0) >= _MIN_SCORE))
+                          and _job_deliverable(job, _job_score(job)))
             is_approved = (not gate) or (out_name in approved if out_name else False)
             if passed and is_approved:
                 ready += 1
@@ -803,8 +827,8 @@ def web_admin_pending(
                 continue
             out_name = os.path.basename(job.result_path)
             score = _job_score(job)
-            if score is not None and score < _MIN_SCORE:
-                continue  # los <90 no se ofrecen al cliente (irán a reedición)
+            if not _job_deliverable(job, score):
+                continue  # <90 o con fallo de palabra → no se ofrece (irá a reedición)
             if out_name in approved:
                 continue
             items.append({
@@ -872,14 +896,14 @@ def web_admin_user_pipeline(
                 else:
                     in_process.append({**base, "state": "queued", "label": "En cola"})
             elif job.status == JobStatus.COMPLETED and out_name:
-                passed = score is None or score >= _MIN_SCORE
+                passed = _job_deliverable(job, score)
                 is_approved = (not gate) or (out_name in approved)
                 if passed and is_approved:
                     ready.append({**base, "state": "delivered", "label": "Entregado"})
                 elif passed and not is_approved:
                     in_process.append({**base, "state": "review", "label": "En revisión"})
                 else:
-                    in_process.append({**base, "state": "requeue", "label": "Re-edición (<90)"})
+                    in_process.append({**base, "state": "requeue", "label": "Re-edición (fallo)"})
             elif job.status in terminal:  # FAILED / CANCELLED
                 in_process.append({**base, "state": "failed", "label": "Fallido"})
     return {
