@@ -443,9 +443,31 @@ class VideoRemover:
         return previews
 
     def process(self, input_path, output_folder, words=None, trajectory=None, log_callback=None, logger=None, clean_mode="Subtítulos Virales", hook_y_pct=0.20, hook_color="#FDD002", upscale_1080p=False, font_path=None):
-        if not words or not trajectory:
-            raise ValueError("No se puede renderizar: Faltan palabras o datos de trayectoria.")
-            
+        # 4 modos:
+        #  - "Subtítulos Virales"      → blur subs originales + zoom 1.10 + subs nuevos
+        #  - "Camuflaje Geométrico…"   → sin blur + zoom 1.15/pulsos/firma + gancho IA
+        #  - "Solo Limpiar…"           → blur subs originales + zoom 1.10, SIN texto
+        #  - "Limpiar Metadata…"       → sin blur (no toca subs) + zoom 1.15/pulsos/firma, SIN texto
+        is_camuflaje = "Camuflaje" in clean_mode
+        add_subs = (clean_mode == "Subtítulos Virales")
+        clean_keep_subs = (clean_mode == "Limpiar Metadata (Sin Tocar Subtítulos)")
+        clean_mask_subs = (clean_mode == "Solo Limpiar (Sin Subtítulos)")
+        # Pipeline "geométrico" (zoom 1.15 + pulsos + micro-firma, sin blur):
+        # camuflaje y "limpiar metadata". El gancho IA solo en camuflaje.
+        use_geometric = is_camuflaje or clean_keep_subs
+        add_hook = is_camuflaje
+        clean_only = clean_keep_subs or clean_mask_subs  # ningún texto añadido
+
+        # Requisitos por modo: los subs nuevos necesitan palabras + trayectoria;
+        # el gancho de camuflaje necesita palabras; los modos "limpiar" no
+        # necesitan nada (trayectoria opcional solo para tapar subs originales).
+        if add_subs and (not words or not trajectory):
+            raise ValueError("No se puede renderizar: faltan palabras o trayectoria para los subtítulos.")
+        if is_camuflaje and not words:
+            raise ValueError("No se puede renderizar: faltan palabras para el gancho.")
+        words = words or []
+        trajectory = trajectory or []
+
         video_original = VideoFileClip(input_path)
         W, H = video_original.size
 
@@ -464,12 +486,12 @@ class VideoRemover:
 
         # INICIALIZACIÓN CRÍTICA (Evita NameError)
         clips = []
-        is_camuflaje = "Camuflaje" in clean_mode
-        
-        if is_camuflaje:
-            # 1. GENERACIÓN DE GANCHO VIRAL (IA Centralizada)
-            hook_text = self.get_hook_text(words)
-            
+
+        if use_geometric:
+            # 1. GENERACIÓN DE GANCHO VIRAL (IA Centralizada) — solo camuflaje.
+            # "Limpiar Metadata" usa el mismo tratamiento anti-copy pero SIN texto.
+            hook_text = self.get_hook_text(words) if add_hook else None
+
             # 2. Zoom Dinámico con Pulsos Aleatorios
             pulse_times = [1.5] + [t for t in range(8, int(video_original.duration), 10)]
             
@@ -494,32 +516,43 @@ class VideoRemover:
                 hook_clip = hook_clip.set_start(0).set_position(('center', int(H * hook_y_pct)))
                 clips.append(hook_clip)
         else:
-            # Modo estándar (Subtítulos amarillos)
+            # Modo estándar (blur de subs originales + zoom). Los subtítulos
+            # amarillos nuevos SOLO se añaden en "Subtítulos Virales"; en
+            # "Solo Limpiar" se deja el vídeo limpio sin texto.
             zoom = 1.10
             v_blurred = video_original.fl(lambda gf, t: self._apply_pro_blur(gf(t).copy(), next((b for ts, b in trajectory if abs(ts-t) < 0.4), None)))
             v_trans = v_blurred.resize(zoom).crop(x_center=(W*zoom)/2, y_center=(H*zoom)/2, width=W, height=H)
-            
-            for i in range(0, len(words), 2):
-                w1 = words[i]
-                w2 = words[i+1] if i+1 < len(words) else None
-                txt = (w1['word'] + " " + (w2['word'] if w2 else "")).upper().strip()
-                start, end = w1['start'], (w2['end'] if w2 else w1['end'] + 0.5)
-                mid_time = (start + end) / 2
-                box = next((b for ts, b in trajectory if abs(ts-mid_time) < 0.5), None)
-                if box:
-                    center_y_box = (box[1] + box[3]/2)
-                    center_y = center_y_box * 1.10 - (H * (1.10 - 1)) / 2
-                    final_y = int(center_y - (H*0.15 / 2) - (H * 0.015))
-                else:
-                    final_y = int(H * 0.8)
-                # En subs mode reusamos hook_color como color de los subs nuevos
-                # (matches el control "Color de los subtítulos" del frontend).
-                c = self.create_text_clip(txt, end-start, (W, int(H * 0.15)), color=hook_color)
-                clips.append(c.set_start(start).set_position((0, final_y)))
-            
+
+            if add_subs:
+                for i in range(0, len(words), 2):
+                    w1 = words[i]
+                    w2 = words[i+1] if i+1 < len(words) else None
+                    txt = (w1['word'] + " " + (w2['word'] if w2 else "")).upper().strip()
+                    start, end = w1['start'], (w2['end'] if w2 else w1['end'] + 0.5)
+                    mid_time = (start + end) / 2
+                    box = next((b for ts, b in trajectory if abs(ts-mid_time) < 0.5), None)
+                    if box:
+                        center_y_box = (box[1] + box[3]/2)
+                        center_y = center_y_box * 1.10 - (H * (1.10 - 1)) / 2
+                        final_y = int(center_y - (H*0.15 / 2) - (H * 0.015))
+                    else:
+                        final_y = int(H * 0.8)
+                    # En subs mode reusamos hook_color como color de los subs nuevos
+                    # (matches el control "Color de los subtítulos" del frontend).
+                    c = self.create_text_clip(txt, end-start, (W, int(H * 0.15)), color=hook_color)
+                    clips.append(c.set_start(start).set_position((0, final_y)))
+
         # Renderizado Final
         final = CompositeVideoClip([v_trans] + clips)
-        out = os.path.join(output_folder, f"CAMOUFLAGE_{os.path.basename(input_path)}" if is_camuflaje else f"ULTRA_RENDER_{os.path.basename(input_path)}")
+        if is_camuflaje:
+            _prefix = "CAMOUFLAGE_"
+        elif clean_keep_subs:
+            _prefix = "CLEAN_META_"
+        elif clean_mask_subs:
+            _prefix = "CLEAN_"
+        else:
+            _prefix = "ULTRA_RENDER_"
+        out = os.path.join(output_folder, f"{_prefix}{os.path.basename(input_path)}")
         
         # ELIMINACIÓN DE METADATOS (ffmpeg_params para limpiar autoría, creación, etc)
         ffmpeg_params = [

@@ -13,6 +13,8 @@ from pydantic import BaseModel
 CleanModeValue = Literal[
     "Subtítulos Virales",
     "Camuflaje Geométrico (Sin Subtítulos)",
+    "Solo Limpiar (Sin Subtítulos)",
+    "Limpiar Metadata (Sin Tocar Subtítulos)",
 ]
 HookYPctValue = Literal[0.20, 0.45, 0.75]
 

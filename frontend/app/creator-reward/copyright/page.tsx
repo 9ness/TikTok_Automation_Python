@@ -51,7 +51,14 @@ export default function CopyrightPage() {
   // subs nuevos (no se aplica position porque siguen la trayectoria del
   // texto original detectado).
   const isCamuflaje = cleanMode === "Camuflaje Geométrico (Sin Subtítulos)";
-  const showHookConfig = true;
+  // Dos modos "limpiar" que NO añaden ningún texto:
+  //  - "Solo Limpiar"     → tapa subs originales (blur) + anti-copy.
+  //  - "Limpiar Metadata" → NO toca subs (deja todo visible) + anti-copy.
+  // En ambos ocultamos los controles de texto (posición, color, fuente).
+  const isCleanMaskSubs = cleanMode === "Solo Limpiar (Sin Subtítulos)";
+  const isCleanMeta = cleanMode === "Limpiar Metadata (Sin Tocar Subtítulos)";
+  const isCleanOnly = isCleanMaskSubs || isCleanMeta;
+  const showHookConfig = !isCleanOnly;
 
   // Carga la fuente real elegida (bundled vía @font-face, system vía nombre).
   const selectedFont = useFontByPath(fontPath);
@@ -129,6 +136,12 @@ export default function CopyrightPage() {
                     <SelectItem value="Camuflaje Geométrico (Sin Subtítulos)">
                       Camuflaje Geométrico (sin subtítulos)
                     </SelectItem>
+                    <SelectItem value="Solo Limpiar (Sin Subtítulos)">
+                      Solo Limpiar (tapa subs originales, sin texto)
+                    </SelectItem>
+                    <SelectItem value="Limpiar Metadata (Sin Tocar Subtítulos)">
+                      Limpiar Metadata (no toca subs, sin texto)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -183,10 +196,27 @@ export default function CopyrightPage() {
                 </div>
               )}
 
-              <div className="space-y-1">
-                <Label className="text-xs">Fuente del texto</Label>
-                <FontSelector value={fontPath} onChange={setFontPath} />
-              </div>
+              {!isCleanOnly && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Fuente del texto</Label>
+                  <FontSelector value={fontPath} onChange={setFontPath} />
+                </div>
+              )}
+
+              {isCleanMaskSubs && (
+                <p className="rounded-md border border-input bg-muted/40 p-2 text-xs text-muted-foreground">
+                  🧼 Tapa los subtítulos originales (si los hay) + zoom +
+                  limpieza de metadatos. NO añade texto nuevo.
+                </p>
+              )}
+
+              {isCleanMeta && (
+                <p className="rounded-md border border-input bg-muted/40 p-2 text-xs text-muted-foreground">
+                  🧹 NO toca los subtítulos (deja el vídeo igual). Solo aplica el
+                  anti-copy: zoom dinámico, micro-cambios y limpieza de metadatos.
+                  Ideal para un vídeo normal que solo quieres &ldquo;despegar&rdquo; del copyright.
+                </p>
+              )}
 
               <label className="flex cursor-pointer items-start gap-2 rounded-md border border-input p-2 text-sm transition-colors hover:border-primary/50">
                 <input
@@ -236,7 +266,10 @@ export default function CopyrightPage() {
                     int(H * hook_y_pct)). En modo Subs el color afecta a los
                     nuevos subs (placeholder cerca del 78%, zona típica). */}
                 <div
-                  className="pointer-events-none absolute inset-x-0 flex justify-center"
+                  className={cn(
+                    "pointer-events-none absolute inset-x-0 flex justify-center",
+                    isCleanOnly && "hidden",
+                  )}
                   style={{
                     top: `${(isCamuflaje ? hookYPct : 0.78) * 100}%`,
                     transform: "translateY(-50%)",

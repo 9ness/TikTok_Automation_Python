@@ -806,12 +806,26 @@ def run_copyright(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     config = p["config"]
     cleaner = VideoRemover(config)
 
-    on_progress(0.05, "🔍 Analizando subtítulos originales…")
-    on_log("🔍 Mapeando trayectoria del texto original…")
-    traj = cleaner.map_text_trajectory(p["input_path"], log_callback=on_log)
-    on_progress(0.20, "🎙️ Transcribiendo audio…")
-    on_log("🎙️ Transcribiendo audio…")
-    words = cleaner.transcribe_video(p["input_path"], log_callback=on_log)
+    clean_mode = p.get("clean_mode", "Subtítulos Virales")
+
+    if clean_mode == "Limpiar Metadata (Sin Tocar Subtítulos)":
+        # No toca los subs originales ni añade texto → ni OCR ni Whisper.
+        on_progress(0.10, "🧹 Anti-copy (zoom + metadatos), sin tocar subtítulos…")
+        on_log("🧹 Modo limpiar metadata: sin OCR ni transcripción (no toca subs).")
+        traj = []
+        words = []
+    else:
+        on_progress(0.05, "🔍 Analizando subtítulos originales…")
+        on_log("🔍 Mapeando trayectoria del texto original…")
+        traj = cleaner.map_text_trajectory(p["input_path"], log_callback=on_log)
+        # "Solo Limpiar" tapa subs originales pero no añade texto → sin Whisper.
+        if clean_mode == "Solo Limpiar (Sin Subtítulos)":
+            words = []
+            on_log("🧼 Modo solo limpiar: sin transcripción ni subtítulos.")
+        else:
+            on_progress(0.20, "🎙️ Transcribiendo audio…")
+            on_log("🎙️ Transcribiendo audio…")
+            words = cleaner.transcribe_video(p["input_path"], log_callback=on_log)
     on_progress(0.40, "🎬 Renderizando vídeo final…")
 
     render_logger = CallbackProgressLogger(
@@ -827,7 +841,7 @@ def run_copyright(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         trajectory=traj,
         log_callback=on_log,
         logger=render_logger,
-        clean_mode=p.get("clean_mode", "Subtítulos Virales"),
+        clean_mode=clean_mode,
         hook_y_pct=p.get("hook_y_pct", 0.20),
         hook_color=p.get("hook_color", "#FDD002"),
         upscale_1080p=bool(p.get("upscale_1080p", False)),

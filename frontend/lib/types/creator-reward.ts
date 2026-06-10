@@ -179,7 +179,9 @@ export interface PronosticosBatchEnqueueResponse {
 // ---------------------------------------------------------------------------
 export type CleanModeValue =
   | "Subtítulos Virales"
-  | "Camuflaje Geométrico (Sin Subtítulos)";
+  | "Camuflaje Geométrico (Sin Subtítulos)"
+  | "Solo Limpiar (Sin Subtítulos)"
+  | "Limpiar Metadata (Sin Tocar Subtítulos)";
 
 export interface CopyrightEnqueueResponse {
   job_id: string;
