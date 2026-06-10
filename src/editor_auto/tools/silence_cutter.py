@@ -3232,7 +3232,7 @@ _DANGLING_TAIL_TOKENS = {
     "lo", "como", "si", "cuando", "aunque", "entonces", "tan", "para",
     "por", "mas", "más", "ni", "ya", "es", "son", "esta", "este", "esto",
     "está", "osea", "están", "estan", "estás", "estaba", "estaban", "era",
-    "eran", "muy",
+    "eran",
 }
 
 
@@ -3258,7 +3258,18 @@ def _trim_dangling_tail_words(
     )
     out: list[tuple[float, float]] = []
     n_total = 0
-    for a, b in keep_intervals:
+    for idx, (a, b) in enumerate(keep_intervals):
+        # SOLO recortar en SALTOS reales de contenido (>2s al siguiente keep)
+        # o en el último segmento. En un micro-corte (silencio/tartamudeo) la
+        # frase CONTINÚA al otro lado — "…es muy muy | muy elástica" — y
+        # recortar el final mutila la frase.
+        next_a = (
+            keep_intervals[idx + 1][0]
+            if idx + 1 < len(keep_intervals) else None
+        )
+        if next_a is not None and (next_a - b) <= 2.0:
+            out.append((a, b))
+            continue
         inside = [s for s in spans if a - 1e-3 <= (s[0] + s[1]) / 2 <= b + 1e-3]
         drops = 0
         first_dropped_start: float | None = None
