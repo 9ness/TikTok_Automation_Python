@@ -2040,6 +2040,40 @@ def _parse_false_starts_cuts(
 _HOLISTIC_MODEL = "gpt-5.4"  # ganador A/B: corta mejor los restarts que gpt-4o, y mas barato
 _HOLISTIC_SEED = 7
 
+# ---------------------------------------------------------------------------
+# Memoria de LECCIONES del motor de edición
+# ---------------------------------------------------------------------------
+# `prompts/editor_lessons.md` es la memoria VIVA del motor: errores reales
+# observados en vídeos de clientes, escritos como reglas para la IA. Se
+# inyecta en TODOS los prompts de decisión de corte (holístico, pass1
+# analyst, pass2 false-starts, revisión de completitud) para que el modelo
+# conozca los patrones de fallo ya descubiertos y no los repita. Al
+# descubrir un fallo nuevo: (1) si es codificable, regla determinista en
+# este archivo .py; (2) SIEMPRE, lección en editor_lessons.md.
+_LESSONS_CACHE: tuple[float, str] | None = None
+
+
+def _load_editor_lessons() -> str:
+    global _LESSONS_CACHE
+    p = Path(__file__).resolve().parent.parent / "prompts" / "editor_lessons.md"
+    try:
+        mt = p.stat().st_mtime
+        if _LESSONS_CACHE is not None and _LESSONS_CACHE[0] == mt:
+            return _LESSONS_CACHE[1]
+        txt = p.read_text(encoding="utf-8").strip()
+        _LESSONS_CACHE = (mt, txt)
+        return txt
+    except OSError:
+        return ""
+
+
+def _with_lessons(system_prompt: str) -> str:
+    """Añade la memoria de lecciones al final de un system prompt de IA."""
+    lessons = _load_editor_lessons()
+    if not lessons:
+        return system_prompt
+    return system_prompt.rstrip() + "\n\n---\n\n" + lessons
+
 
 def _holistic_keep_idxset(
     words: list[dict], *, language: str, model: str, log, label: str,
@@ -2059,7 +2093,7 @@ def _holistic_keep_idxset(
         Path(__file__).resolve().parent.parent
         / "prompts" / "silence_cutter_clean_script.md"
     )
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
     payload = _build_false_starts_payload(words, language)
     # DETERMINISTA: GPT-4o + `seed` fijo + temp 0 → mismo input = mismo
     # resultado SIEMPRE (estable y AFINABLE). Gemini 2.5 Pro es "thinking" →
@@ -2282,7 +2316,7 @@ def _ai_false_starts_openai(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_false_starts.md"
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
     payload = _build_false_starts_payload(words, language)
     result = analyze_transcript_json(
         system_prompt=system_prompt,
@@ -2307,7 +2341,7 @@ def _ai_false_starts_gemini(
     from src.editor_auto.api.gemini_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_false_starts.md"
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
     payload = _build_false_starts_payload(words, language)
     result = analyze_transcript_json(
         system_prompt=system_prompt,
@@ -2429,7 +2463,7 @@ def _ai_cleanup_cuts_with_raw(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_analyst.md"
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
 
     # `gap_to_next_s` = silencio en segundos entre el final de esta palabra
     # y el inicio de la siguiente. Hace OBVIOS los gaps largos para el LLM,
@@ -3460,6 +3494,7 @@ def _ai_completeness_review(
         "duda, no toques. Responde JSON: "
         '{"fixes": [{"i": <índice del segmento>, "drop_last_words": <N>}]}'
     )
+    system = _with_lessons(system)
     try:
         data = openai_client.analyze_transcript_json(
             system_prompt=system,
@@ -4211,7 +4246,7 @@ def _ai_cleanup_cuts(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_analyst.md"
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
 
     payload = {
         "language": language,

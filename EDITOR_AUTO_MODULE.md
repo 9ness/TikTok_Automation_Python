@@ -157,3 +157,18 @@ Reusa `UPSTASH_REDIS_REST_URL/_TOKEN` ya compartidas entre programas.
 - No hay "preview" del flujo antes de encolar (sería un dry-run); la UI
   muestra el orden de ejecución pero la única manera de ver el resultado
   es generar.
+
+## Memoria de lecciones del motor (auto-aprendizaje)
+
+`src/editor_auto/prompts/editor_lessons.md` es la **memoria viva del motor de
+edición**: errores reales observados en vídeos de clientes, escritos como
+reglas para la IA. `silence_cutter._with_lessons()` la inyecta en TODOS los
+prompts de decisión de corte (holístico, pass1 analyst, pass2 false-starts,
+revisión de completitud), con cache por mtime — editar el .md surte efecto en
+el siguiente job sin redeploy.
+
+**Workflow al descubrir un fallo de edición nuevo:**
+1. Si el patrón es codificable → regla determinista en `silence_cutter.py`
+   (snap/trim/valley/guardarraíles) — lo que no depende del LLM no falla.
+2. SIEMPRE → añadir la lección a `editor_lessons.md` (para que la IA tenga el
+   contexto del fallo) y el detalle técnico a `learnings.md` (para el dev).
