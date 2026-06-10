@@ -976,11 +976,8 @@ class SilenceCutterTool:
                 f"[silence_cutter] 🔊 Bordes ajustados al silencio real "
                 f"(amplitud): {n_pre_amp} → {len(merged_cuts)} cortes"
             )
-        # Cleanup audio temporal (ya no se necesita tras el refinado de bordes)
-        try:
-            os.remove(tmp_audio)
-        except OSError:
-            pass
+        # NOTA: tmp_audio se conserva hasta el final de run() — el refinado de
+        # bordes de KEEP al valle de energía (y el del self-heal) lo necesitan.
 
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
         # Absorbe micro-islas de keep (fragmentos de palabra / cabezas de
@@ -1004,6 +1001,51 @@ class SilenceCutterTool:
         # palabra cortada siguiente ('to'/'queto') y evita partir la última
         # palabra (final 'montó'). Es la última autoridad sobre los bordes.
         keep_intervals = _snap_keeps_to_words(keep_intervals, voiced_words or words)
+
+        # Revisión IA de COMPLETITUD: caza finales colgados a mitad de idea
+        # ('...y están solo por ocho' y salta) que el holístico conservó.
+        # Determinista (temp 0 + seed); solo recorta palabras finales.
+        n_completeness = 0
+        if ai_on and bool(config.get("ai_completeness_enabled", True)):
+            try:
+                keep_intervals, comp_diag = _ai_completeness_review(
+                    keep_intervals, voiced_words or words,
+                    language=config.get("ai_language", "es"), log=ctx.on_log,
+                )
+                n_completeness = int(comp_diag.get("applied", 0) or 0)
+                diagnostic["completeness_review"] = comp_diag
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Revisión completitud falló: {e}")
+
+        # Recorte de palabras funcionales COLGADAS al final de cada segmento
+        # (que/y/bueno/...): una frase no puede terminar en conjunción antes
+        # de un salto, ni el vídeo acabar en 'bueno'.
+        keep_intervals, n_dangling = _trim_dangling_tail_words(
+            keep_intervals, voiced_words or words,
+        )
+        if n_dangling:
+            ctx.on_log(
+                f"[silence_cutter] ✂️ {n_dangling} palabra(s) colgada(s) "
+                f"recortadas del final de segmento (que/y/bueno/…)"
+            )
+
+        # Afinado de los DOS bordes de cada keep al VALLE de energía real:
+        # mata las colas sub-palabra de la palabra cortada vecina ('o'/'as'/
+        # 'os' de sedosit-O/florecit-AS/rayadit-O) que Whisper no puede ver
+        # (marca límites ~100-300ms antes del audio real) y evita clipar la
+        # última palabra buena. Solo actúa en habla contigua.
+        n_keep_valley = 0
+        try:
+            keep_intervals, n_keep_valley = _refine_keep_edges_to_valley(
+                keep_intervals, voiced_words or words, tmp_audio,
+            )
+            if n_keep_valley:
+                ctx.on_log(
+                    f"[silence_cutter] 🎯 {n_keep_valley} borde(s) de keep "
+                    f"afinados al valle de energía (anti-cola de palabra)"
+                )
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[silence_cutter] ⚠️ Valle en bordes de keep falló: {e}")
 
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
@@ -1226,6 +1268,18 @@ class SilenceCutterTool:
                         (a, b) for a, b in new_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S
                     ]
                     new_keeps = _snap_keeps_to_words(new_keeps, voiced_words or words)
+                    # Misma higiene de bordes que el flujo principal: sin
+                    # palabras colgadas ni colas sub-palabra en los re-cortes.
+                    new_keeps, _nd = _trim_dangling_tail_words(
+                        new_keeps, voiced_words or words,
+                    )
+                    try:
+                        if os.path.exists(tmp_audio):
+                            new_keeps, _nv = _refine_keep_edges_to_valley(
+                                new_keeps, voiced_words or words, tmp_audio,
+                            )
+                    except Exception:  # noqa: BLE001
+                        pass
                     kept_now = sum(b - a for a, b in new_keeps)
                     kept_before = sum(b - a for a, b in best_keeps)
                     if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
@@ -1390,6 +1444,13 @@ class SilenceCutterTool:
                 )
             # Reescribir el diagnóstico con la sección audit añadida
             _write_diagnostic(diagnostic, ctx)
+
+        # Cleanup del audio temporal (se mantuvo vivo para el valle de bordes
+        # del flujo principal y del self-heal).
+        try:
+            os.remove(tmp_audio)
+        except OSError:
+            pass
 
         ctx.on_progress(1.0, "✅ Cortes aplicados")
         return output_path
@@ -3145,6 +3206,261 @@ def _snap_keeps_to_words(
         if nb - na > 0.05:
             out.append((max(0.0, na), nb))
     return _merge_intervals(out)
+
+
+# Palabras que NO pueden quedar COLGADAS al final de un segmento (conjunciones,
+# preposiciones, artículos, copulas, muletillas). Si un keep termina en una de
+# estas y lo siguiente está cortado, suena a frase rota ("...azul marino que |"
+# o el vídeo acabando en "...bueno"). Se recortan del final del keep.
+_DANGLING_TAIL_TOKENS = {
+    "que", "y", "o", "u", "e", "pero", "porque", "pues", "bueno", "con",
+    "de", "del", "en", "a", "al", "la", "el", "los", "las", "un", "una",
+    "unos", "unas", "mi", "tu", "su", "sus", "me", "te", "se", "le", "les",
+    "lo", "como", "si", "cuando", "aunque", "entonces", "tan", "para",
+    "por", "mas", "más", "ni", "ya", "es", "son", "esta", "este", "esto",
+    "está", "osea",
+}
+
+
+def _trim_dangling_tail_words(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    max_drop: int = 3,
+) -> tuple[list[tuple[float, float]], int]:
+    """Recorta del FINAL de cada keep las palabras funcionales colgadas
+    (que/y/bueno/con/...) cuando lo que sigue está cortado. Una frase que
+    termina en conjunción o muletilla antes de un salto suena rota; sin
+    ellas termina natural ("...azul marino" / "...estampados rayaditos").
+    Deja siempre ≥2 palabras en el segmento. Devuelve (keeps, n_dropped)."""
+    if not keep_intervals or not words:
+        return keep_intervals, 0
+    spans = sorted(
+        (
+            float(w["start"]), float(w["end"]),
+            re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower()),
+        )
+        for w in words if "start" in w and "end" in w
+    )
+    out: list[tuple[float, float]] = []
+    n_total = 0
+    for a, b in keep_intervals:
+        inside = [s for s in spans if a - 1e-3 <= (s[0] + s[1]) / 2 <= b + 1e-3]
+        drops = 0
+        first_dropped_start: float | None = None
+        while (
+            len(inside) >= 3 and drops < max_drop
+            and inside[-1][2] in _DANGLING_TAIL_TOKENS
+        ):
+            first_dropped_start = inside[-1][0]
+            inside.pop()
+            drops += 1
+        if drops:
+            n_total += drops
+            nb = inside[-1][1] + 0.10
+            if first_dropped_start is not None:
+                nb = min(nb, first_dropped_start)
+            b = max(nb, inside[-1][1])
+        if b - a > 0.05:
+            out.append((a, b))
+    return out, n_total
+
+
+def _refine_keep_edges_to_valley(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    audio_path: str,
+    *,
+    contig_s: float = 0.45,
+) -> tuple[list[tuple[float, float]], int]:
+    """Afina los DOS bordes de cada keep al VALLE de energía real (mínimo RMS)
+    cuando hay habla contigua al otro lado del corte.
+
+    Por qué: Whisper marca los límites de palabra ~100-300ms ANTES del audio
+    real. En habla contigua eso significa que:
+      · el INICIO del keep (= fin de un corte) puede caer dentro de la COLA de
+        la palabra eliminada previa → se cuela un resto tipo 'o'/'as'/'os'
+        (sedosit-O, florecit-AS, rayadit-O) antes de la primera palabra buena;
+      · el FINAL del keep (= inicio de un corte) clavado en el start Whisper de
+        la siguiente palabra puede CLIPAR la última palabra buena ('ocho' que
+        no termina) o colar el arranque de la cortada.
+    El valle de energía entre ambas palabras es el punto de corte óptimo real.
+    Solo actúa con habla contigua (<contig_s de hueco); con silencio real deja
+    el borde como está. Devuelve (keeps, n_bordes_afinados)."""
+    if (
+        not keep_intervals or not words or not audio_path
+        or not os.path.exists(audio_path)
+    ):
+        return keep_intervals, 0
+    spans = sorted(
+        (float(w["start"]), float(w["end"]))
+        for w in words if "start" in w and "end" in w
+    )
+    if not spans:
+        return keep_intervals, 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate()
+            n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            raw = wf.readframes(wf.getnframes())
+    except Exception:  # noqa: BLE001
+        return keep_intervals, 0
+    if sampwidth != 2:
+        return keep_intervals, 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    dur_total = len(audio) / float(sr)
+    win = max(1, int(0.020 * sr))
+    hop = max(1, int(0.005 * sr))
+
+    def _valley(t0: float, t1: float) -> float | None:
+        t0 = max(0.0, t0)
+        t1 = min(dur_total, t1)
+        if t1 - t0 < 0.03:
+            return None
+        i0, i1 = int(t0 * sr), int(t1 * sr)
+        best_t = best_rms = None
+        i = i0
+        while i + win <= i1:
+            seg = audio[i:i + win]
+            rms = float((seg * seg).mean()) ** 0.5
+            if best_rms is None or rms < best_rms:
+                best_rms, best_t = rms, (i + win // 2) / sr
+            i += hop
+        return best_t
+
+    out: list[tuple[float, float]] = []
+    n_ref = 0
+    for a, b in keep_intervals:
+        inside = [
+            (ws, we) for ws, we in spans
+            if a - 1e-3 <= (ws + we) / 2 <= b + 1e-3
+        ]
+        na, nb = a, b
+        if inside:
+            fw_s, fw_e = inside[0]
+            lw_s, lw_e = inside[-1]
+            prev_end = max((we for ws, we in spans if we <= fw_s + 1e-3), default=None)
+            nxt = min(
+                ((ws, we) for ws, we in spans if ws >= lw_e - 1e-3),
+                default=None,
+            )
+            # HEAD — cola de la palabra cortada previa colándose al keep.
+            if prev_end is not None and (fw_s - prev_end) < contig_s:
+                v = _valley(
+                    prev_end,
+                    fw_s + min(0.25, 0.4 * max(0.05, fw_e - fw_s)),
+                )
+                if v is not None and abs(v - na) > 0.01:
+                    na, n_ref = v, n_ref + 1
+            # TAIL — última palabra clipada o arranque de la cortada colándose.
+            if nxt is not None and (nxt[0] - lw_e) < contig_s:
+                v = _valley(
+                    lw_e - min(0.15, 0.3 * max(0.05, lw_e - lw_s)),
+                    nxt[0] + min(0.25, 0.4 * max(0.05, nxt[1] - nxt[0])),
+                )
+                if v is not None and abs(v - nb) > 0.01:
+                    nb, n_ref = v, n_ref + 1
+        if nb - na > 0.05:
+            out.append((max(0.0, na), nb))
+    return _merge_intervals(out), n_ref
+
+
+def _ai_completeness_review(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    language: str,
+    log,
+) -> tuple[list[tuple[float, float]], dict]:
+    """Revisión IA de COMPLETITUD de frase por segmento (determinista: temp 0 +
+    seed). El holístico a veces conserva un final colgado a mitad de idea
+    ('...y están solo por ocho' sin completar el precio). Aquí gpt-5.4 ve los
+    segmentos finales EN ORDEN y propone, solo donde haga falta, eliminar las
+    últimas N palabras para que el segmento termine en frase completa. Nunca
+    añade contenido, caps conservadores, y si falla no toca nada."""
+    from src.editor_auto.api import openai_client
+    diag: dict[str, Any] = {}
+    if not openai_client.is_configured():
+        return keep_intervals, {"skipped": "sin OpenAI"}
+    spans = sorted(
+        (
+            float(w["start"]), float(w["end"]),
+            str(w.get("word", "")).strip(),
+        )
+        for w in words if "start" in w and "end" in w
+    )
+    seg_words: list[list[tuple[float, float, str]]] = []
+    for a, b in keep_intervals:
+        seg_words.append(
+            [s for s in spans if a - 1e-3 <= (s[0] + s[1]) / 2 <= b + 1e-3]
+        )
+    segments = [
+        {"i": k, "text": " ".join(s[2] for s in sw)}
+        for k, sw in enumerate(seg_words) if sw
+    ]
+    if not segments:
+        return keep_intervals, {"skipped": "sin segmentos"}
+    system = (
+        "Eres un editor de vídeo profesional. Te paso los SEGMENTOS de habla "
+        "que quedarán en el vídeo final, en orden; entre segmento y segmento "
+        "hay un corte (salto). Tu ÚNICA tarea: detectar segmentos cuyo FINAL "
+        "queda colgado a mitad de frase o de idea — p. ej. termina en un "
+        "precio sin completar ('están solo por ocho' y salta), en conjunción, "
+        "o anuncia algo que ya no se dice. Para cada segmento problemático "
+        "propón eliminar SOLO las últimas N palabras (N pequeño) de modo que "
+        "termine en una frase completa y natural. NO propongas añadir nada. "
+        "NO toques segmentos que ya terminan bien. Sé conservador: ante la "
+        "duda, no toques. Responde JSON: "
+        '{"fixes": [{"i": <índice del segmento>, "drop_last_words": <N>}]}'
+    )
+    try:
+        data = openai_client.analyze_transcript_json(
+            system_prompt=system,
+            user_payload={"language": language, "segments": segments},
+            model=_HOLISTIC_MODEL,
+            temperature=0.0,
+            seed=_HOLISTIC_SEED,
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f"[silence_cutter] ⚠️ Revisión de completitud falló (no bloquea): {e}")
+        return keep_intervals, {"error": str(e)[:200]}
+    fixes = (data or {}).get("fixes") or []
+    diag["proposed"] = len(fixes)
+    out = list(keep_intervals)
+    applied = 0
+    for f in fixes:
+        try:
+            i = int(f.get("i"))
+            n = int(f.get("drop_last_words", 0))
+        except (TypeError, ValueError):
+            continue
+        if not (0 <= i < len(out)) or n <= 0:
+            continue
+        sw = seg_words[i] if i < len(seg_words) else []
+        # Caps: máx 8 palabras, máx 40% del segmento, deja ≥3 palabras.
+        n = min(n, 8, int(len(sw) * 0.4))
+        if n <= 0 or len(sw) - n < 3:
+            continue
+        dropped = sw[-n:]
+        kept_last = sw[-n - 1]
+        a, b = out[i]
+        nb = min(kept_last[1] + 0.10, dropped[0][0])
+        nb = max(nb, kept_last[1])
+        if nb - a > 0.05:
+            out[i] = (a, nb)
+            applied += 1
+            log(
+                f"[silence_cutter] ✂️ Final colgado corregido (seg {i}): fuera "
+                f"'{' '.join(d[2] for d in dropped)}'"
+            )
+    diag["applied"] = applied
+    return out, diag
 
 
 def _derive_self_heal_actions(
