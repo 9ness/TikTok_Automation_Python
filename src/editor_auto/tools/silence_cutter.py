@@ -2232,6 +2232,19 @@ def _ai_holistic_clean_removes(
                 f"(evita dejar 1 palabra suelta sin su frase)"
             )
 
+        # Guardarraíl de TARTAMUDEO: un corte de repetición debe alinearse a la
+        # repetición. Si el holístico borró ['es','muy','muy'] y la siguiente
+        # palabra conservada es 'muy', el 'es' NO era parte del tartamudeo →
+        # re-anexarlo (si no, queda "la cintura | muy elástica" sin el 'es').
+        final_keep, n_stutter_fixes = _reanex_stutter_lead_words(words, final_keep)
+        if n_stutter_fixes:
+            diag["stutter_lead_reverts"] = n_stutter_fixes
+            diag["kept_words"] = len(final_keep)
+            log(
+                f"[silence_cutter]   ↳ {n_stutter_fixes} palabra(s) funcional(es) "
+                f"re-anexada(s) antes de un corte de tartamudeo"
+            )
+
         # Complemento = tramos a QUITAR (índices contiguos NO conservados).
         intervals: list[tuple[float, float]] = []
         i = 0
@@ -3530,6 +3543,51 @@ def _derive_self_heal_actions(
         if s is not None and e is not None and (float(e) - float(s)) > 0.6:
             guarded_cuts.append((float(s) + 0.15, float(e) - 0.15, "silencio_interno"))
     return residue_cuts, guarded_cuts, restores
+
+
+def _reanex_stutter_lead_words(
+    words: list[dict],
+    keep: set[int],
+) -> tuple[set[int], int]:
+    """Alinea los cortes de TARTAMUDEO a la repetición real. Si un bloque
+    eliminado termina en N copias del token que sigue conservado (el holístico
+    quitó 'es muy muy' y conservó el 'muy' siguiente), las palabras de CABECERA
+    del bloque que no son parte de la repetición se re-anexan — pero solo si
+    son pocas (≤2) y funcionales (cortas/stopwords), para no resucitar frases
+    enteras que el holístico quitó a propósito. Devuelve (keep, n_fixes)."""
+    def _norm(w: dict) -> str:
+        return re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+
+    n = len(words)
+    keep = set(keep)
+    fixes = 0
+    i = 0
+    while i < n:
+        if i in keep:
+            i += 1
+            continue
+        j = i
+        while j < n and j not in keep:
+            j += 1
+        block_len = j - i
+        if j < n and 2 <= block_len <= 5:
+            t_next = _norm(words[j])
+            k = j - 1
+            reps = 0
+            while k >= i and t_next and _norm(words[k]) == t_next:
+                reps += 1
+                k -= 1
+            lead = list(range(i, k + 1))
+            if reps >= 1 and 1 <= len(lead) <= 2:
+                lead_toks = [_norm(words[m]) for m in lead]
+                if all(
+                    t and (len(t) <= 3 or t in _AUDIT_STOPWORDS or t in _FILLER_TOKENS)
+                    for t in lead_toks
+                ):
+                    keep.update(lead)
+                    fixes += 1
+        i = j
+    return keep, fixes
 
 
 def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
