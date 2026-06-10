@@ -2044,32 +2044,77 @@ _HOLISTIC_SEED = 7
 # Memoria de LECCIONES del motor de edición
 # ---------------------------------------------------------------------------
 # `prompts/editor_lessons.md` es la memoria VIVA del motor: errores reales
-# observados en vídeos de clientes, escritos como reglas para la IA. Se
-# inyecta en TODOS los prompts de decisión de corte (holístico, pass1
-# analyst, pass2 false-starts, revisión de completitud) para que el modelo
-# conozca los patrones de fallo ya descubiertos y no los repita. Al
-# descubrir un fallo nuevo: (1) si es codificable, regla determinista en
-# este archivo .py; (2) SIEMPRE, lección en editor_lessons.md.
-_LESSONS_CACHE: tuple[float, str] | None = None
+# observados en vídeos de clientes, escritos como reglas para la IA. Cada
+# sección `##` lleva etiquetas `[pasada1|pasada2]` y SOLO se inyecta en esas
+# pasadas (clean_script / analyst / false_starts / completeness) — así el
+# coste y el ruido no crecen linealmente con la memoria: cada pasada recibe
+# únicamente sus lecciones, con un CAP duro. El preámbulo (antes de la
+# primera `##`) es para humanos y NUNCA se envía. Además, como las lecciones
+# van pegadas al system prompt (prefijo estable, payload variable en el user
+# message), el prompt-caching automático de OpenAI descuenta ~50% de esos
+# tokens en llamadas repetidas. Al descubrir un fallo nuevo: (1) si es
+# codificable, regla determinista en este .py; (2) SIEMPRE, lección corta en
+# editor_lessons.md; (3) consolidar lecciones parecidas cuando el cap avise.
+_LESSONS_CACHE: tuple[float, list[tuple[set, str]]] | None = None
+_LESSONS_MAX_CHARS = 6000  # cap por pasada (~1500 tokens) — avisa si se supera
 
 
-def _load_editor_lessons() -> str:
+def _load_editor_lessons(pass_id: str) -> str:
+    """Lecciones relevantes para la pasada `pass_id`, cap aplicado."""
     global _LESSONS_CACHE
     p = Path(__file__).resolve().parent.parent / "prompts" / "editor_lessons.md"
     try:
         mt = p.stat().st_mtime
-        if _LESSONS_CACHE is not None and _LESSONS_CACHE[0] == mt:
-            return _LESSONS_CACHE[1]
-        txt = p.read_text(encoding="utf-8").strip()
-        _LESSONS_CACHE = (mt, txt)
-        return txt
     except OSError:
         return ""
+    if _LESSONS_CACHE is None or _LESSONS_CACHE[0] != mt:
+        try:
+            txt = p.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+        sections: list[tuple[set, str]] = []
+        cur_tags: set | None = None
+        cur_lines: list[str] = []
+        for line in txt.splitlines():
+            if line.startswith("## "):
+                if cur_tags is not None:
+                    sections.append((cur_tags, "\n".join(cur_lines).strip()))
+                m = re.search(r"\[([a-z_|]+)\]\s*$", line)
+                cur_tags = set(m.group(1).split("|")) if m else set()
+                cur_lines = [re.sub(r"\s*\[[a-z_|]+\]\s*$", "", line)]
+            elif cur_tags is not None:
+                cur_lines.append(line)
+            # líneas antes de la primera `##` = preámbulo humano → no se envía
+        if cur_tags is not None:
+            sections.append((cur_tags, "\n".join(cur_lines).strip()))
+        _LESSONS_CACHE = (mt, sections)
+    out: list[str] = []
+    total = 0
+    skipped = 0
+    for tags, body in _LESSONS_CACHE[1]:
+        if tags and pass_id not in tags:
+            continue
+        if total + len(body) > _LESSONS_MAX_CHARS:
+            skipped += 1
+            continue
+        out.append(body)
+        total += len(body)
+    if skipped:
+        print(
+            f"[silence_cutter] ⚠️ editor_lessons.md supera el cap para "
+            f"'{pass_id}' ({skipped} sección(es) fuera) — CONSOLIDAR lecciones."
+        )
+    if not out:
+        return ""
+    return (
+        "# LECCIONES APRENDIDAS (errores reales en vídeos de clientes — "
+        "cúmplelas siempre)\n\n" + "\n\n".join(out)
+    )
 
 
-def _with_lessons(system_prompt: str) -> str:
-    """Añade la memoria de lecciones al final de un system prompt de IA."""
-    lessons = _load_editor_lessons()
+def _with_lessons(system_prompt: str, pass_id: str) -> str:
+    """Añade al system prompt SOLO las lecciones de la pasada `pass_id`."""
+    lessons = _load_editor_lessons(pass_id)
     if not lessons:
         return system_prompt
     return system_prompt.rstrip() + "\n\n---\n\n" + lessons
@@ -2093,7 +2138,7 @@ def _holistic_keep_idxset(
         Path(__file__).resolve().parent.parent
         / "prompts" / "silence_cutter_clean_script.md"
     )
-    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"), "clean_script")
     payload = _build_false_starts_payload(words, language)
     # DETERMINISTA: GPT-4o + `seed` fijo + temp 0 → mismo input = mismo
     # resultado SIEMPRE (estable y AFINABLE). Gemini 2.5 Pro es "thinking" →
@@ -2316,7 +2361,7 @@ def _ai_false_starts_openai(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_false_starts.md"
-    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"), "false_starts")
     payload = _build_false_starts_payload(words, language)
     result = analyze_transcript_json(
         system_prompt=system_prompt,
@@ -2341,7 +2386,7 @@ def _ai_false_starts_gemini(
     from src.editor_auto.api.gemini_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_false_starts.md"
-    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"), "false_starts")
     payload = _build_false_starts_payload(words, language)
     result = analyze_transcript_json(
         system_prompt=system_prompt,
@@ -2463,7 +2508,7 @@ def _ai_cleanup_cuts_with_raw(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_analyst.md"
-    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"), "analyst")
 
     # `gap_to_next_s` = silencio en segundos entre el final de esta palabra
     # y el inicio de la siguiente. Hace OBVIOS los gaps largos para el LLM,
@@ -3494,7 +3539,7 @@ def _ai_completeness_review(
         "duda, no toques. Responde JSON: "
         '{"fixes": [{"i": <índice del segmento>, "drop_last_words": <N>}]}'
     )
-    system = _with_lessons(system)
+    system = _with_lessons(system, "completeness")
     try:
         data = openai_client.analyze_transcript_json(
             system_prompt=system,
@@ -4246,7 +4291,7 @@ def _ai_cleanup_cuts(
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_analyst.md"
-    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"))
+    system_prompt = _with_lessons(prompt_path.read_text(encoding="utf-8"), "analyst")
 
     payload = {
         "language": language,

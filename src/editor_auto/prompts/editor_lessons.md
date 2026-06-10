@@ -1,11 +1,16 @@
 # LECCIONES APRENDIDAS DEL MOTOR DE EDICIÓN
 
-Errores REALES detectados en vídeos de clientes. Son reglas de obligado
-cumplimiento: cada una existe porque el motor cometió ese fallo una vez y un
-cliente lo notó. Este archivo es la memoria viva del motor — cuando se
-descubre un fallo nuevo, se añade aquí la lección para no repetirlo.
+> **Cómo funciona este archivo (para humanos — este preámbulo NO se envía a la IA):**
+> Cada sección `##` lleva etiquetas `[pasada1|pasada2]` que indican a qué
+> pasadas de IA se inyecta: `clean_script` (holístico), `analyst` (pass1),
+> `false_starts` (pass2), `completeness` (revisión de finales). Una sección
+> sin etiquetas se envía a TODAS. Solo se envían las secciones relevantes a
+> cada pasada, con un CAP duro (~6000 chars/pasada) — si se supera, el motor
+> avisa por log: toca CONSOLIDAR (fusionar lecciones parecidas en una regla
+> general), no seguir añadiendo. Las lecciones deben ser cortas, generales y
+> accionables. Detalle técnico del fallo → `learnings.md`, no aquí.
 
-## Tartamudeos y repeticiones
+## Tartamudeos y repeticiones [clean_script|false_starts]
 
 - Al eliminar una repetición ("muy muy muy" → "muy"), el corte debe cubrir
   SOLO las copias repetidas. NUNCA te lleves la palabra funcional anterior:
@@ -15,20 +20,20 @@ descubre un fallo nuevo, se añade aquí la lección para no repetirlo.
   última, que suele ser la versión buena del hablante), nunca trozos de las
   dos mezclados.
 
-## Finales de segmento (lo que precede a un salto de contenido)
+## Finales de segmento [clean_script|completeness]
 
 - Un segmento NUNCA puede terminar a mitad de idea. Ejemplo real: terminar en
   "...y están solo por ocho" (precio sin completar) y saltar a otra cosa suena
   roto. Si la continuación de la frase no se conserva, elimina la frase
-  incompleta ENTERA — mejor que quede fuera a que quede a medias.
+  incompleta ENTERA — mejor fuera que a medias.
 - Un segmento no puede terminar en conjunción, preposición o muletilla
-  colgada: "...que", "...y", "...con", "...bueno", "...pues". Debe terminar
-  en una frase completa y natural.
+  colgada: "...que", "...y", "...con", "...bueno". Debe terminar en frase
+  completa y natural.
 - El FINAL del vídeo es el punto más crítico: tiene que cerrar una frase
-  completa. Jamás acabar en muletilla ("...bueno") ni dejar una idea anunciada
-  sin terminar.
+  completa. Jamás acabar en muletilla ni dejar una idea anunciada sin
+  terminar.
 
-## Frases enteras y coherencia
+## Frases enteras y coherencia [clean_script|false_starts|completeness]
 
 - Conserva frases COMPLETAS. No dejes una palabra de contenido suelta separada
   de su frase, ni conserves un anuncio ("ahora os voy a enseñar...") cuya
@@ -37,8 +42,8 @@ descubre un fallo nuevo, se añade aquí la lección para no repetirlo.
   CONTINÚA al otro lado del corte: no trates ese borde como un final de frase
   ni recortes palabras ahí.
 
-## Contenido de venta
+## Contenido de venta [clean_script|completeness]
 
 - No cortes a medias afirmaciones de venta: precios, beneficios, llamadas a la
   acción. O se conserva la afirmación entera o se elimina entera — un precio
-  a medias ("están solo por ocho...") hace perder la venta.
+  a medias hace perder la venta.

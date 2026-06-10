@@ -4,7 +4,7 @@ from src.editor_auto.tools.silence_cutter import _transcribe  # NO get_queue
 
 K = os.getenv("API_KEY")
 UID = "6fb39fe857784fd3b02bb05fedfc4522"
-JID = "0ddaa7b6"
+JID = "18c66aa5"
 URL = f"http://localhost:8000/api/v1/editor-auto/web/admin/user-pipeline?user_id={UID}"
 term = {"delivered", "review", "requeue", "failed"}
 
