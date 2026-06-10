@@ -1062,63 +1062,179 @@ class SilenceCutterTool:
         # imprescindible para iterar.
         if bool(config.get("post_audit_enabled", True)):
             ctx.on_progress(0.97, "🔬 Auditoría post-render…")
-            audit = _post_render_audit(
-                output_path,
-                keep_intervals=keep_intervals,
-                words=words,
-                stretched_spans=stretched_spans,
-            )
+
+            def _full_audit(kints: list[tuple[float, float]]) -> dict:
+                """Audit acústico + AUDIT PROFUNDO (re-transcribe el RESULTADO
+                y lo compara token a token contra lo esperado). Devuelve el
+                dict de audit con el score ya ajustado."""
+                audit = _post_render_audit(
+                    output_path,
+                    keep_intervals=kints,
+                    words=words,
+                    stretched_spans=stretched_spans,
+                )
+                if (
+                    bool(config.get("deep_audit_enabled", True))
+                    and words and kints
+                    and audit.get("transcription_ok", True)
+                ):
+                    ctx.on_progress(0.985, "🔬 Audit profundo: re-transcribiendo el resultado…")
+                    try:
+                        deep = _deep_audit_compare(
+                            output_path,
+                            words=words,
+                            keep_intervals=kints,
+                            language=config.get("ai_language", "es"),
+                            model_size=config.get("whisper_model_size", "large-v3"),
+                            cpu_threads=int(config.get("whisper_cpu_threads", 1)),
+                            log=ctx.on_log,
+                        )
+                        audit["deep"] = deep
+                        pen = 8 * len(deep.get("inserted_blocks", []) or [])
+                        pen += 8 * len(deep.get("missing_blocks", []) or [])
+                        if pen and audit.get("quality_score") is not None:
+                            new_score = max(0, int(audit["quality_score"]) - pen)
+                            audit["quality_score"] = new_score
+                            audit["needs_requeue"] = bool(audit.get("needs_requeue")) or new_score < 90
+                            audit["verdict"] = _verdict_for_score(new_score)
+                            for b in (deep.get("inserted_blocks") or [])[:3]:
+                                ctx.on_log(
+                                    f"[silence_cutter] 🚩 audit profundo: audio SOBRANTE "
+                                    f"'{b.get('text')}' (~{b.get('output_t')}s del output)"
+                                )
+                            for b in (deep.get("missing_blocks") or [])[:3]:
+                                ctx.on_log(
+                                    f"[silence_cutter] 🚩 audit profundo: palabra PERDIDA "
+                                    f"'{b.get('text')}'"
+                                )
+                        else:
+                            ctx.on_log(
+                                "[silence_cutter] 🔬 Audit profundo: el resultado dice "
+                                "exactamente lo que debía — sin residuos ni pérdidas."
+                            )
+                    except Exception as e:  # noqa: BLE001
+                        audit["deep"] = {"error": f"{type(e).__name__}: {e}"}
+                        ctx.on_log(f"[silence_cutter] ⚠️ Audit profundo falló (no bloquea): {e}")
+                return audit
+
+            audit = _full_audit(keep_intervals)
             diagnostic["audit"] = audit
 
-            # 10b) AUDIT PROFUNDO — re-transcribe el RESULTADO final y lo
-            # compara palabra a palabra contra lo que DEBÍA quedar (los words
-            # dentro de los keeps). Detecta lo que el audit acústico no ve:
-            # residuos de false-start ("estocost"), palabras duplicadas y
-            # palabras buenas perdidas. Texto contra texto → sin falsos
-            # positivos de timestamps. Cuesta ~1-3 min más por vídeo (Whisper
-            # sobre el output) — calidad > velocidad.
-            if (
-                bool(config.get("deep_audit_enabled", True))
-                and words and keep_intervals
-                and audit.get("transcription_ok", True)
-            ):
-                ctx.on_progress(0.985, "🔬 Audit profundo: re-transcribiendo el resultado…")
-                try:
-                    deep = _deep_audit_compare(
-                        output_path,
-                        words=words,
-                        keep_intervals=keep_intervals,
-                        language=config.get("ai_language", "es"),
-                        model_size=config.get("whisper_model_size", "large-v3"),
-                        cpu_threads=int(config.get("whisper_cpu_threads", 1)),
-                        log=ctx.on_log,
+            # 10c) AUTO-CORRECCIÓN — si el score no llega al objetivo, el
+            # corrector convierte los hallazgos del audit en acciones
+            # quirúrgicas (cortar el sobrante exacto / RESTAURAR lo perdido),
+            # re-renderiza SOLO con ffmpeg (sin re-analizar, sin coste de API)
+            # y re-audita. Máx N intentos; si no llega, queda retenido para
+            # revisión humana (needs_requeue) — nunca se entrega algo malo.
+            heal_target = int(config.get("self_heal_target_score", 95))
+            heal_max = int(config.get("self_heal_max_attempts", 2))
+            heal_hist: list[dict] = []
+            if bool(config.get("self_heal_enabled", True)) and words:
+                while (
+                    len(heal_hist) < heal_max
+                    and isinstance(audit.get("quality_score"), int)
+                    and audit["quality_score"] < heal_target
+                    and audit.get("transcription_ok", True)
+                ):
+                    residue_cuts, guarded_cuts, restores = _derive_self_heal_actions(
+                        audit, keep_intervals=keep_intervals,
                     )
-                    audit["deep"] = deep
-                    pen = 8 * len(deep.get("inserted_blocks", []) or [])
-                    pen += 8 * len(deep.get("missing_blocks", []) or [])
-                    if pen and audit.get("quality_score") is not None:
-                        new_score = max(0, int(audit["quality_score"]) - pen)
-                        audit["quality_score"] = new_score
-                        audit["needs_requeue"] = bool(audit.get("needs_requeue")) or new_score < 90
-                        audit["verdict"] = _verdict_for_score(new_score)
-                        for b in (deep.get("inserted_blocks") or [])[:3]:
-                            ctx.on_log(
-                                f"[silence_cutter] 🚩 audit profundo: audio SOBRANTE "
-                                f"'{b.get('text')}' (~{b.get('output_t')}s del output)"
-                            )
-                        for b in (deep.get("missing_blocks") or [])[:3]:
-                            ctx.on_log(
-                                f"[silence_cutter] 🚩 audit profundo: palabra PERDIDA "
-                                f"'{b.get('text')}'"
-                            )
-                    else:
+                    if not (residue_cuts or guarded_cuts or restores):
                         ctx.on_log(
-                            "[silence_cutter] 🔬 Audit profundo: el resultado dice "
-                            "exactamente lo que debía — sin residuos ni pérdidas."
+                            "[silence_cutter] 🩹 Auto-corrección: sin acciones "
+                            "derivables del audit → queda para revisión humana."
                         )
-                except Exception as e:  # noqa: BLE001
-                    audit["deep"] = {"error": f"{type(e).__name__}: {e}"}
-                    ctx.on_log(f"[silence_cutter] ⚠️ Audit profundo falló (no bloquea): {e}")
+                        break
+                    attempt = len(heal_hist) + 1
+                    ctx.on_progress(0.985, f"🩹 Auto-corrección {attempt}/{heal_max}…")
+                    for s, e, why in (residue_cuts + guarded_cuts + restores)[:6]:
+                        ctx.on_log(f"[silence_cutter] 🩹 {why} → input[{s:.2f}, {e:.2f}]")
+                    # restores primero (devolver lo sobre-cortado), cortes después
+                    new_keeps = _union_intervals(
+                        keep_intervals, [(s, e) for s, e, _ in restores],
+                    )
+                    gcuts = [(s, e) for s, e, _ in guarded_cuts]
+                    if gcuts and voiced_words:
+                        gcuts = _protect_word_boundaries(gcuts, voiced_words, _WORD_GUARD_S)
+                    rcuts = [(s, e) for s, e, _ in residue_cuts]
+                    new_keeps = _subtract_intervals(new_keeps, gcuts + rcuts)
+                    new_keeps, _ab = _absorb_keep_islands(
+                        new_keeps, voiced_words or words, min_keep_s=min_keep_island_s,
+                    )
+                    new_keeps = [
+                        (a, b) for a, b in new_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S
+                    ]
+                    kept_now = sum(b - a for a, b in new_keeps)
+                    kept_before = sum(b - a for a, b in keep_intervals)
+                    if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
+                        ctx.on_log(
+                            "[silence_cutter] 🩹 Auto-corrección ABORTADA "
+                            "(recortaría demasiado contenido) → revisión humana."
+                        )
+                        break
+                    # Re-render atómico: a tmp y replace — si falla, se conserva
+                    # el render anterior intacto.
+                    tmp_out = output_path + ".heal.mp4"
+                    try:
+                        _apply_cuts_ffmpeg(
+                            input_path=input_path,
+                            output_path=tmp_out,
+                            keep_intervals=new_keeps,
+                            rotation=video_rotation,
+                            output_aspect=config.get("output_aspect", "9:16"),
+                            log=ctx.on_log,
+                            on_progress=lambda f: ctx.on_progress(
+                                0.985, f"🩹 Re-render corrección {attempt}…",
+                            ),
+                            normalize_audio=normalize_audio,
+                        )
+                        os.replace(tmp_out, output_path)
+                    except Exception as e:  # noqa: BLE001
+                        try:
+                            os.remove(tmp_out)
+                        except OSError:
+                            pass
+                        ctx.on_log(
+                            f"[silence_cutter] ⚠️ Auto-corrección: re-render falló "
+                            f"({e}); conservo el render previo."
+                        )
+                        break
+                    keep_intervals = new_keeps
+                    prev_score = audit.get("quality_score")
+                    audit = _full_audit(keep_intervals)
+                    diagnostic["audit"] = audit
+                    heal_hist.append({
+                        "attempt": attempt,
+                        "score_before": prev_score,
+                        "score_after": audit.get("quality_score"),
+                        "n_residue_cuts": len(rcuts),
+                        "n_guarded_cuts": len(gcuts),
+                        "n_restores": len(restores),
+                        "actions": [w for _, _, w in (residue_cuts + guarded_cuts + restores)][:8],
+                    })
+            if heal_hist:
+                diagnostic["self_heal"] = {
+                    "target": heal_target,
+                    "attempts": len(heal_hist),
+                    "history": heal_hist,
+                }
+                # Reflejar los keeps corregidos en final + proyecto editable
+                diagnostic["final"]["n_keep_intervals"] = len(keep_intervals)
+                diagnostic["final"]["kept_duration_s"] = round(
+                    sum(b - a for a, b in keep_intervals), 3,
+                )
+                diagnostic["final"]["preview_keep_intervals"] = [
+                    {"start": round(s, 3), "end": round(e, 3)}
+                    for s, e in keep_intervals[:20]
+                ]
+                _write_edit_project(
+                    ctx, input_path=input_path, words=words,
+                    keep_intervals=keep_intervals, video_duration=video_duration,
+                )
+                ctx.on_log(
+                    f"[silence_cutter] 🩹 Auto-corrección: {len(heal_hist)} intento(s) "
+                    f"→ score final {audit.get('quality_score')}/100"
+                )
 
             score = audit.get("quality_score")
             verdict = audit.get("verdict", "?")
@@ -2619,9 +2735,9 @@ def _deep_audit_compare(
         if not tok:
             continue
         if frac >= 0.6:
-            expected.append({"tok": tok, "strong": True})
+            expected.append({"tok": tok, "strong": True, "ws": ws, "we": we})
         elif frac >= 0.08:
-            expected.append({"tok": tok, "strong": False})
+            expected.append({"tok": tok, "strong": False, "ws": ws, "we": we})
     if not expected:
         return {"skipped": "sin palabras esperadas"}
 
@@ -2651,11 +2767,13 @@ def _deep_audit_compare(
 
     out_toks = []
     out_times = []
+    out_ends = []
     for w in out_words:
         tok = _norm(w.get("word", ""))
         if tok:
             out_toks.append(tok)
             out_times.append(float(w.get("start", 0.0)))
+            out_ends.append(float(w.get("end", 0.0)))
 
     exp_toks = [e["tok"] for e in expected]
     sm = difflib.SequenceMatcher(None, exp_toks, out_toks, autojunk=False)
@@ -2683,6 +2801,10 @@ def _deep_audit_compare(
                 "text": " ".join(toks),
                 "n_toks": len(toks),
                 "n_strong_content": n_strong_content,
+                # Span en TIEMPO DE INPUT (para que el corrector pueda
+                # RESTAURAR la frase perdida a los keeps).
+                "input_start": round(min(expected[k]["ws"] for k in range(i1, i2)), 3),
+                "input_end": round(max(expected[k]["we"] for k in range(i1, i2)), 3),
             })
         if op in ("replace", "insert"):
             extra = [out_toks[k] for k in range(j1, j2)]
@@ -2690,6 +2812,8 @@ def _deep_audit_compare(
                 "text": " ".join(extra),
                 "n_toks": len(extra),
                 "output_t": round(out_times[j1], 2) if j1 < len(out_times) else None,
+                # Fin del bloque (para que el corrector corte el span entero).
+                "output_t_end": round(out_ends[j2 - 1], 2) if 0 < j2 <= len(out_ends) else None,
             })
 
     # ── Filtros anti-falso-positivo ─────────────────────────────────────────
@@ -2727,6 +2851,95 @@ def _deep_audit_compare(
         "inserted_blocks": inserted[:10],
         "missing_blocks": missing[:10],
     }
+
+
+def _union_intervals(
+    keeps: list[tuple[float, float]],
+    spans: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Keeps ∪ spans, fusionando solapes (para RESTAURAR tramos sobre-cortados)."""
+    allv = sorted(list(keeps) + [(float(a), float(b)) for a, b in spans if b > a])
+    out: list[tuple[float, float]] = []
+    for a, b in allv:
+        if out and a <= out[-1][1] + 1e-6:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return out
+
+
+def _subtract_intervals(
+    keeps: list[tuple[float, float]],
+    cuts: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Keeps − cuts (para aplicar cortes correctivos)."""
+    if not cuts:
+        return list(keeps)
+    merged = _merge_intervals([(float(a), float(b)) for a, b in cuts if b > a])
+    out: list[tuple[float, float]] = []
+    for ka, kb in keeps:
+        cur = ka
+        for ca, cb in merged:
+            if cb <= cur or ca >= kb:
+                continue
+            if ca > cur:
+                out.append((cur, min(ca, kb)))
+            cur = max(cur, cb)
+            if cur >= kb:
+                break
+        if cur < kb:
+            out.append((cur, kb))
+    return [(a, b) for a, b in out if (b - a) > 1e-3]
+
+
+def _derive_self_heal_actions(
+    audit: dict,
+    *,
+    keep_intervals: list[tuple[float, float]],
+) -> tuple[list[tuple], list[tuple], list[tuple]]:
+    """Convierte los hallazgos del audit en ACCIONES correctivas concretas.
+
+    Devuelve (residue_cuts, guarded_cuts, restores), todas en TIEMPO DE INPUT:
+      · residue_cuts — audio sobrante detectado por el audit profundo (mapeado
+        del output al input). NO pasan word-guard: el residuo ES una palabra
+        (el guard lo protegería); se afinan al valle de energía.
+      · guarded_cuts — rellenos estirados supervivientes, palabras sueltas y
+        silencios internos. SÍ pasan word-guard (cortes normales).
+      · restores — frases PERDIDAS (sobre-corte) que hay que devolver al keep.
+    """
+    deep = audit.get("deep") or {}
+    residue_cuts: list[tuple] = []
+    guarded_cuts: list[tuple] = []
+    restores: list[tuple] = []
+    for b in deep.get("inserted_blocks") or []:
+        t0, t1 = b.get("output_t"), b.get("output_t_end")
+        if t0 is None or t1 is None:
+            continue
+        i0 = _map_output_to_input(max(0.0, float(t0) - 0.02), keep_intervals)
+        i1 = _map_output_to_input(float(t1) + 0.02, keep_intervals)
+        if i0 is not None and i1 is not None and (i1 - i0) > 0.05:
+            residue_cuts.append((i0, i1, f"sobrante:'{str(b.get('text',''))[:40]}'"))
+    for b in deep.get("missing_blocks") or []:
+        s, e = b.get("input_start"), b.get("input_end")
+        if s is not None and e is not None and (float(e) - float(s)) > 0.05:
+            restores.append((
+                max(0.0, float(s) - 0.05), float(e) + 0.05,
+                f"perdida:'{str(b.get('text',''))[:40]}'",
+            ))
+    for p in audit.get("surviving_stretched_preview") or []:
+        s, e = p.get("start"), p.get("end")
+        if s is not None and e is not None and (float(e) - float(s)) > 0.3:
+            # conserva la cabeza de 0.15s del relleno (diseño intencional)
+            guarded_cuts.append((float(s) + 0.15, float(e), "relleno_estirado"))
+    for p in audit.get("loose_words_preview") or []:
+        s, e = p.get("start"), p.get("end")
+        if s is not None and e is not None:
+            guarded_cuts.append((float(s), float(e), f"palabra_suelta:'{p.get('text','')}'"))
+    for p in audit.get("internal_silences_preview") or []:
+        s, e = p.get("input_start"), p.get("input_end")
+        if s is not None and e is not None and (float(e) - float(s)) > 0.6:
+            guarded_cuts.append((float(s) + 0.15, float(e) - 0.15, "silencio_interno"))
+    return residue_cuts, guarded_cuts, restores
 
 
 def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
