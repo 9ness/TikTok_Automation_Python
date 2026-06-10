@@ -78,6 +78,9 @@ const DEFAULT_NUMBERS: PresidentsNumbersConfig = {
   font_choice: "Impact",
   mystery_text: "???",
   header_text: "",
+  header_mode: "all",
+  header_duration: 5.0,
+  header_animation: "none",
   header_y_position: 0.07,
   header_font_scale: 0.024,
   header_text_color: "#0B0B0B",
@@ -161,6 +164,12 @@ function flatToNested(flat: Record<string, unknown>): {
     numbers.mystery_text = s("numbers_mystery_text");
   if (s("numbers_header_text") !== undefined)
     numbers.header_text = s("numbers_header_text");
+  if (s("numbers_header_mode"))
+    numbers.header_mode = s("numbers_header_mode") as PresidentsNumbersConfig["header_mode"];
+  if (n("numbers_header_duration") !== undefined)
+    numbers.header_duration = n("numbers_header_duration");
+  if (s("numbers_header_animation"))
+    numbers.header_animation = s("numbers_header_animation") as PresidentsNumbersConfig["header_animation"];
   if (n("numbers_header_y_position") !== undefined)
     numbers.header_y_position = n("numbers_header_y_position");
   if (n("numbers_header_font_scale") !== undefined)
@@ -237,6 +246,9 @@ function nestedToFlat(
     numbers_font_choice: numbers.font_choice,
     numbers_mystery_text: numbers.mystery_text,
     numbers_header_text: numbers.header_text,
+    numbers_header_mode: numbers.header_mode,
+    numbers_header_duration: numbers.header_duration,
+    numbers_header_animation: numbers.header_animation,
     numbers_header_y_position: numbers.header_y_position,
     numbers_header_font_scale: numbers.header_font_scale,
     numbers_header_text_color: numbers.header_text_color,

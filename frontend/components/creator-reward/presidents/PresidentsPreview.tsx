@@ -517,6 +517,11 @@ function NumbersOverlayPreview({
           >
             {numbers.header_text.trim() || "Top 5 Worst US Presidents"}
           </div>
+          {showLabel && numbers.header_mode === "intro" && (
+            <span className="pointer-events-none absolute -top-3 right-0 rounded bg-rose-500/80 px-1 py-0.5 text-[8px] font-medium text-black">
+              header {numbers.header_duration}s · {numbers.header_animation}
+            </span>
+          )}
         </div>
       </div>
 

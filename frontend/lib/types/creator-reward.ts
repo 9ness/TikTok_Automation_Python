@@ -61,8 +61,11 @@ export interface PresidentsNumbersConfig {
   font_choice: string;
   // El #1 es el misterio del vídeo → en la lista se muestra como incógnita.
   mystery_text: string;
-  // Header (gancho fijo todo el vídeo)
+  // Header (gancho). "all" = todo el vídeo · "intro" = solo primeros N seg.
   header_text: string; // vacío → usa el hook_box_text del guion
+  header_mode: "all" | "intro";
+  header_duration: number; // segundos (solo mode=intro)
+  header_animation: "none" | "fade" | "swipe_left"; // solo mode=intro
   header_y_position: number;
   header_font_scale: number;
   header_text_color: string;

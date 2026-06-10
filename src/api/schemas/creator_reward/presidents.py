@@ -63,8 +63,12 @@ class PresidentsNumbersConfig(BaseModel):
     # El #1 es el misterio del vídeo (silueta) → en la lista se muestra como
     # incógnita, nunca el nombre real.
     mystery_text: str = "???"
-    # Header (gancho fijo todo el vídeo)
+    # Header (gancho). Por defecto fijo todo el vídeo; opcionalmente solo los
+    # primeros N segundos con animación (estilo hook box clásico).
     header_text: str = ""  # vacío → usa el hook_box_text del guion
+    header_mode: Literal["all", "intro"] = "all"  # all=todo el vídeo · intro=primeros N s
+    header_duration: float = Field(default=5.0, ge=0.5, le=30.0)  # solo si mode=intro
+    header_animation: Literal["none", "fade", "swipe_left"] = "none"  # solo si mode=intro
     header_y_position: float = Field(default=0.07, ge=0.0, le=1.0)
     header_font_scale: float = Field(default=0.024, gt=0.0, le=0.1)
     header_text_color: str = "#0B0B0B"

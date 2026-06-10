@@ -27,8 +27,12 @@ DEFAULT_NUMBERS_STYLE = {
     # El #1 (puesto 1) es el misterio: en la lista se muestra como incógnita,
     # nunca el nombre real. Es el último en revelarse (countdown 5→1).
     "mystery_text": "???",
-    # Header (gancho fijo todo el vídeo)
+    # Header (gancho). mode="all" → fijo todo el vídeo; "intro" → solo los
+    # primeros `header_duration` s con animación opcional.
     "header_text": "",                 # vacío → usa el hook_box_text del guion
+    "header_mode": "all",              # "all" | "intro"
+    "header_duration": 5.0,            # segundos (solo mode="intro")
+    "header_animation": "none",        # "none" | "fade" | "swipe_left" (mode="intro")
     "header_y_position": 0.07,         # centro vertical del header (0=arriba)
     "header_font_scale": 0.024,        # relativo al alto del vídeo
     "header_text_color": "#0B0B0B",
@@ -119,14 +123,47 @@ def add_numbers_overlay_to_video(
         hh = header_np.shape[0]
         y_center = int(H * float(s["header_y_position"]))
         y_top = max(0, y_center - hh // 2)
-        header_clip = (
-            ImageClip(header_np, transparent=True)
-            .set_duration(dur)
-            .set_position((0, y_top))
-        )
+
+        header_mode = str(s.get("header_mode") or "all")
+        if header_mode == "intro":
+            dur_h = max(0.5, min(float(s.get("header_duration", 5.0)), dur))
+            anim = str(s.get("header_animation") or "none")
+            header_clip = (
+                ImageClip(header_np, transparent=True)
+                .set_start(0)
+                .set_duration(dur_h)
+            )
+            if anim == "swipe_left":
+                exit_t = 0.35
+
+                def _hpos(t, _y=y_top, _w=W, _d=dur_h, _e=exit_t):
+                    if t <= _d - _e:
+                        return (0, _y)
+                    p = (t - (_d - _e)) / _e
+                    return (int(-_w * (p * p)), _y)
+
+                header_clip = header_clip.set_position(_hpos)
+            elif anim == "fade":
+                fade = min(0.3, dur_h / 3.0)
+                header_clip = (
+                    header_clip.set_position((0, y_top))
+                    .crossfadein(fade).crossfadeout(fade)
+                )
+            else:
+                header_clip = header_clip.set_position((0, y_top))
+            if log_callback:
+                log_callback(
+                    f"🔢 Header intro {dur_h:.1f}s ({anim}): \"{header_txt[:40]}\""
+                )
+        else:
+            header_clip = (
+                ImageClip(header_np, transparent=True)
+                .set_duration(dur)
+                .set_position((0, y_top))
+            )
+            if log_callback:
+                log_callback(f"🔢 Header fijo (todo el vídeo): \"{header_txt[:40]}\"")
         layers.append(header_clip)
-        if log_callback:
-            log_callback(f"🔢 Header fijo: \"{header_txt[:40]}\"")
 
     # ----- Lista de números + nombres -----
     list_x = int(W * float(s["list_x_position"]))

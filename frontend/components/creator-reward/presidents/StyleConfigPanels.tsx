@@ -347,6 +347,57 @@ export function NumbersConfigPanel({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <Field label="Mostrar header">
+          <Select
+            value={value.header_mode}
+            onValueChange={(v) =>
+              patch("header_mode", v as PresidentsNumbersConfig["header_mode"])
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo el vídeo</SelectItem>
+              <SelectItem value="intro">Solo primeros seg.</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        {value.header_mode === "intro" && (
+          <>
+            <Field label="Duración header (s)">
+              <Input
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="30"
+                className="h-9"
+                value={value.header_duration}
+                onChange={(e) => patch("header_duration", Number(e.target.value))}
+              />
+            </Field>
+            <Field label="Animación header">
+              <Select
+                value={value.header_animation}
+                onValueChange={(v) =>
+                  patch("header_animation", v as PresidentsNumbersConfig["header_animation"])
+                }
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin anim.</SelectItem>
+                  <SelectItem value="fade">Fade</SelectItem>
+                  <SelectItem value="swipe_left">Swipe ←</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <Field label="Fuente">
           <FontSelector value={currentPath} onChange={setFontByPath} />
         </Field>
