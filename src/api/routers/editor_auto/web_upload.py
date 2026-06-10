@@ -371,16 +371,23 @@ def web_day(
     # ya enviados se siguen en /output. El día acepta más subidas mientras no
     # pase el cierre y no se alcance el tope diario.
     sent = _sent_files(user.id, day)
-    all_files = drive_uploads.list_day_files(user.name, day)
-    drafts = [v for v in all_files if v.get("filename") not in sent]
     has_jobs = bool(_get_day_jobs(user.id, day))
-    # Borradores que el sweeper MOVIÓ a este día (para avisar al cliente). Solo
-    # los que siguen como borradores presentes.
-    draft_names = {v.get("filename") for v in drafts}
-    carried = sorted(_carried_files(user.id, day) & draft_names)
-    # Envío en UNA tanda: el día acepta subidas hasta que se manda a edición.
-    # Tras el primer envío (has_jobs) queda cerrado — no se mandan más tandas.
-    open_day = day_send_open(day) and len(all_files) < _MAX_FILES_PER_DAY and not has_jobs
+    # PERF: listar los borradores hace una llamada a la Drive API (lenta) y SOLO
+    # importa cuando el día sigue ABIERTO para subir (sin envíos y antes del
+    # cierre). Si ya se envió (has_jobs) o pasó el cierre, los borradores no se
+    # muestran → nos saltamos Drive y el día carga casi al instante (era el
+    # cuello de botella de "Obteniendo tus vídeos…" en días ya entregados).
+    can_be_open = day_send_open(day) and not has_jobs
+    if can_be_open:
+        all_files = drive_uploads.list_day_files(user.name, day)
+        drafts = [v for v in all_files if v.get("filename") not in sent]
+        draft_names = {v.get("filename") for v in drafts}
+        carried = sorted(_carried_files(user.id, day) & draft_names)
+        open_day = len(all_files) < _MAX_FILES_PER_DAY
+    else:
+        drafts = []
+        carried = []
+        open_day = False
     return {
         "day": day,
         "locked": not open_day,
