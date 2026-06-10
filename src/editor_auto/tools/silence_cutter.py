@@ -1063,12 +1063,20 @@ class SilenceCutterTool:
         if bool(config.get("post_audit_enabled", True)):
             ctx.on_progress(0.97, "🔬 Auditoría post-render…")
 
-            def _full_audit(kints: list[tuple[float, float]]) -> dict:
+            def _full_audit(
+                kints: list[tuple[float, float]],
+                audit_path: str | None = None,
+            ) -> dict:
                 """Audit acústico + AUDIT PROFUNDO (re-transcribe el RESULTADO
                 y lo compara token a token contra lo esperado). Devuelve el
-                dict de audit con el score ya ajustado."""
+                dict de audit con el score ya ajustado.
+
+                `audit_path` permite auditar un render CANDIDATO (p. ej. el tmp
+                de una auto-corrección) sin haberlo movido aún a `output_path`,
+                para decidir si mejora ANTES de reemplazar el render bueno."""
+                ap = audit_path or output_path
                 audit = _post_render_audit(
-                    output_path,
+                    ap,
                     keep_intervals=kints,
                     words=words,
                     stretched_spans=stretched_spans,
@@ -1081,7 +1089,7 @@ class SilenceCutterTool:
                     ctx.on_progress(0.985, "🔬 Audit profundo: re-transcribiendo el resultado…")
                     try:
                         deep = _deep_audit_compare(
-                            output_path,
+                            ap,
                             words=words,
                             keep_intervals=kints,
                             language=config.get("ai_language", "es"),
@@ -1129,34 +1137,61 @@ class SilenceCutterTool:
             heal_target = int(config.get("self_heal_target_score", 95))
             heal_max = int(config.get("self_heal_max_attempts", 2))
             heal_hist: list[dict] = []
-            if bool(config.get("self_heal_enabled", True)) and words:
+            # MEJOR render hasta ahora. `output_path` SIEMPRE contiene el mejor
+            # render; cada candidato se renderiza a un tmp y se AUDITA ahí, y solo
+            # se mueve a output_path si MEJORA el score. Así el self-heal nunca
+            # entrega algo peor que el render original (antes encadenaba sobre la
+            # versión dañada y podía bajar 89→59→68).
+            best_keeps = list(keep_intervals)
+            best_audit = audit
+            best_score = (
+                audit.get("quality_score")
+                if isinstance(audit.get("quality_score"), int) else None
+            )
+            if (
+                bool(config.get("self_heal_enabled", True)) and words
+                and best_score is not None
+            ):
+                tried_kinds: set[str] = set()
                 while (
                     len(heal_hist) < heal_max
-                    and isinstance(audit.get("quality_score"), int)
-                    and audit["quality_score"] < heal_target
-                    and audit.get("transcription_ok", True)
+                    and best_score < heal_target
+                    and best_audit.get("transcription_ok", True)
                 ):
                     residue_cuts, guarded_cuts, restores = _derive_self_heal_actions(
-                        audit, keep_intervals=keep_intervals,
+                        best_audit, keep_intervals=best_keeps,
                     )
-                    if not (residue_cuts or guarded_cuts or restores):
+                    cut_actions = guarded_cuts + residue_cuts
+                    # Escalado por seguridad: 1º solo CORTES (quitan sobrante /
+                    # silencio — casi nunca dañan), luego RESTAURACIONES (devolver
+                    # sobre-corte — arriesgado: puede reintroducir silencio), y al
+                    # final ambos. Cada set se prueba como mucho una vez.
+                    cand = None
+                    if cut_actions and "cortes" not in tried_kinds:
+                        cand = ("cortes", "cortes", residue_cuts, guarded_cuts, [])
+                    elif restores and "restauracion" not in tried_kinds:
+                        cand = ("restauracion", "restauración", [], [], restores)
+                    elif cut_actions and restores and "ambos" not in tried_kinds:
+                        cand = ("ambos", "cortes+restauración", residue_cuts, guarded_cuts, restores)
+                    if cand is None:
                         ctx.on_log(
-                            "[silence_cutter] 🩹 Auto-corrección: sin acciones "
-                            "derivables del audit → queda para revisión humana."
+                            "[silence_cutter] 🩹 Auto-corrección: sin más acciones "
+                            "que probar → queda para revisión humana."
                         )
                         break
+                    key, kind, r_cuts_a, g_cuts_a, restores_a = cand
+                    tried_kinds.add(key)
                     attempt = len(heal_hist) + 1
-                    ctx.on_progress(0.985, f"🩹 Auto-corrección {attempt}/{heal_max}…")
-                    for s, e, why in (residue_cuts + guarded_cuts + restores)[:6]:
+                    ctx.on_progress(0.985, f"🩹 Auto-corrección {attempt}/{heal_max} ({kind})…")
+                    for s, e, why in (r_cuts_a + g_cuts_a + restores_a)[:6]:
                         ctx.on_log(f"[silence_cutter] 🩹 {why} → input[{s:.2f}, {e:.2f}]")
-                    # restores primero (devolver lo sobre-cortado), cortes después
                     new_keeps = _union_intervals(
-                        keep_intervals, [(s, e) for s, e, _ in restores],
+                        best_keeps, [(s, e) for s, e, _ in restores_a],
                     )
-                    gcuts = [(s, e) for s, e, _ in guarded_cuts]
+                    gcuts = [(s, e) for s, e, _ in g_cuts_a]
                     if gcuts and voiced_words:
                         gcuts = _protect_word_boundaries(gcuts, voiced_words, _WORD_GUARD_S)
-                    rcuts = [(s, e) for s, e, _ in residue_cuts]
+                    rcuts = [(s, e) for s, e, _ in r_cuts_a]
                     new_keeps = _subtract_intervals(new_keeps, gcuts + rcuts)
                     new_keeps, _ab = _absorb_keep_islands(
                         new_keeps, voiced_words or words, min_keep_s=min_keep_island_s,
@@ -1165,15 +1200,22 @@ class SilenceCutterTool:
                         (a, b) for a, b in new_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S
                     ]
                     kept_now = sum(b - a for a, b in new_keeps)
-                    kept_before = sum(b - a for a, b in keep_intervals)
+                    kept_before = sum(b - a for a, b in best_keeps)
                     if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
                         ctx.on_log(
-                            "[silence_cutter] 🩹 Auto-corrección ABORTADA "
-                            "(recortaría demasiado contenido) → revisión humana."
+                            "[silence_cutter] 🩹 Auto-corrección: este set recortaría "
+                            "demasiado → lo descarto y pruebo otro."
                         )
-                        break
-                    # Re-render atómico: a tmp y replace — si falla, se conserva
-                    # el render anterior intacto.
+                        heal_hist.append({
+                            "attempt": attempt, "kind": kind, "accepted": False,
+                            "score_before": best_score, "score_after": None,
+                            "reason": "abort_recorte",
+                            "n_residue_cuts": len(rcuts), "n_guarded_cuts": len(gcuts),
+                            "n_restores": len(restores_a),
+                            "actions": [w for _, _, w in (r_cuts_a + g_cuts_a + restores_a)][:8],
+                        })
+                        continue
+                    # Render del CANDIDATO a tmp — NO toca el mejor render todavía.
                     tmp_out = output_path + ".heal.mp4"
                     try:
                         _apply_cuts_ffmpeg(
@@ -1188,7 +1230,6 @@ class SilenceCutterTool:
                             ),
                             normalize_audio=normalize_audio,
                         )
-                        os.replace(tmp_out, output_path)
                     except Exception as e:  # noqa: BLE001
                         try:
                             os.remove(tmp_out)
@@ -1196,22 +1237,42 @@ class SilenceCutterTool:
                             pass
                         ctx.on_log(
                             f"[silence_cutter] ⚠️ Auto-corrección: re-render falló "
-                            f"({e}); conservo el render previo."
+                            f"({e}); conservo el mejor render."
                         )
                         break
-                    keep_intervals = new_keeps
-                    prev_score = audit.get("quality_score")
-                    audit = _full_audit(keep_intervals)
-                    diagnostic["audit"] = audit
+                    # Audita el candidato (tmp) y SOLO lo acepta si mejora el score.
+                    prev_best = best_score
+                    cand_audit = _full_audit(new_keeps, audit_path=tmp_out)
+                    cand_score = cand_audit.get("quality_score")
+                    accepted = isinstance(cand_score, int) and cand_score > prev_best
+                    if accepted:
+                        os.replace(tmp_out, output_path)
+                        best_keeps, best_audit, best_score = new_keeps, cand_audit, cand_score
+                        diagnostic["audit"] = best_audit
+                        ctx.on_log(
+                            f"[silence_cutter] 🩹 Corrección ACEPTADA ({kind}): "
+                            f"{prev_best} → {cand_score}/100"
+                        )
+                    else:
+                        try:
+                            os.remove(tmp_out)
+                        except OSError:
+                            pass
+                        ctx.on_log(
+                            f"[silence_cutter] 🩹 Corrección DESCARTADA ({kind}): "
+                            f"{prev_best} → {cand_score} (no mejora) — conservo el mejor."
+                        )
                     heal_hist.append({
-                        "attempt": attempt,
-                        "score_before": prev_score,
-                        "score_after": audit.get("quality_score"),
-                        "n_residue_cuts": len(rcuts),
-                        "n_guarded_cuts": len(gcuts),
-                        "n_restores": len(restores),
-                        "actions": [w for _, _, w in (residue_cuts + guarded_cuts + restores)][:8],
+                        "attempt": attempt, "kind": kind, "accepted": accepted,
+                        "score_before": prev_best, "score_after": cand_score,
+                        "n_residue_cuts": len(rcuts), "n_guarded_cuts": len(gcuts),
+                        "n_restores": len(restores_a),
+                        "actions": [w for _, _, w in (r_cuts_a + g_cuts_a + restores_a)][:8],
                     })
+            # El mejor render manda: refleja sus keeps/audit aguas abajo.
+            keep_intervals = best_keeps
+            audit = best_audit
+            diagnostic["audit"] = audit
             if heal_hist:
                 diagnostic["self_heal"] = {
                     "target": heal_target,
