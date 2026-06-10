@@ -258,6 +258,19 @@ class SilenceCutterTool:
             "phases": {},
         }
 
+        # 0a) REPARAR ENTRADA si el stream de vídeo viene dañado. Un .mov/.mp4
+        # con NAL inválidos hace el decode NO determinista → Whisper saca
+        # timings ligeramente distintos y el render concela errores distinto en
+        # cada run, así que el MISMO vídeo daba scores base diferentes (84/89/92
+        # /94) y cortes inconsistentes. Re-encodear a H264 limpio lo estabiliza.
+        # Solo afecta a vídeos corruptos; los sanos pasan intactos.
+        repaired = _repair_corrupt_input(
+            input_path, ctx.temp_folder, ctx.job_id, ctx.on_log,
+        )
+        if repaired != input_path:
+            diagnostic["input_repaired"] = True
+            input_path = repaired
+
         # 0) MODO MANUAL — el editor manual del operador pasa los tramos a
         # CONSERVAR ya decididos. Saltamos TODA la detección (whisper/silero/
         # amplitud/IA/holístico) y renderizamos directamente esos intervalos.
@@ -1391,6 +1404,94 @@ def _write_edit_project(
         ctx.on_log(f"[silence_cutter] 📝 Proyecto editable → {out.name}")
     except Exception as e:  # noqa: BLE001
         ctx.on_log(f"[silence_cutter] ⚠️ No se pudo escribir proyecto editable: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Reparación de entrada — re-encode si el stream viene dañado
+# ---------------------------------------------------------------------------
+# Nº de errores de decode en una muestra que dispara el re-encode. Un vídeo
+# sano da 0; uno con stream H264 roto (NAL inválidos) da decenas/cientos.
+_CORRUPT_ERR_THRESHOLD = 8
+
+
+def _count_decode_errors(input_path: str, *, sample_s: int = 30) -> int:
+    """Decodifica los primeros `sample_s` s del vídeo (sin re-encodear, muxer
+    null → rápido) y cuenta líneas de error de decode (NAL inválidos, frames
+    corruptos). Sirve para detectar un stream dañado que haría el decode NO
+    determinista (cortes/score distintos entre runs del MISMO vídeo)."""
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-v", "error",
+                "-i", input_path, "-map", "0:v:0", "-t", str(sample_s),
+                "-f", "null", "-",
+            ],
+            capture_output=True, text=True, timeout=180,
+        )
+    except Exception:  # noqa: BLE001
+        return 0
+    err = proc.stderr or ""
+    keys = (
+        "NAL", "Error splitting", "corrupt", "missing picture",
+        "Invalid data", "decode_slice", "concealing",
+    )
+    return sum(1 for ln in err.splitlines() if any(k in ln for k in keys))
+
+
+def _repair_corrupt_input(
+    input_path: str, temp_folder: str, job_id: str, log,
+) -> str:
+    """Si la entrada trae el stream de vídeo dañado, la re-encodea a un H264
+    LIMPIO para que Whisper, los cortes y el audit sean fiables y
+    REPRODUCIBLES. Los vídeos sanos NO se tocan (devuelve el path original) →
+    cero impacto en los casos que ya funcionan.
+
+    Orientación: re-encodea con el autorotate por defecto de ffmpeg (hornea la
+    rotación → vídeo ya derecho) y limpia la metadata `rotate`. Aguas abajo
+    `_ffprobe_meta` leerá rotation=0 y lo tratará como derecho → MISMA
+    orientación final que el flujo original (que también deja el frame
+    físicamente rotado)."""
+    n_err = _count_decode_errors(input_path)
+    if n_err <= _CORRUPT_ERR_THRESHOLD:
+        return input_path
+    log(
+        f"[silence_cutter] 🩺 Entrada con stream dañado (~{n_err} errores de "
+        f"decode en 30s) → re-encode a H264 limpio para edición fiable."
+    )
+    clean = os.path.join(temp_folder, f"editor_clean_{job_id}.mp4")
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner",
+        "-fflags", "+genpts", "-err_detect", "ignore_err",
+        "-i", input_path,
+        *_video_encoder_args(),
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        "-metadata:s:v:0", "rotate=0",
+        clean,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        ok = (
+            proc.returncode == 0
+            and os.path.exists(clean)
+            and os.path.getsize(clean) > 10_000
+        )
+        if not ok:
+            log(
+                f"[silence_cutter] ⚠️ Reparación de entrada falló "
+                f"(rc={proc.returncode}) → uso el original."
+            )
+            try:
+                if os.path.exists(clean):
+                    os.remove(clean)
+            except OSError:
+                pass
+            return input_path
+        log("[silence_cutter] 🩺 Entrada reparada → editando sobre versión limpia.")
+        return clean
+    except Exception as e:  # noqa: BLE001
+        log(f"[silence_cutter] ⚠️ Reparación de entrada lanzó {e} → uso el original.")
+        return input_path
 
 
 # ---------------------------------------------------------------------------
