@@ -363,11 +363,19 @@ class JobQueue:
 
             # Ejecutar fuera del lock
             if dispatch is None:
+                # NO matar el job: el dispatcher se registra justo DESPUÉS de
+                # construir la cola (get_queue() hace JobQueue(...) y luego
+                # set_dispatcher), así que al arrancar con jobs PENDING hay una
+                # ventana en la que los workers ya corren sin dispatcher. Antes
+                # esto marcaba FAILED ("No hay dispatcher registrado") y perdía
+                # vídeos en cada deploy/reinicio. Ahora devolvemos el job a
+                # PENDING y esperamos a que aparezca el dispatcher.
                 with self._cond:
-                    job.status = JobStatus.FAILED
-                    job.error = "No hay dispatcher registrado en JobQueue"
-                    job.finished_at = time.time()
+                    job.status = JobStatus.PENDING
+                    job.started_at = None
+                    job.progress_label = ""
                     self._save_state_locked()
+                    self._cond.wait(timeout=1.0)
                 continue
 
             try:

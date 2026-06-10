@@ -121,7 +121,14 @@ def _enqueue_one(user, filename: str) -> bool:
     """
     from src.editor_auto.services import folder_manager, quota_service
     from src.editor_auto.config import user_subfolder
-    from src.queue.manager import get_queue
+    # CRÍTICO: usar la MISMA cola que la API (dependencies.get_queue), NO la
+    # factory de Streamlit (manager.get_queue con @st.cache_resource). En el
+    # proceso FastAPI, manager.get_queue crea una SEGUNDA JobQueue con sus
+    # propios workers sobre el mismo queue_state.json → las dos colas divergen
+    # y el race de arranque (workers antes de set_dispatcher) mata jobs con
+    # "No hay dispatcher registrado". dependencies.get_queue es el singleton
+    # único del proceso, con dispatcher ya registrado.
+    from src.api.dependencies import get_queue
     from src.queue.models import JobMode
 
     # 0. CHECK DE CUOTA + VENTANA HORARIA.
