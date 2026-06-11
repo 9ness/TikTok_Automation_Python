@@ -5325,14 +5325,17 @@ def _apply_cuts_ffmpeg(
         filter_parts.append(audio_filter)
         concat_inputs.append(f"[v{i}][a{i}]")
 
-    # Etiqueta de salida de audio: si normalizamos, encadenamos loudnorm
-    # (EBU R128 → -16 LUFS) DESPUÉS del concat para que TODA la pista quede a
-    # loudness estándar y se oiga (grabaciones bajitas que antes "no se oían").
-    # Se aplica al output final, una sola vez, tras unir los segmentos.
+    # Etiqueta de salida de audio: si normalizamos, aplicamos `speechnorm` al
+    # output final. A diferencia del loudnorm uniforme (que subía toda la pista
+    # por igual y dejaba inaudibles las palabras dichas MÁS bajo — un precio
+    # 'euros', un ingrediente mumblado), speechnorm sube los MOMENTOS de voz
+    # floja hacia el pico → se OYEN. Deja la pista a ~-15 dB (nivel estándar) con
+    # tope de pico (l=1, sin clipping). NO encadenar loudnorm después: re-comprime
+    # el rango y deshace el lift de speechnorm (verificado). Una vez, tras concat.
     a_out = "[outa]"
     norm_part = ""
     if normalize_audio:
-        norm_part = ";[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]"
+        norm_part = ";[outa]speechnorm=e=12.5:r=0.0001:l=1[outa_norm]"
         a_out = "[outa_norm]"
 
     concat_filter = (
