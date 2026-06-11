@@ -980,6 +980,25 @@ class SilenceCutterTool:
         # bordes de KEEP al valle de energía (y el del self-heal) lo necesitan.
 
         keep_intervals = _invert_intervals(merged_cuts, video_duration)
+        # INVARIANTE ANTI-OVER-CUT (robustez pública): una palabra hablada solo
+        # puede eliminarse si una fase de CONTENIDO (holístico/IA/ngram/false-
+        # start/filler estirado) la quitó a propósito. Las fases ACÚSTICAS
+        # (VAD/energía/gap/auto-trim) cortan SILENCIO, jamás una palabra. Si una
+        # palabra real (Whisper, sin fantasmas) la engulló solo un corte acústico
+        # → se re-anexa. Resuelve el caso de bugallo ('proteína', 'un ojo', 'te
+        # lo dejo aquí' comidos por acoustic/silero/gap). Solo AÑADE keep.
+        keep_intervals, n_word_protected = _protect_words_from_acoustic_cuts(
+            keep_intervals, cuts_with_source, voiced_words or words,
+            video_duration=video_duration,
+        )
+        if n_word_protected:
+            diagnostic["phases"]["word_protection_from_acoustic"] = {
+                "words_reanexed": n_word_protected,
+            }
+            ctx.on_log(
+                f"[silence_cutter] 🛟 {n_word_protected} palabra(s) hablada(s) "
+                f"re-anexada(s) (las comía un corte acústico, no de contenido)"
+            )
         # Absorbe micro-islas de keep (fragmentos de palabra / cabezas de
         # relleno) que el merge de cortes deja entre dos cortes y suenan como
         # media palabra o mini-corte raro. Conservador: una palabra de
@@ -3805,6 +3824,69 @@ _COMMON_VERB_FORMS = {
     "vas", "ir", "seria", "sería", "sera", "será", "sois", "somos", "puedes",
     "puede", "pueden", "quiero", "quiere",
 }
+
+
+# Fuentes de corte de CONTENIDO (IA/lingüísticas): SÍ pueden eliminar una
+# palabra hablada a propósito (repetición, falso inicio, muletilla, filler).
+_CONTENT_CUT_SOURCES = frozenset({
+    "stretched_filler", "ai_holistic", "ai", "ngram_repetition", "ai_pass2",
+})
+# Fuentes ACÚSTICAS (silencio/energía): solo deben cortar SILENCIO, NUNCA
+# comerse una palabra hablada. (auto_trim, inter_word_gap, acoustic, silero…)
+
+
+def _protect_words_from_acoustic_cuts(
+    keep_intervals: list[tuple[float, float]],
+    cuts_with_source: list[tuple[float, float, str]],
+    words: list[dict],
+    *,
+    pad: float = 0.06,
+    video_duration: float | None = None,
+) -> tuple[list[tuple[float, float]], int]:
+    """Invariante de robustez anti-OVER-CUT a nivel global.
+
+    Una palabra hablada (detectada por Whisper) solo puede desaparecer si una
+    fase de CONTENIDO (holístico/IA/ngram/false-start/filler estirado) la quitó
+    a propósito. Las fases ACÚSTICAS (VAD, energía, gap entre palabras, auto-
+    trim) existen para cortar SILENCIO — si una de ellas engulló una palabra
+    real (su centro cae fuera de los keeps y NINGÚN corte de contenido la quitó),
+    se RE-ANEXA al keep. Resuelve el caso real de bugallo: 'proteína', 'un ojo',
+    'te lo dejo aquí' comidos por acoustic/silero/inter_word_gap. Solo AÑADE
+    keep, nunca corta. Devuelve (keep_intervals, n_palabras_reanexadas)."""
+    if not words or not keep_intervals:
+        return keep_intervals, 0
+    content_cuts = [
+        (s, e) for (s, e, src) in cuts_with_source if src in _CONTENT_CUT_SOURCES
+    ]
+
+    def _in_keep(center: float) -> bool:
+        return any(a <= center <= b for a, b in keep_intervals)
+
+    def _content_removed(center: float) -> bool:
+        return any(s <= center <= e for s, e in content_cuts)
+
+    extra: list[tuple[float, float]] = []
+    n_prot = 0
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        c = (ws + we) / 2.0
+        if _in_keep(c):
+            continue                       # ya conservada
+        if _content_removed(c):
+            continue                       # la quitó una fase de contenido → OK
+        extra.append((ws - pad, we + pad))  # solo la comió un corte acústico
+        n_prot += 1
+    if not extra:
+        return keep_intervals, 0
+    merged = _merge_intervals(list(keep_intervals) + extra)
+    if video_duration is not None:
+        merged = [
+            (max(0.0, a), min(float(video_duration), b)) for a, b in merged
+        ]
+    return merged, n_prot
 
 
 def _protect_unique_content(
