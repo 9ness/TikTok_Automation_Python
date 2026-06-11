@@ -118,8 +118,12 @@ class StickerArrowTool:
             # Cuánto se mantiene visible (s). Ignorado si `extend_to_end`=True.
             "duration_seconds": 3.5,
             # Si True: una vez aparece, la flecha se queda hasta el FINAL del
-            # vídeo (ignora `duration_seconds`). Útil para CTA persistente.
-            "extend_to_end": False,
+            # vídeo (ignora `duration_seconds`). CTA persistente = comportamiento
+            # por defecto: una vez aparece la flecha (en el momento del gatillo
+            # o en el fallback), se queda HASTA EL FINAL del vídeo. Es lo que
+            # quiere el cliente para TikTok Shop (la llamada a la acción no debe
+            # desaparecer antes de acabar el vídeo).
+            "extend_to_end": True,
             # Fallback si no hay keyword: aparece en los últimos N s del vídeo.
             "fallback_last_seconds": 4.0,
             # Solo buscar keyword en el último X% del vídeo (anti-falso-positivo).
