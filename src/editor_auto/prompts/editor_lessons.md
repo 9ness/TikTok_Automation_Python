@@ -42,6 +42,20 @@
   CONTINÚA al otro lado del corte: no trates ese borde como un final de frase
   ni recortes palabras ahí.
 
+## NUNCA borrar contenido único [clean_script|false_starts]
+
+- El error MÁS GRAVE es comerse contenido real. Por defecto se CONSERVA; solo
+  se quita lo que se dice DOS veces o es ruido puro. Ante la mínima duda → KEEP.
+- Casos reales que NO se deben cortar (pasó y el cliente lo notó): el
+  ingrediente "proteína" en "los dos ingredientes son proteína y crema de
+  arroz"; el lead-in del CTA "asegúrate de" en "asegúrate de echarle un ojo";
+  el CTA "te lo dejo aquí en el carrito"; el conector "porque" en "no dejes
+  pasar la oferta porque yo la noto muchísimo".
+- Si la hablante ENUMERA cosas (ingredientes, características), conserva TODAS;
+  nunca elimines un elemento de la lista.
+- Un corte solo vale si esa MISMA idea exacta se conserva en otro punto, o si
+  es muletilla/falso inicio. Nunca por "resumir" o "acortar".
+
 ## Rectificaciones del hablante [clean_script|false_starts]
 
 - Si el hablante anuncia algo y MÁS TARDE se rectifica con una versión

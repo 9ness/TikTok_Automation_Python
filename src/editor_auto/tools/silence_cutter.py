@@ -2342,6 +2342,17 @@ def _ai_holistic_clean_removes(
                 f"re-anexada(s) antes de un corte de tartamudeo"
             )
 
+        # Red de seguridad: nunca perder contenido ÚNICO (ingredientes, datos,
+        # nombres) que el holístico haya decidido cortar por error.
+        final_keep, n_unique = _protect_unique_content(words, final_keep)
+        if n_unique:
+            diag["unique_content_protected"] = n_unique
+            diag["kept_words"] = len(final_keep)
+            log(
+                f"[silence_cutter]   ↳ {n_unique} tramo(s) re-anexado(s) por "
+                f"contenido ÚNICO (anti over-cut del holístico)"
+            )
+
         # Complemento = tramos a QUITAR (índices contiguos NO conservados).
         intervals: list[tuple[float, float]] = []
         i = 0
@@ -3785,6 +3796,63 @@ def _reanex_stutter_lead_words(
                     fixes += 1
         i = j
     return keep, fixes
+
+
+_COMMON_VERB_FORMS = {
+    "es", "son", "esta", "estan", "están", "estamos", "estoy", "estas", "estás",
+    "era", "eran", "fue", "ser", "estar", "hay", "ha", "han", "he", "has",
+    "habia", "había", "tiene", "tienen", "tengo", "tienes", "va", "van", "voy",
+    "vas", "ir", "seria", "sería", "sera", "será", "sois", "somos", "puedes",
+    "puede", "pueden", "quiero", "quiere",
+}
+
+
+def _protect_unique_content(
+    words: list[dict],
+    keep: set[int],
+) -> tuple[set[int], int]:
+    """Red de seguridad anti-OVER-CUT del holístico. Si un tramo ELIMINADO
+    contiene una palabra de CONTENIDO ÚNICA en toda la transcripción (nombre/
+    adjetivo ≥5 chars, no stopword/muletilla/forma de verbo común, que aparece
+    UNA sola vez), ese tramo lleva información única real (un ingrediente, un
+    dato, un nombre) y se RE-ANEXA al keep. Las repeticiones (freq≥2) y los
+    re-takes (formas verbales) NO se protegen → se siguen pudiendo cortar. Solo
+    AÑADE al keep, nunca sobre-corta. Casos reales que protege: 'proteína' en
+    'los dos ingredientes son proteína y crema de arroz'."""
+    n = len(words)
+    if not n:
+        return keep, 0
+    norm = [
+        re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+        for w in words
+    ]
+    from collections import Counter
+    freq = Counter(t for t in norm if t)
+
+    def _is_unique_content(t: str) -> bool:
+        return (
+            len(t) >= 5 and freq.get(t, 0) == 1
+            and t not in _AUDIT_STOPWORDS
+            and t not in _FILLER_TOKENS
+            and t not in _COMMON_VERB_FORMS
+        )
+
+    keep = set(keep)
+    added = 0
+    i = 0
+    while i < n:
+        if i in keep:
+            i += 1
+            continue
+        j = i
+        while j < n and j not in keep:
+            j += 1
+        if any(_is_unique_content(norm[k]) for k in range(i, j)):
+            for k in range(i, j):
+                keep.add(k)
+            added += 1
+        i = j
+    return keep, added
 
 
 def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
