@@ -1017,6 +1017,20 @@ class SilenceCutterTool:
             except Exception as e:  # noqa: BLE001
                 ctx.on_log(f"[silence_cutter] ⚠️ Revisión completitud falló: {e}")
 
+        # CIERRE del vídeo: la última frase debe terminar en una pausa REAL
+        # del hablante. Si quedó a medias (habla cortada pegada después),
+        # extender hasta la pausa; si no hay pausa alcanzable, cerrar en la
+        # frase anterior. El final es lo que más se nota.
+        keep_intervals, final_fix = _complete_final_phrase(
+            keep_intervals, voiced_words or words,
+        )
+        if final_fix:
+            diagnostic["final_phrase_fix"] = list(final_fix)
+            ctx.on_log(
+                f"[silence_cutter] 🏁 Cierre del vídeo corregido: "
+                f"{final_fix[0]} ({final_fix[1]} palabra(s))"
+            )
+
         # Recorte de palabras funcionales COLGADAS al final de cada segmento
         # (que/y/bueno/...): una frase no puede terminar en conjunción antes
         # de un salto, ni el vídeo acabar en 'bueno'.
@@ -1269,7 +1283,11 @@ class SilenceCutterTool:
                     ]
                     new_keeps = _snap_keeps_to_words(new_keeps, voiced_words or words)
                     # Misma higiene de bordes que el flujo principal: sin
-                    # palabras colgadas ni colas sub-palabra en los re-cortes.
+                    # palabras colgadas ni colas sub-palabra en los re-cortes,
+                    # y el cierre del vídeo siempre en pausa real.
+                    new_keeps, _ff = _complete_final_phrase(
+                        new_keeps, voiced_words or words,
+                    )
                     new_keeps, _nd = _trim_dangling_tail_words(
                         new_keeps, voiced_words or words,
                     )
@@ -3368,6 +3386,73 @@ def _trim_dangling_tail_words(
         if b - a > 0.05:
             out.append((a, b))
     return out, n_total
+
+
+def _complete_final_phrase(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    min_pause_s: float = 0.5,
+    max_extend_s: float = 6.0,
+    max_extend_words: int = 15,
+) -> tuple[list[tuple[float, float]], tuple | None]:
+    """El VÍDEO debe terminar al final de una frase REAL (con pausa del
+    hablante). Si la última palabra conservada va seguida INMEDIATAMENTE
+    (<min_pause_s) de más habla cortada en el input, el corte dejó la frase a
+    medias → EXTIENDE el último keep palabra a palabra hasta la siguiente
+    pausa real. Si no hay pausa alcanzable dentro del margen, RECORTA hacia
+    atrás hasta la última palabra con pausa posterior (cierra en la frase
+    anterior completa). Devuelve (keeps, accion|None)."""
+    if not keep_intervals or not words:
+        return keep_intervals, None
+    spans = sorted(
+        (float(w["start"]), float(w["end"]))
+        for w in words if "start" in w and "end" in w
+    )
+    if not spans:
+        return keep_intervals, None
+    a, b = keep_intervals[-1]
+    inside = [sp for sp in spans if a - 1e-3 <= (sp[0] + sp[1]) / 2 <= b + 1e-3]
+    if not inside:
+        return keep_intervals, None
+    lw_e = inside[-1][1]
+    after = [sp for sp in spans if sp[0] >= lw_e - 1e-3]
+    if not after or (after[0][0] - lw_e) >= min_pause_s:
+        return keep_intervals, None  # ya cierra en pausa real / fin del habla
+    # Extender hasta la siguiente pausa real del hablante.
+    prev_end = lw_e
+    added = 0
+    result_end: float | None = None
+    for ws, we in after:
+        if ws - prev_end >= min_pause_s:
+            result_end = prev_end
+            break
+        if (we - lw_e) > max_extend_s or added >= max_extend_words:
+            result_end = None
+            break
+        prev_end = we
+        added += 1
+    else:
+        result_end = prev_end  # se acabó el habla → cierre natural
+    if result_end is not None and added > 0:
+        out = list(keep_intervals)
+        out[-1] = (a, result_end + 0.10)
+        return _merge_intervals(out), ("extender", added)
+    if result_end is not None:
+        return keep_intervals, None
+    # Sin pausa alcanzable → cerrar en la frase ANTERIOR (última palabra del
+    # keep con pausa real después).
+    for idx in range(len(inside) - 2, -1, -1):
+        we = inside[idx][1]
+        nxt = next((sp for sp in spans if sp[0] >= we - 1e-3), None)
+        if nxt is None or (nxt[0] - we) >= min_pause_s:
+            out = list(keep_intervals)
+            nb = we + 0.10
+            if nb - a > 0.5:
+                out[-1] = (a, nb)
+                return _merge_intervals(out), ("recortar_atras", len(inside) - 1 - idx)
+            break
+    return keep_intervals, None
 
 
 def _refine_keep_edges_to_valley(
