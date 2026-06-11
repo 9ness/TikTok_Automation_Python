@@ -3556,10 +3556,30 @@ def _ai_coherence_judge(
         return {"skipped": "openai no configurado"}
     if call_budget is not None and call_budget and call_budget[0] <= 0:
         return {"skipped": "presupuesto de llamadas agotado"}
-    out_text = (deep or {}).get("out_text") or ""
-    if not out_text or len(words) < 8:
-        return {"skipped": "sin render/transcript"}
+    if len(words) < 8:
+        return {"skipped": "pocas palabras"}
     orig_text = " ".join(str(w.get("word", "")) for w in words).strip()
+    # Texto EDITADO = palabras CONSERVADAS (centro dentro de un keep), en orden.
+    # Representa la DECISIÓN DEL EDITOR (lo que de verdad queda en el vídeo), NO
+    # la re-transcripción del render: Whisper a veces NO re-transcribe una palabra
+    # que SÍ está conservada (fallo de recall en audio cortado), y comparar contra
+    # eso marcaba como "perdidas" palabras presentes (proteína/euros) → falsos
+    # positivos. El juez evalúa lo que el editor decidió dejar (su intención).
+
+    def _in_keep_c(c: float) -> bool:
+        return any(a - 1e-3 <= c <= b + 1e-3 for a, b in keep_intervals)
+
+    kept_words = []
+    for w in words:
+        try:
+            c = (float(w["start"]) + float(w["end"])) / 2.0
+        except (KeyError, ValueError, TypeError):
+            continue
+        if _in_keep_c(c):
+            kept_words.append(w)
+    out_text = " ".join(str(w.get("word", "")) for w in kept_words).strip()
+    if not out_text:
+        return {"skipped": "sin contenido conservado"}
 
     def _flat(s: str) -> str:
         # Sin acentos NI puntuación: Whisper a veces transcribe sin tilde
@@ -5325,17 +5345,14 @@ def _apply_cuts_ffmpeg(
         filter_parts.append(audio_filter)
         concat_inputs.append(f"[v{i}][a{i}]")
 
-    # Etiqueta de salida de audio: si normalizamos, aplicamos `speechnorm` al
-    # output final. A diferencia del loudnorm uniforme (que subía toda la pista
-    # por igual y dejaba inaudibles las palabras dichas MÁS bajo — un precio
-    # 'euros', un ingrediente mumblado), speechnorm sube los MOMENTOS de voz
-    # floja hacia el pico → se OYEN. Deja la pista a ~-15 dB (nivel estándar) con
-    # tope de pico (l=1, sin clipping). NO encadenar loudnorm después: re-comprime
-    # el rango y deshace el lift de speechnorm (verificado). Una vez, tras concat.
+    # Etiqueta de salida de audio: si normalizamos, encadenamos loudnorm
+    # (EBU R128 → -16 LUFS) DESPUÉS del concat para que TODA la pista quede a
+    # loudness estándar y se oiga (grabaciones bajitas que antes "no se oían").
+    # Se aplica al output final, una sola vez, tras unir los segmentos.
     a_out = "[outa]"
     norm_part = ""
     if normalize_audio:
-        norm_part = ";[outa]speechnorm=e=12.5:r=0.0001:l=1[outa_norm]"
+        norm_part = ";[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]"
         a_out = "[outa_norm]"
 
     concat_filter = (
