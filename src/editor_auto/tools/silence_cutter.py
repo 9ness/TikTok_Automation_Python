@@ -3468,10 +3468,14 @@ def _refine_keep_edges_to_valley(
             # lw_e clipaba la palabra buena ('cintur|', 'rayadito|s'). El valle
             # real está entre la cola verdadera (>lw_e) y el onset de la
             # siguiente (>next_start).
+            # Cap de avance dentro de la palabra cortada siguiente: +0.12s máx.
+            # Con 40% de su span, una consonante de baja energía ('m' de
+            # 'marino') hacía caer el valle DENTRO de la palabra y dejaba su
+            # arranque audible ("azul m|" → se oye 'así').
             if nxt is not None and (nxt[0] - lw_e) < contig_s:
                 v = _valley(
                     lw_e,
-                    nxt[0] + min(0.25, 0.4 * max(0.05, nxt[1] - nxt[0])),
+                    nxt[0] + min(0.12, 0.4 * max(0.05, nxt[1] - nxt[0])),
                 )
                 if v is not None and v > lw_e and abs(v - nb) > 0.01:
                     nb, n_ref = v, n_ref + 1
@@ -3572,6 +3576,23 @@ def _ai_completeness_review(
             continue
         dropped = sw[-n:]
         kept_last = sw[-n - 1]
+        # Límite de cláusula: el bloque eliminado debe EMPEZAR en palabra
+        # funcional (conjunción/preposición/artículo) — "y están solo por
+        # ocho" ✓. Si empieza en palabra de contenido ("marino que") el modelo
+        # está partiendo la frase por dentro, no quitando una cláusula colgada
+        # → rechazar (mutiló "azul marino" en un caso real).
+        first_tok = re.sub(r"[^\wáéíóúñü]", "", str(dropped[0][2]).lower())
+        if not (
+            first_tok in _AUDIT_STOPWORDS
+            or first_tok in _FILLER_TOKENS
+            or len(first_tok) <= 3
+        ):
+            log(
+                f"[silence_cutter] 🛑 Completitud rechazada (seg {i}): el "
+                f"recorte '{' '.join(d[2] for d in dropped)}' no empieza en "
+                f"límite de cláusula."
+            )
+            continue
         a, b = out[i]
         nb = min(kept_last[1] + 0.10, dropped[0][0])
         nb = max(nb, kept_last[1])
