@@ -3625,14 +3625,25 @@ def _ai_coherence_judge(
         mt = str(d.get("missing_text", "") or "")
         lost = [_ntok(t) for t in mt.split()]
         lost = [t for t in lost if t]
-        # Verificación de tokens: las palabras "perdidas" deben FALTAR de verdad
-        # en el render. Si están todas presentes → falso positivo, se descarta.
-        if d.get("type") == "promised_item_cut" and lost and not any(
-            t not in out_tokset for t in lost
-        ):
+        # PRECISIÓN ANTI-FALSO-POSITIVO (clave): un defecto SOLO cuenta si señala
+        # una palabra de CONTENIDO concreta que de verdad FALTA del render. Esto:
+        #   · descarta defectos sin `missing_text` (nonsense_join/dangling_ref =
+        #     juicios subjetivos del juez, fuente principal de FP),
+        #   · descarta defectos cuya palabra "perdida" SÍ está en el render
+        #     (euros/%/proteína presentes → el juez se equivocó comparando con el
+        #     original y viendo lo que se cortó a propósito).
+        # Solo sobreviven cortes REALES de contenido (el caso 'proteína' cortada).
+        if not lost:
+            continue
+        content_lost = [
+            t for t in lost
+            if len(t) > 2 and t not in _FILLER_TOKENS and t not in _AUDIT_STOPWORDS
+            and t not in out_tokset
+        ]
+        if not content_lost:
             continue
         sev = min(3, max(1, int(d.get("severity", 2) or 2)))
-        span = _locate_text_in_words(mt, words) if mt else None
+        span = _locate_text_in_words(mt, words)
         defects.append({**d, "severity": sev, "restore_span": span})
 
     penalty = sum(_COH_SEV_PENALTY[x["severity"]] for x in defects)
