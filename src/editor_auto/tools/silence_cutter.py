@@ -4215,6 +4215,54 @@ def _filter_cuts_outside_words(
     return out
 
 
+# Tokens que Whisper ALUCINA típicamente en silencio (créditos YouTube, ruido).
+# Aunque sean ≥5 chars y "parezcan" contenido, sí son fantasmas legítimos.
+_WHISPER_HALLUCINATION_TOKENS = frozenset({
+    "gracias", "suscribete", "suscribirte", "suscribios", "suscribanse",
+    "subtitulos", "subtitulado", "comparte", "comenta", "amara", "amaraorg",
+})
+
+
+def _is_real_content_word(
+    w: dict, prev_w: dict | None, next_w: dict | None,
+    *, max_contig_gap_s: float = 0.5,
+) -> bool:
+    """¿Es una palabra de CONTENIDO real (no una alucinación de Whisper)?
+
+    Whisper alucina en silencio tokens CORTOS/funcionales ('y', 'eh', 'que')
+    o créditos ('gracias', 'suscríbete') — AISLADOS en el silencio. Una palabra
+    de contenido (≥5 chars, no filler/stopword/crédito) que además es CONTIGUA
+    (gap ≤ `max_contig_gap_s`) a otra palabra forma parte de un RUN de habla
+    real que el VAD/amplitud no detectó por voz floja / mala SNR — NO es
+    fantasma. Distingue 'proteína' (pegada a 'crema') de un 'gracias' suelto al
+    final. Conservador: ante voz floja real preferimos NO borrar contenido."""
+    tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+    if (
+        len(tok) < 5
+        or tok in _FILLER_TOKENS
+        or tok in _AUDIT_STOPWORDS
+        or tok in _WHISPER_HALLUCINATION_TOKENS
+    ):
+        return False
+    try:
+        ws, we = float(w["start"]), float(w["end"])
+    except (KeyError, ValueError, TypeError):
+        return False
+    contiguous = False
+    for nb in (prev_w, next_w):
+        if nb is None:
+            continue
+        try:
+            ns, ne = float(nb["start"]), float(nb["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        gap = ns - we if ns >= we else ws - ne  # gap al vecino (cualquier lado)
+        if gap <= max_contig_gap_s:
+            contiguous = True
+            break
+    return contiguous
+
+
 def _filter_phantom_words(
     words: list[dict],
     silero_silence_intervals: list[tuple[float, float]],
@@ -4232,6 +4280,12 @@ def _filter_phantom_words(
           captura alucinaciones que Whisper extendió levemente fuera del
           rango Silero por imprecisión de bordes).
 
+    EXCEPCIÓN (anti over-cut): una palabra de CONTENIDO real contigua a otra
+    (`_is_real_content_word`) NO se marca fantasma aunque caiga en un silencio
+    Silero — es voz floja que el VAD no detectó (mala SNR), no una alucinación.
+    Caso real de bugallo: Silero marcó silencio [11.6-12.9] y descartaba
+    'proteína' (ingrediente, pegada a 'crema de arroz').
+
     Returns: `(clean_words, phantoms)`. Antes la regla solo cogía (a)+(b)
     y se nos escapaban palabras cuya "cola" tras la pronunciación caía
     fuera del silencio Silero — protegían los cuts y los silencios reales
@@ -4248,7 +4302,7 @@ def _filter_phantom_words(
 
     phantoms: list[dict] = []
     clean: list[dict] = []
-    for w in words:
+    for i, w in enumerate(words):
         ws = float(w["start"])
         we = float(w["end"])
         word_dur = we - ws
@@ -4269,6 +4323,12 @@ def _filter_phantom_words(
                 if overlap / word_dur >= min_overlap_pct:
                     is_phantom = True
                     break
+        # Guarda de contenido: voz floja real (no alucinación) → NO fantasma.
+        if is_phantom and _is_real_content_word(
+            w, words[i - 1] if i > 0 else None,
+            words[i + 1] if i + 1 < len(words) else None,
+        ):
+            is_phantom = False
         if is_phantom:
             phantoms.append(w)
         else:
@@ -4437,7 +4497,7 @@ def _drop_words_inside_silences(
     sil = _merge_intervals(list(silences))
     voiced: list[dict] = []
     ghosts: list[dict] = []
-    for w in words:
+    for i, w in enumerate(words):
         try:
             ws = float(w["start"]); we = float(w["end"])
         except (KeyError, ValueError, TypeError):
@@ -4448,6 +4508,13 @@ def _drop_words_inside_silences(
             a <= ws - flank_s and b >= we + flank_s
             for a, b in sil
         )
+        # Guarda de contenido: voz floja real contigua a otra palabra (no una
+        # alucinación aislada) nunca es fantasma aunque el silencio la flanquee.
+        if flanked and _is_real_content_word(
+            w, words[i - 1] if i > 0 else None,
+            words[i + 1] if i + 1 < len(words) else None,
+        ):
+            flanked = False
         if flanked:
             ghosts.append(w)
         else:
