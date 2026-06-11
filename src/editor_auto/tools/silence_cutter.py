@@ -32,6 +32,7 @@ import os
 import re
 import subprocess
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -1246,8 +1247,54 @@ class SilenceCutterTool:
                     except Exception as e:  # noqa: BLE001
                         audit["deep"] = {"error": f"{type(e).__name__}: {e}"}
                         ctx.on_log(f"[silence_cutter] ⚠️ Audit profundo falló (no bloquea): {e}")
+
+                # 10b-bis) JUEZ DE COHERENCIA — ¿el render SIGUE teniendo sentido?
+                # Compara el ORIGINAL con la transcripción real del render (la del
+                # audit profundo, coste Whisper 0). El score se pliega con min():
+                # solo puede BAJAR → un 100 significa que pasó acústico + palabras
+                # + SENTIDO. Es la pasada que convierte el 100 en una nota fiable.
+                if (
+                    bool(config.get("ai_coherence_judge_enabled", True))
+                    and isinstance(audit.get("deep"), dict)
+                    and audit["deep"].get("out_text")
+                ):
+                    ctx.on_progress(0.986, "🧠 Coherencia IA: ¿sigue teniendo sentido?…")
+                    try:
+                        coh = _ai_coherence_judge(
+                            words=words, deep=audit["deep"], keep_intervals=kints,
+                            language=config.get("ai_language", "es"), log=ctx.on_log,
+                            call_budget=coherence_budget, config=config,
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        coh = {"error": f"{type(e).__name__}: {e}"}
+                        ctx.on_log(f"[silence_cutter] ⚠️ Coherencia falló (no bloquea): {e}")
+                    if isinstance(coh.get("coherence_score"), int):
+                        cs = int(coh["coherence_score"])
+                        audit["coherence_score"] = cs
+                        audit["coherence_issues"] = coh.get("defects", [])
+                        audit["coherence_needs_requeue"] = bool(coh.get("coherence_needs_requeue"))
+                        audit["coherence_fallos"] = int(coh.get("coherence_fallos", 0) or 0)
+                        if isinstance(audit.get("quality_score"), int):
+                            audit["quality_score"] = min(audit["quality_score"], cs)
+                            audit["needs_requeue"] = (
+                                bool(audit.get("needs_requeue"))
+                                or bool(coh.get("coherence_needs_requeue"))
+                            )
+                            audit["verdict"] = _verdict_for_score(audit["quality_score"])
+                        for d in (coh.get("defects") or [])[:3]:
+                            ctx.on_log(
+                                f"[silence_cutter] 🚩 coherencia ({d.get('type')}): "
+                                f"falta '{d.get('missing_text')}' — {d.get('why')}"
+                            )
                 return audit
 
+            # Presupuesto COMPARTIDO de llamadas al juez de coherencia (lista
+            # mutable → visible en cada candidato del self-heal). Acota el coste.
+            # Default con MARGEN: 1 (audit inicial) + N intentos de self-heal + 1,
+            # para que el juez evalúe TODOS los candidatos (si se agota, un
+            # candidato sin coherencia parecería 0 fallos y podría aceptarse mal).
+            _heal_n = int(config.get("self_heal_max_attempts", 2))
+            coherence_budget = [int(config.get("coherence_max_calls", _heal_n + 2))]
             audit = _full_audit(keep_intervals)
             diagnostic["audit"] = audit
 
@@ -1278,7 +1325,11 @@ class SilenceCutterTool:
                 tried_kinds: set[str] = set()
                 while (
                     len(heal_hist) < heal_max
-                    and (best_score < heal_target or _count_word_fallos(best_audit) > 0)
+                    and (
+                        best_score < heal_target
+                        or _count_word_fallos(best_audit) > 0
+                        or _count_coherence_fallos(best_audit) > 0
+                    )
                     and best_audit.get("transcription_ok", True)
                 ):
                     residue_cuts, guarded_cuts, restores = _derive_self_heal_actions(
@@ -1391,10 +1442,17 @@ class SilenceCutterTool:
                     cand_audit = _full_audit(new_keeps, audit_path=tmp_out)
                     cand_score = cand_audit.get("quality_score")
                     cand_fallos = _count_word_fallos(cand_audit)
-                    accepted = isinstance(cand_score, int) and (
-                        cand_fallos < prev_fallos
-                        or (cand_fallos == prev_fallos and cand_score > prev_best)
-                    )
+                    # Clave LEXICOGRÁFICA (menor = mejor): 1º fallos de SENTIDO,
+                    # 2º fallos de PALABRA, 3º score. Restaurar una promesa rota
+                    # (coherencia) manda sobre todo; a igualdad, menos fallos de
+                    # palabra; a igualdad, mayor score. Sigue siendo monótono.
+                    def _qkey(a: dict) -> tuple:
+                        return (
+                            _count_coherence_fallos(a),
+                            _count_word_fallos(a),
+                            -(a.get("quality_score") or 0),
+                        )
+                    accepted = isinstance(cand_score, int) and _qkey(cand_audit) < _qkey(best_audit)
                     if accepted:
                         os.replace(tmp_out, output_path)
                         best_keeps, best_audit, best_score = new_keeps, cand_audit, cand_score
@@ -1426,6 +1484,33 @@ class SilenceCutterTool:
             keep_intervals = best_keeps
             audit = best_audit
             diagnostic["audit"] = audit
+
+            # APRENDIZAJE: si tras todo quedó un defecto de SENTIDO confirmado y
+            # grave, escríbelo como lección → el motor no lo repetirá en los
+            # próximos vídeos (idempotente por fingerprint). Solo el 1º (anti-spam).
+            for d in (audit.get("coherence_issues") or [])[:1]:
+                if d.get("confirmed") and int(d.get("severity", 0) or 0) >= 2:
+                    import hashlib
+                    fp = hashlib.sha1(
+                        (str(d.get("type", "")) + str(d.get("why", ""))[:60]).encode("utf-8")
+                    ).hexdigest()[:12]
+                    if _append_editor_lesson(
+                        {"coherence", "clean_script", "completeness"},
+                        f"No partir promesas tipo {d.get('type')}",
+                        (
+                            f"- El render decía «{d.get('rendered_quote')}» pero el original "
+                            f"incluía «{d.get('missing_text') or d.get('original_quote')}» → "
+                            f"rompe el sentido ({d.get('why')}). Regla: si una frase ANUNCIA "
+                            f"una cantidad o lista (dos ingredientes, 3 trucos), conserva TODOS "
+                            f"sus ítems o también el número; nunca dejes una promesa sin su "
+                            f"contenido."
+                        ),
+                        fingerprint=fp,
+                    ):
+                        ctx.on_log(
+                            f"[silence_cutter] 📚 Lección aprendida ({d.get('type')}) "
+                            f"→ editor_lessons.md"
+                        )
             if heal_hist:
                 diagnostic["self_heal"] = {
                     "target": heal_target,
@@ -2128,6 +2213,19 @@ def _parse_false_starts_cuts(
 _HOLISTIC_MODEL = "gpt-5.4"  # ganador A/B: corta mejor los restarts que gpt-4o, y mas barato
 _HOLISTIC_SEED = 7
 
+# Juez de COHERENCIA (pasada final de sentido): mismo modelo/seed deterministas.
+_COHERENCE_MODEL = _HOLISTIC_MODEL
+_COHERENCE_SEED = _HOLISTIC_SEED
+# Penalización del score por severidad del defecto de sentido (1=leve … 3=grave).
+_COH_SEV_PENALTY = {1: 4, 2: 12, 3: 25}
+# Pistas de ENUMERACIÓN/cantidad: si una de estas queda pegada a un corte, puede
+# haberse roto una "promesa" (dice 'dos ingredientes' y nombra uno) → activa juez.
+_COH_LIST_HINTS = frozenset({
+    "dos", "tres", "cuatro", "cinco", "primero", "segundo", "tercero", "razones",
+    "trucos", "ingredientes", "pasos", "motivos", "cosas", "tipos", "formas",
+    "claves", "consejos", "ventajas", "beneficios", "errores", "secretos",
+})
+
 # ---------------------------------------------------------------------------
 # Memoria de LECCIONES del motor de edición
 # ---------------------------------------------------------------------------
@@ -2206,6 +2304,55 @@ def _with_lessons(system_prompt: str, pass_id: str) -> str:
     if not lessons:
         return system_prompt
     return system_prompt.rstrip() + "\n\n---\n\n" + lessons
+
+
+def _append_editor_lesson(
+    pass_ids: set[str], title: str, content: str, *, fingerprint: str,
+) -> bool:
+    """APRENDIZAJE: añade una lección nueva a `editor_lessons.md` para que el
+    motor NO repita el fallo en los próximos vídeos. Idempotente por
+    `fingerprint` (un marcador HTML al final) → nunca duplica ni infla el cap.
+
+    Escritura ATÓMICA (temp + os.replace; NTFS no tiene rename atómico a mitad
+    de escritura), utf-8 explícito, lock best-effort. Invalida la caché de
+    lecciones tras escribir. Best-effort: nunca rompe el job. Devuelve True si
+    escribió una lección nueva."""
+    global _LESSONS_CACHE
+    import hashlib  # noqa: F401  (usado por el caller para el fingerprint)
+    p = Path(__file__).resolve().parent.parent / "prompts" / "editor_lessons.md"
+    marker = f"<!-- coh:fp:{fingerprint} -->"
+    lock = p.with_suffix(".md.lock")
+    fd = None
+    try:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return False  # otro proceso está escribiendo → no insistir
+        try:
+            txt = p.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        if marker in txt:
+            return False  # ya aprendida → dedup
+        tags = "|".join(sorted(pass_ids))
+        block = (
+            f"\n\n## Coherencia: {title} [{tags}]\n\n{content.strip()}\n{marker}\n"
+        )
+        new_txt = txt.rstrip() + block
+        tmp = p.with_suffix(".md.tmp")
+        tmp.write_text(new_txt, encoding="utf-8")
+        os.replace(str(tmp), str(p))
+        _LESSONS_CACHE = None  # fuerza recarga en el próximo job
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+                os.remove(str(lock))
+            except OSError:
+                pass
 
 
 def _holistic_keep_idxset(
@@ -3301,7 +3448,210 @@ def _deep_audit_compare(
         "match_ratio": round(sm.ratio(), 3),
         "inserted_blocks": inserted[:10],
         "missing_blocks": missing[:10],
+        # Transcripción REAL del render (lo que el espectador OYE) — la reusa el
+        # juez de coherencia SIN coste Whisper extra (ya está transcrito aquí).
+        "out_text": " ".join(out_toks),
+        "out_words": [
+            {"word": t, "start": s, "end": e}
+            for t, s, e in zip(out_toks, out_times, out_ends)
+        ],
     }
+
+
+def _removed_spans_text(
+    words: list[dict], keep_intervals: list[tuple[float, float]],
+) -> str:
+    """Texto de las palabras ELIMINADAS a propósito (centro fuera de los keeps).
+
+    Se lo damos al juez como `cuts_summary` → sabe qué se quitó deliberadamente
+    (dedup/muletillas/falsos inicios) y NO lo re-marca como fallo. Clave para no
+    rechazar ediciones legítimas."""
+    out: list[str] = []
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        mid = (ws + we) / 2.0
+        if not any(a - 1e-3 <= mid <= b + 1e-3 for a, b in keep_intervals):
+            out.append(str(w.get("word", "")))
+    return " ".join(out).strip()
+
+
+def _has_list_or_number_near_cut(
+    words: list[dict], keep_intervals: list[tuple[float, float]],
+) -> bool:
+    """Pre-screen barato: ¿hay una palabra CONSERVADA de enumeración/número
+    (`_COH_LIST_HINTS` o dígito) pegada a un borde de corte? Si la hay, puede
+    haberse roto una 'promesa' → vale la pena llamar al juez. Si NO, y el render
+    coincide casi 1:1 con lo esperado, nos saltamos el LLM (coste ~$0)."""
+    kept_idx = set()
+    for i, w in enumerate(words):
+        try:
+            mid = (float(w["start"]) + float(w["end"])) / 2.0
+        except (KeyError, ValueError, TypeError):
+            continue
+        if any(a - 1e-3 <= mid <= b + 1e-3 for a, b in keep_intervals):
+            kept_idx.add(i)
+    n = len(words)
+    for i in kept_idx:
+        tok = re.sub(r"[^\wáéíóúñü]", "", str(words[i].get("word", "")).lower())
+        if tok in _COH_LIST_HINTS or tok.isdigit():
+            # Junto a un hueco REAL: un vecino que EXISTE pero fue CORTADO. El
+            # borde del array (i=0 / i=n-1) no cuenta como hueco — si no se
+            # comprueba, i=0 dispara siempre y gasta presupuesto del LLM.
+            prev_cut = i > 0 and (i - 1) not in kept_idx
+            next_cut = i + 1 < n and (i + 1) not in kept_idx
+            if prev_cut or next_cut:
+                return True
+    return False
+
+
+def _locate_text_in_words(
+    target: str, words: list[dict],
+) -> tuple[float, float] | None:
+    """Localiza (difuso) una secuencia de tokens en `words` → (start, end) en
+    tiempo de INPUT, o None. Para convertir el `missing_text` del juez en un
+    span restaurable. Nunca se fía de timestamps del modelo: mapea por palabras
+    reales."""
+    import difflib
+
+    def _n(s: str) -> str:
+        return re.sub(r"[^\wáéíóúñü]", "", str(s).lower())
+
+    tgt = [_n(t) for t in str(target).split() if _n(t)]
+    if not tgt or not words:
+        return None
+    L = len(tgt)
+    toks = [_n(w.get("word", "")) for w in words]
+    best = None
+    bestr = 0.0
+    for i in range(0, max(1, len(words) - L + 1)):
+        cand = toks[i:i + L]
+        r = difflib.SequenceMatcher(None, tgt, cand).ratio()
+        if r > bestr:
+            bestr = r
+            best = (i, min(len(words) - 1, i + L - 1))
+    if best and bestr >= 0.8:
+        try:
+            return (float(words[best[0]]["start"]), float(words[best[1]]["end"]))
+        except (KeyError, ValueError, TypeError):
+            return None
+    return None
+
+
+def _ai_coherence_judge(
+    *, words: list[dict], deep: dict, keep_intervals: list[tuple[float, float]],
+    language: str, log, call_budget: list[int] | None, config: dict,
+) -> dict:
+    """PASADA FINAL DE SENTIDO. Compara el ORIGINAL con la transcripción REAL del
+    render (`deep['out_text']`, coste Whisper cero) y deja que gpt-5.4 juzgue si
+    el vídeo editado sigue teniendo sentido (caso 'dos ingredientes → arroz' sin
+    proteína). Determinista (temp 0 + seed). Verifica las citas/tokens del modelo
+    contra los textos reales (anti-alucinación). Devuelve dict con
+    `coherence_score`, `defects` (con `restore_span`), `coherence_needs_requeue`
+    y `coherence_fallos` (defectos graves y ARREGLABLES)."""
+    from src.editor_auto.api import openai_client
+    if not openai_client.is_configured():
+        return {"skipped": "openai no configurado"}
+    if call_budget is not None and call_budget and call_budget[0] <= 0:
+        return {"skipped": "presupuesto de llamadas agotado"}
+    out_text = (deep or {}).get("out_text") or ""
+    if not out_text or len(words) < 8:
+        return {"skipped": "sin render/transcript"}
+    orig_text = " ".join(str(w.get("word", "")) for w in words).strip()
+
+    def _flat(s: str) -> str:
+        # Sin acentos NI puntuación: Whisper a veces transcribe sin tilde
+        # ('estan' vs 'están'); si no normalizamos, una cita válida del juez no
+        # casa y se perdería un defecto REAL. Robustez > exactitud ortográfica.
+        s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
+        return re.sub(r"[^\w ]", "", s)
+
+    def _ntok(s: str) -> str:
+        s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
+        return re.sub(r"[^\w]", "", s)
+
+    # PRE-SCREEN: en vídeos claramente limpios (render ≈ esperado, sin fallos de
+    # palabra y sin enumeración/número junto a un corte) NO llamamos al LLM →
+    # coherence_score=100 y el coste medio se queda como hoy (~$0.04).
+    if (
+        float((deep or {}).get("match_ratio", 0) or 0) >= 0.97
+        and not (deep or {}).get("missing_blocks")
+        and not (deep or {}).get("inserted_blocks")
+        and not _has_list_or_number_near_cut(words, keep_intervals)
+    ):
+        return {"coherence_score": 100, "defects": [], "skipped_clean": True}
+
+    cuts_summary = _removed_spans_text(words, keep_intervals)
+    try:
+        prompt_path = (
+            Path(__file__).resolve().parent.parent
+            / "prompts" / "silence_cutter_coherence.md"
+        )
+        system = _with_lessons(prompt_path.read_text(encoding="utf-8"), "coherence")
+    except OSError as e:
+        return {"error": f"prompt no leíble: {e}"}
+    try:
+        data = openai_client.analyze_transcript_json(
+            system_prompt=system,
+            user_payload={
+                "language": language, "original": orig_text,
+                "rendered": out_text, "cuts_summary": cuts_summary,
+            },
+            model=_COHERENCE_MODEL, temperature=0.0, seed=_COHERENCE_SEED,
+        )
+        if call_budget is not None and call_budget:
+            call_budget[0] -= 1
+    except Exception as e:  # noqa: BLE001
+        log(f"[silence_cutter] ⚠️ Juez de coherencia falló (no bloquea): {e}")
+        return {"error": str(e)[:200]}
+
+    flat_orig = _flat(orig_text)
+    flat_out = _flat(out_text)
+    out_tokset = set(_ntok(t) for t in out_text.split())
+    out_tokset.discard("")
+    defects: list[dict] = []
+    for d in (data or {}).get("defects", []) or []:
+        if not d.get("confirmed"):
+            continue
+        oq = _flat(d.get("original_quote", ""))
+        rq = _flat(d.get("rendered_quote", ""))
+        # Anti-alucinación: las citas deben EXISTIR de verdad en los textos.
+        if oq and oq not in flat_orig:
+            continue
+        if rq and rq not in flat_out:
+            continue
+        mt = str(d.get("missing_text", "") or "")
+        lost = [_ntok(t) for t in mt.split()]
+        lost = [t for t in lost if t]
+        # Verificación de tokens: las palabras "perdidas" deben FALTAR de verdad
+        # en el render. Si están todas presentes → falso positivo, se descarta.
+        if d.get("type") == "promised_item_cut" and lost and not any(
+            t not in out_tokset for t in lost
+        ):
+            continue
+        sev = min(3, max(1, int(d.get("severity", 2) or 2)))
+        span = _locate_text_in_words(mt, words) if mt else None
+        defects.append({**d, "severity": sev, "restore_span": span})
+
+    penalty = sum(_COH_SEV_PENALTY[x["severity"]] for x in defects)
+    coh_score = max(0, 100 - penalty)
+    needs_rq = any(x["severity"] >= 2 for x in defects)
+    # Fallos "accionables": graves Y arreglables con restauración → el self-heal
+    # los reintenta. Un defecto grave NO arreglable detiene el loop (retención).
+    fallos = sum(
+        1 for x in defects
+        if x["severity"] >= 2 and x.get("fixable") and x.get("restore_span")
+    )
+    return {
+        "coherence_score": coh_score, "defects": defects,
+        "coherence_needs_requeue": needs_rq, "coherence_fallos": fallos,
+    }
+
+
+def _count_coherence_fallos(audit: dict) -> int:
+    return int((audit or {}).get("coherence_fallos", 0) or 0)
 
 
 def _union_intervals(
@@ -3820,6 +4170,18 @@ def _derive_self_heal_actions(
         s, e = p.get("input_start"), p.get("input_end")
         if s is not None and e is not None and (float(e) - float(s)) > 0.6:
             guarded_cuts.append((float(s) + 0.15, float(e) - 0.15, "silencio_interno"))
+    # COHERENCIA: una promesa rota (dice 'dos ingredientes' y falta uno) se
+    # arregla RESTAURANDO las palabras que faltan (el juez ya las localizó en
+    # tiempo de input → restore_span). Solo defectos arreglables con span.
+    for d in audit.get("coherence_issues") or []:
+        if not d.get("fixable"):
+            continue
+        sp = d.get("restore_span")
+        if d.get("type") == "promised_item_cut" and sp:
+            restores.append((
+                max(0.0, float(sp[0]) - 0.05), float(sp[1]) + 0.05,
+                f"coherencia:'{str(d.get('missing_text',''))[:40]}'",
+            ))
     return residue_cuts, guarded_cuts, restores
 
 

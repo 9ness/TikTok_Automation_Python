@@ -318,6 +318,17 @@ def _job_deliverable(job, score: int | None) -> bool:
     audit = _read_audit(job)
     if audit and audit.get("needs_requeue"):
         return False
+    # Tercer gate: COHERENCIA (que el vídeo tenga SENTIDO). Redundante con
+    # needs_requeue (el juez ya lo marca) pero explícito → sobrevive a cambios
+    # futuros que limpien needs_requeue. Un 100 solo se entrega si el sentido
+    # también pasó.
+    if (
+        audit
+        and audit.get("coherence_score") is not None
+        and int(audit.get("coherence_score") or 0) < 100
+        and audit.get("coherence_needs_requeue")
+    ):
+        return False
     return True
 
 
