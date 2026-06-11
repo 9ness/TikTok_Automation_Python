@@ -3435,6 +3435,31 @@ def _deep_audit_compare(
         if (b["n_toks"] >= 2 or len(b["text"].replace(" ", "")) >= 6)
         and _has_content(b["text"])
     ]
+    # Anti-ALUCINACIÓN de costura: Whisper a veces INVENTA palabras en la junta
+    # de un corte (un clic/glitch que oye como "aprende a"). El residuo REAL es
+    # la cola de algo que SÍ se dijo ("estocost" de "esto costaba"), así que al
+    # menos un token de CONTENIDO del residuo debe parecerse (≥0.7) a una palabra
+    # del ORIGINAL. Si no se parece a NADA dicho → alucinación, no residuo → se
+    # descarta. Solo evita un FALSO fallo (retención indebida); nunca corta más.
+    _all_orig = [t for t in (_norm(w.get("word", "")) for w in words) if t]
+
+    def _is_real_residue(text: str) -> bool:
+        content = [
+            t for t in text.split()
+            if len(t) > 2 and t not in _FILLER_TOKENS and t not in _AUDIT_STOPWORDS
+        ]
+        if not content:
+            return False
+        for ct in content:
+            for ot in _all_orig:
+                if difflib.SequenceMatcher(None, ct, ot).ratio() >= 0.7:
+                    return True
+                # Residuo PEGADO ("estocost" contiene "esto"): substring ≥4 chars.
+                if len(ot) >= 4 and ot in ct:
+                    return True
+        return False
+
+    inserted = [b for b in inserted if _is_real_residue(b["text"])]
     missing = [
         b for b in missing
         if (b["n_toks"] >= 3 and b["n_strong_content"] >= 1)
