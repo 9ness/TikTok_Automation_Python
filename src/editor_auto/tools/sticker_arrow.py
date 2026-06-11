@@ -55,6 +55,16 @@ _DEFAULT_KEYWORDS = (
     "tienda,comprad,comprarlo,compralo,checkout"
 )
 
+# CTA FUERTES: palabras inequívocas de llamada a la acción. Se buscan en TODO
+# el vídeo (no solo en el último tramo), porque cuando el hablante dice
+# "carrito/comprar/link/perfil" SIEMPRE quiere la flecha ahí, esté donde esté.
+# Las DÉBILES/ambiguas (aquí, abajo) solo se buscan en el último tramo para no
+# poner la flecha en un "aquí" de mitad de vídeo que no es CTA.
+_STRONG_CTA = {
+    "carrito", "comprar", "compra", "comprad", "comprarlo", "compralo",
+    "link", "perfil", "enlace", "tienda", "checkout", "comprarla",
+}
+
 
 class StickerArrowTool:
     tool_id: str = TOOL_STICKER_ARROW
@@ -728,8 +738,6 @@ def _find_keyword_matches(
             t = float(w.get("start", 0.0))
         except (TypeError, ValueError):
             continue
-        if t < after_t:
-            continue
         norm = _normalize(w.get("word", ""))
         if not norm:
             continue
@@ -741,6 +749,9 @@ def _find_keyword_matches(
                 if abs(len(norm) - len(kw)) <= 1 and _edit_distance_at_most_1(norm, kw):
                     matched = kw
                     break
+        # CTA FUERTE → vale en todo el vídeo; el resto solo desde after_t.
+        if matched is not None and matched not in _STRONG_CTA and t < after_t:
+            continue
         if matched is not None:
             out.append({
                 "start": t,

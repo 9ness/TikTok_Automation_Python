@@ -865,16 +865,24 @@ def render_subtitles_on_video(
     # las líneas extra crecen hacia ABAJO. Medimos la altura de referencia
     # pre-renderizando cada chunk una vez (idx=-1, barato) y tomando la mínima
     # (= altura de 1 línea; la fuente usa line_h uniforme).
-    base_h = 0
+    # Altura de referencia = la de un chunk de UNA línea, medida con un probe
+    # de 1 palabra (que NUNCA envuelve a 2 líneas). Determinista y robusto: no
+    # depende de pre-renderizar TODOS los chunks (si eso fallaba, base_h=0 y se
+    # caía al centrado-por-chunk que DERIVA — la causa de que los subs salieran
+    # a alturas distintas). La 1ª línea de CUALQUIER chunk queda centrada en
+    # y_pct; si un chunk tuviera 2 líneas, la 2ª crece hacia abajo. Resultado:
+    # la 1ª línea SIEMPRE a la misma altura.
     try:
-        heights = [
-            np.array(render_chunk_image(ch, -1, s, (W, H))).shape[0]
-            for ch in chunks
-        ]
-        base_h = min(heights) if heights else 0
-    except Exception:  # noqa: BLE001 — fallback: anclaje por centro como antes
-        base_h = 0
-    y_first_top_px = int(H * y_pct) - (base_h // 2) if base_h else None
+        base_h = int(np.array(
+            render_chunk_image(
+                [{"word": "Mg", "start": 0.0, "end": 0.1}], -1, s, (W, H),
+            )
+        ).shape[0])
+    except Exception:  # noqa: BLE001
+        base_h = max(1, int(H * 0.09))
+    y_first_top_px = int(H * y_pct) - base_h // 2
+    if log_callback:
+        log_callback(f"📐 subs altura fija: base_h={base_h}px · y_top={y_first_top_px}px")
 
     # Offset global de sincronización (en ms): negativo = adelantar el highlight,
     # positivo = retrasarlo. Compensa el sesgo típico de Whisper en canciones
