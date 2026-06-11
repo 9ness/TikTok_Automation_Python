@@ -3865,12 +3865,6 @@ def _protect_words_from_acoustic_cuts(
     def _content_removed(center: float) -> bool:
         return any(s <= center <= e for s, e in content_cuts)
 
-    # Cap del span re-anexado: ninguna palabra hablada real dura más de ~0.9s.
-    # Si Whisper infló el span (palabra + pausa absorbida, p.ej. 'asegúrate'
-    # 2.6s), re-anexar el span entero re-añadiría ~2s de silencio. Re-anexamos
-    # solo el ONSET (donde está la voz real) → conserva la palabra, deja la
-    # pausa cortada.
-    _MAX_SPOKEN_S = 0.9
     extra: list[tuple[float, float]] = []
     n_prot = 0
     for w in words:
@@ -3883,8 +3877,7 @@ def _protect_words_from_acoustic_cuts(
             continue                       # ya conservada
         if _content_removed(c):
             continue                       # la quitó una fase de contenido → OK
-        we_eff = min(we, ws + _MAX_SPOKEN_S)  # solo el onset si el span está inflado
-        extra.append((ws - pad, we_eff + pad))  # solo la comió un corte acústico
+        extra.append((ws - pad, we + pad))  # solo la comió un corte acústico
         n_prot += 1
     if not extra:
         return keep_intervals, 0
@@ -4470,19 +4463,6 @@ def _detect_stretched_fillers(
         if dur < soft_s:
             continue
         tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
-        # NUNCA marcar como "estirada" una palabra de CONTENIDO real (≥5 chars,
-        # no stopword/filler/crédito). Whisper a veces infla su span (palabra +
-        # pausa absorbida) y marcarla la DESPROTEGE → el corte acústico se come
-        # la palabra (caso 'asegúrate' [29.8-32.4]=2.6s de bugallo). Solo se
-        # estiran de verdad tokens cortos/funcionales (risa, 'eeeh', 'laaa').
-        is_content = (
-            len(tok) >= 5
-            and tok not in _FILLER_TOKENS
-            and tok not in _AUDIT_STOPWORDS
-            and tok not in _WHISPER_HALLUCINATION_TOKENS
-        )
-        if is_content:
-            continue
         if dur >= hard_s:
             out.append((s, e, tok or "·", dur))
         elif len(tok) <= soft_max_chars or tok in _FILLER_TOKENS:
