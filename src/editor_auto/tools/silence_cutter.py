@@ -319,6 +319,26 @@ class SilenceCutterTool:
         tmp_audio = str(tmp_dir / f"editor_silence_{ctx.job_id}_{int(time.time())}.wav")
         extract_audio_from_video(input_path, tmp_audio)
 
+        # 1b) Audio NIVELADO para detección de palabras (Whisper + Silero VAD).
+        # En grabaciones con voz BAJA (mala SNR), Silero marca silencio donde hay
+        # habla floja y Whisper la transcribe con timestamps malos → palabras
+        # como 'proteína' se pierden (se filtran como fantasma). loudnorm sube
+        # TODA la pista al nivel que esperan VAD/Whisper sin degradar la SNR.
+        # La amplitud (detección de silencios) sigue sobre el ORIGINAL → no
+        # alarga el vídeo ni infla silencios. Es el mismo filtro del output.
+        tmp_audio_vad = tmp_audio
+        if bool(config.get("level_audio_for_vad", True)):
+            leveled = str(tmp_dir / f"editor_silence_{ctx.job_id}_lvl.wav")
+            if _level_audio(tmp_audio, leveled, log=ctx.on_log):
+                tmp_audio_vad = leveled
+                diagnostic["phases"]["audio_leveling"] = {
+                    "enabled": True, "for": "whisper+silero", "filter": "loudnorm",
+                }
+                ctx.on_log(
+                    "[silence_cutter] 🔊 Audio nivelado (loudnorm) para Whisper+"
+                    "Silero — capta voz baja sin tocar la detección de silencios"
+                )
+
         # 2) Duración + rotation del vídeo
         video_duration, video_rotation = _ffprobe_meta(input_path)
         diagnostic["video_duration_s"] = video_duration
@@ -336,7 +356,7 @@ class SilenceCutterTool:
             ctx.on_progress(0.10, "🎙️ Whisper transcribiendo…")
             try:
                 words = _transcribe(
-                    tmp_audio,
+                    tmp_audio_vad,
                     model_size=config.get("whisper_model_size", "large-v3"),
                     language=config.get("ai_language", "es"),
                     on_progress=lambda f, m: ctx.on_progress(0.10 + f * 0.18, m),
@@ -413,7 +433,7 @@ class SilenceCutterTool:
             ctx.on_progress(0.30, "🛡️ Silero VAD…")
             try:
                 speech_intervals = _run_silero_vad(
-                    tmp_audio,
+                    tmp_audio_vad,
                     min_silence_ms=int(config.get("min_silence_ms", 500)),
                     padding_ms=int(config.get("padding_ms", 100)),
                     log=ctx.on_log,
@@ -879,10 +899,12 @@ class SilenceCutterTool:
             }
             _write_diagnostic(diagnostic, ctx)
             ctx.on_log("[silence_cutter] No hay cortes a aplicar → passthrough.")
-            try:
-                os.remove(tmp_audio)
-            except OSError:
-                pass
+            for _p in (tmp_audio, tmp_audio_vad):
+                try:
+                    if _p and _p != input_path:
+                        os.remove(_p)
+                except OSError:
+                    pass
             _passthrough_with_format(
                 input_path, output_path, video_rotation,
                 output_aspect=config.get("output_aspect", "9:16"),
@@ -1484,10 +1506,12 @@ class SilenceCutterTool:
 
         # Cleanup del audio temporal (se mantuvo vivo para el valle de bordes
         # del flujo principal y del self-heal).
-        try:
-            os.remove(tmp_audio)
-        except OSError:
-            pass
+        for _p in (tmp_audio, tmp_audio_vad):
+            try:
+                if _p and _p != input_path:
+                    os.remove(_p)
+            except OSError:
+                pass
 
         ctx.on_progress(1.0, "✅ Cortes aplicados")
         return output_path
@@ -1698,6 +1722,33 @@ def _transcribe_subprocess_worker(
         q.put(("ok", words))
     except Exception as e:  # noqa: BLE001
         q.put(("err", f"{type(e).__name__}: {e}"))
+
+
+def _level_audio(src: str, dst: str, *, log=None) -> bool:
+    """Normaliza la loudness (EBU R128 `loudnorm`) para que la voz BAJA llegue
+    al nivel que esperan Silero VAD y Whisper.
+
+    En grabaciones de mala SNR (creadora hablando flojo + ruido de sala) Silero
+    marca SILENCIO donde hay habla y Whisper le pone timestamps malos → palabras
+    reales ('proteína') se pierden. loudnorm sube TODA la pista por igual: la voz
+    floja se vuelve audible para los modelos SIN degradar la relación señal/ruido
+    ni inflar los silencios (la detección de silencios sigue sobre el original).
+    Devuelve True si generó `dst` válido."""
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", src,
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", "16000", "-ac", "1", dst,
+            ],
+            check=True, timeout=300,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return os.path.exists(dst) and os.path.getsize(dst) > 1024
+    except Exception as e:  # noqa: BLE001
+        if log:
+            log(f"[silence_cutter] ⚠️ Nivelado de audio falló ({e}) → uso original")
+        return False
 
 
 def _transcribe(
