@@ -3208,7 +3208,7 @@ def _post_render_audit(
         loose_words = _detect_loose_words(words or [], keep_intervals or [])
         # Rellenos estirados que NO se cortaron (siguen audibles en el corte).
         surviving_stretched = _surviving_stretched_spans(
-            stretched_spans or [], keep_intervals or [],
+            stretched_spans or [], keep_intervals or [], words=words,
         )
 
         n_loose = len(loose_words)
@@ -4527,13 +4527,38 @@ def _surviving_stretched_spans(
     keep_intervals: list[tuple[float, float]],
     *,
     min_overlap_s: float = 0.4,
+    words: list[dict] | None = None,
 ) -> list[dict]:
     """Rellenos estirados (un 'la'/risa de ~2s) que NO se cortaron: siguen
-    solapando una zona conservada ≥ `min_overlap_s` → audibles en el corte."""
+    solapando una zona conservada ≥ `min_overlap_s` → audibles en el corte.
+
+    NO penaliza una palabra de CONTENIDO real cuyo span Whisper infló (palabra
+    + pausa absorbida, p.ej. 'asegúrate' marcada 2.6s): el editor la conservó
+    BIEN — penalizar el score por dejar una palabra real es incorrecto. Solo
+    cuentan los rellenos de verdad (token corto/funcional/filler estirado). La
+    pausa absorbida dentro sí la coge el detector de silencio interno aparte."""
     if not stretched_spans or not keep_intervals:
         return []
+
+    def _span_is_content(a: float, b: float) -> bool:
+        for w in (words or []):
+            try:
+                ws, we = float(w["start"]), float(w["end"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            if abs(ws - a) < 0.02 and abs(we - b) < 0.02:
+                tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+                return (
+                    len(tok) >= 5
+                    and tok not in _FILLER_TOKENS
+                    and tok not in _AUDIT_STOPWORDS
+                )
+        return False
+
     surv: list[dict] = []
     for a, b in stretched_spans:
+        if _span_is_content(a, b):
+            continue  # palabra real conservada → no es un relleno superviviente
         ov = sum(
             max(0.0, min(b, e) - max(a, s)) for s, e in keep_intervals
         )
