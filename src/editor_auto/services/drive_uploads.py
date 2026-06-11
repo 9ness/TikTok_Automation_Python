@@ -157,7 +157,15 @@ def _find_child(parent_id: str | None, name: str) -> str | None:
     )
     r.raise_for_status()
     files = r.json().get("files", [])
-    return files[0]["id"] if files else None
+    # Google Drive busca por nombre CASE-INSENSITIVE (q `name='x'` trae tanto
+    # 'Bugalleitor' como 'bugalleitor') PERO el mount de rclone resuelve rutas
+    # CASE-SENSITIVE. Si no filtramos por case exacto, el upload de un usuario
+    # 'bugalleitor' caía en la carpeta vieja 'Bugalleitor' (otro usuario) y el
+    # pipeline, que lee la ruta literal 'bugalleitor', no encontraba el vídeo.
+    # Filtramos al match EXACTO de nombre para que API y mount coincidan.
+    exact = [f for f in files if f.get("name") == name]
+    pick = exact or files  # si no hay exacto, mantenemos el comportamiento previo
+    return pick[0]["id"] if pick else None
 
 
 def _entrada_id(username: str) -> str | None:

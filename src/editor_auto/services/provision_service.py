@@ -21,14 +21,23 @@ from src.editor_auto.services.style_mapper import build_tool_flow
 
 
 def unique_user_name(base: str) -> str:
-    """Slug único para el nombre de carpeta. Añade sufijo si ya existe."""
+    """Slug único para el nombre de carpeta, CASE-INSENSITIVE.
+
+    Google Drive busca carpetas por nombre SIN distinguir mayúsculas, pero el
+    mount de rclone resuelve rutas CON case. Dos usuarios 'Bugalleitor' y
+    'bugalleitor' generaban carpetas que colisionan en Drive y el vídeo de uno
+    acababa en la carpeta del otro ('vídeo input no encontrado'). Comparamos
+    contra TODOS los nombres existentes (incluidos borrados, para no reusar un
+    nombre cuya carpeta de Drive sigue ahí) en minúsculas → nunca dos nombres
+    que difieran solo en mayúsculas."""
     s = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
     s = re.sub(r"[^A-Za-z0-9._-]+", "_", s).strip("_") or "cliente"
     repo = UserRepo()
-    if repo.get_by_name(s) is None:
+    taken = {(u.name or "").lower() for u in repo.list_all(include_deleted=True)}
+    if s.lower() not in taken:
         return s
     n = 2
-    while repo.get_by_name(f"{s}_{n}") is not None:
+    while f"{s}_{n}".lower() in taken:
         n += 1
     return f"{s}_{n}"
 
