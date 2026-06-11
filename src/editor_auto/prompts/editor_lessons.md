@@ -42,6 +42,16 @@
   CONTINÚA al otro lado del corte: no trates ese borde como un final de frase
   ni recortes palabras ahí.
 
+## Rectificaciones del hablante [clean_script|false_starts]
+
+- Si el hablante anuncia algo y MÁS TARDE se rectifica con una versión
+  corregida de la misma idea — aunque cambie las palabras y no estén
+  contiguas — conserva SOLO la versión final y elimina ENTERO el anuncio
+  anterior. Ejemplo real: "os los dejo aquí en el cuadrito naranja para que
+  lo podáis ver" y después "os voy a dejar por aquí el enlace para que podáis
+  ver todos los estampados" → solo la segunda. Dos anuncios de lo mismo
+  confunden y alargan el vídeo.
+
 ## Contenido de venta [clean_script|completeness]
 
 - No cortes a medias afirmaciones de venta: precios, beneficios, llamadas a la

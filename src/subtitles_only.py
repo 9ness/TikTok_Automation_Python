@@ -796,6 +796,25 @@ def render_subtitles_on_video(
     if log_callback:
         log_callback(f"🔤 {len(words)} palabras en {len(chunks)} chunks")
 
+    # ── Altura ESTABLE entre chunks ──────────────────────────────────────────
+    # Antes cada chunk se anclaba por su CENTRO a y_pct → un chunk de 2 líneas
+    # ponía su primera línea más ARRIBA que uno de 1 línea y el texto "saltaba"
+    # de altura entre chunks. Ahora la PRIMERA línea de todos los chunks queda
+    # SIEMPRE a la misma altura (la de un chunk de 1 línea centrado en y_pct) y
+    # las líneas extra crecen hacia ABAJO. Medimos la altura de referencia
+    # pre-renderizando cada chunk una vez (idx=-1, barato) y tomando la mínima
+    # (= altura de 1 línea; la fuente usa line_h uniforme).
+    base_h = 0
+    try:
+        heights = [
+            np.array(render_chunk_image(ch, -1, s, (W, H))).shape[0]
+            for ch in chunks
+        ]
+        base_h = min(heights) if heights else 0
+    except Exception:  # noqa: BLE001 — fallback: anclaje por centro como antes
+        base_h = 0
+    y_first_top_px = int(H * y_pct) - (base_h // 2) if base_h else None
+
     # Offset global de sincronización (en ms): negativo = adelantar el highlight,
     # positivo = retrasarlo. Compensa el sesgo típico de Whisper en canciones
     # (palabras estimadas 100-300ms antes de su pronunciación real).
@@ -828,9 +847,10 @@ def render_subtitles_on_video(
             clip = ImageClip(arr, transparent=True)
 
             chunk_h = arr.shape[0]
-            y_center_px = int(H * y_pct)
-            y_top_px = y_center_px - chunk_h // 2
-            y_top_px = max(0, min(H - chunk_h, y_top_px))
+            if y_first_top_px is not None:
+                y_top_px = max(0, min(H - chunk_h, y_first_top_px))
+            else:
+                y_top_px = max(0, min(H - chunk_h, int(H * y_pct) - chunk_h // 2))
 
             chunk_start = chunk[0]["start"] + sync_offset
             chunk_end = next_chunk_start + sync_offset
@@ -854,9 +874,10 @@ def render_subtitles_on_video(
             clip = ImageClip(arr, transparent=True)
 
             chunk_h = arr.shape[0]
-            y_center_px = int(H * y_pct)
-            y_top_px = y_center_px - chunk_h // 2
-            y_top_px = max(0, min(H - chunk_h, y_top_px))
+            if y_first_top_px is not None:
+                y_top_px = max(0, min(H - chunk_h, y_first_top_px))
+            else:
+                y_top_px = max(0, min(H - chunk_h, int(H * y_pct) - chunk_h // 2))
 
             word_start = word["start"] + sync_offset
             if i + 1 < len(chunk):
