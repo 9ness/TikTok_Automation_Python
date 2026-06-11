@@ -143,7 +143,15 @@ def _find_child(parent_id: str | None, name: str) -> str | None:
         _DRIVE_API,
         headers=_auth_headers(),
         params={
-            "q": q, "fields": "files(id,name)", "pageSize": 10,
+            "q": q, "fields": "files(id,name,createdTime)", "pageSize": 10,
+            # CRÍTICO: Google Drive PERMITE carpetas con el MISMO nombre. Si
+            # alguna vez hay duplicados de '<día>' (p. ej. una race de subidas
+            # concurrentes creó dos), hay que elegir SIEMPRE la misma — la más
+            # ANTIGUA — para que la API y el mount de rclone (que también
+            # resuelve por nombre) lean la MISMA carpeta. Sin orderBy, Drive
+            # devolvía un orden arbitrario → la subida iba a una carpeta y el
+            # pipeline leía la otra ("vídeo input no encontrado").
+            "orderBy": "createdTime",
             "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
         },
     )
@@ -177,15 +185,37 @@ def _create_folder(parent_id: str, name: str) -> str:
     return r.json()["id"]
 
 
+# Lock + cache por (usuario, día): serializan la resolución/creación de la
+# carpeta del día. Sin esto, N subidas concurrentes (el navegador pide N
+# `upload-url` casi a la vez) corrían `ensure_day_folder` en paralelo; como
+# Drive tiene consistencia EVENTUAL, la búsqueda de cada una no veía la carpeta
+# que las otras acababan de crear → se creaban DUPLICADAS. El lock fuerza que
+# solo la primera cree y las demás reusen; la cache evita además la race de
+# propagación (una vez sabemos el ID, no volvemos a buscar en Drive).
+_DAY_FOLDER_LOCK = threading.Lock()
+_DAY_FOLDER_CACHE: dict[tuple[str, str], str] = {}
+
+
 def ensure_day_folder(username: str, day: str) -> str:
-    """ID de `entrada/<día>/`, creándolo si no existe. Lanza si falta entrada/."""
-    entrada = _entrada_id(username)
-    if not entrada:
-        raise RuntimeError(
-            f"No encuentro entrada/ de '{username}' en Drive. ¿Carpetas creadas/sincronizadas?"
-        )
-    existing = _find_child(entrada, day)
-    return existing or _create_folder(entrada, day)
+    """ID de `entrada/<día>/`, creándolo si no existe. Idempotente y seguro
+    ante subidas concurrentes (nunca crea carpetas duplicadas). Lanza si falta
+    entrada/."""
+    key = (username, day)
+    cached = _DAY_FOLDER_CACHE.get(key)
+    if cached:
+        return cached
+    with _DAY_FOLDER_LOCK:
+        cached = _DAY_FOLDER_CACHE.get(key)
+        if cached:
+            return cached
+        entrada = _entrada_id(username)
+        if not entrada:
+            raise RuntimeError(
+                f"No encuentro entrada/ de '{username}' en Drive. ¿Carpetas creadas/sincronizadas?"
+            )
+        fid = _find_child(entrada, day) or _create_folder(entrada, day)
+        _DAY_FOLDER_CACHE[key] = fid
+        return fid
 
 
 def _day_folder_id(username: str, day: str) -> str | None:

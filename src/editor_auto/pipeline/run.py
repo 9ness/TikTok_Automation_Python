@@ -284,8 +284,25 @@ def run_editor_auto_pipeline(
             f"su flujo. Configura al menos una antes de generar."
         )
 
+    # El input vive en el mount de rclone (Drive). Un vídeo recién subido puede
+    # tardar unos segundos en hacerse visible en el mount (consistencia
+    # eventual de Drive + caché de directorio). Reintentamos un rato antes de
+    # rendirnos, forzando un re-listado del directorio padre (que invalida la
+    # entrada cacheada) en cada vuelta.
     if not os.path.exists(input_video_path):
-        raise RuntimeError(f"Vídeo input no encontrado: {input_video_path}")
+        import time as _time
+        parent = os.path.dirname(input_video_path)
+        for _ in range(18):  # ~90s
+            try:
+                os.listdir(parent)  # fuerza lookup del dir en el mount
+            except OSError:
+                pass
+            if os.path.exists(input_video_path):
+                break
+            _time.sleep(5)
+        if not os.path.exists(input_video_path):
+            raise RuntimeError(f"Vídeo input no encontrado: {input_video_path}")
+        on_log(f"[editor_auto] input visible tras reintento: {os.path.basename(input_video_path)}")
 
     on_log(f"[editor_auto] Job {job_id} · usuario '{user.name}' · "
            f"{len(enabled_steps)} herramienta(s)")
