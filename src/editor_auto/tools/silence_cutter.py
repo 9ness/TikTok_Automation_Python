@@ -3435,31 +3435,57 @@ def _deep_audit_compare(
         if (b["n_toks"] >= 2 or len(b["text"].replace(" ", "")) >= 6)
         and _has_content(b["text"])
     ]
-    # Anti-ALUCINACIÓN de costura: Whisper a veces INVENTA palabras en la junta
-    # de un corte (un clic/glitch que oye como "aprende a"). El residuo REAL es
-    # la cola de algo que SÍ se dijo ("estocost" de "esto costaba"), así que al
-    # menos un token de CONTENIDO del residuo debe parecerse (≥0.7) a una palabra
-    # del ORIGINAL. Si no se parece a NADA dicho → alucinación, no residuo → se
-    # descarta. Solo evita un FALSO fallo (retención indebida); nunca corta más.
-    _all_orig = [t for t in (_norm(w.get("word", "")) for w in words) if t]
+    # Anti-ALUCINACIÓN de costura (POSICIONAL): Whisper INVENTA palabras en la
+    # junta de un corte (un clic/glitch oído como "aprende a" / "carito naranja").
+    # El residuo REAL es la cola/cabeza de la palabra CORTADA en ESA junta
+    # ("estocost" de "esto costaba"), así que sus tokens de contenido deben
+    # parecerse a lo que se cortó CERCA de esa posición — no a cualquier palabra
+    # del vídeo (si comparamos contra todo el guion, un "carito"≈"carrito" dicho
+    # en OTRO punto cuela la alucinación). Mapeamos el residuo a tiempo de input y
+    # exigimos parecido con las palabras cortadas en ±0.9s. Si no hay nada cortado
+    # cerca, o no se parece → alucinación → se descarta. Solo evita un FALSO fallo
+    # (retención indebida); nunca corta más.
+    def _cut_words_near(t_in: float, window: float = 0.9) -> list[str]:
+        near: list[str] = []
+        for w in words:
+            try:
+                ws, we = float(w["start"]), float(w["end"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            c = (ws + we) / 2.0
+            if any(a - 1e-3 <= c <= b + 1e-3 for a, b in keep_intervals):
+                continue  # conservada → no es material cortado
+            if abs(c - t_in) <= window:
+                tok = _norm(w.get("word", ""))
+                if tok:
+                    near.append(tok)
+        return near
 
-    def _is_real_residue(text: str) -> bool:
+    def _is_real_residue_block(b: dict) -> bool:
         content = [
-            t for t in text.split()
+            t for t in str(b.get("text", "")).split()
             if len(t) > 2 and t not in _FILLER_TOKENS and t not in _AUDIT_STOPWORDS
         ]
         if not content:
             return False
+        t0 = b.get("output_t")
+        if t0 is None:
+            return True  # sin posición → no podemos verificar → conservador
+        t_in = _map_output_to_input(float(t0), keep_intervals)
+        if t_in is None:
+            return True
+        near = _cut_words_near(t_in)
+        if not near:
+            return False  # nada cortado cerca → no puede ser residuo → alucinación
         for ct in content:
-            for ot in _all_orig:
-                if difflib.SequenceMatcher(None, ct, ot).ratio() >= 0.7:
+            for ot in near:
+                if difflib.SequenceMatcher(None, ct, ot).ratio() >= 0.6:
                     return True
-                # Residuo PEGADO ("estocost" contiene "esto"): substring ≥4 chars.
-                if len(ot) >= 4 and ot in ct:
+                if len(ot) >= 4 and (ot in ct or ct in ot):  # residuo pegado
                     return True
         return False
 
-    inserted = [b for b in inserted if _is_real_residue(b["text"])]
+    inserted = [b for b in inserted if _is_real_residue_block(b)]
     missing = [
         b for b in missing
         if (b["n_toks"] >= 3 and b["n_strong_content"] >= 1)
