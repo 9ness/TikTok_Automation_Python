@@ -20,7 +20,7 @@
   última, que suele ser la versión buena del hablante), nunca trozos de las
   dos mezclados.
 
-## Finales de segmento [clean_script|completeness]
+## Finales de segmento [completeness]
 
 - Un segmento NUNCA puede terminar a mitad de idea. Ejemplo real: terminar en
   "...y están solo por ocho" (precio sin completar) y saltar a otra cosa suena
@@ -33,7 +33,7 @@
   completa. Jamás acabar en muletilla ni dejar una idea anunciada sin
   terminar.
 
-## Frases enteras y coherencia [clean_script|false_starts|completeness]
+## Frases enteras y coherencia [completeness]
 
 - Conserva frases COMPLETAS. No dejes una palabra de contenido suelta separada
   de su frase, ni conserves un anuncio ("ahora os voy a enseñar...") cuya
@@ -52,7 +52,7 @@
   ver todos los estampados" → solo la segunda. Dos anuncios de lo mismo
   confunden y alargan el vídeo.
 
-## Contenido de venta [clean_script|completeness]
+## Contenido de venta [completeness]
 
 - No cortes a medias afirmaciones de venta: precios, beneficios, llamadas a la
   acción. O se conserva la afirmación entera o se elimina entera — un precio

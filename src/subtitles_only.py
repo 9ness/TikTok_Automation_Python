@@ -737,6 +737,56 @@ def _apply_pop_in(clip, dur: float):
         return clip
 
 
+def _split_chunks_to_one_line(
+    chunks: list[list[dict]],
+    s: dict,
+    video_size: tuple[int, int],
+) -> list[list[dict]]:
+    """Garantiza que cada chunk cabe en UNA línea: replica las métricas de
+    wrap de `render_chunk_image` (fuente, case, espacio, padding) y parte en
+    sub-chunks los que envolverían a 2 líneas. Así el bloque de subtítulos
+    tiene SIEMPRE la misma forma/altura y no 'salta' entre subtítulos."""
+    from PIL import Image, ImageDraw
+    from src.subtitles import TIKTOK_SAFE_X, _apply_case, _load_font
+
+    W, H = video_size
+    font_size = max(16, int(H * s["font_scale"]))
+    font = _load_font(s["font_path"], font_size)
+    stroke_w = s["stroke_width"]
+    tmp = Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(tmp)
+    space_mul = s.get("word_spacing_multiplier", 0.65)
+    space_w = max(1, int(font.getlength(" ") * space_mul))
+    pad_x = int(W * s["pill_pad_x_pct"])
+    _mw_pct = s.get("max_width_pct")
+    if _mw_pct is None:
+        _mw_pct = TIKTOK_SAFE_X[1] - TIKTOK_SAFE_X[0]
+    _mw_pct = max(0.20, min(1.0, float(_mw_pct)))
+    max_line_w = int(W * _mw_pct - pad_x * 4)
+
+    def _w_px(word: dict) -> int:
+        txt = _apply_case(word["word"], s["case_mode"])
+        bb = draw.textbbox((0, 0), txt, font=font, anchor="lt", stroke_width=stroke_w)
+        return bb[2] - bb[0]
+
+    out: list[list[dict]] = []
+    for chunk in chunks:
+        cur: list[dict] = []
+        cur_w = 0
+        for wd in chunk:
+            ww = _w_px(wd)
+            add = ww + (space_w if cur else 0)
+            if cur and cur_w + add > max_line_w:
+                out.append(cur)
+                cur, cur_w = [wd], ww
+            else:
+                cur.append(wd)
+                cur_w += add
+        if cur:
+            out.append(cur)
+    return out
+
+
 def render_subtitles_on_video(
     video_path: str,
     words: list[dict],
@@ -793,8 +843,19 @@ def render_subtitles_on_video(
             log_callback(f"📐 Downscale a {W}x{H} (cap {cap_long}px lado largo)")
 
     chunks = _chunk_words(words, max_words_per_chunk=s["max_words_per_chunk"])
+    # ── 1 chunk = 1 LÍNEA siempre ────────────────────────────────────────────
+    # Un chunk que envuelve a 2 líneas hace que el bloque cambie de forma entre
+    # subtítulos y se perciba como "salto". Pre-medimos cada chunk con las
+    # MISMAS métricas que el renderer (fuente, case, espacio, padding) y, si no
+    # cabe en una línea, lo partimos en sub-chunks que sí caben. El karaoke por
+    # palabra no cambia (los timings van por palabra).
+    try:
+        chunks = _split_chunks_to_one_line(chunks, s, (W, H))
+    except Exception as e:  # noqa: BLE001 — fallback: chunks tal cual
+        if log_callback:
+            log_callback(f"⚠️ split 1-línea falló ({e}); uso chunks originales")
     if log_callback:
-        log_callback(f"🔤 {len(words)} palabras en {len(chunks)} chunks")
+        log_callback(f"🔤 {len(words)} palabras en {len(chunks)} chunks (1 línea/chunk)")
 
     # ── Altura ESTABLE entre chunks ──────────────────────────────────────────
     # Antes cada chunk se anclaba por su CENTRO a y_pct → un chunk de 2 líneas
