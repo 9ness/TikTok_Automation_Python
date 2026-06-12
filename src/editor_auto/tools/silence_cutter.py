@@ -3777,6 +3777,27 @@ def _deep_audit_compare(
                 missing.remove(m)
                 inserted.remove(ins)
                 break
+    # 1-bis) FIABILIDAD — anti-recall-de-Whisper. Una palabra "missing" cuyo span
+    #   de INPUT cae ENTERO dentro de un keep (con margen) tiene su audio presente
+    #   SÍ O SÍ en el output: el render copia ese tramo TAL CUAL. Si Whisper no la
+    #   oyó al re-transcribir, es un fallo de RECALL del modelo, NO una pérdida
+    #   real. Esto eliminaba el grueso de los FALSOS FALLOS ("euros" en buga_2,
+    #   "cuentas"...). Es seguro por construcción: NO puede ocultar un sobre-corte
+    #   (una palabra cortada de verdad NO está dentro de ningún keep, así que no la
+    #   filtra). Un clip de borde (cuentas→cuento) sí sobrevive: su span toca el
+    #   borde del keep → no cae "entero con margen" → se sigue penalizando.
+    _RECALL_MARGIN_S = 0.12
+    def _span_fully_in_keep(s: float, e: float) -> bool:
+        return any(
+            (a + _RECALL_MARGIN_S) <= s and e <= (b - _RECALL_MARGIN_S)
+            for a, b in keep_intervals
+        )
+    missing = [
+        m for m in missing
+        if not _span_fully_in_keep(
+            float(m.get("input_start", 0.0)), float(m.get("input_end", 0.0))
+        )
+    ]
     # 2) Evidencia FUERTE para penalizar (la varianza típica es de 1 palabra):
     #    · sobrante: ≥2 tokens (frase residual/duplicado) o 1 token ≥6 chars
     #      ("estocost"); 1 palabra corta suelta = varianza → ignorar. ADEMÁS
