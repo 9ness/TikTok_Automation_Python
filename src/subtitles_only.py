@@ -972,21 +972,35 @@ def render_subtitles_on_video(
         log_callback(f"🎞️ Componiendo {len(overlays)} sub-clips sobre {W}x{H}…")
 
     final = CompositeVideoClip([video] + overlays, size=(W, H))
-    # CIERRE LIMPIO (mata el "blip"/ruido del último frame): moviepy mete un
-    # artefacto en el PADDING de audio al final (lee tras el fin del stream de
-    # audio → basura determinista ~0.12s antes del final). El silence_cutter ya
-    # deja la voz cerrada con fade ~0.3s antes del final, así que recortamos los
-    # últimos ~130ms (ya post-voz, silencio) → elimina el blip de RAÍZ, no solo
-    # lo atenúa. + fade-out de audio de seguridad sobre el nuevo cierre.
+    # CIERRE LIMPIO (mata el "blip"/ruido del último frame) SIN clipar la última
+    # palabra: moviepy mete un artefacto en el PADDING de audio al final (lee
+    # basura tras el fin del stream → blip determinista que va DESPUÉS de un
+    # silencio digital total). NO se puede recortar una cantidad fija (la cola de
+    # la última palabra puede caer ahí y la clipa, p.ej "cuentas"→"cuento").
+    # Solución ADAPTATIVA: localizar el ÚLTIMO audio real del vídeo base (cola de
+    # la última palabra) y cortar el composite justo después (+pad). El blip va
+    # más allá de eso → eliminado; la palabra queda intacta.
     try:
-        _end_t = max(0.2, float(video.duration) - 0.13)
-        final = final.subclip(0, _end_t)
-    except Exception:
-        pass
-    try:
-        from moviepy.audio.fx.audio_fadeout import audio_fadeout
-        if final.audio is not None:
-            final = final.set_audio(final.audio.fx(audio_fadeout, 0.15))
+        import numpy as _np
+        _vid_dur = float(video.duration)
+        _end_t = _vid_dur
+        if video.audio is not None:
+            _sr = 22050
+            _sa = video.audio.to_soundarray(fps=_sr)
+            _amp = _np.max(_np.abs(_sa), axis=1) if _sa.ndim > 1 else _np.abs(_sa)
+            # umbral ~-46 dBFS: capta la fricativa floja de la última palabra,
+            # pero NO el silencio digital (~0) del padding/fade-out.
+            _idx = _np.where(_amp > 0.005)[0]
+            if len(_idx):
+                _cand = float(_idx[-1]) / _sr + 0.12  # cola natural tras la voz
+                if _cand < _vid_dur - 0.01:
+                    _end_t = _cand
+        if _end_t < _vid_dur - 0.01:
+            final = final.subclip(0, max(0.2, _end_t))
+            # micro fade SOLO sobre el pad de silencio (no llega a la palabra)
+            from moviepy.audio.fx.audio_fadeout import audio_fadeout
+            if final.audio is not None:
+                final = final.set_audio(final.audio.fx(audio_fadeout, 0.05))
     except Exception:
         pass
 
