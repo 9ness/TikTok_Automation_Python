@@ -6303,14 +6303,19 @@ def _apply_style_overrides(
     tal cual (= comportamiento legacy/agresivo intacto)."""
     new_config = dict(config)
     if style == "conversation":
-        # Sube el umbral inter-frase de 0.5s → 1.2s: solo silencios MUY
-        # largos se cortan, los gaps de turnos se preservan.
+        # Sube el umbral inter-frase de 0.5s → 0.8s: más suave que el monólogo
+        # (preserva las micro-pausas de turn-taking <0.8s) pero SÍ corta las
+        # pausas largas (≥0.8s). CLAVE: a 1.2s (valor antiguo) un vídeo de
+        # creador con muchas pausas medias (0.8-1.2s) quedaba PICADO —
+        # demasiadas pausas conservadas → vídeo lento + el audit las penaliza.
+        # Estos son ads de TikTok (snappy), no podcasts: 0.8s es el equilibrio.
         new_config["inter_word_gap_threshold_s"] = max(
-            1.2, float(config.get("inter_word_gap_threshold_s", 0.5))
+            0.8, float(config.get("inter_word_gap_threshold_s", 0.5))
         )
-        # Aumenta el padding natural que se conserva (200ms → 350ms).
-        # Hace que los cortes que SÍ ocurren no suenen secos.
+        # Padding que se conserva tras el corte: 250ms (entre el 200 del
+        # monólogo y el 350 antiguo) → la pausa resultante queda por debajo del
+        # umbral del audit (no la cuenta como silencio) y no suena seca.
         new_config["inter_word_gap_keep_ms"] = max(
-            350, int(config.get("inter_word_gap_keep_ms", 200))
+            250, int(config.get("inter_word_gap_keep_ms", 200))
         )
     return new_config
