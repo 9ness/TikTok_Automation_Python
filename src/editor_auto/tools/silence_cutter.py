@@ -992,6 +992,49 @@ class SilenceCutterTool:
                     f"restaurada (evita truncar el CTA final)."
                 )
 
+        # 7c) PROTEGER LA FRASE DE CIERRE ENTERA (no solo la última palabra). Una
+        # capa IA (pass2/holístico) marca a veces el CTA final ("te lo dejo aquí
+        # anclado") como frase abandonada y lo corta a MITAD de palabra → deja un
+        # fragmento roto ("clado"). Aquí protegemos el último BLOQUE CONTIGUO de
+        # habla (la CTA + despedida): cualquier corte que ACABE dentro de ese
+        # bloque (sin llegar al final) se recorta para terminar ANTES → la frase
+        # de cierre queda ENTERA. El cliente quiere conservar el CTA de cierre.
+        if bool(config.get("protect_closing_phrase", True)) and voiced_words:
+            vw = sorted(
+                (w for w in voiced_words if "start" in w and "end" in w),
+                key=lambda w: float(w["start"]),
+            )
+            if vw:
+                closing_gap_s = 0.6
+                run_start = float(vw[-1]["start"])
+                for i in range(len(vw) - 1, 0, -1):
+                    if float(vw[i]["start"]) - float(vw[i - 1]["end"]) <= closing_gap_s:
+                        run_start = float(vw[i - 1]["start"])
+                    else:
+                        break
+                last_we = max(float(w["end"]) for w in vw)
+                n_clip = 0
+                new_cws3: list[tuple[float, float, str]] = []
+                for s, e, src in cuts_with_source:
+                    # corte que empieza ANTES del cierre y acaba DENTRO de él
+                    # (comería parte del CTA) → recortar a `run_start`.
+                    if s < run_start - 0.02 and run_start - 0.02 < e <= last_we + 0.05:
+                        if run_start - s > 0.05:
+                            new_cws3.append((s, run_start, src))
+                        n_clip += 1
+                    else:
+                        new_cws3.append((s, e, src))
+                cuts_with_source = new_cws3
+                if n_clip:
+                    diagnostic["phases"]["closing_phrase_protection"] = {
+                        "run_start": round(run_start, 3), "n_clipped": n_clip,
+                    }
+                    ctx.on_log(
+                        f"[silence_cutter] 🛡️ Frase de cierre protegida: {n_clip} "
+                        f"corte(s) recortado(s) para no partir el CTA final "
+                        f"(cierre desde {run_start:.1f}s)"
+                    )
+
         cuts_only = [(s, e) for (s, e, _) in cuts_with_source]
         merged_cuts = _merge_intervals(cuts_only)
         # Protección de palabras: ningún corte clipa el final/inicio de una
@@ -5814,7 +5857,8 @@ def _apply_cuts_ffmpeg(
     # imperceptible para voz humana pero suaviza la transición y limpia
     # cualquier cola de audio que FFmpeg no recorta limpio.
     _FADE_S = 0.02
-    _FADE_TAIL_S = 0.15  # fade-out del cierre — mata el residuo tras la última palabra
+    _FADE_TAIL_S = 0.25  # fade-out del cierre — enmascara el residuo de render
+    #                      tras la última palabra (cola de boca/lookahead loudnorm)
 
     filter_parts: list[str] = []
     concat_inputs: list[str] = []
