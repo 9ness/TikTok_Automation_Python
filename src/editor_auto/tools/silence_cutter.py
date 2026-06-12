@@ -1431,6 +1431,24 @@ class SilenceCutterTool:
                                 f"[silence_cutter] 🚩 coherencia ({d.get('type')}): "
                                 f"falta '{d.get('missing_text')}' — {d.get('why')}"
                             )
+                # VEREDICTO EXPLICABLE — el operador ve QUÉ puntuó, no un número:
+                # separa fallo real del motor (Contenido) de fuente bruta (Ritmo)
+                # y de avisos de baja confianza (probables falsos positivos).
+                try:
+                    vd = _build_verdict_detail(audit)
+                    audit["verdict_detail"] = vd
+                    ctx.on_log(f"[silence_cutter] 📋 VEREDICTO: {vd['label']}")
+                    ctx.on_log(
+                        "[silence_cutter]    "
+                        + "  ·  ".join(
+                            f"{d['dim']}: {'✓' if d['ok'] else '⚠ ' + d['detail']}"
+                            for d in vd["dimensions"]
+                        )
+                    )
+                    for lc in vd["low_confidence"][:3]:
+                        ctx.on_log(f"[silence_cutter]    ℹ️ {lc}")
+                except Exception:  # noqa: BLE001
+                    pass
                 return audit
 
             # Presupuesto COMPARTIDO de llamadas al juez de coherencia (lista
@@ -4976,6 +4994,74 @@ def _verdict_for_score(score: int, *, degraded: bool = False) -> str:
     if score >= 50:
         return "REGULAR — hay fallos visibles. Mejor REENCOLAR"
     return "MAL — varios fallos reales. REENCOLAR"
+
+
+def _build_verdict_detail(audit: dict) -> dict:
+    """Veredicto EXPLICABLE por dimensiones: convierte el score opaco en algo que
+    el operador entiende de un vistazo, y —clave— SEPARA los fallos REALES del
+    motor (contenido) de los AVISOS de baja confianza (juez de coherencia sobre
+    re-transcripción de Whisper = fuente principal de falsos positivos), y de la
+    FUENTE BRUTA (muchas pausas/silencios grabados así, no culpa del motor).
+
+    Es solo PRESENTACIÓN: no cambia el score ni el gating. Devuelve
+    {overall: ok|revisar|fallo, label, dimensions[], low_confidence[]}."""
+    deep = audit.get("deep") or {}
+    n_residue = len(deep.get("inserted_blocks") or [])
+    n_missing = len(deep.get("missing_blocks") or [])
+    coh_issues = audit.get("coherence_issues") or []
+    n_internal = int(audit.get("n_internal_silences") or 0)
+    n_loose = int(audit.get("n_loose_words") or 0)
+    n_surv = int(audit.get("n_surviving_stretched") or 0)
+    degraded = not audit.get("transcription_ok", True)
+
+    dims: list[dict] = []
+
+    content_bad: list[str] = []
+    if n_residue:
+        content_bad.append(f"{n_residue} resto(s) de audio sobrante")
+    if n_missing:
+        content_bad.append(f"{n_missing} palabra(s) perdida(s)")
+    dims.append({"dim": "Contenido", "ok": not content_bad,
+                 "detail": "completo" if not content_bad else " · ".join(content_bad)})
+
+    pace_bad: list[str] = []
+    if n_internal:
+        pace_bad.append(f"{n_internal} pausa(s) larga(s)")
+    if n_surv:
+        pace_bad.append(f"{n_surv} muletilla(s) estirada(s)")
+    dims.append({"dim": "Ritmo", "ok": not pace_bad,
+                 "detail": "ágil" if not pace_bad else " · ".join(pace_bad)})
+
+    dims.append({"dim": "Limpieza", "ok": not n_loose,
+                 "detail": "sin restos" if not n_loose else f"{n_loose} palabra(s) suelta(s)"})
+
+    low_conf: list[str] = []
+    for c in coh_issues:
+        mt = c.get("missing_text") or c.get("original_quote") or "?"
+        low_conf.append(
+            f"el medidor cree que falta «{mt}» — VERIFICAR (suele ser FALSO: "
+            "Whisper a veces no re-oye una palabra que sí está)."
+        )
+
+    if degraded:
+        overall, label = "fallo", "FALLO — sin transcripción (corte ciego)"
+    elif content_bad:
+        overall, label = "fallo", "FALLO REAL — revisar contenido"
+    elif n_internal >= 6:
+        overall, label = ("revisar",
+                          "ENTREGABLE pero algo picado — probable FUENTE bruta "
+                          "(pausas/silencios del original), no fallo del motor")
+    elif low_conf:
+        overall, label = ("revisar",
+                          "ENTREGABLE — solo avisos de baja confianza (revisa 5s)")
+    else:
+        overall, label = "ok", "ENTREGABLE — limpio"
+
+    return {
+        "overall": overall, "label": label,
+        "dimensions": dims, "low_confidence": low_conf,
+        "score": audit.get("quality_score"),
+    }
 
 
 def _absorb_keep_islands(
