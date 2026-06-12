@@ -5934,22 +5934,34 @@ def _extend_last_keep_to_word_tail(
     hi = min(len(amp) / sr, le + 0.40, float(video_duration))
     if hi <= le + 0.02:
         return keep_intervals
-    floor = float(np.percentile(amp, 5))
-    thr = max(floor * 3.0, 32768.0 * 0.0035)  # ~-49 dBFS
     win = max(1, int(0.020 * sr)); hop = max(1, int(0.010 * sr))
+
+    def _rms(i0: int) -> float:
+        seg = amp[i0:i0 + win]
+        return float(np.sqrt(np.mean(seg * seg))) if len(seg) else 0.0
+
+    # Umbral RELATIVO al pico de voz de la última palabra (últimos 0.5 s del
+    # keep), no al suelo de ruido (que en audio con mucha voz sube demasiado y
+    # deja fuera la fricativa). 35 dB bajo el pico capta la cola "-s"/"-tas".
+    p0 = max(int((le - 0.5) * sr), int(ls * sr), 0)
+    p1 = int(le * sr)
+    peak = 0.0
+    j = p0
+    while j + win <= p1:
+        peak = max(peak, _rms(j)); j += hop
+    if peak <= 1.0:
+        return keep_intervals
+    thr = peak * (10.0 ** (-35.0 / 20.0))
     t = le; last_voiced = le; silent = 0.0
     while t < hi:
-        i0 = int(t * sr); i1 = min(len(amp), i0 + win)
-        seg = amp[i0:i1]
-        rms = float(np.sqrt(np.mean(seg * seg))) if len(seg) else 0.0
-        if rms > thr:
+        if _rms(int(t * sr)) > thr:
             last_voiced = t + win / sr; silent = 0.0
         else:
             silent += hop / sr
             if silent >= 0.12 and last_voiced > le:
                 break
         t += hop / sr
-    new_le = min(float(video_duration), last_voiced + 0.08)
+    new_le = min(float(video_duration), last_voiced + 0.06)
     if new_le > le + 0.02:
         kk = list(keep_intervals)
         kk[-1] = (ls, new_le)
