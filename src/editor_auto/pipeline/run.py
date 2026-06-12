@@ -351,15 +351,14 @@ def run_editor_auto_pipeline(
     elif source_filename:
         stem = os.path.splitext(os.path.basename(source_filename))[0]
         base_name = f"{stem}_editado.mp4"
-        # Dedup si ya hay un editado con ese nombre
-        n = 2
-        candidate = base_name
-        while os.path.exists(os.path.join(out_folder, candidate)):
-            candidate = f"{stem}_editado_{n}.mp4"
-            n += 1
-        base_name = candidate
+        # REEMPLAZO de versión previa: el output usa SIEMPRE el nombre canónico
+        # `<stem>_editado.mp4`. Si se regenera el MISMO source, se sustituye la
+        # versión anterior (y se limpian versiones numeradas viejas `_2/_3…`)
+        # tras un render correcto → el cliente solo ve la última/mejor, sin
+        # acumular. Sources distintos llevan prefijo timestamp distinto, así que
+        # no colisionan entre clientes/vídeos.
         final_output_path = os.path.join(out_folder, base_name)
-        on_log(f"[editor_auto] Output filename: {base_name}")
+        on_log(f"[editor_auto] Output filename: {base_name} (reemplaza versión previa)")
     else:
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         base_name = f"{ts}_editor_{job_id}.mp4"
@@ -387,14 +386,43 @@ def run_editor_auto_pipeline(
         manual_keep_intervals=manual_keep_intervals,
     )
 
-    # Mover a Drive sincronizado (copy + cleanup, NO move para que un fallo
-    # de I/O en Drive no deje el archivo a medias).
+    # Mover a Drive sincronizado. Copia ATÓMICA (`.part` + os.replace) para que,
+    # al reemplazar una versión previa, el cliente nunca vea un archivo a medias
+    # si falla la copia: queda la vieja o la nueva, jamás corrupto.
     on_log(f"[editor_auto] Copiando a Drive: {final_output_path}")
-    shutil.copyfile(temp_final, final_output_path)
+    _part = final_output_path + ".part"
+    try:
+        shutil.copyfile(temp_final, _part)
+        os.replace(_part, final_output_path)  # atómico en el mismo FS
+    except OSError:
+        # Fallback: copia directa si el mount no soporta rename atómico.
+        shutil.copyfile(temp_final, final_output_path)
+        try:
+            os.remove(_part)
+        except OSError:
+            pass
     try:
         os.remove(temp_final)
     except OSError:
         pass
+
+    # REEMPLAZO: borrar versiones NUMERADAS previas del mismo source (`_2/_3…`)
+    # — el canónico `_editado.mp4` ya se sobrescribió arriba. Solo en flujo auto
+    # (no en retoque manual, que pisa su propio target). Limpia también su
+    # proyecto editable asociado.
+    if source_filename and not output_override:
+        import glob as _glob
+        _stem = os.path.splitext(os.path.basename(source_filename))[0]
+        _proj_dir = os.path.join(os.path.dirname(out_folder), ".editproj")
+        for _old in _glob.glob(os.path.join(out_folder, f"{_stem}_editado_*.mp4")):
+            try:
+                os.remove(_old)
+                on_log(f"[editor_auto] 🗑️ Versión previa eliminada: {os.path.basename(_old)}")
+                _op = os.path.join(_proj_dir, f"{os.path.basename(_old)}.json")
+                if os.path.exists(_op):
+                    os.remove(_op)
+            except OSError:
+                pass
 
     # Reubicar el "proyecto editable" (si el cutter lo escribió) junto al
     # output, indexado por su nombre, para que el editor manual lo cargue.
