@@ -1168,7 +1168,7 @@ class SilenceCutterTool:
         # (si no, captura respiración/click post-discurso = "sonido raro" final).
         try:
             keep_intervals, _clamped_end = _clamp_last_keep_to_last_word(
-                keep_intervals, voiced_words or words,
+                keep_intervals, voiced_words or words, tmp_audio,
             )
             if _clamped_end:
                 ctx.on_log(
@@ -3172,17 +3172,20 @@ def _extend_keeps_to_voiced_edges(
 def _clamp_last_keep_to_last_word(
     keep_intervals: list[tuple[float, float]],
     words: list[dict],
+    audio_path: str | None = None,
     *,
-    tail_pad_s: float = 0.2,
+    tail_pad_s: float = 0.12,
+    valley_search_s: float = 0.4,
 ) -> tuple[list[tuple[float, float]], bool]:
-    """Recorta el ÚLTIMO keep para que acabe poco después de la ÚLTIMA palabra.
+    """Recorta el ÚLTIMO keep para que acabe justo tras la ÚLTIMA palabra.
 
     Tras los rescates de voz, el último keep a veces se extiende más allá de la
-    última palabra hablada y captura un sonido NO-verbal (respiración, click de
-    boca, arranque de una palabra que Whisper no transcribió) → "sonido raro"
-    justo antes de terminar el vídeo. Aquí cerramos el keep en
-    `fin_última_palabra + tail_pad_s`. Solo recorta el cierre, nunca toca el
-    resto. Devuelve (keeps, cambiado)."""
+    última palabra y captura un sonido NO-verbal (respiración, click de boca,
+    arranque de una palabra que Whisper no transcribió) → "sonido raro" justo
+    antes de terminar el vídeo. Cerramos el keep en el VALLE de energía tras la
+    última palabra (corta limpio entre la palabra y el residuo); si no hay audio,
+    en `fin_última_palabra + tail_pad_s`. Solo recorta el cierre. Devuelve
+    (keeps, cambiado)."""
     if not keep_intervals or not words:
         return keep_intervals, False
     a, b = keep_intervals[-1]
@@ -3192,13 +3195,44 @@ def _clamp_last_keep_to_last_word(
             ws, we = float(w["start"]), float(w["end"])
         except (KeyError, ValueError, TypeError):
             continue
-        # palabra cuyo span solapa el último keep
-        if min(we, b) - max(ws, a) > 0.0:
+        if min(we, b) - max(ws, a) > 0.0:  # palabra que solapa el último keep
             last_we = we if last_we is None else max(last_we, we)
-    if last_we is not None and b > last_we + tail_pad_s + 0.05:
-        nb = max(a + 0.1, last_we + tail_pad_s)
-        return keep_intervals[:-1] + [(a, nb)], True
-    return keep_intervals, False
+    if last_we is None or b <= last_we + tail_pad_s + 0.03:
+        return keep_intervals, False
+    nb = last_we + tail_pad_s
+    # Afinar al VALLE de energía en [fin_palabra, fin_palabra+valley_search_s]:
+    # el punto más silencioso = la frontera entre la palabra y el residuo.
+    if audio_path and os.path.exists(audio_path):
+        try:
+            import wave
+            import numpy as np
+            with wave.open(audio_path, "rb") as wf:
+                sr = wf.getframerate(); n_ch = wf.getnchannels()
+                sw = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+            if sw == 2:
+                au = np.frombuffer(raw, dtype=np.int16)
+                if n_ch > 1:
+                    au = au.reshape(-1, n_ch).mean(axis=1)
+                au = au.astype(np.float64)
+                win = max(1, int(0.02 * sr))
+                lo = last_we; hi = min(b, last_we + valley_search_s)
+                best_t = None; best_rms = None
+                t = lo
+                while t <= hi:
+                    i0 = int(t * sr); i1 = min(len(au), i0 + win)
+                    if i1 > i0:
+                        rms = float(np.sqrt(np.mean(au[i0:i1] ** 2)))
+                        if best_rms is None or rms < best_rms:
+                            best_rms = rms; best_t = t
+                    t += 0.01
+                if best_t is not None:
+                    nb = max(last_we + 0.05, best_t)
+        except Exception:
+            pass
+    nb = max(a + 0.1, min(nb, b))
+    if b - nb < 0.04:
+        return keep_intervals, False
+    return keep_intervals[:-1] + [(a, nb)], True
 
 
 def _trim_internal_silences_from_keeps(
