@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from src.editor_auto.config import ensure_user_folders
+from src.editor_auto.config import ensure_user_folders, user_revision_folder
 from src.editor_auto.repos import UserRepo
 from src.editor_auto.services import run_flow
 
@@ -327,11 +327,23 @@ def run_editor_auto_pipeline(
         + (f" ({len(warnings)} warning(s) — features degradadas)" if warnings else "")
     )
 
-    # Carpetas del usuario en Drive — 4 carpetas: entrada/cola/recuperacion/salida
+    # Carpetas del usuario en Drive — entrada/cola/recuperacion/salida/revision
     _, _, _, _, out_folder = ensure_user_folders(user.name)
-    # Subcarpeta por DÍA (subida web): salida/<YYYY-MM-DD>/ para no amontonar
+    # REVISIÓN MANUAL: si el usuario la tiene activa, el vídeo editado va a
+    # `revision/` (staging interno NO compartido) en vez de `salida/`. El admin
+    # lo revisa y mueve a `salida/` solo los aprobados → el cliente nunca ve un
+    # vídeo sin visto bueno. El retoque manual (output_override) NO se desvía.
+    if getattr(user, "manual_review", False) and not output_override:
+        out_folder = user_revision_folder(user.name)
+        Path(out_folder).mkdir(parents=True, exist_ok=True)
+        on_log(
+            "[editor_auto] 🕵️ Revisión manual ACTIVA → output a revision/ "
+            "(no visible para el cliente hasta que lo apruebes)"
+        )
+    # Subcarpeta por DÍA (subida web): <carpeta>/<YYYY-MM-DD>/ para no amontonar
     # los vídeos de distintos días. Solo cuando el job lo indica; el flujo del
-    # admin (sin output_subdir) sigue escribiendo en salida/ plano.
+    # admin (sin output_subdir) sigue escribiendo plano. Se aplica igual a
+    # revision/ que a salida/ → estructura espejo, el move preserva el día.
     if output_subdir and not output_override:
         out_folder = os.path.join(out_folder, output_subdir)
         Path(out_folder).mkdir(parents=True, exist_ok=True)

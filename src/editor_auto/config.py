@@ -317,6 +317,14 @@ def user_recovery_folder(username: str) -> str:
     return os.path.join(user_folder(username), "recuperacion")
 
 
+def user_revision_folder(username: str) -> str:
+    """Carpeta de revisión — staging INTERNO (no compartido con el cliente).
+    Si el usuario tiene `manual_review` activo, los vídeos editados caen aquí
+    en vez de en `salida/`, para que el admin los revise y solo MUEVA a
+    `salida/` los aprobados. El cliente nunca ve esta carpeta."""
+    return os.path.join(user_folder(username), "revision")
+
+
 _VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi")
 
 
@@ -349,15 +357,17 @@ def count_output_videos_today(username: str) -> int | None:
     return n
 
 
-# Slugs canónicos de las 4 carpetas — el frontend los usa como IDs en
-# las URLs y los validamos contra esta whitelist en el backend.
-USER_FOLDERS = ("entrada", "cola", "recuperacion", "salida")
+# Slugs canónicos de las carpetas — el frontend los usa como IDs en las URLs
+# y los validamos contra esta whitelist en el backend. `revision` es interna
+# (staging de revisión manual): aparece en el panel admin pero NO se comparte
+# con el cliente (no está en DEFAULT_SHARE_FOLDERS de drive_sharing).
+USER_FOLDERS = ("entrada", "cola", "recuperacion", "salida", "revision")
 
 
 def user_subfolder(username: str, folder: str) -> str:
     """Resuelve una subcarpeta del usuario por nombre (`entrada`/`cola`/
-    `recuperacion`/`salida`). Lanza `ValueError` si `folder` no está en
-    la whitelist — defensa contra path traversal."""
+    `recuperacion`/`salida`/`revision`). Lanza `ValueError` si `folder` no
+    está en la whitelist — defensa contra path traversal."""
     if folder not in USER_FOLDERS:
         raise ValueError(
             f"Carpeta no permitida: {folder!r} (válidas: {USER_FOLDERS})"
@@ -378,7 +388,11 @@ def ensure_user_folders(username: str) -> tuple[str, str, str, str, str]:
     queue = user_queue_folder(username)
     recovery = user_recovery_folder(username)
     out = user_output_folder(username)
-    for p in (inp, queue, recovery, out):
+    revision = user_revision_folder(username)
+    # `revision/` también se crea (staging de revisión manual). No se devuelve
+    # para no romper el unpack de 5 elementos en los callers; usa
+    # `user_revision_folder()` directamente donde haga falta su ruta.
+    for p in (inp, queue, recovery, out, revision):
         Path(p).mkdir(parents=True, exist_ok=True)
     return base, inp, queue, recovery, out
 

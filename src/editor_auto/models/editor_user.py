@@ -87,6 +87,11 @@ class EditorUser(BaseModel):
     # vídeos. None = sin acceso compartido pendiente de revocar.
     output_released_on: str | None = None
     auto_revoke_output_daily: bool = True
+    # Revisión manual: si True, los vídeos editados caen en `revision/` (staging
+    # interno, NO compartido) en vez de `salida/`. El admin los revisa y mueve a
+    # `salida/` solo los aprobados → el cliente nunca ve un vídeo sin tu visto
+    # bueno. Default False = comportamiento de siempre (directo a salida).
+    manual_review: bool = False
     # Billing — opcional. `subscription=None` significa "user de prueba"
     # (sin cuotas ni ventana horaria). Útil para QA, betas internos, demos.
     subscription: Subscription | None = None

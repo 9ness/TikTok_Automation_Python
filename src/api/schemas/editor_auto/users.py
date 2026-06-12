@@ -41,6 +41,9 @@ class EditorUserUpdateRequest(BaseModel):
     window_end_hour_override: int | None = None
     # Email de la cuenta web (nebulabs-media) a vincular. "" = desvincular.
     account_email: str | None = None
+    # Revisión manual: True → los vídeos editados van a `revision/` (no a
+    # `salida/`) hasta que el admin los apruebe. None = no tocar.
+    manual_review: bool | None = None
 
 
 class WebAccountResponse(BaseModel):
@@ -93,6 +96,7 @@ class EditorUserResponse(BaseModel):
     window_end_hour_override: int | None = None
     output_released_on: str | None = None
     auto_revoke_output_daily: bool = True
+    manual_review: bool = False
     # Puente con la web de cliente (nebulabs-media)
     account_email: str | None = None
     web_account: "WebAccountResponse | None" = None

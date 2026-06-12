@@ -247,17 +247,30 @@ def move_file(
     companion_moved}`. `companion_moved` es el nombre nuevo del .txt si
     se movió, o `None`.
     """
-    base = _validate_filename(filename)
+    # Acepta prefijo de día `YYYY-MM-DD/archivo.mp4` (salida/entrada del flujo
+    # web se organizan por día). El día se PRESERVA en el destino → estructura
+    # espejo entre carpetas (p.ej. salida/<día>/x ↔ revision/<día>/x), así el
+    # vídeo "vuelve a su sitio" al mover de un lado a otro.
+    day: str | None = None
+    name = filename or ""
+    if "/" in name:
+        head, _, tail = name.partition("/")
+        if _DAY_DIR_RE.match(head):
+            day, name = head, tail
+    base = _validate_filename(name)
     src_dir = user_subfolder(username, src_folder)
     dst_dir = user_subfolder(username, dst_folder)
+    if day:
+        src_dir = os.path.join(src_dir, day)
+        dst_dir = os.path.join(dst_dir, day)
     src_path = os.path.join(src_dir, base)
     if not os.path.isfile(src_path):
         raise FolderError(
-            f"Archivo no encontrado en {src_folder}/: {base}"
+            f"Archivo no encontrado en {src_folder}/: {filename}"
         )
     if src_folder == dst_folder:
         return {
-            "filename_new": base,
+            "filename_new": filename,
             "src_folder": src_folder,
             "dst_folder": dst_folder,
             "moved": False,
@@ -292,7 +305,7 @@ def move_file(
                 pass
 
     return {
-        "filename_new": final_name,
+        "filename_new": (f"{day}/{final_name}" if day else final_name),
         "src_folder": src_folder,
         "dst_folder": dst_folder,
         "moved": True,

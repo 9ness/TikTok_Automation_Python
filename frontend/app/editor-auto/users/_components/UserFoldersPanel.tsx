@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   useCreateUserShare,
   useDeleteUserFile,
@@ -62,7 +63,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 import { ManualEditor } from "@/components/editor-auto/ManualEditor";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Eye, CheckCircle2 } from "lucide-react";
 
 
 interface FolderMeta {
@@ -94,6 +95,13 @@ const FOLDERS: FolderMeta[] = [
     description: "Originales tras procesado OK (re-editable).",
     Icon: RotateCcw,
     tone: "text-violet-500",
+  },
+  {
+    id: "revision",
+    label: "Revisión",
+    description: "Pendientes de tu visto bueno. El cliente NO los ve. Aprueba → Salida.",
+    Icon: Eye,
+    tone: "text-orange-500",
   },
   {
     id: "salida",
@@ -136,6 +144,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
     cola: 0,
     recuperacion: 0,
     salida: 0,
+    revision: 0,
   };
   const items = folders.data?.folders[active] ?? [];
   const usedToday = user.data?.usage?.daily_videos_used ?? 0;
@@ -267,6 +276,42 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
             (puedes encolar a mano antes desde la pestaña entrada). El máx/día
             se resetea a medianoche.
           </p>
+        </div>
+
+        {/* Revisión manual: los vídeos editados van a revision/ (no salida/)
+            hasta que el admin los apruebe. El cliente no los ve. */}
+        <div className="flex items-start gap-3 rounded-md border border-orange-500/30 bg-orange-500/5 p-2.5">
+          <Switch
+            checked={Boolean(user.data?.manual_review)}
+            disabled={update.isPending}
+            onCheckedChange={(checked) =>
+              update.mutate(
+                { manual_review: checked },
+                {
+                  onSuccess: () =>
+                    toast.success(
+                      checked
+                        ? "Revisión manual ACTIVADA — los nuevos vídeos irán a Revisión (el cliente no los ve hasta que los apruebes)."
+                        : "Revisión manual desactivada — los vídeos irán directos a Salida.",
+                    ),
+                  onError: (err) =>
+                    toast.error(`Error: ${(err as Error).message}`),
+                },
+              )
+            }
+            aria-label="Revisión manual"
+          />
+          <div className="space-y-0.5">
+            <p className="text-xs font-semibold text-orange-700 dark:text-orange-300">
+              🕵️ Revisión manual antes de Salida
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              Si está activa, los vídeos editados caen en <strong>Revisión</strong>{" "}
+              (el cliente no los ve) hasta que los apruebes a Salida. Útil al
+              principio para repasar cada vídeo. También puedes mover cualquier
+              vídeo de Salida a Revisión cuando quieras retocarlo.
+            </p>
+          </div>
         </div>
 
         {/* Marcar día listo: comparte salida + email aviso — SOLO flujo
@@ -937,6 +982,14 @@ function FileRow({
 
         {file.folder === "salida" && (
           <>
+            <MoveAction
+              label="A revisión"
+              icon={Eye}
+              confirmTitle={`¿Sacar "${file.filename}" de Salida?`}
+              confirmBody="Pasa a Revisión: el cliente deja de verlo. Cuando lo tengas listo, apruébalo para devolverlo a Salida."
+              onAction={() => onMove("revision")}
+              disabled={disabled}
+            />
             {!inDayFolder && (
               <Button
                 variant="outline"
@@ -954,6 +1007,31 @@ function FileRow({
               download={file.filename}
               className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs hover:bg-accent"
               title="Descargar MP4 final"
+            >
+              <Download className="h-3 w-3" />
+              Descargar
+            </a>
+          </>
+        )}
+
+        {file.folder === "revision" && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+              onClick={() => onMove("salida")}
+              disabled={disabled}
+              title="Aprobar → mover a Salida (el cliente ya lo verá)"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Aprobar
+            </Button>
+            <a
+              href={userFilePreviewUrl(userId, file.folder, file.filename)}
+              download={file.filename}
+              className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs hover:bg-accent"
+              title="Descargar para revisar"
             >
               <Download className="h-3 w-3" />
               Descargar

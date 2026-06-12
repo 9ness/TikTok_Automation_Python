@@ -176,6 +176,10 @@ export interface EditorUser {
    *  cambiar de día se revoca el acceso si auto_revoke_output_daily. */
   output_released_on: string | null;
   auto_revoke_output_daily: boolean;
+  /** Si true, los vídeos editados van a `revision/` (staging interno, no
+   *  compartido) en vez de `salida/`. El admin los aprueba moviéndolos a
+   *  salida → el cliente solo ve lo aprobado. */
+  manual_review: boolean;
   /** Email de la cuenta web (nebulabs-media) vinculada. null = sin cuenta. */
   account_email: string | null;
   /** Datos de la cuenta web (rol/plan/trial) si está vinculada. */
@@ -229,6 +233,8 @@ export interface EditorUserUpdateInput {
   window_end_hour_override?: number;
   /** Email de la cuenta web a vincular. "" = desvincular. */
   account_email?: string;
+  /** Revisión manual: true → vídeos a `revision/` hasta aprobarlos. */
+  manual_review?: boolean;
 }
 
 export interface EditorAutoEnqueueResponse {
@@ -240,12 +246,18 @@ export interface EditorAutoEnqueueResponse {
   tool_count: number;
 }
 
-// Las 4 carpetas que el cliente y el admin gestionan:
+// Las carpetas que el cliente y el admin gestionan:
 //   entrada       — cliente deposita aquí
 //   cola          — vídeo bloqueado mientras procesa (admin no toca)
 //   recuperacion  — original tras procesado OK (re-editable)
 //   salida        — MP4 final que el cliente descarga
-export type FolderName = "entrada" | "cola" | "recuperacion" | "salida";
+//   revision      — staging interno de revisión manual (NO lo ve el cliente)
+export type FolderName =
+  | "entrada"
+  | "cola"
+  | "recuperacion"
+  | "salida"
+  | "revision";
 
 export interface FolderFile {
   filename: string;
@@ -270,6 +282,7 @@ export interface FolderCounts {
   cola: number;
   recuperacion: number;
   salida: number;
+  revision: number;
 }
 
 export interface UserFoldersResponse {

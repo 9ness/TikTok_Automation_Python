@@ -130,6 +130,7 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         window_end_hour_override=u.window_end_hour_override,
         output_released_on=u.output_released_on,
         auto_revoke_output_daily=u.auto_revoke_output_daily,
+        manual_review=getattr(u, "manual_review", False),
         account_email=u.account_email,
         web_account=_web_account_dto(
             get_web_account_repo().get(u.account_email)
@@ -367,6 +368,8 @@ def update_user(
                 details={"account_email": em},
             )
         u.account_email = em or None
+    if payload.manual_review is not None:
+        u.manual_review = bool(payload.manual_review)
     # Asegurar carpetas en Drive — idempotente. Cubre el caso de users
     # creados antes de que `resolve_editor_root` supiera autodetectar el
     # padre del Drive (entonces cayeron al fallback local).
