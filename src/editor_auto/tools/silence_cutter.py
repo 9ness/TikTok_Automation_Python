@@ -1289,6 +1289,20 @@ class SilenceCutterTool:
             )
         diagnostic["final"]["audio_normalized"] = normalize_audio
         ctx.on_progress(0.72, "✂️ Aplicando cortes con FFmpeg…")
+        # Extender el último keep a la cola fricativa real de la última palabra
+        # (anti "cuentas"→"cuento"): el detector de tail_silence corta antes de
+        # que la "-s" se apague. Energía con suelo absoluto.
+        if bool(config.get("extend_last_word_tail", True)):
+            _ext_keeps = _extend_last_keep_to_word_tail(
+                keep_intervals, tmp_audio, video_duration
+            )
+            if _ext_keeps and _ext_keeps[-1][1] > keep_intervals[-1][1] + 0.02:
+                ctx.on_log(
+                    f"[silence_cutter] 🗣️ Cola última palabra: extiendo keep "
+                    f"{keep_intervals[-1][1]:.2f}s → {_ext_keeps[-1][1]:.2f}s "
+                    f"(no clipar la fricativa final)."
+                )
+                keep_intervals = _ext_keeps
         _content_end_out = _content_end_output_s(keep_intervals, tmp_audio)
         _apply_cuts_ffmpeg(
             input_path=input_path,
@@ -5885,6 +5899,62 @@ def _content_end_output_s(
             return acc + max(0.0, last_src - s)
         acc += (e - s)
     return acc
+
+
+def _extend_last_keep_to_word_tail(
+    keep_intervals: list[tuple[float, float]],
+    audio_path: str,
+    video_duration: float,
+) -> list[tuple[float, float]]:
+    """Extiende el FINAL del último keep para cubrir la cola fricativa real de la
+    ÚLTIMA palabra ("-s"/"-tas"). El detector de tail_silence + el guard de
+    palabra cortan en el fin de palabra de Whisper (sub-reportado) y dejan fuera
+    la cola decreciente → "cuentas" suena como "cuento". Aquí escaneamos hacia
+    delante con umbral de SUELO DE RUIDO ABSOLUTO (no relativo al borde, que cae
+    demasiado rápido) y extendemos hasta el silencio post-voz real. Solo el último
+    keep; cap +0.4 s y duración del vídeo. Determinista; cualquier fallo → keeps
+    intactos."""
+    if not keep_intervals or not audio_path or not os.path.exists(audio_path):
+        return keep_intervals
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return keep_intervals
+    if sampwidth != 2 or sr <= 0:
+        return keep_intervals
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    amp = np.abs(audio.astype(np.float64))
+    ls, le = keep_intervals[-1]
+    hi = min(len(amp) / sr, le + 0.40, float(video_duration))
+    if hi <= le + 0.02:
+        return keep_intervals
+    floor = float(np.percentile(amp, 5))
+    thr = max(floor * 3.0, 32768.0 * 0.0035)  # ~-49 dBFS
+    win = max(1, int(0.020 * sr)); hop = max(1, int(0.010 * sr))
+    t = le; last_voiced = le; silent = 0.0
+    while t < hi:
+        i0 = int(t * sr); i1 = min(len(amp), i0 + win)
+        seg = amp[i0:i1]
+        rms = float(np.sqrt(np.mean(seg * seg))) if len(seg) else 0.0
+        if rms > thr:
+            last_voiced = t + win / sr; silent = 0.0
+        else:
+            silent += hop / sr
+            if silent >= 0.12 and last_voiced > le:
+                break
+        t += hop / sr
+    new_le = min(float(video_duration), last_voiced + 0.08)
+    if new_le > le + 0.02:
+        kk = list(keep_intervals)
+        kk[-1] = (ls, new_le)
+        return kk
+    return keep_intervals
 
 
 def _apply_cuts_ffmpeg(
