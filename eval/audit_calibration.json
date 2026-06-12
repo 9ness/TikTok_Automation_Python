@@ -1,0 +1,46 @@
+{
+  "_doc": "SET DE CALIBRACIÓN del audit de silence_cutter. Cada entrada es un vídeo real con su VERDAD (lo que de verdad tiene), para medir la fiabilidad del medidor: cuántos FALSOS FALLOS (audit marca fallo donde no lo hay) y FALLOS NO DETECTADOS (audit dice OK pero hay un problema real). Tras cada cambio del motor/audit se re-corre y se mide contra TODO el set → fin del 'a remolque'. También es la base del A/B de ASR (Whisper vs Deepgram). nestor: confirma/corrige el campo 'truth' de cada uno y añade más vídeos.",
+  "_truth_values": {
+    "good": "vídeo correcto y entregable; el audit DEBERÍA darlo por bueno (sin fallos reales)",
+    "source_rough": "el contenido está completo pero la FUENTE es bruta (pausas/repeticiones grabadas así); el audit no debe culpar al motor",
+    "real_fallo": "tiene un fallo REAL del motor (palabra cortada, ruido, etc.); el audit DEBE marcarlo"
+  },
+  "videos": [
+    {
+      "id": "buga_1",
+      "user": "nueveness",
+      "source": "1781176776_buga_1.MOV",
+      "truth": "good",
+      "real_issues": [],
+      "audit_dio": { "score": 100, "coh": 100, "wfallos": 0 },
+      "nota": "Limpio de verdad. El audit acertó (100)."
+    },
+    {
+      "id": "buga_2",
+      "user": "nueveness",
+      "source": "1781176798_buga_2.mp4",
+      "truth": "good",
+      "real_issues": [],
+      "audit_dio": { "score": 88, "coh": 88, "wfallos": 0 },
+      "nota": "Vídeo PERFECTO. El 88 es FALSO POSITIVO: el juez de coherencia marca 'euros' (que sí está) por mala alineación de Whisper. Caso candidato a que lo arregle un ASR mejor."
+    },
+    {
+      "id": "clienta_2",
+      "user": "nueveness",
+      "source": "1781176867_clienta_2.MOV",
+      "truth": "source_rough",
+      "real_issues": ["picado (pausas residuales)", "toma repetida ('fajas colombianas' x2)"],
+      "audit_dio": { "score": 32, "coh": 100, "wfallos": 0 },
+      "nota": "Contenido completo. El 32 refleja que la FUENTE es bruta (pausones + toma repetida grabados así), no un fallo del motor. El audit debería distinguir 'fuente bruta' de 'fallo del motor'."
+    },
+    {
+      "id": "bugallo_img6968",
+      "user": "bugalleitor",
+      "source": "1781196342_IMG_6968.mov",
+      "truth": "good",
+      "real_issues": [],
+      "audit_dio": { "score": "~95 tras fixes", "coh": 100, "wfallos": 0 },
+      "nota": "Tenía fallos reales (proteína/naranja/cuentas/ruido) → arreglados en sesiones previas. Ahora entregable. Sirve de regresión: que siga saliendo bien."
+    }
+  ]
+}
