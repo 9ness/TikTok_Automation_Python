@@ -972,49 +972,56 @@ def render_subtitles_on_video(
         log_callback(f"🎞️ Componiendo {len(overlays)} sub-clips sobre {W}x{H}…")
 
     final = CompositeVideoClip([video] + overlays, size=(W, H))
-    # CIERRE LIMPIO (mata el "blip"/ruido del último frame) SIN clipar la última
-    # palabra: moviepy mete un artefacto en el PADDING de audio al final (lee
-    # basura tras el fin del stream → blip determinista que va DESPUÉS de un
-    # silencio digital total). NO se puede recortar una cantidad fija (la cola de
-    # la última palabra puede caer ahí y la clipa, p.ej "cuentas"→"cuento").
-    # Solución ADAPTATIVA: localizar el ÚLTIMO audio real del vídeo base (cola de
-    # la última palabra) y cortar el composite justo después (+pad). El blip va
-    # más allá de eso → eliminado; la palabra queda intacta.
-    try:
-        import numpy as _np
-        _vid_dur = float(video.duration)
-        _end_t = _vid_dur
-        if video.audio is not None:
-            _sr = 22050
-            _sa = video.audio.to_soundarray(fps=_sr)
-            _amp = _np.max(_np.abs(_sa), axis=1) if _sa.ndim > 1 else _np.abs(_sa)
-            # umbral ~-46 dBFS: capta la fricativa floja de la última palabra,
-            # pero NO el silencio digital (~0) del padding/fade-out.
-            _idx = _np.where(_amp > 0.005)[0]
-            if len(_idx):
-                _cand = float(_idx[-1]) / _sr + 0.12  # cola natural tras la voz
-                if _cand < _vid_dur - 0.01:
-                    _end_t = _cand
-        if _end_t < _vid_dur - 0.01:
-            final = final.subclip(0, max(0.2, _end_t))
-            # micro fade SOLO sobre el pad de silencio (no llega a la palabra)
-            from moviepy.audio.fx.audio_fadeout import audio_fadeout
-            if final.audio is not None:
-                final = final.set_audio(final.audio.fx(audio_fadeout, 0.05))
-    except Exception:
-        pass
 
     ffmpeg_extra = ["-pix_fmt", "yuv420p", "-crf", str(quality_settings.get("crf", 20))]
 
-    final.write_videofile(
-        output_path,
-        fps=video.fps,
-        codec="libx264",
-        audio_codec="aac",
-        preset=quality_settings.get("preset", "medium"),
-        threads=8,
-        logger=logger,
-        ffmpeg_params=ffmpeg_extra,
-    )
+    # RENDER EN 2 PASOS para eliminar de RAÍZ el "blip"/ruido del último frame:
+    # moviepy, al re-encodear el AUDIO (AAC), mete un artefacto determinista al
+    # final (lee tras el fin del stream). En vez de parchearlo, moviepy escribe
+    # SOLO el vídeo (subs quemados) y el audio se MUXEA con ffmpeg directo desde
+    # el input, SIN tocarlo. Así el audio final es EXACTAMENTE el del input (voz
+    # íntegra, cierre tal cual lo dejó el silence_cutter) y el blip nunca existe.
+    # -shortest recorta si moviepy alargó el vídeo unos ms.
+    import os as _os
+    import subprocess as _sp
+    _noaudio = output_path + ".noaudio.mp4"
+    try:
+        final.write_videofile(
+            _noaudio,
+            fps=video.fps,
+            codec="libx264",
+            audio=False,
+            preset=quality_settings.get("preset", "medium"),
+            threads=8,
+            logger=logger,
+            ffmpeg_params=ffmpeg_extra,
+        )
+        _sp.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", _noaudio, "-i", video_path,
+                "-map", "0:v:0", "-map", "1:a:0?",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+                "-shortest", "-movflags", "+faststart",
+                output_path,
+            ],
+            check=True,
+        )
+        try:
+            _os.remove(_noaudio)
+        except OSError:
+            pass
+    except Exception:
+        # Fallback robusto: si el mux falla, render moviepy clásico (con audio).
+        final.write_videofile(
+            output_path,
+            fps=video.fps,
+            codec="libx264",
+            audio_codec="aac",
+            preset=quality_settings.get("preset", "medium"),
+            threads=8,
+            logger=logger,
+            ffmpeg_params=ffmpeg_extra,
+        )
     video.close()
     return output_path

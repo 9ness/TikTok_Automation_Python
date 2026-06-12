@@ -1289,6 +1289,7 @@ class SilenceCutterTool:
             )
         diagnostic["final"]["audio_normalized"] = normalize_audio
         ctx.on_progress(0.72, "✂️ Aplicando cortes con FFmpeg…")
+        _content_end_out = _content_end_output_s(keep_intervals, tmp_audio)
         _apply_cuts_ffmpeg(
             input_path=input_path,
             output_path=output_path,
@@ -1298,6 +1299,7 @@ class SilenceCutterTool:
             log=ctx.on_log,
             on_progress=lambda f: ctx.on_progress(0.72 + f * 0.25, "✂️ Renderizando…"),
             normalize_audio=normalize_audio,
+            content_end_s=_content_end_out,
         )
 
         # 10) Auditoría post-render — analizar el MP4 final con silencedetect
@@ -1549,6 +1551,7 @@ class SilenceCutterTool:
                                 0.985, f"🩹 Re-render corrección {attempt}…",
                             ),
                             normalize_audio=normalize_audio,
+                            content_end_s=_content_end_output_s(new_keeps, tmp_audio),
                         )
                     except Exception as e:  # noqa: BLE001
                         try:
@@ -5829,6 +5832,62 @@ def _aspect_filter(output_aspect: str) -> str | None:
     )
 
 
+def _content_end_output_s(
+    keep_intervals: list[tuple[float, float]], audio_path: str
+) -> float | None:
+    """Instante de OUTPUT (s) justo tras el ÚLTIMO audio REAL (energía) del
+    último keep. Sirve para anclar el fade de cierre SOLO sobre el silencio
+    post-voz, de modo que NUNCA clipe la última palabra: Whisper sub-reporta la
+    cola fricativa final ("-s"/"-tas"), pero la energía no. Si la voz llena el
+    último keep (no hay cola muda), devuelve ~total → no habrá fade. None si no
+    se puede medir (decode/formato/silencio) → el llamador usa un fade mínimo."""
+    if not keep_intervals or not audio_path or not os.path.exists(audio_path):
+        return None
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return None
+    if sampwidth != 2 or sr <= 0:
+        return None
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    ls, le = keep_intervals[-1]
+    i0 = max(0, int(ls * sr)); i1 = min(len(audio), int(le * sr))
+    win = max(1, int(0.020 * sr)); hop = max(1, int(0.010 * sr))
+    if i1 - i0 < win * 2:
+        return None
+    seg = audio[i0:i1]
+    ts: list[float] = []; rms: list[float] = []
+    pos = 0
+    while pos + win <= len(seg):
+        s = seg[pos:pos + win]
+        rms.append(float(np.sqrt(np.mean(s * s))) + 1e-9)
+        ts.append(ls + (pos + win / 2) / sr)
+        pos += hop
+    if len(rms) < 3:
+        return None
+    a = np.array(rms)
+    # umbral relativo: suelo local (percentil 20) +12 dB, o -48 dBFS absoluto.
+    floor = float(np.percentile(a, 20))
+    thr = max(floor * (10.0 ** (12.0 / 20.0)), 32768.0 * 0.004)
+    voiced = np.where(a > thr)[0]
+    if len(voiced) == 0:
+        return None
+    last_src = min(le, ts[int(voiced[-1])] + 0.06)  # +60 ms de cola natural
+    acc = 0.0
+    for s, e in keep_intervals:
+        if last_src <= e:
+            return acc + max(0.0, last_src - s)
+        acc += (e - s)
+    return acc
+
+
 def _apply_cuts_ffmpeg(
     *,
     input_path: str,
@@ -5839,6 +5898,7 @@ def _apply_cuts_ffmpeg(
     log,
     on_progress,
     normalize_audio: bool = False,
+    content_end_s: float | None = None,
 ) -> None:
     """Concatena los `keep_intervals` con un filter_complex de FFmpeg.
 
@@ -5911,7 +5971,15 @@ def _apply_cuts_ffmpeg(
     if normalize_audio:
         _chain.append("[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]")
         a_out = "[outa_norm]"
-    _fade_d = min(_FADE_TAIL_S, max(0.0, total_output_s - 0.15))
+    # Fade de cierre ANCLADO al fin del audio real (content_end_s): cubre SOLO el
+    # silencio post-voz → JAMÁS clipa la última palabra. Si la voz llena el último
+    # keep (content_end≈total) el fade es 0 (no hay cola que desvanecer; la voz se
+    # respeta entera). Sin ese dato, fade mínimo de seguridad. La duración nunca
+    # empieza antes de content_end porque d ≤ total−content_end.
+    if content_end_s is not None:
+        _fade_d = min(_FADE_TAIL_S, max(0.0, total_output_s - float(content_end_s)))
+    else:
+        _fade_d = min(0.06, max(0.0, total_output_s - 0.15))
     if _fade_d >= 0.05:
         _fst = max(0.0, total_output_s - _fade_d)
         _chain.append(f"{a_out}afade=t=out:st={_fst:.3f}:d={_fade_d:.3f}[outa_fin]")
