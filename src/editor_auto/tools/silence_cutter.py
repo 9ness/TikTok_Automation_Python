@@ -5868,12 +5868,11 @@ def _apply_cuts_ffmpeg(
             f"setpts=PTS-STARTPTS{extra_vf}[v{i}]"
         )
         seg_dur = end - start
-        # Fade-out del ÚLTIMO segmento más largo (~150ms): desvanece la cola
-        # tras la última palabra → mata cualquier residuo/clic/"du" del cierre
-        # (cola de boca, artefacto del corte, lookahead de loudnorm) sin clipar
-        # la palabra. El resto de segmentos usan el micro-fade de 20ms.
-        is_last = (i == len(keep_intervals) - 1)
-        fade_out_d = _FADE_TAIL_S if (is_last and seg_dur >= 0.35) else _FADE_S
+        # Micro-fade de 20ms en cada segmento (anti-clic de concat). El fade de
+        # CIERRE grande ya NO se hace aquí: se aplica DESPUÉS de loudnorm (si no,
+        # loudnorm ve la cola desvanecida y SUBE la ganancia para compensar →
+        # amplifica el residuo del final = el "burst" del último frame).
+        fade_out_d = _FADE_S
         # Solo aplicamos fades si el segmento es lo suficientemente largo
         # para no comerse contenido (mínimo 100ms para 20+20ms de fades).
         if seg_dur >= 0.10:
@@ -5892,15 +5891,25 @@ def _apply_cuts_ffmpeg(
         filter_parts.append(audio_filter)
         concat_inputs.append(f"[v{i}][a{i}]")
 
-    # Etiqueta de salida de audio: si normalizamos, encadenamos loudnorm
-    # (EBU R128 → -16 LUFS) DESPUÉS del concat para que TODA la pista quede a
-    # loudness estándar y se oiga (grabaciones bajitas que antes "no se oían").
-    # Se aplica al output final, una sola vez, tras unir los segmentos.
+    # Cadena de audio de salida tras el concat: loudnorm (si toca) y SIEMPRE un
+    # fade-out de cierre FINAL como ÚLTIMA operación. CLAVE: el fade va DESPUÉS de
+    # loudnorm. Si fuera antes (en los segmentos), loudnorm vería la cola
+    # desvaneciéndose y SUBIRÍA la ganancia para mantener −16 LUFS, amplificando
+    # el residuo del final = el "burst"/ruido del último frame. Aplicándolo
+    # después, loudnorm trabaja a nivel pleno (sin subir ganancia) y el fade
+    # cierra limpio → nunca hay ruido raro al final. Robusto y general.
+    total_output_s = sum(end - start for start, end in keep_intervals)
     a_out = "[outa]"
-    norm_part = ""
+    _chain: list[str] = []
     if normalize_audio:
-        norm_part = ";[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]"
+        _chain.append("[outa]loudnorm=I=-16:TP=-1.5:LRA=11[outa_norm]")
         a_out = "[outa_norm]"
+    _fade_d = min(_FADE_TAIL_S, max(0.0, total_output_s - 0.15))
+    if _fade_d >= 0.05:
+        _fst = max(0.0, total_output_s - _fade_d)
+        _chain.append(f"{a_out}afade=t=out:st={_fst:.3f}:d={_fade_d:.3f}[outa_fin]")
+        a_out = "[outa_fin]"
+    norm_part = (";" + ";".join(_chain)) if _chain else ""
 
     concat_filter = (
         "".join(concat_inputs) + f"concat=n={n}:v=1:a=1[outv][outa]"
@@ -5909,7 +5918,7 @@ def _apply_cuts_ffmpeg(
 
     # Duración esperada del output (suma de keep_intervals) → ms para que el
     # progress callback sepa contra qué comparar `out_time_ms` y dar % real.
-    total_output_ms = int(sum(end - start for start, end in keep_intervals) * 1000)
+    total_output_ms = int(total_output_s * 1000)
 
     cmd = [
         "ffmpeg", "-y",
