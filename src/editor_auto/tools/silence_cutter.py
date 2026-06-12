@@ -3998,16 +3998,26 @@ def _ai_coherence_judge(
     # eso marcaba como "perdidas" palabras presentes (proteína/euros) → falsos
     # positivos. El juez evalúa lo que el editor decidió dejar (su intención).
 
-    def _in_keep_c(c: float) -> bool:
-        return any(a - 1e-3 <= c <= b + 1e-3 for a, b in keep_intervals)
+    # Conservada = su span SOLAPA un keep (≥40% de su duración), NO solo el
+    # centro: Whisper coloca mal el tiempo de algunas palabras (deja el centro
+    # justo fuera del keep aunque su AUDIO esté dentro) → con el criterio de
+    # centro se marcaban como "perdidas" palabras presentes (euros). El solape es
+    # robusto a ese error de timing y sigue siendo seguro (una palabra cortada de
+    # verdad no solapa ningún keep).
+    def _kept_overlap(ws: float, we: float) -> bool:
+        dur = max(1e-6, we - ws)
+        ov = sum(
+            max(0.0, min(we, b) - max(ws, a)) for a, b in keep_intervals
+        )
+        return (ov / dur) >= 0.4
 
     kept_words = []
     for w in words:
         try:
-            c = (float(w["start"]) + float(w["end"])) / 2.0
+            ws, we = float(w["start"]), float(w["end"])
         except (KeyError, ValueError, TypeError):
             continue
-        if _in_keep_c(c):
+        if _kept_overlap(ws, we):
             kept_words.append(w)
     out_text = " ".join(str(w.get("word", "")) for w in kept_words).strip()
     if not out_text:
