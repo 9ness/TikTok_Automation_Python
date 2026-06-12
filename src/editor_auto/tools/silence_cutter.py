@@ -1124,6 +1124,29 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Valle en bordes de keep falló: {e}")
 
+        # RESCATE DE VOZ EN BORDES: si un corte acústico + el snap a palabras
+        # clipó voz real pegada al borde de un keep (Whisper mal-alineó/infló el
+        # span o se saltó una palabra: 'naranja' a medias, 'asegúrate' comido),
+        # extendemos el borde hacia esa voz hasta el silencio real — sin entrar
+        # en cortes de CONTENIDO (dedup/falso inicio). Puro audio, agnóstico a
+        # los timings de Whisper. Solo añade keep.
+        try:
+            _content_cuts = [
+                (s, e) for (s, e, src) in cuts_with_source
+                if src in _CONTENT_CUT_SOURCES
+            ]
+            keep_intervals, n_voiced_ext = _extend_keeps_to_voiced_edges(
+                keep_intervals, tmp_audio, _content_cuts,
+            )
+            if n_voiced_ext:
+                ctx.on_log(
+                    f"[silence_cutter] 🗣️ {n_voiced_ext} borde(s) de keep "
+                    f"extendido(s) para rescatar voz clipada por el corte"
+                )
+                diagnostic["phases"]["voiced_edge_rescue"] = {"n": n_voiced_ext}
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[silence_cutter] ⚠️ Rescate de voz en bordes falló: {e}")
+
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
@@ -3000,6 +3023,111 @@ def _preserve_speech_islands_in_cuts(
         if e - cursor >= 0.12:
             new_cuts.append((cursor, e))
     return new_cuts, n_islands
+
+
+def _extend_keeps_to_voiced_edges(
+    keep_intervals: list[tuple[float, float]],
+    audio_path: str,
+    content_cuts: list[tuple[float, float]],
+    *,
+    max_ext_s: float = 0.6,
+    step_s: float = 0.03,
+    drop_db: float = 22.0,
+) -> tuple[list[tuple[float, float]], int]:
+    """Extiende los bordes de cada keep para CAPTURAR la voz adyacente que un
+    corte acústico + el snap a palabras dejó fuera.
+
+    Whisper a veces infla el span de una palabra o se salta una (p.ej. se come
+    'naranja' y mete 'asegúrate' con un span [29.8-32.4] que engloba naranja +
+    pausa + asegúrate). El snap a límites de palabra usa el CENTRO Whisper —que
+    cae en el silencio— y descarta la voz real pegada al borde del keep (la cola
+    de 'naranja', el 'asegúrate' real). Aquí, en cada borde, medimos la energía
+    hacia fuera: mientras siga siendo VOZ (no cae > `drop_db` dB bajo el nivel
+    del propio keep en ese borde) y NO entre en un corte de CONTENIDO (dedup/
+    falso inicio del holístico), extendemos hasta el silencio real (máx
+    `max_ext_s`). Solo AÑADE keep → nunca clipa más. Es agnóstico a los timings
+    de Whisper (puro audio), así que arregla cualquier palabra mal-alineada en un
+    borde. Devuelve (keeps, n_bordes_extendidos)."""
+    if not keep_intervals or not audio_path or not os.path.exists(audio_path):
+        return keep_intervals, 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return keep_intervals, 0
+    if sampwidth != 2:
+        return keep_intervals, 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    total_s = len(audio) / sr
+    win = max(1, int(0.025 * sr))
+    hop = max(1, int(0.020 * sr))
+
+    def _db_at(t: float) -> float:
+        i0 = int(max(0.0, t) * sr); i1 = min(len(audio), i0 + win)
+        if i1 - i0 < 1:
+            return -120.0
+        seg = audio[i0:i1]
+        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+        return 20.0 * float(np.log10(rms / 32768.0))
+
+    # Suelo de SILENCIO global del propio audio (percentil 15 de la energía por
+    # ventanas): NUNCA extender por debajo de `floor + 12 dB` → no metemos
+    # dead-air aunque el borde del keep esté en zona ya quieta.
+    all_db = []
+    pos = 0
+    while pos + win <= len(audio):
+        seg = audio[pos:pos + win]
+        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+        all_db.append(20.0 * float(np.log10(rms / 32768.0)))
+        pos += hop
+    floor = float(np.percentile(all_db, 15)) if all_db else -60.0
+    voice_min = floor + 12.0
+
+    def _in_content_cut(t: float) -> bool:
+        return any(s - 1e-3 <= t <= e + 1e-3 for s, e in content_cuts)
+
+    def _voiced(t: float, thr_rel: float) -> bool:
+        db = _db_at(t)
+        return db >= thr_rel and db >= voice_min
+
+    kept = [(float(a), float(b)) for a, b in keep_intervals]
+    n_ext = 0
+    out: list[tuple[float, float]] = []
+    for a, b in kept:
+        # nivel de referencia = voz cerca del propio borde del keep
+        ref_a = max(_db_at(a + 0.01), _db_at(a + 0.04), _db_at(a + 0.08))
+        ref_b = max(_db_at(b - 0.08), _db_at(b - 0.04), _db_at(b - 0.01))
+        thr_a = ref_a - drop_db
+        thr_b = ref_b - drop_db
+        na, nb = a, b
+        t = a - step_s
+        moved = a
+        while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
+            if _voiced(t, thr_a):
+                moved = t
+            else:
+                break
+            t -= step_s
+        if moved < a - 0.02:
+            na = moved; n_ext += 1
+        t = b + step_s
+        moved = b
+        while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
+            if _voiced(t, thr_b):
+                moved = t
+            else:
+                break
+            t += step_s
+        if moved > b + 0.02:
+            nb = moved; n_ext += 1
+        out.append((max(0.0, na), min(total_s, nb)))
+    return _merge_intervals(out), n_ext
 
 
 def _refine_cut_edges_to_valley(
