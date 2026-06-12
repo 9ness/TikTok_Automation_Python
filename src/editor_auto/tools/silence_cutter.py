@@ -2010,6 +2010,56 @@ def _level_audio(src: str, dst: str, *, log=None) -> bool:
         return False
 
 
+def _transcribe_deepgram(
+    audio_path: str, *, language: str = "es", model: str = "nova-2",
+) -> list[dict]:
+    """Transcribe con Deepgram (timestamps por palabra más precisos que Whisper
+    en audio ruidoso). Devuelve el MISMO formato que `_transcribe`:
+    [{word, start, end}]. Requiere `DEEPGRAM_API_KEY`. Lanza si falla → el
+    caller cae a Whisper. Audio nivelado 16k mono (mismo pre-proceso)."""
+    import json
+    import tempfile
+    import urllib.request
+    key = os.getenv("DEEPGRAM_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError("DEEPGRAM_API_KEY no configurada")
+    wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", audio_path,
+             "-ac", "1", "-ar", "16000", "-vn", wav],
+            check=True, timeout=180,
+        )
+        payload = open(wav, "rb").read()
+    finally:
+        try:
+            os.remove(wav)
+        except OSError:
+            pass
+    url = (
+        f"https://api.deepgram.com/v1/listen?model={model}&language={language}"
+        "&punctuate=true&smart_format=true"
+    )
+    req = urllib.request.Request(
+        url, data=payload, method="POST",
+        headers={"Authorization": f"Token {key}", "Content-Type": "audio/wav"},
+    )
+    with urllib.request.urlopen(req, timeout=300) as r:
+        resp = json.load(r)
+    words = (
+        resp.get("results", {}).get("channels", [{}])[0]
+        .get("alternatives", [{}])[0].get("words", [])
+    )
+    out: list[dict] = []
+    for w in words:
+        out.append({
+            "word": str(w.get("punctuated_word") or w.get("word", "")),
+            "start": float(w.get("start", 0.0)),
+            "end": float(w.get("end", 0.0)),
+        })
+    return out
+
+
 def _transcribe(
     audio_path: str, *, model_size: str, language: str, on_progress,
     timeout_s: int = 1200, fallback_model: str = "small",
@@ -2017,16 +2067,28 @@ def _transcribe(
 ) -> list[dict]:
     """Transcribe con Whisper, robusto a deadlocks de ctranslate2.
 
+    A/B de ASR: si `EDITOR_ASR_PROVIDER=deepgram` (+ `DEEPGRAM_API_KEY`), usa
+    Deepgram (timestamps más limpios). Por defecto 'whisper' → producción intacta.
+    Si Deepgram falla, cae a Whisper (nunca rompe el job).
+
     El deadlock de ctranslate2/int8 en CPU es FLAKY (a veces cuelga, a veces
     no, con el MISMO audio) y más probable con MÁS hilos. Estrategia de
-    ESCALADO de hilos (rápido→seguro→ligero):
-      1) large-v3 a `primary_threads` hilos → RÁPIDO (multi-core).
-      2) Si el watchdog lo mata por deadlock, reintenta large-v3 a 1 HILO →
+    ESCALADO de hilos (rápido->seguro->ligero):
+      1) large-v3 a `primary_threads` hilos -> RÁPIDO (multi-core).
+      2) Si el watchdog lo mata por deadlock, reintenta large-v3 a 1 HILO ->
          más lento pero casi nunca se cuelga; conserva la calidad del modelo.
-      3) Si aún cuelga, cae a `fallback_model` (small) a 1 hilo → garantizado.
+      3) Si aún cuelga, cae a `fallback_model` (small) a 1 hilo -> garantizado.
     El watchdog por inactividad de CPU detecta el cuelgue en ~2-3min (no espera
     el timeout entero), así que el escalado no cuesta 20min por intento.
     """
+    if os.getenv("EDITOR_ASR_PROVIDER", "whisper").strip().lower() == "deepgram":
+        try:
+            dg = _transcribe_deepgram(audio_path, language=language)
+            if dg:
+                return dg
+        except Exception:  # noqa: BLE001 — cualquier fallo → fallback a Whisper
+            pass
+
     primary_threads = max(1, int(primary_threads))
     # (modelo, hilos): 2 intentos de large antes del fallback. Si primary>1, el
     # 2º baja a 1 hilo (más seguro); si primary ya es 1, el 2º es un REINTENTO
