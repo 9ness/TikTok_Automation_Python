@@ -5826,7 +5826,9 @@ def _apply_cuts_ffmpeg(
     # imperceptible para voz humana pero suaviza la transición y limpia
     # cualquier cola de audio que FFmpeg no recorta limpio.
     _FADE_S = 0.02
-    _FADE_TAIL_S = 0.15  # fade-out del cierre — mata el residuo tras la última palabra
+    _FADE_TAIL_S = 0.28  # fade-out del cierre — mata el residuo tras la última
+    #                      palabra (cola de boca/clic/lookahead de loudnorm a
+    #                      nivel de RENDER, resistente a recortar el keep)
 
     filter_parts: list[str] = []
     concat_inputs: list[str] = []
