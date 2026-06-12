@@ -1147,37 +1147,6 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Rescate de voz en bordes falló: {e}")
 
-        # RECORTE DE SILENCIOS INTERNOS: dead-air que quedó DENTRO de un keep
-        # porque Whisper lo etiquetó como palabra (un slot mudo mal-alineado, un
-        # 'y' con span inflado casi todo silencio). Energía pura → recorta el
-        # silencio dejando una pausa natural; respeta las pausas cortas (<0.4s).
-        try:
-            keep_intervals, n_sil_trim = _trim_internal_silences_from_keeps(
-                keep_intervals, tmp_audio,
-            )
-            if n_sil_trim:
-                ctx.on_log(
-                    f"[silence_cutter] 🔇 {n_sil_trim} silencio(s) interno(s) "
-                    f"(dead-air dentro de un keep) recortado(s)"
-                )
-                diagnostic["phases"]["internal_silence_trim"] = {"n": n_sil_trim}
-        except Exception as e:  # noqa: BLE001
-            ctx.on_log(f"[silence_cutter] ⚠️ Recorte de silencios internos falló: {e}")
-
-        # CIERRE LIMPIO: el último keep no debe pasar de la última palabra + pad
-        # (si no, captura respiración/click post-discurso = "sonido raro" final).
-        try:
-            keep_intervals, _clamped_end = _clamp_last_keep_to_last_word(
-                keep_intervals, voiced_words or words, tmp_audio,
-            )
-            if _clamped_end:
-                ctx.on_log(
-                    "[silence_cutter] 🏁 Cierre recortado a la última palabra "
-                    "(elimina sonido no-verbal del final)"
-                )
-        except Exception as e:  # noqa: BLE001
-            ctx.on_log(f"[silence_cutter] ⚠️ Recorte de cierre falló: {e}")
-
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
@@ -3128,199 +3097,37 @@ def _extend_keeps_to_voiced_edges(
         return db >= thr_rel and db >= voice_min
 
     kept = [(float(a), float(b)) for a, b in keep_intervals]
-    n_keeps = len(kept)
     n_ext = 0
     out: list[tuple[float, float]] = []
-    for idx, (a, b) in enumerate(kept):
+    for a, b in kept:
         # nivel de referencia = voz cerca del propio borde del keep
         ref_a = max(_db_at(a + 0.01), _db_at(a + 0.04), _db_at(a + 0.08))
         ref_b = max(_db_at(b - 0.08), _db_at(b - 0.04), _db_at(b - 0.01))
         thr_a = ref_a - drop_db
         thr_b = ref_b - drop_db
         na, nb = a, b
-        # NO extender el ARRANQUE del primer keep ni el FINAL del último: esos
-        # son los bordes del VÍDEO (no hay palabra vecina que rescatar) y
-        # extender ahí captura ruido pre/post-discurso (respiración, click de
-        # boca) → "sonido raro" al final. Solo bordes INTERIORES (junto a un
-        # corte) clipan voz real (naranja, asegúrate).
-        if idx > 0:
-            t = a - step_s
-            moved = a
-            while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
-                if _voiced(t, thr_a):
-                    moved = t
-                else:
-                    break
-                t -= step_s
-            if moved < a - 0.02:
-                na = moved; n_ext += 1
-        if idx < n_keeps - 1:
-            t = b + step_s
-            moved = b
-            while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
-                if _voiced(t, thr_b):
-                    moved = t
-                else:
-                    break
-                t += step_s
-            if moved > b + 0.02:
-                nb = moved; n_ext += 1
+        t = a - step_s
+        moved = a
+        while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
+            if _voiced(t, thr_a):
+                moved = t
+            else:
+                break
+            t -= step_s
+        if moved < a - 0.02:
+            na = moved; n_ext += 1
+        t = b + step_s
+        moved = b
+        while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
+            if _voiced(t, thr_b):
+                moved = t
+            else:
+                break
+            t += step_s
+        if moved > b + 0.02:
+            nb = moved; n_ext += 1
         out.append((max(0.0, na), min(total_s, nb)))
     return _merge_intervals(out), n_ext
-
-
-def _clamp_last_keep_to_last_word(
-    keep_intervals: list[tuple[float, float]],
-    words: list[dict],
-    audio_path: str | None = None,
-    *,
-    tail_pad_s: float = 0.12,
-    valley_search_s: float = 0.4,
-) -> tuple[list[tuple[float, float]], bool]:
-    """Recorta el ÚLTIMO keep para que acabe justo tras la ÚLTIMA palabra.
-
-    Tras los rescates de voz, el último keep a veces se extiende más allá de la
-    última palabra y captura un sonido NO-verbal (respiración, click de boca,
-    arranque de una palabra que Whisper no transcribió) → "sonido raro" justo
-    antes de terminar el vídeo. Cerramos el keep en el VALLE de energía tras la
-    última palabra (corta limpio entre la palabra y el residuo); si no hay audio,
-    en `fin_última_palabra + tail_pad_s`. Solo recorta el cierre. Devuelve
-    (keeps, cambiado)."""
-    if not keep_intervals or not words:
-        return keep_intervals, False
-    a, b = keep_intervals[-1]
-    last_we = None
-    for w in words:
-        try:
-            ws, we = float(w["start"]), float(w["end"])
-        except (KeyError, ValueError, TypeError):
-            continue
-        if min(we, b) - max(ws, a) > 0.0:  # palabra que solapa el último keep
-            last_we = we if last_we is None else max(last_we, we)
-    if last_we is None or b <= last_we + tail_pad_s + 0.03:
-        return keep_intervals, False
-    nb = last_we + tail_pad_s
-    # Afinar al VALLE de energía en [fin_palabra, fin_palabra+valley_search_s]:
-    # el punto más silencioso = la frontera entre la palabra y el residuo.
-    if audio_path and os.path.exists(audio_path):
-        try:
-            import wave
-            import numpy as np
-            with wave.open(audio_path, "rb") as wf:
-                sr = wf.getframerate(); n_ch = wf.getnchannels()
-                sw = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
-            if sw == 2:
-                au = np.frombuffer(raw, dtype=np.int16)
-                if n_ch > 1:
-                    au = au.reshape(-1, n_ch).mean(axis=1)
-                au = au.astype(np.float64)
-                win = max(1, int(0.02 * sr))
-                lo = last_we; hi = min(b, last_we + valley_search_s)
-                best_t = None; best_rms = None
-                t = lo
-                while t <= hi:
-                    i0 = int(t * sr); i1 = min(len(au), i0 + win)
-                    if i1 > i0:
-                        rms = float(np.sqrt(np.mean(au[i0:i1] ** 2)))
-                        if best_rms is None or rms < best_rms:
-                            best_rms = rms; best_t = t
-                    t += 0.01
-                if best_t is not None:
-                    nb = max(last_we + 0.05, best_t)
-        except Exception:
-            pass
-    nb = max(a + 0.1, min(nb, b))
-    if b - nb < 0.04:
-        return keep_intervals, False
-    return keep_intervals[:-1] + [(a, nb)], True
-
-
-def _trim_internal_silences_from_keeps(
-    keep_intervals: list[tuple[float, float]],
-    audio_path: str,
-    *,
-    min_sil_s: float = 0.35,
-    residual_s: float = 0.16,
-    edge_guard_s: float = 0.04,
-    sil_margin_db: float = 10.0,
-) -> tuple[list[tuple[float, float]], int]:
-    """Recorta SILENCIOS internos (dead-air) DENTRO de un keep que el cortador no
-    quitó porque Whisper los etiquetó como parte de una palabra: un slot mudo
-    donde mal-ubicó una palabra (el 'proteína' fantasma en 12.16s) o una palabra
-    con span inflado que es casi todo silencio (un 'y' de ~1s). Mide energía por
-    ventanas; los tramos por debajo de `suelo_global + sil_margin_db` durante
-    ≥`min_sil_s` (sin tocar los `edge_guard_s` de cada borde) se RECORTAN dejando
-    `residual_s` de pausa natural. Solo recorta SILENCIO real → nunca quita voz.
-    Las pausas naturales <`min_sil_s` se respetan. Devuelve (keeps, n_recortes)."""
-    if not keep_intervals or not audio_path or not os.path.exists(audio_path):
-        return keep_intervals, 0
-    import wave
-    try:
-        with wave.open(audio_path, "rb") as wf:
-            sr = wf.getframerate(); n_ch = wf.getnchannels()
-            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
-    except Exception:
-        return keep_intervals, 0
-    if sampwidth != 2:
-        return keep_intervals, 0
-    import numpy as np
-    audio = np.frombuffer(raw, dtype=np.int16)
-    if n_ch > 1:
-        audio = audio.reshape(-1, n_ch).mean(axis=1)
-    audio = audio.astype(np.float64)
-    win = max(1, int(0.025 * sr)); hop = max(1, int(0.020 * sr))
-
-    all_db = []
-    pos = 0
-    while pos + win <= len(audio):
-        seg = audio[pos:pos + win]
-        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
-        all_db.append(20.0 * float(np.log10(rms / 32768.0)))
-        pos += hop
-    floor = float(np.percentile(all_db, 15)) if all_db else -60.0
-    sil_thr = floor + sil_margin_db
-
-    def _db_at(t: float) -> float:
-        i0 = int(max(0.0, t) * sr); i1 = min(len(audio), i0 + win)
-        if i1 - i0 < 1:
-            return -120.0
-        seg = audio[i0:i1]
-        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
-        return 20.0 * float(np.log10(rms / 32768.0))
-
-    out: list[tuple[float, float]] = []
-    n_trim = 0
-    for a, b in keep_intervals:
-        a = float(a); b = float(b)
-        # localizar tramos de SILENCIO internos
-        sils: list[tuple[float, float]] = []
-        t = a + edge_guard_s
-        run_start = None
-        while t <= b - edge_guard_s:
-            if _db_at(t) < sil_thr:
-                if run_start is None:
-                    run_start = t
-            elif run_start is not None:
-                if (t - run_start) >= min_sil_s:
-                    sils.append((run_start, t))
-                run_start = None
-            t += hop / sr
-        if run_start is not None and (b - edge_guard_s - run_start) >= min_sil_s:
-            sils.append((run_start, b - edge_guard_s))
-        if not sils:
-            out.append((a, b)); continue
-        # cortar cada silencio dejando `residual_s` de pausa (mitad a cada lado)
-        cursor = a
-        for si, se in sils:
-            keep_to = si + residual_s / 2.0
-            resume = se - residual_s / 2.0
-            if keep_to - cursor >= 0.12:
-                out.append((cursor, keep_to))
-            cursor = max(cursor, resume)
-            n_trim += 1
-        if b - cursor >= 0.12:
-            out.append((cursor, b))
-    return _merge_intervals(out), n_trim
 
 
 def _refine_cut_edges_to_valley(
@@ -4052,20 +3859,16 @@ def _ai_coherence_judge(
     # eso marcaba como "perdidas" palabras presentes (proteína/euros) → falsos
     # positivos. El juez evalúa lo que el editor decidió dejar (su intención).
 
-    # Una palabra cuenta como CONSERVADA si su span SOLAPA un keep ≥30% (no solo
-    # por su centro): Whisper mal-ubica palabras (el 'proteína' fantasma cuyo
-    # AUDIO real se rescató en otra isla y cuyo slot etiquetado se recortó por
-    # silencio) → con criterio de centro el juez creía que faltaba y daba un
-    # falso positivo. El solape es robusto a esos timestamps imprecisos.
+    def _in_keep_c(c: float) -> bool:
+        return any(a - 1e-3 <= c <= b + 1e-3 for a, b in keep_intervals)
+
     kept_words = []
     for w in words:
         try:
-            ws, we = float(w["start"]), float(w["end"])
+            c = (float(w["start"]) + float(w["end"])) / 2.0
         except (KeyError, ValueError, TypeError):
             continue
-        dur = max(1e-6, we - ws)
-        ov = sum(max(0.0, min(we, e) - max(ws, s)) for s, e in keep_intervals)
-        if (ov / dur) >= 0.30:
+        if _in_keep_c(c):
             kept_words.append(w)
     out_text = " ".join(str(w.get("word", "")) for w in kept_words).strip()
     if not out_text:
@@ -5826,9 +5629,7 @@ def _apply_cuts_ffmpeg(
     # imperceptible para voz humana pero suaviza la transición y limpia
     # cualquier cola de audio que FFmpeg no recorta limpio.
     _FADE_S = 0.02
-    _FADE_TAIL_S = 0.28  # fade-out del cierre — mata el residuo tras la última
-    #                      palabra (cola de boca/clic/lookahead de loudnorm a
-    #                      nivel de RENDER, resistente a recortar el keep)
+    _FADE_TAIL_S = 0.15  # fade-out del cierre — mata el residuo tras la última palabra
 
     filter_parts: list[str] = []
     concat_inputs: list[str] = []
