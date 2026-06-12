@@ -3183,34 +3183,41 @@ def _extend_keeps_to_voiced_edges(
 
     kept = [(float(a), float(b)) for a, b in keep_intervals]
     n_ext = 0
+    n_keeps = len(kept)
     out: list[tuple[float, float]] = []
-    for a, b in kept:
+    for idx, (a, b) in enumerate(kept):
         # nivel de referencia = voz cerca del propio borde del keep
         ref_a = max(_db_at(a + 0.01), _db_at(a + 0.04), _db_at(a + 0.08))
         ref_b = max(_db_at(b - 0.08), _db_at(b - 0.04), _db_at(b - 0.01))
         thr_a = ref_a - drop_db
         thr_b = ref_b - drop_db
         na, nb = a, b
-        t = a - step_s
-        moved = a
-        while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
-            if _voiced(t, thr_a):
-                moved = t
-            else:
-                break
-            t -= step_s
-        if moved < a - 0.02:
-            na = moved; n_ext += 1
-        t = b + step_s
-        moved = b
-        while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
-            if _voiced(t, thr_b):
-                moved = t
-            else:
-                break
-            t += step_s
-        if moved > b + 0.02:
-            nb = moved; n_ext += 1
+        # NO extender el ARRANQUE del primer keep ni el FINAL del último: son los
+        # bordes del VÍDEO, no hay palabra clipada que rescatar, y extender ahí
+        # mete ruido pre/post-discurso (respiración/click) = "ruido raro" del
+        # último frame. Solo bordes INTERIORES (junto a un corte) clipan voz.
+        if idx > 0:
+            t = a - step_s
+            moved = a
+            while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
+                if _voiced(t, thr_a):
+                    moved = t
+                else:
+                    break
+                t -= step_s
+            if moved < a - 0.02:
+                na = moved; n_ext += 1
+        if idx < n_keeps - 1:
+            t = b + step_s
+            moved = b
+            while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
+                if _voiced(t, thr_b):
+                    moved = t
+                else:
+                    break
+                t += step_s
+            if moved > b + 0.02:
+                nb = moved; n_ext += 1
         out.append((max(0.0, na), min(total_s, nb)))
     return _merge_intervals(out), n_ext
 
