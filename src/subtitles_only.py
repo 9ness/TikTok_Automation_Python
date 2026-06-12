@@ -972,18 +972,21 @@ def render_subtitles_on_video(
         log_callback(f"🎞️ Componiendo {len(overlays)} sub-clips sobre {W}x{H}…")
 
     final = CompositeVideoClip([video] + overlays, size=(W, H))
-    # Cerrar a la duración EXACTA del vídeo base: un sub-clip que por redondeo
-    # acabe un pelo más allá hace que moviepy EXTIENDA el composite y lea 1 frame
-    # de audio de más al final → un "blip"/ruido en el último frame. Fijar la
-    # duración lo elimina de raíz. + fade-out de audio de seguridad.
+    # CIERRE LIMPIO (mata el "blip"/ruido del último frame): moviepy mete un
+    # artefacto en el PADDING de audio al final (lee tras el fin del stream de
+    # audio → basura determinista ~0.12s antes del final). El silence_cutter ya
+    # deja la voz cerrada con fade ~0.3s antes del final, así que recortamos los
+    # últimos ~130ms (ya post-voz, silencio) → elimina el blip de RAÍZ, no solo
+    # lo atenúa. + fade-out de audio de seguridad sobre el nuevo cierre.
     try:
-        final = final.set_duration(float(video.duration))
+        _end_t = max(0.2, float(video.duration) - 0.13)
+        final = final.subclip(0, _end_t)
     except Exception:
         pass
     try:
         from moviepy.audio.fx.audio_fadeout import audio_fadeout
         if final.audio is not None:
-            final = final.set_audio(final.audio.fx(audio_fadeout, 0.2))
+            final = final.set_audio(final.audio.fx(audio_fadeout, 0.15))
     except Exception:
         pass
 
