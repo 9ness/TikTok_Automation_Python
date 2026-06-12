@@ -1535,6 +1535,16 @@ class SilenceCutterTool:
                             )
                     except Exception:  # noqa: BLE001
                         pass
+                    # Re-extender la cola de la última palabra: _snap_keeps_to_words
+                    # (arriba) la recorta al fin de palabra de Whisper, que sub-
+                    # reporta la fricativa final. Igual que el render principal, la
+                    # recuperamos por energía — si no, el render del self-heal (que
+                    # PISA al principal cuando mejora el score) clipa "cuentas"→
+                    # "cuento". Esta era la pieza que faltaba.
+                    if bool(config.get("extend_last_word_tail", True)):
+                        new_keeps = _extend_last_keep_to_word_tail(
+                            new_keeps, tmp_audio, video_duration
+                        )
                     kept_now = sum(b - a for a, b in new_keeps)
                     kept_before = sum(b - a for a, b in best_keeps)
                     if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
