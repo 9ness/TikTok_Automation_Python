@@ -70,6 +70,19 @@ _MIN_REMAINING_S = 0.10        # sub-cuts más cortos tras trim se descartan
 # margen de sobra (objetivo: NUNCA comerse una palabra).
 _WORD_GUARD_S = 0.15
 
+# Re-alineación de spans INFLADOS de Whisper (palabra real + pausa absorbida,
+# p.ej. 'asegúrate' 2.6s, 'muchísimo' 2.78s). Encoge SOLO el span a su voz
+# dominante para liberar el silencio absorbido. Umbrales relativos al suelo
+# LOCAL del propio span (la voz floja a −25dB lee como voz) — clave para no
+# tocar voz floja real (lección de regresiones por umbral absoluto).
+_REALIGN_INFLATE_HARD_S = 1.6   # cualquier token >= esto = candidato
+_REALIGN_INFLATE_SOFT_S = 0.9   # token corto/filler/stopword >= esto = candidato
+_REALIGN_VOICE_DB = 12.0        # voz = energía >= suelo_local_del_span + esto
+_REALIGN_MIN_DEAD_S = 0.35      # prueba de INFLACIÓN: hueco mudo contiguo mínimo
+_REALIGN_MIN_RUN_S = 0.12       # run de voz mínimo (nunca dejar palabra < esto)
+_REALIGN_BRIDGE_S = 0.10        # puentea micro-dips dentro de una palabra
+_REALIGN_PAD_S = 0.06           # margen alrededor del run de voz
+
 
 class SilenceCutterTool:
     tool_id: str = TOOL_SILENCE_CUTTER
@@ -377,6 +390,35 @@ class SilenceCutterTool:
                 "preview_first_10": [w.get("word") for w in words[:10]],
                 "preview_last_5": [w.get("word") for w in words[-5:]],
             }
+
+            # 3a) RE-ALINEAR SPANS INFLADOS: Whisper a veces marca una palabra
+            # mucho más larga de lo que suena (palabra + pausa absorbida:
+            # 'asegúrate' 2.6s, 'muchísimo' 2.78s). Encogemos SOLO el span a su
+            # voz dominante — nunca movemos/insertamos/borramos/reordenamos una
+            # palabra → seguro por construcción (no puede perder una palabra,
+            # resucitar un tartamudeo, ni cortar voz floja). Así el silencio
+            # absorbido queda LIBRE y el cortador de pausas lo quita normalmente.
+            # Corre ANTES de todo (fillers/fantasmas/auto-trim/IA) para que TODAS
+            # las fases vean spans consistentes. Lee el audio nivelado (el que
+            # Whisper transcribió). Con kill-switch.
+            if words and bool(config.get("realign_inflated_spans", True)):
+                try:
+                    n_re = _shrink_inflated_word_spans(words, tmp_audio_vad)
+                    diagnostic["phases"]["span_realign"] = {
+                        "n_shrunk": n_re,
+                        "preview": [
+                            {"w": w.get("word"),
+                             "start": w.get("start"), "end": w.get("end")}
+                            for w in words if w.get("_realigned")
+                        ][:10],
+                    }
+                    if n_re:
+                        ctx.on_log(
+                            f"[silence_cutter] 📐 {n_re} span(s) inflado(s) "
+                            f"encogido(s) a su voz (silencio liberado para cortar)"
+                        )
+                except Exception as e:  # noqa: BLE001
+                    ctx.on_log(f"[silence_cutter] ⚠️ Re-alineación de spans falló: {e}")
 
         # 3b) FILLERS ESTIRADOS — palabra que dura ANORMALMENTE mucho. A veces
         # es un sonido no-hablado etiquetado como palabra ("la"/risa), PERO a
@@ -4208,6 +4250,149 @@ def _complete_final_phrase(
                 return _merge_intervals(out), ("recortar_atras", len(inside) - 1 - idx)
             break
     return keep_intervals, None
+
+
+def _longest_below(
+    ts: list[float], dbs: list[float], thr: float, lo: float, hi: float,
+) -> float:
+    """Duración del tramo CONTIGUO más largo por DEBAJO de `thr` dentro de
+    [lo, hi]. Sirve para probar que una zona es silencio real (no una sílaba
+    floja continua)."""
+    best = 0.0
+    run_start = None
+    last_t = None
+    for t, db in zip(ts, dbs):
+        if t < lo or t > hi:
+            continue
+        if db < thr:
+            if run_start is None:
+                run_start = t
+            last_t = t
+        else:
+            if run_start is not None and last_t is not None:
+                best = max(best, last_t - run_start)
+            run_start = None
+    if run_start is not None and last_t is not None:
+        best = max(best, last_t - run_start)
+    return best
+
+
+def _shrink_inflated_word_spans(words: list[dict], audio_path: str) -> int:
+    """Encoge SOLO los spans INFLADOS de Whisper (palabra real + pausa absorbida)
+    a su voz dominante. NUNCA mueve/inserta/borra/reordena/re-textea una palabra
+    → seguro POR CONSTRUCCIÓN: no puede perder una palabra (solo edita start/end
+    de un dict existente), resucitar un tartamudeo (jamás extiende un span hacia
+    audio vecino, solo lo reduce), ni cortar voz floja (umbral relativo al suelo
+    local + prueba de hueco mudo contiguo). Al reducir el span, el silencio
+    absorbido queda LIBRE para que el cortador de pausas existente lo quite.
+
+    Lee `audio_path` (el audio nivelado que Whisper transcribió → mismo marco de
+    referencia). Determinista. Devuelve nº de palabras encogidas. Cualquier fallo
+    de decode → 0 y palabras intactas."""
+    if not words or not audio_path or not os.path.exists(audio_path):
+        return 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return 0
+    if sampwidth != 2:
+        return 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    win = max(1, int(0.020 * sr)); hop = max(1, int(0.005 * sr))
+
+    def _windows(a: float, b: float) -> tuple[list[float], list[float]]:
+        i0 = max(0, int(a * sr)); i1 = min(len(audio), int(b * sr))
+        ts: list[float] = []; dbs: list[float] = []
+        pos = i0
+        while pos + win <= i1:
+            seg = audio[pos:pos + win]
+            rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+            ts.append((pos + win / 2) / sr)
+            dbs.append(20.0 * float(np.log10(rms / 32768.0)))
+            pos += hop
+        return ts, dbs
+
+    n_shrunk = 0
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        dur = we - ws
+        tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+        # GATE 1 — pre-screen barato por duración/token (toca <5% de palabras).
+        short_or_filler = (
+            len(tok) <= 3 or tok in _FILLER_TOKENS or tok in _AUDIT_STOPWORDS
+        )
+        if not (dur >= _REALIGN_INFLATE_HARD_S
+                or (dur >= _REALIGN_INFLATE_SOFT_S and short_or_filler)):
+            continue
+        ts, dbs = _windows(ws, we)
+        if len(dbs) < 4:
+            continue
+        # Umbral RELATIVO al suelo local del span (voz floja sigue siendo voz).
+        floor = float(np.percentile(dbs, 10))
+        thr = floor + _REALIGN_VOICE_DB
+        # Runs de voz, puenteando micro-dips (<BRIDGE) dentro de una palabra.
+        runs: list[tuple[float, float]] = []
+        run_s = None; prev_voiced_t = None
+        for t, db in zip(ts, dbs):
+            if db >= thr:
+                if run_s is None:
+                    run_s = t
+                prev_voiced_t = t
+            elif run_s is not None and prev_voiced_t is not None \
+                    and (t - prev_voiced_t) > _REALIGN_BRIDGE_S:
+                runs.append((run_s, prev_voiced_t)); run_s = None
+        if run_s is not None and prev_voiced_t is not None:
+            runs.append((run_s, prev_voiced_t))
+        runs = [(a, b) for a, b in runs if (b - a) >= _REALIGN_MIN_RUN_S]
+        if not runs:
+            continue  # sin voz dentro → mis-placed → dejar a island-rescue, NO tocar
+        # ANCHOR-RESPECT: run más cercano al ONSET de Whisper (confiamos el start
+        # mucho más que el end). Encoge sobre todo la COLA.
+        run_a, run_b = min(runs, key=lambda r: abs(r[0] - ws))
+        # GATE 2 — prueba de INFLACIÓN: hueco mudo contiguo ≥MIN_DEAD entre el fin
+        # del run dominante y el fin de la palabra. Sin hueco → palabra real larga
+        # (un 'adidas' lento) → NO tocar.
+        if _longest_below(ts, dbs, thr, run_b, we) < _REALIGN_MIN_DEAD_S:
+            continue
+        new_s = max(ws, run_a - _REALIGN_PAD_S)
+        new_e = min(we, run_b + _REALIGN_PAD_S)
+        # GATE 3 — cambio significativo.
+        if not (new_e < we - 0.10 or new_s > ws + 0.10):
+            continue
+        # GATE 4 — nunca vaciar una palabra.
+        if new_e - new_s < _REALIGN_MIN_RUN_S:
+            continue
+        # GATE 5 — probar que la COLA liberada es silencio real (no una sílaba
+        # floja continua tipo 'claro ya'): hueco mudo contiguo ≥MIN_DEAD.
+        if (we - new_e) > 0.05 and \
+                _longest_below(ts, dbs, thr, new_e, we) < _REALIGN_MIN_DEAD_S:
+            continue
+        w["start"] = round(new_s, 3); w["end"] = round(new_e, 3)
+        w["_realigned"] = True
+        n_shrunk += 1
+
+    # MONOTONICIDAD (belt-and-suspenders): como solo encogemos hacia dentro, los
+    # spans no pueden solapar al vecino; este clamp garantiza la invariante que
+    # asumen _snap_keeps_to_words / _protect_word_boundaries.
+    for i in range(1, len(words)):
+        try:
+            if float(words[i]["start"]) < float(words[i - 1]["end"]):
+                words[i]["start"] = round(float(words[i - 1]["end"]), 3)
+                if float(words[i]["end"]) < float(words[i]["start"]):
+                    words[i]["end"] = float(words[i]["start"])
+        except (KeyError, ValueError, TypeError):
+            continue
+    return n_shrunk
 
 
 def _refine_keep_edges_to_valley(
