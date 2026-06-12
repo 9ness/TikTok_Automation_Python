@@ -999,6 +999,27 @@ class SilenceCutterTool:
                 f"[silence_cutter] 🔊 Bordes ajustados al silencio real "
                 f"(amplitud): {n_pre_amp} → {len(merged_cuts)} cortes"
             )
+        # ANTI-CORTE-DE-VOZ: un corte de "silencio" largo a veces engulle una
+        # palabra que Whisper MAL-ALINEÓ fuera de él (le puso timestamp en una
+        # zona muda contigua — p.ej. 'proteína', cuyo audio real está a ~3.8s del
+        # slot donde Whisper la etiquetó; el hueco entre medias se cortaba entero
+        # llevándose la voz). Esa palabra es AUDIBLE: su energía está MUY por
+        # encima del silencio real del propio corte. Partimos el corte para
+        # CONSERVAR esas islas de voz. Solo deja de cortar → nunca sobre-corta.
+        try:
+            merged_cuts, n_islands = _preserve_speech_islands_in_cuts(
+                merged_cuts, tmp_audio,
+            )
+            if n_islands:
+                merged_cuts = _merge_intervals(merged_cuts)
+                ctx.on_log(
+                    f"[silence_cutter] 🗣️ {n_islands} isla(s) de VOZ rescatada(s) de "
+                    f"dentro de un corte (palabra mal-alineada por Whisper, no se pierde)"
+                )
+                diagnostic["phases"]["speech_islands_preserved"] = {"n": n_islands}
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[silence_cutter] ⚠️ Rescate de islas de voz falló: {e}")
+
         # NOTA: tmp_audio se conserva hasta el final de run() — el refinado de
         # bordes de KEEP al valle de energía (y el del self-heal) lo necesitan.
 
@@ -2886,6 +2907,99 @@ def _protect_word_boundaries(
         if ne - ns > 0.05:
             out.append((ns, ne))
     return out
+
+
+def _preserve_speech_islands_in_cuts(
+    cuts: list[tuple[float, float]],
+    audio_path: str,
+    *,
+    min_cut_s: float = 1.0,
+    min_island_s: float = 0.22,
+    db_above_floor: float = 14.0,
+    edge_guard_s: float = 0.18,
+    pad_s: float = 0.08,
+) -> tuple[list[tuple[float, float]], int]:
+    """Rescata ISLAS de voz atrapadas dentro de un corte largo de 'silencio'.
+
+    Whisper a veces MAL-ALINEA una palabra: le pone el timestamp en una zona muda
+    contigua y deja su audio real dentro de un hueco SIN palabras que el cortador
+    elimina entero (caso real: 'proteína', cuyo audio está a ~3.8s del slot donde
+    Whisper la marcó). Esa palabra es AUDIBLE: su energía está MUY por encima del
+    silencio real de su alrededor. Para cada corte ≥`min_cut_s` medimos RMS por
+    ventanas de 20ms y detectamos tramos ≥`min_island_s` con energía
+    ≥`db_above_floor` dB sobre el SUELO de ruido del PROPIO corte (percentil 10).
+    Esas islas se SACAN del corte (se conservan, con `pad_s` de margen). Se
+    ignoran islas pegadas a los bordes (`edge_guard_s`: colas/onsets de las
+    palabras vecinas, ya cubiertas por el word-guard). Solo REDUCE el corte —
+    nunca corta más. Devuelve (cuts_nuevos, n_islas)."""
+    if not cuts or not audio_path or not os.path.exists(audio_path):
+        return cuts, 0
+    if not any((e - s) >= min_cut_s for s, e in cuts):
+        return cuts, 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return cuts, 0
+    if sampwidth != 2:
+        return cuts, 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    win = max(1, int(0.020 * sr)); hop = max(1, int(0.010 * sr))
+
+    def _db_windows(s: float, e: float) -> tuple[list[float], list[float]]:
+        i0 = max(0, int(s * sr)); i1 = min(len(audio), int(e * sr))
+        ts: list[float] = []; dbs: list[float] = []
+        pos = i0
+        while pos + win <= i1:
+            seg = audio[pos:pos + win]
+            rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+            ts.append((pos + win / 2) / sr)
+            dbs.append(20.0 * float(np.log10(rms / 32768.0)))
+            pos += hop
+        return ts, dbs
+
+    new_cuts: list[tuple[float, float]] = []
+    n_islands = 0
+    for s, e in cuts:
+        if (e - s) < min_cut_s:
+            new_cuts.append((s, e)); continue
+        ts, dbs = _db_windows(s, e)
+        if len(dbs) < 4:
+            new_cuts.append((s, e)); continue
+        floor = float(np.percentile(dbs, 10))
+        thr = floor + db_above_floor
+        islands: list[tuple[float, float]] = []
+        run_start = None
+        for k, db in enumerate(dbs):
+            if db >= thr:
+                if run_start is None:
+                    run_start = k
+            elif run_start is not None:
+                islands.append((ts[run_start], ts[k - 1])); run_start = None
+        if run_start is not None:
+            islands.append((ts[run_start], ts[-1]))
+        good = [
+            (a, b) for a, b in islands
+            if (b - a) >= min_island_s and a > s + edge_guard_s and b < e - edge_guard_s
+        ]
+        if not good:
+            new_cuts.append((s, e)); continue
+        cursor = s
+        for a, b in good:
+            a = max(s, a - pad_s); b = min(e, b + pad_s)
+            if a - cursor >= 0.12:
+                new_cuts.append((cursor, a))
+            cursor = max(cursor, b)
+            n_islands += 1
+        if e - cursor >= 0.12:
+            new_cuts.append((cursor, e))
+    return new_cuts, n_islands
 
 
 def _refine_cut_edges_to_valley(
