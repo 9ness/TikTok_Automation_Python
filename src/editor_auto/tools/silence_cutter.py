@@ -1164,6 +1164,20 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Recorte de silencios internos falló: {e}")
 
+        # CIERRE LIMPIO: el último keep no debe pasar de la última palabra + pad
+        # (si no, captura respiración/click post-discurso = "sonido raro" final).
+        try:
+            keep_intervals, _clamped_end = _clamp_last_keep_to_last_word(
+                keep_intervals, voiced_words or words,
+            )
+            if _clamped_end:
+                ctx.on_log(
+                    "[silence_cutter] 🏁 Cierre recortado a la última palabra "
+                    "(elimina sonido no-verbal del final)"
+                )
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[silence_cutter] ⚠️ Recorte de cierre falló: {e}")
+
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
@@ -3155,6 +3169,38 @@ def _extend_keeps_to_voiced_edges(
     return _merge_intervals(out), n_ext
 
 
+def _clamp_last_keep_to_last_word(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    tail_pad_s: float = 0.2,
+) -> tuple[list[tuple[float, float]], bool]:
+    """Recorta el ÚLTIMO keep para que acabe poco después de la ÚLTIMA palabra.
+
+    Tras los rescates de voz, el último keep a veces se extiende más allá de la
+    última palabra hablada y captura un sonido NO-verbal (respiración, click de
+    boca, arranque de una palabra que Whisper no transcribió) → "sonido raro"
+    justo antes de terminar el vídeo. Aquí cerramos el keep en
+    `fin_última_palabra + tail_pad_s`. Solo recorta el cierre, nunca toca el
+    resto. Devuelve (keeps, cambiado)."""
+    if not keep_intervals or not words:
+        return keep_intervals, False
+    a, b = keep_intervals[-1]
+    last_we = None
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        # palabra cuyo span solapa el último keep
+        if min(we, b) - max(ws, a) > 0.0:
+            last_we = we if last_we is None else max(last_we, we)
+    if last_we is not None and b > last_we + tail_pad_s + 0.05:
+        nb = max(a + 0.1, last_we + tail_pad_s)
+        return keep_intervals[:-1] + [(a, nb)], True
+    return keep_intervals, False
+
+
 def _trim_internal_silences_from_keeps(
     keep_intervals: list[tuple[float, float]],
     audio_path: str,
@@ -3972,16 +4018,20 @@ def _ai_coherence_judge(
     # eso marcaba como "perdidas" palabras presentes (proteína/euros) → falsos
     # positivos. El juez evalúa lo que el editor decidió dejar (su intención).
 
-    def _in_keep_c(c: float) -> bool:
-        return any(a - 1e-3 <= c <= b + 1e-3 for a, b in keep_intervals)
-
+    # Una palabra cuenta como CONSERVADA si su span SOLAPA un keep ≥30% (no solo
+    # por su centro): Whisper mal-ubica palabras (el 'proteína' fantasma cuyo
+    # AUDIO real se rescató en otra isla y cuyo slot etiquetado se recortó por
+    # silencio) → con criterio de centro el juez creía que faltaba y daba un
+    # falso positivo. El solape es robusto a esos timestamps imprecisos.
     kept_words = []
     for w in words:
         try:
-            c = (float(w["start"]) + float(w["end"])) / 2.0
+            ws, we = float(w["start"]), float(w["end"])
         except (KeyError, ValueError, TypeError):
             continue
-        if _in_keep_c(c):
+        dur = max(1e-6, we - ws)
+        ov = sum(max(0.0, min(we, e) - max(ws, s)) for s, e in keep_intervals)
+        if (ov / dur) >= 0.30:
             kept_words.append(w)
     out_text = " ".join(str(w.get("word", "")) for w in kept_words).strip()
     if not out_text:
