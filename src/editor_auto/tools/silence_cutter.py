@@ -1147,6 +1147,23 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Rescate de voz en bordes falló: {e}")
 
+        # RECORTE DE SILENCIOS INTERNOS: dead-air que quedó DENTRO de un keep
+        # porque Whisper lo etiquetó como palabra (un slot mudo mal-alineado, un
+        # 'y' con span inflado casi todo silencio). Energía pura → recorta el
+        # silencio dejando una pausa natural; respeta las pausas cortas (<0.4s).
+        try:
+            keep_intervals, n_sil_trim = _trim_internal_silences_from_keeps(
+                keep_intervals, tmp_audio,
+            )
+            if n_sil_trim:
+                ctx.on_log(
+                    f"[silence_cutter] 🔇 {n_sil_trim} silencio(s) interno(s) "
+                    f"(dead-air dentro de un keep) recortado(s)"
+                )
+                diagnostic["phases"]["internal_silence_trim"] = {"n": n_sil_trim}
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[silence_cutter] ⚠️ Recorte de silencios internos falló: {e}")
+
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
@@ -3097,37 +3114,133 @@ def _extend_keeps_to_voiced_edges(
         return db >= thr_rel and db >= voice_min
 
     kept = [(float(a), float(b)) for a, b in keep_intervals]
+    n_keeps = len(kept)
     n_ext = 0
     out: list[tuple[float, float]] = []
-    for a, b in kept:
+    for idx, (a, b) in enumerate(kept):
         # nivel de referencia = voz cerca del propio borde del keep
         ref_a = max(_db_at(a + 0.01), _db_at(a + 0.04), _db_at(a + 0.08))
         ref_b = max(_db_at(b - 0.08), _db_at(b - 0.04), _db_at(b - 0.01))
         thr_a = ref_a - drop_db
         thr_b = ref_b - drop_db
         na, nb = a, b
-        t = a - step_s
-        moved = a
-        while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
-            if _voiced(t, thr_a):
-                moved = t
-            else:
-                break
-            t -= step_s
-        if moved < a - 0.02:
-            na = moved; n_ext += 1
-        t = b + step_s
-        moved = b
-        while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
-            if _voiced(t, thr_b):
-                moved = t
-            else:
-                break
-            t += step_s
-        if moved > b + 0.02:
-            nb = moved; n_ext += 1
+        # NO extender el ARRANQUE del primer keep ni el FINAL del último: esos
+        # son los bordes del VÍDEO (no hay palabra vecina que rescatar) y
+        # extender ahí captura ruido pre/post-discurso (respiración, click de
+        # boca) → "sonido raro" al final. Solo bordes INTERIORES (junto a un
+        # corte) clipan voz real (naranja, asegúrate).
+        if idx > 0:
+            t = a - step_s
+            moved = a
+            while (a - t) <= max_ext_s and t > 0.0 and not _in_content_cut(t):
+                if _voiced(t, thr_a):
+                    moved = t
+                else:
+                    break
+                t -= step_s
+            if moved < a - 0.02:
+                na = moved; n_ext += 1
+        if idx < n_keeps - 1:
+            t = b + step_s
+            moved = b
+            while (t - b) <= max_ext_s and t < total_s and not _in_content_cut(t):
+                if _voiced(t, thr_b):
+                    moved = t
+                else:
+                    break
+                t += step_s
+            if moved > b + 0.02:
+                nb = moved; n_ext += 1
         out.append((max(0.0, na), min(total_s, nb)))
     return _merge_intervals(out), n_ext
+
+
+def _trim_internal_silences_from_keeps(
+    keep_intervals: list[tuple[float, float]],
+    audio_path: str,
+    *,
+    min_sil_s: float = 0.35,
+    residual_s: float = 0.16,
+    edge_guard_s: float = 0.04,
+    sil_margin_db: float = 10.0,
+) -> tuple[list[tuple[float, float]], int]:
+    """Recorta SILENCIOS internos (dead-air) DENTRO de un keep que el cortador no
+    quitó porque Whisper los etiquetó como parte de una palabra: un slot mudo
+    donde mal-ubicó una palabra (el 'proteína' fantasma en 12.16s) o una palabra
+    con span inflado que es casi todo silencio (un 'y' de ~1s). Mide energía por
+    ventanas; los tramos por debajo de `suelo_global + sil_margin_db` durante
+    ≥`min_sil_s` (sin tocar los `edge_guard_s` de cada borde) se RECORTAN dejando
+    `residual_s` de pausa natural. Solo recorta SILENCIO real → nunca quita voz.
+    Las pausas naturales <`min_sil_s` se respetan. Devuelve (keeps, n_recortes)."""
+    if not keep_intervals or not audio_path or not os.path.exists(audio_path):
+        return keep_intervals, 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:
+        return keep_intervals, 0
+    if sampwidth != 2:
+        return keep_intervals, 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    win = max(1, int(0.025 * sr)); hop = max(1, int(0.020 * sr))
+
+    all_db = []
+    pos = 0
+    while pos + win <= len(audio):
+        seg = audio[pos:pos + win]
+        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+        all_db.append(20.0 * float(np.log10(rms / 32768.0)))
+        pos += hop
+    floor = float(np.percentile(all_db, 15)) if all_db else -60.0
+    sil_thr = floor + sil_margin_db
+
+    def _db_at(t: float) -> float:
+        i0 = int(max(0.0, t) * sr); i1 = min(len(audio), i0 + win)
+        if i1 - i0 < 1:
+            return -120.0
+        seg = audio[i0:i1]
+        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+        return 20.0 * float(np.log10(rms / 32768.0))
+
+    out: list[tuple[float, float]] = []
+    n_trim = 0
+    for a, b in keep_intervals:
+        a = float(a); b = float(b)
+        # localizar tramos de SILENCIO internos
+        sils: list[tuple[float, float]] = []
+        t = a + edge_guard_s
+        run_start = None
+        while t <= b - edge_guard_s:
+            if _db_at(t) < sil_thr:
+                if run_start is None:
+                    run_start = t
+            elif run_start is not None:
+                if (t - run_start) >= min_sil_s:
+                    sils.append((run_start, t))
+                run_start = None
+            t += hop / sr
+        if run_start is not None and (b - edge_guard_s - run_start) >= min_sil_s:
+            sils.append((run_start, b - edge_guard_s))
+        if not sils:
+            out.append((a, b)); continue
+        # cortar cada silencio dejando `residual_s` de pausa (mitad a cada lado)
+        cursor = a
+        for si, se in sils:
+            keep_to = si + residual_s / 2.0
+            resume = se - residual_s / 2.0
+            if keep_to - cursor >= 0.12:
+                out.append((cursor, keep_to))
+            cursor = max(cursor, resume)
+            n_trim += 1
+        if b - cursor >= 0.12:
+            out.append((cursor, b))
+    return _merge_intervals(out), n_trim
 
 
 def _refine_cut_edges_to_valley(
