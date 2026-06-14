@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  ExternalLink,
   ImagePlus,
   Loader2,
   MessageSquarePlus,
   PanelLeft,
   Send,
+  Smartphone,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   type ChatMessage,
   fetchSessionDetail,
+  startRemote,
   streamChat,
   useChatSessions,
 } from "@/lib/queries/claude-chat";
@@ -40,6 +41,8 @@ export default function ClaudeChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [showList, setShowList] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [remoting, setRemoting] = useState(false);
+  const [remoteMsg, setRemoteMsg] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -72,6 +75,24 @@ export default function ClaudeChatPage() {
     setMessages([]);
     setErr(null);
     setShowList(false);
+  }
+
+  async function doRemote() {
+    if (!sessionId || remoting) return;
+    setRemoting(true);
+    setRemoteMsg(null);
+    try {
+      const r = await startRemote(sessionId, project);
+      setRemoteMsg(
+        r.remote
+          ? "✅ Activado. Abre la app de Claude → Code y verás este chat para continuarlo en el móvil."
+          : "⚠️ No se pudo activar el control remoto. Reinténtalo.",
+      );
+    } catch {
+      setRemoteMsg("⚠️ Error activando el control remoto.");
+    } finally {
+      setRemoting(false);
+    }
   }
 
   function send() {
@@ -142,11 +163,20 @@ export default function ClaudeChatPage() {
           <MessageSquarePlus className="h-4 w-4" />
           <span className="ml-1 hidden sm:inline">Nuevo</span>
         </Button>
-        <Button asChild variant="ghost" size="sm" className="shrink-0" title="Abrir en la app (control remoto, sin imágenes)">
-          <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" />
-            <span className="ml-1 hidden md:inline">App</span>
-          </a>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="shrink-0"
+          onClick={doRemote}
+          disabled={!sessionId || remoting}
+          title="Activar este chat en la app del móvil (control remoto)"
+        >
+          {remoting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Smartphone className="h-4 w-4" />
+          )}
+          <span className="ml-1 hidden sm:inline">A la app</span>
         </Button>
       </header>
 
@@ -233,6 +263,11 @@ export default function ClaudeChatPage() {
             {err && (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
                 {err}
+              </div>
+            )}
+            {remoteMsg && (
+              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs">
+                {remoteMsg}
               </div>
             )}
             <div ref={endRef} />

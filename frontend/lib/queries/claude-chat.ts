@@ -22,6 +22,34 @@ export interface ChatSession {
   last: string | null;
   turns: number;
   mtime: number;
+  remote?: boolean;
+}
+
+/** Inyecta Remote Control a una sesión → aparece en la app de Claude (Code). */
+export async function startRemote(
+  sessionId: string,
+  project: string,
+): Promise<{ ok: boolean; remote: boolean; msg?: string }> {
+  const fd = new FormData();
+  fd.append("session_id", sessionId);
+  fd.append("project", project || "");
+  const res = await fetch(`${BASE}/claude-chat/remote/start`, {
+    method: "POST",
+    headers: headers(),
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`remote ${res.status}`);
+  return res.json();
+}
+
+export async function stopRemote(sessionId: string): Promise<void> {
+  const fd = new FormData();
+  fd.append("session_id", sessionId);
+  await fetch(`${BASE}/claude-chat/remote/stop`, {
+    method: "POST",
+    headers: headers(),
+    body: fd,
+  });
 }
 export interface SessionsResponse {
   projects: string[];
