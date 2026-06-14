@@ -29,7 +29,7 @@ export interface ChatSession {
 export async function startRemote(
   sessionId: string,
   project: string,
-): Promise<{ ok: boolean; remote: boolean; msg?: string }> {
+): Promise<{ ok: boolean; remote: boolean; url?: string | null; msg?: string }> {
   const fd = new FormData();
   fd.append("session_id", sessionId);
   fd.append("project", project || "");

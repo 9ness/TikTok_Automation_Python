@@ -43,6 +43,7 @@ export default function ClaudeChatPage() {
   const [err, setErr] = useState<string | null>(null);
   const [remoting, setRemoting] = useState(false);
   const [remoteMsg, setRemoteMsg] = useState<string | null>(null);
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -81,11 +82,13 @@ export default function ClaudeChatPage() {
     if (!sessionId || remoting) return;
     setRemoting(true);
     setRemoteMsg(null);
+    setRemoteUrl(null);
     try {
       const r = await startRemote(sessionId, project);
+      setRemoteUrl(r.url ?? null);
       setRemoteMsg(
         r.remote
-          ? "✅ Activado. Abre la app de Claude → Code y verás este chat para continuarlo en el móvil."
+          ? "✅ Activado en la app. Abre este chat en el móvil:"
           : "⚠️ No se pudo activar el control remoto. Reinténtalo.",
       );
     } catch {
@@ -266,8 +269,18 @@ export default function ClaudeChatPage() {
               </div>
             )}
             {remoteMsg && (
-              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs">
-                {remoteMsg}
+              <div className="space-y-1 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs">
+                <div>{remoteMsg}</div>
+                {remoteUrl && (
+                  <a
+                    href={remoteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-emerald-600 underline dark:text-emerald-400"
+                  >
+                    <Smartphone className="h-3.5 w-3.5" /> Abrir en la app
+                  </a>
+                )}
               </div>
             )}
             <div ref={endRef} />
