@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  Bot,
   Captions,
   ChevronDown,
   ChevronRight,
@@ -103,6 +104,10 @@ const NAV: NavGroup[] = [
   {
     kind: "single",
     item: { href: "/costs", label: "Costes", icon: DollarSign },
+  },
+  {
+    kind: "single",
+    item: { href: "/claude", label: "Claude", icon: Bot },
   },
   {
     kind: "single",
