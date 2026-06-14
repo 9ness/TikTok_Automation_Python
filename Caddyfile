@@ -32,7 +32,9 @@
 	# nunca internet; ufw bloquea el resto). `handle_path` quita el prefijo
 	# → el backend recibe /sessions, /chat, etc. `flush_interval -1` permite
 	# el streaming SSE del chat sin buffering.
-	handle_path /claude-chat/* {
+	@cchat path /claude-chat/*
+	handle @cchat {
+		uri strip_prefix /claude-chat
 		reverse_proxy 172.18.0.1:8765 {
 			flush_interval -1
 		}
