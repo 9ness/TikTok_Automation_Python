@@ -70,6 +70,15 @@ _MIN_REMAINING_S = 0.10        # sub-cuts más cortos tras trim se descartan
 # margen de sobra (objetivo: NUNCA comerse una palabra).
 _WORD_GUARD_S = 0.15
 
+# Self-heal SALVAGE (drop-offender): si un lote de cortes de limpieza sube el
+# score pero UN corte roza una palabra (introduce 1 fallo de palabra), en vez de
+# tirar TODO el lote, localizamos el/los corte(s) culpables (los que solapan la
+# palabra perdida) y re-renderizamos sin ellos. Solo se intenta si hay ≥ esta
+# ganancia en juego (no merece un re-render por <10 pts). El resultado solo
+# reemplaza al output si queda ESTRICTAMENTE mejor por la misma clave _qkey →
+# nunca empeora un vídeo.
+_SALVAGE_MIN_GAIN = 10
+
 # Re-alineación de spans INFLADOS de Whisper (palabra real + pausa absorbida,
 # p.ej. 'asegúrate' 2.6s, 'muchísimo' 2.78s). Encoge SOLO el span a su voz
 # dominante para liberar el silencio absorbido. Umbrales relativos al suelo
@@ -1456,7 +1465,7 @@ class SilenceCutterTool:
             # Default con MARGEN: 1 (audit inicial) + N intentos de self-heal + 1,
             # para que el juez evalúe TODOS los candidatos (si se agota, un
             # candidato sin coherencia parecería 0 fallos y podría aceptarse mal).
-            _heal_n = int(config.get("self_heal_max_attempts", 2))
+            _heal_n = int(config.get("self_heal_max_attempts", 3))
             coherence_budget = [int(config.get("coherence_max_calls", _heal_n + 2))]
             audit = _full_audit(keep_intervals)
             diagnostic["audit"] = audit
@@ -1468,7 +1477,7 @@ class SilenceCutterTool:
             # y re-audita. Máx N intentos; si no llega, queda retenido para
             # revisión humana (needs_requeue) — nunca se entrega algo malo.
             heal_target = int(config.get("self_heal_target_score", 95))
-            heal_max = int(config.get("self_heal_max_attempts", 2))
+            heal_max = int(config.get("self_heal_max_attempts", 3))
             heal_hist: list[dict] = []
             # MEJOR render hasta ahora. `output_path` SIEMPRE contiene el mejor
             # render; cada candidato se renderiza a un tmp y se AUDITA ahí, y solo
@@ -1627,10 +1636,148 @@ class SilenceCutterTool:
                             -(a.get("quality_score") or 0),
                         )
                     accepted = isinstance(cand_score, int) and _qkey(cand_audit) < _qkey(best_audit)
+                    salvaged = False
+                    # SALVAGE (restaurar-palabra): el lote de limpieza SUBIÓ el
+                    # score pero clipó UNA palabra de contenido (la perdió en un
+                    # borde de keep — sea por el corte o por la higiene snap/valle).
+                    # En vez de tirar TODO el lote, RESTAURA el span exacto de las
+                    # palabras perdidas a los keeps del candidato (mantiene los N
+                    # silencios cortados; sólo des-clipa la palabra). Re-renderiza
+                    # y sólo reemplaza si queda estrictamente mejor (misma clave
+                    # _qkey) → nunca empeora, sólo cuesta un render extra.
+                    if (
+                        not accepted and isinstance(cand_score, int)
+                        and (cand_score - best_score) >= _SALVAGE_MIN_GAIN
+                        and (
+                            _count_word_fallos(cand_audit) > _count_word_fallos(best_audit)
+                            or _count_coherence_fallos(cand_audit) > _count_coherence_fallos(best_audit)
+                        )
+                    ):
+                        # Spans a RESTAURAR (input time): palabras perdidas del audit
+                        # profundo + promesas rotas del juez de coherencia (restore_span).
+                        miss_spans = [
+                            (float(m["input_start"]), float(m["input_end"]))
+                            for m in ((cand_audit.get("deep") or {}).get("missing_blocks") or [])
+                            if m.get("input_start") is not None and m.get("input_end") is not None
+                        ]
+                        for _d in (cand_audit.get("coherence_issues") or []):
+                            _rs = _d.get("restore_span")
+                            if isinstance(_rs, (list, tuple)) and len(_rs) == 2:
+                                try:
+                                    miss_spans.append((float(_rs[0]), float(_rs[1])))
+                                except (TypeError, ValueError):
+                                    pass
+                        # Spans de RESIDUO a cortar (audio sobrante): inserted_blocks
+                        # del audit profundo, mapeados de tiempo de OUTPUT a INPUT.
+                        ins_cut_spans: list[tuple[float, float]] = []
+                        for _b in ((cand_audit.get("deep") or {}).get("inserted_blocks") or []):
+                            _ot, _oe = _b.get("output_t"), _b.get("output_t_end")
+                            if _ot is None or _oe is None:
+                                continue
+                            try:
+                                _is = _map_output_to_input(float(_ot), new_keeps)
+                                _ie = _map_output_to_input(float(_oe), new_keeps)
+                            except (TypeError, ValueError):
+                                _is = _ie = None
+                            if _is is not None and _ie is not None and _ie > _is:
+                                ins_cut_spans.append((_is, _ie))
+                        ctx.on_log(
+                            f"[silence_cutter] 🩹 Salvage: candidato {best_score}→{cand_score} · "
+                            f"{len(miss_spans)} span(s) a restaurar · {len(ins_cut_spans)} residuo(s) "
+                            f"a cortar. Intento conservar la limpieza…"
+                        )
+                        if miss_spans or ins_cut_spans:
+                            # Restaura lo perdido + corta el residuo sobre los keeps del
+                            # CANDIDATO — no re-aplico snap/valle (es lo que clipa); sólo
+                            # merge/resta + re-extiendo la cola final.
+                            pad = _WORD_GUARD_S
+                            salv_keeps = _union_intervals(
+                                new_keeps, [(ms - pad, me + pad) for ms, me in miss_spans],
+                            )
+                            if ins_cut_spans:
+                                _safe_cuts = ins_cut_spans
+                                if voiced_words:
+                                    _safe_cuts = _protect_word_boundaries(
+                                        _safe_cuts, voiced_words, _WORD_GUARD_S,
+                                    )
+                                salv_keeps = _subtract_intervals(salv_keeps, _safe_cuts)
+                            salv_keeps = [
+                                (a, b) for a, b in salv_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S
+                            ]
+                            if bool(config.get("extend_last_word_tail", True)):
+                                salv_keeps = _extend_last_keep_to_word_tail(
+                                    salv_keeps, tmp_audio, video_duration,
+                                )
+                            kept_salv = sum(b - a for a, b in salv_keeps)
+                            if salv_keeps and kept_salv >= max(3.0, 0.25 * kept_before):
+                                tmp_out2 = output_path + ".salv.mp4"
+                                try:
+                                    _apply_cuts_ffmpeg(
+                                        input_path=input_path,
+                                        output_path=tmp_out2,
+                                        keep_intervals=salv_keeps,
+                                        rotation=video_rotation,
+                                        output_aspect=config.get("output_aspect", "9:16"),
+                                        log=ctx.on_log,
+                                        on_progress=lambda f: ctx.on_progress(
+                                            0.985, f"🩹 Salvage corrección {attempt}…",
+                                        ),
+                                        normalize_audio=normalize_audio,
+                                        content_end_s=_content_end_output_s(salv_keeps, tmp_audio),
+                                    )
+                                    salv_audit = _full_audit(salv_keeps, audit_path=tmp_out2)
+                                    salv_score = salv_audit.get("quality_score")
+                                    if (
+                                        isinstance(salv_score, int)
+                                        and _qkey(salv_audit) < _qkey(best_audit)
+                                    ):
+                                        try:
+                                            os.remove(tmp_out)
+                                        except OSError:
+                                            pass
+                                        tmp_out = tmp_out2
+                                        new_keeps = salv_keeps
+                                        cand_audit = salv_audit
+                                        cand_score = salv_score
+                                        cand_fallos = _count_word_fallos(salv_audit)
+                                        accepted = True
+                                        salvaged = True
+                                        ctx.on_log(
+                                            f"[silence_cutter] 🩹✅ Salvage: restauré "
+                                            f"{len(miss_spans)} palabra(s) y conservé la limpieza "
+                                            f"→ score {best_score}→{cand_score}/100, "
+                                            f"fallos_palabra {cand_fallos}."
+                                        )
+                                    else:
+                                        try:
+                                            os.remove(tmp_out2)
+                                        except OSError:
+                                            pass
+                                        ctx.on_log(
+                                            f"[silence_cutter] 🩹 Salvage sin éxito "
+                                            f"(quedó {salv_score}); conservo el mejor."
+                                        )
+                                except Exception as e:  # noqa: BLE001
+                                    try:
+                                        os.remove(tmp_out2)
+                                    except OSError:
+                                        pass
+                                    ctx.on_log(
+                                        f"[silence_cutter] ⚠️ Salvage: re-render falló "
+                                        f"({e}); conservo el mejor render."
+                                    )
                     if accepted:
                         os.replace(tmp_out, output_path)
                         best_keeps, best_audit, best_score = new_keeps, cand_audit, cand_score
                         diagnostic["audit"] = best_audit
+                        # La pasada hizo progreso → el audit cambió y quedan
+                        # hallazgos NUEVOS (p. ej. silencios que antes no eran los
+                        # findings top). Re-habilita CORTES para que una pasada más
+                        # (acotada por heal_max) los limpie. Solo tras ACEPTAR →
+                        # best_audit ya es distinto, así que no se re-deriva idéntico
+                        # y no hay bucle. Si se rechaza, 'cortes' sigue marcado.
+                        tried_kinds.discard("cortes")
+                        tried_kinds.discard("ambos")
                         ctx.on_log(
                             f"[silence_cutter] 🩹 Corrección ACEPTADA ({kind}): "
                             f"fallos_palabra {prev_fallos}→{cand_fallos} · "
@@ -1647,7 +1794,8 @@ class SilenceCutterTool:
                             f"score {prev_best}→{cand_score} — conservo el mejor."
                         )
                     heal_hist.append({
-                        "attempt": attempt, "kind": kind, "accepted": accepted,
+                        "attempt": attempt, "kind": kind + ("+salvage" if salvaged else ""),
+                        "accepted": accepted, "salvaged": salvaged,
                         "score_before": prev_best, "score_after": cand_score,
                         "word_fallos_before": prev_fallos, "word_fallos_after": cand_fallos,
                         "n_residue_cuts": len(rcuts), "n_guarded_cuts": len(gcuts),
