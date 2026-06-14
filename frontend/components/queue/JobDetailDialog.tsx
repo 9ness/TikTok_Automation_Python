@@ -24,7 +24,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useJobLogs, useJobSummary } from "@/lib/queries/queue";
+import {
+  type JobSummaryResponse,
+  useJobLogs,
+  useJobSummary,
+} from "@/lib/queries/queue";
 
 interface Props {
   jobId: string;
@@ -248,6 +252,13 @@ function SummaryView({ jobId, isRunning, open }: { jobId: string; isRunning: boo
           nSurvivingStretched={s.n_surviving_stretched ?? 0}
         />
       )}
+
+      {/* Veredicto explicable: QUÉ se puntuó (Contenido/Ritmo/Limpieza) */}
+      {s.verdict_detail &&
+        ((s.verdict_detail.dimensions?.length ?? 0) > 0 ||
+          s.verdict_detail.label) && (
+          <VerdictDetailCard detail={s.verdict_detail} />
+        )}
 
       {/* Auto-corrección: mejora de score por reintento */}
       {s.self_heal?.history && s.self_heal.history.length > 0 && (
@@ -554,6 +565,77 @@ function QualityCard({
         </div>
       )}
     </div>
+  );
+}
+
+function VerdictDetailCard({
+  detail,
+}: {
+  detail: NonNullable<JobSummaryResponse["verdict_detail"]>;
+}) {
+  const dims = detail.dimensions ?? [];
+  const lowConf = detail.low_confidence ?? [];
+  const headColor =
+    detail.overall === "fallo"
+      ? "text-destructive"
+      : detail.overall === "revisar"
+        ? "text-amber-500"
+        : "text-emerald-600 dark:text-emerald-400";
+
+  return (
+    <section className="space-y-2 rounded-md border bg-muted/30 p-2 sm:p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        📋 Veredicto
+      </h4>
+      {detail.label && (
+        <p className={`break-words text-xs font-medium sm:text-sm ${headColor}`}>
+          {detail.label}
+        </p>
+      )}
+      {dims.length > 0 && (
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          {dims.map((d) => (
+            <div
+              key={d.dim}
+              className={`flex items-start gap-1.5 rounded-md border p-1.5 text-[11px] sm:text-xs ${
+                d.ok
+                  ? "border-emerald-500/30 bg-emerald-500/5"
+                  : "border-amber-500/40 bg-amber-500/5"
+              }`}
+            >
+              {d.ok ? (
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+              )}
+              <div className="min-w-0">
+                <span className="font-semibold">{d.dim}</span>
+                {d.detail && (
+                  <span className="ml-1 break-words text-muted-foreground">
+                    {d.detail}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {lowConf.length > 0 && (
+        <div className="space-y-1 rounded-md border border-cyan-500/30 bg-cyan-500/5 p-1.5">
+          <p className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">
+            ℹ️ Avisos de baja confianza (probables falsos positivos)
+          </p>
+          {lowConf.map((w, i) => (
+            <p
+              key={i}
+              className="break-words text-[11px] text-muted-foreground"
+            >
+              {w}
+            </p>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

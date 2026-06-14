@@ -80,6 +80,13 @@ export interface JobSummaryResponse {
   ai_cuts_by_reason?: Record<string, number>;
   quality_score?: number | null;
   quality_verdict?: string | null;
+  /** Veredicto explicable: etiqueta + dimensiones + avisos baja confianza. */
+  verdict_detail?: {
+    overall?: "ok" | "revisar" | "fallo" | string;
+    label?: string;
+    dimensions?: { dim: string; ok: boolean; detail?: string }[];
+    low_confidence?: string[];
+  } | null;
   /** Auto-corrección: intentos con score antes→después por reintento. */
   self_heal?: {
     target?: number;

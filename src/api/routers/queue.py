@@ -324,6 +324,10 @@ def get_job_summary(
         "ai_cuts_by_reason": ai_cuts_by_reason,
         "quality_score": quality_score,
         "quality_verdict": quality_verdict,
+        # Veredicto EXPLICABLE: etiqueta + dimensiones (Contenido/Ritmo/
+        # Limpieza) + avisos de baja confianza. Lo que el operador lee de
+        # un vistazo para saber QUÉ puntuó, no solo el número.
+        "verdict_detail": audit.get("verdict_detail"),
         # Auto-corrección: intentos y mejora de score por reintento
         # (p.ej. [{"attempt":1,"score_before":94,"score_after":100,...}]).
         "self_heal": diag.get("self_heal"),
