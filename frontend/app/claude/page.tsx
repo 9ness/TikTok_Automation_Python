@@ -154,8 +154,10 @@ export default function ClaudeChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col md:h-screen">
-      {/* Barra superior */}
-      <header className="flex items-center gap-2 border-b p-2 sm:p-3">
+      {/* Barra superior — botones a la IZQUIERDA (siempre visibles); el
+          selector de proyecto a la derecha. `md:pr-28` deja hueco al badge
+          "Cola" (fixed right-3 top-3) del layout para que no tape nada. */}
+      <header className="flex items-center gap-2 border-b p-2 sm:p-3 md:pr-28">
         <Button
           variant="outline"
           size="sm"
@@ -165,23 +167,12 @@ export default function ClaudeChatPage() {
           <PanelLeft className="h-4 w-4" />
           <span className="ml-1 hidden sm:inline">Chats</span>
         </Button>
-        <select
-          value={project}
-          onChange={(e) => setProject(e.target.value)}
-          className="min-w-0 flex-1 truncate rounded-md border bg-background px-2 py-1.5 text-xs sm:text-sm"
-        >
-          {projects.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
         <Button size="sm" onClick={newChat} className="shrink-0">
           <MessageSquarePlus className="h-4 w-4" />
           <span className="ml-1 hidden sm:inline">Nuevo</span>
         </Button>
         <Button
-          variant="secondary"
+          variant={sessionId ? "default" : "secondary"}
           size="sm"
           className="shrink-0"
           onClick={doRemote}
@@ -195,6 +186,17 @@ export default function ClaudeChatPage() {
           )}
           <span className="ml-1 hidden sm:inline">A la app</span>
         </Button>
+        <select
+          value={project}
+          onChange={(e) => setProject(e.target.value)}
+          className="min-w-0 flex-1 truncate rounded-md border bg-background px-2 py-1.5 text-xs sm:text-sm"
+        >
+          {projects.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </header>
 
       <div className="relative flex min-h-0 flex-1">
