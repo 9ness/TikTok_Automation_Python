@@ -172,12 +172,34 @@ override `TIKTOK_SHOP_ROOT_PATH` en .env). Estructura interna:
 
 **Módulos** (todos en [`src/tiktok_shop/`](src/tiktok_shop/)):
 `api/{atlas_cloud,gemini,minimax_clone}.py`,
-`pipeline/{analyzer,strategist,seedance_director,seedance_renderer,veo3_director,nano_banana_prompt_generator,editor,drive_uploader}.py`,
-`prompts/*.md`, `repos/*_repo.py`, `services/{cost_calculator,pilot_tracker,tier_selector}.py`,
+`pipeline/{analyzer,strategist,seedance_director,seedance_renderer,veo3_director,nano_banana_prompt_generator,carousel_director,editor,drive_uploader}.py`,
+`prompts/*.md`, `repos/*_repo.py`, `services/{cost_calculator,pilot_tracker,tier_selector,discovery_service,ads_signal,creation_pack}.py`,
 `utils/{duration_splitter,image_url_provider,photo_quality}.py`,
 `ui/{shop_router,tab_*}.py`.
 
-**Redis** (prefijo `tiktok_shop:`): `user:`, `product:`, `generation:`, `voice:`.
+**Redis** (prefijo `tiktok_shop:`): `user:`, `product:`, `generation:`, `voice:`, `discovery:`, `plan:`.
+
+**🔍 Radar de Productos** (tab `ui/tab_radar.py`): descubre productos ganadores
+con inyección de ADS + pocos creadores (estrategia GMV Max) vía EchoTik
+(`ECHOTIK_API_USER`/`ECHOTIK_API_PASSWORD`). `services/discovery_service.py`
+escanea ranklist/keywords → `services/ads_signal.py` puntúa (demanda, pocos
+creadores, ADS, momentum, comisión) → importa a `Product`. Genera también
+carruseles (`pipeline/carousel_director.py` + `prompts/carousel_director.md`).
+Kalodata NO tiene API barata (solo Enterprise) — el proxy de ADS se infiere de
+los vídeos: proxy EchoTik (views altas + engagement bajo + ventas) Y/O la
+ETIQUETA AD real de TikTok leída vía Apify (`apify_cloud.extract_ad_flag` +
+`search_product_ad_videos`) — `ads_signal.ads_injection_signal` combina ambas en
+`gmv_max_likelihood` (0-100) + `probable_boosted`. Selector de fuente en el scan.
+`services/creation_pack.py:build_pack/plan_week` deja el producto LISTO PARA
+CREAR: descarga fotos (image_search), análisis, research de vídeos ganadores,
+genera estilos de vídeo (preset_generator) + carruseles + prompt Nano Banana,
+y escribe `_products/<slug>/PLAN.md` + `prompt_templates/` (+ `_plans/week_*.md`
+repartiendo productos por día). Persiste un `WeekPlan` (`models/week_plan.py`,
+`repos/plan_repo.py`, key `plan:`) → sub-tab "📅 Calendario" muestra qué producto
+probar cada día con checkbox "probado". `Product.origin` ("manual"|"radar")
+distingue los importados por el Radar de los creados a mano (filtro + badge en
+pestaña Productos). UI Radar: sub-tabs "🔎 Descubrir / 🗓️ Plan 7 días /
+📅 Calendario / 🎠 Carruseles".
 Cola unificada con Creator Reward via `JobMode.TIKTOK_SHOP`.
 
 **Tiers** (5, ver [`config.py`](src/tiktok_shop/config.py)):

@@ -62,6 +62,19 @@ def render() -> None:
         st.info("Aún no hay productos. Pulsa '➕ Crear producto'.")
         return
 
+    # Filtro por origen (manual vs Radar) para que no se mezclen.
+    n_manual = sum(1 for p in products if getattr(p, "origin", "manual") != "radar")
+    n_radar = sum(1 for p in products if getattr(p, "origin", "manual") == "radar")
+    origin_filter = st.radio(
+        "Origen",
+        [f"Todos ({len(products)})", f"✍️ Manuales ({n_manual})", f"🔍 Radar ({n_radar})"],
+        horizontal=True, key="prod_origin_filter", label_visibility="collapsed",
+    )
+    if origin_filter.startswith("✍️"):
+        products = [p for p in products if getattr(p, "origin", "manual") != "radar"]
+    elif origin_filter.startswith("🔍"):
+        products = [p for p in products if getattr(p, "origin", "manual") == "radar"]
+
     for p in products:
         _render_product_card(p, repo)
 
@@ -81,7 +94,8 @@ def _render_product_card(p: Product, repo: ProductRepo) -> None:
         with c2:
             tier_def = VIDEO_MODELS.get(p.video_config.default_tier, {})
             tier_badge = tier_def.get("tier_color", "⚪") + " " + tier_def.get("name", p.video_config.default_tier)
-            st.markdown(f"**{p.name}**  ·  {tier_badge}")
+            origin_badge = "🔍 Radar" if getattr(p, "origin", "manual") == "radar" else "✍️ Manual"
+            st.markdown(f"**{p.name}**  ·  {tier_badge}  ·  `{origin_badge}`")
             st.caption(f"`{p.slug}` · {p.category}/{p.subcategory or '-'} · {p.brand or 'sin marca'}")
             if p.tiktok_shop.price_eur is not None:
                 st.caption(f"💶 {p.tiktok_shop.price_eur:.2f}€ · 🏷️ {p.tiktok_shop.commission_rate * 100:.0f}%")

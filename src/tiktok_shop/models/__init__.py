@@ -11,6 +11,8 @@ from .video_preset import VideoPreset, SUGGESTED_ANGLES, make_preset_id
 from .voice import VoiceClone
 from .shortcut import OperatorShortcut
 from .performance import PublishedVideo, parse_tiktok_video_id
+from .discovery import AdsSignal, DiscoveredProduct, WinnerScore
+from .week_plan import PlanEntry, WeekPlan
 
 __all__ = [
     "TikTokUser",
@@ -38,4 +40,9 @@ __all__ = [
     "OperatorShortcut",
     "PublishedVideo",
     "parse_tiktok_video_id",
+    "AdsSignal",
+    "DiscoveredProduct",
+    "WinnerScore",
+    "PlanEntry",
+    "WeekPlan",
 ]
