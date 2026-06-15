@@ -5,6 +5,7 @@ import {
   Loader2,
   MessageSquarePlus,
   PanelLeft,
+  Pencil,
   Send,
   Smartphone,
   X,
@@ -14,7 +15,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   type ChatMessage,
+  type ChatSession,
   fetchSessionDetail,
+  renameSession,
   startRemote,
   streamChat,
   useChatSessions,
@@ -68,6 +71,17 @@ export default function ClaudeChatPage() {
     } catch {
       setMessages([]);
       setErr("No se pudo cargar el chat.");
+    }
+  }
+
+  async function doRename(s: ChatSession) {
+    const name = window.prompt("Nombre del chat:", s.title);
+    if (name === null) return;
+    try {
+      await renameSession(s.id, name.trim());
+      sessionsQ.refetch();
+    } catch {
+      setErr("No se pudo renombrar.");
     }
   }
 
@@ -207,28 +221,39 @@ export default function ClaudeChatPage() {
             </div>
           )}
           {sessions.map((s) => (
-            <button
+            <div
               key={s.id}
-              onClick={() => openSession(s.id, s.project)}
-              className={`block w-full border-b px-3 py-2 text-left hover:bg-muted/50 ${
-                s.id === sessionId ? "bg-muted" : ""
-              }`}
+              className={`relative border-b ${s.id === sessionId ? "bg-muted" : ""}`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-[11px] font-semibold text-primary">
-                  {s.project}
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  {timeAgo(s.mtime)}
-                </span>
-              </div>
-              <div className="truncate text-xs">{s.title}</div>
-              {s.last && (
-                <div className="truncate text-[11px] text-muted-foreground">
-                  {s.last}
+              <button
+                onClick={() => openSession(s.id, s.project)}
+                className="block w-full px-3 py-2 pr-9 text-left hover:bg-muted/50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[11px] font-semibold text-primary">
+                    {s.project}
+                    {s.remote ? " · 📱" : ""}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {timeAgo(s.mtime)}
+                  </span>
                 </div>
-              )}
-            </button>
+                <div className="truncate text-xs">{s.title}</div>
+                {s.last && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {s.last}
+                  </div>
+                )}
+              </button>
+              <button
+                onClick={() => doRename(s)}
+                className="absolute right-1 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title="Renombrar"
+                aria-label="renombrar"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
         </aside>
 

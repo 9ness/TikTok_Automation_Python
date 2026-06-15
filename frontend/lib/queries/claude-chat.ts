@@ -42,6 +42,20 @@ export async function startRemote(
   return res.json();
 }
 
+export async function renameSession(
+  sessionId: string,
+  title: string,
+): Promise<void> {
+  const fd = new FormData();
+  fd.append("session_id", sessionId);
+  fd.append("title", title);
+  await fetch(`${BASE}/claude-chat/rename`, {
+    method: "POST",
+    headers: headers(),
+    body: fd,
+  });
+}
+
 export async function stopRemote(sessionId: string): Promise<void> {
   const fd = new FormData();
   fd.append("session_id", sessionId);
