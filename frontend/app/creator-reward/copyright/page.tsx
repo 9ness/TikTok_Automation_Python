@@ -39,7 +39,8 @@ export default function CopyrightPage() {
   const enqueue = useEnqueueCopyright();
   const openQueue = useDrawerStore((s) => s.openQueue);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [batchDone, setBatchDone] = useState<number | null>(null);
   const [cleanMode, setCleanMode] = useState<CleanModeValue>("Subtítulos Virales");
   const [hookYPct, setHookYPct] = useState<number>(0.20);
   const [hookColor, setHookColor] = useState<string>("#FDD002");
@@ -64,34 +65,55 @@ export default function CopyrightPage() {
   const selectedFont = useFontByPath(fontPath);
   const previewFontFamily = useFontFamily(selectedFont);
 
-  // Preview URL del MP4 local (Object URL). Se revoca al cambiar de archivo.
+  // Preview URL del primer MP4 local (Object URL). Se revoca al cambiar.
+  const firstFile = files[0] ?? null;
   const previewUrl = useMemo(
-    () => (file ? URL.createObjectURL(file) : null),
-    [file],
+    () => (firstFile ? URL.createObjectURL(firstFile) : null),
+    [firstFile],
   );
   useEffect(() => {
     if (!previewUrl) return;
     return () => URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
+  // Encola los vídeos seleccionados uno a uno (un job por vídeo, misma
+  // config). Si alguno falla, sigue con el resto y reporta al final.
   async function submit() {
-    if (!file) return;
-    try {
-      const res = await enqueue.mutateAsync({
-        file,
-        clean_mode: cleanMode,
-        hook_y_pct: hookYPct,
-        hook_color: hookColor,
-        upscale_1080p: upscale1080p,
-        font_path: fontPath || null,
-      });
-      toast.success(`Encolado · job ${res.job_id.slice(0, 8)}`);
+    if (!files.length) return;
+    let ok = 0;
+    const failed: string[] = [];
+    setBatchDone(0);
+    for (const file of files) {
+      try {
+        await enqueue.mutateAsync({
+          file,
+          clean_mode: cleanMode,
+          hook_y_pct: hookYPct,
+          hook_color: hookColor,
+          upscale_1080p: upscale1080p,
+          font_path: fontPath || null,
+        });
+        ok += 1;
+      } catch (err) {
+        failed.push(file.name);
+        toast.error(
+          `${file.name}: ${err instanceof ApiError ? err.message : "error al encolar"}`,
+        );
+      }
+      setBatchDone((d) => (d ?? 0) + 1);
+    }
+    setBatchDone(null);
+    if (ok > 0) {
+      toast.success(
+        ok === 1 ? "Encolado 1 vídeo" : `Encolados ${ok} vídeos`,
+      );
       openQueue();
-      setFile(null);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Error al encolar.");
+      // Conserva solo los que fallaron para reintentar.
+      setFiles(files.filter((f) => failed.includes(f.name)));
     }
   }
+
+  const isSubmitting = enqueue.isPending || batchDone !== null;
 
   return (
     <div className="container mx-auto space-y-4 p-6 md:p-8">
@@ -105,8 +127,8 @@ export default function CopyrightPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="min-w-0 space-y-4">
           <VideoUploader
-            file={file}
-            onChange={setFile}
+            files={files}
+            onChange={setFiles}
             onError={(msg) => toast.error(msg)}
           />
 
@@ -320,16 +342,20 @@ export default function CopyrightPage() {
           </div>
           <Button
             onClick={submit}
-            disabled={!file || enqueue.isPending}
+            disabled={!files.length || isSubmitting}
             size="lg"
             className="w-full"
           >
-            {enqueue.isPending ? (
+            {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
             )}
-            Procesar y encolar
+            {isSubmitting && batchDone !== null
+              ? `Encolando ${batchDone}/${files.length}…`
+              : files.length > 1
+                ? `Procesar y encolar (${files.length})`
+                : "Procesar y encolar"}
           </Button>
         </div>
       </div>

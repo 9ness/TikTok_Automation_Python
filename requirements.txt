@@ -21,6 +21,8 @@ beautifulsoup4
 # que el user sube en "Replicar viral". Versión headless = ~30MB extra
 # vs ~80MB de opencv-python normal.
 opencv-python-headless>=4.9
+# Quitar Copy (video_remover.py) — OCR de subtítulos originales para enmascararlos.
+easyocr>=1.7
 streamlit-authenticator>=0.4.0
 bcrypt
 faster-whisper

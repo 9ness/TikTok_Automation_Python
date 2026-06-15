@@ -165,9 +165,10 @@ export default function SubsAutoPage() {
           {step === 0 && (
             <>
               <VideoUploader
-                file={file}
-                onChange={setFile}
+                files={file ? [file] : []}
+                onChange={(fs) => setFile(fs[0] ?? null)}
                 onError={(msg) => toast.error(msg)}
+                multiple={false}
               />
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Modelo Whisper">

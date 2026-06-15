@@ -280,9 +280,10 @@ export default function ConstruccionPovPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="min-w-0 space-y-4">
           <VideoUploader
-            file={file}
-            onChange={handleFileChange}
+            files={file ? [file] : []}
+            onChange={(fs) => handleFileChange(fs[0] ?? null)}
             onError={(msg) => toast.error(msg)}
+            multiple={false}
           />
 
           <CollapsibleCard
