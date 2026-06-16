@@ -141,6 +141,10 @@ export interface Product {
   /** Presets de vídeo precocinados (música + scripted). Generables con
    *  Gemini desde el tab Presets del producto. */
   video_presets: VideoPreset[];
+  /** Carruseles (Photo Mode) generados por el Radar/build_pack. */
+  carousels?: Record<string, unknown>[];
+  /** Origen: "manual" (creado a mano) o "radar" (importado del Radar). */
+  origin?: "manual" | "radar";
   /** Investigación profunda: reviews + top vídeos TikTok + comentarios.
    *  Se rellena al pulsar "Reanalizar producto". Vacío por defecto. */
   research_context: ResearchContext;

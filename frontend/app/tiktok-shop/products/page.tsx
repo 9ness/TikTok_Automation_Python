@@ -10,9 +10,23 @@ import { ProductCard } from "@/components/products/ProductCard";
 import { ProductCreateDialog } from "@/components/products/ProductCreateDialog";
 import { useProducts } from "@/lib/queries/products";
 
+type OriginFilter = "all" | "manual" | "radar";
+
 export default function ShopProductsPage() {
   const [open, setOpen] = useState(false);
+  const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const products = useProducts({ limit: 100 });
+
+  const allItems = products.data?.items ?? [];
+  const nManual = allItems.filter((p) => (p.origin ?? "manual") !== "radar").length;
+  const nRadar = allItems.filter((p) => (p.origin ?? "manual") === "radar").length;
+  const items = allItems.filter((p) =>
+    originFilter === "all"
+      ? true
+      : originFilter === "radar"
+        ? (p.origin ?? "manual") === "radar"
+        : (p.origin ?? "manual") !== "radar",
+  );
 
   return (
     <div className="container mx-auto p-3 sm:p-6 md:p-10">
@@ -35,6 +49,31 @@ export default function ShopProductsPage() {
           <span className="sm:hidden">Nuevo</span>
         </Button>
       </div>
+
+      {products.data && allItems.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {(
+            [
+              ["all", `Todos (${allItems.length})`],
+              ["manual", `✍️ Manuales (${nManual})`],
+              ["radar", `🔍 Radar (${nRadar})`],
+            ] as [OriginFilter, string][]
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setOriginFilter(val)}
+              className={
+                "rounded-full border px-3 py-1 text-xs transition " +
+                (originFilter === val
+                  ? "border-orange-500 bg-orange-500/10 font-medium"
+                  : "border-border text-muted-foreground hover:border-foreground/40")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {products.isLoading && <ProductsSkeleton />}
 
@@ -68,7 +107,7 @@ export default function ShopProductsPage() {
 
       {products.data && products.data.items.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {products.data.items.map((p) => (
+          {items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
         </div>

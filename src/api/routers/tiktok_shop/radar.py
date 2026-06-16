@@ -19,7 +19,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_queue
+from src.queue.manager import JobQueue
+from src.queue.models import JobMode
 from src.tiktok_shop.models.discovery import DiscoveredProduct
 
 
@@ -216,6 +218,202 @@ _ECHOTIK_REGIONS = [
     {"code": "BR", "label": "🇧🇷 Brasil"},
     {"code": "MX", "label": "🇲🇽 México"},
 ]
+
+
+# ── Calendario / Plan (Fase 2) ───────────────────────────────────────
+def _pack_options(research: bool, n_carousels: int, n_photos: int) -> dict:
+    return {
+        "download_photos": n_photos > 0,
+        "photos_to_download": n_photos,
+        "research": research,
+        "generate_video_presets": True,
+        "n_carousels": n_carousels,
+    }
+
+
+class ImportToCalendarRequest(BaseModel):
+    product_id: str
+    day: int = 1
+    category: str = "otros"
+    language: str = "es_ES"
+    research: bool = True
+    n_carousels: int = 2
+    n_photos: int = 4
+
+
+class CalendarActionResponse(BaseModel):
+    ok: bool
+    product_id: str | None = None
+    slug: str | None = None
+    job_id: str | None = None
+    message: str = ""
+
+
+@router.post("/import-to-calendar", response_model=CalendarActionResponse)
+def import_to_calendar(
+    body: ImportToCalendarRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Importa un candidato → Product, lo añade al día del calendario y
+    encola la generación del pack (research + estilos + carruseles)."""
+    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
+    from src.tiktok_shop.repos import DiscoveryRepo, PlanRepo
+    from src.tiktok_shop.services import discovery_service
+
+    cand = DiscoveryRepo().get(body.product_id)
+    if cand is None:
+        return CalendarActionResponse(ok=False, message="Candidato no encontrado.")
+    try:
+        product = discovery_service.import_candidate(
+            cand, category=body.category, language=body.language,
+        )
+    except Exception as e:
+        return CalendarActionResponse(ok=False, message=f"Error importando: {e}")
+
+    # Añadir al plan actual (o crear uno).
+    prepo = PlanRepo()
+    plan = prepo.get_current()
+    if plan is None:
+        from datetime import datetime, timezone
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        plan = WeekPlan(label=f"Semana {date}", date=date, days=7)
+    if not any(e.product_id == product.id for e in plan.entries):
+        plan.entries.append(PlanEntry(
+            day=max(1, body.day), product_id=product.id, slug=product.slug,
+            name=product.name, score=cand.score.total, ads_verdict=cand.ads.verdict,
+        ))
+    plan.days = max(plan.days, body.day)
+    prepo.save(plan, make_current=True)
+
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_PACK,
+        title=f"📦 Pack: {product.name}",
+        params={
+            "product_id": product.id,
+            "options": _pack_options(body.research, body.n_carousels, body.n_photos),
+        },
+        enqueued_by=operator or None,
+    )
+    return CalendarActionResponse(
+        ok=True, product_id=product.id, slug=product.slug, job_id=job.id,
+        message=f"'{product.name}' en el día {body.day}, generando pack…",
+    )
+
+
+class PlanGenerateRequest(BaseModel):
+    per_day: int = 2
+    days: int = 7
+    research: bool = True
+    n_carousels: int = 2
+    n_photos: int = 4
+
+
+@router.post("/plan/generate", response_model=CalendarActionResponse)
+def plan_generate(
+    body: PlanGenerateRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Encola el plan N/día: importa los top candidatos y construye sus packs."""
+    n_products = max(1, body.per_day * body.days)
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_PLAN,
+        title=f"🗓️ Plan {body.per_day}/día × {body.days}d",
+        params={
+            "n_products": n_products, "per_day": body.per_day, "days": body.days,
+            "options": _pack_options(body.research, body.n_carousels, body.n_photos),
+        },
+        enqueued_by=operator or None,
+    )
+    return CalendarActionResponse(
+        ok=True, job_id=job.id,
+        message=f"Plan {body.per_day}/día encolado ({n_products} productos).",
+    )
+
+
+class PlanEntryOut(BaseModel):
+    day: int
+    product_id: str
+    slug: str
+    name: str
+    score: float
+    ads_verdict: str
+    tested: bool
+    presets_count: int = 0
+    carousels_count: int = 0
+    pack_ready: bool = False
+
+
+class WeekPlanOut(BaseModel):
+    exists: bool
+    id: str = ""
+    label: str = ""
+    days: int = 7
+    entries: list[PlanEntryOut] = Field(default_factory=list)
+
+
+@router.get("/plan", response_model=WeekPlanOut)
+def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut:
+    """Devuelve el plan actual (calendario), enriqueciendo cada producto con
+    sus prompts ya generados (presets + carruseles) en vivo desde Redis."""
+    from src.tiktok_shop.repos import PlanRepo, ProductRepo
+
+    plan = PlanRepo().get_current()
+    if plan is None:
+        return WeekPlanOut(exists=False)
+    prepo = ProductRepo()
+    out: list[PlanEntryOut] = []
+    for e in plan.entries:
+        prod = prepo.get(e.product_id)
+        n_pre = len(prod.video_presets) if prod else 0
+        n_car = len(prod.carousels) if prod else 0
+        out.append(PlanEntryOut(
+            day=e.day, product_id=e.product_id, slug=e.slug, name=e.name,
+            score=e.score, ads_verdict=e.ads_verdict, tested=e.tested,
+            presets_count=n_pre, carousels_count=n_car,
+            pack_ready=(n_pre > 0 or n_car > 0),
+        ))
+    return WeekPlanOut(
+        exists=True, id=plan.id, label=plan.label, days=plan.days, entries=out,
+    )
+
+
+class MarkTestedRequest(BaseModel):
+    product_id: str
+    tested: bool = True
+
+
+@router.post("/plan/tested")
+def mark_tested(
+    body: MarkTestedRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict[str, bool]:
+    from src.tiktok_shop.repos import PlanRepo
+
+    repo = PlanRepo()
+    plan = repo.get_current()
+    if plan is None:
+        return {"ok": False}
+    changed = False
+    for e in plan.entries:
+        if e.product_id == body.product_id:
+            e.tested = body.tested
+            changed = True
+    if changed:
+        repo.save(plan, make_current=False)
+    return {"ok": changed}
+
+
+@router.delete("/plan")
+def delete_plan(operator: Annotated[str, Depends(get_current_user)]) -> dict[str, bool]:
+    from src.tiktok_shop.repos import PlanRepo
+
+    repo = PlanRepo()
+    plan = repo.get_current()
+    if plan is None:
+        return {"ok": False}
+    return {"ok": repo.delete(plan.id)}
 
 
 @router.get("/regions")

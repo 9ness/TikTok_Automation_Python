@@ -124,3 +124,79 @@ export function useRadarClear() {
     mutationFn: () => api.post<{ deleted: number }>("/api/v1/tiktok-shop/radar/clear"),
   });
 }
+
+// ── Calendario / Plan (Fase 2) ─────────────────────────────────────
+export interface PlanEntry {
+  day: number;
+  product_id: string;
+  slug: string;
+  name: string;
+  score: number;
+  ads_verdict: string;
+  tested: boolean;
+  presets_count: number;
+  carousels_count: number;
+  pack_ready: boolean;
+}
+
+export interface WeekPlan {
+  exists: boolean;
+  id: string;
+  label: string;
+  days: number;
+  entries: PlanEntry[];
+}
+
+export interface CalendarActionResponse {
+  ok: boolean;
+  product_id: string | null;
+  slug: string | null;
+  job_id: string | null;
+  message: string;
+}
+
+export function useRadarPlan() {
+  return useQuery<WeekPlan>({
+    queryKey: ["radar-plan"],
+    queryFn: () => api.get<WeekPlan>("/api/v1/tiktok-shop/radar/plan"),
+    // Refresca mientras haya packs generándose (pack_ready=false).
+    refetchInterval: (q) =>
+      q.state.data?.entries?.some((e) => !e.pack_ready) ? 5000 : false,
+    retry: false,
+  });
+}
+
+export function useImportToCalendar() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    { product_id: string; day?: number; research?: boolean; n_carousels?: number }
+  >({
+    mutationFn: (body) =>
+      api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/import-to-calendar", body),
+  });
+}
+
+export function usePlanGenerate() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    { per_day?: number; days?: number; research?: boolean; n_carousels?: number }
+  >({
+    mutationFn: (body) =>
+      api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/generate", body),
+  });
+}
+
+export function useMarkTested() {
+  return useMutation<{ ok: boolean }, Error, { product_id: string; tested: boolean }>({
+    mutationFn: (body) =>
+      api.post<{ ok: boolean }>("/api/v1/tiktok-shop/radar/plan/tested", body),
+  });
+}
+
+export function useDeletePlan() {
+  return useMutation<{ ok: boolean }, Error, void>({
+    mutationFn: () => api.del<{ ok: boolean }>("/api/v1/tiktok-shop/radar/plan"),
+  });
+}

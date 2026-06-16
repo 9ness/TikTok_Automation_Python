@@ -22,6 +22,8 @@ class JobMode(str, Enum):
     CONSTRUCCION_POV = "construccion_pov"
     TIKTOK_SHOP = "tiktok_shop"
     TIKTOK_SHOP_WATERMARK = "tiktok_shop_watermark"
+    TIKTOK_SHOP_PACK = "tiktok_shop_pack"      # Radar: pack de 1 producto
+    TIKTOK_SHOP_PLAN = "tiktok_shop_plan"      # Radar: plan N/día (varios packs)
     EDITOR_AUTO = "editor_auto"
 
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bot,
+  CalendarDays,
   Captions,
   ChevronDown,
   ChevronRight,
@@ -82,6 +83,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/tiktok-shop/discover", label: "Buscar Productos", icon: Search },
       { href: "/tiktok-shop/radar", label: "Radar (GMV Max)", icon: Radar },
+      { href: "/tiktok-shop/calendar", label: "Calendario", icon: CalendarDays },
       { href: "/tiktok-shop/products", label: "Mis productos", icon: Package },
       { href: "/tiktok-shop/users", label: "Usuarios", icon: Users },
       { href: "/tiktok-shop/generate", label: "Generador", icon: Sparkles },

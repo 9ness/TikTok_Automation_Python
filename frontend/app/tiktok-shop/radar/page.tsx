@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  CalendarPlus,
   Check,
   ExternalLink,
   Loader2,
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  useImportToCalendar,
   useRadarCandidates,
   useRadarClear,
   useRadarImport,
@@ -242,6 +244,8 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 function RadarCard({ c, onImported }: { c: RadarCandidate; onImported: () => void }) {
   const imp = useRadarImport();
+  const toCal = useImportToCalendar();
+  const [day, setDay] = useState(1);
   const boosted = c.ads.probable_boosted;
   const verdictColor =
     c.ads.verdict === "fuerte" ? "text-red-500" : c.ads.verdict === "media" ? "text-orange-500" : "text-muted-foreground";
@@ -287,14 +291,16 @@ function RadarCard({ c, onImported }: { c: RadarCandidate; onImported: () => voi
           <p className="line-clamp-2 text-[10px] text-muted-foreground">{c.ads.reasons.join(" · ")}</p>
         )}
 
-        <div className="flex items-center gap-2 pt-1">
-          {c.imported ? (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          {c.imported && (
             <span className="flex items-center gap-1 text-xs text-green-600">
               <Check className="h-3 w-3" /> Importado
             </span>
-          ) : (
+          )}
+          {!c.imported && (
             <Button
               size="sm"
+              variant="outline"
               disabled={imp.isPending}
               onClick={() =>
                 imp.mutate(
@@ -313,6 +319,36 @@ function RadarCard({ c, onImported }: { c: RadarCandidate; onImported: () => voi
               Importar
             </Button>
           )}
+          {/* Al calendario: importa + encola el pack en el día elegido */}
+          <select
+            value={day}
+            onChange={(e) => setDay(+e.target.value)}
+            className="rounded-md border border-border bg-background px-1 py-1 text-[11px]"
+            title="Día del calendario"
+          >
+            {Array.from({ length: 7 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>Día {d}</option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            disabled={toCal.isPending}
+            onClick={() =>
+              toCal.mutate(
+                { product_id: c.product_id, day },
+                {
+                  onSuccess: (r) => {
+                    if (r.ok) { toast.success(r.message); onImported(); }
+                    else toast.error(r.message);
+                  },
+                  onError: (e) => toast.error(e.message),
+                },
+              )
+            }
+          >
+            {toCal.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CalendarPlus className="mr-1 h-3 w-3" />}
+            Al calendario
+          </Button>
           {c.tiktok_url && (
             <a href={c.tiktok_url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
               <ExternalLink className="h-3.5 w-3.5" />

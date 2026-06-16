@@ -1713,6 +1713,67 @@ def run_tiktok_shop_watermark(job: Job, on_log: OnLog, on_progress: OnProgress) 
 # ============================================================
 # Dispatch
 # ============================================================
+def run_tiktok_shop_pack(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Radar: construye el pack completo de UN producto (fotos + research +
+    estilos de vídeo + carruseles + carpeta). Los prompts quedan en el
+    Product (Redis) para verlos en el calendario sin abrir Drive."""
+    from src.tiktok_shop.repos import ProductRepo
+    from src.tiktok_shop.services.creation_pack import PackOptions, build_pack
+
+    product_id = job.params["product_id"]
+    options = PackOptions(**(job.params.get("options") or {}))
+    on_progress(0.05, "📦 Cargando producto…")
+    product = ProductRepo().get(product_id)
+    if product is None:
+        raise RuntimeError(f"Producto {product_id} no existe")
+
+    # build_pack hace fotos→análisis→research→presets→carruseles→archivos.
+    # Mapeamos sus logs a progreso aproximado por palabras clave.
+    def _log(msg: str) -> None:
+        on_log(msg)
+        if "fotos" in msg.lower():
+            on_progress(0.2, "🖼️ Fotos…")
+        elif "research" in msg.lower() or "vídeos ganadores" in msg.lower():
+            on_progress(0.4, "🎬 Investigando vídeos ganadores…")
+        elif "estilos de vídeo" in msg.lower() or "presets" in msg.lower():
+            on_progress(0.6, "🎥 Estilos de vídeo…")
+        elif "carrusel" in msg.lower():
+            on_progress(0.8, "🎠 Carruseles…")
+
+    res = build_pack(product, options=options, log_callback=_log)
+    on_progress(1.0, f"✅ Pack listo · 🎠 {res.carousels_generated} · 🎥 {res.presets_generated}")
+    return res.folder or product.slug
+
+
+def run_tiktok_shop_plan(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Radar: plan N productos/día — importa los top candidatos y construye
+    el pack de cada uno + escribe el WeekPlan (calendario)."""
+    from src.tiktok_shop.services.creation_pack import PackOptions, plan_week
+
+    n_products = int(job.params.get("n_products", 14))
+    per_day = int(job.params.get("per_day", 2))
+    days = int(job.params.get("days", 7))
+    options = PackOptions(**(job.params.get("options") or {}))
+
+    done = {"n": 0}
+
+    def _log(msg: str) -> None:
+        on_log(msg)
+        if msg.strip().startswith("✅ Pack de"):
+            done["n"] += 1
+            on_progress(min(0.98, done["n"] / max(1, n_products)),
+                        f"📦 {done['n']}/{n_products} productos…")
+
+    on_progress(0.02, f"🗓️ Preparando {n_products} productos ({per_day}/día)…")
+    results = plan_week(
+        n_products=n_products, options=options, days=days, per_day=per_day,
+        log_callback=_log,
+    )
+    ok = sum(1 for r in results if r.slug)
+    on_progress(1.0, f"✅ {ok} productos preparados")
+    return f"plan:{ok}/{len(results)}"
+
+
 _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.PRESIDENTS: run_presidents,
     JobMode.PRONOSTICOS: run_pronosticos,
@@ -1721,6 +1782,8 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.CONSTRUCCION_POV: run_construccion_pov,
     JobMode.TIKTOK_SHOP: run_tiktok_shop,
     JobMode.TIKTOK_SHOP_WATERMARK: run_tiktok_shop_watermark,
+    JobMode.TIKTOK_SHOP_PACK: run_tiktok_shop_pack,
+    JobMode.TIKTOK_SHOP_PLAN: run_tiktok_shop_plan,
     JobMode.EDITOR_AUTO: run_editor_auto,
 }
 
@@ -1733,6 +1796,8 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.CONSTRUCCION_POV: "creator_reward",
     JobMode.TIKTOK_SHOP: "tiktok_shop",
     JobMode.TIKTOK_SHOP_WATERMARK: "tiktok_shop",
+    JobMode.TIKTOK_SHOP_PACK: "tiktok_shop",
+    JobMode.TIKTOK_SHOP_PLAN: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
 }
 

@@ -143,6 +143,11 @@ class ProductResponse(BaseModel):
     # Presets de vídeo precocinados (música + scripted). Dump genérico
     # — el frontend tiene types VideoPreset que matchea.
     video_presets: list[dict[str, Any]] = Field(default_factory=list)
+    # Carruseles (Photo Mode) generados por el Radar/build_pack.
+    carousels: list[dict[str, Any]] = Field(default_factory=list)
+    # Origen del producto: "manual" (creado a mano) o "radar" (descubierto e
+    # importado por el Radar). Permite separarlos en "Mis productos".
+    origin: str = "manual"
     # Investigación profunda (pains, benefits, objections, viral_patterns,
     # top_videos, etc). Se rellena al pulsar "Reanalizar producto".
     research_context: dict[str, Any] = Field(default_factory=dict)
