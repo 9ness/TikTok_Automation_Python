@@ -151,10 +151,16 @@ class SilenceCutterTool:
             # salvó). Si quieres bajar costes, desactiva uno de los dos
             # toggles en la config UI.
             "ai_pass2_openai_enabled": True,
-            # Gemini DESACTIVADO: es "thinking" (no determinista, varía aunque
-            # temp=0) → rompe la consistencia. La pasada 2 corre solo con
-            # gpt-5.4 (temp 0 + seed) = mismo resultado siempre.
-            "ai_pass2_gemini_enabled": False,
+            # Gemini ACTIVADO (unión con OpenAI) — RECALL > determinismo estricto:
+            # OpenAI (temp 0+seed) es consistente pero por sensibilidad al CONTEXTO
+            # se le escapan restarts borderline que Gemini SÍ caza (caso real:
+            # "y esto empezó esto costaba" — OpenAI lo dejó, Gemini lo corta). La
+            # unión maximiza la detección de falsos arranques. Coste: Gemini es
+            # "thinking" (no determinista) → el MISMO vídeo puede variar algo entre
+            # ediciones; aceptable porque el self-heal es monótono (nunca empeora)
+            # y <90 se retiene. Desactiva este toggle si necesitas determinismo
+            # estricto (p. ej. para A/B de score).
+            "ai_pass2_gemini_enabled": True,
             "gemini_model": "gemini-2.5-pro",
             # `large-v3` por defecto — máxima precisión. ~3-5x más lento
             # que `small` y ~6-8GB RAM (vs ~1GB). El operador puede bajar
