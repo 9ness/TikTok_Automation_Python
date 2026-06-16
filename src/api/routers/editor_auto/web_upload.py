@@ -487,7 +487,7 @@ class SendToEditRequest(BaseModel):
 
 def _enqueue_video(
     queue: JobQueue, user: EditorUser, mount_path: Path, day: str,
-    *, plan=None, scheduled_for: float | None = None,
+    *, plan=None, scheduled_for: float | None = None, is_admin: bool = False,
 ) -> str:
     """Encola un vídeo leyéndolo DIRECTO del rclone-mount (input_path = ruta
     del mount). El runner lee on-demand al procesar — sin copia previa que
@@ -510,7 +510,8 @@ def _enqueue_video(
     if user.subscription and user.subscription.status not in ("active", "trial"):
         raise APIError("Tu suscripción no está activa.", status_code=402)
     tools_used = [s.tool_id for s in enabled]
-    if plan and plan.allowed_tools:
+    # ADMIN: sin filtro de plan por herramienta (usa todas las de su estilo).
+    if plan and plan.allowed_tools and not is_admin:
         for tid in tools_used:
             if tid not in plan.allowed_tools:
                 raise APIError(
@@ -623,7 +624,7 @@ def web_send_to_edit(
             break
         mount_path = Path(user_input_day_folder(user.name, day)) / v["filename"]
         try:
-            job_id = _enqueue_video(queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for)
+            job_id = _enqueue_video(queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for, is_admin=is_admin)
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
             errors.append({"filename": v["filename"], "error": e.message})
