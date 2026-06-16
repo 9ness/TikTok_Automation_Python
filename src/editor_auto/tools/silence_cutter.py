@@ -920,25 +920,9 @@ class SilenceCutterTool:
         ai_pass2_diag: dict[str, Any] = {"enabled": ai_pass2_on}
         if ai_pass2_on and words:
             ctx.on_progress(0.62, "🤖 Pasada 2: GPT-4o + Gemini 2.5 Pro…")
-            # CLAVE: pass2 ve el transcript LIMPIO (palabras que SOBREVIVEN a los
-            # cortes previos: acústicos + holístico + analyst + ngram), NO el
-            # bruto completo. En el bruto largo/ruidoso los modelos se pierden
-            # restarts borderline (caso real "y esto empezó esto costaba": en el
-            # bruto lo dejan, en el limpio AMBOS modelos lo cortan — verificado).
-            # Los índices/tiempos que devuelve pass2 son sobre esta lista limpia,
-            # así que el corte aplicado es válido (tiempos reales).
-            _prev_cuts = [(s, e) for (s, e, _src) in cuts_with_source]
-
-            def _alive(_w: dict) -> bool:
-                c = (float(_w.get("start", 0) or 0) + float(_w.get("end", 0) or 0)) / 2.0
-                return not any(s <= c <= e for s, e in _prev_cuts)
-
-            _p2_words = [w for w in words if _alive(w)]
-            ai_pass2_diag["n_words_clean"] = len(_p2_words)
-            ai_pass2_diag["n_words_raw"] = len(words)
             try:
                 fs_intervals, fs_diag = _ai_false_starts_consensus(
-                    words=_p2_words,
+                    words=words,
                     language=config.get("ai_language", "es"),
                     openai_model=config.get("ai_model", "gpt-4o"),
                     gemini_model=config.get("gemini_model", "gemini-2.5-pro"),
