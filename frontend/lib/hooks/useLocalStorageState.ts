@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 /**
  * useState + persistencia automática en localStorage.
  *
@@ -9,6 +13,10 @@ import { useEffect, useState } from "react";
  *   (durante SSR usa siempre `defaultValue` para no romper la hidratación).
  * - Guarda cualquier cambio posterior.
  * - Si el JSON guardado está corrupto, cae a `defaultValue`.
+ * - Si tanto el valor guardado como el default son objetos planos, fusiona
+ *   `{ ...default, ...guardado }` para que un localStorage de una versión
+ *   anterior (sin campos añadidos después) no deje propiedades `undefined`
+ *   que revienten al hacer `.toFixed()`/`.map()` en el render.
  *
  * Nota: el valor inicial del SSR siempre es `defaultValue`. La sincronización
  * con storage ocurre en un `useEffect` post-mount, por lo que en componentes
@@ -29,7 +37,13 @@ export function useLocalStorageState<T>(
       const raw = window.localStorage.getItem(key);
       if (raw !== null) {
         const parsed = JSON.parse(raw) as T;
-        setValue(parsed);
+        // Fusiona sobre el default para rellenar campos añadidos después de
+        // que el usuario guardara su config (si no, quedan `undefined`).
+        setValue(
+          isPlainObject(parsed) && isPlainObject(defaultValue)
+            ? ({ ...defaultValue, ...parsed } as T)
+            : parsed,
+        );
       }
     } catch {
       // JSON corrupto — ignorar y mantener default.
