@@ -43,6 +43,17 @@ const FLAGS: Record<string, string> = {
   ES: "🇪🇸", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", GB: "🇬🇧", US: "🇺🇸", BR: "🇧🇷", MX: "🇲🇽",
 };
 
+// Barre las principales categorías TikTok Shop en un solo scan (1 llamada
+// EchoTik por nicho). Equivale a "escanear muchas carpetas" del operador.
+const BROAD_NICHES = [
+  "crema facial", "serum", "maquillaje", "perfume",
+  "creatina", "proteina",
+  "organizador hogar", "lampara led", "humidificador", "cocina gadget",
+  "auriculares", "cargador",
+  "crocs", "zapatillas", "reloj",
+  "juguete perro", "limpiador",
+];
+
 export default function RadarPage() {
   const qc = useQueryClient();
   const regionsQ = useRadarRegions();
@@ -58,9 +69,17 @@ export default function RadarPage() {
   const [requireAds, setRequireAds] = useState(false);
   const [deepAds, setDeepAds] = useState(true);
   const [sort, setSort] = useState("commission");
+  // Filtros POST-scan (sobre los candidatos ya cargados, sin re-buscar)
+  const [viewOnlyBoosted, setViewOnlyBoosted] = useState(false);
+  const [viewMinComm, setViewMinComm] = useState(0);
 
   const candidatesQ = useRadarCandidates(sort);
-  const items = candidatesQ.data ?? [];
+  const allCands = candidatesQ.data ?? [];
+  const items = allCands.filter(
+    (c) =>
+      (!viewOnlyBoosted || c.ads.probable_boosted) &&
+      c.commission_pct >= viewMinComm,
+  );
 
   const toggleRegion = (code: string) =>
     setRegions((r) => (r.includes(code) ? r.filter((x) => x !== code) : [...r, code]));
@@ -133,13 +152,26 @@ export default function RadarPage() {
 
           {/* Keywords */}
           <div>
-            <label className="text-xs font-medium">Nichos / keywords (una por línea)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium">Nichos / keywords (una por línea)</label>
+              <button
+                onClick={() => setKeywords(BROAD_NICHES.join("\n"))}
+                className="text-[11px] text-orange-500 hover:underline"
+                title="Rellena ~17 nichos para barrer muchas categorías"
+              >
+                🌐 Nichos amplios
+              </button>
+            </div>
             <textarea
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               rows={4}
               className="mt-1 w-full rounded-md border border-border bg-background p-2 text-xs"
             />
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              EchoTik no tiene un &quot;top de todos&quot; — se descubre por nicho. Cada
+              keyword × país = 1 llamada. Ojo con la cuota del trial.
+            </p>
           </div>
 
           {/* Filtros */}
@@ -176,11 +208,24 @@ export default function RadarPage() {
       </Card>
 
       {/* Resultados */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          {items.length} candidatos · {items.filter((c) => c.imported).length} importados
+          {items.length}{items.length !== allCands.length ? `/${allCands.length}` : ""} candidatos · {items.filter((c) => c.imported).length} importados
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtros post-scan */}
+          <label className="flex items-center gap-1 text-xs">
+            <input type="checkbox" checked={viewOnlyBoosted} onChange={(e) => setViewOnlyBoosted(e.target.checked)} />
+            🚀 Solo GMV Max
+          </label>
+          <label className="flex items-center gap-1 text-xs">
+            Comisión ≥
+            <input
+              type="number" value={viewMinComm} min={0}
+              onChange={(e) => setViewMinComm(+e.target.value)}
+              className="w-12 rounded-md border border-border bg-background px-1 py-0.5"
+            />%
+          </label>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
@@ -224,6 +269,27 @@ export default function RadarPage() {
   );
 }
 
+function Cover({ url }: { url: string }) {
+  const [broken, setBroken] = useState(false);
+  if (!url || broken) {
+    return (
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded bg-muted">
+        <Package className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setBroken(true)}
+      className="h-16 w-16 shrink-0 rounded object-cover"
+    />
+  );
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -254,14 +320,7 @@ function RadarCard({ c, onImported }: { c: RadarCandidate; onImported: () => voi
     <Card className="overflow-hidden">
       <CardContent className="space-y-2 p-3">
         <div className="flex gap-2">
-          {c.cover_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.cover_url} alt="" className="h-16 w-16 shrink-0 rounded object-cover" />
-          ) : (
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded bg-muted">
-              <Package className="h-5 w-5 text-muted-foreground" />
-            </div>
-          )}
+          <Cover url={c.cover_url} />
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-xs font-medium">
               {FLAGS[c.region] ?? ""} {c.name}
