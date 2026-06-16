@@ -1269,6 +1269,36 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Rescate de voz en bordes falló: {e}")
 
+        # Limpieza de palabras sueltas: un editor humano, al revisar su corte,
+        # tira los clips diminutos aislados cuyo ÚNICO contenido es relleno
+        # ('os', 'la', 'y'…) — el artefacto que más se nota (palabra colgada
+        # entre dos cortes, sin frase). `_detect_loose_words` solo marca basura
+        # por construcción (keep ≤0.85s, 1-2 tokens funcionales/≤2 chars), así
+        # que descartarlos NUNCA se lleva contenido. Es no-regresión por diseño:
+        # un vídeo sin sueltas no tiene nada que filtrar → no-op.
+        if bool(config.get("drop_loose_filler_keeps", True)) and len(keep_intervals) > 1:
+            try:
+                _loose = _detect_loose_words(words, keep_intervals)
+                if _loose:
+                    _loose_spans = {(l["start"], l["end"]) for l in _loose}
+                    _before_n = len(keep_intervals)
+                    keep_intervals = [
+                        (s, e) for (s, e) in keep_intervals
+                        if (round(s, 2), round(e, 2)) not in _loose_spans
+                    ] or keep_intervals  # nunca vaciar
+                    _dropped = _before_n - len(keep_intervals)
+                    if _dropped:
+                        ctx.on_log(
+                            f"[silence_cutter] 🧹 {_dropped} clip(s) suelto(s) de "
+                            f"relleno descartado(s): "
+                            f"{', '.join(repr(l['text']) for l in _loose[:4])}"
+                        )
+                        diagnostic["phases"]["loose_filler_cleanup"] = {
+                            "n": _dropped, "preview": _loose[:6],
+                        }
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Limpieza de sueltas falló: {e}")
+
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
