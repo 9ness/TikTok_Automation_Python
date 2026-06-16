@@ -229,6 +229,7 @@ interface Carousel {
   format?: string;
   concept?: string;
   hook_caption?: string;
+  hashtags?: string[];
   suggested_sound?: string;
   slides?: Slide[];
 }
@@ -355,7 +356,10 @@ function ProductPrompts({ productId }: { productId: string }) {
                 Carrusel {i + 1} · {c.format} — {(c.concept ?? "").slice(0, 50)}
               </summary>
               <div className="mt-2 space-y-2">
-                <CopyBlock label="📝 Caption" text={c.hook_caption ?? ""} />
+                <CopyBlock label="📝 Caption (sin hashtags)" text={c.hook_caption ?? ""} />
+                {c.hashtags && c.hashtags.length > 0 && (
+                  <CopyBlock label="#️⃣ Hashtags (opcional)" text={c.hashtags.join(" ")} />
+                )}
                 {c.suggested_sound && <p className="text-muted-foreground">🎵 {c.suggested_sound}</p>}
                 {(c.slides ?? []).map((s, j) => (
                   <div key={j} className="space-y-1">

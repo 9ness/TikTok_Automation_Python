@@ -29,7 +29,8 @@ context + number of slides + **output language** (es or en).
   "format": "listicle | before_after | comparison | pov | problem_solution",
   "concept": "one-line angle",
   "language": "es | en",
-  "hook_caption": "TikTok post caption in the output language. First line stops scroll. Hashtags ONLY here at the end (5-8).",
+  "hook_caption": "TikTok post caption in the output language. First line stops scroll. NO hashtags inside the caption.",
+  "hashtags": ["#tag1", "#tag2"],
   "suggested_sound": "type of trending audio to use",
   "text_style": "ONE consistent text-overlay style reused in EVERY slide image: font family + weight, color, stroke/shadow, and position (e.g. 'bold rounded sans-serif, white with soft dark shadow, top-center'). Real TikTok/IG caption look.",
   "slides": [
@@ -38,7 +39,7 @@ context + number of slides + **output language** (es or en).
       "role": "hook | item | proof | objection | before | after | cta",
       "on_screen_text": "the exact text to render, in the output language, MAX 8 words",
       "swipe_cue": "tiny directional cue ('mira el 3 →') or ''",
-      "image_prompt": "SELF-CONTAINED prompt for ONE single 9:16 image (one slide, NEVER a collage/grid): describe the exact scene/composition WITH the product, AND end by instructing it to render `on_screen_text` baked into the image using `text_style`. Start with the scene (no 'EN' prefix)."
+      "image_prompt": "SELF-CONTAINED prompt for ONE single 9:16 image. MUST START with the text-overlay instruction so the model can't ignore it, then the scene. Use this shape: '9:16 vertical image. Large bold legible TEXT OVERLAY reading EXACTLY: «<on_screen_text>» (<text_style>), spelled exactly, well contrasted. Scene: <scene with the product, native phone-photo look>. Maintain exact product appearance: same colors, labels, proportions. ONE single image, not a collage. No other text, no hashtags, no logos.'"
     }
   ],
   "image_style_guide": "global consistency: same product, same background family, same lighting, same text_style across ALL slides",
@@ -59,13 +60,15 @@ context + number of slides + **output language** (es or en).
   English, but the text the model must RENDER is quoted EXACTLY from
   `on_screen_text` in the output language (so a Spanish carousel shows Spanish
   text on the image, even though the scene description is in English).
-- **Text baked into the image**: every `image_prompt` MUST end with an explicit
-  instruction like: `Render this exact text overlaid on the image, baked in,
-  as a clean modern TikTok caption (<text_style>): "<on_screen_text>". Spelling
-  must be exact. No other text.`
-- **NO hashtags, NO emojis spam, NO watermarks, NO logos rendered in ANY image.**
-  Hashtags live ONLY in `hook_caption`. The only text in an image is the slide's
-  `on_screen_text`.
+- **Text baked into the image (CRITICAL — the model keeps skipping it)**: every
+  `image_prompt` MUST LEAD with the text instruction (first sentence), quoting the
+  exact `on_screen_text` in «guillemets», stating it must be large, legible and
+  spelled exactly. Do NOT bury it at the end. The image WITHOUT the text is a
+  failure.
+- **NO hashtags anywhere — not in the caption, not in the image.** `hook_caption`
+  has zero hashtags; hashtags go ONLY in the separate `hashtags` array (the
+  operator decides whether to use them). The only text in an image is the slide's
+  `on_screen_text`. No emojis spam, no watermarks, no logos in images.
 - **Slide 1 = the HOOK and the thumbnail**: make its `image_prompt` the MOST
   specific — describe the exact eye-catching composition (angle, setting, focal
   point, the product hero) AND render the bold hook text prominently. It must
