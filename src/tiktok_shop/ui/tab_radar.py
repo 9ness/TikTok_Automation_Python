@@ -105,12 +105,23 @@ def _render_discover() -> None:
                 key="radar_mingmv",
                 help="Calibrado a España (mercado pequeño). Súbelo para US/UK.",
             )
+            min_units = st.number_input(
+                "Artículos vendidos mínimos", min_value=0, value=5, step=1,
+                key="radar_minunits",
+                help="Filtro del chaval: >5 unidades vendidas.",
+            )
+            min_commission = st.slider(
+                "Comisión mínima (%)", 0, 40, 0, key="radar_mincomm",
+                help="El chaval empieza alto (>19%) y la BAJA hasta que salen "
+                     "más productos. En España muchas comisiones son 8-12%, "
+                     "así que déjala baja para no quedarte sin candidatos.",
+            )
             min_score = st.slider(
                 "Score mínimo", 0, 100, 25, key="radar_minscore",
             )
             require_ads = st.checkbox(
-                "Exigir señal de ADS (media/fuerte)", value=False,
-                key="radar_reqads",
+                "Exigir señal de ADS (= '¿producto de anuncios?: Sí')",
+                value=False, key="radar_reqads",
             )
 
         keywords_raw = st.text_area(
@@ -127,6 +138,8 @@ def _render_discover() -> None:
         filters = DiscoveryFilters(
             max_influencers=int(max_infl),
             min_gmv_eur=float(min_gmv),
+            min_units_sold=int(min_units),
+            min_commission_pct=float(min_commission),
             min_score=float(min_score),
             require_ads_signal=bool(require_ads),
         )

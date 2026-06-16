@@ -331,7 +331,9 @@ class DiscoveryFilters:
     """Filtros que aplica el Radar antes de mostrar un candidato."""
     max_influencers: int = 200       # "pocos creadores" — descarta saturados
     min_gmv_eur: float = 300.0       # demanda mínima (calibrado a ES, mercado pequeño)
-    min_commission_pct: float = 0.0  # 0 = sin filtro de comisión
+    min_units_sold: int = 0          # artículos vendidos mínimos (filtro del chaval: >5)
+    min_commission_pct: float = 0.0  # comisión mínima %. El chaval empieza alto (>19%)
+                                     # y la BAJA para que salgan más productos.
     min_score: float = 25.0          # score total mínimo para entrar al Radar
     require_ads_signal: bool = False  # si True, exige ads.probable_boosted
     excluded_verdicts: list[str] = field(default_factory=list)
@@ -340,9 +342,12 @@ class DiscoveryFilters:
         influencers = int(units_filter_ctx.get("influencer_count") or 0)
         gmv = float(units_filter_ctx.get("gmv_30d") or units_filter_ctx.get("gmv") or 0.0)
         commission = float(units_filter_ctx.get("commission_pct") or 0.0)
+        units = int(units_filter_ctx.get("units_sold") or 0)
         if influencers and influencers > self.max_influencers:
             return False
         if gmv < self.min_gmv_eur:
+            return False
+        if units < self.min_units_sold:
             return False
         if commission < self.min_commission_pct:
             return False
