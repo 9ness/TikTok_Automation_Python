@@ -241,6 +241,13 @@ def render_chunk_image(
     font_size = max(16, int(H * s["font_scale"]))
     font = _load_font(s["font_path"], font_size)
     stroke_w = s["stroke_width"]
+    # ascent del FONT (constante, no depende de las letras de cada palabra).
+    # Dibujamos cada palabra anclada a su LÍNEA BASE (anchor "ls") a una base
+    # común = top_línea + ascent → TODAS las palabras de la línea quedan en la
+    # MISMA base. Con anchor "lt" (lo anterior) se alineaba el TOPE del glifo,
+    # así palabras con alturas distintas (mayúsc/ascendentes vs minúsc) caían a
+    # bases distintas = subtítulos ESCALONADOS. Esto lo elimina de raíz.
+    _ascent = font.getmetrics()[0]
 
     tmp = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(tmp)
@@ -323,10 +330,13 @@ def render_chunk_image(
     for line in lines:
         line_text_w = sum(w[2] for w in line) + space_w * (len(line) - 1)
         x = (W - line_text_w) // 2
+        # Base común de la línea: TODAS las palabras se asientan aquí (anchor
+        # "ls"), no importa su altura de glifo → cero escalonado.
+        y_base = y + _ascent
 
         for idx, word_text, ww in line:
             is_active = (idx == highlight_idx)
-            actual = cdraw.textbbox((x, y), word_text, font=font, anchor="lt", stroke_width=stroke_w)
+            actual = cdraw.textbbox((x, y_base), word_text, font=font, anchor="ls", stroke_width=stroke_w)
 
             # ─── Capa BAJO el texto: pill / box_outline / glow ───
             if is_active and mode == "pill":
@@ -350,11 +360,11 @@ def render_chunk_image(
                 gdraw = ImageDraw.Draw(glow_layer)
                 glow_stroke = max(stroke_w + 8, int(font_size * 0.18))
                 gdraw.text(
-                    (x, y), word_text, font=font,
+                    (x, y_base), word_text, font=font,
                     fill=s["highlight_color"],
                     stroke_width=glow_stroke,
                     stroke_fill=s["highlight_color"],
-                    anchor="lt",
+                    anchor="ls",
                 )
                 glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=max(4, font_size // 12)))
                 canvas.alpha_composite(glow_layer)
@@ -377,13 +387,13 @@ def render_chunk_image(
                 shadow_layer = Image.new("RGBA", (W, total_h), (0, 0, 0, 0))
                 sdraw = ImageDraw.Draw(shadow_layer)
                 sdraw.text(
-                    (x + shadow_dx, y + shadow_dy),
+                    (x + shadow_dx, y_base + shadow_dy),
                     word_text,
                     font=font,
                     fill=(sr, sg, sb, sa),
                     stroke_width=stroke_w,
                     stroke_fill=(sr, sg, sb, sa),
-                    anchor="lt",
+                    anchor="ls",
                 )
                 if shadow_blur > 0:
                     shadow_layer = shadow_layer.filter(
@@ -403,13 +413,13 @@ def render_chunk_image(
             else:
                 text_fill = s["text_color"]
             cdraw.text(
-                (x, y),
+                (x, y_base),
                 word_text,
                 font=font,
                 fill=text_fill,
                 stroke_width=stroke_w,
                 stroke_fill=s["stroke_color"],
-                anchor="lt",
+                anchor="ls",
             )
 
             # ─── Capa SOBRE el texto: underline ───
