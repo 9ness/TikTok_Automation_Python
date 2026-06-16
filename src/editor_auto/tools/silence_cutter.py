@@ -859,8 +859,23 @@ class SilenceCutterTool:
                         (ai_raw_result or {}).get("cuts", [])
                     ),
                 })
-                for s, e in ai_cuts:
-                    cuts_with_source.append((s, e, "ai"))
+                # Etiqueta los 'noise_gap' aparte ("ai_noise_gap"): la IA marcó
+                # una PAUSA ahí, no un borrado deliberado de contenido. Si en ese
+                # hueco había una palabra de contenido (caso real 'proteína'),
+                # word-protection la re-anexa. Fallback seguro al "ai" de siempre
+                # si el conteo no cuadra.
+                _ai_tagged = _parse_ai_cuts_tagged(
+                    (ai_raw_result or {}).get("cuts", []),
+                    words=words, video_duration=video_duration,
+                )
+                if len(_ai_tagged) == len(ai_cuts):
+                    for s, e, _rsn in _ai_tagged:
+                        cuts_with_source.append(
+                            (s, e, "ai_noise_gap" if _rsn == "noise_gap" else "ai")
+                        )
+                else:
+                    for s, e in ai_cuts:
+                        cuts_with_source.append((s, e, "ai"))
             except Exception as e:
                 ai_diag["error"] = f"{type(e).__name__}: {e}"
                 ctx.on_log(
@@ -1109,7 +1124,7 @@ class SilenceCutterTool:
             # rescata dentro de cortes acústicos (palabra real mal-alineada).
             _island_protected = [
                 (s, e) for (s, e, src) in cuts_with_source
-                if src in _CONTENT_CUT_SOURCES or src == "auto_trim"
+                if src in _CONTENT_CUT_SOURCES or src == "auto_trim" or src == "ai_noise_gap"
             ]
             merged_cuts, n_islands = _preserve_speech_islands_in_cuts(
                 merged_cuts, tmp_audio, protected_cuts=_island_protected,
@@ -1240,7 +1255,7 @@ class SilenceCutterTool:
             # de buga_1). El head/tail es tan autoritativo como un corte de la IA.
             _content_cuts = [
                 (s, e) for (s, e, src) in cuts_with_source
-                if src in _CONTENT_CUT_SOURCES or src == "auto_trim"
+                if src in _CONTENT_CUT_SOURCES or src == "auto_trim" or src == "ai_noise_gap"
             ]
             keep_intervals, n_voiced_ext = _extend_keeps_to_voiced_edges(
                 keep_intervals, tmp_audio, _content_cuts,
@@ -5311,12 +5326,25 @@ def _protect_words_from_acoustic_cuts(
     content_cuts = [
         (s, e) for (s, e, src) in cuts_with_source if src in _CONTENT_CUT_SOURCES
     ]
+    # 'noise_gap' de la IA: marcó una PAUSA ahí, NO un borrado deliberado. Si
+    # tragó una palabra de CONTENIDO (proteína), la re-anexamos; el relleno que
+    # la IA cortara bien en ese hueco se queda fuera.
+    noise_gap_cuts = [
+        (s, e) for (s, e, src) in cuts_with_source if src == "ai_noise_gap"
+    ]
 
     def _in_keep(center: float) -> bool:
         return any(a <= center <= b for a, b in keep_intervals)
 
     def _content_removed(center: float) -> bool:
         return any(s <= center <= e for s, e in content_cuts)
+
+    def _in_noise_gap(center: float) -> bool:
+        return any(s <= center <= e for s, e in noise_gap_cuts)
+
+    def _is_content_word(w: dict) -> bool:
+        tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+        return bool(tok) and tok not in _FILLER_TOKENS and len(tok) > 2
 
     extra: list[tuple[float, float]] = []
     n_prot = 0
@@ -5330,7 +5358,11 @@ def _protect_words_from_acoustic_cuts(
             continue                       # ya conservada
         if _content_removed(c):
             continue                       # la quitó una fase de contenido → OK
-        extra.append((ws - pad, we + pad))  # solo la comió un corte acústico
+        # Si la engulló un noise_gap de la IA, solo rescatamos CONTENIDO real
+        # (no rellenos sueltos que la IA cortó a propósito en esa pausa).
+        if _in_noise_gap(c) and not _is_content_word(w):
+            continue
+        extra.append((ws - pad, we + pad))  # corte acústico / noise_gap con contenido
         n_prot += 1
     if not extra:
         return keep_intervals, 0
@@ -6280,6 +6312,41 @@ def _parse_ai_cuts(
         if t1 - t0 > 0.05:
             intervals.append((t0, t1))
     return intervals
+
+
+def _parse_ai_cuts_tagged(
+    cuts_raw: list[dict],
+    *,
+    words: list[dict],
+    video_duration: float,
+) -> list[tuple[float, float, str]]:
+    """Como `_parse_ai_cuts` pero CONSERVA el `reason` de cada corte. Sirve para
+    distinguir los 'noise_gap' (la IA adivina una PAUSA, no un borrado de
+    contenido deliberado) del resto. Si en un noise_gap había una palabra de
+    contenido real (caso 'proteína'), word-protection la re-anexa."""
+    n = len(words)
+    out: list[tuple[float, float, str]] = []
+    for cut in cuts_raw:
+        try:
+            i0 = int(cut.get("start_word_idx"))
+            i1 = int(cut.get("end_word_idx"))
+        except (TypeError, ValueError):
+            continue
+        ts, te = cut.get("t_start"), cut.get("t_end")
+        if i0 in (-1, -2):
+            if ts is None or te is None:
+                continue
+            t0, t1 = float(ts), float(te)
+        else:
+            if not (0 <= i0 <= i1 < n):
+                continue
+            t0 = float(ts) if ts is not None else float(words[i0]["start"])
+            t1 = float(te) if te is not None else float(words[i1]["end"])
+        t0 = max(0.0, min(video_duration, t0))
+        t1 = max(0.0, min(video_duration, t1))
+        if t1 - t0 > 0.05:
+            out.append((t0, t1, str(cut.get("reason") or "")))
+    return out
 
 
 # ---------------------------------------------------------------------------
