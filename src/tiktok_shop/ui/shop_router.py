@@ -37,6 +37,7 @@ def render(_config: dict) -> None:
         _render_health_banner()
 
     tabs = st.tabs([
+        "🔍 Radar",
         "📦 Productos",
         "👥 Usuarios TikTok",
         "🎬 Generar Vídeo",
@@ -47,18 +48,21 @@ def render(_config: dict) -> None:
     # Cada tab tiene su propio spinner contextual dentro de su `render()`,
     # alrededor de la query Redis pesada. Aquí solo enrutamos.
     with tabs[0]:
+        from .tab_radar import render as render_radar
+        render_radar()
+    with tabs[1]:
         from .tab_products import render as render_products
         render_products()
-    with tabs[1]:
+    with tabs[2]:
         from .tab_users import render as render_users
         render_users()
-    with tabs[2]:
+    with tabs[3]:
         from .tab_generator import render as render_generator
         render_generator()
-    with tabs[3]:
+    with tabs[4]:
         from .tab_voices import render as render_voices
         render_voices()
-    with tabs[4]:
+    with tabs[5]:
         from .tab_history import render as render_history
         render_history()
 

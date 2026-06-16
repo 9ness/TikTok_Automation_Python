@@ -284,6 +284,10 @@ class Product(BaseModel):
     research_context: ResearchContext = Field(default_factory=ResearchContext)
     performance_history: PerformanceHistory = Field(default_factory=PerformanceHistory)
     needs_nano_banana_regeneration: bool = False
+    # Origen del producto: "manual" (creado a mano en la pestaña Productos) o
+    # "radar" (descubierto + importado por el Radar de Productos). Default
+    # "manual" para que TODOS los productos existentes sigan siendo manuales.
+    origin: Literal["manual", "radar"] = "manual"
     drive_folder: str | None = None
     deleted: bool = False                     # soft-delete: oculta sin tocar Drive/Redis
     last_analyzed_at: str | None = None      # último análisis Gemini exitoso

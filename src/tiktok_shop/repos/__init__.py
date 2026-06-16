@@ -5,6 +5,8 @@ from .generation_repo import GenerationRepo
 from .voice_repo import VoiceRepo
 from .shortcut_repo import ShortcutRepo
 from .published_repo import PublishedVideoRepo
+from .discovery_repo import DiscoveryRepo
+from .plan_repo import PlanRepo
 
 __all__ = [
     "ShopRedis",
@@ -15,4 +17,6 @@ __all__ = [
     "VoiceRepo",
     "ShortcutRepo",
     "PublishedVideoRepo",
+    "DiscoveryRepo",
+    "PlanRepo",
 ]

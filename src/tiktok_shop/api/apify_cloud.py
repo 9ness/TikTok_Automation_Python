@@ -306,6 +306,95 @@ def extract_video_metadata(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ═════════════════════════════════════════════════════════════════════
+# Detección de la etiqueta "AD" (branded content / paid partnership)
+# ═════════════════════════════════════════════════════════════════════
+# TikTok marca los vídeos patrocinados/branded con distintos flags según
+# el actor/versión del scraper. Comprobamos varios nombres conocidos para
+# ser robustos. Es la etiqueta lila "AD" que el operador mira a ojo en
+# Kalodata — aquí la leemos automáticamente.
+_AD_FLAG_KEYS = (
+    "isAd", "isSponsored", "isPaidPartnership", "isBrandedContent",
+    "adAuthorization", "brandedContent", "isCommerce",
+)
+
+
+def extract_ad_flag(item: dict[str, Any]) -> bool | None:
+    """Devuelve True/False si el vídeo lleva (o no) etiqueta de anuncio,
+    o None si el actor no expone ningún flag (no podemos saberlo).
+
+    Comprueba varios nombres de campo (top-level y anidados en
+    `commerceUserInfo`/`adInfo`) porque varía por actor/versión."""
+    # Top-level flags
+    for k in _AD_FLAG_KEYS:
+        v = item.get(k)
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)) and v in (0, 1):
+            return bool(v)
+    # Nidos conocidos
+    for nest_key in ("commerceUserInfo", "adInfo", "brandOrganicType"):
+        nest = item.get(nest_key)
+        if isinstance(nest, dict):
+            for k in _AD_FLAG_KEYS:
+                v = nest.get(k)
+                if isinstance(v, bool):
+                    return v
+        # brandOrganicType: int/str de TikTok (>0 = contenido de marca)
+        if nest_key == "brandOrganicType" and isinstance(nest, (int, str)):
+            try:
+                return int(nest) > 0
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def search_product_ad_videos(
+    product_name: str,
+    *,
+    limit: int = 12,
+    country: str = "ES",
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Busca en TikTok los vídeos de un producto y devuelve dicts
+    normalizados con la señal de ADS: views/likes/comments/shares + el flag
+    `ad_flag` (etiqueta AD real de TikTok, o None si no se expone).
+
+    Pensado para `ads_signal.ads_injection_signal` (provider Apify). NO trae
+    ventas (TikTok no las expone públicamente) — la señal viene de la
+    etiqueta AD + el ratio views/engagement."""
+    if not apify_is_configured():
+        return []
+    try:
+        items = search_tiktok_videos(
+            product_name, limit=limit, sort_by="popular",
+            country=country, log_callback=log_callback,
+        )
+    except (ApifyError, ApifyTransient) as e:
+        if log_callback:
+            log_callback(f"  ⚠️ Apify ad-search falló ({e}) — sigo")
+        return []
+    out: list[dict[str, Any]] = []
+    for it in items:
+        meta = extract_video_metadata(it)
+        out.append({
+            "url": meta["url"],
+            "views": meta["view_count"],
+            "likes": meta["like_count"],
+            "comments": meta["comment_count"],
+            "shares": meta["share_count"],
+            "ad_flag": extract_ad_flag(it),
+        })
+    if log_callback:
+        labeled = sum(1 for v in out if v["ad_flag"] is True)
+        known = sum(1 for v in out if v["ad_flag"] is not None)
+        log_callback(
+            f"  📢 Apify: {len(out)} vídeos · etiqueta AD legible en {known} · "
+            f"{labeled} marcados como anuncio"
+        )
+    return out
+
+
 def scrape_tiktok_comments(
     video_urls: list[str],
     *,

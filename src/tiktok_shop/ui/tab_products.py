@@ -62,8 +62,41 @@ def render() -> None:
         st.info("Aún no hay productos. Pulsa '➕ Crear producto'.")
         return
 
+    # Filtro por origen (manual vs Radar) para que no se mezclen.
+    n_manual = sum(1 for p in products if getattr(p, "origin", "manual") != "radar")
+    n_radar = sum(1 for p in products if getattr(p, "origin", "manual") == "radar")
+    origin_filter = st.radio(
+        "Origen",
+        [f"Todos ({len(products)})", f"✍️ Manuales ({n_manual})", f"🔍 Radar ({n_radar})"],
+        horizontal=True, key="prod_origin_filter", label_visibility="collapsed",
+    )
+    if origin_filter.startswith("✍️"):
+        products = [p for p in products if getattr(p, "origin", "manual") != "radar"]
+    elif origin_filter.startswith("🔍"):
+        products = [p for p in products if getattr(p, "origin", "manual") == "radar"]
+
     for p in products:
         _render_product_card(p, repo)
+
+
+def _build_pack_for_product(p: Product) -> None:
+    """Construye el pack completo de un producto (fotos + research + estilos
+    + carruseles + carpeta). Mismo flujo que el Radar, para productos creados
+    a mano (flujo de descubrimiento manual con el panel web de EchoTik)."""
+    from src.tiktok_shop.services.creation_pack import PackOptions, build_pack
+
+    with st.status(f"📦 Pack de '{p.name}'…", expanded=True) as status:
+        try:
+            res = build_pack(p, options=PackOptions(), log_callback=status.write)
+            status.update(
+                label=(f"✅ Pack listo · 🎠 {res.carousels_generated} · "
+                       f"🎥 {res.presets_generated} · 🖼️ {res.photos_downloaded}"),
+                state="complete", expanded=False,
+            )
+            st.toast(f"📦 Carpeta lista en {res.folder}")
+        except Exception as e:
+            status.update(label=f"❌ Error: {e}", state="error")
+            st.exception(e)
 
 
 def _render_product_card(p: Product, repo: ProductRepo) -> None:
@@ -81,7 +114,8 @@ def _render_product_card(p: Product, repo: ProductRepo) -> None:
         with c2:
             tier_def = VIDEO_MODELS.get(p.video_config.default_tier, {})
             tier_badge = tier_def.get("tier_color", "⚪") + " " + tier_def.get("name", p.video_config.default_tier)
-            st.markdown(f"**{p.name}**  ·  {tier_badge}")
+            origin_badge = "🔍 Radar" if getattr(p, "origin", "manual") == "radar" else "✍️ Manual"
+            st.markdown(f"**{p.name}**  ·  {tier_badge}  ·  `{origin_badge}`")
             st.caption(f"`{p.slug}` · {p.category}/{p.subcategory or '-'} · {p.brand or 'sin marca'}")
             if p.tiktok_shop.price_eur is not None:
                 st.caption(f"💶 {p.tiktok_shop.price_eur:.2f}€ · 🏷️ {p.tiktok_shop.commission_rate * 100:.0f}%")
@@ -114,6 +148,9 @@ def _render_product_card(p: Product, repo: ProductRepo) -> None:
                 st.session_state[f"_edit_for_{p.id}"] = True
             if st.button("🍌", key=f"nb_prod_{p.id}", help="Generar fotos premium con Nano Banana 2"):
                 st.session_state[f"_nano_banana_for_{p.id}"] = True
+            if st.button("📦", key=f"pack_prod_{p.id}",
+                         help="Pack completo: fotos + research vídeos ganadores + estilos + carruseles + carpeta"):
+                _build_pack_for_product(p)
             # Borrado en 2 clicks: primer click marca pendiente, segundo confirma
             confirm_key = f"_confirm_del_prod_{p.id}"
             if st.session_state.get(confirm_key):

@@ -3,6 +3,7 @@ from .strategist import generate_strategy
 from .seedance_director import generate_seedance_prompts
 from .veo3_director import generate_veo3_prompt
 from .nano_banana_prompt_generator import generate_nano_banana_prompt
+from .carousel_director import generate_carousel
 
 __all__ = [
     "analyze_product",
@@ -10,4 +11,5 @@ __all__ = [
     "generate_seedance_prompts",
     "generate_veo3_prompt",
     "generate_nano_banana_prompt",
+    "generate_carousel",
 ]

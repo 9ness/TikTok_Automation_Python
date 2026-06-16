@@ -202,6 +202,41 @@ DEFAULT_VOICE_PRESETS_EN: list[dict] = [
     {"id": "English_DisdainfulYoungman", "label": "Disdainful Youngman (EN)"},
 ]
 
+# Regiones que soporta la API de EchoTik (lista oficial de su mensaje de
+# error). Si pides otra región → HTTP 500 "region must match ...".
+ECHOTIK_SUPPORTED_REGIONS = (
+    "US", "ID", "TH", "PH", "MY", "VN", "GB", "MX", "SG", "SA", "BR",
+    "ES", "DE", "FR", "JP", "IT",
+)
+
+# Opciones de país para el Radar (label con bandera → code EchoTik). Solo
+# las que EchoTik cubre. Los mercados TikTok Shop EU NO cubiertos por EchoTik
+# (Austria, Bélgica, Grecia, Hungría, Países Bajos, Polonia, Portugal,
+# Chequia) NO se ofrecen aquí porque la API devuelve 500.
+ECHOTIK_REGION_OPTIONS: dict[str, str] = {
+    "🇪🇸 España": "ES",
+    "🇩🇪 Alemania": "DE",
+    "🇫🇷 Francia": "FR",
+    "🇮🇹 Italia": "IT",
+    "🇬🇧 Reino Unido": "GB",
+    "🇺🇸 EE.UU.": "US",
+    "🇧🇷 Brasil": "BR",
+    "🇲🇽 México": "MX",
+}
+
+# Banderas por code (para mostrar en las tarjetas del Radar).
+REGION_FLAGS: dict[str, str] = {
+    "ES": "🇪🇸", "DE": "🇩🇪", "FR": "🇫🇷", "IT": "🇮🇹", "GB": "🇬🇧",
+    "US": "🇺🇸", "BR": "🇧🇷", "MX": "🇲🇽", "JP": "🇯🇵", "ID": "🇮🇩",
+    "TH": "🇹🇭", "PH": "🇵🇭", "MY": "🇲🇾", "VN": "🇻🇳", "SG": "🇸🇬", "SA": "🇸🇦",
+}
+
+# Países TikTok Shop EU que EchoTik NO cubre (para avisar en la UI).
+ECHOTIK_UNSUPPORTED_EU = (
+    "Austria", "Bélgica", "Grecia", "Hungría", "Países Bajos",
+    "Polonia", "Portugal", "Chequia",
+)
+
 NICHE_OPTIONS = ["skincare", "fitness", "hogar", "tech", "moda", "otros"]
 LANGUAGE_OPTIONS = ["es", "en", "pt", "fr", "it", "de"]
 COUNTRY_OPTIONS = ["ES", "MX", "AR", "CO", "CL", "PE", "US", "FR", "IT", "DE"]
