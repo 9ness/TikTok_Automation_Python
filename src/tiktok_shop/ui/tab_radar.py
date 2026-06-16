@@ -509,6 +509,79 @@ def _render_calendar() -> None:
                         e.tested = new_val
                         repo.save(plan, make_current=False)
                         st.rerun()
+                # Ver los prompts (vídeo + carruseles) sin salir de la app
+                show_key = f"cal_show_{plan.id}_{e.slug}_{day}"
+                if st.button("🎬 Ver vídeos + carruseles", key=f"btn_{show_key}"):
+                    st.session_state[show_key] = not st.session_state.get(show_key, False)
+                if st.session_state.get(show_key):
+                    product = ProductRepo().get(e.product_id)
+                    _render_product_prompts(product)
+
+
+def _render_product_prompts(product) -> None:
+    """Visor in-app de los prompts generados de un producto: estilos de
+    vídeo (presets) + carruseles, con bloques copiables. Sin abrir Drive."""
+    if product is None:
+        st.error("Producto no encontrado (¿se borró del catálogo?).")
+        return
+
+    pv = list(getattr(product, "video_presets", []) or [])
+    cars = list(getattr(product, "carousels", []) or [])
+    if not pv and not cars:
+        st.info(
+            "Este producto aún no tiene prompts generados. Genera el "
+            "**📦 Pack completo** (en Descubrir) o re-ejecuta el plan."
+        )
+        return
+
+    inner = st.tabs([f"🎥 Vídeos ({len(pv)})", f"🎠 Carruseles ({len(cars)})"])
+
+    # ── Estilos de vídeo ──
+    with inner[0]:
+        if not pv:
+            st.caption("Sin estilos de vídeo.")
+        for i, p in enumerate(pv):
+            kind = getattr(p, "kind", ""); angle = getattr(p, "angle", "")
+            name = getattr(p, "name", f"Preset {i+1}")
+            dur = getattr(p, "duration_s", "")
+            tiers = ", ".join(getattr(p, "compatible_tiers", []) or [])
+            with st.expander(f"{i+1}. {name} · {kind}{'/' + angle if angle else ''} · {dur}s"):
+                st.caption(f"Tiers compatibles: {tiers}")
+                vs = getattr(p, "voice_script", "") or ""
+                if vs:
+                    st.markdown("**🎙️ Guion de voz:**"); st.code(vs, language="text")
+                hooks = getattr(p, "hooks_alternatives", []) or []
+                if hooks:
+                    st.markdown("**🎣 Hooks alternativos:**")
+                    st.code("\n".join(f"- {h}" for h in hooks), language="text")
+                sp = getattr(p, "seedance_prompt", "") or ""
+                if sp:
+                    st.markdown("**🎬 Prompt Seedance (Standard/Advanced):**"); st.code(sp, language="text")
+                v3 = getattr(p, "veo3_prompt", "") or ""
+                if v3:
+                    st.markdown("**🟣 Prompt Veo 3:**"); st.code(v3, language="text")
+                cta = getattr(p, "cta", "") or ""
+                if cta:
+                    st.caption(f"CTA: {cta}")
+
+    # ── Carruseles ──
+    with inner[1]:
+        if not cars:
+            st.caption("Sin carruseles.")
+        for i, c in enumerate(cars):
+            fmt = c.get("format", "")
+            with st.expander(f"Carrusel {i+1} · {fmt} — {c.get('concept', '')[:50]}"):
+                st.markdown("**📝 Caption (copiar al subir):**")
+                st.code(c.get("hook_caption", ""), language="text")
+                if c.get("suggested_sound"):
+                    st.caption(f"🎵 Sonido sugerido: {c['suggested_sound']}")
+                for s in c.get("slides", []):
+                    cue = f"  ↪ {s.get('swipe_cue')}" if s.get("swipe_cue") else ""
+                    st.markdown(
+                        f"**Slide {s.get('slide_number')}** [{s.get('role', '')}] — "
+                        f"\"{s.get('on_screen_text', '')}\"{cue}"
+                    )
+                    st.code(s.get("image_prompt", ""), language="text")
 
 
 # ═════════════════════════════════════════════════════════════════════

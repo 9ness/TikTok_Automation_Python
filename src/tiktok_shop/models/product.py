@@ -277,6 +277,11 @@ class Product(BaseModel):
     # Se crean desde la UI del producto pulsando "Generar" — Gemini usa
     # los prompts music_bof_director.md / scripted_bof_director.md.
     video_presets: list["VideoPreset"] = Field(default_factory=list)
+    # Carruseles generados (Photo Mode) — cada uno es el dict del
+    # carousel_director (format, hook_caption, slides[], ...). Se persisten
+    # aquí para verlos/copiarlos desde la app (Radar → Calendario) sin abrir
+    # Drive. Los escribe `creation_pack.build_pack`.
+    carousels: list[dict] = Field(default_factory=list)
     # Investigación profunda: reviews + top vídeos TikTok + comentarios.
     # Se rellena vía `research_service.py` al pulsar "Reanalizar producto".
     # Los prompts directores leen esto para afinar hooks y guiones con

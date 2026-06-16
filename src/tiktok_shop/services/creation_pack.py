@@ -205,6 +205,8 @@ def build_pack(
             log_callback(f"  ⚠️ Nano prompt falló ({e}) — sigo")
 
     # Persistir el producto enriquecido ────────────────────────────────
+    if carousels:
+        product.carousels = carousels   # para verlos en la app sin abrir Drive
     product.touch()
     repo.save(product)
 
