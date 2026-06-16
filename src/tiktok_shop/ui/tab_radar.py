@@ -39,6 +39,13 @@ def render() -> None:
             "`ECHOTIK_API_PASSWORD` en `.env` para usar el Radar. "
             "(Sin esto el descubrimiento no puede leer ventas reales.)"
         )
+    elif echotik_cloud.quota_exhausted():
+        st.error(
+            "🚫 **EchoTik sin cuota** — el trial de 100 llamadas se ha agotado. "
+            "Los scans devolverán 0 productos. Amplía el plan API de EchoTik "
+            "(~$100/año, 100k req) o usa el panel web manual + 📦 Pack. "
+            "Los candidatos ya descubiertos siguen disponibles abajo."
+        )
 
     sub = st.tabs(["🔎 Descubrir", "🗓️ Plan 7 días", "📅 Calendario", "🎠 Carruseles"])
     with sub[0]:
@@ -350,11 +357,13 @@ def _render_week_plan() -> None:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        n_products = st.number_input(
-            "Productos a preparar", 1, min(30, len(pool)),
-            min(7, len(pool)), key="plan_nprod",
+        per_day = st.number_input(
+            "Productos por día", 1, 5, 2, key="plan_perday",
+            help="Como el chaval: 2 productos al día.",
         )
-        days = st.number_input("Repartir en N días", 1, 14, 7, key="plan_days")
+        days = st.number_input("Días", 1, 14, 7, key="plan_days")
+        n_products = min(int(per_day) * int(days), len(pool))
+        st.caption(f"= **{n_products}** productos ({per_day}/día × {days} días, máx {len(pool)} disponibles)")
     with col2:
         do_research = st.checkbox(
             "🎬 Investigar vídeos ganadores", value=True, key="plan_research",
@@ -391,7 +400,7 @@ def _render_week_plan() -> None:
             try:
                 results = plan_week(
                     n_products=int(n_products), options=opts,
-                    days=int(days), log_callback=_log,
+                    days=int(days), per_day=int(per_day), log_callback=_log,
                 )
                 ok = sum(1 for r in results if r.slug)
                 status.update(

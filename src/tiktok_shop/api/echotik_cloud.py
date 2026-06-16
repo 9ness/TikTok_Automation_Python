@@ -41,6 +41,33 @@ def echotik_is_configured() -> bool:
     )
 
 
+# ── Seguimiento de cuota agotada ─────────────────────────────────────
+# Se marca cuando la API devuelve "Usage Limit Exceeded / Increase Quota"
+# (trial de 100 llamadas agotado). Se limpia en la siguiente llamada con
+# éxito. El banner del Radar lo lee para avisar al operador al instante.
+_LAST_QUOTA_ERROR: tuple[float, str] | None = None
+
+
+def _mark_quota_error(text: str) -> bool:
+    """Si `text` indica cuota agotada, marca el flag y devuelve True."""
+    global _LAST_QUOTA_ERROR
+    low = (text or "").lower()
+    if "usage limit" in low or "increase quota" in low or "quota" in low:
+        import time
+        _LAST_QUOTA_ERROR = (time.time(), text[:200])
+        return True
+    return False
+
+
+def quota_exhausted() -> bool:
+    """True si la última llamada relevante a EchoTik dio cuota agotada."""
+    return _LAST_QUOTA_ERROR is not None
+
+
+def last_quota_error_msg() -> str:
+    return _LAST_QUOTA_ERROR[1] if _LAST_QUOTA_ERROR else ""
+
+
 def _base_url() -> str:
     return (os.environ.get("ECHOTIK_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
@@ -82,7 +109,9 @@ def _get(
             log_callback("  ⚠️ EchoTik 401 — credenciales inválidas o trial caducado")
         return None
     if r.status_code >= 400:
-        if log_callback:
+        if _mark_quota_error(r.text) and log_callback:
+            log_callback("  🚫 EchoTik SIN CUOTA (trial agotado) — amplía plan API")
+        elif log_callback:
             log_callback(f"  ⚠️ EchoTik HTTP {r.status_code}: {r.text[:150]}")
         return None
     try:
@@ -90,9 +119,14 @@ def _get(
     except ValueError:
         return None
     if body.get("code") not in (0, 200):
-        if log_callback:
+        if _mark_quota_error(str(body.get("message"))) and log_callback:
+            log_callback("  🚫 EchoTik SIN CUOTA (trial agotado) — amplía plan API")
+        elif log_callback:
             log_callback(f"  ⚠️ EchoTik code={body.get('code')}: {body.get('message')}")
         return None
+    # Éxito → limpiar el flag de cuota (si se había recargado el plan).
+    global _LAST_QUOTA_ERROR
+    _LAST_QUOTA_ERROR = None
     return body.get("data")
 
 

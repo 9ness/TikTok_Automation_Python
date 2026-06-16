@@ -233,6 +233,7 @@ def plan_week(
     category: str = "otros",
     language: str = "es_ES",
     days: int = 7,
+    per_day: int | None = None,
     only_non_imported: bool = True,
     log_callback: LogCallback = _noop,
 ) -> list[PackResult]:
@@ -278,16 +279,23 @@ def plan_week(
                 warnings=[f"fatal: {e}"],
             )
         results.append(res)
-        day = (idx % max(1, days)) + 1
+        # Asignación de día: si `per_day` se da, secuencial (día 1 = primeros
+        # `per_day`, día 2 = siguientes…) — así pruebas N productos por día.
+        # Si no, round-robin sobre `days`.
+        if per_day and per_day > 0:
+            day = idx // per_day + 1
+        else:
+            day = (idx % max(1, days)) + 1
         day_map.append((day, res, cand))
 
     # Persistir el plan en Redis (para el calendario) + escribir el .md
+    effective_days = max((d for d, _, _ in day_map), default=days)
     try:
-        _persist_week_plan(day_map, days=days, log_callback=log_callback)
+        _persist_week_plan(day_map, days=effective_days, log_callback=log_callback)
     except Exception as e:
         log_callback(f"⚠️ No se pudo guardar el plan en Redis ({e})")
     try:
-        _write_week_plan(day_map, days=days, log_callback=log_callback)
+        _write_week_plan(day_map, days=effective_days, log_callback=log_callback)
     except Exception as e:
         log_callback(f"⚠️ No se pudo escribir el plan semanal ({e})")
 
