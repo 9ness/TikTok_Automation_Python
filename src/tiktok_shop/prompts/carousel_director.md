@@ -38,7 +38,7 @@ context + number of slides + **output language** (es or en).
       "role": "hook | item | proof | objection | before | after | cta",
       "on_screen_text": "the exact text to render, in the output language, MAX 8 words",
       "swipe_cue": "tiny directional cue ('mira el 3 →') or ''",
-      "image_prompt": "SELF-CONTAINED prompt for an image model: describe the exact scene/composition WITH the product, AND instruct it to render `on_screen_text` baked into the image using `text_style`."
+      "image_prompt": "SELF-CONTAINED prompt for ONE single 9:16 image (one slide, NEVER a collage/grid): describe the exact scene/composition WITH the product, AND end by instructing it to render `on_screen_text` baked into the image using `text_style`. Start with the scene (no 'EN' prefix)."
     }
   ],
   "image_style_guide": "global consistency: same product, same background family, same lighting, same text_style across ALL slides",
@@ -47,10 +47,18 @@ context + number of slides + **output language** (es or en).
 
 ## Rules — IMPORTANT
 
+- **ONE single image per slide — NEVER a collage.** Each `image_prompt` must
+  produce ONE standalone 9:16 vertical image (a single carousel slide). NEVER a
+  collage, grid, multi-panel, split of different slides, mood-board, or the whole
+  carousel mocked-up in one image. Slide 1 is the cover/hook — a single hero image.
+- **Do NOT prefix the prompt with "EN" or any language tag.** Write a natural
+  English scene description (no "EN," at the start).
 - **Language**: `on_screen_text`, `hook_caption` and the text the image renders
   go in the requested OUTPUT LANGUAGE (es = Spain Spanish natural, NOT literal;
-  en = natural English). `image_prompt` scene description stays in ENGLISH, but
-  the text it must RENDER is quoted in the output language.
+  en = natural English). The `image_prompt` SCENE description is written in
+  English, but the text the model must RENDER is quoted EXACTLY from
+  `on_screen_text` in the output language (so a Spanish carousel shows Spanish
+  text on the image, even though the scene description is in English).
 - **Text baked into the image**: every `image_prompt` MUST end with an explicit
   instruction like: `Render this exact text overlaid on the image, baked in,
   as a clean modern TikTok caption (<text_style>): "<on_screen_text>". Spelling
