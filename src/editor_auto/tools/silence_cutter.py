@@ -151,16 +151,12 @@ class SilenceCutterTool:
             # salvó). Si quieres bajar costes, desactiva uno de los dos
             # toggles en la config UI.
             "ai_pass2_openai_enabled": True,
-            # Gemini ACTIVADO (unión con OpenAI) — RECALL > determinismo estricto:
-            # OpenAI (temp 0+seed) es consistente pero por sensibilidad al CONTEXTO
-            # se le escapan restarts borderline que Gemini SÍ caza (caso real:
-            # "y esto empezó esto costaba" — OpenAI lo dejó, Gemini lo corta). La
-            # unión maximiza la detección de falsos arranques. Coste: Gemini es
-            # "thinking" (no determinista) → el MISMO vídeo puede variar algo entre
-            # ediciones; aceptable porque el self-heal es monótono (nunca empeora)
-            # y <90 se retiene. Desactiva este toggle si necesitas determinismo
-            # estricto (p. ej. para A/B de score).
-            "ai_pass2_gemini_enabled": True,
+            # Gemini DESACTIVADO (determinismo): la pasada 2 corre solo con gpt
+            # (temp 0 + seed) = mismo resultado siempre. Probado que Gemini NO
+            # aportaba en el caso borderline ("y esto empezó") — el problema no era
+            # el modelo sino el INPUT (ver _p2_words abajo): con el transcript
+            # LIMPIO, gpt determinista ya lo caza. Reactivar solo para A/B.
+            "ai_pass2_gemini_enabled": False,
             "gemini_model": "gemini-2.5-pro",
             # `large-v3` por defecto — máxima precisión. ~3-5x más lento
             # que `small` y ~6-8GB RAM (vs ~1GB). El operador puede bajar
@@ -924,9 +920,25 @@ class SilenceCutterTool:
         ai_pass2_diag: dict[str, Any] = {"enabled": ai_pass2_on}
         if ai_pass2_on and words:
             ctx.on_progress(0.62, "🤖 Pasada 2: GPT-4o + Gemini 2.5 Pro…")
+            # CLAVE: pass2 ve el transcript LIMPIO (palabras que SOBREVIVEN a los
+            # cortes previos: acústicos + holístico + analyst + ngram), NO el
+            # bruto completo. En el bruto largo/ruidoso los modelos se pierden
+            # restarts borderline (caso real "y esto empezó esto costaba": en el
+            # bruto lo dejan, en el limpio AMBOS modelos lo cortan — verificado).
+            # Los índices/tiempos que devuelve pass2 son sobre esta lista limpia,
+            # así que el corte aplicado es válido (tiempos reales).
+            _prev_cuts = [(s, e) for (s, e, _src) in cuts_with_source]
+
+            def _alive(_w: dict) -> bool:
+                c = (float(_w.get("start", 0) or 0) + float(_w.get("end", 0) or 0)) / 2.0
+                return not any(s <= c <= e for s, e in _prev_cuts)
+
+            _p2_words = [w for w in words if _alive(w)]
+            ai_pass2_diag["n_words_clean"] = len(_p2_words)
+            ai_pass2_diag["n_words_raw"] = len(words)
             try:
                 fs_intervals, fs_diag = _ai_false_starts_consensus(
-                    words=words,
+                    words=_p2_words,
                     language=config.get("ai_language", "es"),
                     openai_model=config.get("ai_model", "gpt-4o"),
                     gemini_model=config.get("gemini_model", "gemini-2.5-pro"),
