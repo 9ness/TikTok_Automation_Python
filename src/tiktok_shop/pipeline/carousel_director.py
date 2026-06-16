@@ -18,6 +18,15 @@ from src.tiktok_shop.api.gemini import generate_json, is_configured, load_system
 from src.tiktok_shop.models import Product
 
 
+# Presets de estilo de texto para A/B de carruseles. Se fuerza en TODAS las
+# slides cuando el operador elige uno; si no, Gemini decide.
+TEXT_STYLE_PRESETS: dict[str, str] = {
+    "simple": "bold rounded sans-serif, white text with a soft dark shadow, NO box (clean minimal overlay)",
+    "box": "bold rounded sans-serif text inside a solid rounded-rectangle banner whose colour matches the carousel's main pastel palette, high-contrast text inside the box",
+    "outline": "bold condensed sans-serif, white text with a thick contrasting dark outline/stroke",
+}
+
+
 def generate_carousel(
     product: Product,
     *,
@@ -25,6 +34,7 @@ def generate_carousel(
     angle: str = "",
     audience: str = "",
     language: str | None = None,
+    text_style: str | None = None,
 ) -> dict[str, Any]:
     """Devuelve el dict del carrusel (concept, hook_caption, slides[], ...).
 
@@ -34,10 +44,13 @@ def generate_carousel(
         audience: audiencia objetivo (si vacío, usa la del producto).
         language: "es" | "en" — idioma de los textos del carrusel. Si None,
             se deriva del `product.language` (es_* → es, en_* → en).
+        text_style: preset de estilo de texto ("simple"|"box"|"outline") para
+            A/B. Si None, Gemini decide el estilo.
     """
     n_slides = max(3, min(10, n_slides))
     audience = audience or ", ".join(product.target_audience[:3])
     lang = _norm_lang(language or product.language)
+    forced_style = TEXT_STYLE_PRESETS.get((text_style or "").lower(), "")
 
     if not is_configured():
         data = _mock_carousel(product, n_slides)
@@ -45,7 +58,7 @@ def generate_carousel(
         return data
 
     system = load_system_prompt("carousel_director.md")
-    user_msg = _build_user_prompt(product, n_slides, angle, audience, lang)
+    user_msg = _build_user_prompt(product, n_slides, angle, audience, lang, forced_style)
     data = generate_json(system, user_msg, temperature=0.7)
     if not isinstance(data, dict):
         return _mock_carousel(product, n_slides)
@@ -62,6 +75,7 @@ def _norm_lang(raw: str | None) -> str:
 
 def _build_user_prompt(
     product: Product, n_slides: int, angle: str, audience: str, lang: str = "es",
+    forced_style: str = "",
 ) -> str:
     lang_name = "Spanish (Spain)" if lang == "es" else "English"
     rc = product.research_context
@@ -81,6 +95,10 @@ def _build_user_prompt(
     ]
     if angle:
         lines.append(f"Forced angle: {angle}")
+    if forced_style:
+        lines.append(
+            f"FORCED TEXT STYLE — use this EXACT text_style in EVERY slide: {forced_style}"
+        )
 
     # Inyectar research context real si lo hay (mejor que inventar).
     if rc.customer_pains:

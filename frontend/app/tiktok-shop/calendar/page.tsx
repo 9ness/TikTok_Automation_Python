@@ -239,6 +239,7 @@ function ProductPrompts({ productId }: { productId: string }) {
   const { data: product, isLoading } = useProduct(productId);
   const [tab, setTab] = useState<"video" | "carousel">("video");
   const [carLang, setCarLang] = useState("es");
+  const [carStyle, setCarStyle] = useState("simple");
   const regen = useRegenerateCarousels();
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
@@ -326,11 +327,22 @@ function ProductPrompts({ productId }: { productId: string }) {
               <option value="es">🇪🇸 Español</option>
               <option value="en">🇬🇧 English</option>
             </select>
+            <span className="text-[11px] font-medium">Texto:</span>
+            <select
+              value={carStyle}
+              onChange={(e) => setCarStyle(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+              title="Estilo del texto para A/B"
+            >
+              <option value="simple">Simple (sin caja)</option>
+              <option value="box">Caja de color</option>
+              <option value="outline">Contorno</option>
+            </select>
             <button
               disabled={regen.isPending}
               onClick={() =>
                 regen.mutate(
-                  { product_id: productId, language: carLang },
+                  { product_id: productId, language: carLang, text_style: carStyle },
                   {
                     onSuccess: (r) => {
                       if (r.ok) {

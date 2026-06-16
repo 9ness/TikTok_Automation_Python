@@ -410,6 +410,7 @@ def mark_tested(
 class RegenCarouselsRequest(BaseModel):
     product_id: str
     language: str = "es"          # "es" | "en"
+    text_style: str | None = None  # "simple" | "box" | "outline" | None (auto)
     n_carousels: int = 2
     n_slides: int = 6
 
@@ -442,6 +443,7 @@ def regenerate_carousels(
         for _ in range(n):
             data = generate_carousel(
                 product, n_slides=body.n_slides, language=body.language,
+                text_style=body.text_style,
             )
             if data and data.get("slides"):
                 carousels.append(data)

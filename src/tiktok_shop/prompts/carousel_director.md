@@ -75,7 +75,17 @@ context + number of slides + **output language** (es or en).
   work as a tiny thumbnail and stop the scroll in under 1 second.
 - **Consistency**: all slides share the SAME `text_style`, the same product, and
   a coherent setting/lighting family (define once in `image_style_guide` and
-  repeat the key style words in every `image_prompt`).
+  repeat the key style words in every `image_prompt`). If a FORCED text style is
+  given in the input, use it verbatim as `text_style` in EVERY slide.
+- **Safe margins for the text**: the text overlay must sit within safe margins,
+  NOT near the edges of the frame (TikTok overlays UI — username, caption,
+  buttons — on the borders). Keep text comfortably inside (roughly the central
+  60-70% of the frame). State this in each `image_prompt`.
+- **CTA slide (last, role 'cta') — the arrow**: render JUST a clean simple arrow
+  (no clutter) pointing toward the LOWER-LEFT (that's where TikTok shows the
+  orange cart button). Position the arrow in the lower-left area but NOT at the
+  very bottom edge — leave space so it sits ABOVE where the cart would be, not on
+  top of it. The arrow points down-left. Plus the short CTA text overlay.
 - **Native / UGC look**, not a glossy ad: real phone-photo feel, natural light,
   real home/lifestyle settings. Still photorealistic, 9:16 vertical.
 - Keep the SAME product across all slides — every `image_prompt` includes
