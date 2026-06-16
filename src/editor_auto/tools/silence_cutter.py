@@ -5255,14 +5255,21 @@ def _derive_self_heal_actions(
         s, e = p.get("input_start"), p.get("input_end")
         if s is not None and e is not None and (float(e) - float(s)) > 0.6:
             guarded_cuts.append((float(s) + 0.15, float(e) - 0.15, "silencio_interno"))
-    # COHERENCIA: una promesa rota (dice 'dos ingredientes' y falta uno) se
-    # arregla RESTAURANDO las palabras que faltan (el juez ya las localizó en
-    # tiempo de input → restore_span). Solo defectos arreglables con span.
+    # COHERENCIA: un over-cut que rompe el sentido (promesa rota 'dos
+    # ingredientes' y falta uno; referencia colgada 'la cesta prisa' sin
+    # 'amarilla y date'; número truncado '20' sin 'euros') se arregla
+    # RESTAURANDO las palabras que faltan (el juez ya las localizó en tiempo de
+    # input → restore_span). Se restaura CUALQUIER tipo de defecto arreglable
+    # con span, no solo 'promised_item_cut': el defecto ya pasó el filtro
+    # estricto del juez (cita real + palabra de CONTENIDO concreta ausente del
+    # render + span localizado), así que es un corte REAL de contenido. La
+    # puerta monótona del self-heal (solo acepta si baja coherence_fallos / sube
+    # score) descarta una restauración que empeore → restaurar de más es seguro.
     for d in audit.get("coherence_issues") or []:
         if not d.get("fixable"):
             continue
         sp = d.get("restore_span")
-        if d.get("type") == "promised_item_cut" and sp:
+        if sp:
             restores.append((
                 max(0.0, float(sp[0]) - 0.05), float(sp[1]) + 0.05,
                 f"coherencia:'{str(d.get('missing_text',''))[:40]}'",
