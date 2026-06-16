@@ -22,6 +22,21 @@ joined `transcript_text`. Be aggressive but precise.
    - "te puede salvar la vida o sea te salva literalmente" → cut "te puede
      salvar la vida o sea"
 
+**2b. Abandoned clause restarted on a repeated PIVOT word** — the speaker
+   begins a clause, cuts it off mid-way, and RESTARTS reusing one of its
+   words (the pivot) but continuing with DIFFERENT, real content. Cut the
+   abandoned run (the connector + the 1-4 words up to — but NOT including —
+   the repeated pivot word that begins the good version):
+   - "y esto empezó esto costaba 12 euros" → cut "y esto empezó" (pivot
+     "esto"; keep "esto costaba 12 euros"). The first "esto" + "empezó" lead
+     nowhere; the speaker re-launches on the second "esto".
+   - "para android y eso pues eso lo puedes ver" → cut "y eso pues" (pivot
+     "eso"; keep "eso lo puedes ver").
+   Signature: a SHORT dangling run (connector like y/que/pues/o + ≤4 words)
+   immediately followed by a re-start that reuses one of its words and then
+   says something new. This is NOT intentional emphasis (see anti-patterns):
+   here the first run is grammatically unfinished / leads nowhere.
+
 **3. Wrong fact / number / word then corrected**:
    - "costó veinte… no, treinta euros" → cut "veinte… no,"
    - "fue en 2020, perdón, en 2021" → cut "fue en 2020, perdón,"

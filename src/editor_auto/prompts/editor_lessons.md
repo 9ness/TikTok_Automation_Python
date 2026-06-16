@@ -65,6 +65,14 @@
   lo podáis ver" y después "os voy a dejar por aquí el enlace para que podáis
   ver todos los estampados" → solo la segunda. Dos anuncios de lo mismo
   confunden y alargan el vídeo.
+- ARRANQUE ABANDONADO + reinicio sobre una palabra PIVOTE repetida (contiguo):
+  el hablante empieza una frase, la abandona a medias y reempieza reusando una
+  palabra y continuando con contenido NUEVO. Corta el arranque abandonado.
+  Caso real (cliente lo notó): "...para android y esto empezó esto costaba 12
+  euros" → cortar "y esto empezó" y conservar "esto costaba 12 euros" (pivote
+  "esto"). Señal: tramo colgado corto (conector y/que/pues/o + ≤4 palabras
+  gramaticalmente sin terminar) seguido inmediatamente de un reinicio que
+  reusa una de sus palabras. NO confundir con énfasis ("muy muy").
 
 ## Contenido de venta [completeness]
 
