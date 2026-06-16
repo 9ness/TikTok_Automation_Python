@@ -152,10 +152,11 @@ class SilenceCutterTool:
             # toggles en la config UI.
             "ai_pass2_openai_enabled": True,
             # Gemini DESACTIVADO (determinismo): la pasada 2 corre solo con gpt
-            # (temp 0 + seed) = mismo resultado siempre. Probado que Gemini NO
-            # aportaba en el caso borderline ("y esto empezó") — el problema no era
-            # el modelo sino el INPUT (ver _p2_words abajo): con el transcript
-            # LIMPIO, gpt determinista ya lo caza. Reactivar solo para A/B.
+            # (temp 0 + seed) = mismo resultado siempre. Probado en el caso
+            # borderline "y esto empezó esto costaba": ni Gemini ni el transcript
+            # limpio lo cazan en el pipeline real (sí en una re-transcripción
+            # aislada del output, pero ese input no existe en pass2) → no merece
+            # romper el determinismo. Reactivar solo para A/B de recall.
             "ai_pass2_gemini_enabled": False,
             "gemini_model": "gemini-2.5-pro",
             # `large-v3` por defecto — máxima precisión. ~3-5x más lento
