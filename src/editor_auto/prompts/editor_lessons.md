@@ -79,12 +79,3 @@
 - No cortes a medias afirmaciones de venta: precios, beneficios, llamadas a la
   acción. O se conserva la afirmación entera o se elimina entera — un precio
   a medias hace perder la venta.
-
-## Cierre del vídeo [clean_script|analyst|false_starts]
-
-- El CIERRE (últimos segundos) es lo que más se nota: NO lo dejes seco ni
-  cortado. Si el final encadena dos ideas y entre ellas había una frase
-  PUENTE/transición ("…hasta el día 7, [así que corre / no lo dejes pasar], y
-  píllate la tuya"), CONSÉRVALA aunque parezca relleno — sin ella el cierre
-  suena cortado/abrupto. Caso real (clienta_2): quedó "…hasta el día 7 y
-  píllate la tuya" sin puente. No cortes conectores ni transiciones en el cierre.
