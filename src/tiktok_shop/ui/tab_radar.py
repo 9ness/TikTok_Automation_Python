@@ -123,6 +123,19 @@ def _render_discover() -> None:
                 "Exigir señal de ADS (= '¿producto de anuncios?: Sí')",
                 value=False, key="radar_reqads",
             )
+            require_video = st.checkbox(
+                "🎬 Solo venden por vídeo (no directos)", value=False,
+                key="radar_video",
+                help="Filtro 'Fuente de ingresos: Video' del chaval — descarta "
+                     "productos que venden sobre todo por livestream.",
+            )
+            min_growth = st.number_input(
+                "📈 Crecimiento mínimo % (0 = off)", value=0, step=10,
+                key="radar_growth",
+                help="El chaval usa >50%. OJO: muchos productos en ES tienen "
+                     "datos viejos sin ventas recientes → un filtro alto puede "
+                     "dejarte sin candidatos. Empieza en 0 y sube poco a poco.",
+            )
 
         keywords_raw = st.text_area(
             "Nichos / keywords a escanear (uno por línea)",
@@ -142,6 +155,8 @@ def _render_discover() -> None:
             min_commission_pct=float(min_commission),
             min_score=float(min_score),
             require_ads_signal=bool(require_ads),
+            require_video_driven=bool(require_video),
+            min_growth_pct=(float(min_growth) if min_growth and min_growth > 0 else None),
         )
         with st.status(f"🛰️ Escaneando {len(regions)} país(es)…", expanded=True) as status:
             def _log(msg: str) -> None:
@@ -184,14 +199,30 @@ def _render_discover() -> None:
         return
 
     n_imported = sum(1 for c in candidates if c.imported)
-    head_cols = st.columns([3, 1])
+    head_cols = st.columns([2, 2, 1])
     with head_cols[0]:
         st.markdown(f"**{len(candidates)} candidatos** · {n_imported} importados")
     with head_cols[1]:
-        if st.button("🧹 Limpiar no importados", key="radar_clear"):
+        sort_by = st.selectbox(
+            "Ordenar por",
+            ["💰 Comisión", "⭐ Score", "💶 GMV", "🚀 GMV Max", "📈 Crecimiento"],
+            key="radar_sortby", label_visibility="collapsed",
+        )
+    with head_cols[2]:
+        if st.button("🧹 Limpiar", key="radar_clear",
+                     help="Borra los candidatos no importados"):
             n = repo.clear_non_imported()
             st.toast(f"🧹 {n} candidatos eliminados")
             st.rerun()
+
+    sort_key = {
+        "💰 Comisión": lambda c: c.commission_pct,
+        "⭐ Score": lambda c: c.score.total,
+        "💶 GMV": lambda c: (c.gmv_30d or c.gmv),
+        "🚀 GMV Max": lambda c: c.ads.gmv_max_likelihood,
+        "📈 Crecimiento": lambda c: (c.growth_pct if c.growth_pct is not None else -999),
+    }[sort_by]
+    candidates = sorted(candidates, key=sort_key, reverse=True)
 
     for c in candidates:
         _render_candidate_card(c)
@@ -222,9 +253,17 @@ def _render_candidate_card(c) -> None:
                 st.markdown(f"{flag} **[{title}]({c.tiktok_url})**")
             else:
                 st.markdown(f"{flag} **{title}**")
-            st.caption(
-                f"👥 {c.influencer_count} creadores · 💶 €{(c.gmv_30d or c.gmv):,.0f} GMV · "
-                f"🎬 {c.video_count} vídeos · 💰 {c.commission_pct:.0f}%"
+            growth_txt = (
+                f" · 📈 {c.growth_pct:+.0f}%" if c.growth_pct is not None else " · 📈 s/d"
+            )
+            video_txt = (
+                f" · 🎬 {c.video_sales_ratio*100:.0f}% vídeo"
+                if c.video_sales_ratio < 0.999 else ""
+            )
+            st.markdown(
+                f"💰 **Comisión {c.commission_pct:.0f}%** · "
+                f"👥 {c.influencer_count} creadores · 💶 €{(c.gmv_30d or c.gmv):,.0f} · "
+                f"{c.units_sold} uds{growth_txt}{video_txt}"
             )
             if c.ads.probable_boosted:
                 st.markdown(f"**{boosted_badge}**")

@@ -336,6 +336,11 @@ class DiscoveryFilters:
                                      # y la BAJA para que salgan más productos.
     min_score: float = 25.0          # score total mínimo para entrar al Radar
     require_ads_signal: bool = False  # si True, exige ads.probable_boosted
+    # Fuente de ingresos VÍDEO (no directos) — filtro del chaval.
+    require_video_driven: bool = False
+    min_video_ratio: float = 0.5      # 0.5 = al menos mitad de ventas por vídeo
+    # Crecimiento mínimo % (None = sin filtro). El chaval usa >50%.
+    min_growth_pct: float | None = None
     excluded_verdicts: list[str] = field(default_factory=list)
 
     def passes(self, units_filter_ctx: dict, score: WinnerScore, ads: AdsSignal) -> bool:
@@ -355,6 +360,16 @@ class DiscoveryFilters:
             return False
         if self.require_ads_signal and not ads.probable_boosted:
             return False
+        if self.require_video_driven:
+            vr = units_filter_ctx.get("video_sales_ratio")
+            if vr is not None and float(vr) < self.min_video_ratio:
+                return False
+        if self.min_growth_pct is not None:
+            g = units_filter_ctx.get("growth_pct")
+            # Sin dato de crecimiento (producto con datos viejos) → no pasa
+            # el filtro de "creciendo ahora".
+            if g is None or float(g) < self.min_growth_pct:
+                return False
         if ads.verdict in self.excluded_verdicts:
             return False
         return True

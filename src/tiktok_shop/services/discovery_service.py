@@ -269,7 +269,28 @@ def _yesterday_iso() -> str:
     return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
+def _growth_pct(units_30d: int, units_60d: int) -> float | None:
+    """Crecimiento reciente: ventas de los últimos 30d vs los 30d previos
+    (días 30-60). None si no hay datos suficientes para deducirlo."""
+    prev = max(0, units_60d - units_30d)   # ventas en días 30-60
+    if prev > 0:
+        return round((units_30d - prev) / prev * 100.0, 1)
+    if units_30d > 0:
+        return 100.0   # producto nuevo: todas las ventas son recientes
+    return None        # sin ventas recientes → no se puede deducir (dato viejo)
+
+
+def _video_sales_ratio(units_total: int, live_count: int) -> float:
+    """1.0 = todas las ventas por vídeo · 0 = todas por directo (live)."""
+    denom = max(1, units_total)
+    return round(max(0.0, min(1.0, 1.0 - live_count / denom)), 3)
+
+
 def _to_candidate(p: dict, score) -> DiscoveredProduct:
+    units_total = int(p.get("units_sold") or 0)
+    units_30 = int(p.get("units_sold_30d") or 0)
+    units_60 = int(p.get("units_sold_60d") or 0)
+    live = int(p.get("live_sale_count") or 0)
     return DiscoveredProduct(
         product_id=str(p.get("product_id") or ""),
         name=p.get("name") or "",
@@ -278,13 +299,18 @@ def _to_candidate(p: dict, score) -> DiscoveredProduct:
         region=p.get("region") or "ES",
         category_id=str(p.get("category_id") or ""),
         category_label=str(p.get("_category_label") or ""),
-        units_sold=int(p.get("units_sold") or 0),
+        units_sold=units_total,
         units_sold_7d=int(p.get("units_sold_7d") or 0),
-        units_sold_30d=int(p.get("units_sold_30d") or 0),
+        units_sold_30d=units_30,
+        units_sold_60d=units_60,
+        units_sold_90d=int(p.get("units_sold_90d") or 0),
         gmv=float(p.get("gmv") or 0.0),
         gmv_30d=float(p.get("gmv_30d") or 0.0),
         video_count=int(p.get("video_count") or 0),
         video_sale_count=int(p.get("video_sale_count") or 0),
+        live_sale_count=live,
+        growth_pct=_growth_pct(units_30, units_60),
+        video_sales_ratio=_video_sales_ratio(units_total, live),
         influencer_count=int(p.get("influencer_count") or 0),
         rating=float(p.get("rating") or 0.0),
         review_count=int(p.get("review_count") or 0),
@@ -307,6 +333,8 @@ def _candidate_metrics(c: DiscoveredProduct) -> dict:
         "video_sale_count": c.video_sale_count,
         "influencer_count": c.influencer_count,
         "commission_pct": c.commission_pct,
+        "growth_pct": c.growth_pct,
+        "video_sales_ratio": c.video_sales_ratio,
     }
 
 

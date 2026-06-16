@@ -95,11 +95,17 @@ class DiscoveredProduct(BaseModel):
     units_sold: int = 0
     units_sold_7d: int = 0
     units_sold_30d: int = 0
+    units_sold_60d: int = 0
+    units_sold_90d: int = 0
     gmv: float = 0.0
     gmv_30d: float = 0.0
     video_count: int = 0
     video_sale_count: int = 0
+    live_sale_count: int = 0
     influencer_count: int = 0
+    # Computados a partir de las ventanas de ventas:
+    growth_pct: float | None = None    # crecimiento reciente % (None = sin datos)
+    video_sales_ratio: float = 1.0     # 1.0 = todo vídeo, 0 = todo directo (live)
     rating: float = 0.0
     review_count: int = 0
     min_price: float = 0.0
