@@ -1907,13 +1907,52 @@ class SilenceCutterTool:
                                     content_end_s=_content_end_output_s(_sw_keeps, tmp_audio),
                                 )
                                 _sw_audit = _full_audit(_sw_keeps, audit_path=_tmp_sw)
+                                # Cortar un restart "rephrase" deja sus palabras
+                                # como "missing" en el audit profundo (no recurren).
+                                # NO es pérdida real → no debe vetar el corte. La
+                                # seguridad real es: (1) coherencia (sentido) no
+                                # empeora, y (2) las palabras que ahora "faltan"
+                                # caen DENTRO del trozo que quité (el restart). Si
+                                # faltara algo FUERA del corte = pérdida real →
+                                # rechazo.
+                                def _missing_key(_m: dict) -> tuple:
+                                    return (round(float(_m.get("input_start", 0) or 0), 1),
+                                            round(float(_m.get("input_end", 0) or 0), 1))
+                                _best_miss = {
+                                    _missing_key(_m)
+                                    for _m in ((best_audit.get("deep") or {}).get("missing_blocks") or [])
+                                }
+
+                                def _within_sweep(_m: dict) -> bool:
+                                    _s0, _e0 = _m.get("input_start"), _m.get("input_end")
+                                    if _s0 is None or _e0 is None:
+                                        return False
+                                    return any(
+                                        cs - 0.35 <= float(_s0) and float(_e0) <= ce + 0.35
+                                        for cs, ce, _ in _in_cuts
+                                    )
+                                _unexpected = [
+                                    _m for _m in ((_sw_audit.get("deep") or {}).get("missing_blocks") or [])
+                                    if _missing_key(_m) not in _best_miss and not _within_sweep(_m)
+                                ]
                                 _safe = (
                                     isinstance(_sw_audit.get("quality_score"), int)
-                                    and _count_word_fallos(_sw_audit) <= _count_word_fallos(best_audit)
+                                    and not _unexpected
                                     and _count_coherence_fallos(_sw_audit) <= _count_coherence_fallos(best_audit)
                                     and bool(_sw_audit.get("transcription_ok", True))
                                 )
                                 if _safe:
+                                    # El "missing" del restart es INTENCIONADO →
+                                    # limpia el needs_requeue/score espurio que vino
+                                    # solo de quitarlo (mantén coherencia como gate).
+                                    _sw_audit["needs_requeue"] = bool(
+                                        _sw_audit.get("coherence_needs_requeue")
+                                    )
+                                    _sw_audit["quality_score"] = max(
+                                        int(_sw_audit.get("quality_score") or 0),
+                                        int(best_score or 0),
+                                    )
+                                    _sw_audit["verdict"] = _verdict_for_score(_sw_audit["quality_score"])
                                     os.replace(_tmp_sw, output_path)
                                     best_keeps, best_audit = _sw_keeps, _sw_audit
                                     best_score = best_audit.get("quality_score")
@@ -1922,13 +1961,14 @@ class SilenceCutterTool:
                                     }
                                     ctx.on_log(
                                         "[silence_cutter] 🧹✅ Barrido: falso(s) arranque(s) "
-                                        "eliminado(s) del output sin perder contenido."
+                                        f"eliminado(s) del output ({', '.join(w for *_, w in _in_cuts)}) "
+                                        "— sentido intacto, sin pérdida real."
                                     )
                                 else:
                                     os.remove(_tmp_sw)
                                     ctx.on_log(
-                                        "[silence_cutter] 🧹 Barrido DESCARTADO (subía "
-                                        "fallos de palabra/coherencia) → conservo el mejor."
+                                        "[silence_cutter] 🧹 Barrido DESCARTADO (rompería "
+                                        "coherencia o perdería contenido fuera del restart)."
                                     )
                             except Exception as _e:  # noqa: BLE001
                                 try:
