@@ -9,7 +9,11 @@
       "Bash(git -C d:/Proyectos_Personales/TikTok_Automation_Python diff --cached --stat)",
       "Bash(ssh*root@62.238.19.31*)",
       "Bash(ssh*nebulabsai@62.238.19.31*)",
-      "Bash(scp*62.238.19.31*)"
+      "Bash(scp*62.238.19.31*)",
+      "Bash(docker exec *)",
+      "Bash(awk '{print \"Free: \"$4}')",
+      "Bash(docker compose *)",
+      "Bash(echo \"BUILD_EXIT=$?\")"
     ]
   }
 }

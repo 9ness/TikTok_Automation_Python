@@ -79,6 +79,26 @@ def render() -> None:
         _render_product_card(p, repo)
 
 
+def _build_pack_for_product(p: Product) -> None:
+    """Construye el pack completo de un producto (fotos + research + estilos
+    + carruseles + carpeta). Mismo flujo que el Radar, para productos creados
+    a mano (flujo de descubrimiento manual con el panel web de EchoTik)."""
+    from src.tiktok_shop.services.creation_pack import PackOptions, build_pack
+
+    with st.status(f"📦 Pack de '{p.name}'…", expanded=True) as status:
+        try:
+            res = build_pack(p, options=PackOptions(), log_callback=status.write)
+            status.update(
+                label=(f"✅ Pack listo · 🎠 {res.carousels_generated} · "
+                       f"🎥 {res.presets_generated} · 🖼️ {res.photos_downloaded}"),
+                state="complete", expanded=False,
+            )
+            st.toast(f"📦 Carpeta lista en {res.folder}")
+        except Exception as e:
+            status.update(label=f"❌ Error: {e}", state="error")
+            st.exception(e)
+
+
 def _render_product_card(p: Product, repo: ProductRepo) -> None:
     with st.container(border=True):
         c1, c2, c3, c4 = st.columns([1.5, 2.2, 1, 1])
@@ -128,6 +148,9 @@ def _render_product_card(p: Product, repo: ProductRepo) -> None:
                 st.session_state[f"_edit_for_{p.id}"] = True
             if st.button("🍌", key=f"nb_prod_{p.id}", help="Generar fotos premium con Nano Banana 2"):
                 st.session_state[f"_nano_banana_for_{p.id}"] = True
+            if st.button("📦", key=f"pack_prod_{p.id}",
+                         help="Pack completo: fotos + research vídeos ganadores + estilos + carruseles + carpeta"):
+                _build_pack_for_product(p)
             # Borrado en 2 clicks: primer click marca pendiente, segundo confirma
             confirm_key = f"_confirm_del_prod_{p.id}"
             if st.session_state.get(confirm_key):

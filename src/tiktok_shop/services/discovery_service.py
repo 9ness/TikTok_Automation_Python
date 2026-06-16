@@ -48,7 +48,11 @@ def discover(
     *,
     region: str = "ES",
     keywords: list[str] | None = None,
-    use_ranklist: bool = True,
+    # OJO: el endpoint /product/ranklist de EchoTik suele devolver los
+    # productos SIN métricas (ventas/creadores/GMV a 0) → se filtran todos.
+    # Por eso default False: la fuente fiable es la búsqueda por keyword
+    # (/product/list trae ventas, creadores, views, conversión completos).
+    use_ranklist: bool = False,
     ranklist_date: str | None = None,
     per_source_limit: int = 20,
     deep_ads_check: bool = True,

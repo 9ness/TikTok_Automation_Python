@@ -34,11 +34,13 @@ class ScoreParams:
     """Umbrales que definen qué es un "ganador". Defaults calibrados a la
     estrategia de las capturas (pocos creadores <200, demanda real)."""
     # Demanda: GMV (30d si está, si no total) que da puntuación plena.
-    demand_full_gmv_eur: float = 30_000.0
+    # Calibrado a TikTok Shop España (mercado pequeño): ~10k€ GMV ya es un
+    # producto fuerte. Súbelo para mercados grandes (US/UK).
+    demand_full_gmv_eur: float = 10_000.0
     # Pocos creadores: score pleno por debajo de `comp_full_below`, cae a 0
     # en `comp_zero_above`. El operador busca <200 creadores.
     comp_full_below: int = 50
-    comp_zero_above: int = 300
+    comp_zero_above: int = 200
     # Comisión: % que da score pleno (afiliado quiere alta comisión).
     commission_full_pct: float = 25.0
     # Proxy de ads sin mirar vídeos: vídeos por creador. >1 creador publica
@@ -327,10 +329,10 @@ def ads_injection_signal(
 @dataclass
 class DiscoveryFilters:
     """Filtros que aplica el Radar antes de mostrar un candidato."""
-    max_influencers: int = 250       # "pocos creadores" — descarta saturados
-    min_gmv_eur: float = 1_000.0     # demanda mínima para que valga la pena
+    max_influencers: int = 200       # "pocos creadores" — descarta saturados
+    min_gmv_eur: float = 300.0       # demanda mínima (calibrado a ES, mercado pequeño)
     min_commission_pct: float = 0.0  # 0 = sin filtro de comisión
-    min_score: float = 40.0          # score total mínimo para entrar al Radar
+    min_score: float = 25.0          # score total mínimo para entrar al Radar
     require_ads_signal: bool = False  # si True, exige ads.probable_boosted
     excluded_verdicts: list[str] = field(default_factory=list)
 

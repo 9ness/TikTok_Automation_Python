@@ -59,8 +59,10 @@ def _render_discover() -> None:
         with col1:
             region = st.text_input("Región", value="ES", key="radar_region")
             use_ranklist = st.checkbox(
-                "🏆 Incluir top ventas del día", value=True, key="radar_ranklist",
-                help="Trae el ranking de productos más vendidos de EchoTik.",
+                "🏆 Incluir top ventas (ranklist)", value=False, key="radar_ranklist",
+                help="El ranklist de EchoTik suele venir SIN métricas (todo a 0) "
+                     "→ se filtra. Mejor usar keywords abajo. Déjalo off salvo que "
+                     "tu plan sí devuelva datos en el ranklist.",
             )
             deep_ads = st.checkbox(
                 "📢 Deducir GMV Max (vídeos)", value=True,
@@ -82,15 +84,16 @@ def _render_discover() -> None:
             )
         with col2:
             max_infl = st.slider(
-                "Máx creadores (pocos = mejor)", 20, 1000, 250, step=10,
+                "Máx creadores (pocos = mejor)", 20, 1000, 200, step=10,
                 key="radar_maxinfl",
             )
             min_gmv = st.number_input(
-                "GMV mínimo (€)", min_value=0, value=1000, step=500,
+                "GMV mínimo (€)", min_value=0, value=300, step=100,
                 key="radar_mingmv",
+                help="Calibrado a España (mercado pequeño). Súbelo para US/UK.",
             )
             min_score = st.slider(
-                "Score mínimo", 0, 100, 40, key="radar_minscore",
+                "Score mínimo", 0, 100, 25, key="radar_minscore",
             )
             require_ads = st.checkbox(
                 "Exigir señal de ADS (media/fuerte)", value=False,
@@ -99,10 +102,10 @@ def _render_discover() -> None:
 
         keywords_raw = st.text_area(
             "Nichos / keywords a escanear (uno por línea)",
-            value="", key="radar_keywords",
-            placeholder="ventilador techo\ncreatina\ncrocs",
-            help="Cada línea = una búsqueda EchoTik. Déjalo vacío para usar "
-                 "solo el top ventas del día.",
+            value="crocs\nventilador techo\ncreatina\nbotella termo\nhumidificador",
+            key="radar_keywords",
+            help="Cada línea = una búsqueda EchoTik (/product/list, trae ventas + "
+                 "creadores + views). Es la fuente principal del Radar. Pon tus nichos.",
         )
 
     if st.button("🔍 Escanear ahora", type="primary", key="radar_scan_btn"):
