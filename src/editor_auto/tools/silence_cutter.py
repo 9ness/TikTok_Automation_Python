@@ -1360,6 +1360,31 @@ class SilenceCutterTool:
                     words=words,
                     stretched_spans=stretched_spans,
                 )
+                # RESIDUO SIN VOZ: tramos conservados que no contienen palabra
+                # hablada (dead-air/tos/chasquido que sobrevivió). El juez no lo
+                # medía → un 100 podía traer basura visible ('empieza tarde sin
+                # nada' / '1s al final'). Baja el score (borde pesa más); el gate
+                # <90 decide retención si suman. NO retiene por sí solo un caso
+                # leve interior.
+                try:
+                    n_res, res_edge, res_prev = _count_residue_islands(
+                        kints, voiced_words or words,
+                    )
+                    audit["n_residue_islands"] = n_res
+                    audit["residue_head_tail"] = res_edge
+                    audit["residue_preview"] = res_prev[:5]
+                    if n_res and isinstance(audit.get("quality_score"), int):
+                        penalty = 5 * n_res + (5 if res_edge else 0)
+                        audit["quality_score"] = max(0, audit["quality_score"] - penalty)
+                        audit["verdict"] = _verdict_for_score(audit["quality_score"])
+                        for r in res_prev[:3]:
+                            ctx.on_log(
+                                f"[silence_cutter] 🚮 residuo sin voz conservado "
+                                f"[{r['start']:.2f}-{r['end']:.2f}]s "
+                                f"({'borde' if r['edge'] else 'interior'})"
+                            )
+                except Exception:  # noqa: BLE001
+                    pass
                 if (
                     bool(config.get("deep_audit_enabled", True))
                     and words and kints
@@ -5251,6 +5276,8 @@ def _build_verdict_detail(audit: dict) -> dict:
     n_internal = int(audit.get("n_internal_silences") or 0)
     n_loose = int(audit.get("n_loose_words") or 0)
     n_surv = int(audit.get("n_surviving_stretched") or 0)
+    n_residue = int(audit.get("n_residue_islands") or 0)
+    res_edge = bool(audit.get("residue_head_tail"))
     degraded = not audit.get("transcription_ok", True)
 
     dims: list[dict] = []
@@ -5271,8 +5298,15 @@ def _build_verdict_detail(audit: dict) -> dict:
     dims.append({"dim": "Ritmo", "ok": not pace_bad,
                  "detail": "ágil" if not pace_bad else " · ".join(pace_bad)})
 
-    dims.append({"dim": "Limpieza", "ok": not n_loose,
-                 "detail": "sin restos" if not n_loose else f"{n_loose} palabra(s) suelta(s)"})
+    clean_bad: list[str] = []
+    if n_loose:
+        clean_bad.append(f"{n_loose} palabra(s) suelta(s)")
+    if n_residue:
+        clean_bad.append(
+            f"{n_residue} hueco(s) sin voz" + (" (arranque/cierre)" if res_edge else "")
+        )
+    dims.append({"dim": "Limpieza", "ok": not clean_bad,
+                 "detail": "sin restos" if not clean_bad else " · ".join(clean_bad)})
 
     low_conf: list[str] = []
     for c in coh_issues:
@@ -5286,6 +5320,10 @@ def _build_verdict_detail(audit: dict) -> dict:
         overall, label = "fallo", "FALLO — sin transcripción (corte ciego)"
     elif content_bad:
         overall, label = "fallo", "FALLO REAL — revisar contenido"
+    elif res_edge or n_residue >= 2:
+        overall, label = ("revisar",
+                          "ENTREGABLE pero con relleno sin voz "
+                          "(arranque/cierre/hueco) — revisar 5s")
     elif n_internal >= 6:
         overall, label = ("revisar",
                           "ENTREGABLE pero algo picado — probable FUENTE bruta "
@@ -5340,6 +5378,42 @@ def _absorb_keep_islands(
         else:
             absorbed.append({"start": round(a, 3), "end": round(b, 3), "dur": round(b - a, 3)})
     return kept, absorbed
+
+
+def _count_residue_islands(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    *,
+    min_s: float = 0.30,
+    pad: float = 0.05,
+) -> tuple[int, bool, list[dict]]:
+    """Cuenta 'islas de residuo': tramos CONSERVADOS de >=`min_s` que NO solapan
+    el span de NINGUNA palabra hablada (voiced). Son dead-air / tos / chasquido /
+    respiración que sobrevivieron al corte — justo lo que el usuario ve como
+    'empieza tarde sin nada' o '1s al final sin nada'. Un tramo con voz (aunque
+    sea un relleno) NO cuenta: eso ya lo cubren loose_words/coherencia. El juez
+    no tenía forma de ver esto (solo medía palabras-perdidas/silencios) → un 100
+    podía traer basura sin cortar. Devuelve (n, hay_en_cabecera_o_cola, preview);
+    el residuo en borde pesa más porque es lo más visible."""
+    if not keep_intervals:
+        return 0, False, []
+    spans = [
+        (float(w.get("start", 0.0)), float(w.get("end", 0.0))) for w in (words or [])
+    ]
+    n = len(keep_intervals)
+    out: list[dict] = []
+    head_tail = False
+    for idx, (a, b) in enumerate(keep_intervals):
+        if (b - a) < min_s:
+            continue
+        has_speech = any(ws < b + pad and we > a - pad for ws, we in spans)
+        if has_speech:
+            continue
+        is_edge = (idx == 0 or idx == n - 1)
+        head_tail = head_tail or is_edge
+        out.append({"start": round(a, 3), "end": round(b, 3),
+                    "dur": round(b - a, 3), "edge": is_edge})
+    return len(out), head_tail, out
 
 
 def _detect_loose_words(
