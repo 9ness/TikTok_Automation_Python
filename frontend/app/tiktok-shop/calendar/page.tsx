@@ -7,6 +7,8 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Download,
+  ExternalLink,
   Loader2,
   Rocket,
   Trash2,
@@ -27,6 +29,14 @@ import { useProduct } from "@/lib/queries/products";
 const VERDICT: Record<string, string> = {
   fuerte: "📢🔥", media: "📢", baja: "🔇", desconocida: "❔",
 };
+
+/** URL al endpoint que sirve la foto (api_key por query — <img> no manda headers). */
+function buildPhotoUrl(productId: string, filename: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
+  return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;
+}
 
 export default function CalendarPage() {
   const qc = useQueryClient();
@@ -166,6 +176,16 @@ function DayEntry({ e }: { e: PlanEntry }) {
                 </span>
               )}
             </p>
+            {e.tiktok_url && (
+              <a
+                href={e.tiktok_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-orange-500 hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" /> Abrir ficha (descargar fotos)
+              </a>
+            )}
           </div>
           <label className="flex shrink-0 cursor-pointer items-center gap-1 text-xs">
             <input
@@ -221,9 +241,49 @@ function ProductPrompts({ productId }: { productId: string }) {
 
   const presets = product.video_presets ?? [];
   const carousels = (product.carousels ?? []) as unknown as Carousel[];
+  const photos = (product.photos?.source ?? []).filter((p) => !p.deleted);
+  const listingUrl = product.tiktok_shop?.product_url ?? "";
 
   return (
     <div className="mt-1 rounded-md border border-border p-2">
+      {/* Fotos del producto: de dónde sacarlas para adjuntar */}
+      <div className="mb-2 rounded bg-muted/50 p-2">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-medium">📸 Fotos para adjuntar</span>
+          {listingUrl && (
+            <a
+              href={listingUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] text-orange-500 hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" /> Ficha TikTok Shop (fotos oficiales)
+            </a>
+          )}
+        </div>
+        {photos.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {photos.map((ph) => {
+              const url = buildPhotoUrl(product.id, ph.filename);
+              return (
+                <a key={ph.filename} href={url} download={ph.filename} target="_blank" rel="noreferrer" title="Descargar" className="relative block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="h-14 w-14 rounded border border-border object-cover" />
+                  <Download className="absolute bottom-0.5 right-0.5 h-3 w-3 text-white drop-shadow" />
+                </a>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            Sin fotos descargadas. Usa el enlace de la ficha para bajar las oficiales.
+          </p>
+        )}
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Adjunta estas (o las de la ficha) al pegar los prompts en Veo 3 / Nano Banana.
+        </p>
+      </div>
+
       <div className="mb-2 flex gap-1.5">
         <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos ({presets.length})</TabBtn>
         <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>🎠 Carruseles ({carousels.length})</TabBtn>

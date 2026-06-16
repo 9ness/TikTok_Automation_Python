@@ -134,6 +134,7 @@ export interface PlanEntry {
   score: number;
   ads_verdict: string;
   tested: boolean;
+  tiktok_url: string;
   presets_count: number;
   carousels_count: number;
   pack_ready: boolean;

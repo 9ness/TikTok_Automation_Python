@@ -340,6 +340,7 @@ class PlanEntryOut(BaseModel):
     score: float
     ads_verdict: str
     tested: bool
+    tiktok_url: str = ""          # ficha del producto (para bajar fotos)
     presets_count: int = 0
     carousels_count: int = 0
     pack_ready: bool = False
@@ -368,10 +369,11 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
         prod = prepo.get(e.product_id)
         n_pre = len(prod.video_presets) if prod else 0
         n_car = len(prod.carousels) if prod else 0
+        url = (prod.tiktok_shop.product_url or "") if prod else ""
         out.append(PlanEntryOut(
             day=e.day, product_id=e.product_id, slug=e.slug, name=e.name,
             score=e.score, ads_verdict=e.ads_verdict, tested=e.tested,
-            presets_count=n_pre, carousels_count=n_car,
+            tiktok_url=url, presets_count=n_pre, carousels_count=n_car,
             pack_ready=(n_pre > 0 or n_car > 0),
         ))
     return WeekPlanOut(
