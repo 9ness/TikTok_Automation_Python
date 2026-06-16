@@ -18,6 +18,7 @@ import json
 import streamlit as st
 
 from src.tiktok_shop.api import echotik_cloud
+from src.tiktok_shop.config import REGION_FLAGS
 from src.tiktok_shop.pipeline.carousel_director import generate_carousel
 from src.tiktok_shop.repos import DiscoveryRepo, ProductRepo
 from src.tiktok_shop.services import discovery_service
@@ -55,9 +56,21 @@ def render() -> None:
 # ═════════════════════════════════════════════════════════════════════
 def _render_discover() -> None:
     with st.expander("⚙️ Configuración del scan", expanded=False):
+        from src.tiktok_shop.config import (
+            ECHOTIK_REGION_OPTIONS, ECHOTIK_UNSUPPORTED_EU,
+        )
+        region_labels = st.multiselect(
+            "Países a escanear", list(ECHOTIK_REGION_OPTIONS.keys()),
+            default=["🇪🇸 España"], key="radar_regions",
+            help="EchoTik solo cubre estos mercados. Cada país añade × sus "
+                 "llamadas (keywords × países), ojo con la cuota.",
+        )
+        st.caption(
+            "ℹ️ TikTok Shop EU sin datos en EchoTik (no seleccionables): "
+            + ", ".join(ECHOTIK_UNSUPPORTED_EU)
+        )
         col1, col2 = st.columns(2)
         with col1:
-            region = st.text_input("Región", value="ES", key="radar_region")
             use_ranklist = st.checkbox(
                 "🏆 Incluir top ventas (ranklist)", value=False, key="radar_ranklist",
                 help="El ranklist de EchoTik suele venir SIN métricas (todo a 0) "
@@ -109,6 +122,7 @@ def _render_discover() -> None:
         )
 
     if st.button("🔍 Escanear ahora", type="primary", key="radar_scan_btn"):
+        regions = [ECHOTIK_REGION_OPTIONS[lbl] for lbl in region_labels] or ["ES"]
         keywords = [k.strip() for k in keywords_raw.splitlines() if k.strip()]
         filters = DiscoveryFilters(
             max_influencers=int(max_infl),
@@ -116,27 +130,30 @@ def _render_discover() -> None:
             min_score=float(min_score),
             require_ads_signal=bool(require_ads),
         )
-        logs: list[str] = []
-        with st.status("🛰️ Escaneando EchoTik…", expanded=True) as status:
+        with st.status(f"🛰️ Escaneando {len(regions)} país(es)…", expanded=True) as status:
             def _log(msg: str) -> None:
-                logs.append(msg)
                 status.write(msg)
 
+            total = 0
             try:
                 ads_provider = "apify" if ads_source.startswith("Apify") else "echotik"
-                results = discovery_service.discover(
-                    region=region.strip() or "ES",
-                    keywords=keywords,
-                    use_ranklist=use_ranklist,
-                    per_source_limit=int(per_source),
-                    deep_ads_check=deep_ads,
-                    ads_provider=ads_provider,
-                    filters=filters,
-                    score_params=ScoreParams(comp_zero_above=max(60, int(max_infl) + 50)),
-                    log_callback=_log,
-                )
+                for code in regions:
+                    flag = REGION_FLAGS.get(code, "")
+                    status.write(f"\n{flag} === {code} ===")
+                    results = discovery_service.discover(
+                        region=code,
+                        keywords=keywords,
+                        use_ranklist=use_ranklist,
+                        per_source_limit=int(per_source),
+                        deep_ads_check=deep_ads,
+                        ads_provider=ads_provider,
+                        filters=filters,
+                        score_params=ScoreParams(comp_zero_above=max(60, int(max_infl) + 50)),
+                        log_callback=_log,
+                    )
+                    total += len(results)
                 status.update(
-                    label=f"✅ {len(results)} ganadores encontrados",
+                    label=f"✅ {total} ganadores en {len(regions)} país(es)",
                     state="complete", expanded=False,
                 )
             except Exception as e:
@@ -187,10 +204,11 @@ def _render_candidate_card(c) -> None:
             st.markdown(f"### {badge} {score.total:.0f}")
         with cols[1]:
             title = c.name or f"Producto {c.product_id}"
+            flag = REGION_FLAGS.get(c.region, "")
             if c.tiktok_url:
-                st.markdown(f"**[{title}]({c.tiktok_url})**")
+                st.markdown(f"{flag} **[{title}]({c.tiktok_url})**")
             else:
-                st.markdown(f"**{title}**")
+                st.markdown(f"{flag} **{title}**")
             st.caption(
                 f"👥 {c.influencer_count} creadores · 💶 €{(c.gmv_30d or c.gmv):,.0f} GMV · "
                 f"🎬 {c.video_count} vídeos · 💰 {c.commission_pct:.0f}%"
