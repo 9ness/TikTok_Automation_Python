@@ -1840,6 +1840,105 @@ class SilenceCutterTool:
                         "n_restores": len(restores_a),
                         "actions": [w for _, _, w in (r_cuts_a + g_cuts_a + restores_a)][:8],
                     })
+            # 10d) BARRIDO FINAL de FALSOS ARRANQUES sobre la transcripción del
+            # OUTPUT. La pasada 2 corre sobre el input BRUTO y se le escapan
+            # restarts borderline (caso "y esto empezó"); aquí re-usamos las
+            # `out_words` que el audit profundo YA re-transcribió del RESULTADO —
+            # donde el detector SÍ los caza — mapeamos a tiempo de INPUT con
+            # _map_output_to_input, re-cortamos y re-auditamos. MONÓTONO: solo se
+            # acepta si NO sube fallos de palabra ni de coherencia (quitar un
+            # restart redundante no debe perder contenido ni romper el sentido;
+            # si los sube, era contenido real → se descarta solo). Determinista
+            # (gpt temp 0+seed). Generaliza: caza cualquier restart que escape.
+            if (
+                bool(config.get("false_start_output_sweep", True))
+                and words and best_audit.get("transcription_ok", True)
+            ):
+                try:
+                    _ow = ((best_audit.get("deep") or {}).get("out_words")) or []
+                    _ow_words = [
+                        {"idx": i, "word": w.get("word", ""),
+                         "start": float(w.get("start", 0) or 0),
+                         "end": float(w.get("end", 0) or 0)}
+                        for i, w in enumerate(_ow)
+                    ]
+                    _fs_out, _ = (
+                        _ai_false_starts_openai(
+                            words=_ow_words, language=config.get("ai_language", "es"),
+                            model=config.get("ai_model", "gpt-4o"), log=ctx.on_log,
+                        ) if len(_ow_words) >= 4 else ([], None)
+                    )
+                    _in_cuts: list[tuple[float, float, str]] = []
+                    for _o0, _o1, _raw in _fs_out:
+                        _i0 = _map_output_to_input(float(_o0), best_keeps)
+                        _i1 = _map_output_to_input(float(_o1), best_keeps)
+                        if _i0 is not None and _i1 is not None and _i1 > _i0:
+                            _in_cuts.append((_i0, _i1, (_raw or {}).get("first_attempt", "restart")))
+                    if _in_cuts:
+                        ctx.on_log(
+                            f"[silence_cutter] 🧹 Barrido final: {len(_in_cuts)} falso(s) "
+                            f"arranque(s) en el OUTPUT → recorto "
+                            + " · ".join(f"'{w}'" for *_, w in _in_cuts)
+                        )
+                        _cuts = [(s, e) for s, e, _ in _in_cuts]
+                        if voiced_words:
+                            _cuts = _protect_word_boundaries(_cuts, voiced_words, _WORD_GUARD_S)
+                        _sw_keeps = _subtract_intervals(list(best_keeps), _cuts)
+                        _sw_keeps = [(a, b) for a, b in _sw_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S]
+                        _sw_keeps = _snap_keeps_to_words(_sw_keeps, voiced_words or words)
+                        _sw_keeps, _ = _complete_final_phrase(_sw_keeps, voiced_words or words)
+                        if bool(config.get("extend_last_word_tail", True)):
+                            _sw_keeps = _extend_last_keep_to_word_tail(
+                                _sw_keeps, tmp_audio, video_duration,
+                            )
+                        _kept_sw = sum(b - a for a, b in _sw_keeps)
+                        _kept_bf = sum(b - a for a, b in best_keeps)
+                        if _sw_keeps and _kept_sw >= max(3.0, 0.5 * _kept_bf):
+                            _tmp_sw = output_path + ".fsweep.mp4"
+                            try:
+                                _apply_cuts_ffmpeg(
+                                    input_path=input_path, output_path=_tmp_sw,
+                                    keep_intervals=_sw_keeps, rotation=video_rotation,
+                                    output_aspect=config.get("output_aspect", "9:16"),
+                                    log=ctx.on_log,
+                                    on_progress=lambda f: ctx.on_progress(
+                                        0.99, "🧹 Barrido falsos arranques…"),
+                                    normalize_audio=normalize_audio,
+                                    content_end_s=_content_end_output_s(_sw_keeps, tmp_audio),
+                                )
+                                _sw_audit = _full_audit(_sw_keeps, audit_path=_tmp_sw)
+                                _safe = (
+                                    isinstance(_sw_audit.get("quality_score"), int)
+                                    and _count_word_fallos(_sw_audit) <= _count_word_fallos(best_audit)
+                                    and _count_coherence_fallos(_sw_audit) <= _count_coherence_fallos(best_audit)
+                                    and bool(_sw_audit.get("transcription_ok", True))
+                                )
+                                if _safe:
+                                    os.replace(_tmp_sw, output_path)
+                                    best_keeps, best_audit = _sw_keeps, _sw_audit
+                                    best_score = best_audit.get("quality_score")
+                                    diagnostic["false_start_sweep"] = {
+                                        "cut": [w for *_, w in _in_cuts],
+                                    }
+                                    ctx.on_log(
+                                        "[silence_cutter] 🧹✅ Barrido: falso(s) arranque(s) "
+                                        "eliminado(s) del output sin perder contenido."
+                                    )
+                                else:
+                                    os.remove(_tmp_sw)
+                                    ctx.on_log(
+                                        "[silence_cutter] 🧹 Barrido DESCARTADO (subía "
+                                        "fallos de palabra/coherencia) → conservo el mejor."
+                                    )
+                            except Exception as _e:  # noqa: BLE001
+                                try:
+                                    os.remove(_tmp_sw)
+                                except OSError:
+                                    pass
+                                ctx.on_log(f"[silence_cutter] ⚠️ Barrido re-render falló: {_e}")
+                except Exception as _e:  # noqa: BLE001
+                    ctx.on_log(f"[silence_cutter] ⚠️ Barrido falsos arranques falló: {_e}")
+
             # El mejor render manda: refleja sus keeps/audit aguas abajo.
             keep_intervals = best_keeps
             audit = best_audit
