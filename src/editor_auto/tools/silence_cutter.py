@@ -1101,8 +1101,15 @@ class SilenceCutterTool:
         # encima del silencio real del propio corte. Partimos el corte para
         # CONSERVAR esas islas de voz. Solo deja de cortar → nunca sobre-corta.
         try:
+            # Cortes AUTORITATIVOS (cabecera/cola + contenido IA): el rescate de
+            # islas NO debe resucitar tos/falsos arranques dentro de ellos. Solo
+            # rescata dentro de cortes acústicos (palabra real mal-alineada).
+            _island_protected = [
+                (s, e) for (s, e, src) in cuts_with_source
+                if src in _CONTENT_CUT_SOURCES or src == "auto_trim"
+            ]
             merged_cuts, n_islands = _preserve_speech_islands_in_cuts(
-                merged_cuts, tmp_audio,
+                merged_cuts, tmp_audio, protected_cuts=_island_protected,
             )
             if n_islands:
                 merged_cuts = _merge_intervals(merged_cuts)
@@ -1225,9 +1232,12 @@ class SilenceCutterTool:
         # en cortes de CONTENIDO (dedup/falso inicio). Puro audio, agnóstico a
         # los timings de Whisper. Solo añade keep.
         try:
+            # +auto_trim: tampoco extender un keep hacia la cabecera/cola que el
+            # auto-trim eliminó (re-metería el dead-air inicial/final — fallo s1/s6
+            # de buga_1). El head/tail es tan autoritativo como un corte de la IA.
             _content_cuts = [
                 (s, e) for (s, e, src) in cuts_with_source
-                if src in _CONTENT_CUT_SOURCES
+                if src in _CONTENT_CUT_SOURCES or src == "auto_trim"
             ]
             keep_intervals, n_voiced_ext = _extend_keeps_to_voiced_edges(
                 keep_intervals, tmp_audio, _content_cuts,
@@ -3281,6 +3291,7 @@ def _preserve_speech_islands_in_cuts(
     db_above_floor: float = 14.0,
     edge_guard_s: float = 0.18,
     pad_s: float = 0.08,
+    protected_cuts: list[tuple[float, float]] | None = None,
 ) -> tuple[list[tuple[float, float]], int]:
     """Rescata ISLAS de voz atrapadas dentro de un corte largo de 'silencio'.
 
@@ -3294,7 +3305,17 @@ def _preserve_speech_islands_in_cuts(
     Esas islas se SACAN del corte (se conservan, con `pad_s` de margen). Se
     ignoran islas pegadas a los bordes (`edge_guard_s`: colas/onsets de las
     palabras vecinas, ya cubiertas por el word-guard). Solo REDUCE el corte —
-    nunca corta más. Devuelve (cuts_nuevos, n_islas)."""
+    nunca corta más. Devuelve (cuts_nuevos, n_islas).
+
+    `protected_cuts`: regiones que un corte AUTORITATIVO eliminó a propósito —
+    cabecera/cola (auto_trim) y contenido (IA/holístico/ngram/false-start/filler).
+    Una isla con energía dentro de una de estas NO es una palabra mal-alineada:
+    es una TOS, un FALSO ARRANQUE o RUIDO que la IA mandó cortar. NUNCA se
+    rescata (era el bug de buga_1: tos/arranques resucitados como 'islas de voz'
+    dentro de la cabecera y de cortes de la IA). El rescate solo aplica dentro de
+    cortes puramente ACÚSTICOS (VAD/energía/gap), que es donde Whisper esconde la
+    palabra real."""
+    protected_cuts = protected_cuts or []
     if not cuts or not audio_path or not os.path.exists(audio_path):
         return cuts, 0
     if not any((e - s) >= min_cut_s for s, e in cuts):
@@ -3351,6 +3372,14 @@ def _preserve_speech_islands_in_cuts(
             (a, b) for a, b in islands
             if (b - a) >= min_island_s and a > s + edge_guard_s and b < e - edge_guard_s
         ]
+        # No resucitar islas dentro de un corte AUTORITATIVO (cabecera/cola o
+        # contenido de la IA): ahí la energía es tos/falso arranque/ruido que se
+        # mandó cortar, no una palabra mal-alineada. Solap = [a,b]∩[ps,pe]≠∅.
+        if protected_cuts and good:
+            good = [
+                (a, b) for a, b in good
+                if not any(a < pe and b > ps for ps, pe in protected_cuts)
+            ]
         if not good:
             new_cuts.append((s, e)); continue
         cursor = s
