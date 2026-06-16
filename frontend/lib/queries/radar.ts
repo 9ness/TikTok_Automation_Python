@@ -201,3 +201,14 @@ export function useDeletePlan() {
     mutationFn: () => api.del<{ ok: boolean }>("/api/v1/tiktok-shop/radar/plan"),
   });
 }
+
+export function useRegenerateCarousels() {
+  return useMutation<
+    { ok: boolean; count: number; language: string },
+    Error,
+    { product_id: string; language: string; n_carousels?: number; n_slides?: number }
+  >({
+    mutationFn: (body) =>
+      api.post("/api/v1/tiktok-shop/radar/carousels/regenerate", body),
+  });
+}

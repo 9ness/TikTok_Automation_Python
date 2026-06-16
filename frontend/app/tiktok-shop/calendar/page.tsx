@@ -22,9 +22,10 @@ import {
   useMarkTested,
   usePlanGenerate,
   useRadarPlan,
+  useRegenerateCarousels,
   type PlanEntry,
 } from "@/lib/queries/radar";
-import { useProduct } from "@/lib/queries/products";
+import { useProduct, productKeys } from "@/lib/queries/products";
 
 const VERDICT: Record<string, string> = {
   fuerte: "📢🔥", media: "📢", baja: "🔇", desconocida: "❔",
@@ -233,8 +234,11 @@ interface Carousel {
 }
 
 function ProductPrompts({ productId }: { productId: string }) {
+  const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(productId);
   const [tab, setTab] = useState<"video" | "carousel">("video");
+  const [carLang, setCarLang] = useState("es");
+  const regen = useRegenerateCarousels();
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
   if (!product) return <p className="text-xs text-destructive">Producto no encontrado.</p>;
@@ -310,6 +314,40 @@ function ProductPrompts({ productId }: { productId: string }) {
 
       {tab === "carousel" && (
         <div className="space-y-2">
+          {/* Selector de idioma + regenerar */}
+          <div className="flex flex-wrap items-center gap-2 rounded bg-muted/50 p-2">
+            <span className="text-[11px] font-medium">Idioma:</span>
+            <select
+              value={carLang}
+              onChange={(e) => setCarLang(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+            >
+              <option value="es">🇪🇸 Español</option>
+              <option value="en">🇬🇧 English</option>
+            </select>
+            <button
+              disabled={regen.isPending}
+              onClick={() =>
+                regen.mutate(
+                  { product_id: productId, language: carLang },
+                  {
+                    onSuccess: (r) => {
+                      if (r.ok) {
+                        toast.success(`${r.count} carruseles regenerados (${r.language})`);
+                        qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+                      } else toast.error("No se pudieron regenerar.");
+                    },
+                    onError: (e) => toast.error(e.message),
+                  },
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+            >
+              {regen.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Regenerar carruseles
+            </button>
+            <span className="text-[10px] text-muted-foreground">texto en pantalla + sin hashtags en la imagen</span>
+          </div>
           {carousels.length === 0 && <p className="text-xs text-muted-foreground">Sin carruseles.</p>}
           {carousels.map((c, i) => (
             <details key={i} className="rounded border border-border/60 p-2 text-xs">

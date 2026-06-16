@@ -407,6 +407,57 @@ def mark_tested(
     return {"ok": changed}
 
 
+class RegenCarouselsRequest(BaseModel):
+    product_id: str
+    language: str = "es"          # "es" | "en"
+    n_carousels: int = 2
+    n_slides: int = 6
+
+
+@router.post("/carousels/regenerate")
+def regenerate_carousels(
+    body: RegenCarouselsRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Regenera los carruseles de un producto en el idioma elegido (es/en)
+    con el prompt mejorado (texto renderizado en la imagen, sin hashtags).
+    Síncrono: solo Gemini (~10-15s/carrusel)."""
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.pipeline.carousel_director import generate_carousel
+    from src.tiktok_shop.repos import ProductRepo
+
+    repo = ProductRepo()
+    product = repo.get(body.product_id)
+    if product is None:
+        return {"ok": False, "message": "Producto no encontrado."}
+
+    n = max(1, min(6, body.n_carousels))
+    start_job(
+        job_id=f"carousel_{uuid.uuid4().hex[:10]}",
+        program="tiktok_shop", mode="product_discovery",
+        title=f"Carruseles {body.language}: {product.name}", user=operator or None,
+    )
+    carousels = []
+    try:
+        for _ in range(n):
+            data = generate_carousel(
+                product, n_slides=body.n_slides, language=body.language,
+            )
+            if data and data.get("slides"):
+                carousels.append(data)
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+
+    if carousels:
+        product.carousels = carousels
+        product.touch()
+        repo.save(product)
+    return {"ok": bool(carousels), "count": len(carousels), "language": body.language}
+
+
 @router.delete("/plan")
 def delete_plan(operator: Annotated[str, Depends(get_current_user)]) -> dict[str, bool]:
     from src.tiktok_shop.repos import PlanRepo
