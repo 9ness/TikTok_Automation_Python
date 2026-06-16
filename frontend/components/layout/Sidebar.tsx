@@ -19,6 +19,7 @@ import {
   Menu,
   Mic,
   Package,
+  Radar,
   Scissors,
   Search,
   Settings,
@@ -80,6 +81,7 @@ const NAV: NavGroup[] = [
     icon: ShoppingBag,
     items: [
       { href: "/tiktok-shop/discover", label: "Buscar Productos", icon: Search },
+      { href: "/tiktok-shop/radar", label: "Radar (GMV Max)", icon: Radar },
       { href: "/tiktok-shop/products", label: "Mis productos", icon: Package },
       { href: "/tiktok-shop/users", label: "Usuarios", icon: Users },
       { href: "/tiktok-shop/generate", label: "Generador", icon: Sparkles },

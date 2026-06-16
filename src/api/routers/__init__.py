@@ -29,6 +29,7 @@ from .editor_auto import (
 )
 from .tiktok_shop import (
     discovery_router as tiktok_shop_discovery_router,
+    radar_router as tiktok_shop_radar_router,
     hooks_router as tiktok_shop_hooks_router,
     performance_router as tiktok_shop_performance_router,
     presets_router as tiktok_shop_presets_router,
@@ -77,6 +78,7 @@ __all__ = [
     "editor_auto_referrals_router",
     "editor_auto_web_upload_router",
     "tiktok_shop_discovery_router",
+    "tiktok_shop_radar_router",
     "tiktok_shop_hooks_router",
     "tiktok_shop_performance_router",
     "tiktok_shop_presets_router",

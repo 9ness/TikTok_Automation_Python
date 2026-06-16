@@ -73,6 +73,7 @@ from src.api.routers import (
     subs_auto_frame_router,
     subs_auto_router,
     tiktok_shop_discovery_router,
+    tiktok_shop_radar_router,
     tiktok_shop_hooks_router,
     tiktok_shop_performance_router,
     tiktok_shop_presets_router,
@@ -249,6 +250,7 @@ def create_app() -> FastAPI:
     app.include_router(editor_auto_referrals_router)
     app.include_router(editor_auto_web_upload_router)
     app.include_router(tiktok_shop_discovery_router)
+    app.include_router(tiktok_shop_radar_router)
     app.include_router(tiktok_shop_hooks_router)
     app.include_router(tiktok_shop_performance_router)
     app.include_router(tiktok_shop_presets_router)
