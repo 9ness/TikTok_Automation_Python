@@ -212,6 +212,19 @@ def _user_has_plan(user: EditorUser) -> bool:
         return False
 
 
+def _is_admin(user: EditorUser) -> bool:
+    """True si la cuenta web vinculada tiene rol ADMIN. El admin no tiene el
+    tope de 'mandar a edición una vez al día' ni el límite diario de vídeos:
+    puede subir y mandar a editar tantas veces como quiera (testing/operación).
+    El resto de planes mantienen el límite de 1 envío/día."""
+    try:
+        from src.editor_auto.repos.web_account_repo import get_web_account_repo
+        acc = get_web_account_repo().get(user.account_email) or {}
+        return (acc.get("role") or "").strip().lower() == "admin"
+    except Exception:
+        return False
+
+
 def _rate_check(email: str) -> None:
     r = get_editor_redis()
     if not r.is_available():
@@ -407,12 +420,15 @@ def web_day(
     # pase el cierre y no se alcance el tope diario.
     sent = _sent_files(user.id, day)
     has_jobs = bool(_get_day_jobs(user.id, day))
+    # Admin puede seguir subiendo y mandando a editar tras el primer envío →
+    # el día sigue "abierto" para él aunque ya tenga jobs.
+    is_admin = _is_admin(user)
     # PERF: listar los borradores hace una llamada a la Drive API (lenta) y SOLO
     # importa cuando el día sigue ABIERTO para subir (sin envíos y antes del
     # cierre). Si ya se envió (has_jobs) o pasó el cierre, los borradores no se
     # muestran → nos saltamos Drive y el día carga casi al instante (era el
     # cuello de botella de "Obteniendo tus vídeos…" en días ya entregados).
-    can_be_open = day_send_open(day) and not has_jobs
+    can_be_open = day_send_open(day) and (is_admin or not has_jobs)
     if can_be_open:
         all_files = drive_uploads.list_day_files(user.name, day)
         drafts = [v for v in all_files if v.get("filename") not in sent]
@@ -543,7 +559,9 @@ def web_send_to_edit(
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     _require_drive()
     user = _resolve_user(claims)
-    if _get_day_jobs(user.id, day):
+    is_admin = _is_admin(user)
+    # Tope de 1 envío/día — NO aplica a admin (puede mandar a editar varias veces).
+    if _get_day_jobs(user.id, day) and not is_admin:
         raise APIError("Este día ya se mandó a edición.", status_code=409)
     if not day_send_open(day):
         raise APIError(
@@ -561,7 +579,9 @@ def web_send_to_edit(
     # El plan limita las herramientas: si el estilo del cliente incluye una tool
     # que su plan NO cubre (p.ej. sticker_arrow en Starter), la DESCARTAMOS en
     # silencio en vez de fallar el envío — el vídeo se edita con las permitidas.
-    if plan and plan.allowed_tools:
+    # ADMIN: sin filtro de plan → usa TODAS las tools de su estilo (la flecha CTA
+    # incluida, aunque su plan sea Starter) — para testear/operar sin límites.
+    if plan and plan.allowed_tools and not is_admin:
         tool_flow = [s for s in tool_flow if s.tool_id in plan.allowed_tools]
     user.tool_flow = tool_flow
     UserRepo().save(user)
@@ -582,8 +602,10 @@ def web_send_to_edit(
     sched_epoch = _day_processing_start(day, start_hour)
     scheduled_for = sched_epoch if sched_epoch > time.time() else None
 
-    # Cuota por DÍA del plan (cuenta los ya programados para ese día).
-    eff_daily = _effective_daily_limit(user, plan)
+    # Cuota por DÍA del plan (cuenta los ya programados para ese día). Admin =
+    # sin tope (0 = ilimitado), para poder mandar a editar tantas veces como
+    # quiera el mismo día.
+    eff_daily = 0 if is_admin else _effective_daily_limit(user, plan)
     already = len(_get_day_jobs(user.id, day))
     remaining = (eff_daily - already) if eff_daily > 0 else None
 
