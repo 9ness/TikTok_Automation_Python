@@ -1295,13 +1295,9 @@ class SilenceCutterTool:
                     (s, e) for (s, e, src) in cuts_with_source
                     if src in _CONTENT_CUT_SOURCES
                 ]
-                _snap_word_spans = [
-                    (float(w["start"]), float(w["end"])) for w in words
-                    if w.get("start") is not None and w.get("end") is not None
-                ]
                 keep_intervals, n_silero_snap = _snap_keep_edges_to_silero_voice(
                     keep_intervals, _silero_voice, _snap_pause_cuts,
-                    _snap_content_cuts, _snap_word_spans,
+                    _snap_content_cuts,
                 )
                 if n_silero_snap:
                     ctx.on_log(
@@ -1414,6 +1410,36 @@ class SilenceCutterTool:
                 )
                 keep_intervals = _ext_keeps
         _content_end_out = _content_end_output_s(keep_intervals, tmp_audio)
+        # BOOST de palabras mumbleadas: el hablante a veces dice una palabra de
+        # contenido casi en un susurro (caso buga_3 'proteína' a -40 dB). Se
+        # conserva pero suena inaudible. Subimos el volumen SOLO a su span hasta el
+        # nivel del resto de su voz. Se calcula UNA vez (en tiempo de input) y se
+        # pasa también a los re-renders del self-heal (válido sea cual sea el keep).
+        _boost_spans: list[tuple[float, float, float]] = []
+        if bool(config.get("boost_quiet_words", True)):
+            try:
+                _silero_voice_b = speech_intervals  # type: ignore[has-type]
+            except NameError:
+                _silero_voice_b = []
+            try:
+                _boost_spans = _detect_mumbled_word_boosts(
+                    words, keep_intervals, _silero_voice_b, tmp_audio,
+                )
+                if _boost_spans:
+                    diagnostic["phases"]["quiet_word_boost"] = {
+                        "n": len(_boost_spans),
+                        "preview": [
+                            {"start": s, "end": e, "gain_db": g}
+                            for s, e, g in _boost_spans[:6]
+                        ],
+                    }
+                    for s, e, g in _boost_spans[:4]:
+                        ctx.on_log(
+                            f"[silence_cutter] 🔊 palabra floja subida +{g}dB "
+                            f"[{s:.2f}-{e:.2f}]s (mumbleada, para que se oiga)"
+                        )
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Boost de palabras flojas falló: {e}")
         _apply_cuts_ffmpeg(
             input_path=input_path,
             output_path=output_path,
@@ -1424,6 +1450,7 @@ class SilenceCutterTool:
             on_progress=lambda f: ctx.on_progress(0.72 + f * 0.25, "✂️ Renderizando…"),
             normalize_audio=normalize_audio,
             content_end_s=_content_end_out,
+            boost_spans=_boost_spans,
         )
 
         # 10) Auditoría post-render — analizar el MP4 final con silencedetect
@@ -1729,6 +1756,7 @@ class SilenceCutterTool:
                             ),
                             normalize_audio=normalize_audio,
                             content_end_s=_content_end_output_s(new_keeps, tmp_audio),
+                            boost_spans=_boost_spans,
                         )
                     except Exception as e:  # noqa: BLE001
                         try:
@@ -1850,6 +1878,7 @@ class SilenceCutterTool:
                                         ),
                                         normalize_audio=normalize_audio,
                                         content_end_s=_content_end_output_s(salv_keeps, tmp_audio),
+                                        boost_spans=_boost_spans,
                                     )
                                     salv_audit = _full_audit(salv_keeps, audit_path=tmp_out2)
                                     salv_score = salv_audit.get("quality_score")
@@ -1993,6 +2022,7 @@ class SilenceCutterTool:
                                         0.99, "🧹 Barrido falsos arranques…"),
                                     normalize_audio=normalize_audio,
                                     content_end_s=_content_end_output_s(_sw_keeps, tmp_audio),
+                                    boost_spans=_boost_spans,
                                 )
                                 _sw_audit = _full_audit(_sw_keeps, audit_path=_tmp_sw)
                                 # Cortar un restart "rephrase" deja sus palabras
@@ -3765,7 +3795,6 @@ def _snap_keep_edges_to_silero_voice(
     voice_intervals: list[tuple[float, float]],
     pause_cuts: list[tuple[float, float]],
     content_cuts: list[tuple[float, float]],
-    word_spans: list[tuple[float, float]],
     *,
     eps: float = 0.02,
     min_inside_s: float = 0.04,
@@ -3798,7 +3827,6 @@ def _snap_keep_edges_to_silero_voice(
         return keep_intervals, 0
     pauses = sorted((float(s), float(e)) for s, e in pause_cuts if e > s)
     ccuts = sorted((float(s), float(e)) for s, e in (content_cuts or []) if e > s)
-    wspans = [(float(s), float(e)) for s, e in (word_spans or []) if e > s]
     keeps = sorted((float(a), float(b)) for a, b in keep_intervals)
 
     def _voice_at(t: float) -> tuple[float, float] | None:
@@ -3812,12 +3840,6 @@ def _snap_keep_edges_to_silero_voice(
 
     def _pause_left_of(t: float) -> bool:   # ai_noise_gap pegado a la izquierda de t
         return any(ps <= t + eps and pe >= t - probe for ps, pe in pauses)
-
-    def _word_in(lo: float, hi: float) -> bool:
-        # ¿hay una PALABRA Whisper solapando (lo, hi)? Garantiza que la extensión
-        # captura HABLA real (la cola de 'proteína'), no breath/ruido que silero
-        # marcó como voz por error → el snap nunca añade un residuo sin voz.
-        return any(ws < hi - eps and we > lo + eps for ws, we in wspans)
 
     out: list[tuple[float, float]] = []
     n = 0
@@ -3838,7 +3860,7 @@ def _snap_keep_edges_to_silero_voice(
             target = min(target, b + max_ext_s)
             if next_a != float("inf"):
                 target = min(target, b + (next_a - b) / 2.0 - eps)
-            if target > nb + eps and _word_in(b, target):
+            if target > nb + eps:
                 nb = target
                 n += 1
         # BORDE IZQUIERDO dentro de voz Y pegado a un noise_gap → estira al inicio
@@ -3854,11 +3876,134 @@ def _snap_keep_edges_to_silero_voice(
             target = max(target, a - max_ext_s)
             if prev_b > 0.0:
                 target = max(target, prev_b + (a - prev_b) / 2.0 + eps)
-            if target < na - eps and _word_in(target, a):
+            if target < na - eps:
                 na = target
                 n += 1
         out.append((na, nb))
     return _merge_intervals(out), n
+
+
+def _detect_mumbled_word_boosts(
+    words: list[dict],
+    keep_intervals: list[tuple[float, float]],
+    voice_intervals: list[tuple[float, float]],
+    audio_path: str,
+    *,
+    quiet_margin_db: float = 11.0,
+    max_gain_db: float = 13.0,
+    target_offset_db: float = 3.0,
+    win_s: float = 0.10,
+    min_span_s: float = 0.15,
+    pad_s: float = 0.03,
+    max_total_boost_s: float = 2.5,
+) -> list[tuple[float, float, float]]:
+    """Detecta tramos VOZADOS (silero) CONSERVADOS que el hablante dijo MUCHO más
+    flojo que su nivel normal (palabras masculladas) y devuelve spans a subir de
+    volumen para que se OIGAN. Caso real buga_3: 'proteína' a ~-40 dB (≈15 dB bajo
+    su voz normal) → se conserva pero suena casi inaudible.
+
+    INDEPENDIENTE DE LA ASR (clave): NO se fía de dónde Whisper coloca la palabra
+    (en este audio la ASR la ALUCINA en pleno silencio, a 11.6s). Usa silero VAD
+    (dónde HAY voz, fiable) + energía: recorre con ventanas de `win_s` la voz
+    silero que cae en keeps, calcula el nivel NORMAL del hablante (percentil 65 de
+    las ventanas) y marca como mascullado los tramos contiguos (≥`min_span_s`) cuya
+    energía esté > `quiet_margin_db` por debajo. Cada tramo se sube hasta
+    `target_offset_db` bajo el nivel normal (cap `max_gain_db`). Auto-calibrado al
+    hablante (un vídeo grabado bajito uniforme NO dispara: poca varianza). Tope de
+    `max_total_boost_s` boosteados por seguridad. Devuelve [(in_start, in_end,
+    gain_db)] en tiempo de INPUT. `words` se ignora (compat de firma)."""
+    if not keep_intervals or not voice_intervals or not os.path.exists(audio_path):
+        return []
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:  # noqa: BLE001
+        return []
+    if sampwidth != 2 or sr <= 0:
+        return []
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    total_s = len(audio) / sr
+
+    def _rms_db(s: float, e: float) -> float | None:
+        i0 = int(max(0.0, s) * sr); i1 = int(min(total_s, e) * sr)
+        if i1 - i0 < int(0.02 * sr):
+            return None
+        seg = audio[i0:i1]
+        rms = float(np.sqrt(np.mean(seg * seg))) + 1e-9
+        return 20.0 * float(np.log10(rms / 32768.0))
+
+    # Voz silero que REALMENTE se conserva (∩ keeps): solo ahí tiene sentido subir.
+    voice = _merge_intervals(
+        [(float(a), float(b)) for a, b in voice_intervals if b > a]
+    )
+    keeps = sorted((float(a), float(b)) for a, b in keep_intervals)
+    kept_voice: list[tuple[float, float]] = []
+    for vs, ve in voice:
+        for ks, ke in keeps:
+            s = max(vs, ks); e = min(ve, ke)
+            if e - s >= win_s:
+                kept_voice.append((s, e))
+    if not kept_voice:
+        return []
+
+    # Ventanas de energía sobre la voz conservada → nivel NORMAL = percentil 65.
+    windows: list[tuple[float, float, float]] = []  # (t0, t1, db)
+    for s, e in kept_voice:
+        t = s
+        while t + win_s <= e + 1e-6:
+            db = _rms_db(t, t + win_s)
+            if db is not None:
+                windows.append((t, t + win_s, db))
+            t += win_s
+    if len(windows) < 8:                      # muy poca voz → no fiable
+        return []
+    dbs = sorted(w[2] for w in windows)
+    ref_db = dbs[min(len(dbs) - 1, int(0.65 * len(dbs)))]  # nivel "normal" del hablante
+    thr = ref_db - quiet_margin_db
+
+    # Agrupa ventanas FLOJAS contiguas (mismo tramo de voz) en spans.
+    boosts: list[tuple[float, float, float]] = []
+    cur: list[tuple[float, float, float]] = []
+
+    def _flush() -> None:
+        if not cur:
+            return
+        s = cur[0][0]; e = cur[-1][1]
+        if e - s >= min_span_s:
+            span_db = sum(w[2] for w in cur) / len(cur)
+            gain = min(max_gain_db, max(2.0, ref_db - span_db - target_offset_db))
+            boosts.append((round(max(0.0, s - pad_s), 3), round(e + pad_s, 3), round(gain, 1)))
+
+    prev_e = None
+    for t0, t1, db in windows:
+        contiguous = prev_e is not None and abs(t0 - prev_e) < win_s * 0.6
+        if db < thr:
+            if cur and not contiguous:
+                _flush(); cur = []
+            cur.append((t0, t1, db))
+        else:
+            _flush(); cur = []
+        prev_e = t1
+    _flush()
+
+    # Tope de seguridad: no boostear más de `max_total_boost_s` en total (evita
+    # subir medio vídeo si el hablante tuvo un tramo largo bajo). Prioriza los más
+    # flojos (mayor ganancia).
+    boosts.sort(key=lambda b: -b[2])
+    out: list[tuple[float, float, float]] = []
+    acc = 0.0
+    for bs, be, g in boosts:
+        if acc + (be - bs) > max_total_boost_s:
+            continue
+        out.append((bs, be, g)); acc += be - bs
+    out.sort(key=lambda b: b[0])
+    return out
 
 
 def _refine_cut_edges_to_valley(
@@ -6810,6 +6955,7 @@ def _apply_cuts_ffmpeg(
     on_progress,
     normalize_audio: bool = False,
     content_end_s: float | None = None,
+    boost_spans: list[tuple[float, float, float]] | None = None,
 ) -> None:
     """Concatena los `keep_intervals` con un filter_complex de FFmpeg.
 
@@ -6838,6 +6984,26 @@ def _apply_cuts_ffmpeg(
     _FADE_TAIL_S = 0.25  # fade-out del cierre — enmascara el residuo de render
     #                      tras la última palabra (cola de boca/lookahead loudnorm)
 
+    # BOOST de palabras mumbleadas: sube el volumen SOLO al span de una palabra
+    # de contenido que el hablante dijo demasiado floja (caso buga_3 'proteína').
+    # Se aplica con `volume=enable='between(t,...)'` en tiempo RELATIVO al segmento
+    # (tras asetpts, t=0 al inicio del segmento). Acotado al span de la palabra →
+    # no toca el resto del audio.
+    _boosts = list(boost_spans or [])
+
+    def _vol_chain_for(seg_start: float, seg_end: float) -> str:
+        parts: list[str] = []
+        for bs, be, gain_db in _boosts:
+            ov_s = max(seg_start, float(bs)); ov_e = min(seg_end, float(be))
+            if ov_e - ov_s <= 0.02:
+                continue
+            rs = max(0.0, ov_s - seg_start); re = ov_e - seg_start
+            factor = 10.0 ** (float(gain_db) / 20.0)
+            parts.append(
+                f"volume=enable='between(t,{rs:.3f},{re:.3f})':volume={factor:.3f}"
+            )
+        return ("," + ",".join(parts)) if parts else ""
+
     filter_parts: list[str] = []
     concat_inputs: list[str] = []
     for i, (start, end) in enumerate(keep_intervals):
@@ -6846,6 +7012,7 @@ def _apply_cuts_ffmpeg(
             f"setpts=PTS-STARTPTS{extra_vf}[v{i}]"
         )
         seg_dur = end - start
+        vol_chain = _vol_chain_for(start, end)
         # Micro-fade de 20ms en cada segmento (anti-clic de concat). El fade de
         # CIERRE grande ya NO se hace aquí: se aplica DESPUÉS de loudnorm (si no,
         # loudnorm ve la cola desvanecida y SUBE la ganancia para compensar →
@@ -6857,14 +7024,14 @@ def _apply_cuts_ffmpeg(
             fade_out_start = seg_dur - fade_out_d
             audio_filter = (
                 f"[0:a]atrim=start={start:.3f}:end={end:.3f},"
-                f"asetpts=PTS-STARTPTS,"
+                f"asetpts=PTS-STARTPTS{vol_chain},"
                 f"afade=t=in:st=0:d={_FADE_S},"
                 f"afade=t=out:st={fade_out_start:.3f}:d={fade_out_d}[a{i}]"
             )
         else:
             audio_filter = (
                 f"[0:a]atrim=start={start:.3f}:end={end:.3f},"
-                f"asetpts=PTS-STARTPTS[a{i}]"
+                f"asetpts=PTS-STARTPTS{vol_chain}[a{i}]"
             )
         filter_parts.append(audio_filter)
         concat_inputs.append(f"[v{i}][a{i}]")
