@@ -1308,6 +1308,32 @@ class SilenceCutterTool:
             except Exception as e:  # noqa: BLE001
                 ctx.on_log(f"[silence_cutter] ⚠️ Snap de bordes a voz silero falló: {e}")
 
+            # RESCATE DE ISLAS: una palabra CLARA y aislada (voz silero fuerte)
+            # que cayó ENTERA dentro de un ai_noise_gap y se cortó. Caso real
+            # buga_3: "Proteína." dicha fuerte en [10.4-11.6] que la IA metió en
+            # una pausa [8.3-12.16] → la devolvemos al keep. Gate estrecho:
+            # dentro de noise_gap, no en contenido, ≥0.30s y energía muy sobre el
+            # suelo (descarta tos/ruido). Es el verdadero fix de buga_3.
+            try:
+                _isl_pause = [
+                    (s, e) for (s, e, src) in cuts_with_source if src == "ai_noise_gap"
+                ]
+                _isl_content = [
+                    (s, e) for (s, e, src) in cuts_with_source
+                    if src in _CONTENT_CUT_SOURCES
+                ]
+                keep_intervals, n_isl = _rescue_silero_islands_in_noise_gaps(
+                    keep_intervals, _silero_voice, _isl_pause, _isl_content, tmp_audio,
+                )
+                if n_isl:
+                    ctx.on_log(
+                        f"[silence_cutter] 🏝️ {n_isl} isla(s) de voz clara rescatada(s) "
+                        f"de un noise_gap (palabra que la IA metió en una pausa)"
+                    )
+                    diagnostic["phases"]["silero_island_rescue"] = {"n": n_isl}
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Rescate de islas silero falló: {e}")
+
         # Limpieza de palabras sueltas: un editor humano, al revisar su corte,
         # tira los clips diminutos aislados cuyo ÚNICO contenido es relleno
         # ('os', 'la', 'y'…) — el artefacto que más se nota (palabra colgada
@@ -3881,6 +3907,98 @@ def _snap_keep_edges_to_silero_voice(
                 n += 1
         out.append((na, nb))
     return _merge_intervals(out), n
+
+
+def _rescue_silero_islands_in_noise_gaps(
+    keep_intervals: list[tuple[float, float]],
+    voice_intervals: list[tuple[float, float]],
+    pause_cuts: list[tuple[float, float]],
+    content_cuts: list[tuple[float, float]],
+    audio_path: str,
+    *,
+    min_island_s: float = 0.30,
+    min_db_over_floor: float = 16.0,
+    overlap_keep_frac: float = 0.5,
+) -> tuple[list[tuple[float, float]], int]:
+    """Rescata ISLAS de voz silero CLARAS que cayeron ENTERAS dentro de un
+    `ai_noise_gap` y se cortaron. Caso real buga_3: la clienta dice "Proteína."
+    FUERTE y aislada en [10.4-11.6], pero la IA marcó [8.3-12.16] como UNA pausa
+    (noise_gap) y se la tragó — y el rescate de islas normal SE SALTA los
+    noise_gap (commit 4f9af3a). silero ve esa voz clarísima → la devolvemos al
+    keep.
+
+    Disparo ESTRECHO = seguro: SOLO islas que (1) silero marca como voz, (2) NO
+    están ya en un keep, (3) caen dentro de un `ai_noise_gap` (la IA solo adivinó
+    pausa), (4) NO tocan un corte de CONTENIDO deliberado, (5) duran
+    ≥`min_island_s`, y (6) su energía está ≥`min_db_over_floor` dB sobre el SUELO
+    de silencio del audio (descarta tos/respiración/blips flojos — proteína está
+    a -22 dB, +33 sobre suelo). Devuelve (keeps, n_islas_rescatadas)."""
+    if not voice_intervals or not pause_cuts or not os.path.exists(audio_path):
+        return keep_intervals, 0
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:  # noqa: BLE001
+        return keep_intervals, 0
+    if sampwidth != 2 or sr <= 0:
+        return keep_intervals, 0
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64)
+    total_s = len(audio) / sr
+    win = max(1, int(0.025 * sr)); hop = max(1, int(0.02 * sr))
+    all_db = []
+    pos = 0
+    while pos + win <= len(audio):
+        seg = audio[pos:pos + win]
+        all_db.append(20.0 * float(np.log10(float(np.sqrt(np.mean(seg * seg))) / 32768.0 + 1e-9)))
+        pos += hop
+    floor = float(np.percentile(all_db, 15)) if all_db else -60.0
+
+    def _rms_db(s: float, e: float) -> float:
+        i0 = int(max(0.0, s) * sr); i1 = int(min(total_s, e) * sr)
+        if i1 - i0 < int(0.02 * sr):
+            return -120.0
+        seg = audio[i0:i1]
+        return 20.0 * float(np.log10(float(np.sqrt(np.mean(seg * seg))) / 32768.0 + 1e-9))
+
+    keeps = sorted((float(a), float(b)) for a, b in keep_intervals)
+    pauses = [(float(s), float(e)) for s, e in pause_cuts if e > s]
+    ccuts = [(float(s), float(e)) for s, e in (content_cuts or []) if e > s]
+
+    def _kept_frac(s: float, e: float) -> float:
+        ov = sum(max(0.0, min(e, b) - max(s, a)) for a, b in keeps)
+        return ov / max(1e-6, e - s)
+
+    def _inside_pause(s: float, e: float) -> bool:
+        c = (s + e) / 2.0
+        return any(ps - 1e-3 <= c <= pe + 1e-3 for ps, pe in pauses)
+
+    def _hits_content(s: float, e: float) -> bool:
+        return any(cs < e and ce > s for cs, ce in ccuts)
+
+    new_keeps = list(keeps)
+    n = 0
+    for vs, ve in sorted((float(a), float(b)) for a, b in voice_intervals if b > a):
+        if ve - vs < min_island_s:
+            continue
+        if _kept_frac(vs, ve) >= overlap_keep_frac:   # ya conservada → nada que hacer
+            continue
+        if not _inside_pause(vs, ve):                  # solo islas dentro de noise_gap
+            continue
+        if _hits_content(vs, ve):                      # la IA la cortó a propósito → respetar
+            continue
+        if _rms_db(vs, ve) < floor + min_db_over_floor:  # demasiado floja → tos/ruido, no voz real
+            continue
+        new_keeps.append((vs, ve))
+        n += 1
+    if not n:
+        return keep_intervals, 0
+    return _merge_intervals(new_keeps), n
 
 
 def _detect_mumbled_word_boosts(
