@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon,
@@ -185,6 +185,10 @@ function DayEntry({ e }: { e: PlanEntry }) {
   const qc = useQueryClient();
   const mark = useMarkTested();
   const [open, setOpen] = useState(false);
+  // Estado local del check → feedback instantáneo (el plan se refresca cada
+  // 5s mientras se generan packs y pisaba el estado del checkbox controlado).
+  const [tested, setTested] = useState(e.tested);
+  useEffect(() => setTested(e.tested), [e.tested]);
 
   return (
     <Card>
@@ -192,7 +196,7 @@ function DayEntry({ e }: { e: PlanEntry }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-medium">
-              {e.tested && <Check className="mr-1 inline h-3.5 w-3.5 text-green-600" />}
+              {tested && <Check className="mr-1 inline h-3.5 w-3.5 text-green-600" />}
               {e.name}
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -219,13 +223,18 @@ function DayEntry({ e }: { e: PlanEntry }) {
           <label className="flex shrink-0 cursor-pointer items-center gap-1 text-xs">
             <input
               type="checkbox"
-              checked={e.tested}
-              onChange={(ev) =>
+              checked={tested}
+              onChange={(ev) => {
+                const v = ev.target.checked;
+                setTested(v);   // instantáneo
                 mark.mutate(
-                  { product_id: e.product_id, tested: ev.target.checked },
-                  { onSuccess: () => qc.invalidateQueries({ queryKey: ["radar-plan"] }) },
-                )
-              }
+                  { product_id: e.product_id, tested: v },
+                  {
+                    onError: () => setTested(!v),   // revierte si falla
+                    onSuccess: () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
+                  },
+                );
+              }}
             />
             Probado
           </label>
