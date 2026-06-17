@@ -204,6 +204,17 @@ def build_pack(
             res.warnings.append(f"nano: {e}")
             log_callback(f"  ⚠️ Nano prompt falló ({e}) — sigo")
 
+    # 5b. HOOKS BOFU (textos simples para A/B — consejo del operador) ───
+    try:
+        from src.tiktok_shop.services.hooks_generator import generate_bofu_hooks
+        bofu = generate_bofu_hooks(product, n=10)
+        if bofu.get("hooks"):
+            product.bofu_hooks = bofu["hooks"]
+            log_callback(f"  🎣 {len(bofu['hooks'])} hooks BOFU")
+    except Exception as e:
+        res.warnings.append(f"hooks_bofu: {e}")
+        log_callback(f"  ⚠️ Hooks BOFU fallaron ({e}) — sigo")
+
     # Persistir el producto enriquecido ────────────────────────────────
     if carousels:
         product.carousels = carousels   # para verlos en la app sin abrir Drive

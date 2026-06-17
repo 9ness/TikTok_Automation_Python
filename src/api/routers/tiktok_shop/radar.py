@@ -504,6 +504,11 @@ def bofu_hooks(
             finalize_and_persist()
         except Exception:
             pass
+    # Persistir en el producto para verlos siempre en el calendario.
+    if res.get("hooks"):
+        product.bofu_hooks = res["hooks"]
+        product.touch()
+        ProductRepo().save(product)
     return {"ok": True, **res}
 
 

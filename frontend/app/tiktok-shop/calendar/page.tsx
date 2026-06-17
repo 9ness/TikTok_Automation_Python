@@ -417,7 +417,10 @@ function ProductPrompts({ productId }: { productId: string }) {
         </div>
       )}
 
-      {tab === "hooks" && (
+      {tab === "hooks" && (() => {
+        const persisted = (product.bofu_hooks ?? []) as BofuHook[];
+        const hooksToShow = bofuHooks.length ? bofuHooks : persisted;
+        return (
         <div className="space-y-2">
           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
             🎣 Hooks BOFU (parte baja del embudo): textos cortos y simples — a
@@ -431,6 +434,7 @@ function ProductPrompts({ productId }: { productId: string }) {
                 {
                   onSuccess: (r) => {
                     setBofuHooks(r.hooks);
+                    qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
                     toast.success(`${r.hooks.length} hooks generados`);
                   },
                   onError: (e) => toast.error(e.message),
@@ -440,11 +444,11 @@ function ProductPrompts({ productId }: { productId: string }) {
             className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
           >
             {bofu.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            Generar hooks BOFU
+            {hooksToShow.length ? "Regenerar hooks BOFU" : "Generar hooks BOFU"}
           </button>
-          {bofuHooks.length > 0 && (
+          {hooksToShow.length > 0 && (
             <div className="space-y-1">
-              {bofuHooks.map((h, i) => (
+              {hooksToShow.map((h, i) => (
                 <div key={i} className="flex items-center gap-2 rounded border border-border/60 p-1.5 text-xs">
                   <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{h.type}</span>
                   <span className="flex-1">{h.text}</span>
@@ -460,7 +464,8 @@ function ProductPrompts({ productId }: { productId: string }) {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -143,6 +143,8 @@ export interface Product {
   video_presets: VideoPreset[];
   /** Carruseles (Photo Mode) generados por el Radar/build_pack. */
   carousels?: Record<string, unknown>[];
+  /** Hooks BOFU para A/B: {text, type}. */
+  bofu_hooks?: { text: string; type: string }[];
   /** Origen: "manual" (creado a mano) o "radar" (importado del Radar). */
   origin?: "manual" | "radar";
   /** Investigación profunda: reviews + top vídeos TikTok + comentarios.

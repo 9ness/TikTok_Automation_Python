@@ -145,6 +145,8 @@ class ProductResponse(BaseModel):
     video_presets: list[dict[str, Any]] = Field(default_factory=list)
     # Carruseles (Photo Mode) generados por el Radar/build_pack.
     carousels: list[dict[str, Any]] = Field(default_factory=list)
+    # Hooks BOFU (textos cortos para A/B): cada uno {text, type}.
+    bofu_hooks: list[dict[str, Any]] = Field(default_factory=list)
     # Origen del producto: "manual" (creado a mano) o "radar" (descubierto e
     # importado por el Radar). Permite separarlos en "Mis productos".
     origin: str = "manual"
