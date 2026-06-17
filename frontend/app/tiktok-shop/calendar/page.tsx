@@ -47,8 +47,9 @@ export default function CalendarPage() {
   const planQ = useRadarPlan();
   const gen = usePlanGenerate();
   const del = useDeletePlan();
-  const [perDay, setPerDay] = useState(2);
+  const [perDay, setPerDay] = useState(10);
   const [days, setDays] = useState(7);
+  const [selectedDay, setSelectedDay] = useState(1);
 
   const plan = planQ.data;
   const byDay = new Map<number, PlanEntry[]>();
@@ -134,22 +135,46 @@ export default function CalendarPage() {
           Sin plan todavía. Genera uno arriba, o añade productos desde el <b>Radar</b> (botón &quot;Al calendario&quot;).
         </p>
       ) : (
-        <div className="space-y-4">
-          {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => {
-            const entries = byDay.get(d) ?? [];
-            return (
-              <div key={d}>
-                <h2 className="mb-1.5 text-sm font-semibold">📅 Día {d}</h2>
-                {entries.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">— libre —</p>
-                ) : (
-                  <div className="space-y-2">
-                    {entries.map((e) => <DayEntry key={e.product_id} e={e} />)}
-                  </div>
-                )}
+        <div className="space-y-3">
+          {/* Fila de días clicables */}
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => {
+              const entries = byDay.get(d) ?? [];
+              const doneD = entries.filter((e) => e.tested).length;
+              const active = d === selectedDay;
+              return (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDay(d)}
+                  className={
+                    "flex flex-col items-center rounded-lg border px-3 py-1.5 text-xs transition " +
+                    (active
+                      ? "border-orange-500 bg-orange-500/10 font-semibold"
+                      : "border-border text-muted-foreground hover:border-foreground/40")
+                  }
+                >
+                  <span>Día {d}</span>
+                  <span className="text-[10px]">
+                    {entries.length === 0 ? "libre" : `${doneD}/${entries.length} ✓`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Productos del día seleccionado */}
+          <div>
+            <h2 className="mb-1.5 text-sm font-semibold">📅 Día {selectedDay}</h2>
+            {(byDay.get(selectedDay) ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">— día libre —</p>
+            ) : (
+              <div className="space-y-2">
+                {(byDay.get(selectedDay) ?? []).map((e) => (
+                  <DayEntry key={e.product_id} e={e} />
+                ))}
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
     </div>

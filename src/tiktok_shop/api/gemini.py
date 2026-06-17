@@ -288,11 +288,16 @@ def generate_text(
     OpenAI (gpt-4o-mini por defecto). Excepción: si hay `videos` (análisis
     multimodal de vídeo), NO se puede usar OpenAI → propaga el error de Gemini.
     """
+    # Si hay fallback OpenAI disponible (texto/imágenes, no vídeo/web), no
+    # tiene sentido esperar los reintentos lentos de Gemini (15s+30s) cuando
+    # está sin cuota: probamos cada key UNA vez y caemos a OpenAI al instante.
+    can_openai = _openai_available() and not videos and not enable_web_search
+    retries = 1 if can_openai else max_retries_on_quota
     try:
         return _generate_text_gemini(
             system_prompt, user_prompt, model=model, expect_json=expect_json,
             images=images, videos=videos, enable_web_search=enable_web_search,
-            temperature=temperature, max_retries_on_quota=max_retries_on_quota,
+            temperature=temperature, max_retries_on_quota=retries,
             max_output_tokens=max_output_tokens,
         )
     except Exception as e:
