@@ -222,6 +222,21 @@ export function useVideoTemplates(productId: string) {
   });
 }
 
+export interface BofuHook {
+  text: string;
+  type: string;
+}
+
+export function useBofuHooks() {
+  return useMutation<
+    { ok: boolean; hooks: BofuHook[]; language: string },
+    Error,
+    { product_id: string; language: string; n?: number }
+  >({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/hooks/bofu", body),
+  });
+}
+
 export function useRegenerateCarousels() {
   return useMutation<
     { ok: boolean; count: number; language: string },

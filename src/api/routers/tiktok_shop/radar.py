@@ -472,6 +472,41 @@ def delete_plan(operator: Annotated[str, Depends(get_current_user)]) -> dict[str
     return {"ok": repo.delete(plan.id)}
 
 
+class BofuHooksRequest(BaseModel):
+    product_id: str
+    language: str = "es"
+    n: int = 10
+
+
+@router.post("/hooks/bofu")
+def bofu_hooks(
+    body: BofuHooksRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Genera hooks BOFU simples (nombre del producto + empujón a la venta)
+    para A/B testear. Texto en pantalla / opener del caption."""
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.repos import ProductRepo
+    from src.tiktok_shop.services.hooks_generator import generate_bofu_hooks
+
+    product = ProductRepo().get(body.product_id)
+    if product is None:
+        return {"ok": False, "hooks": [], "message": "Producto no encontrado."}
+    start_job(
+        job_id=f"bofuhooks_{uuid.uuid4().hex[:8]}",
+        program="tiktok_shop", mode="product_discovery",
+        title=f"Hooks BOFU: {product.name}", user=operator or None,
+    )
+    try:
+        res = generate_bofu_hooks(product, n=body.n, language=body.language)
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+    return {"ok": True, **res}
+
+
 @router.get("/video-templates")
 def video_templates(
     operator: Annotated[str, Depends(get_current_user)],

@@ -189,3 +189,49 @@ def generate_themed_hooks(
         "theme_interpretation": str(data.get("theme_interpretation", ""))[:300],
         "hooks": hooks,
     }
+
+
+def generate_bofu_hooks(
+    product: Product,
+    *,
+    n: int = 10,
+    language: str | None = None,
+) -> dict[str, Any]:
+    """Genera N hooks BOFU SIMPLES (parte baja del embudo) para A/B testear.
+
+    Textos cortos centrados en el nombre del producto + empujón a la venta
+    (consejo del operador 100€/día). Devuelve dict con `hooks: [{text, type}]`.
+    Usa gemini.generate_text → con fallback a OpenAI si Gemini sin cuota.
+    """
+    import json as _json
+
+    n = max(1, min(20, int(n)))
+    lang = "en" if (language or product.language or "es").lower().startswith("en") else "es"
+    lang_name = "English" if lang == "en" else "Spanish (Spain)"
+    benefit = (product.selling_points[0] if product.selling_points else "") or product.category
+    system = load_system_prompt("hooks_bofu.md")
+    user_prompt = (
+        f"Product: {product.name}\n"
+        f"Brand: {product.brand or '—'}\n"
+        f"Category: {product.category}\n"
+        f"Key benefit: {benefit}\n"
+        f"OUTPUT LANGUAGE: {lang} ({lang_name}).\n\n"
+        f"Generate EXACTLY {n} short BOFU hooks (varied types, ≥2 that are just "
+        f"the product name). Return JSON with `hooks`."
+    )
+    result = gemini.generate_text(
+        system_prompt=system, user_prompt=user_prompt,
+        model="gemini-2.5-flash", expect_json=True, temperature=0.9,
+    )
+    try:
+        data = _json.loads(result) if isinstance(result, str) else result
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    hooks = []
+    for h in (data.get("hooks") or []):
+        if isinstance(h, dict) and str(h.get("text", "")).strip():
+            hooks.append({"text": str(h["text"]).strip()[:120],
+                          "type": str(h.get("type", ""))[:20]})
+    return {"hooks": hooks[:n], "language": lang}

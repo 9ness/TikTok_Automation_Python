@@ -18,12 +18,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  useBofuHooks,
   useDeletePlan,
   useMarkTested,
   usePlanGenerate,
   useRadarPlan,
   useRegenerateCarousels,
   useVideoTemplates,
+  type BofuHook,
   type PlanEntry,
 } from "@/lib/queries/radar";
 import { useProduct, productKeys } from "@/lib/queries/products";
@@ -238,11 +240,13 @@ interface Carousel {
 function ProductPrompts({ productId }: { productId: string }) {
   const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(productId);
-  const [tab, setTab] = useState<"video" | "carousel" | "templates">("video");
+  const [tab, setTab] = useState<"video" | "carousel" | "templates" | "hooks">("video");
   const tpls = useVideoTemplates(productId);
   const [carLang, setCarLang] = useState("es");
   const [carStyle, setCarStyle] = useState("simple");
   const regen = useRegenerateCarousels();
+  const bofu = useBofuHooks();
+  const [bofuHooks, setBofuHooks] = useState<BofuHook[]>([]);
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
   if (!product) return <p className="text-xs text-destructive">Producto no encontrado.</p>;
@@ -296,6 +300,7 @@ function ProductPrompts({ productId }: { productId: string }) {
         <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos IA ({presets.length})</TabBtn>
         <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>🎠 Carruseles ({carousels.length})</TabBtn>
         <TabBtn active={tab === "templates"} onClick={() => setTab("templates")}>⚡ Plantillas ({tpls.data?.templates.length ?? 0})</TabBtn>
+        <TabBtn active={tab === "hooks"} onClick={() => setTab("hooks")}>🎣 Hooks BOFU</TabBtn>
       </div>
 
       {tab === "video" && (
@@ -409,6 +414,51 @@ function ProductPrompts({ productId }: { productId: string }) {
               </div>
             </details>
           ))}
+        </div>
+      )}
+
+      {tab === "hooks" && (
+        <div className="space-y-2">
+          <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+            🎣 Hooks BOFU (parte baja del embudo): textos cortos y simples — a
+            menudo solo el nombre del producto + empujón a la venta. Para A/B.
+          </p>
+          <button
+            disabled={bofu.isPending}
+            onClick={() =>
+              bofu.mutate(
+                { product_id: productId, language: "es", n: 10 },
+                {
+                  onSuccess: (r) => {
+                    setBofuHooks(r.hooks);
+                    toast.success(`${r.hooks.length} hooks generados`);
+                  },
+                  onError: (e) => toast.error(e.message),
+                },
+              )
+            }
+            className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {bofu.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            Generar hooks BOFU
+          </button>
+          {bofuHooks.length > 0 && (
+            <div className="space-y-1">
+              {bofuHooks.map((h, i) => (
+                <div key={i} className="flex items-center gap-2 rounded border border-border/60 p-1.5 text-xs">
+                  <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{h.type}</span>
+                  <span className="flex-1">{h.text}</span>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(h.text); toast.success("Copiado"); }}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Copiar"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
