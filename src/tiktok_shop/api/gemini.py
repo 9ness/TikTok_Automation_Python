@@ -25,6 +25,7 @@ exponencial con el `retry_delay` exacto que devuelve el servidor.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -268,6 +269,101 @@ def _is_quota_error(exc: Exception) -> bool:
 # API pública: generate_text con fallback dual-key
 # ---------------------------------------------------------------------------
 def generate_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    model: str = DEFAULT_MODEL,
+    expect_json: bool = False,
+    images: list[str | bytes] | None = None,
+    videos: list[str] | None = None,
+    enable_web_search: bool = False,
+    temperature: float = 0.8,
+    max_retries_on_quota: int = 3,
+    max_output_tokens: int = 8192,
+) -> str:
+    """Gemini con fallback a OpenAI cuando Gemini se queda sin cuota.
+
+    Intenta Gemini (free → paid → legacy). Si TODAS las keys de Gemini están
+    agotadas (429/cap) o no hay ninguna definida, y hay `OPENAI_API_KEY`, cae a
+    OpenAI (gpt-4o-mini por defecto). Excepción: si hay `videos` (análisis
+    multimodal de vídeo), NO se puede usar OpenAI → propaga el error de Gemini.
+    """
+    try:
+        return _generate_text_gemini(
+            system_prompt, user_prompt, model=model, expect_json=expect_json,
+            images=images, videos=videos, enable_web_search=enable_web_search,
+            temperature=temperature, max_retries_on_quota=max_retries_on_quota,
+            max_output_tokens=max_output_tokens,
+        )
+    except Exception as e:
+        # Fallback OpenAI: solo para texto/imágenes (vídeo no soportado) y solo
+        # si Gemini falló por cuota/sin-keys (no por errores de request).
+        fallback_ok = (_is_quota_error(e) or isinstance(e, EnvironmentError))
+        if fallback_ok and not videos and not enable_web_search and _openai_available():
+            log_warning(_LOGGER_NAME, "Gemini agotado → fallback a OpenAI", error=str(e)[:120])
+            return _call_openai_fallback(
+                system_prompt, user_prompt, expect_json=expect_json,
+                images=images, temperature=temperature,
+            )
+        raise
+
+
+def _openai_available() -> bool:
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def _call_openai_fallback(
+    system_prompt: str, user_prompt: str, *,
+    expect_json: bool, images: list[str | bytes] | None, temperature: float,
+) -> str:
+    """Respaldo con OpenAI Chat (gpt-4o-mini por defecto). Soporta texto +
+    imágenes (no vídeo). Mismo contrato que generate_text."""
+    import openai
+
+    model = os.getenv("TIKTOK_SHOP_OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    content: list[dict[str, Any]] = [{"type": "text", "text": user_prompt}]
+    for img in images or []:
+        try:
+            if isinstance(img, str):
+                data, mime = Path(img).read_bytes(), _guess_mime(img)
+            elif isinstance(img, (bytes, bytearray)):
+                data, mime = bytes(img), "image/jpeg"
+            else:
+                continue
+            b64 = base64.b64encode(data).decode("ascii")
+            content.append({"type": "image_url",
+                            "image_url": {"url": f"data:{mime};base64,{b64}"}})
+        except Exception:
+            continue
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content},
+        ],
+        "temperature": temperature,
+    }
+    if expect_json:
+        kwargs["response_format"] = {"type": "json_object"}
+    resp = client.chat.completions.create(**kwargs)
+    text = (resp.choices[0].message.content or "").strip()
+    try:
+        from src.cost_tracking import record_openai_chat
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            record_openai_chat(
+                input_tokens=int(getattr(u, "prompt_tokens", 0) or 0),
+                output_tokens=int(getattr(u, "completion_tokens", 0) or 0),
+                model=model,
+            )
+    except Exception:
+        pass
+    log_info(_LOGGER_NAME, "OpenAI fallback OK", model=model)
+    return _strip_json_fences(text) if expect_json else text
+
+
+def _generate_text_gemini(
     system_prompt: str,
     user_prompt: str,
     *,
