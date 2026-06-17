@@ -1269,6 +1269,44 @@ class SilenceCutterTool:
         except Exception as e:  # noqa: BLE001
             ctx.on_log(f"[silence_cutter] ⚠️ Rescate de voz en bordes falló: {e}")
 
+        # SNAP DE BORDES A VOZ SILERO (rescate de palabra clipada por una PAUSA):
+        # silero VAD es la señal MÁS fiable de "aquí HAY voz", agnóstica a los
+        # timings inflados de Whisper. Si un borde de keep cae DENTRO de un
+        # intervalo de voz silero, el corte partió una palabra hablada. Caso real
+        # buga_3: 'proteína' — Whisper infló su span absorbiendo la pausa
+        # siguiente; un noise_gap cayó en su cola hablada y el rescate por energía
+        # quedó bloqueado. Estiramos el borde hasta el límite de ESA voz silero.
+        # GATE anti-regresión: silero solo segmenta con silencios ≥0.5s, así que
+        # un corte de CONTENIDO en habla continua deja AMBOS bordes dentro de un
+        # mismo intervalo de voz → estirar ahí resucitaría lo que la IA quitó. Por
+        # eso pasamos los cortes de _CONTENT_CUT_SOURCES (sin ai_noise_gap, que es
+        # PAUSA) y la extensión SE DETIENE ante ellos: solo cruza pausas.
+        try:
+            _silero_voice = speech_intervals  # type: ignore[has-type]
+        except NameError:
+            _silero_voice = []
+        if _silero_voice and keep_intervals:
+            try:
+                _snap_pause_cuts = [
+                    (s, e) for (s, e, src) in cuts_with_source
+                    if src == "ai_noise_gap"
+                ]
+                _snap_content_cuts = [
+                    (s, e) for (s, e, src) in cuts_with_source
+                    if src in _CONTENT_CUT_SOURCES
+                ]
+                keep_intervals, n_silero_snap = _snap_keep_edges_to_silero_voice(
+                    keep_intervals, _silero_voice, _snap_pause_cuts, _snap_content_cuts,
+                )
+                if n_silero_snap:
+                    ctx.on_log(
+                        f"[silence_cutter] 🎙️ {n_silero_snap} borde(s) de keep "
+                        f"ajustado(s) al límite de voz silero (anti-partir palabra)"
+                    )
+                    diagnostic["phases"]["silero_edge_snap"] = {"n": n_silero_snap}
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Snap de bordes a voz silero falló: {e}")
+
         # Limpieza de palabras sueltas: un editor humano, al revisar su corte,
         # tira los clips diminutos aislados cuyo ÚNICO contenido es relleno
         # ('os', 'la', 'y'…) — el artefacto que más se nota (palabra colgada
@@ -3715,6 +3753,99 @@ def _extend_keeps_to_voiced_edges(
             nb = moved; n_ext += 1
         out.append((max(0.0, na), min(total_s, nb)))
     return _merge_intervals(out), n_ext
+
+
+def _snap_keep_edges_to_silero_voice(
+    keep_intervals: list[tuple[float, float]],
+    voice_intervals: list[tuple[float, float]],
+    pause_cuts: list[tuple[float, float]],
+    content_cuts: list[tuple[float, float]],
+    *,
+    eps: float = 0.02,
+    min_inside_s: float = 0.04,
+    max_ext_s: float = 0.6,
+    probe: float = 0.1,
+) -> tuple[list[tuple[float, float]], int]:
+    """Rescata una palabra CLIPADA por una PAUSA mal-delimitada de la IA. Caso
+    real buga_3: la IA marcó [8.3-12.16] como `ai_noise_gap` (PAUSA adivinada),
+    pero silero VAD —la señal MÁS fiable de "aquí hay voz", agnóstica a los
+    timings inflados de Whisper— ve voz hasta 8.7: el límite del noise_gap partió
+    la cola de 'proteína'. Si un borde de keep cae DENTRO de un intervalo de voz
+    silero Y está pegado a un `ai_noise_gap` (`pause_cuts`), estiramos el borde
+    hasta el fin de esa voz silero.
+
+    DISPARO ESTRECHO = regresión cero: SOLO actúa junto a un `ai_noise_gap` (la
+    IA admite que adivinó una pausa, no un borrado). Un vídeo sin ai_noise_gap
+    (p.ej. buga_1) → no-op total. NUNCA junto a cortes acústicos puros (podrían
+    re-meter micro-pausas) ni de contenido. Salvaguardas extra: la extensión se
+    detiene en el primer `content_cuts` (_CONTENT_CUT_SOURCES, sin ai_noise_gap)
+    por delante, cap `max_ext_s`, y no pasa de la mitad del hueco al keep vecino
+    (anti merge-collapse). El cap al FIN de la voz silero garantiza que jamás se
+    re-mete la pausa real (cae FUERA de todo intervalo de voz). Solo ALARGA.
+    Devuelve (keeps, n_bordes_ajustados)."""
+    if not keep_intervals or not voice_intervals or not pause_cuts:
+        return keep_intervals, 0
+    voice = _merge_intervals(
+        [(float(a), float(b)) for a, b in voice_intervals if b > a]
+    )
+    if not voice:
+        return keep_intervals, 0
+    pauses = sorted((float(s), float(e)) for s, e in pause_cuts if e > s)
+    ccuts = sorted((float(s), float(e)) for s, e in (content_cuts or []) if e > s)
+    keeps = sorted((float(a), float(b)) for a, b in keep_intervals)
+
+    def _voice_at(t: float) -> tuple[float, float] | None:
+        for vs, ve in voice:
+            if vs - 1e-3 <= t <= ve + 1e-3:
+                return (vs, ve)
+        return None
+
+    def _pause_right_of(t: float) -> bool:  # ai_noise_gap pegado a la derecha de t
+        return any(ps <= t + probe and pe >= t - eps for ps, pe in pauses)
+
+    def _pause_left_of(t: float) -> bool:   # ai_noise_gap pegado a la izquierda de t
+        return any(ps <= t + eps and pe >= t - probe for ps, pe in pauses)
+
+    out: list[tuple[float, float]] = []
+    n = 0
+    for i, (a, b) in enumerate(keeps):
+        na, nb = a, b
+        prev_b = keeps[i - 1][1] if i > 0 else 0.0
+        next_a = keeps[i + 1][0] if i + 1 < len(keeps) else float("inf")
+        # BORDE DERECHO dentro de voz Y pegado a un noise_gap → estira al fin de
+        # la voz, parando en el primer corte de CONTENIDO por delante.
+        v = _voice_at(b)
+        if v is not None and v[0] + eps < b < v[1] - min_inside_s and _pause_right_of(b):
+            target = v[1]
+            for cs, ce in ccuts:            # ccuts ordenados asc por cs
+                if ce <= b:
+                    continue                # corte ya pasado
+                target = b if cs <= b else min(target, cs)
+                break                       # el primero relevante es el más cercano
+            target = min(target, b + max_ext_s)
+            if next_a != float("inf"):
+                target = min(target, b + (next_a - b) / 2.0 - eps)
+            if target > nb + eps:
+                nb = target
+                n += 1
+        # BORDE IZQUIERDO dentro de voz Y pegado a un noise_gap → estira al inicio
+        # de la voz, parando en el corte de CONTENIDO por detrás más cercano.
+        v = _voice_at(a)
+        if v is not None and v[0] + min_inside_s < a < v[1] - eps and _pause_left_of(a):
+            target = v[0]
+            for cs, ce in reversed(ccuts):  # desc por cs
+                if cs >= a:
+                    continue
+                target = a if ce >= a else max(target, ce)
+                break
+            target = max(target, a - max_ext_s)
+            if prev_b > 0.0:
+                target = max(target, prev_b + (a - prev_b) / 2.0 + eps)
+            if target < na - eps:
+                na = target
+                n += 1
+        out.append((na, nb))
+    return _merge_intervals(out), n
 
 
 def _refine_cut_edges_to_valley(
