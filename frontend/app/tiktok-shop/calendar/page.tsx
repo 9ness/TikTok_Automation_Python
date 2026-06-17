@@ -71,7 +71,7 @@ export default function CalendarPage() {
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
           <label className="text-xs">
             Productos/día
-            <input type="number" value={perDay} min={1} max={5}
+            <input type="number" value={perDay} min={1} max={20}
               onChange={(e) => setPerDay(+e.target.value)}
               className="ml-2 w-16 rounded-md border border-border bg-background px-2 py-1" />
           </label>

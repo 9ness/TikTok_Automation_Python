@@ -39,6 +39,8 @@ export interface RadarCandidate {
   influencer_count: number;
   video_count: number;
   commission_pct: number;
+  min_price: number;
+  max_price: number;
   growth_pct: number | null;
   video_sales_ratio: number;
   score: WinnerScore;

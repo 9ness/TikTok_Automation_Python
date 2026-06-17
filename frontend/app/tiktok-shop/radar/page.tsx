@@ -35,6 +35,7 @@ const SORTS = [
   { value: "score", label: "⭐ Score ganador" },
   { value: "gmv", label: "💶 Más facturación" },
   { value: "gmv_max", label: "🚀 GMV Max" },
+  { value: "price", label: "💸 Precio alto (menos competencia)" },
   { value: "growth", label: "📈 Crecimiento" },
   { value: "creators", label: "👥 Menos creadores" },
 ];
@@ -119,6 +120,8 @@ export default function RadarPage() {
       <p className="text-xs text-muted-foreground sm:text-sm">
         Descubre productos con <b>inyección de ADS (GMV Max)</b> y <b>pocos creadores</b>.
         Ordena por comisión y prueba los mejores — da igual el país, vendes desde España.
+        💡 Tip: los productos <b>caros o sin muestra gratis</b> suelen tener menos
+        competencia (ordena por <b>💸 Precio alto</b>).
       </p>
 
       {/* Configuración del scan */}
@@ -339,6 +342,9 @@ function RadarCard({ c, onImported }: { c: RadarCandidate; onImported: () => voi
           <span><Users className="mr-0.5 inline h-3 w-3" />{c.influencer_count} creadores</span>
           <span>💶 €{(c.gmv_30d || c.gmv).toLocaleString("es-ES", { maximumFractionDigits: 0 })}</span>
           <span>{c.units_sold} uds</span>
+          {(c.max_price || c.min_price) > 0 && (
+            <span>💸 €{(c.max_price || c.min_price).toLocaleString("es-ES", { maximumFractionDigits: 0 })}</span>
+          )}
           {c.growth_pct !== null && <span>📈 {c.growth_pct > 0 ? "+" : ""}{c.growth_pct.toFixed(0)}%</span>}
         </div>
 

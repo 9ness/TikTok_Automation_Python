@@ -166,7 +166,13 @@ _NO_ONSCREEN_TEXT_DIRECTIVE = (
     "Do NOT render or burn any on-screen text, letters, words, captions, "
     "titles or subtitles inside the video — the only text allowed is the "
     "product's own label on the packaging. All overlays/subtitles are added "
-    "later in editing."
+    "later in editing. "
+    # Regla del operador: NADA de personas/caras generadas por IA (salen
+    # falsas y rinden peor). Solo POV / manos / pies / explicativo centrado
+    # en el producto — nunca una cara ni una persona completa.
+    "Do NOT show AI-generated people or faces: no full human, no visible face. "
+    "If a person is needed, show ONLY hands / feet / lower legs from a POV "
+    "angle. Prefer product-focused and POV/explainer shots."
 )
 
 

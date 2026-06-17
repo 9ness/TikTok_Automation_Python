@@ -80,6 +80,7 @@ _SORT_KEYS = {
     "gmv_max": lambda c: c.ads.gmv_max_likelihood,
     "growth": lambda c: (c.growth_pct if c.growth_pct is not None else -999),
     "creators": lambda c: -c.influencer_count,   # menos = mejor
+    "price": lambda c: (c.max_price or c.min_price),  # caro = menos competencia
 }
 
 

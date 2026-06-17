@@ -43,7 +43,7 @@ context + number of slides + **output language** (es or en).
     }
   ],
   "image_style_guide": "global consistency: same product, same background family, same lighting, same text_style across ALL slides",
-  "human_presence_note": "which slide(s) show partial human presence (hands/torso)"
+  "human_presence_note": "which slide(s) use POV/hands/feet (NO faces, NO full AI people)"
 }
 
 ## Rules — IMPORTANT
@@ -90,7 +90,11 @@ context + number of slides + **output language** (es or en).
   real home/lifestyle settings. Still photorealistic, 9:16 vertical.
 - Keep the SAME product across all slides — every `image_prompt` includes
   "Maintain exact product appearance: same colors, labels, proportions."
-- Partial human presence (hands/torso using the product) in ≥1 slide.
+- **NO AI-generated people or faces** — full AI humans/faces look fake and
+  perform worse. Prefer product-focused and POV shots. If a person appears,
+  show ONLY hands / feet / lower legs / torso from behind — NEVER a face. Each
+  `image_prompt` must state: "no human faces, no full person; hands/feet/POV
+  only". POV and explainer angles are encouraged.
 - One idea per slide. Use `swipe_cue` to pull to the next.
 - Use the research context when present (open with a real pain; one slide kills
   the top objection).
