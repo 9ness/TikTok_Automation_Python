@@ -1286,27 +1286,34 @@ class SilenceCutterTool:
         except NameError:
             _silero_voice = []
         if _silero_voice and keep_intervals:
-            try:
-                _snap_pause_cuts = [
-                    (s, e) for (s, e, src) in cuts_with_source
-                    if src == "ai_noise_gap"
-                ]
-                _snap_content_cuts = [
-                    (s, e) for (s, e, src) in cuts_with_source
-                    if src in _CONTENT_CUT_SOURCES
-                ]
-                keep_intervals, n_silero_snap = _snap_keep_edges_to_silero_voice(
-                    keep_intervals, _silero_voice, _snap_pause_cuts,
-                    _snap_content_cuts,
-                )
-                if n_silero_snap:
-                    ctx.on_log(
-                        f"[silence_cutter] 🎙️ {n_silero_snap} borde(s) de keep "
-                        f"ajustado(s) al límite de voz silero (anti-partir palabra)"
+            # EDGE-SNAP — DESACTIVADO por defecto (`silero_edge_snap_enabled`=False).
+            # Extendía bordes de keep a la voz silero pegada a un noise_gap, pero
+            # sin word-guard se dispara en EXCESO en vídeos conversacionales
+            # (clienta_2: 24 bordes → micro-artefactos, nota 78) y NO era el fix
+            # real de buga_3 (ese es el RESCATE DE ISLAS de abajo, independiente).
+            # Se deja el código tras flag por si se reactiva con un word-guard.
+            if config.get("silero_edge_snap_enabled", False):
+                try:
+                    _snap_pause_cuts = [
+                        (s, e) for (s, e, src) in cuts_with_source
+                        if src == "ai_noise_gap"
+                    ]
+                    _snap_content_cuts = [
+                        (s, e) for (s, e, src) in cuts_with_source
+                        if src in _CONTENT_CUT_SOURCES
+                    ]
+                    keep_intervals, n_silero_snap = _snap_keep_edges_to_silero_voice(
+                        keep_intervals, _silero_voice, _snap_pause_cuts,
+                        _snap_content_cuts,
                     )
-                    diagnostic["phases"]["silero_edge_snap"] = {"n": n_silero_snap}
-            except Exception as e:  # noqa: BLE001
-                ctx.on_log(f"[silence_cutter] ⚠️ Snap de bordes a voz silero falló: {e}")
+                    if n_silero_snap:
+                        ctx.on_log(
+                            f"[silence_cutter] 🎙️ {n_silero_snap} borde(s) de keep "
+                            f"ajustado(s) al límite de voz silero (anti-partir palabra)"
+                        )
+                        diagnostic["phases"]["silero_edge_snap"] = {"n": n_silero_snap}
+                except Exception as e:  # noqa: BLE001
+                    ctx.on_log(f"[silence_cutter] ⚠️ Snap de bordes a voz silero falló: {e}")
 
             # RESCATE DE ISLAS: una palabra CLARA y aislada (voz silero fuerte)
             # que cayó ENTERA dentro de un ai_noise_gap y se cortó. Caso real
