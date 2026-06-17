@@ -472,6 +472,39 @@ def delete_plan(operator: Annotated[str, Depends(get_current_user)]) -> dict[str
     return {"ok": repo.delete(plan.id)}
 
 
+@router.get("/video-templates")
+def video_templates(
+    operator: Annotated[str, Depends(get_current_user)],
+    product_id: str = Query(default=""),
+) -> dict:
+    """Plantillas de vídeo reutilizables (sin coste IA). Si se pasa
+    `product_id`, devuelve el prompt ya rellenado con el nombre del producto
+    y filtra por su categoría/nicho; si no, todas con el placeholder {product}."""
+    from src.tiktok_shop import video_templates as vt
+    from src.tiktok_shop.repos import ProductRepo
+
+    product = ProductRepo().get(product_id) if product_id else None
+    niche = None
+    name = ""
+    if product is not None:
+        niche = f"{product.category} {product.subcategory or ''} {product.name}"
+        name = product.name
+    tpls = vt.templates_for_niche(niche)
+    return {
+        "product_name": name,
+        "templates": [
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "niches": t["niches"],
+                "notes": t["notes"],
+                "prompt": vt.render_template(t["prompt"], name) if name else t["prompt"],
+            }
+            for t in tpls
+        ],
+    }
+
+
 @router.get("/regions")
 def regions(operator: Annotated[str, Depends(get_current_user)]) -> dict:
     """Países soportados por EchoTik para el selector del Radar."""

@@ -204,6 +204,24 @@ export function useDeletePlan() {
   });
 }
 
+export interface VideoTemplate {
+  id: string;
+  name: string;
+  niches: string[];
+  notes: string;
+  prompt: string;
+}
+
+export function useVideoTemplates(productId: string) {
+  return useQuery<{ product_name: string; templates: VideoTemplate[] }>({
+    queryKey: ["radar-video-templates", productId],
+    queryFn: () =>
+      api.get(`/api/v1/tiktok-shop/radar/video-templates?product_id=${encodeURIComponent(productId)}`),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
 export function useRegenerateCarousels() {
   return useMutation<
     { ok: boolean; count: number; language: string },

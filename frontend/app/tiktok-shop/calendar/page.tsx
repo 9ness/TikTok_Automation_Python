@@ -23,6 +23,7 @@ import {
   usePlanGenerate,
   useRadarPlan,
   useRegenerateCarousels,
+  useVideoTemplates,
   type PlanEntry,
 } from "@/lib/queries/radar";
 import { useProduct, productKeys } from "@/lib/queries/products";
@@ -237,7 +238,8 @@ interface Carousel {
 function ProductPrompts({ productId }: { productId: string }) {
   const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(productId);
-  const [tab, setTab] = useState<"video" | "carousel">("video");
+  const [tab, setTab] = useState<"video" | "carousel" | "templates">("video");
+  const tpls = useVideoTemplates(productId);
   const [carLang, setCarLang] = useState("es");
   const [carStyle, setCarStyle] = useState("simple");
   const regen = useRegenerateCarousels();
@@ -290,9 +292,10 @@ function ProductPrompts({ productId }: { productId: string }) {
         </p>
       </div>
 
-      <div className="mb-2 flex gap-1.5">
-        <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos ({presets.length})</TabBtn>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos IA ({presets.length})</TabBtn>
         <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>🎠 Carruseles ({carousels.length})</TabBtn>
+        <TabBtn active={tab === "templates"} onClick={() => setTab("templates")}>⚡ Plantillas ({tpls.data?.templates.length ?? 0})</TabBtn>
       </div>
 
       {tab === "video" && (
@@ -382,6 +385,27 @@ function ProductPrompts({ productId }: { productId: string }) {
                     <CopyBlock label="" text={s.image_prompt ?? ""} />
                   </div>
                 ))}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+
+      {tab === "templates" && (
+        <div className="space-y-2">
+          <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+            ⚡ Plantillas reutilizables (sin coste IA). Copia el prompt y <b>adjunta
+            una foto del producto</b> al pegarlo en Veo 3 / Gemini. Ideal para
+            volumen — sin caras IA, POV/manos.
+          </p>
+          {(tpls.data?.templates ?? []).map((t) => (
+            <details key={t.id} className="rounded border border-border/60 p-2 text-xs">
+              <summary className="cursor-pointer font-medium">
+                {t.name} <span className="text-muted-foreground">· {t.niches.join("/")}</span>
+              </summary>
+              <div className="mt-2 space-y-1">
+                {t.notes && <p className="text-[11px] text-muted-foreground">{t.notes}</p>}
+                <CopyBlock label="" text={t.prompt} />
               </div>
             </details>
           ))}
