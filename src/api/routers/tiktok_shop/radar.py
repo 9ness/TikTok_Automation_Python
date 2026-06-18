@@ -461,6 +461,32 @@ def regenerate_carousels(
     return {"ok": bool(carousels), "count": len(carousels), "language": body.language}
 
 
+class RemoveEntryRequest(BaseModel):
+    product_id: str
+
+
+@router.post("/plan/remove")
+def remove_from_plan(
+    body: RemoveEntryRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Quita un producto del calendario (no borra el producto del catálogo,
+    solo lo saca del plan). Para curar productos malos (agotados, fuera de
+    temporada, etc.)."""
+    from src.tiktok_shop.repos import PlanRepo
+
+    repo = PlanRepo()
+    plan = repo.get_current()
+    if plan is None:
+        return {"ok": False, "removed": 0}
+    before = len(plan.entries)
+    plan.entries = [e for e in plan.entries if e.product_id != body.product_id]
+    removed = before - len(plan.entries)
+    if removed:
+        repo.save(plan, make_current=False)
+    return {"ok": removed > 0, "removed": removed}
+
+
 @router.delete("/plan")
 def delete_plan(operator: Annotated[str, Depends(get_current_user)]) -> dict[str, bool]:
     from src.tiktok_shop.repos import PlanRepo

@@ -24,6 +24,7 @@ import {
   usePlanGenerate,
   useRadarPlan,
   useRegenerateCarousels,
+  useRemoveFromPlan,
   useVideoTemplates,
   type BofuHook,
   type PlanEntry,
@@ -184,6 +185,7 @@ export default function CalendarPage() {
 function DayEntry({ e }: { e: PlanEntry }) {
   const qc = useQueryClient();
   const mark = useMarkTested();
+  const remove = useRemoveFromPlan();
   const [open, setOpen] = useState(false);
   // Estado local del check → feedback instantáneo (el plan se refresca cada
   // 5s mientras se generan packs y pisaba el estado del checkbox controlado).
@@ -220,24 +222,44 @@ function DayEntry({ e }: { e: PlanEntry }) {
               </a>
             )}
           </div>
-          <label className="flex shrink-0 cursor-pointer items-center gap-1 text-xs">
-            <input
-              type="checkbox"
-              checked={tested}
-              onChange={(ev) => {
-                const v = ev.target.checked;
-                setTested(v);   // instantáneo
-                mark.mutate(
-                  { product_id: e.product_id, tested: v },
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <label className="flex cursor-pointer items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                checked={tested}
+                onChange={(ev) => {
+                  const v = ev.target.checked;
+                  setTested(v);   // instantáneo
+                  mark.mutate(
+                    { product_id: e.product_id, tested: v },
+                    {
+                      onError: () => setTested(!v),   // revierte si falla
+                      onSuccess: () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
+                    },
+                  );
+                }}
+              />
+              Probado
+            </label>
+            <button
+              disabled={remove.isPending}
+              onClick={() =>
+                remove.mutate(
+                  { product_id: e.product_id },
                   {
-                    onError: () => setTested(!v),   // revierte si falla
-                    onSuccess: () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
+                    onSuccess: () => {
+                      toast.success("Quitado del calendario");
+                      qc.invalidateQueries({ queryKey: ["radar-plan"] });
+                    },
                   },
-                );
-              }}
-            />
-            Probado
-          </label>
+                )
+              }
+              className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-red-500"
+              title="Quitar del calendario (no borra el producto)"
+            >
+              <Trash2 className="h-3 w-3" /> quitar
+            </button>
+          </div>
         </div>
 
         {e.pack_ready && (

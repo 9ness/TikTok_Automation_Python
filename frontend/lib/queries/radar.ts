@@ -204,6 +204,12 @@ export function useDeletePlan() {
   });
 }
 
+export function useRemoveFromPlan() {
+  return useMutation<{ ok: boolean; removed: number }, Error, { product_id: string }>({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/plan/remove", body),
+  });
+}
+
 export interface VideoTemplate {
   id: string;
   name: string;
