@@ -1269,6 +1269,27 @@ def run_pronosticos_pipeline(
         viral_overlays=viral_overlays,
     )
 
+    # ── Muñeco viejo sabio con lip-sync (solo VIRAL), abajo-centrado, encima ──
+    if video_style == "viral":
+        try:
+            char_path = _resolve_asset("munecos", "sabio.png")
+            if char_path:
+                from .viral_puppet import build_puppet_clip
+                puppet = build_puppet_clip(
+                    char_path, audio_path, audio_duration, (W, H), fps=fps,
+                )
+                if puppet is not None:
+                    timeline.append({
+                        "start": 0.0, "duration": audio_duration,
+                        "clip_factory": (lambda c=puppet: c),
+                        "is_overlay": True, "label": "muñeco_sabio",
+                    })
+                    log("🧙 Muñeco viejo sabio con lip-sync añadido (abajo-centro)")
+            else:
+                log("ℹ️ Muñeco viral no añadido: falta munecos/sabio.png en la librería.")
+        except Exception as e_pup:
+            log(f"⚠️ Muñeco no añadido (non-fatal): {e_pup}")
+
     # Log resumen del timeline (debug del overlay perfil + ligas)
     overlays = [e for e in timeline if e.get("is_overlay")]
     if overlays:
