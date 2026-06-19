@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Image as ImageIcon, Loader2, Search, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Image as ImageIcon,
+  Loader2,
+  Search,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,12 +18,21 @@ import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import {
   matchPhotoFileUrl,
+  matchPhotosKeys,
+  useAutoFetchMatchPhoto,
   useDeleteMatchPhoto,
   useMatchPhotoFolders,
   useMatchPhotos,
+  useMatchTeamsForDate,
   useSaveMatchPhoto,
   useSearchMatchPhotos,
 } from "@/lib/queries/creator-reward/matchPhotos";
+
+function defaultDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function MatchPhotosPage() {
   const [team, setTeam] = useState("");
@@ -31,6 +47,58 @@ export default function MatchPhotosPage() {
   const saved = useMatchPhotos(teamTrim || null);
 
   const results = search.data?.images ?? [];
+
+  // Auto-búsqueda por jornada (una foto de jugador por equipo de la fecha).
+  const qc = useQueryClient();
+  const [dateInput, setDateInput] = useState(defaultDate());
+  const [activeDate, setActiveDate] = useState<string | null>(null);
+  const teamsQ = useMatchTeamsForDate(activeDate);
+  const autoFetch = useAutoFetchMatchPhoto();
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; current: string } | null>(null);
+  const [teamLog, setTeamLog] = useState<Record<string, string>>({});
+
+  async function runAutoFetch(mode: "missing" | "all") {
+    const teams = teamsQ.data?.teams ?? [];
+    const targets = mode === "missing" ? teams.filter((t) => !t.has_photos) : teams;
+    if (targets.length === 0) {
+      toast.info(
+        mode === "missing"
+          ? "Todos los equipos ya tienen foto."
+          : "No hay equipos en esta fecha.",
+      );
+      return;
+    }
+    setRunning(true);
+    setTeamLog({});
+    let created = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const t = targets[i];
+      if (!t) continue;
+      setProgress({ done: i, total: targets.length, current: t.name });
+      try {
+        const res = await autoFetch.mutateAsync({ team: t.name, mode });
+        const label =
+          res.status === "created"
+            ? "✅ guardada"
+            : res.status === "exists"
+              ? "• ya tenía"
+              : res.status === "no_good"
+                ? "⚠️ sin jugador"
+                : "✗ error";
+        setTeamLog((p) => ({ ...p, [t.name]: label }));
+        if (res.status === "created") created++;
+      } catch {
+        setTeamLog((p) => ({ ...p, [t.name]: "✗ error" }));
+      }
+    }
+    setProgress(null);
+    setRunning(false);
+    toast.success(`Auto-búsqueda terminada: ${created} foto(s) nueva(s).`);
+    qc.invalidateQueries({ queryKey: matchPhotosKeys.folders() });
+    qc.invalidateQueries({ queryKey: matchPhotosKeys.teamsForDate(activeDate ?? "") });
+    if (teamTrim) qc.invalidateQueries({ queryKey: matchPhotosKeys.team(teamTrim) });
+  }
 
   async function runSearch() {
     const q = query.trim();
@@ -84,6 +152,86 @@ export default function MatchPhotosPage() {
           </p>
         </div>
       </header>
+
+      {/* Auto-búsqueda por jornada */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-semibold">Auto-buscar por jornada</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Carga los equipos de los partidos de una fecha y busca una foto de
+            jugador (filtrada con IA) por equipo. 9:16 automático.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <Input
+              type="date"
+              value={dateInput}
+              onChange={(e) => setDateInput(e.target.value)}
+              className="h-9 w-44"
+            />
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={() => setActiveDate(dateInput)}
+              disabled={teamsQ.isFetching}
+            >
+              {teamsQ.isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Cargar equipos"
+              )}
+            </Button>
+            <Button
+              className="h-9"
+              onClick={() => runAutoFetch("missing")}
+              disabled={running || !teamsQ.data?.teams.length}
+            >
+              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              <span className="ml-1">Buscar las que faltan</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-9"
+              onClick={() => runAutoFetch("all")}
+              disabled={running || !teamsQ.data?.teams.length}
+            >
+              Buscar todas (+1)
+            </Button>
+          </div>
+
+          {progress && (
+            <p className="text-xs text-muted-foreground">
+              Buscando {progress.done + 1}/{progress.total}: {progress.current}…
+            </p>
+          )}
+
+          {activeDate && teamsQ.data && (
+            <div className="flex flex-wrap gap-1.5">
+              {teamsQ.data.teams.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  No hay partidos/equipos para {activeDate}.
+                </span>
+              )}
+              {teamsQ.data.teams.map((t) => (
+                <span
+                  key={t.name}
+                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                    t.has_photos
+                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      : "border-border"
+                  }`}
+                  title={teamLog[t.name] ?? (t.has_photos ? `${t.count} foto(s)` : "sin foto")}
+                >
+                  {t.has_photos ? "✓" : "○"} {t.name}
+                  {teamLog[t.name] ? ` · ${teamLog[t.name]}` : ""}
+                </span>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Equipo destino */}
       <Card>

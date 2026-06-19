@@ -25,8 +25,9 @@ import json
 import os
 import re
 import time
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import quote
 
 import requests
@@ -110,6 +111,34 @@ class SaveResponse(BaseModel):
     team: str
     filename: str
     url: str
+
+
+class TeamStatus(BaseModel):
+    name: str
+    has_photos: bool
+    count: int
+
+
+class TeamsForDateResponse(BaseModel):
+    date: str
+    teams: list[TeamStatus]
+
+
+class AutoFetchRequest(BaseModel):
+    team: str = Field(..., min_length=1, max_length=80)
+    mode: Literal["missing", "all"] = "missing"
+    query: str | None = None
+
+
+class AutoFetchResponse(BaseModel):
+    team: str
+    status: Literal["created", "exists", "no_good", "failed"]
+    filename: str | None = None
+    url: str | None = None
+    source: str | None = None
+    query: str | None = None
+    count: int = 0
+    reason: str | None = None
 
 
 # ── Helpers de disco ──────────────────────────────────────────────────────────
@@ -272,6 +301,154 @@ def _file_url(team: str, filename: str) -> str:
     return f"{_PREFIX}/file?team={quote(team)}&filename={quote(filename)}"
 
 
+def _persist_image(img: Image.Image, team: str) -> tuple[str, str]:
+    """Recorta a 9:16 y guarda en fotos/<team>/. Devuelve (filename, url)."""
+    out = _cover_9x16(img)
+    dest = _team_dir(team, create=True)
+    slug = _slug(team)
+    filename = f"{slug}-{_next_index(dest, slug)}.jpg"
+    out.save(dest / filename, "JPEG", quality=88)
+    return filename, _file_url(team, filename)
+
+
+def _count_photos(team: str) -> int:
+    d = _team_dir(team)
+    if not d.exists():
+        return 0
+    return sum(1 for p in d.iterdir() if p.suffix.lower() in _IMG_EXTS and p.is_file())
+
+
+def _split_teams(match: str) -> list[str]:
+    """'Barcelona vs Real Madrid' → ['Barcelona', 'Real Madrid']."""
+    parts = re.split(r"\s+(?:vs\.?|v\.?|-|–|x)\s+", str(match or ""), flags=re.IGNORECASE)
+    return [p.strip() for p in parts if p and p.strip()]
+
+
+# ── Auto-fetch: una foto de JUGADOR por equipo (filtro Gemini Vision) ──────────
+def _download_valid(url: str) -> bytes | None:
+    try:
+        r = requests.get(url, headers=_BROWSER_HEADERS, timeout=12)
+        if r.status_code != 200 or len(r.content) < 8000:
+            return None
+        im = Image.open(io.BytesIO(r.content))
+        if im.width < 500 or im.height < 500:
+            return None
+        im.convert("RGB")  # fuerza decodificar (descarta corruptas/SVG)
+        return r.content
+    except Exception:
+        return None
+
+
+def _pick_best_player(images: list[bytes], team: str) -> int:
+    """Gemini Vision elige la mejor foto que muestre un JUGADOR real (cara+cuerpo).
+    Devuelve el índice 0-based, o -1 si NINGUNA vale. Si la IA falla → 0."""
+    if not images:
+        return -1
+    try:
+        thumbs: list[bytes] = []
+        for b in images:
+            im = Image.open(io.BytesIO(b)).convert("RGB")
+            buf = io.BytesIO()
+            _cover_9x16(im, 320, 420).save(buf, "JPEG", quality=65)
+            thumbs.append(buf.getvalue())
+        prompt = (
+            f"Te paso {len(images)} imágenes CANDIDATAS (índice 0..{len(images) - 1}) "
+            f"como FONDO vertical 9:16 de un vídeo de TikTok sobre el equipo de fútbol "
+            f'"{team}".\n\n'
+            "REQUISITO: la imagen DEBE mostrar a UNA PERSONA — un JUGADOR real, con "
+            "CARA y CUERPO visibles, jugando o posando.\n"
+            "RECHAZA (devuelve -1 si TODAS son así): camiseta sola sin persona, "
+            "trofeos/copas/medallas/balones, escudos/logos/banderas/gráficos/texto, "
+            "estadios vacíos o gradas, foto de equipo completo (varios en fila), "
+            "collages, fotos antiguas o borrosas.\n\n"
+            "De las que SÍ muestran un jugador con cara visible, elige la MEJOR: primer "
+            "plano o plano medio, nítida, actual, que funcione recortada a 9:16 vertical.\n\n"
+            'Devuelve SOLO JSON: {"best_index": <índice 0-based o -1>, "reason": "<breve>"}.'
+        )
+        from src.tiktok_shop.api.gemini import generate_text
+
+        txt = generate_text(
+            "Eres un editor visual estricto que selecciona fotos de jugadores.",
+            prompt,
+            expect_json=True,
+            images=thumbs,
+            temperature=0.1,
+            max_output_tokens=200,
+        )
+        m = re.search(r"\{[\s\S]*\}", txt or "")
+        data = json.loads(m.group(0) if m else (txt or "{}"))
+        idx = int(data.get("best_index", -1))
+        if idx == -1:
+            return -1
+        if 0 <= idx < len(images):
+            return idx
+        return 0
+    except Exception:
+        return 0  # si Vision falla, aceptamos la mejor del ranking
+
+
+def _auto_fetch_one(team_raw: str, mode: str, query: str | None) -> AutoFetchResponse:
+    team = _safe_team(team_raw)
+    existing = _count_photos(team)
+    if mode == "missing" and existing > 0:
+        return AutoFetchResponse(team=team, status="exists", count=existing)
+
+    year = datetime.now().year
+    if query and query.strip():
+        queries = [query.strip()]
+    else:
+        queries = [
+            f"{team} jugador estrella futbol {year}",
+            f"{team} futbolista {year} primer plano cara",
+            f"{team} jugador celebrando {year}",
+        ]
+
+    last = ""
+    for q in queries:
+        try:
+            cands = _bing_image_search(q, 8)
+        except Exception as e:
+            last = f"búsqueda: {e}"
+            continue
+        if not cands:
+            last = "sin resultados"
+            continue
+        valid: list[tuple[bytes, str]] = []
+        for c in cands[:6]:
+            if len(valid) >= 3:
+                break
+            b = _download_valid(c.url)
+            if b:
+                valid.append((b, c.url))
+        if not valid:
+            last = "ninguna candidata se pudo descargar"
+            continue
+        best = _pick_best_player([b for b, _ in valid], team)
+        if best == -1:
+            last = "sin foto de jugador (solo camisetas/trofeos/escudos)"
+            continue
+        content, source = valid[best]
+        try:
+            img = Image.open(io.BytesIO(content))
+            filename, url = _persist_image(img, team)
+        except Exception as e:
+            last = f"no se pudo guardar: {e}"
+            continue
+        return AutoFetchResponse(
+            team=team,
+            status="created",
+            filename=filename,
+            url=url,
+            source=source,
+            query=q,
+            count=existing + 1,
+        )
+
+    return AutoFetchResponse(
+        team=team, status="no_good", count=existing, reason=last or "sin foto válida"
+    )
+
+
 # ── Endpoints ───────────────────────────────────────────────────────────────────
 @router.post("/search", response_model=SearchResponse)
 def search_images(payload: SearchRequest) -> SearchResponse:
@@ -331,15 +508,38 @@ def save_photo(payload: SaveRequest) -> SaveResponse:
         raise APIError(f"La imagen devolvió {resp.status_code}.")
     try:
         img = Image.open(io.BytesIO(resp.content))
-        out = _cover_9x16(img)
+        filename, url = _persist_image(img, team)
     except Exception as e:
         raise ValidationError(f"El archivo no es una imagen válida: {e}")
+    return SaveResponse(team=team, filename=filename, url=url)
 
-    dest = _team_dir(team, create=True)
-    slug = _slug(team)
-    filename = f"{slug}-{_next_index(dest, slug)}.jpg"
-    out.save(dest / filename, "JPEG", quality=88)
-    return SaveResponse(team=team, filename=filename, url=_file_url(team, filename))
+
+@router.get("/teams", response_model=TeamsForDateResponse)
+def teams_for_date(date: Annotated[str, Query(..., min_length=8)]) -> TeamsForDateResponse:
+    """Equipos que aparecen en los picks de esa fecha (Redis) + estado de fotos."""
+    from src.pronosticos.data_loader import get_picks, list_versions, load_raw_payload
+
+    payload = load_raw_payload(date)
+    if payload is None:
+        return TeamsForDateResponse(date=date, teams=[])
+    names: dict[str, None] = {}
+    for v in list_versions(payload) or []:
+        for p in get_picks(v) or []:
+            for t in _split_teams(p.get("match", "")):
+                names.setdefault(t, None)
+    teams = [
+        TeamStatus(name=n, has_photos=_count_photos(n) > 0, count=_count_photos(n))
+        for n in sorted(names, key=str.lower)
+    ]
+    return TeamsForDateResponse(date=date, teams=teams)
+
+
+@router.post("/auto-fetch", response_model=AutoFetchResponse)
+def auto_fetch(payload: AutoFetchRequest) -> AutoFetchResponse:
+    """Busca y guarda UNA foto de jugador para un equipo (1 por llamada;
+    el frontend itera mostrando progreso). mode='missing' salta los que ya
+    tienen foto; mode='all' añade una más."""
+    return _auto_fetch_one(payload.team, payload.mode, payload.query)
 
 
 @router.delete("/photo", status_code=status.HTTP_204_NO_CONTENT)

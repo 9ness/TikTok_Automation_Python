@@ -49,3 +49,31 @@ export interface MatchPhotoSaveResponse {
   filename: string;
   url: string;
 }
+
+export interface MatchTeamStatus {
+  name: string;
+  has_photos: boolean;
+  count: number;
+}
+
+export interface MatchTeamsForDateResponse {
+  date: string;
+  teams: MatchTeamStatus[];
+}
+
+export interface MatchAutoFetchRequest {
+  team: string;
+  mode: "missing" | "all";
+  query?: string;
+}
+
+export interface MatchAutoFetchResponse {
+  team: string;
+  status: "created" | "exists" | "no_good" | "failed";
+  filename: string | null;
+  url: string | null;
+  source: string | null;
+  query: string | null;
+  count: number;
+  reason: string | null;
+}
