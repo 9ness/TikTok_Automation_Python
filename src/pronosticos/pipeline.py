@@ -891,6 +891,23 @@ def run_pronosticos_pipeline(
         else:
             log("ℹ️ SFX clink no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
 
+    # 4.c.bis SFX "flash" de transición (solo estilo VIRAL): un whoosh en el
+    # corte a cada pick (inicio de cada segmento), coincidiendo con la aparición
+    # de la barra del partido. Gated en viral → no toca el render estándar.
+    if video_style == "viral":
+        flash_path = _resolve_sfx("flash.mp3", "transition.mp3", "whoosh.mp3")
+        if flash_path:
+            flash_anchors = [float(s) for (s, _e) in segments.get("picks", []) if s and s > 0]
+            if flash_anchors:
+                audio_clip = _mix_sfx_at_timestamps(
+                    audio_clip, flash_path, flash_anchors,
+                    sfx_volume, audio_duration, log, label="⚡ flash viral",
+                )
+            else:
+                log("ℹ️ Estilo viral sin anclas de pick para el flash.")
+        else:
+            log("ℹ️ SFX flash (viral) no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
+
     # 4.d Overlay de logos de ligas en la intro (al detectar 'ligas/champions/europa...')
     league_overlay_anchor: float | None = None
     league_logos: list[str] = []
