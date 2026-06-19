@@ -146,7 +146,9 @@ def load_chosen_version(target_date: str | None = None,
 
     if not chosen.get("script"):
         raise ValueError(f"Versión {chosen.get('id')!r} sin campo `script`.")
-    if chosen.get("mode") not in ("single_match", "multi_match"):
+    # 'viral' = estilo nuevo (gancho + 4 picks); misma estructura que multi_match
+    # (selected_picks), así que el pipeline lo procesa igual.
+    if chosen.get("mode") not in ("single_match", "multi_match", "viral"):
         raise ValueError(f"Modo desconocido en versión {chosen.get('id')!r}: {chosen.get('mode')}")
 
     return chosen
