@@ -13,7 +13,7 @@ asegurarse de que el asset NO tiene boca dibujada.
 from __future__ import annotations
 
 # Posición de la boca en coords del PNG del sabio SIN BOCA (1024×1536).
-_MOUTH_CX, _MOUTH_CY = 505, 525
+_MOUTH_CX, _MOUTH_CY = 492, 540
 _MOUTH_HW = 74                       # medio-ancho de la boca
 _LINE = (74, 42, 28, 255)            # color del trazo del cartoon (labios)
 _K = 12                              # nº de estados de apertura (suave)
