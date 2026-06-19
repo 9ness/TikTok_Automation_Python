@@ -27,7 +27,7 @@ import {
   useLatestPronosticosDate,
   usePronosticosVersions,
 } from "@/lib/queries/creator-reward/pronosticos";
-import { buildVoiceSampleUrl } from "@/lib/queries/voices";
+import { buildVoiceSampleUrl, useVoices } from "@/lib/queries/voices";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   PronosticosAudioConfig,
@@ -124,6 +124,39 @@ export default function PronosticosPage() {
 
   // V2 = estilo "viral": solo voz, 9:16 fijo, sin subtítulos ni posiciones.
   const isViral = overlays.video_style === "viral";
+
+  // Filtros del catálogo de voces (MiniMax solo tiene un español "es"; filtramos
+  // por edad y género, que sí distingue el catálogo).
+  const [voiceAge, setVoiceAge] = useLocalStorageState<string>(
+    "pronosticos.voice_age.v1",
+    "",
+  );
+  const [voiceGender, setVoiceGender] = useLocalStorageState<string>(
+    "pronosticos.voice_gender.v1",
+    "",
+  );
+  const voicesQ = useVoices({
+    language: "es",
+    age_group: (voiceAge || undefined) as "young" | "adult" | "mature" | undefined,
+    gender: (voiceGender || undefined) as "male" | "female" | undefined,
+    include_presets: true,
+  });
+  const FAV_IDS = new Set<string>(FAVORITE_VOICES.map((v) => v.id));
+  const voiceOptions = (() => {
+    const items = voicesQ.data?.items ?? [];
+    const opts = items
+      .map((v) => ({
+        id: v.minimax_voice_id,
+        label: `${FAV_IDS.has(v.minimax_voice_id) ? "⭐ " : ""}${v.name}`,
+        fav: FAV_IDS.has(v.minimax_voice_id),
+      }))
+      .sort((a, b) => Number(b.fav) - Number(a.fav) || a.label.localeCompare(b.label));
+    // Garantiza que la voz seleccionada siga visible aunque los filtros la excluyan.
+    if (voiceId && voiceId !== "__custom__" && !opts.some((o) => o.id === voiceId)) {
+      opts.unshift({ id: voiceId, label: `${voiceId} (actual)`, fav: false });
+    }
+    return opts;
+  })();
 
   // Preview de voz — reproduce la muestra MP3 cacheada del endpoint /voices/{id}/sample.
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
@@ -251,7 +284,9 @@ export default function PronosticosPage() {
   const voiceSummary =
     voiceId === "__custom__"
       ? voiceCustom || "Custom (vacío)"
-      : FAVORITE_VOICES.find((v) => v.id === voiceId)?.label ?? voiceId;
+      : voicesQ.data?.items.find((v) => v.minimax_voice_id === voiceId)?.name ??
+        FAVORITE_VOICES.find((v) => v.id === voiceId)?.label ??
+        voiceId;
 
   return (
     <div className="container mx-auto space-y-4 p-6 md:p-8">
@@ -361,15 +396,43 @@ export default function PronosticosPage() {
             }
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Voz MiniMax</Label>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">Voz MiniMax (español)</Label>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Select value={voiceAge || "any"} onValueChange={(v) => setVoiceAge(v === "any" ? "" : v)}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue placeholder="Edad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Edad: cualquiera</SelectItem>
+                      <SelectItem value="young">Joven</SelectItem>
+                      <SelectItem value="adult">Adulto</SelectItem>
+                      <SelectItem value="mature">Mayor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={voiceGender || "any"} onValueChange={(v) => setVoiceGender(v === "any" ? "" : v)}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue placeholder="Género" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Género: cualquiera</SelectItem>
+                      <SelectItem value="male">Masculino</SelectItem>
+                      <SelectItem value="female">Femenino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="self-center text-xs text-muted-foreground">
+                    {voicesQ.isLoading
+                      ? "cargando…"
+                      : `${voiceOptions.filter((o) => o.id !== "__custom__").length} voces`}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2">
                   <Select value={voiceId} onValueChange={setVoiceId}>
                     <SelectTrigger className="h-9 flex-1">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      {FAVORITE_VOICES.map((v) => (
+                    <SelectContent className="max-h-72">
+                      {voiceOptions.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.label}
                         </SelectItem>
