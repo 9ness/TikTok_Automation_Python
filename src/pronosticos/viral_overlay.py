@@ -238,7 +238,7 @@ def build_viral_match_bar(home: str, away: str, date_str: str, time_raw_or_peru:
     draw = ImageDraw.Draw(img)
 
     bar_h = 300
-    bar_y = int(H * 0.38)
+    bar_y = int(H * 0.26)   # arriba para no solaparse con el muñeco (mitad inferior)
     draw.rounded_rectangle([0, bar_y, W, bar_y + bar_h], radius=0, fill=BAR_BG)
 
     ddmmyy, abbr = _date_badge(date_str)
