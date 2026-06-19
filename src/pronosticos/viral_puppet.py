@@ -51,30 +51,53 @@ def _draw_mouth(img, cx, cy, crx, cry, hw, openness: float) -> None:
 
 
 def _voice_envelope(audio_path: str, duration: float, fps: int):
-    """Envolvente de volumen (RMS) de la voz, normalizada 0..1, una por fotograma."""
+    """Envolvente de volumen (RMS) de la voz, normalizada 0..1, una por fotograma.
+
+    Lee el audio con ffmpeg → WAV PCM y lo decodifica con el módulo `wave`
+    (NO con MoviePy `to_soundarray`, que está roto con esta versión de numpy:
+    'arrays to stack must be passed as a sequence' → devolvía silencio y la
+    boca no se movía)."""
     import numpy as np
-    from moviepy.editor import AudioFileClip
+    import os
+    import subprocess
+    import tempfile
+    import wave
     n = int(duration * fps) + 1
+    sr = 22050
+    tmp = None
     try:
-        a = AudioFileClip(audio_path)
-        sr = 22050
-        snd = a.to_soundarray(fps=sr)
-        a.close()
+        fd, tmp = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", audio_path, "-vn", "-ac", "1",
+             "-ar", str(sr), "-acodec", "pcm_s16le", tmp],
+            capture_output=True, timeout=120,
+        )
+        with wave.open(tmp, "rb") as w:
+            sr = w.getframerate()
+            raw = w.readframes(w.getnframes())
+        snd = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     except Exception:
         return np.zeros(n)
-    if getattr(snd, "ndim", 1) == 2:
-        snd = snd.mean(axis=1)
+    finally:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+    if snd.size == 0:
+        return np.zeros(n)
     hop = max(1, int(sr / fps))
     env = np.zeros(n)
     for i in range(n):
         seg = snd[i * hop:(i + 1) * hop]
         if len(seg):
             env[i] = float(np.sqrt(np.mean(seg ** 2)))
-    p = float(np.percentile(env, 92))
+    p = float(np.percentile(env, 90))
     if p <= 0:
         p = float(env.max()) or 1e-6
     env = np.clip(env / p, 0.0, 1.0)
-    env = np.where(env < 0.12, 0.0, env)   # umbral de silencio
+    env = np.where(env < 0.10, 0.0, env)   # umbral de silencio
     return env
 
 
