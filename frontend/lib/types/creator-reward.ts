@@ -147,6 +147,8 @@ export interface PronosticosOverlaysConfig {
   league_overlay_duration: number;
   saturation: number;
   show_pick_carousel: boolean;
+  // Estilo de vídeo: "standard" (histórico) o "viral" (overlays nuevos).
+  video_style: "standard" | "viral";
   // Posiciones configurables vía preview drag (0..1).
   subtitle_y_pct: number;
   league_overlay_y_pct: number;

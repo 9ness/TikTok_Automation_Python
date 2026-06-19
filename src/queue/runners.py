@@ -685,6 +685,7 @@ def run_pronosticos(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
         team_shield_x_inset_pct=p.get("team_shield_x_inset_pct", 0.06),
         profile_cta_y_pct=p.get("profile_cta_y_pct", 0.36),
         profile_cta_height_pct=p.get("profile_cta_height_pct", 0.32),
+        video_style=p.get("video_style", "standard"),
     )
     return final_path
 

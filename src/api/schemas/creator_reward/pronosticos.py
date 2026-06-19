@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -68,6 +68,8 @@ class PronosticosOverlaysConfig(BaseModel):
     league_overlay_duration: float = Field(default=3.0, ge=0.5, le=10.0)
     saturation: float = Field(default=1.25, ge=0.5, le=2.0)
     show_pick_carousel: bool = False
+    # Estilo de vídeo: "standard" (histórico, intacto) o "viral" (overlays nuevos).
+    video_style: Literal["standard", "viral"] = "standard"
 
     # --- Posiciones de los overlays (0.0 = top, 1.0 = bottom) ---
     # Todos opcionales con los defaults históricos del pipeline. Se exponen

@@ -193,6 +193,7 @@ def enqueue_pronosticos(
             "league_overlay_duration": payload.overlays.league_overlay_duration,
             "saturation": payload.overlays.saturation,
             "show_pick_carousel": payload.overlays.show_pick_carousel,
+            "video_style": payload.overlays.video_style,
             # Posiciones configurables vía preview drag (UI)
             "subtitle_y_pct": payload.overlays.subtitle_y_pct,
             "league_overlay_y_pct": payload.overlays.league_overlay_y_pct,

@@ -65,6 +65,7 @@ const DEFAULT_OVERLAYS: PronosticosOverlaysConfig = {
   league_overlay_duration: 2.5,
   saturation: 1.25,
   show_pick_carousel: false,
+  video_style: "standard",
   // Defaults históricos del pipeline (pronosticos/pipeline.py).
   subtitle_y_pct: 0.78,
   league_overlay_y_pct: 0.30,
@@ -190,7 +191,7 @@ export default function PronosticosPage() {
     const sfxLabel = sfx.length > 0 ? `${sfx.length} SFX` : "sin SFX";
     return `${audio.add_subtitles ? "subs" : "no subs"} · ${sfxLabel} · BGM ${audio.add_background_music ? `${Math.round(audio.bgm_volume * 100)}%` : "off"}`;
   })();
-  const overlaysSummary = `intro ${overlays.use_intro_folder ? "✓" : "✗"} · ligas ${overlays.add_league_overlay ? "✓" : "✗"} · sat ${overlays.saturation.toFixed(2)} · carrusel ${overlays.show_pick_carousel ? "✓" : "✗"}`;
+  const overlaysSummary = `${overlays.video_style === "viral" ? "🔥 viral" : "clásico"} · intro ${overlays.use_intro_folder ? "✓" : "✗"} · ligas ${overlays.add_league_overlay ? "✓" : "✗"} · sat ${overlays.saturation.toFixed(2)} · carrusel ${overlays.show_pick_carousel ? "✓" : "✗"}`;
   const voiceSummary =
     voiceId === "__custom__"
       ? voiceCustom || "Custom (vacío)"
@@ -369,6 +370,22 @@ export default function PronosticosPage() {
 
           <CollapsibleCard title="Overlays + Vídeo" subtitle={overlaysSummary}>
             <div className="space-y-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Estilo de vídeo</span>
+                <select
+                  className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                  value={overlays.video_style}
+                  onChange={(e) =>
+                    setOverlays({
+                      ...overlays,
+                      video_style: e.target.value as "standard" | "viral",
+                    })
+                  }
+                >
+                  <option value="standard">Estándar (clásico)</option>
+                  <option value="viral">Viral (gancho + barra partidos)</option>
+                </select>
+              </label>
               <label className="flex items-center gap-2 text-sm">
                 <Switch
                   checked={overlays.use_intro_folder}

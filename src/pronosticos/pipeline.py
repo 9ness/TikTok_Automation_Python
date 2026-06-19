@@ -378,6 +378,23 @@ def _perfil_visual_silent(perfil_path: str, duration: float, W: int, H: int,
     return img.set_position(("center", y_top)).set_duration(duration)
 
 
+def _viral_overlay_clip(png_path: str, duration: float):
+    """Carga un overlay del estilo VIRAL (PNG RGBA a frame completo, con el
+    elemento ya posicionado dentro) como ImageClip transparente a (0,0)."""
+    from PIL import Image as _PILImage
+    arr = np.array(_PILImage.open(png_path).convert("RGBA"))
+    return ImageClip(arr, transparent=True).set_duration(duration).set_position((0, 0))
+
+
+def _split_match(match: str) -> tuple[str, str]:
+    """'Portugal vs RD Congo' → ('Portugal', 'RD Congo'). Tolerante a 'vs.'/'VS'."""
+    import re
+    parts = re.split(r"\s+vs\.?\s+", str(match or ""), maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip()
+    return (str(match or "").strip(), "")
+
+
 class _ClipDeck:
     """Baraja sin reposición: entrega clips en orden aleatorio y solo repite
     cuando se han usado TODOS. Estado compartido entre segmentos que usan la
@@ -470,7 +487,9 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
                            team_shield_height_pct: float = 0.22,
                            team_shield_x_inset_pct: float = 0.06,
                            profile_cta_y_pct: float = 0.36,
-                           profile_cta_height_pct: float = 0.32) -> list:
+                           profile_cta_height_pct: float = 0.32,
+                           video_style: str = "standard",
+                           viral_overlays: dict | None = None) -> list:
     """Construye el timeline de visuales usando segmentos detectados.
 
     Estructura por pick:
@@ -523,11 +542,29 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
                 "clip_factory": lambda dur=intro_dur: _stock_visual(None, dur, W, H),
             })
 
+    # ── Overlay VIRAL: tarjeta de partidos durante la INTRO (gancho) ──
+    if video_style == "viral" and viral_overlays and viral_overlays.get("hook") and intro_dur > 0:
+        timeline.append({
+            "start": intro_start, "duration": intro_dur,
+            "clip_factory": lambda p=viral_overlays["hook"], dur=intro_dur: _viral_overlay_clip(p, dur),
+            "is_overlay": True, "label": "viral_hook",
+        })
+
     # ── PICKS ──
     for i, (s_start, s_end) in enumerate(segments["picks"], start=1):
         seg_dur = max(0.0, s_end - s_start)
         if seg_dur <= 0:
             continue
+
+        # Overlay VIRAL: barra del partido durante TODO el segmento del pick.
+        if video_style == "viral" and viral_overlays:
+            _bar_path = (viral_overlays.get("bars") or {}).get(i)
+            if _bar_path:
+                timeline.append({
+                    "start": s_start, "duration": seg_dur,
+                    "clip_factory": lambda p=_bar_path, dur=seg_dur: _viral_overlay_clip(p, dur),
+                    "is_overlay": True, "label": f"viral_bar_{i}",
+                })
 
         # Carrusel al inicio del pick (opcional, OFF por defecto — el usuario
         # prefiere ver vídeo de stock continuo). Si se activa, ocupa los primeros
@@ -715,6 +752,7 @@ def run_pronosticos_pipeline(
     team_shield_x_inset_pct: float = 0.06,
     profile_cta_y_pct: float = 0.36,
     profile_cta_height_pct: float = 0.32,
+    video_style: str = "standard",
 ) -> str:
     """Genera el MP4 final y devuelve la ruta.
 
@@ -1056,6 +1094,30 @@ def run_pronosticos_pipeline(
             "logos": league_logos,
         }
 
+    # ── Overlays del estilo VIRAL (tarjeta de partidos + barras con banderas) ──
+    # Se generan como PNGs en work_dir y se pasan al timeline. Gated: solo viral.
+    viral_overlays = None
+    if video_style == "viral":
+        try:
+            from .viral_overlay import build_viral_hook_overlay, build_viral_match_bar
+            hook_matches = []
+            for p in picks:
+                _h, _a = _split_match(p.get("match", ""))
+                hook_matches.append({"home": _h, "away": _a, "time": p.get("time", "")})
+            hook_png = os.path.join(work_dir, "viral_hook.png")
+            build_viral_hook_overlay(hook_matches, hook_png, (W, H))
+            bars: dict[int, str] = {}
+            for i, p in enumerate(picks, start=1):
+                _h, _a = _split_match(p.get("match", ""))
+                bar_png = os.path.join(work_dir, f"viral_bar_{i}.png")
+                build_viral_match_bar(_h, _a, target_date, p.get("time", ""), bar_png, (W, H))
+                bars[i] = bar_png
+            viral_overlays = {"hook": hook_png, "bars": bars}
+            log(f"🎨 Overlays VIRAL: tarjeta de partidos + {len(bars)} barras generadas")
+        except Exception as e_viral:
+            log(f"⚠️ Overlays viral no generados (non-fatal): {e_viral}")
+            viral_overlays = None
+
     # team_shields_data ya se calculó arriba (paso 4.d.bis), tras decidir
     # si suprimir el overlay de liga.
     timeline = _build_visual_timeline(
@@ -1076,6 +1138,8 @@ def run_pronosticos_pipeline(
         team_shield_x_inset_pct=team_shield_x_inset_pct,
         profile_cta_y_pct=profile_cta_y_pct,
         profile_cta_height_pct=profile_cta_height_pct,
+        video_style=video_style,
+        viral_overlays=viral_overlays,
     )
 
     # Log resumen del timeline (debug del overlay perfil + ligas)
