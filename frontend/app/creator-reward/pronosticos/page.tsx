@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Calendar, Loader2, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Calendar, Loader2, Pause, Play, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { PronosticosPreview } from "@/components/creator-reward/pronosticos/PronosticosPreview";
@@ -27,6 +27,7 @@ import {
   useLatestPronosticosDate,
   usePronosticosVersions,
 } from "@/lib/queries/creator-reward/pronosticos";
+import { buildVoiceSampleUrl } from "@/lib/queries/voices";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   PronosticosAudioConfig,
@@ -121,6 +122,45 @@ export default function PronosticosPage() {
     DEFAULT_OVERLAYS,
   );
 
+  // V2 = estilo "viral": solo voz, 9:16 fijo, sin subtítulos ni posiciones.
+  const isViral = overlays.video_style === "viral";
+
+  // Preview de voz — reproduce la muestra MP3 cacheada del endpoint /voices/{id}/sample.
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const previewRef = useRef<HTMLAudioElement | null>(null);
+  function previewVoice() {
+    const vid = voiceId === "__custom__" ? voiceCustom.trim() : voiceId;
+    if (!vid) {
+      toast.error("Elige una voz o escribe un voice ID primero.");
+      return;
+    }
+    if (previewRef.current) {
+      previewRef.current.pause();
+      previewRef.current = null;
+    }
+    if (playingVoice === vid) {
+      setPlayingVoice(null);
+      return;
+    }
+    const a = new Audio(buildVoiceSampleUrl(vid));
+    previewRef.current = a;
+    setPlayingVoice(vid);
+    a.onended = () => setPlayingVoice(null);
+    a.onerror = () => {
+      toast.error("No se pudo cargar la muestra de esa voz.");
+      setPlayingVoice(null);
+    };
+    a.play().catch(() => {
+      toast.error("No se pudo reproducir la muestra.");
+      setPlayingVoice(null);
+    });
+  }
+  useEffect(() => {
+    return () => {
+      previewRef.current?.pause();
+    };
+  }, []);
+
   // Auto pre-select la versión `is_selected` cuando carga
   useEffect(() => {
     if (versions.data?.versions) {
@@ -163,15 +203,31 @@ export default function PronosticosPage() {
     const finalVoice =
       voiceId === "__custom__" ? voiceCustom.trim() || null : voiceId || null;
 
+    // En V2 (viral): 9:16 fijo y perfil de audio limpio (sin subtítulos ni
+    // clink/dinero/cámara — el flash de transición ya va automático). El resto
+    // de posiciones/overlays no aplican (el pipeline las ignora en viral).
+    const videoSize: [number, number] = isViral
+      ? [1080, 1920]
+      : RESOLUTIONS[resolutionIdx]?.size ?? [1080, 1920];
+    const effectiveAudio: PronosticosAudioConfig = isViral
+      ? {
+          ...audio,
+          add_subtitles: false,
+          add_money_sfx: false,
+          add_clink_sfx: false,
+          add_camera_sfx: false,
+        }
+      : audio;
+
     try {
       const res = await enqueue.mutateAsync({
         target_date: date,
         version_ids: Array.from(selectedIds),
         voice_id_override: finalVoice,
         script_overrides: overridesObj,
-        video_size: RESOLUTIONS[resolutionIdx]?.size ?? [1080, 1920],
+        video_size: videoSize,
         publish_to_redis: publishToRedis,
-        audio,
+        audio: effectiveAudio,
         overlays,
       });
       toast.success(`${res.total_enqueued} versión(es) encoladas.`);
@@ -232,6 +288,45 @@ export default function PronosticosPage() {
         </CardContent>
       </Card>
 
+      {/* Selector principal de versión/estilo del vídeo */}
+      <Card>
+        <CardContent className="p-3">
+          <Label className="text-xs">Versión del vídeo</Label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setOverlays({ ...overlays, video_style: "standard" })}
+              className={`rounded-lg border p-3 text-left transition ${
+                !isViral
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:bg-muted/50"
+              }`}
+            >
+              <div className="text-sm font-semibold">V1 · Estándar</div>
+              <div className="text-xs text-muted-foreground">
+                Versión clásica con todas las opciones (posiciones, subtítulos,
+                overlays, SFX).
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOverlays({ ...overlays, video_style: "viral" })}
+              className={`rounded-lg border p-3 text-left transition ${
+                isViral
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:bg-muted/50"
+              }`}
+            >
+              <div className="text-sm font-semibold">🔥 V2 · Viral</div>
+              <div className="text-xs text-muted-foreground">
+                Gancho + barra de partidos. Solo eliges la voz; 9:16 y posiciones
+                fijas.
+              </div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       {versions.isLoading && <Skeleton className="h-40 w-full" />}
 
       {versions.data && !versions.data.payload_exists && (
@@ -258,25 +353,46 @@ export default function PronosticosPage() {
           )}
 
           <CollapsibleCard
-            title="Voz + Resolución"
-            subtitle={`${voiceSummary} · ${RESOLUTIONS[resolutionIdx]?.label ?? "1080p"}`}
+            title={isViral ? "Voz" : "Voz + Resolución"}
+            subtitle={
+              isViral
+                ? `${voiceSummary} · 9:16`
+                : `${voiceSummary} · ${RESOLUTIONS[resolutionIdx]?.label ?? "1080p"}`
+            }
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Voz MiniMax</Label>
-                <Select value={voiceId} onValueChange={setVoiceId}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FAVORITE_VOICES.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="__custom__">✏️ Custom (voice ID)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select value={voiceId} onValueChange={setVoiceId}>
+                    <SelectTrigger className="h-9 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FAVORITE_VOICES.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">✏️ Custom (voice ID)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9 shrink-0"
+                    onClick={previewVoice}
+                    title="Escuchar una frase con esta voz"
+                  >
+                    {playingVoice ? (
+                      <Pause className="h-4 w-4" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                    <span className="ml-1">Probar</span>
+                  </Button>
+                </div>
               </div>
               {voiceId === "__custom__" && (
                 <div className="space-y-1">
@@ -289,24 +405,26 @@ export default function PronosticosPage() {
                   />
                 </div>
               )}
-              <div className="space-y-1">
-                <Label className="text-xs">Resolución</Label>
-                <Select
-                  value={String(resolutionIdx)}
-                  onValueChange={(v) => setResolutionIdx(Number(v))}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RESOLUTIONS.map((r, i) => (
-                      <SelectItem key={r.label} value={String(i)}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isViral && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Resolución</Label>
+                  <Select
+                    value={String(resolutionIdx)}
+                    onValueChange={(v) => setResolutionIdx(Number(v))}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RESOLUTIONS.map((r, i) => (
+                        <SelectItem key={r.label} value={String(i)}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <label className="flex items-end gap-2 pb-1 text-sm">
                 <Switch
                   checked={publishToRedis}
@@ -315,8 +433,16 @@ export default function PronosticosPage() {
                 <span>Publicar URL del MP4 en Redis</span>
               </label>
             </div>
+            {isViral && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                V2 Viral: resolución 9:16 fija, sin subtítulos, posiciones de
+                overlays predefinidas. Solo configuras la voz.
+              </p>
+            )}
           </CollapsibleCard>
 
+          {!isViral && (
+          <>
           <CollapsibleCard title="Audio (subs + SFX + BGM)" subtitle={audioSummary}>
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-sm font-medium">
@@ -370,22 +496,6 @@ export default function PronosticosPage() {
 
           <CollapsibleCard title="Overlays + Vídeo" subtitle={overlaysSummary}>
             <div className="space-y-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">Estilo de vídeo</span>
-                <select
-                  className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                  value={overlays.video_style}
-                  onChange={(e) =>
-                    setOverlays({
-                      ...overlays,
-                      video_style: e.target.value as "standard" | "viral",
-                    })
-                  }
-                >
-                  <option value="standard">Estándar (clásico)</option>
-                  <option value="viral">Viral (gancho + barra partidos)</option>
-                </select>
-              </label>
               <label className="flex items-center gap-2 text-sm">
                 <Switch
                   checked={overlays.use_intro_folder}
@@ -437,11 +547,15 @@ export default function PronosticosPage() {
               />
             </div>
           </CollapsibleCard>
+          </>
+          )}
         </div>
 
         {/* Sticky right column — preview + resumen + encolar */}
         <div className="space-y-3 lg:sticky lg:top-6">
-          <PronosticosPreview overlays={overlays} onChange={setOverlays} />
+          {!isViral && (
+            <PronosticosPreview overlays={overlays} onChange={setOverlays} />
+          )}
           <Card>
             <CardContent className="space-y-2 p-3 text-xs">
               <p className="font-semibold uppercase tracking-wider text-muted-foreground">
