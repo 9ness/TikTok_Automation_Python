@@ -301,10 +301,16 @@ def get_voice_sample(
         language = target.language
     else:
         v = repo.get(voice_id)
-        if v is None:
-            raise VoiceNotFoundError(f"Voz '{voice_id}' no encontrada.")
-        minimax_id = v.minimax_voice_id
-        language = v.language
+        if v is not None:
+            minimax_id = v.minimax_voice_id
+            language = v.language
+        else:
+            # Preset MiniMax pasado por su id CRUDO (ej. 'Spanish_Strong-WilledBoy',
+            # como los favoritos de Pronósticos o un voice_id custom). No está en el
+            # repo, pero el id ya ES el minimax_voice_id → lo usamos directo. Idioma
+            # deducido del prefijo (Spanish_/English_).
+            minimax_id = voice_id
+            language = "en" if voice_id.lower().startswith("english_") else "es"
 
     sample_text = text or (
         "I lay the waterproof membrane and seal every joint. I install the "
