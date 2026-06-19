@@ -913,6 +913,34 @@ def run_pronosticos_pipeline(
         n_ok = sum(1 for w in pick_windows if w is not None)
         log(f"🟢 Picks localizados en audio: {n_ok}/{len(pick_texts)}")
 
+    # 4.a.bis VIRAL: el guion viral pone el veredicto al FINAL de cada pick
+    # ("Me quedo con (...)"), no una transición de apertura ("empezamos con")
+    # como el clásico. Por eso recalculamos los segmentos a partir de los
+    # paréntesis (pick_windows): la foto/barra de cada partido debe aparecer
+    # cuando EMPIEZA a hablar de él, no al llegar al veredicto (que iba ~2s tarde).
+    if (video_style == "viral" and pick_windows
+            and all(w is not None for w in pick_windows) and len(pick_windows) >= 2):
+        v_starts = [float(word_timings[w[0]]["start"]) for w in pick_windows]
+        v_ends = [float(word_timings[w[1]]["end"]) for w in pick_windows]
+        cta = segments.get("cta")
+        # Gancho ≈ frase de apertura: ~45% del tiempo hasta el primer veredicto.
+        intro_end = min(max(v_starts[0] * 0.45, 3.0), 8.0)
+        new_picks: list = []
+        prev = intro_end
+        n = len(v_ends)
+        for i in range(n):
+            end_i = v_ends[i] if i < n - 1 else audio_duration
+            # Si el CTA va justo tras este pick, extiende su foto para cubrirlo
+            # (el cambio de partido ocurre al ACABAR el CTA).
+            if cta and prev <= cta[0] <= end_i + 0.5 and cta[1] > end_i:
+                end_i = cta[1]
+            new_picks.append((prev, max(prev + 0.2, end_i)))
+            prev = new_picks[-1][1]
+        segments["intro"] = (0.0, intro_end)
+        segments["picks"] = new_picks
+        log(f"🎬 Viral: segmentos por paréntesis — intro 0–{intro_end:.1f}s, "
+            f"{n} picks; cambios de foto sincronizados con el habla")
+
     # 4.b SFX de dinero sincronizado con la cifra del bote en la intro
     if add_money_sfx and word_timings:
         money_path = _resolve_sfx("money.mp3", "cha-ching.mp3", "dinero.mp3")
@@ -1182,8 +1210,13 @@ def run_pronosticos_pipeline(
         try:
             from .viral_overlay import build_viral_hook_overlay, build_viral_match_bar
             hook_matches = []
+            _seen_matches: set = set()
             for p in picks:
                 _h, _a = _split_match(p.get("match", ""))
+                _key = (_h.lower(), _a.lower())
+                if _key in _seen_matches:
+                    continue  # dos picks del mismo partido → listarlo una sola vez
+                _seen_matches.add(_key)
                 hook_matches.append({"home": _h, "away": _a, "time": p.get("time", "")})
             hook_png = os.path.join(work_dir, "viral_hook.png")
             build_viral_hook_overlay(hook_matches, hook_png, (W, H))
