@@ -124,6 +124,11 @@ export default function PronosticosPage() {
 
   // V2 = estilo "viral": solo voz, 9:16 fijo, sin subtítulos ni posiciones.
   const isViral = overlays.video_style === "viral";
+  // Música de fondo en V2: OFF por defecto, opcional (independiente de V1).
+  const [viralBgm, setViralBgm] = useLocalStorageState<boolean>(
+    "pronosticos.viral_bgm.v1",
+    false,
+  );
 
   // Filtros del catálogo de voces (MiniMax solo tiene un español "es"; filtramos
   // por edad y género, que sí distingue el catálogo).
@@ -249,6 +254,7 @@ export default function PronosticosPage() {
           add_money_sfx: false,
           add_clink_sfx: false,
           add_camera_sfx: false,
+          add_background_music: viralBgm,
         }
       : audio;
 
@@ -497,10 +503,16 @@ export default function PronosticosPage() {
               </label>
             </div>
             {isViral && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                V2 Viral: resolución 9:16 fija, sin subtítulos, posiciones de
-                overlays predefinidas. Solo configuras la voz.
-              </p>
+              <div className="mt-2 space-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={viralBgm} onCheckedChange={setViralBgm} />
+                  <span>Música de fondo (opcional)</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  V2 Viral: resolución 9:16 fija, sin subtítulos, posiciones de
+                  overlays predefinidas. Solo configuras la voz y la música.
+                </p>
+              </div>
             )}
           </CollapsibleCard>
 

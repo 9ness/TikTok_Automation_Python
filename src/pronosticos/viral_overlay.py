@@ -70,6 +70,47 @@ def _norm(s: str) -> str:
     return " ".join(s.replace("&", "and").split())
 
 
+# Nombre de selección → ESPAÑOL para mostrar en los overlays (las picks vienen
+# en inglés: 'Germany', 'Ivory Coast'). Clave normalizada con _norm().
+TEAM_ES: dict[str, str] = {
+    "germany": "Alemania", "spain": "España", "france": "Francia",
+    "italy": "Italia", "netherlands": "Países Bajos", "holland": "Países Bajos",
+    "england": "Inglaterra", "portugal": "Portugal", "belgium": "Bélgica",
+    "croatia": "Croacia", "switzerland": "Suiza", "denmark": "Dinamarca",
+    "sweden": "Suecia", "norway": "Noruega", "poland": "Polonia",
+    "czech republic": "Chequia", "czechia": "Chequia", "austria": "Austria",
+    "serbia": "Serbia", "ukraine": "Ucrania", "wales": "Gales",
+    "scotland": "Escocia", "turkey": "Turquía", "turkiye": "Turquía",
+    "greece": "Grecia", "romania": "Rumanía", "hungary": "Hungría",
+    "slovenia": "Eslovenia", "slovakia": "Eslovaquia", "iceland": "Islandia",
+    "bosnia and herzegovina": "Bosnia", "uzbekistan": "Uzbekistán",
+    "russia": "Rusia", "ireland": "Irlanda", "finland": "Finlandia",
+    "argentina": "Argentina", "brazil": "Brasil", "uruguay": "Uruguay",
+    "colombia": "Colombia", "chile": "Chile", "peru": "Perú",
+    "ecuador": "Ecuador", "paraguay": "Paraguay", "venezuela": "Venezuela",
+    "bolivia": "Bolivia", "united states": "Estados Unidos", "usa": "Estados Unidos",
+    "mexico": "México", "canada": "Canadá", "costa rica": "Costa Rica",
+    "panama": "Panamá", "honduras": "Honduras", "jamaica": "Jamaica",
+    "el salvador": "El Salvador", "guatemala": "Guatemala", "curacao": "Curazao",
+    "haiti": "Haití", "cuba": "Cuba", "dominican republic": "República Dominicana",
+    "morocco": "Marruecos", "senegal": "Senegal", "tunisia": "Túnez",
+    "algeria": "Argelia", "egypt": "Egipto", "ghana": "Ghana",
+    "nigeria": "Nigeria", "cameroon": "Camerún", "ivory coast": "Costa de Marfil",
+    "south africa": "Sudáfrica", "dr congo": "RD Congo", "congo dr": "RD Congo",
+    "mali": "Malí", "cape verde": "Cabo Verde",
+    "japan": "Japón", "south korea": "Corea del Sur", "korea republic": "Corea del Sur",
+    "australia": "Australia", "saudi arabia": "Arabia Saudí", "qatar": "Catar",
+    "iran": "Irán", "iraq": "Irak", "jordan": "Jordania",
+    "united arab emirates": "Emiratos Árabes", "uae": "Emiratos Árabes",
+    "new zealand": "Nueva Zelanda",
+}
+
+
+def _to_es(name: str) -> str:
+    """Traduce el nombre de la selección a español para mostrar (si lo conoce)."""
+    return TEAM_ES.get(_norm(name), name)
+
+
 def _font(size: int, bold: bool = True):
     from src.font_resolver import resolve_font
     candidates = ([r"C:\Windows\Fonts\impact.ttf", r"C:\Windows\Fonts\arialbd.ttf"]
@@ -148,41 +189,41 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
 
     rows = matches[:4]
     n = max(1, len(rows))
-    pad = int(W * 0.05)
-    card_x = int(W * 0.05)
-    card_w = W - 2 * card_x
-    row_h = 150
-    card_h = n * row_h + 2 * pad
-    card_y = int(H * 0.20)
+    margin = int(W * 0.045)
+    row_h = 152
+    vpad = int(H * 0.022)
+    card_x = 0
+    card_w = W                      # TODO el ancho (edge to edge)
+    card_h = n * row_h + 2 * vpad
+    card_y = int(H * 0.18)
 
-    # tarjeta blanca redondeada
-    draw.rounded_rectangle([card_x, card_y, card_x + card_w, card_y + card_h], radius=34, fill=(255, 255, 255, 245))
+    # banda blanca a todo el ancho
+    draw.rectangle([card_x, card_y, card_x + card_w, card_y + card_h], fill=(255, 255, 255, 245))
 
     fsize = 46
     font = _font(fsize)
-    flag_sz = 70
+    flag_sz = 74
     cx = W // 2
     for i, m in enumerate(rows):
-        ry = card_y + pad + i * row_h + row_h // 2
+        ry = card_y + vpad + i * row_h + row_h // 2
         time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
-        # hora centro
+        # hora en el centro
         draw.text((cx, ry), time_txt, font=font, fill=DARK_TEXT, anchor="mm")
-        tw = draw.textlength(time_txt, font=font)
-        # banderas a los lados de la hora
+        # LOCAL a la izquierda: bandera + nombre
         fa = round_flag(m.get("home", ""), flag_sz)
-        fb = round_flag(m.get("away", ""), flag_sz)
-        fa_x = int(cx - tw / 2 - 24 - flag_sz)
-        fb_x = int(cx + tw / 2 + 24)
+        hx = card_x + margin
         if fa is not None:
-            img.alpha_composite(fa, (fa_x, ry - flag_sz // 2))
+            img.alpha_composite(fa, (hx, ry - flag_sz // 2))
+        draw.text((hx + flag_sz + 18, ry), _to_es(m.get("home", "")), font=font, fill=DARK_TEXT, anchor="lm")
+        # VISITANTE a la derecha: nombre + bandera
+        fb = round_flag(m.get("away", ""), flag_sz)
+        bx = card_x + card_w - margin - flag_sz
         if fb is not None:
-            img.alpha_composite(fb, (fb_x, ry - flag_sz // 2))
-        # nombres a los extremos
-        draw.text((fa_x - 24, ry), str(m.get("home", "")), font=font, fill=DARK_TEXT, anchor="rm")
-        draw.text((fb_x + flag_sz + 24, ry), str(m.get("away", "")), font=font, fill=DARK_TEXT, anchor="lm")
+            img.alpha_composite(fb, (bx, ry - flag_sz // 2))
+        draw.text((bx - 18, ry), _to_es(m.get("away", "")), font=font, fill=DARK_TEXT, anchor="rm")
         if i < n - 1:
-            sy = card_y + pad + (i + 1) * row_h
-            draw.line([(card_x + 30, sy), (card_x + card_w - 30, sy)], fill=(0, 0, 0, 30), width=2)
+            sy = card_y + vpad + (i + 1) * row_h
+            draw.line([(margin, sy), (card_w - margin, sy)], fill=(0, 0, 0, 30), width=2)
 
     img.save(output_path, "PNG")
     return output_path
@@ -221,7 +262,7 @@ def build_viral_match_bar(home: str, away: str, date_str: str, time_raw_or_peru:
         fl = round_flag(team, flag_sz)
         if fl is not None:
             img.alpha_composite(fl, (anchor_x - flag_sz // 2, cy - 60 - flag_sz // 2))
-        draw.text((anchor_x, cy + 70), str(team), font=name_font, fill=WHITE, anchor="mm")
+        draw.text((anchor_x, cy + 70), _to_es(team), font=name_font, fill=WHITE, anchor="mm")
 
     img.save(output_path, "PNG")
     return output_path
