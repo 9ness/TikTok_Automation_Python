@@ -127,5 +127,18 @@ def build_puppet_clip(char_path: str, voice_audio_path: str, duration: float,
     video = VideoClip(make_frame, duration=duration)
     mask = ImageClip(alpha, ismask=True).set_duration(duration)
     clip = video.set_duration(duration).set_mask(mask)
-    y = H - target_h - int(H * bottom_margin_frac)
-    return clip.set_position(("center", y))
+
+    # Movimiento sutil de "vida": bote vertical (más al hablar) + leve vaivén
+    # lateral. Solo anima la posición (barato), sin rigging de brazos.
+    import math
+    base_y = H - target_h - int(H * bottom_margin_frac)
+    x_center = (W - target_w) // 2
+
+    def _pos(t):
+        i = min(n - 1, int(t * fps))
+        e = float(env[i])
+        bob = math.sin(t * 2 * math.pi * 1.7) * (3.0 + 9.0 * e)   # rebote, más al hablar
+        sway = math.sin(t * 2 * math.pi * 0.45) * 7.0             # vaivén lento
+        return (int(x_center + sway), int(base_y + bob))
+
+    return clip.set_position(_pos)
