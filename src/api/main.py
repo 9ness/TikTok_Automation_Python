@@ -63,6 +63,8 @@ from src.api.routers import (
     fonts_router,
     generations_router,
     generations_video_router,
+    match_photos_file_router,
+    match_photos_router,
     presidents_router,
     product_photo_file_router,
     products_router,
@@ -235,6 +237,8 @@ def create_app() -> FastAPI:
     app.include_router(queue_video_router)
     app.include_router(presidents_router)
     app.include_router(pronosticos_router)
+    app.include_router(match_photos_router)
+    app.include_router(match_photos_file_router)
     app.include_router(copyright_router)
     app.include_router(construccion_pov_router)
     app.include_router(subs_auto_router)

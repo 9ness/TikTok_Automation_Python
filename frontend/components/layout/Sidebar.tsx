@@ -14,6 +14,7 @@ import {
   DollarSign,
   HardHat,
   History,
+  Image as ImageIcon,
   LayoutDashboard,
   LineChart,
   Loader2,
@@ -73,6 +74,7 @@ const NAV: NavGroup[] = [
       { href: "/creator-reward/subs-auto", label: "Subs sobre Vídeo", icon: Captions },
       { href: "/creator-reward/construccion-pov", label: "Construcción POV", icon: HardHat },
       { href: "/creator-reward/tools/voices", label: "Herramientas · Voces", icon: Wrench },
+      { href: "/creator-reward/tools/fotos", label: "Herramientas · Fotos", icon: ImageIcon },
     ],
   },
   {

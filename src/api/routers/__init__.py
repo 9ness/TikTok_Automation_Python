@@ -10,6 +10,8 @@ from .queue import video_router as queue_video_router
 from .creator_reward import (
     construccion_pov_router,
     copyright_router,
+    match_photos_file_router,
+    match_photos_router,
     presidents_router,
     pronosticos_router,
     subs_auto_frame_router,
@@ -56,6 +58,8 @@ __all__ = [
     "queue_video_router",
     "construccion_pov_router",
     "copyright_router",
+    "match_photos_router",
+    "match_photos_file_router",
     "presidents_router",
     "pronosticos_router",
     "subs_auto_router",
