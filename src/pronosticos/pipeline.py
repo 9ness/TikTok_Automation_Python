@@ -395,6 +395,31 @@ def _split_match(match: str) -> tuple[str, str]:
     return (str(match or "").strip(), "")
 
 
+def _pick_bet_team(pick: dict, home: str, away: str) -> tuple[str, str]:
+    """Devuelve (equipo_de_la_apuesta, el_otro). Mira el texto del pick: si nombra
+    a un equipo (ej. 'Doble Oportunidad Netherlands', '+4.5 córners Ecuador') usa
+    ese; si es de total sin equipo (ej. '+1.5 goles') cae al local."""
+    import unicodedata
+
+    def _norm(s: str) -> str:
+        s = (s or "").lower()
+        return "".join(
+            c for c in unicodedata.normalize("NFD", s)
+            if unicodedata.category(c) != "Mn"
+        )
+
+    text = _norm(f"{pick.get('pick', '')} {pick.get('pick_narrated', '')}")
+    nh, na = _norm(home), _norm(away)
+    # Si ambos aparecen, gana el que aparece antes en el texto (el sujeto del pick).
+    ih = text.find(nh) if nh else -1
+    ia = text.find(na) if na else -1
+    if ih != -1 and (ia == -1 or ih <= ia):
+        return home, away
+    if ia != -1:
+        return away, home
+    return home, away  # apuesta de total/sin equipo → local
+
+
 def _resolve_team_photo(team: str) -> str | None:
     """Primera foto guardada para un equipo en BIBLIOTECA_PRONOSTICOS_CLIPS/fotos/<equipo>/
     (la herramienta 'Fotos de partido' las guarda ahí en 9:16). None si no hay."""
@@ -1169,8 +1194,10 @@ def run_pronosticos_pipeline(
                 bar_png = os.path.join(work_dir, f"viral_bar_{i}.png")
                 build_viral_match_bar(_h, _a, target_date, p.get("time", ""), bar_png, (W, H))
                 bars[i] = bar_png
-                # Foto del equipo (local primero, luego visitante) como fondo del pick.
-                photo = _resolve_team_photo(_h) or _resolve_team_photo(_a)
+                # Fondo del pick: foto del EQUIPO DE LA APUESTA (si la apuesta no
+                # nombra equipo, el local); si ese no tiene foto, el otro.
+                _bet, _other = _pick_bet_team(p, _h, _a)
+                photo = _resolve_team_photo(_bet) or _resolve_team_photo(_other)
                 if photo:
                     bg_picks[i] = photo
             # Fondo del gancho: la primera foto disponible de la jornada.
