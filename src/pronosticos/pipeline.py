@@ -395,6 +395,27 @@ def _split_match(match: str) -> tuple[str, str]:
     return (str(match or "").strip(), "")
 
 
+def _resolve_team_photo(team: str) -> str | None:
+    """Primera foto guardada para un equipo en BIBLIOTECA_PRONOSTICOS_CLIPS/fotos/<equipo>/
+    (la herramienta 'Fotos de partido' las guarda ahí en 9:16). None si no hay."""
+    import glob
+    import re
+    if not team:
+        return None
+    # Mismo saneado que match_photos._safe_team → mismo nombre de carpeta.
+    t = team.strip().replace("/", " ").replace("\\", " ")
+    t = re.sub(r"[^\w\s\-]", "", t, flags=re.UNICODE).strip()
+    t = re.sub(r"\s+", " ", t)
+    folder = _resolve_asset("fotos", t)
+    if not folder or not os.path.isdir(folder):
+        return None
+    for ext in ("*.jpg", "*.jpeg", "*.png", "*.webp"):
+        files = sorted(glob.glob(os.path.join(folder, ext)))
+        if files:
+            return files[0]
+    return None
+
+
 class _ClipDeck:
     """Baraja sin reposición: entrega clips en orden aleatorio y solo repite
     cuando se han usado TODOS. Estado compartido entre segmentos que usan la
@@ -524,7 +545,14 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
     # ── INTRO ──
     intro_start, intro_end = segments["intro"]
     intro_dur = max(0.0, intro_end - intro_start)
-    if intro_dur > 0:
+    _intro_bg = (viral_overlays or {}).get("bg_intro") if video_style == "viral" else None
+    if intro_dur > 0 and _intro_bg:
+        # VIRAL: foto de fondo (Ken Burns) en el gancho, en vez de stock.
+        timeline.append({
+            "start": intro_start, "duration": intro_dur,
+            "clip_factory": lambda p=_intro_bg, dur=intro_dur: _ken_burns_image_silent(p, dur, W, H),
+        })
+    elif intro_dur > 0:
         intro_pool = clip_pools.get("intro") or clip_pools.get("1") or []
         plan = _plan_clips_for_segment(intro_dur, _deck_for(intro_pool))
         if plan:
@@ -586,21 +614,32 @@ def _build_visual_timeline(audio_duration: float, picks: list[dict],
 
         # Stock múltiple para el resto del segmento
         if stock_dur > 0:
-            pool = clip_pools.get(str(i)) or []
-            plan = _plan_clips_for_segment(stock_dur, _deck_for(pool))
-            if plan:
-                cursor = stock_start
-                for clip_path, d in plan:
-                    timeline.append({
-                        "start": cursor, "duration": d,
-                        "clip_factory": lambda dur=d, p=clip_path: _stock_visual(p, dur, W, H),
-                    })
-                    cursor += d
-            else:
+            _pick_bg = (
+                (viral_overlays or {}).get("bg_picks", {}).get(i)
+                if video_style == "viral" else None
+            )
+            if _pick_bg:
+                # VIRAL: foto del equipo del partido (Ken Burns) como fondo del pick.
                 timeline.append({
                     "start": stock_start, "duration": stock_dur,
-                    "clip_factory": lambda dur=stock_dur: _stock_visual(None, dur, W, H),
+                    "clip_factory": lambda p=_pick_bg, dur=stock_dur: _ken_burns_image_silent(p, dur, W, H),
                 })
+            else:
+                pool = clip_pools.get(str(i)) or []
+                plan = _plan_clips_for_segment(stock_dur, _deck_for(pool))
+                if plan:
+                    cursor = stock_start
+                    for clip_path, d in plan:
+                        timeline.append({
+                            "start": cursor, "duration": d,
+                            "clip_factory": lambda dur=d, p=clip_path: _stock_visual(p, dur, W, H),
+                        })
+                        cursor += d
+                else:
+                    timeline.append({
+                        "start": stock_start, "duration": stock_dur,
+                        "clip_factory": lambda dur=stock_dur: _stock_visual(None, dur, W, H),
+                    })
 
     # ── Cap final: si los segmentos no cubren toda la duración del audio
     covered = max((e["start"] + e["duration"] for e in timeline), default=0.0)
@@ -1124,13 +1163,24 @@ def run_pronosticos_pipeline(
             hook_png = os.path.join(work_dir, "viral_hook.png")
             build_viral_hook_overlay(hook_matches, hook_png, (W, H))
             bars: dict[int, str] = {}
+            bg_picks: dict[int, str] = {}
             for i, p in enumerate(picks, start=1):
                 _h, _a = _split_match(p.get("match", ""))
                 bar_png = os.path.join(work_dir, f"viral_bar_{i}.png")
                 build_viral_match_bar(_h, _a, target_date, p.get("time", ""), bar_png, (W, H))
                 bars[i] = bar_png
-            viral_overlays = {"hook": hook_png, "bars": bars}
-            log(f"🎨 Overlays VIRAL: tarjeta de partidos + {len(bars)} barras generadas")
+                # Foto del equipo (local primero, luego visitante) como fondo del pick.
+                photo = _resolve_team_photo(_h) or _resolve_team_photo(_a)
+                if photo:
+                    bg_picks[i] = photo
+            # Fondo del gancho: la primera foto disponible de la jornada.
+            bg_intro = next(iter(bg_picks.values()), None)
+            viral_overlays = {
+                "hook": hook_png, "bars": bars,
+                "bg_picks": bg_picks, "bg_intro": bg_intro,
+            }
+            log(f"🎨 Overlays VIRAL: tarjeta + {len(bars)} barras + "
+                f"{len(bg_picks)} fotos de fondo (gancho: {'sí' if bg_intro else 'no'})")
         except Exception as e_viral:
             log(f"⚠️ Overlays viral no generados (non-fatal): {e_viral}")
             viral_overlays = None
