@@ -1330,6 +1330,15 @@ def run_pronosticos_pipeline(
     elif segments.get("cta"):
         log("⚠️ Hay ventana CTA pero ningún overlay se añadió al timeline "
             "(¿perfil.png faltante o ruta mal resuelta?).")
+
+    # Fundido de audio corto al final: evita el "click"/micro-ruido del corte
+    # abrupto (el audio terminaba con amplitud no nula).
+    try:
+        from moviepy.audio.fx.audio_fadeout import audio_fadeout
+        audio_clip = audio_clip.fx(audio_fadeout, 0.18)
+    except Exception as _e_fade:
+        log(f"ℹ️ Fade-out de audio no aplicado (non-fatal): {_e_fade}")
+
     final = _compose_video(audio_clip, timeline, W, H)
 
     # 9. Guardar (nombre incluye version_id si hay varias)
