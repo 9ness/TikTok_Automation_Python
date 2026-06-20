@@ -56,7 +56,8 @@ TEAM_ISO2: dict[str, str] = {
     "sudafrica": "za", "south africa": "za", "rd congo": "cd", "dr congo": "cd", "congo dr": "cd",
     "mali": "ml", "cabo verde": "cv", "cape verde": "cv",
     "japon": "jp", "japan": "jp", "corea del sur": "kr", "south korea": "kr", "korea republic": "kr",
-    "australia": "au", "arabia saudita": "sa", "saudi arabia": "sa", "catar": "qa", "qatar": "qa",
+    "australia": "au", "arabia saudita": "sa", "arabia saudi": "sa", "saudi arabia": "sa",
+    "catar": "qa", "qatar": "qa",
     "iran": "ir", "irak": "iq", "iraq": "iq", "jordania": "jo", "jordan": "jo",
     "emiratos arabes unidos": "ae", "uae": "ae", "nueva zelanda": "nz", "new zealand": "nz",
 }
@@ -189,41 +190,48 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
 
     rows = matches[:4]
     n = max(1, len(rows))
-    margin = int(W * 0.045)
-    row_h = 152
-    vpad = int(H * 0.022)
-    card_x = 0
-    card_w = W                      # TODO el ancho (edge to edge)
-    card_h = n * row_h + 2 * vpad
-    card_y = int(H * 0.18)
+    side = int(W * 0.06)
+    card_x = side
+    card_w = W - 2 * side                  # tarjeta con márgenes (NO a todo el ancho)
+    block_h = 128                          # por partido: 2 líneas (local / visitante)
+    vpad = 26
+    card_h = n * block_h + 2 * vpad
+    card_y = int(H * 0.13)
 
-    # banda blanca a todo el ancho
-    draw.rectangle([card_x, card_y, card_x + card_w, card_y + card_h], fill=(255, 255, 255, 245))
+    # tarjeta blanca compacta y redondeada
+    draw.rounded_rectangle([card_x, card_y, card_x + card_w, card_y + card_h],
+                           radius=34, fill=(255, 255, 255, 240))
 
-    fsize = 46
-    font = _font(fsize)
-    flag_sz = 74
-    cx = W // 2
+    name_font = _font(40)
+    time_font = _font(36)
+    star_font = _font(46)
+    flag_sz = 48
     for i, m in enumerate(rows):
-        ry = card_y + vpad + i * row_h + row_h // 2
-        time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
-        # hora en el centro
-        draw.text((cx, ry), time_txt, font=font, fill=DARK_TEXT, anchor="mm")
-        # LOCAL a la izquierda: bandera + nombre
+        top = card_y + vpad + i * block_h
+        cyl = top + block_h // 2
+        y1 = top + int(block_h * 0.30)     # local (línea de arriba)
+        y2 = top + int(block_h * 0.70)     # visitante (línea de abajo)
+        # estrella a la izquierda
+        draw.text((card_x + 40, cyl), "★", font=star_font, fill=GOLD, anchor="mm")
+        flag_x = card_x + 78
+        name_x = flag_x + flag_sz + 16
+        # LOCAL: bandera + nombre
         fa = round_flag(m.get("home", ""), flag_sz)
-        hx = card_x + margin
         if fa is not None:
-            img.alpha_composite(fa, (hx, ry - flag_sz // 2))
-        draw.text((hx + flag_sz + 18, ry), _to_es(m.get("home", "")), font=font, fill=DARK_TEXT, anchor="lm")
-        # VISITANTE a la derecha: nombre + bandera
+            img.alpha_composite(fa, (flag_x, y1 - flag_sz // 2))
+        draw.text((name_x, y1), _to_es(m.get("home", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
+        # VISITANTE: bandera + nombre (debajo)
         fb = round_flag(m.get("away", ""), flag_sz)
-        bx = card_x + card_w - margin - flag_sz
         if fb is not None:
-            img.alpha_composite(fb, (bx, ry - flag_sz // 2))
-        draw.text((bx - 18, ry), _to_es(m.get("away", "")), font=font, fill=DARK_TEXT, anchor="rm")
+            img.alpha_composite(fb, (flag_x, y2 - flag_sz // 2))
+        draw.text((name_x, y2), _to_es(m.get("away", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
+        # hora (Perú) a la derecha
+        time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
+        draw.text((card_x + card_w - 34, cyl), time_txt, font=time_font, fill=(90, 95, 105), anchor="rm")
+        # separador entre partidos
         if i < n - 1:
-            sy = card_y + vpad + (i + 1) * row_h
-            draw.line([(margin, sy), (card_w - margin, sy)], fill=(0, 0, 0, 30), width=2)
+            sy = top + block_h
+            draw.line([(card_x + 30, sy), (card_x + card_w - 30, sy)], fill=(0, 0, 0, 28), width=2)
 
     img.save(output_path, "PNG")
     return output_path
