@@ -225,9 +225,28 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
         if fb is not None:
             img.alpha_composite(fb, (flag_x, y2 - flag_sz // 2))
         draw.text((name_x, y2), _to_es(m.get("away", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
-        # hora (Perú) a la derecha
+        # ── Grupo derecho estilo "app": auriculares + pastilla PREVIEW + hora ──
         time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
-        draw.text((card_x + card_w - 34, cyl), time_txt, font=time_font, fill=(90, 95, 105), anchor="rm")
+        gray = (150, 156, 166)
+        time_x = card_x + card_w - 30
+        draw.text((time_x, cyl), time_txt, font=time_font, fill=(90, 95, 105), anchor="rm")
+        tw = draw.textlength(time_txt, font=time_font)
+        gx = int(time_x - tw - 26)              # borde derecho del bloque auriculares/PREVIEW
+        # pastilla PREVIEW (debajo del centro)
+        pv_font = _font(20)
+        pvw = draw.textlength("PREVIEW", font=pv_font)
+        pill_w = int(pvw + 22)
+        px1 = gx - pill_w
+        py0 = cyl + 4
+        draw.rounded_rectangle([px1, py0, gx, py0 + 32], radius=9, outline=gray, width=2)
+        draw.text(((px1 + gx) // 2, py0 + 16), "PREVIEW", font=pv_font, fill=gray, anchor="mm")
+        # auriculares encima de la pastilla
+        hcx = (px1 + gx) // 2
+        hs = 30
+        hy = cyl - hs - 6
+        draw.arc([hcx - hs // 2, hy, hcx + hs // 2, hy + hs], start=180, end=360, fill=gray, width=3)
+        draw.rectangle([hcx - hs // 2, int(hy + hs * 0.42), hcx - hs // 2 + 7, int(hy + hs * 0.82)], fill=gray)
+        draw.rectangle([hcx + hs // 2 - 7, int(hy + hs * 0.42), hcx + hs // 2, int(hy + hs * 0.82)], fill=gray)
         # separador entre partidos
         if i < n - 1:
             sy = top + block_h
