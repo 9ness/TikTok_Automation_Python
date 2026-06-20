@@ -156,6 +156,21 @@ def round_flag(team_name: str, size: int) -> Image.Image | None:
     return out
 
 
+def rect_flag(team_name: str, w: int, h: int) -> Image.Image | None:
+    """Bandera RECTANGULAR de la selección (para el gancho). None si no se conoce."""
+    iso = TEAM_ISO2.get(_norm(team_name))
+    if not iso:
+        return None
+    src = _safe_download(f"https://flagcdn.com/w160/{iso}.png")
+    if src is None:
+        return None
+    flag = src.resize((w, h), Image.Resampling.LANCZOS)
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    out.paste(flag, (0, 0))
+    ImageDraw.Draw(out).rectangle([0, 0, w - 1, h - 1], outline=(0, 0, 0, 55), width=1)
+    return out
+
+
 def madrid_to_peru(raw: str) -> str:
     """'YYYY-MM-DD HH:MM' (Madrid, verano UTC+2) → hora Perú (UTC-5) en 'h:mm p.m.'."""
     import re
@@ -205,7 +220,7 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
     name_font = _font(40)
     time_font = _font(36)
     star_font = _font(46)
-    flag_sz = 48
+    fw, fh = 56, 38                          # banderas RECTANGULARES (estilo ejemplo)
     for i, m in enumerate(rows):
         top = card_y + vpad + i * block_h
         cyl = top + block_h // 2
@@ -214,16 +229,16 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
         # estrella a la izquierda
         draw.text((card_x + 40, cyl), "★", font=star_font, fill=GOLD, anchor="mm")
         flag_x = card_x + 78
-        name_x = flag_x + flag_sz + 16
+        name_x = flag_x + fw + 16
         # LOCAL: bandera + nombre
-        fa = round_flag(m.get("home", ""), flag_sz)
+        fa = rect_flag(m.get("home", ""), fw, fh)
         if fa is not None:
-            img.alpha_composite(fa, (flag_x, y1 - flag_sz // 2))
+            img.alpha_composite(fa, (flag_x, y1 - fh // 2))
         draw.text((name_x, y1), _to_es(m.get("home", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
         # VISITANTE: bandera + nombre (debajo)
-        fb = round_flag(m.get("away", ""), flag_sz)
+        fb = rect_flag(m.get("away", ""), fw, fh)
         if fb is not None:
-            img.alpha_composite(fb, (flag_x, y2 - flag_sz // 2))
+            img.alpha_composite(fb, (flag_x, y2 - fh // 2))
         draw.text((name_x, y2), _to_es(m.get("away", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
         # ── Grupo derecho estilo "app": auriculares + pastilla PREVIEW + hora ──
         time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
