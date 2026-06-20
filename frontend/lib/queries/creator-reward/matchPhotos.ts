@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  ViralSlotsResponse,
   MatchAutoFetchRequest,
   MatchAutoFetchResponse,
   MatchPhotoFoldersResponse,
@@ -61,6 +62,18 @@ export function useSaveMatchPhoto() {
       qc.invalidateQueries({ queryKey: matchPhotosKeys.team(res.team) });
       qc.invalidateQueries({ queryKey: matchPhotosKeys.folders() });
     },
+  });
+}
+
+export function useViralSlots(date: string | null, versionId: string | null) {
+  return useQuery<ViralSlotsResponse>({
+    queryKey: [...matchPhotosKeys.all, "viral-slots", date ?? "", versionId ?? ""],
+    queryFn: () =>
+      api.get<ViralSlotsResponse>(
+        `${ROOT}/viral-slots?date=${encodeURIComponent(date ?? "")}` +
+          (versionId ? `&version_id=${encodeURIComponent(versionId)}` : ""),
+      ),
+    enabled: Boolean(date),
   });
 }
 

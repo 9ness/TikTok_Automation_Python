@@ -124,6 +124,27 @@ class TeamsForDateResponse(BaseModel):
     teams: list[TeamStatus]
 
 
+class PhotoCandidate(BaseModel):
+    team: str
+    filename: str
+    url: str
+    ref: str   # "Equipo/archivo.jpg" — lo que se manda como override al render
+
+
+class ViralSlot(BaseModel):
+    index: int
+    match: str
+    bet_team: str
+    candidates: list[PhotoCandidate]
+
+
+class ViralSlotsResponse(BaseModel):
+    date: str
+    version_id: str | None = None
+    hook_candidates: list[PhotoCandidate]
+    picks: list[ViralSlot]
+
+
 class AutoFetchRequest(BaseModel):
     team: str = Field(..., min_length=1, max_length=80)
     mode: Literal["missing", "all"] = "missing"
@@ -532,6 +553,85 @@ def teams_for_date(date: Annotated[str, Query(..., min_length=8)]) -> TeamsForDa
         for n in sorted(names, key=str.lower)
     ]
     return TeamsForDateResponse(date=date, teams=teams)
+
+
+def _photos_for_team(team: str) -> list[PhotoCandidate]:
+    team = _safe_team(team)
+    d = _team_dir(team)
+    out: list[PhotoCandidate] = []
+    if d.exists():
+        for p in sorted(d.iterdir(), key=lambda x: x.name.lower()):
+            if p.suffix.lower() in _IMG_EXTS and p.is_file():
+                out.append(PhotoCandidate(
+                    team=team, filename=p.name, url=_file_url(team, p.name),
+                    ref=f"{team}/{p.name}",
+                ))
+    return out
+
+
+def _bet_team(pick: dict, home: str, away: str) -> tuple[str, str]:
+    """Equipo de la apuesta (igual que el render): si el pick nombra a un equipo lo
+    usa; si es de total sin equipo, el local."""
+    import unicodedata
+
+    def _n(s):
+        s = (s or "").lower()
+        return "".join(c for c in unicodedata.normalize("NFD", s)
+                       if unicodedata.category(c) != "Mn")
+
+    text = _n(f"{pick.get('pick', '')} {pick.get('pick_narrated', '')}")
+    nh, na = _n(home), _n(away)
+    ih = text.find(nh) if nh else -1
+    ia = text.find(na) if na else -1
+    if ih != -1 and (ia == -1 or ih <= ia):
+        return home, away
+    if ia != -1:
+        return away, home
+    return home, away
+
+
+@router.get("/viral-slots", response_model=ViralSlotsResponse)
+def viral_slots(
+    date: Annotated[str, Query(..., min_length=8)],
+    version_id: Annotated[str | None, Query()] = None,
+) -> ViralSlotsResponse:
+    """Para el estilo viral: por cada pick (y para el gancho) devuelve las fotos
+    candidatas (miniaturas) para que el usuario elija visualmente cuál va de fondo."""
+    from src.pronosticos.data_loader import get_picks, list_versions, load_raw_payload
+
+    payload = load_raw_payload(date)
+    if payload is None:
+        return ViralSlotsResponse(date=date, hook_candidates=[], picks=[])
+    versions = list_versions(payload) or []
+    chosen = None
+    if version_id:
+        chosen = next((x for x in versions if str(x.get("id")) == str(version_id)), None)
+    chosen = chosen or next((x for x in versions if x.get("is_selected")), None) or (
+        versions[-1] if versions else None)
+    picks = get_picks(chosen) if chosen else []
+
+    slots: list[ViralSlot] = []
+    hook: list[PhotoCandidate] = []
+    seen_refs: set = set()
+    for i, p in enumerate(picks, start=1):
+        parts = _split_teams(p.get("match", ""))
+        home = parts[0] if parts else ""
+        away = parts[1] if len(parts) > 1 else ""
+        bet, other = _bet_team(p, home, away)
+        cands = _photos_for_team(bet)
+        if not cands and other:
+            cands = _photos_for_team(other)
+        slots.append(ViralSlot(index=i, match=p.get("match", ""), bet_team=bet, candidates=cands))
+        # gancho: unión de fotos de ambos equipos de todos los partidos
+        for t in (bet, other):
+            for c in _photos_for_team(t):
+                if c.ref not in seen_refs:
+                    seen_refs.add(c.ref)
+                    hook.append(c)
+    return ViralSlotsResponse(
+        date=date, version_id=str(chosen.get("id")) if chosen else None,
+        hook_candidates=hook, picks=slots,
+    )
 
 
 @router.post("/auto-fetch", response_model=AutoFetchResponse)

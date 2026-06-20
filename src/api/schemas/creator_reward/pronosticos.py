@@ -70,6 +70,9 @@ class PronosticosOverlaysConfig(BaseModel):
     show_pick_carousel: bool = False
     # Estilo de vídeo: "standard" (histórico, intacto) o "viral" (overlays nuevos).
     video_style: Literal["standard", "viral"] = "standard"
+    # Fotos elegidas a mano (estilo viral): {"hook": "Equipo/archivo.jpg", "1": ...,
+    # "2": ...}. Si falta una clave, el render cae a la foto automática.
+    photo_overrides: dict[str, str] | None = None
 
     # --- Posiciones de los overlays (0.0 = top, 1.0 = bottom) ---
     # Todos opcionales con los defaults históricos del pipeline. Se exponen

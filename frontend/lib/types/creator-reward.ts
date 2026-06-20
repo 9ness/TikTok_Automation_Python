@@ -149,6 +149,8 @@ export interface PronosticosOverlaysConfig {
   show_pick_carousel: boolean;
   // Estilo de vídeo: "standard" (histórico) o "viral" (overlays nuevos).
   video_style: "standard" | "viral";
+  // Fotos elegidas a mano (viral): { hook: "Equipo/archivo.jpg", "1": ..., "2": ... }.
+  photo_overrides?: Record<string, string>;
   // Posiciones configurables vía preview drag (0..1).
   subtitle_y_pct: number;
   league_overlay_y_pct: number;

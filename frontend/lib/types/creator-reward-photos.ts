@@ -67,6 +67,27 @@ export interface MatchAutoFetchRequest {
   query?: string;
 }
 
+export interface ViralPhotoCandidate {
+  team: string;
+  filename: string;
+  url: string;
+  ref: string; // "Equipo/archivo.jpg" — se manda como override
+}
+
+export interface ViralSlot {
+  index: number;
+  match: string;
+  bet_team: string;
+  candidates: ViralPhotoCandidate[];
+}
+
+export interface ViralSlotsResponse {
+  date: string;
+  version_id: string | null;
+  hook_candidates: ViralPhotoCandidate[];
+  picks: ViralSlot[];
+}
+
 export interface MatchAutoFetchResponse {
   team: string;
   status: "created" | "exists" | "no_good" | "failed";

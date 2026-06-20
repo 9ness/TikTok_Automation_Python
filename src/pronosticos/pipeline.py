@@ -441,6 +441,16 @@ def _resolve_team_photo(team: str) -> str | None:
     return None
 
 
+def _resolve_override_photo(rel: str | None) -> str | None:
+    """Foto elegida por el usuario en formato 'Equipo/archivo.jpg' → ruta absoluta."""
+    if not rel:
+        return None
+    parts = [x for x in str(rel).split("/") if x]
+    if len(parts) < 2:
+        return None
+    return _resolve_asset("fotos", parts[0], parts[1])
+
+
 class _ClipDeck:
     """Baraja sin reposición: entrega clips en orden aleatorio y solo repite
     cuando se han usado TODOS. Estado compartido entre segmentos que usan la
@@ -817,6 +827,7 @@ def run_pronosticos_pipeline(
     profile_cta_y_pct: float = 0.36,
     profile_cta_height_pct: float = 0.32,
     video_style: str = "standard",
+    photo_overrides: dict | None = None,
 ) -> str:
     """Genera el MP4 final y devuelve la ruta.
 
@@ -1227,14 +1238,18 @@ def run_pronosticos_pipeline(
                 bar_png = os.path.join(work_dir, f"viral_bar_{i}.png")
                 build_viral_match_bar(_h, _a, target_date, p.get("time", ""), bar_png, (W, H))
                 bars[i] = bar_png
-                # Fondo del pick: foto del EQUIPO DE LA APUESTA (si la apuesta no
-                # nombra equipo, el local); si ese no tiene foto, el otro.
-                _bet, _other = _pick_bet_team(p, _h, _a)
-                photo = _resolve_team_photo(_bet) or _resolve_team_photo(_other)
+                # Fondo del pick: 1) foto elegida por el usuario (override visual),
+                # 2) si no, foto del EQUIPO DE LA APUESTA (o el otro si falta).
+                _po = (photo_overrides or {}).get(str(i))
+                photo = _resolve_override_photo(_po)
+                if not photo:
+                    _bet, _other = _pick_bet_team(p, _h, _a)
+                    photo = _resolve_team_photo(_bet) or _resolve_team_photo(_other)
                 if photo:
                     bg_picks[i] = photo
-            # Fondo del gancho: la primera foto disponible de la jornada.
-            bg_intro = next(iter(bg_picks.values()), None)
+            # Fondo del gancho: override del usuario o la 1ª foto de la jornada.
+            _hook_ov = _resolve_override_photo((photo_overrides or {}).get("hook"))
+            bg_intro = _hook_ov or next(iter(bg_picks.values()), None)
             viral_overlays = {
                 "hook": hook_png, "bars": bars,
                 "bg_picks": bg_picks, "bg_intro": bg_intro,

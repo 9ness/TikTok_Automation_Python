@@ -28,6 +28,10 @@ import {
   usePronosticosVersions,
 } from "@/lib/queries/creator-reward/pronosticos";
 import { buildVoiceSampleUrl, useVoices } from "@/lib/queries/voices";
+import {
+  matchPhotoFileUrl,
+  useViralSlots,
+} from "@/lib/queries/creator-reward/matchPhotos";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   PronosticosAudioConfig,
@@ -67,6 +71,7 @@ const DEFAULT_OVERLAYS: PronosticosOverlaysConfig = {
   saturation: 1.25,
   show_pick_carousel: false,
   video_style: "standard",
+  photo_overrides: {},
   // Defaults históricos del pipeline (pronosticos/pipeline.py).
   subtitle_y_pct: 0.78,
   league_overlay_y_pct: 0.30,
@@ -129,6 +134,15 @@ export default function PronosticosPage() {
     "pronosticos.viral_bgm.v1",
     false,
   );
+  // Selector visual de fotos de fondo (estilo viral): gancho + cada pick.
+  const selectedVersionId = Array.from(selectedIds)[0] ?? null;
+  const viralSlots = useViralSlots(isViral ? date : null, selectedVersionId);
+  function setPhotoOverride(slot: string, ref: string) {
+    const cur: Record<string, string> = { ...(overlays.photo_overrides || {}) };
+    if (cur[slot] === ref) delete cur[slot]; // re-click → quitar (vuelve a automática)
+    else cur[slot] = ref;
+    setOverlays({ ...overlays, photo_overrides: cur });
+  }
 
   // Filtros del catálogo de voces (MiniMax solo tiene un español "es"; filtramos
   // por edad y género, que sí distingue el catálogo).
@@ -516,6 +530,46 @@ export default function PronosticosPage() {
             )}
           </CollapsibleCard>
 
+          {isViral && (
+            <CollapsibleCard
+              title="Fondos del vídeo (fotos)"
+              subtitle="elige la foto del gancho y de cada pick"
+            >
+              {!selectedVersionId && (
+                <p className="text-sm text-muted-foreground">
+                  Selecciona una versión del guion arriba para elegir las fotos.
+                </p>
+              )}
+              {viralSlots.isLoading && (
+                <p className="text-sm text-muted-foreground">Cargando fotos…</p>
+              )}
+              {viralSlots.data && (
+                <div className="space-y-4">
+                  <PhotoSlotRow
+                    label="🎬 Gancho (fondo de la portada)"
+                    candidates={viralSlots.data.hook_candidates}
+                    selected={overlays.photo_overrides?.hook}
+                    onSelect={(ref) => setPhotoOverride("hook", ref)}
+                  />
+                  {viralSlots.data.picks.map((s) => (
+                    <PhotoSlotRow
+                      key={s.index}
+                      label={`Pick ${s.index} · ${s.match} (${s.bet_team})`}
+                      candidates={s.candidates}
+                      selected={overlays.photo_overrides?.[String(s.index)]}
+                      onSelect={(ref) => setPhotoOverride(String(s.index), ref)}
+                    />
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Clic en una foto para elegirla (clic otra vez para volver a la
+                    automática). Si un equipo no tiene fotos, añádelas en{" "}
+                    <span className="font-medium">Herramientas · Fotos</span>.
+                  </p>
+                </div>
+              )}
+            </CollapsibleCard>
+          )}
+
           {!isViral && (
           <>
           <CollapsibleCard title="Audio (subs + SFX + BGM)" subtitle={audioSummary}>
@@ -748,6 +802,53 @@ function SliderRow({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full"
       />
+    </div>
+  );
+}
+
+function PhotoSlotRow({
+  label,
+  candidates,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  candidates: { ref: string; url: string; filename: string }[];
+  selected?: string;
+  onSelect: (ref: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="text-xs font-medium">{label}</div>
+      {candidates.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Sin fotos para este equipo — se usará la automática / stock.
+        </p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {candidates.map((c) => (
+            <button
+              key={c.ref}
+              type="button"
+              onClick={() => onSelect(c.ref)}
+              className={`shrink-0 overflow-hidden rounded-md border-2 transition ${
+                selected === c.ref
+                  ? "border-primary ring-2 ring-primary/40"
+                  : "border-transparent hover:border-muted-foreground/40"
+              }`}
+              title={c.filename}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={matchPhotoFileUrl(c.url)}
+                alt={c.filename}
+                className="h-28 w-[63px] object-cover"
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
