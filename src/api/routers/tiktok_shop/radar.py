@@ -344,7 +344,9 @@ class PlanEntryOut(BaseModel):
     tiktok_url: str = ""          # ficha del producto (para bajar fotos)
     presets_count: int = 0
     carousels_count: int = 0
-    pack_ready: bool = False
+    hooks_count: int = 0
+    pack_ready: bool = False      # tiene algún contenido (hooks ya cuenta)
+    ai_ready: bool = False        # tiene vídeos IA + carruseles generados
 
 
 class WeekPlanOut(BaseModel):
@@ -370,15 +372,53 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
         prod = prepo.get(e.product_id)
         n_pre = len(prod.video_presets) if prod else 0
         n_car = len(prod.carousels) if prod else 0
+        n_hooks = len(prod.bofu_hooks) if prod else 0
         url = (prod.tiktok_shop.product_url or "") if prod else ""
         out.append(PlanEntryOut(
             day=e.day, product_id=e.product_id, slug=e.slug, name=e.name,
             score=e.score, ads_verdict=e.ads_verdict, tested=e.tested,
             tiktok_url=url, presets_count=n_pre, carousels_count=n_car,
-            pack_ready=(n_pre > 0 or n_car > 0),
+            hooks_count=n_hooks,
+            pack_ready=(n_pre > 0 or n_car > 0 or n_hooks > 0),
+            ai_ready=(n_pre > 0 or n_car > 0),
         ))
     return WeekPlanOut(
         exists=True, id=plan.id, label=plan.label, days=plan.days, entries=out,
+    )
+
+
+class PlanPackRequest(BaseModel):
+    product_id: str
+    research: bool = False
+    n_carousels: int = 2
+    n_photos: int = 4
+
+
+@router.post("/plan/pack", response_model=CalendarActionResponse)
+def plan_pack(
+    body: PlanPackRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Re-encola el pack de un producto que YA está en el calendario pero
+    quedó sin generar (sin candidato en DiscoveryRepo — usa el Product)."""
+    from src.tiktok_shop.repos import ProductRepo
+
+    product = ProductRepo().get(body.product_id)
+    if product is None:
+        return CalendarActionResponse(ok=False, message="Producto no encontrado.")
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_PACK,
+        title=f"📦 Pack: {product.name}",
+        params={
+            "product_id": product.id,
+            "options": _pack_options(body.research, body.n_carousels, body.n_photos),
+        },
+        enqueued_by=operator or None,
+    )
+    return CalendarActionResponse(
+        ok=True, product_id=product.id, slug=product.slug, job_id=job.id,
+        message=f"Generando pack de '{product.name}'…",
     )
 
 

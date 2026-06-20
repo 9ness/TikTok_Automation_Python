@@ -139,7 +139,9 @@ export interface PlanEntry {
   tiktok_url: string;
   presets_count: number;
   carousels_count: number;
+  hooks_count: number;
   pack_ready: boolean;
+  ai_ready: boolean;
 }
 
 export interface WeekPlan {
@@ -188,6 +190,17 @@ export function usePlanGenerate() {
   >({
     mutationFn: (body) =>
       api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/generate", body),
+  });
+}
+
+export function usePlanPack() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    { product_id: string; research?: boolean; n_carousels?: number }
+  >({
+    mutationFn: (body) =>
+      api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/pack", body),
   });
 }
 

@@ -22,6 +22,7 @@ import {
   useDeletePlan,
   useMarkTested,
   usePlanGenerate,
+  usePlanPack,
   useRadarPlan,
   useRegenerateCarousels,
   useRemoveFromPlan,
@@ -186,11 +187,42 @@ function DayEntry({ e }: { e: PlanEntry }) {
   const qc = useQueryClient();
   const mark = useMarkTested();
   const remove = useRemoveFromPlan();
+  const pack = usePlanPack();
   const [open, setOpen] = useState(false);
+  // El plan no sabe si hay un job activo: marcamos "generando" solo tras
+  // pulsar el botón, así un pack pendiente no muestra un spinner falso.
+  const [packing, setPacking] = useState(false);
   // Estado local del check → feedback instantáneo (el plan se refresca cada
   // 5s mientras se generan packs y pisaba el estado del checkbox controlado).
   const [tested, setTested] = useState(e.tested);
   useEffect(() => setTested(e.tested), [e.tested]);
+  // Mientras se generan los vídeos IA, refresca el plan hasta que aparezcan.
+  useEffect(() => {
+    if (!packing) return;
+    if (e.ai_ready) {
+      setPacking(false);
+      return;
+    }
+    const t = setInterval(
+      () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
+      6000,
+    );
+    return () => clearInterval(t);
+  }, [packing, e.ai_ready, qc]);
+
+  const genAI = () => {
+    setPacking(true);
+    pack.mutate(
+      { product_id: e.product_id },
+      {
+        onSuccess: () => toast.success("Vídeos IA + carruseles en cola"),
+        onError: () => {
+          setPacking(false);
+          toast.error("No se pudo encolar");
+        },
+      },
+    );
+  };
 
   return (
     <Card>
@@ -203,12 +235,9 @@ function DayEntry({ e }: { e: PlanEntry }) {
             </p>
             <p className="text-[11px] text-muted-foreground">
               ⭐ {e.score.toFixed(0)} · {VERDICT[e.ads_verdict] ?? ""} ADS {e.ads_verdict} ·{" "}
-              {e.pack_ready ? (
-                <span>🎠 {e.carousels_count} · 🎥 {e.presets_count}</span>
-              ) : (
-                <span className="text-orange-500">
-                  <Loader2 className="inline h-3 w-3 animate-spin" /> generando pack…
-                </span>
+              ⚡ plantillas · 🎣 {e.hooks_count}
+              {e.ai_ready && (
+                <span> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</span>
               )}
             </p>
             {e.tiktok_url && (
@@ -262,15 +291,29 @@ function DayEntry({ e }: { e: PlanEntry }) {
           </div>
         </div>
 
-        {e.pack_ready && (
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setOpen((o) => !o)}
             className="flex items-center gap-1 text-xs text-orange-500 hover:underline"
           >
             <ChevronDown className={"h-3.5 w-3.5 transition " + (open ? "rotate-180" : "")} />
-            Ver vídeos + carruseles
+            Ver prompts
           </button>
-        )}
+          {!e.ai_ready &&
+            (packing || pack.isPending ? (
+              <span className="inline-flex items-center gap-1 text-xs text-orange-500">
+                <Loader2 className="h-3 w-3 animate-spin" /> generando vídeos IA…
+              </span>
+            ) : (
+              <button
+                onClick={genAI}
+                className="text-xs text-muted-foreground hover:text-orange-500 hover:underline"
+                title="Generar estilos de vídeo IA + carruseles (más lento)"
+              >
+                ✨ Generar vídeos IA + carruseles
+              </button>
+            ))}
+        </div>
         {open && <ProductPrompts productId={e.product_id} />}
       </CardContent>
     </Card>
@@ -296,7 +339,7 @@ interface Carousel {
 function ProductPrompts({ productId }: { productId: string }) {
   const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(productId);
-  const [tab, setTab] = useState<"video" | "carousel" | "templates" | "hooks">("video");
+  const [tab, setTab] = useState<"video" | "carousel" | "templates" | "hooks">("templates");
   const tpls = useVideoTemplates(productId);
   const [carLang, setCarLang] = useState("es");
   const [carStyle, setCarStyle] = useState("simple");
@@ -361,7 +404,7 @@ function ProductPrompts({ productId }: { productId: string }) {
 
       {tab === "video" && (
         <div className="space-y-2">
-          {presets.length === 0 && <p className="text-xs text-muted-foreground">Sin estilos.</p>}
+          {presets.length === 0 && <p className="text-xs text-muted-foreground">Sin vídeos IA todavía — pulsa &quot;✨ Generar vídeos IA&quot; arriba. Mientras, usa la pestaña ⚡ Plantillas.</p>}
           {presets.map((p, i) => (
             <details key={i} className="rounded border border-border/60 p-2 text-xs">
               <summary className="cursor-pointer font-medium">
@@ -425,7 +468,7 @@ function ProductPrompts({ productId }: { productId: string }) {
             </button>
             <span className="text-[10px] text-muted-foreground">texto en pantalla + sin hashtags en la imagen</span>
           </div>
-          {carousels.length === 0 && <p className="text-xs text-muted-foreground">Sin carruseles.</p>}
+          {carousels.length === 0 && <p className="text-xs text-muted-foreground">Sin carruseles todavía — pulsa &quot;✨ Generar vídeos IA + carruseles&quot; arriba (o &quot;Regenerar carruseles&quot;).</p>}
           {carousels.map((c, i) => (
             <details key={i} className="rounded border border-border/60 p-2 text-xs">
               <summary className="cursor-pointer font-medium">
