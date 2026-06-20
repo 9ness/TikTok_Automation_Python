@@ -1220,6 +1220,13 @@ def run_pronosticos_pipeline(
     if video_style == "viral":
         try:
             from .viral_overlay import build_viral_hook_overlay, build_viral_match_bar
+            from .data_loader import load_fixture_times
+            # Los picks NO traen la hora → la sacamos de raw_matches_tiktok por fixture_id.
+            _ftimes = load_fixture_times(target_date)
+
+            def _pick_time(p):
+                return _ftimes.get(str(p.get("fixture_id") or "")) or p.get("time", "")
+
             hook_matches = []
             _seen_matches: set = set()
             for p in picks:
@@ -1228,7 +1235,7 @@ def run_pronosticos_pipeline(
                 if _key in _seen_matches:
                     continue  # dos picks del mismo partido → listarlo una sola vez
                 _seen_matches.add(_key)
-                hook_matches.append({"home": _h, "away": _a, "time": p.get("time", "")})
+                hook_matches.append({"home": _h, "away": _a, "time": _pick_time(p)})
             hook_png = os.path.join(work_dir, "viral_hook.png")
             build_viral_hook_overlay(hook_matches, hook_png, (W, H))
             bars: dict[int, str] = {}
@@ -1236,7 +1243,7 @@ def run_pronosticos_pipeline(
             for i, p in enumerate(picks, start=1):
                 _h, _a = _split_match(p.get("match", ""))
                 bar_png = os.path.join(work_dir, f"viral_bar_{i}.png")
-                build_viral_match_bar(_h, _a, target_date, p.get("time", ""), bar_png, (W, H))
+                build_viral_match_bar(_h, _a, target_date, _pick_time(p), bar_png, (W, H))
                 bars[i] = bar_png
                 # Fondo del pick: 1) foto elegida por el usuario (override visual),
                 # 2) si no, foto del EQUIPO DE LA APUESTA (o el otro si falta).

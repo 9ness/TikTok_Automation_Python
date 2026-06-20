@@ -67,6 +67,37 @@ def load_raw_payload(target_date: str | None = None,
     return _coerce_json(raw)
 
 
+def load_fixture_times(target_date: str | None = None,
+                       redis: UpstashRedis | None = None) -> dict[str, str]:
+    """{fixture_id(str): 'YYYY-MM-DD HH:MM' (Madrid)} desde `raw_matches_tiktok`.
+
+    Los picks del guion NO traen la hora — está aquí, por `fixture_id`. El
+    `timestamp` es UTC; lo pasamos a Madrid (verano CEST = UTC+2) para que el
+    overlay lo convierta a Perú (−7h) como el resto."""
+    from datetime import datetime, timedelta
+    if not target_date:
+        target_date = tomorrow_iso()
+    redis = redis or UpstashRedis()
+    raw = redis.hget(f"raw_matches_tiktok:{target_date[:7]}", target_date)
+    out: dict[str, str] = {}
+    if not raw:
+        return out
+    matches = _coerce_json(raw)
+    if not isinstance(matches, list):
+        return out
+    for m in matches:
+        fid = str(m.get("id") or "")
+        ts = m.get("timestamp")
+        if not fid or ts is None:
+            continue
+        try:
+            madrid = datetime.utcfromtimestamp(int(ts)) + timedelta(hours=2)
+            out[fid] = madrid.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            continue
+    return out
+
+
 def list_versions(payload: dict | None) -> list[dict]:
     """Devuelve la lista de versiones disponibles dentro de un payload.
 
