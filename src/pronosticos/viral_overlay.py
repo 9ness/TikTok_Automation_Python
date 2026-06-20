@@ -237,6 +237,34 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
     return output_path
 
 
+def _relative_day(s: str) -> str:
+    """Día relativo en español (Hoy/Mañana/Ayer/día de la semana) según la fecha
+    del partido EN PERÚ vs hoy en Perú. Acepta 'YYYY-MM-DD HH:MM' (Madrid, se
+    convierte a Perú −7h) o 'YYYY-MM-DD'."""
+    import re
+    from datetime import date as _date, datetime, timedelta, timezone
+    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})", s or "")
+    peru_dt = None
+    if m:
+        peru_dt = datetime(int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5])) - timedelta(hours=7)
+        d = peru_dt.date()
+    else:
+        md = re.search(r"(\d{4})-(\d{2})-(\d{2})", s or "")
+        if not md:
+            return ""
+        d = _date(int(md[1]), int(md[2]), int(md[3]))
+    peru_today = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=5)).date()
+    diff = (d - peru_today).days
+    if diff == 0:
+        return "Hoy"
+    if diff == 1:
+        return "Mañana"
+    if diff == -1:
+        return "Ayer"
+    return dias[(peru_dt or datetime(d.year, d.month, d.day)).weekday()]
+
+
 def build_viral_match_bar(home: str, away: str, date_str: str, time_raw_or_peru: str,
                           output_path: str, video_size: tuple[int, int] = (1080, 1920)) -> str:
     """Barra oscura del partido (por pick): ★ · bandera+equipo · fecha+hora · bandera+equipo · ★.
@@ -249,8 +277,8 @@ def build_viral_match_bar(home: str, away: str, date_str: str, time_raw_or_peru:
     bar_y = int(H * 0.26)   # arriba para no solaparse con el muñeco (mitad inferior)
     draw.rounded_rectangle([0, bar_y, W, bar_y + bar_h], radius=0, fill=BAR_BG)
 
-    ddmmyy, abbr = _date_badge(date_str)
     time_txt = time_raw_or_peru if "m." in (time_raw_or_peru or "") else madrid_to_peru(time_raw_or_peru)
+    day_lbl = _relative_day(time_raw_or_peru) or _relative_day(date_str)
     cy = bar_y + bar_h // 2
     cx = W // 2
 
@@ -259,9 +287,10 @@ def build_viral_match_bar(home: str, away: str, date_str: str, time_raw_or_peru:
     draw.text((40, cy), "★", font=star_font, fill=GOLD, anchor="lm")
     draw.text((W - 40, cy), "★", font=star_font, fill=GOLD, anchor="rm")
 
-    # fecha + hora (centro)
-    draw.text((cx, cy - 24), ddmmyy, font=_font(56), fill=WHITE, anchor="mm")
-    draw.text((cx, cy + 40), f"{abbr}, {time_txt}", font=_font(42), fill=(207, 214, 221), anchor="mm")
+    # hora (Perú) grande + día relativo debajo (centro)
+    draw.text((cx, cy - 22), time_txt, font=_font(60), fill=WHITE, anchor="mm")
+    if day_lbl:
+        draw.text((cx, cy + 44), day_lbl, font=_font(44), fill=(207, 214, 221), anchor="mm")
 
     # local (izquierda) y visitante (derecha): bandera redonda + nombre debajo
     flag_sz = 96
