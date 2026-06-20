@@ -184,6 +184,17 @@ def madrid_to_peru(raw: str) -> str:
     return f"{h12}:{d.minute:02d} {ampm}"
 
 
+def madrid_to_peru_24h(raw: str) -> str:
+    """Igual que madrid_to_peru pero en 24h fijo 'HH:MM' (para el gancho, ancho fijo)."""
+    import re
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})", raw or "")
+    if not m:
+        return raw or ""
+    from datetime import datetime, timedelta
+    d = datetime(int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5])) - timedelta(hours=7)
+    return f"{d.hour:02d}:{d.minute:02d}"
+
+
 def _date_badge(date_str: str) -> tuple[str, str]:
     """date_str 'YYYY-MM-DD' → ('DD/MM/YY', 'mié')."""
     import re
@@ -241,12 +252,12 @@ def build_viral_hook_overlay(matches: list[dict], output_path: str,
             img.alpha_composite(fb, (flag_x, y2 - fh // 2))
         draw.text((name_x, y2), _to_es(m.get("away", "")), font=name_font, fill=DARK_TEXT, anchor="lm")
         # ── Grupo derecho estilo "app": auriculares + pastilla PREVIEW + hora ──
-        time_txt = m.get("time_peru") or madrid_to_peru(m.get("time", ""))
+        # Hora en 24h fijo (HH:MM) → ancho constante → todo alineado verticalmente.
+        time_txt = madrid_to_peru_24h(m.get("time", ""))
         gray = (150, 156, 166)
         time_x = card_x + card_w - 30
         draw.text((time_x, cyl), time_txt, font=time_font, fill=(90, 95, 105), anchor="rm")
-        tw = draw.textlength(time_txt, font=time_font)
-        gx = int(time_x - tw - 26)              # borde derecho del bloque auriculares/PREVIEW
+        gx = card_x + card_w - 168              # columna FIJA del PREVIEW → alineación vertical
         # pastilla PREVIEW (debajo del centro)
         pv_font = _font(20)
         pvw = draw.textlength("PREVIEW", font=pv_font)
