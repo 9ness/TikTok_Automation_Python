@@ -929,6 +929,7 @@ def run_pronosticos_pipeline(
     # como el clásico. Por eso recalculamos los segmentos a partir de los
     # paréntesis (pick_windows): la foto/barra de cada partido debe aparecer
     # cuando EMPIEZA a hablar de él, no al llegar al veredicto (que iba ~2s tarde).
+    _viral_segments_ok = False
     if (video_style == "viral" and pick_windows
             and all(w is not None for w in pick_windows) and len(pick_windows) >= 2):
         v_starts = [float(word_timings[w[0]]["start"]) for w in pick_windows]
@@ -949,6 +950,7 @@ def run_pronosticos_pipeline(
             prev = new_picks[-1][1]
         segments["intro"] = (0.0, intro_end)
         segments["picks"] = new_picks
+        _viral_segments_ok = True
         log(f"🎬 Viral: segmentos por paréntesis — intro 0–{intro_end:.1f}s, "
             f"{n} picks; cambios de foto sincronizados con el habla")
 
@@ -994,22 +996,9 @@ def run_pronosticos_pipeline(
         else:
             log("ℹ️ SFX clink no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
 
-    # 4.c.bis SFX "flash" de transición (solo estilo VIRAL): un whoosh en el
-    # corte a cada pick (inicio de cada segmento), coincidiendo con la aparición
-    # de la barra del partido. Gated en viral → no toca el render estándar.
-    if video_style == "viral":
-        flash_path = _resolve_sfx("flash.mp3", "transition.mp3", "whoosh.mp3")
-        if flash_path:
-            flash_anchors = [float(s) for (s, _e) in segments.get("picks", []) if s and s > 0]
-            if flash_anchors:
-                audio_clip = _mix_sfx_at_timestamps(
-                    audio_clip, flash_path, flash_anchors,
-                    sfx_volume, audio_duration, log, label="⚡ flash viral",
-                )
-            else:
-                log("ℹ️ Estilo viral sin anclas de pick para el flash.")
-        else:
-            log("ℹ️ SFX flash (viral) no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
+    # (El SFX "flash" de transición viral se mezcla MÁS ABAJO, tras fijar los
+    # segmentos definitivos — si se hace aquí, el fallback uniforme posterior los
+    # cambiaría y el flash quedaría desincronizado o sin anclas.)
 
     # 4.d Overlay de logos de ligas en la intro (al detectar 'ligas/champions/europa...')
     league_overlay_anchor: float | None = None
@@ -1123,7 +1112,8 @@ def run_pronosticos_pipeline(
         log("⚠️ Sin anchor 'linkcito' — sin overlay perfil.png.")
 
     # Si Whisper detectó menos picks que los del payload, fallback a reparto uniforme
-    if n_detected != len(picks) and len(picks) > 0:
+    # (salvo que el recálculo VIRAL por paréntesis ya haya fijado segmentos buenos).
+    if n_detected != len(picks) and len(picks) > 0 and not _viral_segments_ok:
         log(f"⚠️ Whisper no detectó todas las transiciones ({n_detected}/{len(picks)}). "
             f"Cayendo a reparto uniforme.")
         intro_end = audio_duration * 0.07  # ~7% para intro
@@ -1131,6 +1121,25 @@ def run_pronosticos_pipeline(
         segments["intro"] = (0.0, intro_end)
         segments["picks"] = [(intro_end + i * slot, intro_end + (i + 1) * slot)
                              for i in range(len(picks))]
+
+    # SFX "flash"/whoosh de transición (solo VIRAL): en el inicio de cada pick,
+    # cuando cambia la foto + aparece la barra. Aquí los segmentos ya son los
+    # DEFINITIVOS → el flash queda sincronizado con el cambio de foto. Volumen
+    # alto (un whoosh de transición debe oírse claramente sobre la voz).
+    if video_style == "viral":
+        flash_path = _resolve_sfx("flash.mp3", "transition.mp3", "whoosh.mp3")
+        if flash_path:
+            flash_anchors = [float(s) for (s, _e) in segments.get("picks", []) if s and s > 0]
+            if flash_anchors:
+                flash_vol = min(1.0, max(sfx_volume, 0.5) + 0.45)
+                audio_clip = _mix_sfx_at_timestamps(
+                    audio_clip, flash_path, flash_anchors,
+                    flash_vol, audio_duration, log, label="⚡ flash viral",
+                )
+            else:
+                log("ℹ️ Estilo viral sin anclas de pick para el flash.")
+        else:
+            log("ℹ️ SFX flash (viral) no encontrado en BIBLIOTECA_PRONOSTICOS_CLIPS/sfx/")
 
     # 5. Renderizar carruseles (solo si el flag está activo — por defecto OFF)
     carousels: dict[int, str] = {}
