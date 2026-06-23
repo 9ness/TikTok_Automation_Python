@@ -222,6 +222,9 @@ _ECHOTIK_REGIONS = [
 
 
 # ── Calendario / Plan (Fase 2) ───────────────────────────────────────
+_PER_DAY_DEFAULT = 10   # productos por día en la cola del calendario
+
+
 def _pack_options(research: bool, n_carousels: int, n_photos: int) -> dict:
     return {
         "download_photos": n_photos > 0,
@@ -230,6 +233,31 @@ def _pack_options(research: bool, n_carousels: int, n_photos: int) -> dict:
         "generate_video_presets": True,
         "n_carousels": n_carousels,
     }
+
+
+def _light_pack_options() -> dict:
+    """Pack LIGERO: solo análisis + hooks BOFU. Sin vídeos IA ni carruseles
+    (las plantillas universales son estáticas, no necesitan generación)."""
+    return {
+        "download_photos": False,   # la foto ya viene de la URL
+        "photos_to_download": 0,
+        "analyze": True,
+        "research": False,
+        "generate_video_presets": False,
+        "n_carousels": 0,
+        "generate_nano_banana": False,
+    }
+
+
+def _reflow_plan(plan, per_day: int = _PER_DAY_DEFAULT) -> None:
+    """Recompacta el calendario como una cola: ordena por día (estable,
+    preserva el orden dentro del día) y reparte en bloques de `per_day`.
+    Así, al borrar productos de un día, los posteriores suben para rellenar."""
+    per_day = max(1, per_day)
+    plan.entries.sort(key=lambda e: e.day)
+    for i, e in enumerate(plan.entries):
+        e.day = i // per_day + 1
+    plan.days = max(1, (len(plan.entries) + per_day - 1) // per_day)
 
 
 class ImportToCalendarRequest(BaseModel):
@@ -387,6 +415,127 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
     )
 
 
+class AddUrlRequest(BaseModel):
+    url: str
+    name: str | None = None        # override si el scraper no saca nombre
+    category: str | None = None
+    language: str = "es_ES"
+    per_day: int = _PER_DAY_DEFAULT
+
+
+@router.post("/plan/add-url", response_model=CalendarActionResponse)
+def add_url(
+    body: AddUrlRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Añade un producto a la COLA del calendario desde su URL de TikTok Shop.
+
+    Scrapea nombre+foto de la URL (share-URL de la app), crea el producto,
+    lo coloca en el primer hueco libre (per_day) recompactando la cola, y
+    encola un pack LIGERO (solo hooks BOFU; las plantillas son estáticas)."""
+    from src.tiktok_shop.config import (
+        product_drive_folder,
+        product_photos_generated_folder,
+        product_photos_source_folder,
+    )
+    from src.tiktok_shop.models.product import Product, TikTokShopMeta, slugify
+    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
+    from src.tiktok_shop.repos import PlanRepo, ProductRepo
+    from src.tiktok_shop.utils.url_scraper import scrape_product_url
+
+    url = (body.url or "").strip()
+    if not url:
+        return CalendarActionResponse(ok=False, message="Pega una URL de TikTok Shop.")
+
+    # 1) Scrape (share-URL de la app trae name+image vía og_info) ─────────
+    data: dict = {}
+    try:
+        data = scrape_product_url(url, use_gemini=False) or {}
+    except Exception as e:  # nunca debería, scrape es defensivo
+        data = {"warnings": str(e)}
+
+    name = (body.name or data.get("name") or "").strip()
+    if not name or name.lower() == "security check":
+        return CalendarActionResponse(
+            ok=False,
+            message=(
+                "No pude leer el producto de esa URL (TikTok la bloquea). "
+                "Usa la share-URL del botón Compartir de la app de TikTok, "
+                "o añade el nombre a mano."
+            ),
+        )
+
+    repo = ProductRepo()
+    slug = slugify(name)
+    product = repo.get_by_slug(slug)
+    if product is None:
+        category = (body.category or data.get("category") or "otros").strip() or "otros"
+        price = data.get("price_eur")
+        product = Product(
+            slug=slug, name=name[:200],
+            brand=(data.get("brand") or None),
+            category=category, subcategory=(data.get("subcategory") or None),
+            language=body.language, origin="manual",
+            tiktok_shop=TikTokShopMeta(
+                product_url=url, commission_rate=0.10,
+                price_eur=float(price) if price else None,
+            ),
+        )
+        # Carpetas + foto de la URL (best-effort, no aborta) ──────────────
+        try:
+            from pathlib import Path
+            Path(product_drive_folder(slug)).mkdir(parents=True, exist_ok=True)
+            Path(product_photos_source_folder(slug)).mkdir(parents=True, exist_ok=True)
+            Path(product_photos_generated_folder(slug)).mkdir(parents=True, exist_ok=True)
+            product.drive_folder = product_drive_folder(slug)
+        except OSError:
+            pass
+        img = data.get("image_url")
+        if img:
+            try:
+                from src.tiktok_shop.utils.photo_downloader import (
+                    download_image_to_product,
+                )
+                photo = download_image_to_product(
+                    product_slug=slug, image_url=img,
+                    photo_type="packshot", origin="tiktok_shop_url",
+                )
+                if photo is not None:
+                    product.photos.source.append(photo)
+            except Exception:
+                pass
+        repo.save(product)
+
+    # 2) Colocar en la cola (append + reflow) ─────────────────────────────
+    prepo = PlanRepo()
+    plan = prepo.get_current()
+    if plan is None:
+        from datetime import datetime, timezone
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        plan = WeekPlan(label=f"Semana {date}", date=date, days=1)
+    if not any(e.product_id == product.id for e in plan.entries):
+        plan.entries.append(PlanEntry(
+            day=10_000, product_id=product.id, slug=product.slug,
+            name=product.name, score=0, ads_verdict="desconocida",
+        ))
+    _reflow_plan(plan, body.per_day)
+    prepo.save(plan, make_current=True)
+    landed = next((e.day for e in plan.entries if e.product_id == product.id), 1)
+
+    # 3) Pack LIGERO en background (solo hooks BOFU) ──────────────────────
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_PACK,
+        title=f"🎣 Hooks: {product.name}",
+        params={"product_id": product.id, "options": _light_pack_options()},
+        enqueued_by=operator or None,
+    )
+    return CalendarActionResponse(
+        ok=True, product_id=product.id, slug=product.slug, job_id=job.id,
+        message=f"'{product.name}' añadido al día {landed} (cola). Generando hooks…",
+    )
+
+
 class PlanPackRequest(BaseModel):
     product_id: str
     research: bool = False
@@ -523,6 +672,8 @@ def remove_from_plan(
     plan.entries = [e for e in plan.entries if e.product_id != body.product_id]
     removed = before - len(plan.entries)
     if removed:
+        # Recompacta la cola: los productos de días posteriores suben.
+        _reflow_plan(plan)
         repo.save(plan, make_current=False)
     return {"ok": removed > 0, "removed": removed}
 
@@ -605,6 +756,8 @@ def video_templates(
                 "niches": t["niches"],
                 "notes": t["notes"],
                 "prompt": vt.render_template(t["prompt"], name) if name else t["prompt"],
+                "first_frame_prompt": vt.render_first_frame(t, name),
+                "kling_prompt": vt.render_kling(t, name),
             }
             for t in tpls
         ],

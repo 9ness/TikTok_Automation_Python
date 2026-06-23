@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   useBofuHooks,
   useDeletePlan,
+  useAddUrl,
   useMarkTested,
   usePlanGenerate,
   usePlanPack,
@@ -49,9 +50,33 @@ export default function CalendarPage() {
   const planQ = useRadarPlan();
   const gen = usePlanGenerate();
   const del = useDeletePlan();
+  const addUrl = useAddUrl();
   const [perDay, setPerDay] = useState(10);
   const [days, setDays] = useState(7);
   const [selectedDay, setSelectedDay] = useState(1);
+  const [url, setUrl] = useState("");
+  const [manualName, setManualName] = useState("");
+
+  const submitUrl = () => {
+    const u = url.trim();
+    if (!u) return;
+    addUrl.mutate(
+      { url: u, name: manualName.trim() || undefined, per_day: perDay },
+      {
+        onSuccess: (r) => {
+          if (r.ok) {
+            toast.success(r.message);
+            setUrl("");
+            setManualName("");
+            qc.invalidateQueries({ queryKey: ["radar-plan"] });
+          } else {
+            toast.error(r.message);
+          }
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  };
 
   const plan = planQ.data;
   const byDay = new Map<number, PlanEntry[]>();
@@ -71,6 +96,46 @@ export default function CalendarPage() {
       <p className="text-xs text-muted-foreground sm:text-sm">
         Qué producto probar cada día, con sus prompts de vídeo y carruseles listos.
       </p>
+
+      {/* Añadir producto por URL de TikTok Shop (flujo Kalodata manual) */}
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <p className="text-sm font-semibold">➕ Añadir producto por URL</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitUrl();
+              }}
+              placeholder="Pega la share-URL de TikTok Shop (botón Compartir → Copiar enlace)"
+              className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs"
+            />
+            <Button disabled={addUrl.isPending || !url.trim()} onClick={submitUrl}>
+              {addUrl.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Rocket className="mr-2 h-4 w-4" />
+              )}
+              Analizar y añadir
+            </Button>
+          </div>
+          <input
+            value={manualName}
+            onChange={(e) => setManualName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitUrl();
+            }}
+            placeholder="Nombre del producto (opcional · solo si la URL no lo detecta)"
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-[11px]"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Lee nombre + foto de la URL, genera plantillas (foto 1er frame Nano Banana
+            + Kling) y hooks, y lo coloca solo en la cola ({perDay}/día). Usa la
+            <b> share-URL</b> de la app (la canónica la bloquea TikTok).
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Generar plan automático */}
       <Card>
@@ -498,9 +563,9 @@ function ProductPrompts({ productId }: { productId: string }) {
       {tab === "templates" && (
         <div className="space-y-2">
           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-            ⚡ Plantillas reutilizables (sin coste IA). Copia el prompt y <b>adjunta
-            una foto del producto</b> al pegarlo en Veo 3 / Gemini. Ideal para
-            volumen — sin caras IA, POV/manos.
+            ⚡ Plantillas reutilizables (sin coste IA). Flujo Kling: genera la <b>foto
+            del 1er frame</b> en Nano Banana (adjunta la foto del producto), y pásala a
+            <b> Kling</b> como start-frame. Sin caras IA, POV/manos.
           </p>
           {(tpls.data?.templates ?? []).map((t) => (
             <details key={t.id} className="rounded border border-border/60 p-2 text-xs">
@@ -509,7 +574,9 @@ function ProductPrompts({ productId }: { productId: string }) {
               </summary>
               <div className="mt-2 space-y-1">
                 {t.notes && <p className="text-[11px] text-muted-foreground">{t.notes}</p>}
-                <CopyBlock label="" text={t.prompt} />
+                <CopyBlock label="🍌 1er frame (Nano Banana + foto producto)" text={t.first_frame_prompt} />
+                <CopyBlock label="🎬 Kling (i2v desde el 1er frame)" text={t.kling_prompt} />
+                <CopyBlock label="🟣 Veo 3 (alternativa texto→vídeo)" text={t.prompt} />
               </div>
             </details>
           ))}

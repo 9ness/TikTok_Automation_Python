@@ -229,6 +229,19 @@ export interface VideoTemplate {
   niches: string[];
   notes: string;
   prompt: string;
+  first_frame_prompt: string;
+  kling_prompt: string;
+}
+
+export function useAddUrl() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    { url: string; name?: string; category?: string; per_day?: number }
+  >({
+    mutationFn: (body) =>
+      api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/add-url", body),
+  });
 }
 
 export function useVideoTemplates(productId: string) {
