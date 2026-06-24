@@ -62,6 +62,7 @@ const DEFAULT_AUDIO: PronosticosAudioConfig = {
   camera_volume: 0.5,
   add_background_music: true,
   bgm_volume: 0.2,
+  voice_speed: 1.2,
 };
 
 const DEFAULT_OVERLAYS: PronosticosOverlaysConfig = {
@@ -522,6 +523,30 @@ export default function PronosticosPage() {
                   <Switch checked={viralBgm} onCheckedChange={setViralBgm} />
                   <span>Música de fondo (opcional)</span>
                 </label>
+                <div className="flex items-center gap-2 text-sm flex-wrap">
+                  <span className="text-muted-foreground">Velocidad voz:</span>
+                  {[1.0, 1.1, 1.2, 1.3].map((sp) => {
+                    const active = Math.abs((audio.voice_speed ?? 1.2) - sp) < 0.001;
+                    return (
+                      <button
+                        key={sp}
+                        type="button"
+                        onClick={() => setAudio({ ...audio, voice_speed: sp })}
+                        className={`px-2.5 py-1 rounded-md border text-xs font-semibold transition ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-border hover:bg-muted"
+                        }`}
+                      >
+                        {sp.toFixed(1)}x
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Más velocidad = vídeo más corto. 1.2x es el estándar; baja a
+                  1.1x/1.0x si el guion sale corto y quieres alargar el vídeo.
+                </p>
                 <p className="text-xs text-muted-foreground">
                   V2 Viral: resolución 9:16 fija, sin subtítulos, posiciones de
                   overlays predefinidas. Solo configuras la voz y la música.

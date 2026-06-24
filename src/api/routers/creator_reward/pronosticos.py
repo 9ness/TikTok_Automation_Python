@@ -208,6 +208,7 @@ def enqueue_pronosticos(
             "script_override": script_override,
             "add_background_music": payload.audio.add_background_music,
             "bgm_volume": payload.audio.bgm_volume,
+            "voice_speed": payload.audio.voice_speed,
         }
         job = queue.enqueue(JobMode.PRONOSTICOS, title=title, params=params)
         jobs_info.append({

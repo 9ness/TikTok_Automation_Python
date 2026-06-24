@@ -139,6 +139,8 @@ export interface PronosticosAudioConfig {
   camera_volume: number;
   add_background_music: boolean;
   bgm_volume: number;
+  /** Velocidad de la voz en el estilo viral (atempo). 1.0 = normal, 1.2 = rápida. */
+  voice_speed?: number;
 }
 
 export interface PronosticosOverlaysConfig {

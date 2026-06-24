@@ -60,6 +60,9 @@ class PronosticosAudioConfig(BaseModel):
     camera_volume: float = Field(default=0.45, ge=0.0, le=1.0)
     add_background_music: bool = True
     bgm_volume: float = Field(default=0.20, ge=0.0, le=1.0)
+    # Velocidad de la voz en el estilo viral (atempo). 1.0 = normal, 1.2 = más
+    # rápida/corta. Permite ajustar la duración del vídeo desde la UI.
+    voice_speed: float = Field(default=1.2, ge=0.5, le=2.0)
 
 
 class PronosticosOverlaysConfig(BaseModel):

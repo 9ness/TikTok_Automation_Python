@@ -828,6 +828,9 @@ def run_pronosticos_pipeline(
     profile_cta_height_pct: float = 0.32,
     video_style: str = "standard",
     photo_overrides: dict | None = None,
+    # Velocidad de la voz (atempo ffmpeg) en el estilo viral. 1.0 = normal,
+    # 1.2 = más dinámica/corta. Configurable desde la UI para ajustar la duración.
+    voice_speed: float = 1.2,
 ) -> str:
     """Genera el MP4 final y devuelve la ruta.
 
@@ -901,22 +904,24 @@ def run_pronosticos_pipeline(
     locutor.generate_single_audio(tts_script, audio_path, voice_id_override=voice_id_override)
     _progress(0.20, "Voz sintetizada")
 
-    # VIRAL: acelera la voz x1.2 (más dinámico) ANTES de Whisper, para que los
-    # tiempos de palabra/segmentos/overlays cuadren con el audio acelerado.
-    # atempo conserva el tono (no suena "ardilla"). Gated en viral → V1 intacto.
-    if video_style == "viral":
+    # VIRAL: ajusta la velocidad de la voz (atempo) ANTES de Whisper, para que los
+    # tiempos de palabra/segmentos/overlays cuadren con el audio. atempo conserva el
+    # tono (no suena "ardilla"). Velocidad configurable desde la UI (voice_speed):
+    # 1.2 = dinámica/corta, 1.0 = normal, <1.0 = más lenta/larga. Gated viral → V1 intacto.
+    _vspeed = max(0.5, min(2.0, float(voice_speed or 1.0)))
+    if video_style == "viral" and abs(_vspeed - 1.0) > 0.001:
         _sped = os.path.join(work_dir, "voice_fast.mp3")
         try:
             import subprocess
             subprocess.run(
-                ["ffmpeg", "-y", "-i", audio_path, "-filter:a", "atempo=1.2", "-vn", _sped],
+                ["ffmpeg", "-y", "-i", audio_path, "-filter:a", f"atempo={_vspeed}", "-vn", _sped],
                 capture_output=True, timeout=180, check=True,
             )
             if os.path.exists(_sped) and os.path.getsize(_sped) > 1000:
                 audio_path = _sped
-                log("⏩ Voz acelerada x1.2 (viral) — vídeo más dinámico y corto")
+                log(f"⏩ Voz a x{_vspeed} (viral) — duración ajustada según la velocidad elegida")
         except Exception as _e_speed:
-            log(f"ℹ️ No se pudo acelerar la voz x1.2 (non-fatal): {_e_speed}")
+            log(f"ℹ️ No se pudo cambiar la velocidad de la voz a x{_vspeed} (non-fatal): {_e_speed}")
 
     # 3. Whisper local para word_timings
     _progress(0.22, "Transcribiendo audio (Whisper)...")
