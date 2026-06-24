@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, ArrowUp, ChevronUp, ChevronDown, Check, Clock, Coins, Download, ExternalLink, FileText, Film, Loader2, Play, Timer, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowUp, ChevronUp, ChevronDown, Check, Clock, Coins, Download, ExternalLink, FileText, Film, Loader2, Play, ShoppingBag, Timer, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ import {
   PROGRAM_ICON,
   PROGRAM_LABEL,
   SUBMODULE_LABEL,
+  type Program,
 } from "@/lib/queue-meta";
 import type { ActiveJob, JobStatus } from "@/lib/types/queue";
 import { cn } from "@/lib/utils";
@@ -180,7 +181,9 @@ export function JobCard({ job }: { job: ActiveJob }) {
       toast.error(err instanceof ApiError ? err.message : "Error al eliminar.");
     }
   }
-  const program = MODE_TO_PROGRAM[job.mode];
+  // Fallback defensivo: un `mode` que el frontend aún no conozca (p.ej. uno
+  // nuevo del backend) NO debe tumbar todo el drawer con un icono undefined.
+  const program: Program = MODE_TO_PROGRAM[job.mode] ?? "tiktok_shop";
   const isRunning = job.status === "running";
   const isFailed = job.status === "failed";
   const isCompleted = job.status === "completed";
@@ -232,8 +235,8 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const programIsShop = program === "tiktok_shop";
   const showSubmodule = !programIsShop;
   const details = describeJobParams(job.mode, job.params);
-  const ProgramIcon = PROGRAM_ICON[program];
-  const SubmoduleIcon = MODE_ICON[job.mode];
+  const ProgramIcon = PROGRAM_ICON[program] ?? ShoppingBag;
+  const SubmoduleIcon = MODE_ICON[job.mode] ?? ShoppingBag;
 
   async function handleCancel() {
     try {
