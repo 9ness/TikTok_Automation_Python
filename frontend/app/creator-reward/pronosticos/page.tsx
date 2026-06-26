@@ -138,6 +138,15 @@ export default function PronosticosPage() {
   // Selector visual de fotos de fondo (estilo viral): gancho + cada pick.
   const selectedVersionId = Array.from(selectedIds)[0] ?? null;
   const viralSlots = useViralSlots(isViral ? date : null, selectedVersionId);
+  // Duración estimada del vídeo según la velocidad de voz elegida. El guion guarda
+  // `estimated_duration_s` a velocidad ~1x; al acelerar con atempo la duración real
+  // ≈ estimado / velocidad. Así puedes ver cuánto durará antes de generar.
+  const selectedVersion =
+    versions.data?.versions.find((v) => v.id === selectedVersionId) ?? null;
+  const estDurationAtSpeed =
+    selectedVersion?.estimated_duration_s != null
+      ? selectedVersion.estimated_duration_s / (audio.voice_speed ?? 1.2)
+      : null;
   function setPhotoOverride(slot: string, ref: string) {
     const cur: Record<string, string> = { ...(overlays.photo_overrides || {}) };
     if (cur[slot] === ref) delete cur[slot]; // re-click → quitar (vuelve a automática)
@@ -542,6 +551,18 @@ export default function PronosticosPage() {
                       </button>
                     );
                   })}
+                  {estDurationAtSpeed != null && (
+                    <span
+                      className={`ml-auto text-xs font-semibold tabular-nums px-2 py-1 rounded-md border ${
+                        estDurationAtSpeed >= 60 && estDurationAtSpeed <= 65
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                          : "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                      }`}
+                      title="Duración estimada del vídeo con esta velocidad"
+                    >
+                      ≈ {Math.round(estDurationAtSpeed)}s
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Más velocidad = vídeo más corto. 1.2x es el estándar; baja a
