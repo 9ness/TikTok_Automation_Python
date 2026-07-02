@@ -184,3 +184,28 @@ export function useDeployRestart() {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Claude Remote Control (chat web "A la app") — backend Agent SDK fuera de
+// Docker. Libera el slot colgado / reinicia el proceso host desde la web.
+// ---------------------------------------------------------------------------
+export interface ClaudeSdkResult {
+  ok: boolean;
+  action: string;
+  stdout?: string;
+  stderr?: string;
+}
+
+/** 🔓 Libera los slots remotos colgados (graceful, sin reiniciar). */
+export function useClaudeSdkFree() {
+  return useMutation<ClaudeSdkResult, Error, void>({
+    mutationFn: () => api.post(`${ROOT}/claude-sdk/free`, {}),
+  });
+}
+
+/** 🔄 Reinicio duro del backend Remote Control. */
+export function useClaudeSdkRestart() {
+  return useMutation<ClaudeSdkResult, Error, void>({
+    mutationFn: () => api.post(`${ROOT}/claude-sdk/restart`, {}),
+  });
+}

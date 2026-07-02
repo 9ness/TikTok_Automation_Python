@@ -15,6 +15,7 @@ import {
   RefreshCw,
   RotateCw,
   Server,
+  Smartphone,
   Terminal,
   Wrench,
 } from "lucide-react";
@@ -43,6 +44,8 @@ import {
 import {
   type DeployServiceName,
   type DeployStatus,
+  useClaudeSdkFree,
+  useClaudeSdkRestart,
   useDeployContainers,
   useDeployHealth,
   useDeployLog,
@@ -102,6 +105,9 @@ export function DeployPanel() {
   const runDeploy = useDeployRun();
   const rebuild = useDeployRebuild();
   const restart = useDeployRestart();
+  const sdkFree = useClaudeSdkFree();
+  const sdkRestart = useClaudeSdkRestart();
+  const sdkBusy = sdkFree.isPending || sdkRestart.isPending;
   const busy = runDeploy.isPending || rebuild.isPending || restart.isPending;
 
   // El status puede venir de la query inicial o la live — preferimos la
@@ -218,15 +224,60 @@ export function DeployPanel() {
                 ))}
               </div>
             </div>
+
+            {/* Claude Remoto — backend Agent SDK fuera de Docker (:8765).
+                El chat web "A la app" tiene 1 solo slot remoto; si queda
+                colgado, estos botones lo liberan/reinician sin SSH. */}
+            <div>
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Claude Remoto (chat &quot;A la app&quot;)
+              </p>
+              <div className="space-y-2">
+                <AdvancedAction
+                  label="Liberar remoto colgado"
+                  description="Suelta el slot remoto ocupado sin reiniciar — prueba esto primero"
+                  icon={Smartphone}
+                  confirmTitle="¿Liberar el control remoto?"
+                  confirmBody="Hace stop de las sesiones remotas activas del chat de Claude. Desbloquea 'A la app' si el slot quedó pillado. No reinicia nada."
+                  confirmActionLabel="Liberar"
+                  onAction={() => sdkFree.mutateAsync()}
+                  disabled={!reachable || sdkBusy}
+                  loading={sdkFree.isPending}
+                />
+                <AdvancedAction
+                  label="Reiniciar backend remoto"
+                  description="Kill + relaunch del Agent SDK (:8765). Úsalo si liberar no basta"
+                  icon={RotateCw}
+                  confirmTitle="¿Reiniciar el backend de Remote Control?"
+                  confirmBody="Reinicia el proceso host del chat de Claude (Agent SDK en :8765). Corta cualquier sesión remota activa unos segundos y libera el slot colgado."
+                  confirmActionLabel="Reiniciar"
+                  onAction={() => sdkRestart.mutateAsync()}
+                  disabled={!reachable || sdkBusy}
+                  loading={sdkRestart.isPending}
+                />
+              </div>
+            </div>
           </div>
         )}
 
-        {(runDeploy.error || rebuild.error || restart.error) && (
+        {(sdkFree.data || sdkRestart.data) && (
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 font-mono text-[11px] text-emerald-700 dark:text-emerald-300">
+            {(sdkRestart.data ?? sdkFree.data)?.stdout || "✅ OK"}
+          </pre>
+        )}
+
+        {(runDeploy.error ||
+          rebuild.error ||
+          restart.error ||
+          sdkFree.error ||
+          sdkRestart.error) && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
             {String(
               runDeploy.error?.message ??
                 rebuild.error?.message ??
-                restart.error?.message,
+                restart.error?.message ??
+                sdkFree.error?.message ??
+                sdkRestart.error?.message,
             )}
           </div>
         )}

@@ -231,3 +231,47 @@ def deploy_restart(
     if code >= 400:
         raise HTTPException(status_code=code, detail=body)
     return body
+
+
+# ---------------------------------------------------------------------------
+# Claude Remote Control (chat web "A la app") — backend Agent SDK fuera de
+# Docker (proceso host en :8765). No es un container, así que los endpoints
+# docker de arriba no lo tocan: usa estos, que corren `deploy/fix_remote.sh`
+# vía el webhook_listener (mismo user que el SDK → sin sudo).
+# ---------------------------------------------------------------------------
+@router.get("/claude-sdk/status")
+def claude_sdk_status(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """Estado del backend Remote Control + sesiones remotas activas."""
+    key = _api_key_or_raise(settings)
+    code, body = _call("GET", "/admin/claude-sdk/status", api_key=key, timeout=60)
+    if code >= 400:
+        raise HTTPException(status_code=code, detail=body)
+    return body
+
+
+@router.post("/claude-sdk/free")
+def claude_sdk_free(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """🔓 Libera (graceful) los slots remotos colgados sin reiniciar nada.
+    Prueba esto primero: suele desbloquear "A la app" al instante."""
+    key = _api_key_or_raise(settings)
+    code, body = _call("POST", "/admin/claude-sdk/free", api_key=key, timeout=60)
+    if code >= 400:
+        raise HTTPException(status_code=code, detail=body)
+    return body
+
+
+@router.post("/claude-sdk/restart")
+def claude_sdk_restart(
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """🔄 Reinicio duro del backend Remote Control (kill + relaunch, o
+    systemd si lo gestiona). Úsalo si `free` no basta."""
+    key = _api_key_or_raise(settings)
+    code, body = _call("POST", "/admin/claude-sdk/restart", api_key=key, timeout=130)
+    if code >= 400:
+        raise HTTPException(status_code=code, detail=body)
+    return body

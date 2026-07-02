@@ -57,6 +57,11 @@ LOG.addHandler(_h)
 
 APP_DIR = os.environ.get("APP_DIR", "/home/nebulabsai/TikTok_Automation_Python")
 DEPLOY_SCRIPT = os.path.join(APP_DIR, "deploy", "deploy_safe.sh")
+# Script de rescate del backend "Remote Control" del chat web de Claude
+# (Agent SDK en :8765). Lo lanza el panel Settings → Deploy. El listener
+# corre como `nebulabsai` (mismo user dueño del uvicorn del SDK) → puede
+# reiniciarlo sin sudo (kill + relaunch) o liberar el slot colgado.
+FIX_REMOTE_SCRIPT = os.path.join(APP_DIR, "deploy", "fix_remote.sh")
 DEPLOY_LOG = os.path.join(APP_DIR, "logs", "deploy.log")
 SECRET = os.environ.get("WEBHOOK_SECRET", "").encode()
 ADMIN_API_KEY = os.environ.get("API_KEY", "")  # mismo de la app
@@ -254,6 +259,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(200, _smart_status())
             return
 
+        if path == "/admin/claude-sdk/status":
+            self._handle_claude_sdk("status")
+            return
+
         self.send_error(404)
 
     # ------------------------------------------------------------------
@@ -278,6 +287,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         if path == "/admin/docker/restart":
             self._handle_docker_restart()
+            return
+
+        if path == "/admin/claude-sdk/restart":
+            self._handle_claude_sdk("restart")
+            return
+
+        if path == "/admin/claude-sdk/free":
+            self._handle_claude_sdk("free")
             return
 
         self.send_error(404)
@@ -444,6 +461,34 @@ class WebhookHandler(BaseHTTPRequestHandler):
             "service": service,
             "stdout": out[-500:],
             "stderr": err[-500:],
+        })
+
+    def _handle_claude_sdk(self, action: str) -> None:
+        """Rescate del backend Remote Control del chat web de Claude (Agent
+        SDK en :8765), fuera de Docker. Corre `deploy/fix_remote.sh`:
+          - status  → estado del proceso + sesiones remotas activas
+          - free    → libera (stop) los slots remotos colgados (graceful)
+          - restart → reinicio duro del backend SDK
+        Síncrono — devolvemos rc + salida para que el panel la muestre."""
+        if not self._check_admin_auth():
+            return
+        if not os.path.exists(FIX_REMOTE_SCRIPT):
+            self._json_response(500, {"error": f"script no existe: {FIX_REMOTE_SCRIPT}"})
+            return
+        arg = {"restart": "--restart", "status": "--status", "free": ""}.get(action)
+        if arg is None:
+            self._json_response(400, {"error": f"acción inválida: {action}"})
+            return
+        cmd = ["/bin/bash", FIX_REMOTE_SCRIPT]
+        if arg:
+            cmd.append(arg)
+        rc, out, err = _run(cmd, timeout=120)
+        LOG.info(f"🤖 claude-sdk {action} → rc={rc}")
+        self._json_response(200 if rc == 0 else 500, {
+            "ok": rc == 0,
+            "action": action,
+            "stdout": out[-2000:],
+            "stderr": err[-1000:],
         })
 
 
@@ -637,6 +682,9 @@ def main():
     LOG.info("  POST /admin/deploy              (X-API-Key)")
     LOG.info("  POST /admin/docker/rebuild      (X-API-Key)")
     LOG.info("  POST /admin/docker/restart      (X-API-Key)")
+    LOG.info("  POST /admin/claude-sdk/restart  (X-API-Key)")
+    LOG.info("  POST /admin/claude-sdk/free     (X-API-Key)")
+    LOG.info("  GET  /admin/claude-sdk/status   (X-API-Key)")
     LOG.info("  GET  /admin/docker/ps           (X-API-Key)")
     LOG.info("  GET  /admin/deploy/log?n=200    (X-API-Key)")
     LOG.info("  GET  /admin/system              (X-API-Key)")

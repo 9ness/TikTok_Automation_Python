@@ -8,6 +8,7 @@ import {
   Pencil,
   Send,
   Smartphone,
+  SmartphoneOff,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import {
   fetchSessionDetail,
   renameSession,
   startRemote,
+  stopRemote,
   streamChat,
   useChatSessions,
 } from "@/lib/queries/claude-chat";
@@ -98,17 +100,42 @@ export default function ClaudeChatPage() {
     setRemoteMsg(null);
     setRemoteUrl(null);
     try {
-      const r = await startRemote(sessionId, project);
+      let r = await startRemote(sessionId, project);
+      // Solo hay 1 slot remoto. Si está ocupado por OTRA sesión (posible
+      // remoto colgado), la liberamos y reintentamos una vez.
+      if (!r.remote) {
+        const busy = sessions.filter((s) => s.remote && s.id !== sessionId);
+        for (const s of busy) {
+          try {
+            await stopRemote(s.id);
+          } catch {
+            /* best-effort */
+          }
+        }
+        if (busy.length) r = await startRemote(sessionId, project);
+      }
       setRemoteUrl(r.url ?? null);
       setRemoteMsg(
         r.remote
           ? "✅ Activado en la app. Abre este chat en el móvil:"
-          : "⚠️ No se pudo activar el control remoto. Reinténtalo.",
+          : "⚠️ No se pudo activar el control remoto. Pulsa 📱✕ en el chat que lo tenga activo para liberarlo y reinténtalo.",
       );
+      sessionsQ.refetch();
     } catch {
       setRemoteMsg("⚠️ Error activando el control remoto.");
     } finally {
       setRemoting(false);
+    }
+  }
+
+  async function doStopRemote(s: ChatSession) {
+    try {
+      await stopRemote(s.id);
+      setRemoteMsg("✅ Remoto liberado.");
+      setRemoteUrl(null);
+      sessionsQ.refetch();
+    } catch {
+      setErr("No se pudo desactivar el remoto.");
     }
   }
 
@@ -229,7 +256,9 @@ export default function ClaudeChatPage() {
             >
               <button
                 onClick={() => openSession(s.id, s.project)}
-                className="block w-full px-3 py-2 pr-9 text-left hover:bg-muted/50"
+                className={`block w-full px-3 py-2 text-left hover:bg-muted/50 ${
+                  s.remote ? "pr-16" : "pr-9"
+                }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[11px] font-semibold text-primary">
@@ -255,6 +284,16 @@ export default function ClaudeChatPage() {
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
+              {s.remote && (
+                <button
+                  onClick={() => doStopRemote(s)}
+                  className="absolute right-8 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                  title="Desactivar control remoto (liberar slot)"
+                  aria-label="desactivar remoto"
+                >
+                  <SmartphoneOff className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </aside>
