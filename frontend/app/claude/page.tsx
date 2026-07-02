@@ -8,7 +8,6 @@ import {
   Pencil,
   Send,
   Smartphone,
-  SmartphoneOff,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -291,7 +290,7 @@ export default function ClaudeChatPage() {
                   title="Desactivar control remoto (liberar slot)"
                   aria-label="desactivar remoto"
                 >
-                  <SmartphoneOff className="h-3.5 w-3.5" />
+                  <Smartphone className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
