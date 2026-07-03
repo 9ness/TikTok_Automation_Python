@@ -1,0 +1,17 @@
+# Timer que dispara claude-save-sessions.service cada 5 min mientras el
+# server está encendido. Mantiene el snapshot actualizado por si abres
+# chats nuevos entre reboots.
+[Unit]
+Description=Timer for periodic snapshot of Claude Code sessions
+
+[Timer]
+# Primer disparo 2 min tras el boot (los servicios ya estables).
+OnBootSec=2min
+# Repite cada 5 min.
+OnUnitActiveSec=5min
+# Si el server estaba apagado cuando debía dispararse, no acumules.
+Persistent=false
+Unit=claude-save-sessions.service
+
+[Install]
+WantedBy=timers.target

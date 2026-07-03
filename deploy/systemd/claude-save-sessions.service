@@ -1,0 +1,26 @@
+# Snapshot periódico de las sesiones `claude --resume UUID` vivas.
+# Escribe ~/.claude/remote_state/active_chats.jsonl que luego
+# claude-restore-sessions.service usa al bootear.
+#
+# Dispara este service el timer claude-save-sessions.timer (cada 5 min).
+# También corre una última vez ANTES del shutdown gracias a
+# `Before=shutdown.target` + `DefaultDependencies=no` en el timer.
+[Unit]
+Description=Snapshot Claude Code active tmux sessions (rc_UUID chats)
+After=claude-chat.service
+# Este service se ejecuta también en el ciclo de apagado — captura el
+# último estado justo antes de que systemd mate las tmux sessions.
+DefaultDependencies=no
+Before=shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+User=nebulabsai
+Group=nebulabsai
+ExecStart=/home/nebulabsai/proyectos/TikTok_Automation_Python/deploy/save_chat_sessions.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target shutdown.target

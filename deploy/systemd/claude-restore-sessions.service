@@ -1,0 +1,39 @@
+# Restaura las sesiones tmux `claude --resume UUID` que estaban vivas
+# antes del último apagado. Snapshot escrito por save_chat_sessions.sh
+# (o su timer). Después del boot, la app Claude ve los chats como
+# "Conectado" automáticamente sin tener que abrir cada uno a mano.
+#
+# Instalar:
+#   sudo cp deploy/systemd/claude-restore-sessions.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable claude-restore-sessions.service
+#
+# Test manual (equivalente a lo que hace en boot):
+#   sudo systemctl start claude-restore-sessions
+#   journalctl -u claude-restore-sessions -n 30 --no-pager
+[Unit]
+Description=Restore Claude Code tmux sessions after boot (rc_UUID chats)
+# Necesitamos que claude-chat.service (Agent SDK) esté arriba primero para
+# que el backend Remote Control pueda "adoptar" las tmux sessions cuando
+# la app las tocara. Sin él, las tmux siguen vivas pero desconectadas.
+After=network-online.target claude-chat.service
+Wants=network-online.target
+# Si claude-chat falla, seguimos restaurando: los chats siguen accesibles
+# vía SSH+tmux aunque la app web no los vea.
+Requires=
+
+[Service]
+Type=oneshot
+User=nebulabsai
+Group=nebulabsai
+RemainAfterExit=yes
+# 30s margen para que tmux server + PATH del usuario estén disponibles.
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/nebulabsai/proyectos/TikTok_Automation_Python/deploy/restore_chat_sessions.sh
+# No falla el boot si el restore tuvo algún error individual.
+SuccessExitStatus=0 1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
