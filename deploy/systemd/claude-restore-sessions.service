@@ -27,9 +27,13 @@ Type=oneshot
 User=nebulabsai
 Group=nebulabsai
 RemainAfterExit=yes
-# 30s margen para que tmux server + PATH del usuario estén disponibles.
+# 5s margen para que tmux + PATH + Docker + SDK estén listos.
 ExecStartPre=/bin/sleep 5
 ExecStart=/home/nebulabsai/proyectos/TikTok_Automation_Python/deploy/restore_chat_sessions.sh
+# El restore hace POST /remote/start en paralelo por chat. Cada llamada
+# tarda ~24s (el SDK spawnea tmux, envía /remote-control, captura URL).
+# En paralelo con 7 chats: ~30-40s. Damos margen amplio.
+TimeoutStartSec=180
 # No falla el boot si el restore tuvo algún error individual.
 SuccessExitStatus=0 1
 StandardOutput=journal
