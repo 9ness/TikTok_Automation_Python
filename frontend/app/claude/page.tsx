@@ -154,6 +154,24 @@ export default function ClaudeChatPage() {
     }
   }
 
+  /** Activa Remote Control en un chat concreto desde el sidebar sin
+   *  necesidad de abrirlo. Marca `remotingChatId` para mostrar spinner
+   *  solo en esa fila (no bloquea toda la UI). */
+  const [remotingChatId, setRemotingChatId] = useState<string | null>(null);
+  async function doStartRemoteFor(s: ChatSession) {
+    setRemotingChatId(s.id);
+    setRemoteMsg(null);
+    try {
+      const r = await startRemote(s.id, s.project);
+      setRemoteMsg(r.url ? `✅ Remoto activo · ${r.url}` : "✅ Remoto activo");
+      await sessionsQ.refetch();
+    } catch (e) {
+      setRemoteMsg(`⚠️ Error activando remoto: ${(e as Error).message}`);
+    } finally {
+      setRemotingChatId(null);
+    }
+  }
+
   function send() {
     const text = input.trim();
     if ((!text && images.length === 0) || streaming) return;
@@ -254,14 +272,19 @@ export default function ClaudeChatPage() {
               setStartingAll(false);
             }
           }}
-          title="Activa Remote Control en todos los chats 📌 (o los 10 más recientes si no hay pins). Tarda ~30-40s."
+          title={`Activa Remote Control en los ${sessions.filter((s) => s.always_on).length} chats 📌 anclados (o los 10 más recientes si no hay pins). Tarda ~30-40s.`}
         >
           {startingAll ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Rocket className="h-4 w-4" />
           )}
-          <span className="ml-1 hidden sm:inline">Activar todos</span>
+          <span className="ml-1 hidden sm:inline">
+            Activar anclados
+            {sessions.some((s) => s.always_on)
+              ? ` (${sessions.filter((s) => s.always_on).length})`
+              : ""}
+          </span>
         </Button>
         <select
           value={project}
@@ -353,7 +376,7 @@ export default function ClaudeChatPage() {
               <button
                 onClick={() => openSession(s.id, s.project)}
                 className={`block w-full px-3 py-2 text-left hover:bg-muted/50 ${
-                  s.remote ? "pr-24" : "pr-16"
+                  "pr-24"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -414,16 +437,35 @@ export default function ClaudeChatPage() {
                   <PinOff className="h-3.5 w-3.5" />
                 )}
               </button>
-              {s.remote && (
-                <button
-                  onClick={() => doStopRemote(s)}
-                  className="absolute right-16 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
-                  title="Desactivar control remoto (liberar slot)"
-                  aria-label="desactivar remoto"
-                >
+              {/* Botón 📱 toggle — SIEMPRE visible.
+                  · verde+relleno si está en remoto (click → desactivar)
+                  · gris outline si NO está en remoto (click → activar).
+                  Sin abrir el chat: pulsas aquí y en ~25s aparece en la app. */}
+              <button
+                onClick={() =>
+                  s.remote ? doStopRemote(s) : doStartRemoteFor(s)
+                }
+                className={`absolute right-16 top-1.5 rounded p-1 ${
+                  s.remote
+                    ? "text-emerald-500 hover:bg-muted hover:text-destructive"
+                    : "text-muted-foreground hover:bg-muted hover:text-emerald-600"
+                }`}
+                title={
+                  s.remote
+                    ? "Desactivar control remoto (liberar slot)"
+                    : "Activar control remoto (aparece en la app en ~25s)"
+                }
+                aria-label={
+                  s.remote ? "desactivar remoto" : "activar remoto"
+                }
+                disabled={remotingChatId === s.id}
+              >
+                {remotingChatId === s.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
                   <Smartphone className="h-3.5 w-3.5" />
-                </button>
-              )}
+                )}
+              </button>
             </div>
           ))}
         </aside>
