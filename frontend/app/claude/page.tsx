@@ -6,6 +6,9 @@ import {
   MessageSquarePlus,
   PanelLeft,
   Pencil,
+  Pin,
+  PinOff,
+  Rocket,
   Send,
   Smartphone,
   X,
@@ -18,9 +21,11 @@ import {
   type ChatSession,
   fetchSessionDetail,
   renameSession,
+  startAllRemote,
   startRemote,
   stopRemote,
   streamChat,
+  toggleAlwaysOn,
   useChatSessions,
 } from "@/lib/queries/claude-chat";
 
@@ -36,6 +41,13 @@ export default function ClaudeChatPage() {
   const sessionsQ = useChatSessions();
   const projects = sessionsQ.data?.projects ?? [];
   const sessions = sessionsQ.data?.sessions ?? [];
+  // Lista filtrada según los tabs "Todos / 📌 Anclados / 📱 Remotos".
+  // La barra superior sticky muestra los contadores y permite alternar.
+  const filteredSessions = sessions.filter((s) => {
+    if (filter === "pinned") return Boolean(s.always_on);
+    if (filter === "remote") return Boolean(s.remote);
+    return true;
+  });
 
   const [project, setProject] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -48,6 +60,9 @@ export default function ClaudeChatPage() {
   const [remoting, setRemoting] = useState(false);
   const [remoteMsg, setRemoteMsg] = useState<string | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [startingAll, setStartingAll] = useState(false);
+  const [pinningId, setPinningId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "pinned" | "remote">("all");
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -240,15 +255,93 @@ export default function ClaudeChatPage() {
             showList ? "block" : "hidden"
           } absolute z-20 h-full w-72 max-w-[85vw] overflow-y-auto border-r bg-background md:static md:z-0 md:block md:w-72`}
         >
-          <div className="p-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Tus chats ({sessions.length})
+          {/* Barra superior sticky — siempre visible aunque scrolleés la lista */}
+          <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
+            <div className="flex items-center justify-between gap-2 p-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Tus chats ({filteredSessions.length}/{sessions.length})
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px]"
+                disabled={startingAll}
+                onClick={async () => {
+                  setStartingAll(true);
+                  setRemoteMsg(null);
+                  try {
+                    const r = await startAllRemote();
+                    setRemoteMsg(
+                      `Activados ${r.started} · ya activos ${r.already_active} · fallidos ${r.failed}`,
+                    );
+                    await sessionsQ.refetch();
+                  } catch (e) {
+                    setRemoteMsg(
+                      `Error activando todos: ${(e as Error).message}`,
+                    );
+                  } finally {
+                    setStartingAll(false);
+                  }
+                }}
+                title="Activa Remote Control en todos los chats marcados 📌 (o los 10 más recientes si no hay pins). Tarda ~30-40s."
+                aria-label="activar todos"
+              >
+                {startingAll ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Rocket className="h-3 w-3" />
+                )}
+                <span className="hidden sm:inline">Activar todos</span>
+                <span className="sm:hidden">Todos</span>
+              </Button>
+            </div>
+            {/* Tabs de filtro */}
+            <div className="flex gap-1 px-2 pb-2">
+              {(
+                [
+                  { key: "all", label: "Todos", icon: null, count: sessions.length },
+                  {
+                    key: "pinned",
+                    label: "📌 Anclados",
+                    icon: null,
+                    count: sessions.filter((s) => s.always_on).length,
+                  },
+                  {
+                    key: "remote",
+                    label: "📱 Remotos",
+                    icon: null,
+                    count: sessions.filter((s) => s.remote).length,
+                  },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setFilter(tab.key)}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
+                    filter === tab.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {tab.label}
+                  <span className="ml-1 opacity-70">({tab.count})</span>
+                </button>
+              ))}
+            </div>
           </div>
           {sessionsQ.isLoading && (
             <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
             </div>
           )}
-          {sessions.map((s) => (
+          {filteredSessions.length === 0 && !sessionsQ.isLoading && (
+            <div className="p-4 text-center text-[11px] text-muted-foreground">
+              {filter === "pinned" && "Sin chats anclados aún. Ancla los que uses a menudo con 📌."}
+              {filter === "remote" && "Ningún chat con Remote Control activo. Pulsa 🚀 Activar todos o abre uno."}
+              {filter === "all" && "Sin chats."}
+            </div>
+          )}
+          {filteredSessions.map((s) => (
             <div
               key={s.id}
               className={`relative border-b ${s.id === sessionId ? "bg-muted" : ""}`}
@@ -256,12 +349,13 @@ export default function ClaudeChatPage() {
               <button
                 onClick={() => openSession(s.id, s.project)}
                 className={`block w-full px-3 py-2 text-left hover:bg-muted/50 ${
-                  s.remote ? "pr-16" : "pr-9"
+                  s.remote ? "pr-24" : "pr-16"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[11px] font-semibold text-primary">
                     {s.project}
+                    {s.always_on ? " · 📌" : ""}
                     {s.remote ? " · 📱" : ""}
                   </span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">
@@ -283,10 +377,43 @@ export default function ClaudeChatPage() {
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
+              <button
+                onClick={async () => {
+                  setPinningId(s.id);
+                  try {
+                    await toggleAlwaysOn(s.id, !s.always_on);
+                    await sessionsQ.refetch();
+                  } catch (e) {
+                    setRemoteMsg(`Error pin: ${(e as Error).message}`);
+                  } finally {
+                    setPinningId(null);
+                  }
+                }}
+                className={`absolute right-8 top-1.5 rounded p-1 ${
+                  s.always_on
+                    ? "text-amber-500 hover:bg-muted hover:text-amber-600"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                title={
+                  s.always_on
+                    ? "Quitar de la lista de arranque automático"
+                    : "Añadir a arranque automático (se activa Remote Control al reiniciar el server)"
+                }
+                aria-label="pin arranque"
+                disabled={pinningId === s.id}
+              >
+                {pinningId === s.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : s.always_on ? (
+                  <Pin className="h-3.5 w-3.5" />
+                ) : (
+                  <PinOff className="h-3.5 w-3.5" />
+                )}
+              </button>
               {s.remote && (
                 <button
                   onClick={() => doStopRemote(s)}
-                  className="absolute right-8 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                  className="absolute right-16 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
                   title="Desactivar control remoto (liberar slot)"
                   aria-label="desactivar remoto"
                 >

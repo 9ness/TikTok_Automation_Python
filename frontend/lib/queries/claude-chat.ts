@@ -23,6 +23,10 @@ export interface ChatSession {
   turns: number;
   mtime: number;
   remote?: boolean;
+  /** True si el chat está marcado como "arranca al reiniciar el server" —
+   *  guardado en ~/.claude/remote_state/always_on.json, gestionado por el
+   *  toggle 📌 en la UI. */
+  always_on?: boolean;
 }
 
 /** Inyecta Remote Control a una sesión → aparece en la app de Claude (Code). */
@@ -64,6 +68,51 @@ export async function stopRemote(sessionId: string): Promise<void> {
     headers: headers(),
     body: fd,
   });
+}
+
+/** Activa Remote Control en TODOS los chats marcados always-on (o las 10
+ *  más recientes si aún no hay pins). Idempotente: salta los ya activos.
+ *  Devuelve resumen con contadores + resultados por chat. Tarda ~30-40s. */
+export async function startAllRemote(): Promise<{
+  ok: boolean;
+  total_processed: number;
+  started: number;
+  already_active: number;
+  failed: number;
+  results: Array<{
+    uuid: string;
+    project: string;
+    started: boolean;
+    remote: boolean;
+    url?: string | null;
+    skipped_reason?: string;
+    error?: string;
+  }>;
+}> {
+  const res = await fetch(`${BASE}/claude-chat/remote/start-all`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error(`start-all ${res.status}`);
+  return res.json();
+}
+
+/** Toggle del pin 📌 de un chat: `enabled=true` lo añade a la lista de
+ *  arranque, `enabled=false` lo saca. Persistente en always_on.json. */
+export async function toggleAlwaysOn(
+  sessionId: string,
+  enabled: boolean,
+): Promise<{ ok: boolean; always_on: boolean; total: number }> {
+  const fd = new FormData();
+  fd.append("session_id", sessionId);
+  fd.append("enabled", String(enabled));
+  const res = await fetch(`${BASE}/claude-chat/remote/always-on`, {
+    method: "POST",
+    headers: headers(),
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`always-on ${res.status}`);
+  return res.json();
 }
 export interface SessionsResponse {
   projects: string[];
