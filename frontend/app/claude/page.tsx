@@ -41,13 +41,6 @@ export default function ClaudeChatPage() {
   const sessionsQ = useChatSessions();
   const projects = sessionsQ.data?.projects ?? [];
   const sessions = sessionsQ.data?.sessions ?? [];
-  // Lista filtrada según los tabs "Todos / 📌 Anclados / 📱 Remotos".
-  // La barra superior sticky muestra los contadores y permite alternar.
-  const filteredSessions = sessions.filter((s) => {
-    if (filter === "pinned") return Boolean(s.always_on);
-    if (filter === "remote") return Boolean(s.remote);
-    return true;
-  });
 
   const [project, setProject] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -63,6 +56,14 @@ export default function ClaudeChatPage() {
   const [startingAll, setStartingAll] = useState(false);
   const [pinningId, setPinningId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pinned" | "remote">("all");
+
+  // Lista filtrada según los tabs "Todos / 📌 Anclados / 📱 Remotos".
+  // DEBE ir DESPUÉS del `useState(filter)` — antes daba ReferenceError por TDZ.
+  const filteredSessions = sessions.filter((s) => {
+    if (filter === "pinned") return Boolean(s.always_on);
+    if (filter === "remote") return Boolean(s.remote);
+    return true;
+  });
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
