@@ -199,7 +199,10 @@ export default function ClaudeChatPage() {
       {/* Barra superior — botones a la IZQUIERDA (siempre visibles); el
           selector de proyecto a la derecha. `md:pr-28` deja hueco al badge
           "Cola" (fixed right-3 top-3) del layout para que no tape nada. */}
-      <header className="flex items-center gap-2 border-b p-2 sm:p-3 md:pr-28">
+      {/* Header principal sticky arriba del todo. Es siempre visible sin
+          importar en qué chat estés ni cuánto scrollees. En móvil ocupa el
+          top de la ventana; los tabs de filtro van justo debajo. */}
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-background/95 p-2 backdrop-blur sm:p-3 md:pr-28">
         <Button
           variant="outline"
           size="sm"
@@ -228,6 +231,38 @@ export default function ClaudeChatPage() {
           )}
           <span className="ml-1 hidden sm:inline">A la app</span>
         </Button>
+        {/* Botón "Activar TODOS los pinneados" — siempre disponible sin
+            tener que abrir el listado. Un tap → ~30-40s → todos con
+            Remote Control activo. */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          disabled={startingAll}
+          onClick={async () => {
+            setStartingAll(true);
+            setRemoteMsg(null);
+            try {
+              const r = await startAllRemote();
+              setRemoteMsg(
+                `Activados ${r.started} · ya activos ${r.already_active} · fallidos ${r.failed}`,
+              );
+              await sessionsQ.refetch();
+            } catch (e) {
+              setRemoteMsg(`Error activando todos: ${(e as Error).message}`);
+            } finally {
+              setStartingAll(false);
+            }
+          }}
+          title="Activa Remote Control en todos los chats 📌 (o los 10 más recientes si no hay pins). Tarda ~30-40s."
+        >
+          {startingAll ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Rocket className="h-4 w-4" />
+          )}
+          <span className="ml-1 hidden sm:inline">Activar todos</span>
+        </Button>
         <select
           value={project}
           onChange={(e) => setProject(e.target.value)}
@@ -240,6 +275,43 @@ export default function ClaudeChatPage() {
           ))}
         </select>
       </header>
+
+      {/* Tabs de filtro siempre visibles — al pulsar cualquiera abre el
+          sidebar con la lista filtrada. Sticky justo debajo del header
+          principal para no perderse aunque scrollees el hilo del chat. */}
+      <div className="sticky top-[57px] z-20 flex gap-1 border-b bg-background/95 p-1.5 backdrop-blur sm:top-[65px]">
+        {(
+          [
+            { key: "all" as const, label: "Todos", count: sessions.length },
+            {
+              key: "pinned" as const,
+              label: "📌 Anclados",
+              count: sessions.filter((s) => s.always_on).length,
+            },
+            {
+              key: "remote" as const,
+              label: "📱 Remotos",
+              count: sessions.filter((s) => s.remote).length,
+            },
+          ]
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => {
+              setFilter(tab.key);
+              setShowList(true);
+            }}
+            className={`flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+              filter === tab.key && showList
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {tab.label}
+            <span className="ml-1 opacity-70">({tab.count})</span>
+          </button>
+        ))}
+      </div>
 
       <div className="relative flex min-h-0 flex-1">
         {/* Lista de chats */}
@@ -256,79 +328,10 @@ export default function ClaudeChatPage() {
             showList ? "block" : "hidden"
           } absolute z-20 h-full w-72 max-w-[85vw] overflow-y-auto border-r bg-background md:static md:z-0 md:block md:w-72`}
         >
-          {/* Barra superior sticky — siempre visible aunque scrolleés la lista */}
-          <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-            <div className="flex items-center justify-between gap-2 p-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Tus chats ({filteredSessions.length}/{sessions.length})
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1 px-2 text-[11px]"
-                disabled={startingAll}
-                onClick={async () => {
-                  setStartingAll(true);
-                  setRemoteMsg(null);
-                  try {
-                    const r = await startAllRemote();
-                    setRemoteMsg(
-                      `Activados ${r.started} · ya activos ${r.already_active} · fallidos ${r.failed}`,
-                    );
-                    await sessionsQ.refetch();
-                  } catch (e) {
-                    setRemoteMsg(
-                      `Error activando todos: ${(e as Error).message}`,
-                    );
-                  } finally {
-                    setStartingAll(false);
-                  }
-                }}
-                title="Activa Remote Control en todos los chats marcados 📌 (o los 10 más recientes si no hay pins). Tarda ~30-40s."
-                aria-label="activar todos"
-              >
-                {startingAll ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Rocket className="h-3 w-3" />
-                )}
-                <span className="hidden sm:inline">Activar todos</span>
-                <span className="sm:hidden">Todos</span>
-              </Button>
-            </div>
-            {/* Tabs de filtro */}
-            <div className="flex gap-1 px-2 pb-2">
-              {(
-                [
-                  { key: "all", label: "Todos", icon: null, count: sessions.length },
-                  {
-                    key: "pinned",
-                    label: "📌 Anclados",
-                    icon: null,
-                    count: sessions.filter((s) => s.always_on).length,
-                  },
-                  {
-                    key: "remote",
-                    label: "📱 Remotos",
-                    icon: null,
-                    count: sessions.filter((s) => s.remote).length,
-                  },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key)}
-                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
-                    filter === tab.key
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {tab.label}
-                  <span className="ml-1 opacity-70">({tab.count})</span>
-                </button>
-              ))}
-            </div>
+          {/* Contador simple del listado — el botón "Activar todos" y los
+              tabs de filtro viven ahora en el header principal (sticky top). */}
+          <div className="sticky top-0 z-10 border-b bg-background/95 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+            Tus chats ({filteredSessions.length}/{sessions.length})
           </div>
           {sessionsQ.isLoading && (
             <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
