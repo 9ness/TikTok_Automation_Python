@@ -78,9 +78,11 @@ def generate_problem_videos(
             hook = str(ost[0]).strip() if ost else ""
         videos.append({
             "concept": str(v.get("concept", ""))[:80],
+            "format": str(v.get("format", ""))[:80],
             "emotion": str(v.get("emotion", ""))[:80],
             "angle": str(v.get("angle", ""))[:240],
             "veo3_prompt": veo[:2000],
+            "spoken_line": str(v.get("spoken_line", ""))[:300],
             "hook_text": hook[:120],
             "cta_text": str(v.get("cta_text", ""))[:60],
             "caption": str(v.get("caption", ""))[:300],

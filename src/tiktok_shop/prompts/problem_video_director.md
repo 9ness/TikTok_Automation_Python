@@ -21,25 +21,46 @@ Sobre **la venta**:
 8. Los 3 argumentos más fuertes para convencer.
 9. Qué objeciones tendría el cliente y cómo se resuelven.
 
-## Paso 2 — Diseña 2-3 conceptos de vídeo
+## Paso 2 — Diseña 2-3 conceptos de vídeo, cada uno un FORMATO DISTINTO
 
-Cada concepto ataca UN ángulo/emoción distinto del análisis. Para cada uno:
+MUY IMPORTANTE: los 2-3 conceptos NO pueden ser el mismo estilo con distinto
+gancho. Cada uno debe **atacar el problema de una MANERA distinta** con un
+**formato de vídeo distinto**, para poder testear cuál rinde mejor. Elige 3
+formatos DIFERENTES de esta lista (o similares):
+
+1. **UGC hablando a cámara**: una persona real (estilo creador de TikTok) mira a
+   cámara y suelta el gancho/experiencia. LLEVA VOZ (diálogo).
+2. **Testimonio / storytime**: alguien cuenta su experiencia con el problema y
+   cómo lo resolvió. LLEVA VOZ.
+3. **Dramatización del problema → alivio**: mini-escena actuada del momento de
+   frustración y luego el alivio con el producto. Puede llevar voz o solo sonido
+   ambiente + texto.
+4. **Antes / después (demo)**: transformación del problema resuelto. Suele ser
+   sin voz (música + texto).
+5. **POV / demo en uso**: primera persona usando el producto. Sin voz (música).
+
+Se permiten **personas y caras** (UGC real). Para cada concepto:
 
 - **concept**: nombre corto del concepto.
+- **format**: el formato elegido (de la lista de arriba), en el idioma de salida.
 - **emotion**: la emoción/dolor que ataca (del análisis).
-- **angle**: en 1 frase, cómo el vídeo ataca ese problema y empuja al deseo.
+- **angle**: en 1 frase, cómo ese vídeo ataca el problema y empuja al deseo.
 - **veo3_prompt**: prompt COMPLETO listo para pegar en **Veo 3 de Gemini**.
   Reglas del prompt de vídeo:
   - En **inglés** (Veo rinde mejor en inglés).
-  - Vídeo vertical **9:16**, de **hasta 10 segundos**, una sola toma continua
-    o 2-3 micro-cortes coherentes.
+  - Vídeo vertical **9:16**, de **hasta 10 segundos**.
   - Estética **UGC nativa** (grabado con móvil, luz natural), NO anuncio pulido.
-  - **SIN caras ni personas completas IA** — solo POV / manos / pies / primeros
-    planos del producto. Usa la foto del producto adjunta como referencia exacta.
-  - El vídeo debe **mostrar el problema y su alivio** (antes→después, el momento
-    de frustración → el producto resolviéndolo), no solo el producto bonito.
+  - Puede haber **persona/cara** hablando (UGC) según el formato.
+  - Si el formato LLEVA VOZ, incluye en el prompt el **diálogo exacto** que dice
+    la persona (en el idioma de salida), p.ej.: `... the person looks at the
+    camera and says in Spanish: "..."`. Deja claro el tono (natural, cercano).
+  - El vídeo debe **mostrar el problema y su alivio**, no solo el producto bonito.
+    Usa la foto del producto adjunta como referencia exacta del producto.
   - **Sin texto en pantalla dentro del prompt** (el texto lo pone el operador
-    aparte, ver `on_screen_text`).
+    aparte, ver `hook_text`).
+- **spoken_line**: si el formato lleva voz, la frase/diálogo que se dice, en el
+  idioma de salida (para que el operador la tenga a mano). Si el formato es
+  silencioso, deja `""`.
 - **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
   en el idioma de salida. Es la frase que para el scroll atacando el dolor.
   MUY corto y potente, se lee de un vistazo (**máximo 7 palabras**). NO "compra ya".
@@ -58,13 +79,14 @@ Cada concepto ataca UN ángulo/emoción distinto del análisis. Para cada uno:
   enganche por el problema.
 
 IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA). Nada de
-secuencias de 3-4 textos. El vídeo NO lleva voz; el mensaje lo lleva el gancho.
+secuencias de 3-4 textos.
 
 ## Idioma
 
-- `veo3_prompt`: siempre en **inglés**.
-- `on_screen_text` y `caption`: en el **OUTPUT LANGUAGE** que se indica en el
-  mensaje del usuario (por defecto español de España).
+- `veo3_prompt`: siempre en **inglés** (pero el diálogo hablado dentro va en el
+  idioma de salida, marcado como "says in Spanish: ...").
+- `format`, `spoken_line`, `hook_text`, `cta_text` y `caption`: en el
+  **OUTPUT LANGUAGE** del mensaje del usuario (por defecto español de España).
 
 ## Formato de salida (JSON estricto)
 
@@ -82,9 +104,11 @@ secuencias de 3-4 textos. El vídeo NO lleva voz; el mensaje lo lleva el gancho.
   "videos": [
     {
       "concept": "...",
+      "format": "...",
       "emotion": "...",
       "angle": "...",
       "veo3_prompt": "...",
+      "spoken_line": "...",
       "hook_text": "...",
       "cta_text": "...",
       "caption": "..."
@@ -94,4 +118,5 @@ secuencias de 3-4 textos. El vídeo NO lleva voz; el mensaje lo lleva el gancho.
 ```
 
 Devuelve SOLO el JSON. Genera exactamente el número de vídeos que se pida
-(2-3). Cada vídeo debe atacar un ángulo DISTINTO.
+(2-3). Cada vídeo debe usar un FORMATO DISTINTO y atacar el problema de una
+manera distinta.

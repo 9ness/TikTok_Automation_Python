@@ -148,9 +148,11 @@ export interface Product {
   /** Vídeos que atacan el problema (Veo3): concepto + prompt + textos en pantalla. */
   problem_videos?: {
     concept: string;
+    format: string;
     emotion: string;
     angle: string;
     veo3_prompt: string;
+    spoken_line: string;
     hook_text: string;
     cta_text: string;
     caption: string;

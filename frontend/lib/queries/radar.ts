@@ -266,9 +266,11 @@ export function useAddBatch() {
 
 export interface ProblemVideo {
   concept: string;
+  format: string;
   emotion: string;
   angle: string;
   veo3_prompt: string;
+  spoken_line: string;
   hook_text: string;
   cta_text: string;
   caption: string;
