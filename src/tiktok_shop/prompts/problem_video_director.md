@@ -42,7 +42,13 @@ Cada concepto ataca UN ángulo/emoción distinto del análisis. Para cada uno:
     aparte, ver `on_screen_text`).
 - **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
   en el idioma de salida. Es la frase que para el scroll atacando el dolor.
-  Corto y potente (≤10 palabras). NO "compra ya". Ej: `"Mi bebé lloraba de calor en el carrito"`.
+  Corto y potente (≤12 palabras). NO "compra ya".
+  **VARÍA el formato — NO siempre pregunta.** Elige el que mejor le pegue al
+  producto/ángulo y usa un estilo DISTINTO en cada concepto. Mezcla entre:
+  - Afirmación/confesión: `"Mi bebé lloraba de calor en el carrito"`, `"Llevo años con dolor de articulaciones cada mañana"`.
+  - Imperativo + curiosidad: `"Si te duelen las articulaciones al levantarte, mira esto"`.
+  - Dato/impacto: `"El 80% no sabe por qué se hincha tras comer"`.
+  - Pregunta (solo a veces): `"¿Hinchazón después de comer?"`.
 - **cta_text**: UN CTA corto para la parte de abajo apuntando al carrito
   naranja de TikTok Shop, en el idioma de salida. Ej: `"Míralo aquí 👇🛒"` o
   `"Toca el carrito 🛒"`. (En TikTok Shop el producto ya sale etiquetado; esto
