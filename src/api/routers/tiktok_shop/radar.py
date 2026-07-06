@@ -373,7 +373,8 @@ class PlanEntryOut(BaseModel):
     presets_count: int = 0
     carousels_count: int = 0
     hooks_count: int = 0
-    pack_ready: bool = False      # tiene algún contenido (hooks ya cuenta)
+    problem_videos_count: int = 0
+    pack_ready: bool = False      # tiene algún contenido (hooks/vídeos-problema cuentan)
     ai_ready: bool = False        # tiene vídeos IA + carruseles generados
 
 
@@ -401,18 +402,38 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
         n_pre = len(prod.video_presets) if prod else 0
         n_car = len(prod.carousels) if prod else 0
         n_hooks = len(prod.bofu_hooks) if prod else 0
+        n_pv = len(prod.problem_videos) if prod else 0
         url = (prod.tiktok_shop.product_url or "") if prod else ""
         out.append(PlanEntryOut(
             day=e.day, product_id=e.product_id, slug=e.slug, name=e.name,
             score=e.score, ads_verdict=e.ads_verdict, tested=e.tested,
             tiktok_url=url, presets_count=n_pre, carousels_count=n_car,
-            hooks_count=n_hooks,
-            pack_ready=(n_pre > 0 or n_car > 0 or n_hooks > 0),
+            hooks_count=n_hooks, problem_videos_count=n_pv,
+            pack_ready=(n_pre > 0 or n_car > 0 or n_hooks > 0 or n_pv > 0),
             ai_ready=(n_pre > 0 or n_car > 0),
         ))
     return WeekPlanOut(
         exists=True, id=plan.id, label=plan.label, days=plan.days, entries=out,
     )
+
+
+def _gen_options(gens: list[str] | None) -> dict:
+    """Opciones de pack según los tipos de generación elegidos.
+    gens ⊆ {"problem_videos", "bofu_hooks", "styles"}. Default: solo
+    vídeos-problema (lo que el operador quiere activo ahora)."""
+    gens = gens or ["problem_videos"]
+    styles = "styles" in gens
+    return {
+        "download_photos": False,
+        "photos_to_download": 0,
+        "analyze": True,
+        "research": False,
+        "generate_video_presets": styles,
+        "n_carousels": 2 if styles else 0,
+        "generate_nano_banana": False,
+        "generate_bofu_hooks": "bofu_hooks" in gens,
+        "generate_problem_videos": "problem_videos" in gens,
+    }
 
 
 class AddUrlRequest(BaseModel):
@@ -421,6 +442,8 @@ class AddUrlRequest(BaseModel):
     category: str | None = None
     language: str = "es_ES"
     per_day: int = _PER_DAY_DEFAULT
+    # Tipos de generación a ejecutar: "problem_videos" | "bofu_hooks" | "styles"
+    gens: list[str] = Field(default_factory=lambda: ["problem_videos"])
 
 
 @router.post("/plan/add-url", response_model=CalendarActionResponse)
@@ -523,16 +546,16 @@ def add_url(
     prepo.save(plan, make_current=True)
     landed = next((e.day for e in plan.entries if e.product_id == product.id), 1)
 
-    # 3) Pack LIGERO en background (solo hooks BOFU) ──────────────────────
+    # 3) Pack según tipos de generación elegidos (background) ─────────────
     job = queue.enqueue(
         JobMode.TIKTOK_SHOP_PACK,
-        title=f"🎣 Hooks: {product.name}",
-        params={"product_id": product.id, "options": _light_pack_options()},
+        title=f"🎯 Generando: {product.name}",
+        params={"product_id": product.id, "options": _gen_options(body.gens)},
         enqueued_by=operator or None,
     )
     return CalendarActionResponse(
         ok=True, product_id=product.id, slug=product.slug, job_id=job.id,
-        message=f"'{product.name}' añadido al día {landed} (cola). Generando hooks…",
+        message=f"'{product.name}' añadido al día {landed} (cola). Generando prompts…",
     )
 
 
@@ -724,6 +747,51 @@ def bofu_hooks(
     # Persistir en el producto para verlos siempre en el calendario.
     if res.get("hooks"):
         product.bofu_hooks = res["hooks"]
+        product.touch()
+        ProductRepo().save(product)
+    return {"ok": True, **res}
+
+
+class ProblemVideosRequest(BaseModel):
+    product_id: str
+    language: str = "es"
+    n: int = 3
+
+
+@router.post("/videos/problem")
+def problem_videos(
+    body: ProblemVideosRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Genera 2-3 conceptos de vídeo que atacan el PROBLEMA del cliente
+    (MOFU/TOFU) listos para Veo 3: prompt + textos en pantalla + ángulo."""
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.repos import ProductRepo
+    from src.tiktok_shop.services.problem_video_generator import (
+        generate_problem_videos,
+    )
+
+    product = ProductRepo().get(body.product_id)
+    if product is None:
+        return {"ok": False, "videos": [], "message": "Producto no encontrado."}
+    start_job(
+        job_id=f"probvid_{uuid.uuid4().hex[:8]}",
+        program="tiktok_shop", mode="product_discovery",
+        title=f"Vídeos-problema: {product.name}", user=operator or None,
+    )
+    try:
+        res = generate_problem_videos(product, n=body.n, language=body.language)
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+    if res.get("videos"):
+        product.problem_videos = res["videos"]
+        product.problem_analysis = {
+            "ideal_customer": res.get("ideal_customer", {}),
+            "sale": res.get("sale", {}),
+        }
         product.touch()
         ProductRepo().save(product)
     return {"ok": True, **res}

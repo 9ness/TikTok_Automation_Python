@@ -140,6 +140,7 @@ export interface PlanEntry {
   presets_count: number;
   carousels_count: number;
   hooks_count: number;
+  problem_videos_count: number;
   pack_ready: boolean;
   ai_ready: boolean;
 }
@@ -237,10 +238,29 @@ export function useAddUrl() {
   return useMutation<
     CalendarActionResponse,
     Error,
-    { url: string; name?: string; category?: string; per_day?: number }
+    { url: string; name?: string; category?: string; per_day?: number; gens?: string[] }
   >({
     mutationFn: (body) =>
       api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/add-url", body),
+  });
+}
+
+export interface ProblemVideo {
+  concept: string;
+  emotion: string;
+  angle: string;
+  veo3_prompt: string;
+  on_screen_text: string[];
+  caption: string;
+}
+
+export function useProblemVideos() {
+  return useMutation<
+    { ok: boolean; videos: ProblemVideo[]; ideal_customer?: Record<string, unknown>; sale?: Record<string, unknown>; language: string },
+    Error,
+    { product_id: string; language: string; n?: number }
+  >({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/videos/problem", body),
   });
 }
 

@@ -71,6 +71,9 @@ class PackOptions:
     n_carousels: int = 3
     carousel_slides: int = 6
     generate_nano_banana: bool = True
+    generate_bofu_hooks: bool = True            # hooks BOFU (parte baja embudo)
+    generate_problem_videos: bool = False       # vídeos que atacan el problema (Veo3)
+    n_problem_videos: int = 3
     write_files: bool = True
 
 
@@ -205,15 +208,34 @@ def build_pack(
             log_callback(f"  ⚠️ Nano prompt falló ({e}) — sigo")
 
     # 5b. HOOKS BOFU (textos simples para A/B — consejo del operador) ───
-    try:
-        from src.tiktok_shop.services.hooks_generator import generate_bofu_hooks
-        bofu = generate_bofu_hooks(product, n=10)
-        if bofu.get("hooks"):
-            product.bofu_hooks = bofu["hooks"]
-            log_callback(f"  🎣 {len(bofu['hooks'])} hooks BOFU")
-    except Exception as e:
-        res.warnings.append(f"hooks_bofu: {e}")
-        log_callback(f"  ⚠️ Hooks BOFU fallaron ({e}) — sigo")
+    if opt.generate_bofu_hooks:
+        try:
+            from src.tiktok_shop.services.hooks_generator import generate_bofu_hooks
+            bofu = generate_bofu_hooks(product, n=10)
+            if bofu.get("hooks"):
+                product.bofu_hooks = bofu["hooks"]
+                log_callback(f"  🎣 {len(bofu['hooks'])} hooks BOFU")
+        except Exception as e:
+            res.warnings.append(f"hooks_bofu: {e}")
+            log_callback(f"  ⚠️ Hooks BOFU fallaron ({e}) — sigo")
+
+    # 5c. VÍDEOS QUE ATACAN EL PROBLEMA (MOFU/TOFU, Veo 3) ──────────────
+    if opt.generate_problem_videos:
+        try:
+            from src.tiktok_shop.services.problem_video_generator import (
+                generate_problem_videos,
+            )
+            pv = generate_problem_videos(product, n=opt.n_problem_videos)
+            if pv.get("videos"):
+                product.problem_videos = pv["videos"]
+                product.problem_analysis = {
+                    "ideal_customer": pv.get("ideal_customer", {}),
+                    "sale": pv.get("sale", {}),
+                }
+                log_callback(f"  🎯 {len(pv['videos'])} vídeos-problema (Veo3)")
+        except Exception as e:
+            res.warnings.append(f"problem_videos: {e}")
+            log_callback(f"  ⚠️ Vídeos-problema fallaron ({e}) — sigo")
 
     # Persistir el producto enriquecido ────────────────────────────────
     if carousels:

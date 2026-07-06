@@ -24,12 +24,14 @@ import {
   useMarkTested,
   usePlanGenerate,
   usePlanPack,
+  useProblemVideos,
   useRadarPlan,
   useRegenerateCarousels,
   useRemoveFromPlan,
   useVideoTemplates,
   type BofuHook,
   type PlanEntry,
+  type ProblemVideo,
 } from "@/lib/queries/radar";
 import { useProduct, productKeys } from "@/lib/queries/products";
 
@@ -56,12 +58,16 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState(1);
   const [url, setUrl] = useState("");
   const [manualName, setManualName] = useState("");
+  // Tipos de generación al añadir. Por defecto SOLO vídeos-problema.
+  const [gens, setGens] = useState<string[]>(["problem_videos"]);
+  const toggleGen = (g: string) =>
+    setGens((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
 
   const submitUrl = () => {
     const u = url.trim();
     if (!u) return;
     addUrl.mutate(
-      { url: u, name: manualName.trim() || undefined, per_day: perDay },
+      { url: u, name: manualName.trim() || undefined, per_day: perDay, gens },
       {
         onSuccess: (r) => {
           if (r.ok) {
@@ -126,13 +132,38 @@ export default function CalendarPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") submitUrl();
             }}
-            placeholder="Nombre del producto (opcional · solo si la URL no lo detecta)"
+            placeholder="Nombre del producto (pégalo de Kalodata · la URL de TikTok no lo detecta)"
             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-[11px]"
           />
+          {/* Tipos de generación */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: "problem_videos", label: "🎯 Vídeos que atacan el problema" },
+              { id: "bofu_hooks", label: "🎣 Hooks BOFU" },
+              { id: "styles", label: "🎬 8-9 estilos IA + carruseles" },
+            ].map((g) => {
+              const on = gens.includes(g.id);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => toggleGen(g.id)}
+                  className={
+                    "rounded-full border px-2.5 py-1 text-[11px] transition " +
+                    (on
+                      ? "border-orange-500 bg-orange-500/10 font-medium text-orange-600"
+                      : "border-border text-muted-foreground hover:border-foreground/40")
+                  }
+                >
+                  {on ? "✓ " : ""}
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
           <p className="text-[11px] text-muted-foreground">
-            Lee nombre + foto de la URL, genera plantillas (foto 1er frame Nano Banana
-            + Kling) y hooks, y lo coloca solo en la cola ({perDay}/día). Usa la
-            <b> share-URL</b> de la app (la canónica la bloquea TikTok).
+            Lee nombre + foto de la URL y genera lo marcado arriba (por defecto solo
+            🎯 vídeos-problema para Veo 3). Lo coloca solo en la cola ({perDay}/día).
           </p>
         </CardContent>
       </Card>
@@ -300,7 +331,7 @@ function DayEntry({ e }: { e: PlanEntry }) {
             </p>
             <p className="text-[11px] text-muted-foreground">
               ⭐ {e.score.toFixed(0)} · {VERDICT[e.ads_verdict] ?? ""} ADS {e.ads_verdict} ·{" "}
-              ⚡ plantillas · 🎣 {e.hooks_count}
+              🎯 {e.problem_videos_count} · ⚡ plantillas · 🎣 {e.hooks_count}
               {e.ai_ready && (
                 <span> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</span>
               )}
@@ -404,13 +435,15 @@ interface Carousel {
 function ProductPrompts({ productId }: { productId: string }) {
   const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(productId);
-  const [tab, setTab] = useState<"video" | "carousel" | "templates" | "hooks">("templates");
+  const [tab, setTab] = useState<"problem" | "video" | "carousel" | "templates" | "hooks">("problem");
   const tpls = useVideoTemplates(productId);
   const [carLang, setCarLang] = useState("es");
   const [carStyle, setCarStyle] = useState("simple");
   const regen = useRegenerateCarousels();
   const bofu = useBofuHooks();
   const [bofuHooks, setBofuHooks] = useState<BofuHook[]>([]);
+  const probVids = useProblemVideos();
+  const [problemVideos, setProblemVideos] = useState<ProblemVideo[]>([]);
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
   if (!product) return <p className="text-xs text-destructive">Producto no encontrado.</p>;
@@ -419,6 +452,9 @@ function ProductPrompts({ productId }: { productId: string }) {
   const carousels = (product.carousels ?? []) as unknown as Carousel[];
   const photos = (product.photos?.source ?? []).filter((p) => !p.deleted);
   const listingUrl = product.tiktok_shop?.product_url ?? "";
+  const problemToShow: ProblemVideo[] = problemVideos.length
+    ? problemVideos
+    : ((product.problem_videos ?? []) as ProblemVideo[]);
 
   return (
     <div className="mt-1 rounded-md border border-border p-2">
@@ -461,11 +497,65 @@ function ProductPrompts({ productId }: { productId: string }) {
       </div>
 
       <div className="mb-2 flex flex-wrap gap-1.5">
+        <TabBtn active={tab === "problem"} onClick={() => setTab("problem")}>🎯 Vídeos problema ({(problemVideos.length || (product.problem_videos?.length ?? 0))})</TabBtn>
         <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos IA ({presets.length})</TabBtn>
         <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>🎠 Carruseles ({carousels.length})</TabBtn>
         <TabBtn active={tab === "templates"} onClick={() => setTab("templates")}>⚡ Plantillas ({tpls.data?.templates.length ?? 0})</TabBtn>
         <TabBtn active={tab === "hooks"} onClick={() => setTab("hooks")}>🎣 Hooks BOFU</TabBtn>
       </div>
+
+      {tab === "problem" && (
+        <div className="space-y-2">
+          <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+            🎯 Vídeos que <b>atacan el problema</b> del cliente (medio embudo). Copia el
+            prompt en <b>Veo 3 de Gemini</b> (adjunta la foto del producto) para un vídeo
+            de ~10s, y superpón los <b>textos en pantalla</b> que van al lado. Sin caras IA.
+          </p>
+          <button
+            disabled={probVids.isPending}
+            onClick={() =>
+              probVids.mutate(
+                { product_id: productId, language: "es", n: 3 },
+                {
+                  onSuccess: (r) => {
+                    if (r.ok && r.videos?.length) {
+                      setProblemVideos(r.videos);
+                      qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+                    } else toast.error("No se pudieron generar.");
+                  },
+                  onError: (e) => toast.error(e.message),
+                },
+              )
+            }
+            className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {probVids.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            {problemToShow.length ? "Regenerar vídeos" : "Generar vídeos problema"}
+          </button>
+          {problemToShow.length === 0 && !probVids.isPending && (
+            <p className="text-xs text-muted-foreground">Aún no generados — pulsa el botón.</p>
+          )}
+          {problemToShow.map((v, i) => (
+            <details key={i} className="rounded border border-border/60 p-2 text-xs" open={i === 0}>
+              <summary className="cursor-pointer font-medium">
+                {i + 1}. {v.concept}{" "}
+                <span className="text-muted-foreground">· {v.emotion}</span>
+              </summary>
+              <div className="mt-2 space-y-2">
+                {v.angle && <p className="text-[11px] text-muted-foreground">🎯 {v.angle}</p>}
+                <CopyBlock label="🟣 Prompt Veo 3 (10s · adjunta foto)" text={v.veo3_prompt} />
+                {v.on_screen_text?.length > 0 && (
+                  <CopyBlock
+                    label="📝 Textos en pantalla (en orden)"
+                    text={v.on_screen_text.map((t, k) => `${k + 1}. ${t}`).join("\n")}
+                  />
+                )}
+                {v.caption && <CopyBlock label="✍️ Caption (sin hashtags)" text={v.caption} />}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
 
       {tab === "video" && (
         <div className="space-y-2">

@@ -145,6 +145,16 @@ export interface Product {
   carousels?: Record<string, unknown>[];
   /** Hooks BOFU para A/B: {text, type}. */
   bofu_hooks?: { text: string; type: string }[];
+  /** Vídeos que atacan el problema (Veo3): concepto + prompt + textos en pantalla. */
+  problem_videos?: {
+    concept: string;
+    emotion: string;
+    angle: string;
+    veo3_prompt: string;
+    on_screen_text: string[];
+    caption: string;
+  }[];
+  problem_analysis?: Record<string, unknown>;
   /** Origen: "manual" (creado a mano) o "radar" (importado del Radar). */
   origin?: "manual" | "radar";
   /** Investigación profunda: reviews + top vídeos TikTok + comentarios.

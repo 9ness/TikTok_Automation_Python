@@ -285,6 +285,12 @@ class Product(BaseModel):
     # Hooks BOFU (textos cortos parte-baja-del-embudo) para A/B. Cada uno
     # {text, type}. Generados por build_pack / endpoint /radar/hooks/bofu.
     bofu_hooks: list[dict] = Field(default_factory=list)
+    # Vídeos que atacan el PROBLEMA del cliente (MOFU/TOFU) para Veo 3. Cada uno
+    # {concept, emotion, angle, veo3_prompt, on_screen_text[], caption}. Se
+    # guarda también el análisis (ideal_customer, sale) bajo `problem_analysis`.
+    # Generados por problem_video_generator / endpoint /radar/videos/problem.
+    problem_videos: list[dict] = Field(default_factory=list)
+    problem_analysis: dict = Field(default_factory=dict)
     # Investigación profunda: reviews + top vídeos TikTok + comentarios.
     # Se rellena vía `research_service.py` al pulsar "Reanalizar producto".
     # Los prompts directores leen esto para afinar hooks y guiones con

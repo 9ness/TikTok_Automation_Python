@@ -147,6 +147,10 @@ class ProductResponse(BaseModel):
     carousels: list[dict[str, Any]] = Field(default_factory=list)
     # Hooks BOFU (textos cortos para A/B): cada uno {text, type}.
     bofu_hooks: list[dict[str, Any]] = Field(default_factory=list)
+    # Vídeos que atacan el problema (Veo3): {concept, emotion, angle,
+    # veo3_prompt, on_screen_text[], caption}. + análisis cliente/venta.
+    problem_videos: list[dict[str, Any]] = Field(default_factory=list)
+    problem_analysis: dict[str, Any] = Field(default_factory=dict)
     # Origen del producto: "manual" (creado a mano) o "radar" (descubierto e
     # importado por el Radar). Permite separarlos en "Mis productos".
     origin: str = "manual"
