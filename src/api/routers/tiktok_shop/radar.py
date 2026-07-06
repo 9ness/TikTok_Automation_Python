@@ -442,8 +442,117 @@ class AddUrlRequest(BaseModel):
     category: str | None = None
     language: str = "es_ES"
     per_day: int = _PER_DAY_DEFAULT
-    # Tipos de generación a ejecutar: "problem_videos" | "bofu_hooks" | "styles"
-    gens: list[str] = Field(default_factory=lambda: ["problem_videos"])
+    # Tipos de generación a ejecutar YA: "problem_videos" | "bofu_hooks" | "styles".
+    # Default vacío = NO generar al añadir (el operador elige después por producto).
+    gens: list[str] = Field(default_factory=list)
+
+
+def _scrape_create_product(
+    url: str, name_override: str | None, category: str | None, language: str,
+):
+    """Scrapea la URL + crea (o reusa) el Product con foto. Devuelve
+    (product | None, error_msg). No toca el plan ni genera prompts."""
+    from src.tiktok_shop.config import (
+        product_drive_folder,
+        product_photos_generated_folder,
+        product_photos_source_folder,
+    )
+    from src.tiktok_shop.models.product import Product, TikTokShopMeta, slugify
+    from src.tiktok_shop.repos import ProductRepo
+    from src.tiktok_shop.utils.url_scraper import scrape_product_url
+
+    url = (url or "").strip()
+    if not url:
+        return None, "URL vacía."
+    # La URL canónica (tiktok.com/view/product) la bloquea TikTok (Security
+    # Check) → si ya tenemos nombre, saltamos el scrape HTTP (no da ni foto).
+    is_canonical_blocked = "tiktok.com/view/product" in url
+    data: dict = {}
+    if not (name_override and is_canonical_blocked):
+        try:
+            data = scrape_product_url(url, use_gemini=False) or {}
+        except Exception as e:
+            data = {"warnings": str(e)}
+    name = (name_override or data.get("name") or "").strip()
+    if not name or name.lower() == "security check":
+        return None, (
+            "No pude leer el producto (TikTok bloquea la URL canónica). "
+            "Añade el nombre o usa la share-URL de la app."
+        )
+    repo = ProductRepo()
+    slug = slugify(name)
+    product = repo.get_by_slug(slug)
+    if product is not None:
+        return product, ""
+    cat = (category or data.get("category") or "otros").strip() or "otros"
+    price = data.get("price_eur")
+    product = Product(
+        slug=slug, name=name[:200],
+        brand=(data.get("brand") or None),
+        category=cat, subcategory=(data.get("subcategory") or None),
+        language=language, origin="manual",
+        tiktok_shop=TikTokShopMeta(
+            product_url=url, commission_rate=0.10,
+            price_eur=float(price) if price else None,
+        ),
+    )
+    try:
+        from pathlib import Path
+        Path(product_drive_folder(slug)).mkdir(parents=True, exist_ok=True)
+        Path(product_photos_source_folder(slug)).mkdir(parents=True, exist_ok=True)
+        Path(product_photos_generated_folder(slug)).mkdir(parents=True, exist_ok=True)
+        product.drive_folder = product_drive_folder(slug)
+    except OSError:
+        pass
+    img = data.get("image_url")
+    if img:
+        try:
+            from src.tiktok_shop.utils.photo_downloader import download_image_to_product
+            photo = download_image_to_product(
+                product_slug=slug, image_url=img,
+                photo_type="packshot", origin="tiktok_shop_url",
+            )
+            if photo is not None:
+                product.photos.source.append(photo)
+        except Exception:
+            pass
+    repo.save(product)
+    return product, ""
+
+
+def _queue_product(product, per_day: int) -> int:
+    """Añade el product a la cola del plan (append + reflow). Devuelve el día."""
+    from datetime import datetime, timezone
+
+    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
+    from src.tiktok_shop.repos import PlanRepo
+
+    prepo = PlanRepo()
+    plan = prepo.get_current()
+    if plan is None:
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        plan = WeekPlan(label=f"Semana {date}", date=date, days=1)
+    if not any(e.product_id == product.id for e in plan.entries):
+        plan.entries.append(PlanEntry(
+            day=10_000, product_id=product.id, slug=product.slug,
+            name=product.name, score=0, ads_verdict="desconocida",
+        ))
+    _reflow_plan(plan, per_day)
+    prepo.save(plan, make_current=True)
+    return next((e.day for e in plan.entries if e.product_id == product.id), 1)
+
+
+def _maybe_enqueue_gens(queue, product, gens, operator) -> str | None:
+    """Encola un pack con las generaciones elegidas. None si gens vacío."""
+    if not gens:
+        return None
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_PACK,
+        title=f"🎯 Generando: {product.name}",
+        params={"product_id": product.id, "options": _gen_options(gens)},
+        enqueued_by=operator or None,
+    )
+    return job.id
 
 
 @router.post("/plan/add-url", response_model=CalendarActionResponse)
@@ -452,110 +561,84 @@ def add_url(
     operator: Annotated[str, Depends(get_current_user)],
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> CalendarActionResponse:
-    """Añade un producto a la COLA del calendario desde su URL de TikTok Shop.
-
-    Scrapea nombre+foto de la URL (share-URL de la app), crea el producto,
-    lo coloca en el primer hueco libre (per_day) recompactando la cola, y
-    encola un pack LIGERO (solo hooks BOFU; las plantillas son estáticas)."""
-    from src.tiktok_shop.config import (
-        product_drive_folder,
-        product_photos_generated_folder,
-        product_photos_source_folder,
-    )
-    from src.tiktok_shop.models.product import Product, TikTokShopMeta, slugify
-    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
-    from src.tiktok_shop.repos import PlanRepo, ProductRepo
-    from src.tiktok_shop.utils.url_scraper import scrape_product_url
-
-    url = (body.url or "").strip()
-    if not url:
-        return CalendarActionResponse(ok=False, message="Pega una URL de TikTok Shop.")
-
-    # 1) Scrape (share-URL de la app trae name+image vía og_info) ─────────
-    data: dict = {}
-    try:
-        data = scrape_product_url(url, use_gemini=False) or {}
-    except Exception as e:  # nunca debería, scrape es defensivo
-        data = {"warnings": str(e)}
-
-    name = (body.name or data.get("name") or "").strip()
-    if not name or name.lower() == "security check":
-        return CalendarActionResponse(
-            ok=False,
-            message=(
-                "No pude leer el producto de esa URL (TikTok la bloquea). "
-                "Usa la share-URL del botón Compartir de la app de TikTok, "
-                "o añade el nombre a mano."
-            ),
-        )
-
-    repo = ProductRepo()
-    slug = slugify(name)
-    product = repo.get_by_slug(slug)
+    """Añade UN producto a la cola desde su URL. Por defecto NO genera prompts
+    (gens vacío) — el operador elige después qué generar por producto."""
+    product, err = _scrape_create_product(body.url, body.name, body.category, body.language)
     if product is None:
-        category = (body.category or data.get("category") or "otros").strip() or "otros"
-        price = data.get("price_eur")
-        product = Product(
-            slug=slug, name=name[:200],
-            brand=(data.get("brand") or None),
-            category=category, subcategory=(data.get("subcategory") or None),
-            language=body.language, origin="manual",
-            tiktok_shop=TikTokShopMeta(
-                product_url=url, commission_rate=0.10,
-                price_eur=float(price) if price else None,
-            ),
-        )
-        # Carpetas + foto de la URL (best-effort, no aborta) ──────────────
-        try:
-            from pathlib import Path
-            Path(product_drive_folder(slug)).mkdir(parents=True, exist_ok=True)
-            Path(product_photos_source_folder(slug)).mkdir(parents=True, exist_ok=True)
-            Path(product_photos_generated_folder(slug)).mkdir(parents=True, exist_ok=True)
-            product.drive_folder = product_drive_folder(slug)
-        except OSError:
-            pass
-        img = data.get("image_url")
-        if img:
-            try:
-                from src.tiktok_shop.utils.photo_downloader import (
-                    download_image_to_product,
-                )
-                photo = download_image_to_product(
-                    product_slug=slug, image_url=img,
-                    photo_type="packshot", origin="tiktok_shop_url",
-                )
-                if photo is not None:
-                    product.photos.source.append(photo)
-            except Exception:
-                pass
-        repo.save(product)
-
-    # 2) Colocar en la cola (append + reflow) ─────────────────────────────
-    prepo = PlanRepo()
-    plan = prepo.get_current()
-    if plan is None:
-        from datetime import datetime, timezone
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        plan = WeekPlan(label=f"Semana {date}", date=date, days=1)
-    if not any(e.product_id == product.id for e in plan.entries):
-        plan.entries.append(PlanEntry(
-            day=10_000, product_id=product.id, slug=product.slug,
-            name=product.name, score=0, ads_verdict="desconocida",
-        ))
-    _reflow_plan(plan, body.per_day)
-    prepo.save(plan, make_current=True)
-    landed = next((e.day for e in plan.entries if e.product_id == product.id), 1)
-
-    # 3) Pack según tipos de generación elegidos (background) ─────────────
-    job = queue.enqueue(
-        JobMode.TIKTOK_SHOP_PACK,
-        title=f"🎯 Generando: {product.name}",
-        params={"product_id": product.id, "options": _gen_options(body.gens)},
-        enqueued_by=operator or None,
-    )
+        return CalendarActionResponse(ok=False, message=err)
+    landed = _queue_product(product, body.per_day)
+    job_id = _maybe_enqueue_gens(queue, product, body.gens, operator)
+    tail = " Generando prompts…" if job_id else ""
     return CalendarActionResponse(
-        ok=True, product_id=product.id, slug=product.slug, job_id=job.id,
-        message=f"'{product.name}' añadido al día {landed} (cola). Generando prompts…",
+        ok=True, product_id=product.id, slug=product.slug, job_id=job_id,
+        message=f"'{product.name}' añadido al día {landed} (cola).{tail}",
+    )
+
+
+class AddBatchRequest(BaseModel):
+    # Texto multilínea: un producto por línea, "nombre — url" (o "url — nombre",
+    # o solo url). Se parsea la URL y el resto es el nombre.
+    raw: str
+    per_day: int = _PER_DAY_DEFAULT
+    language: str = "es_ES"
+    gens: list[str] = Field(default_factory=list)
+
+
+class BatchItemResult(BaseModel):
+    line: str
+    ok: bool
+    name: str = ""
+    day: int = 0
+    message: str = ""
+
+
+class AddBatchResponse(BaseModel):
+    ok: bool
+    added: int
+    failed: int
+    results: list[BatchItemResult] = Field(default_factory=list)
+
+
+def _parse_batch_line(line: str) -> tuple[str, str]:
+    """Extrae (url, name) de una línea flexible. La URL es el primer token
+    http(s); el resto (sin separadores) es el nombre."""
+    import re
+
+    m = re.search(r"https?://\S+", line)
+    if not m:
+        return "", ""
+    url = m.group(0).rstrip(".,;")
+    name = (line[: m.start()] + " " + line[m.end():]).strip()
+    name = name.strip(" —–-:|\t").strip()
+    return url, name
+
+
+@router.post("/plan/add-batch", response_model=AddBatchResponse)
+def add_batch(
+    body: AddBatchRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> AddBatchResponse:
+    """Añade VARIOS productos a la cola de golpe (uno por línea), en orden.
+    Por defecto NO genera prompts — se eligen después por producto."""
+    lines = [ln.strip() for ln in (body.raw or "").splitlines() if ln.strip()]
+    results: list[BatchItemResult] = []
+    added = 0
+    for ln in lines:
+        url, name = _parse_batch_line(ln)
+        if not url:
+            results.append(BatchItemResult(line=ln, ok=False, message="Sin URL en la línea."))
+            continue
+        product, err = _scrape_create_product(url, name or None, None, body.language)
+        if product is None:
+            results.append(BatchItemResult(line=ln, ok=False, message=err))
+            continue
+        day = _queue_product(product, body.per_day)
+        _maybe_enqueue_gens(queue, product, body.gens, operator)
+        added += 1
+        results.append(BatchItemResult(line=ln, ok=True, name=product.name, day=day))
+    return AddBatchResponse(
+        ok=added > 0, added=added, failed=len(results) - added, results=results,
     )
 
 

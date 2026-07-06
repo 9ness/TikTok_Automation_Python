@@ -245,6 +245,25 @@ export function useAddUrl() {
   });
 }
 
+export interface BatchItemResult {
+  line: string;
+  ok: boolean;
+  name: string;
+  day: number;
+  message: string;
+}
+
+export function useAddBatch() {
+  return useMutation<
+    { ok: boolean; added: number; failed: number; results: BatchItemResult[] },
+    Error,
+    { raw: string; per_day?: number; language?: string; gens?: string[] }
+  >({
+    mutationFn: (body) =>
+      api.post("/api/v1/tiktok-shop/radar/plan/add-batch", body),
+  });
+}
+
 export interface ProblemVideo {
   concept: string;
   emotion: string;

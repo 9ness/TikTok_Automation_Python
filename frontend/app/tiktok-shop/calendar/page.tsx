@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   useBofuHooks,
   useDeletePlan,
-  useAddUrl,
+  useAddBatch,
   useMarkTested,
   usePlanGenerate,
   usePlanPack,
@@ -52,31 +52,35 @@ export default function CalendarPage() {
   const planQ = useRadarPlan();
   const gen = usePlanGenerate();
   const del = useDeletePlan();
-  const addUrl = useAddUrl();
+  const addBatch = useAddBatch();
   const [perDay, setPerDay] = useState(10);
   const [days, setDays] = useState(7);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [url, setUrl] = useState("");
-  const [manualName, setManualName] = useState("");
-  // Tipos de generación al añadir. Por defecto SOLO vídeos-problema.
-  const [gens, setGens] = useState<string[]>(["problem_videos"]);
+  const [batch, setBatch] = useState("");
+  // Tipos de generación al añadir. Por defecto NINGUNO (se elige después).
+  const [gens, setGens] = useState<string[]>([]);
   const toggleGen = (g: string) =>
     setGens((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
 
-  const submitUrl = () => {
-    const u = url.trim();
-    if (!u) return;
-    addUrl.mutate(
-      { url: u, name: manualName.trim() || undefined, per_day: perDay, gens },
+  const submitBatch = () => {
+    const raw = batch.trim();
+    if (!raw) return;
+    addBatch.mutate(
+      { raw, per_day: perDay, gens },
       {
         onSuccess: (r) => {
-          if (r.ok) {
-            toast.success(r.message);
-            setUrl("");
-            setManualName("");
+          if (r.added > 0) {
+            toast.success(
+              `${r.added} añadido(s) a la cola${r.failed ? ` · ${r.failed} fallaron` : ""}`,
+            );
+            // Deja en el textarea solo las líneas que fallaron, con el motivo.
+            const failed = r.results.filter((x) => !x.ok);
+            setBatch(failed.map((x) => x.line).join("\n"));
+            if (failed.length)
+              toast.error(`${failed.length} sin añadir: ${failed[0].message}`);
             qc.invalidateQueries({ queryKey: ["radar-plan"] });
           } else {
-            toast.error(r.message);
+            toast.error(r.results[0]?.message ?? "No se añadió ninguno.");
           }
         },
         onError: (e) => toast.error(e.message),
@@ -103,44 +107,28 @@ export default function CalendarPage() {
         Qué producto probar cada día, con sus prompts de vídeo y carruseles listos.
       </p>
 
-      {/* Añadir producto por URL de TikTok Shop (flujo Kalodata manual) */}
+      {/* Añadir productos por URL (en lote, flujo Kalodata manual) */}
       <Card>
         <CardContent className="space-y-2 p-4">
-          <p className="text-sm font-semibold">➕ Añadir producto por URL</p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitUrl();
-              }}
-              placeholder="Pega la share-URL de TikTok Shop (botón Compartir → Copiar enlace)"
-              className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs"
-            />
-            <Button disabled={addUrl.isPending || !url.trim()} onClick={submitUrl}>
-              {addUrl.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Rocket className="mr-2 h-4 w-4" />
-              )}
-              Analizar y añadir
-            </Button>
-          </div>
-          <input
-            value={manualName}
-            onChange={(e) => setManualName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitUrl();
-            }}
-            placeholder="Nombre del producto (pégalo de Kalodata · la URL de TikTok no lo detecta)"
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-[11px]"
+          <p className="text-sm font-semibold">➕ Añadir productos a la cola</p>
+          <textarea
+            value={batch}
+            onChange={(e) => setBatch(e.target.value)}
+            rows={4}
+            placeholder={
+              "Un producto por línea:  Nombre del producto — https://www.tiktok.com/view/product/...\n" +
+              "Nombre otro producto — https://...\n" +
+              "(pega varios de golpe, se añaden en orden)"
+            }
+            className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-[11px]"
           />
-          {/* Tipos de generación */}
-          <div className="flex flex-wrap gap-1.5">
+          {/* Tipos de generación (opcional al añadir; por defecto NINGUNO) */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Generar ahora:</span>
             {[
-              { id: "problem_videos", label: "🎯 Vídeos que atacan el problema" },
+              { id: "problem_videos", label: "🎯 Vídeos-problema" },
               { id: "bofu_hooks", label: "🎣 Hooks BOFU" },
-              { id: "styles", label: "🎬 8-9 estilos IA + carruseles" },
+              { id: "styles", label: "🎬 8-9 estilos" },
             ].map((g) => {
               const on = gens.includes(g.id);
               return (
@@ -161,10 +149,20 @@ export default function CalendarPage() {
               );
             })}
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Lee nombre + foto de la URL y genera lo marcado arriba (por defecto solo
-            🎯 vídeos-problema para Veo 3). Lo coloca solo en la cola ({perDay}/día).
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground">
+              Se añaden a la cola ({perDay}/día). Sin marcar nada = solo se añaden;
+              generas los prompts luego en cada producto.
+            </p>
+            <Button disabled={addBatch.isPending || !batch.trim()} onClick={submitBatch}>
+              {addBatch.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Rocket className="mr-2 h-4 w-4" />
+              )}
+              Añadir a la cola
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
