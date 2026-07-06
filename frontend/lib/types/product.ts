@@ -151,7 +151,8 @@ export interface Product {
     emotion: string;
     angle: string;
     veo3_prompt: string;
-    on_screen_text: string[];
+    hook_text: string;
+    cta_text: string;
     caption: string;
   }[];
   problem_analysis?: Record<string, unknown>;

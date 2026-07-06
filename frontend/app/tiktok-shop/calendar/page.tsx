@@ -542,13 +542,9 @@ function ProductPrompts({ productId }: { productId: string }) {
               <div className="mt-2 space-y-2">
                 {v.angle && <p className="text-[11px] text-muted-foreground">🎯 {v.angle}</p>}
                 <CopyBlock label="🟣 Prompt Veo 3 (10s · adjunta foto)" text={v.veo3_prompt} />
-                {v.on_screen_text?.length > 0 && (
-                  <CopyBlock
-                    label="📝 Textos en pantalla (en orden)"
-                    text={v.on_screen_text.map((t, k) => `${k + 1}. ${t}`).join("\n")}
-                  />
-                )}
-                {v.caption && <CopyBlock label="✍️ Caption (sin hashtags)" text={v.caption} />}
+                {v.hook_text && <CopyBlock label="📌 Texto gancho (en pantalla arriba)" text={v.hook_text} />}
+                {v.cta_text && <CopyBlock label="🛒 CTA (abajo, al carrito)" text={v.cta_text} />}
+                {v.caption && <CopyBlock label="✍️ Caption (descripción del post · sin hashtags)" text={v.caption} />}
               </div>
             </details>
           ))}

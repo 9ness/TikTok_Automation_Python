@@ -70,14 +70,19 @@ def generate_problem_videos(
         veo = str(v.get("veo3_prompt", "")).strip()
         if not veo:
             continue
-        ost_raw = v.get("on_screen_text") or []
-        on_screen = [str(t).strip()[:120] for t in ost_raw if str(t).strip()][:6]
+        # 1 texto gancho + 1 CTA (nada de secuencias largas). Compat: si el
+        # modelo devuelve `on_screen_text` como lista, usa el 1º como hook.
+        hook = str(v.get("hook_text", "")).strip()
+        if not hook:
+            ost = v.get("on_screen_text") or []
+            hook = str(ost[0]).strip() if ost else ""
         videos.append({
             "concept": str(v.get("concept", ""))[:80],
             "emotion": str(v.get("emotion", ""))[:80],
             "angle": str(v.get("angle", ""))[:240],
             "veo3_prompt": veo[:2000],
-            "on_screen_text": on_screen,
+            "hook_text": hook[:120],
+            "cta_text": str(v.get("cta_text", ""))[:60],
             "caption": str(v.get("caption", ""))[:300],
         })
 

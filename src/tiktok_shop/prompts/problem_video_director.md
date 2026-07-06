@@ -40,12 +40,19 @@ Cada concepto ataca UN ángulo/emoción distinto del análisis. Para cada uno:
     de frustración → el producto resolviéndolo), no solo el producto bonito.
   - **Sin texto en pantalla dentro del prompt** (el texto lo pone el operador
     aparte, ver `on_screen_text`).
-- **on_screen_text**: lista de 2-4 textos cortos que el operador superpondrá,
-  en orden temporal. En el **idioma de salida** (ver abajo). Deben reforzar el
-  ángulo: primero el gancho/dolor, luego el giro, y un cierre suave hacia el
-  deseo (NO "compra ya"; esto es medio embudo). Ej: `["Llevo semanas sin dormir por esto", "hasta que probé X", "y ahora por fin descanso"]`.
-- **caption**: caption para TikTok en el idioma de salida, **SIN hashtags**,
-  1-2 frases que enganchen por el problema.
+- **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
+  en el idioma de salida. Es la frase que para el scroll atacando el dolor.
+  Corto y potente (≤10 palabras). NO "compra ya". Ej: `"Mi bebé lloraba de calor en el carrito"`.
+- **cta_text**: UN CTA corto para la parte de abajo apuntando al carrito
+  naranja de TikTok Shop, en el idioma de salida. Ej: `"Míralo aquí 👇🛒"` o
+  `"Toca el carrito 🛒"`. (En TikTok Shop el producto ya sale etiquetado; esto
+  solo lo refuerza.)
+- **caption**: descripción del POST (lo que se escribe al subir el vídeo, no va
+  en pantalla) en el idioma de salida, **SIN hashtags**, 1-2 frases que
+  enganchen por el problema.
+
+IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA). Nada de
+secuencias de 3-4 textos. El vídeo NO lleva voz; el mensaje lo lleva el gancho.
 
 ## Idioma
 
@@ -72,7 +79,8 @@ Cada concepto ataca UN ángulo/emoción distinto del análisis. Para cada uno:
       "emotion": "...",
       "angle": "...",
       "veo3_prompt": "...",
-      "on_screen_text": ["...", "..."],
+      "hook_text": "...",
+      "cta_text": "...",
       "caption": "..."
     }
   ]
