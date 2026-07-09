@@ -442,6 +442,39 @@ function ProductPrompts({ productId }: { productId: string }) {
   const [bofuHooks, setBofuHooks] = useState<BofuHook[]>([]);
   const probVids = useProblemVideos();
   const [problemVideos, setProblemVideos] = useState<ProblemVideo[]>([]);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1.12);
+
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  const readyUrl = (i: number) =>
+    `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/ready?product_id=${productId}&concept_index=${i}` +
+    (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
+  const uploadVideo = async (i: number, f: File) => {
+    setUploadingIdx(i);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("product_id", productId);
+      fd.append("concept_index", String(i));
+      fd.append("zoom", String(zoom));
+      const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+      const res = await fetch(
+        `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/upload${qs}`,
+        { method: "POST", body: fd },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        toast.success("Vídeo listo para descargar");
+        setProblemVideos([]);
+        qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+      } else toast.error(data.message ?? "Error procesando");
+    } catch {
+      toast.error("Error subiendo el vídeo");
+    } finally {
+      setUploadingIdx(null);
+    }
+  };
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
   if (!product) return <p className="text-xs text-destructive">Producto no encontrado.</p>;
@@ -533,6 +566,20 @@ function ProductPrompts({ productId }: { productId: string }) {
           {problemToShow.length === 0 && !probVids.isPending && (
             <p className="text-xs text-muted-foreground">Aún no generados — pulsa el botón.</p>
           )}
+          {problemToShow.length > 0 && (
+            <div className="flex items-center gap-2 rounded bg-muted/40 p-2 text-[11px]">
+              <span>🔍 Zoom quita-marca:</span>
+              <input
+                type="range" min={1} max={1.4} step={0.02} value={zoom}
+                onChange={(e) => setZoom(+e.target.value)}
+                className="h-1 w-32"
+              />
+              <span className="font-mono">{zoom.toFixed(2)}×</span>
+              <span className="text-muted-foreground">
+                (sube si aún se ve la marca de agua; aplica al subir vídeo)
+              </span>
+            </div>
+          )}
           {problemToShow.map((v, i) => (
             <details key={i} className="rounded border border-border/60 p-2 text-xs" open={i === 0}>
               <summary className="cursor-pointer font-medium">
@@ -551,6 +598,38 @@ function ProductPrompts({ productId }: { productId: string }) {
                 {v.hook_text && <CopyBlock label="📌 Texto gancho (en pantalla arriba)" text={v.hook_text} />}
                 {v.cta_text && <CopyBlock label="🛒 CTA (abajo, al carrito)" text={v.cta_text} />}
                 {v.caption && <CopyBlock label="✍️ Caption (descripción del post · sin hashtags)" text={v.caption} />}
+
+                {/* Subir el vídeo generado → lo deja listo (zoom + gancho + CTA) */}
+                <div className="mt-1 flex flex-wrap items-center gap-3 rounded bg-muted/40 p-2">
+                  {v.ready_video ? (
+                    <a
+                      href={readyUrl(i)}
+                      download
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 hover:underline"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Descargar vídeo LISTO (con textos)
+                    </a>
+                  ) : uploadingIdx === i ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-orange-500">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Procesando (zoom + textos)…
+                    </span>
+                  ) : null}
+                  {uploadingIdx !== i && (
+                    <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-orange-500 hover:underline">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadVideo(i, f);
+                          e.target.value = "";
+                        }}
+                      />
+                      {v.ready_video ? "↻ re-subir" : "📤 Subir vídeo generado (Flow) → dejar listo"}
+                    </label>
+                  )}
+                </div>
               </div>
             </details>
           ))}

@@ -13,10 +13,12 @@ ads_signal}`. Cost tracking en job mode="product_discovery".
 
 from __future__ import annotations
 
+import os
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_current_user, get_queue
@@ -878,6 +880,80 @@ def problem_videos(
         product.touch()
         ProductRepo().save(product)
     return {"ok": True, **res}
+
+
+def _ready_dir(slug: str) -> str:
+    from src.tiktok_shop.config import product_drive_folder
+    return os.path.join(product_drive_folder(slug), "videos_ready")
+
+
+@router.post("/videos/problem/upload")
+def upload_problem_video(
+    operator: Annotated[str, Depends(get_current_user)],
+    file: Annotated[UploadFile, File()],
+    product_id: Annotated[str, Form()],
+    concept_index: Annotated[int, Form()],
+    zoom: Annotated[float, Form()] = 1.12,
+) -> dict:
+    """Sube el vídeo generado (Flow/Kling) de UN concepto → lo procesa
+    (zoom quita-marca + gancho arriba + CTA abajo) → lo deja listo para bajar."""
+    import shutil
+
+    from src.tiktok_shop.pipeline.ready_video import process_ready_video
+    from src.tiktok_shop.repos import ProductRepo
+
+    repo = ProductRepo()
+    product = repo.get(product_id)
+    if product is None or concept_index < 0 or concept_index >= len(product.problem_videos):
+        return {"ok": False, "message": "Producto o concepto no encontrado."}
+    concept = product.problem_videos[concept_index]
+
+    ready_dir = _ready_dir(product.slug)
+    os.makedirs(ready_dir, exist_ok=True)
+    raw_path = os.path.join(ready_dir, f"concept_{concept_index}_raw.mp4")
+    out_path = os.path.join(ready_dir, f"concept_{concept_index}.mp4")
+    try:
+        with open(raw_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        process_ready_video(
+            raw_path, out_path,
+            hook_text=concept.get("hook_text", ""),
+            cta_text=concept.get("cta_text", ""),
+            zoom=zoom,
+        )
+    except Exception as e:
+        return {"ok": False, "message": f"Error procesando: {e}"}
+    finally:
+        try:
+            os.remove(raw_path)
+        except OSError:
+            pass
+
+    concept["ready_video"] = f"concept_{concept_index}.mp4"
+    product.touch()
+    repo.save(product)
+    return {"ok": True, "message": "Vídeo listo para descargar."}
+
+
+@router.get("/videos/problem/ready")
+def download_ready_video(
+    operator: Annotated[str, Depends(get_current_user)],
+    product_id: str,
+    concept_index: int,
+):
+    """Descarga el vídeo procesado (listo para subir a TikTok)."""
+    from src.tiktok_shop.repos import ProductRepo
+
+    product = ProductRepo().get(product_id)
+    if product is None:
+        return {"ok": False, "message": "Producto no encontrado."}
+    path = os.path.join(_ready_dir(product.slug), f"concept_{concept_index}.mp4")
+    if not os.path.exists(path):
+        return {"ok": False, "message": "Aún no procesado."}
+    return FileResponse(
+        path, media_type="video/mp4",
+        filename=f"{product.slug}_{concept_index}.mp4",
+    )
 
 
 @router.get("/video-templates")

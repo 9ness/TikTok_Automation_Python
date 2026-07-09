@@ -274,6 +274,7 @@ export interface ProblemVideo {
   hook_text: string;
   cta_text: string;
   caption: string;
+  ready_video?: string;
 }
 
 export function useProblemVideos() {

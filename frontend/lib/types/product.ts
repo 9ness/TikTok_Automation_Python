@@ -156,6 +156,7 @@ export interface Product {
     hook_text: string;
     cta_text: string;
     caption: string;
+    ready_video?: string;
   }[];
   problem_analysis?: Record<string, unknown>;
   /** Origen: "manual" (creado a mano) o "radar" (importado del Radar). */
