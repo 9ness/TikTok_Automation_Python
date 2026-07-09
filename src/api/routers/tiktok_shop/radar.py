@@ -890,49 +890,42 @@ def _ready_dir(slug: str) -> str:
 @router.post("/videos/problem/upload")
 def upload_problem_video(
     operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
     file: Annotated[UploadFile, File()],
     product_id: Annotated[str, Form()],
     concept_index: Annotated[int, Form()],
     zoom: Annotated[float, Form()] = 1.12,
 ) -> dict:
-    """Sube el vídeo generado (Flow/Kling) de UN concepto → lo procesa
-    (zoom quita-marca + gancho arriba + CTA abajo) → lo deja listo para bajar."""
+    """Sube el vídeo generado (Flow/Kling) de UN concepto → guarda el original
+    y ENCOLA el procesado (zoom quita-marca + gancho + CTA + flecha). El
+    resultado y cualquier error se ven en la Cola."""
     import shutil
 
-    from src.tiktok_shop.pipeline.ready_video import process_ready_video
     from src.tiktok_shop.repos import ProductRepo
 
-    repo = ProductRepo()
-    product = repo.get(product_id)
+    product = ProductRepo().get(product_id)
     if product is None or concept_index < 0 or concept_index >= len(product.problem_videos):
         return {"ok": False, "message": "Producto o concepto no encontrado."}
-    concept = product.problem_videos[concept_index]
 
     ready_dir = _ready_dir(product.slug)
     os.makedirs(ready_dir, exist_ok=True)
     raw_path = os.path.join(ready_dir, f"concept_{concept_index}_raw.mp4")
-    out_path = os.path.join(ready_dir, f"concept_{concept_index}.mp4")
     try:
         with open(raw_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
-        process_ready_video(
-            raw_path, out_path,
-            hook_text=concept.get("hook_text", ""),
-            cta_text=concept.get("cta_text", ""),
-            zoom=zoom,
-        )
     except Exception as e:
-        return {"ok": False, "message": f"Error procesando: {e}"}
-    finally:
-        try:
-            os.remove(raw_path)
-        except OSError:
-            pass
+        return {"ok": False, "message": f"Error guardando el vídeo: {e}"}
 
-    concept["ready_video"] = f"concept_{concept_index}.mp4"
-    product.touch()
-    repo.save(product)
-    return {"ok": True, "message": "Vídeo listo para descargar."}
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_READY_VIDEO,
+        title=f"🎬 Vídeo listo: {product.name} · v{concept_index + 1}",
+        params={
+            "product_id": product.id, "concept_index": concept_index,
+            "raw_path": raw_path, "zoom": zoom,
+        },
+        enqueued_by=operator or None,
+    )
+    return {"ok": True, "job_id": job.id, "message": "En la cola, procesando…"}
 
 
 @router.get("/videos/problem/ready")

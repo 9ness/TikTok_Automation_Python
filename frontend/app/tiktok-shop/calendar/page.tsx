@@ -443,6 +443,7 @@ function ProductPrompts({ productId }: { productId: string }) {
   const probVids = useProblemVideos();
   const [problemVideos, setProblemVideos] = useState<ProblemVideo[]>([]);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [processingIdx, setProcessingIdx] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1.12);
 
   const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -465,9 +466,9 @@ function ProductPrompts({ productId }: { productId: string }) {
       );
       const data = await res.json();
       if (data.ok) {
-        toast.success("Vídeo listo para descargar");
-        setProblemVideos([]);
-        qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+        toast.success(data.message ?? "En la cola, procesando…");
+        setProblemVideos([]);       // usa datos del producto (traen ready_video)
+        setProcessingIdx(i);        // → polling hasta que el runner lo deje listo
       } else toast.error(data.message ?? "Error procesando");
     } catch {
       toast.error("Error subiendo el vídeo");
@@ -475,6 +476,22 @@ function ProductPrompts({ productId }: { productId: string }) {
       setUploadingIdx(null);
     }
   };
+
+  // Mientras el job de la cola procesa, refresca hasta que aparezca ready_video.
+  useEffect(() => {
+    if (processingIdx === null) return;
+    const done = (product?.problem_videos?.[processingIdx] as ProblemVideo | undefined)?.ready_video;
+    if (done) {
+      setProcessingIdx(null);
+      toast.success("Vídeo listo para descargar");
+      return;
+    }
+    const t = setInterval(
+      () => qc.invalidateQueries({ queryKey: productKeys.detail(productId) }),
+      5000,
+    );
+    return () => clearInterval(t);
+  }, [processingIdx, product, productId, qc]);
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Cargando prompts…</p>;
   if (!product) return <p className="text-xs text-destructive">Producto no encontrado.</p>;
@@ -611,10 +628,14 @@ function ProductPrompts({ productId }: { productId: string }) {
                     </a>
                   ) : uploadingIdx === i ? (
                     <span className="inline-flex items-center gap-1 text-xs text-orange-500">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Procesando (zoom + textos)…
+                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo…
+                    </span>
+                  ) : processingIdx === i ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-orange-500">
+                      <Loader2 className="h-3 w-3 animate-spin" /> En la cola, procesando…
                     </span>
                   ) : null}
-                  {uploadingIdx !== i && (
+                  {uploadingIdx !== i && processingIdx !== i && (
                     <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-orange-500 hover:underline">
                       <input
                         type="file"

@@ -1776,6 +1776,47 @@ def run_tiktok_shop_plan(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     return f"plan:{ok}/{len(results)}"
 
 
+def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Procesa un vídeo subido (Flow/Kling) → lo deja LISTO para TikTok:
+    zoom quita-marca + gancho/CTA + flecha. Guarda en videos_ready y marca
+    el concepto. El original NO se borra si falla (para depurar)."""
+    import os
+
+    from src.tiktok_shop.config import product_drive_folder
+    from src.tiktok_shop.pipeline.ready_video import process_ready_video
+    from src.tiktok_shop.repos import ProductRepo
+
+    product_id = job.params["product_id"]
+    idx = int(job.params["concept_index"])
+    raw_path = job.params["raw_path"]
+    zoom = float(job.params.get("zoom", 1.12))
+
+    repo = ProductRepo()
+    product = repo.get(product_id)
+    if product is None or idx < 0 or idx >= len(product.problem_videos):
+        raise RuntimeError("Producto o concepto no encontrado")
+    concept = product.problem_videos[idx]
+
+    ready_dir = os.path.join(product_drive_folder(product.slug), "videos_ready")
+    out_path = os.path.join(ready_dir, f"concept_{idx}.mp4")
+    on_progress(0.1, "🎬 Procesando vídeo…")
+    process_ready_video(
+        raw_path, out_path,
+        hook_text=concept.get("hook_text", ""),
+        cta_text=concept.get("cta_text", ""),
+        zoom=zoom, log=on_log,
+    )
+    concept["ready_video"] = f"concept_{idx}.mp4"
+    product.touch()
+    repo.save(product)
+    try:
+        os.remove(raw_path)   # solo si el procesado fue bien
+    except OSError:
+        pass
+    on_progress(1.0, "✅ Vídeo listo para descargar")
+    return out_path
+
+
 _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.PRESIDENTS: run_presidents,
     JobMode.PRONOSTICOS: run_pronosticos,
@@ -1786,6 +1827,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_WATERMARK: run_tiktok_shop_watermark,
     JobMode.TIKTOK_SHOP_PACK: run_tiktok_shop_pack,
     JobMode.TIKTOK_SHOP_PLAN: run_tiktok_shop_plan,
+    JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
 }
 
@@ -1800,6 +1842,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_WATERMARK: "tiktok_shop",
     JobMode.TIKTOK_SHOP_PACK: "tiktok_shop",
     JobMode.TIKTOK_SHOP_PLAN: "tiktok_shop",
+    JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
 }
 
