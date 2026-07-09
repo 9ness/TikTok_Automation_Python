@@ -1,12 +1,15 @@
-"""Deja un vídeo generado (Flow/Kling) LISTO para subir a TikTok Shop:
+"""Deja un vídeo generado (Flow/Kling) LISTO para subir a TikTok Shop, con
+edición de CALIDAD (no cutre):
 
-1. **Zoom** para sacar la marca de agua del borde fuera de cuadro (lo que el
-   operador hacía a mano) → escala + recorte centrado a 1080x1920 (9:16).
-2. Quema el **gancho** (arriba) y el **CTA** (abajo) con estética TikTok
-   (Montserrat ExtraBold, blanco con borde negro grueso, legible sobre todo).
+1. **Zoom inteligente**: detecta en qué esquina está la marca de agua (analiza
+   frames: región estática + con bordes = logo) y hace un recorte DIRIGIDO con
+   el mínimo zoom para sacarla de cuadro. Fallback: zoom central manual.
+2. **Textos en zona segura de TikTok** (no tapan el centro del vídeo ni los
+   iconos laterales): gancho arriba, CTA abajo, Montserrat ExtraBold blanco con
+   borde negro grueso.
+3. **Flecha CTA** animada (asset del Editor) apuntando al carrito (abajo-izq).
 
-Sin coste (ffmpeg/MoviePy local). Los emojis se quitan del texto quemado
-(no se rasterizan bien); el texto va limpio.
+Sin coste (MoviePy/ffmpeg local). Emojis se quitan del texto quemado.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from typing import Callable
 
 import numpy as np
 from moviepy.editor import CompositeVideoClip, ImageClip, VideoFileClip
-from moviepy.video.fx.all import crop
+from moviepy.video.fx.all import crop, loop, resize
 from PIL import Image, ImageDraw, ImageFont
 
 from src.font_resolver import _bundled_fonts_dir
@@ -25,10 +28,13 @@ from src.font_resolver import _bundled_fonts_dir
 _noop: Callable[[str], None] = lambda _m: None
 
 TARGET_W, TARGET_H = 1080, 1920
+# Zonas seguras TikTok (de subtitles.py): evitar iconos laterales + UI inferior.
+SAFE_Y = (0.15, 0.75)
+SAFE_X = (0.05, 0.78)
 
-# Emojis / pictogramas fuera del BMP → fuera del texto quemado.
 _EMOJI_RE = re.compile(
-    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF←-⇿⬀-⯿️]+"
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
+    "\U00002190-\U000021FF\U00002B00-\U00002BFF\U0000FE0F]+"
 )
 
 
@@ -41,9 +47,73 @@ def _clean(text: str) -> str:
     return _EMOJI_RE.sub("", text or "").strip()
 
 
+# ── Detección de la marca de agua ────────────────────────────────────────
+def _edge_energy(a: np.ndarray) -> float:
+    g = a.mean(axis=2) if a.ndim == 3 else a
+    gx = np.abs(np.diff(g, axis=1)).mean()
+    gy = np.abs(np.diff(g, axis=0)).mean()
+    return float(gx + gy)
+
+
+def detect_watermark_corner(clip, log=_noop):
+    """Devuelve ('bl'|'br'|'tl'|'tr', frac_w, frac_h) de la esquina con marca de
+    agua, o None. Heurística: esquina estática (poca varianza temporal) pero con
+    bordes (logo/texto) = marca de agua."""
+    try:
+        dur = clip.duration or 2.0
+        ts = [dur * f for f in (0.1, 0.3, 0.5, 0.7, 0.9)]
+        frames = [clip.get_frame(t).astype(np.float32) for t in ts]
+        H, W = frames[0].shape[:2]
+        cw, ch = int(W * 0.24), int(H * 0.14)
+        regions = {
+            "tl": (slice(0, ch), slice(0, cw)),
+            "tr": (slice(0, ch), slice(W - cw, W)),
+            "bl": (slice(H - ch, H), slice(0, cw)),
+            "br": (slice(H - ch, H), slice(W - cw, W)),
+        }
+        best, best_score = None, 0.0
+        for name, (ys, xs) in regions.items():
+            stack = np.stack([f[ys, xs] for f in frames])   # T,h,w,3
+            temporal_std = stack.std(axis=0).mean()          # bajo = estático
+            mean_region = stack.mean(axis=0)
+            edges = _edge_energy(mean_region)                # alto = tiene logo
+            score = edges / (1.0 + temporal_std)             # estático + edgy
+            if score > best_score:
+                best, best_score = name, score
+        # Umbral: la esquina candidata debe destacar sobre el ruido base.
+        if best and best_score > 3.5:
+            log(f"  🔎 Marca de agua detectada en esquina '{best}'")
+            return best, 0.22, 0.13
+        log("  🔎 Sin marca clara detectada — zoom central")
+        return None
+    except Exception:
+        return None
+
+
+def _crop_params(corner, base_w, base_h, manual_zoom):
+    """Params de recorte dirigido para quitar la esquina `corner`. Devuelve
+    (crop_w, crop_h, x_center, y_center) sobre un frame ya escalado a
+    (base_w, base_h)*zoom."""
+    if corner is None:
+        z = manual_zoom
+        zw, zh = base_w * z, base_h * z
+        return zw, zh, zw / 2, zh / 2
+    name, fw, fh = corner
+    # Zoom mínimo para poder desplazar el recorte y tapar la esquina.
+    z = max(manual_zoom, 1.0 + 2 * max(fw, fh) * 0.5)
+    z = min(z, 1.4)
+    zw, zh = TARGET_W * z, TARGET_H * z
+    dx = (zw - TARGET_W) / 2      # margen recortable a cada lado
+    dy = (zh - TARGET_H) / 2
+    # Desplazar el centro del recorte LEJOS de la esquina con marca.
+    x_center = zw / 2 + (dx if "l" in name else -dx)
+    y_center = zh / 2 + (dy if "t" in name else -dy)
+    return zw, zh, x_center, y_center
+
+
+# ── Texto estilo TikTok ──────────────────────────────────────────────────
 def _wrap(draw, text, font, max_w):
-    words = text.split()
-    lines, cur = [], ""
+    words, lines, cur = text.split(), [], ""
     for w in words:
         test = (cur + " " + w).strip()
         if draw.textlength(test, font=font) <= max_w or not cur:
@@ -56,38 +126,53 @@ def _wrap(draw, text, font, max_w):
     return lines
 
 
-def _render_text_png(text: str, *, font_size: int, max_w: int) -> Image.Image | None:
-    """Texto blanco con borde negro grueso (estilo TikTok) sobre transparente."""
+def _render_text_png(text: str, *, font_size: int, max_w: int):
     text = _clean(text)
     if not text:
         return None
     font = ImageFont.truetype(_font_path(), font_size)
-    stroke = max(3, int(font_size * 0.14))
-    scratch = Image.new("RGBA", (10, 10))
-    d0 = ImageDraw.Draw(scratch)
+    stroke = max(3, int(font_size * 0.15))
+    d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     lines = _wrap(d0, text, font, max_w)
     line_h = int(font_size * 1.18)
-    pad = stroke + 8
+    pad = stroke + 10
     w = int(max((d0.textlength(ln, font=font) for ln in lines), default=0)) + pad * 2
     h = line_h * len(lines) + pad * 2
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     for i, ln in enumerate(lines):
-        lw = d.textlength(ln, font=font)
-        x = (w - lw) / 2
-        y = pad + i * line_h
-        d.text((x, y), ln, font=font, fill="white",
+        x = (w - d.textlength(ln, font=font)) / 2
+        d.text((x, pad + i * line_h), ln, font=font, fill="white",
                stroke_width=stroke, stroke_fill="black")
     return img
 
 
-def _text_clip(text: str, *, font_size: int, y_center_pct: float, duration: float):
-    png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * 0.86))
+def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration):
+    png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * max_w_pct))
     if png is None:
         return None
-    clip = ImageClip(np.array(png)).set_duration(duration)
     y = int(TARGET_H * y_center_pct - png.height / 2)
-    return clip.set_position(("center", y))
+    return ImageClip(np.array(png)).set_duration(duration).set_position(("center", y))
+
+
+# ── Flecha CTA (asset del Editor Auto, defensivo) ────────────────────────
+def _arrow_clip(duration):
+    try:
+        from src.editor_auto.config import arrows_folder
+        folder = arrows_folder()
+        prefer = ["flecha_abajo_triple_blanca.mov", "flecha_amarilla.mov",
+                  "flecha_blanca.mov"]
+        path = next((os.path.join(folder, f) for f in prefer
+                     if os.path.exists(os.path.join(folder, f))), None)
+        if path is None:
+            return None
+        arr = VideoFileClip(path, has_mask=True)
+        arr = resize(arr, width=int(TARGET_W * 0.16))
+        arr = loop(arr, duration=duration)
+        # Abajo-izquierda, apuntando al carrito de TikTok Shop.
+        return arr.set_position((int(TARGET_W * 0.12), int(TARGET_H * 0.78)))
+    except Exception:
+        return None
 
 
 def process_ready_video(
@@ -97,31 +182,41 @@ def process_ready_video(
     hook_text: str = "",
     cta_text: str = "",
     zoom: float = 1.12,
+    with_arrow: bool = True,
     log: Callable[[str], None] = _noop,
 ) -> str:
-    """Procesa el vídeo → 1080x1920 con zoom (quita marca) + gancho + CTA."""
-    zoom = max(1.0, min(1.6, float(zoom)))
-    log(f"🎬 Procesando (zoom {zoom:.2f}) → 1080x1920…")
+    zoom = max(1.0, min(1.4, float(zoom)))
+    log("🎬 Procesando vídeo → 1080x1920…")
     base = VideoFileClip(input_path)
 
-    # Cover-fit a 1080x1920, luego zoom, luego recorte centrado.
-    if base.w / base.h > TARGET_W / TARGET_H:
-        fitted = base.resize(height=TARGET_H)
-    else:
-        fitted = base.resize(width=TARGET_W)
-    zoomed = fitted.resize(zoom)
-    core = crop(zoomed, x_center=zoomed.w / 2, y_center=zoomed.h / 2,
-                width=TARGET_W, height=TARGET_H)
+    # Cover-fit a 9:16 sin zoom aún.
+    fitted = base.resize(height=TARGET_H) if base.w / base.h > TARGET_W / TARGET_H \
+        else base.resize(width=TARGET_W)
+    fitted = crop(fitted, x_center=fitted.w / 2, y_center=fitted.h / 2,
+                  width=TARGET_W, height=TARGET_H)
+
+    # Zoom inteligente: detectar esquina de la marca y recortar dirigido.
+    corner = detect_watermark_corner(fitted, log=log)
+    zw, zh, xc, yc = _crop_params(corner, TARGET_W, TARGET_H, zoom)
+    zoomed = resize(fitted, newsize=(int(zw), int(zh)))
+    core = crop(zoomed, x_center=xc, y_center=yc, width=TARGET_W, height=TARGET_H)
 
     layers = [core]
-    hk = _text_clip(hook_text, font_size=64, y_center_pct=0.16, duration=core.duration)
+    hk = _text_clip(hook_text, font_size=64, y_center_pct=0.17,
+                    max_w_pct=0.84, duration=core.duration)
     if hk is not None:
         layers.append(hk)
-        log("  📌 Gancho quemado (arriba)")
-    ct = _text_clip(cta_text, font_size=46, y_center_pct=0.82, duration=core.duration)
+        log("  📌 Gancho (zona segura arriba)")
+    ct = _text_clip(cta_text, font_size=46, y_center_pct=0.70,
+                    max_w_pct=0.60, duration=core.duration)
     if ct is not None:
         layers.append(ct)
-        log("  🛒 CTA quemado (abajo)")
+        log("  🛒 CTA (zona segura)")
+    if with_arrow:
+        ar = _arrow_clip(core.duration)
+        if ar is not None:
+            layers.append(ar)
+            log("  ➘ Flecha CTA al carrito")
 
     final = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H))
     if base.audio is not None:
