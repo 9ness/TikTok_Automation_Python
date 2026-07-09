@@ -155,22 +155,44 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration):
     return ImageClip(np.array(png)).set_duration(duration).set_position(("center", y))
 
 
-# ── Flecha CTA (asset del Editor Auto, defensivo) ────────────────────────
-def _arrow_clip(duration):
+# ── Flecha CTA (asset del Editor Auto, color adaptado por contraste) ─────
+# Posición de la flecha (abajo-izq, apuntando al carrito de TikTok Shop).
+_ARROW_X, _ARROW_Y = 0.12, 0.78
+
+
+def _pick_arrow(core, folder: str):
+    """Elige la flecha del Editor Auto que MÁS contrasta con el fondo de su
+    zona (reusa la lógica WCAG de sticker_arrow). Fallback: blanca abajo."""
+    from src.editor_auto.tools.sticker_arrow import _ARROW_COLORS, _best_contrast_arrow
+
+    pool = [os.path.join(folder, f) for f in _ARROW_COLORS
+            if os.path.exists(os.path.join(folder, f))]
+    if not pool:
+        return None
+    # Color medio del fondo en la zona de la flecha.
+    try:
+        fr = core.get_frame((core.duration or 2) * 0.5)
+        x0, y0 = int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y)
+        patch = fr[y0:y0 + int(TARGET_H * 0.12), x0:x0 + int(TARGET_W * 0.16)]
+        bg = tuple(float(v) for v in patch.reshape(-1, 3).mean(axis=0))
+    except Exception:
+        bg = (0.0, 0.0, 0.0)
+    return _best_contrast_arrow(pool, bg)
+
+
+def _arrow_clip(core, duration, log=_noop):
     try:
         from src.editor_auto.config import arrows_folder
         folder = arrows_folder()
-        prefer = ["flecha_abajo_triple_blanca.mov", "flecha_amarilla.mov",
-                  "flecha_blanca.mov"]
-        path = next((os.path.join(folder, f) for f in prefer
-                     if os.path.exists(os.path.join(folder, f))), None)
-        if path is None:
+        if not os.path.isdir(folder):
+            return None
+        path = _pick_arrow(core, folder)
+        if path is None or not os.path.exists(path):
             return None
         arr = VideoFileClip(path, has_mask=True)
-        arr = resize(arr, width=int(TARGET_W * 0.16))
-        arr = loop(arr, duration=duration)
-        # Abajo-izquierda, apuntando al carrito de TikTok Shop.
-        return arr.set_position((int(TARGET_W * 0.12), int(TARGET_H * 0.78)))
+        arr = loop(resize(arr, width=int(TARGET_W * 0.16)), duration=duration)
+        log(f"  ➘ Flecha CTA: {os.path.basename(path)} (mejor contraste)")
+        return arr.set_position((int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y)))
     except Exception:
         return None
 
@@ -213,10 +235,9 @@ def process_ready_video(
         layers.append(ct)
         log("  🛒 CTA (zona segura)")
     if with_arrow:
-        ar = _arrow_clip(core.duration)
+        ar = _arrow_clip(core, core.duration, log=log)
         if ar is not None:
             layers.append(ar)
-            log("  ➘ Flecha CTA al carrito")
 
     final = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H))
     if base.audio is not None:
