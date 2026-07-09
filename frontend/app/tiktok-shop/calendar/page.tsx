@@ -77,7 +77,7 @@ export default function CalendarPage() {
             const failed = r.results.filter((x) => !x.ok);
             setBatch(failed.map((x) => x.line).join("\n"));
             if (failed.length)
-              toast.error(`${failed.length} sin añadir: ${failed[0].message}`);
+              toast.error(`${failed.length} sin añadir: ${failed[0]?.message ?? ""}`);
             qc.invalidateQueries({ queryKey: ["radar-plan"] });
           } else {
             toast.error(r.results[0]?.message ?? "No se añadió ninguno.");
