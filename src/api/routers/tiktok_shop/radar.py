@@ -17,7 +17,7 @@ import os
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -930,12 +930,24 @@ def upload_problem_video(
 
 @router.get("/videos/problem/ready")
 def download_ready_video(
-    operator: Annotated[str, Depends(get_current_user)],
     product_id: str,
     concept_index: int,
+    api_key: Annotated[str | None, Query()] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
 ):
-    """Descarga el vídeo procesado (listo para subir a TikTok)."""
+    """Descarga el vídeo procesado (listo para subir a TikTok). Auth por
+    query `api_key` (como las fotos) porque va en un <a href> que no manda
+    headers."""
+    from fastapi import HTTPException
+
+    from src.api.config import get_settings
     from src.tiktok_shop.repos import ProductRepo
+
+    settings = get_settings()
+    if settings.api_key:
+        provided = x_api_key or api_key
+        if not provided or provided != settings.api_key:
+            raise HTTPException(status_code=401, detail="API key inválida o ausente.")
 
     product = ProductRepo().get(product_id)
     if product is None:

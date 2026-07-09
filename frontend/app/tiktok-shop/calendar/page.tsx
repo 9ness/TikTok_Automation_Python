@@ -459,10 +459,13 @@ function ProductPrompts({ productId }: { productId: string }) {
       fd.append("product_id", productId);
       fd.append("concept_index", String(i));
       fd.append("zoom", String(zoom));
-      const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
       const res = await fetch(
-        `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/upload${qs}`,
-        { method: "POST", body: fd },
+        `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/upload`,
+        {
+          method: "POST",
+          headers: apiKey ? { "X-API-Key": apiKey } : {},
+          body: fd,
+        },
       );
       const data = await res.json();
       if (data.ok) {
