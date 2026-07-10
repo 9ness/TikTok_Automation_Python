@@ -443,6 +443,7 @@ function ProductPrompts({ productId }: { productId: string }) {
   const probVids = useProblemVideos();
   const [problemVideos, setProblemVideos] = useState<ProblemVideo[]>([]);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [uploadPct, setUploadPct] = useState(0);
   const [processingIdx, setProcessingIdx] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1.12);
 
@@ -451,33 +452,39 @@ function ProductPrompts({ productId }: { productId: string }) {
   const readyUrl = (i: number) =>
     `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/ready?product_id=${productId}&concept_index=${i}` +
     (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
-  const uploadVideo = async (i: number, f: File) => {
+  const uploadVideo = (i: number, f: File) => {
     setUploadingIdx(i);
-    try {
-      const fd = new FormData();
-      fd.append("file", f);
-      fd.append("product_id", productId);
-      fd.append("concept_index", String(i));
-      fd.append("zoom", String(zoom));
-      const res = await fetch(
-        `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/upload`,
-        {
-          method: "POST",
-          headers: apiKey ? { "X-API-Key": apiKey } : {},
-          body: fd,
-        },
-      );
-      const data = await res.json();
-      if (data.ok) {
-        toast.success(data.message ?? "En la cola, procesando…");
-        setProblemVideos([]);       // usa datos del producto (traen ready_video)
-        setProcessingIdx(i);        // → polling hasta que el runner lo deje listo
-      } else toast.error(data.message ?? "Error procesando");
-    } catch {
-      toast.error("Error subiendo el vídeo");
-    } finally {
+    setUploadPct(0);
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("product_id", productId);
+    fd.append("concept_index", String(i));
+    fd.append("zoom", String(zoom));
+    // XHR para tener progreso de subida (fetch no lo expone).
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/upload`);
+    if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
       setUploadingIdx(null);
-    }
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.ok) {
+          toast.success(data.message ?? "En la cola, procesando…");
+          setProblemVideos([]);   // usa datos del producto (traen ready_video)
+          setProcessingIdx(i);    // → polling hasta que el runner lo deje listo
+        } else toast.error(data.message ?? "Error procesando");
+      } catch {
+        toast.error("Respuesta inválida del servidor");
+      }
+    };
+    xhr.onerror = () => {
+      setUploadingIdx(null);
+      toast.error("Error subiendo el vídeo");
+    };
+    xhr.send(fd);
   };
 
   // Mientras el job de la cola procesa, refresca hasta que aparezca ready_video.
@@ -631,7 +638,8 @@ function ProductPrompts({ productId }: { productId: string }) {
                     </a>
                   ) : uploadingIdx === i ? (
                     <span className="inline-flex items-center gap-1 text-xs text-orange-500">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo…
+                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo {uploadPct}%…
+                      {uploadPct >= 100 && " (encolando)"}
                     </span>
                   ) : processingIdx === i ? (
                     <span className="inline-flex items-center gap-1 text-xs text-orange-500">

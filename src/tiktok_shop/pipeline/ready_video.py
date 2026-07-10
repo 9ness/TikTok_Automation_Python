@@ -20,7 +20,7 @@ from typing import Callable
 
 import numpy as np
 from moviepy.editor import CompositeVideoClip, ImageClip, VideoFileClip
-from moviepy.video.fx.all import crop, loop, resize
+from moviepy.video.fx.all import crop, resize
 from PIL import Image, ImageDraw, ImageFont
 
 from src.font_resolver import _bundled_fonts_dir
@@ -155,44 +155,56 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration):
     return ImageClip(np.array(png)).set_duration(duration).set_position(("center", y))
 
 
-# ── Flecha CTA (asset del Editor Auto, color adaptado por contraste) ─────
-# Posición de la flecha (abajo-izq, apuntando al carrito de TikTok Shop).
-_ARROW_X, _ARROW_Y = 0.12, 0.78
+# ── Flecha CTA (dibujada con PIL, color adaptado — sin depender de .mov) ──
+# Nota: leer las flechas .mov del Editor desde el drive de red fallaba de forma
+# intermitente en MoviePy ("failed to read first frame") y tumbaba el render.
+# La dibujamos con PIL: siempre funciona, sin I/O del drive lento.
+_ARROW_X, _ARROW_Y = 0.10, 0.76
 
 
-def _pick_arrow(core, folder: str):
-    """Elige la flecha del Editor Auto que MÁS contrasta con el fondo de su
-    zona (reusa la lógica WCAG de sticker_arrow). Fallback: blanca abajo."""
-    from src.editor_auto.tools.sticker_arrow import _ARROW_COLORS, _best_contrast_arrow
-
-    pool = [os.path.join(folder, f) for f in _ARROW_COLORS
-            if os.path.exists(os.path.join(folder, f))]
-    if not pool:
-        return None
-    # Color medio del fondo en la zona de la flecha.
+def _bg_luma(core) -> float:
     try:
         fr = core.get_frame((core.duration or 2) * 0.5)
         x0, y0 = int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y)
-        patch = fr[y0:y0 + int(TARGET_H * 0.12), x0:x0 + int(TARGET_W * 0.16)]
-        bg = tuple(float(v) for v in patch.reshape(-1, 3).mean(axis=0))
+        patch = fr[y0:y0 + int(TARGET_H * 0.14), x0:x0 + int(TARGET_W * 0.18)]
+        return float(patch.reshape(-1, 3).mean())
     except Exception:
-        bg = (0.0, 0.0, 0.0)
-    return _best_contrast_arrow(pool, bg)
+        return 0.0
+
+
+def _draw_arrow_png(w: int, fill, outline):
+    """Flecha gruesa apuntando abajo (al carrito), RGBA con borde."""
+    h = int(w * 1.3)
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    cx = w / 2
+    sw = w * 0.30          # ancho del asta
+    hw = w * 0.80          # ancho de la cabeza
+    top = h * 0.05
+    mid = h * 0.52
+    tip = h * 0.96
+    pts = [
+        (cx - sw / 2, top), (cx + sw / 2, top),
+        (cx + sw / 2, mid), (cx + hw / 2, mid),
+        (cx, tip),
+        (cx - hw / 2, mid), (cx - sw / 2, mid),
+    ]
+    d.polygon(pts, fill=fill)
+    d.line(pts + [pts[0]], fill=outline, width=max(3, int(w * 0.05)), joint="curve")
+    return img
 
 
 def _arrow_clip(core, duration, log=_noop):
     try:
-        from src.editor_auto.config import arrows_folder
-        folder = arrows_folder()
-        if not os.path.isdir(folder):
-            return None
-        path = _pick_arrow(core, folder)
-        if path is None or not os.path.exists(path):
-            return None
-        arr = VideoFileClip(path, has_mask=True)
-        arr = loop(resize(arr, width=int(TARGET_W * 0.16)), duration=duration)
-        log(f"  ➘ Flecha CTA: {os.path.basename(path)} (mejor contraste)")
-        return arr.set_position((int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y)))
+        luma = _bg_luma(core)
+        if luma < 130:
+            fill, outline = (255, 255, 255, 255), (0, 0, 0, 255)
+        else:
+            fill, outline = (15, 15, 15, 255), (255, 255, 255, 255)
+        png = _draw_arrow_png(int(TARGET_W * 0.13), fill, outline)
+        log("  ➘ Flecha CTA (dibujada, color adaptado)")
+        return (ImageClip(np.array(png)).set_duration(duration)
+                .set_position((int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y))))
     except Exception:
         return None
 
@@ -239,16 +251,29 @@ def process_ready_video(
         if ar is not None:
             layers.append(ar)
 
-    final = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H))
-    if base.audio is not None:
-        final = final.set_audio(base.audio)
-
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    final.write_videofile(
-        output_path, codec="libx264", audio_codec="aac", fps=30,
-        preset="medium", ffmpeg_params=["-pix_fmt", "yuv420p"],
-        logger=None, threads=4,
-    )
+
+    def _render(lys):
+        comp = CompositeVideoClip(lys, size=(TARGET_W, TARGET_H))
+        if base.audio is not None:
+            comp = comp.set_audio(base.audio)
+        comp.write_videofile(
+            output_path, codec="libx264", audio_codec="aac", fps=30,
+            preset="medium", ffmpeg_params=["-pix_fmt", "yuv420p"],
+            logger=None, threads=4,
+        )
+        return comp
+
+    final = None
+    try:
+        final = _render(layers)
+    except Exception as e:
+        # Belt-and-suspenders: si algún overlay peta, saca al menos el vídeo
+        # con zoom + textos (sin lo que sobre) para no dejar al operador sin nada.
+        log(f"  ⚠️ Render con overlays falló ({str(e)[:80]}) — reintento sin flecha")
+        safe = [core] + [x for x in (hk, ct) if x is not None]
+        final = _render(safe)
+
     for c in (base, final):
         try:
             c.close()
