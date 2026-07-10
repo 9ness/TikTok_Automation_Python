@@ -14,6 +14,7 @@ Sin coste (MoviePy/ffmpeg local). Emojis se quitan del texto quemado.
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from typing import Callable
@@ -147,26 +148,30 @@ def _render_text_png(text: str, *, font_size: int, max_w: int):
     return img
 
 
-def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration):
+def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_pct=0.5):
     png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * max_w_pct))
     if png is None:
         return None
+    x = int(TARGET_W * x_center_pct - png.width / 2)
     y = int(TARGET_H * y_center_pct - png.height / 2)
-    return ImageClip(np.array(png)).set_duration(duration).set_position(("center", y))
+    return ImageClip(np.array(png)).set_duration(duration).set_position((x, y))
 
 
 # ── Flecha CTA (dibujada con PIL, color adaptado — sin depender de .mov) ──
 # Nota: leer las flechas .mov del Editor desde el drive de red fallaba de forma
 # intermitente en MoviePy ("failed to read first frame") y tumbaba el render.
 # La dibujamos con PIL: siempre funciona, sin I/O del drive lento.
-_ARROW_X, _ARROW_Y = 0.10, 0.76
+# CTA (texto) + flecha van JUNTOS abajo-izquierda: texto encima, flecha debajo,
+# apuntando al carrito de TikTok Shop. Coordenadas = CENTRO del elemento.
+_CTA_CX, _CTA_CY = 0.26, 0.72
+_ARROW_CX, _ARROW_CY = 0.26, 0.82
 
 
 def _bg_luma(core) -> float:
     try:
         fr = core.get_frame((core.duration or 2) * 0.5)
-        x0, y0 = int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y)
-        patch = fr[y0:y0 + int(TARGET_H * 0.14), x0:x0 + int(TARGET_W * 0.18)]
+        cx, cy = int(TARGET_W * _ARROW_CX), int(TARGET_H * _ARROW_CY)
+        patch = fr[cy - 70:cy + 70, cx - 90:cx + 90]
         return float(patch.reshape(-1, 3).mean())
     except Exception:
         return 0.0
@@ -201,10 +206,18 @@ def _arrow_clip(core, duration, log=_noop):
             fill, outline = (255, 255, 255, 255), (0, 0, 0, 255)
         else:
             fill, outline = (15, 15, 15, 255), (255, 255, 255, 255)
-        png = _draw_arrow_png(int(TARGET_W * 0.13), fill, outline)
-        log("  ➘ Flecha CTA (dibujada, color adaptado)")
-        return (ImageClip(np.array(png)).set_duration(duration)
-                .set_position((int(TARGET_W * _ARROW_X), int(TARGET_H * _ARROW_Y))))
+        png = _draw_arrow_png(int(TARGET_W * 0.12), fill, outline)
+        w, h = png.size
+        x0 = int(TARGET_W * _ARROW_CX - w / 2)
+        y0 = int(TARGET_H * _ARROW_CY - h / 2)
+        amp = int(TARGET_H * 0.012)   # bob ±~23px
+        clip = ImageClip(np.array(png)).set_duration(duration)
+        # Animación: sube y baja (bob) apuntando al carrito.
+        clip = clip.set_position(
+            lambda t: (x0, y0 + int(amp * math.sin(t * 2 * math.pi * 1.2)))
+        )
+        log("  ➘ Flecha CTA animada (color adaptado)")
+        return clip
     except Exception:
         return None
 
@@ -230,7 +243,12 @@ def process_ready_video(
                   width=TARGET_W, height=TARGET_H)
 
     # Zoom inteligente: detectar esquina de la marca y recortar dirigido.
+    # Si no se detecta nada, por defecto quitamos la esquina INFERIOR-DERECHA
+    # (Flow/Veo pone ahí su destello ✦).
     corner = detect_watermark_corner(fitted, log=log)
+    if corner is None:
+        corner = ("br", 0.22, 0.14)
+        log("  🔎 Sin marca clara → recorto esquina inferior-derecha (Flow)")
     zw, zh, xc, yc = _crop_params(corner, TARGET_W, TARGET_H, zoom)
     zoomed = resize(fitted, newsize=(int(zw), int(zh)))
     core = crop(zoomed, x_center=xc, y_center=yc, width=TARGET_W, height=TARGET_H)
@@ -241,11 +259,11 @@ def process_ready_video(
     if hk is not None:
         layers.append(hk)
         log("  📌 Gancho (zona segura arriba)")
-    ct = _text_clip(cta_text, font_size=46, y_center_pct=0.70,
-                    max_w_pct=0.60, duration=core.duration)
+    ct = _text_clip(cta_text, font_size=44, x_center_pct=_CTA_CX,
+                    y_center_pct=_CTA_CY, max_w_pct=0.44, duration=core.duration)
     if ct is not None:
         layers.append(ct)
-        log("  🛒 CTA (zona segura)")
+        log("  🛒 CTA (encima de la flecha)")
     if with_arrow:
         ar = _arrow_clip(core, core.duration, log=log)
         if ar is not None:
