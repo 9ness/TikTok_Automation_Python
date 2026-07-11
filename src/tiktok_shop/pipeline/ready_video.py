@@ -127,29 +127,46 @@ def _wrap(draw, text, font, max_w):
     return lines
 
 
-def _render_text_png(text: str, *, font_size: int, max_w: int):
+# Estilos de texto para dar VARIEDAD entre las 3 versiones de un producto
+# (se rota por índice de concepto). fuente + color relleno + color borde.
+_TEXT_STYLES = [
+    {"font": "Montserrat-ExtraBold.ttf", "fill": (255, 255, 255), "stroke": (0, 0, 0)},
+    {"font": "anton.ttf", "fill": (255, 221, 0), "stroke": (0, 0, 0)},          # amarillo viral
+    {"font": "LuckiestGuy-Regular.ttf", "fill": (255, 255, 255), "stroke": (18, 18, 60)},
+    {"font": "Rubik-Bold.ttf", "fill": (255, 255, 255), "stroke": (214, 20, 90)},  # rosa
+]
+
+
+def _style(idx: int) -> dict:
+    return _TEXT_STYLES[idx % len(_TEXT_STYLES)]
+
+
+def _render_text_png(text: str, *, font_size: int, max_w: int, style: dict | None = None):
     text = _clean(text)
     if not text:
         return None
-    font = ImageFont.truetype(_font_path(), font_size)
+    st = style or _TEXT_STYLES[0]
+    font = ImageFont.truetype(_font_path(st["font"]), font_size)
     stroke = max(3, int(font_size * 0.15))
     d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     lines = _wrap(d0, text, font, max_w)
-    line_h = int(font_size * 1.18)
-    pad = stroke + 10
+    line_h = int(font_size * 1.2)
+    pad = stroke + 12
     w = int(max((d0.textlength(ln, font=font) for ln in lines), default=0)) + pad * 2
     h = line_h * len(lines) + pad * 2
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     for i, ln in enumerate(lines):
         x = (w - d.textlength(ln, font=font)) / 2
-        d.text((x, pad + i * line_h), ln, font=font, fill="white",
-               stroke_width=stroke, stroke_fill="black")
+        d.text((x, pad + i * line_h), ln, font=font, fill=tuple(st["fill"]),
+               stroke_width=stroke, stroke_fill=tuple(st["stroke"]))
     return img
 
 
-def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_pct=0.5):
-    png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * max_w_pct))
+def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_pct=0.5,
+               style: dict | None = None):
+    png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * max_w_pct),
+                           style=style)
     if png is None:
         return None
     x = int(TARGET_W * x_center_pct - png.width / 2)
@@ -230,10 +247,12 @@ def process_ready_video(
     cta_text: str = "",
     zoom: float = 1.12,
     with_arrow: bool = True,
+    style: int = 0,
     log: Callable[[str], None] = _noop,
 ) -> str:
     zoom = max(1.0, min(1.4, float(zoom)))
-    log("🎬 Procesando vídeo → 1080x1920…")
+    st = _style(int(style))
+    log(f"🎬 Procesando vídeo → 1080x1920… (estilo {int(style) % len(_TEXT_STYLES)}: {st['font']})")
     base = VideoFileClip(input_path)
 
     # Cover-fit a 9:16 sin zoom aún.
@@ -255,12 +274,12 @@ def process_ready_video(
 
     layers = [core]
     hk = _text_clip(hook_text, font_size=64, y_center_pct=0.17,
-                    max_w_pct=0.84, duration=core.duration)
+                    max_w_pct=0.84, duration=core.duration, style=st)
     if hk is not None:
         layers.append(hk)
         log("  📌 Gancho (zona segura arriba)")
     ct = _text_clip(cta_text, font_size=44, x_center_pct=_CTA_CX,
-                    y_center_pct=_CTA_CY, max_w_pct=0.44, duration=core.duration)
+                    y_center_pct=_CTA_CY, max_w_pct=0.44, duration=core.duration, style=st)
     if ct is not None:
         layers.append(ct)
         log("  🛒 CTA (encima de la flecha)")

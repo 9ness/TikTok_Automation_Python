@@ -1804,7 +1804,7 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
         raw_path, out_path,
         hook_text=concept.get("hook_text", ""),
         cta_text=concept.get("cta_text", ""),
-        zoom=zoom, log=on_log,
+        zoom=zoom, style=idx, log=on_log,
     )
     concept["ready_video"] = f"concept_{idx}.mp4"
     product.touch()
