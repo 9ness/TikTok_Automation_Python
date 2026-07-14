@@ -376,16 +376,19 @@ def process_ready_video(
     fitted = crop(fitted, x_center=fitted.w / 2, y_center=fitted.h / 2,
                   width=TARGET_W, height=TARGET_H)
 
-    # Zoom inteligente: detectar esquina de la marca y recortar dirigido.
-    # Si no se detecta nada, por defecto quitamos la esquina INFERIOR-DERECHA
-    # (Flow/Veo pone ahí su destello ✦).
-    corner = detect_watermark_corner(fitted, log=log)
-    if corner is None:
-        corner = ("br", 0.22, 0.14)
-        log("  🔎 Sin marca clara → recorto esquina inferior-derecha (Flow)")
-    zw, zh, xc, yc = _crop_params(corner, TARGET_W, TARGET_H, zoom)
-    zoomed = resize(fitted, newsize=(int(zw), int(zh)))
-    core = crop(zoomed, x_center=xc, y_center=yc, width=TARGET_W, height=TARGET_H)
+    # Quita-marca al estilo del operador: zoom mínimo + subir el encuadre para
+    # cortar SOLO el borde INFERIOR (donde Flow/Veo pone su marca), perdiendo lo
+    # mínimo. Laterales simétricos (no come al sujeto de un lado como el recorte
+    # en esquina). El slider `zoom` controla cuánto se corta abajo.
+    z = max(1.02, min(1.4, zoom))
+    zw, zh = int(TARGET_W * z), int(TARGET_H * z)
+    zoomed = resize(fitted, newsize=(zw, zh))
+    # y_center = TARGET_H/2 → el recorte queda PEGADO ARRIBA: todo el sobrante
+    # (zh-1920) se corta por ABAJO. x centrado → laterales simétricos.
+    core = crop(zoomed, x_center=zw / 2, y_center=TARGET_H / 2,
+                width=TARGET_W, height=TARGET_H)
+    log(f"  ✂️ Quita-marca: zoom {z:.2f}× subiendo el encuadre "
+        f"(corta ~{int((z - 1) * 100)}% abajo, {int((z - 1) * 50)}% cada lado)")
 
     layers = [core]
     # Layout tipo "vídeo que vende": texto arriba + flecha roja sola al carrito.
