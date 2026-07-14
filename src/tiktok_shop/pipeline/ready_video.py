@@ -151,32 +151,122 @@ def _text_mode(idx: int) -> str:
     return _TEXT_MODES[idx % len(_TEXT_MODES)]
 
 
-def _render_text_png(text: str, *, font_size: int, max_w: int, style: dict | None = None):
-    text = _clean(text)
+# ── Emojis en color (Noto Color Emoji, CBDT a 109px → escalado) ──────────
+_EMOJI_FONT_CACHE: dict = {}
+
+
+def _emoji_font():
+    if "f" not in _EMOJI_FONT_CACHE:
+        try:
+            _EMOJI_FONT_CACHE["f"] = ImageFont.truetype(
+                _font_path("NotoColorEmoji.ttf"), 109)
+        except Exception:
+            _EMOJI_FONT_CACHE["f"] = None
+    return _EMOJI_FONT_CACHE["f"]
+
+
+def _split_runs(s: str):
+    """Parte la línea en tramos ('text'|'emoji', substring)."""
+    runs, cur, kind = [], "", None
+    for ch in s:
+        k = "emoji" if _EMOJI_RE.match(ch) else "text"
+        if k == kind:
+            cur += ch
+        else:
+            if cur:
+                runs.append((kind, cur))
+            cur, kind = ch, k
+    if cur:
+        runs.append((kind, cur))
+    return runs
+
+
+def _emoji_run_img(run: str, size: int):
+    ef = _emoji_font()
+    if ef is None:
+        return None
+    try:
+        canvas = Image.new("RGBA", (180 * (len(run) + 1), 200), (0, 0, 0, 0))
+        d = ImageDraw.Draw(canvas)
+        d.text((4, 4), run, font=ef, embedded_color=True)
+        bbox = canvas.getbbox()
+        if not bbox:
+            return None
+        img = canvas.crop(bbox)
+        w, h = img.size
+        return img.resize((max(1, int(w * size / h)), size), Image.LANCZOS)
+    except Exception:
+        return None
+
+
+def _seg_width(runs, font, d0, emoji_size, gap):
+    total = 0.0
+    for k, t in runs:
+        if k == "emoji":
+            im = _emoji_run_img(t, emoji_size)
+            total += (im.width + gap) if im else 0
+        else:
+            total += d0.textlength(t, font=font)
+    return total
+
+
+def _render_text_png(text: str, *, font_size: int, max_w: int,
+                     style: dict | None = None, use_emoji: bool = True):
+    if not use_emoji:
+        text = _clean(text)
+    text = (text or "").strip()
     if not text:
         return None
     st = style or _TEXT_STYLES[0]
     font = ImageFont.truetype(_font_path(st["font"]), font_size)
     stroke = max(3, int(font_size * 0.15))
+    emoji_size = int(font_size * 0.92)
+    gap = int(font_size * 0.06)
     d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
-    lines = _wrap(d0, text, font, max_w)
-    line_h = int(font_size * 1.2)
+
+    # Wrap por palabras midiendo texto + emojis.
+    def w_of(s):
+        return _seg_width(_split_runs(s), font, d0, emoji_size, gap)
+
+    words, lines, cur = text.split(), [], ""
+    for word in words:
+        test = (cur + " " + word).strip()
+        if w_of(test) <= max_w or not cur:
+            cur = test
+        else:
+            lines.append(cur)
+            cur = word
+    if cur:
+        lines.append(cur)
+
+    line_h = int(font_size * 1.24)
     pad = stroke + 12
-    w = int(max((d0.textlength(ln, font=font) for ln in lines), default=0)) + pad * 2
-    h = line_h * len(lines) + pad * 2
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    line_ws = [w_of(ln) for ln in lines]
+    W = int(max(line_ws, default=0)) + pad * 2
+    H = line_h * len(lines) + pad * 2
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     for i, ln in enumerate(lines):
-        x = (w - d.textlength(ln, font=font)) / 2
-        d.text((x, pad + i * line_h), ln, font=font, fill=tuple(st["fill"]),
-               stroke_width=stroke, stroke_fill=tuple(st["stroke"]))
+        x = (W - line_ws[i]) / 2
+        y = pad + i * line_h
+        for k, t in _split_runs(ln):
+            if k == "emoji":
+                im = _emoji_run_img(t, emoji_size)
+                if im is not None:
+                    ey = int(y + (font_size - emoji_size) / 2 + font_size * 0.10)
+                    img.paste(im, (int(x), ey), im)
+                    x += im.width + gap
+            else:
+                d.text((x, y), t, font=font, fill=tuple(st["fill"]),
+                       stroke_width=stroke, stroke_fill=tuple(st["stroke"]))
+                x += d0.textlength(t, font=font)
     return img
 
 
 def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_pct=0.5,
-               style: dict | None = None):
+               style: dict | None = None, use_emoji: bool = True):
     png = _render_text_png(text, font_size=font_size, max_w=int(TARGET_W * max_w_pct),
-                           style=style)
+                           style=style, use_emoji=use_emoji)
     if png is None:
         return None
     x = int(TARGET_W * x_center_pct - png.width / 2)
@@ -292,31 +382,33 @@ def process_ready_video(
     dur = core.duration
     akind = _arrow_kind(int(style))
     mode = _text_mode(int(style))
+    # Variedad: la versión 0 va LIMPIA (sin emoji); las demás con emoji.
+    use_emoji = (int(style) % len(_TEXT_STYLES)) != 0
     if mode == "sequence" and (cta_text or "").strip():
         split = dur * 0.45
         hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
-                        max_w_pct=0.86, duration=split, style=st)
+                        max_w_pct=0.86, duration=split, style=st, use_emoji=use_emoji)
         if hk is not None:
             layers.append(hk)
         ct = _text_clip(cta_text, font_size=58, y_center_pct=0.26,
-                        max_w_pct=0.86, duration=dur - split, style=st)
+                        max_w_pct=0.86, duration=dur - split, style=st, use_emoji=use_emoji)
         if ct is not None:
             layers.append(ct.set_start(split))
         if with_arrow:
             ar = _arrow_clip(core, dur - split, kind=akind, log=log)
             if ar is not None:
                 layers.append(ar.set_start(split))
-        log("  📌 Secuencia: gancho → CTA + flecha")
+        log(f"  📌 Secuencia: gancho → CTA + flecha (emoji={use_emoji})")
     else:
         hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
-                        max_w_pct=0.86, duration=dur, style=st)
+                        max_w_pct=0.86, duration=dur, style=st, use_emoji=use_emoji)
         if hk is not None:
             layers.append(hk)
         if with_arrow:
             ar = _arrow_clip(core, dur, kind=akind, log=log)
             if ar is not None:
                 layers.append(ar)
-        log("  📌 Texto único + flecha")
+        log(f"  📌 Texto único + flecha (emoji={use_emoji})")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
