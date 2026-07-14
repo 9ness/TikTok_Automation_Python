@@ -50,16 +50,19 @@ Se permiten **personas y caras** (UGC real). Para cada concepto:
   - En **inglés** (Veo rinde mejor en inglés).
   - Vídeo vertical **9:16**, de **hasta 10 segundos**.
   - Estética **UGC nativa** (grabado con móvil, luz natural), NO anuncio pulido.
-  - **REALISMO — evita el look IA (CRÍTICO):** el fondo debe estar **ENFOCADO
-    y nítido** (gran profundidad de campo), **NO desenfocado / NO bokeh / NO
-    shallow depth of field** — un vídeo de móvil real tiene TODO en foco. Entorno
-    real y con vida (dormitorio, espejo del baño, calle, cocina) con detalles
-    auténticos. Persona **realista**: piel con textura y poros naturales, NADA de
-    cara plastificada/demasiado perfecta de IA, luz natural (no de estudio),
-    encuadre de móvil ligeramente imperfecto. Incluye SIEMPRE en el veo3_prompt
-    algo como: `sharp deep focus with the entire background in focus, no bokeh,
-    no shallow depth of field, realistic natural skin texture with pores,
-    authentic handheld phone-camera look, not a polished ad`.
+  - **REALISMO — evita el look IA (CRÍTICO):** los modelos IGNORAN los negativos
+    ("no bokeh") → hay que describir la **CÁMARA que da todo enfocado**. Una
+    **cámara frontal de móvil** (gran angular, sensor pequeño) tiene enorme
+    profundidad de campo: persona Y fondo nítidos. NO uses palabras trampa como
+    "cinematic", "portrait", "DSLR", "professional", "shallow", "bokeh".
+    Persona realista: piel con textura/poros, luz natural, encuadre imperfecto.
+    Incluye SIEMPRE en el veo3_prompt, textual, algo como:
+    `filmed on a front-facing smartphone selfie camera, ultra-wide small-sensor
+    lens so the ENTIRE frame is in sharp deep focus — the person AND the whole
+    background room are crisp, detailed and clearly visible; flat even focus edge
+    to edge, absolutely no background blur, no depth-of-field effect; realistic
+    natural skin texture with visible pores; authentic amateur handheld phone
+    video, not cinematic, not a polished ad`.
   - **Si es ROPA / moda con persona:** se ve bien la prenda (ajuste, tela y caída
     realistas), cuerpo con proporciones naturales, persona de cuerpo o medio
     cuerpo para lucir la prenda; NADA de fondo borroso de estudio.
