@@ -38,14 +38,15 @@ formatos DIFERENTES de esta lista (o similares):
 4. **Antes / después (demo)**: transformación del problema resuelto. Suele ser
    sin voz (música + texto).
 5. **POV / demo en uso**: primera persona usando el producto. Sin voz (música).
-6. **Persona luciendo/probando el producto (2 PASOS, imagen→vídeo)** — SOBRE
-   TODO para **ropa, moda, accesorios, calzado, joyas, wearables**. Una persona
-   **generada** (que ENCAJE con el producto: género/edad/estilo del público
-   objetivo) luce o se prueba el producto (mirror selfie / probándoselo frente
-   a un espejo). **Silencioso** (solo música, la persona NO habla). Se hace en 2
-   pasos → rellena `image_prompt` (Paso 1) y `animate_prompt` (Paso 2); el
-   `veo3_prompt` puede quedar vacío en este formato. Elige este formato para al
-   menos 1 concepto si el producto es ropa/moda/accesorio.
+6. **Persona luciendo/probando el producto (2 PASOS, imagen→vídeo)** — para
+   TODO lo que se **LLEVA PUESTO** (wearable): **ropa, moda, calzado, joyas,
+   RELOJES/SMARTWATCHES, gafas, gorras, bolsos, accesorios**. Una persona
+   **generada** (que ENCAJE con el producto: género/edad/estilo del público)
+   luce/prueba el producto (mirror selfie o primer plano de la muñeca/zona donde
+   se lleva). **Silencioso** (solo música, la persona NO habla). 2 pasos →
+   rellena `image_prompt` (Paso 1) y `animate_prompt` (Paso 2); `veo3_prompt`
+   vacío. **OBLIGATORIO: si el producto se lleva puesto (ropa/reloj/joya/gafas/
+   calzado/bolso/accesorio), AL MENOS 1 de los conceptos DEBE usar este formato.**
 
 Se permiten **personas y caras** (UGC real). Para cada concepto:
 
