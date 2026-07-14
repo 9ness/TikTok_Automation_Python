@@ -141,6 +141,16 @@ def _style(idx: int) -> dict:
     return _TEXT_STYLES[idx % len(_TEXT_STYLES)]
 
 
+# Modo de texto por versión (rota): "single" = 1 texto fijo (valor directo,
+# estilo chica) · "sequence" = gancho SIN flecha → cambia a CTA + flecha
+# (historia/POV, estilo perro). Alternar entre versiones para testear.
+_TEXT_MODES = ["single", "sequence", "single", "sequence"]
+
+
+def _text_mode(idx: int) -> str:
+    return _TEXT_MODES[idx % len(_TEXT_MODES)]
+
+
 def _render_text_png(text: str, *, font_size: int, max_w: int, style: dict | None = None):
     text = _clean(text)
     if not text:
@@ -277,16 +287,36 @@ def process_ready_video(
     core = crop(zoomed, x_center=xc, y_center=yc, width=TARGET_W, height=TARGET_H)
 
     layers = [core]
-    # Edición simple (como los que venden): UN solo texto arriba + flecha sola.
-    hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
-                    max_w_pct=0.86, duration=core.duration, style=st)
-    if hk is not None:
-        layers.append(hk)
-        log("  📌 Texto (arriba)")
-    if with_arrow:
-        ar = _arrow_clip(core, core.duration, kind=_arrow_kind(int(style)), log=log)
-        if ar is not None:
-            layers.append(ar)
+    # Layout tipo "vídeo que vende": texto arriba + flecha roja sola al carrito.
+    # single = 1 texto fijo + flecha; sequence = gancho SIN flecha → CTA + flecha.
+    dur = core.duration
+    akind = _arrow_kind(int(style))
+    mode = _text_mode(int(style))
+    if mode == "sequence" and (cta_text or "").strip():
+        split = dur * 0.45
+        hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
+                        max_w_pct=0.86, duration=split, style=st)
+        if hk is not None:
+            layers.append(hk)
+        ct = _text_clip(cta_text, font_size=58, y_center_pct=0.26,
+                        max_w_pct=0.86, duration=dur - split, style=st)
+        if ct is not None:
+            layers.append(ct.set_start(split))
+        if with_arrow:
+            ar = _arrow_clip(core, dur - split, kind=akind, log=log)
+            if ar is not None:
+                layers.append(ar.set_start(split))
+        log("  📌 Secuencia: gancho → CTA + flecha")
+    else:
+        hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
+                        max_w_pct=0.86, duration=dur, style=st)
+        if hk is not None:
+            layers.append(hk)
+        if with_arrow:
+            ar = _arrow_clip(core, dur, kind=akind, log=log)
+            if ar is not None:
+                layers.append(ar)
+        log("  📌 Texto único + flecha")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
