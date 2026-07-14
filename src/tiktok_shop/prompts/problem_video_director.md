@@ -50,6 +50,19 @@ Se permiten **personas y caras** (UGC real). Para cada concepto:
   - En **inglés** (Veo rinde mejor en inglés).
   - Vídeo vertical **9:16**, de **hasta 10 segundos**.
   - Estética **UGC nativa** (grabado con móvil, luz natural), NO anuncio pulido.
+  - **REALISMO — evita el look IA (CRÍTICO):** el fondo debe estar **ENFOCADO
+    y nítido** (gran profundidad de campo), **NO desenfocado / NO bokeh / NO
+    shallow depth of field** — un vídeo de móvil real tiene TODO en foco. Entorno
+    real y con vida (dormitorio, espejo del baño, calle, cocina) con detalles
+    auténticos. Persona **realista**: piel con textura y poros naturales, NADA de
+    cara plastificada/demasiado perfecta de IA, luz natural (no de estudio),
+    encuadre de móvil ligeramente imperfecto. Incluye SIEMPRE en el veo3_prompt
+    algo como: `sharp deep focus with the entire background in focus, no bokeh,
+    no shallow depth of field, realistic natural skin texture with pores,
+    authentic handheld phone-camera look, not a polished ad`.
+  - **Si es ROPA / moda con persona:** se ve bien la prenda (ajuste, tela y caída
+    realistas), cuerpo con proporciones naturales, persona de cuerpo o medio
+    cuerpo para lucir la prenda; NADA de fondo borroso de estudio.
   - Puede haber **persona/cara** hablando (UGC) según el formato.
   - Si el formato LLEVA VOZ, incluye en el prompt el **diálogo exacto** que dice
     la persona (en el idioma de salida), p.ej.: `... the person looks at the
