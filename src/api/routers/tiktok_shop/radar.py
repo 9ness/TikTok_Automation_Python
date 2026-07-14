@@ -398,9 +398,11 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
     if plan is None:
         return WeekPlanOut(exists=False)
     prepo = ProductRepo()
+    # Batch: 1 roundtrip a Redis en vez de N gets (carga rápida del calendario).
+    prods = prepo.get_many([e.product_id for e in plan.entries])
     out: list[PlanEntryOut] = []
     for e in plan.entries:
-        prod = prepo.get(e.product_id)
+        prod = prods.get(e.product_id)
         n_pre = len(prod.video_presets) if prod else 0
         n_car = len(prod.carousels) if prod else 0
         n_hooks = len(prod.bofu_hooks) if prod else 0
@@ -781,6 +783,37 @@ def remove_from_plan(
     removed = before - len(plan.entries)
     if removed:
         # Recompacta la cola: los productos de días posteriores suben.
+        _reflow_plan(plan)
+        repo.save(plan, make_current=False)
+    return {"ok": removed > 0, "removed": removed}
+
+
+class RemoveBatchRequest(BaseModel):
+    product_ids: list[str] = Field(default_factory=list)
+    day: int | None = None   # si se pasa, borra TODO ese día (además de ids)
+
+
+@router.post("/plan/remove-batch")
+def remove_batch_from_plan(
+    body: RemoveBatchRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Quita VARIOS productos del calendario de golpe (por ids y/o día entero)
+    + 1 solo reflow + 1 solo guardado → rápido."""
+    from src.tiktok_shop.repos import PlanRepo
+
+    repo = PlanRepo()
+    plan = repo.get_current()
+    if plan is None:
+        return {"ok": False, "removed": 0}
+    ids = set(body.product_ids or [])
+    before = len(plan.entries)
+    plan.entries = [
+        e for e in plan.entries
+        if e.product_id not in ids and (body.day is None or e.day != body.day)
+    ]
+    removed = before - len(plan.entries)
+    if removed:
         _reflow_plan(plan)
         repo.save(plan, make_current=False)
     return {"ok": removed > 0, "removed": removed}

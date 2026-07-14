@@ -67,6 +67,23 @@ class ProductRepo:
                 video_cfg["has_complex_packaging"] = video_cfg.pop("avoid_packaging_close_up")
         return data
 
+    def get_many(self, product_ids: list[str]) -> dict[str, "Product"]:
+        """Lee varios productos en 1 roundtrip (mget). Devuelve {id: Product}.
+        Crítico para el calendario (antes: N gets → segundos de carga)."""
+        ids = [pid for pid in product_ids if pid]
+        if not ids:
+            return {}
+        raws = self.r.mget_json([self._key(pid) for pid in ids])
+        out: dict[str, Product] = {}
+        for pid, data in zip(ids, raws):
+            if not data:
+                continue
+            try:
+                out[pid] = Product.model_validate(self._migrate_legacy_shape(data))
+            except Exception as e:
+                print(f"[ProductRepo] decode error {pid}: {e}")
+        return out
+
     def get_by_slug(self, slug: str) -> Product | None:
         pid = self.r.get_str(f"{self.SLUG_INDEX}{slug}")
         if not pid:

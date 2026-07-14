@@ -27,6 +27,7 @@ import {
   useProblemVideos,
   useRadarPlan,
   useRegenerateCarousels,
+  useRemoveBatch,
   useRemoveFromPlan,
   useVideoTemplates,
   type BofuHook,
@@ -56,6 +57,24 @@ export default function CalendarPage() {
   const [perDay, setPerDay] = useState(10);
   const [days, setDays] = useState(7);
   const [selectedDay, setSelectedDay] = useState(1);
+  const removeBatch = useRemoveBatch();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSel = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const doRemoveBatch = (body: { product_ids?: string[]; day?: number }) =>
+    removeBatch.mutate(body, {
+      onSuccess: (r) => {
+        toast.success(`${r.removed} quitado(s) del calendario`);
+        setSelected(new Set());
+        qc.invalidateQueries({ queryKey: ["radar-plan"] });
+      },
+      onError: (e) => toast.error(e.message),
+    });
   const [batch, setBatch] = useState("");
   // Tipos de generación al añadir. Por defecto NINGUNO (se elige después).
   const [gens, setGens] = useState<string[]>([]);
@@ -260,13 +279,52 @@ export default function CalendarPage() {
 
           {/* Productos del día seleccionado */}
           <div>
-            <h2 className="mb-1.5 text-sm font-semibold">📅 Día {selectedDay}</h2>
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">📅 Día {selectedDay}</h2>
+              {(byDay.get(selectedDay) ?? []).length > 0 && (
+                <button
+                  disabled={removeBatch.isPending}
+                  onClick={() => {
+                    if (confirm(`¿Vaciar el día ${selectedDay}? (quita todos sus productos del calendario)`))
+                      doRemoveBatch({ day: selectedDay });
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-red-500"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Vaciar día
+                </button>
+              )}
+            </div>
+            {selected.size > 0 && (
+              <div className="mb-1.5 flex items-center justify-between gap-2 rounded-md bg-red-500/10 px-2 py-1.5">
+                <span className="text-[11px] font-medium">{selected.size} seleccionado(s)</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelected(new Set())}
+                    className="text-[11px] text-muted-foreground hover:underline"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={removeBatch.isPending}
+                    onClick={() => doRemoveBatch({ product_ids: [...selected] })}
+                    className="inline-flex items-center gap-1 rounded bg-red-500 px-2 py-1 text-[11px] font-semibold text-white"
+                  >
+                    <Trash2 className="h-3 w-3" /> Borrar seleccionados
+                  </button>
+                </div>
+              </div>
+            )}
             {(byDay.get(selectedDay) ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">— día libre —</p>
             ) : (
               <div className="space-y-2">
                 {(byDay.get(selectedDay) ?? []).map((e) => (
-                  <DayEntry key={e.product_id} e={e} />
+                  <DayEntry
+                    key={e.product_id}
+                    e={e}
+                    selected={selected.has(e.product_id)}
+                    onToggle={() => toggleSel(e.product_id)}
+                  />
                 ))}
               </div>
             )}
@@ -277,7 +335,15 @@ export default function CalendarPage() {
   );
 }
 
-function DayEntry({ e }: { e: PlanEntry }) {
+function DayEntry({
+  e,
+  selected,
+  onToggle,
+}: {
+  e: PlanEntry;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   const qc = useQueryClient();
   const mark = useMarkTested();
   const remove = useRemoveFromPlan();
@@ -322,7 +388,15 @@ function DayEntry({ e }: { e: PlanEntry }) {
     <Card>
       <CardContent className="space-y-2 p-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggle}
+              className="mt-1 shrink-0"
+              title="Seleccionar para borrar en lote"
+            />
+            <div className="min-w-0">
             <p className="text-sm font-medium">
               {tested && <Check className="mr-1 inline h-3.5 w-3.5 text-green-600" />}
               {e.name}
@@ -344,6 +418,7 @@ function DayEntry({ e }: { e: PlanEntry }) {
                 <ExternalLink className="h-3 w-3" /> Abrir ficha (descargar fotos)
               </a>
             )}
+            </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <label className="flex cursor-pointer items-center gap-1 text-xs">

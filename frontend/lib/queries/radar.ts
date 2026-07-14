@@ -224,6 +224,16 @@ export function useRemoveFromPlan() {
   });
 }
 
+export function useRemoveBatch() {
+  return useMutation<
+    { ok: boolean; removed: number },
+    Error,
+    { product_ids?: string[]; day?: number }
+  >({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/plan/remove-batch", body),
+  });
+}
+
 export interface VideoTemplate {
   id: string;
   name: string;
