@@ -178,62 +178,66 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_p
 # Nota: leer las flechas .mov del Editor desde el drive de red fallaba de forma
 # intermitente en MoviePy ("failed to read first frame") y tumbaba el render.
 # La dibujamos con PIL: siempre funciona, sin I/O del drive lento.
-# CTA (texto) + flecha van JUNTOS abajo-izquierda: texto encima, flecha debajo,
-# apuntando al carrito de TikTok Shop. Coordenadas = CENTRO del elemento.
-_CTA_CX, _CTA_CY = 0.26, 0.72
-_ARROW_CX, _ARROW_CY = 0.26, 0.82
+# La flecha va SOLA en la zona media-izquierda apuntando al carrito naranja de
+# TikTok Shop (como los vídeos que venden). ROJA con borde blanco. Coordenadas
+# = CENTRO del elemento. 3 tipos para variar entre versiones.
+_ARROW_CX, _ARROW_CY = 0.22, 0.60
+_ARROW_RED = (228, 30, 30, 255)
+_ARROW_OUTLINE = (255, 255, 255, 255)
+_ARROW_KINDS = ["down", "double", "fat"]
 
 
-def _bg_luma(core) -> float:
-    try:
-        fr = core.get_frame((core.duration or 2) * 0.5)
-        cx, cy = int(TARGET_W * _ARROW_CX), int(TARGET_H * _ARROW_CY)
-        patch = fr[cy - 70:cy + 70, cx - 90:cx + 90]
-        return float(patch.reshape(-1, 3).mean())
-    except Exception:
-        return 0.0
+def _arrow_kind(idx: int) -> str:
+    return _ARROW_KINDS[idx % len(_ARROW_KINDS)]
 
 
-def _draw_arrow_png(w: int, fill, outline):
-    """Flecha gruesa apuntando abajo (al carrito), RGBA con borde."""
-    h = int(w * 1.3)
+def _draw_arrow_png(kind: str, w: int, fill=_ARROW_RED, outline=_ARROW_OUTLINE):
+    """Flecha roja apuntando abajo (al carrito). kind: down|double|fat."""
+    h = int(w * 1.4)
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     cx = w / 2
-    sw = w * 0.30          # ancho del asta
-    hw = w * 0.80          # ancho de la cabeza
-    top = h * 0.05
-    mid = h * 0.52
-    tip = h * 0.96
-    pts = [
-        (cx - sw / 2, top), (cx + sw / 2, top),
-        (cx + sw / 2, mid), (cx + hw / 2, mid),
-        (cx, tip),
-        (cx - hw / 2, mid), (cx - sw / 2, mid),
-    ]
-    d.polygon(pts, fill=fill)
-    d.line(pts + [pts[0]], fill=outline, width=max(3, int(w * 0.05)), joint="curve")
+    ow = max(4, int(w * 0.09))
+
+    def _solid_arrow(sw_f, hw_f, top_f, mid_f, tip_f):
+        sw, hw = w * sw_f, w * hw_f
+        top, mid, tip = h * top_f, h * mid_f, h * tip_f
+        pts = [
+            (cx - sw / 2, top), (cx + sw / 2, top),
+            (cx + sw / 2, mid), (cx + hw / 2, mid),
+            (cx, tip),
+            (cx - hw / 2, mid), (cx - sw / 2, mid),
+        ]
+        d.polygon(pts, fill=fill)
+        d.line(pts + [pts[0]], fill=outline, width=ow, joint="curve")
+
+    if kind == "fat":
+        _solid_arrow(0.46, 0.98, 0.16, 0.50, 0.92)
+    elif kind == "double":
+        hw = w * 0.80
+        lw = max(7, int(w * 0.16))
+        for off in (0.0, 0.40):
+            y1, y2 = h * (0.06 + off), h * (0.44 + off)
+            for col, wd in ((outline, lw + ow * 2), (fill, lw)):
+                d.line([(cx - hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
+                d.line([(cx + hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
+    else:  # down
+        _solid_arrow(0.32, 0.82, 0.05, 0.52, 0.95)
     return img
 
 
-def _arrow_clip(core, duration, log=_noop):
+def _arrow_clip(core, duration, kind="down", log=_noop):
     try:
-        luma = _bg_luma(core)
-        if luma < 130:
-            fill, outline = (255, 255, 255, 255), (0, 0, 0, 255)
-        else:
-            fill, outline = (15, 15, 15, 255), (255, 255, 255, 255)
-        png = _draw_arrow_png(int(TARGET_W * 0.12), fill, outline)
+        png = _draw_arrow_png(kind, int(TARGET_W * 0.13))
         w, h = png.size
         x0 = int(TARGET_W * _ARROW_CX - w / 2)
         y0 = int(TARGET_H * _ARROW_CY - h / 2)
-        amp = int(TARGET_H * 0.012)   # bob ±~23px
+        amp = int(TARGET_H * 0.012)   # bob suave
         clip = ImageClip(np.array(png)).set_duration(duration)
-        # Animación: sube y baja (bob) apuntando al carrito.
         clip = clip.set_position(
             lambda t: (x0, y0 + int(amp * math.sin(t * 2 * math.pi * 1.2)))
         )
-        log("  ➘ Flecha CTA animada (color adaptado)")
+        log(f"  ➘ Flecha CTA roja ({kind}) apuntando al carrito")
         return clip
     except Exception:
         return None
@@ -273,18 +277,14 @@ def process_ready_video(
     core = crop(zoomed, x_center=xc, y_center=yc, width=TARGET_W, height=TARGET_H)
 
     layers = [core]
-    hk = _text_clip(hook_text, font_size=64, y_center_pct=0.17,
-                    max_w_pct=0.84, duration=core.duration, style=st)
+    # Edición simple (como los que venden): UN solo texto arriba + flecha sola.
+    hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
+                    max_w_pct=0.86, duration=core.duration, style=st)
     if hk is not None:
         layers.append(hk)
-        log("  📌 Gancho (zona segura arriba)")
-    ct = _text_clip(cta_text, font_size=44, x_center_pct=_CTA_CX,
-                    y_center_pct=_CTA_CY, max_w_pct=0.44, duration=core.duration, style=st)
-    if ct is not None:
-        layers.append(ct)
-        log("  🛒 CTA (encima de la flecha)")
+        log("  📌 Texto (arriba)")
     if with_arrow:
-        ar = _arrow_clip(core, core.duration, log=log)
+        ar = _arrow_clip(core, core.duration, kind=_arrow_kind(int(style)), log=log)
         if ar is not None:
             layers.append(ar)
 
@@ -308,7 +308,7 @@ def process_ready_video(
         # Belt-and-suspenders: si algún overlay peta, saca al menos el vídeo
         # con zoom + textos (sin lo que sobre) para no dejar al operador sin nada.
         log(f"  ⚠️ Render con overlays falló ({str(e)[:80]}) — reintento sin flecha")
-        safe = [core] + [x for x in (hk, ct) if x is not None]
+        safe = [core] + [x for x in (hk,) if x is not None]
         final = _render(safe)
 
     for c in (base, final):
