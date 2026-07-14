@@ -1781,6 +1781,8 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     zoom quita-marca + gancho/CTA + flecha. Guarda en videos_ready y marca
     el concepto. El original NO se borra si falla (para depurar)."""
     import os
+    import re
+    from datetime import datetime
 
     from src.tiktok_shop.config import product_drive_folder
     from src.tiktok_shop.pipeline.ready_video import process_ready_video
@@ -1798,7 +1800,11 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     concept = product.problem_videos[idx]
 
     ready_dir = os.path.join(product_drive_folder(product.slug), "videos_ready")
-    out_path = os.path.join(ready_dir, f"concept_{idx}.mp4")
+    # Nombre único: producto + versión + fecha/hora → sin duplicados al bajar.
+    short = re.sub(r"[^a-z0-9]+", "_", product.name.lower())[:40].strip("_") or "video"
+    ts = datetime.now().strftime("%Y%m%d_%H%M")
+    fname = f"{short}_v{idx + 1}_{ts}.mp4"
+    out_path = os.path.join(ready_dir, fname)
     on_progress(0.1, "🎬 Procesando vídeo…")
     process_ready_video(
         raw_path, out_path,
@@ -1806,7 +1812,8 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
         cta_text=concept.get("cta_text", ""),
         zoom=zoom, style=idx, log=on_log,
     )
-    concept["ready_video"] = f"concept_{idx}.mp4"
+    concept["ready_video"] = fname
+    concept["ready_at"] = ts
     product.touch()
     repo.save(product)
     try:

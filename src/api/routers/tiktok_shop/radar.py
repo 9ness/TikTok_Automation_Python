@@ -952,13 +952,16 @@ def download_ready_video(
     product = ProductRepo().get(product_id)
     if product is None:
         return {"ok": False, "message": "Producto no encontrado."}
-    path = os.path.join(_ready_dir(product.slug), f"concept_{concept_index}.mp4")
+    # Nombre único guardado en el concepto (producto_vN_fecha.mp4); fallback al
+    # nombre antiguo por compatibilidad.
+    fname = None
+    if 0 <= concept_index < len(product.problem_videos):
+        fname = (product.problem_videos[concept_index] or {}).get("ready_video")
+    fname = fname or f"concept_{concept_index}.mp4"
+    path = os.path.join(_ready_dir(product.slug), fname)
     if not os.path.exists(path):
         return {"ok": False, "message": "Aún no procesado."}
-    return FileResponse(
-        path, media_type="video/mp4",
-        filename=f"{product.slug}_{concept_index}.mp4",
-    )
+    return FileResponse(path, media_type="video/mp4", filename=fname)
 
 
 @router.get("/video-templates")

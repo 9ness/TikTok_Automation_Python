@@ -292,7 +292,7 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_p
 # La flecha va SOLA en la zona media-izquierda apuntando al carrito naranja de
 # TikTok Shop (como los vídeos que venden). ROJA con borde blanco. Coordenadas
 # = CENTRO del elemento. 3 tipos para variar entre versiones.
-_ARROW_CX, _ARROW_CY = 0.22, 0.60
+_ARROW_CX, _ARROW_CY = 0.22, 0.72
 _ARROW_RED = (228, 30, 30, 255)
 _ARROW_OUTLINE = (255, 255, 255, 255)
 _ARROW_KINDS = ["down", "double", "fat"]
