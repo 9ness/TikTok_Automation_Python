@@ -445,7 +445,7 @@ function ProductPrompts({ productId }: { productId: string }) {
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [processingIdx, setProcessingIdx] = useState<number | null>(null);
-  const [zoom, setZoom] = useState(1.12);
+  const [zoom, setZoom] = useState(1.18);
 
   const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
@@ -620,7 +620,17 @@ function ProductPrompts({ productId }: { productId: string }) {
               </summary>
               <div className="mt-2 space-y-2">
                 {v.angle && <p className="text-[11px] text-muted-foreground">🎯 {v.angle}</p>}
-                <CopyBlock label="🟣 Prompt Veo 3 (10s · adjunta foto)" text={v.veo3_prompt} />
+                {v.image_prompt ? (
+                  <>
+                    <p className="rounded bg-purple-500/10 p-1.5 text-[10px] text-purple-500">
+                      🧑 Formato persona en 2 pasos: genera la imagen (Paso 1) y anímala (Paso 2). La persona la crea la IA, tú solo adjuntas la foto del producto.
+                    </p>
+                    <CopyBlock label="🖼️ Paso 1 · Imagen persona (Nano Banana / Gemini + foto producto)" text={v.image_prompt} />
+                    <CopyBlock label="🎬 Paso 2 · Animar el still (Veo Frames / Kling i2v · silencioso)" text={v.animate_prompt ?? ""} />
+                  </>
+                ) : (
+                  <CopyBlock label="🟣 Prompt Veo 3 (10s · adjunta foto)" text={v.veo3_prompt} />
+                )}
                 {v.spoken_line && <CopyBlock label="🗣️ Lo que dice (voz)" text={v.spoken_line} />}
                 {v.hook_text && <CopyBlock label="📌 Texto gancho (en pantalla arriba)" text={v.hook_text} />}
                 {v.cta_text && <CopyBlock label="🛒 CTA (abajo, al carrito)" text={v.cta_text} />}

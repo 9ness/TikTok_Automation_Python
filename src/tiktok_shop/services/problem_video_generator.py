@@ -68,7 +68,9 @@ def generate_problem_videos(
         if not isinstance(v, dict):
             continue
         veo = str(v.get("veo3_prompt", "")).strip()
-        if not veo:
+        img = str(v.get("image_prompt", "")).strip()
+        # El formato "Persona luciendo" no lleva veo3_prompt sino image+animate.
+        if not veo and not img:
             continue
         # 1 texto gancho + 1 CTA (nada de secuencias largas). Compat: si el
         # modelo devuelve `on_screen_text` como lista, usa el 1º como hook.
@@ -82,6 +84,8 @@ def generate_problem_videos(
             "emotion": str(v.get("emotion", ""))[:80],
             "angle": str(v.get("angle", ""))[:240],
             "veo3_prompt": veo[:2000],
+            "image_prompt": str(v.get("image_prompt", ""))[:2000],
+            "animate_prompt": str(v.get("animate_prompt", ""))[:2000],
             "spoken_line": str(v.get("spoken_line", ""))[:300],
             "hook_text": hook[:120],
             "cta_text": str(v.get("cta_text", ""))[:60],

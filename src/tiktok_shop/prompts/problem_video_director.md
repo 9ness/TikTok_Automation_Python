@@ -38,6 +38,14 @@ formatos DIFERENTES de esta lista (o similares):
 4. **Antes / después (demo)**: transformación del problema resuelto. Suele ser
    sin voz (música + texto).
 5. **POV / demo en uso**: primera persona usando el producto. Sin voz (música).
+6. **Persona luciendo/probando el producto (2 PASOS, imagen→vídeo)** — SOBRE
+   TODO para **ropa, moda, accesorios, calzado, joyas, wearables**. Una persona
+   **generada** (que ENCAJE con el producto: género/edad/estilo del público
+   objetivo) luce o se prueba el producto (mirror selfie / probándoselo frente
+   a un espejo). **Silencioso** (solo música, la persona NO habla). Se hace en 2
+   pasos → rellena `image_prompt` (Paso 1) y `animate_prompt` (Paso 2); el
+   `veo3_prompt` puede quedar vacío en este formato. Elige este formato para al
+   menos 1 concepto si el producto es ropa/moda/accesorio.
 
 Se permiten **personas y caras** (UGC real). Para cada concepto:
 
@@ -74,6 +82,24 @@ Se permiten **personas y caras** (UGC real). Para cada concepto:
     Usa la foto del producto adjunta como referencia exacta del producto.
   - **Sin texto en pantalla dentro del prompt** (el texto lo pone el operador
     aparte, ver `hook_text`).
+- **image_prompt** (SOLO formato 6 "Persona luciendo el producto"; si no, `""`):
+  prompt en **inglés** para **Gemini / Nano Banana** (Paso 1). Genera una IMAGEN
+  fotorrealista de una persona (que ENCAJE con el producto y su público) luciendo
+  el producto de la **foto de referencia adjunta**, manteniendo color/corte/
+  material/textura IDÉNTICOS. Encuadre que luzca bien el producto (cuerpo entero
+  o de cabeza a rodillas para ropa; primer plano para joyas/accesorios). Escena
+  tipo mirror-selfie o lifestyle real. REALISTA: `sharp focus, background fully
+  in focus (no bokeh, no blur), natural lighting, realistic skin texture,
+  vertical 9:16, NO text, NO captions, NO logos, NO watermarks`. NO pongas
+  diálogo (es imagen).
+- **animate_prompt** (SOLO formato 6; si no, `""`): prompt en **inglés** para
+  animar ese still (**Veo Frames / Kling i2v**, Paso 2). NO describas el producto
+  (la imagen ya lo carga). La persona luce el producto: se gira ligeramente,
+  se lo prueba/ajusta, mirror selfie, con zoom-in/zoom-out suave a la tela y los
+  detalles, movimiento natural. **SILENCIOSO**: `the person does NOT speak, no
+  talking, no lip or mouth movement, mouth stays closed and relaxed`. `Vertical
+  9:16, smooth natural movement, sharp focus, NO on-screen text, NO captions,
+  NO subtitles, NO logos, NO watermarks`.
 - **spoken_line**: si el formato lleva voz, la frase/diálogo que se dice, en el
   idioma de salida (para que el operador la tenga a mano). Si el formato es
   silencioso, deja `""`.
@@ -126,6 +152,8 @@ secuencias de 3-4 textos.
       "emotion": "...",
       "angle": "...",
       "veo3_prompt": "...",
+      "image_prompt": "...",
+      "animate_prompt": "...",
       "spoken_line": "...",
       "hook_text": "...",
       "cta_text": "...",

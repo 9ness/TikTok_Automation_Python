@@ -270,6 +270,8 @@ export interface ProblemVideo {
   emotion: string;
   angle: string;
   veo3_prompt: string;
+  image_prompt?: string;
+  animate_prompt?: string;
   spoken_line: string;
   hook_text: string;
   cta_text: string;

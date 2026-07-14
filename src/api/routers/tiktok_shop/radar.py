@@ -894,7 +894,7 @@ def upload_problem_video(
     file: Annotated[UploadFile, File()],
     product_id: Annotated[str, Form()],
     concept_index: Annotated[int, Form()],
-    zoom: Annotated[float, Form()] = 1.12,
+    zoom: Annotated[float, Form()] = 1.18,
 ) -> dict:
     """Sube el vídeo generado (Flow/Kling) de UN concepto → guarda el original
     y ENCOLA el procesado (zoom quita-marca + gancho + CTA + flecha). El

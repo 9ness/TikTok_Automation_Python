@@ -1791,7 +1791,7 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     product_id = job.params["product_id"]
     idx = int(job.params["concept_index"])
     raw_path = job.params["raw_path"]
-    zoom = float(job.params.get("zoom", 1.12))
+    zoom = float(job.params.get("zoom", 1.18))
 
     repo = ProductRepo()
     product = repo.get(product_id)
