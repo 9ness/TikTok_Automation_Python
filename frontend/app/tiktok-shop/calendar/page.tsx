@@ -607,74 +607,90 @@ function ProductPrompts({ productId }: { productId: string }) {
               </span>
             </div>
           )}
-          {problemToShow.map((v, i) => (
-            <details key={i} className="rounded border border-border/60 p-2 text-xs" open={i === 0}>
-              <summary className="cursor-pointer font-medium">
-                {i + 1}. {v.concept}
-                {v.format && (
-                  <span className="ml-1 rounded bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600">
-                    {v.format}
-                  </span>
-                )}{" "}
-                <span className="text-muted-foreground">· {v.emotion}</span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                {v.angle && <p className="text-[11px] text-muted-foreground">🎯 {v.angle}</p>}
-                {v.image_prompt ? (
-                  <>
-                    <p className="rounded bg-purple-500/10 p-1.5 text-[10px] text-purple-500">
-                      🧑 Formato persona en 2 pasos: genera la imagen (Paso 1) y anímala (Paso 2). La persona la crea la IA, tú solo adjuntas la foto del producto.
-                    </p>
-                    <CopyBlock label="🖼️ Paso 1 · Imagen persona (Nano Banana / Gemini + foto producto)" text={v.image_prompt} />
-                    <CopyBlock label="🎬 Paso 2 · Animar el still (Veo Frames / Kling i2v · silencioso)" text={v.animate_prompt ?? ""} />
-                  </>
-                ) : (
-                  <CopyBlock label="🟣 Prompt Veo 3 (10s · adjunta foto)" text={v.veo3_prompt} />
-                )}
-                {v.spoken_line && <CopyBlock label="🗣️ Lo que dice (voz)" text={v.spoken_line} />}
-                {v.hook_text && <CopyBlock label="📌 Texto gancho (en pantalla arriba)" text={v.hook_text} />}
-                {v.cta_text && <CopyBlock label="🛒 CTA (abajo, al carrito)" text={v.cta_text} />}
-                {v.caption && <CopyBlock label="✍️ Caption (descripción del post · sin hashtags)" text={v.caption} />}
-
-                {/* Subir el vídeo generado → lo deja listo (zoom + gancho + CTA) */}
-                <div className="mt-1 flex flex-wrap items-center gap-3 rounded bg-muted/40 p-2">
-                  {v.ready_video ? (
-                    <a
-                      href={readyUrl(i)}
-                      download
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 hover:underline"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Descargar vídeo LISTO (con textos)
-                    </a>
-                  ) : uploadingIdx === i ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-orange-500">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo {uploadPct}%…
-                      {uploadPct >= 100 && " (encolando)"}
-                    </span>
-                  ) : processingIdx === i ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-orange-500">
-                      <Loader2 className="h-3 w-3 animate-spin" /> En la cola, procesando…
-                    </span>
-                  ) : null}
-                  {uploadingIdx !== i && processingIdx !== i && (
-                    <label className="inline-flex cursor-pointer items-center gap-1 text-xs text-orange-500 hover:underline">
-                      <input
-                        type="file"
-                        accept="video/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadVideo(i, f);
-                          e.target.value = "";
-                        }}
-                      />
-                      {v.ready_video ? "↻ re-subir" : "📤 Subir vídeo generado (Flow) → dejar listo"}
-                    </label>
-                  )}
+          {problemToShow.map((v, i) => {
+            const fileInput = (
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadVideo(i, f);
+                  e.target.value = "";
+                }}
+              />
+            );
+            const actionBtn =
+              uploadingIdx === i ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-orange-500">
+                  <Loader2 className="h-3 w-3 animate-spin" /> {uploadPct}%
+                </span>
+              ) : processingIdx === i ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-orange-500">
+                  <Loader2 className="h-3 w-3 animate-spin" /> en cola…
+                </span>
+              ) : v.ready_video ? (
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={readyUrl(i)}
+                    download
+                    className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Descargar
+                  </a>
+                  <label className="cursor-pointer text-[10px] text-muted-foreground hover:underline" title="re-subir">
+                    {fileInput}↻
+                  </label>
                 </div>
+              ) : (
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600">
+                  {fileInput}📤 Subir vídeo
+                </label>
+              );
+            return (
+              <div key={i} className="rounded-lg border border-border/60 p-2.5 text-xs">
+                {/* Cabecera: versión + formato + botón subir/descargar SIEMPRE visible */}
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-semibold">V{i + 1}</span>{" "}
+                    <span className="text-muted-foreground">{v.concept}</span>
+                    {v.format && (
+                      <span className="ml-1 inline-block rounded bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600">
+                        {v.format}
+                      </span>
+                    )}
+                  </div>
+                  <div className="shrink-0">{actionBtn}</div>
+                </div>
+
+                {/* Prompt(s) principal(es) para copiar */}
+                {v.image_prompt ? (
+                  <div className="space-y-1.5">
+                    <CopyBlock label="🖼️ Paso 1 · Imagen persona (Nano Banana + foto)" text={v.image_prompt} />
+                    <CopyBlock label="🎬 Paso 2 · Animar (Flow Frames / Kling · silencioso)" text={v.animate_prompt ?? ""} />
+                    <p className="text-[10px] text-purple-500">
+                      🧑 2 pasos: haz la imagen (Paso 1), anímala (Paso 2) y sube el vídeo arriba.
+                    </p>
+                  </div>
+                ) : (
+                  <CopyBlock label="🟣 Prompt Veo 3 (adjunta foto del producto)" text={v.veo3_prompt} />
+                )}
+
+                {/* Textos: colapsados para no ocupar */}
+                <details className="mt-1.5">
+                  <summary className="cursor-pointer text-[11px] text-muted-foreground">
+                    📝 Gancho · CTA · caption
+                  </summary>
+                  <div className="mt-1 space-y-1">
+                    {v.hook_text && <CopyBlock label="📌 Gancho" text={v.hook_text} />}
+                    {v.cta_text && <CopyBlock label="🛒 CTA" text={v.cta_text} />}
+                    {v.caption && <CopyBlock label="✍️ Caption (sin hashtags)" text={v.caption} />}
+                    {v.spoken_line && <CopyBlock label="🗣️ Voz" text={v.spoken_line} />}
+                  </div>
+                </details>
               </div>
-            </details>
-          ))}
+            );
+          })}
         </div>
       )}
 
