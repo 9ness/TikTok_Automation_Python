@@ -34,8 +34,19 @@ SAFE_Y = (0.15, 0.75)
 SAFE_X = (0.05, 0.78)
 
 _EMOJI_RE = re.compile(
-    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
-    "\U00002190-\U000021FF\U00002B00-\U00002BFF\U0000FE0F]+"
+    "["
+    "\U0001F000-\U0001FAFF"     # pictogramas suplementarios (😍👀👇🛒…)
+    "\U00002600-\U000027BF"     # símbolos varios + dingbats (☀✅✨…)
+    "\U0001F1E6-\U0001F1FF"     # banderas
+    "\U00002190-\U000021FF"     # flechas
+    "\U00002B00-\U00002BFF"     # símbolos/flechas varios
+    "\U00002300-\U000023FF"     # técnico (⌚⏰⏳…)
+    "\U000025A0-\U000025FF"     # formas geométricas
+    "\U0000203C\U00002049"      # ‼ ⁉
+    "\U00002122\U00002139"      # ™ ℹ
+    "\U000020E3\U0000FE0F"      # keycap combiner + variation selector
+    "\U00003030\U0000303D\U00003297\U00003299\U00002934\U00002935"
+    "]+"
 )
 
 

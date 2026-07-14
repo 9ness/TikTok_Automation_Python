@@ -64,8 +64,8 @@ Se permiten **personas y caras** (UGC real). Para cada concepto:
 - **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
   en el idioma de salida. Es la frase que para el scroll atacando el dolor.
   MUY corto y potente, se lee de un vistazo (**máximo 7 palabras**). NO "compra ya".
-  Puede **terminar con 1 emoji** que encaje con la emoción (😍🥰😱🔥…) — como los
-  vídeos que venden. No abuses: 1 emoji como mucho, y solo si pega.
+  Puede **terminar con 1-2 emojis** que encajen y **VARÍA** entre conceptos —
+  usa distintos según el tono: 😍🥰😱🔥👀‼️⁉️😮💥✅👇💕🤯. No siempre los mismos.
   **VARÍA el formato — NO siempre pregunta.** Elige el que mejor le pegue al
   producto/ángulo y usa un estilo DISTINTO en cada concepto. Mezcla entre:
   - Afirmación/confesión: `"Mi bebé lloraba de calor"`, `"Dolor de articulaciones cada mañana"`.
