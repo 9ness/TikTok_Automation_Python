@@ -75,15 +75,22 @@ export default function CalendarPage() {
       },
       onError: (e) => toast.error(e.message),
     });
-  const [batch, setBatch] = useState("");
+  // Una fila por producto: {url, name}. Empezamos con 1 fila.
+  const [rows, setRows] = useState<{ url: string; name: string }[]>([{ url: "", name: "" }]);
+  const setRow = (i: number, k: "url" | "name", val: string) =>
+    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const addRow = () => setRows((prev) => [...prev, { url: "", name: "" }]);
+  const removeRow = (i: number) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev));
   // Tipos de generación al añadir. Por defecto NINGUNO (se elige después).
   const [gens, setGens] = useState<string[]>([]);
   const toggleGen = (g: string) =>
     setGens((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
 
   const submitBatch = () => {
-    const raw = batch.trim();
-    if (!raw) return;
+    const valid = rows.filter((r) => r.url.trim());
+    if (!valid.length) return;
+    const raw = valid.map((r) => `${r.name.trim()} — ${r.url.trim()}`).join("\n");
     addBatch.mutate(
       { raw, per_day: perDay, gens },
       {
@@ -92,9 +99,13 @@ export default function CalendarPage() {
             toast.success(
               `${r.added} añadido(s) a la cola${r.failed ? ` · ${r.failed} fallaron` : ""}`,
             );
-            // Deja en el textarea solo las líneas que fallaron, con el motivo.
+            // Deja solo las filas que fallaron (para corregirlas).
+            const failedUrls = new Set(
+              r.results.filter((x) => !x.ok).map((x) => x.line.match(/https?:\/\/\S+/)?.[0] ?? ""),
+            );
+            const remaining = valid.filter((row) => failedUrls.has(row.url.trim()));
+            setRows(remaining.length ? remaining : [{ url: "", name: "" }]);
             const failed = r.results.filter((x) => !x.ok);
-            setBatch(failed.map((x) => x.line).join("\n"));
             if (failed.length)
               toast.error(`${failed.length} sin añadir: ${failed[0]?.message ?? ""}`);
             qc.invalidateQueries({ queryKey: ["radar-plan"] });
@@ -130,17 +141,42 @@ export default function CalendarPage() {
       <Card>
         <CardContent className="space-y-2 p-4">
           <p className="text-sm font-semibold">➕ Añadir productos a la cola</p>
-          <textarea
-            value={batch}
-            onChange={(e) => setBatch(e.target.value)}
-            rows={4}
-            placeholder={
-              "Un producto por línea:  Nombre del producto — https://www.tiktok.com/view/product/...\n" +
-              "Nombre otro producto — https://...\n" +
-              "(pega varios de golpe, se añaden en orden)"
-            }
-            className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-[11px]"
-          />
+          {/* Una fila (link + título) por producto */}
+          <div className="space-y-1.5">
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-4 shrink-0 text-[11px] text-muted-foreground">{i + 1}.</span>
+                <input
+                  value={r.url}
+                  onChange={(e) => setRow(i, "url", e.target.value)}
+                  placeholder="URL de TikTok Shop"
+                  className="min-w-0 flex-[2] rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+                />
+                <input
+                  value={r.name}
+                  onChange={(e) => setRow(i, "name", e.target.value)}
+                  placeholder="Título del producto"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  disabled={rows.length === 1}
+                  className="shrink-0 text-muted-foreground hover:text-red-500 disabled:opacity-30"
+                  title="Quitar fila"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addRow}
+            className="text-[11px] font-medium text-orange-500 hover:underline"
+          >
+            + Añadir otro producto
+          </button>
           {/* Tipos de generación (opcional al añadir; por defecto NINGUNO) */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground">Generar ahora:</span>
@@ -173,7 +209,7 @@ export default function CalendarPage() {
               Se añaden a la cola ({perDay}/día). Sin marcar nada = solo se añaden;
               generas los prompts luego en cada producto.
             </p>
-            <Button disabled={addBatch.isPending || !batch.trim()} onClick={submitBatch}>
+            <Button disabled={addBatch.isPending || !rows.some((r) => r.url.trim())} onClick={submitBatch}>
               {addBatch.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
