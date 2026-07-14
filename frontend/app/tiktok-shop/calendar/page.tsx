@@ -760,8 +760,8 @@ function ProductPrompts({ productId }: { productId: string }) {
               );
             return (
               <div key={i} className="rounded-lg border border-border/60 p-2.5 text-xs">
-                {/* Cabecera: versión + formato + botón subir/descargar SIEMPRE visible */}
-                <div className="mb-2 flex items-start justify-between gap-2">
+                {/* Cabecera: V# + formato + botón subir/descargar */}
+                <div className="mb-1.5 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <span className="font-semibold">V{i + 1}</span>{" "}
                     <span className="text-muted-foreground">{v.concept}</span>
@@ -774,31 +774,21 @@ function ProductPrompts({ productId }: { productId: string }) {
                   <div className="shrink-0">{actionBtn}</div>
                 </div>
 
-                {/* Prompt(s) principal(es) para copiar */}
-                {v.image_prompt ? (
-                  <div className="space-y-1.5">
-                    <CopyBlock label="🖼️ Paso 1 · Imagen persona (Nano Banana + foto)" text={v.image_prompt} />
-                    <CopyBlock label="🎬 Paso 2 · Animar (Flow Frames / Kling · silencioso)" text={v.animate_prompt ?? ""} />
-                    <p className="text-[10px] text-purple-500">
-                      🧑 2 pasos: haz la imagen (Paso 1), anímala (Paso 2) y sube el vídeo arriba.
-                    </p>
-                  </div>
-                ) : (
-                  <CopyBlock label="🟣 Prompt Veo 3 (adjunta foto del producto)" text={v.veo3_prompt} />
-                )}
-
-                {/* Textos: colapsados para no ocupar */}
-                <details className="mt-1.5">
-                  <summary className="cursor-pointer text-[11px] text-muted-foreground">
-                    📝 Gancho · CTA · caption
-                  </summary>
-                  <div className="mt-1 space-y-1">
-                    {v.hook_text && <CopyBlock label="📌 Gancho" text={v.hook_text} />}
-                    {v.cta_text && <CopyBlock label="🛒 CTA" text={v.cta_text} />}
-                    {v.caption && <CopyBlock label="✍️ Caption (sin hashtags)" text={v.caption} />}
-                    {v.spoken_line && <CopyBlock label="🗣️ Voz" text={v.spoken_line} />}
-                  </div>
-                </details>
+                {/* Chips: copiar cada prompt/texto con 1 clic (sin ocupar espacio) */}
+                <div className="flex flex-wrap gap-1.5">
+                  {v.image_prompt ? (
+                    <>
+                      <CopyChip label="🖼️ Paso 1 imagen" text={v.image_prompt} primary />
+                      <CopyChip label="🎬 Paso 2 animar" text={v.animate_prompt ?? ""} primary />
+                    </>
+                  ) : (
+                    <CopyChip label="🟣 Prompt Veo 3" text={v.veo3_prompt} primary />
+                  )}
+                  <CopyChip label="📌 Gancho" text={v.hook_text} />
+                  <CopyChip label="🛒 CTA" text={v.cta_text} />
+                  <CopyChip label="✍️ Caption" text={v.caption} />
+                  {v.spoken_line && <CopyChip label="🗣️ Voz" text={v.spoken_line} />}
+                </div>
               </div>
             );
           })}
@@ -984,6 +974,28 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
       }
     >
       {children}
+    </button>
+  );
+}
+
+/** Botón compacto: copia el texto al portapapeles sin mostrarlo (ahorra espacio). */
+function CopyChip({ label, text, primary }: { label: string; text: string; primary?: boolean }) {
+  if (!text) return null;
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        toast.success("Copiado");
+      }}
+      title={`Copiar: ${label}`}
+      className={
+        "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
+        (primary
+          ? "border-purple-500/40 bg-purple-500/10 text-purple-500 hover:bg-purple-500/20"
+          : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground")
+      }
+    >
+      <Copy className="h-3 w-3" /> {label}
     </button>
   );
 }
