@@ -403,6 +403,55 @@ def get_product_ad_videos(
     return out
 
 
+def get_video_ad_detail(
+    video_id: str,
+    *,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any] | None:
+    """Etiquetas de anuncio CRUDAS de TikTok para un vídeo (v3 `realtime/*`).
+
+    A diferencia de `get_product_ad_videos` (que lee el `is_ad` calculado por
+    EchoTik, T+1), esto pide a EchoTik que scrapee el vídeo EN VIVO y nos
+    devuelva el estado del front-end de TikTok tal cual. Sirve para dos cosas:
+
+      1. **Cruzar** el `is_ad` de EchoTik contra la etiqueta ORIGINAL de
+         TikTok → saber si EchoTik lo mide o se lo inventa (no documentado).
+      2. Salir del T+1 cuando el crawl de ES viene viejo.
+
+    Campos relevantes (de la doc oficial):
+      `is_ads` (bool) · `is_paid_content` (bool) · `branded_content_type` (int)
+      `commerce_info.ad_source` (int) · `commerce_info.bc_label_test_text`
+      (str — el ejemplo de la propia doc es "Comisión pagada", en español).
+
+    Cuesta 1 request POR VÍDEO (vs 1 por producto en `get_product_ad_videos`)
+    → usar para muestreo/validación, no para barrer.
+    """
+    if not echotik_is_configured() or not video_id:
+        return None
+    data = _get(
+        "realtime/video/detail", {"video_id": str(video_id)},
+        base=V3_BASE_URL, log_callback=log_callback,
+    )
+    if not isinstance(data, dict):
+        return None
+    commerce = data.get("commerce_info") if isinstance(data.get("commerce_info"), dict) else {}
+    return {
+        "video_id": str(video_id),
+        "is_ads": data.get("is_ads"),
+        "is_paid_content": data.get("is_paid_content"),
+        "branded_content_type": data.get("branded_content_type"),
+        "ad_source": (commerce or {}).get("ad_source"),
+        "bc_label": (commerce or {}).get("bc_label_test_text") or "",
+        # Cualquier etiqueta comercial visible = TikTok declara el vídeo como
+        # comercial. En la UE eso se aplica AUTOMÁTICAMENTE a los vídeos de
+        # afiliado de un producto en campaña GMV Max.
+        "any_commercial_label": bool(
+            data.get("is_ads") or data.get("is_paid_content")
+            or (commerce or {}).get("bc_label_test_text")
+        ),
+    }
+
+
 def _to_ad_flag(raw: Any) -> bool | None:
     """`is_ad` (1=anuncio, 0=no) → bool. None si falta/ilegible.
 

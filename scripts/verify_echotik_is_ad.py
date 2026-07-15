@@ -126,6 +126,49 @@ def main() -> int:
         print(f"{WARN} `total_video_sale_cnt` = 0 en todos (como en el trial).")
         print("   → no bloquea: `is_ad` es la señal que importa.")
 
+    # ── 5. Validación cruzada contra la etiqueta ORIGINAL de TikTok ──
+    # `is_ad` lo calcula EchoTik y NO está documentado si lo lee de TikTok o
+    # lo infiere. `realtime/video/detail` scrapea el vídeo en vivo y devuelve
+    # los campos crudos del front-end → si coinciden, `is_ad` es de fiar.
+    print("\n═══ 5. ¿El `is_ad` de EchoTik coincide con la etiqueta de TikTok? ═══")
+    print("    (realtime/video/detail — 1 request por vídeo, muestreamos 3)")
+    sample = [v for v in vids if isinstance(v["ad_flag"], bool)][:3] or vids[:3]
+    agree = disagree = unknown = 0
+    for v in sample:
+        det = ec.get_video_ad_detail(v["video_id"], log_callback=log)
+        if ec.quota_exhausted():
+            print(f"{WARN} sin cuota a mitad del cruce — parcial")
+            break
+        if not det:
+            unknown += 1
+            print(f"    {v['video_id'][:18]}: realtime no devolvió detalle")
+            continue
+        real = det["any_commercial_label"]
+        mine = v["ad_flag"]
+        mark = OK if real == mine else BAD
+        if mine is None:
+            unknown += 1
+            mark = WARN
+        elif real == mine:
+            agree += 1
+        else:
+            disagree += 1
+        label = det["bc_label"] or "—"
+        print(f"    {mark} {v['video_id'][:18]}: is_ad={mine} · TikTok: "
+              f"is_ads={det['is_ads']} paid={det['is_paid_content']} "
+              f"bct={det['branded_content_type']} etiqueta={label!r}")
+
+    if agree and not disagree:
+        print(f"{OK} `is_ad` COINCIDE con TikTok en {agree}/{agree} → señal de fiar.")
+    elif disagree:
+        print(f"{BAD} `is_ad` DISCREPA de TikTok en {disagree} de {agree + disagree}.")
+        print("   → EchoTik estaría infiriendo. Usa realtime/video/detail como fuente.")
+        ok = False
+    else:
+        print(f"{WARN} sin datos para cruzar ({unknown} desconocidos).")
+
+    print("\n" + "═" * 60)
+    print(f"{OK + ' ADELANTE — paga el plan API.' if ok else BAD + ' NO pagues todavía.'}")
     return 0 if ok else 1
 
 
