@@ -1,16 +1,25 @@
 "use client";
 
+/**
+ * Calendario por FECHAS reales: rejilla del mes → día → productos.
+ *
+ * Rendimiento (la razón de que esté partido así): la rejilla del mes usa
+ * `useMonth`, que NO trae datos de producto — solo lo guardado en la entrada.
+ * Los prompts/fotos se piden con `useDay` al abrir un día concreto. El
+ * calendario viejo enriquecía TODAS las entradas de golpe: iba bien con 15
+ * productos y se arrastraba con 200. Si algún día hace falta algo del producto
+ * en la rejilla, hay que guardarlo en la entrada, NO llamar al producto.
+ */
+
 import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon,
-  Check,
   ChevronDown,
   Copy,
   Download,
   ExternalLink,
   Loader2,
-  Rocket,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,23 +28,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   useBofuHooks,
-  useDeletePlan,
   useAddBatch,
   useAutoDay,
-  useMarkTested,
-  usePlanGenerate,
   usePlanPack,
   useProblemVideos,
-  useRadarPlan,
   useRegenerateCarousels,
-  useRemoveBatch,
-  useRemoveFromPlan,
   useVideoTemplates,
   type BofuHook,
-  type PlanEntry,
   type ProblemVideo,
 } from "@/lib/queries/radar";
+import {
+  calendarKeys,
+  useCalendarMonths,
+  useDay,
+  useMonth,
+  useRemoveCalendarEntries,
+  type CalendarEntryDetail,
+} from "@/lib/queries/calendar";
 import { useProduct, productKeys } from "@/lib/queries/products";
+
+import { MonthGrid, shiftMonth, todayIso } from "./MonthGrid";
+import { OutcomeBar } from "./OutcomeBar";
+import { FormatRanking, StatsRow } from "./Stats";
 
 const VERDICT: Record<string, string> = {
   fuerte: "📢🔥", media: "📢", baja: "🔇", desconocida: "❔",
@@ -49,27 +63,91 @@ function buildPhotoUrl(productId: string, filename: string): string {
   return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;
 }
 
+function prettyDate(iso: string): string {
+  const p = iso.split("-");
+  const dt = new Date(Date.UTC(Number(p[0] ?? 0), Number(p[1] ?? 1) - 1, Number(p[2] ?? 1)));
+  return dt.toLocaleDateString("es-ES", {
+    weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
+  });
+}
+
 export default function CalendarPage() {
   const qc = useQueryClient();
-  const planQ = useRadarPlan();
-  const gen = usePlanGenerate();
-  const del = useDeletePlan();
-  const addBatch = useAddBatch();
+  const today = todayIso();
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [selected, setSelected] = useState(today);
 
-  // ── Radar v2: llenar un día con los productos que reciben ADS ahora ──
+  const monthQ = useMonth(month);
+  const dayQ = useDay(selected);
+  const monthsQ = useCalendarMonths();
+  const removeEntries = useRemoveCalendarEntries();
+
+  // Al cambiar de mes, saltar al día 1 si el seleccionado es de otro mes.
+  useEffect(() => {
+    if (!selected.startsWith(month)) setSelected(`${month}-01`);
+  }, [month, selected]);
+
+  const entries = monthQ.data?.entries ?? [];
+  const dayEntries = dayQ.data ?? [];
+
+  // ── Añadir productos a mano (URL de TikTok Shop) ──────────────────
+  const addBatch = useAddBatch();
+  const [rows, setRows] = useState<{ url: string; name: string }[]>([{ url: "", name: "" }]);
+  const setRow = (i: number, k: "url" | "name", val: string) =>
+    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const addRow = () => setRows((prev) => [...prev, { url: "", name: "" }]);
+  const removeRow = (i: number) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev));
+  const [gens, setGens] = useState<string[]>([]);
+  const toggleGen = (g: string) =>
+    setGens((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: calendarKeys.month(month) });
+    qc.invalidateQueries({ queryKey: calendarKeys.day(selected) });
+    qc.invalidateQueries({ queryKey: calendarKeys.months });
+  };
+
+  const submitBatch = () => {
+    const valid = rows.filter((r) => r.url.trim());
+    if (!valid.length) return;
+    const raw = valid.map((r) => `${r.name.trim()} — ${r.url.trim()}`).join("\n");
+    addBatch.mutate(
+      { raw, date: selected, gens },
+      {
+        onSuccess: (r) => {
+          if (r.added > 0) {
+            toast.success(`${r.added} añadido(s) al ${selected}`);
+            const failedUrls = new Set(
+              r.results.filter((x) => !x.ok).map((x) => x.line.match(/https?:\/\/\S+/)?.[0] ?? ""),
+            );
+            const remaining = valid.filter((row) => failedUrls.has(row.url.trim()));
+            setRows(remaining.length ? remaining : [{ url: "", name: "" }]);
+            const failed = r.results.filter((x) => !x.ok);
+            if (failed.length)
+              toast.error(`${failed.length} sin añadir: ${failed[0]?.message ?? ""}`);
+            refreshAll();
+          } else {
+            toast.error(r.results[0]?.message ?? "No se añadió ninguno.");
+          }
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  };
+
+  // ── Radar v2: llenar el día seleccionado ──────────────────────────
   const autoDayM = useAutoDay();
-  const [autoDay, setAutoDay] = useState(1);
   const [autoTopN, setAutoTopN] = useState(6);
   const [autoMaxIfl, setAutoMaxIfl] = useState(250);
   const [autoMinEur, setAutoMinEur] = useState(3);
   // 3 vídeos/producto mientras se aprende: son 3 FORMATOS distintos, así que
-  // testean el creativo además del producto. Con 1 solo no sabrías si falló
-  // el producto o el vídeo. Bajar a 1-2 cuando se sepa qué formato gana.
+  // testean el creativo además del producto. Bajar a 1 cuando se sepa cuál gana.
   const [autoVids, setAutoVids] = useState(3);
   const runAutoDay = () => {
     autoDayM.mutate(
       {
-        day: autoDay,
+        date: selected,
         top_n: autoTopN,
         max_influencers: autoMaxIfl,
         min_commission_eur: autoMinEur,
@@ -83,162 +161,68 @@ export default function CalendarPage() {
             return;
           }
           toast.success(r.message || "Buscando productos con ADS frescos…");
-          // El job tarda minutos: refrescamos al rato para que aparezcan.
-          setTimeout(() => qc.invalidateQueries({ queryKey: ["radar-plan"] }), 20_000);
+          setTimeout(refreshAll, 20_000);
         },
         onError: (e) => toast.error(e.message),
       },
     );
   };
-
-  const [perDay, setPerDay] = useState(10);
-  const [days, setDays] = useState(7);
-  const [selectedDay, setSelectedDay] = useState(1);
-  const removeBatch = useRemoveBatch();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const toggleSel = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const doRemoveBatch = (body: { product_ids?: string[]; day?: number }) =>
-    removeBatch.mutate(body, {
-      onSuccess: (r) => {
-        toast.success(`${r.removed} quitado(s) del calendario`);
-        setSelected(new Set());
-        qc.invalidateQueries({ queryKey: ["radar-plan"] });
-      },
-      onError: (e) => toast.error(e.message),
-    });
-  // Una fila por producto: {url, name}. Empezamos con 1 fila.
-  const [rows, setRows] = useState<{ url: string; name: string }[]>([{ url: "", name: "" }]);
-  const setRow = (i: number, k: "url" | "name", val: string) =>
-    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
-  const addRow = () => setRows((prev) => [...prev, { url: "", name: "" }]);
-  const removeRow = (i: number) =>
-    setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev));
-  // Tipos de generación al añadir. Por defecto NINGUNO (se elige después).
-  const [gens, setGens] = useState<string[]>([]);
-  const toggleGen = (g: string) =>
-    setGens((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
-
-  const submitBatch = () => {
-    const valid = rows.filter((r) => r.url.trim());
-    if (!valid.length) return;
-    const raw = valid.map((r) => `${r.name.trim()} — ${r.url.trim()}`).join("\n");
-    addBatch.mutate(
-      { raw, per_day: perDay, gens },
-      {
-        onSuccess: (r) => {
-          if (r.added > 0) {
-            toast.success(
-              `${r.added} añadido(s) a la cola${r.failed ? ` · ${r.failed} fallaron` : ""}`,
-            );
-            // Deja solo las filas que fallaron (para corregirlas).
-            const failedUrls = new Set(
-              r.results.filter((x) => !x.ok).map((x) => x.line.match(/https?:\/\/\S+/)?.[0] ?? ""),
-            );
-            const remaining = valid.filter((row) => failedUrls.has(row.url.trim()));
-            setRows(remaining.length ? remaining : [{ url: "", name: "" }]);
-            const failed = r.results.filter((x) => !x.ok);
-            if (failed.length)
-              toast.error(`${failed.length} sin añadir: ${failed[0]?.message ?? ""}`);
-            qc.invalidateQueries({ queryKey: ["radar-plan"] });
-          } else {
-            toast.error(r.results[0]?.message ?? "No se añadió ninguno.");
-          }
-        },
-        onError: (e) => toast.error(e.message),
-      },
-    );
-  };
-
-  const plan = planQ.data;
-  const byDay = new Map<number, PlanEntry[]>();
-  (plan?.entries ?? []).forEach((e) => {
-    byDay.set(e.day, [...(byDay.get(e.day) ?? []), e]);
-  });
-  const totalDays = Math.max(plan?.days ?? days, ...(plan?.entries.map((e) => e.day) ?? [1]));
-  const done = (plan?.entries ?? []).filter((e) => e.tested).length;
-  const total = plan?.entries.length ?? 0;
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div className="flex items-center gap-2">
         <CalendarIcon className="h-6 w-6 text-orange-500" />
         <h1 className="text-xl font-bold sm:text-2xl">Calendario</h1>
+        {monthsQ.data && monthsQ.data.length > 1 && (
+          <select
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="ml-auto rounded-md border border-border bg-background px-2 py-1 text-xs"
+          >
+            {monthsQ.data.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        )}
       </div>
-      <p className="text-xs text-muted-foreground sm:text-sm">
-        Qué producto probar cada día, con sus prompts de vídeo y carruseles listos.
-      </p>
 
-      {/* Radar v2: llenar un día solo con lo que TikTok está impulsando ahora */}
+      <MonthGrid
+        month={month}
+        entries={entries}
+        selected={selected}
+        onSelect={setSelected}
+        onPrev={() => setMonth((m) => shiftMonth(m, -1))}
+        onNext={() => setMonth((m) => shiftMonth(m, 1))}
+      />
+
+      <StatsRow stats={monthQ.data?.stats} />
+      <FormatRanking stats={monthQ.data?.stats} />
+
+      {/* Llenar el día seleccionado con lo que TikTok impulsa ahora */}
       <Card className="border-purple-500/40 bg-purple-500/[0.03]">
         <CardContent className="space-y-2.5 p-4">
           <div>
-            <p className="text-sm font-semibold">🎯 Llenar un día automáticamente</p>
+            <p className="text-sm font-semibold">🎯 Llenar este día automáticamente</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Busca qué productos están recibiendo <strong>inyección de ADS ahora mismo</strong> en
-              España, descarta los saturados y deja los mejores en el día que elijas, con sus
-              prompts listos. Sin buscar nada a mano.
+              España, descarta los saturados y los deja en el <strong>{prettyDate(selected)}</strong>{" "}
+              con sus prompts listos.
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground">Día</span>
-              <input
-                type="number"
-                min={1}
-                value={autoDay}
-                onChange={(e) => setAutoDay(Math.max(1, Number(e.target.value) || 1))}
-                className="w-14 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground">Productos</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={autoTopN}
-                onChange={(e) => setAutoTopN(Math.max(1, Number(e.target.value) || 1))}
-                className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5" title="Cuantos más creadores, más se reparte la inyección de GMV Max">
-              <span className="text-[10px] text-muted-foreground">Máx. creadores</span>
-              <input
-                type="number"
-                min={5}
-                value={autoMaxIfl}
-                onChange={(e) => setAutoMaxIfl(Math.max(5, Number(e.target.value) || 5))}
-                className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5" title="Un 12% de un producto de 10€ son 1,20€ — filtra por lo que cobras de verdad">
-              <span className="text-[10px] text-muted-foreground">Mín. €/venta</span>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                value={autoMinEur}
-                onChange={(e) => setAutoMinEur(Math.max(0, Number(e.target.value) || 0))}
-                className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5" title="3 = las 3 versiones son formatos distintos (UGC / dramatización / POV) → testeas el creativo además del producto. Baja a 1 cuando sepas qué formato te funciona.">
-              <span className="text-[10px] text-muted-foreground">Vídeos/producto</span>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={autoVids}
-                onChange={(e) => setAutoVids(Math.min(5, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
-              />
-            </label>
+            <NumField label="Productos" value={autoTopN} onChange={setAutoTopN} min={1} max={20} w="w-16" />
+            <NumField
+              label="Vídeos/producto" value={autoVids} onChange={setAutoVids} min={1} max={5} w="w-16"
+              title="3 = las 3 versiones son formatos distintos (UGC / dramatización / POV) → testeas el creativo además del producto. Baja a 1 cuando sepas cuál te funciona."
+            />
+            <NumField
+              label="Máx. creadores" value={autoMaxIfl} onChange={setAutoMaxIfl} min={5} w="w-20"
+              title="Cuantos más creadores, más se reparte la inyección de GMV Max"
+            />
+            <NumField
+              label="Mín. €/venta" value={autoMinEur} onChange={setAutoMinEur} min={0} step={0.5} w="w-20"
+              title="Un 12% de un producto de 10€ son 1,20€ — filtra por lo que cobras de verdad"
+            />
             <Button
               size="sm"
               onClick={runAutoDay}
@@ -248,7 +232,7 @@ export default function CalendarPage() {
               {autoDayM.isPending ? (
                 <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Buscando…</>
               ) : (
-                <>🎯 Llenar día {autoDay} ({autoTopN * autoVids} vídeos)</>
+                <>🎯 Llenar ({autoTopN * autoVids} vídeos)</>
               )}
             </Button>
           </div>
@@ -258,11 +242,10 @@ export default function CalendarPage() {
         </CardContent>
       </Card>
 
-      {/* Añadir productos por URL (en lote, flujo Kalodata manual) */}
+      {/* Añadir productos a mano por URL */}
       <Card>
         <CardContent className="space-y-2 p-4">
-          <p className="text-sm font-semibold">➕ Añadir productos a la cola</p>
-          {/* Una fila (link + título) por producto */}
+          <p className="text-sm font-semibold">➕ Añadir productos al {selected}</p>
           <div className="space-y-1.5">
             {rows.map((r, i) => (
               <div key={i} className="flex items-center gap-1.5">
@@ -298,7 +281,6 @@ export default function CalendarPage() {
           >
             + Añadir otro producto
           </button>
-          {/* Tipos de generación (opcional al añadir; por defecto NINGUNO) */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground">Generar ahora:</span>
             {[
@@ -313,219 +295,142 @@ export default function CalendarPage() {
                   type="button"
                   onClick={() => toggleGen(g.id)}
                   className={
-                    "rounded-full border px-2.5 py-1 text-[11px] transition " +
+                    "rounded-full border px-2 py-0.5 text-[11px] transition " +
                     (on
-                      ? "border-orange-500 bg-orange-500/10 font-medium text-orange-600"
-                      : "border-border text-muted-foreground hover:border-foreground/40")
+                      ? "border-orange-500 bg-orange-500/10 text-orange-500"
+                      : "border-border text-muted-foreground hover:border-foreground/50")
                   }
                 >
-                  {on ? "✓ " : ""}
                   {g.label}
                 </button>
               );
             })}
           </div>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">
-              Se añaden a la cola ({perDay}/día). Sin marcar nada = solo se añaden;
-              generas los prompts luego en cada producto.
+            <p className="text-[10px] text-muted-foreground">
+              Sin marcar nada = solo se añaden; generas los prompts luego.
             </p>
-            <Button disabled={addBatch.isPending || !rows.some((r) => r.url.trim())} onClick={submitBatch}>
+            <Button size="sm" onClick={submitBatch} disabled={addBatch.isPending}>
               {addBatch.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Añadiendo…</>
               ) : (
-                <Rocket className="mr-2 h-4 w-4" />
+                <>🚀 Añadir</>
               )}
-              Añadir a la cola
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Generar plan automático */}
-      <Card>
-        <CardContent className="flex flex-wrap items-end gap-3 p-4">
-          <label className="text-xs">
-            Productos/día
-            <input type="number" value={perDay} min={1} max={20}
-              onChange={(e) => setPerDay(+e.target.value)}
-              className="ml-2 w-16 rounded-md border border-border bg-background px-2 py-1" />
-          </label>
-          <label className="text-xs">
-            Días
-            <input type="number" value={days} min={1} max={14}
-              onChange={(e) => setDays(+e.target.value)}
-              className="ml-2 w-16 rounded-md border border-border bg-background px-2 py-1" />
-          </label>
-          <Button
-            disabled={gen.isPending}
-            onClick={() =>
-              gen.mutate(
-                { per_day: perDay, days },
+      {/* ── El día seleccionado ── */}
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <h2 className="text-sm font-semibold capitalize">
+          {prettyDate(selected)}
+          {selected === today && (
+            <span className="ml-1.5 rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] text-orange-500">
+              hoy
+            </span>
+          )}
+        </h2>
+        {dayEntries.length > 0 && (
+          <button
+            onClick={() => {
+              if (!confirm(`¿Vaciar el ${selected}? (${dayEntries.length} productos)`)) return;
+              removeEntries.mutate(
+                { date: selected },
                 {
                   onSuccess: (r) => {
-                    toast.success(r.message);
-                    qc.invalidateQueries({ queryKey: ["radar-plan"] });
+                    toast.success(`${r.removed} quitado(s)`);
+                    refreshAll();
                   },
                   onError: (e) => toast.error(e.message),
                 },
-              )
-            }
-          >
-            {gen.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-            Generar plan {perDay}/día
-          </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Importa los top candidatos del Radar y genera sus packs (en la cola).
-          </p>
-        </CardContent>
-      </Card>
-
-      {total > 0 && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">{done}/{total} probados</p>
-          <Button
-            variant="ghost" size="sm"
-            onClick={() =>
-              del.mutate(undefined, {
-                onSuccess: () => {
-                  toast.success("Plan borrado");
-                  qc.invalidateQueries({ queryKey: ["radar-plan"] });
-                },
-              })
-            }
-          >
-            <Trash2 className="mr-1 h-4 w-4" /> Borrar plan
-          </Button>
-        </div>
-      )}
-
-      {planQ.isLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando calendario…</p>
-      ) : !plan?.exists || total === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Sin plan todavía. Genera uno arriba, o añade productos desde el <b>Radar</b> (botón &quot;Al calendario&quot;).
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {/* Fila de días clicables */}
-          <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => {
-              const entries = byDay.get(d) ?? [];
-              const doneD = entries.filter((e) => e.tested).length;
-              const active = d === selectedDay;
-              return (
-                <button
-                  key={d}
-                  onClick={() => setSelectedDay(d)}
-                  className={
-                    "flex flex-col items-center rounded-lg border px-3 py-1.5 text-xs transition " +
-                    (active
-                      ? "border-orange-500 bg-orange-500/10 font-semibold"
-                      : "border-border text-muted-foreground hover:border-foreground/40")
-                  }
-                >
-                  <span>Día {d}</span>
-                  <span className="text-[10px]">
-                    {entries.length === 0 ? "libre" : `${doneD}/${entries.length} ✓`}
-                  </span>
-                </button>
               );
-            })}
-          </div>
+            }}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-red-500"
+          >
+            <Trash2 className="h-3 w-3" /> Vaciar día
+          </button>
+        )}
+      </div>
 
-          {/* Productos del día seleccionado */}
-          <div>
-            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">📅 Día {selectedDay}</h2>
-              {(byDay.get(selectedDay) ?? []).length > 0 && (
-                <button
-                  disabled={removeBatch.isPending}
-                  onClick={() => {
-                    if (confirm(`¿Vaciar el día ${selectedDay}? (quita todos sus productos del calendario)`))
-                      doRemoveBatch({ day: selectedDay });
-                  }}
-                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-red-500"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Vaciar día
-                </button>
-              )}
-            </div>
-            {selected.size > 0 && (
-              <div className="mb-1.5 flex items-center justify-between gap-2 rounded-md bg-red-500/10 px-2 py-1.5">
-                <span className="text-[11px] font-medium">{selected.size} seleccionado(s)</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelected(new Set())}
-                    className="text-[11px] text-muted-foreground hover:underline"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    disabled={removeBatch.isPending}
-                    onClick={() => doRemoveBatch({ product_ids: [...selected] })}
-                    className="inline-flex items-center gap-1 rounded bg-red-500 px-2 py-1 text-[11px] font-semibold text-white"
-                  >
-                    <Trash2 className="h-3 w-3" /> Borrar seleccionados
-                  </button>
-                </div>
-              </div>
-            )}
-            {(byDay.get(selectedDay) ?? []).length === 0 ? (
-              <p className="text-xs text-muted-foreground">— día libre —</p>
-            ) : (
-              <div className="space-y-2">
-                {(byDay.get(selectedDay) ?? []).map((e) => (
-                  <DayEntry
-                    key={e.product_id}
-                    e={e}
-                    selected={selected.has(e.product_id)}
-                    onToggle={() => toggleSel(e.product_id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+      {dayQ.isLoading ? (
+        <p className="text-xs text-muted-foreground">Cargando…</p>
+      ) : dayEntries.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-sm text-muted-foreground">Sin productos este día.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Usa 🎯 Llenar este día, o añádelos por URL arriba.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {dayEntries.map((e) => (
+            <DayProductCard key={e.product_id} e={e} onChanged={refreshAll} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function DayEntry({
-  e,
-  selected,
-  onToggle,
+function NumField({
+  label, value, onChange, min, max, step, w, title,
 }: {
-  e: PlanEntry;
-  selected: boolean;
-  onToggle: () => void;
+  label: string; value: number; onChange: (n: number) => void;
+  min?: number; max?: number; step?: number; w: string; title?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-0.5" title={title}>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => {
+          let n = Number(e.target.value) || 0;
+          if (min !== undefined) n = Math.max(min, n);
+          if (max !== undefined) n = Math.min(max, n);
+          onChange(n);
+        }}
+        className={w + " rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"}
+      />
+    </label>
+  );
+}
+
+function DayProductCard({
+  e,
+  onChanged,
+}: {
+  e: CalendarEntryDetail;
+  onChanged: () => void;
 }) {
   const qc = useQueryClient();
-  const mark = useMarkTested();
-  const remove = useRemoveFromPlan();
+  const remove = useRemoveCalendarEntries();
   const pack = usePlanPack();
   const [open, setOpen] = useState(false);
-  // El plan no sabe si hay un job activo: marcamos "generando" solo tras
-  // pulsar el botón, así un pack pendiente no muestra un spinner falso.
   const [packing, setPacking] = useState(false);
-  // Estado local del check → feedback instantáneo (el plan se refresca cada
-  // 5s mientras se generan packs y pisaba el estado del checkbox controlado).
-  const [tested, setTested] = useState(e.tested);
-  useEffect(() => setTested(e.tested), [e.tested]);
-  // Mientras se generan los vídeos IA, refresca el plan hasta que aparezcan.
+
+  // Los formatos de las versiones salen del producto — solo hacen falta al
+  // abrir el día, y `useProduct` está cacheado por react-query.
+  const { data: product } = useProduct(e.product_id);
+  const versionLabels: string[] = ((product?.problem_videos ?? []) as ProblemVideo[]).map(
+    (v, i) => v.format || v.concept || `Versión ${i + 1}`,
+  );
+
   useEffect(() => {
     if (!packing) return;
-    if (e.ai_ready) {
+    if (e.presets_count > 0 || e.carousels_count > 0) {
       setPacking(false);
       return;
     }
-    const t = setInterval(
-      () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
-      6000,
-    );
+    const t = setInterval(onChanged, 6000);
     return () => clearInterval(t);
-  }, [packing, e.ai_ready, qc]);
+  }, [packing, e.presets_count, e.carousels_count, onChanged]);
 
   const genAI = () => {
     setPacking(true);
@@ -541,81 +446,51 @@ function DayEntry({
     );
   };
 
+  const aiReady = e.presets_count > 0 || e.carousels_count > 0;
+
   return (
-    <Card>
+    <Card className={e.sold ? "border-green-500/40" : undefined}>
       <CardContent className="space-y-2 p-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-2">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={onToggle}
-              className="mt-1 shrink-0"
-              title="Seleccionar para borrar en lote"
-            />
-            <div className="min-w-0">
-            <p className="text-sm font-medium">
-              {tested && <Check className="mr-1 inline h-3.5 w-3.5 text-green-600" />}
-              {e.name}
-            </p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{e.name}</p>
             <p className="text-[11px] text-muted-foreground">
-              ⭐ {e.score.toFixed(0)} · {VERDICT[e.ads_verdict] ?? ""} ADS {e.ads_verdict} ·{" "}
-              🎯 {e.problem_videos_count} · ⚡ plantillas · 🎣 {e.hooks_count}
-              {e.ai_ready && (
-                <span> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</span>
-              )}
+              ⭐ {e.score.toFixed(0)} · {VERDICT[e.ads_verdict] ?? ""} ADS {e.ads_verdict}
+              {e.influencer_count > 0 && <> · 👥 {e.influencer_count}</>}
+              {e.commission_eur > 0 && <> · 💰 {e.commission_eur.toFixed(2)}€/venta</>}
+              {" · "}🎯 {e.problem_videos_count}
+              {aiReady && <> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</>}
             </p>
-            {e.tiktok_url && (
-              <a
-                href={e.tiktok_url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-orange-500 hover:underline"
-              >
-                <ExternalLink className="h-3 w-3" /> Abrir ficha (descargar fotos)
-              </a>
-            )}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <label className="flex cursor-pointer items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={tested}
-                onChange={(ev) => {
-                  const v = ev.target.checked;
-                  setTested(v);   // instantáneo
-                  mark.mutate(
-                    { product_id: e.product_id, tested: v },
-                    {
-                      onError: () => setTested(!v),   // revierte si falla
-                      onSuccess: () => qc.invalidateQueries({ queryKey: ["radar-plan"] }),
-                    },
-                  );
-                }}
-              />
-              Probado
-            </label>
-            <button
-              disabled={remove.isPending}
-              onClick={() =>
-                remove.mutate(
-                  { product_id: e.product_id },
-                  {
-                    onSuccess: () => {
-                      toast.success("Quitado del calendario");
-                      qc.invalidateQueries({ queryKey: ["radar-plan"] });
-                    },
-                  },
-                )
-              }
-              className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-red-500"
-              title="Quitar del calendario (no borra el producto)"
+            <a
+              href={`https://www.tiktok.com/view/product/${e.product_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-orange-500 hover:underline"
             >
-              <Trash2 className="h-3 w-3" /> quitar
-            </button>
+              <ExternalLink className="h-3 w-3" /> Abrir ficha (foto para el escaparate)
+            </a>
           </div>
+          <button
+            disabled={remove.isPending}
+            onClick={() =>
+              remove.mutate(
+                { date: e.date, product_ids: [e.product_id] },
+                {
+                  onSuccess: () => {
+                    toast.success("Quitado del calendario");
+                    onChanged();
+                  },
+                },
+              )
+            }
+            className="inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground hover:text-red-500"
+            title="Quitar del calendario (no borra el producto)"
+          >
+            <Trash2 className="h-3 w-3" /> quitar
+          </button>
         </div>
+
+        <OutcomeBar e={e} versionLabels={versionLabels} />
 
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -625,7 +500,7 @@ function DayEntry({
             <ChevronDown className={"h-3.5 w-3.5 transition " + (open ? "rotate-180" : "")} />
             Ver prompts
           </button>
-          {!e.ai_ready &&
+          {!aiReady &&
             (packing || pack.isPending ? (
               <span className="inline-flex items-center gap-1 text-xs text-orange-500">
                 <Loader2 className="h-3 w-3 animate-spin" /> generando vídeos IA…

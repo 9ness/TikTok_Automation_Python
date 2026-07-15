@@ -506,7 +506,7 @@ class AddUrlRequest(BaseModel):
     name: str | None = None        # override si el scraper no saca nombre
     category: str | None = None
     language: str = "es_ES"
-    per_day: int = _PER_DAY_DEFAULT
+    date: str = ""                 # YYYY-MM-DD del calendario. Vacío = hoy.
     # Tipos de generación a ejecutar YA: "problem_videos" | "bofu_hooks" | "styles".
     # Default vacío = NO generar al añadir (el operador elige después por producto).
     gens: list[str] = Field(default_factory=list)
@@ -585,26 +585,23 @@ def _scrape_create_product(
     return product, ""
 
 
-def _queue_product(product, per_day: int) -> int:
-    """Añade el product a la cola del plan (append + reflow). Devuelve el día."""
-    from datetime import datetime, timezone
+def _queue_product(product, date: str = "") -> str:
+    """Cuelga el producto de una FECHA del calendario. Devuelve la fecha.
 
-    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
-    from src.tiktok_shop.repos import PlanRepo
+    Antes esto hacía append con `day=10_000` + reflow en bloques de N/día —
+    una cola, no un calendario. Ahora va directo a la fecha pedida (hoy por
+    defecto): si el operador añade un producto a mano, lo quiere HOY, no en un
+    "día 7" que no sabe cuándo cae.
+    """
+    from src.tiktok_shop.models.month_plan import DayEntry, today_iso
+    from src.tiktok_shop.repos.month_plan_repo import MonthPlanRepo
 
-    prepo = PlanRepo()
-    plan = prepo.get_current()
-    if plan is None:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        plan = WeekPlan(label=f"Semana {date}", date=date, days=1)
-    if not any(e.product_id == product.id for e in plan.entries):
-        plan.entries.append(PlanEntry(
-            day=10_000, product_id=product.id, slug=product.slug,
-            name=product.name, score=0, ads_verdict="desconocida",
-        ))
-    _reflow_plan(plan, per_day)
-    prepo.save(plan, make_current=True)
-    return next((e.day for e in plan.entries if e.product_id == product.id), 1)
+    d = date or today_iso()
+    MonthPlanRepo().add_entry(DayEntry(
+        date=d, product_id=product.id, slug=product.slug, name=product.name,
+        score=0.0, ads_verdict="desconocida",
+    ))
+    return d
 
 
 def _maybe_enqueue_gens(queue, product, gens, operator) -> str | None:
@@ -631,12 +628,12 @@ def add_url(
     product, err = _scrape_create_product(body.url, body.name, body.category, body.language)
     if product is None:
         return CalendarActionResponse(ok=False, message=err)
-    landed = _queue_product(product, body.per_day)
+    landed = _queue_product(product, body.date)
     job_id = _maybe_enqueue_gens(queue, product, body.gens, operator)
     tail = " Generando prompts…" if job_id else ""
     return CalendarActionResponse(
         ok=True, product_id=product.id, slug=product.slug, job_id=job_id,
-        message=f"'{product.name}' añadido al día {landed} (cola).{tail}",
+        message=f"'{product.name}' añadido al {landed}.{tail}",
     )
 
 
@@ -644,7 +641,7 @@ class AddBatchRequest(BaseModel):
     # Texto multilínea: un producto por línea, "nombre — url" (o "url — nombre",
     # o solo url). Se parsea la URL y el resto es el nombre.
     raw: str
-    per_day: int = _PER_DAY_DEFAULT
+    date: str = ""                 # YYYY-MM-DD del calendario. Vacío = hoy.
     language: str = "es_ES"
     gens: list[str] = Field(default_factory=list)
 
@@ -653,7 +650,7 @@ class BatchItemResult(BaseModel):
     line: str
     ok: bool
     name: str = ""
-    day: int = 0
+    date: str = ""
     message: str = ""
 
 
@@ -698,10 +695,10 @@ def add_batch(
         if product is None:
             results.append(BatchItemResult(line=ln, ok=False, message=err))
             continue
-        day = _queue_product(product, body.per_day)
+        landed = _queue_product(product, body.date)
         _maybe_enqueue_gens(queue, product, body.gens, operator)
         added += 1
-        results.append(BatchItemResult(line=ln, ok=True, name=product.name, day=day))
+        results.append(BatchItemResult(line=ln, ok=True, name=product.name, date=landed))
     return AddBatchResponse(
         ok=added > 0, added=added, failed=len(results) - added, results=results,
     )

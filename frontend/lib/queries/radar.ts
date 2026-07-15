@@ -190,7 +190,7 @@ export function useAutoDay() {
     CalendarActionResponse,
     Error,
     {
-      day: number;
+      date?: string;
       top_n?: number;
       region?: string;
       days_window?: number;
@@ -270,7 +270,7 @@ export function useAddUrl() {
   return useMutation<
     CalendarActionResponse,
     Error,
-    { url: string; name?: string; category?: string; per_day?: number; gens?: string[] }
+    { url: string; name?: string; category?: string; date?: string; gens?: string[] }
   >({
     mutationFn: (body) =>
       api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/add-url", body),
@@ -281,7 +281,7 @@ export interface BatchItemResult {
   line: string;
   ok: boolean;
   name: string;
-  day: number;
+  date: string;
   message: string;
 }
 
@@ -289,7 +289,7 @@ export function useAddBatch() {
   return useMutation<
     { ok: boolean; added: number; failed: number; results: BatchItemResult[] },
     Error,
-    { raw: string; per_day?: number; language?: string; gens?: string[] }
+    { raw: string; date?: string; language?: string; gens?: string[] }
   >({
     mutationFn: (body) =>
       api.post("/api/v1/tiktok-shop/radar/plan/add-batch", body),
