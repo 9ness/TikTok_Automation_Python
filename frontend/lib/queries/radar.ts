@@ -196,6 +196,7 @@ export function useAutoDay() {
       days_window?: number;
       max_influencers?: number | null;
       min_commission_eur?: number;
+      videos_per_product?: number;
       gens?: string[];
     }
   >({

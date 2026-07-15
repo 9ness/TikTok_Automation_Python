@@ -59,9 +59,12 @@ export default function CalendarPage() {
   // ── Radar v2: llenar un día con los productos que reciben ADS ahora ──
   const autoDayM = useAutoDay();
   const [autoDay, setAutoDay] = useState(1);
-  const [autoTopN, setAutoTopN] = useState(5);
+  const [autoTopN, setAutoTopN] = useState(6);
   const [autoMaxIfl, setAutoMaxIfl] = useState(250);
-  const [autoMinEur, setAutoMinEur] = useState(0);
+  const [autoMinEur, setAutoMinEur] = useState(3);
+  // 1 vídeo/producto: método del operador de 100€/día — explorar barato,
+  // doblar solo en el que venda.
+  const [autoVids, setAutoVids] = useState(1);
   const runAutoDay = () => {
     autoDayM.mutate(
       {
@@ -69,6 +72,7 @@ export default function CalendarPage() {
         top_n: autoTopN,
         max_influencers: autoMaxIfl,
         min_commission_eur: autoMinEur,
+        videos_per_product: autoVids,
         gens: ["problem_videos"],
       },
       {
@@ -223,6 +227,17 @@ export default function CalendarPage() {
                 className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
               />
             </label>
+            <label className="flex flex-col gap-0.5" title="1 vídeo por producto: explorar barato y doblar solo en el que venda. Varios vídeos del mismo producto compiten por la misma inyección.">
+              <span className="text-[10px] text-muted-foreground">Vídeos/producto</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={autoVids}
+                onChange={(e) => setAutoVids(Math.min(5, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+              />
+            </label>
             <Button
               size="sm"
               onClick={runAutoDay}
@@ -232,7 +247,7 @@ export default function CalendarPage() {
               {autoDayM.isPending ? (
                 <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Buscando…</>
               ) : (
-                <>🎯 Llenar día {autoDay}</>
+                <>🎯 Llenar día {autoDay} ({autoTopN * autoVids} vídeos)</>
               )}
             </Button>
           </div>

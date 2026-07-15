@@ -340,7 +340,12 @@ class AutoDayRequest(BaseModel):
     days_window: float = 3.0        # frescura de la inyección (días)
     video_pages: int = 8            # 10 vídeos por página, 1 request c/u
     max_influencers: int | None = 250   # «menos de 200-250» — repartir menos
-    min_commission_eur: float = 0.0     # suelo en EUROS por venta, no en %
+    min_commission_eur: float = 3.0     # suelo en EUROS por venta, no en %
+    # 1 por producto = método del operador de 100€/día: explorar barato con
+    # muchos productos y doblar SOLO en el que vende. Los vídeos extra del
+    # mismo producto compiten por la misma bolsa de GMV Max; un producto
+    # nuevo es una bolsa nueva.
+    videos_per_product: int = 1
     gens: list[str] | None = None       # qué generar: problem_videos por defecto
 
 
@@ -368,7 +373,7 @@ def auto_day(
             "video_pages": body.video_pages,
             "max_influencers": body.max_influencers,
             "min_commission_eur": body.min_commission_eur,
-            "options": _gen_options(body.gens),
+            "options": _gen_options(body.gens, body.videos_per_product),
         },
         enqueued_by=operator or None,
     )
@@ -468,10 +473,16 @@ def get_plan(operator: Annotated[str, Depends(get_current_user)]) -> WeekPlanOut
     )
 
 
-def _gen_options(gens: list[str] | None) -> dict:
+def _gen_options(gens: list[str] | None, n_problem_videos: int = 3) -> dict:
     """Opciones de pack según los tipos de generación elegidos.
     gens ⊆ {"problem_videos", "bofu_hooks", "styles"}. Default: solo
-    vídeos-problema (lo que el operador quiere activo ahora)."""
+    vídeos-problema (lo que el operador quiere activo ahora).
+
+    `n_problem_videos`: cuántos conceptos por producto. El día automático usa
+    1 (método del operador de 100€/día: 1 vídeo por producto, y si vende, se
+    doblan los vídeos de ESE producto). Más vídeos del mismo producto no son
+    apuestas nuevas — compiten por la misma bolsa de GMV Max.
+    """
     gens = gens or ["problem_videos"]
     styles = "styles" in gens
     return {
@@ -484,6 +495,7 @@ def _gen_options(gens: list[str] | None) -> dict:
         "generate_nano_banana": False,
         "generate_bofu_hooks": "bofu_hooks" in gens,
         "generate_problem_videos": "problem_videos" in gens,
+        "n_problem_videos": max(1, min(5, n_problem_videos)),
     }
 
 
