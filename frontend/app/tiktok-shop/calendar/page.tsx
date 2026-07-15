@@ -62,9 +62,10 @@ export default function CalendarPage() {
   const [autoTopN, setAutoTopN] = useState(6);
   const [autoMaxIfl, setAutoMaxIfl] = useState(250);
   const [autoMinEur, setAutoMinEur] = useState(3);
-  // 1 vídeo/producto: método del operador de 100€/día — explorar barato,
-  // doblar solo en el que venda.
-  const [autoVids, setAutoVids] = useState(1);
+  // 3 vídeos/producto mientras se aprende: son 3 FORMATOS distintos, así que
+  // testean el creativo además del producto. Con 1 solo no sabrías si falló
+  // el producto o el vídeo. Bajar a 1-2 cuando se sepa qué formato gana.
+  const [autoVids, setAutoVids] = useState(3);
   const runAutoDay = () => {
     autoDayM.mutate(
       {
@@ -227,7 +228,7 @@ export default function CalendarPage() {
                 className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
               />
             </label>
-            <label className="flex flex-col gap-0.5" title="1 vídeo por producto: explorar barato y doblar solo en el que venda. Varios vídeos del mismo producto compiten por la misma inyección.">
+            <label className="flex flex-col gap-0.5" title="3 = las 3 versiones son formatos distintos (UGC / dramatización / POV) → testeas el creativo además del producto. Baja a 1 cuando sepas qué formato te funciona.">
               <span className="text-[10px] text-muted-foreground">Vídeos/producto</span>
               <input
                 type="number"

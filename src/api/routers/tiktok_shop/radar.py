@@ -341,11 +341,13 @@ class AutoDayRequest(BaseModel):
     video_pages: int = 8            # 10 vídeos por página, 1 request c/u
     max_influencers: int | None = 250   # «menos de 200-250» — repartir menos
     min_commission_eur: float = 3.0     # suelo en EUROS por venta, no en %
-    # 1 por producto = método del operador de 100€/día: explorar barato con
-    # muchos productos y doblar SOLO en el que vende. Los vídeos extra del
-    # mismo producto compiten por la misma bolsa de GMV Max; un producto
-    # nuevo es una bolsa nueva.
-    videos_per_product: int = 1
+    # 3 por producto MIENTRAS SE APRENDE. El operador de 100€/día sube 1 y
+    # dobla en el que vende, pero eso presupone saber YA qué vídeo funciona
+    # (4 cuentas, meses en US). Con 1 vídeo, si no vende no sabes si falló el
+    # producto o el creativo. Las 3 versiones son formatos DISTINTOS por
+    # diseño (problem_video_director.md) → test A/B del creativo, no 3 copias.
+    # Cuando se sepa qué formato gana → bajar a 1-2 y doblar en ganadores.
+    videos_per_product: int = 3
     gens: list[str] | None = None       # qué generar: problem_videos por defecto
 
 
