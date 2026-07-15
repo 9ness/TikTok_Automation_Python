@@ -31,6 +31,11 @@ import requests
 
 
 DEFAULT_BASE_URL = "https://open.echotik.live/api/v2"
+# v3 es la ÚNICA versión documentada (opendocs.echotik.live). La usamos solo
+# para `echotik/video/list`, que expone `is_ad` — v2 no tiene ese campo.
+# El resto sigue en v2 porque está validado en vivo (2026-06) y v3 no se ha
+# podido verificar campo a campo (cuota agotada).
+V3_BASE_URL = "https://open.echotik.live/api/v3"
 TIMEOUT_S = 60
 
 
@@ -81,12 +86,16 @@ def _auth() -> tuple[str, str]:
 
 def _get(
     path: str, params: dict[str, Any],
-    *, log_callback: Callable[[str], None] | None = None,
+    *, base: str | None = None,
+    log_callback: Callable[[str], None] | None = None,
 ) -> Any:
     """GET con Basic Auth. Devuelve `data` del JSON (o None si error).
     Registra el coste (~€0.0001/request) en el job activo. Nunca lanza —
-    loguea y devuelve None para que el research degrade con elegancia."""
-    url = f"{_base_url()}/{path.lstrip('/')}"
+    loguea y devuelve None para que el research degrade con elegancia.
+
+    `base` permite apuntar a otra versión de la API (ver V3_BASE_URL).
+    """
+    url = f"{(base or _base_url()).rstrip('/')}/{path.lstrip('/')}"
     try:
         r = requests.get(url, params=params, auth=_auth(), timeout=TIMEOUT_S)
     except requests.RequestException as e:
@@ -311,6 +320,103 @@ def get_product_videos(
         sold = sum(1 for x in out if x["units_sold"] > 0)
         log_callback(f"  ✓ {len(out)} vídeos ({sold} con ventas registradas)")
     return out
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Vídeos de un producto CON LA ETIQUETA DE ANUNCIO REAL  (v3, `is_ad`)
+# ═════════════════════════════════════════════════════════════════════
+def get_product_ad_videos(
+    product_id: str,
+    *,
+    region: str = "ES",
+    limit: int = 10,
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Vídeos de un producto con `is_ad` — la etiqueta de ANUNCIO real.
+
+    Por qué esto es la señal buena (y no el proxy de engagement):
+
+      * v3 `echotik/video/list` documenta `is_ad` como «是否投流视频，
+        1=投流视频，0=非投流视频» → 投流 = "inyección de tráfico pagado".
+        Es literalmente la inyección de ADS que buscamos, no una inferencia.
+      * TikTok Ads documenta que, EN LA UE (España incluida), los vídeos de
+        afiliado de un producto metido en una campaña **GMV Max** reciben
+        etiqueta de contenido comercial de forma AUTOMÁTICA
+        (ads.tiktok.com/help/article/about-product-gmv-max) → la proporción
+        de vídeos con `is_ad=1` es la huella pública de GMV Max en ese
+        producto. Es la misma cuenta que el operador hace a mano contando
+        etiquetas lilas "AD" en Kalodata.
+
+    Una sola request devuelve etiqueta Y ventas por vídeo → hace innecesario
+    el doble sondeo EchoTik+Apify de `ads_signal` (Apify solo daba etiqueta,
+    y su `isAd` es casi siempre False por construcción).
+
+    Devuelve la MISMA forma que consume `ads_signal.ads_injection_signal`:
+    `{views, likes, comments, shares, units_sold, gmv, ad_flag}`, con
+    `ad_flag` bool (None si la API no trae el campo → no lo inventamos).
+
+    ⚠️ SIN VERIFICAR EN VIVO: la cuota del trial (100 req) está agotada, así
+    que no se ha podido confirmar que `is_ad` venga poblado para region=ES.
+    Ver `scripts/verify_echotik_is_ad.py` — un solo comando lo zanja.
+    """
+    if not echotik_is_configured() or not product_id:
+        return []
+    if log_callback:
+        log_callback(f"  🏷️ EchoTik v3: etiqueta AD (is_ad) del producto {product_id}…")
+    # OJO: sin filtro `is_ad` a propósito. Necesitamos el TOTAL y los
+    # marcados para calcular la proporción; filtrar daría solo el numerador
+    # y costaría 2 requests en vez de 1.
+    data = _get(
+        "echotik/video/list",
+        {"product_id": product_id, "region": region, "page_num": 1,
+         "page_size": min(limit, 10)},
+        base=V3_BASE_URL,
+        log_callback=log_callback,
+    )
+    rows = data if isinstance(data, list) else (
+        data.get("list") if isinstance(data, dict) and isinstance(data.get("list"), list) else None
+    )
+    if not rows:
+        return []
+    out: list[dict[str, Any]] = []
+    for v in rows:
+        out.append({
+            "video_id": str(v.get("video_id") or ""),
+            "url": _build_tiktok_url(v.get("user_id"), str(v.get("video_id") or "")),
+            "ad_flag": _to_ad_flag(v.get("is_ad")),
+            "units_sold": int(v.get("total_video_sale_cnt") or 0),
+            "gmv": float(v.get("total_video_sale_gmv_amt") or 0),
+            "views": int(v.get("total_views_cnt") or 0),
+            "likes": int(v.get("total_digg_cnt") or 0),
+            "comments": int(v.get("total_comments_cnt") or 0),
+            "shares": int(v.get("total_shares_cnt") or 0),
+            "create_time": v.get("create_time") or "",
+        })
+    out.sort(key=lambda x: x["views"], reverse=True)
+    if log_callback:
+        flagged = sum(1 for x in out if x["ad_flag"] is True)
+        known = sum(1 for x in out if isinstance(x["ad_flag"], bool))
+        if known:
+            log_callback(f"  ✓ {flagged}/{known} vídeos con etiqueta AD (is_ad=1)")
+        else:
+            log_callback("  ⚠️ la API no devolvió `is_ad` — sin etiqueta real")
+    return out
+
+
+def _to_ad_flag(raw: Any) -> bool | None:
+    """`is_ad` (1=anuncio, 0=no) → bool. None si falta/ilegible.
+
+    None significa "no lo sé", NO "no es anuncio" — `ads_signal` distingue
+    ambos y solo pondera la señal cuando existe de verdad.
+    """
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, bool):
+        return raw
+    try:
+        return int(raw) == 1
+    except (TypeError, ValueError):
+        return None
 
 
 def _to_pct(rate: Any) -> float:
