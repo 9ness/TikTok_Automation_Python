@@ -148,7 +148,7 @@ export function describeJobParams(
       if (params.days) out.push(`${String(params.days)} días`);
       break;
     case "tiktok_shop_auto_day":
-      if (params.day) out.push(`día ${String(params.day)}`);
+      if (params.date) out.push(String(params.date));
       if (params.top_n) out.push(`top ${String(params.top_n)}`);
       if (params.region) out.push(String(params.region));
       break;

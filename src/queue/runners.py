@@ -1781,16 +1781,15 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
     que están recibiendo inyección de ADS AHORA.
 
     Escanea la inyección fresca (`fresh_ads_discovery`), se queda con el top N
-    tras filtros, los importa como Product, los cuelga del día pedido y encola
-    los prompts de cada uno. El operador abre el día y ya tiene con qué grabar.
+    tras filtros, los importa como Product, los cuelga de la FECHA pedida en el
+    calendario y genera sus prompts. El operador abre el día y tiene con qué
+    grabar.
 
-    Params: region, day, top_n, days_window, video_pages, max_influencers,
-            min_commission_eur, gens, options.
+    Params: region, date (YYYY-MM-DD, default hoy), top_n, days_window,
+            video_pages, max_influencers, min_commission_eur, gens, options.
     """
-    from datetime import datetime, timezone
-
-    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
-    from src.tiktok_shop.repos import PlanRepo
+    from src.tiktok_shop.models.month_plan import DayEntry, today_iso
+    from src.tiktok_shop.repos.month_plan_repo import MonthPlanRepo
     from src.tiktok_shop.services import discovery_service
     from src.tiktok_shop.services.creation_pack import PackOptions, build_pack
     from src.tiktok_shop.services.fresh_ads_discovery import (
@@ -1800,7 +1799,8 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
     )
 
     region = str(job.params.get("region") or "ES")
-    day = max(1, int(job.params.get("day", 1)))
+    # Fecha REAL, no un "día 1..N". Default: hoy.
+    date = str(job.params.get("date") or today_iso())
     top_n = max(1, int(job.params.get("top_n", 5)))
     window = float(job.params.get("days_window", 3))
     pages = int(job.params.get("video_pages", 8))
@@ -1835,18 +1835,13 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
         return "auto_day:0 (ninguno supera min_commission_eur)"
 
     chosen = cands[:top_n]
-    on_log(f"🏆 Top {len(chosen)} para el día {day}:")
+    on_log(f"🏆 Top {len(chosen)} para el {date}:")
     for i, c in enumerate(chosen, 1):
         on_log(f"   {i}. [{c.score.total:.0f}] {c.name[:44]} · "
                f"{c.influencer_count} creadores · {commission_eur(c):.2f}€/venta")
 
     # ── 2. Importar + colgar del día + generar prompts ───────────────
-    prepo = PlanRepo()
-    plan = prepo.get_current()
-    if plan is None:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        plan = WeekPlan(label=f"Semana {date}", date=date, days=7)
-
+    repo = MonthPlanRepo()
     added = 0
     for i, cand in enumerate(chosen):
         base = 0.15 + (i / len(chosen)) * 0.80
@@ -1856,13 +1851,16 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
         except Exception as e:  # noqa: BLE001
             on_log(f"  ⚠️ no se pudo importar {cand.name[:34]!r}: {e}")
             continue
-        if not any(e.product_id == product.id for e in plan.entries):
-            plan.entries.append(PlanEntry(
-                day=day, product_id=product.id, slug=product.slug,
-                name=product.name, score=cand.score.total,
-                ads_verdict=cand.ads.verdict,
-            ))
-            added += 1
+        # add_entry es idempotente por (fecha, producto) → re-lanzar el
+        # mismo día no duplica.
+        repo.add_entry(DayEntry(
+            date=date, product_id=product.id, slug=product.slug,
+            name=product.name, score=cand.score.total,
+            ads_verdict=cand.ads.verdict,
+            influencer_count=cand.influencer_count,
+            commission_eur=round(commission_eur(cand), 2),
+        ))
+        added += 1
         try:
             build_pack(product, options=options, log_callback=on_log)
         except Exception as e:  # noqa: BLE001
@@ -1870,11 +1868,8 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
             # perderlo. El operador puede regenerar desde la tarjeta.
             on_log(f"  ⚠️ pack falló para {product.name[:34]!r}: {e}")
 
-    plan.days = max(plan.days, day)
-    prepo.save(plan, make_current=True)
-
-    on_progress(1.0, f"✅ {added} productos en el día {day}")
-    return f"auto_day:{added}/{len(chosen)} día={day}"
+    on_progress(1.0, f"✅ {added} productos el {date}")
+    return f"auto_day:{added}/{len(chosen)} fecha={date}"
 
 
 def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:

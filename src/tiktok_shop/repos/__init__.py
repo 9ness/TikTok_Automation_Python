@@ -7,6 +7,7 @@ from .shortcut_repo import ShortcutRepo
 from .published_repo import PublishedVideoRepo
 from .discovery_repo import DiscoveryRepo
 from .plan_repo import PlanRepo
+from .month_plan_repo import MonthPlanRepo
 
 __all__ = [
     "ShopRedis",
@@ -19,4 +20,5 @@ __all__ = [
     "PublishedVideoRepo",
     "DiscoveryRepo",
     "PlanRepo",
+    "MonthPlanRepo",
 ]

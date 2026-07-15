@@ -334,7 +334,7 @@ def import_to_calendar(
 
 class AutoDayRequest(BaseModel):
     """Llenar un día solo, con lo que está recibiendo ADS ahora mismo."""
-    day: int = 1
+    date: str = ""                  # YYYY-MM-DD. Vacío = hoy.
     top_n: int = 5
     region: str = "ES"
     days_window: float = 3.0        # frescura de la inyección (días)
@@ -358,17 +358,17 @@ def auto_day(
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> CalendarActionResponse:
     """Botón "llenar el día": busca los productos con inyección de ADS FRESCA
-    en España, se queda con los `top_n` mejores y los deja en el día `day` del
-    calendario con sus prompts listos.
+    en España, se queda con los `top_n` mejores y los deja en la fecha `date`
+    del calendario (hoy por defecto) con sus prompts listos.
 
     Va por la cola porque tarda: ~18 requests a EchoTik + los prompts de cada
     producto (Gemini). El progreso se ve en el drawer de Cola.
     """
     job = queue.enqueue(
         JobMode.TIKTOK_SHOP_AUTO_DAY,
-        title=f"🎯 Día {body.day}: top {body.top_n} con ADS frescos",
+        title=f"🎯 {body.date or 'hoy'}: top {body.top_n} con ADS frescos",
         params={
-            "day": body.day,
+            "date": body.date,
             "top_n": body.top_n,
             "region": body.region,
             "days_window": body.days_window,
@@ -382,7 +382,7 @@ def auto_day(
     return CalendarActionResponse(
         ok=True, product_id=None, slug=None, job_id=job.id,
         message=f"Buscando los {body.top_n} mejores productos con ADS frescos "
-                f"para el día {body.day}…",
+                f"para el {body.date or 'día de hoy'}…",
     )
 
 
