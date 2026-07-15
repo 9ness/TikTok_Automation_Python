@@ -21,6 +21,7 @@ import {
   useBofuHooks,
   useDeletePlan,
   useAddBatch,
+  useAutoDay,
   useMarkTested,
   usePlanGenerate,
   usePlanPack,
@@ -54,6 +55,37 @@ export default function CalendarPage() {
   const gen = usePlanGenerate();
   const del = useDeletePlan();
   const addBatch = useAddBatch();
+
+  // ── Radar v2: llenar un día con los productos que reciben ADS ahora ──
+  const autoDayM = useAutoDay();
+  const [autoDay, setAutoDay] = useState(1);
+  const [autoTopN, setAutoTopN] = useState(5);
+  const [autoMaxIfl, setAutoMaxIfl] = useState(250);
+  const [autoMinEur, setAutoMinEur] = useState(0);
+  const runAutoDay = () => {
+    autoDayM.mutate(
+      {
+        day: autoDay,
+        top_n: autoTopN,
+        max_influencers: autoMaxIfl,
+        min_commission_eur: autoMinEur,
+        gens: ["problem_videos"],
+      },
+      {
+        onSuccess: (r) => {
+          if (!r.ok) {
+            toast.error(r.message || "No se pudo lanzar la búsqueda");
+            return;
+          }
+          toast.success(r.message || "Buscando productos con ADS frescos…");
+          // El job tarda minutos: refrescamos al rato para que aparezcan.
+          setTimeout(() => qc.invalidateQueries({ queryKey: ["radar-plan"] }), 20_000);
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  };
+
   const [perDay, setPerDay] = useState(10);
   const [days, setDays] = useState(7);
   const [selectedDay, setSelectedDay] = useState(1);
@@ -136,6 +168,79 @@ export default function CalendarPage() {
       <p className="text-xs text-muted-foreground sm:text-sm">
         Qué producto probar cada día, con sus prompts de vídeo y carruseles listos.
       </p>
+
+      {/* Radar v2: llenar un día solo con lo que TikTok está impulsando ahora */}
+      <Card className="border-purple-500/40 bg-purple-500/[0.03]">
+        <CardContent className="space-y-2.5 p-4">
+          <div>
+            <p className="text-sm font-semibold">🎯 Llenar un día automáticamente</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Busca qué productos están recibiendo <strong>inyección de ADS ahora mismo</strong> en
+              España, descarta los saturados y deja los mejores en el día que elijas, con sus
+              prompts listos. Sin buscar nada a mano.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-muted-foreground">Día</span>
+              <input
+                type="number"
+                min={1}
+                value={autoDay}
+                onChange={(e) => setAutoDay(Math.max(1, Number(e.target.value) || 1))}
+                className="w-14 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-muted-foreground">Productos</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={autoTopN}
+                onChange={(e) => setAutoTopN(Math.max(1, Number(e.target.value) || 1))}
+                className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5" title="Cuantos más creadores, más se reparte la inyección de GMV Max">
+              <span className="text-[10px] text-muted-foreground">Máx. creadores</span>
+              <input
+                type="number"
+                min={5}
+                value={autoMaxIfl}
+                onChange={(e) => setAutoMaxIfl(Math.max(5, Number(e.target.value) || 5))}
+                className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5" title="Un 12% de un producto de 10€ son 1,20€ — filtra por lo que cobras de verdad">
+              <span className="text-[10px] text-muted-foreground">Mín. €/venta</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                value={autoMinEur}
+                onChange={(e) => setAutoMinEur(Math.max(0, Number(e.target.value) || 0))}
+                className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+              />
+            </label>
+            <Button
+              size="sm"
+              onClick={runAutoDay}
+              disabled={autoDayM.isPending}
+              className="bg-purple-600 text-white hover:bg-purple-700"
+            >
+              {autoDayM.isPending ? (
+                <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Buscando…</>
+              ) : (
+                <>🎯 Llenar día {autoDay}</>
+              )}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Tarda un par de minutos — el progreso se ve en la Cola.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Añadir productos por URL (en lote, flujo Kalodata manual) */}
       <Card>

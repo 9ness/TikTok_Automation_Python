@@ -183,6 +183,27 @@ export function useImportToCalendar() {
   });
 }
 
+/** Llena un día del calendario con los productos que están recibiendo
+ *  inyección de ADS ahora mismo (Radar v2, descubrimiento invertido). */
+export function useAutoDay() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    {
+      day: number;
+      top_n?: number;
+      region?: string;
+      days_window?: number;
+      max_influencers?: number | null;
+      min_commission_eur?: number;
+      gens?: string[];
+    }
+  >({
+    mutationFn: (body) =>
+      api.post<CalendarActionResponse>("/api/v1/tiktok-shop/radar/plan/auto-day", body),
+  });
+}
+
 export function usePlanGenerate() {
   return useMutation<
     CalendarActionResponse,

@@ -25,6 +25,7 @@ class JobMode(str, Enum):
     TIKTOK_SHOP_PACK = "tiktok_shop_pack"      # Radar: pack de 1 producto
     TIKTOK_SHOP_PLAN = "tiktok_shop_plan"      # Radar: plan N/día (varios packs)
     TIKTOK_SHOP_READY_VIDEO = "tiktok_shop_ready_video"  # subir vídeo → listo TikTok
+    TIKTOK_SHOP_AUTO_DAY = "tiktok_shop_auto_day"  # Radar v2: llenar 1 día solo
     EDITOR_AUTO = "editor_auto"
 
 
@@ -46,6 +47,7 @@ MODE_LABELS = {
     JobMode.TIKTOK_SHOP: "🛒 TikTok Shop",
     JobMode.TIKTOK_SHOP_WATERMARK: "🚿 Sin marca (TikTok Shop)",
     JobMode.TIKTOK_SHOP_READY_VIDEO: "🎬 Vídeo listo (TikTok Shop)",
+    JobMode.TIKTOK_SHOP_AUTO_DAY: "🎯 Día automático (ADS frescos)",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
 }
 

@@ -15,6 +15,7 @@ import {
   Film,
   HardHat,
   Package,
+  Radar,
   Scissors,
   ShieldOff,
   ShoppingBag,
@@ -30,6 +31,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   tiktok_shop_watermark: "tiktok_shop",
   tiktok_shop_pack: "tiktok_shop",
   tiktok_shop_plan: "tiktok_shop",
+  tiktok_shop_auto_day: "tiktok_shop",
   tiktok_shop_ready_video: "tiktok_shop",
   presidents: "creator_reward",
   pronosticos: "creator_reward",
@@ -56,6 +58,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   tiktok_shop_watermark: "Sin marca",
   tiktok_shop_pack: "Pack",
   tiktok_shop_plan: "Plan",
+  tiktok_shop_auto_day: "Día auto",
   tiktok_shop_ready_video: "Vídeo listo",
   presidents: "Presidentes",
   pronosticos: "Pronósticos",
@@ -70,6 +73,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   tiktok_shop_watermark: ShieldOff,
   tiktok_shop_pack: Package,
   tiktok_shop_plan: CalendarDays,
+  tiktok_shop_auto_day: Radar,
   tiktok_shop_ready_video: Film,
   presidents: Crown,
   pronosticos: BarChart3,
@@ -142,6 +146,11 @@ export function describeJobParams(
     case "tiktok_shop_plan":
       if (params.per_day) out.push(`${String(params.per_day)}/día`);
       if (params.days) out.push(`${String(params.days)} días`);
+      break;
+    case "tiktok_shop_auto_day":
+      if (params.day) out.push(`día ${String(params.day)}`);
+      if (params.top_n) out.push(`top ${String(params.top_n)}`);
+      if (params.region) out.push(String(params.region));
       break;
   }
   return out;

@@ -1776,6 +1776,107 @@ def run_tiktok_shop_plan(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     return f"plan:{ok}/{len(results)}"
 
 
+def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Radar v2: llena UN día del calendario solo, con los mejores productos
+    que están recibiendo inyección de ADS AHORA.
+
+    Escanea la inyección fresca (`fresh_ads_discovery`), se queda con el top N
+    tras filtros, los importa como Product, los cuelga del día pedido y encola
+    los prompts de cada uno. El operador abre el día y ya tiene con qué grabar.
+
+    Params: region, day, top_n, days_window, video_pages, max_influencers,
+            min_commission_eur, gens, options.
+    """
+    from datetime import datetime, timezone
+
+    from src.tiktok_shop.models.week_plan import PlanEntry, WeekPlan
+    from src.tiktok_shop.repos import PlanRepo
+    from src.tiktok_shop.services import discovery_service
+    from src.tiktok_shop.services.creation_pack import PackOptions, build_pack
+    from src.tiktok_shop.services.fresh_ads_discovery import (
+        FreshAdsFilters,
+        commission_eur,
+        discover_fresh_ad_products,
+    )
+
+    region = str(job.params.get("region") or "ES")
+    day = max(1, int(job.params.get("day", 1)))
+    top_n = max(1, int(job.params.get("top_n", 5)))
+    window = float(job.params.get("days_window", 3))
+    pages = int(job.params.get("video_pages", 8))
+    options = PackOptions(**(job.params.get("options") or {}))
+
+    filters = FreshAdsFilters(
+        max_influencers=job.params.get("max_influencers", 250),
+        min_commission_pct=float(job.params.get("min_commission_pct", 0.0)),
+    )
+    min_eur = float(job.params.get("min_commission_eur", 0.0))
+
+    # ── 1. Escanear la inyección fresca ──────────────────────────────
+    on_progress(0.05, f"📡 Buscando inyección de ADS en {region}…")
+    cands = discover_fresh_ad_products(
+        region=region, days=window, video_pages=pages,
+        max_products=max(20, top_n * 4), deep_ads_top_n=max(top_n, 8),
+        filters=filters, persist=True, log_callback=on_log,
+    )
+    if not cands:
+        on_progress(1.0, "∅ Sin productos con ADS frescos")
+        return "auto_day:0 (sin candidatos — ¿cuota de EchoTik agotada?)"
+
+    # Suelo en EUROS por venta: un 12% de un producto de 10€ son 1,20€ — no
+    # compensa grabar por eso. Se filtra aquí y no en FreshAdsFilters porque
+    # necesita el precio ya resuelto.
+    if min_eur > 0:
+        before = len(cands)
+        cands = [c for c in cands if commission_eur(c) >= min_eur]
+        on_log(f"💰 {len(cands)}/{before} con ≥{min_eur:.2f}€ por venta")
+    if not cands:
+        on_progress(1.0, "∅ Ninguno llega al mínimo por venta")
+        return "auto_day:0 (ninguno supera min_commission_eur)"
+
+    chosen = cands[:top_n]
+    on_log(f"🏆 Top {len(chosen)} para el día {day}:")
+    for i, c in enumerate(chosen, 1):
+        on_log(f"   {i}. [{c.score.total:.0f}] {c.name[:44]} · "
+               f"{c.influencer_count} creadores · {commission_eur(c):.2f}€/venta")
+
+    # ── 2. Importar + colgar del día + generar prompts ───────────────
+    prepo = PlanRepo()
+    plan = prepo.get_current()
+    if plan is None:
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        plan = WeekPlan(label=f"Semana {date}", date=date, days=7)
+
+    added = 0
+    for i, cand in enumerate(chosen):
+        base = 0.15 + (i / len(chosen)) * 0.80
+        on_progress(base, f"📦 {i + 1}/{len(chosen)}: {cand.name[:34]}…")
+        try:
+            product = discovery_service.import_candidate(cand, language="es")
+        except Exception as e:  # noqa: BLE001
+            on_log(f"  ⚠️ no se pudo importar {cand.name[:34]!r}: {e}")
+            continue
+        if not any(e.product_id == product.id for e in plan.entries):
+            plan.entries.append(PlanEntry(
+                day=day, product_id=product.id, slug=product.slug,
+                name=product.name, score=cand.score.total,
+                ads_verdict=cand.ads.verdict,
+            ))
+            added += 1
+        try:
+            build_pack(product, options=options, log_callback=on_log)
+        except Exception as e:  # noqa: BLE001
+            # El producto ya está en el calendario: mejor sin prompts que
+            # perderlo. El operador puede regenerar desde la tarjeta.
+            on_log(f"  ⚠️ pack falló para {product.name[:34]!r}: {e}")
+
+    plan.days = max(plan.days, day)
+    prepo.save(plan, make_current=True)
+
+    on_progress(1.0, f"✅ {added} productos en el día {day}")
+    return f"auto_day:{added}/{len(chosen)} día={day}"
+
+
 def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Procesa un vídeo subido (Flow/Kling) → lo deja LISTO para TikTok:
     zoom quita-marca + gancho/CTA + flecha. Guarda en videos_ready y marca
@@ -1834,6 +1935,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_WATERMARK: run_tiktok_shop_watermark,
     JobMode.TIKTOK_SHOP_PACK: run_tiktok_shop_pack,
     JobMode.TIKTOK_SHOP_PLAN: run_tiktok_shop_plan,
+    JobMode.TIKTOK_SHOP_AUTO_DAY: run_tiktok_shop_auto_day,
     JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
 }
@@ -1849,6 +1951,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_WATERMARK: "tiktok_shop",
     JobMode.TIKTOK_SHOP_PACK: "tiktok_shop",
     JobMode.TIKTOK_SHOP_PLAN: "tiktok_shop",
+    JobMode.TIKTOK_SHOP_AUTO_DAY: "tiktok_shop",
     JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
 }

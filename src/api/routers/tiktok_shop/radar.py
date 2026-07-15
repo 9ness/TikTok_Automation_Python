@@ -332,6 +332,53 @@ def import_to_calendar(
     )
 
 
+class AutoDayRequest(BaseModel):
+    """Llenar un día solo, con lo que está recibiendo ADS ahora mismo."""
+    day: int = 1
+    top_n: int = 5
+    region: str = "ES"
+    days_window: float = 3.0        # frescura de la inyección (días)
+    video_pages: int = 8            # 10 vídeos por página, 1 request c/u
+    max_influencers: int | None = 250   # «menos de 200-250» — repartir menos
+    min_commission_eur: float = 0.0     # suelo en EUROS por venta, no en %
+    gens: list[str] | None = None       # qué generar: problem_videos por defecto
+
+
+@router.post("/plan/auto-day", response_model=CalendarActionResponse)
+def auto_day(
+    body: AutoDayRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Botón "llenar el día": busca los productos con inyección de ADS FRESCA
+    en España, se queda con los `top_n` mejores y los deja en el día `day` del
+    calendario con sus prompts listos.
+
+    Va por la cola porque tarda: ~18 requests a EchoTik + los prompts de cada
+    producto (Gemini). El progreso se ve en el drawer de Cola.
+    """
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_AUTO_DAY,
+        title=f"🎯 Día {body.day}: top {body.top_n} con ADS frescos",
+        params={
+            "day": body.day,
+            "top_n": body.top_n,
+            "region": body.region,
+            "days_window": body.days_window,
+            "video_pages": body.video_pages,
+            "max_influencers": body.max_influencers,
+            "min_commission_eur": body.min_commission_eur,
+            "options": _gen_options(body.gens),
+        },
+        enqueued_by=operator or None,
+    )
+    return CalendarActionResponse(
+        ok=True, product_id=None, slug=None, job_id=job.id,
+        message=f"Buscando los {body.top_n} mejores productos con ADS frescos "
+                f"para el día {body.day}…",
+    )
+
+
 class PlanGenerateRequest(BaseModel):
     per_day: int = 2
     days: int = 7
