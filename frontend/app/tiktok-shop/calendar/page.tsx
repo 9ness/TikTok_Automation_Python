@@ -375,26 +375,58 @@ export default function CalendarPage() {
   );
 }
 
+/**
+ * Campo numérico que SE DEJA VACIAR mientras escribes.
+ *
+ * El fallo obvio es recortar al mínimo en cada pulsación: al borrar el "6"
+ * para teclear "4", el campo queda vacío un instante → Number("") es 0 → se
+ * sube a min → te reescribe un "1" encima y no hay forma de cambiarlo.
+ * Aquí el texto crudo vive en local y solo se normaliza al salir del campo
+ * (o al pulsar Enter); mientras tanto se propaga hacia arriba únicamente si
+ * ya es un número válido dentro de rango.
+ */
 function NumField({
   label, value, onChange, min, max, step, w, title,
 }: {
   label: string; value: number; onChange: (n: number) => void;
   min?: number; max?: number; step?: number; w: string; title?: string;
 }) {
+  const [raw, setRaw] = useState(String(value));
+  // Solo re-sincroniza si el padre cambia de verdad (no en cada tecla, porque
+  // un valor fuera de rango o vacío no se propaga).
+  useEffect(() => setRaw(String(value)), [value]);
+
+  const inRange = (n: number) =>
+    (min === undefined || n >= min) && (max === undefined || n <= max);
+
+  const commit = () => {
+    let n = Number(raw);
+    if (raw.trim() === "" || Number.isNaN(n)) n = min ?? 0;
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    setRaw(String(n));
+    onChange(n);
+  };
+
   return (
     <label className="flex flex-col gap-0.5" title={title}>
       <span className="text-[10px] text-muted-foreground">{label}</span>
       <input
         type="number"
+        inputMode="decimal"
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={raw}
         onChange={(e) => {
-          let n = Number(e.target.value) || 0;
-          if (min !== undefined) n = Math.max(min, n);
-          if (max !== undefined) n = Math.min(max, n);
-          onChange(n);
+          const v = e.target.value;
+          setRaw(v);
+          const n = Number(v);
+          if (v.trim() !== "" && !Number.isNaN(n) && inRange(n)) onChange(n);
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         className={w + " rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"}
       />
