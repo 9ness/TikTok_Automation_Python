@@ -112,6 +112,19 @@ class DiscoveredProduct(BaseModel):
     max_price: float = 0.0
     commission_pct: float = 0.0
 
+    # ── Señales de inyección FRESCA (EchoTik v3 `is_ad`) ─────────────
+    # Las rellena `fresh_ads_discovery`. Son los 4 ejes de la estrategia:
+    # inyección reciente + POCOS creadores/vídeos + tracción.
+    # Verificado en ES (2026-07-15): todos vienen poblados salvo las ventas
+    # por ventana (total_sale_7d/30d = 0 siempre) → el crecimiento se mide
+    # con `views_7d`, NO con ventas.
+    ad_videos_fresh: int = 0             # vídeos con is_ad=1 dentro de la ventana
+    ad_videos_total_seen: int = 0        # vídeos del producto vistos en el barrido
+    newest_ad_video_days: float | None = None  # edad del vídeo con ADS más nuevo
+    influencers_7d: int = 0              # creadores que publicaron en 7d (competencia VIVA)
+    video_count_7d: int = 0              # vídeos publicados en 7d
+    views_7d: int = 0                    # vistas en 7d → proxy de crecimiento
+
     # Computados
     score: WinnerScore = Field(default_factory=WinnerScore)
     ads: AdsSignal = Field(default_factory=AdsSignal)

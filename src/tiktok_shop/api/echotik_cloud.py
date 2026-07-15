@@ -403,6 +403,93 @@ def get_product_ad_videos(
     return out
 
 
+def get_fresh_ad_videos(
+    *,
+    region: str = "ES",
+    page: int = 1,
+    page_size: int = 10,
+    only_ads: bool = True,
+    only_selling: bool = True,
+    log_callback: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Vídeos con inyección de ADS, **del más nuevo al más viejo**.
+
+    Es el motor del descubrimiento invertido: en vez de buscar productos y
+    mirar si tienen ads, preguntamos qué se está inyectando AHORA. Cada fila
+    trae `video_products` con el producto al que apunta.
+
+    ⚠️ EL SORT ES OBLIGATORIO, no cosmético. Sin `video_sort_field=2` +
+    `sort_type=1` el orden por defecto devuelve vídeos de 400-1200 días de
+    antigüedad — eso es lo que nos hizo creer que el crawl de ES venía viejo
+    (learnings:193). Con el sort, lo más nuevo es de ~1 día. Verificado en
+    vivo 2026-07-15.
+
+    Valores válidos (doc oficial):
+      `video_sort_field`: 1=total_digg_cnt · 2=create_time · 3=total_views_cnt
+      `sort_type`: 0=asc · 1=desc   (¡2 devuelve HTTP 500!)
+      `sales_flag`: 1=vídeo que vende (带货视频) · `is_ad`: 1=投流视频
+    """
+    if not echotik_is_configured():
+        return []
+    params: dict[str, Any] = {
+        "region": region,
+        "video_sort_field": 2,   # create_time
+        "sort_type": 1,          # descendente → lo más nuevo primero
+        "page_num": max(1, page),
+        "page_size": min(page_size, 10),
+    }
+    if only_ads:
+        params["is_ad"] = 1
+    if only_selling:
+        params["sales_flag"] = 1
+    data = _get("echotik/video/list", params, base=V3_BASE_URL, log_callback=log_callback)
+    rows = data if isinstance(data, list) else (
+        data.get("list") if isinstance(data, dict) and isinstance(data.get("list"), list) else None
+    )
+    return rows or []
+
+
+def get_products_detail(
+    product_ids: list[str],
+    *,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Métricas de varios productos → `{product_id: dict}`.
+
+    `echotik/product/detail` acepta **10 IDs por request** (sin `region`), lo
+    que hace el escaneo baratísimo: 40 productos = 4 requests. Trocea solo.
+
+    Trae los ejes que decide la estrategia (verificado poblado en ES):
+      `total_ifl_cnt` · `total_ifl_video_7d_cnt` (creadores ACTIVOS 7d) ·
+      `total_video_cnt` · `total_video_7d_cnt` · `total_views_7d_cnt` ·
+      `product_commission_rate` · `min_price` · `sales_trend_flag`.
+    NO fiarse de `total_sale_7d_cnt`/`_30d_cnt`: vienen a 0 en ES.
+
+    ~40% de los IDs no están fichados por EchoTik → simplemente no salen en
+    el dict (el llamante los salta).
+    """
+    ids = [str(p) for p in product_ids if p]
+    if not echotik_is_configured() or not ids:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(ids), 10):  # el endpoint capa a 10 por request
+        chunk = ids[i:i + 10]
+        data = _get(
+            "echotik/product/detail", {"product_ids": ",".join(chunk)},
+            base=V3_BASE_URL, log_callback=log_callback,
+        )
+        rows = data if isinstance(data, list) else (
+            data.get("list") if isinstance(data, dict) and isinstance(data.get("list"), list) else None
+        )
+        for r in rows or []:
+            pid = str(r.get("product_id") or "")
+            if pid:
+                out[pid] = r
+    if log_callback:
+        log_callback(f"  ✓ {len(out)}/{len(ids)} productos con métricas")
+    return out
+
+
 def get_video_ad_detail(
     video_id: str,
     *,
@@ -494,6 +581,18 @@ def _first_cover_url(raw: Any) -> str:
     if isinstance(raw, list) and raw:
         return str(raw[0].get("url") or "") if isinstance(raw[0], dict) else ""
     return ""
+
+
+# Alias públicos — los usan los services (`fresh_ads_discovery`) para
+# normalizar respuestas crudas de la API sin tocar helpers privados.
+def to_pct(rate: Any) -> float:
+    """Comisión de EchoTik → porcentaje (0.1 → 10.0)."""
+    return _to_pct(rate)
+
+
+def first_cover_url(raw: Any) -> str:
+    """`cover_url` (string JSON) → primera URL, o ""."""
+    return _first_cover_url(raw)
 
 
 def _build_tiktok_url(user_id: Any, video_id: str) -> str:
