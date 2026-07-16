@@ -47,7 +47,15 @@
       "WebFetch(domain:www.truefoundry.com)",
       "WebFetch(domain:buyglm.com)",
       "WebFetch(domain:www.currentaffair.today)",
-      "Bash(python3 -m py_compile src/api/routers/tiktok_shop/radar.py src/tiktok_shop/services/problem_video_generator.py src/tiktok_shop/services/creation_pack.py src/tiktok_shop/models/product.py src/api/schemas/product.py)"
+      "Bash(python3 -m py_compile src/api/routers/tiktok_shop/radar.py src/tiktok_shop/services/problem_video_generator.py src/tiktok_shop/services/creation_pack.py src/tiktok_shop/models/product.py src/api/schemas/product.py)",
+      "Bash(git commit -q -m 'chore\\(docs\\): consolida agents.md en AGENTS.md como arnés para agentes IA' -m 'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> *)",
+      "Bash(gh api *)",
+      "Bash(npm -v)",
+      "Bash(git config *)",
+      "Bash(grep -on \"python -m pytest[^\\\\\"'\\\\`]*\" learnings.md)",
+      "Bash(python -c \"import pytest; print\\('pytest', pytest.__version__\\)\")",
+      "Bash(git commit *)",
+      "Bash(grep -rno \"\\\\`\\\\${NAMESPACE}:[a-z_:]*\\\\|'fiesta:[a-z_:]*'\" app/actions.ts)"
     ]
   }
 }

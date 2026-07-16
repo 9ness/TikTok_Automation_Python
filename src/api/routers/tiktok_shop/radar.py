@@ -340,7 +340,10 @@ class AutoDayRequest(BaseModel):
     days_window: float = 3.0        # frescura de la inyección (días)
     video_pages: int = 8            # 10 vídeos por página, 1 request c/u
     max_influencers: int | None = 250   # «menos de 200-250» — repartir menos
-    min_commission_eur: float = 3.0     # suelo en EUROS por venta, no en %
+    # Suelo en EUROS por venta. 1€ y no 3€: el peine que YA vendió al operador
+    # eran 12,14€ de GMV ≈ 1,5€ de comisión — un suelo de 3€ habría descartado
+    # su único ganador probado. Mata los céntimos, no la clase de producto.
+    min_commission_eur: float = 1.0
     # 3 por producto MIENTRAS SE APRENDE. El operador de 100€/día sube 1 y
     # dobla en el que vende, pero eso presupone saber YA qué vídeo funciona
     # (4 cuentas, meses en US). Con 1 vídeo, si no vende no sabes si falló el

@@ -140,7 +140,7 @@ export default function CalendarPage() {
   const autoDayM = useAutoDay();
   const [autoTopN, setAutoTopN] = useState(6);
   const [autoMaxIfl, setAutoMaxIfl] = useState(250);
-  const [autoMinEur, setAutoMinEur] = useState(3);
+  const [autoMinEur, setAutoMinEur] = useState(1);
   // 3 vídeos/producto mientras se aprende: son 3 FORMATOS distintos, así que
   // testean el creativo además del producto. Bajar a 1 cuando se sepa cuál gana.
   const [autoVids, setAutoVids] = useState(3);

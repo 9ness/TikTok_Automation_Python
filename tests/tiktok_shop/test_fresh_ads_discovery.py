@@ -37,7 +37,7 @@ GEOMAR = _p(  # 29 creadores, 2 activos, 10% com, 501€ → el punto dulce
 MAQUILLAJE = _p(  # el ganador real del primer escaneo: 23 creadores, 3 activos
     product_id="maq", name="Set maquillaje brillo labios", ad_videos_fresh=1,
     newest_ad_video_days=1.1, influencer_count=23, influencers_7d=3,
-    video_count=40, video_count_7d=3, views_7d=831, units_sold=50,
+    video_count=40, video_count_7d=3, views_7d=831, units_sold=2489,
     commission_pct=12.0, min_price=10.0,
 )
 PERFUME = _p(  # 488 creadores, 1144 vídeos → saturado pese a 13.647 ventas
@@ -142,11 +142,42 @@ def test_product_ids_parsea_el_string_json() -> None:
 
 
 # ── Comisión en EUROS, no en porcentaje ──────────────────────────────
-POCO = _p(  # 2% suena fatal... sobre 831€ son 16,62€/venta
+POCO = _p(  # REAL: 5 creadores, 2/5 vídeos con AD... y **1 venta en total**
     product_id="poco", name="POCO F8 Ultra", ad_videos_fresh=1,
     influencer_count=5, influencers_7d=2, video_count=5, video_count_7d=2,
-    views_7d=1688, commission_pct=2.0, min_price=831.0,
+    views_7d=1688, units_sold=1, commission_pct=2.0, min_price=831.0,
 )
+RECORTADORA = _p(  # REAL: 3.304 ventas — demanda probada de sobra
+    product_id="rec", name="Recortadora eléctrica", ad_videos_fresh=1,
+    influencer_count=72, influencers_7d=13, video_count=282, video_count_7d=30,
+    views_7d=19_830, units_sold=3304, commission_pct=8.0, min_price=8.6,
+)
+
+
+def test_sin_ventas_no_es_un_hueco_es_un_cementerio() -> None:
+    """EL BUG que invirtió el ranking: el POCO tenía 1 venta en toda su vida y
+    salía 95/100 (pocos creadores + 2/5 con etiqueta AD), mientras la
+    recortadora de 3.304 ventas caía al 7º. 'Pocos creadores' tiene dos causas
+    opuestas: nadie lo ha encontrado (oportunidad) o NADIE LO QUIERE (muerto).
+    Sin ventas no se distinguen — el suelo de demanda es lo que las separa."""
+    POCO.score = score_fresh_ad_product(POCO)
+    ok, why = FreshAdsFilters().passes(POCO)
+    assert not ok, f"un producto con 1 venta NO puede pasar (score {POCO.score.total})"
+    assert "venta" in why
+
+
+def test_la_demanda_puntua() -> None:
+    """A igualdad de lo demás, el que vende más puntúa más."""
+    poco_v = _p(units_sold=5, influencer_count=20, influencers_7d=2, ad_videos_fresh=1)
+    mucho_v = _p(units_sold=500, influencer_count=20, influencers_7d=2, ad_videos_fresh=1)
+    assert score_fresh_ad_product(mucho_v).demand > score_fresh_ad_product(poco_v).demand
+    assert score_fresh_ad_product(mucho_v).total > score_fresh_ad_product(poco_v).total
+
+
+def test_la_recortadora_pasa_el_suelo_de_demanda() -> None:
+    RECORTADORA.score = score_fresh_ad_product(RECORTADORA)
+    ok, why = FreshAdsFilters().passes(RECORTADORA)
+    assert ok, f"3.304 ventas deberían pasar: {why}"
 
 
 def test_comision_se_mide_en_euros_no_en_porcentaje() -> None:

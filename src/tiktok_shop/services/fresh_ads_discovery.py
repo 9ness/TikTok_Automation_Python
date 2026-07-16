@@ -96,6 +96,16 @@ class FreshAdsParams:
     ads_full_at: int = 3            # (a) 3+ vídeos en la ventana → 100
     ad_ratio_full_at: float = 0.4   # (b) 40% de los vídeos con AD → 100
 
+    # ── Demanda: ¿ALGUIEN lo compra? ──
+    # El eje que faltaba, y su ausencia invirtió el ranking: el POCO F8 salía
+    # 95/100 con **1 venta en toda su vida** mientras la recortadora de 3.304
+    # ventas caía al 7º. "Pocos creadores" tiene DOS causas opuestas —
+    # (a) nadie lo ha encontrado aún = oportunidad, (b) NADIE LO QUIERE = muerto —
+    # y sin ventas es imposible distinguirlas. Que un vendedor esté inyectando
+    # ADS en un producto que no vende solo significa que está quemando dinero.
+    # `total_sale_cnt` es all-time (los campos 7d/30d vienen a 0 en ES).
+    units_full_at: int = 500
+
     # ── Competencia: MENOS es mejor (el eje clave del operador) ──
     # Referencia real ES: perfume 488 creadores (saturado) · crocs 78 ·
     # GEOMAR 29 (bueno) · POCO F8 5 (ideal, pero 2% comisión).
@@ -129,10 +139,13 @@ class FreshAdsParams:
     # El % se mantiene solo como suelo mínimo en los filtros, no en el score.
 
     # ── Pesos (suman 1.0) ──
-    # El grueso va al equilibrio ads+competencia: es la tesis del operador.
-    w_ads: float = 0.30
-    w_competition: float = 0.35   # el eje MÁS pesado — "repartir entre menos"
-    w_traction: float = 0.20
+    # El grueso va al equilibrio demanda+competencia: producto que SE VENDE
+    # con POCA gente vendiéndolo. Sin demanda, "pocos creadores" no es un
+    # hueco: es un cementerio.
+    w_ads: float = 0.25
+    w_competition: float = 0.30   # "repartir el pastel entre menos"
+    w_demand: float = 0.20        # ¿lo compra alguien? (faltaba)
+    w_traction: float = 0.10
     w_commission: float = 0.15
 
 
@@ -142,6 +155,11 @@ class FreshAdsFilters:
     max_influencers: int | None = 250        # pastel demasiado repartido
     max_influencers_7d: int | None = None    # competencia viva
     max_videos_7d: int | None = None
+    # SUELO DE DEMANDA — el filtro que faltaba. Un producto con ~0 ventas no
+    # es un hueco de mercado, es un producto que nadie quiere; da igual que
+    # tenga pocos creadores y ADS. Real ES: el POCO F8 tenía 1 venta y salía
+    # primero con 95/100. Referencia: 160 (GEOMAR) · 766 · 1.010 · 3.304.
+    min_units_sold: int = 30
     min_commission_pct: float = 0.0
     min_views_7d: int = 0
     min_score: float = 30.0
@@ -150,6 +168,8 @@ class FreshAdsFilters:
     def passes(self, c: DiscoveredProduct) -> tuple[bool, str]:
         if self.exclude_zero_commission and c.commission_pct <= 0:
             return False, "comisión 0%"
+        if c.units_sold < self.min_units_sold:
+            return False, f"solo {c.units_sold} ventas (<{self.min_units_sold}) — nadie lo compra"
         if self.max_influencers is not None and c.influencer_count > self.max_influencers:
             return False, f"{c.influencer_count} creadores (>{self.max_influencers})"
         if self.max_influencers_7d is not None and c.influencers_7d > self.max_influencers_7d:
@@ -221,12 +241,14 @@ def score_fresh_ad_product(
     # colaba arriba.
     competition = comp_total * 0.45 + comp_7d * 0.35 + comp_vid7d * 0.20
 
+    demand = _ramp_up(c.units_sold, 0, p.units_full_at)
     traction = _ramp_up(views_per_video(c), 0, p.views_per_video_full_at)
     commission = _ramp_up(commission_eur(c), 0, p.commission_eur_full_at)
 
     base = (
         ads * p.w_ads
         + competition * p.w_competition
+        + demand * p.w_demand
         + traction * p.w_traction
         + commission * p.w_commission
     )
@@ -260,6 +282,8 @@ def score_fresh_ad_product(
         reasons.append(f"🥵 {c.influencer_count} creadores en total — saturado")
     elif c.influencer_count <= p.ifl_ideal_below:
         reasons.append(f"✨ {c.influencer_count} creadores en total — hueco libre")
+    if c.units_sold:
+        reasons.append(f"🛒 {c.units_sold:,} ventas — demanda probada")
     vpv = views_per_video(c)
     if vpv:
         reasons.append(f"📈 {vpv:,.0f} views por vídeo esta semana — lo que se llevaría el tuyo")
@@ -271,10 +295,10 @@ def score_fresh_ad_product(
 
     return WinnerScore(
         total=round(total, 1),
-        demand=round(traction, 1),
+        demand=round(demand, 1),            # ventas reales
         low_competition=round(competition, 1),
         ads_injection=round(ads, 1),
-        momentum=round(traction, 1),
+        momentum=round(traction, 1),        # views/vídeo = tracción reciente
         commission=round(commission, 1),
         reasons=reasons,
     )
