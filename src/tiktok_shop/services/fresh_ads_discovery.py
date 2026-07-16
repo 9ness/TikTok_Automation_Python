@@ -107,10 +107,13 @@ class FreshAdsParams:
     units_full_at: int = 500
 
     # ── Competencia: MENOS es mejor (el eje clave del operador) ──
-    # Referencia real ES: perfume 488 creadores (saturado) · crocs 78 ·
-    # GEOMAR 29 (bueno) · POCO F8 5 (ideal, pero 2% comisión).
-    ifl_ideal_below: int = 30     # 30 creadores o menos → 100
-    ifl_zero_above: int = 200     # 200+ → 0
+    # OJO: estos umbrales van contra `real_influencers()` (creadores REALES,
+    # los de la ficha de TikTok), NO contra el crudo de EchoTik. Antes iban
+    # contra el crudo y, como EchoTik infravalora 2.6x, `zero_above=200`
+    # estaba dejando pasar productos con ~520 creadores reales.
+    # Regla del operador (Jonny): «siempre menos de 200 creadores».
+    ifl_ideal_below: int = 30     # 30 reales o menos → 100
+    ifl_zero_above: int = 200     # 200+ reales → 0
     # Creadores ACTIVOS esta semana: mide la competencia VIVA, no la histórica.
     ifl7d_ideal_below: int = 3    # 3 o menos activos → 100
     ifl7d_zero_above: int = 30    # 30+ → 0
@@ -152,6 +155,8 @@ class FreshAdsParams:
 @dataclass
 class FreshAdsFilters:
     """Descartes duros. `None` = sin límite."""
+    # En creadores REALES (ver real_influencers): EchoTik infravalora 2.6x,
+    # así que un 250 sobre su número crudo dejaba pasar ~650 reales.
     max_influencers: int | None = 250        # pastel demasiado repartido
     max_influencers_7d: int | None = None    # competencia viva
     max_videos_7d: int | None = None
@@ -170,8 +175,9 @@ class FreshAdsFilters:
             return False, "comisión 0%"
         if c.units_sold < self.min_units_sold:
             return False, f"solo {c.units_sold} ventas (<{self.min_units_sold}) — nadie lo compra"
-        if self.max_influencers is not None and c.influencer_count > self.max_influencers:
-            return False, f"{c.influencer_count} creadores (>{self.max_influencers})"
+        ifl = real_influencers(c)
+        if self.max_influencers is not None and ifl > self.max_influencers:
+            return False, f"~{ifl} creadores reales (>{self.max_influencers})"
         if self.max_influencers_7d is not None and c.influencers_7d > self.max_influencers_7d:
             return False, f"{c.influencers_7d} creadores activos 7d"
         if self.max_videos_7d is not None and c.video_count_7d > self.max_videos_7d:
@@ -188,6 +194,38 @@ class FreshAdsFilters:
 # ═════════════════════════════════════════════════════════════════════
 # SCORE
 # ═════════════════════════════════════════════════════════════════════
+# ── Corrección del recuento de creadores de EchoTik ──────────────────
+# EchoTik INFRAVALORA los creadores de forma SISTEMÁTICA. Contrastado contra
+# la ficha del Creator Center (la fuente de verdad de TikTok):
+#
+#     GLAIRIS   EchoTik 126 → real 330   = 2.62x
+#     ARMONIAS  EchoTik  47 → real 122   = 2.60x
+#
+# Que las dos razones salgan casi idénticas dice que no es ruido: es una
+# diferencia de definición (EchoTik solo cuenta los creadores que tiene
+# rastreados). Por eso se corrige con una constante en vez de obligar al
+# operador a verificar producto por producto — que es trabajo manual que
+# mata la automatización entera.
+#
+# Para ORDENAR daría igual (un factor constante no cambia el orden); lo que
+# rompía eran los UMBRALES: `max_influencers=250` sobre el número de EchoTik
+# dejaba pasar productos con ~650 creadores reales.
+#
+# ⚠️ n=2. Es una calibración de dos puntos, no una ley. Conviene re-medirla
+# de vez en cuando abriendo UNA ficha y comparando (no todas).
+ECHOTIK_INFLUENCER_FACTOR = 2.6
+
+
+def real_influencers(c: DiscoveredProduct) -> int:
+    """Creadores REALES estimados (los de la ficha de TikTok).
+
+    `c.influencer_count` guarda el dato crudo de EchoTik sin tocar; esto es
+    la estimación derivada. Todos los umbrales del score y los filtros van
+    contra ESTE número, que es el que ve el operador en el Creator Center.
+    """
+    return int(round(c.influencer_count * ECHOTIK_INFLUENCER_FACTOR))
+
+
 def views_per_video(c: DiscoveredProduct) -> float:
     """Vistas medias que se lleva CADA vídeo reciente del producto.
 
@@ -232,7 +270,7 @@ def score_fresh_ad_product(
     # Competencia: combinamos histórica (¿está saturado?) con viva (¿me estoy
     # metiendo en una pelea AHORA?). La viva pesa más: un producto con 500
     # creadores históricos pero 2 activos está abandonado = oportunidad.
-    comp_total = _ramp_down(c.influencer_count, p.ifl_ideal_below, p.ifl_zero_above)
+    comp_total = _ramp_down(real_influencers(c), p.ifl_ideal_below, p.ifl_zero_above)
     comp_7d = _ramp_down(c.influencers_7d, p.ifl7d_ideal_below, p.ifl7d_zero_above)
     comp_vid7d = _ramp_down(c.video_count_7d, p.vid7d_ideal_below, p.vid7d_zero_above)
     # comp_total manda: es el "reparto del pastel" del que habla el operador
@@ -278,10 +316,11 @@ def score_fresh_ad_product(
         reasons.append(f"🎯 solo {c.influencers_7d} creadores activos esta semana — pastel poco repartido")
     elif c.influencers_7d >= p.ifl7d_zero_above:
         reasons.append(f"⚠️ {c.influencers_7d} creadores activos — mucha competencia por la inyección")
-    if c.influencer_count >= p.ifl_zero_above:
-        reasons.append(f"🥵 {c.influencer_count} creadores en total — saturado")
-    elif c.influencer_count <= p.ifl_ideal_below:
-        reasons.append(f"✨ {c.influencer_count} creadores en total — hueco libre")
+    ifl = real_influencers(c)
+    if ifl >= p.ifl_zero_above:
+        reasons.append(f"🥵 ~{ifl} creadores en total — saturado")
+    elif ifl <= p.ifl_ideal_below:
+        reasons.append(f"✨ ~{ifl} creadores en total — hueco libre")
     if c.units_sold:
         reasons.append(f"🛒 {c.units_sold:,} ventas — demanda probada")
     vpv = views_per_video(c)

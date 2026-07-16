@@ -1796,6 +1796,7 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
         FreshAdsFilters,
         commission_eur,
         discover_fresh_ad_products,
+        real_influencers,
     )
 
     region = str(job.params.get("region") or "ES")
@@ -1838,7 +1839,8 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
     on_log(f"🏆 Top {len(chosen)} para el {date}:")
     for i, c in enumerate(chosen, 1):
         on_log(f"   {i}. [{c.score.total:.0f}] {c.name[:44]} · "
-               f"{c.influencer_count} creadores · {commission_eur(c):.2f}€/venta")
+               f"~{real_influencers(c)} creadores · {c.units_sold} ventas · "
+               f"{commission_eur(c):.2f}€/venta")
 
     # ── 2. Importar + colgar del día + generar prompts ───────────────
     repo = MonthPlanRepo()
@@ -1857,7 +1859,9 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
             date=date, product_id=product.id, slug=product.slug,
             name=product.name, score=cand.score.total,
             ads_verdict=cand.ads.verdict,
-            influencer_count=cand.influencer_count,
+            # El REAL estimado, no el crudo de EchoTik (infravalora 2.6x):
+            # es el número que el operador verá en la ficha de TikTok.
+            influencer_count=real_influencers(cand),
             commission_eur=round(commission_eur(cand), 2),
             seller_name=cand.seller_name,
         ))

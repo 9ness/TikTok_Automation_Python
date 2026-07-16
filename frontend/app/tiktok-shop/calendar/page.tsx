@@ -488,7 +488,11 @@ function DayProductCard({
             <p className="text-sm font-medium">{e.name}</p>
             <p className="text-[11px] text-muted-foreground">
               ⭐ {e.score.toFixed(0)} · {VERDICT[e.ads_verdict] ?? ""} ADS {e.ads_verdict}
-              {e.influencer_count > 0 && <> · 👥 {e.influencer_count}</>}
+              {e.influencer_count > 0 && (
+                <span title="Creadores estimados (EchoTik infravalora ~2.6x; esto ya va corregido). Contrástalo en la ficha de TikTok → Información de la promoción.">
+                  {" · 👥 ~"}{e.influencer_count}
+                </span>
+              )}
               {e.commission_eur > 0 && <> · 💰 {e.commission_eur.toFixed(2)}€/venta</>}
               {" · "}🎯 {e.problem_videos_count}
               {aiReady && <> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</>}

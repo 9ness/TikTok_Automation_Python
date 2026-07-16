@@ -16,6 +16,7 @@ from src.tiktok_shop.services.fresh_ads_discovery import (  # noqa: E402
     FreshAdsFilters,
     _product_ids,
     commission_eur,
+    real_influencers,
     score_fresh_ad_product,
     views_per_video,
 )
@@ -120,9 +121,13 @@ def test_filtro_descarta_comision_cero() -> None:
 
 
 def test_filtro_descarta_saturados() -> None:
+    """El perfume: EchoTik dice 488 creadores → ~1.269 reales. Antes el
+    filtro comparaba 488 contra 250 y también lo descartaba, pero por suerte:
+    productos entre 96 y 250 de EchoTik (250-650 reales) SÍ se colaban."""
     PERFUME.score = score_fresh_ad_product(PERFUME)
     ok, why = FreshAdsFilters(max_influencers=250).passes(PERFUME)
-    assert not ok and "488" in why
+    assert not ok and "reales" in why
+    assert real_influencers(PERFUME) > 1000
 
 
 def test_geomar_pasa_los_filtros() -> None:
@@ -196,6 +201,37 @@ def test_comision_eur_sin_precio_no_revienta() -> None:
     assert commission_eur(_p(commission_pct=10.0, min_price=0.0, max_price=0.0)) == 0.0
     # sin min_price cae a max_price
     assert commission_eur(_p(commission_pct=10.0, min_price=0.0, max_price=50.0)) == 5.0
+
+
+# ── EchoTik infravalora los creadores 2.6x (contrastado con TikTok) ──
+def test_correccion_de_creadores_cuadra_con_tiktok() -> None:
+    """Contrastado abriendo la ficha del Creator Center, que es la verdad:
+        GLAIRIS   EchoTik 126 → TikTok 330
+        ARMONIAS  EchoTik  47 → TikTok 122
+    Las dos razones salen casi idénticas (2.62 / 2.60) → error SISTEMÁTICO,
+    no ruido. Por eso se corrige con una constante en vez de obligar al
+    operador a verificar producto por producto."""
+    assert abs(real_influencers(_p(influencer_count=126)) - 330) <= 30
+    assert abs(real_influencers(_p(influencer_count=47)) - 122) <= 15
+
+
+def test_el_umbral_va_contra_creadores_REALES() -> None:
+    """El bug: max_influencers=250 sobre el número CRUDO de EchoTik dejaba
+    pasar productos con ~650 creadores reales."""
+    saturado = _p(influencer_count=126, units_sold=245, commission_pct=10.0,
+                  min_price=12.05, ad_videos_fresh=1)   # ~330 reales
+    saturado.score = score_fresh_ad_product(saturado)
+    ok, why = FreshAdsFilters(max_influencers=250).passes(saturado)
+    assert not ok, "330 creadores reales NO pueden pasar un filtro de 250"
+    assert "reales" in why
+
+
+def test_la_correccion_no_cambia_el_orden() -> None:
+    """Un factor constante no altera el ranking — solo los umbrales. Es la
+    razón de que se pueda corregir sin verificar nada."""
+    pocos = _p(influencer_count=20, units_sold=500, ad_videos_fresh=1, influencers_7d=2)
+    muchos = _p(influencer_count=60, units_sold=500, ad_videos_fresh=1, influencers_7d=2)
+    assert score_fresh_ad_product(pocos).low_competition > score_fresh_ad_product(muchos).low_competition
 
 
 if __name__ == "__main__":
