@@ -40,6 +40,7 @@ class DayEntryOut(BaseModel):
     ads_verdict: str = ""
     influencer_count: int = 0
     commission_eur: float = 0.0
+    seller_name: str = ""
     uploaded: bool = False
     sold: bool = False
     sold_version: int | None = None

@@ -493,14 +493,31 @@ function DayProductCard({
               {" · "}🎯 {e.problem_videos_count}
               {aiReady && <> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</>}
             </p>
-            <a
-              href={`https://www.tiktok.com/view/product/${e.product_id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-orange-500 hover:underline"
-            >
-              <ExternalLink className="h-3 w-3" /> Abrir ficha (foto para el escaparate)
-            </a>
+            {/* Cómo encontrar el producto.
+                NO se pone enlace a `tiktok.com/view/product/<id>`: TikTok lo
+                bloquea con "Security Check" en web Y devuelve "Hubo un
+                problema" en la app — verificado. Lo que funciona es buscar el
+                NOMBRE en el Centro de Afiliados, y la TIENDA es lo que
+                desambigua cuando varias venden lo mismo. */}
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(e.name);
+                  toast.success("Nombre copiado — búscalo en el Centro de Afiliados");
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-[11px] font-medium text-orange-500 hover:bg-orange-500/20"
+              >
+                <Copy className="h-3 w-3" /> Copiar nombre
+              </button>
+              {e.seller_name && (
+                <span
+                  className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                  title="Tienda — comprueba que es esta al buscarlo, varias pueden vender lo mismo"
+                >
+                  🏪 {e.seller_name}
+                </span>
+              )}
+            </div>
           </div>
           <button
             disabled={remove.isPending}

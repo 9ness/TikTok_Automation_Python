@@ -490,6 +490,36 @@ def get_products_detail(
     return out
 
 
+def get_seller_names(
+    seller_ids: list[str],
+    *,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, str]:
+    """`{seller_id: nombre de la tienda}`. 10 por request, como product/detail.
+
+    Necesario porque la URL canónica del producto está muerta: el operador
+    busca por nombre en el Centro de Afiliados y varias tiendas pueden vender
+    lo mismo — la tienda es lo que identifica el producto exacto.
+    """
+    ids = [str(s) for s in seller_ids if s]
+    if not echotik_is_configured() or not ids:
+        return {}
+    out: dict[str, str] = {}
+    for i in range(0, len(ids), 10):
+        data = _get(
+            "echotik/seller/detail", {"seller_ids": ",".join(ids[i:i + 10])},
+            base=V3_BASE_URL, log_callback=log_callback,
+        )
+        rows = data if isinstance(data, list) else (
+            data.get("list") if isinstance(data, dict) and isinstance(data.get("list"), list) else None
+        )
+        for r in rows or []:
+            sid = str(r.get("seller_id") or "")
+            if sid:
+                out[sid] = str(r.get("seller_name") or r.get("shop_name") or "")
+    return out
+
+
 def get_video_ad_detail(
     video_id: str,
     *,

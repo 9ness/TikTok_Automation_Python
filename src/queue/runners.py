@@ -1859,6 +1859,7 @@ def run_tiktok_shop_auto_day(job: Job, on_log: OnLog, on_progress: OnProgress) -
             ads_verdict=cand.ads.verdict,
             influencer_count=cand.influencer_count,
             commission_eur=round(commission_eur(cand), 2),
+            seller_name=cand.seller_name,
         ))
         added += 1
         try:

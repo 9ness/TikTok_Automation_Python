@@ -20,6 +20,7 @@ export interface CalendarEntry {
   ads_verdict: string;
   influencer_count: number;
   commission_eur: number;
+  seller_name: string;
   uploaded: boolean;
   sold: boolean;
   sold_version: number | null;

@@ -108,6 +108,13 @@ class DiscoveredProduct(BaseModel):
     video_sales_ratio: float = 1.0     # 1.0 = todo vídeo, 0 = todo directo (live)
     rating: float = 0.0
     review_count: int = 0
+    # Tienda — imprescindible para IDENTIFICAR el producto: la URL canónica
+    # `tiktok.com/view/product/<id>` está muerta (Security Check en web Y en
+    # la app), así que el operador busca por NOMBRE en el Centro de Afiliados
+    # y varias tiendas pueden vender lo mismo. El nombre de la tienda es lo
+    # que desambigua.
+    seller_id: str = ""
+    seller_name: str = ""
     min_price: float = 0.0
     max_price: float = 0.0
     commission_pct: float = 0.0

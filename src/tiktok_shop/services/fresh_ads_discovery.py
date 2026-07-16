@@ -415,6 +415,17 @@ def discover_fresh_ad_products(
 
     candidates.sort(key=lambda c: c.score.total, reverse=True)
 
+    # ── 3b. Nombre de la tienda (1 request por cada 10) ──────────────
+    # No es cosmético: la URL canónica del producto está muerta, así que el
+    # operador lo busca por NOMBRE en el Centro de Afiliados y varias tiendas
+    # pueden vender lo mismo. La tienda es lo que identifica cuál es.
+    sids = list({c.seller_id for c in candidates if c.seller_id})
+    if sids:
+        names = echotik_cloud.get_seller_names(sids, log_callback=None)
+        for c in candidates:
+            c.seller_name = names.get(c.seller_id, "")
+        log_callback(f"🏪 {len(names)} tiendas identificadas")
+
     # ── 4. Filtrar ───────────────────────────────────────────────────
     kept: list[DiscoveredProduct] = []
     for c in candidates:
@@ -501,6 +512,7 @@ def _to_candidate(
         influencer_count=int(d.get("total_ifl_cnt") or 0),
         rating=float(d.get("product_rating") or 0),
         review_count=int(d.get("review_count") or 0),
+        seller_id=str(d.get("seller_id") or ""),
         min_price=float(d.get("min_price") or 0),
         max_price=float(d.get("max_price") or 0),
         commission_pct=echotik_cloud.to_pct(d.get("product_commission_rate")),

@@ -55,6 +55,9 @@ class DayEntry(BaseModel):
     ads_verdict: str = ""
     influencer_count: int = 0
     commission_eur: float = 0.0
+    # La URL canónica de TikTok está bloqueada → el operador busca por nombre
+    # en el Centro de Afiliados y necesita la tienda para saber cuál es.
+    seller_name: str = ""
 
     # ── Resultado (lo marca el operador) ─────────────────────────────
     uploaded: bool = False          # ¿llegué a subir el vídeo?
