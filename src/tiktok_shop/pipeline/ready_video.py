@@ -14,7 +14,6 @@ Sin coste (MoviePy/ffmpeg local). Emojis se quitan del texto quemado.
 
 from __future__ import annotations
 
-import math
 import os
 import re
 from typing import Callable
@@ -288,119 +287,104 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_p
     return ImageClip(np.array(png)).set_duration(duration).set_position((x, y))
 
 
-# ── Flecha CTA (dibujada con PIL, color adaptado — sin depender de .mov) ──
-# Nota: leer las flechas .mov del Editor desde el drive de red fallaba de forma
-# intermitente en MoviePy ("failed to read first frame") y tumbaba el render.
-# La dibujamos con PIL: siempre funciona, sin I/O del drive lento.
-# La flecha va SOLA en la zona media-izquierda apuntando al carrito naranja de
-# TikTok Shop (como los vídeos que venden). ROJA con borde blanco. Coordenadas
-# = CENTRO del elemento. 3 tipos para variar entre versiones.
-_ARROW_CX, _ARROW_CY = 0.22, 0.72
-_ARROW_WHITE = (255, 255, 255, 255)
-_ARROW_BLACK = (18, 18, 18, 255)
-# Paleta de flechas: (relleno, borde). El operador quiere variedad de color, no
-# siempre roja. La naranja imita el carrito de TikTok Shop; blanca lleva borde
-# negro para que se lea sobre fondo claro.
-_ARROW_COLORS: list[tuple] = [
-    ((228, 30, 30, 255), _ARROW_WHITE),    # rojo (clásico)
-    ((255, 125, 0, 255), _ARROW_WHITE),    # naranja carrito
-    ((255, 210, 0, 255), _ARROW_BLACK),    # amarillo viral
-    ((255, 255, 255, 255), _ARROW_BLACK),  # blanco
-    ((233, 30, 120, 255), _ARROW_WHITE),   # rosa fuerte
-    ((45, 200, 90, 255), _ARROW_WHITE),    # verde lima
+# ── Flecha CTA: las flechas REALES del proyecto (.mov animadas) ──────────
+# Fuente de verdad = `<TIKTOK_EDITOR>/Assets/flechas/*.mov`, las MISMAS que
+# ofrece la web admin de nebulabs (ARROW_SHAPES en nebulabs-media). No se
+# dibujan a mano: se superponen con FFmpeg (como hace `editor_auto`), que SÍ
+# lee los .mov sin problema — el fallo antiguo era de MoviePy leyendo del
+# drive de red, no de FFmpeg. Así las flechas quedan sincronizadas con el
+# admin y no hay que inventar formas.
+#
+# Posición: CENTRO del elemento en la zona media-izquierda apuntando al
+# carrito naranja de TikTok Shop (como los vídeos que venden).
+_ARROW_CX, _ARROW_CY = 0.24, 0.70
+_ARROW_SCALE_W = 0.16   # ancho de la flecha = 16% del ancho del vídeo
+
+# Orden canónico (= ARROW_SHAPES del admin). Se rota por versión con desfase
+# por producto → variedad usando SOLO flechas reales.
+_ARROW_FILES = [
+    "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
+    "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
+    "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
+    "flecha_triple_blanca.mov", "flecha_3d_roja.mov",
+    "flecha_3d_amarilla.mov", "flecha_abajo_triple_blanca.mov",
 ]
-_ARROW_RED = _ARROW_COLORS[0][0]           # compat
-_ARROW_OUTLINE = _ARROW_WHITE
-_ARROW_KINDS = ["down", "double", "fat", "chevron", "curved"]
 
 
-def _arrow_kind(idx: int) -> str:
-    return _ARROW_KINDS[idx % len(_ARROW_KINDS)]
-
-
-def _arrow_color(idx: int) -> tuple:
-    """(relleno, borde). Stride 2 desfasado del `kind` para que color y forma
-    NO vayan sincronizados → más combinaciones percibidas."""
-    return _ARROW_COLORS[(idx * 2 + 1) % len(_ARROW_COLORS)]
-
-
-def _draw_arrow_png(kind: str, w: int, fill=_ARROW_RED, outline=_ARROW_OUTLINE):
-    """Flecha apuntando abajo (al carrito). kind: down|double|fat|chevron|curved."""
-    h = int(w * 1.4)
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    cx = w / 2
-    ow = max(4, int(w * 0.09))
-
-    def _solid_arrow(sw_f, hw_f, top_f, mid_f, tip_f):
-        sw, hw = w * sw_f, w * hw_f
-        top, mid, tip = h * top_f, h * mid_f, h * tip_f
-        pts = [
-            (cx - sw / 2, top), (cx + sw / 2, top),
-            (cx + sw / 2, mid), (cx + hw / 2, mid),
-            (cx, tip),
-            (cx - hw / 2, mid), (cx - sw / 2, mid),
-        ]
-        d.polygon(pts, fill=fill)
-        d.line(pts + [pts[0]], fill=outline, width=ow, joint="curve")
-
-    if kind == "fat":
-        _solid_arrow(0.46, 0.98, 0.16, 0.50, 0.92)
-    elif kind == "double":
-        hw = w * 0.80
-        lw = max(7, int(w * 0.16))
-        for off in (0.0, 0.40):
-            y1, y2 = h * (0.06 + off), h * (0.44 + off)
-            for col, wd in ((outline, lw + ow * 2), (fill, lw)):
-                d.line([(cx - hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
-                d.line([(cx + hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
-    elif kind == "chevron":
-        # Tres galones apilados (»»» girados hacia abajo) → sensación de "baja".
-        hw = w * 0.82
-        lw = max(8, int(w * 0.17))
-        for off in (0.0, 0.26, 0.52):
-            y1, y2 = h * (0.06 + off), h * (0.30 + off)
-            for col, wd in ((outline, lw + ow * 2), (fill, lw)):
-                d.line([(cx - hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
-                d.line([(cx + hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
-    elif kind == "curved":
-        # Flecha curva (swoosh) dibujada como arco + punta triangular.
-        box = [w * 0.12, h * 0.02, w * 1.30, h * 1.30]
-        lw = max(9, int(w * 0.18))
-        for col, wd in ((outline, lw + ow * 2), (fill, lw)):
-            d.arc(box, start=200, end=290, fill=col, width=wd)
-        # Punta en el extremo inferior del arco (~290°).
-        tipx, tipy = cx - w * 0.02, h * 0.98
-        s = w * 0.30
-        pts = [(tipx, tipy + s * 0.5), (tipx - s * 0.7, tipy - s * 0.3),
-               (tipx + s * 0.4, tipy - s * 0.6)]
-        d.polygon(pts, fill=fill)
-        d.line(pts + [pts[0]], fill=outline, width=ow, joint="curve")
-    else:  # down
-        _solid_arrow(0.32, 0.82, 0.05, 0.52, 0.95)
-    return img
-
-
-_COLOR_NAMES = ["rojo", "naranja", "amarillo", "blanco", "rosa", "verde"]
-
-
-def _arrow_clip(core, duration, kind="down", color_idx=0, log=_noop):
+def _arrows_dir() -> str:
+    """Carpeta de las flechas reales. Reusa el helper del Editor (asset
+    transversal, no lógica de programa). Fallback a nebulabs-media si no está."""
     try:
-        fill, outline = _ARROW_COLORS[color_idx % len(_ARROW_COLORS)]
-        png = _draw_arrow_png(kind, int(TARGET_W * 0.13), fill=fill, outline=outline)
-        w, h = png.size
-        x0 = int(TARGET_W * _ARROW_CX - w / 2)
-        y0 = int(TARGET_H * _ARROW_CY - h / 2)
-        amp = int(TARGET_H * 0.012)   # bob suave
-        clip = ImageClip(np.array(png)).set_duration(duration)
-        clip = clip.set_position(
-            lambda t: (x0, y0 + int(amp * math.sin(t * 2 * math.pi * 1.2)))
-        )
-        cname = _COLOR_NAMES[color_idx % len(_COLOR_NAMES)]
-        log(f"  ➘ Flecha CTA {cname} ({kind}) apuntando al carrito")
-        return clip
+        from src.editor_auto.config import arrows_folder
+        d = arrows_folder()
+        if d and os.path.isdir(d):
+            return d
     except Exception:
+        pass
+    alt = os.path.expanduser("~/proyectos/nebulabs-media/public/arrows")
+    return alt if os.path.isdir(alt) else ""
+
+
+def _pick_arrow(idx: int) -> str | None:
+    """Ruta a un .mov real, rotando por `idx`. Salta los que no existan en
+    disco (p.ej. algún .mov que aún no esté sincronizado). None si ninguna."""
+    d = _arrows_dir()
+    if not d:
         return None
+    n = len(_ARROW_FILES)
+    for k in range(n):
+        fname = _ARROW_FILES[(idx + k) % n]
+        p = os.path.join(d, fname)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def _overlay_arrow_ffmpeg(video_in, arrow_mov, video_out, windows, log=_noop):
+    """Superpone la flecha .mov real sobre el vídeo con FFmpeg (mismo enfoque
+    que `editor_auto.sticker_arrow`: stream_loop del sticker + overlay con
+    alpha). `windows` = lista de (t0, t1) donde debe verse la flecha.
+
+    Devuelve True si generó `video_out`; False si falló (el llamante se queda
+    con el vídeo sin flecha).
+    """
+    if not (arrow_mov and windows):
+        return False
+    px = max(0.0, min(1.0, _ARROW_CX))
+    py = max(0.0, min(1.0, _ARROW_CY))
+    sw_px = int(round(TARGET_W * _ARROW_SCALE_W))
+    if sw_px % 2 != 0:
+        sw_px -= 1
+    enable = "+".join(f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in windows)
+    filter_complex = (
+        f"[1:v]scale={sw_px}:-2,format=rgba[s];"
+        f"[0:v][s]overlay="
+        f"x=(main_w*{px})-(overlay_w/2):"
+        f"y=(main_h*{py})-(overlay_h/2):"
+        f"enable='{enable}'[v]"
+    )
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", video_in,
+        "-stream_loop", "-1", "-i", arrow_mov,
+        "-filter_complex", filter_complex,
+        "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "copy", "-shortest", "-movflags", "+faststart",
+        video_out,
+    ]
+    try:
+        import subprocess
+        proc = subprocess.run(cmd, capture_output=True, timeout=900)
+        if proc.returncode != 0:
+            err = proc.stderr.decode("utf-8", errors="ignore")[-300:]
+            log(f"  ⚠️ overlay flecha falló: {err}")
+            return False
+        log(f"  ➘ Flecha real '{os.path.basename(arrow_mov)}' apuntando al carrito")
+        return True
+    except Exception as e:  # noqa: BLE001
+        log(f"  ⚠️ overlay flecha excepción: {str(e)[:120]}")
+        return False
 
 
 def process_ready_video(
@@ -440,16 +424,15 @@ def process_ready_video(
         f"(corta ~{int((z - 1) * 100)}% abajo, {int((z - 1) * 50)}% cada lado)")
 
     layers = [core]
-    # Layout tipo "vídeo que vende": texto arriba + flecha roja sola al carrito.
-    # single = 1 texto fijo + flecha; sequence = gancho SIN flecha → CTA + flecha.
+    # Layout tipo "vídeo que vende": texto arriba + flecha real sola al carrito.
+    # single = 1 texto fijo + flecha todo el rato · sequence = gancho SIN flecha
+    # → CTA + flecha en la 2ª mitad. La FLECHA ya no se compone en MoviePy: se
+    # superpone después con FFmpeg usando los .mov reales (ventana = `awindows`).
     dur = core.duration
-    akind = _arrow_kind(int(style))
-    # Color desfasado del kind (stride 2) → forma y color NO van sincronizados,
-    # así 5 formas × 6 colores dan muchas combinaciones distintas por producto.
-    acolor = int(style) * 2 + 1
     mode = _text_mode(int(style))
-    # Variedad: la versión 0 va LIMPIA (sin emoji); las demás con emoji.
     use_emoji = (int(style) % len(_TEXT_STYLES)) != 0
+    arrow_mov = _pick_arrow(int(style)) if with_arrow else None
+    awindows: list[tuple] = []
     if mode == "sequence" and (cta_text or "").strip():
         split = dur * 0.45
         hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
@@ -460,30 +443,29 @@ def process_ready_video(
                         max_w_pct=0.86, duration=dur - split, style=st, use_emoji=use_emoji)
         if ct is not None:
             layers.append(ct.set_start(split))
-        if with_arrow:
-            ar = _arrow_clip(core, dur - split, kind=akind, color_idx=acolor, log=log)
-            if ar is not None:
-                layers.append(ar.set_start(split))
+        awindows = [(split, dur)]
         log(f"  📌 Secuencia: gancho → CTA + flecha (emoji={use_emoji})")
     else:
         hk = _text_clip(hook_text, font_size=62, y_center_pct=0.26,
                         max_w_pct=0.86, duration=dur, style=st, use_emoji=use_emoji)
         if hk is not None:
             layers.append(hk)
-        if with_arrow:
-            ar = _arrow_clip(core, dur, kind=akind, color_idx=acolor, log=log)
-            if ar is not None:
-                layers.append(ar)
+        awindows = [(0.0, dur)]
         log(f"  📌 Texto único + flecha (emoji={use_emoji})")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    def _render(lys):
+    # Render MoviePy (vídeo + texto, SIN flecha) a un temporal; luego FFmpeg le
+    # superpone la flecha .mov real → output_path. Si no hay flecha o el overlay
+    # falla, el temporal (ya válido) se mueve a output_path — nunca sin vídeo.
+    tmp_txt = output_path + ".txt.mp4"
+
+    def _render(lys, dst):
         comp = CompositeVideoClip(lys, size=(TARGET_W, TARGET_H))
         if base.audio is not None:
             comp = comp.set_audio(base.audio)
         comp.write_videofile(
-            output_path, codec="libx264", audio_codec="aac", fps=30,
+            dst, codec="libx264", audio_codec="aac", fps=30,
             preset="medium", ffmpeg_params=["-pix_fmt", "yuv420p"],
             logger=None, threads=4,
         )
@@ -491,13 +473,25 @@ def process_ready_video(
 
     final = None
     try:
-        final = _render(layers)
+        final = _render(layers, tmp_txt)
     except Exception as e:
-        # Belt-and-suspenders: si algún overlay peta, saca al menos el vídeo
-        # con zoom + textos (sin lo que sobre) para no dejar al operador sin nada.
-        log(f"  ⚠️ Render con overlays falló ({str(e)[:80]}) — reintento sin flecha")
-        safe = [core] + [x for x in (hk,) if x is not None]
-        final = _render(safe)
+        log(f"  ⚠️ Render de texto falló ({str(e)[:80]}) — reintento solo vídeo")
+        final = _render([core], tmp_txt)
+
+    # Overlay de la flecha real (FFmpeg). Si algo falla, nos quedamos con tmp.
+    placed = False
+    if arrow_mov and awindows:
+        placed = _overlay_arrow_ffmpeg(tmp_txt, arrow_mov, output_path, awindows, log=log)
+    if not placed:
+        try:
+            os.replace(tmp_txt, output_path)
+        except Exception:
+            pass
+    else:
+        try:
+            os.remove(tmp_txt)
+        except Exception:
+            pass
 
     for c in (base, final):
         try:

@@ -1909,11 +1909,11 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     out_path = os.path.join(ready_dir, fname)
     on_progress(0.1, "🎬 Procesando vídeo…")
     # Desfase por PRODUCTO: sin esto, todo producto empieza en el estilo/flecha 0
-    # y las 3 versiones salen SIEMPRE la misma tripleta (blanco→amarillo→azul,
-    # flecha roja...). Sumando un hash estable del producto, cada producto
-    # arranca en un punto distinto de la rotación → variedad real entre productos,
-    # y las 3 versiones siguen siendo distintas entre sí (idx 0/1/2).
-    seed = int(hashlib.md5(product_id.encode()).hexdigest(), 16) % 210  # 7×5×6
+    # y las 3 versiones salen SIEMPRE la misma tripleta. Sumando un hash estable
+    # del producto, cada producto arranca en un punto distinto de la rotación
+    # (7 estilos de texto × 12 flechas reales × 4 modos) → variedad real entre
+    # productos, y las 3 versiones siguen distintas entre sí (idx 0/1/2).
+    seed = int(hashlib.md5(product_id.encode()).hexdigest(), 16) % 420  # lcm(7,12,4,5)
     process_ready_video(
         raw_path, out_path,
         hook_text=concept.get("hook_text", ""),
