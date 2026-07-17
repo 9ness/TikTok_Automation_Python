@@ -55,7 +55,8 @@
       "Bash(grep -on \"python -m pytest[^\\\\\"'\\\\`]*\" learnings.md)",
       "Bash(python -c \"import pytest; print\\('pytest', pytest.__version__\\)\")",
       "Bash(git commit *)",
-      "Bash(grep -rno \"\\\\`\\\\${NAMESPACE}:[a-z_:]*\\\\|'fiesta:[a-z_:]*'\" app/actions.ts)"
+      "Bash(grep -rno \"\\\\`\\\\${NAMESPACE}:[a-z_:]*\\\\|'fiesta:[a-z_:]*'\" app/actions.ts)",
+      "Bash(~/TikTok_Automation_Python/venv/bin/python /tmp/variety.py)"
     ]
   }
 }
