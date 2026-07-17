@@ -14,6 +14,7 @@ tocar `st.*`.
 from __future__ import annotations
 
 import glob
+import hashlib
 import os
 import shutil
 import time
@@ -1907,11 +1908,17 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     fname = f"{short}_v{idx + 1}_{ts}.mp4"
     out_path = os.path.join(ready_dir, fname)
     on_progress(0.1, "🎬 Procesando vídeo…")
+    # Desfase por PRODUCTO: sin esto, todo producto empieza en el estilo/flecha 0
+    # y las 3 versiones salen SIEMPRE la misma tripleta (blanco→amarillo→azul,
+    # flecha roja...). Sumando un hash estable del producto, cada producto
+    # arranca en un punto distinto de la rotación → variedad real entre productos,
+    # y las 3 versiones siguen siendo distintas entre sí (idx 0/1/2).
+    seed = int(hashlib.md5(product_id.encode()).hexdigest(), 16) % 210  # 7×5×6
     process_ready_video(
         raw_path, out_path,
         hook_text=concept.get("hook_text", ""),
         cta_text=concept.get("cta_text", ""),
-        zoom=zoom, style=idx, log=on_log,
+        zoom=zoom, style=seed + idx, log=on_log,
     )
     concept["ready_video"] = fname
     concept["ready_at"] = ts

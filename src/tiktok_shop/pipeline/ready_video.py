@@ -142,9 +142,12 @@ def _wrap(draw, text, font, max_w):
 # (se rota por índice de concepto). fuente + color relleno + color borde.
 _TEXT_STYLES = [
     {"font": "Montserrat-ExtraBold.ttf", "fill": (255, 255, 255), "stroke": (0, 0, 0)},
-    {"font": "anton.ttf", "fill": (255, 221, 0), "stroke": (0, 0, 0)},          # amarillo viral
+    {"font": "anton.ttf", "fill": (255, 221, 0), "stroke": (0, 0, 0)},           # amarillo viral
     {"font": "LuckiestGuy-Regular.ttf", "fill": (255, 255, 255), "stroke": (18, 18, 60)},
-    {"font": "Rubik-Bold.ttf", "fill": (255, 255, 255), "stroke": (214, 20, 90)},  # rosa
+    {"font": "Rubik-Bold.ttf", "fill": (255, 255, 255), "stroke": (214, 20, 90)},   # rosa
+    {"font": "anton.ttf", "fill": (255, 255, 255), "stroke": (228, 30, 30)},        # blanco/rojo
+    {"font": "Montserrat-ExtraBold.ttf", "fill": (18, 18, 18), "stroke": (255, 255, 255)},  # negro/blanco
+    {"font": "LuckiestGuy-Regular.ttf", "fill": (255, 125, 0), "stroke": (0, 0, 0)},  # naranja
 ]
 
 
@@ -293,17 +296,36 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_p
 # TikTok Shop (como los vídeos que venden). ROJA con borde blanco. Coordenadas
 # = CENTRO del elemento. 3 tipos para variar entre versiones.
 _ARROW_CX, _ARROW_CY = 0.22, 0.72
-_ARROW_RED = (228, 30, 30, 255)
-_ARROW_OUTLINE = (255, 255, 255, 255)
-_ARROW_KINDS = ["down", "double", "fat"]
+_ARROW_WHITE = (255, 255, 255, 255)
+_ARROW_BLACK = (18, 18, 18, 255)
+# Paleta de flechas: (relleno, borde). El operador quiere variedad de color, no
+# siempre roja. La naranja imita el carrito de TikTok Shop; blanca lleva borde
+# negro para que se lea sobre fondo claro.
+_ARROW_COLORS: list[tuple] = [
+    ((228, 30, 30, 255), _ARROW_WHITE),    # rojo (clásico)
+    ((255, 125, 0, 255), _ARROW_WHITE),    # naranja carrito
+    ((255, 210, 0, 255), _ARROW_BLACK),    # amarillo viral
+    ((255, 255, 255, 255), _ARROW_BLACK),  # blanco
+    ((233, 30, 120, 255), _ARROW_WHITE),   # rosa fuerte
+    ((45, 200, 90, 255), _ARROW_WHITE),    # verde lima
+]
+_ARROW_RED = _ARROW_COLORS[0][0]           # compat
+_ARROW_OUTLINE = _ARROW_WHITE
+_ARROW_KINDS = ["down", "double", "fat", "chevron", "curved"]
 
 
 def _arrow_kind(idx: int) -> str:
     return _ARROW_KINDS[idx % len(_ARROW_KINDS)]
 
 
+def _arrow_color(idx: int) -> tuple:
+    """(relleno, borde). Stride 2 desfasado del `kind` para que color y forma
+    NO vayan sincronizados → más combinaciones percibidas."""
+    return _ARROW_COLORS[(idx * 2 + 1) % len(_ARROW_COLORS)]
+
+
 def _draw_arrow_png(kind: str, w: int, fill=_ARROW_RED, outline=_ARROW_OUTLINE):
-    """Flecha roja apuntando abajo (al carrito). kind: down|double|fat."""
+    """Flecha apuntando abajo (al carrito). kind: down|double|fat|chevron|curved."""
     h = int(w * 1.4)
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -332,14 +354,40 @@ def _draw_arrow_png(kind: str, w: int, fill=_ARROW_RED, outline=_ARROW_OUTLINE):
             for col, wd in ((outline, lw + ow * 2), (fill, lw)):
                 d.line([(cx - hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
                 d.line([(cx + hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
+    elif kind == "chevron":
+        # Tres galones apilados (»»» girados hacia abajo) → sensación de "baja".
+        hw = w * 0.82
+        lw = max(8, int(w * 0.17))
+        for off in (0.0, 0.26, 0.52):
+            y1, y2 = h * (0.06 + off), h * (0.30 + off)
+            for col, wd in ((outline, lw + ow * 2), (fill, lw)):
+                d.line([(cx - hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
+                d.line([(cx + hw / 2, y1), (cx, y2)], fill=col, width=wd, joint="curve")
+    elif kind == "curved":
+        # Flecha curva (swoosh) dibujada como arco + punta triangular.
+        box = [w * 0.12, h * 0.02, w * 1.30, h * 1.30]
+        lw = max(9, int(w * 0.18))
+        for col, wd in ((outline, lw + ow * 2), (fill, lw)):
+            d.arc(box, start=200, end=290, fill=col, width=wd)
+        # Punta en el extremo inferior del arco (~290°).
+        tipx, tipy = cx - w * 0.02, h * 0.98
+        s = w * 0.30
+        pts = [(tipx, tipy + s * 0.5), (tipx - s * 0.7, tipy - s * 0.3),
+               (tipx + s * 0.4, tipy - s * 0.6)]
+        d.polygon(pts, fill=fill)
+        d.line(pts + [pts[0]], fill=outline, width=ow, joint="curve")
     else:  # down
         _solid_arrow(0.32, 0.82, 0.05, 0.52, 0.95)
     return img
 
 
-def _arrow_clip(core, duration, kind="down", log=_noop):
+_COLOR_NAMES = ["rojo", "naranja", "amarillo", "blanco", "rosa", "verde"]
+
+
+def _arrow_clip(core, duration, kind="down", color_idx=0, log=_noop):
     try:
-        png = _draw_arrow_png(kind, int(TARGET_W * 0.13))
+        fill, outline = _ARROW_COLORS[color_idx % len(_ARROW_COLORS)]
+        png = _draw_arrow_png(kind, int(TARGET_W * 0.13), fill=fill, outline=outline)
         w, h = png.size
         x0 = int(TARGET_W * _ARROW_CX - w / 2)
         y0 = int(TARGET_H * _ARROW_CY - h / 2)
@@ -348,7 +396,8 @@ def _arrow_clip(core, duration, kind="down", log=_noop):
         clip = clip.set_position(
             lambda t: (x0, y0 + int(amp * math.sin(t * 2 * math.pi * 1.2)))
         )
-        log(f"  ➘ Flecha CTA roja ({kind}) apuntando al carrito")
+        cname = _COLOR_NAMES[color_idx % len(_COLOR_NAMES)]
+        log(f"  ➘ Flecha CTA {cname} ({kind}) apuntando al carrito")
         return clip
     except Exception:
         return None
@@ -395,6 +444,9 @@ def process_ready_video(
     # single = 1 texto fijo + flecha; sequence = gancho SIN flecha → CTA + flecha.
     dur = core.duration
     akind = _arrow_kind(int(style))
+    # Color desfasado del kind (stride 2) → forma y color NO van sincronizados,
+    # así 5 formas × 6 colores dan muchas combinaciones distintas por producto.
+    acolor = int(style) * 2 + 1
     mode = _text_mode(int(style))
     # Variedad: la versión 0 va LIMPIA (sin emoji); las demás con emoji.
     use_emoji = (int(style) % len(_TEXT_STYLES)) != 0
@@ -409,7 +461,7 @@ def process_ready_video(
         if ct is not None:
             layers.append(ct.set_start(split))
         if with_arrow:
-            ar = _arrow_clip(core, dur - split, kind=akind, log=log)
+            ar = _arrow_clip(core, dur - split, kind=akind, color_idx=acolor, log=log)
             if ar is not None:
                 layers.append(ar.set_start(split))
         log(f"  📌 Secuencia: gancho → CTA + flecha (emoji={use_emoji})")
@@ -419,7 +471,7 @@ def process_ready_video(
         if hk is not None:
             layers.append(hk)
         if with_arrow:
-            ar = _arrow_clip(core, dur, kind=akind, log=log)
+            ar = _arrow_clip(core, dur, kind=akind, color_idx=acolor, log=log)
             if ar is not None:
                 layers.append(ar)
         log(f"  📌 Texto único + flecha (emoji={use_emoji})")
