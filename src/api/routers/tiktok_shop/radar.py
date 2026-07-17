@@ -1058,6 +1058,78 @@ def download_ready_video(
     return FileResponse(path, media_type="video/mp4", filename=fname)
 
 
+def _edits_dir() -> str:
+    """Carpeta para ediciones libres (no atadas a un producto)."""
+    from src.tiktok_shop.config import resolve_shop_root
+    d = os.path.join(resolve_shop_root(), "_manual_edits")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+@router.post("/videos/edit/upload")
+def upload_edit_video(
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    file: Annotated[UploadFile, File()],
+    hook_text: Annotated[str, Form()] = "",
+    cta_text: Annotated[str, Form()] = "",
+    zoom: Annotated[float, Form()] = 1.18,
+) -> dict:
+    """Editor LIBRE: sube cualquier vídeo → misma edición que los vídeos-problema
+    (zoom quita-marca + gancho/CTA + flecha real) SIN necesitar un concepto
+    guardado. Sirve para las plantillas ⚡ y subidas sueltas. Devuelve un `token`
+    con el que descargar el resultado cuando la cola termine."""
+    import shutil
+
+    token = uuid.uuid4().hex[:16]
+    d = _edits_dir()
+    raw_path = os.path.join(d, f"{token}_raw.mp4")
+    out_path = os.path.join(d, f"{token}.mp4")
+    try:
+        with open(raw_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "message": f"Error guardando el vídeo: {e}"}
+
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_READY_VIDEO,
+        title="🎬 Editar vídeo (plantilla)",
+        params={
+            "raw_path": raw_path, "out_path": out_path,
+            "hook_text": hook_text, "cta_text": cta_text, "zoom": zoom,
+        },
+        enqueued_by=operator or None,
+    )
+    return {"ok": True, "job_id": job.id, "token": token, "message": "En la cola, procesando…"}
+
+
+@router.get("/videos/edit/ready")
+def download_edit_video(
+    token: str,
+    api_key: Annotated[str | None, Query()] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+):
+    """Descarga la edición libre (por `token`). 404 mientras la cola no acabe."""
+    import re
+
+    from fastapi import HTTPException
+
+    from src.api.config import get_settings
+
+    settings = get_settings()
+    if settings.api_key:
+        provided = x_api_key or api_key
+        if not provided or provided != settings.api_key:
+            raise HTTPException(status_code=401, detail="API key inválida o ausente.")
+    # token seguro: solo hex (evita path traversal).
+    if not re.fullmatch(r"[a-f0-9]{8,32}", token or ""):
+        raise HTTPException(status_code=400, detail="token inválido")
+    path = os.path.join(_edits_dir(), f"{token}.mp4")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Aún no procesado.")
+    return FileResponse(path, media_type="video/mp4", filename=f"editado_{token}.mp4")
+
+
 @router.get("/video-templates")
 def video_templates(
     operator: Annotated[str, Depends(get_current_user)],

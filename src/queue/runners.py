@@ -1890,10 +1890,32 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     from src.tiktok_shop.pipeline.ready_video import process_ready_video
     from src.tiktok_shop.repos import ProductRepo
 
-    product_id = job.params["product_id"]
-    idx = int(job.params["concept_index"])
     raw_path = job.params["raw_path"]
     zoom = float(job.params.get("zoom", 1.18))
+
+    # ── Modo GENÉRICO (editor libre): sin producto ni concepto. Se pasa el
+    # `out_path` ya resuelto + gancho/CTA directos. Sirve para editar cualquier
+    # vídeo (plantillas ⚡, subidas sueltas) con la misma edición que los
+    # vídeos-problema, sin depender de un concepto guardado. ──
+    if job.params.get("out_path"):
+        out_path = job.params["out_path"]
+        on_progress(0.1, "🎬 Procesando vídeo…")
+        seed = int(hashlib.md5(out_path.encode()).hexdigest(), 16) % 420
+        process_ready_video(
+            raw_path, out_path,
+            hook_text=str(job.params.get("hook_text", "")),
+            cta_text=str(job.params.get("cta_text", "")),
+            zoom=zoom, style=seed, log=on_log,
+        )
+        try:
+            os.remove(raw_path)
+        except OSError:
+            pass
+        on_progress(1.0, "✅ Vídeo listo para descargar")
+        return out_path
+
+    product_id = job.params["product_id"]
+    idx = int(job.params["concept_index"])
 
     repo = ProductRepo()
     product = repo.get(product_id)

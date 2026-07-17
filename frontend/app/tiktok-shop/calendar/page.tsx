@@ -940,22 +940,18 @@ function ProductPrompts({ productId }: { productId: string }) {
       {tab === "templates" && (
         <div className="space-y-2">
           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-            ⚡ Plantillas reutilizables (sin coste IA). Flujo Kling: genera la <b>foto
-            del 1er frame</b> en Nano Banana (adjunta la foto del producto), y pásala a
-            <b> Kling</b> como start-frame. Sin caras IA, POV/manos.
+            ⚡ Plantillas simples (sin coste IA, sin caras — POV/manos). Copia el
+            prompt con 1 clic, genéralo en Kling/Veo, y <b>súbelo aquí para editarlo</b>
+            {" "}(quita-marca + flecha + gancho) igual que los vídeos-problema.
           </p>
           {(tpls.data?.templates ?? []).map((t) => (
-            <details key={t.id} className="rounded border border-border/60 p-2 text-xs">
-              <summary className="cursor-pointer font-medium">
-                {t.name} <span className="text-muted-foreground">· {t.niches.join("/")}</span>
-              </summary>
-              <div className="mt-2 space-y-1">
-                {t.notes && <p className="text-[11px] text-muted-foreground">{t.notes}</p>}
-                <CopyBlock label="🍌 1er frame (Nano Banana + foto producto)" text={t.first_frame_prompt} />
-                <CopyBlock label="🎬 Kling (i2v desde el 1er frame)" text={t.kling_prompt} />
-                <CopyBlock label="🟣 Veo 3 (alternativa texto→vídeo)" text={t.prompt} />
-              </div>
-            </details>
+            <TemplateEditCard
+              key={t.id}
+              t={t}
+              apiBase={apiBase}
+              apiKey={apiKey}
+              defaultZoom={zoom}
+            />
           ))}
         </div>
       )}
@@ -1046,6 +1042,149 @@ function CopyChip({ label, text, primary }: { label: string; text: string; prima
     >
       <Copy className="h-3 w-3" /> {label}
     </button>
+  );
+}
+
+/** Tarjeta de plantilla ⚡ con la MISMA interfaz simple que los vídeos-problema:
+ *  chips para copiar los prompts + subir vídeo para editar (editor libre) +
+ *  descargar. No depende de un concepto guardado — usa /videos/edit/*. */
+function TemplateEditCard({
+  t,
+  apiBase,
+  apiKey,
+  defaultZoom,
+}: {
+  t: import("@/lib/queries/radar").VideoTemplate;
+  apiBase: string;
+  apiKey: string;
+  defaultZoom: number;
+}) {
+  const [hook, setHook] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [pct, setPct] = useState(0);
+  const [processing, setProcessing] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  const readyUrl = token
+    ? `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/ready?token=${token}` +
+      (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "")
+    : "";
+
+  // Poll: la descarga da 404 hasta que la cola termina → cuando responde OK,
+  // mostramos el botón de descargar.
+  useEffect(() => {
+    if (!processing || !token) return;
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(readyUrl, { method: "HEAD" });
+        if (r.ok) {
+          setProcessing(false);
+          clearInterval(id);
+        }
+      } catch {
+        /* sigue intentando */
+      }
+    }, 4000);
+    return () => clearInterval(id);
+  }, [processing, token, readyUrl]);
+
+  const onUpload = (f: File) => {
+    setUploading(true);
+    setPct(0);
+    setToken(null);
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("hook_text", hook.trim());
+    fd.append("cta_text", hook.trim() ? "Míralo aquí 👇🛒" : "");
+    fd.append("zoom", String(defaultZoom));
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/upload`);
+    if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      setUploading(false);
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.ok && data.token) {
+          setToken(data.token);
+          setProcessing(true);
+          toast.success("En la cola, editando…");
+        } else toast.error(data.message ?? "Error");
+      } catch {
+        toast.error("Respuesta inválida del servidor");
+      }
+    };
+    xhr.onerror = () => {
+      setUploading(false);
+      toast.error("Error de red al subir");
+    };
+    xhr.send(fd);
+  };
+
+  const fileInput = (
+    <input
+      type="file"
+      accept="video/*"
+      className="hidden"
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) onUpload(f);
+        e.target.value = "";
+      }}
+    />
+  );
+  const actionBtn = uploading ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-orange-500">
+      <Loader2 className="h-3 w-3 animate-spin" /> {pct}%
+    </span>
+  ) : processing ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-orange-500">
+      <Loader2 className="h-3 w-3 animate-spin" /> editando…
+    </span>
+  ) : token ? (
+    <div className="flex items-center gap-1.5">
+      <a
+        href={readyUrl}
+        download
+        className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1.5 text-[11px] font-semibold text-white"
+      >
+        <Download className="h-3.5 w-3.5" /> Descargar
+      </a>
+      <label className="cursor-pointer text-[10px] text-muted-foreground hover:underline" title="editar otro">
+        {fileInput}↻
+      </label>
+    </div>
+  ) : (
+    <label className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600">
+      {fileInput}📤 Subir vídeo
+    </label>
+  );
+
+  return (
+    <div className="rounded-lg border border-border/60 p-2.5 text-xs">
+      <div className="mb-1.5 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="font-semibold">{t.name}</span>{" "}
+          <span className="text-muted-foreground">· {t.niches.join("/")}</span>
+        </div>
+        <div className="shrink-0">{actionBtn}</div>
+      </div>
+      {t.notes && <p className="mb-1.5 text-[10px] text-muted-foreground">{t.notes}</p>}
+      <div className="mb-1.5 flex flex-wrap gap-1.5">
+        <CopyChip label="🍌 1er frame" text={t.first_frame_prompt} primary />
+        <CopyChip label="🎬 Kling" text={t.kling_prompt} primary />
+        <CopyChip label="🟣 Veo 3" text={t.prompt} />
+      </div>
+      {/* Gancho opcional que se quema al editar (las plantillas no traen uno). */}
+      <input
+        value={hook}
+        onChange={(e) => setHook(e.target.value)}
+        placeholder="Gancho opcional para el vídeo (se quema al editar)…"
+        className="w-full rounded-md border border-border bg-background px-2 py-1 text-[11px]"
+      />
+    </div>
   );
 }
 
