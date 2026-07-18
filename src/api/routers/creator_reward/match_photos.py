@@ -618,9 +618,17 @@ def viral_slots(
         home = parts[0] if parts else ""
         away = parts[1] if len(parts) > 1 else ""
         bet, other = _bet_team(p, home, away)
-        cands = _photos_for_team(bet)
-        if not cands and other:
-            cands = _photos_for_team(other)
+        # Candidatas de AMBOS equipos del partido (antes solo el de la apuesta):
+        # primero el equipo de la apuesta (sigue siendo el default), luego el
+        # rival, para que el usuario pueda elegir foto de cualquiera de los dos
+        # en cada pick. Útil sobre todo en un vídeo dedicado a un único partido
+        # (p.ej. la final), donde los 4 picks son del mismo cruce.
+        cands = list(_photos_for_team(bet))
+        _pick_refs = {c.ref for c in cands}
+        for c in _photos_for_team(other):
+            if c.ref not in _pick_refs:
+                _pick_refs.add(c.ref)
+                cands.append(c)
         slots.append(ViralSlot(index=i, match=p.get("match", ""), bet_team=bet, candidates=cands))
         # gancho: unión de fotos de ambos equipos de todos los partidos
         for t in (bet, other):
