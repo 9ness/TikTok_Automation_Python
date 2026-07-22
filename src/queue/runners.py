@@ -1942,10 +1942,18 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
         cta_text=concept.get("cta_text", ""),
         zoom=zoom, style=seed + idx, log=on_log,
     )
-    concept["ready_video"] = fname
-    concept["ready_at"] = ts
-    product.touch()
-    repo.save(product)
+    # Re-leer FRESCO justo antes de guardar. El procesado tarda minutos y otro
+    # job de OTRA versión del MISMO producto pudo terminar y guardar mientras
+    # tanto. Si guardáramos el `product` leído al inicio, machacaríamos el
+    # ready_video que ese otro job acaba de poner (race read-modify-write: el
+    # operador veía V1 volver a "Subir vídeo" tras subir V2/V3). Tocamos solo
+    # el índice de esta versión sobre la copia más reciente.
+    fresh = repo.get(product_id) or product
+    if 0 <= idx < len(fresh.problem_videos):
+        fresh.problem_videos[idx]["ready_video"] = fname
+        fresh.problem_videos[idx]["ready_at"] = ts
+    fresh.touch()
+    repo.save(fresh)
     try:
         os.remove(raw_path)   # solo si el procesado fue bien
     except OSError:
