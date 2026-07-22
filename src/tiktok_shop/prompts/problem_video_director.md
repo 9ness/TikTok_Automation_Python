@@ -100,8 +100,11 @@ Para cada concepto:
     reference photo; only the exact product from the reference`. (El operador se
     quejó de que salían frambuesas rojas en un producto de pastillas azules.)
   El encuadre depende del formato:
-  - **Con persona (1, 2, 3, 6):** una persona que ENCAJE con el producto y su
-    público (género/edad/estilo). Persona a cámara = medio cuerpo tipo selfie;
+  - **Con persona (1, 2, 3, 6):** una persona ATRACTIVA y JOVEN que ENCAJE con el
+    producto y su público — hombre o mujer **de unos 28-32 años, guapo/a, con
+    buena presencia en cámara** (textual: `attractive good-looking young adult
+    around 28-32, appealing and camera-friendly`). Persona a cámara = medio
+    cuerpo tipo selfie;
     ropa = cuerpo entero; joya/reloj/accesorio = primer plano de la zona;
     testimonio/dramatización = la persona con el producto en la escena del
     problema (baño, cocina, gimnasio…).
@@ -120,12 +123,13 @@ Para cada concepto:
     a flat all-in-focus phone snapshot, absolutely NO background blur, NO bokeh,
     NO depth-of-field, NO out-of-focus areas anywhere`.
     (b) **Anti-look-IA (textual SIEMPRE):** `candid amateur iPhone photo, casual
-    everyday snapshot, real natural skin with visible pores, texture and tiny
-    imperfections, NO beautification, NO smoothing, NO airbrush, NO waxy or
-    plastic skin, NO glossy CGI look, NO perfect symmetry; natural imperfect
-    indoor lighting, slightly imperfect casual framing, subtle real camera grain;
-    looks like a genuine phone photo a real person took, NOT an ad, NOT
-    cinematic, NOT a render`. `vertical 9:16, NO text, NO captions, NO logos, NO
+    everyday snapshot, real natural skin with visible pores and realistic
+    texture, but CLEAR HEALTHY GOOD-LOOKING skin — NO acne, NO pimples, NO
+    blemishes, NO skin problems; NO beautification, NO smoothing, NO airbrush, NO
+    waxy or plastic skin, NO glossy CGI look, NO perfect symmetry; natural
+    imperfect indoor lighting, slightly imperfect casual framing, subtle real
+    camera grain; looks like a genuine phone photo a real ATTRACTIVE person took,
+    NOT an ad, NOT cinematic, NOT a render`. `vertical 9:16, NO text, NO captions, NO logos, NO
     watermarks`. NO diálogo (es imagen).
 - **animate_prompt** (SIEMPRE): prompt en **inglés** para animar ese still con
   **Veo 3.1 (imagen→vídeo: la foto de Nano Banana es el primer fotograma)**,
