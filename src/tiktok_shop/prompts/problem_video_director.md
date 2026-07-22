@@ -76,7 +76,16 @@ Para cada concepto:
 - **image_prompt** (SIEMPRE, para TODOS los conceptos): prompt en **inglés** para
   **Gemini / Nano Banana** (Paso 1). Genera una IMAGEN fotorrealista con el
   producto de la **foto de referencia adjunta**, manteniendo color/forma/
-  material/texto del envase IDÉNTICOS. El encuadre depende del formato:
+  material/texto del envase IDÉNTICOS.
+  - **ANCLA EL PRODUCTO (crítico — es la ÚNICA referencia que tendrá el vídeo):**
+    el vídeo solo anima esta imagen, así que el producto DEBE salir **grande,
+    totalmente enfocado, bien iluminado y con la etiqueta/marca de frente y
+    legible**, en primer plano o muy visible. Incluye textual: `the product from
+    the attached reference is reproduced EXACTLY — identical shape, colour,
+    label text and logo, pixel-accurate, large and prominent, in sharp focus,
+    label facing the camera and clearly readable`. Si el producto sale pequeño o
+    borroso, el vídeo lo perderá.
+  El encuadre depende del formato:
   - **Con persona (1, 2, 3, 6):** una persona que ENCAJE con el producto y su
     público (género/edad/estilo). Persona a cámara = medio cuerpo tipo selfie;
     ropa = cuerpo entero; joya/reloj/accesorio = primer plano de la zona;
