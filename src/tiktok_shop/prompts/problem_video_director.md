@@ -82,10 +82,17 @@ Para cada concepto:
     el vídeo solo anima esta imagen, así que el producto DEBE salir **grande,
     totalmente enfocado, bien iluminado y con la etiqueta/marca de frente y
     legible**, en primer plano o muy visible. Incluye textual: `the product from
-    the attached reference is reproduced EXACTLY — identical shape, colour,
-    label text and logo, pixel-accurate, large and prominent, in sharp focus,
-    label facing the camera and clearly readable`. Si el producto sale pequeño o
-    borroso, el vídeo lo perderá.
+    the attached reference is reproduced EXACTLY — identical shape, EXACT real
+    colour (do NOT change it: if the pills/liquid/gummies are blue they stay
+    blue), same label text and logo, pixel-accurate, large and prominent, in
+    sharp focus, label facing the camera and clearly readable`. Si el producto
+    sale pequeño o borroso, el vídeo lo perderá.
+  - **NO INVENTES elementos:** describe SOLO lo que hay en la foto de referencia.
+    NADA de frutas, bayas, frambuesas, hojas, decoración, garnish ni objetos
+    extra que no estén en la referencia. Textual: `do NOT add any fruits,
+    berries, garnish, leaves, decorations or objects that are not in the
+    reference photo; only the exact product from the reference`. (El operador se
+    quejó de que salían frambuesas rojas en un producto de pastillas azules.)
   El encuadre depende del formato:
   - **Con persona (1, 2, 3, 6):** una persona que ENCAJE con el producto y su
     público (género/edad/estilo). Persona a cámara = medio cuerpo tipo selfie;
@@ -98,11 +105,14 @@ Para cada concepto:
     fondo de estudio. Bien iluminado, nítido, apetecible pero natural (UGC).
   - **REALISMO — LO MÁS IMPORTANTE (que NO parezca IA):** la foto tiene que
     parecer un **snapshot casual de móvil**, no una imagen generada. Dos frentes:
-    (a) **Enfoque:** describe la CÁMARA que enfoca TODO, no los negativos —
-    `shot on a front-facing smartphone selfie camera, ultra-wide small-sensor
-    lens, the ENTIRE frame in sharp deep focus, subject AND the whole background
-    crisp edge to edge, absolutely NO background blur, NO bokeh, NO
-    depth-of-field`.
+    (a) **Enfoque (el operador se queja de que a veces sale borroso):** describe
+    la CÁMARA que enfoca TODO Y pon el **fondo CERCA** para que no haya distancia
+    donde desenfocar. Textual: `shot on a front-facing smartphone selfie camera,
+    ultra-wide small-sensor lens; the background is a plain everyday wall/room
+    right behind the subject, close, with NO distance — so the ENTIRE frame is in
+    sharp deep focus, subject AND background equally crisp edge to edge; this is
+    a flat all-in-focus phone snapshot, absolutely NO background blur, NO bokeh,
+    NO depth-of-field, NO out-of-focus areas anywhere`.
     (b) **Anti-look-IA (textual SIEMPRE):** `candid amateur iPhone photo, casual
     everyday snapshot, real natural skin with visible pores, texture and tiny
     imperfections, NO beautification, NO smoothing, NO airbrush, NO waxy or
@@ -115,9 +125,19 @@ Para cada concepto:
   **Veo 3.1 (imagen→vídeo: la foto de Nano Banana es el primer fotograma)**,
   Paso 2. NO describas el producto (la imagen ya lo carga). Movimiento **MÍNIMO y CONSISTENTE** — es lo que evita los fallos de
   consistencia: nada de cambios bruscos, el producto y la escena NO cambian.
-  - Con persona: se gira/ajusta el producto, reacciona, gesto sutil, zoom suave.
-    Añade: `the person does NOT speak, mouth stays closed and relaxed, no lip
-    movement`.
+  - Con persona: **que HAGA algo, no que mire fija** (el operador se queja de
+    "mujer mirando a cámara sin hacer nada"). La persona **enseña/usa el
+    producto de forma ACTIVA**: lo acerca a cámara, lo aplica/toma/muestra, gira
+    el envase para que se vea, gesto natural y expresivo (sonríe, asiente,
+    reacción de sorpresa/alivio), la cámara puede acercarse. Textual: `the person
+    ACTIVELY shows and uses the product — lifts it toward the camera, turns it to
+    show the label, applies/takes it, lively natural gestures and a genuine
+    expression (smile / nod / surprise); dynamic engaging movement, NOT a static
+    stare into the camera; the person does NOT speak, mouth stays closed and
+    relaxed, no lip movement`.
+    (Nota: Veo 3.1 i2v genera UN plano continuo desde la foto; no puede hacer
+    varias tomas. Para que sea dinámico, el movimiento y la acción van DENTRO de
+    ese plano — persona activa + leve acercamiento de cámara.)
   - De producto: la mano aplica/usa el producto, o zoom-in/out suave, o el
     líquido/textura se mueve un poco. Sin manos que aparezcan de la nada.
   - CONSISTENCIA, textual SIEMPRE: `keep the product identical and stable the
