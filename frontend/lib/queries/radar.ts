@@ -185,6 +185,41 @@ export function useImportToCalendar() {
 
 /** Llena un día del calendario con los productos que están recibiendo
  *  inyección de ADS ahora mismo (Radar v2, descubrimiento invertido). */
+export interface ScrapeProduct {
+  product_id: string;
+  title: string;
+  sold: number;
+  price: number;
+  image: string;
+  seller: string;
+  product_url: string;
+}
+
+/** Buscar productos de TikTok Shop España por nicho (ScrapeCreators). */
+export function useScrapeSearch() {
+  return useMutation<
+    { ok: boolean; configured: boolean; products: ScrapeProduct[]; credits_remaining: number | null; message: string },
+    Error,
+    { query: string; min_sold?: number; max_price?: number }
+  >({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/scrape/search", body),
+  });
+}
+
+/** Crear el producto encontrado + añadirlo a un día + generar vídeos. */
+export function useScrapeAdd() {
+  return useMutation<
+    CalendarActionResponse,
+    Error,
+    {
+      product_id: string; title: string; image?: string; price?: number;
+      sold?: number; seller?: string; date?: string; gens?: string[];
+    }
+  >({
+    mutationFn: (body) => api.post("/api/v1/tiktok-shop/radar/scrape/add", body),
+  });
+}
+
 export function useAutoDay() {
   return useMutation<
     CalendarActionResponse,

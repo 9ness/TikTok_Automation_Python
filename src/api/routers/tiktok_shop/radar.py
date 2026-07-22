@@ -1058,6 +1058,140 @@ def download_ready_video(
     return FileResponse(path, media_type="video/mp4", filename=fname)
 
 
+class ScrapeSearchRequest(BaseModel):
+    query: str
+    region: str = "ES"
+    min_sold: int = 20
+    max_price: float = 80.0
+
+
+class ScrapeProductOut(BaseModel):
+    product_id: str
+    title: str
+    sold: int
+    price: float
+    image: str
+    seller: str
+    product_url: str
+
+
+class ScrapeSearchResponse(BaseModel):
+    ok: bool
+    configured: bool = True
+    products: list[ScrapeProductOut] = Field(default_factory=list)
+    credits_remaining: int | None = None
+    message: str = ""
+
+
+@router.post("/scrape/search", response_model=ScrapeSearchResponse)
+def scrape_search(
+    body: ScrapeSearchRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> ScrapeSearchResponse:
+    """Busca productos de TikTok Shop por nicho vía ScrapeCreators (España).
+    Devuelve productos que VENDEN, ordenados por ventas. La tendencia/creadores
+    se verifican en el Centro de Afiliados (botón 'Abrir producto')."""
+    from src.tiktok_shop.api import scrapecreators as sc
+
+    if not sc.is_configured():
+        return ScrapeSearchResponse(
+            ok=False, configured=False,
+            message="ScrapeCreators no configurado (SCRAPECREATORS_API_KEY).",
+        )
+    prods, credits = sc.search_shop_products(
+        body.query, region=body.region,
+        min_sold=body.min_sold, max_price=body.max_price,
+    )
+    items = [
+        ScrapeProductOut(
+            product_url=f"https://www.tiktok.com/shop/pdp/{p['product_id']}", **p,
+        ) for p in prods
+    ]
+    hint = "" if items else "Sin productos que superen el mínimo de ventas — baja el filtro o prueba otro nicho."
+    return ScrapeSearchResponse(
+        ok=True, products=items, credits_remaining=credits, message=hint,
+    )
+
+
+class ScrapeAddRequest(BaseModel):
+    product_id: str          # id de TikTok
+    title: str
+    image: str = ""
+    price: float = 0.0
+    sold: int = 0
+    seller: str = ""
+    date: str = ""           # YYYY-MM-DD; vacío = hoy
+    gens: list[str] | None = None   # default: vídeos-problema
+
+
+@router.post("/scrape/add", response_model=CalendarActionResponse)
+def scrape_add(
+    body: ScrapeAddRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> CalendarActionResponse:
+    """Crea el producto (con foto de ScrapeCreators, que SÍ carga), lo cuelga
+    del día del calendario y encola la generación de sus 3 vídeos-problema."""
+    from pathlib import Path
+
+    from src.tiktok_shop.config import (
+        product_drive_folder, product_photos_generated_folder,
+        product_photos_source_folder,
+    )
+    from src.tiktok_shop.models.month_plan import DayEntry, today_iso
+    from src.tiktok_shop.models.product import Product, TikTokShopMeta, slugify
+    from src.tiktok_shop.repos import ProductRepo
+    from src.tiktok_shop.repos.month_plan_repo import MonthPlanRepo
+
+    name = (body.title or "").strip()[:200]
+    if not name:
+        return CalendarActionResponse(ok=False, message="Sin nombre de producto.")
+    repo = ProductRepo()
+    slug = slugify(name)
+    product = repo.get_by_slug(slug)
+    if product is None:
+        product = Product(
+            slug=slug, name=name, category="belleza", language="es_ES", origin="radar",
+            tiktok_shop=TikTokShopMeta(
+                product_id=body.product_id or None,
+                product_url=f"https://www.tiktok.com/shop/pdp/{body.product_id}" if body.product_id else None,
+                commission_rate=0.10,
+                price_eur=float(body.price) if body.price else None,
+            ),
+        )
+        for f in (product_drive_folder, product_photos_source_folder, product_photos_generated_folder):
+            try:
+                Path(f(slug)).mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+        product.drive_folder = product_drive_folder(slug)
+        if body.image:
+            try:
+                from src.tiktok_shop.utils.photo_downloader import download_image_to_product
+                photo = download_image_to_product(
+                    product_slug=slug, image_url=body.image,
+                    photo_type="packshot", origin="internet",
+                )
+                if photo is not None:
+                    product.photos.source.append(photo)
+            except Exception:
+                pass
+        repo.save(product)
+
+    date = body.date or today_iso()
+    MonthPlanRepo().add_entry(DayEntry(
+        date=date, product_id=product.id, slug=product.slug, name=product.name,
+        score=float(body.sold),
+        commission_eur=round(float(body.price) * 0.10, 2) if body.price else 0.0,
+        seller_name=body.seller,
+    ))
+    job_id = _maybe_enqueue_gens(queue, product, body.gens or ["problem_videos"], operator)
+    return CalendarActionResponse(
+        ok=True, product_id=product.id, slug=product.slug, job_id=job_id,
+        message=f"'{name[:40]}' añadido al {date}, generando vídeos…",
+    )
+
+
 def _edits_dir() -> str:
     """Carpeta para ediciones libres (no atadas a un producto)."""
     from src.tiktok_shop.config import resolve_shop_root

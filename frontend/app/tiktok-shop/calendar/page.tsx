@@ -30,12 +30,15 @@ import {
   useBofuHooks,
   useAddBatch,
   useAutoDay,
+  useScrapeSearch,
+  useScrapeAdd,
   usePlanPack,
   useProblemVideos,
   useRegenerateCarousels,
   useVideoTemplates,
   type BofuHook,
   type ProblemVideo,
+  type ScrapeProduct,
 } from "@/lib/queries/radar";
 import {
   calendarKeys,
@@ -197,6 +200,9 @@ export default function CalendarPage() {
 
       <StatsRow stats={monthQ.data?.stats} />
       <FormatRanking stats={monthQ.data?.stats} />
+
+      {/* Buscar productos por nicho (ScrapeCreators) → añadir al día */}
+      <ProductSearcher date={selected} onAdded={refreshAll} />
 
       {/* Llenar el día seleccionado con lo que TikTok impulsa ahora */}
       <Card className="border-purple-500/40 bg-purple-500/[0.03]">
@@ -1053,6 +1059,133 @@ function CopyChip({ label, text, primary }: { label: string; text: string; prima
     >
       <Copy className="h-3 w-3" /> {label}
     </button>
+  );
+}
+
+/** Buscador de productos por nicho (ScrapeCreators, España). Trae productos
+ *  que VENDEN, con foto; cada uno se añade al día con un botón (crea el
+ *  producto + genera las 3 versiones). La tendencia/creadores se verifican
+ *  luego en el Centro de Afiliados (botón "Abrir producto"). */
+function ProductSearcher({ date, onAdded }: { date: string; onAdded: () => void }) {
+  const search = useScrapeSearch();
+  const add = useScrapeAdd();
+  const [query, setQuery] = useState("");
+  const [minSold, setMinSold] = useState(20);
+  const [results, setResults] = useState<ScrapeProduct[]>([]);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+
+  const doSearch = () => {
+    if (!query.trim()) return;
+    search.mutate(
+      { query: query.trim(), min_sold: minSold, max_price: 80 },
+      {
+        onSuccess: (r) => {
+          if (!r.configured) {
+            toast.error("ScrapeCreators no configurado en el servidor");
+            return;
+          }
+          setResults(r.products);
+          setCredits(r.credits_remaining);
+          if (!r.products.length) toast(r.message || "Sin resultados — baja el mínimo de ventas");
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  };
+
+  const doAdd = (p: ScrapeProduct) => {
+    add.mutate(
+      {
+        product_id: p.product_id, title: p.title, image: p.image,
+        price: p.price, sold: p.sold, seller: p.seller, date,
+        gens: ["problem_videos"],
+      },
+      {
+        onSuccess: (r) => {
+          if (!r.ok) { toast.error(r.message); return; }
+          toast.success(r.message || "Añadido, generando vídeos…");
+          setAddedIds((s) => new Set(s).add(p.product_id));
+          setTimeout(onAdded, 15_000);
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  };
+
+  return (
+    <Card className="border-emerald-500/40 bg-emerald-500/[0.03]">
+      <CardContent className="space-y-2.5 p-4">
+        <div>
+          <p className="text-sm font-semibold">🔎 Buscar productos por nicho (España)</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Escribe un nicho (&quot;colágeno&quot;, &quot;gua sha&quot;, &quot;proteína&quot;…) → productos que{" "}
+            <strong>venden</strong> en España, con foto. Añádelos al{" "}
+            <strong>{prettyDate(date)}</strong> y verifica la tendencia con &quot;Abrir producto&quot;.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            placeholder="nicho: colágeno, serum, gorra…"
+            className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+          />
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-muted-foreground">Mín. ventas</span>
+            <input
+              type="number" min={0} value={minSold}
+              onChange={(e) => setMinSold(Math.max(0, Number(e.target.value) || 0))}
+              className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-[11px]"
+            />
+          </label>
+          <Button size="sm" onClick={doSearch} disabled={search.isPending}
+            className="bg-emerald-600 text-white hover:bg-emerald-700">
+            {search.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <>🔎 Buscar</>}
+          </Button>
+        </div>
+        {credits !== null && (
+          <p className="text-[10px] text-muted-foreground">Créditos ScrapeCreators restantes: {credits}</p>
+        )}
+        {results.length > 0 && (
+          <div className="space-y-1.5">
+            {results.map((p) => {
+              const added = addedIds.has(p.product_id);
+              return (
+                <div key={p.product_id} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
+                  {p.image && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={p.image} alt="" className="h-12 w-12 shrink-0 rounded object-cover" referrerPolicy="no-referrer" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium">{p.title}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      🛒 {p.sold.toLocaleString()} vendidos · {p.price.toFixed(0)}€ ·{" "}
+                      {p.seller && <>🏪 {p.seller} · </>}
+                      <a href={p.product_url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">
+                        abrir
+                      </a>
+                    </p>
+                  </div>
+                  {added ? (
+                    <span className="shrink-0 text-[11px] text-green-600">✓ añadido</span>
+                  ) : (
+                    <button
+                      onClick={() => doAdd(p)}
+                      disabled={add.isPending}
+                      className="shrink-0 rounded-md bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      ➕ Añadir
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
