@@ -504,6 +504,17 @@ function DayProductCard({
                 NOMBRE en el Centro de Afiliados, y la TIENDA es lo que
                 desambigua cuando varias venden lo mismo. */}
             <div className="mt-1 flex flex-wrap items-center gap-1">
+              {e.product_url && (
+                <a
+                  href={e.product_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md border border-green-500/40 bg-green-500/10 px-2 py-1 text-[11px] font-medium text-green-600 hover:bg-green-500/20"
+                  title="Abre en la app de TikTok"
+                >
+                  <ExternalLink className="h-3 w-3" /> Abrir producto
+                </a>
+              )}
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(e.name);

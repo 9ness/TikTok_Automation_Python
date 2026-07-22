@@ -31,6 +31,7 @@ export interface CalendarEntry {
 
 /** Solo en la vista de UN día: cuenta lo que el producto tiene generado. */
 export interface CalendarEntryDetail extends CalendarEntry {
+  product_url: string;
   problem_videos_count: number;
   presets_count: number;
   carousels_count: number;

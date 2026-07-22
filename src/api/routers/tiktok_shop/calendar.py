@@ -56,6 +56,10 @@ class DayEntryDetailOut(DayEntryOut):
     carousels_count: int = 0
     hooks_count: int = 0
     pack_ready: bool = False
+    # URL canónica de TikTok Shop (shop/pdp/<id>). La bloquea a bots (Security
+    # Check) pero SÍ abre en la app del operador — verificado. Vacía si no hay
+    # product_id de TikTok.
+    product_url: str = ""
 
 
 class MonthOut(BaseModel):
@@ -128,11 +132,14 @@ def get_day(
         n_pre = len(p.video_presets) if p else 0
         n_car = len(p.carousels) if p else 0
         n_hooks = len(getattr(p, "bofu_hooks", []) or []) if p else 0
+        tid = (getattr(getattr(p, "tiktok_shop", None), "product_id", "") or "") if p else ""
+        url = f"https://www.tiktok.com/shop/pdp/{tid}" if tid else ""
         out.append(DayEntryDetailOut(
             **e.model_dump(),
             problem_videos_count=n_pv, presets_count=n_pre,
             carousels_count=n_car, hooks_count=n_hooks,
             pack_ready=bool(n_pv or n_pre or n_car or n_hooks),
+            product_url=url,
         ))
     return out
 
