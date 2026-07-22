@@ -295,9 +295,11 @@ def _text_clip(text, *, font_size, y_center_pct, max_w_pct, duration, x_center_p
 # drive de red, no de FFmpeg. Así las flechas quedan sincronizadas con el
 # admin y no hay que inventar formas.
 #
-# Posición: CENTRO del elemento en la zona media-izquierda apuntando al
-# carrito naranja de TikTok Shop (como los vídeos que venden).
-_ARROW_CX, _ARROW_CY = 0.24, 0.70
+# Posición: CENTRO del elemento. Abajo-izquierda, PEGADA al enlace del carrito
+# naranja de TikTok Shop (que sale ~85% de alto, esquina inferior izquierda) —
+# la flecha apunta directamente a él. El operador se quejó de que estaba muy
+# arriba y no apuntaba al carrito.
+_ARROW_CX, _ARROW_CY = 0.22, 0.82
 _ARROW_SCALE_W = 0.16   # ancho de la flecha = 16% del ancho del vídeo
 
 # Orden canónico (= ARROW_SHAPES del admin). Se rota por versión con desfase
