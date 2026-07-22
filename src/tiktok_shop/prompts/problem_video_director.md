@@ -54,12 +54,13 @@ composición estable.
 
 **Por eso TODOS los conceptos — con persona o de producto — usan 2 PASOS:**
 - Rellena SIEMPRE `image_prompt` (Paso 1, Nano Banana) + `animate_prompt`
-  (Paso 2, Kling/Veo Frames i2v).
+  (Paso 2, Veo 3.1 imagen→vídeo).
 - Deja `veo3_prompt` **SIEMPRE vacío** (`""`). Ya NO usamos texto→vídeo.
 - Todo es **SILENCIOSO**; el gancho va en el texto de pantalla.
 
 Flujo del operador: en Nano Banana adjunta la foto del PRODUCTO → sale la
-imagen (Paso 1). En Kling adjunta **solo esa imagen generada** (el producto ya
+imagen (Paso 1). En Veo 3.1 (imagen→vídeo) usa **solo esa imagen generada** como
+primer fotograma (el producto ya
 está dentro; NO se vuelve a adjuntar la foto del producto) → sale el vídeo.
 
 **OBLIGATORIO:** de los 2-3 conceptos, **AL MENOS 1 de producto/demo sin
@@ -95,17 +96,24 @@ Para cada concepto:
     primer plano del producto en uso, manos sosteniéndolo/aplicándolo, o el
     antes/después del resultado. Escena real de casa (encimera, baño, mesa), no
     fondo de estudio. Bien iluminado, nítido, apetecible pero natural (UGC).
-  - **REALISMO — SIEMPRE, textual (lo que mata el look IA):** describe la CÁMARA
-    que enfoca TODO, no los negativos: `shot on a front-facing smartphone selfie
-    camera, ultra-wide small-sensor lens, the ENTIRE frame in sharp deep focus —
-    subject AND the whole background crisp and clearly visible, flat even focus
-    edge to edge, absolutely NO background blur, NO bokeh, NO depth-of-field;
-    realistic textures (skin pores / product surface), natural indoor lighting,
-    authentic amateur phone photo, not cinematic, not a studio ad; vertical 9:16,
-    NO text, NO captions, NO logos, NO watermarks`. NO diálogo (es imagen).
-- **animate_prompt** (SIEMPRE): prompt en **inglés** para animar ese still
-  (**Kling / Veo Frames i2v**, Paso 2). NO describas el producto (la imagen ya
-  lo carga). Movimiento **MÍNIMO y CONSISTENTE** — es lo que evita los fallos de
+  - **REALISMO — LO MÁS IMPORTANTE (que NO parezca IA):** la foto tiene que
+    parecer un **snapshot casual de móvil**, no una imagen generada. Dos frentes:
+    (a) **Enfoque:** describe la CÁMARA que enfoca TODO, no los negativos —
+    `shot on a front-facing smartphone selfie camera, ultra-wide small-sensor
+    lens, the ENTIRE frame in sharp deep focus, subject AND the whole background
+    crisp edge to edge, absolutely NO background blur, NO bokeh, NO
+    depth-of-field`.
+    (b) **Anti-look-IA (textual SIEMPRE):** `candid amateur iPhone photo, casual
+    everyday snapshot, real natural skin with visible pores, texture and tiny
+    imperfections, NO beautification, NO smoothing, NO airbrush, NO waxy or
+    plastic skin, NO glossy CGI look, NO perfect symmetry; natural imperfect
+    indoor lighting, slightly imperfect casual framing, subtle real camera grain;
+    looks like a genuine phone photo a real person took, NOT an ad, NOT
+    cinematic, NOT a render`. `vertical 9:16, NO text, NO captions, NO logos, NO
+    watermarks`. NO diálogo (es imagen).
+- **animate_prompt** (SIEMPRE): prompt en **inglés** para animar ese still con
+  **Veo 3.1 (imagen→vídeo: la foto de Nano Banana es el primer fotograma)**,
+  Paso 2. NO describas el producto (la imagen ya lo carga). Movimiento **MÍNIMO y CONSISTENTE** — es lo que evita los fallos de
   consistencia: nada de cambios bruscos, el producto y la escena NO cambian.
   - Con persona: se gira/ajusta el producto, reacciona, gesto sutil, zoom suave.
     Añade: `the person does NOT speak, mouth stays closed and relaxed, no lip
@@ -169,7 +177,7 @@ secuencias de 3-4 textos.
       "angle": "...",
       "veo3_prompt": "",
       "image_prompt": "prompt Nano Banana (Paso 1) — SIEMPRE relleno",
-      "animate_prompt": "prompt Kling i2v (Paso 2) — SIEMPRE relleno",
+      "animate_prompt": "prompt Veo 3.1 i2v (Paso 2) — SIEMPRE relleno",
       "spoken_line": "",
       "hook_text": "...",
       "cta_text": "...",
