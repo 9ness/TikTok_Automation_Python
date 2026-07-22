@@ -36,31 +36,35 @@ formatos DIFERENTES de esta lista (o similares):
 3. **Dramatización del problema → alivio**: mini-escena de la frustración y luego
    el alivio con el producto, con PERSONA. **2 PASOS, SILENCIOSA** (texto).
 4. **Antes / después (demo de PRODUCTO)**: transformación mostrada en el PRODUCTO
-   o resultado (sin persona protagonista). `veo3_prompt`, sin voz.
+   o resultado (sin persona protagonista). **2 PASOS, SILENCIOSA.**
 5. **POV / demo en uso (manos / primer plano)**: primera persona, se ven manos o
-   el producto en uso, SIN cara protagonista. `veo3_prompt`, sin voz.
+   el producto en uso, SIN cara protagonista. **2 PASOS, SILENCIOSA.**
 6. **Persona luciendo/probando el producto** — para TODO lo que se **LLEVA
    PUESTO** (ropa, moda, calzado, joyas, RELOJES, gafas, bolsos, accesorios).
    Mirror selfie o primer plano de la zona donde se lleva. **2 PASOS, SILENCIOSA.**
 
-## ⚠️ REGLA DE ORO — CÓMO SE GENERA CADA CONCEPTO
+## ⚠️ REGLA DE ORO — TODO PARTE DE FOTO (2 PASOS, SIN EXCEPCIÓN)
 
-Los modelos texto→vídeo (Veo 3) hacen **personas FALSAS con fondo desenfocado**
-(look IA). La técnica que da personas REALISTAS es la de **2 PASOS**: primero una
-FOTO fotorrealista (Nano Banana, con la cámara que enfoca todo), luego se anima.
+Los modelos texto→vídeo (Veo 3) fallan en dos cosas: **fondos desenfocados que
+delatan la IA** y **falta de consistencia** (el producto/la escena mutan a
+mitad de vídeo). La solución para AMBAS es la técnica de **2 PASOS**: primero
+una FOTO fotorrealista con Nano Banana (donde controlamos el encuadre, el
+enfoque y el producto exacto), luego se anima esa foto (i2v), que mantiene la
+composición estable.
 
-Por eso:
-- **Si el protagonista es una PERSONA (formatos 1, 2, 3, 6)** → usa **2 PASOS**:
-  rellena `image_prompt` (Paso 1) + `animate_prompt` (Paso 2) y deja
-  `veo3_prompt` **vacío**. La persona es **SILENCIOSA** (no habla, no mueve la
-  boca); el gancho va en el texto de pantalla.
-- **Si NO hay persona protagonista (formatos 4, 5: demo de producto, manos,
-  primer plano)** → usa `veo3_prompt` y deja `image_prompt`/`animate_prompt`
-  vacíos.
+**Por eso TODOS los conceptos — con persona o de producto — usan 2 PASOS:**
+- Rellena SIEMPRE `image_prompt` (Paso 1, Nano Banana) + `animate_prompt`
+  (Paso 2, Kling/Veo Frames i2v).
+- Deja `veo3_prompt` **SIEMPRE vacío** (`""`). Ya NO usamos texto→vídeo.
+- Todo es **SILENCIOSO**; el gancho va en el texto de pantalla.
 
-**OBLIGATORIO:** de los 2-3 conceptos, **AL MENOS 1 debe ser de producto/demo
-sin persona** (formato 4 o 5, vía `veo3_prompt`) y **AL MENOS 1 con persona
-realista** (2 pasos). No hagas los 3 con persona ni los 3 de producto.
+Flujo del operador: en Nano Banana adjunta la foto del PRODUCTO → sale la
+imagen (Paso 1). En Kling adjunta **solo esa imagen generada** (el producto ya
+está dentro; NO se vuelve a adjuntar la foto del producto) → sale el vídeo.
+
+**OBLIGATORIO:** de los 2-3 conceptos, **AL MENOS 1 de producto/demo sin
+persona** (formato 4 o 5) y **AL MENOS 1 con persona realista**. No hagas los 3
+iguales. Todos vía 2 pasos.
 
 Para cada concepto:
 
@@ -68,58 +72,42 @@ Para cada concepto:
 - **format**: el formato elegido (de la lista de arriba), en el idioma de salida.
 - **emotion**: la emoción/dolor que ataca (del análisis).
 - **angle**: en 1 frase, cómo ese vídeo ataca el problema y empuja al deseo.
-- **veo3_prompt** (SOLO formatos SIN persona protagonista — 4 y 5: demo de
-  producto, antes/después del producto, manos, primer plano. Si el concepto
-  tiene persona, deja esto `""` y usa los 2 pasos): prompt COMPLETO para **Veo 3
-  de Gemini**.
-  Reglas del prompt de vídeo:
-  - En **inglés** (Veo rinde mejor en inglés).
-  - Vídeo vertical **9:16**, de **hasta 10 segundos**, **SIN voz** (música/ambiente).
-  - **NADA de personas hablando a cámara** (eso va por los 2 pasos). Aquí: el
-    producto en uso, manos, el resultado, el problema resuelto.
-  - Estética **UGC nativa** (grabado con móvil, luz natural), NO anuncio pulido.
-  - **REALISMO — evita el look IA (CRÍTICO):** los modelos IGNORAN los negativos
-    ("no bokeh") → hay que describir la **CÁMARA que da todo enfocado**. Una
-    **cámara frontal de móvil** (gran angular, sensor pequeño) tiene enorme
-    profundidad de campo: persona Y fondo nítidos. NO uses palabras trampa como
-    "cinematic", "portrait", "DSLR", "professional", "shallow", "bokeh".
-    Persona realista: piel con textura/poros, luz natural, encuadre imperfecto.
-    Incluye SIEMPRE en el veo3_prompt, textual, algo como:
-    `filmed on a front-facing smartphone selfie camera, ultra-wide small-sensor
-    lens so the ENTIRE frame is in sharp deep focus — the person AND the whole
-    background room are crisp, detailed and clearly visible; flat even focus edge
-    to edge, absolutely no background blur, no depth-of-field effect; realistic
-    natural skin texture with visible pores; authentic amateur handheld phone
-    video, not cinematic, not a polished ad`.
-  - El vídeo debe **mostrar el problema y su alivio**, no solo el producto bonito.
-    Usa la foto del producto adjunta como referencia exacta del producto.
-  - **Sin texto en pantalla dentro del prompt** (el texto lo pone el operador
-    aparte, ver `hook_text`).
-- **image_prompt** (para TODO concepto con PERSONA protagonista — formatos 1, 2,
-  3, 6; si no hay persona, `""`): prompt en **inglés** para **Gemini / Nano
-  Banana** (Paso 1). Genera una IMAGEN fotorrealista de una persona (que ENCAJE
-  con el producto y su público: género/edad/estilo) con el producto de la **foto
-  de referencia adjunta**, manteniendo color/forma/material IDÉNTICOS.
-  - Encuadre según el formato: persona a cámara = medio cuerpo/primer plano tipo
-    selfie; luciendo ropa = cuerpo entero; joya/reloj/accesorio = primer plano de
-    la zona; testimonio/dramatización = la persona con el producto en la escena
-    del problema (baño, cocina, gimnasio…).
-  - **REALISMO (lo que mata el look IA):** describe la CÁMARA que enfoca TODO, no
-    los negativos. Incluye SIEMPRE, textual: `shot on a front-facing smartphone
-    selfie camera, ultra-wide small-sensor lens, the ENTIRE frame in sharp deep
-    focus — the person AND the whole background room crisp and clearly visible,
-    flat even focus edge to edge, absolutely NO background blur, NO bokeh, NO
-    depth-of-field; realistic skin texture with visible pores, natural indoor
-    lighting, authentic amateur photo, not cinematic, not a studio ad; vertical
-    9:16, NO text, NO captions, NO logos, NO watermarks`. NO diálogo (es imagen).
-- **animate_prompt** (mismo alcance que image_prompt; si no, `""`): prompt en
-  **inglés** para animar ese still (**Veo Frames / Kling i2v**, Paso 2). NO
-  describas el producto (la imagen ya lo carga). Movimiento natural según el
-  formato: la persona se gira/ajusta el producto, reacciona, gesto sutil,
-  zoom-in/out suave. **SILENCIOSO SIEMPRE**: `the person does NOT speak, no
-  talking, mouth stays closed and relaxed, no lip movement`. `Vertical 9:16,
-  smooth natural handheld movement, sharp deep focus, NO on-screen text, NO
-  captions, NO subtitles, NO logos, NO watermarks`.
+- **veo3_prompt**: SIEMPRE `""`. Ya no se usa texto→vídeo (ver Regla de Oro).
+- **image_prompt** (SIEMPRE, para TODOS los conceptos): prompt en **inglés** para
+  **Gemini / Nano Banana** (Paso 1). Genera una IMAGEN fotorrealista con el
+  producto de la **foto de referencia adjunta**, manteniendo color/forma/
+  material/texto del envase IDÉNTICOS. El encuadre depende del formato:
+  - **Con persona (1, 2, 3, 6):** una persona que ENCAJE con el producto y su
+    público (género/edad/estilo). Persona a cámara = medio cuerpo tipo selfie;
+    ropa = cuerpo entero; joya/reloj/accesorio = primer plano de la zona;
+    testimonio/dramatización = la persona con el producto en la escena del
+    problema (baño, cocina, gimnasio…).
+  - **De producto, sin persona (4, 5):** el producto como PROTAGONISTA —
+    primer plano del producto en uso, manos sosteniéndolo/aplicándolo, o el
+    antes/después del resultado. Escena real de casa (encimera, baño, mesa), no
+    fondo de estudio. Bien iluminado, nítido, apetecible pero natural (UGC).
+  - **REALISMO — SIEMPRE, textual (lo que mata el look IA):** describe la CÁMARA
+    que enfoca TODO, no los negativos: `shot on a front-facing smartphone selfie
+    camera, ultra-wide small-sensor lens, the ENTIRE frame in sharp deep focus —
+    subject AND the whole background crisp and clearly visible, flat even focus
+    edge to edge, absolutely NO background blur, NO bokeh, NO depth-of-field;
+    realistic textures (skin pores / product surface), natural indoor lighting,
+    authentic amateur phone photo, not cinematic, not a studio ad; vertical 9:16,
+    NO text, NO captions, NO logos, NO watermarks`. NO diálogo (es imagen).
+- **animate_prompt** (SIEMPRE): prompt en **inglés** para animar ese still
+  (**Kling / Veo Frames i2v**, Paso 2). NO describas el producto (la imagen ya
+  lo carga). Movimiento **MÍNIMO y CONSISTENTE** — es lo que evita los fallos de
+  consistencia: nada de cambios bruscos, el producto y la escena NO cambian.
+  - Con persona: se gira/ajusta el producto, reacciona, gesto sutil, zoom suave.
+    Añade: `the person does NOT speak, mouth stays closed and relaxed, no lip
+    movement`.
+  - De producto: la mano aplica/usa el producto, o zoom-in/out suave, o el
+    líquido/textura se mueve un poco. Sin manos que aparezcan de la nada.
+  - CONSISTENCIA, textual SIEMPRE: `keep the product identical and stable the
+    whole clip — same shape, color, label and text, no morphing, no warping, no
+    extra fingers, no flickering; only subtle natural motion; the background
+    stays the same; smooth slow handheld movement, sharp deep focus, vertical
+    9:16, NO on-screen text, NO captions, NO subtitles, NO logos, NO watermarks`.
 - **spoken_line**: SIEMPRE `""`. Todos los formatos son silenciosos ahora (el
   mensaje va en el texto de pantalla); nadie habla a cámara.
 - **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
@@ -146,10 +134,10 @@ secuencias de 3-4 textos.
 
 ## Idioma
 
-- `veo3_prompt`: siempre en **inglés** (pero el diálogo hablado dentro va en el
-  idioma de salida, marcado como "says in Spanish: ...").
-- `format`, `spoken_line`, `hook_text`, `cta_text` y `caption`: en el
-  **OUTPUT LANGUAGE** del mensaje del usuario (por defecto español de España).
+- `image_prompt` y `animate_prompt`: siempre en **inglés**.
+- `format`, `hook_text`, `cta_text` y `caption`: en el **OUTPUT LANGUAGE** del
+  mensaje del usuario (por defecto español de España). `veo3_prompt` y
+  `spoken_line` van siempre vacíos (`""`).
 
 ## Formato de salida (JSON estricto)
 
@@ -170,10 +158,10 @@ secuencias de 3-4 textos.
       "format": "...",
       "emotion": "...",
       "angle": "...",
-      "veo3_prompt": "...",
-      "image_prompt": "...",
-      "animate_prompt": "...",
-      "spoken_line": "...",
+      "veo3_prompt": "",
+      "image_prompt": "prompt Nano Banana (Paso 1) — SIEMPRE relleno",
+      "animate_prompt": "prompt Kling i2v (Paso 2) — SIEMPRE relleno",
+      "spoken_line": "",
       "hook_text": "...",
       "cta_text": "...",
       "caption": "..."
