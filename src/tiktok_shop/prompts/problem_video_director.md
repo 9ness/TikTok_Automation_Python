@@ -29,10 +29,10 @@ gancho. Cada uno debe **atacar el problema de una MANERA distinta** con un
 formatos DIFERENTES de esta lista (o similares):
 
 1. **Persona a cámara (creador)**: una persona (estilo creador de TikTok) mira a
-   cámara mostrando el problema/reacción. **2 PASOS, imagen→vídeo, SILENCIOSA**
-   (el mensaje va en el texto de pantalla, la persona NO habla).
-2. **Testimonio / persona reaccionando**: alguien muestra el antes/después o su
-   reacción con el producto. **2 PASOS, SILENCIOSA** (texto en pantalla).
+   cámara y CUENTA su experiencia. **2 PASOS, imagen→vídeo, HABLADA** — la
+   persona HABLA en **español de España** (Veo 3.1 genera la voz + lip-sync).
+2. **Testimonio / persona reaccionando**: alguien cuenta su experiencia con el
+   problema y cómo lo resolvió. **2 PASOS, HABLADA** (español de España).
 3. **Dramatización del problema → alivio**: mini-escena de la frustración y luego
    el alivio con el producto, con PERSONA. **2 PASOS, SILENCIOSA** (texto).
 4. **Antes / después (demo de PRODUCTO)**: transformación mostrada en el PRODUCTO
@@ -56,7 +56,13 @@ composición estable.
 - Rellena SIEMPRE `image_prompt` (Paso 1, Nano Banana) + `animate_prompt`
   (Paso 2, Veo 3.1 imagen→vídeo).
 - Deja `veo3_prompt` **SIEMPRE vacío** (`""`). Ya NO usamos texto→vídeo.
-- Todo es **SILENCIOSO**; el gancho va en el texto de pantalla.
+- **HABLADO vs SILENCIOSO:**
+  - Formatos **1 (persona a cámara)** y **2 (testimonio)** → la persona **HABLA
+    en español de España** (Veo 3.1 pone la voz + lip-sync). Rellena
+    `spoken_line` con lo que dice.
+  - Formatos **3, 4, 5, 6** → **SILENCIOSOS** (`spoken_line=""`); el mensaje va
+    en el texto de pantalla.
+- De los 2-3 conceptos, que **AL MENOS 1 HABLE** (formato 1 o 2).
 
 Flujo del operador: en Nano Banana adjunta la foto del PRODUCTO → sale la
 imagen (Paso 1). En Veo 3.1 (imagen→vídeo) usa **solo esa imagen generada** como
@@ -125,19 +131,22 @@ Para cada concepto:
   **Veo 3.1 (imagen→vídeo: la foto de Nano Banana es el primer fotograma)**,
   Paso 2. NO describas el producto (la imagen ya lo carga). Movimiento **MÍNIMO y CONSISTENTE** — es lo que evita los fallos de
   consistencia: nada de cambios bruscos, el producto y la escena NO cambian.
-  - Con persona: **que HAGA algo, no que mire fija** (el operador se queja de
-    "mujer mirando a cámara sin hacer nada"). La persona **enseña/usa el
-    producto de forma ACTIVA**: lo acerca a cámara, lo aplica/toma/muestra, gira
-    el envase para que se vea, gesto natural y expresivo (sonríe, asiente,
-    reacción de sorpresa/alivio), la cámara puede acercarse. Textual: `the person
+  - **Persona que HABLA (formatos 1, 2):** la persona mira a cámara y DICE el
+    `spoken_line` en **español de España**, con lip-sync natural, mientras
+    enseña/usa el producto. Textual, con el diálogo exacto: `the person looks at
+    the camera and speaks in casual natural Spanish from Spain (Castilian Spanish
+    accent, friendly TikTok-creator tone), saying: "<spoken_line>", with natural
+    accurate lip-sync and mouth movement; she/he also shows and uses the product
+    — lifts it toward the camera, turns the label; lively natural gestures and
+    genuine expression; NOT a static stare`.
+  - **Persona que NO habla (formatos 3, 6):** que HAGA algo, no que mire fija (el
+    operador se queja de "mujer mirando sin hacer nada"). Textual: `the person
     ACTIVELY shows and uses the product — lifts it toward the camera, turns it to
-    show the label, applies/takes it, lively natural gestures and a genuine
-    expression (smile / nod / surprise); dynamic engaging movement, NOT a static
-    stare into the camera; the person does NOT speak, mouth stays closed and
-    relaxed, no lip movement`.
-    (Nota: Veo 3.1 i2v genera UN plano continuo desde la foto; no puede hacer
-    varias tomas. Para que sea dinámico, el movimiento y la acción van DENTRO de
-    ese plano — persona activa + leve acercamiento de cámara.)
+    show the label, applies/takes it, lively gestures and a genuine expression;
+    dynamic movement, NOT a static stare; the person does NOT speak, mouth stays
+    closed and relaxed, no lip movement`.
+    (Nota: Veo 3.1 i2v genera UN plano continuo desde la foto; no hace varias
+    tomas. El dinamismo va DENTRO del plano: persona activa + leve push-in.)
   - De producto: la mano aplica/usa el producto, o zoom-in/out suave, o el
     líquido/textura se mueve un poco. Sin manos que aparezcan de la nada.
   - CONSISTENCIA, textual SIEMPRE: `keep the product identical and stable the
@@ -145,8 +154,10 @@ Para cada concepto:
     extra fingers, no flickering; only subtle natural motion; the background
     stays the same; smooth slow handheld movement, sharp deep focus, vertical
     9:16, NO on-screen text, NO captions, NO subtitles, NO logos, NO watermarks`.
-- **spoken_line**: SIEMPRE `""`. Todos los formatos son silenciosos ahora (el
-  mensaje va en el texto de pantalla); nadie habla a cámara.
+- **spoken_line**: para formatos **1 y 2 (hablados)**, la frase EXACTA que dice
+  la persona, en **español de España** — natural, cercana, de creador (no
+  locución de anuncio), corta (1-2 frases), atacando el dolor. Para formatos 3,
+  4, 5, 6 (silenciosos), `""`. El `animate_prompt` debe incluir esta frase textual.
 - **hook_text**: UN SOLO texto gancho para superponer en pantalla (arriba),
   en el idioma de salida. Es la frase que para el scroll atacando el dolor.
   MUY corto y potente, se lee de un vistazo (**máximo 7 palabras**). NO "compra ya".
@@ -171,10 +182,12 @@ secuencias de 3-4 textos.
 
 ## Idioma
 
-- `image_prompt` y `animate_prompt`: siempre en **inglés**.
-- `format`, `hook_text`, `cta_text` y `caption`: en el **OUTPUT LANGUAGE** del
-  mensaje del usuario (por defecto español de España). `veo3_prompt` y
-  `spoken_line` van siempre vacíos (`""`).
+- `image_prompt` y `animate_prompt`: en **inglés** (pero el diálogo `spoken_line`
+  dentro del animate_prompt va en **español de España**, marcado `speaks in
+  Spanish from Spain: "..."`).
+- `format`, `hook_text`, `cta_text`, `caption` y `spoken_line`: en el **OUTPUT
+  LANGUAGE** (por defecto español de España). `veo3_prompt` siempre `""`;
+  `spoken_line` relleno solo en formatos 1 y 2, `""` en el resto.
 
 ## Formato de salida (JSON estricto)
 
