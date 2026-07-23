@@ -56,23 +56,26 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
   de producto / POV manos / antes-después SIN voz protagonista, hazlo
   **SILENCIOSO** (`spoken_line=""`) y el mensaje va en el texto de pantalla.
 
-### 🎬 MODO: versiones vs segmentos (por PLANOS/cortes o duración)
+### 🎬 MODO: un clip (con cortes internos) vs varios clips (troceado)
 
-Veo 3.1 (imagen→vídeo) genera clips de **~8 segundos** y **UN solo plano continuo**
-por clip. Intentar meter varios ángulos o una rotación de 90° en UN clip rompe la
-consistencia (el móvil "flota", aparece otra mano, la persona muta). Por eso:
+Veo 3.1 (imagen→vídeo) genera **UN clip de hasta ~10s**, y **SÍ sabe hacer CORTES
+duros a otro plano/ángulo DENTRO del mismo clip**. Lo que rompe la consistencia
+(móvil "flotando", otra mano, morphing) NO es el corte, sino intentar una
+**rotación CONTINUA** de la cámara/cuerpo. Regla: para cambiar de ángulo usa un
+**CORTE LIMPIO**, nunca una rotación/morph.
 
-**ELIGE TÚ el modo** (el mensaje de usuario te da la duración y el cap de segmentos):
+**ELIGE TÚ el modo** (el mensaje de usuario te da la duración y el cap):
 
-- **MODE: segments** si el viral tiene **MÁS DE UN PLANO/ángulo (cortes)** —
-  aunque sea corto — **O** dura más que un clip (~8s). Cada plano del original se
-  replica como **UN segmento = UN clip** con su corte, y al unirlos reproduces el
-  vídeo con SUS mismos cortes.
-- **MODE: versions** solo si es **un único plano continuo y corto**. Entonces
-  genera N versiones A/B (1 clip cada una), `segments: []`.
+- **MODE: versions** si el vídeo **CABE en una generación (≤ ~10s)** — aunque
+  tenga varios planos. Genera N versiones A/B, cada una **UN solo clip**,
+  `segments: []`. Si el original cambia de ángulo, reprodúcelo como **CORTE DURO
+  descrito DENTRO del `animate_prompt`** (ver sección animate), no como rotación.
+- **MODE: segments** SOLO si el vídeo es **demasiado largo para un clip (> ~10s)**.
+  Entonces trocéalo: **1 segmento por plano** (o por tramo de ~8s), y al unirlos
+  reproduces el vídeo con SUS cortes. Devuelve **1 solo objeto** en `videos` con su
+  array `segments` (máx el cap que te den).
 
-Pon `"mode"` en la salida con tu decisión. En segmentos, devuelve **1 solo objeto**
-en `videos` con su array `segments` (máx el cap que te den).
+Pon `"mode"` en la salida con tu decisión.
 
 #### Cada segmento: CORTE (foto nueva) o CONTINUACIÓN (extiende)
 
@@ -166,6 +169,16 @@ es solo la plantilla de estructura; el producto es el del operador).
 NO describas el producto (la imagen ya lo carga). Movimiento **MÍNIMO y
 CONSISTENTE**. Replica el MOVIMIENTO/acción del viral (si en el viral la persona
 enseña y habla, o una mano aplica el producto, o hay un antes/después, reprodúcelo).
+
+- **CAMBIOS DE ÁNGULO/PLANO en un solo clip (modo versions):** si el original
+  cambia de ángulo, descríbelo como un **CORTE DURO** dentro del clip, no como una
+  rotación. Textual, adaptado al vídeo: `the clip has clean HARD CUTS between
+  shots, like a real TikTok edit: shot 1 <front view ...>, then a HARD CUT to shot
+  2 <side-profile view of the SAME person, same face and same outfit ...>, then a
+  HARD CUT to shot 3 <close-up of the product ...>; each shot is static and
+  stable; NO continuous camera rotation, NO spinning, NO morphing between shots —
+  only clean instant cuts; the person and outfit stay IDENTICAL across every cut`.
+  Reproduce el MISMO número y orden de cortes que el original.
 
 - **Persona que HABLA:** `the person looks at the camera and speaks in casual
   natural Spanish from Spain (Castilian Spanish accent, friendly TikTok-creator

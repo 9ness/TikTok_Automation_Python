@@ -710,7 +710,6 @@ def replicate_viral_2step(
     # Aquí solo calculamos el CAP de segmentos; el modo real sale de la respuesta.
     import math
     _CLIP_S = 8.0
-    duration_long = duration_s > 10.0
     max_segments = min(5, max(2, math.ceil(duration_s / _CLIP_S) + 1))
     log_callback(
         f"🎬 Duración {duration_s:.1f}s → Gemini decide modo "
@@ -818,18 +817,21 @@ def replicate_viral_2step(
             "GOOGLE_GEMINI_KEY_PAID en .env para usar replicar viral."
         )
     system_prompt = load_system_prompt("viral_replica_director.md")
+    fits_one_clip = duration_s <= 10.0
     mode_line = (
-        f"DECIDE MODE yourself and set `mode` in the output:\n"
-        f"- Use MODE: segments if the viral has MORE THAN ONE distinct shot/angle "
-        f"(cuts) — even if short — OR is longer than ~8s. Return EXACTLY 1 object "
-        f"in `videos` with a `segments` array (max {max_segments} segments): one "
-        f"segment per shot with transition=\"cut\" (its own image_prompt, same "
-        f"person across shots); use transition=\"continue\" only to extend a single "
-        f"long shot past 8s. Replicate the SAME cuts as the original — never merge "
-        f"several angles into one continuous rotation.\n"
-        f"- Use MODE: versions ONLY if the viral is a SINGLE continuous short shot: "
-        f"then generate {n} A/B version(s), each one ~8s clip with `segments: []`.\n"
-        f"(Duration is {duration_s:.1f}s; {'looks long' if duration_long else 'short'}.)\n"
+        f"DECIDE MODE yourself and set `mode` in the output. Veo 3.1 makes ONE clip "
+        f"of up to ~10s, and it CAN do hard cuts to new shots/angles INSIDE a single "
+        f"clip.\n"
+        f"- The viral is {duration_s:.1f}s → it {'FITS in one Veo generation' if fits_one_clip else 'is TOO LONG for one Veo generation'}.\n"
+        f"- If it FITS (<=~10s): use MODE: versions and generate {n} A/B version(s), "
+        f"each ONE clip, `segments: []`. If the original has camera-angle changes/cuts, "
+        f"reproduce them as HARD CUTS described INSIDE the single animate_prompt "
+        f"(e.g. 'front shot ... then a clean hard cut to a side-profile shot of the "
+        f"SAME person and outfit ...') — NOT a continuous rotation or morph.\n"
+        f"- Only if it is TOO LONG (> ~10s): use MODE: segments (max {max_segments} "
+        f"segments), one segment per shot with transition=\"cut\" (its own image_prompt, "
+        f"same person across shots) or transition=\"continue\" to extend a long shot. "
+        f"Replicate the SAME cuts as the original.\n"
     )
     user_msg = (
         f"OUTPUT LANGUAGE: {lang_label}\n"
