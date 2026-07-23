@@ -176,6 +176,7 @@ export interface Product {
     caption: string;
     ready_video?: string;
     segments?: {
+      transition?: string;
       is_extend: boolean;
       label: string;
       image_prompt: string;

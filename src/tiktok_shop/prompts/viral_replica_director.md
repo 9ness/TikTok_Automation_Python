@@ -25,6 +25,9 @@ vende**. Sé concreto y accionable (no genérico):
    creíble.
 6. **structure** — la ESTRUCTURA replicable en 1 frase (p. ej. "gancho de dolor →
    demo en uso 5s → resultado → CTA carrito").
+7. **shots** — cuenta los **PLANOS/ángulos distintos separados por CORTES** (p. ej.
+   "3 planos: frontal, lateral, primer plano del detalle"). Es CLAVE: muchos
+   virales cambian de ángulo con CORTES, no con una rotación continua.
 
 ## Paso 2 — Replica esa fórmula para el PRODUCTO del operador
 
@@ -53,39 +56,63 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
   de producto / POV manos / antes-después SIN voz protagonista, hazlo
   **SILENCIOSO** (`spoken_line=""`) y el mensaje va en el texto de pantalla.
 
-### 🎬 MODO por duración — el mensaje de usuario te indica MODE + k
+### 🎬 MODO: versiones vs segmentos (por PLANOS/cortes o duración)
 
-Veo 3.1 (imagen→vídeo) genera clips de **~8 segundos**. Por eso hay dos modos, y
-el mensaje de usuario te dice cuál usar:
+Veo 3.1 (imagen→vídeo) genera clips de **~8 segundos** y **UN solo plano continuo**
+por clip. Intentar meter varios ángulos o una rotación de 90° en UN clip rompe la
+consistencia (el móvil "flota", aparece otra mano, la persona muta). Por eso:
 
-- **MODE: versions** (viral corto, ≤10s) → genera N **versiones independientes**
-  (conceptos alternativos para A/B). Cada versión es UN clip: `image_prompt` +
-  `animate_prompt` a nivel de la versión, y `segments` vacío (`[]`).
+**ELIGE TÚ el modo** (el mensaje de usuario te da la duración y el cap de segmentos):
 
-- **MODE: segments, k=<N>** (viral largo, >10s) → genera **UNA sola réplica FIEL**
-  troceada en **k segmentos ENCADENADOS** de ~8s que, unidos, reproducen el
-  vídeo entero. Devuelve EXACTAMENTE 1 objeto en `videos`, con su array
-  `segments` de longitud k:
-  - **Segmento 1** (`is_extend=false`): `image_prompt` relleno (foto Nano Banana
-    de la persona/escena, con TODOS los anchors de realismo). `animate_prompt`
-    anima esa foto y dice la **parte 1** del guion.
-  - **Segmentos 2..k** (`is_extend=true`): `image_prompt = ""`. NO se genera foto
-    nueva — el operador **extiende desde el ÚLTIMO fotograma del clip anterior**
-    (función "extend" de Veo/Flow) para MANTENER LA MISMA PERSONA Y ESCENA. El
-    `animate_prompt` describe SOLO la continuación (la persona sigue hablando y
-    diciendo la **parte i** del guion, con lip-sync; misma persona, mismo fondo,
-    sin cortes). Textual al inicio: `continue seamlessly from the previous clip's
-    last frame — SAME person, same face, same clothes, same background, no cut,
-    no change of scene`.
-  - **Parte el `spoken_line` en k trozos** (uno por segmento), en orden, cubriendo
-    todo el guion del viral. Cada segmento lleva SU trozo en su `spoken_line` y
-    dentro de su `animate_prompt`.
-  - `hook_text`/`cta_text`/`caption` van a nivel de la RÉPLICA (una vez), no por
-    segmento. El gancho en pantalla aparece al principio; el CTA al final.
+- **MODE: segments** si el viral tiene **MÁS DE UN PLANO/ángulo (cortes)** —
+  aunque sea corto — **O** dura más que un clip (~8s). Cada plano del original se
+  replica como **UN segmento = UN clip** con su corte, y al unirlos reproduces el
+  vídeo con SUS mismos cortes.
+- **MODE: versions** solo si es **un único plano continuo y corto**. Entonces
+  genera N versiones A/B (1 clip cada una), `segments: []`.
+
+Pon `"mode"` en la salida con tu decisión. En segmentos, devuelve **1 solo objeto**
+en `videos` con su array `segments` (máx el cap que te den).
+
+#### Cada segmento: CORTE (foto nueva) o CONTINUACIÓN (extiende)
+
+Cada segmento lleva un campo **`transition`**:
+
+- **`"cut"`** = plano/ángulo NUEVO (hay un CORTE respecto al anterior). Lleva su
+  **propio `image_prompt`** (foto Nano Banana de ESE plano) e `is_extend=false`.
+  - El **primer** segmento es siempre `"cut"` (plano de apertura).
+  - Para un corte que muestra a la **MISMA persona desde otro ángulo** (p. ej.
+    frontal → lateral), el `image_prompt` DEBE fijar que es la MISMA persona:
+    `the SAME person as before — identical face, hair, body and the SAME outfit/
+    product — just shown from a different camera angle/pose (e.g. side profile);
+    keep them consistent, only the angle changes`. Así el parecido se mantiene
+    entre planos. El operador genera esta foto en Nano Banana usando la imagen
+    anterior como referencia de la persona.
+- **`"continue"`** = MISMO plano que sigue (para alargar un plano largo >8s).
+  `image_prompt=""`, `is_extend=true`. El operador **extiende desde el ÚLTIMO
+  fotograma del clip anterior** (Veo/Flow "extend"). Textual al inicio del
+  `animate_prompt`: `continue seamlessly from the previous clip's last frame —
+  SAME person, same face, same clothes, same background, no cut`.
+
+**Replica los CORTES del original:** usa tantos segmentos `"cut"` como planos
+tenga el viral, en el mismo orden (frontal, lateral, primer plano del detalle…).
+NO conviertas varios ángulos en una sola rotación continua.
+
+#### Consistencia dentro de cada clip (anti-morph) — OBLIGATORIO
+
+Como cada clip es UN plano, el movimiento dentro debe ser **MÍNIMO**. En CADA
+`animate_prompt` incluye textual: `MINIMAL motion within the shot — the person
+does NOT spin or rotate their body; the pose stays stable; the phone/hand keeps a
+firm steady grip and NEVER floats, never detaches, no second hand or extra arm or
+extra fingers appear; no morphing or warping of the phone, hands or product;
+change of angle happens ONLY at the cut between clips, never inside a clip`.
+
+- **Reparte el `spoken_line`** (si es hablado) en trozos por segmento, en orden.
+- `hook_text`/`cta_text`/`caption` van a nivel de la RÉPLICA (una vez): el gancho
+  aparece al principio, el CTA al final.
 
 En AMBOS modos, cada `image_prompt` presente lleva los anchors completos de
-producto + realismo de abajo. En segmentos, el producto debe salir de forma
-consistente en TODA la secuencia.
+producto + realismo de abajo, y la persona debe salir IDÉNTICA en todos los planos.
 
 ### Anclaje del PRODUCTO (crítico)
 
@@ -152,11 +179,15 @@ enseña y habla, o una mano aplica el producto, o hay un antes/después, reprod�
   the person does NOT speak, mouth stays closed and relaxed, no lip movement`.
 - **De producto:** la mano aplica/usa el producto, o zoom-in/out suave, o la
   textura/líquido se mueve un poco. Sin manos que aparezcan de la nada.
-- CONSISTENCIA, textual SIEMPRE: `keep the product identical and stable the whole
-  clip — same shape, color, label and text, no morphing, no warping, no extra
-  fingers, no flickering; only subtle natural motion; the background stays the
-  same; smooth slow handheld movement, sharp deep focus, vertical 9:16, NO
-  on-screen text, NO captions, NO subtitles, NO logos, NO watermarks`.
+- CONSISTENCIA + ANTI-MORPH, textual SIEMPRE: `keep the product AND the person
+  identical and stable the whole clip — same face, same shape, color, label and
+  text, no morphing, no warping, no extra fingers, no extra hands or arms, no
+  flickering; the person does NOT spin or rotate the body; any phone/hand keeps a
+  firm steady grip and never floats or detaches; only subtle natural motion; the
+  background stays the same; smooth slow handheld movement, sharp deep focus,
+  vertical 9:16, NO on-screen text, NO captions, NO subtitles, NO logos, NO
+  watermarks`. (El cambio de ángulo se hace con un CORTE entre clips, nunca
+  rotando dentro del clip.)
 
 ### Textos y voz de cada versión
 
@@ -191,7 +222,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
   "mode": "versions",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
-    "why_sells": "...", "visual_style": "...", "structure": "..."
+    "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo"
   },
   "videos": [
     {
@@ -219,13 +250,13 @@ van vacíos (todo va en `segments`):
 ```json
 {
   "mode": "segments",
-  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "..." },
+  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle" },
   "videos": [
     {
       "concept": "...",
       "format": "...",
       "emotion": "...",
-      "angle": "cómo la secuencia replica el viral entero",
+      "angle": "cómo la secuencia replica el viral entero (con sus mismos cortes)",
       "veo3_prompt": "",
       "image_prompt": "",
       "animate_prompt": "",
@@ -235,17 +266,19 @@ van vacíos (todo va en `segments`):
       "caption": "...",
       "segments": [
         {
+          "transition": "cut",
           "is_extend": false,
-          "label": "Trozo 1",
-          "image_prompt": "prompt Nano Banana del segmento 1 — en inglés, con anchors",
-          "animate_prompt": "Veo 3.1 i2v del segmento 1, dice la parte 1 — en inglés",
+          "label": "Plano 1 — frontal",
+          "image_prompt": "Nano Banana del plano 1 (frontal) — inglés, con anchors + anti-morph",
+          "animate_prompt": "Veo 3.1 i2v plano 1: movimiento MÍNIMO, sin rotar; dice la parte 1 — inglés",
           "spoken_line": "parte 1 del guion (español de España)"
         },
         {
-          "is_extend": true,
-          "label": "Trozo 2",
-          "image_prompt": "",
-          "animate_prompt": "continue from previous last frame... dice la parte 2 — inglés",
+          "transition": "cut",
+          "is_extend": false,
+          "label": "Plano 2 — lateral (CORTE, misma persona)",
+          "image_prompt": "Nano Banana del plano 2: SAME person/face/outfit, side profile — inglés",
+          "animate_prompt": "Veo 3.1 i2v plano 2: movimiento MÍNIMO; dice la parte 2 — inglés",
           "spoken_line": "parte 2 del guion (español de España)"
         }
       ]
@@ -254,6 +287,8 @@ van vacíos (todo va en `segments`):
 }
 ```
 
-Devuelve SOLO el JSON, respetando el MODE que te indique el mensaje de usuario.
-En **versions**, la versión 1 es la réplica fiel y las extra son variaciones. En
-**segments**, devuelve UN solo objeto con k segmentos que cubran el vídeo entero.
+Devuelve SOLO el JSON con tu decisión de `mode`. Si el viral tiene varios
+PLANOS/cortes (aunque sea corto) o dura más de ~8s → **segments** (1 segmento por
+plano, `transition:"cut"`; usa `"continue"` solo para alargar un mismo plano
+largo). Si es un plano continuo corto → **versions**. Réplica los MISMOS cortes
+del original; nunca conviertas varios ángulos en una rotación continua.

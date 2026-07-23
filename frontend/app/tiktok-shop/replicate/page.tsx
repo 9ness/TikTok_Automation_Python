@@ -411,35 +411,42 @@ export default function ReplicatePage() {
                 {v.segments && v.segments.length > 0 ? (
                   <>
                     <p className="mb-1.5 rounded bg-muted/50 p-1.5 text-[10px] text-muted-foreground">
-                      🎬 Vídeo largo troceado en <b>{v.segments.length} clips de ~8s encadenados</b>.
-                      Genera el trozo 1 con Nano Banana → Veo 3.1. Los siguientes:
-                      en Veo/Flow pulsa <b>&quot;Extender&quot;</b> desde el último fotograma del clip
-                      anterior (no generes foto nueva → misma persona). Une los clips y súbelo aquí.
+                      🎬 El vídeo se replica <b>plano a plano ({v.segments.length} clips)</b>, con
+                      sus mismos <b>cortes</b> (así se mantiene la consistencia — nada de rotar en
+                      un solo clip). <b>✂️ Corte</b> = genera una foto nueva del plano
+                      (misma persona) → Veo 3.1. <b>↪️ Continúa</b> = en Veo/Flow pulsa
+                      <b> &quot;Extender&quot;</b> desde el último fotograma. Une los clips con corte y súbelo aquí.
                     </p>
                     <div className="space-y-1.5">
-                      {v.segments.map((s, si) => (
-                        <div key={si} className="rounded border border-border/50 p-1.5">
-                          <div className="mb-1 text-[11px] font-medium">
-                            {s.is_extend ? "↪️" : "🎬"} {s.label}
-                            {s.is_extend && (
+                      {v.segments.map((s, si) => {
+                        const isCut = !s.is_extend;
+                        const isNewAngleCut = isCut && si > 0;
+                        return (
+                          <div key={si} className="rounded border border-border/50 p-1.5">
+                            <div className="mb-1 text-[11px] font-medium">
+                              {s.is_extend ? "↪️" : isNewAngleCut ? "✂️" : "🎬"} {s.label}
                               <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                                (extiende desde el clip anterior)
+                                {s.is_extend
+                                  ? "(extiende desde el clip anterior)"
+                                  : isNewAngleCut
+                                    ? "(corte: foto nueva del ángulo, MISMA persona → usa la foto anterior como referencia)"
+                                    : "(plano de apertura)"}
                               </span>
-                            )}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {s.is_extend ? (
+                                <CopyChip label="🎬 Animar (extender)" text={s.animate_prompt} primary />
+                              ) : (
+                                <>
+                                  <CopyChip label={isNewAngleCut ? "🖼️ Foto (nuevo ángulo)" : "🖼️ Paso 1 imagen"} text={s.image_prompt} primary />
+                                  <CopyChip label="🎬 Paso 2 animar" text={s.animate_prompt} primary />
+                                </>
+                              )}
+                              {s.spoken_line && <CopyChip label="🗣️ Voz (este plano)" text={s.spoken_line} />}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {s.is_extend ? (
-                              <CopyChip label="🎬 Animar (extender)" text={s.animate_prompt} primary />
-                            ) : (
-                              <>
-                                <CopyChip label="🖼️ Paso 1 imagen" text={s.image_prompt} primary />
-                                <CopyChip label="🎬 Paso 2 animar" text={s.animate_prompt} primary />
-                              </>
-                            )}
-                            {s.spoken_line && <CopyChip label="🗣️ Voz (este trozo)" text={s.spoken_line} />}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <CopyChip label="📌 Gancho" text={v.hook_text} />

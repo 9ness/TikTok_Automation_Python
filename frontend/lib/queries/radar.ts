@@ -332,6 +332,8 @@ export function useAddBatch() {
 }
 
 export interface ReplicaSegment {
+  /** "cut" = plano nuevo (foto propia) · "continue" = extiende del clip anterior. */
+  transition?: string;
   is_extend: boolean;
   label: string;
   image_prompt: string;
