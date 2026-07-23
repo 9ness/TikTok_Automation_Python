@@ -1094,6 +1094,7 @@ async def replica_generate(
     ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
     video_path = os.path.join(tmp, f"viral{ext}")
     ref_path = None
+    thumb_name = ""  # foto de referencia persistida (miniatura del historial)
     try:
         with open(video_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -1102,6 +1103,10 @@ async def replica_generate(
             ref_path = os.path.join(tmp, f"ref{rext}")
             with open(ref_path, "wb") as f:
                 shutil.copyfileobj(reference_photo.file, f)
+            # Copia PERSISTENTE (sobrevive al borrado del tmp) para la miniatura.
+            from src.api.temp_storage import upload_subdir
+            thumb_name = f"{uuid.uuid4().hex[:16]}{rext}"
+            shutil.copyfile(ref_path, os.path.join(str(upload_subdir("replica_thumbs")), thumb_name))
     except Exception as e:
         return {"ok": False, "message": f"Error guardando el vídeo: {e}"}
 
@@ -1142,9 +1147,11 @@ async def replica_generate(
         from src.tiktok_shop.repos import ReplicaRepo
         why = res.get("why_viral", {}) or {}
         first = res["videos"][0] if res["videos"] else {}
-        title = (why.get("hook") or first.get("concept") or "Réplica viral")[:80]
+        product_name = str(res.get("product_name") or "").strip()
+        title = (product_name or why.get("hook") or first.get("concept") or "Réplica viral")[:80]
         session = ReplicaSession(
-            title=title, mode=res.get("mode", "versions"), language=language,
+            title=title, product_name=product_name, thumb=thumb_name,
+            mode=res.get("mode", "versions"), language=language,
             duration_s=float(res.get("duration_s", 0.0) or 0.0),
             used_reference_photo=bool(res.get("used_reference_photo", False)),
             same_product=same_product, why_viral=why, videos=res["videos"],
@@ -1154,6 +1161,8 @@ async def replica_generate(
             replica_id = session.id
         except Exception as e:
             print(f"[replica_generate] no pude guardar sesión: {e}")
+
+    res["has_thumb"] = bool(thumb_name)
 
     return {"ok": True, "replica_id": replica_id, **res}
 
@@ -1241,7 +1250,8 @@ def replica_list(operator: Annotated[str, Depends(get_current_user)]) -> dict:
     for s in ReplicaRepo().list_all():
         n_ready = sum(1 for v in s.videos if (v or {}).get("ready_token"))
         items.append({
-            "id": s.id, "title": s.title, "mode": s.mode,
+            "id": s.id, "title": s.title, "product_name": s.product_name,
+            "has_thumb": bool(s.thumb), "mode": s.mode,
             "n_versions": len(s.videos), "n_ready": n_ready,
             "duration_s": s.duration_s, "created_at": s.created_at,
         })
@@ -1260,10 +1270,39 @@ def replica_get(
     if s is None:
         return {"ok": False, "message": "Réplica no encontrada."}
     return {
-        "ok": True, "replica_id": s.id, "title": s.title, "mode": s.mode,
+        "ok": True, "replica_id": s.id, "title": s.title,
+        "product_name": s.product_name, "has_thumb": bool(s.thumb), "mode": s.mode,
         "why_viral": s.why_viral, "videos": s.videos, "language": s.language,
         "duration_s": s.duration_s, "used_reference_photo": s.used_reference_photo,
     }
+
+
+@router.get("/videos/replica/thumb")
+def replica_thumb(
+    replica_id: str,
+    api_key: Annotated[str | None, Query()] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+):
+    """Sirve la foto de referencia (miniatura) de una réplica. Auth por query
+    `api_key` (va en un <img src>)."""
+    from fastapi import HTTPException
+
+    from src.api.config import get_settings
+    from src.api.temp_storage import upload_subdir
+    from src.tiktok_shop.repos import ReplicaRepo
+
+    settings = get_settings()
+    if settings.api_key:
+        provided = x_api_key or api_key
+        if not provided or provided != settings.api_key:
+            raise HTTPException(status_code=401, detail="API key inválida o ausente.")
+    s = ReplicaRepo().get(replica_id)
+    if s is None or not s.thumb:
+        raise HTTPException(status_code=404, detail="Sin miniatura.")
+    path = os.path.join(str(upload_subdir("replica_thumbs")), s.thumb)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Sin miniatura.")
+    return FileResponse(path)
 
 
 @router.delete("/videos/replica/delete")
@@ -1271,10 +1310,18 @@ def replica_delete(
     replica_id: str,
     operator: Annotated[str, Depends(get_current_user)],
 ) -> dict:
-    """Borra una réplica guardada del historial."""
+    """Borra una réplica guardada del historial (y su miniatura)."""
+    from src.api.temp_storage import upload_subdir
     from src.tiktok_shop.repos import ReplicaRepo
 
-    return {"ok": ReplicaRepo().delete(replica_id)}
+    repo = ReplicaRepo()
+    s = repo.get(replica_id)
+    if s and s.thumb:
+        try:
+            os.remove(os.path.join(str(upload_subdir("replica_thumbs")), s.thumb))
+        except OSError:
+            pass
+    return {"ok": repo.delete(replica_id)}
 
 
 class ReplicaTokenRequest(BaseModel):

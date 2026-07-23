@@ -38,17 +38,25 @@ interface ReplicaResult {
   videos: ProblemVideo[];
   why: WhyViral;
   mode: string;
+  productName: string;
+  hasThumb: boolean;
 }
 
 interface HistoryItem {
   id: string;
   title: string;
+  product_name?: string;
+  has_thumb?: boolean;
   mode: string;
   n_versions: number;
   n_ready: number;
   duration_s: number;
   created_at: string;
 }
+
+const thumbUrl = (id: string) =>
+  `${apiBase}/api/v1/tiktok-shop/radar/videos/replica/thumb?replica_id=${id}` +
+  (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
 
 async function apiFetch(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
@@ -123,7 +131,10 @@ export default function ReplicatePage() {
   const loadSession = async (id: string) => {
     const d = await apiFetch(`/api/v1/tiktok-shop/radar/videos/replica/get?replica_id=${id}`);
     if (d.ok) {
-      setResult({ videos: d.videos ?? [], why: d.why_viral ?? {}, mode: d.mode ?? "versions" });
+      setResult({
+        videos: d.videos ?? [], why: d.why_viral ?? {}, mode: d.mode ?? "versions",
+        productName: d.product_name ?? "", hasThumb: !!d.has_thumb,
+      });
       setReplicaId(id);
       seedTokens(d.videos ?? []);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -169,7 +180,10 @@ export default function ReplicatePage() {
       });
       const data = await res.json();
       if (data.ok && data.videos?.length) {
-        setResult({ videos: data.videos, why: data.why_viral ?? {}, mode: data.mode ?? "versions" });
+        setResult({
+          videos: data.videos, why: data.why_viral ?? {}, mode: data.mode ?? "versions",
+          productName: data.product_name ?? "", hasThumb: !!data.has_thumb,
+        });
         setReplicaId(data.replica_id ?? null);
         toast.success(`${data.videos.length} ${data.mode === "segments" ? "réplica (troceada)" : "versión(es)"} lista(s) · guardada`);
         loadHistory();
@@ -346,6 +360,20 @@ export default function ReplicatePage() {
         </p>
       </div>
 
+      {/* Cabecera del resultado: producto + miniatura */}
+      {result && (result.productName || result.hasThumb) && (
+        <div className="flex items-center gap-3 rounded-lg border border-orange-500/40 bg-orange-500/5 p-2.5">
+          {result.hasThumb && replicaId && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbUrl(replicaId)} alt="" className="h-14 w-14 shrink-0 rounded-md border border-border object-cover" />
+          )}
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Producto</div>
+            <div className="truncate text-sm font-semibold">{result.productName || "(sin nombre)"}</div>
+          </div>
+        </div>
+      )}
+
       {/* Por qué viraliza */}
       {(why.hook || why.structure) && (
         <div className="space-y-1.5 rounded-lg border border-border p-3">
@@ -494,13 +522,21 @@ export default function ReplicatePage() {
                   (replicaId === h.id ? "border-orange-500/60 bg-orange-500/5" : "border-border/60")
                 }
               >
-                <button onClick={() => loadSession(h.id)} className="min-w-0 flex-1 text-left">
-                  <div className="truncate font-medium">{h.title}</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {h.mode === "segments" ? "🎬 troceada" : `${h.n_versions} versión(es)`}
-                    {" · "}{Math.round(h.duration_s)}s
-                    {h.n_ready > 0 && <span className="text-green-600"> · {h.n_ready} listo(s) ✅</span>}
-                    {" · "}{new Date(h.created_at).toLocaleDateString()}
+                <button onClick={() => loadSession(h.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                  {h.has_thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumbUrl(h.id)} alt="" className="h-10 w-10 shrink-0 rounded border border-border object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-border text-muted-foreground">🎬</div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{h.product_name || h.title}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {h.mode === "segments" ? "🎬 troceada" : `${h.n_versions} versión(es)`}
+                      {" · "}{Math.round(h.duration_s)}s
+                      {h.n_ready > 0 && <span className="text-green-600"> · {h.n_ready} listo(s) ✅</span>}
+                      {" · "}{new Date(h.created_at).toLocaleDateString()}
+                    </div>
                   </div>
                 </button>
                 <button

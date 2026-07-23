@@ -903,6 +903,7 @@ def replicate_viral_2step(
     return {
         "ok": True,
         "why_viral": why_viral,
+        "product_name": _safe_str(raw.get("product_name"), ""),
         "videos": videos,
         "mode": "segments" if segment_mode else "versions",
         "n_segments": n_segments,

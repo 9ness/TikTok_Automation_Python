@@ -261,6 +261,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
 ```json
 {
   "mode": "versions",
+  "product_name": "nombre corto del producto (identifícalo por la foto + frames), máx ~6 palabras, en el idioma de salida",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
     "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only"
@@ -291,6 +292,7 @@ van vacíos (todo va en `segments`):
 ```json
 {
   "mode": "segments",
+  "product_name": "nombre corto del producto (máx ~6 palabras, idioma de salida)",
   "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face" },
   "videos": [
     {

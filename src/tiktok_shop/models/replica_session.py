@@ -27,6 +27,8 @@ def _now_iso() -> str:
 class ReplicaSession(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     title: str = ""                       # derivado del gancho / concepto
+    product_name: str = ""                # nombre del producto (IA lo identifica)
+    thumb: str = ""                       # filename de la foto de referencia subida
     mode: str = "versions"                # "versions" | "segments"
     language: str = "es"
     duration_s: float = 0.0
