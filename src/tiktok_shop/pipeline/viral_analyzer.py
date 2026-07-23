@@ -858,6 +858,10 @@ def replicate_viral_2step(
     if not isinstance(raw, dict):
         raw = {}
     why_viral = raw.get("why_viral") if isinstance(raw.get("why_viral"), dict) else {}
+    # Género elegido por Gemini → dentro de why_viral para guardarlo/mostrarlo.
+    pg = _safe_str(raw.get("person_gender"), "")
+    if pg and "person_gender" not in why_viral:
+        why_viral["person_gender"] = pg
     videos_raw = raw.get("videos") if isinstance(raw.get("videos"), list) else []
     # El modo REAL lo decidió Gemini: por el campo `mode` o porque devolvió
     # segmentos en el primer objeto.

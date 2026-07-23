@@ -36,6 +36,10 @@ vende**. Sé concreto y accionable (no genérico):
      la cabeza, como un mirror selfie de ropa sin cara).
    - `"face"` = se ve la CARA de una persona.
    Esto MANDA sobre el formato (ver regla crítica abajo).
+9. **person_gender** — si hay persona o voz, su género: `"male"` o `"female"`
+   (elige uno; si el original no lo deja claro, decide el que mejor pegue al
+   producto/público). `"none"` solo si NO hay persona NI voz. Este género será
+   el MISMO en TODAS las versiones/segmentos (persona visible Y voz).
 
 ## Paso 2 — Replica esa fórmula para el PRODUCTO del operador
 
@@ -78,6 +82,18 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
   cuadro** (con el producto). NUNCA una foto SOLO del producto y luego una persona
   metida en el `animate_prompt` — Veo se inventaría una persona **distinta en cada
   clip**. La persona del vídeo = la persona de la foto, idéntica en todos los clips.
+- **🚨 REGLA CRÍTICA 3 — EL ANIMATE NO INTRODUCE PERSONAS QUE NO ESTÉN EN LA FOTO.**
+  El `animate_prompt` solo mueve lo que YA está en la foto. Si es POV/manos o sin
+  persona, la animación **NO puede hacer aparecer una persona/cara/cuerpo**.
+  Textual en esos casos: `do NOT introduce or reveal any person, face or body that
+  is not already visible in the first frame; only the hands/product already in the
+  photo move`. (Fallo del operador: fotos POV de manos → el vídeo metía una persona.)
+- **🚨 REGLA CRÍTICA 4 — GÉNERO FIJO (`person_gender`) EN TODOS LOS PROMPTS.** Elige
+  UN solo género para toda la réplica y repítelo **explícito** en CADA `image_prompt`
+  y CADA `animate_prompt` (y en la voz si habla): `a young MAN around 28-32` o
+  `a young WOMAN around 28-32`, y voz `male/female Spanish voice`. Así NO sale un
+  hombre en una versión y una mujer en otra. (Si `person_gender` es `"none"`, no
+  hay persona visible ni voz → ignora esta regla.)
 - **HABLADO vs SILENCIOSO:** si el viral original tiene una persona HABLANDO a
   cámara (o testimonio), replica eso → la persona **HABLA en español de España**
   (Veo 3.1 pone voz + lip-sync) y rellenas `spoken_line`. Si el viral es una demo
@@ -198,6 +214,11 @@ NO describas el producto (la imagen ya lo carga). Movimiento **MÍNIMO y
 CONSISTENTE**. Replica el MOVIMIENTO/acción del viral (si en el viral la persona
 enseña y habla, o una mano aplica el producto, o hay un antes/después, reprodúcelo).
 
+**ANTES DE NADA (reglas críticas 3 y 4):** el animate respeta `human_presence`
+(POV/manos o sin persona → NO aparece ninguna persona/cara que no esté ya en la
+foto) y repite el `person_gender` explícito (`young man`/`young woman ~30`) para
+que el género no cambie entre vídeos.
+
 - **CAMBIOS DE ÁNGULO/PLANO en un solo clip (modo versions):** si el original
   cambia de ángulo, descríbelo como un **CORTE DURO** dentro del clip, no como una
   rotación. Textual, adaptado al vídeo: `the clip has clean HARD CUTS between
@@ -262,6 +283,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
 {
   "mode": "versions",
   "product_name": "nombre corto del producto (identifícalo por la foto + frames), máx ~6 palabras, en el idioma de salida",
+  "person_gender": "male | female | none (el MISMO en todas las versiones)",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
     "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only"
@@ -293,6 +315,7 @@ van vacíos (todo va en `segments`):
 {
   "mode": "segments",
   "product_name": "nombre corto del producto (máx ~6 palabras, idioma de salida)",
+  "person_gender": "male | female | none (el MISMO en todos los segmentos)",
   "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face" },
   "videos": [
     {
