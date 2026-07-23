@@ -331,6 +331,14 @@ export function useAddBatch() {
   });
 }
 
+export interface ReplicaSegment {
+  is_extend: boolean;
+  label: string;
+  image_prompt: string;
+  animate_prompt: string;
+  spoken_line: string;
+}
+
 export interface ProblemVideo {
   concept: string;
   format: string;
@@ -344,6 +352,8 @@ export interface ProblemVideo {
   cta_text: string;
   caption: string;
   ready_video?: string;
+  /** Modo réplica larga: trozos encadenados de ~8s (solo "Replicar viral"). */
+  segments?: ReplicaSegment[];
 }
 
 export function useProblemVideos() {

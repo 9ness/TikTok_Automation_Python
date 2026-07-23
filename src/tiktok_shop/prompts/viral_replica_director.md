@@ -53,6 +53,40 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
   de producto / POV manos / antes-después SIN voz protagonista, hazlo
   **SILENCIOSO** (`spoken_line=""`) y el mensaje va en el texto de pantalla.
 
+### 🎬 MODO por duración — el mensaje de usuario te indica MODE + k
+
+Veo 3.1 (imagen→vídeo) genera clips de **~8 segundos**. Por eso hay dos modos, y
+el mensaje de usuario te dice cuál usar:
+
+- **MODE: versions** (viral corto, ≤10s) → genera N **versiones independientes**
+  (conceptos alternativos para A/B). Cada versión es UN clip: `image_prompt` +
+  `animate_prompt` a nivel de la versión, y `segments` vacío (`[]`).
+
+- **MODE: segments, k=<N>** (viral largo, >10s) → genera **UNA sola réplica FIEL**
+  troceada en **k segmentos ENCADENADOS** de ~8s que, unidos, reproducen el
+  vídeo entero. Devuelve EXACTAMENTE 1 objeto en `videos`, con su array
+  `segments` de longitud k:
+  - **Segmento 1** (`is_extend=false`): `image_prompt` relleno (foto Nano Banana
+    de la persona/escena, con TODOS los anchors de realismo). `animate_prompt`
+    anima esa foto y dice la **parte 1** del guion.
+  - **Segmentos 2..k** (`is_extend=true`): `image_prompt = ""`. NO se genera foto
+    nueva — el operador **extiende desde el ÚLTIMO fotograma del clip anterior**
+    (función "extend" de Veo/Flow) para MANTENER LA MISMA PERSONA Y ESCENA. El
+    `animate_prompt` describe SOLO la continuación (la persona sigue hablando y
+    diciendo la **parte i** del guion, con lip-sync; misma persona, mismo fondo,
+    sin cortes). Textual al inicio: `continue seamlessly from the previous clip's
+    last frame — SAME person, same face, same clothes, same background, no cut,
+    no change of scene`.
+  - **Parte el `spoken_line` en k trozos** (uno por segmento), en orden, cubriendo
+    todo el guion del viral. Cada segmento lleva SU trozo en su `spoken_line` y
+    dentro de su `animate_prompt`.
+  - `hook_text`/`cta_text`/`caption` van a nivel de la RÉPLICA (una vez), no por
+    segmento. El gancho en pantalla aparece al principio; el CTA al final.
+
+En AMBOS modos, cada `image_prompt` presente lleva los anchors completos de
+producto + realismo de abajo. En segmentos, el producto debe salir de forma
+consistente en TODA la secuencia.
+
 ### Anclaje del PRODUCTO (crítico)
 
 El operador adjunta, **como ÚLTIMA imagen**, una **FOTO DE REFERENCIA del
@@ -150,15 +184,14 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
 
 ## Formato de salida (JSON estricto)
 
+**MODE: versions** (viral corto) — N versiones, cada una 1 clip, `segments: []`:
+
 ```json
 {
+  "mode": "versions",
   "why_viral": {
-    "hook": "...",
-    "retention": "...",
-    "emotion": "...",
-    "why_sells": "...",
-    "visual_style": "...",
-    "structure": "..."
+    "hook": "...", "retention": "...", "emotion": "...",
+    "why_sells": "...", "visual_style": "...", "structure": "..."
   },
   "videos": [
     {
@@ -167,17 +200,60 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
       "emotion": "...",
       "angle": "en 1 frase, cómo esta versión replica la fórmula ganadora",
       "veo3_prompt": "",
-      "image_prompt": "prompt Nano Banana (Paso 1) — SIEMPRE relleno, en inglés",
-      "animate_prompt": "prompt Veo 3.1 i2v (Paso 2) — SIEMPRE relleno, en inglés",
+      "image_prompt": "prompt Nano Banana (Paso 1) — en inglés",
+      "animate_prompt": "prompt Veo 3.1 i2v (Paso 2) — en inglés",
       "spoken_line": "",
       "hook_text": "...",
       "cta_text": "...",
-      "caption": "..."
+      "caption": "...",
+      "segments": []
     }
   ]
 }
 ```
 
-Devuelve SOLO el JSON. La versión 1 es la RÉPLICA FIEL de la estructura del
-viral; las extra son variaciones del mismo esqueleto. Genera exactamente el
-número de versiones que se pida.
+**MODE: segments** (viral largo) — UNA réplica fiel, `videos` con 1 objeto y su
+array `segments` de longitud k. `image_prompt`/`animate_prompt` de nivel superior
+van vacíos (todo va en `segments`):
+
+```json
+{
+  "mode": "segments",
+  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "..." },
+  "videos": [
+    {
+      "concept": "...",
+      "format": "...",
+      "emotion": "...",
+      "angle": "cómo la secuencia replica el viral entero",
+      "veo3_prompt": "",
+      "image_prompt": "",
+      "animate_prompt": "",
+      "spoken_line": "guion completo (referencia)",
+      "hook_text": "...",
+      "cta_text": "...",
+      "caption": "...",
+      "segments": [
+        {
+          "is_extend": false,
+          "label": "Trozo 1",
+          "image_prompt": "prompt Nano Banana del segmento 1 — en inglés, con anchors",
+          "animate_prompt": "Veo 3.1 i2v del segmento 1, dice la parte 1 — en inglés",
+          "spoken_line": "parte 1 del guion (español de España)"
+        },
+        {
+          "is_extend": true,
+          "label": "Trozo 2",
+          "image_prompt": "",
+          "animate_prompt": "continue from previous last frame... dice la parte 2 — inglés",
+          "spoken_line": "parte 2 del guion (español de España)"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Devuelve SOLO el JSON, respetando el MODE que te indique el mensaje de usuario.
+En **versions**, la versión 1 es la réplica fiel y las extra son variaciones. En
+**segments**, devuelve UN solo objeto con k segmentos que cubran el vídeo entero.

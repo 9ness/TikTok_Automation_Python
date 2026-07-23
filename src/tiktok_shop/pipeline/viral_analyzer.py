@@ -625,14 +625,39 @@ _REPLICA_KEYS = (
 )
 
 
+def _normalize_segment(s: Any, idx: int) -> dict:
+    """Sanea un segmento encadenado (trozo de un vídeo largo)."""
+    if not isinstance(s, dict):
+        s = {}
+    is_extend = bool(s.get("is_extend", idx > 0))
+    return {
+        "is_extend": is_extend,
+        "label": _safe_str(s.get("label"), f"Trozo {idx + 1}"),
+        # El segmento 1 lleva foto Nano Banana; los 2+ extienden (sin image_prompt).
+        "image_prompt": "" if is_extend else _safe_str(s.get("image_prompt"), ""),
+        "animate_prompt": _safe_str(s.get("animate_prompt"), ""),
+        "spoken_line": _safe_str(s.get("spoken_line"), ""),
+    }
+
+
 def _normalize_replica(v: Any, idx: int) -> dict:
-    """Sanea una versión de réplica al schema 2-step de problem_videos."""
+    """Sanea una versión de réplica al schema 2-step de problem_videos.
+    Soporta `segments` (modo réplica larga encadenada)."""
     if not isinstance(v, dict):
         v = {}
     out = {k: _safe_str(v.get(k), "") for k in _REPLICA_KEYS}
     out["veo3_prompt"] = ""  # nunca texto→vídeo
     if not out["concept"]:
         out["concept"] = f"Réplica v{idx + 1}"
+    raw_segs = v.get("segments")
+    segs = (
+        [_normalize_segment(s, i) for i, s in enumerate(raw_segs)]
+        if isinstance(raw_segs, list) else []
+    )
+    # Segmento 1 SIEMPRE con foto (aunque Gemini marque is_extend por error).
+    if segs:
+        segs[0]["is_extend"] = False
+    out["segments"] = segs
     return out
 
 
@@ -662,6 +687,24 @@ def replicate_viral_2step(
     log_callback(f"📐 Probing duración de '{video_path}'…")
     duration_s = _probe_duration_seconds(video_path)
     log_callback(f"⏱️ Duración: {duration_s:.1f}s")
+
+    # Modo por duración: Veo 3.1 i2v ≈ 8s/clip. Si el viral es corto → N
+    # versiones (A/B). Si es largo → UNA réplica fiel troceada en k segmentos
+    # encadenados (~8s cada uno) que, unidos, cubren el vídeo entero.
+    import math
+    _CLIP_S = 8.0
+    _SEGMENT_THRESHOLD_S = 10.0
+    _MAX_SEGMENTS = 4
+    segment_mode = duration_s > _SEGMENT_THRESHOLD_S
+    n_segments = (
+        min(_MAX_SEGMENTS, max(2, math.ceil(duration_s / _CLIP_S)))
+        if segment_mode else 0
+    )
+    if segment_mode:
+        n = 1  # una sola réplica fiel troceada
+        log_callback(f"🎬 Vídeo largo → modo SEGMENTOS: {n_segments} trozos encadenados.")
+    else:
+        log_callback(f"🎬 Vídeo corto → modo VERSIONES: {max(1, n)} clip(s).")
 
     ts = int(time.time())
     tmp_dir = Path(temp_folder) / f"replica_{ts}"
@@ -755,9 +798,23 @@ def replicate_viral_2step(
             "GOOGLE_GEMINI_KEY_PAID en .env para usar replicar viral."
         )
     system_prompt = load_system_prompt("viral_replica_director.md")
+    if segment_mode:
+        mode_line = (
+            f"MODE: segments, k={n_segments}. The viral is {duration_s:.1f}s long "
+            f"(> one 8s clip). Return EXACTLY 1 object in `videos` with a `segments` "
+            f"array of length {n_segments} (segment 1 has a Nano Banana image_prompt; "
+            f"segments 2+ are is_extend=true, image_prompt=\"\"). Split the spoken "
+            f"script across the {n_segments} segments in order.\n"
+        )
+    else:
+        mode_line = (
+            f"MODE: versions. Number of versions to generate: {n} "
+            f"(version 1 = faithful replica). Each version is a single ~8s clip "
+            f"with `segments: []`.\n"
+        )
     user_msg = (
         f"OUTPUT LANGUAGE: {lang_label}\n"
-        f"Number of versions to generate: {n} (version 1 = faithful replica).\n"
+        f"{mode_line}"
         f"Viral video total duration: {duration_s:.1f} seconds.\n"
         f"Viral audio transcript ({n_words} words): {transcript[:3000] or '(no speech / music only)'}\n"
         f"The first {len(frame_paths)} attached images are the viral video frames "
@@ -785,10 +842,13 @@ def replicate_viral_2step(
         raw = {}
     why_viral = raw.get("why_viral") if isinstance(raw.get("why_viral"), dict) else {}
     videos_raw = raw.get("videos") if isinstance(raw.get("videos"), list) else []
-    videos = [_normalize_replica(v, i) for i, v in enumerate(videos_raw[:max(1, n)])]
+    limit = 1 if segment_mode else max(1, n)
+    videos = [_normalize_replica(v, i) for i, v in enumerate(videos_raw[:limit])]
     if not videos:
         _cleanup(tmp_dir)
         raise RuntimeError("Gemini no devolvió ninguna versión de réplica.")
+    if segment_mode and not videos[0].get("segments"):
+        log_callback("⚠️ Modo segmentos pero Gemini no devolvió trozos — cae a 1 clip.")
 
     # 6. Coste (estimación local, mismo criterio que analyze_viral_video)
     from src.cost_tracking import _resolve_gemini_rates
@@ -814,6 +874,8 @@ def replicate_viral_2step(
         "ok": True,
         "why_viral": why_viral,
         "videos": videos,
+        "mode": "segments" if segment_mode else "versions",
+        "n_segments": n_segments,
         "language": language,
         "duration_s": round(duration_s, 1),
         "used_reference_photo": has_reference,

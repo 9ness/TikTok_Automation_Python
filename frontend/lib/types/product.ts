@@ -175,6 +175,13 @@ export interface Product {
     cta_text: string;
     caption: string;
     ready_video?: string;
+    segments?: {
+      is_extend: boolean;
+      label: string;
+      image_prompt: string;
+      animate_prompt: string;
+      spoken_line: string;
+    }[];
   }[];
   /** "por qué viraliza" del último vídeo replicado. */
   viral_replica_analysis?: Record<string, unknown>;
