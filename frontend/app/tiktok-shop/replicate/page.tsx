@@ -23,7 +23,16 @@ interface WhyViral {
   why_sells?: string;
   visual_style?: string;
   structure?: string;
+  shots?: string;
+  human_presence?: string;
 }
+
+const PRESENCE_LABEL: Record<string, string> = {
+  none: "Sin personas (solo producto)",
+  hands_only: "POV — solo manos (sin cara)",
+  body_no_face: "Cuerpo sin cara",
+  face: "Persona con cara",
+};
 
 interface ReplicaResult {
   videos: ProblemVideo[];
@@ -347,6 +356,10 @@ export default function ReplicatePage() {
             {why.emotion && <li><b className="text-foreground">Emoción:</b> {why.emotion}</li>}
             {why.why_sells && <li><b className="text-foreground">Por qué vende:</b> {why.why_sells}</li>}
             {why.visual_style && <li><b className="text-foreground">Estilo visual:</b> {why.visual_style}</li>}
+            {why.human_presence && (
+              <li><b className="text-foreground">Personas:</b> {PRESENCE_LABEL[why.human_presence] ?? why.human_presence}</li>
+            )}
+            {why.shots && <li><b className="text-foreground">Planos:</b> {why.shots}</li>}
             {why.structure && <li><b className="text-foreground">Estructura:</b> {why.structure}</li>}
           </ul>
         </div>

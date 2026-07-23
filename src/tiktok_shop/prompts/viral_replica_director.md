@@ -28,6 +28,14 @@ vende**. Sé concreto y accionable (no genérico):
 7. **shots** — cuenta los **PLANOS/ángulos distintos separados por CORTES** (p. ej.
    "3 planos: frontal, lateral, primer plano del detalle"). Es CLAVE: muchos
    virales cambian de ángulo con CORTES, no con una rotación continua.
+8. **human_presence** — MIRA los fotogramas y clasifica cuánta persona se ve:
+   - `"none"` = NO se ve ninguna persona (solo producto / objetos).
+   - `"hands_only"` = **POV / primera persona: solo se ven MANOS** (o brazos)
+     manipulando el producto, SIN cara ni cuerpo.
+   - `"body_no_face"` = se ve cuerpo/torso pero **NO la cara** (encuadre que corta
+     la cabeza, como un mirror selfie de ropa sin cara).
+   - `"face"` = se ve la CARA de una persona.
+   Esto MANDA sobre el formato (ver regla crítica abajo).
 
 ## Paso 2 — Replica esa fórmula para el PRODUCTO del operador
 
@@ -50,16 +58,26 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
 - Rellena SIEMPRE `image_prompt` (Paso 1, Nano Banana) + `animate_prompt`
   (Paso 2, Veo 3.1 imagen→vídeo).
 - Deja `veo3_prompt` **SIEMPRE vacío** (`""`).
-- **🚨 REGLA CRÍTICA — SI HAY PERSONA, LA FOTO YA LLEVA A LA PERSONA.** El
-  `image_prompt` y el `animate_prompt` DEBEN coincidir: si en el vídeo aparece una
-  persona (habla, enseña, sostiene el producto…), la **FOTO del Paso 1 tiene que
-  mostrar a ESA persona en cuadro** (con el producto). NUNCA generes una foto
-  SOLO del producto (sin persona) y luego metas una persona en el `animate_prompt`
-  — Veo se inventaría una persona **distinta en cada clip** (justo el fallo del
-  operador: fotos sin persona → vídeos con personas diferentes). Regla: la persona
-  del vídeo = la persona de la foto, idéntica. Solo deja la foto sin persona si el
-  vídeo es de PRODUCTO puro (POV manos / demo sin protagonista) y el animate
-  tampoco mete una persona entera.
+- **🚨 REGLA CRÍTICA 1 — RESPETA LA PRESENCIA HUMANA DEL ORIGINAL (`human_presence`).**
+  La réplica debe mostrar **la MISMA cantidad de persona que el viral original**.
+  NO inventes gente ni caras que no están:
+  - `"none"` → réplica SIN personas: solo el producto/escena. Ni manos ni cara.
+  - `"hands_only"` (POV, solo manos) → réplica **en POV, solo MANOS** manipulando
+    el producto. **PROHIBIDO mostrar cara o cuerpo entero.** `image_prompt` y
+    `animate_prompt`: `first-person POV, only the person's hands/forearms are
+    visible holding and using the product, NO face, NO head, NO full body, NO
+    person shown — just hands from the wearer's point of view`.
+  - `"body_no_face"` → se ve cuerpo pero **sin cara** (encuadre que corta la
+    cabeza). Mantén ESE encuadre: nada de cara.
+  - `"face"` → sí se ve la cara → réplica con persona (regla 2).
+  El fallo del operador: el viral era POV (solo una mano) y la réplica metió
+  personas con cara. NO lo hagas: **copia el nivel de persona del original**.
+- **🚨 REGLA CRÍTICA 2 — SI HAY PERSONA/CARA, LA FOTO YA LLEVA A ESA PERSONA.** Si
+  (y solo si) el original muestra a una persona/cara, el `image_prompt` y el
+  `animate_prompt` DEBEN coincidir: la **FOTO del Paso 1 muestra a ESA persona en
+  cuadro** (con el producto). NUNCA una foto SOLO del producto y luego una persona
+  metida en el `animate_prompt` — Veo se inventaría una persona **distinta en cada
+  clip**. La persona del vídeo = la persona de la foto, idéntica en todos los clips.
 - **HABLADO vs SILENCIOSO:** si el viral original tiene una persona HABLANDO a
   cámara (o testimonio), replica eso → la persona **HABLA en español de España**
   (Veo 3.1 pone voz + lip-sync) y rellenas `spoken_line`. Si el viral es una demo
@@ -245,7 +263,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
   "mode": "versions",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
-    "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo"
+    "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only"
   },
   "videos": [
     {
@@ -273,7 +291,7 @@ van vacíos (todo va en `segments`):
 ```json
 {
   "mode": "segments",
-  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle" },
+  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face" },
   "videos": [
     {
       "concept": "...",
