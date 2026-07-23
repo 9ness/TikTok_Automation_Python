@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clapperboard,
   Copy,
   Download,
   Loader2,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +29,23 @@ interface ReplicaResult {
   videos: ProblemVideo[];
   why: WhyViral;
   mode: string;
+}
+
+interface HistoryItem {
+  id: string;
+  title: string;
+  mode: string;
+  n_versions: number;
+  n_ready: number;
+  duration_s: number;
+  created_at: string;
+}
+
+async function apiFetch(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  if (apiKey) headers.set("X-API-Key", apiKey);
+  const res = await fetch(`${apiBase}${path}`, { ...init, headers });
+  return res.json();
 }
 
 function CopyChip({ label, text, primary }: { label: string; text: string; primary?: boolean }) {
@@ -60,12 +78,60 @@ export default function ReplicatePage() {
   const [generating, setGenerating] = useState(false);
   const [zoom, setZoom] = useState(1.18);
   const [result, setResult] = useState<ReplicaResult | null>(null);
+  const [replicaId, setReplicaId] = useState<string | null>(null);
+
+  // Historial de réplicas guardadas.
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Estado de subida→edición por índice de tarjeta (editor genérico por token).
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [processingIdx, setProcessingIdx] = useState<number | null>(null);
   const [tokens, setTokens] = useState<Record<number, string>>({});
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const d = await apiFetch("/api/v1/tiktok-shop/radar/videos/replica/list");
+      if (d.ok) setHistory(d.items ?? []);
+    } catch {
+      /* silencioso */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  // Al cargar unos `videos`, inicializa los tokens de los ya quemados.
+  const seedTokens = (vids: ProblemVideo[]) => {
+    const t: Record<number, string> = {};
+    vids.forEach((v, i) => {
+      if (v.ready_token) t[i] = v.ready_token;
+    });
+    setTokens(t);
+  };
+
+  const loadSession = async (id: string) => {
+    const d = await apiFetch(`/api/v1/tiktok-shop/radar/videos/replica/get?replica_id=${id}`);
+    if (d.ok) {
+      setResult({ videos: d.videos ?? [], why: d.why_viral ?? {}, mode: d.mode ?? "versions" });
+      setReplicaId(id);
+      seedTokens(d.videos ?? []);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else toast.error(d.message ?? "No se pudo cargar.");
+  };
+
+  const deleteSession = async (id: string) => {
+    const d = await apiFetch(`/api/v1/tiktok-shop/radar/videos/replica/delete?replica_id=${id}`, { method: "DELETE" });
+    if (d.ok) {
+      toast.success("Réplica borrada");
+      if (replicaId === id) {
+        setResult(null);
+        setReplicaId(null);
+      }
+      loadHistory();
+    } else toast.error("No se pudo borrar.");
+  };
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const refInputRef = useRef<HTMLInputElement>(null);
@@ -95,7 +161,9 @@ export default function ReplicatePage() {
       const data = await res.json();
       if (data.ok && data.videos?.length) {
         setResult({ videos: data.videos, why: data.why_viral ?? {}, mode: data.mode ?? "versions" });
-        toast.success(`${data.videos.length} ${data.mode === "segments" ? "réplica (troceada)" : "versión(es)"} lista(s)`);
+        setReplicaId(data.replica_id ?? null);
+        toast.success(`${data.videos.length} ${data.mode === "segments" ? "réplica (troceada)" : "versión(es)"} lista(s) · guardada`);
+        loadHistory();
       } else {
         toast.error(data.message ?? "No se pudo replicar.");
       }
@@ -120,6 +188,14 @@ export default function ReplicatePage() {
           setProcessingIdx((cur) => (cur === i ? null : cur));
           setTokens((prev) => ({ ...prev, [i]: token }));
           toast.success("Vídeo listo para descargar");
+          // Persistir el token en la sesión → sobrevive recargas.
+          if (replicaId) {
+            apiFetch("/api/v1/tiktok-shop/radar/videos/replica/settoken", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ replica_id: replicaId, concept_index: i, token }),
+            }).then(() => loadHistory()).catch(() => undefined);
+          }
         }
       } catch {
         /* reintenta en el siguiente tick */
@@ -384,6 +460,45 @@ export default function ReplicatePage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Historial de réplicas guardadas */}
+      {history.length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-border p-3">
+          <h2 className="text-sm font-semibold">🗂️ Mis réplicas guardadas ({history.length})</h2>
+          <p className="text-[10px] text-muted-foreground">
+            Cada réplica que generas se guarda aquí. Ábrela para volver a copiar los prompts
+            o descargar el vídeo quemado. No se pierden al recargar.
+          </p>
+          <div className="space-y-1.5">
+            {history.map((h) => (
+              <div
+                key={h.id}
+                className={
+                  "flex items-center gap-2 rounded-md border p-2 text-xs " +
+                  (replicaId === h.id ? "border-orange-500/60 bg-orange-500/5" : "border-border/60")
+                }
+              >
+                <button onClick={() => loadSession(h.id)} className="min-w-0 flex-1 text-left">
+                  <div className="truncate font-medium">{h.title}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {h.mode === "segments" ? "🎬 troceada" : `${h.n_versions} versión(es)`}
+                    {" · "}{Math.round(h.duration_s)}s
+                    {h.n_ready > 0 && <span className="text-green-600"> · {h.n_ready} listo(s) ✅</span>}
+                    {" · "}{new Date(h.created_at).toLocaleDateString()}
+                  </div>
+                </button>
+                <button
+                  onClick={() => deleteSession(h.id)}
+                  title="Borrar"
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

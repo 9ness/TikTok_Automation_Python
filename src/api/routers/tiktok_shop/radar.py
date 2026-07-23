@@ -1133,7 +1133,29 @@ async def replica_generate(
         product.viral_replica_analysis = res.get("why_viral", {})
         product.touch()
         repo.save(product)
-    return {"ok": True, **res}
+
+    # Persistir SIEMPRE como sesión de réplica (historial) → no se pierden las
+    # ideas al recargar. Título derivado del gancho o del primer concepto.
+    replica_id = None
+    if res.get("videos"):
+        from src.tiktok_shop.models.replica_session import ReplicaSession
+        from src.tiktok_shop.repos import ReplicaRepo
+        why = res.get("why_viral", {}) or {}
+        first = res["videos"][0] if res["videos"] else {}
+        title = (why.get("hook") or first.get("concept") or "Réplica viral")[:80]
+        session = ReplicaSession(
+            title=title, mode=res.get("mode", "versions"), language=language,
+            duration_s=float(res.get("duration_s", 0.0) or 0.0),
+            used_reference_photo=bool(res.get("used_reference_photo", False)),
+            same_product=same_product, why_viral=why, videos=res["videos"],
+        )
+        try:
+            ReplicaRepo().save(session)
+            replica_id = session.id
+        except Exception as e:
+            print(f"[replica_generate] no pude guardar sesión: {e}")
+
+    return {"ok": True, "replica_id": replica_id, **res}
 
 
 @router.post("/videos/replica/upload")
@@ -1207,6 +1229,82 @@ def download_replica_video(
     if not os.path.exists(path):
         return {"ok": False, "message": "Aún no procesado."}
     return FileResponse(path, media_type="video/mp4", filename=fname)
+
+
+# ── Historial de réplicas (sesiones persistidas) ─────────────────────
+@router.get("/videos/replica/list")
+def replica_list(operator: Annotated[str, Depends(get_current_user)]) -> dict:
+    """Lista las réplicas guardadas (más recientes primero) — resumen ligero."""
+    from src.tiktok_shop.repos import ReplicaRepo
+
+    items = []
+    for s in ReplicaRepo().list_all():
+        n_ready = sum(1 for v in s.videos if (v or {}).get("ready_token"))
+        items.append({
+            "id": s.id, "title": s.title, "mode": s.mode,
+            "n_versions": len(s.videos), "n_ready": n_ready,
+            "duration_s": s.duration_s, "created_at": s.created_at,
+        })
+    return {"ok": True, "items": items}
+
+
+@router.get("/videos/replica/get")
+def replica_get(
+    replica_id: str,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Devuelve una sesión de réplica completa (versiones + análisis)."""
+    from src.tiktok_shop.repos import ReplicaRepo
+
+    s = ReplicaRepo().get(replica_id)
+    if s is None:
+        return {"ok": False, "message": "Réplica no encontrada."}
+    return {
+        "ok": True, "replica_id": s.id, "title": s.title, "mode": s.mode,
+        "why_viral": s.why_viral, "videos": s.videos, "language": s.language,
+        "duration_s": s.duration_s, "used_reference_photo": s.used_reference_photo,
+    }
+
+
+@router.delete("/videos/replica/delete")
+def replica_delete(
+    replica_id: str,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Borra una réplica guardada del historial."""
+    from src.tiktok_shop.repos import ReplicaRepo
+
+    return {"ok": ReplicaRepo().delete(replica_id)}
+
+
+class ReplicaTokenRequest(BaseModel):
+    replica_id: str
+    concept_index: int
+    token: str
+
+
+@router.post("/videos/replica/settoken")
+def replica_set_token(
+    body: ReplicaTokenRequest,
+    operator: Annotated[str, Depends(get_current_user)],
+) -> dict:
+    """Persiste el `token` del vídeo final quemado (editor genérico) en la
+    versión correspondiente de la sesión → el botón verde sobrevive recargas."""
+    import re
+
+    from src.tiktok_shop.repos import ReplicaRepo
+
+    if not re.fullmatch(r"[a-f0-9]{8,32}", body.token or ""):
+        return {"ok": False, "message": "token inválido"}
+    repo = ReplicaRepo()
+    s = repo.get(body.replica_id)
+    if s is None:
+        return {"ok": False, "message": "Réplica no encontrada."}
+    if 0 <= body.concept_index < len(s.videos):
+        s.videos[body.concept_index]["ready_token"] = body.token
+        repo.save(s)
+        return {"ok": True}
+    return {"ok": False, "message": "Índice fuera de rango."}
 
 
 class ScrapeSearchRequest(BaseModel):

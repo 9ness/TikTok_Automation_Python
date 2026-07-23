@@ -352,6 +352,8 @@ export interface ProblemVideo {
   cta_text: string;
   caption: string;
   ready_video?: string;
+  /** Token del vídeo final quemado (editor genérico) — historial de réplicas. */
+  ready_token?: string;
   /** Modo réplica larga: trozos encadenados de ~8s (solo "Replicar viral"). */
   segments?: ReplicaSegment[];
 }
