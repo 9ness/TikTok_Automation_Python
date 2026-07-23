@@ -813,7 +813,10 @@ def replicate_viral_2step(
             "GOOGLE_GEMINI_KEY_PAID en .env para usar replicar viral."
         )
     system_prompt = load_system_prompt("viral_replica_director.md")
-    fits_one_clip = duration_s <= 10.0
+    # El operador genera clips de ~10s. Umbral con margen (11s) para que un vídeo
+    # "de 10s" que probe 10.x NO se trocee: se hace en UN clip con CORTES
+    # INTERNOS descritos en el animate. Solo se trocea si es claramente más largo.
+    fits_one_clip = duration_s <= 11.0
     mode_line = (
         f"DECIDE MODE yourself and set `mode` in the output. Veo 3.1 makes ONE clip "
         f"of up to ~10s, and it CAN do hard cuts to new shots/angles INSIDE a single "
