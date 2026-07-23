@@ -818,17 +818,26 @@ def replicate_viral_2step(
         f"DECIDE MODE yourself and set `mode` in the output. Veo 3.1 makes ONE clip "
         f"of up to ~10s, and it CAN do hard cuts to new shots/angles INSIDE a single "
         f"clip.\n"
-        f"- The viral is {duration_s:.1f}s → it {'FITS in one Veo generation' if fits_one_clip else 'is TOO LONG for one Veo generation'}.\n"
-        f"- If it FITS (<=~10s): use MODE: versions and generate {n} A/B version(s), "
-        f"each ONE clip, `segments: []`. If the original has camera-angle changes/cuts, "
-        f"reproduce them as HARD CUTS described INSIDE the single animate_prompt "
-        f"(e.g. 'front shot ... then a clean hard cut to a side-profile shot of the "
-        f"SAME person and outfit ...') — NOT a continuous rotation or morph.\n"
-        f"- Only if it is TOO LONG (> ~10s): use MODE: segments (max {max_segments} "
-        f"segments), one segment per shot with transition=\"cut\" (its own image_prompt, "
-        f"same person across shots) or transition=\"continue\" to extend a long shot. "
-        f"Replicate the SAME cuts as the original.\n"
     )
+    if fits_one_clip:
+        mode_line += (
+            f"USE **MODE: versions** (the viral is {duration_s:.1f}s, fits ONE clip). "
+            f"Generate exactly {n} version(s). For EACH version you MUST fill BOTH "
+            f"`image_prompt` AND `animate_prompt` (never empty) and set `segments: []`. "
+            f"If the original has camera-angle changes/cuts, reproduce them as HARD "
+            f"CUTS described INSIDE the single animate_prompt (e.g. 'front shot ... "
+            f"then a clean hard cut to a side-profile shot of the SAME person and "
+            f"outfit ...') — NOT a continuous rotation or morph.\n"
+        )
+    else:
+        mode_line += (
+            f"USE **MODE: segments** (the viral is {duration_s:.1f}s, TOO LONG for one "
+            f"clip). Return EXACTLY 1 object in `videos` whose `segments` array has "
+            f"2..{max_segments} items. EACH segment MUST fill `image_prompt` AND "
+            f"`animate_prompt` (never empty). Segment 1 transition=\"cut\"; the rest "
+            f"transition=\"continue\" (same person, its photo references the previous "
+            f"one) or \"cut\" if there is a real scene change.\n"
+        )
     user_msg = (
         f"OUTPUT LANGUAGE: {lang_label}\n"
         f"{mode_line}"
@@ -863,21 +872,55 @@ def replicate_viral_2step(
     if pg and "person_gender" not in why_viral:
         why_viral["person_gender"] = pg
     videos_raw = raw.get("videos") if isinstance(raw.get("videos"), list) else []
-    # El modo REAL lo decidió Gemini: por el campo `mode` o porque devolvió
-    # segmentos en el primer objeto.
-    returned_mode = _safe_str(raw.get("mode"), "").lower()
-    has_segments = bool(
-        videos_raw and isinstance(videos_raw[0], dict) and videos_raw[0].get("segments")
-    )
-    segment_mode = returned_mode == "segments" or has_segments
+    # El modo lo decide PYTHON por duración (determinista): ≤10s versiones,
+    # >10s segmentos. No dejamos que Gemini lo elija (lo hacía mal → devolvía
+    # "segments" con el array vacío y prompts en blanco).
+    segment_mode = not fits_one_clip
     limit = 1 if segment_mode else max(1, n)
     videos = [_normalize_replica(v, i) for i, v in enumerate(videos_raw[:limit])]
     if not videos:
         _cleanup(tmp_dir)
         raise RuntimeError("Gemini no devolvió ninguna versión de réplica.")
-    # Cap de segmentos por seguridad.
-    if segment_mode and videos[0].get("segments"):
-        videos[0]["segments"] = videos[0]["segments"][:max_segments]
+
+    # ── Validación / salvamento: NUNCA una versión sin prompts ──
+    for v in videos:
+        segs = v.get("segments") or []
+        if segment_mode:
+            # Segmentos: si vienen vacíos pero hay prompt de nivel superior,
+            # crea 1 segmento con él. Si un segmento no tiene image_prompt,
+            # hereda el del anterior (misma persona) para no dejarlo en blanco.
+            if not segs and (v.get("image_prompt") or v.get("animate_prompt")):
+                segs = [{
+                    "transition": "cut", "is_extend": False, "label": "Trozo 1",
+                    "image_prompt": v.get("image_prompt", ""),
+                    "animate_prompt": v.get("animate_prompt", ""),
+                    "spoken_line": v.get("spoken_line", ""),
+                }]
+            last_img = ""
+            for sg in segs:
+                if sg.get("image_prompt"):
+                    last_img = sg["image_prompt"]
+                elif last_img:
+                    sg["image_prompt"] = last_img
+            v["segments"] = segs[:max_segments]
+        else:
+            # Versiones: si el prompt de nivel superior está vacío pero hay
+            # segmentos (Gemini se equivocó de modo), aplánalos.
+            if not v.get("image_prompt") and segs:
+                v["image_prompt"] = segs[0].get("image_prompt", "")
+                joined = " ".join(s.get("animate_prompt", "") for s in segs if s.get("animate_prompt"))
+                v["animate_prompt"] = v.get("animate_prompt") or joined
+            v["segments"] = []
+
+    # Si TODO quedó vacío (Gemini devolvió basura), es un fallo real.
+    def _has_prompt(v: dict) -> bool:
+        if v.get("image_prompt") or v.get("animate_prompt"):
+            return True
+        return any(s.get("image_prompt") or s.get("animate_prompt") for s in (v.get("segments") or []))
+    if not any(_has_prompt(v) for v in videos):
+        _cleanup(tmp_dir)
+        raise RuntimeError("Gemini no rellenó los prompts de imagen/vídeo. Reintenta.")
+
     n_segments = len(videos[0].get("segments", [])) if segment_mode else 0
     log_callback(
         f"🎬 Modo {'SEGMENTOS' if segment_mode else 'VERSIONES'}"

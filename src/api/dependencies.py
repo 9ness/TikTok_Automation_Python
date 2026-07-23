@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 
 from src.api.config import APISettings, get_settings
 from src.api.exceptions import UnauthorizedError
@@ -75,17 +75,21 @@ def get_generation_repo(redis: Annotated[ShopRedis, Depends(get_redis)]) -> Gene
 def get_current_user(
     settings: Annotated[APISettings, Depends(get_settings)],
     x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+    api_key: Annotated[str | None, Query()] = None,
 ) -> str:
-    """Auth simple por header `X-API-Key`.
+    """Auth simple por `X-API-Key` (header) o `api_key` (query).
 
     - Si `API_KEY` no está definida en el entorno → no se exige (modo dev).
-    - Si está definida → header obligatorio y debe coincidir.
+    - Si está definida → debe coincidir el header O el query. El query es
+      imprescindible para `<img src>` / `<a href download>` (miniaturas y
+      descargas), que NO pueden mandar headers.
 
     Devuelve un identificador de "usuario" trivial (`api-key-user`). Cuando
     haya multi-tenant lo cambiamos por algo real.
     """
     if not settings.api_key:
         return "anonymous"
-    if not x_api_key or x_api_key != settings.api_key:
+    provided = x_api_key or api_key
+    if not provided or provided != settings.api_key:
         raise UnauthorizedError("API key inválida o ausente.")
     return "api-key-user"
