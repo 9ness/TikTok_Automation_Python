@@ -71,9 +71,10 @@ duros a otro plano/ángulo DENTRO del mismo clip**. Lo que rompe la consistencia
   `segments: []`. Si el original cambia de ángulo, reprodúcelo como **CORTE DURO
   descrito DENTRO del `animate_prompt`** (ver sección animate), no como rotación.
 - **MODE: segments** SOLO si el vídeo es **demasiado largo para un clip (> ~10s)**.
-  Entonces trocéalo: **1 segmento por plano** (o por tramo de ~8s), y al unirlos
-  reproduces el vídeo con SUS cortes. Devuelve **1 solo objeto** en `videos` con su
-  array `segments` (máx el cap que te den).
+  Trocéalo en tramos de ~7-8s (cap dado). **Por defecto: 1 foto de apertura
+  (`"cut"`) + el resto `"continue"`** (extender) para mantener la MISMA cara.
+  Añade otro `"cut"` solo si hay un cambio de escena/plano REAL. Devuelve **1 solo
+  objeto** en `videos` con su array `segments`.
 
 Pon `"mode"` en la salida con tu decisión.
 
@@ -91,15 +92,23 @@ Cada segmento lleva un campo **`transition`**:
     keep them consistent, only the angle changes`. Así el parecido se mantiene
     entre planos. El operador genera esta foto en Nano Banana usando la imagen
     anterior como referencia de la persona.
-- **`"continue"`** = MISMO plano que sigue (para alargar un plano largo >8s).
-  `image_prompt=""`, `is_extend=true`. El operador **extiende desde el ÚLTIMO
-  fotograma del clip anterior** (Veo/Flow "extend"). Textual al inicio del
-  `animate_prompt`: `continue seamlessly from the previous clip's last frame —
-  SAME person, same face, same clothes, same background, no cut`.
+- **`"continue"`** = el vídeo SIGUE con la misma persona/escena (para cubrir la
+  duración sin cambiar de plano). `image_prompt=""`, `is_extend=true`. El operador
+  **extiende desde el ÚLTIMO fotograma del clip anterior** (Veo/Flow "extend").
+  Textual al inicio del `animate_prompt`: `continue seamlessly from the previous
+  clip's last frame — SAME person, same face, same clothes, same background, no cut`.
 
-**Replica los CORTES del original:** usa tantos segmentos `"cut"` como planos
-tenga el viral, en el mismo orden (frontal, lateral, primer plano del detalle…).
-NO conviertas varios ángulos en una sola rotación continua.
+**⚠️ PREFIERE `"continue"` por defecto.** Si el vídeo es la MISMA persona/escena a
+lo largo del tiempo (persona a cámara, testimonio, mismo sitio) — aunque cambie
+un poco de ángulo — usa **1 solo `"cut"` (la foto de apertura) y el resto
+`"continue"`**. Extender desde el último fotograma **GARANTIZA la misma cara**;
+generar varias fotos sueltas arriesga caras distintas. Un vídeo de 15s de una
+persona hablando = **1 foto + 2 continue**, NO 3 fotos.
+
+Usa un `"cut"` extra SOLO cuando el original tenga un **cambio de escena/plano
+REAL** (p. ej. pasa de la persona a un primer plano del producto solo, o cambia
+de habitación) — ahí sí hace falta una foto nueva. En ese caso, el `image_prompt`
+fija que es la MISMA persona/producto. NUNCA conviertas ángulos en rotación continua.
 
 #### Consistencia dentro de cada clip (anti-morph) — OBLIGATORIO
 
