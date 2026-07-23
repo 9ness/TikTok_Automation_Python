@@ -628,26 +628,22 @@ _REPLICA_KEYS = (
 def _normalize_segment(s: Any, idx: int) -> dict:
     """Sanea un segmento de la réplica.
 
-    `transition`: "cut" = plano/ángulo nuevo (foto Nano Banana propia) ·
-    "continue" = mismo plano que se alarga (extiende desde el último fotograma,
-    sin foto). `is_extend` se deriva de `transition` (continue → True)."""
+    Cada segmento tiene su PROPIA foto (`image_prompt`) → cada clip se hace
+    foto→vídeo por separado (el operador no tiene "extender"). `transition` es
+    solo informativo para la UI: "cut" = cambio de escena/plano real · "continue"
+    = sigue la misma persona/escena (la foto referencia la anterior). `is_extend`
+    queda SIEMPRE False (ya no dependemos de la función extender)."""
     if not isinstance(s, dict):
         s = {}
     transition = _safe_str(s.get("transition"), "").lower()
-    if transition == "continue":
-        is_extend = True
-    elif transition == "cut":
-        is_extend = False
-    else:
-        # Sin transition explícita: compat con is_extend; el 1º siempre es corte.
-        is_extend = bool(s.get("is_extend", False)) and idx > 0
-        transition = "continue" if is_extend else "cut"
+    if transition not in ("cut", "continue"):
+        transition = "cut" if idx == 0 else "continue"
     return {
         "transition": transition,
-        "is_extend": is_extend,
-        "label": _safe_str(s.get("label"), f"Plano {idx + 1}"),
-        # Corte → foto Nano Banana propia; continuación → extiende (sin foto).
-        "image_prompt": "" if is_extend else _safe_str(s.get("image_prompt"), ""),
+        "is_extend": False,
+        "label": _safe_str(s.get("label"), f"Trozo {idx + 1}"),
+        # SIEMPRE hay foto por clip (la persona debe estar en la foto).
+        "image_prompt": _safe_str(s.get("image_prompt"), ""),
         "animate_prompt": _safe_str(s.get("animate_prompt"), ""),
         "spoken_line": _safe_str(s.get("spoken_line"), ""),
     }

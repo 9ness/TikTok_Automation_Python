@@ -50,6 +50,16 @@ exacto), luego se anima esa foto (i2v), que mantiene la composición estable.
 - Rellena SIEMPRE `image_prompt` (Paso 1, Nano Banana) + `animate_prompt`
   (Paso 2, Veo 3.1 imagen→vídeo).
 - Deja `veo3_prompt` **SIEMPRE vacío** (`""`).
+- **🚨 REGLA CRÍTICA — SI HAY PERSONA, LA FOTO YA LLEVA A LA PERSONA.** El
+  `image_prompt` y el `animate_prompt` DEBEN coincidir: si en el vídeo aparece una
+  persona (habla, enseña, sostiene el producto…), la **FOTO del Paso 1 tiene que
+  mostrar a ESA persona en cuadro** (con el producto). NUNCA generes una foto
+  SOLO del producto (sin persona) y luego metas una persona en el `animate_prompt`
+  — Veo se inventaría una persona **distinta en cada clip** (justo el fallo del
+  operador: fotos sin persona → vídeos con personas diferentes). Regla: la persona
+  del vídeo = la persona de la foto, idéntica. Solo deja la foto sin persona si el
+  vídeo es de PRODUCTO puro (POV manos / demo sin protagonista) y el animate
+  tampoco mete una persona entera.
 - **HABLADO vs SILENCIOSO:** si el viral original tiene una persona HABLANDO a
   cámara (o testimonio), replica eso → la persona **HABLA en español de España**
   (Veo 3.1 pone voz + lip-sync) y rellenas `spoken_line`. Si el viral es una demo
@@ -71,44 +81,35 @@ duros a otro plano/ángulo DENTRO del mismo clip**. Lo que rompe la consistencia
   `segments: []`. Si el original cambia de ángulo, reprodúcelo como **CORTE DURO
   descrito DENTRO del `animate_prompt`** (ver sección animate), no como rotación.
 - **MODE: segments** SOLO si el vídeo es **demasiado largo para un clip (> ~10s)**.
-  Trocéalo en tramos de ~7-8s (cap dado). **Por defecto: 1 foto de apertura
-  (`"cut"`) + el resto `"continue"`** (extender) para mantener la MISMA cara.
-  Añade otro `"cut"` solo si hay un cambio de escena/plano REAL. Devuelve **1 solo
-  objeto** en `videos` con su array `segments`.
+  Trocéalo en tramos de ~7-8s (cap dado). **CADA segmento tiene su PROPIA foto**
+  (`image_prompt` relleno) → cada clip se hace foto→vídeo por separado (el operador
+  NO tiene función "extender"). Devuelve **1 solo objeto** en `videos` con su array
+  `segments`.
 
 Pon `"mode"` en la salida con tu decisión.
 
-#### Cada segmento: CORTE (foto nueva) o CONTINUACIÓN (extiende)
+#### Segmentos: cada uno es una foto→vídeo, con la MISMA persona encadenada
 
-Cada segmento lleva un campo **`transition`**:
+Como el operador **no dispone de "extender"**, **cada segmento lleva su propia
+`image_prompt`** (una foto) y su `animate_prompt`. Para que la persona sea la
+MISMA en todos los clips, se **encadenan las fotos por referencia**:
 
-- **`"cut"`** = plano/ángulo NUEVO (hay un CORTE respecto al anterior). Lleva su
-  **propio `image_prompt`** (foto Nano Banana de ESE plano) e `is_extend=false`.
-  - El **primer** segmento es siempre `"cut"` (plano de apertura).
-  - Para un corte que muestra a la **MISMA persona desde otro ángulo** (p. ej.
-    frontal → lateral), el `image_prompt` DEBE fijar que es la MISMA persona:
-    `the SAME person as before — identical face, hair, body and the SAME outfit/
-    product — just shown from a different camera angle/pose (e.g. side profile);
-    keep them consistent, only the angle changes`. Así el parecido se mantiene
-    entre planos. El operador genera esta foto en Nano Banana usando la imagen
-    anterior como referencia de la persona.
-- **`"continue"`** = el vídeo SIGUE con la misma persona/escena (para cubrir la
-  duración sin cambiar de plano). `image_prompt=""`, `is_extend=true`. El operador
-  **extiende desde el ÚLTIMO fotograma del clip anterior** (Veo/Flow "extend").
-  Textual al inicio del `animate_prompt`: `continue seamlessly from the previous
-  clip's last frame — SAME person, same face, same clothes, same background, no cut`.
-
-**⚠️ PREFIERE `"continue"` por defecto.** Si el vídeo es la MISMA persona/escena a
-lo largo del tiempo (persona a cámara, testimonio, mismo sitio) — aunque cambie
-un poco de ángulo — usa **1 solo `"cut"` (la foto de apertura) y el resto
-`"continue"`**. Extender desde el último fotograma **GARANTIZA la misma cara**;
-generar varias fotos sueltas arriesga caras distintas. Un vídeo de 15s de una
-persona hablando = **1 foto + 2 continue**, NO 3 fotos.
-
-Usa un `"cut"` extra SOLO cuando el original tenga un **cambio de escena/plano
-REAL** (p. ej. pasa de la persona a un primer plano del producto solo, o cambia
-de habitación) — ahí sí hace falta una foto nueva. En ese caso, el `image_prompt`
-fija que es la MISMA persona/producto. NUNCA conviertas ángulos en rotación continua.
+- **Segmento 1** (`transition:"cut"`, `is_extend:false`): foto de apertura con la
+  **persona + producto** en cuadro (todos los anchors de realismo).
+- **Segmentos 2..k** (`transition:"continue"`, `is_extend:false`): TAMBIÉN llevan
+  `image_prompt` relleno. Debe fijar que es la **MISMA persona de la foto
+  anterior**: `the SAME person as in the attached previous photo (use it as the
+  person reference) — identical face, hair, skin, body and the SAME outfit;
+  same room/background; only the moment/pose advances slightly`. El operador
+  genera esta foto en Nano Banana **adjuntando la foto anterior + la del
+  producto**. Así la cara se mantiene entre clips sin necesitar "extender".
+  - Usa `transition:"continue"` cuando sigue la misma escena/plano (lo normal en
+    una persona hablando). Usa `transition:"cut"` solo si hay un **cambio de
+    escena/ángulo REAL** (p. ej. de la persona a un primer plano del producto).
+    En ambos casos el `image_prompt` va **relleno** (siempre hay foto por clip).
+- **La persona SIEMPRE en la foto** (regla crítica de arriba): nunca un clip cuya
+  foto no tenga persona pero el animate sí. Un vídeo de 15s de una persona = 3
+  fotos ENCADENADAS (cada una referencia la anterior), NO 3 personas distintas.
 
 #### Consistencia dentro de cada clip (anti-morph) — OBLIGATORIO
 
@@ -296,11 +297,11 @@ van vacíos (todo va en `segments`):
           "spoken_line": "parte 1 del guion (español de España)"
         },
         {
-          "transition": "cut",
+          "transition": "continue",
           "is_extend": false,
-          "label": "Plano 2 — lateral (CORTE, misma persona)",
-          "image_prompt": "Nano Banana del plano 2: SAME person/face/outfit, side profile — inglés",
-          "animate_prompt": "Veo 3.1 i2v plano 2: movimiento MÍNIMO; dice la parte 2 — inglés",
+          "label": "Trozo 2 — sigue la misma persona",
+          "image_prompt": "Nano Banana trozo 2: the SAME person as in the attached previous photo (use it as reference) — identical face/hair/outfit, same room; person + product in frame — inglés",
+          "animate_prompt": "Veo 3.1 i2v trozo 2: la MISMA persona (ya está en la foto), movimiento MÍNIMO; dice la parte 2 — inglés",
           "spoken_line": "parte 2 del guion (español de España)"
         }
       ]
@@ -309,8 +310,8 @@ van vacíos (todo va en `segments`):
 }
 ```
 
-Devuelve SOLO el JSON con tu decisión de `mode`. Si el viral tiene varios
-PLANOS/cortes (aunque sea corto) o dura más de ~8s → **segments** (1 segmento por
-plano, `transition:"cut"`; usa `"continue"` solo para alargar un mismo plano
-largo). Si es un plano continuo corto → **versions**. Réplica los MISMOS cortes
-del original; nunca conviertas varios ángulos en una rotación continua.
+TODOS los segmentos llevan `image_prompt` relleno (una foto por clip). La persona
+DEBE estar en la foto y ser la MISMA en todos (cada foto 2..k referencia la
+anterior). Devuelve SOLO el JSON con tu decisión de `mode`: **segments** solo si
+NO cabe en un clip (> ~10s); si cabe, **versions** con cortes internos en el
+`animate_prompt`. Nunca conviertas ángulos en rotación continua.

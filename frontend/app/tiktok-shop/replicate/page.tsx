@@ -411,38 +411,32 @@ export default function ReplicatePage() {
                 {v.segments && v.segments.length > 0 ? (
                   <>
                     <p className="mb-1.5 rounded bg-muted/50 p-1.5 text-[10px] text-muted-foreground">
-                      🎬 El vídeo se replica <b>plano a plano ({v.segments.length} clips)</b>, con
-                      sus mismos <b>cortes</b> (así se mantiene la consistencia — nada de rotar en
-                      un solo clip). <b>✂️ Corte</b> = genera una foto nueva del plano
-                      (misma persona) → Veo 3.1. <b>↪️ Continúa</b> = en Veo/Flow pulsa
-                      <b> &quot;Extender&quot;</b> desde el último fotograma. Une los clips con corte y súbelo aquí.
+                      🎬 Es largo, se replica en <b>{v.segments.length} clips</b> que unes al final.
+                      <b> Cada trozo tiene su propia foto</b> (la persona sale SIEMPRE en la foto).
+                      Para que sea la <b>misma persona</b>: en el trozo 1 generas la foto con la del
+                      producto; en los siguientes, <b>adjunta la foto del trozo anterior + la del
+                      producto</b> → Nano Banana mantiene la cara. Luego animas cada foto en Veo 3.1
+                      y unes los clips en orden.
                     </p>
                     <div className="space-y-1.5">
                       {v.segments.map((s, si) => {
-                        const isCut = !s.is_extend;
-                        const isNewAngleCut = isCut && si > 0;
+                        const isScene = si > 0 && s.transition === "cut";
                         return (
                           <div key={si} className="rounded border border-border/50 p-1.5">
                             <div className="mb-1 text-[11px] font-medium">
-                              {s.is_extend ? "↪️" : isNewAngleCut ? "✂️" : "🎬"} {s.label}
+                              {si === 0 ? "🎬" : isScene ? "✂️" : "🔗"} {s.label}
                               <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                                {s.is_extend
-                                  ? "(extiende desde el clip anterior)"
-                                  : isNewAngleCut
-                                    ? "(corte: foto nueva del ángulo, MISMA persona → usa la foto anterior como referencia)"
-                                    : "(plano de apertura)"}
+                                {si === 0
+                                  ? "(foto de apertura: persona + producto)"
+                                  : isScene
+                                    ? "(cambio de escena — genera foto nueva adjuntando la anterior + producto, MISMA persona)"
+                                    : "(misma persona: adjunta la foto del trozo anterior + la del producto)"}
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1.5">
-                              {s.is_extend ? (
-                                <CopyChip label="🎬 Animar (extender)" text={s.animate_prompt} primary />
-                              ) : (
-                                <>
-                                  <CopyChip label={isNewAngleCut ? "🖼️ Foto (nuevo ángulo)" : "🖼️ Paso 1 imagen"} text={s.image_prompt} primary />
-                                  <CopyChip label="🎬 Paso 2 animar" text={s.animate_prompt} primary />
-                                </>
-                              )}
-                              {s.spoken_line && <CopyChip label="🗣️ Voz (este plano)" text={s.spoken_line} />}
+                              <CopyChip label={si === 0 ? "🖼️ Foto (Paso 1)" : "🖼️ Foto (misma persona)"} text={s.image_prompt} primary />
+                              <CopyChip label="🎬 Animar (Paso 2)" text={s.animate_prompt} primary />
+                              {s.spoken_line && <CopyChip label="🗣️ Voz (este trozo)" text={s.spoken_line} />}
                             </div>
                           </div>
                         );
