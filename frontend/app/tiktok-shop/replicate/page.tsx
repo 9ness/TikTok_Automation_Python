@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import {
   Clapperboard,
   Copy,
@@ -11,7 +10,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useProducts, useProduct, productKeys } from "@/lib/queries/products";
 import type { ProblemVideo } from "@/lib/queries/radar";
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -24,6 +22,12 @@ interface WhyViral {
   why_sells?: string;
   visual_style?: string;
   structure?: string;
+}
+
+interface ReplicaResult {
+  videos: ProblemVideo[];
+  why: WhyViral;
+  mode: string;
 }
 
 function CopyChip({ label, text, primary }: { label: string; text: string; primary?: boolean }) {
@@ -48,44 +52,40 @@ function CopyChip({ label, text, primary }: { label: string; text: string; prima
 }
 
 export default function ReplicatePage() {
-  const qc = useQueryClient();
-  const { data: list, isLoading: loadingList } = useProducts({ limit: 200 });
-  const products = useMemo(
-    () => (list?.items ?? []).filter((p) => !p.deleted),
-    [list],
-  );
-
-  const [productId, setProductId] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
+  const [sameProduct, setSameProduct] = useState(true);
   const [n, setN] = useState(1);
   const [lang, setLang] = useState("es");
   const [generating, setGenerating] = useState(false);
   const [zoom, setZoom] = useState(1.18);
+  const [result, setResult] = useState<ReplicaResult | null>(null);
 
-  const { data: product } = useProduct(productId || undefined);
-  const replicas = (product?.viral_replicas ?? []) as ProblemVideo[];
-  const why = (product?.viral_replica_analysis ?? {}) as WhyViral;
-
-  // Subida / procesado por índice
+  // Estado de subida→edición por índice de tarjeta (editor genérico por token).
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [processingIdx, setProcessingIdx] = useState<number | null>(null);
+  const [tokens, setTokens] = useState<Record<number, string>>({});
 
-  const readyUrl = (i: number) =>
-    `${apiBase}/api/v1/tiktok-shop/radar/videos/replica/ready?product_id=${productId}&concept_index=${i}` +
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const refInputRef = useRef<HTMLInputElement>(null);
+
+  const readyUrl = (token: string) =>
+    `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/ready?token=${token}` +
     (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
 
   const generate = async () => {
-    if (!productId) return toast.error("Elige un producto base.");
     if (!videoFile) return toast.error("Sube el vídeo viral a replicar.");
+    if (!refFile) return toast.error("Sube la foto del producto.");
     setGenerating(true);
+    setResult(null);
+    setTokens({});
     const fd = new FormData();
     fd.append("file", videoFile);
-    fd.append("product_id", productId);
+    fd.append("reference_photo", refFile);
+    fd.append("same_product", String(sameProduct));
     fd.append("n", String(n));
     fd.append("language", lang);
-    if (refFile) fd.append("reference_photo", refFile);
     try {
       const res = await fetch(`${apiBase}/api/v1/tiktok-shop/radar/videos/replica/generate`, {
         method: "POST",
@@ -94,8 +94,8 @@ export default function ReplicatePage() {
       });
       const data = await res.json();
       if (data.ok && data.videos?.length) {
-        toast.success(`${data.videos.length} versión(es) generadas${data.used_reference_photo ? " (con foto de referencia)" : ""}`);
-        qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+        setResult({ videos: data.videos, why: data.why_viral ?? {}, mode: data.mode ?? "versions" });
+        toast.success(`${data.videos.length} ${data.mode === "segments" ? "réplica (troceada)" : "versión(es)"} lista(s)`);
       } else {
         toast.error(data.message ?? "No se pudo replicar.");
       }
@@ -106,16 +106,37 @@ export default function ReplicatePage() {
     }
   };
 
-  const uploadVideo = (i: number, f: File) => {
+  const pollStatus = (i: number, token: string) => {
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(
+          `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/status?token=${token}` +
+            (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : ""),
+          { headers: apiKey ? { "X-API-Key": apiKey } : undefined },
+        );
+        const d = await r.json();
+        if (d.ready) {
+          clearInterval(t);
+          setProcessingIdx((cur) => (cur === i ? null : cur));
+          setTokens((prev) => ({ ...prev, [i]: token }));
+          toast.success("Vídeo listo para descargar");
+        }
+      } catch {
+        /* reintenta en el siguiente tick */
+      }
+    }, 5000);
+  };
+
+  const uploadVideo = (i: number, f: File, hookText: string, ctaText: string) => {
     setUploadingIdx(i);
     setUploadPct(0);
     const fd = new FormData();
     fd.append("file", f);
-    fd.append("product_id", productId);
-    fd.append("concept_index", String(i));
+    fd.append("hook_text", hookText);
+    fd.append("cta_text", ctaText);
     fd.append("zoom", String(zoom));
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${apiBase}/api/v1/tiktok-shop/radar/videos/replica/upload`);
+    xhr.open("POST", `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/upload`);
     if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
@@ -124,9 +145,15 @@ export default function ReplicatePage() {
       setUploadingIdx(null);
       try {
         const data = JSON.parse(xhr.responseText);
-        if (data.ok) {
+        if (data.ok && data.token) {
           toast.success(data.message ?? "En la cola, procesando…");
           setProcessingIdx(i);
+          setTokens((prev) => {
+            const next = { ...prev };
+            delete next[i];
+            return next;
+          });
+          pollStatus(i, data.token);
         } else toast.error(data.message ?? "Error procesando");
       } catch {
         toast.error("Respuesta inválida del servidor");
@@ -139,24 +166,8 @@ export default function ReplicatePage() {
     xhr.send(fd);
   };
 
-  // Polling hasta que aparezca ready_video del índice en proceso.
-  useEffect(() => {
-    if (processingIdx === null) return;
-    const done = (product?.viral_replicas?.[processingIdx] as ProblemVideo | undefined)?.ready_video;
-    if (done) {
-      setProcessingIdx(null);
-      toast.success("Réplica lista para descargar");
-      return;
-    }
-    const t = setInterval(
-      () => qc.invalidateQueries({ queryKey: productKeys.detail(productId) }),
-      5000,
-    );
-    return () => clearInterval(t);
-  }, [processingIdx, product, productId, qc]);
-
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const refInputRef = useRef<HTMLInputElement>(null);
+  const why = result?.why ?? {};
+  const videos = result?.videos ?? [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-3 sm:p-4">
@@ -165,35 +176,15 @@ export default function ReplicatePage() {
         <h1 className="text-lg font-semibold">Replicar vídeo viral</h1>
       </div>
       <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
-        Sube un vídeo que <b>ya funciona</b> en TikTok. Gemini analiza <b>por qué
-        viraliza</b> y genera versiones <b>2 pasos (foto→vídeo)</b> para replicar la
-        fórmula con <b>tu producto</b>. Copia el <b>Paso 1</b> en Nano Banana (adjunta la
-        foto del producto) → la imagen resultante al <b>Paso 2</b> en Veo 3.1 → sube el
-        vídeo aquí para quemar gancho + CTA + flecha.
+        Sube un vídeo que <b>ya funciona</b> + la <b>foto del producto</b>. Gemini analiza
+        <b> por qué viraliza</b> y genera versiones <b>2 pasos (foto→vídeo)</b>. Copia el
+        <b> Paso 1</b> en Nano Banana (adjunta la foto) → la imagen al <b>Paso 2</b> en Veo 3.1
+        → sube el vídeo aquí para quemar gancho + CTA + flecha. <b>No hace falta crear el
+        producto en la web.</b>
       </p>
 
       {/* Formulario */}
       <div className="space-y-3 rounded-lg border border-border p-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium">Producto base</label>
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          >
-            <option value="">{loadingList ? "Cargando…" : "— Elige un producto —"}</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            La réplica llevará este producto. Sube una <b>foto de referencia</b> abajo solo
-            si quieres trasladar la fórmula a un producto distinto al de sus fotos.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {/* Vídeo viral */}
           <div>
@@ -208,9 +199,9 @@ export default function ReplicatePage() {
               <span className="truncate">{videoFile ? videoFile.name : "Subir vídeo viral…"}</span>
             </button>
           </div>
-          {/* Foto de referencia opcional */}
+          {/* Foto del producto */}
           <div>
-            <label className="mb-1 block text-xs font-medium">Foto del producto (opcional)</label>
+            <label className="mb-1 block text-xs font-medium">Foto del producto *</label>
             <input ref={refInputRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { setRefFile(e.target.files?.[0] ?? null); }} />
             <button
@@ -218,10 +209,24 @@ export default function ReplicatePage() {
               className="flex w-full items-center gap-2 truncate rounded-md border border-dashed border-border px-2 py-1.5 text-xs hover:border-foreground/50"
             >
               <Upload className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{refFile ? refFile.name : "Foto de referencia…"}</span>
+              <span className="truncate">{refFile ? refFile.name : "Subir foto del producto…"}</span>
             </button>
           </div>
         </div>
+
+        {/* Check: ¿la foto es el producto del vídeo? */}
+        <label className="flex cursor-pointer items-start gap-2 rounded-md bg-muted/40 p-2 text-xs">
+          <input type="checkbox" checked={sameProduct}
+            onChange={(e) => setSameProduct(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" />
+          <span>
+            <b>La foto es el mismo producto que sale en el vídeo.</b>
+            <span className="block text-[10px] text-muted-foreground">
+              Desmárcalo si es <b>tu producto distinto</b> y solo quieres trasladar la fórmula
+              del viral a él.
+            </span>
+          </span>
+        </label>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -250,11 +255,10 @@ export default function ReplicatePage() {
             {generating ? "Analizando…" : "Analizar y replicar"}
           </button>
         </div>
-        {generating && (
-          <p className="text-[11px] text-muted-foreground">
-            Extrayendo audio (Whisper) + muestreando frames + Gemini… puede tardar ~30-60s.
-          </p>
-        )}
+        <p className="text-[10px] text-muted-foreground">
+          Vídeos &gt;10s se trocean solos en clips de ~8s encadenados. El análisis tarda ~30-60s
+          (Whisper + Gemini).
+        </p>
       </div>
 
       {/* Por qué viraliza */}
@@ -273,7 +277,7 @@ export default function ReplicatePage() {
       )}
 
       {/* Réplicas */}
-      {replicas.length > 0 && (
+      {videos.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 rounded bg-muted/40 p-2 text-[11px]">
             <span>🔍 Zoom quita-marca:</span>
@@ -282,10 +286,11 @@ export default function ReplicatePage() {
             <span className="font-mono">{zoom.toFixed(2)}×</span>
             <span className="text-muted-foreground">(sube si aún se ve la marca; aplica al subir)</span>
           </div>
-          {replicas.map((v, i) => {
+          {videos.map((v, i) => {
+            const doneToken = tokens[i];
             const fileInput = (
               <input type="file" accept="video/*" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(i, f); e.target.value = ""; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(i, f, v.hook_text, v.cta_text); e.target.value = ""; }} />
             );
             const actionBtn =
               uploadingIdx === i ? (
@@ -296,9 +301,9 @@ export default function ReplicatePage() {
                 <span className="inline-flex items-center gap-1 text-[11px] text-orange-500">
                   <Loader2 className="h-3 w-3 animate-spin" /> en cola…
                 </span>
-              ) : v.ready_video ? (
+              ) : doneToken ? (
                 <div className="flex items-center gap-1.5">
-                  <a href={readyUrl(i)} download
+                  <a href={readyUrl(doneToken)} download
                     className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1.5 text-[11px] font-semibold text-white">
                     <Download className="h-3.5 w-3.5" /> Descargar
                   </a>
@@ -315,7 +320,7 @@ export default function ReplicatePage() {
               <div key={i} className="rounded-lg border border-border/60 p-2.5 text-xs">
                 <div className="mb-1.5 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="font-semibold">R{i + 1}</span>{" "}
+                    <span className="font-semibold">{result?.mode === "segments" ? "Réplica" : `V${i + 1}`}</span>{" "}
                     <span className="text-muted-foreground">{v.concept}</span>
                     {v.format && (
                       <span className="ml-1 inline-block rounded bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600">

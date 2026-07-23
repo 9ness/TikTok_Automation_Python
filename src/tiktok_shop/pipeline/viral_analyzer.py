@@ -664,8 +664,9 @@ def _normalize_replica(v: Any, idx: int) -> dict:
 def replicate_viral_2step(
     video_path: str,
     *,
-    product: Any,
+    product: Any = None,
     reference_photo_path: str | None = None,
+    same_product: bool = True,
     n: int = 1,
     language: str = "es",
     gemini_model: str = "gemini-2.5-flash",
@@ -781,13 +782,22 @@ def replicate_viral_2step(
     features = getattr(product, "key_features", []) or []
 
     lang_label = "español de España (es_ES)" if language.startswith("es") else language
-    ref_note = (
-        f"The LAST attached image (image #{len(images)}) is the PRODUCT REFERENCE "
-        f"— reproduce THAT exact product in every image_prompt."
-        if has_reference else
-        "No product reference photo attached — replicate the SAME product as it "
-        "appears in the viral frames."
-    )
+    if has_reference:
+        same_note = (
+            "This reference IS the same product shown in the viral."
+            if same_product else
+            "This is a DIFFERENT product than the one in the viral — transfer the "
+            "winning formula/structure to THIS product (adapt hooks/claims to it)."
+        )
+        ref_note = (
+            f"The LAST attached image (image #{len(images)}) is the PRODUCT REFERENCE "
+            f"— reproduce THAT exact product in every image_prompt. {same_note}"
+        )
+    else:
+        ref_note = (
+            "No product reference photo attached — replicate the SAME product as it "
+            "appears in the viral frames."
+        )
 
     # 5. Gemini
     from src.tiktok_shop.api.gemini import generate_json, is_configured, load_system_prompt

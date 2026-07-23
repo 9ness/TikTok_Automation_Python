@@ -1063,15 +1063,20 @@ def download_ready_video(
 async def replica_generate(
     operator: Annotated[str, Depends(get_current_user)],
     file: Annotated[UploadFile, File()],
-    product_id: Annotated[str, Form()],
+    reference_photo: Annotated[UploadFile | None, File()] = None,
+    product_id: Annotated[str, Form()] = "",
+    same_product: Annotated[bool, Form()] = True,
     n: Annotated[int, Form()] = 1,
     language: Annotated[str, Form()] = "es",
-    reference_photo: Annotated[UploadFile | None, File()] = None,
     gemini_model: Annotated[str, Form()] = "gemini-2.5-flash",
 ) -> dict:
-    """Sube un vídeo VIRAL + (opcional) foto del producto → Gemini analiza por
-    qué funciona y devuelve N versiones 2-step (foto→vídeo) para replicar la
-    fórmula con el producto del operador. Persiste en `product.viral_replicas`."""
+    """Sube un vídeo VIRAL + foto del producto → Gemini analiza por qué funciona
+    y devuelve N versiones 2-step (foto→vídeo) para replicar la fórmula.
+
+    Standalone (sin producto): basta el vídeo + la foto del producto; `same_product`
+    indica si la foto es el producto que sale en el vídeo o uno distinto. NO
+    persiste en catálogo — devuelve las versiones en la respuesta. Si se pasa
+    `product_id` (opcional/avanzado), además persiste en `product.viral_replicas`."""
     import shutil
     import tempfile
 
@@ -1080,9 +1085,10 @@ async def replica_generate(
     from src.tiktok_shop.repos import ProductRepo
 
     repo = ProductRepo()
-    product = repo.get(product_id)
-    if product is None:
-        return {"ok": False, "message": "Producto no encontrado."}
+    product = repo.get(product_id) if product_id else None
+    # Standalone requiere la foto del producto (es el único anclaje que hay).
+    if product is None and not (reference_photo is not None and reference_photo.filename):
+        return {"ok": False, "message": "Sube la foto del producto para replicar."}
 
     tmp = tempfile.mkdtemp(prefix="replica_in_")
     ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
@@ -1102,13 +1108,15 @@ async def replica_generate(
     start_job(
         job_id=f"replica_{uuid.uuid4().hex[:8]}",
         program="tiktok_shop", mode="viral_replica",
-        title=f"Replicar viral: {product.name}", product_id=product.id,
+        title=f"Replicar viral: {product.name if product else 'standalone'}",
+        product_id=product.id if product else None,
         user=operator or None,
     )
     try:
         res = replicate_viral_2step(
             video_path, product=product, reference_photo_path=ref_path,
-            n=max(1, min(3, n)), language=language, gemini_model=gemini_model,
+            same_product=same_product, n=max(1, min(3, n)),
+            language=language, gemini_model=gemini_model,
         )
     except Exception as e:
         return {"ok": False, "message": f"No se pudo replicar: {e}"}
@@ -1120,7 +1128,7 @@ async def replica_generate(
         import shutil as _sh
         _sh.rmtree(tmp, ignore_errors=True)
 
-    if res.get("videos"):
+    if product is not None and res.get("videos"):
         product.viral_replicas = res["videos"]
         product.viral_replica_analysis = res.get("why_viral", {})
         product.touch()
@@ -1405,6 +1413,16 @@ def download_edit_video(
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Aún no procesado.")
     return FileResponse(path, media_type="video/mp4", filename=f"editado_{token}.mp4")
+
+
+@router.get("/videos/edit/status")
+def edit_video_status(token: str) -> dict:
+    """Sondeo ligero: ¿está lista la edición libre por `token`? Sin descargar
+    el vídeo (el front lo usa para mostrar el botón verde)."""
+    import re
+    if not re.fullmatch(r"[a-f0-9]{8,32}", token or ""):
+        return {"ready": False}
+    return {"ready": os.path.exists(os.path.join(_edits_dir(), f"{token}.mp4"))}
 
 
 @router.get("/video-templates")
