@@ -40,6 +40,12 @@ vende**. Sé concreto y accionable (no genérico):
    (elige uno; si el original no lo deja claro, decide el que mejor pegue al
    producto/público). `"none"` solo si NO hay persona NI voz. Este género será
    el MISMO en TODAS las versiones/segmentos (persona visible Y voz).
+10. **cta_action** — MIRA cómo el original llama a comprar al FINAL: ¿la persona/
+    mano **SEÑALA o toca hacia el enlace del carrito** (normalmente
+    **abajo-izquierda** de la pantalla), apunta al carrito naranja, hace un gesto
+    de "toca aquí"? Descríbelo (p. ej. "señala con el dedo hacia abajo-izquierda,
+    al carrito"). Si no hay gesto de CTA, `"none"`. ESTO HAY QUE REPLICARLO en el
+    vídeo (ver animate).
 
 ## Paso 2 — Replica esa fórmula para el PRODUCTO del operador
 
@@ -219,6 +225,15 @@ enseña y habla, o una mano aplica el producto, o hay un antes/después, reprod�
 foto) y repite el `person_gender` explícito (`young man`/`young woman ~30`) para
 que el género no cambie entre vídeos.
 
+- **🛒 GESTO CTA — REPLÍCALO SIEMPRE (importante).** Si `cta_action` no es
+  `"none"`, el vídeo DEBE incluir ese gesto de llamada a la acción, normalmente
+  **al FINAL**. Textual: `at the end, the person (or the hand) clearly POINTS DOWN
+  toward the bottom-left corner of the screen — toward the TikTok Shop cart link —
+  with an inviting "tap here / get it here" gesture, holding the point for ~1
+  second`. Si es POV/manos, que sea **una mano señalando abajo-izquierda**. En
+  segmentos, mete el gesto CTA en el ÚLTIMO segmento. El operador ya superpone una
+  flecha al carrito encima, pero el **gesto de la persona señalando** es lo que lo
+  hace convincente (el viral lo tenía y tus réplicas no → hay que ponerlo).
 - **CAMBIOS DE ÁNGULO/PLANO en un solo clip (modo versions):** si el original
   cambia de ángulo, descríbelo como un **CORTE DURO** dentro del clip, no como una
   rotación. Textual, adaptado al vídeo: `the clip has clean HARD CUTS between
@@ -284,6 +299,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
   "mode": "versions",
   "product_name": "nombre corto del producto (identifícalo por la foto + frames), máx ~6 palabras, en el idioma de salida",
   "person_gender": "male | female | none (el MISMO en todas las versiones)",
+  "cta_action": "cómo señala al carrito en el original (o 'none')",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
     "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only"
@@ -316,6 +332,7 @@ van vacíos (todo va en `segments`):
   "mode": "segments",
   "product_name": "nombre corto del producto (máx ~6 palabras, idioma de salida)",
   "person_gender": "male | female | none (el MISMO en todos los segmentos)",
+  "cta_action": "cómo señala al carrito en el original (o 'none')",
   "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face" },
   "videos": [
     {

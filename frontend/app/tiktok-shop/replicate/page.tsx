@@ -26,6 +26,7 @@ interface WhyViral {
   shots?: string;
   human_presence?: string;
   person_gender?: string;
+  cta_action?: string;
 }
 
 const PRESENCE_LABEL: Record<string, string> = {
@@ -400,6 +401,9 @@ export default function ReplicatePage() {
               </li>
             )}
             {why.shots && <li><b className="text-foreground">Planos:</b> {why.shots}</li>}
+            {why.cta_action && why.cta_action !== "none" && (
+              <li><b className="text-foreground">Gesto CTA:</b> {why.cta_action}</li>
+            )}
             {why.structure && <li><b className="text-foreground">Estructura:</b> {why.structure}</li>}
           </ul>
         </div>

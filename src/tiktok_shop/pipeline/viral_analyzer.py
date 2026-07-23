@@ -874,6 +874,9 @@ def replicate_viral_2step(
     pg = _safe_str(raw.get("person_gender"), "")
     if pg and "person_gender" not in why_viral:
         why_viral["person_gender"] = pg
+    cta_a = _safe_str(raw.get("cta_action"), "")
+    if cta_a and "cta_action" not in why_viral:
+        why_viral["cta_action"] = cta_a
     videos_raw = raw.get("videos") if isinstance(raw.get("videos"), list) else []
     # El modo lo decide PYTHON por duración (determinista): ≤10s versiones,
     # >10s segmentos. No dejamos que Gemini lo elija (lo hacía mal → devolvía
