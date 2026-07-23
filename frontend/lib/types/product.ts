@@ -161,6 +161,23 @@ export interface Product {
     ready_video?: string;
   }[];
   problem_analysis?: Record<string, unknown>;
+  /** Réplicas 2-step de vídeos virales subidos (mismo schema que problem_videos). */
+  viral_replicas?: {
+    concept: string;
+    format: string;
+    emotion: string;
+    angle: string;
+    veo3_prompt: string;
+    image_prompt?: string;
+    animate_prompt?: string;
+    spoken_line: string;
+    hook_text: string;
+    cta_text: string;
+    caption: string;
+    ready_video?: string;
+  }[];
+  /** "por qué viraliza" del último vídeo replicado. */
+  viral_replica_analysis?: Record<string, unknown>;
   /** Origen: "manual" (creado a mano) o "radar" (importado del Radar). */
   origin?: "manual" | "radar";
   /** Investigación profunda: reviews + top vídeos TikTok + comentarios.

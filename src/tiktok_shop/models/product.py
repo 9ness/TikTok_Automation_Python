@@ -291,6 +291,13 @@ class Product(BaseModel):
     # Generados por problem_video_generator / endpoint /radar/videos/problem.
     problem_videos: list[dict] = Field(default_factory=list)
     problem_analysis: dict = Field(default_factory=dict)
+    # Réplicas 2-step de vídeos VIRALES subidos por el operador. Mismo schema
+    # que problem_videos (concept, format, image_prompt, animate_prompt,
+    # spoken_line, hook_text, cta_text, caption, ready_video). Se guarda el
+    # análisis "por qué viraliza" bajo `viral_replica_analysis`. Generados por
+    # viral_analyzer.replicate_viral_2step / endpoint /replicate-viral-2step.
+    viral_replicas: list[dict] = Field(default_factory=list)
+    viral_replica_analysis: dict = Field(default_factory=dict)
     # Investigación profunda: reviews + top vídeos TikTok + comentarios.
     # Se rellena vía `research_service.py` al pulsar "Reanalizar producto".
     # Los prompts directores leen esto para afinar hooks y guiones con

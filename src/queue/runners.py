@@ -1916,18 +1916,23 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
 
     product_id = job.params["product_id"]
     idx = int(job.params["concept_index"])
+    # Lista destino: problem_videos (default) o viral_replicas (replicar viral).
+    # Mismo schema 2-step, misma maquinaria de render; solo cambia el campo.
+    concept_field = job.params.get("concept_field", "problem_videos")
 
     repo = ProductRepo()
     product = repo.get(product_id)
-    if product is None or idx < 0 or idx >= len(product.problem_videos):
+    concepts = getattr(product, concept_field, None) if product is not None else None
+    if product is None or not isinstance(concepts, list) or idx < 0 or idx >= len(concepts):
         raise RuntimeError("Producto o concepto no encontrado")
-    concept = product.problem_videos[idx]
+    concept = concepts[idx]
 
     ready_dir = os.path.join(product_drive_folder(product.slug), "videos_ready")
     # Nombre único: producto + versión + fecha/hora → sin duplicados al bajar.
     short = re.sub(r"[^a-z0-9]+", "_", product.name.lower())[:40].strip("_") or "video"
     ts = datetime.now().strftime("%Y%m%d_%H%M")
-    fname = f"{short}_v{idx + 1}_{ts}.mp4"
+    tag = "rep" if concept_field == "viral_replicas" else "v"
+    fname = f"{short}_{tag}{idx + 1}_{ts}.mp4"
     out_path = os.path.join(ready_dir, fname)
     on_progress(0.1, "🎬 Procesando vídeo…")
     # Desfase por PRODUCTO: sin esto, todo producto empieza en el estilo/flecha 0
@@ -1949,9 +1954,10 @@ def run_tiktok_shop_ready_video(job: Job, on_log: OnLog, on_progress: OnProgress
     # operador veía V1 volver a "Subir vídeo" tras subir V2/V3). Tocamos solo
     # el índice de esta versión sobre la copia más reciente.
     fresh = repo.get(product_id) or product
-    if 0 <= idx < len(fresh.problem_videos):
-        fresh.problem_videos[idx]["ready_video"] = fname
-        fresh.problem_videos[idx]["ready_at"] = ts
+    fresh_list = getattr(fresh, concept_field, None)
+    if isinstance(fresh_list, list) and 0 <= idx < len(fresh_list):
+        fresh_list[idx]["ready_video"] = fname
+        fresh_list[idx]["ready_at"] = ts
     fresh.touch()
     repo.save(fresh)
     try:

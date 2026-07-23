@@ -1058,6 +1058,149 @@ def download_ready_video(
     return FileResponse(path, media_type="video/mp4", filename=fname)
 
 
+# ── Replicar vídeo VIRAL (2-step foto→vídeo) ─────────────────────────
+@router.post("/videos/replica/generate")
+async def replica_generate(
+    operator: Annotated[str, Depends(get_current_user)],
+    file: Annotated[UploadFile, File()],
+    product_id: Annotated[str, Form()],
+    n: Annotated[int, Form()] = 1,
+    language: Annotated[str, Form()] = "es",
+    reference_photo: Annotated[UploadFile | None, File()] = None,
+    gemini_model: Annotated[str, Form()] = "gemini-2.5-flash",
+) -> dict:
+    """Sube un vídeo VIRAL + (opcional) foto del producto → Gemini analiza por
+    qué funciona y devuelve N versiones 2-step (foto→vídeo) para replicar la
+    fórmula con el producto del operador. Persiste en `product.viral_replicas`."""
+    import shutil
+    import tempfile
+
+    from src.cost_tracking import finalize_and_persist, start_job
+    from src.tiktok_shop.pipeline.viral_analyzer import replicate_viral_2step
+    from src.tiktok_shop.repos import ProductRepo
+
+    repo = ProductRepo()
+    product = repo.get(product_id)
+    if product is None:
+        return {"ok": False, "message": "Producto no encontrado."}
+
+    tmp = tempfile.mkdtemp(prefix="replica_in_")
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
+    video_path = os.path.join(tmp, f"viral{ext}")
+    ref_path = None
+    try:
+        with open(video_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        if reference_photo is not None and reference_photo.filename:
+            rext = os.path.splitext(reference_photo.filename)[1].lower() or ".jpg"
+            ref_path = os.path.join(tmp, f"ref{rext}")
+            with open(ref_path, "wb") as f:
+                shutil.copyfileobj(reference_photo.file, f)
+    except Exception as e:
+        return {"ok": False, "message": f"Error guardando el vídeo: {e}"}
+
+    start_job(
+        job_id=f"replica_{uuid.uuid4().hex[:8]}",
+        program="tiktok_shop", mode="viral_replica",
+        title=f"Replicar viral: {product.name}", product_id=product.id,
+        user=operator or None,
+    )
+    try:
+        res = replicate_viral_2step(
+            video_path, product=product, reference_photo_path=ref_path,
+            n=max(1, min(3, n)), language=language, gemini_model=gemini_model,
+        )
+    except Exception as e:
+        return {"ok": False, "message": f"No se pudo replicar: {e}"}
+    finally:
+        try:
+            finalize_and_persist()
+        except Exception:
+            pass
+        import shutil as _sh
+        _sh.rmtree(tmp, ignore_errors=True)
+
+    if res.get("videos"):
+        product.viral_replicas = res["videos"]
+        product.viral_replica_analysis = res.get("why_viral", {})
+        product.touch()
+        repo.save(product)
+    return {"ok": True, **res}
+
+
+@router.post("/videos/replica/upload")
+def upload_replica_video(
+    operator: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    file: Annotated[UploadFile, File()],
+    product_id: Annotated[str, Form()],
+    concept_index: Annotated[int, Form()],
+    zoom: Annotated[float, Form()] = 1.18,
+) -> dict:
+    """Sube el vídeo generado (Nano Banana→Veo) de UNA réplica → guarda el
+    original y encola el procesado (zoom quita-marca + gancho + CTA + flecha)."""
+    import shutil
+
+    from src.tiktok_shop.repos import ProductRepo
+
+    product = ProductRepo().get(product_id)
+    if product is None or concept_index < 0 or concept_index >= len(product.viral_replicas):
+        return {"ok": False, "message": "Producto o réplica no encontrada."}
+
+    ready_dir = _ready_dir(product.slug)
+    os.makedirs(ready_dir, exist_ok=True)
+    raw_path = os.path.join(ready_dir, f"replica_{concept_index}_raw.mp4")
+    try:
+        with open(raw_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    except Exception as e:
+        return {"ok": False, "message": f"Error guardando el vídeo: {e}"}
+
+    job = queue.enqueue(
+        JobMode.TIKTOK_SHOP_READY_VIDEO,
+        title=f"🎬 Réplica lista: {product.name} · r{concept_index + 1}",
+        params={
+            "product_id": product.id, "concept_index": concept_index,
+            "concept_field": "viral_replicas", "raw_path": raw_path, "zoom": zoom,
+        },
+        enqueued_by=operator or None,
+    )
+    return {"ok": True, "job_id": job.id, "message": "En la cola, procesando…"}
+
+
+@router.get("/videos/replica/ready")
+def download_replica_video(
+    product_id: str,
+    concept_index: int,
+    api_key: Annotated[str | None, Query()] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+):
+    """Descarga la réplica procesada. Auth por query `api_key` (va en <a href>)."""
+    from fastapi import HTTPException
+
+    from src.api.config import get_settings
+    from src.tiktok_shop.repos import ProductRepo
+
+    settings = get_settings()
+    if settings.api_key:
+        provided = x_api_key or api_key
+        if not provided or provided != settings.api_key:
+            raise HTTPException(status_code=401, detail="API key inválida o ausente.")
+
+    product = ProductRepo().get(product_id)
+    if product is None:
+        return {"ok": False, "message": "Producto no encontrado."}
+    fname = None
+    if 0 <= concept_index < len(product.viral_replicas):
+        fname = (product.viral_replicas[concept_index] or {}).get("ready_video")
+    if not fname:
+        return {"ok": False, "message": "Aún no procesado."}
+    path = os.path.join(_ready_dir(product.slug), fname)
+    if not os.path.exists(path):
+        return {"ok": False, "message": "Aún no procesado."}
+    return FileResponse(path, media_type="video/mp4", filename=fname)
+
+
 class ScrapeSearchRequest(BaseModel):
     query: str
     region: str = "ES"

@@ -619,6 +619,213 @@ def analyze_viral_video(
     }
 
 
+_REPLICA_KEYS = (
+    "concept", "format", "emotion", "angle", "image_prompt",
+    "animate_prompt", "spoken_line", "hook_text", "cta_text", "caption",
+)
+
+
+def _normalize_replica(v: Any, idx: int) -> dict:
+    """Sanea una versión de réplica al schema 2-step de problem_videos."""
+    if not isinstance(v, dict):
+        v = {}
+    out = {k: _safe_str(v.get(k), "") for k in _REPLICA_KEYS}
+    out["veo3_prompt"] = ""  # nunca texto→vídeo
+    if not out["concept"]:
+        out["concept"] = f"Réplica v{idx + 1}"
+    return out
+
+
+def replicate_viral_2step(
+    video_path: str,
+    *,
+    product: Any,
+    reference_photo_path: str | None = None,
+    n: int = 1,
+    language: str = "es",
+    gemini_model: str = "gemini-2.5-flash",
+    temp_folder: str = "./temp_work",
+    log_callback: LogCallback = _noop,
+) -> dict:
+    """Ingeniería inversa de un vídeo VIRAL → réplica 2-step (foto→vídeo) para
+    el producto del operador.
+
+    Reutiliza el pipeline del analyzer (ffprobe + Whisper + frames) pero llama
+    al prompt `viral_replica_director.md` y devuelve el schema de problem_videos
+    (image_prompt + animate_prompt + textos) + un bloque `why_viral`.
+
+    - `reference_photo_path`: foto del producto NUEVO al que se traslada la
+      fórmula. Si se pasa, se adjunta como ÚLTIMA imagen y el image_prompt se
+      ancla a ella. Si es None, se usa la primera foto source del producto (o,
+      si no hay, se replica el producto tal como sale en el viral).
+    """
+    log_callback(f"📐 Probing duración de '{video_path}'…")
+    duration_s = _probe_duration_seconds(video_path)
+    log_callback(f"⏱️ Duración: {duration_s:.1f}s")
+
+    ts = int(time.time())
+    tmp_dir = Path(temp_folder) / f"replica_{ts}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Whisper
+    audio_path = str(tmp_dir / "audio.wav")
+    log_callback("🎙️ Extrayendo audio…")
+    transcript = ""
+    hook_text = ""
+    n_words = 0
+    try:
+        _extract_audio(video_path, audio_path)
+        log_callback("🎙️ Transcribiendo (Whisper small, local)…")
+        from src.subtitles import transcribe
+        words = transcribe(audio_path, model_size="small", language=None)
+        n_words = len(words)
+        transcript = " ".join(w.get("word", "") for w in words).strip()
+        hook_text = " ".join(
+            w["word"] for w in words
+            if isinstance(w.get("start"), (int, float)) and float(w["start"]) < 3.0
+        ).strip() or transcript[:80]
+        log_callback(f"📝 {n_words} palabras detectadas.")
+    except Exception as e:
+        log_callback(f"⚠️ Sin audio/transcripción ({e}). Sigo solo con frames.")
+
+    # 2. Frames del viral (orden cronológico)
+    log_callback("🎞️ Muestreando frames (1/s, max 30)…")
+    frames_dir = tmp_dir / "frames"
+    frame_paths = _sample_frames(video_path, frames_dir, max_frames=30)
+    if not frame_paths:
+        _cleanup(tmp_dir)
+        raise RuntimeError("No se pudieron extraer frames del vídeo.")
+    log_callback(f"🖼️ {len(frame_paths)} frames listos.")
+
+    # 3. Foto de referencia del producto (ancla) → última imagen
+    ref_path = reference_photo_path
+    has_reference = False
+    if ref_path and os.path.exists(ref_path):
+        has_reference = True
+    else:
+        ref_path = None
+        try:
+            from src.tiktok_shop.config import product_photos_source_folder
+            source_photos = getattr(getattr(product, "photos", None), "source", []) or []
+            for p in source_photos:
+                if getattr(p, "deleted", False):
+                    continue
+                local = getattr(p, "local_path", None)
+                if local and os.path.exists(local):
+                    ref_path = local
+                    break
+                cand = os.path.join(product_photos_source_folder(product.slug), p.filename)
+                if os.path.exists(cand):
+                    ref_path = cand
+                    break
+            if ref_path:
+                has_reference = True
+        except Exception:
+            ref_path = None
+
+    images = list(frame_paths)
+    if ref_path:
+        images.append(ref_path)
+
+    # 4. Contexto del producto
+    product_name = getattr(product, "name", "") or ""
+    product_brand = getattr(product, "brand", "") or ""
+    product_category = getattr(product, "category", "") or ""
+    tiktok_meta = getattr(product, "tiktok_shop", None)
+    price = getattr(tiktok_meta, "price_eur", None) if tiktok_meta else None
+    price_str = f"{float(price):.2f}€" if price else "(sin definir)"
+    selling = getattr(product, "selling_points", []) or []
+    features = getattr(product, "key_features", []) or []
+
+    lang_label = "español de España (es_ES)" if language.startswith("es") else language
+    ref_note = (
+        f"The LAST attached image (image #{len(images)}) is the PRODUCT REFERENCE "
+        f"— reproduce THAT exact product in every image_prompt."
+        if has_reference else
+        "No product reference photo attached — replicate the SAME product as it "
+        "appears in the viral frames."
+    )
+
+    # 5. Gemini
+    from src.tiktok_shop.api.gemini import generate_json, is_configured, load_system_prompt
+    if not is_configured():
+        _cleanup(tmp_dir)
+        raise RuntimeError(
+            "Gemini no configurado — define GOOGLE_GEMINI_KEY_FREE o "
+            "GOOGLE_GEMINI_KEY_PAID en .env para usar replicar viral."
+        )
+    system_prompt = load_system_prompt("viral_replica_director.md")
+    user_msg = (
+        f"OUTPUT LANGUAGE: {lang_label}\n"
+        f"Number of versions to generate: {n} (version 1 = faithful replica).\n"
+        f"Viral video total duration: {duration_s:.1f} seconds.\n"
+        f"Viral audio transcript ({n_words} words): {transcript[:3000] or '(no speech / music only)'}\n"
+        f"The first {len(frame_paths)} attached images are the viral video frames "
+        f"in chronological order (~1 fps). {ref_note}\n\n"
+        f"=== USER'S PRODUCT (the replica must feature THIS product) ===\n"
+        f"- Name: {product_name}\n"
+        f"- Brand: {product_brand or '(no brand)'}\n"
+        f"- Category: {product_category}\n"
+        f"- Real price: {price_str}\n"
+        f"- Key features: {', '.join(features) or '(none)'}\n"
+        f"- Selling points: {', '.join(selling) or '(none)'}\n"
+    )
+
+    log_callback(f"🤖 Gemini '{gemini_model}' con {len(images)} imágenes…")
+    try:
+        raw = generate_json(
+            system_prompt, user_msg,
+            model=gemini_model, images=images, temperature=0.5,
+        )
+    except Exception as e:
+        _cleanup(tmp_dir)
+        raise RuntimeError(f"Gemini falló al replicar el vídeo: {e}")
+
+    if not isinstance(raw, dict):
+        raw = {}
+    why_viral = raw.get("why_viral") if isinstance(raw.get("why_viral"), dict) else {}
+    videos_raw = raw.get("videos") if isinstance(raw.get("videos"), list) else []
+    videos = [_normalize_replica(v, i) for i, v in enumerate(videos_raw[:max(1, n)])]
+    if not videos:
+        _cleanup(tmp_dir)
+        raise RuntimeError("Gemini no devolvió ninguna versión de réplica.")
+
+    # 6. Coste (estimación local, mismo criterio que analyze_viral_video)
+    from src.cost_tracking import _resolve_gemini_rates
+    est_input_tokens = len(images) * 258 + len(system_prompt) // 4 + len(user_msg) // 4
+    est_output_tokens = 400 * len(videos) + 300
+    in_rate, out_rate = _resolve_gemini_rates(gemini_model)
+    cost_usd = (
+        (est_input_tokens / 1_000_000) * in_rate
+        + (est_output_tokens / 1_000_000) * out_rate
+    )
+    try:
+        from src.cost_tracking import record_gemini
+        record_gemini(
+            input_tokens=est_input_tokens, output_tokens=est_output_tokens,
+            model=gemini_model, detail="viral_replica",
+        )
+    except Exception:
+        pass
+
+    _cleanup(tmp_dir)
+    log_callback(f"✅ {len(videos)} versión(es) de réplica listas.")
+    return {
+        "ok": True,
+        "why_viral": why_viral,
+        "videos": videos,
+        "language": language,
+        "duration_s": round(duration_s, 1),
+        "used_reference_photo": has_reference,
+        "cost_breakdown": {
+            "gemini_usd": round(cost_usd, 4),
+            "whisper_usd": 0.0,
+            "total_usd": round(cost_usd, 4),
+            "gemini_model": gemini_model,
+        },
+    }
+
+
 def _cleanup(tmp_dir: Path) -> None:
     """Borra el subdir temporal del análisis. Errores se ignoran (cosmético)."""
     try:
