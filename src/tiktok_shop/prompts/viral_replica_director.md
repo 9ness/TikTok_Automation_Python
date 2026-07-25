@@ -46,6 +46,13 @@ vende**. Sé concreto y accionable (no genérico):
     de "toca aquí"? Descríbelo (p. ej. "señala con el dedo hacia abajo-izquierda,
     al carrito"). Si no hay gesto de CTA, `"none"`. ESTO HAY QUE REPLICARLO en el
     vídeo (ver animate).
+11. **dialogue** — ¿es una CONVERSACIÓN de dos voces? Mira el transcript (turnos,
+    pregunta→respuesta) y los frames. Clasifica:
+    - `"none"` = una sola voz (o sin voz).
+    - `"interview"` = **quien graba habla FUERA de cámara** (voz en off) y la
+      **protagonista responde EN cámara**. Indica qué dice cada uno (frase off-cam
+      de quien graba / frase en-cam de la protagonista). El mensaje de usuario
+      puede FORZARlo con un flag "conversation".
 
 ## Paso 2 — Replica esa fórmula para el PRODUCTO del operador
 
@@ -250,6 +257,19 @@ que el género no cambie entre vídeos.
   movement; she/he also shows and uses the product — lifts it toward the camera,
   turns the label; lively natural gestures and genuine expression; NOT a static
   stare`.
+- **🗣️ CONVERSACIÓN / ENTREVISTA (`dialogue = "interview"`):** hay DOS voces —
+  quien graba (fuera de cámara) y la protagonista (en cámara). Replícalo así:
+  - La **protagonista EN cámara** dice su frase con **lip-sync** (como arriba); su
+    frase va en `spoken_line`.
+  - **Quien graba** habla como **VOZ EN OFF** (mejor esfuerzo de Veo). Mételo
+    textual en el animate: `an OFF-SCREEN voice (the person filming, NOT visible,
+    off-camera) says in Spanish from Spain: "<frase de quien graba>", then the
+    on-camera person answers with lip-sync: "<spoken_line>"`. El que graba **NO
+    aparece** en cuadro (regla de presencia humana). Respeta el orden real
+    (normalmente: pregunta off-cam → respuesta en cámara).
+  - **Géneros:** usa un género para la protagonista (en cámara) y, si se distingue,
+    otro para la voz en off; indícalos explícitos (`off-screen male/female voice`,
+    `on-camera young man/woman`). Mantenlos iguales en todas las versiones.
 - **Persona que NO habla:** `the person ACTIVELY shows and uses the product —
   lifts it toward the camera, turns it to show the label, applies/takes it,
   lively gestures and a genuine expression; dynamic movement, NOT a static stare;
@@ -302,7 +322,7 @@ IMPORTANTE: SOLO esos dos textos en pantalla (1 gancho + 1 CTA).
   "cta_action": "cómo señala al carrito en el original (o 'none')",
   "why_viral": {
     "hook": "...", "retention": "...", "emotion": "...",
-    "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only"
+    "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "1 plano continuo", "human_presence": "hands_only", "dialogue": "none"
   },
   "videos": [
     {
@@ -333,7 +353,7 @@ van vacíos (todo va en `segments`):
   "product_name": "nombre corto del producto (máx ~6 palabras, idioma de salida)",
   "person_gender": "male | female | none (el MISMO en todos los segmentos)",
   "cta_action": "cómo señala al carrito en el original (o 'none')",
-  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face" },
+  "why_viral": { "hook": "...", "retention": "...", "emotion": "...", "why_sells": "...", "visual_style": "...", "structure": "...", "shots": "3 planos: frontal, lateral, detalle", "human_presence": "face", "dialogue": "interview" },
   "videos": [
     {
       "concept": "...",

@@ -27,6 +27,7 @@ interface WhyViral {
   human_presence?: string;
   person_gender?: string;
   cta_action?: string;
+  dialogue?: string;
 }
 
 const PRESENCE_LABEL: Record<string, string> = {
@@ -98,6 +99,7 @@ export default function ReplicatePage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
   const [sameProduct, setSameProduct] = useState(true);
+  const [conversation, setConversation] = useState(false);
   const [n, setN] = useState(1);
   const [lang, setLang] = useState("es");
   const [generating, setGenerating] = useState(false);
@@ -178,6 +180,7 @@ export default function ReplicatePage() {
     fd.append("file", videoFile);
     fd.append("reference_photo", refFile);
     fd.append("same_product", String(sameProduct));
+    fd.append("conversation", String(conversation));
     fd.append("n", String(n));
     fd.append("language", lang);
     try {
@@ -335,6 +338,21 @@ export default function ReplicatePage() {
           </span>
         </label>
 
+        {/* Check: ¿es una conversación (dos voces)? */}
+        <label className="flex cursor-pointer items-start gap-2 rounded-md bg-muted/40 p-2 text-xs">
+          <input type="checkbox" checked={conversation}
+            onChange={(e) => setConversation(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" />
+          <span>
+            <b>🗣️ Es una conversación (dos voces).</b>
+            <span className="block text-[10px] text-muted-foreground">
+              Quien graba habla fuera de cámara y la protagonista responde en cámara. La IA
+              intenta detectarlo solo; márcalo para forzarlo. La voz de quien graba sale como
+              <b> voz en off</b> (mejor esfuerzo de Veo).
+            </span>
+          </span>
+        </label>
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium">Versiones:</span>
@@ -403,6 +421,9 @@ export default function ReplicatePage() {
             {why.shots && <li><b className="text-foreground">Planos:</b> {why.shots}</li>}
             {why.cta_action && why.cta_action !== "none" && (
               <li><b className="text-foreground">Gesto CTA:</b> {why.cta_action}</li>
+            )}
+            {why.dialogue && why.dialogue !== "none" && (
+              <li><b className="text-foreground">Conversación:</b> {why.dialogue === "interview" ? "Entrevista (voz off + protagonista en cámara)" : why.dialogue}</li>
             )}
             {why.structure && <li><b className="text-foreground">Estructura:</b> {why.structure}</li>}
           </ul>

@@ -677,6 +677,7 @@ def replicate_viral_2step(
     product: Any = None,
     reference_photo_path: str | None = None,
     same_product: bool = True,
+    conversation: bool = False,
     n: int = 1,
     language: str = "es",
     gemini_model: str = "gemini-2.5-flash",
@@ -841,9 +842,17 @@ def replicate_viral_2step(
             f"transition=\"continue\" (same person, its photo references the previous "
             f"one) or \"cut\" if there is a real scene change.\n"
         )
+    conv_line = (
+        "The operator says this IS a CONVERSATION/interview (two voices: the "
+        "off-camera filmer + the on-camera person). Set why_viral.dialogue accordingly "
+        "and replicate it (on-camera lip-sync + off-screen voice).\n"
+        if conversation else
+        "Auto-detect if it is a conversation (two voices) and set why_viral.dialogue.\n"
+    )
     user_msg = (
         f"OUTPUT LANGUAGE: {lang_label}\n"
         f"{mode_line}"
+        f"{conv_line}"
         f"Viral video total duration: {duration_s:.1f} seconds.\n"
         f"Viral audio transcript ({n_words} words): {transcript[:3000] or '(no speech / music only)'}\n"
         f"The first {len(frame_paths)} attached images are the viral video frames "

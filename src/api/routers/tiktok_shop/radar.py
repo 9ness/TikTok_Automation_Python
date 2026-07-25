@@ -1066,6 +1066,7 @@ async def replica_generate(
     reference_photo: Annotated[UploadFile | None, File()] = None,
     product_id: Annotated[str, Form()] = "",
     same_product: Annotated[bool, Form()] = True,
+    conversation: Annotated[bool, Form()] = False,
     n: Annotated[int, Form()] = 1,
     language: Annotated[str, Form()] = "es",
     gemini_model: Annotated[str, Form()] = "gemini-2.5-flash",
@@ -1120,8 +1121,8 @@ async def replica_generate(
     try:
         res = replicate_viral_2step(
             video_path, product=product, reference_photo_path=ref_path,
-            same_product=same_product, n=max(1, min(3, n)),
-            language=language, gemini_model=gemini_model,
+            same_product=same_product, conversation=conversation,
+            n=max(1, min(3, n)), language=language, gemini_model=gemini_model,
         )
     except Exception as e:
         return {"ok": False, "message": f"No se pudo replicar: {e}"}
