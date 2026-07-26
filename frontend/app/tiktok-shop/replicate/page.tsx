@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Clapperboard,
   Copy,
@@ -103,6 +103,7 @@ export default function ReplicatePage() {
   const [n, setN] = useState(1);
   const [lang, setLang] = useState("es");
   const [generating, setGenerating] = useState(false);
+  const [formError, setFormError] = useState("");
   const [zoom, setZoom] = useState(1.18);
   const [result, setResult] = useState<ReplicaResult | null>(null);
   const [replicaId, setReplicaId] = useState<string | null>(null);
@@ -163,16 +164,23 @@ export default function ReplicatePage() {
     } else toast.error("No se pudo borrar.");
   };
 
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const refInputRef = useRef<HTMLInputElement>(null);
 
   const readyUrl = (token: string) =>
     `${apiBase}/api/v1/tiktok-shop/radar/videos/edit/ready?token=${token}` +
     (apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : "");
 
   const generate = async () => {
-    if (!videoFile) return toast.error("Sube el vídeo viral a replicar.");
-    if (!refFile) return toast.error("Sube la foto del producto.");
+    // Aviso INLINE además del toast: en móvil el toast puede pasar
+    // desapercibido y parece que "no pasa nada" al pulsar.
+    setFormError("");
+    if (!videoFile) {
+      setFormError("Falta el vídeo viral: tócalo arriba y elige el MP4.");
+      return toast.error("Sube el vídeo viral a replicar.");
+    }
+    if (!refFile) {
+      setFormError("Falta la foto del producto: tócala arriba y elígela.");
+      return toast.error("Sube la foto del producto.");
+    }
     setGenerating(true);
     setResult(null);
     setTokens({});
@@ -199,9 +207,11 @@ export default function ReplicatePage() {
         toast.success(`${data.videos.length} ${data.mode === "segments" ? "réplica (troceada)" : "versión(es)"} lista(s) · guardada`);
         loadHistory();
       } else {
+        setFormError(data.message ?? "No se pudo replicar.");
         toast.error(data.message ?? "No se pudo replicar.");
       }
     } catch (e) {
+      setFormError(`Error de red: ${(e as Error).message}`);
       toast.error(`Error: ${(e as Error).message}`);
     } finally {
       setGenerating(false);
@@ -296,31 +306,37 @@ export default function ReplicatePage() {
       {/* Formulario */}
       <div className="space-y-3 rounded-lg border border-border p-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {/* Vídeo viral */}
+          {/* Vídeo viral — <label> envolviendo el input: en móvil abre el
+              selector de forma nativa (ref.click() sobre un input oculto
+              fallaba). */}
           <div>
-            <label className="mb-1 block text-xs font-medium">Vídeo viral (MP4) *</label>
-            <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
-              onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); }} />
-            <button
-              onClick={() => videoInputRef.current?.click()}
-              className="flex w-full items-center gap-2 truncate rounded-md border border-dashed border-border px-2 py-1.5 text-xs hover:border-foreground/50"
+            <span className="mb-1 block text-xs font-medium">Vídeo viral (MP4) *</span>
+            <label
+              className={
+                "flex w-full cursor-pointer items-center gap-2 truncate rounded-md border border-dashed px-2 py-2 text-xs " +
+                (videoFile ? "border-green-600/60 text-green-600" : "border-border hover:border-foreground/50")
+              }
             >
+              <input type="file" accept="video/*" className="sr-only"
+                onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); }} />
               <Upload className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{videoFile ? videoFile.name : "Subir vídeo viral…"}</span>
-            </button>
+              <span className="truncate">{videoFile ? `✅ ${videoFile.name}` : "Subir vídeo viral…"}</span>
+            </label>
           </div>
           {/* Foto del producto */}
           <div>
-            <label className="mb-1 block text-xs font-medium">Foto del producto *</label>
-            <input ref={refInputRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => { setRefFile(e.target.files?.[0] ?? null); }} />
-            <button
-              onClick={() => refInputRef.current?.click()}
-              className="flex w-full items-center gap-2 truncate rounded-md border border-dashed border-border px-2 py-1.5 text-xs hover:border-foreground/50"
+            <span className="mb-1 block text-xs font-medium">Foto del producto *</span>
+            <label
+              className={
+                "flex w-full cursor-pointer items-center gap-2 truncate rounded-md border border-dashed px-2 py-2 text-xs " +
+                (refFile ? "border-green-600/60 text-green-600" : "border-border hover:border-foreground/50")
+              }
             >
+              <input type="file" accept="image/*" className="sr-only"
+                onChange={(e) => { setRefFile(e.target.files?.[0] ?? null); }} />
               <Upload className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{refFile ? refFile.name : "Subir foto del producto…"}</span>
-            </button>
+              <span className="truncate">{refFile ? `✅ ${refFile.name}` : "Subir foto del producto…"}</span>
+            </label>
           </div>
         </div>
 
@@ -380,6 +396,11 @@ export default function ReplicatePage() {
             {generating ? "Analizando…" : "Analizar y replicar"}
           </button>
         </div>
+        {formError && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-[11px] text-destructive">
+            ⚠️ {formError}
+          </p>
+        )}
         <p className="text-[10px] text-muted-foreground">
           Vídeos &gt;10s se trocean solos en clips de ~8s encadenados. El análisis tarda ~30-60s
           (Whisper + Gemini).
