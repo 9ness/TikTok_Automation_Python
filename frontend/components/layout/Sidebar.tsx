@@ -23,6 +23,7 @@ import {
   Mic,
   Package,
   Radar,
+  Rocket,
   Scissors,
   Search,
   Settings,
@@ -31,6 +32,7 @@ import {
   Sparkles,
   Trophy,
   Users,
+  Video,
   Wrench,
   X,
 } from "lucide-react";
@@ -94,6 +96,15 @@ const NAV: NavGroup[] = [
       { href: "/tiktok-shop/history", label: "Histórico", icon: History },
       { href: "/tiktok-shop/voices", label: "Voces", icon: Mic },
       { href: "/tiktok-shop/watermark-remover", label: "Sin marca", icon: ShieldOff },
+    ],
+  },
+  {
+    kind: "group",
+    title: "Tiktok Shop AI Pro",
+    basePath: "/tiktok-shop-ai-pro",
+    icon: Rocket,
+    items: [
+      { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
     ],
   },
   {

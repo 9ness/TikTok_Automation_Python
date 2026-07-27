@@ -9,8 +9,9 @@ Regla estricta: Respuestas de 1-2 líneas máximo. Cero explicaciones, cortesía
 ## Resumen del proyecto
 
 `TikTok_Automation_Python` — fábrica Streamlit que genera vídeos virales 9:16
-para TikTok. **3 programas principales** seleccionables en la sidebar (Creator
-Reward / TikTok Shop / Editor Auto), cada uno con sus nichos.
+para TikTok. **4 programas principales** seleccionables en la sidebar (Creator
+Reward / TikTok Shop / Editor Auto / Tiktok Shop AI Pro), cada uno con sus
+nichos.
 
 ### Programa 1 — Creator Reward (existente)
 
@@ -33,6 +34,12 @@ Reward / TikTok Shop / Editor Auto), cada uno con sus nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | ✂️ Editor Auto | `EDITOR_AUTO` | Edita vídeo input con flujo configurable de herramientas componibles por usuario (subs, cortador silencios + IA, ...) |
+
+### Programa 4 — Tiktok Shop AI Pro
+
+| Función | Modo | Propósito |
+|---|---|---|
+| 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
 
@@ -212,6 +219,41 @@ Program máx 5 shoppable/semana (tracker en `services/pilot_tracker.py`).
 
 ---
 
+## Programa 4 — Tiktok Shop AI Pro
+
+**Briefing completo en [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md)** —
+fuente de verdad del módulo (arquitectura, banco de candidatos, estilos,
+jitter, numeración, schema Redis).
+
+**Propósito:** vídeos POV/reacción en lote (ponente + b-roll de paisajes)
+para llegar a 1000 seguidores en TikTok Shop — técnica anti-copyright
+"voice-over + b-roll". Sin Redis de negocio como TikTok Shop, solo tracking
+de uso; sin APIs de pago (todo ffmpeg + Whisper local + rclone) → **sin cost
+tracking, a propósito** (ver VIRALIZACION_MODULE.md).
+
+**Módulos** (todos en [`src/viralizacion/`](src/viralizacion/)):
+`config.py` (paths locales + parámetros de render/jitter),
+`repos/{redis_base,usage_repo}.py` (tracking de candidatos ya usados, prefijo
+`viralizacion:`), `services/{allocator,drive_uploader}.py`,
+`pipeline/{resource_scanner,transcriber,styles,renderer,batch}.py`.
+
+**Ponentes:** Pablo Motos y Víctor Küppers (banco de gancho + audios propios,
+paisajes compartidos). Assets en carpeta LOCAL persistente
+(`VIRALIZACION_ASSETS_PATH`, NO Drive montado, NO `/tmp`) — vídeo de gancho
+por ponente + audios + vídeo de paisajes (~61min) + música de fondo.
+
+**3 estilos de subtítulo/filtro** rotando por ronda (A Clásico / B Reveal
+letra-a-letra con glow / C Cinemático karaoke por palabra + letterbox) +
+jitter anti-fingerprint (zoom, duración de paisaje, transición, EQ) por
+clip/vídeo para que la plantilla no deje huella reconocible.
+
+**Nunca repite** gancho ni tramo de paisaje por ponente (Redis SET de
+índices usados, asignación con `PoolExhaustedError` claro si se agota).
+
+Cola unificada con Creator Reward vía `JobMode.VIRALIZACION_BATCH`.
+
+---
+
 ## Variables de entorno (`.env`)
 
 ```env
@@ -268,6 +310,12 @@ PIXABAY_API_KEY=...
 # TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
 # OPENAI_API_KEY ya definida arriba — silence_cutter usa gpt-4o (mejor calidad)
+
+# === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
+# Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.
+# Auto-detect si no se define (prueba "~/viralizacion_assets").
+# VIRALIZACION_ASSETS_PATH="/home/nebulabsai/viralizacion_assets"
+# VIRALIZACION_REDIS_PREFIX=viralizacion:   # default
 ```
 
 ---
@@ -287,6 +335,14 @@ carrusel, intro, selector de versión + cola).
 
 Sin sidebar — todo en tabs del área principal: Productos / Usuarios /
 Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop/ui/)).
+
+### Programa 4 — Tiktok Shop AI Pro
+
+Grupo de sidebar propio (frontend Next.js) separado de "TikTok Shop" —
+`basePath: /tiktok-shop-ai-pro`. Un único item hoy: "Viralización 1K"
+(`/tiktok-shop-ai-pro/viralizacion`), formulario simple (ponentes + cantidad
++ nombre de cuenta + rondas con música). Pensado para acumular más
+herramientas del mismo grupo en el futuro.
 
 ---
 
@@ -323,6 +379,9 @@ Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop
   `record_<api>` con la tarifa vigente; (2) llama al helper justo tras el
   response real (con tokens/chars/segundos reales del provider). El panel
   `/costs` mostrará el desglose automáticamente — no hace falta tocar UI.
+  Excepción explícita: Programa 4 (Viralización) no usa ninguna API de pago
+  (ffmpeg/Whisper local/rclone) → sin `record_*`, a propósito (ver
+  VIRALIZACION_MODULE.md).
 
 ---
 
@@ -334,6 +393,7 @@ Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop
 | [`ADDING_PROGRAM.md`](ADDING_PROGRAM.md) | **Checklist para añadir un programa nuevo** (touchpoints API + runner + Redis + frontend + cost + deploy + tests + docs) |
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
 | [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + OpenAI GPT-4o |
+| [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Playbook de depuración del cortador de vídeo** — LEER antes de tocar `silence_cutter.py`: jerarquía de señales (silero>energía>Whisper), pipeline, casuística de bugs reales (proteína…), cómo diagnosticar una queja, gotchas de cola/deploy, auto-corrección |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |
 | [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local (uvicorn + npm run dev), troubleshooting WS/cache |

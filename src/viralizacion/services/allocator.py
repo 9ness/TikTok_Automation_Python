@@ -1,0 +1,83 @@
+"""Asigna candidatos de gancho/paisaje SIN repetir nunca (por ponente),
+combinando el banco de candidatos (`pipeline/resource_scanner.py`) con el
+tracking de uso persistente en Redis (`repos/usage_repo.py`).
+
+Los índices se marcan como usados en Redis EN CUANTO se asignan (antes de
+que termine el render) — si el render falla después, el caller debe llamar
+a `release_hook/release_paisajes` para no perder el hueco definitivamente.
+"""
+
+from __future__ import annotations
+
+from src.viralizacion.pipeline.resource_scanner import (
+    scan_hook_candidates,
+    scan_paisaje_candidates,
+)
+from src.viralizacion.repos import usage_repo
+
+
+class PoolExhaustedError(RuntimeError):
+    """Se agotaron los candidatos disponibles (gancho o paisaje) para un ponente."""
+
+
+def count_available_hooks(ponente: str) -> tuple[int, int]:
+    """Devuelve (disponibles, total) de candidatos de gancho para `ponente`."""
+    candidates = scan_hook_candidates(ponente)
+    used = usage_repo.get_used_hook_indices(ponente)
+    available = [c for c in candidates if c["index"] not in used]
+    return len(available), len(candidates)
+
+
+def count_available_paisajes(ponente: str) -> tuple[int, int]:
+    """Devuelve (disponibles, total) de candidatos de paisaje para `ponente`
+    (el pool es compartido entre ponentes, pero el uso se rastrea por
+    separado — por eso el resultado es específico de `ponente`)."""
+    candidates = scan_paisaje_candidates()
+    used = usage_repo.get_used_paisaje_indices(ponente)
+    available = [c for c in candidates if c["index"] not in used]
+    return len(available), len(candidates)
+
+
+def allocate_hook(ponente: str) -> dict:
+    """Asigna (y marca como usado) un candidato de gancho no usado para
+    `ponente`. Lanza `PoolExhaustedError` si no queda ninguno."""
+    candidates = scan_hook_candidates(ponente)
+    used = usage_repo.get_used_hook_indices(ponente)
+    available = [c for c in candidates if c["index"] not in used]
+    if not available:
+        raise PoolExhaustedError(
+            f"Pool de gancho agotado para '{ponente}': hacían falta 1 más, "
+            f"quedan 0 de {len(candidates)} candidatos totales "
+            f"({len(used)} ya usados)."
+        )
+    chosen = available[0]
+    usage_repo.mark_hook_used(ponente, chosen["index"])
+    return chosen
+
+
+def release_hook(ponente: str, index: int) -> None:
+    usage_repo.release_hook_used(ponente, index)
+
+
+def allocate_paisaje_segments(ponente: str, n: int) -> list[dict]:
+    """Asigna (y marca como usados) `n` candidatos de paisaje no usados por
+    `ponente`. Lanza `PoolExhaustedError` con el déficit exacto si no hay
+    suficientes."""
+    candidates = scan_paisaje_candidates()
+    used = usage_repo.get_used_paisaje_indices(ponente)
+    available = [c for c in candidates if c["index"] not in used]
+    if len(available) < n:
+        raise PoolExhaustedError(
+            f"Pool de paisaje agotado para '{ponente}': hacían falta {n}, "
+            f"quedan {len(available)} de {len(candidates)} candidatos totales "
+            f"({len(used)} ya usados)."
+        )
+    chosen = available[:n]
+    for c in chosen:
+        usage_repo.mark_paisaje_used(ponente, c["index"])
+    return chosen
+
+
+def release_paisajes(ponente: str, indices: list[int]) -> None:
+    for idx in indices:
+        usage_repo.release_paisaje_used(ponente, idx)

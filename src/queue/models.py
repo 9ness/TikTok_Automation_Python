@@ -27,6 +27,7 @@ class JobMode(str, Enum):
     TIKTOK_SHOP_READY_VIDEO = "tiktok_shop_ready_video"  # subir vídeo → listo TikTok
     TIKTOK_SHOP_AUTO_DAY = "tiktok_shop_auto_day"  # Radar v2: llenar 1 día solo
     EDITOR_AUTO = "editor_auto"
+    VIRALIZACION_BATCH = "viralizacion_batch"
 
 
 class JobStatus(str, Enum):
@@ -49,6 +50,7 @@ MODE_LABELS = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: "🎬 Vídeo listo (TikTok Shop)",
     JobMode.TIKTOK_SHOP_AUTO_DAY: "🎯 Día automático (ADS frescos)",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
+    JobMode.VIRALIZACION_BATCH: "🚀 Viralización 1K",
 }
 
 

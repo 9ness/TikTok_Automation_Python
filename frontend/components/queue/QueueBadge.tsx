@@ -55,9 +55,14 @@ export function QueueBadge() {
 interface Summary {
   total: number;
   runningCount: number;
-  // editor_auto añadido para no perder typecheck en el for-of que indexa
-  // por `MODE_TO_PROGRAM[j.mode]` (cuyo retorno incluye "editor_auto").
-  byProgram: { tiktok_shop: number; creator_reward: number; editor_auto: number };
+  // editor_auto/viralizacion añadidos para no perder typecheck en el for-of
+  // que indexa por `MODE_TO_PROGRAM[j.mode]` (cuyo retorno incluye ambos).
+  byProgram: {
+    tiktok_shop: number;
+    creator_reward: number;
+    editor_auto: number;
+    viralizacion: number;
+  };
   byMode: Partial<Record<JobMode, number>>;
   tooltip: string;
 }
@@ -67,7 +72,7 @@ function buildSummary(activeMap: Record<string, { mode: JobMode; status: string 
   const total = jobs.length;
   const runningCount = jobs.filter((j) => j.status === "running").length;
 
-  const byProgram = { tiktok_shop: 0, creator_reward: 0, editor_auto: 0 };
+  const byProgram = { tiktok_shop: 0, creator_reward: 0, editor_auto: 0, viralizacion: 0 };
   const byMode: Partial<Record<JobMode, number>> = {};
   for (const j of jobs) {
     byProgram[MODE_TO_PROGRAM[j.mode]] += 1;
@@ -88,6 +93,7 @@ function buildSummary(activeMap: Record<string, { mode: JobMode; status: string 
       }
     }
     if (byProgram.editor_auto > 0) lines.push(`✂️ Editor Auto: ${byProgram.editor_auto}`);
+    if (byProgram.viralizacion > 0) lines.push(`🚀 Tiktok Shop AI Pro: ${byProgram.viralizacion}`);
     if (runningCount > 0) lines.push(`(${runningCount} en ejecución)`);
   }
 

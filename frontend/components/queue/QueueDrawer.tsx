@@ -63,7 +63,8 @@ export function QueueDrawer() {
     const ts = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "tiktok_shop");
     const cr = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "creator_reward");
     const ea = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "editor_auto");
-    return { ts, cr, ea };
+    const vi = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "viralizacion");
+    return { ts, cr, ea, vi };
   }, [filtered]);
 
   if (!open) return null;
@@ -110,7 +111,9 @@ export function QueueDrawer() {
         {/* Filtros principales */}
         <div className="space-y-2 border-b px-4 py-3">
           <div className="flex flex-wrap gap-1">
-            {(["all", "tiktok_shop", "creator_reward", "editor_auto"] as ProgramFilter[]).map(
+            {(
+              ["all", "tiktok_shop", "creator_reward", "editor_auto", "viralizacion"] as ProgramFilter[]
+            ).map(
               (f) => (
                 <Button
                   key={f}
@@ -166,6 +169,9 @@ export function QueueDrawer() {
                 )}
                 {grouped.ea.length > 0 && (
                   <ProgramGroup label={PROGRAM_LABEL.editor_auto} jobs={grouped.ea} />
+                )}
+                {grouped.vi.length > 0 && (
+                  <ProgramGroup label={PROGRAM_LABEL.viralizacion} jobs={grouped.vi} />
                 )}
               </>
             ) : (

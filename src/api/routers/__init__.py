@@ -40,6 +40,7 @@ from .tiktok_shop import (
     shortcuts_router as tiktok_shop_shortcuts_router,
     watermark_remover_router as tiktok_shop_watermark_remover_router,
 )
+from .viralizacion import enqueue_router as viralizacion_enqueue_router
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
@@ -91,4 +92,5 @@ __all__ = [
     "tiktok_shop_replicate_viral_router",
     "tiktok_shop_shortcuts_router",
     "tiktok_shop_watermark_remover_router",
+    "viralizacion_enqueue_router",
 ]

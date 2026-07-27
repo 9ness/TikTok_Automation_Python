@@ -1604,6 +1604,44 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
 
 
 # ============================================================
+# RUNNER: VIRALIZACIÓN (Programa 4)
+# ============================================================
+def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Genera un batch de vídeos POV/reacción (gancho + paisajes) para uno
+    o varios ponentes y los sube a Drive al terminar.
+
+    Params esperados en job.params:
+      - ponentes: list[str] (slugs, ej ["pablo", "victor"])
+      - cantidad: dict[str, int] (total de vídeos pedidos por ponente)
+      - nombre_cuenta: str (carpeta destino en Drive)
+      - music_rounds: int (rondas con música de fondo por audio, default 1)
+
+    Sin cost tracking: no hay ninguna API de pago en este pipeline (todo
+    ffmpeg + Whisper local + rclone) — ver VIRALIZACION_MODULE.md.
+    """
+    on_progress(0.0, "🚀 Cargando pipeline de Viralización…")
+    from src.viralizacion.pipeline.batch import run_batch
+
+    p = job.params
+    result = run_batch(
+        ponentes=list(p.get("ponentes") or []),
+        cantidad=dict(p.get("cantidad") or {}),
+        nombre_cuenta=p.get("nombre_cuenta") or "sin_nombre",
+        music_rounds=int(p.get("music_rounds", 1)),
+        on_log=on_log,
+        on_progress=on_progress,
+    )
+    on_log(
+        f"[viralizacion] batch {result['batch_id']} · {result['total_videos']} vídeos · "
+        f"subidos a {result['remote_dirs']}"
+    )
+    # No hay un único "archivo final" (son N vídeos por ponente) — devolvemos
+    # la carpeta de staging local como `result_path` (el operador ya tiene
+    # los vídeos en Drive; esto es solo referencia/debug).
+    return result["staging_root"]
+
+
+# ============================================================
 # RUNNER: TIKTOK SHOP WATERMARK REMOVER
 # ============================================================
 def run_tiktok_shop_watermark(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -1981,6 +2019,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_AUTO_DAY: run_tiktok_shop_auto_day,
     JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
+    JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
 }
 
 
@@ -1997,6 +2036,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_AUTO_DAY: "tiktok_shop",
     JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
+    JobMode.VIRALIZACION_BATCH: "viralizacion",
 }
 
 
