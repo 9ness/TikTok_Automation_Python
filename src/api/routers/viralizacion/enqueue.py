@@ -48,12 +48,17 @@ def list_ponentes() -> PonentesListResponse:
     items: list[PonenteInfo] = []
     for slug, meta in config.PONENTES.items():
         n_audios = len(config.ponente_audio_files(slug))
+        # cache_only: el escaneo de cara tarda minutos y no puede bloquear el GET.
         try:
-            hooks_available, hooks_total = allocator.count_available_hooks(slug)
+            hooks_available, hooks_total = allocator.count_available_hooks(
+                slug, cache_only=True
+            )
         except Exception:
             hooks_available, hooks_total = 0, 0
         try:
-            paisajes_available, paisajes_total = allocator.count_available_paisajes(slug)
+            paisajes_available, paisajes_total = allocator.count_available_paisajes(
+                slug, cache_only=True
+            )
         except Exception:
             paisajes_available, paisajes_total = 0, 0
         items.append(PonenteInfo(

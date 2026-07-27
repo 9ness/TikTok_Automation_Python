@@ -93,6 +93,34 @@ def _chop_hook_run(run: list[dict]) -> list[dict]:
     return out
 
 
+def load_hook_candidates_cached(ponente: str) -> list[dict]:
+    """Lee SOLO la caché de gancho (sin escanear). Vacío si no existe.
+
+    Para endpoints UI rápidos — el escaneo de cara tarda minutos y NUNCA
+    debe bloquear un GET.
+    """
+    cache_path = config.hook_candidates_cache_path(ponente)
+    if not cache_path.exists():
+        return []
+    try:
+        data = json.loads(cache_path.read_text())
+        return data.get("candidates", []) or []
+    except Exception:
+        return []
+
+
+def load_paisaje_candidates_cached() -> list[dict]:
+    """Lee SOLO la caché de paisaje (sin trocear). Vacío si no existe."""
+    cache_path = config.paisaje_candidates_cache_path()
+    if not cache_path.exists():
+        return []
+    try:
+        data = json.loads(cache_path.read_text())
+        return data.get("candidates", []) or []
+    except Exception:
+        return []
+
+
 def scan_hook_candidates(ponente: str, *, force: bool = False) -> list[dict]:
     """Devuelve la lista de candidatos de gancho `{index, start, cx_frac}`
     para `ponente`, usando caché en disco salvo `force=True`."""

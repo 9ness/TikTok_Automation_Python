@@ -10,6 +10,8 @@ a `release_hook/release_paisajes` para no perder el hueco definitivamente.
 from __future__ import annotations
 
 from src.viralizacion.pipeline.resource_scanner import (
+    load_hook_candidates_cached,
+    load_paisaje_candidates_cached,
     scan_hook_candidates,
     scan_paisaje_candidates,
 )
@@ -20,19 +22,33 @@ class PoolExhaustedError(RuntimeError):
     """Se agotaron los candidatos disponibles (gancho o paisaje) para un ponente."""
 
 
-def count_available_hooks(ponente: str) -> tuple[int, int]:
-    """Devuelve (disponibles, total) de candidatos de gancho para `ponente`."""
-    candidates = scan_hook_candidates(ponente)
+def count_available_hooks(ponente: str, *, cache_only: bool = False) -> tuple[int, int]:
+    """Devuelve (disponibles, total) de candidatos de gancho para `ponente`.
+
+    `cache_only=True` (UI): no dispara escaneo de cara — solo lee JSON cache.
+    """
+    candidates = (
+        load_hook_candidates_cached(ponente)
+        if cache_only
+        else scan_hook_candidates(ponente)
+    )
     used = usage_repo.get_used_hook_indices(ponente)
     available = [c for c in candidates if c["index"] not in used]
     return len(available), len(candidates)
 
 
-def count_available_paisajes(ponente: str) -> tuple[int, int]:
+def count_available_paisajes(ponente: str, *, cache_only: bool = False) -> tuple[int, int]:
     """Devuelve (disponibles, total) de candidatos de paisaje para `ponente`
     (el pool es compartido entre ponentes, pero el uso se rastrea por
-    separado — por eso el resultado es específico de `ponente`)."""
-    candidates = scan_paisaje_candidates()
+    separado — por eso el resultado es específico de `ponente`).
+
+    `cache_only=True` (UI): no trocea el vídeo — solo lee JSON cache.
+    """
+    candidates = (
+        load_paisaje_candidates_cached()
+        if cache_only
+        else scan_paisaje_candidates()
+    )
     used = usage_repo.get_used_paisaje_indices(ponente)
     available = [c for c in candidates if c["index"] not in used]
     return len(available), len(candidates)
