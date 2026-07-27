@@ -70,20 +70,29 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
             continue
         if config.ponente_gancho_video(ponente) is None:
             errors.append(f"'{ponente}': no hay vídeo de gancho disponible.")
-        avail_hooks, total_hooks = allocator.count_available_hooks(ponente)
-        if avail_hooks < total:
+        # cache_only: no disparar escaneo de cara (minutos) en el enqueue.
+        # Si no hay caché aún pero existe gancho, el job lo escaneará al arrancar.
+        avail_hooks, total_hooks = allocator.count_available_hooks(
+            ponente, cache_only=True
+        )
+        if total_hooks > 0 and avail_hooks < total:
             errors.append(
                 f"'{ponente}': pool de gancho insuficiente — pedidos {total}, "
                 f"disponibles {avail_hooks} de {total_hooks} candidatos totales."
             )
-        # Estimación de paisajes: usamos duración media del audio más largo
-        # como cota superior razonable por vídeo (chequeo aproximado — el
-        # chequeo exacto/definitivo ocurre al asignar en el propio render).
-        durations = [ffprobe_duration(a) for a in audios]
-        max_fill = max(durations) - config.HOOK_DUR if durations else 0.0
-        n_paisajes_per_video = build_paisaje_segments(max(max_fill, 0.0))
-        needed_paisajes = n_paisajes_per_video * total
-        avail_paisajes, total_paisajes = allocator.count_available_paisajes(ponente)
+        # Paisajes: estimar con el reparto REAL de rondas por audio
+        # (no max(duración)×total — eso sobreestima brutalmente si hay un
+        # audio largo y varios cortos). 15 vídeos / 5 audios → 3 rondas c/u.
+        rounds = _rounds_per_audio(total, len(audios))
+        needed_paisajes = 0
+        for audio_path, n_rounds in zip(audios, rounds):
+            if n_rounds <= 0:
+                continue
+            fill = max(0.0, ffprobe_duration(audio_path) - config.HOOK_DUR)
+            needed_paisajes += build_paisaje_segments(fill) * n_rounds
+        avail_paisajes, total_paisajes = allocator.count_available_paisajes(
+            ponente, cache_only=True
+        )
         if avail_paisajes < needed_paisajes:
             errors.append(
                 f"'{ponente}': pool de paisaje insuficiente (estimado) — "
