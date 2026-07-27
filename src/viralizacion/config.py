@@ -152,27 +152,72 @@ def musica_file() -> Path | None:
     return files[0] if files else None
 
 
-def staging_folder() -> Path:
-    """Carpeta de trabajo temporal donde se acumulan los MP4 de un batch
-    antes de subirlos a Drive de un tirón. Vive dentro de la raíz de
-    assets (persistente, NO `/tmp`) pero cada batch usa su propia
-    subcarpeta con nombre único."""
-    return assets_root_path() / "staging"
+def work_root() -> Path:
+    """Raíz ESCRIBIBLE (staging + caches).
 
-
-def cache_folder() -> Path:
-    """Cachés de escaneo (candidatos de gancho/paisaje) y transcripciones."""
-    root = assets_root_path() / "_cache"
+    En Docker el mount de assets suele ser del host (uid 1000) y el
+    proceso corre como `app` (uid 999) → Permission denied al mkdir en
+    staging. Preferimos:
+      1) VIRALIZACION_WORK_PATH
+      2) API_TEMP_ROOT/viralizacion  (volumen docker `api_temp`, escribible)
+      3) assets_root/_work          (dev local, mismo usuario)
+    """
+    env = os.getenv("VIRALIZACION_WORK_PATH")
+    if env:
+        root = Path(env)
+    else:
+        api_temp = os.getenv("API_TEMP_ROOT")
+        if api_temp:
+            root = Path(api_temp) / "viralizacion"
+        else:
+            root = assets_root_path() / "_work"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
+def staging_folder() -> Path:
+    """MP4 de un batch antes de subir a Drive. Subcarpeta única por batch."""
+    root = work_root() / "staging"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def cache_folder() -> Path:
+    """Cachés de escaneo y transcripciones (siempre en work_root escribible)."""
+    root = work_root() / "_cache"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _seed_cache_from_legacy(work: Path, legacy: Path) -> Path:
+    """Si hay caché legacy en assets (solo-lectura) y aún no en work, cópiala."""
+    work.parent.mkdir(parents=True, exist_ok=True)
+    if work.exists():
+        return work
+    if legacy.is_file():
+        try:
+            work.write_bytes(legacy.read_bytes())
+            return work
+        except OSError:
+            # work no escribible o legacy ilegible → devolver legacy (read)
+            return legacy
+    return work
+
+
 def hook_candidates_cache_path(slug: str) -> Path:
-    return ponente_folder(slug) / "hook_candidates.json"
+    """JSON de ganchos: escribible en work_root; se siembra desde assets si existe."""
+    return _seed_cache_from_legacy(
+        work_root() / "hook_candidates" / f"{slug}.json",
+        ponente_folder(slug) / "hook_candidates.json",
+    )
 
 
 def paisaje_candidates_cache_path() -> Path:
-    return paisajes_folder() / "paisaje_candidates.json"
+    """JSON de paisajes: escribible en work_root; se siembra desde assets si existe."""
+    return _seed_cache_from_legacy(
+        work_root() / "paisaje_candidates.json",
+        paisajes_folder() / "paisaje_candidates.json",
+    )
 
 
 def transcript_cache_path(slug: str, audio_path: Path) -> Path:
