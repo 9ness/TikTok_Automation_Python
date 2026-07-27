@@ -53,6 +53,10 @@ services:
       # hermana de TIKTOK_CR/TIKTOK_SHOP la primera vez que se crea un
       # usuario (vía `resolve_editor_root` → `ensure_user_folders`).
       TIKTOK_EDITOR_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+      # Programa 4 — Viralización: assets LOCALES (gancho/audios/paisajes/música).
+      # NO van por Drive montado (ficheros pesados reutilizados). Path DENTRO
+      # del container; el bind de abajo mapea el dir del host.
+      VIRALIZACION_ASSETS_PATH: "/viralizacion_assets"
       # Service Account de Google Drive — necesario para compartir
       # carpetas entrada/salida con emails desde el panel del usuario.
       # El archivo JSON real lo coloca el operador en `secrets/google-sa.json`
@@ -69,6 +73,11 @@ services:
         target: /mnt/drive
         bind:
           propagation: rshared
+      # Viralización assets (local host, NO Drive). RW: staging + caches
+      # Whisper/candidates se escriben aquí durante el render.
+      - type: bind
+        source: ${VIRALIZACION_ASSETS_HOST_PATH:-/home/nebulabsai/viralizacion_assets}
+        target: /viralizacion_assets
       # Host data read-only para los endpoints de diagnóstico (deploy.log,
       # deploy_status.json, queue_state.json, git HEAD, VERSION). Sin esto
       # el panel solo verá los datos del propio container (build snapshot).
