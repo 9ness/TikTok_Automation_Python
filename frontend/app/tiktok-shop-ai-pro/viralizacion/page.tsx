@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Rocket } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Palette, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useGenerateViralizacion, usePonentes } from "@/lib/queries/viralizacion";
+import {
+  useEstilos,
+  useGenerateViralizacion,
+  usePonentes,
+  useRoundPlan,
+} from "@/lib/queries/viralizacion";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 
 export default function ViralizacionPage() {
@@ -21,6 +26,23 @@ export default function ViralizacionPage() {
 
   const ponentes = ponentesQuery.data?.items ?? [];
   const selectedSlugs = Object.keys(selected).filter((slug) => selected[slug]);
+
+  // Estilo por ronda. El plan se calcula sobre el primer ponente elegido: el
+  // reparto en rondas depende de cuántos audios tiene, y las rondas son el
+  // "ciclo" que el operador quiere diferenciar.
+  const [roundStyles, setRoundStyles] = useState<string[]>([]);
+  const estilos = useEstilos();
+  const planPonente = selectedSlugs[0] ?? null;
+  const planCantidad = planPonente ? (cantidad[planPonente] ?? 5) : 0;
+  const plan = useRoundPlan(planPonente, planCantidad);
+
+  // Al cambiar el reparto, arrancar desde los estilos por defecto (la
+  // rotación) para que lo que se envía siempre case con las rondas reales.
+  useEffect(() => {
+    const rounds = plan.data?.rounds;
+    if (rounds) setRoundStyles(rounds.map((r) => r.default_style));
+  }, [plan.data]);
+
   const canSubmit =
     selectedSlugs.length > 0 && nombreCuenta.trim().length > 0 && !generate.isPending;
 
@@ -39,6 +61,7 @@ export default function ViralizacionPage() {
       ),
       nombre_cuenta: nombreCuenta.trim(),
       music_rounds: musicRounds,
+      round_styles: roundStyles,
     };
     try {
       const res = await generate.mutateAsync(body);
@@ -151,6 +174,53 @@ export default function ViralizacionPage() {
           />
         </div>
       </section>
+
+      {/* Estilo por ronda ("ciclo"): así cada pasada se ve distinta */}
+      {plan.data && plan.data.rounds.length > 0 && (
+        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+          <div className="flex items-center gap-2">
+            <Palette className="h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-sm font-semibold">Estilo de cada ronda</p>
+          </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Los vídeos se reparten entre los audios en rondas. Elige un estilo
+            por ronda para que cada ciclo se vea distinto.
+          </p>
+          <div className="space-y-2">
+            {plan.data.rounds.map((r, i) => (
+              <div key={r.ronda} className="flex items-center gap-2">
+                <span className="w-28 shrink-0 text-[11px] sm:text-xs">
+                  Ronda {r.ronda}
+                  <span className="text-muted-foreground"> · {r.n_videos} vídeo(s)</span>
+                </span>
+                <select
+                  value={roundStyles[i] ?? r.default_style}
+                  onChange={(e) =>
+                    setRoundStyles((prev) => {
+                      const next = [...prev];
+                      while (next.length < plan.data!.rounds.length) next.push("");
+                      next[i] = e.target.value;
+                      return next;
+                    })
+                  }
+                  className="flex-1 truncate rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
+                >
+                  {(estilos.data?.items ?? []).map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          {planPonente && (
+            <p className="text-[10px] text-muted-foreground">
+              Reparto calculado para <b>{planPonente}</b> con {planCantidad} vídeos.
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button

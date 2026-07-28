@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
   PonentesListResponse,
+  RoundPlanResponse,
+  StylesListResponse,
   ViralizacionGenerateRequest,
   ViralizacionGenerateResponse,
 } from "@/lib/types/viralizacion";
@@ -20,6 +22,25 @@ export function usePonentes() {
   return useQuery<PonentesListResponse>({
     queryKey: viralizacionKeys.ponentes(),
     queryFn: () => api.get<PonentesListResponse>(`${ROOT}/ponentes`),
+  });
+}
+
+export function useEstilos() {
+  return useQuery<StylesListResponse>({
+    queryKey: [...viralizacionKeys.all, "estilos"] as const,
+    queryFn: () => api.get<StylesListResponse>(`${ROOT}/estilos`),
+  });
+}
+
+/** Cuántos vídeos caen en cada ronda — define cuántos selectores mostrar. */
+export function useRoundPlan(ponente: string | null, cantidad: number) {
+  return useQuery<RoundPlanResponse>({
+    queryKey: [...viralizacionKeys.all, "plan", ponente, cantidad] as const,
+    queryFn: () =>
+      api.get<RoundPlanResponse>(
+        `${ROOT}/plan?ponente=${encodeURIComponent(ponente ?? "")}&cantidad=${cantidad}`,
+      ),
+    enabled: Boolean(ponente) && cantidad > 0,
   });
 }
 

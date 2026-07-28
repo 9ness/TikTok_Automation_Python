@@ -17,11 +17,33 @@ export interface PonentesListResponse {
   items: PonenteInfo[];
 }
 
+export interface StyleChoice {
+  key: string;
+  label: string;
+}
+
+export interface StylesListResponse {
+  items: StyleChoice[];
+}
+
+export interface RoundPlan {
+  ronda: number;
+  n_videos: number;
+  default_style: string;
+}
+
+export interface RoundPlanResponse {
+  total_videos: number;
+  rounds: RoundPlan[];
+}
+
 export interface ViralizacionGenerateRequest {
   ponentes: string[];
   cantidad: Record<string, number>;
   nombre_cuenta: string;
   music_rounds: number;
+  /** Estilo de cada ronda: índice 0 = ronda 1. Vacío = rotación automática. */
+  round_styles?: string[];
 }
 
 export interface ViralizacionGenerateResponse {
