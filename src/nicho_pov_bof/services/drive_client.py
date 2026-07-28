@@ -155,6 +155,30 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     return photos
 
 
+def probe_dimensions(photo: dict) -> dict:
+    """Añade `width`/`height` a una foto, descargándola si hace falta.
+
+    Las dimensiones son la señal que distingue la foto de producto (cuadrada)
+    de la captura con título (pantallazo alto o tira ancha), y `rclone lsjson`
+    no las trae. La descarga se cachea, así que solo se paga una vez.
+    """
+    import os
+
+    from PIL import Image
+
+    if photo.get("width") and photo.get("height"):
+        return photo
+    try:
+        suffix = os.path.splitext(photo.get("name", ""))[1].lower() or ".jpg"
+        path = fetch_photo(photo["id"], suffix=suffix)
+        with Image.open(path) as im:
+            photo["width"], photo["height"] = im.size
+    except Exception as e:  # una foto ilegible no puede tumbar la carpeta
+        photo["width"] = photo["height"] = 0
+        photo["probe_error"] = str(e)
+    return photo
+
+
 def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     """Descarga una foto por file ID y devuelve la ruta local cacheada.
 
