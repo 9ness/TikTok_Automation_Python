@@ -60,10 +60,12 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
         avail_hooks, total_hooks = allocator.count_available_hooks(
             ponente, cache_only=True
         )
-        if total_hooks > 0 and avail_hooks < total:
+        # El gancho SE RECICLA: al agotarse la vuelta se abre un ciclo nuevo
+        # con otro zoom, otro audio y otro estilo. Solo es error no tener
+        # ningún candidato en absoluto.
+        if total_hooks == 0 and avail_hooks == 0:
             errors.append(
-                f"'{ponente}': pool de gancho insuficiente — pedidos {total}, "
-                f"disponibles {avail_hooks} de {total_hooks} candidatos totales."
+                f"'{ponente}': no hay ningún candidato de gancho detectado."
             )
         rounds = _rounds_per_audio(total, len(audios))
         needed_paisajes = 0

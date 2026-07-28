@@ -65,13 +65,22 @@ def allocate_hook(ponente: str) -> dict:
     candidates = scan_hook_candidates(ponente)
     used = usage_repo.get_used_hook_indices(ponente)
     available = [c for c in candidates if c["index"] not in used]
+
+    # Ciclo nuevo al agotarse, igual que con los paisajes: el gancho se
+    # reencuadra con un zoom aleatorio distinto y acompaña a otro audio, otros
+    # subtítulos y otro estilo, así que reutilizarlo NO produce el mismo vídeo.
+    # Sin esto la generación se bloqueaba al llegar al nº de ganchos del banco.
     if not available:
-        raise PoolExhaustedError(
-            f"Pool de gancho agotado para '{ponente}': hacían falta 1 más, "
-            f"quedan 0 de {len(candidates)} candidatos totales "
-            f"({len(used)} ya usados)."
-        )
-    chosen = available[0]
+        if not candidates:
+            raise PoolExhaustedError(
+                f"No hay ningún candidato de gancho para '{ponente}'."
+            )
+        usage_repo.reset_hook_used(ponente)
+        available = list(candidates)
+
+    # Al azar, no `available[0]`: si no, dos tandas seguidas empiezan por el
+    # mismo gancho.
+    chosen = random.choice(available)
     usage_repo.mark_hook_used(ponente, chosen["index"])
     return chosen
 

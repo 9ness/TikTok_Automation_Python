@@ -57,6 +57,20 @@ def release_hook_used(ponente: str, index: int) -> None:
         r.srem(f"hook_used:{ponente}", str(index))
 
 
+def reset_hook_used(ponente: str) -> int:
+    """Empieza un ciclo nuevo de ganchos.
+
+    El gancho se reencuadra con un zoom aleatorio distinto en cada uso, y va
+    con otro audio, otros subtítulos y otro estilo, así que reutilizarlo no
+    produce el mismo vídeo — que es lo que importa para el copyright.
+    """
+    r = _require_redis()
+    used = get_used_hook_indices(ponente)
+    for idx in used:
+        r.srem(f"hook_used:{ponente}", str(idx))
+    return len(used)
+
+
 def mark_paisaje_used(ponente: str, index: int) -> None:
     r = _require_redis()
     r.sadd(f"paisaje_used:{ponente}", str(index))
