@@ -114,6 +114,68 @@ def distribute_with_caps(total: float, caps: list[float]) -> list[float]:
     return share
 
 
+def _vignette_filter(style: StylePreset) -> str:
+    """Viñeta fija o "respirando" (vaivén lento) según el estilo."""
+    if style.vignette_breathe > 0:
+        # Periodo largo y aleatorio: es un latido de fondo, no un parpadeo.
+        period = random.uniform(6.0, 10.0)
+        phase = random.uniform(0.0, 6.28)
+        return (
+            f"vignette=angle='{style.vignette_angle}"
+            f"+{style.vignette_breathe:.3f}*sin(2*PI*t/{period:.2f}+{phase:.2f})'"
+            f":mode=forward:eval=frame"
+        )
+    return f"vignette=angle={style.vignette_angle}:mode=forward"
+
+
+def _light_leak_filter(style: StylePreset, duration: float) -> str:
+    """Destellos cálidos tipo fuga de luz, repartidos por el vídeo.
+
+    Se modela como una campana de Gauss sobre el brillo: sube y baja suave en
+    ~0,5s. Se evita el primer y último segundo para no pisar la entrada ni el
+    cierre.
+    """
+    n = max(0, style.light_leaks)
+    if n <= 0 or duration <= 3:
+        return ""
+    margin = 1.5
+    span = max(1.0, duration - 2 * margin)
+    # Repartidos con jitter, no equiespaciados (delataría la plantilla).
+    times = [
+        margin + span * (i + 0.5) / n + random.uniform(-0.8, 0.8)
+        for i in range(n)
+    ]
+    terms = "+".join(
+        f"{random.uniform(0.16, 0.26):.3f}*exp(-pow(t-{max(0.5, t):.2f},2)/0.06)"
+        for t in times
+    )
+    return f"eq=brightness='{terms}':eval=frame"
+
+
+def _scratches_filter(style: StylePreset, duration: float) -> str:
+    """Rayaduras verticales tipo proyector viejo.
+
+    Líneas finas que aparecen unas décimas en una posición al azar. Se generan
+    en Python (posición e instante fijos por render) en vez de con `random()`
+    de ffmpeg: así es reproducible y no cuesta CPU por frame.
+    """
+    n = max(0, style.film_scratches)
+    if n <= 0 or duration <= 2:
+        return ""
+    parts = []
+    for _ in range(n):
+        x = random.randint(int(config.TARGET_W * 0.08), int(config.TARGET_W * 0.92))
+        t0 = random.uniform(0.5, max(0.6, duration - 1.0))
+        dur = random.uniform(0.06, 0.18)
+        w = random.choice([1, 2, 2, 3])
+        alpha = random.uniform(0.12, 0.28)
+        parts.append(
+            f"drawbox=x={x}:y=0:w={w}:h=ih:color=white@{alpha:.2f}:t=fill"
+            f":enable='between(t,{t0:.2f},{t0 + dur:.2f})'"
+        )
+    return ",".join(parts)
+
+
 def _jittered_eq_filter(extra: dict) -> str:
     frac = config.EQ_JITTER_FRAC
     contrast = config.EQ_BASE_CONTRAST * random.uniform(1 - frac, 1 + frac)
@@ -210,7 +272,42 @@ def xfade_offsets(specs: list[ClipSpec], transitions: list[tuple[str, float]]) -
     return offsets
 
 
-def _clip_vf(spec: ClipSpec) -> str:
+def _ken_burns_vf(spec: ClipSpec, delta: float) -> str:
+    """Zoom lento sobre el clip (Ken Burns), dirección al azar.
+
+    Se escala por encima del destino y `zoompan` recorta una ventana que se
+    va cerrando (o abriendo) frame a frame, así el plano "respira" en vez de
+    parecer una foto fija. La dirección se sortea por clip para que dos
+    paisajes seguidos no se muevan igual.
+    """
+    zmax = 1.0 + max(0.0, delta)
+    # Margen extra para que el zoom no pierda resolución al recortar.
+    w = int(config.TARGET_W * zmax)
+    h = int(config.TARGET_H * zmax)
+    frames = max(1, int(round(spec.extract_dur * config.TARGET_FPS)))
+    rate = delta / frames
+    if random.random() < 0.5:
+        z = f"min(1+{rate:.6f}*on,{zmax:.4f})"      # acercarse
+    else:
+        z = f"max({zmax:.4f}-{rate:.6f}*on,1.0)"    # alejarse
+    return (
+        f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h},"
+        f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d=1:s={config.TARGET_W}x{config.TARGET_H}:fps={config.TARGET_FPS}"
+    )
+
+
+def _clip_vf(spec: ClipSpec, ken_burns: float = 0.0) -> str:
+    # El Ken Burns solo va en los PAISAJES (`cx_frac is None`). En el gancho
+    # el encuadre está calculado sobre la cara detectada; moverlo la
+    # descentraría o le cortaría la frente.
+    if ken_burns > 0 and spec.cx_frac is None:
+        return (
+            f"{_ken_burns_vf(spec, ken_burns)},"
+            f"hflip,format=yuv420p,setsar=1"
+        )
+
     scale_w = max(config.TARGET_W, round(config.TARGET_W * spec.zoom))
     scale_h = max(config.TARGET_H, round(config.TARGET_H * spec.zoom))
     if spec.cx_frac is not None:
@@ -225,7 +322,8 @@ def _clip_vf(spec: ClipSpec) -> str:
     )
 
 
-def _extract_clip(spec: ClipSpec, out_path: Path, on_log: OnLog | None) -> Path:
+def _extract_clip(spec: ClipSpec, out_path: Path, on_log: OnLog | None,
+                  ken_burns: float = 0.0) -> Path:
     """Fase 1: un solo input → clip corto 1080x1920. RAM baja, seek rápido."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -233,7 +331,7 @@ def _extract_clip(spec: ClipSpec, out_path: Path, on_log: OnLog | None) -> Path:
         "-ss", f"{spec.extract_start:.3f}",
         "-t", f"{spec.extract_dur:.3f}",
         "-i", str(spec.src),
-        "-vf", _clip_vf(spec),
+        "-vf", _clip_vf(spec, ken_burns),
         "-an",
         "-c:v", "libx264",
         "-preset", config.FFMPEG_CLIP_PRESET,
@@ -311,8 +409,16 @@ def _finalize(
 ) -> Path:
     """Fase 3: grade + subtítulos + audio (1 input de vídeo corto)."""
     eq_filter = _jittered_eq_filter(style.eq_extra)
-    vignette_filter = f"vignette=angle={style.vignette_angle}:mode=forward"
+    vignette_filter = _vignette_filter(style)
     noise_filter = style.noise_filter_override or config.NOISE_FILTER_BASE
+    # Efectos de cine del estilo. Van ANTES de los subtítulos para que el
+    # destello no lave el texto ni la rayadura lo cruce por encima.
+    extra_fx = [
+        f for f in (
+            _light_leak_filter(style, target_duration),
+            _scratches_filter(style, target_duration),
+        ) if f
+    ]
 
     ass_escaped = str(ass_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     fontsdir_escaped = config.SUB_FONTSDIR.replace("\\", "\\\\").replace(":", "\\:")
@@ -321,7 +427,7 @@ def _finalize(
     post_label = "vsubs" if style.post_subtitle_filters else "vfinal"
     # Grading propio del estilo (colorbalance, colorchannelmixer…) ANTES de
     # quemar los subtítulos, para no teñir el texto.
-    pre = "".join(f"{f}," for f in style.pre_subtitle_filters)
+    pre = "".join(f"{f}," for f in [*style.pre_subtitle_filters, *extra_fx])
     filters.append(
         f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
         f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
@@ -474,7 +580,7 @@ def render_video(
         cp = work / f"c{i:02d}.mp4"
         if on_log:
             on_log(f"[renderer] extract clip {i+1}/{len(specs)} ({spec.extract_dur:.1f}s)")
-        _extract_clip(spec, cp, on_log)
+        _extract_clip(spec, cp, on_log, ken_burns=style.ken_burns)
         clip_paths.append(cp)
 
     xfade_path = work / "xfade.mp4"

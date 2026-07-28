@@ -202,12 +202,27 @@ class StylePreset:
     # None = usa `config.TRANSITION_LANDSCAPE`.
     transition_landscape: tuple[str, float] | None = None
 
+    # --- Efectos "de cine" (repartidos entre estilos a propósito, para que
+    # cada ciclo tenga una personalidad reconocible) ------------------------
+    # Zoom lento tipo Ken Burns sobre los paisajes: fracción total que se
+    # acerca (o aleja) a lo largo del clip. 0 = imagen quieta. Es lo que hace
+    # que el plano "respire" en vez de parecer una foto fija.
+    ken_burns: float = 0.0
+    # Amplitud del vaivén de la viñeta (0 = fija).
+    vignette_breathe: float = 0.0
+    # Nº de destellos cálidos tipo fuga de luz a lo largo del vídeo.
+    light_leaks: int = 0
+    # Nº de rayaduras verticales tipo proyector viejo.
+    film_scratches: int = 0
+
 
 STYLE_PRESETS: dict[str, StylePreset] = {
     "classic": StylePreset(
         key="classic",
         label="A · Clásico",
         build_ass=build_ass_classic,
+        # Limpio: solo el plano respirando. Es el estilo ya validado.
+        ken_burns=0.10,
     ),
     "reveal": StylePreset(
         key="reveal",
@@ -220,6 +235,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         # usa como fallback un `noise` bastante más denso/visible que el de
         # Estilo A, que cumple el mismo propósito de "firma" diferenciadora.
         noise_filter_override="noise=alls=35:allf=t+u:c0s=1",
+        # Grano fuerte + rayaduras: el más "sucio" y reconocible.
+        film_scratches=3,
     ),
     "cinematic": StylePreset(
         key="cinematic",
@@ -231,6 +248,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
             f"drawbox=x=0:y=0:w={config.TARGET_W}:h=77:color=black:t=fill",
             f"drawbox=x=0:y={config.TARGET_H - 77}:w={config.TARGET_W}:h=77:color=black:t=fill",
         ],
+        ken_burns=0.12,
+        vignette_breathe=0.15,
     ),
     # --- Variantes cinematográficas (D/E/F) -------------------------------
     # Solo cambian el GRADING y la TRANSICIÓN respecto a las anteriores; la
@@ -246,6 +265,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         pre_subtitle_filters=["colorbalance=rs=-0.12:bs=0.18:rm=0.06:bm=-0.05"],
         # Disolución suave y larga: encadenado "de cine" en vez de corte a negro.
         transition_landscape=("dissolve", 0.7),
+        ken_burns=0.14,
+        light_leaks=2,
     ),
     "noir": StylePreset(
         key="noir",
@@ -258,6 +279,9 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         noise_filter_override="noise=alls=18:allf=t+u",
         # Fundido a negro corto y seco, muy de cine negro.
         transition_landscape=("fadeblack", 0.45),
+        # Sin zoom: quieto, contrastado y rayado — el más sobrio/dramático.
+        film_scratches=5,
+        vignette_breathe=0.20,
     ),
     "golden": StylePreset(
         key="golden",
@@ -269,6 +293,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         pre_subtitle_filters=["colorbalance=rs=0.10:gs=0.03:bs=-0.10"],
         # Fundido a blanco: rompe visualmente con todos los demás ciclos.
         transition_landscape=("fadewhite", 0.5),
+        ken_burns=0.12,
+        light_leaks=3,
     ),
 }
 
