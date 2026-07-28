@@ -25,12 +25,42 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   en español, SIN emojis y SIN hashtags — los hashtags los añade el
   operador aparte.
 - `gancho`: el texto que va arriba del vídeo. En MAYÚSCULAS, máximo 4
-  palabras, con UN emoji al principio y el MISMO emoji al final. Ejemplos:
-  `⚠️ CUPÓN DESCUENTO ⚠️`, `😱 NO ME LO CREO 😱`, `🔥 ESTO ES VIRAL 🔥`.
-- `cta`: el texto que va abajo, invitando a mirar el enlace/carrito.
-  Máximo 4 palabras, con emoji (delante, detrás o ambos — varía tú el
-  patrón). Ejemplos: `⬇️ COMPRUÉBALO ABAJO ⬇️`, `Revísalo abajo 😱`,
-  `👉 Link en el carrito`.
+  palabras, con UN emoji al principio y el MISMO emoji al final.
+
+  **Va SIEMPRE del PRECIO o del CUPÓN, nunca del producto.** Es lo que hace
+  que la gente abra el carrito: si el gancho describe el producto
+  (`PIEL PERFECTA YA`, `SILLA GAMING TOP`) no aporta motivo para pulsar y el
+  CTR se hunde. El producto ya se ve en pantalla y su nombre va justo debajo.
+
+  Ejemplos válidos — cópiales el ÁNGULO, no las palabras exactas:
+  `⚠️ CUPÓN DESCUENTO ⚠️`, `🤑 ESTO ES UN ROBO 🤑`,
+  `🔥 PRECIAZO DE LOCOS 🔥`, `💸 REBAJADÍSIMO 💸`, `😱 QUÉ CHOLLO 😱`,
+  `🫣 MENUDO PRECIO 🫣`, `💰 BAJÓN DE PRECIO 💰`, `🤯 A ESTE PRECIO NO 🤯`.
+
+  ### PROHIBIDO: falsa escasez (TikTok SANCIONA la cuenta)
+
+  NO generes NUNCA textos que inventen urgencia o escasez que no podemos
+  demostrar. Están prohibidos, entre otros:
+  `ÚLTIMAS UNIDADES`, `QUEDAN POCAS`, `SOLO HOY`, `DOBLE CUPÓN`,
+  `OFERTA LIMITADA`, `SE AGOTA`, `ÚLTIMA OPORTUNIDAD`, `SOLO 2 HORAS`,
+  `OPORTUNIDAD ÚNICA`, `NO SE REPITE`, cuentas atrás, porcentajes de
+  descuento concretos y precios.
+
+  Tampoco valen las palabras `ÚNICA`, `ÚLTIMA`, `EXCLUSIVO` ni `AHORA O
+  NUNCA` dentro del gancho: aunque suenen inofensivas, insinúan un plazo.
+
+  Lo permitido es hablar del cupón o de que el precio está bien, sin poner
+  plazo ni cantidad: eso es cierto y verificable en la ficha del producto.
+
+- `cta`: el texto que va debajo del gancho, invitando a MIRAR la oferta —
+  nunca a comprar. Máximo 4 palabras, con emoji (delante, detrás o ambos;
+  varía el patrón). Ejemplos válidos:
+  `😱 REVÍSALO AHORA 😱`, `👇 REVÍSALO ABAJO 👇`, `DESCÚBRELO AHORA 👀`,
+  `MÍRALO AQUÍ ABAJO 👇`, `COMPRUÉBALO TÚ MISMO 👀`.
+
+  NO uses verbos de compra (`compra`, `cómpralo`, `llévatelo`, `pídelo`)
+  ni el emoji del carrito 🛒: chirría con el tono del vídeo, que es el de
+  alguien que te enseña un descubrimiento, no el de un anuncio.
 
 ## Variedad — MUY IMPORTANTE
 
