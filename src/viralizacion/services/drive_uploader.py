@@ -26,6 +26,10 @@ from src.viralizacion import config
 
 OnLog = Callable[[str], None]
 
+# Nombre de subcarpeta ya resuelto por tanda, para no recalcular el sufijo en
+# cada vídeo (ver `_mount_dir_for`).
+_SUBDIR_CACHE: dict[tuple, str] = {}
+
 
 def batch_subdir(ponente: str, fecha: str, n_videos: int) -> str:
     """Subcarpeta de una tanda: `32_pablo_2026-07-28`.
@@ -34,6 +38,24 @@ def batch_subdir(ponente: str, fecha: str, n_videos: int) -> str:
     el operador, con la cantidad delante para saber de un vistazo qué hay.
     """
     return f"{int(n_videos)}_{ponente}_{fecha}"
+
+
+def _unique_subdir(base_dir: Path, nombre: str) -> str:
+    """Añade sufijo `_2`, `_3`… si esa subcarpeta ya tiene vídeos.
+
+    Generar dos tandas del mismo ponente, el mismo día y con la misma cantidad
+    daba EXACTAMENTE el mismo nombre (`28_pablo_2026-07-28`), así que la
+    segunda se mezclaba con la primera y los ficheros se pisaban entre sí.
+    """
+    destino = base_dir / nombre
+    if not destino.is_dir() or not any(destino.glob("*.mp4")):
+        return nombre
+    n = 2
+    while (base_dir / f"{nombre}_{n}").is_dir() and any(
+        (base_dir / f"{nombre}_{n}").glob("*.mp4")
+    ):
+        n += 1
+    return f"{nombre}_{n}"
 
 
 def remote_dir_for(nombre_cuenta: str, fecha: str, ponente: str, n_videos: int = 0) -> str:
@@ -64,10 +86,16 @@ def _mount_dir_for(
     if root is None:
         return None
     carpeta = config.sanitize_account_name(nombre_cuenta)
-    return (
-        root / config.DRIVE_UPLOAD_ROOT / carpeta
-        / batch_subdir(ponente, fecha, n_videos)
-    )
+    base = root / config.DRIVE_UPLOAD_ROOT / carpeta
+    # Resuelto una sola vez por tanda y cacheado: si se recalculara en cada
+    # `upload_file` el sufijo iría subiendo con cada vídeo y la tanda quedaría
+    # repartida entre `_2`, `_3`, `_4`…
+    clave = (str(base), ponente, fecha, int(n_videos))
+    nombre = _SUBDIR_CACHE.get(clave)
+    if nombre is None:
+        nombre = _unique_subdir(base, batch_subdir(ponente, fecha, n_videos))
+        _SUBDIR_CACHE[clave] = nombre
+    return base / nombre
 
 
 def list_carpetas() -> list[str]:

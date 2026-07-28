@@ -365,6 +365,36 @@ def run_batch(
         + (f", {len(failed)} fallos" if failed else "")
         + (f", {skipped} skip" if skipped else ""),
     )
+    # Limpieza del VPS: el staging acumulaba cientos de MB por tanda (el disco
+    # llegó al 88%). Pero antes se COMPRUEBA fichero a fichero que el MP4 está
+    # de verdad en el destino: rclone llegó a reportar "upload succeeded" para
+    # 4 vídeos que NUNCA aparecieron en Drive (coincidió con una saturación de
+    # la cuota de la API). Fiarse del "no hubo errores" habría borrado los
+    # únicos originales que quedaban.
+    if done > 0 and not upload_failed and not failed and remote_dirs:
+        pendientes: list[str] = []
+        for ponente, destino in remote_dirs.items():
+            dest_dir = Path(destino)
+            for local in sorted((staging_root / ponente).glob("*.mp4")):
+                remoto = dest_dir / local.name
+                if not remoto.is_file() or remoto.stat().st_size != local.stat().st_size:
+                    pendientes.append(local.name)
+        if pendientes:
+            on_log(
+                f"[batch] NO se borra el staging: {len(pendientes)} vídeo(s) no "
+                f"están confirmados en destino ({pendientes[:4]})"
+            )
+        else:
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(staging_root, ignore_errors=True)
+                on_log(
+                    f"[batch] staging local borrado ({staging_root.name}) — "
+                    f"{done} vídeo(s) verificados en Drive"
+                )
+            except OSError as e:
+                on_log(f"[batch] no se pudo borrar el staging: {e}")
+
     if done == 0:
         raise RuntimeError(
             f"Batch sin ningún vídeo generado. Fallos: {failed[:5]}"
