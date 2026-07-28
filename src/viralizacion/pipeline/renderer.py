@@ -438,10 +438,14 @@ def render_video(
                 f"hacen falta {fill_duration:.1f}s de paisaje."
             )
         durations = distribute_with_caps(fill_duration, caps)
-        paisaje_segments = [
-            (Path(c["path"]), float(c.get("start") or 0.0), d)
-            for c, d in zip(paisaje_candidates, durations)
-        ]
+        # El desplazamiento se sortea AHORA, sabiendo ya cuánto se usa de cada
+        # clip: así el fragmento cabe siempre y el mismo clip nunca sale con
+        # el mismo encuadre temporal en dos vídeos distintos.
+        paisaje_segments = []
+        for c, d in zip(paisaje_candidates, durations):
+            total = float(c.get("dur") or 0.0)
+            start = random.uniform(0.0, max(0.0, total - d))
+            paisaje_segments.append((Path(c["path"]), round(start, 3), d))
     else:
         durations = _jittered_paisaje_durations(fill_duration, n_needed)
         paisaje_segments = [

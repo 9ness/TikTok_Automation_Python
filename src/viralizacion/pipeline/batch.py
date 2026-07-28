@@ -233,7 +233,7 @@ def run_batch(
                         # se trocea el vídeo largo como antes.
                         if clip_library.is_available():
                             paisaje_cs = allocator.allocate_paisaje_clips(
-                                ponente, n_paisajes
+                                ponente, n_paisajes, min_total_dur=fill_duration,
                             )
                         else:
                             paisaje_cs = allocator.allocate_paisaje_segments(

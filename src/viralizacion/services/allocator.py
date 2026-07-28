@@ -78,7 +78,7 @@ def release_hook(ponente: str, index: int) -> None:
     usage_repo.release_hook_used(ponente, index)
 
 
-def allocate_paisaje_clips(ponente: str, n: int) -> list[dict]:
+def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> list[dict]:
     """Asigna `n` clips de la biblioteca, uno por LUGAR distinto.
 
     Cada clip es un plano entero del original, así que el sitio no cambia a
@@ -113,34 +113,55 @@ def allocate_paisaje_clips(ponente: str, n: int) -> list[dict]:
         available = list(clips)
 
     random.shuffle(available)
+
+    def _enough(sel: list[dict]) -> bool:
+        """`n` clips Y material suficiente.
+
+        Los planos duran lo que duran (3,3s a 17s), así que `n` calculado a
+        4,5s/clip se queda corto con los planos cortos. Se siguen añadiendo
+        clips hasta cubrir la duración pedida.
+        """
+        if len(sel) < n:
+            return False
+        return sum(float(c.get("dur") or 0.0) for c in sel) >= min_total_dur
+
     chosen: list[dict] = []
     seen_locations: set = set()
+    # Primera pasada: un clip por LUGAR distinto (no mezclar el mismo sitio
+    # desde otro ángulo dentro de un vídeo).
     for c in available:
+        if _enough(chosen):
+            break
         loc = c.get("location", c["index"])
         if loc in seen_locations:
             continue
         seen_locations.add(loc)
         chosen.append(c)
-        if len(chosen) == n:
-            break
-    # Si los lugares distintos no dan para `n`, se completa con lo que queda
-    # (mejor repetir lugar que fallar el vídeo entero).
-    if len(chosen) < n:
+    # Segunda pasada si aún falta material: mejor repetir lugar que fallar.
+    if not _enough(chosen):
         for c in available:
-            if c not in chosen:
-                chosen.append(c)
-                if len(chosen) == n:
-                    break
+            if c in chosen:
+                continue
+            chosen.append(c)
+            if _enough(chosen):
+                break
+
+    if not _enough(chosen):
+        raise PoolExhaustedError(
+            f"Los {len(chosen)} clips disponibles para '{ponente}' suman "
+            f"{sum(float(c.get('dur') or 0) for c in chosen):.1f}s pero hacen "
+            f"falta {min_total_dur:.1f}s."
+        )
 
     out: list[dict] = []
     for c in chosen:
-        start, dur = clip_library.random_window(c)
         usage_repo.mark_paisaje_used(ponente, c["index"])
         out.append({
             "index": c["index"],
             "path": str(clip_library.clip_path(c)),
-            "start": start,
-            "dur": dur,
+            # Duración COMPLETA del plano: es el tope real. El renderer decide
+            # cuánto usa de cada uno y sortea el desplazamiento dentro.
+            "dur": float(c.get("dur") or 0.0),
         })
     return out
 
