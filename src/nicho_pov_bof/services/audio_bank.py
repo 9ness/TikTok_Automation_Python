@@ -120,7 +120,12 @@ def prepare(audio: Path, *, on_log: OnLog = _noop) -> Path:
         on_log(f"[audio_bank] reutilizando versión ya procesada: {out_path.name}")
         return out_path
 
-    tmp_path = out_path.with_suffix(out_path.suffix + ".part")
+    # El sufijo `.part` va ANTES de la extensión (`x.part.mp3`, no
+    # `x.mp3.part`): ffmpeg deduce el formato de salida de la extensión y con
+    # `.part` al final fallaba SIEMPRE con "Unable to find a suitable output
+    # format", así que nunca se recortaba nada y además se reintentaba en cada
+    # vídeo porque el fichero cacheado no llegaba a crearse.
+    tmp_path = out_path.with_name(f"{out_path.stem}.part{out_path.suffix}")
     cmd = [
         "ffmpeg", "-y", "-v", "error",
         "-i", str(audio),
