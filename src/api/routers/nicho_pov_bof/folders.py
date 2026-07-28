@@ -16,12 +16,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import FileResponse
 
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
+    BackupCheckResponse,
+    BackupSyncRequest,
+    BackupSyncResponse,
     FoldersListResponse,
     MarkCompletedRequest,
     MarkCompletedResponse,
@@ -31,6 +34,8 @@ from src.api.schemas.nicho_pov_bof import (
     SourceInfo,
     SourcesListResponse,
 )
+from src.queue.manager import JobQueue
+from src.queue.models import JobMode, JobStatus
 
 router = APIRouter(
     prefix="/api/v1/nicho-pov-bof",
@@ -149,6 +154,45 @@ def get_photo(
         # El contenido de un file ID es inmutable → cachea agresivo.
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@router.get("/backup/check", response_model=BackupCheckResponse)
+def backup_check() -> BackupCheckResponse:
+    """¿Ha cambiado algo en el Drive de origen desde la última copia?
+
+    Solo lee y compara — no copia nada. Tarda lo que tarde el listado
+    recursivo del Drive (~1 min con 2.2k objetos).
+    """
+    from src.nicho_pov_bof.services import backup_sync
+
+    try:
+        return BackupCheckResponse(**backup_sync.check_only())
+    except RuntimeError as e:
+        raise APIError(f"No se pudo comparar con el origen: {e}", status_code=502) from e
+
+
+@router.post(
+    "/backup/sync",
+    response_model=BackupSyncResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def backup_sync_enqueue(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    body: BackupSyncRequest,
+) -> BackupSyncResponse:
+    """Encola la copia. Va por la cola porque puede tardar mucho."""
+    title = "💾 Backup Productos España" + (" (completa)" if body.force_full else "")
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_BACKUP,
+        title=title,
+        params={"force_full": bool(body.force_full)},
+    )
+    pending = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    position = next((i for i, j in enumerate(pending) if j.id == job.id), 0)
+    return BackupSyncResponse(job_id=job.id, title=title, position_in_queue=position)
 
 
 @router.post("/complete", response_model=MarkCompletedResponse)

@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  BackupCheckResponse,
+  BackupSyncResponse,
   FoldersListResponse,
   MarkCompletedRequest,
   MarkCompletedResponse,
@@ -57,6 +59,20 @@ export function useMarkCompleted(source: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: nichoPovBofKeys.folders(source) });
     },
+  });
+}
+
+/** Comprobar cambios en el Drive de origen. Bajo demanda: el listado
+ *  recursivo tarda ~1 min, así que no se dispara solo al abrir la página. */
+export function useBackupCheck() {
+  return useMutation<BackupCheckResponse, Error, void>({
+    mutationFn: () => api.get<BackupCheckResponse>(`${ROOT}/backup/check`),
+  });
+}
+
+export function useBackupSync() {
+  return useMutation<BackupSyncResponse, Error, { force_full: boolean }>({
+    mutationFn: (body) => api.post<BackupSyncResponse>(`${ROOT}/backup/sync`, body),
   });
 }
 

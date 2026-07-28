@@ -13,6 +13,7 @@ import {
   Captions,
   Crown,
   Film,
+  HardDrive,
   HardHat,
   Package,
   Radar,
@@ -42,6 +43,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   construccion_pov: "creator_reward",
   editor_auto: "editor_auto",
   viralizacion_batch: "viralizacion",
+  nicho_pov_bof_backup: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -72,6 +74,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   construccion_pov: "Construcción POV",
   editor_auto: "Editor Auto",
   viralizacion_batch: "Viralización 1K",
+  nicho_pov_bof_backup: "Backup Productos España",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -88,6 +91,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   construccion_pov: HardHat,
   editor_auto: Scissors,
   viralizacion_batch: Video,
+  nicho_pov_bof_backup: HardDrive,
 };
 
 /**
@@ -166,6 +170,9 @@ export function describeJobParams(
         out.push(params.ponentes.join(", "));
       if (params.nombre_cuenta) out.push(String(params.nombre_cuenta));
       if (params.music_rounds != null) out.push(`música ${String(params.music_rounds)}`);
+      break;
+    case "nicho_pov_bof_backup":
+      out.push(params.force_full ? "copia completa" : "incremental");
       break;
   }
   return out;

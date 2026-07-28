@@ -37,6 +37,24 @@ export interface PhotosListResponse {
   items: PhotoInfo[];
 }
 
+export interface BackupCheckResponse {
+  last_snapshot: string | null;
+  has_changes: boolean;
+  would_be_full: boolean;
+  full_copy_ratio: number;
+  n_added: number;
+  n_modified: number;
+  n_deleted: number;
+  n_total_source: number;
+  change_ratio: number;
+}
+
+export interface BackupSyncResponse {
+  job_id: string;
+  title: string;
+  position_in_queue: number;
+}
+
 export interface MarkCompletedRequest {
   source: string;
   folder: string;

@@ -1,17 +1,30 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, LayoutGrid, Loader2, RefreshCw, Target } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  HardDrive,
+  LayoutGrid,
+  Loader2,
+  RefreshCw,
+  Target,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
   buildPhotoUrl,
+  useBackupCheck,
+  useBackupSync,
   useFolders,
   useMarkCompleted,
   usePhotos,
   useSources,
 } from "@/lib/queries/nichoPovBof";
+import { useDrawerStore } from "@/lib/stores/drawerStore";
+import type { BackupCheckResponse } from "@/lib/types/nichoPovBof";
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useState("aleatorios_1");
@@ -23,6 +36,38 @@ export default function NichoPovBofPage() {
   const sources = useSources();
   const folders = useFolders(source);
   const markCompleted = useMarkCompleted(source);
+
+  const [backup, setBackup] = useState<BackupCheckResponse | null>(null);
+  const backupCheck = useBackupCheck();
+  const backupSync = useBackupSync();
+  const openQueue = useDrawerStore((s) => s.openQueue);
+
+  function checkBackup() {
+    backupCheck.mutate(undefined, {
+      onSuccess: (res) => {
+        setBackup(res);
+        toast.success(
+          res.has_changes
+            ? `${res.n_added} nuevos · ${res.n_modified} modificados · ${res.n_deleted} borrados en origen`
+            : "Sin cambios desde la última copia",
+        );
+      },
+      onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+    });
+  }
+
+  function syncBackup(forceFull: boolean) {
+    backupSync.mutate(
+      { force_full: forceFull },
+      {
+        onSuccess: () => {
+          toast.success("Backup encolado");
+          openQueue();
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
 
   const data = folders.data;
   const folder = picked ?? data?.current ?? null;
@@ -137,6 +182,86 @@ export default function NichoPovBofPage() {
             style={{ width: `${pct}%` }}
           />
         </div>
+      </section>
+
+      {/* Backup del Drive de origen */}
+      <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+        <div className="flex items-center gap-2">
+          <HardDrive className="h-4 w-4 shrink-0 text-sky-500" />
+          <p className="text-sm font-semibold">Copia de seguridad</p>
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          El Drive de origen es de un tercero y se borra sin aviso. Comprueba si
+          han añadido o cambiado algo y guarda solo la diferencia.
+        </p>
+
+        {backup && (
+          <div className="space-y-1 rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px]">
+            <p className="text-muted-foreground">
+              Última copia:{" "}
+              <span className="font-medium text-foreground">
+                {backup.last_snapshot ?? "ninguna"}
+              </span>
+            </p>
+            {backup.has_changes ? (
+              <>
+                <p>
+                  <span className="font-semibold text-emerald-500">+{backup.n_added}</span> nuevos ·{" "}
+                  <span className="font-semibold text-amber-500">~{backup.n_modified}</span> modificados ·{" "}
+                  <span className="font-semibold text-red-500">-{backup.n_deleted}</span> borrados en origen
+                </p>
+                <p className="text-muted-foreground">
+                  {Math.round(backup.change_ratio * 100)}% del archivo ({backup.n_total_source} ficheros).{" "}
+                  {backup.would_be_full
+                    ? "Se hará copia COMPLETA nueva."
+                    : "Se copiará solo la diferencia."}
+                </p>
+              </>
+            ) : (
+              <p className="text-emerald-500">Sin cambios — no hay nada que copiar.</p>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={checkBackup}
+            disabled={backupCheck.isPending}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+          >
+            {backupCheck.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Comprobar cambios
+          </button>
+          <button
+            type="button"
+            onClick={() => syncBackup(false)}
+            disabled={backupSync.isPending}
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50"
+          >
+            {backupSync.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <HardDrive className="h-3.5 w-3.5" />
+            )}
+            Sincronizar
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => syncBackup(true)}
+          disabled={backupSync.isPending}
+          className="w-full rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        >
+          Forzar copia completa nueva
+        </button>
+        <p className="text-[10px] text-muted-foreground">
+          También corre solo cada día a las 06:00.
+        </p>
       </section>
 
       {folders.isLoading && (

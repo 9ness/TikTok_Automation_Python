@@ -1660,6 +1660,43 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
 
 
 # ============================================================
+# RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
+# ============================================================
+def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Copia versionada de "Productos España" (Drive de un tercero).
+
+    El admin de ese Drive borra todo periódicamente, así que esto detecta qué
+    cambió desde la última copia y guarda solo la diferencia — o una copia
+    completa nueva si cambió demasiado. Las copias son server-side.
+    """
+    from src.nicho_pov_bof.services import backup_sync
+
+    p = job.params or {}
+    result = backup_sync.run_sync(
+        force_full=bool(p.get("force_full")),
+        on_log=on_log,
+        on_progress=on_progress,
+    )
+
+    on_log(
+        f"[backup] modo={result['mode']} ({result['reason']}) · "
+        f"+{result['n_added']} nuevos · ~{result['n_modified']} modificados · "
+        f"-{result['n_deleted']} borrados en origen"
+    )
+    if result.get("dest"):
+        on_log(f"[backup] destino: {result['dest']}")
+
+    if result.get("failed"):
+        raise RuntimeError(
+            f"Backup incompleto: {result['copied']} copiados pero "
+            f"{result['failed']} fallaron. Destino: {result.get('dest')}. "
+            f"Primeros errores: {result.get('errors', [])[:3]}"
+        )
+
+    return result.get("dest") or "sin-cambios"
+
+
+# ============================================================
 # RUNNER: TIKTOK SHOP WATERMARK REMOVER
 # ============================================================
 def run_tiktok_shop_watermark(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2038,6 +2075,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
     JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
+    JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
 }
 
 
@@ -2055,6 +2093,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
     JobMode.VIRALIZACION_BATCH: "viralizacion",
+    JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
 }
 
 

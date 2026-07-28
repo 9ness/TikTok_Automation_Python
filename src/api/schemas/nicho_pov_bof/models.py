@@ -52,6 +52,30 @@ class MarkCompletedRequest(BaseModel):
     completed: bool = True
 
 
+class BackupCheckResponse(BaseModel):
+    """Diff del origen contra la última copia. No copia nada."""
+
+    last_snapshot: str | None = None
+    has_changes: bool
+    would_be_full: bool
+    full_copy_ratio: float
+    n_added: int
+    n_modified: int
+    n_deleted: int
+    n_total_source: int
+    change_ratio: float
+
+
+class BackupSyncRequest(BaseModel):
+    force_full: bool = False
+
+
+class BackupSyncResponse(BaseModel):
+    job_id: str
+    title: str
+    position_in_queue: int
+
+
 class MarkCompletedResponse(BaseModel):
     source: str
     folder: str

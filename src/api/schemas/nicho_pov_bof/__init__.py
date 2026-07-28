@@ -1,6 +1,9 @@
 """Schemas del Nicho POV BOF."""
 
 from .models import (
+    BackupCheckResponse,
+    BackupSyncRequest,
+    BackupSyncResponse,
     FoldersListResponse,
     MarkCompletedRequest,
     MarkCompletedResponse,
@@ -12,6 +15,9 @@ from .models import (
 )
 
 __all__ = [
+    "BackupCheckResponse",
+    "BackupSyncRequest",
+    "BackupSyncResponse",
     "FoldersListResponse",
     "MarkCompletedRequest",
     "MarkCompletedResponse",

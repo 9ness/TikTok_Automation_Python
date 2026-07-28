@@ -1,0 +1,303 @@
+"""Backup versionado del Drive compartido "Productos España".
+
+El admin del Drive de origen avisa y borra todo cada cierto tiempo, así que
+necesitamos (a) una copia íntegra en nuestro Drive y (b) detectar qué ha
+cambiado desde la última copia sin volver a copiarlo todo.
+
+Dos decisiones que no son obvias:
+
+1. **La identidad de un fichero es su file ID, no su ruta.** En este Drive hay
+   ~388 objetos con nombre duplicado dentro de la misma carpeta (`2.PNG` dos
+   veces). Si el snapshot se indexara por ruta, esos pares se pisarían y cada
+   diff mentiría. Indexado por ID, los duplicados son objetos distintos y el
+   diff es exacto.
+
+2. **`rclone copy` DESCARTA duplicados** ("Duplicate object found in source -
+   ignoring") porque no puede representar dos ficheros con el mismo nombre en
+   una carpeta. Por eso toda copia (completa o delta) pasa por
+   `rclone backend copyid`, que copia por ID a un nombre desambiguado.
+
+Las copias son server-side (Drive → Drive): no bajan al disco del VPS.
+El origen NUNCA se modifica.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
+
+from src.nicho_pov_bof import config
+
+OnLog = Callable[[str], None]
+_noop: OnLog = lambda _: None
+
+# Origen como connection-string: convierte "Compartido conmigo" en la raíz sin
+# afectar al destino (que vive en "Mi unidad" del mismo remote).
+SRC_REMOTE = "gdrive,shared_with_me=true:"
+SRC_PATH = f"{SRC_REMOTE}{config.SHARED_ROOT}"
+
+# Destino: hermano de TIKTOK_SHOP_AI_PRO bajo la raíz del proyecto en Drive.
+BACKUP_PARENT = "NEBULABS_AUTOMATED_TIKTOK"
+BACKUP_PREFIX = "BACKUP_Productos_Espana"
+
+# Si cambia más de esta fracción del archivo, sale más a cuenta una copia
+# completa nueva que un delta gigante.
+FULL_COPY_RATIO = float(os.getenv("NICHO_POV_BOF_FULL_COPY_RATIO") or 0.40)
+
+
+def _rclone(args: list[str], *, timeout: float = 1800, on_log: OnLog = _noop) -> str:
+    cmd = ["rclone", *args]
+    conf = config.rclone_config_path()
+    if conf:
+        cmd += ["--config", conf]
+    on_log("+ " + " ".join(cmd[:6]) + (" …" if len(cmd) > 6 else ""))
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        raise RuntimeError("rclone no está instalado en este entorno.") from None
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"rclone excedió {timeout:.0f}s: {' '.join(args[:2])}") from None
+    if proc.returncode != 0:
+        raise RuntimeError(f"rclone falló ({' '.join(args[:2])}): {proc.stderr[-400:]}")
+    return proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# Snapshots
+# ---------------------------------------------------------------------------
+def snapshot_dir() -> Path:
+    root = os.getenv("API_TEMP_ROOT") or "temp_work"
+    d = Path(root) / "nicho_pov_bof_backups"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def take_snapshot(*, on_log: OnLog = _noop) -> dict:
+    """Listado completo del origen indexado por file ID."""
+    on_log("[backup] listando el origen (recursivo)…")
+    raw = _rclone(["lsjson", SRC_PATH, "--recursive", "--files-only"], on_log=on_log)
+    items = json.loads(raw or "[]")
+    snap: dict[str, dict] = {}
+    for it in items:
+        fid = it.get("ID")
+        if not fid:
+            continue
+        snap[fid] = {
+            "path": it.get("Path", ""),
+            "size": int(it.get("Size") or 0),
+            "mtime": it.get("ModTime", ""),
+        }
+    on_log(f"[backup] {len(snap)} objetos en el origen")
+    return snap
+
+
+def save_snapshot(snap: dict, tag: str) -> Path:
+    p = snapshot_dir() / f"snapshot_{tag}.json"
+    p.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8")
+    return p
+
+
+def load_latest_snapshot() -> tuple[str | None, dict]:
+    """(tag, snapshot) del snapshot más reciente, o (None, {}) si no hay."""
+    snaps = sorted(snapshot_dir().glob("snapshot_*.json"))
+    if not snaps:
+        return None, {}
+    latest = snaps[-1]
+    tag = latest.stem.replace("snapshot_", "")
+    try:
+        return tag, json.loads(latest.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None, {}
+
+
+# ---------------------------------------------------------------------------
+# Diff
+# ---------------------------------------------------------------------------
+def diff_snapshots(old: dict, new: dict) -> dict:
+    """Qué ha cambiado entre dos snapshots (identidad = file ID).
+
+    `deleted` es informativo: en un backup los ficheros borrados en el origen
+    se CONSERVAN — precisamente de eso va tener una copia.
+    """
+    old_ids, new_ids = set(old), set(new)
+    added = sorted(new_ids - old_ids)
+    deleted = sorted(old_ids - new_ids)
+    modified = sorted(
+        i for i in (old_ids & new_ids)
+        if old[i].get("size") != new[i].get("size")
+        or old[i].get("mtime") != new[i].get("mtime")
+    )
+    changed = len(added) + len(modified)
+    total = max(len(new_ids), 1)
+    return {
+        "added": added,
+        "modified": modified,
+        "deleted": deleted,
+        "n_added": len(added),
+        "n_modified": len(modified),
+        "n_deleted": len(deleted),
+        "n_total_source": len(new_ids),
+        "change_ratio": changed / total,
+        "has_changes": bool(added or modified or deleted),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Copia
+# ---------------------------------------------------------------------------
+def _dest_name(path: str, file_id: str, dup_paths: set[str]) -> str:
+    """Nombre destino; desambigua solo si esa ruta está duplicada en origen."""
+    if path not in dup_paths:
+        return path
+    parent, _, name = path.rpartition("/")
+    stem, dot, ext = name.rpartition(".")
+    if not stem:
+        stem, dot, ext = name, "", ""
+    new_name = f"{stem}__{file_id[:8]}{dot}{ext}"
+    return f"{parent}/{new_name}" if parent else new_name
+
+
+def _duplicated_paths(snap: dict) -> set[str]:
+    seen: dict[str, int] = {}
+    for meta in snap.values():
+        p = meta.get("path", "")
+        seen[p] = seen.get(p, 0) + 1
+    return {p for p, n in seen.items() if n > 1}
+
+
+def copy_by_ids(
+    file_ids: list[str],
+    snap: dict,
+    dest_root: str,
+    *,
+    on_log: OnLog = _noop,
+    on_progress: Callable[[float, str], None] | None = None,
+) -> dict:
+    """Copia server-side los IDs dados a `dest_root`, preservando rutas."""
+    dup_paths = _duplicated_paths(snap)
+    ok = failed = 0
+    errors: list[str] = []
+    total = max(len(file_ids), 1)
+
+    for i, fid in enumerate(file_ids, 1):
+        meta = snap.get(fid) or {}
+        path = meta.get("path") or fid
+        dest = f"{dest_root}/{_dest_name(path, fid, dup_paths)}"
+        try:
+            _rclone(["backend", "copyid", SRC_REMOTE, fid, dest], timeout=900, on_log=_noop)
+            ok += 1
+        except RuntimeError as e:
+            failed += 1
+            if len(errors) < 10:
+                errors.append(f"{path}: {e}")
+        if on_progress and (i % 10 == 0 or i == len(file_ids)):
+            on_progress(i / total, f"copiando {i}/{len(file_ids)}")
+        if i % 100 == 0:
+            on_log(f"[backup] {i}/{len(file_ids)} · {ok} ok · {failed} fallos")
+
+    return {"copied": ok, "failed": failed, "errors": errors}
+
+
+def run_sync(
+    *,
+    force_full: bool = False,
+    on_log: OnLog = _noop,
+    on_progress: Callable[[float, str], None] | None = None,
+) -> dict:
+    """Comprueba cambios y copia lo que falte.
+
+    - Sin snapshot previo, o cambio > FULL_COPY_RATIO, o `force_full`:
+      copia COMPLETA a `BACKUP_Productos_Espana_<fecha>`.
+    - Si no: copia solo added+modified a `..._delta_<fecha>`.
+    """
+    prog = on_progress or (lambda *_: None)
+    tag = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M")
+    fecha = tag.split("_")[0]
+
+    prog(0.05, "Listando el origen…")
+    new_snap = take_snapshot(on_log=on_log)
+    old_tag, old_snap = load_latest_snapshot()
+
+    d = diff_snapshots(old_snap, new_snap)
+    on_log(
+        f"[backup] vs snapshot {old_tag or '(ninguno)'}: "
+        f"+{d['n_added']} nuevos · ~{d['n_modified']} modificados · "
+        f"-{d['n_deleted']} borrados en origen ({d['change_ratio']:.0%} del archivo)"
+    )
+
+    if not old_snap:
+        reason = "no había copia previa"
+        full = True
+    elif force_full:
+        reason = "copia completa forzada"
+        full = True
+    elif d["change_ratio"] > FULL_COPY_RATIO:
+        reason = f"cambió el {d['change_ratio']:.0%} (> {FULL_COPY_RATIO:.0%})"
+        full = True
+    else:
+        reason = "cambios acotados"
+        full = False
+
+    if not d["has_changes"] and old_snap:
+        on_log("[backup] sin cambios — no se copia nada")
+        save_snapshot(new_snap, tag)
+        prog(1.0, "Sin cambios")
+        return {
+            "mode": "none", "reason": "sin cambios", "tag": tag,
+            "dest": None, "copied": 0, "failed": 0, **_counts(d),
+        }
+
+    if full:
+        dest = f"gdrive:{BACKUP_PARENT}/{BACKUP_PREFIX}_{fecha}"
+        ids = sorted(new_snap)
+        on_log(f"[backup] copia COMPLETA ({reason}) → {dest}")
+    else:
+        dest = f"gdrive:{BACKUP_PARENT}/{BACKUP_PREFIX}_delta_{fecha}"
+        ids = d["added"] + d["modified"]
+        on_log(f"[backup] copia DELTA ({reason}, {len(ids)} ficheros) → {dest}")
+
+    prog(0.15, f"Copiando {len(ids)} ficheros…")
+    res = copy_by_ids(ids, new_snap, dest, on_log=on_log, on_progress=lambda f, m: prog(0.15 + f * 0.8, m))
+
+    save_snapshot(new_snap, tag)
+    prog(1.0, f"{res['copied']} copiados, {res['failed']} fallos")
+
+    if res["failed"]:
+        on_log(f"[backup] ⚠️ {res['failed']} ficheros fallaron: {res['errors'][:5]}")
+
+    return {
+        "mode": "full" if full else "delta",
+        "reason": reason,
+        "tag": tag,
+        "dest": dest,
+        **_counts(d),
+        **res,
+    }
+
+
+def _counts(d: dict) -> dict:
+    return {
+        "n_added": d["n_added"],
+        "n_modified": d["n_modified"],
+        "n_deleted": d["n_deleted"],
+        "n_total_source": d["n_total_source"],
+        "change_ratio": round(d["change_ratio"], 4),
+    }
+
+
+def check_only(*, on_log: OnLog = _noop) -> dict:
+    """Diff sin copiar nada (para el botón "comprobar cambios")."""
+    new_snap = take_snapshot(on_log=on_log)
+    old_tag, old_snap = load_latest_snapshot()
+    d = diff_snapshots(old_snap, new_snap)
+    return {
+        "last_snapshot": old_tag,
+        "has_changes": d["has_changes"] or not old_snap,
+        "would_be_full": (not old_snap) or d["change_ratio"] > FULL_COPY_RATIO,
+        "full_copy_ratio": FULL_COPY_RATIO,
+        **_counts(d),
+    }
