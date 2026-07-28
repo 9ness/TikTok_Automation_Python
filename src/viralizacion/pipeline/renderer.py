@@ -431,20 +431,25 @@ def render_video(
     if from_library:
         # Cada clip solo tiene el material de SU plano: repartir sin pasarse
         # o ffmpeg congelaría el último fotograma para rellenar.
-        caps = [float(c.get("dur") or 0.0) for c in paisaje_candidates]
+        # Se reserva `CLIP_TRANSITION_PAD_S` por clip para el solape del
+        # fundido; lo que queda es lo que se puede usar de verdad.
+        pad = config.CLIP_TRANSITION_PAD_S
+        caps = [max(0.0, float(c.get("dur") or 0.0) - pad) for c in paisaje_candidates]
         if sum(caps) + 1e-3 < fill_duration:
             raise RuntimeError(
-                f"Los {n_needed} clips asignados suman {sum(caps):.1f}s pero "
-                f"hacen falta {fill_duration:.1f}s de paisaje."
+                f"Los {n_needed} clips asignados dan {sum(caps):.1f}s útiles "
+                f"(descontado el margen de transición) pero hacen falta "
+                f"{fill_duration:.1f}s de paisaje."
             )
         durations = distribute_with_caps(fill_duration, caps)
         # El desplazamiento se sortea AHORA, sabiendo ya cuánto se usa de cada
-        # clip: así el fragmento cabe siempre y el mismo clip nunca sale con
-        # el mismo encuadre temporal en dos vídeos distintos.
+        # clip: así el fragmento cabe siempre —con su margen— y el mismo clip
+        # nunca sale con el mismo encuadre temporal en dos vídeos distintos.
         paisaje_segments = []
         for c, d in zip(paisaje_candidates, durations):
             total = float(c.get("dur") or 0.0)
-            start = random.uniform(0.0, max(0.0, total - d))
+            half = pad / 2
+            start = half + random.uniform(0.0, max(0.0, total - d - pad))
             paisaje_segments.append((Path(c["path"]), round(start, 3), d))
     else:
         durations = _jittered_paisaje_durations(fill_duration, n_needed)

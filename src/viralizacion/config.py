@@ -331,6 +331,12 @@ PAISAJE_ZOOM_JITTER_RANGE = (1.0, 1.18)   # hay margen de sobra, más agresivo
 # con `fill_duration` — ver `pipeline/renderer.py:_jittered_paisaje_durations`).
 PAISAJE_CLIP_DUR_JITTER_RANGE = (3.5, 5.5)
 
+# Margen que hay que dejar libre en cada clip de la biblioteca para el SOLAPE
+# de las transiciones: el renderer extrae `duración + medio fundido` por cada
+# lado. Sin reservarlo, una ventana pegada al borde del clip pide material que
+# no existe y ffmpeg congela el último fotograma (vídeo de 49s con 470 frames).
+CLIP_TRANSITION_PAD_S = 1.3
+
 # Duración de la transición paisaje→paisaje (antes fija en 0.9s). La
 # transición gancho→paisaje (hblur) se mantiene fija en 0.35s — es la
 # validada explícitamente por el operador y no aporta tanta "huella" al

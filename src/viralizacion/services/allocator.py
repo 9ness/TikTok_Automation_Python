@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import random
 
+from src.viralizacion import config
+
 from src.viralizacion.pipeline.resource_scanner import (
     load_hook_candidates_cached,
     load_paisaje_candidates_cached,
@@ -114,6 +116,11 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
 
     random.shuffle(available)
 
+    def _usable(c: dict) -> float:
+        """Material aprovechable del clip: hay que reservar el solape de la
+        transición, que el renderer extrae por fuera de la ventana."""
+        return max(0.0, float(c.get("dur") or 0.0) - config.CLIP_TRANSITION_PAD_S)
+
     def _enough(sel: list[dict]) -> bool:
         """`n` clips Y material suficiente.
 
@@ -123,7 +130,7 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
         """
         if len(sel) < n:
             return False
-        return sum(float(c.get("dur") or 0.0) for c in sel) >= min_total_dur
+        return sum(_usable(c) for c in sel) >= min_total_dur
 
     chosen: list[dict] = []
     seen_locations: set = set()
@@ -148,8 +155,8 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
 
     if not _enough(chosen):
         raise PoolExhaustedError(
-            f"Los {len(chosen)} clips disponibles para '{ponente}' suman "
-            f"{sum(float(c.get('dur') or 0) for c in chosen):.1f}s pero hacen "
+            f"Los {len(chosen)} clips disponibles para {ponente!r} dan "
+            f"{sum(_usable(c) for c in chosen):.1f}s útiles pero hacen "
             f"falta {min_total_dur:.1f}s."
         )
 
