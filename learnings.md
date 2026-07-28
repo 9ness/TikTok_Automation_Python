@@ -280,3 +280,8 @@
 - Drive "shared with me" NO se ve por el mount FUSE: hay que leerlo por CLI con `--drive-shared-with-me`.
 - En Drive puede haber ficheros con NOMBRE DUPLICADO en la misma carpeta (`2.PNG` ×2) → descargar por path es ambiguo; usar `rclone backend copyid <remote>: <fileID> <dest>`.
 - Escribir scratch con `output_path.with_suffix(...)` lo mete en el dir de salida, que luego se publica entero → el scratch acaba en Drive. Usar siempre tmp_dir.
+- Viralización: los tramos de paisaje se cortaban por TIEMPO fijo sobre un vídeo de 61min, así que dos tramos seguidos podían ser el mismo plano (transición visible pero mismo lugar). Solución: banco de clips troceado por CAMBIO DE ESCENA real (`select='gt(scene,0.28)'` + `showinfo`), un fichero por plano.
+- Al revisar material para descartar texto, revisar el ENCUADRE FINAL, no el fotograma original: en 9:16 se usa solo la franja central del 16:9, así que rótulos y marcas de agua de las esquinas desaparecen solos. Revisar el 16:9 descartaba 84 planos, 49 de ellos válidos.
+- Extraer una ventana de un clip para xfade necesita `duración + medio fundido por cada lado`. Si la ventana va pegada al borde, ffmpeg NO falla: rellena congelando el último fotograma (vídeo "de 49s" con 470 frames en vez de 1471). Reservar margen y verificar con `ffprobe -count_frames`.
+- `ffmpeg -vf "select=...,metadata=print"` no escribe nada si el filtro no exporta metadatos; para timestamps de corte de escena usar `showinfo` y parsear `pts_time` de stderr.
+- Un `until ! pgrep -f "<patrón>"` se auto-detecta (el propio bash del bucle contiene el patrón) y no termina nunca: usar `pgrep -f "[p]atrón"`.
