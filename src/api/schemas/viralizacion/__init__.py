@@ -1,4 +1,5 @@
 from .models import (
+    CarpetasListResponse,
     PonenteInfo,
     PonentesListResponse,
     RoundPlan,
@@ -10,6 +11,7 @@ from .models import (
 )
 
 __all__ = [
+    "CarpetasListResponse",
     "PonenteInfo",
     "PonentesListResponse",
     "RoundPlan",

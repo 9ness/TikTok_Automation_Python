@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, status
 from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import InvalidEnqueueRequestError
 from src.api.schemas.viralizacion import (
+    CarpetasListResponse,
     PonenteInfo,
     PonentesListResponse,
     RoundPlan,
@@ -75,6 +76,18 @@ def list_ponentes() -> PonentesListResponse:
             paisajes_total=paisajes_total,
         ))
     return PonentesListResponse(items=items)
+
+
+@router.get("/carpetas", response_model=CarpetasListResponse)
+def list_carpetas() -> CarpetasListResponse:
+    """Carpetas ya creadas bajo VIRALIZACION.
+
+    La UI las ofrece en un desplegable para no tener que recordar el nombre
+    exacto (y poder acumular tandas en la misma carpeta).
+    """
+    from src.viralizacion.services import drive_uploader
+
+    return CarpetasListResponse(items=drive_uploader.list_carpetas())
 
 
 @router.get("/estilos", response_model=StylesListResponse)

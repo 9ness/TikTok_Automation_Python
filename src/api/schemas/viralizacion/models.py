@@ -19,6 +19,12 @@ class PonentesListResponse(BaseModel):
     items: list[PonenteInfo]
 
 
+class CarpetasListResponse(BaseModel):
+    """Carpetas ya creadas bajo VIRALIZACION, para elegir dónde guardar."""
+
+    items: list[str]
+
+
 class StyleChoice(BaseModel):
     key: str
     label: str

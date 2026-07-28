@@ -27,11 +27,20 @@ from src.viralizacion import config
 OnLog = Callable[[str], None]
 
 
-def remote_dir_for(nombre_cuenta: str, fecha: str, ponente: str) -> str:
-    account_safe = config.sanitize_account_name(nombre_cuenta)
+def batch_subdir(ponente: str, fecha: str, n_videos: int) -> str:
+    """Subcarpeta de una tanda: `32_pablo_2026-07-28`.
+
+    Cada ponente va en su propia subcarpeta dentro de la carpeta elegida por
+    el operador, con la cantidad delante para saber de un vistazo qué hay.
+    """
+    return f"{int(n_videos)}_{ponente}_{fecha}"
+
+
+def remote_dir_for(nombre_cuenta: str, fecha: str, ponente: str, n_videos: int = 0) -> str:
+    carpeta = config.sanitize_account_name(nombre_cuenta)
     return (
         f"{config.DRIVE_REMOTE}{config.DRIVE_UPLOAD_ROOT}/"
-        f"{account_safe}_{fecha}/{ponente}/"
+        f"{carpeta}/{batch_subdir(ponente, fecha, n_videos)}/"
     )
 
 
@@ -48,12 +57,34 @@ def _mount_root() -> Path | None:
     return None
 
 
-def _mount_dir_for(nombre_cuenta: str, fecha: str, ponente: str) -> Path | None:
+def _mount_dir_for(
+    nombre_cuenta: str, fecha: str, ponente: str, n_videos: int = 0
+) -> Path | None:
     root = _mount_root()
     if root is None:
         return None
-    account_safe = config.sanitize_account_name(nombre_cuenta)
-    return root / config.DRIVE_UPLOAD_ROOT / f"{account_safe}_{fecha}" / ponente
+    carpeta = config.sanitize_account_name(nombre_cuenta)
+    return (
+        root / config.DRIVE_UPLOAD_ROOT / carpeta
+        / batch_subdir(ponente, fecha, n_videos)
+    )
+
+
+def list_carpetas() -> list[str]:
+    """Carpetas ya creadas bajo VIRALIZACION, para ofrecerlas en la UI."""
+    root = _mount_root()
+    if root is None:
+        return []
+    base = root / config.DRIVE_UPLOAD_ROOT
+    if not base.is_dir():
+        return []
+    try:
+        return sorted(
+            (d.name for d in base.iterdir() if d.is_dir() and not d.name.startswith(".")),
+            key=str.lower,
+        )
+    except OSError:
+        return []
 
 
 def _copy_into_mount(src: Path, dest_dir: Path, on_log: OnLog | None = None) -> None:
@@ -89,18 +120,19 @@ def upload_file(
     nombre_cuenta: str,
     fecha: str,
     ponente: str,
+    n_videos: int = 0,
     on_log: OnLog | None = None,
 ) -> str:
     """Publica un único MP4 en cuanto termina (no espera al batch entero)."""
     if not local_path.is_file():
         raise FileNotFoundError(str(local_path))
 
-    mount_dir = _mount_dir_for(nombre_cuenta, fecha, ponente)
+    mount_dir = _mount_dir_for(nombre_cuenta, fecha, ponente, n_videos)
     if mount_dir is not None:
         _copy_into_mount(local_path, mount_dir, on_log=on_log)
         return str(mount_dir)
 
-    remote_dir = remote_dir_for(nombre_cuenta, fecha, ponente)
+    remote_dir = remote_dir_for(nombre_cuenta, fecha, ponente, n_videos)
     _rclone_copy(str(local_path), remote_dir, on_log=on_log)
     return remote_dir
 
@@ -110,6 +142,7 @@ def upload_batch(
     nombre_cuenta: str,
     fecha: str,
     ponentes: list[str],
+    cantidad: dict[str, int] | None = None,
     on_log: OnLog | None = None,
 ) -> dict[str, str]:
     """Publica `staging_root/<ponente>/*.mp4` para cada ponente con ficheros.
@@ -127,7 +160,8 @@ def upload_batch(
         if not mp4s:
             continue
 
-        mount_dir = _mount_dir_for(nombre_cuenta, fecha, ponente)
+        n_videos = (cantidad or {}).get(ponente, len(mp4s))
+        mount_dir = _mount_dir_for(nombre_cuenta, fecha, ponente, n_videos)
         if mount_dir is not None:
             for f in mp4s:
                 dest = mount_dir / f.name
@@ -138,7 +172,7 @@ def upload_batch(
             results[ponente] = str(mount_dir)
             continue
 
-        remote_dir = remote_dir_for(nombre_cuenta, fecha, ponente)
+        remote_dir = remote_dir_for(nombre_cuenta, fecha, ponente, n_videos)
         # `--include *.mp4` para no arrastrar scratch del renderer.
         cmd = ["rclone", "copy", str(local_dir), remote_dir, "--include", "*.mp4", "-v"]
         if on_log:

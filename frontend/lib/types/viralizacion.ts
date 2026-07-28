@@ -17,6 +17,10 @@ export interface PonentesListResponse {
   items: PonenteInfo[];
 }
 
+export interface CarpetasListResponse {
+  items: string[];
+}
+
 export interface StyleChoice {
   key: string;
   label: string;

@@ -235,7 +235,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         eq_extra={"gamma_r": 1.10, "gamma_b": 0.90},
         pre_subtitle_filters=["colorbalance=rs=-0.12:bs=0.18:rm=0.06:bm=-0.05"],
         # Disolución suave y larga: encadenado "de cine" en vez de corte a negro.
-        transition_landscape=("dissolve", 1.1),
+        transition_landscape=("dissolve", 0.7),
     ),
     "noir": StylePreset(
         key="noir",
@@ -247,7 +247,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         pre_subtitle_filters=["colorchannelmixer=.35:.45:.15:0:.35:.45:.15:0:.35:.45:.20:0"],
         noise_filter_override="noise=alls=18:allf=t+u",
         # Fundido a negro corto y seco, muy de cine negro.
-        transition_landscape=("fadeblack", 0.55),
+        transition_landscape=("fadeblack", 0.45),
     ),
     "golden": StylePreset(
         key="golden",
@@ -258,7 +258,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         eq_extra={"gamma_r": 1.12, "gamma_g": 1.02, "gamma_b": 0.88},
         pre_subtitle_filters=["colorbalance=rs=0.10:gs=0.03:bs=-0.10"],
         # Fundido a blanco: rompe visualmente con todos los demás ciclos.
-        transition_landscape=("fadewhite", 0.8),
+        transition_landscape=("fadewhite", 0.5),
     ),
 }
 

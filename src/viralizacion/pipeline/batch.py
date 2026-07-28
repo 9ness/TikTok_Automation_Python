@@ -209,7 +209,8 @@ def run_batch(
                     skipped += 1
                     try:
                         remote = upload_file(
-                            out_path, nombre_cuenta, fecha, ponente, on_log=on_log,
+                            out_path, nombre_cuenta, fecha, ponente,
+                            n_videos=n_total, on_log=on_log,
                         )
                         remote_dirs[ponente] = remote
                     except Exception as e:
@@ -272,7 +273,8 @@ def run_batch(
                     )
                     try:
                         remote = upload_file(
-                            out_path, nombre_cuenta, fecha, ponente, on_log=on_log,
+                            out_path, nombre_cuenta, fecha, ponente,
+                            n_videos=n_total, on_log=on_log,
                         )
                         remote_dirs[ponente] = remote
                     except Exception as e:
@@ -325,7 +327,7 @@ def run_batch(
     try:
         final_remotes = upload_batch(
             staging_root, nombre_cuenta, fecha,
-            ponentes=list(outputs.keys()), on_log=on_log,
+            ponentes=list(outputs.keys()), cantidad=cantidad, on_log=on_log,
         )
         remote_dirs.update(final_remotes)
     except Exception as e:

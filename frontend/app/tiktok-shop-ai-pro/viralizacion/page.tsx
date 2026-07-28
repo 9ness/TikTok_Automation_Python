@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  useCarpetas,
   useEstilos,
   useGenerateViralizacion,
   usePonentes,
@@ -30,6 +31,12 @@ export default function ViralizacionPage() {
   // Estilo por ronda. El plan se calcula sobre el primer ponente elegido: el
   // reparto en rondas depende de cuántos audios tiene, y las rondas son el
   // "ciclo" que el operador quiere diferenciar.
+  // "__nueva__" = escribir un nombre a mano; si no, se reutiliza una carpeta
+  // que ya existe en Drive.
+  const [carpetaExistente, setCarpetaExistente] = useState("__nueva__");
+  const carpetas = useCarpetas();
+  const today = new Date().toISOString().slice(0, 10);
+
   const [roundStyles, setRoundStyles] = useState<string[]>([]);
   const estilos = useEstilos();
   const planPonente = selectedSlugs[0] ?? null;
@@ -154,14 +161,41 @@ export default function ViralizacionPage() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1">
-          <span className="mb-1 block text-xs font-medium sm:text-sm">Nombre de cuenta *</span>
-          <input
-            type="text"
-            value={nombreCuenta}
-            onChange={(e) => setNombreCuenta(e.target.value)}
-            placeholder="p. ej. mi_cuenta_tiktok"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
-          />
+          <span className="mb-1 block text-xs font-medium sm:text-sm">
+            Carpeta de destino *
+          </span>
+          {/* Desplegable con las carpetas que ya existen en Drive, para no
+              tener que recordar el nombre exacto y poder acumular tandas. */}
+          <select
+            value={carpetaExistente}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCarpetaExistente(v);
+              if (v !== "__nueva__") setNombreCuenta(v);
+              else setNombreCuenta("");
+            }}
+            className="mb-1.5 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
+          >
+            <option value="__nueva__">➕ Carpeta nueva…</option>
+            {(carpetas.data?.items ?? []).map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          {carpetaExistente === "__nueva__" && (
+            <input
+              type="text"
+              value={nombreCuenta}
+              onChange={(e) => setNombreCuenta(e.target.value)}
+              placeholder="nombre de la carpeta nueva"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
+            />
+          )}
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Se guardará en <code>VIRALIZACION/{nombreCuenta || "…"}/</code>, con
+            una subcarpeta por ponente (p. ej. <code>32_pablo_{today}</code>).
+          </p>
         </div>
         <div>
           <span className="mb-1 block text-xs font-medium sm:text-sm">Rondas con música</span>

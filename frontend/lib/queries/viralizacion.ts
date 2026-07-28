@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  CarpetasListResponse,
   PonentesListResponse,
   RoundPlanResponse,
   StylesListResponse,
@@ -22,6 +23,13 @@ export function usePonentes() {
   return useQuery<PonentesListResponse>({
     queryKey: viralizacionKeys.ponentes(),
     queryFn: () => api.get<PonentesListResponse>(`${ROOT}/ponentes`),
+  });
+}
+
+export function useCarpetas() {
+  return useQuery<CarpetasListResponse>({
+    queryKey: [...viralizacionKeys.all, "carpetas"] as const,
+    queryFn: () => api.get<CarpetasListResponse>(`${ROOT}/carpetas`),
   });
 }
 
