@@ -40,6 +40,7 @@ nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
+| 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
 
@@ -251,6 +252,26 @@ clip/vídeo para que la plantilla no deje huella reconocible.
 índices usados, asignación con `PoolExhaustedError` claro si se agota).
 
 Cola unificada con Creator Reward vía `JobMode.VIRALIZACION_BATCH`.
+
+### Nicho POV BOF (mismo programa, fase 1)
+
+Navegador del Drive **compartido conmigo** `Productos España` (2 fuentes:
+`1 Prod Aleatorios` / `2 Prod Aleatorios 2`) con progreso por carpeta de
+producto. **Todavía no genera vídeos.**
+
+Módulos en [`src/nicho_pov_bof/`](src/nicho_pov_bof/): `config.py`,
+`repos/{redis_base,progress_repo}.py` (prefijo `nicho_pov_bof:`),
+`services/drive_client.py`. API: `/api/v1/nicho-pov-bof/*`.
+
+Dos cosas no obvias:
+- El Drive es *shared-with-me* → **no aparece en el mount FUSE**; se lee por
+  CLI con `--drive-shared-with-me`.
+- Dentro de una carpeta hay **nombres de fichero duplicados** (`2.PNG` dos
+  veces). El identificador canónico de una foto es su **file ID**, y se
+  descarga con `rclone backend copyid`.
+
+`Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
+Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
 
 ---
 

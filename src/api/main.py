@@ -85,6 +85,7 @@ from src.api.routers import (
     tiktok_shop_watermark_remover_router,
     users_router,
     viralizacion_enqueue_router,
+    nicho_pov_bof_folders_router,
     voices_router,
     voices_sample_router,
 )
@@ -265,6 +266,7 @@ def create_app() -> FastAPI:
     app.include_router(tiktok_shop_shortcuts_router)
     app.include_router(tiktok_shop_watermark_remover_router)
     app.include_router(viralizacion_enqueue_router)
+    app.include_router(nicho_pov_bof_folders_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)

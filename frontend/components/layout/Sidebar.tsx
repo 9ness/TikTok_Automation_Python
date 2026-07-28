@@ -30,6 +30,7 @@ import {
   ShieldOff,
   ShoppingBag,
   Sparkles,
+  Target,
   Trophy,
   Users,
   Video,
@@ -59,6 +60,15 @@ type NavItem = {
 type NavGroup =
   | { kind: "single"; item: NavItem }
   | { kind: "group"; title: string; basePath: string; icon: LucideIcon; items: NavItem[] };
+
+/** ¿`pathname` cae dentro de `base`, respetando el límite de segmento?
+ *
+ * Un `startsWith` pelado hace que "/tiktok-shop-ai-pro/x" cuente como dentro
+ * de "/tiktok-shop" → se abrían los DOS grupos a la vez. */
+function isUnder(pathname: string | null | undefined, base: string): boolean {
+  if (!pathname) return false;
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
 
 const NAV: NavGroup[] = [
   {
@@ -105,6 +115,7 @@ const NAV: NavGroup[] = [
     icon: Rocket,
     items: [
       { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
+      { href: "/tiktok-shop-ai-pro/nicho-pov-bof", label: "Nicho POV BOF", icon: Target },
     ],
   },
   {
@@ -140,7 +151,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const node of NAV) {
-      if (node.kind === "group") init[node.title] = pathname?.startsWith(node.basePath) ?? false;
+      if (node.kind === "group") init[node.title] = isUnder(pathname, node.basePath);
     }
     return init;
   });
@@ -150,7 +161,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     setExpanded((prev) => {
       const next = { ...prev };
       for (const node of NAV) {
-        if (node.kind === "group" && pathname?.startsWith(node.basePath)) {
+        if (node.kind === "group" && isUnder(pathname, node.basePath)) {
           next[node.title] = true;
         }
       }
@@ -289,7 +300,7 @@ function SidebarLink({
   onNavigate?: () => void;
 }) {
   const active =
-    item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href) ?? false;
+    item.href === "/" ? pathname === "/" : isUnder(pathname, item.href);
   const Icon = item.icon;
   return (
     <li>
