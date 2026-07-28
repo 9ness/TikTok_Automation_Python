@@ -100,30 +100,35 @@ def _line_char_timeline(line: dict) -> tuple[str, list[float]]:
 
 
 def build_ass_reveal(lines: list[dict], preset: "StylePreset") -> str:
+    """UNA palabra en pantalla cada vez, grande y con glow.
+
+    Antes se revelaba letra a letra acumulando la frase entera: con frases
+    largas el texto se hacía diminuto y se leía fatal en el móvil. Mostrar
+    una sola palabra a la vez obliga a leerla, aguanta cualquier longitud de
+    frase y encaja mejor con el ritmo del audio.
+    """
+    # Tamaño mayor que el resto de estilos: al haber una sola palabra hay
+    # sitio de sobra y el impacto es la gracia del estilo.
+    font_size = int(config.SUB_FONTSIZE * 1.35)
     style_line = (
-        f"Style: Default,{config.SUB_FONT},{config.SUB_FONTSIZE},"
-        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,2,0,5,"
+        f"Style: Default,{config.SUB_FONT},{font_size},"
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,4,0,5,"
         f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
     )
     header = _ass_header(style_line)
     events: list[str] = []
-    glow_tag = r"{\bord6\blur6\3c&HFFFFFF&\4c&HFFFFFF&}"
-    reset_tag = r"{\r}"
+    # Glow blanco suave alrededor de la palabra activa.
+    glow_tag = r"{\bord5\blur5\3c&HFFFFFF&\4c&HFFFFFF&}"
 
     for ln in lines:
-        full_text, times = _line_char_timeline(ln)
-        n = len(full_text)
-        for i in range(n):
-            ev_start = times[i - 1] if i > 0 else ln["start"]
-            ev_end = times[i] if times[i] > ev_start else ev_start + 0.01
-            if i == n - 1:
-                ev_end = max(ev_end, ln["end"])
-            if ev_end <= ev_start:
-                continue
-            shown = full_text[: i + 1]
-            prefix, last_char = shown[:-1], shown[-1]
-            text = f"{prefix}{glow_tag}{last_char}{reset_tag}"
-            events.append(_dialogue(ev_start, ev_end, text))
+        for w in ln.get("words") or []:
+            start = float(w["start"])
+            end = float(w["end"])
+            # Whisper a veces devuelve palabras de duración ~0; sin un mínimo
+            # la palabra parpadearía y no daría tiempo a leerla.
+            if end - start < 0.12:
+                end = start + 0.12
+            events.append(_dialogue(start, end, f"{glow_tag}{w['word']}"))
 
     return header + "\n".join(events) + "\n"
 

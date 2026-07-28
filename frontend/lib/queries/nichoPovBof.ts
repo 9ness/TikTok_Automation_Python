@@ -6,11 +6,16 @@ import { api } from "@/lib/api";
 import type {
   BackupCheckResponse,
   BackupSyncResponse,
+  EstadoRequest,
+  ExtraerTextosRequest,
   FoldersListResponse,
   MarkCompletedRequest,
   MarkCompletedResponse,
   PhotosListResponse,
+  ProductoItem,
+  PromptsResponse,
   SourcesListResponse,
+  VendidoItem,
 } from "@/lib/types/nichoPovBof";
 
 const ROOT = "/api/v1/nicho-pov-bof";
@@ -21,6 +26,10 @@ export const nichoPovBofKeys = {
   folders: (source: string) => [...nichoPovBofKeys.all, "folders", source] as const,
   photos: (source: string, folder: string) =>
     [...nichoPovBofKeys.all, "photos", source, folder] as const,
+  prompts: () => [...nichoPovBofKeys.all, "prompts"] as const,
+  productos: (source: string, folder: string) =>
+    [...nichoPovBofKeys.all, "productos", source, folder] as const,
+  vendidos: (source: string) => [...nichoPovBofKeys.all, "vendidos", source] as const,
 };
 
 export function useSources() {
@@ -84,4 +93,73 @@ export function buildPhotoUrl(source: string, folder: string, fileId: string): s
   return `${base}${ROOT}/photo?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
   )}&file_id=${encodeURIComponent(fileId)}${qs}`;
+}
+
+// --- Fase 2: automatización de vídeos ----------------------------------
+
+/** Prompts fijos (imagen/vídeo) — no dependen de carpeta ni fuente. */
+export function usePrompts() {
+  return useQuery<PromptsResponse>({
+    queryKey: nichoPovBofKeys.prompts(),
+    queryFn: () => api.get<PromptsResponse>(`${ROOT}/prompts`),
+    staleTime: Infinity,
+  });
+}
+
+export function useProductos(source: string, folder: string | null) {
+  return useQuery<ProductoItem[]>({
+    queryKey: nichoPovBofKeys.productos(source, folder ?? ""),
+    queryFn: () =>
+      api.get<ProductoItem[]>(
+        `${ROOT}/productos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+          folder ?? "",
+        )}`,
+      ),
+    enabled: Boolean(source && folder),
+  });
+}
+
+/** Tarda ~1 min (lee las capturas con Gemini) — el caller muestra spinner. */
+export function useExtraerTextos() {
+  const qc = useQueryClient();
+  return useMutation<ProductoItem[], Error, ExtraerTextosRequest>({
+    mutationFn: (body) => api.post<ProductoItem[]>(`${ROOT}/extraer-textos`, body),
+    onSuccess: (items, vars) => {
+      qc.setQueryData(nichoPovBofKeys.productos(vars.source, vars.folder), items);
+    },
+  });
+}
+
+export function useSetEstado() {
+  const qc = useQueryClient();
+  return useMutation<ProductoItem, Error, EstadoRequest>({
+    mutationFn: (body) => api.post<ProductoItem>(`${ROOT}/producto/estado`, body),
+    onSuccess: (updated, vars) => {
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(vars.source, vars.folder),
+        (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
+      );
+      // Puede haber entrado o salido de "vendidos".
+      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
+    },
+  });
+}
+
+export function useVendidos(source: string) {
+  return useQuery<VendidoItem[]>({
+    queryKey: nichoPovBofKeys.vendidos(source),
+    queryFn: () => api.get<VendidoItem[]>(`${ROOT}/vendidos?source=${encodeURIComponent(source)}`),
+    enabled: Boolean(source),
+  });
+}
+
+/** URL de descarga de la foto limpia por nombre de producto (no por file id;
+ *  el backend resuelve el par limpia/titulada dentro de la carpeta). */
+export function buildCleanPhotoDownloadUrl(source: string, folder: string, producto: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  return `${base}${ROOT}/foto-limpia?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+    folder,
+  )}&producto=${encodeURIComponent(producto)}${qs}`;
 }

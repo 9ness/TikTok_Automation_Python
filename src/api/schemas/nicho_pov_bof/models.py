@@ -83,3 +83,66 @@ class MarkCompletedResponse(BaseModel):
     completed_count: int
     total: int
     next_folder: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# FASE 2 — automatización de vídeos
+# ---------------------------------------------------------------------------
+class PromptsResponse(BaseModel):
+    """Los dos prompts fijos que copia el operador fuera de la app."""
+
+    imagen: str
+    video: str
+
+
+class ProductoInfo(BaseModel):
+    """Un producto de una carpeta: emparejado de fotos + textos + estado."""
+
+    producto: str
+    clean_photo_id: str | None = None
+    titled_photo_id: str | None = None
+    titulo: str = ""
+    titulo_tiktok_completo: str = ""
+    tienda: str = ""
+    caption: str = ""
+    gancho: str = ""
+    cta: str = ""
+    uploaded: bool = False
+    sold: bool = False
+    video_path: str | None = None
+
+
+class ProductosListResponse(BaseModel):
+    source: str
+    folder: str
+    items: list[ProductoInfo]
+    # True una vez que se pulsó "Obtener textos" con éxito para la carpeta.
+    textos_extraidos: bool = False
+
+
+class ExtraerTextosRequest(BaseModel):
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+
+
+class ProductoEstadoRequest(BaseModel):
+    """Parche parcial: solo se tocan los campos que vengan poblados."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    producto: str = Field(..., min_length=1)
+    uploaded: bool | None = None
+    sold: bool | None = None
+
+
+class VideoUploadResponse(BaseModel):
+    ok: bool
+    job_id: str | None = None
+    message: str
+
+
+class SoldProductsResponse(BaseModel):
+    # Cada item trae source/folder/producto + los campos guardados
+    # (titulo, video_path, gancho, cta...) — el schema exacto por producto
+    # ya lo valida `ProductoInfo`, aquí basta un dict de paso.
+    items: list[dict]

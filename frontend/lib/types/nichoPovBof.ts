@@ -69,3 +69,52 @@ export interface MarkCompletedResponse {
   total: number;
   next_folder: string | null;
 }
+
+// --- Fase 2: automatización de vídeos ---------------------------------
+
+export interface PromptsResponse {
+  imagen: string;
+  video: string;
+}
+
+export interface ProductoItem {
+  producto: string;
+  clean_photo_id: string | null;
+  titled_photo_id: string | null;
+  titulo: string | null;
+  titulo_tiktok_completo: string | null;
+  tienda: string | null;
+  caption: string | null;
+  gancho: string | null;
+  cta: string | null;
+  uploaded: boolean;
+  sold: boolean;
+  video_path: string | null;
+}
+
+/** Item de /vendidos: agrega productos de TODAS las carpetas de la fuente,
+ *  así que trae `folder` (no está en ProductoItem porque ahí el folder ya
+ *  viene fijado por query param). Se necesita para poder construir la URL
+ *  de la foto con `buildPhotoUrl(source, folder, id)`. */
+export interface VendidoItem extends ProductoItem {
+  folder: string;
+}
+
+export interface ExtraerTextosRequest {
+  source: string;
+  folder: string;
+}
+
+export interface EstadoRequest {
+  source: string;
+  folder: string;
+  producto: string;
+  uploaded?: boolean;
+  sold?: boolean;
+}
+
+export interface VideoUploadResponse {
+  ok: boolean;
+  job_id: string | null;
+  message: string;
+}

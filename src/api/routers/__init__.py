@@ -41,7 +41,10 @@ from .tiktok_shop import (
     watermark_remover_router as tiktok_shop_watermark_remover_router,
 )
 from .viralizacion import enqueue_router as viralizacion_enqueue_router
-from .nicho_pov_bof import folders_router as nicho_pov_bof_folders_router
+from .nicho_pov_bof import (
+    folders_router as nicho_pov_bof_folders_router,
+    productos_router as nicho_pov_bof_productos_router,
+)
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
@@ -95,4 +98,5 @@ __all__ = [
     "tiktok_shop_watermark_remover_router",
     "viralizacion_enqueue_router",
     "nicho_pov_bof_folders_router",
+    "nicho_pov_bof_productos_router",
 ]

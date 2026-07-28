@@ -29,6 +29,7 @@ class JobMode(str, Enum):
     EDITOR_AUTO = "editor_auto"
     VIRALIZACION_BATCH = "viralizacion_batch"
     NICHO_POV_BOF_BACKUP = "nicho_pov_bof_backup"  # copia/diff del Drive compartido
+    NICHO_POV_BOF_VIDEO = "nicho_pov_bof_video"  # montaje final por producto
 
 
 class JobStatus(str, Enum):
@@ -53,6 +54,7 @@ MODE_LABELS = {
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
     JobMode.VIRALIZACION_BATCH: "🚀 Viralización 1K",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",
+    JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
 }
 
 

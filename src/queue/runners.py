@@ -1700,6 +1700,103 @@ def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -
 
 
 # ============================================================
+# RUNNER: NICHO POV BOF — MONTAJE DE VÍDEO POR PRODUCTO
+# ============================================================
+def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo final de UN producto (Fase 2 del Nicho POV BOF) y lo
+    publica en Drive.
+
+    Params esperados en job.params:
+      - source, folder, producto: identifican el producto (carpeta del Drive
+        compartido "Productos España" + número de producto dentro de ella).
+      - raw_path: vídeo bruto subido por el operador (Veo3/Kling), en
+        API_TEMP_ROOT.
+      - sexo: "hombre" | "mujer" — el operador solo elige esto, la frase/voz
+        salen sorteadas del banco de audios.
+      - origen: "veo3" | "kling" — determina si hay que quitar marca de agua.
+    """
+    from src.nicho_pov_bof import config
+    from src.nicho_pov_bof.pipeline import video_editor
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import audio_bank
+
+    p = job.params
+    source = p["source"]
+    folder = p["folder"]
+    producto = p["producto"]
+    raw_path = Path(p["raw_path"])
+    sexo = p["sexo"]
+    origen = p.get("origen", "")
+
+    on_progress(0.02, "📝 Leyendo textos guardados…")
+    textos = product_repo.get_product(source, folder, producto)
+    if not textos:
+        on_log(
+            f"[nicho_pov_bof] sin textos guardados para producto {producto!r} "
+            f"en {folder!r} — el bloque de texto saldrá vacío (¿faltó pulsar "
+            "'Obtener textos'?)"
+        )
+
+    on_progress(0.06, "🔊 Preparando audio…")
+    audio_raw = audio_bank.pick_random(sexo)
+    audio_ready = audio_bank.prepare(audio_raw, on_log=on_log)
+    on_log(f"[nicho_pov_bof] audio elegido: {audio_raw.name} → {audio_ready.name}")
+
+    work_dir = raw_path.parent / f"work_{producto}_{raw_path.stem}"
+    output_local = work_dir / "output.mp4"
+
+    def _pipeline_progress(pct: float, label: str) -> None:
+        # Reserva 0-0.08 para la prep de arriba y 0.92-1.0 para publicar en
+        # Drive; el 84% restante es lo que reporta `video_editor.build_video`.
+        on_progress(0.08 + pct * 0.84, label)
+
+    video_editor.build_video(
+        raw_video=raw_path,
+        audio_path=audio_ready,
+        textos=textos,
+        origen=origen,
+        output_path=output_local,
+        work_dir=work_dir,
+        layout=video_editor.layout_for_producto(producto),
+        on_log=on_log,
+        on_progress=_pipeline_progress,
+    )
+
+    on_progress(0.94, "☁️ Publicando en Drive…")
+    root = audio_bank.mount_root()
+    if root is None:
+        raise RuntimeError(
+            "No se encontró el mount de Drive (DRIVE_MOUNT_ROOT / /mnt/drive / "
+            "~/gdrive) — no se puede publicar el vídeo final."
+        )
+    # Nombre literal pedido por el módulo: "<producto> <folder>.mp4"
+    # (p. ej. "1 Pront Flow.mp4"), agrupado bajo la carpeta de origen.
+    dest_dir = root / config.DRIVE_UPLOAD_ROOT / "videos" / folder
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / f"{producto} {folder}.mp4"
+    tmp_dest = dest_path.with_name(dest_path.name + ".part")
+    shutil.copy2(output_local, tmp_dest)
+    tmp_dest.replace(dest_path)
+    on_log(f"[nicho_pov_bof] publicado en Drive: {dest_path}")
+
+    product_repo.update_product(
+        source, folder, producto, uploaded=True, video_path=str(dest_path),
+    )
+
+    # El bruto subido y el work_dir de escalones intermedios ya no hacen
+    # falta una vez publicado — no se conservan (a diferencia del audio
+    # original, que SIEMPRE se conserva en audio_bank).
+    try:
+        raw_path.unlink(missing_ok=True)
+        shutil.rmtree(work_dir, ignore_errors=True)
+    except OSError as cleanup_err:
+        on_log(f"[nicho_pov_bof] ⚠️ no pude limpiar temporales: {cleanup_err}")
+
+    on_progress(1.0, "✅ Listo")
+    return str(dest_path)
+
+
+# ============================================================
 # RUNNER: TIKTOK SHOP WATERMARK REMOVER
 # ============================================================
 def run_tiktok_shop_watermark(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2079,6 +2176,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.EDITOR_AUTO: run_editor_auto,
     JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
+    JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
 }
 
 
@@ -2097,6 +2195,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.EDITOR_AUTO: "editor_auto",
     JobMode.VIRALIZACION_BATCH: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
+    JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
 }
 
 

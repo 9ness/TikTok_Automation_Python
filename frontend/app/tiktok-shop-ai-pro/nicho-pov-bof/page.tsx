@@ -2,29 +2,46 @@
 
 import {
   Check,
+  Clapperboard,
   ChevronLeft,
   ChevronRight,
+  ClipboardCopy,
+  Copy,
+  Download,
   HardDrive,
   LayoutGrid,
   Loader2,
   RefreshCw,
+  ShoppingBag,
+  Sparkles,
   Target,
+  Upload,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useBackupCheck,
   useBackupSync,
+  useExtraerTextos,
   useFolders,
   useMarkCompleted,
   usePhotos,
+  usePrompts,
+  useProductos,
+  useSetEstado,
   useSources,
+  useVendidos,
 } from "@/lib/queries/nichoPovBof";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
-import type { BackupCheckResponse } from "@/lib/types/nichoPovBof";
+import type {
+  BackupCheckResponse,
+  ProductoItem,
+  VideoUploadResponse,
+} from "@/lib/types/nichoPovBof";
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useState("aleatorios_1");
@@ -72,6 +89,61 @@ export default function NichoPovBofPage() {
   const data = folders.data;
   const folder = picked ?? data?.current ?? null;
   const photos = usePhotos(source, folder);
+
+  // --- Fase 2: automatización de vídeos ---
+  const prompts = usePrompts();
+  const productos = useProductos(source, folder);
+  const extraerTextos = useExtraerTextos();
+  const vendidos = useVendidos(source);
+  const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState("");
+
+  function copyText(label: string, text: string | undefined) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
+  }
+
+  async function downloadCleanPhotos() {
+    if (!folder || !productos.data?.length) return;
+    const items = productos.data.filter((p) => p.clean_photo_id);
+    if (!items.length) {
+      toast.error("No hay fotos limpias en esta carpeta");
+      return;
+    }
+    setDownloadingPhotos(true);
+    try {
+      // El navegador móvil no deja elegir carpeta de descarga: van a
+      // Descargas con el nombre prefijado por la carpeta para que queden
+      // juntas. Se disparan una a una con un pequeño retardo — varias
+      // descargas simultáneas suelen bloquearse o cancelarse.
+      for (const [i, p] of items.entries()) {
+        setDownloadProgress(`${i + 1}/${items.length}`);
+        const a = document.createElement("a");
+        a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto);
+        a.download = `${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        if (i < items.length - 1) await new Promise((r) => setTimeout(r, 600));
+      }
+      toast.success(`${items.length} foto(s) descargadas`);
+    } finally {
+      setDownloadingPhotos(false);
+      setDownloadProgress("");
+    }
+  }
+
+  function runExtraerTextos() {
+    if (!folder) return;
+    extraerTextos.mutate(
+      { source, folder },
+      {
+        onSuccess: () => toast.success("Textos extraídos"),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
 
   const idx = useMemo(
     () => (data && folder ? data.items.findIndex((f) => f.name === folder) : -1),
@@ -395,6 +467,365 @@ export default function NichoPovBofPage() {
           </button>
         </section>
       )}
+
+      {/* Fase 2 — automatización de vídeos por producto */}
+      {data && folder && (
+        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 shrink-0 text-purple-500" />
+            <p className="text-sm font-semibold">Automatización de vídeos</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => copyText("Prompt imagen", prompts.data?.imagen)}
+              disabled={!prompts.data?.imagen}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
+            </button>
+            <button
+              type="button"
+              onClick={() => copyText("Prompt vídeo", prompts.data?.video)}
+              disabled={!prompts.data?.video}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              <Clapperboard className="h-3.5 w-3.5" /> Prompt vídeo
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void downloadCleanPhotos()}
+              disabled={downloadingPhotos || !productos.data?.length}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              {downloadingPhotos ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {downloadProgress}
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" /> Descargar fotos limpias
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={runExtraerTextos}
+              disabled={extraerTextos.isPending}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-purple-600 disabled:opacity-50"
+            >
+              {extraerTextos.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extrayendo… (~1 min)
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" /> Obtener textos
+                </>
+              )}
+            </button>
+          </div>
+
+          {productos.isLoading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
+            </div>
+          )}
+
+          {productos.isError && (
+            <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
+              {(productos.error as Error)?.message ?? "No se pudieron cargar los productos."}
+            </p>
+          )}
+
+          {productos.data && productos.data.length > 0 && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {productos.data.map((p) => (
+                <ProductoCard key={p.producto} source={source} folder={folder} producto={p} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Productos que vendieron */}
+      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+        <div className="flex items-center gap-2">
+          <ShoppingBag className="h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-sm font-semibold">Productos que vendieron</p>
+        </div>
+
+        {vendidos.isLoading && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
+          </div>
+        )}
+
+        {vendidos.data && vendidos.data.length === 0 && (
+          <p className="text-xs text-muted-foreground">Todavía ninguno.</p>
+        )}
+
+        {vendidos.data && vendidos.data.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            {vendidos.data.map((v) => (
+              <div
+                key={`${v.folder}-${v.producto}`}
+                className="flex items-center gap-2 rounded-lg border border-border/60 p-1.5"
+              >
+                {v.clean_photo_id ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={buildPhotoUrl(source, v.folder, v.clean_photo_id)}
+                    alt={v.producto}
+                    loading="lazy"
+                    className="h-10 w-10 shrink-0 rounded object-cover"
+                  />
+                ) : (
+                  <div className="h-10 w-10 shrink-0 rounded bg-muted" />
+                )}
+                <p className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                  {v.titulo || v.producto}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/** Botón compacto: copia el texto al portapapeles sin mostrarlo. Mismo
+ *  patrón que `CopyChip` de `calendar/page.tsx:1044`. */
+function CopyChip({ label, text }: { label: string; text: string }) {
+  if (!text) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        toast.success("Copiado");
+      }}
+      title={`Copiar: ${label}`}
+      className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+    >
+      <Copy className="h-3 w-3 shrink-0" />
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+/** Tarjeta de producto: textos, sexo/origen, subida de vídeo y toggles
+ *  Subido/Vendió. Estado local + servidor para que los toggles se sientan
+ *  instantáneos (mismo patrón que `OutcomeBar` del calendario). */
+function ProductoCard({
+  source,
+  folder,
+  producto,
+}: {
+  source: string;
+  folder: string;
+  producto: ProductoItem;
+}) {
+  const setEstado = useSetEstado();
+  const [uploaded, setUploaded] = useState(producto.uploaded);
+  const [sold, setSold] = useState(producto.sold);
+  const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
+  const [origen, setOrigen] = useState<"veo3" | "kling">("veo3");
+  const [uploading, setUploading] = useState(false);
+  const [pct, setPct] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // El producto puede llegar actualizado desde otra mutación (p. ej. tras
+  // "Obtener textos" refresca la lista entera) — resincroniza el estado local.
+  useEffect(() => {
+    setUploaded(producto.uploaded);
+    setSold(producto.sold);
+  }, [producto.uploaded, producto.sold]);
+
+  const pushEstado = (patch: { uploaded?: boolean; sold?: boolean }) => {
+    setEstado.mutate(
+      { source, folder, producto: producto.producto, ...patch },
+      { onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)) },
+    );
+  };
+
+  const toggleUploaded = () => {
+    const v = !uploaded;
+    setUploaded(v);
+    pushEstado({ uploaded: v });
+  };
+
+  const toggleSold = () => {
+    const v = !sold;
+    setSold(v);
+    // Vender implica haberlo subido — mismo criterio que OutcomeBar del
+    // calendario: evita el estado imposible "vendió pero no subido".
+    if (v && !uploaded) setUploaded(true);
+    pushEstado(v && !uploaded ? { sold: v, uploaded: true } : { sold: v });
+  };
+
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
+
+  function uploadVideo(file: File) {
+    setUploading(true);
+    setPct(0);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("source", source);
+    fd.append("folder", folder);
+    fd.append("producto", producto.producto);
+    fd.append("sexo", sexo);
+    fd.append("origen", origen);
+    // XHR (no fetch) para tener progreso real de subida — mismo patrón que
+    // `uploadVideo()` en calendar/page.tsx:634.
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof/video/upload`);
+    if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      setUploading(false);
+      try {
+        const resData = JSON.parse(xhr.responseText) as VideoUploadResponse;
+        if (resData.ok) toast.success(resData.message || "En la cola, editando…");
+        else toast.error(resData.message || "Error subiendo el vídeo");
+      } catch {
+        toast.error("Respuesta inválida del servidor");
+      }
+    };
+    xhr.onerror = () => {
+      setUploading(false);
+      toast.error("Error de red al subir");
+    };
+    xhr.send(fd);
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      <div className="flex gap-2">
+        {producto.clean_photo_id ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={buildPhotoUrl(source, folder, producto.clean_photo_id)}
+            alt={producto.producto}
+            loading="lazy"
+            className="h-16 w-16 shrink-0 rounded-lg border border-border/60 object-cover"
+          />
+        ) : (
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 text-center text-[9px] text-muted-foreground">
+            sin foto
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold sm:text-sm">
+            {producto.titulo || producto.producto}
+          </p>
+          {producto.titulo_tiktok_completo && (
+            <p className="truncate text-[10px] text-muted-foreground">
+              {producto.titulo_tiktok_completo}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Copiar textos extraídos — solo se muestran los que tengan valor */}
+      <div className="flex flex-wrap gap-1">
+        <CopyChip label="📝 Título" text={producto.titulo ?? ""} />
+        <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
+        <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} />
+        <CopyChip label="✍️ Caption" text={producto.caption ?? ""} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+          {(["hombre", "mujer"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSexo(s)}
+              className={`flex-1 rounded px-1.5 py-1 transition ${
+                sexo === s ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
+              }`}
+            >
+              {s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+          {(["veo3", "kling"] as const).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOrigen(o)}
+              className={`flex-1 rounded px-1.5 py-1 capitalize transition ${
+                origen === o ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
+              }`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) uploadVideo(f);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium transition hover:border-foreground/30 disabled:opacity-50"
+      >
+        {uploading ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo {pct}%
+          </>
+        ) : (
+          <>
+            <Upload className="h-3.5 w-3.5" /> Subir vídeo
+          </>
+        )}
+      </button>
+
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={toggleUploaded}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            uploaded
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          📤 Subido
+        </button>
+        <button
+          type="button"
+          onClick={toggleSold}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            sold
+              ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          💰 Vendió
+        </button>
+      </div>
     </div>
   );
 }
