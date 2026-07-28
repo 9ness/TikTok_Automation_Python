@@ -1,6 +1,10 @@
 from .models import (
     PonenteInfo,
     PonentesListResponse,
+    RoundPlan,
+    RoundPlanResponse,
+    StyleChoice,
+    StylesListResponse,
     ViralizacionGenerateRequest,
     ViralizacionGenerateResponse,
 )
@@ -8,6 +12,10 @@ from .models import (
 __all__ = [
     "PonenteInfo",
     "PonentesListResponse",
+    "RoundPlan",
+    "RoundPlanResponse",
+    "StyleChoice",
+    "StylesListResponse",
     "ViralizacionGenerateRequest",
     "ViralizacionGenerateResponse",
 ]

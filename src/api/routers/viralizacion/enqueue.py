@@ -9,13 +9,17 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import InvalidEnqueueRequestError
 from src.api.schemas.viralizacion import (
     PonenteInfo,
     PonentesListResponse,
+    RoundPlan,
+    RoundPlanResponse,
+    StyleChoice,
+    StylesListResponse,
     ViralizacionGenerateRequest,
     ViralizacionGenerateResponse,
 )
@@ -73,6 +77,48 @@ def list_ponentes() -> PonentesListResponse:
     return PonentesListResponse(items=items)
 
 
+@router.get("/estilos", response_model=StylesListResponse)
+def list_estilos() -> StylesListResponse:
+    from src.viralizacion.pipeline import styles
+
+    return StylesListResponse(
+        items=[StyleChoice(**c) for c in styles.style_choices()]
+    )
+
+
+@router.get("/plan", response_model=RoundPlanResponse)
+def round_plan(
+    ponente: Annotated[str, Query()],
+    cantidad: Annotated[int, Query(ge=1)],
+) -> RoundPlanResponse:
+    """Cuántos vídeos caen en cada ronda, para dibujar un selector por ronda.
+
+    Con 8 audios y 10 vídeos salen 2 rondas: la 1 con 8 vídeos y la 2 con 2.
+    Sin esto el operador no puede saber cuántos estilos tiene que elegir.
+    """
+    from src.viralizacion import config
+    from src.viralizacion.pipeline import styles
+    from src.viralizacion.pipeline.batch import _rounds_per_audio
+
+    n_audios = len(config.ponente_audio_files(ponente))
+    if n_audios <= 0:
+        raise InvalidEnqueueRequestError(
+            f"El ponente '{ponente}' no tiene audios.", details={"ponente": ponente}
+        )
+
+    per_audio = _rounds_per_audio(int(cantidad), n_audios)
+    max_rondas = max(per_audio) if per_audio else 0
+    rounds = [
+        RoundPlan(
+            ronda=r,
+            n_videos=sum(1 for x in per_audio if x >= r),
+            default_style=styles.get_style_for_round(r).key,
+        )
+        for r in range(1, max_rondas + 1)
+    ]
+    return RoundPlanResponse(total_videos=int(cantidad), rounds=rounds)
+
+
 @router.post(
     "/generate",
     response_model=ViralizacionGenerateResponse,
@@ -109,6 +155,7 @@ def generate(
         "cantidad": cantidad,
         "nombre_cuenta": body.nombre_cuenta,
         "music_rounds": int(body.music_rounds),
+        "round_styles": [s for s in (body.round_styles or []) if s],
     }
     job = queue.enqueue(JobMode.VIRALIZACION_BATCH, title=title, params=params)
 

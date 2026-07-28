@@ -96,6 +96,9 @@ def run_batch(
     cantidad: dict[str, int],
     nombre_cuenta: str,
     music_rounds: int = config.DEFAULT_MUSIC_ROUNDS,
+    # Estilo elegido por el operador para cada ronda: `round_styles[i]` es la
+    # ronda i+1. Lo que no se especifique cae en la rotación automática.
+    round_styles: list[str] | None = None,
     on_log: OnLog = lambda _msg: None,
     on_progress: OnProgress = lambda _pct, _label: None,
 ) -> dict:
@@ -164,7 +167,7 @@ def run_batch(
             full_audio_dur = ffprobe_duration(audio_path)
 
             for ronda in range(1, rounds_needed + 1):
-                style = styles.get_style_for_round(ronda)
+                style = styles.resolve_style(ronda, round_styles)
                 include_music = ronda <= music_rounds
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
                 out_path = ponente_out_dir / filename
@@ -233,7 +236,10 @@ def run_batch(
 
                     outputs[ponente].append(str(out_path))
                     done += 1
-                    on_log(f"[batch][{ponente}] ✅ {filename} listo")
+                    on_log(
+                        f"[batch][{ponente}] ✅ {filename} listo "
+                        f"(ronda {ronda} · estilo {style.label})"
+                    )
                     try:
                         remote = upload_file(
                             out_path, nombre_cuenta, fecha, ponente, on_log=on_log,

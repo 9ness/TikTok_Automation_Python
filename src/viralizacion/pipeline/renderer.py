@@ -103,11 +103,24 @@ def build_paisaje_segments(fill_duration: float) -> int:
     return max(1, round(fill_duration / config.PAISAJE_CLIP_TARGET_S))
 
 
-def build_transitions(n_clips: int) -> list[tuple[str, float]]:
+def build_transitions(n_clips: int, style: "StylePreset | None" = None) -> list[tuple[str, float]]:
     if n_clips < 2:
         return []
+    # Cada estilo puede traer su propia transición entre paisajes (disolución
+    # larga, fundido a blanco…). Es una de las señas que diferencian un ciclo
+    # de otro. Sin override se usa la de config.
+    ttype, tbase = (
+        style.transition_landscape
+        if style is not None and style.transition_landscape
+        else config.TRANSITION_LANDSCAPE
+    )
     lo, hi = config.TRANSITION_LANDSCAPE_JITTER_RANGE
-    landscape = [("fadeblack", round(random.uniform(lo, hi), 3)) for _ in range(n_clips - 2)]
+    # El jitter escala la duración base del estilo, no una constante global.
+    scale = tbase / config.TRANSITION_LANDSCAPE[1] if config.TRANSITION_LANDSCAPE[1] else 1.0
+    landscape = [
+        (ttype, round(random.uniform(lo, hi) * scale, 3))
+        for _ in range(n_clips - 2)
+    ]
     return [config.TRANSITION_HOOK] + landscape
 
 
@@ -269,8 +282,11 @@ def _finalize(
 
     filters: list[str] = []
     post_label = "vsubs" if style.post_subtitle_filters else "vfinal"
+    # Grading propio del estilo (colorbalance, colorchannelmixer…) ANTES de
+    # quemar los subtítulos, para no teñir el texto.
+    pre = "".join(f"{f}," for f in style.pre_subtitle_filters)
     filters.append(
-        f"[0:v]{eq_filter},{vignette_filter},{noise_filter},"
+        f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
         f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
     )
     if style.post_subtitle_filters:
@@ -374,7 +390,7 @@ def render_video(
     durations = _jittered_paisaje_durations(fill_duration, n_needed)
     paisaje_segments = [(c["start"], d) for c, d in zip(paisaje_candidates, durations)]
 
-    transitions = build_transitions(1 + len(paisaje_segments))
+    transitions = build_transitions(1 + len(paisaje_segments), style)
     specs = build_clip_specs(
         hook_video, hook_candidate["start"], hook_candidate["cx_frac"],
         paisajes_video, paisaje_segments, transitions, target_duration,

@@ -1628,6 +1628,7 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         cantidad=dict(p.get("cantidad") or {}),
         nombre_cuenta=p.get("nombre_cuenta") or "sin_nombre",
         music_rounds=int(p.get("music_rounds", 1)),
+        round_styles=list(p.get("round_styles") or []) or None,
         on_log=on_log,
         on_progress=on_progress,
     )

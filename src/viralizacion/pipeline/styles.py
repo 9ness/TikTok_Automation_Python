@@ -185,6 +185,12 @@ class StylePreset:
     eq_extra: dict = field(default_factory=dict)  # ej. {"gamma_r": 1.06, "gamma_b": 0.94}
     noise_filter_override: str | None = None  # None = usa el ruido base con jitter
     post_subtitle_filters: list[str] = field(default_factory=list)
+    # Grading cinematográfico que no cabe en `eq` (colorbalance, curves…).
+    # Se aplica ANTES de quemar los subtítulos, para que el texto no se tiña.
+    pre_subtitle_filters: list[str] = field(default_factory=list)
+    # Override de la transición entre paisajes: (tipo_xfade, duración_base).
+    # None = usa `config.TRANSITION_LANDSCAPE`.
+    transition_landscape: tuple[str, float] | None = None
 
 
 STYLE_PRESETS: dict[str, StylePreset] = {
@@ -216,12 +222,76 @@ STYLE_PRESETS: dict[str, StylePreset] = {
             f"drawbox=x=0:y={config.TARGET_H - 77}:w={config.TARGET_W}:h=77:color=black:t=fill",
         ],
     ),
+    # --- Variantes cinematográficas (D/E/F) -------------------------------
+    # Solo cambian el GRADING y la TRANSICIÓN respecto a las anteriores; la
+    # posición del subtítulo se deja igual a propósito (decisión del operador:
+    # mover el texto entre ciclos perjudica la lectura en el feed).
+    "teal_orange": StylePreset(
+        key="teal_orange",
+        label="D · Teal & Orange",
+        build_ass=build_ass_cinematic,
+        vignette_angle="PI/3.8",
+        # Look de blockbuster: sombras frías, pieles cálidas.
+        eq_extra={"gamma_r": 1.10, "gamma_b": 0.90},
+        pre_subtitle_filters=["colorbalance=rs=-0.12:bs=0.18:rm=0.06:bm=-0.05"],
+        # Disolución suave y larga: encadenado "de cine" en vez de corte a negro.
+        transition_landscape=("dissolve", 1.1),
+    ),
+    "noir": StylePreset(
+        key="noir",
+        label="E · Noir",
+        build_ass=build_ass_classic,
+        vignette_angle="PI/3.2",
+        # Contraste alto y color muy lavado (sin llegar a B/N puro).
+        eq_extra={"gamma": 0.95},
+        pre_subtitle_filters=["colorchannelmixer=.35:.45:.15:0:.35:.45:.15:0:.35:.45:.20:0"],
+        noise_filter_override="noise=alls=18:allf=t+u",
+        # Fundido a negro corto y seco, muy de cine negro.
+        transition_landscape=("fadeblack", 0.55),
+    ),
+    "golden": StylePreset(
+        key="golden",
+        label="F · Hora dorada",
+        build_ass=build_ass_reveal,
+        vignette_angle="PI/4.5",
+        # Cálido y luminoso, tipo atardecer.
+        eq_extra={"gamma_r": 1.12, "gamma_g": 1.02, "gamma_b": 0.88},
+        pre_subtitle_filters=["colorbalance=rs=0.10:gs=0.03:bs=-0.10"],
+        # Fundido a blanco: rompe visualmente con todos los demás ciclos.
+        transition_landscape=("fadewhite", 0.8),
+    ),
 }
 
-STYLE_ORDER = ["classic", "reveal", "cinematic"]
+# Orden de rotación automática cuando el operador no elige estilo por ronda.
+STYLE_ORDER = ["classic", "reveal", "cinematic", "teal_orange", "noir", "golden"]
 
 
 def get_style_for_round(round_idx: int) -> StylePreset:
-    """`round_idx` es 1-based (ronda 1, 2, 3…). Rota A/B/C/A/B/C…"""
+    """`round_idx` es 1-based (ronda 1, 2, 3…). Rota por `STYLE_ORDER`."""
     key = STYLE_ORDER[(round_idx - 1) % len(STYLE_ORDER)]
     return STYLE_PRESETS[key]
+
+
+def resolve_style(round_idx: int, round_styles: list[str] | None) -> StylePreset:
+    """Estilo de una ronda: el elegido por el operador, o la rotación.
+
+    `round_styles[i]` es el estilo de la ronda i+1. Si la lista es más corta
+    que el número de rondas, las rondas sobrantes vuelven a la rotación
+    automática — así elegir 2 estilos no rompe una tanda de 5 rondas.
+    """
+    if round_styles:
+        idx = round_idx - 1
+        if 0 <= idx < len(round_styles):
+            key = (round_styles[idx] or "").strip()
+            if key in STYLE_PRESETS:
+                return STYLE_PRESETS[key]
+    return get_style_for_round(round_idx)
+
+
+def style_choices() -> list[dict]:
+    """Estilos disponibles para el selector de la UI, en orden de rotación."""
+    return [
+        {"key": k, "label": STYLE_PRESETS[k].label}
+        for k in STYLE_ORDER
+        if k in STYLE_PRESETS
+    ]

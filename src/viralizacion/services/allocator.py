@@ -9,6 +9,8 @@ a `release_hook/release_paisajes` para no perder el hueco definitivamente.
 
 from __future__ import annotations
 
+import random
+
 from src.viralizacion.pipeline.resource_scanner import (
     load_hook_candidates_cached,
     load_paisaje_candidates_cached,
@@ -88,7 +90,19 @@ def allocate_paisaje_segments(ponente: str, n: int) -> list[dict]:
             f"quedan {len(available)} de {len(candidates)} candidatos totales "
             f"({len(used)} ya usados)."
         )
-    chosen = available[:n]
+    # Los candidatos son trozos CONTIGUOS de 4,5s del mismo vídeo fuente, así
+    # que `available[:n]` daba n tramos seguidos: el corte se veía pero el
+    # plano era el mismo sitio (misma fachada, misma plaza…). Repartimos los
+    # n tramos en n bloques a lo largo de todo el vídeo y sacamos uno al azar
+    # de cada bloque → clips consecutivos quedan a minutos de distancia en el
+    # origen, que es lo que hace que se vean lugares distintos.
+    chosen: list[dict] = []
+    bucket = len(available) / n
+    for i in range(n):
+        lo = int(i * bucket)
+        hi = max(lo + 1, min(int((i + 1) * bucket), len(available)))
+        chosen.append(random.choice(available[lo:hi]))
+
     for c in chosen:
         usage_repo.mark_paisaje_used(ponente, c["index"])
     return chosen
