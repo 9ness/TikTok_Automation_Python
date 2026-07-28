@@ -85,6 +85,28 @@ RUN python -c "import packaging, packaging.version; print('packaging OK', packag
     && python -c "import faster_whisper; print('faster_whisper OK')" \
     && python -c "from googleapiclient.discovery import build; print('google-api-client OK')"
 
+# rclone: necesario para leer Drives "compartidos conmigo", que NO aparecen en
+# el mount FUSE (`/mnt/drive` solo expone "Mi unidad"). Lo usa el Nicho POV BOF
+# para listar/descargar de "Productos España". Sin esto esos endpoints revientan
+# con [Errno 2] No such file or directory: 'rclone'.
+# Posición deliberada: DESPUÉS del pip install (no invalida torch/whisper) y
+# ANTES de copiar `src` (un cambio de código no re-descarga el binario).
+# Binario oficial — el de Debian va varias versiones por detrás.
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) rc_arch="amd64" ;; \
+        arm64) rc_arch="arm64" ;; \
+        *) echo "arquitectura no soportada: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://downloads.rclone.org/rclone-current-linux-${rc_arch}.zip" -o /tmp/rclone.zip; \
+    apt-get update && apt-get install -y --no-install-recommends unzip; \
+    unzip -q -j /tmp/rclone.zip '*/rclone' -d /usr/local/bin; \
+    chmod +x /usr/local/bin/rclone; \
+    apt-get purge -y unzip && apt-get autoremove -y; \
+    rm -rf /tmp/rclone.zip /var/lib/apt/lists/*; \
+    rclone version
+
 # Código fuente. Solo lo que el módulo API necesita en runtime —
 # Streamlit (`main.py`) NO se copia (no se sirve desde Docker).
 COPY src ./src

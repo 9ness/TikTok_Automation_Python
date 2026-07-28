@@ -90,6 +90,21 @@ LISTING_TTL_S = float(os.getenv("NICHO_POV_BOF_LISTING_TTL_S") or 300)
 RCLONE_TIMEOUT_S = float(os.getenv("NICHO_POV_BOF_RCLONE_TIMEOUT_S") or 120)
 
 
+def rclone_config_path() -> str:
+    """Ruta del rclone.conf a usar, o "" para el default de rclone.
+
+    En el container la API corre como uid 999 y el `rclone.conf` canónico del
+    host es 600 del uid 1000 → ilegible. El operador deja una copia legible en
+    `secrets/rclone.conf`, que el compose monta read-only en `/app/secrets`.
+    """
+    explicit = os.getenv("NICHO_POV_BOF_RCLONE_CONFIG")
+    if explicit:
+        return explicit
+    if os.path.isfile("/app/secrets/rclone.conf"):
+        return "/app/secrets/rclone.conf"
+    return ""
+
+
 def photo_cache_dir() -> str:
     """Dir local donde se cachean las fotos descargadas por file ID.
 

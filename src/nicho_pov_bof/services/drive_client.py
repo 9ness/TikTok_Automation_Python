@@ -51,6 +51,9 @@ def _cache_put(key: str, payload: Any) -> None:
 def _run_rclone(args: list[str], *, on_log: Callable[[str], None] = _noop) -> str:
     """Ejecuta rclone y devuelve stdout. Lanza RuntimeError si falla."""
     cmd = ["rclone", *args, config.SHARED_WITH_ME_FLAG]
+    conf = config.rclone_config_path()
+    if conf:
+        cmd += ["--config", conf]
     on_log("+ " + " ".join(cmd))
     try:
         proc = subprocess.run(
@@ -62,6 +65,14 @@ def _run_rclone(args: list[str], *, on_log: Callable[[str], None] = _noop) -> st
     except subprocess.TimeoutExpired:
         raise RuntimeError(
             f"rclone tardó más de {config.RCLONE_TIMEOUT_S:.0f}s: {' '.join(args[:2])}"
+        ) from None
+    except FileNotFoundError:
+        # El container de la API no traía rclone (ver Dockerfile.api). Sin él
+        # no hay forma de leer un Drive "compartido conmigo": no está en el
+        # mount FUSE. Mensaje explícito en vez de un 500 pelado.
+        raise RuntimeError(
+            "rclone no está instalado en este entorno. El Drive compartido "
+            "solo se puede leer por CLI (--drive-shared-with-me)."
         ) from None
     if proc.returncode != 0:
         raise RuntimeError(
