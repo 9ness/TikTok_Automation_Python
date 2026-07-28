@@ -1654,10 +1654,12 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
             f"{len(failed)} fallidos, {len(upload_failed)} sin subir. "
             f"Staging local: {result['staging_root']}. Revisa el log del job."
         )
-    # No hay un único "archivo final" (son N vídeos por ponente) — devolvemos
-    # la carpeta de staging local como `result_path` (el operador ya tiene
-    # los vídeos en Drive; esto es solo referencia/debug).
-    return result["staging_root"]
+    # No hay un único "archivo final" (son N vídeos por ponente). Se devuelve
+    # la CARPETA DE DRIVE, no la de staging: la UI usa el último tramo del
+    # `result_path` para buscar en Drive, y el staging lleva un uuid aleatorio
+    # que allí no existe — el botón de Drive no encontraba nada.
+    remotes = result.get("remote_dirs") or {}
+    return next(iter(remotes.values()), result["staging_root"])
 
 
 # ============================================================

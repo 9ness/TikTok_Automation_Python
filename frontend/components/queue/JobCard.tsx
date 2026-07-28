@@ -222,16 +222,23 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const isCancellable = job.status === "pending" || job.status === "running";
   const isDismissible =
     job.status === "completed" || job.status === "failed" || job.status === "cancelled";
-  const hasVideo = isCompleted && !!job.result_path;
+  // Estos modos producen N ficheros, no uno: `result_path` es una CARPETA.
+  // Reproducir/descargar no aplica (el endpoint espera un fichero); solo
+  // tiene sentido abrir la carpeta en Drive.
+  const isFolderResult =
+    job.mode === "viralizacion_batch" || job.mode === "nicho_pov_bof_backup";
+  const hasVideo = isCompleted && !!job.result_path && !isFolderResult;
+  const hasFolder = isCompleted && !!job.result_path && isFolderResult;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY;
   const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
   const downloadUrl = hasVideo
     ? `${api.baseUrl}/api/v1/queue/${job.job_id}/download${qs}`
     : null;
   const filename = job.result_path?.split(/[/\\]/).pop() ?? `${job.job_id}.mp4`;
-  const driveSearchUrl = hasVideo
-    ? `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`
-    : null;
+  const driveSearchUrl =
+    hasVideo || hasFolder
+      ? `https://drive.google.com/drive/search?q=${encodeURIComponent(filename)}`
+      : null;
   const programIsShop = program === "tiktok_shop";
   const showSubmodule = !programIsShop;
   const details = describeJobParams(job.mode, job.params);
@@ -517,6 +524,21 @@ export function JobCard({ job }: { job: ActiveJob }) {
             <FileText className="h-3 w-3" />
             Ver detalle
           </Button>
+        </div>
+      )}
+
+      {hasFolder && driveSearchUrl && (
+        <div className="mt-2 space-y-1">
+          <Button asChild size="sm" variant="default" className="h-7 gap-1 px-3 text-[10px] sm:text-xs">
+            <a href={driveSearchUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" />
+              <span className="truncate">Abrir carpeta en Drive</span>
+            </a>
+          </Button>
+          <p className="text-[10px] text-muted-foreground">
+            Son varios vídeos: se abren desde la carpeta{" "}
+            <span className="font-medium text-foreground">{filename}</span>.
+          </p>
         </div>
       )}
 
