@@ -116,6 +116,43 @@ def photo_cache_dir() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Vídeo (fase 2)
+# ---------------------------------------------------------------------------
+TARGET_W, TARGET_H, TARGET_FPS = 1080, 1920, 30
+
+# Zonas seguras de TikTok — mismas que el resto del proyecto
+# (`src/subtitles.py`): fuera de aquí la UI de TikTok tapa el texto.
+SAFE_X = (0.05, 0.78)
+SAFE_Y = (0.15, 0.75)
+
+# Bloque de texto: gancho arriba, título del producto en medio, CTA debajo.
+TEXT_BLOCK_Y = 0.17          # centro del bloque, dentro de la zona segura
+HOOK_FONT_SIZE = 64
+TITLE_FONT_SIZE = 58
+CTA_FONT_SIZE = 62
+
+# Flecha .mov: abajo a la izquierda, justo encima de la etiqueta naranja de la
+# tienda que pinta TikTok. Mismos valores que `ready_video.py`.
+ARROW_CX, ARROW_CY = 0.22, 0.82
+ARROW_SCALE_W = 0.16
+# La flecha entra este margen ANTES de que se diga la palabra clave.
+ARROW_LEAD_S = 1.0
+ARROW_DURATION_S = 3.5
+
+# Palabra que dispara la flecha. Las 5 frases locutadas dicen todas
+# "carrito naranja", así que basta con "carrito"; el resto son variantes por
+# si en el futuro se graban frases nuevas.
+ARROW_KEYWORDS = ("carrito", "naranja", "cupones", "cupón", "enlace", "tienda")
+
+# Duración objetivo del vídeo. Los audios rondan 12-14s, así que lo normal es
+# que el audio sea MÁS LARGO y haya que alargar el vídeo.
+VIDEO_TARGET_S = 10.0
+# Si el audio es más largo, el vídeo se alarga rebobinando su tramo final
+# (ida y vuelta). No se ralentiza: deformaría el gesto de la mano.
+REVERSE_TAIL_MAX_S = 4.0
+
+
+# ---------------------------------------------------------------------------
 # Redis
 # ---------------------------------------------------------------------------
 def redis_prefix() -> str:
