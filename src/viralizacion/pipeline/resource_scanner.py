@@ -53,6 +53,12 @@ def _face_samples(video_path: Path, step_s: float = config.FACE_SAMPLE_STEP_S) -
                 "t": round(t, 2),
                 "h_frac": round(fh / height, 4) if height else 0.0,
                 "cx_frac": round((fx + fw / 2) / width, 4) if width else 0.5,
+                # Cuántas caras hay en el frame. Imprescindible para descartar
+                # planos de PÚBLICO: ahí salen 20 caras y la más cercana supera
+                # el umbral de tamaño, así que se colaban como si fueran el
+                # ponente (en Víctor, 4 de cada 6 ganchos eran del patio de
+                # butacas). Un ponente en plano corto está SOLO.
+                "n_faces": int(len(faces)),
             })
         t += step_s
     cap.release()
@@ -137,7 +143,14 @@ def scan_hook_candidates(ponente: str, *, force: bool = False) -> list[dict]:
         )
 
     samples = _face_samples(video)
-    big = [s for s in samples if s["h_frac"] > config.FACE_HEIGHT_FRAC_THRESHOLD]
+    # Cara grande Y una sola persona en el plano. Sin lo segundo entran las
+    # tomas de público (ver `n_faces` en `_face_samples`). Los caches viejos
+    # no traen `n_faces`; se aceptan para no invalidarlos.
+    big = [
+        s for s in samples
+        if s["h_frac"] > config.FACE_HEIGHT_FRAC_THRESHOLD
+        and s.get("n_faces", 1) <= 1
+    ]
     runs = _find_runs(big)
 
     candidates: list[dict] = []

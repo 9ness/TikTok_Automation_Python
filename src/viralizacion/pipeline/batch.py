@@ -121,6 +121,10 @@ def run_batch(
     # Estilo elegido por el operador para cada ronda: `round_styles[i]` es la
     # ronda i+1. Lo que no se especifique cae en la rotación automática.
     round_styles: list[str] | None = None,
+    # Estilos elegidos por el operador. Los vídeos se reparten entre ellos a
+    # partes iguales, independientemente de cuántas rondas salgan del reparto
+    # de audios. Vacío = los 6.
+    styles_pool: list[str] | None = None,
     on_log: OnLog = lambda _msg: None,
     on_progress: OnProgress = lambda _pct, _label: None,
 ) -> dict:
@@ -169,6 +173,10 @@ def run_batch(
             f"rondas por audio: {rounds_per_audio}"
         )
 
+        # Un estilo por vídeo, repartido a partes iguales entre los elegidos.
+        plan_estilos = styles.distribute_styles(n_total, styles_pool)
+        idx_video = 0
+
         outputs[ponente] = []
         ponente_out_dir = staging_root / ponente
         ponente_tmp_dir = tmp_root / ponente
@@ -189,7 +197,12 @@ def run_batch(
             full_audio_dur = ffprobe_duration(audio_path)
 
             for ronda in range(1, rounds_needed + 1):
-                style = styles.resolve_style(ronda, round_styles)
+                if styles_pool:
+                    key = plan_estilos[idx_video] if idx_video < len(plan_estilos) else None
+                    style = styles.STYLE_PRESETS.get(key) or styles.resolve_style(ronda, round_styles)
+                else:
+                    style = styles.resolve_style(ronda, round_styles)
+                idx_video += 1
                 include_music = ronda <= music_rounds
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
                 out_path = ponente_out_dir / filename

@@ -48,6 +48,8 @@ export interface ViralizacionGenerateRequest {
   music_rounds: number;
   /** Estilo de cada ronda: índice 0 = ronda 1. Vacío = rotación automática. */
   round_styles?: string[];
+  /** Estilos elegidos; los vídeos se reparten entre ellos a partes iguales. */
+  styles_pool?: string[];
 }
 
 export interface ViralizacionGenerateResponse {

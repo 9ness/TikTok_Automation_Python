@@ -169,6 +169,7 @@ def generate(
         "nombre_cuenta": body.nombre_cuenta,
         "music_rounds": int(body.music_rounds),
         "round_styles": [s for s in (body.round_styles or []) if s],
+        "styles_pool": [s for s in (body.styles_pool or []) if s],
     }
     job = queue.enqueue(JobMode.VIRALIZACION_BATCH, title=title, params=params)
 

@@ -39,6 +39,9 @@ export default function ViralizacionPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [roundStyles, setRoundStyles] = useState<string[]>([]);
+  // Estilos marcados. Por defecto TODOS: el reparto equitativo entre los 6 es
+  // lo que da variedad a una tanda grande.
+  const [stylesPool, setStylesPool] = useState<string[]>([]);
   const estilos = useEstilos();
   const planPonente = selectedSlugs[0] ?? null;
   const planCantidad = planPonente ? (cantidad[planPonente] ?? 5) : 0;
@@ -70,6 +73,7 @@ export default function ViralizacionPage() {
       nombre_cuenta: nombreCuenta.trim(),
       music_rounds: musicRounds,
       round_styles: roundStyles,
+      styles_pool: stylesPool,
     };
     try {
       const res = await generate.mutateAsync(body);
@@ -232,52 +236,68 @@ export default function ViralizacionPage() {
         </div>
       </section>
 
-      {/* Estilo por ronda ("ciclo"): así cada pasada se ve distinta */}
-      {plan.data && plan.data.rounds.length > 0 && (
-        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-          <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 shrink-0 text-amber-500" />
-            <p className="text-sm font-semibold">Estilo de cada ronda</p>
-          </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Los vídeos se reparten entre los audios en rondas. Elige un estilo
-            por ronda para que cada ciclo se vea distinto.
-          </p>
-          <div className="space-y-2">
-            {plan.data.rounds.map((r, i) => (
-              <div key={r.ronda} className="flex items-center gap-2">
-                <span className="w-28 shrink-0 text-[11px] sm:text-xs">
-                  Ronda {r.ronda}
-                  <span className="text-muted-foreground"> · {r.n_videos} vídeo(s)</span>
-                </span>
-                <select
-                  value={roundStyles[i] ?? r.default_style}
-                  onChange={(e) =>
-                    setRoundStyles((prev) => {
-                      const next = [...prev];
-                      while (next.length < plan.data!.rounds.length) next.push("");
-                      next[i] = e.target.value;
-                      return next;
-                    })
-                  }
-                  className="flex-1 truncate rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
-                >
-                  {(estilos.data?.items ?? []).map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-          {planPonente && (
+      {/* Versiones a generar: se reparten a partes iguales entre las marcadas.
+          Antes el estilo iba por RONDA y las rondas dependían del nº de audios,
+          así que con 25 vídeos y 8 audios solo salían 4 de los 6 estilos. */}
+      <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+        <div className="flex items-center gap-2">
+          <Palette className="h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-sm font-semibold">Versiones a generar</p>
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Marca las versiones que quieres. Los vídeos se reparten entre ellas a
+          partes iguales. Sin marcar ninguna se usan todas.
+        </p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {(estilos.data?.items ?? []).map((s) => {
+            const marcado = stylesPool.length === 0 || stylesPool.includes(s.key);
+            return (
+              <label
+                key={s.key}
+                className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition sm:text-sm ${
+                  marcado
+                    ? "border-amber-500/60 bg-amber-500/10"
+                    : "border-border/60 text-muted-foreground"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-amber-500"
+                  checked={marcado}
+                  onChange={(e) => {
+                    const todos = (estilos.data?.items ?? []).map((x) => x.key);
+                    // Lista vacía = "todas". Al desmarcar la primera hay que
+                    // materializar la lista completa para poder quitar una.
+                    const base = stylesPool.length === 0 ? todos : stylesPool;
+                    setStylesPool(
+                      e.target.checked
+                        ? Array.from(new Set([...base, s.key]))
+                        : base.filter((k) => k !== s.key),
+                    );
+                  }}
+                />
+                <span className="truncate">{s.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        {(() => {
+          const n = selectedSlugs.reduce((acc, slug) => acc + (cantidad[slug] ?? 5), 0);
+          const nEst = stylesPool.length || (estilos.data?.items?.length ?? 6);
+          if (!n || !nEst) return null;
+          const base = Math.floor(n / nEst);
+          const resto = n % nEst;
+          return (
             <p className="text-[10px] text-muted-foreground">
-              Reparto calculado para <b>{planPonente}</b> con {planCantidad} vídeos.
+              {n} vídeo(s) entre {nEst} versión(es) →{" "}
+              {resto === 0
+                ? `${base} de cada una`
+                : `${resto} versión(es) con ${base + 1} y el resto con ${base}`}
+              .
             </p>
-          )}
-        </section>
-      )}
+          );
+        })()}
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

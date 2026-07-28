@@ -56,6 +56,9 @@ class ViralizacionGenerateRequest(BaseModel):
     # Estilo por ronda: `round_styles[i]` es la ronda i+1. Vacío = rotación
     # automática. Lo que falte también cae en la rotación.
     round_styles: list[str] = Field(default_factory=list)
+    # Estilos elegidos: los vídeos se reparten entre ellos a partes iguales,
+    # sin depender de cuántas rondas salgan del reparto de audios. Vacío = los 6.
+    styles_pool: list[str] = Field(default_factory=list)
 
 
 class ViralizacionGenerateResponse(BaseModel):

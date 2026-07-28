@@ -369,6 +369,24 @@ def resolve_style(round_idx: int, round_styles: list[str] | None) -> StylePreset
     return get_style_for_round(round_idx)
 
 
+def distribute_styles(total: int, pool: list[str] | None) -> list[str]:
+    """Reparte `total` vídeos entre los estilos elegidos, a partes iguales.
+
+    Sustituye al reparto "por ronda", que ataba el estilo al número de audios:
+    con 25 vídeos y 8 audios salían 4 rondas, así que 2 de los 6 estilos no se
+    usaban NUNCA por mucho que el operador los quisiera.
+
+    Con 25 vídeos y 6 estilos salen 5,4,4,4,4,4 (los primeros se llevan el
+    resto). Se devuelve INTERCALADO, no en bloques: si el proceso se corta a
+    medias quedan vídeos de todos los estilos, no solo de los primeros.
+    """
+    keys = [k for k in (pool or []) if k in STYLE_PRESETS]
+    if not keys:
+        keys = list(STYLE_ORDER)
+    total = max(0, int(total))
+    return [keys[i % len(keys)] for i in range(total)]
+
+
 def style_choices() -> list[dict]:
     """Estilos disponibles para el selector de la UI, en orden de rotación."""
     return [
