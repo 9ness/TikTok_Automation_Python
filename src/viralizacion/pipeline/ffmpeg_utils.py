@@ -36,3 +36,15 @@ def ffprobe_video_size(path: Path | str) -> tuple[int, int]:
     )
     w, h = out.stdout.strip().split("x")
     return int(w), int(h)
+
+
+def is_valid_mp4(path: Path | str, min_duration: float = 5.0) -> bool:
+    """True si el fichero existe, tiene moov y duración >= min_duration."""
+    p = Path(path)
+    if not p.is_file() or p.stat().st_size < 50_000:
+        return False
+    try:
+        dur = ffprobe_duration(p)
+    except (subprocess.CalledProcessError, ValueError):
+        return False
+    return dur >= min_duration

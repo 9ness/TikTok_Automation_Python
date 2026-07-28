@@ -1635,6 +1635,24 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         f"[viralizacion] batch {result['batch_id']} · {result['total_videos']} vídeos · "
         f"subidos a {result['remote_dirs']}"
     )
+    # Un batch "partial" tenía el mismo aspecto que uno perfecto: sin esto, 14
+    # de 15 vídeos fallidos se veían como job verde.
+    failed = result.get("failed") or []
+    upload_failed = result.get("upload_failed") or []
+    if failed or upload_failed:
+        if failed:
+            on_log(f"[viralizacion] ⚠️ {len(failed)} vídeo(s) fallaron: {failed[:5]}")
+        if upload_failed:
+            on_log(
+                f"[viralizacion] ⚠️ {len(upload_failed)} vídeo(s) NO llegaron a "
+                f"Drive: {upload_failed[:5]}"
+            )
+        raise RuntimeError(
+            f"Batch {result.get('status')}: {result['total_videos']} vídeo(s) OK "
+            f"(ya en {result['remote_dirs'] or 'ningún destino'}), "
+            f"{len(failed)} fallidos, {len(upload_failed)} sin subir. "
+            f"Staging local: {result['staging_root']}. Revisa el log del job."
+        )
     # No hay un único "archivo final" (son N vídeos por ponente) — devolvemos
     # la carpeta de staging local como `result_path` (el operador ya tiene
     # los vídeos en Drive; esto es solo referencia/debug).

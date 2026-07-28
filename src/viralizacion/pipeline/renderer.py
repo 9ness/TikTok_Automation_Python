@@ -3,18 +3,17 @@ cara en primer plano) + tramos de paisaje, xfade, filtro "película"
 (+ extras por estilo), subtítulos quemados (estilo A/B/C) y mezcla de
 audio (voz [+ música opcional]).
 
-Adaptado de `~/viralizacion_work/build_test_v2.py` (prototipo validado por
-el operador) con estas diferencias:
-- Ponente / candidatos de gancho y paisaje son dinámicos (vienen del
-  allocator, nunca se repiten — ver `services/allocator.py`).
-- 3 estilos de subtítulo/filtro rotables (`pipeline/styles.py`).
-- Jitter aleatorio por clip/vídeo (zoom, duración de paisaje, duración de
-  transición, eq) para evitar una "huella" de plantilla reconocible — ver
-  `config.py` sección "Anti-fingerprint"."""
+Optimizaciones (2026-07):
+- Tope de duración (~55s) + ventana de audio por ronda (no monstruos de 3min).
+- Render en 2 fases: pre-extract clip a clip (1 input, RAM baja) → xfade
+  sobre clips cortos ya en 1080x1920 → grade/subs/audio final.
+- Encode veryfast/CRF23 para peso TikTok y velocidad.
+"""
 
 from __future__ import annotations
 
 import random
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -30,26 +29,38 @@ OnLog = Callable[[str], None]
 @dataclass
 class ClipSpec:
     src: Path
-    start: float          # inicio nominal en la fuente
-    nominal_dur: float    # duración "lógica" en el timeline final
-    extract_start: float  # inicio real a extraer (compensado para el xfade)
-    extract_dur: float    # duración real a extraer
-    zoom: float            # zoom extra sobre el mínimo necesario para cubrir 1080x1920
-    cx_frac: float | None = None  # None = crop centrado
+    start: float
+    nominal_dur: float
+    extract_start: float
+    extract_dur: float
+    zoom: float
+    cx_frac: float | None = None
+
+
+def slice_words(words: list[dict], window_start: float, window_dur: float) -> list[dict]:
+    """Recorta palabras a la ventana de audio y re-basa timings a t=0."""
+    end = window_start + window_dur
+    out: list[dict] = []
+    for w in words:
+        ws = float(w["start"])
+        we = float(w["end"])
+        if we <= window_start or ws >= end:
+            continue
+        out.append({
+            "word": w["word"],
+            "start": max(0.0, ws - window_start),
+            "end": min(window_dur, we - window_start),
+        })
+    return out
 
 
 def _jittered_paisaje_durations(fill_duration: float, n: int) -> list[float]:
-    """`n` duraciones cuya SUMA es exactamente `fill_duration`, cada una
-    variando dentro de `PAISAJE_CLIP_DUR_JITTER_RANGE` (media ~4.5s) para
-    que no todos los tramos midan lo mismo (huella de plantilla)."""
     if n <= 1:
         return [fill_duration]
     lo, hi = config.PAISAJE_CLIP_DUR_JITTER_RANGE
     weights = [random.uniform(lo, hi) for _ in range(n)]
     scale = fill_duration / sum(weights)
     durations = [w * scale for w in weights]
-    # Clamp + redistribuye el exceso/déficit un par de pasadas para converger
-    # dentro del rango sin perder la suma exacta.
     for _ in range(5):
         excess = 0.0
         free_idx = []
@@ -67,9 +78,6 @@ def _jittered_paisaje_durations(fill_duration: float, n: int) -> list[float]:
         share = excess / len(free_idx)
         for i in free_idx:
             durations[i] += share
-    # Corrección final: absorbe cualquier resto de precisión flotante en el
-    # último elemento para que la suma cuadre EXACTA (milisegundo) con
-    # `fill_duration` — el vídeo tiene que durar lo mismo que el audio.
     diff = fill_duration - sum(durations)
     durations[-1] += diff
     return durations
@@ -92,16 +100,10 @@ def _jittered_eq_filter(extra: dict) -> str:
 
 
 def build_paisaje_segments(fill_duration: float) -> int:
-    """Nº de tramos de paisaje necesarios para cubrir `fill_duration`
-    (~PAISAJE_CLIP_TARGET_S cada uno, en MEDIA — la duración real de cada
-    uno se jitteriza luego en `_jittered_paisaje_durations`)."""
     return max(1, round(fill_duration / config.PAISAJE_CLIP_TARGET_S))
 
 
 def build_transitions(n_clips: int) -> list[tuple[str, float]]:
-    """Una entrada por transición (len == n_clips - 1): la 1ª es el hblur
-    gancho→paisaje (fija, validada), el resto fadeblack paisaje→paisaje
-    con duración jitterizada por transición (anti-fingerprint)."""
     if n_clips < 2:
         return []
     lo, hi = config.TRANSITION_LANDSCAPE_JITTER_RANGE
@@ -158,49 +160,106 @@ def xfade_offsets(specs: list[ClipSpec], transitions: list[tuple[str, float]]) -
     return offsets
 
 
-def build_filter_complex(
+def _clip_vf(spec: ClipSpec) -> str:
+    scale_w = max(config.TARGET_W, round(config.TARGET_W * spec.zoom))
+    scale_h = max(config.TARGET_H, round(config.TARGET_H * spec.zoom))
+    if spec.cx_frac is not None:
+        x_expr = f"min(max((in_w-{config.TARGET_W})*{spec.cx_frac},0),in_w-{config.TARGET_W})"
+    else:
+        x_expr = f"(in_w-{config.TARGET_W})/2"
+    y_expr = f"(in_h-{config.TARGET_H})/2"
+    return (
+        f"scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase,"
+        f"crop={config.TARGET_W}:{config.TARGET_H}:x='{x_expr}':y='{y_expr}',"
+        f"hflip,fps={config.TARGET_FPS},format=yuv420p,setsar=1"
+    )
+
+
+def _extract_clip(spec: ClipSpec, out_path: Path, on_log: OnLog | None) -> Path:
+    """Fase 1: un solo input → clip corto 1080x1920. RAM baja, seek rápido."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{spec.extract_start:.3f}",
+        "-t", f"{spec.extract_dur:.3f}",
+        "-i", str(spec.src),
+        "-vf", _clip_vf(spec),
+        "-an",
+        "-c:v", "libx264",
+        "-preset", config.FFMPEG_CLIP_PRESET,
+        "-crf", str(config.FFMPEG_CLIP_CRF),
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(out_path),
+    ]
+    run(cmd, on_log=on_log)
+    return out_path
+
+
+def _xfade_clips(
+    clip_paths: list[Path],
     specs: list[ClipSpec],
     transitions: list[tuple[str, float]],
-    ass_path: Path,
-    target_duration: float,
-    style: StylePreset,
-    voice_path: Path,
-    music_path: Path | None,
-) -> tuple[str, list[str]]:
+    out_path: Path,
+    on_log: OnLog | None,
+) -> Path:
+    """Fase 2: xfade sobre clips YA recortados (pocos MB c/u, sin reabrir el 2.5GB)."""
+    if len(clip_paths) == 1:
+        shutil.copy2(clip_paths[0], out_path)
+        return out_path
+
     input_args: list[str] = []
-    per_clip_labels = []
-
-    for s in specs:
-        input_args += ["-ss", f"{s.extract_start:.3f}", "-t", f"{s.extract_dur:.3f}", "-i", str(s.src)]
-
-    filters = []
-    for i, s in enumerate(specs):
-        scale_w = max(config.TARGET_W, round(config.TARGET_W * s.zoom))
-        scale_h = max(config.TARGET_H, round(config.TARGET_H * s.zoom))
-        if s.cx_frac is not None:
-            x_expr = f"min(max((in_w-{config.TARGET_W})*{s.cx_frac},0),in_w-{config.TARGET_W})"
-        else:
-            x_expr = f"(in_w-{config.TARGET_W})/2"
-        y_expr = f"(in_h-{config.TARGET_H})/2"
-        label = f"v{i}"
-        filters.append(
-            f"[{i}:v]scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase,"
-            f"crop={config.TARGET_W}:{config.TARGET_H}:x='{x_expr}':y='{y_expr}',"
-            f"hflip,fps={config.TARGET_FPS},format=yuv420p,setsar=1[{label}]"
-        )
-        per_clip_labels.append(label)
+    for p in clip_paths:
+        input_args += ["-i", str(p)]
 
     offsets = xfade_offsets(specs, transitions)
-    prev_label = per_clip_labels[0]
-    for i in range(1, len(specs)):
+    filters: list[str] = []
+    prev = "0:v"
+    for i in range(1, len(clip_paths)):
         out_label = f"x{i}"
         ttype, tdur = transitions[i - 1]
         filters.append(
-            f"[{prev_label}][{per_clip_labels[i]}]xfade=transition={ttype}:"
+            f"[{prev}][{i}:v]xfade=transition={ttype}:"
             f"duration={tdur}:offset={offsets[i-1]:.3f}[{out_label}]"
         )
-        prev_label = out_label
+        prev = out_label
 
+    filter_script = ";\n".join(filters)
+    script_path = out_path.with_suffix(".xfade.txt")
+    script_path.write_text(filter_script, encoding="utf-8")
+
+    cmd = (
+        ["ffmpeg", "-y"]
+        + input_args
+        + [
+            "-filter_complex_script", str(script_path),
+            "-map", f"[{prev}]",
+            "-an",
+            "-c:v", "libx264",
+            "-preset", config.FFMPEG_CLIP_PRESET,
+            "-crf", str(config.FFMPEG_CLIP_CRF),
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(out_path),
+        ]
+    )
+    run(cmd, on_log=on_log)
+    return out_path
+
+
+def _finalize(
+    video_path: Path,
+    *,
+    ass_path: Path,
+    style: StylePreset,
+    voice_path: Path,
+    voice_start: float,
+    target_duration: float,
+    music_path: Path | None,
+    output_path: Path,
+    on_log: OnLog | None,
+) -> Path:
+    """Fase 3: grade + subtítulos + audio (1 input de vídeo corto)."""
     eq_filter = _jittered_eq_filter(style.eq_extra)
     vignette_filter = f"vignette=angle={style.vignette_angle}:mode=forward"
     noise_filter = style.noise_filter_override or config.NOISE_FILTER_BASE
@@ -208,27 +267,28 @@ def build_filter_complex(
     ass_escaped = str(ass_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     fontsdir_escaped = config.SUB_FONTSDIR.replace("\\", "\\\\").replace(":", "\\:")
 
+    filters: list[str] = []
     post_label = "vsubs" if style.post_subtitle_filters else "vfinal"
     filters.append(
-        f"[{prev_label}]{eq_filter},{vignette_filter},{noise_filter},"
+        f"[0:v]{eq_filter},{vignette_filter},{noise_filter},"
         f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
     )
     if style.post_subtitle_filters:
-        filters.append(
-            f"[vsubs]{','.join(style.post_subtitle_filters)}[vfinal]"
-        )
+        filters.append(f"[vsubs]{','.join(style.post_subtitle_filters)}[vfinal]")
 
-    n = len(specs)
-    voice_idx = n
-    input_args += ["-t", f"{target_duration:.3f}", "-i", str(voice_path)]
-    filters.append(f"[{voice_idx}:a]volume={config.VOICE_VOLUME}[voice]")
+    input_args = ["-i", str(video_path)]
+    input_args += [
+        "-ss", f"{voice_start:.3f}",
+        "-t", f"{target_duration:.3f}",
+        "-i", str(voice_path),
+    ]
+    filters.append(f"[1:a]volume={config.VOICE_VOLUME}[voice]")
 
     if music_path is not None:
-        music_idx = n + 1
         input_args += ["-ss", "0", "-t", f"{target_duration:.3f}", "-i", str(music_path)]
         fade_start = max(0.0, target_duration - config.MUSIC_FADEOUT_DUR)
         filters.append(
-            f"[{music_idx}:a]volume={config.MUSIC_VOLUME},"
+            f"[2:a]volume={config.MUSIC_VOLUME},"
             f"afade=t=out:st={fade_start:.3f}:d={config.MUSIC_FADEOUT_DUR}[music]"
         )
         filters.append(
@@ -238,7 +298,33 @@ def build_filter_complex(
     else:
         filters.append("[voice]alimiter=limit=0.95[aout]")
 
-    return ";\n".join(filters), input_args
+    # OJO: junto al .ass (tmp_dir), NO junto a output_path — el dir de salida
+    # se publica entero en Drive y este scratch acababa subido con los MP4.
+    script_path = ass_path.with_suffix(".final.txt")
+    script_path.write_text(";\n".join(filters), encoding="utf-8")
+
+    cmd = (
+        ["ffmpeg", "-y"]
+        + input_args
+        + [
+            "-filter_complex_script", str(script_path),
+            "-map", "[vfinal]", "-map", "[aout]",
+            "-t", f"{target_duration:.3f}",
+            "-r", str(config.TARGET_FPS),
+            "-c:v", "libx264",
+            "-preset", config.FFMPEG_PRESET,
+            "-crf", str(config.FFMPEG_CRF),
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", config.FFMPEG_AUDIO_BITRATE,
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    try:
+        run(cmd, on_log=on_log)
+    finally:
+        script_path.unlink(missing_ok=True)
+    return output_path
 
 
 def render_video(
@@ -256,15 +342,27 @@ def render_video(
     output_path: Path,
     tmp_dir: Path,
     on_log: OnLog | None = None,
+    audio_start: float = 0.0,
+    target_duration: float | None = None,
 ) -> Path:
     tmp_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    target_duration = ffprobe_duration(audio_path)
-    if on_log:
-        on_log(f"[renderer] audio completo: {target_duration:.2f}s (se usa entero, sin recortar)")
+    full_audio_dur = ffprobe_duration(audio_path)
+    if target_duration is None:
+        _start, target_duration = config.audio_window_for_round(full_audio_dur, 1)
+        audio_start = _start
+    target_duration = float(target_duration)
+    audio_start = float(audio_start)
 
-    lines = group_into_phrases(words)
+    if on_log:
+        on_log(
+            f"[renderer] ventana audio {audio_start:.1f}s+{target_duration:.1f}s "
+            f"(fuente {full_audio_dur:.1f}s)"
+        )
+
+    window_words = slice_words(words, audio_start, target_duration)
+    lines = group_into_phrases(window_words)
     if on_log:
         on_log(f"[renderer] {len(lines)} líneas de subtítulo · estilo {style.label}")
 
@@ -272,7 +370,8 @@ def render_video(
     ass_path.write_text(style.build_ass(lines, style), encoding="utf-8")
 
     fill_duration = target_duration - config.HOOK_DUR
-    durations = _jittered_paisaje_durations(fill_duration, len(paisaje_candidates))
+    n_needed = len(paisaje_candidates)
+    durations = _jittered_paisaje_durations(fill_duration, n_needed)
     paisaje_segments = [(c["start"], d) for c, d in zip(paisaje_candidates, durations)]
 
     transitions = build_transitions(1 + len(paisaje_segments))
@@ -281,24 +380,39 @@ def render_video(
         paisajes_video, paisaje_segments, transitions, target_duration,
     )
 
+    work = tmp_dir / f"{output_path.stem}_clips"
+    if work.exists():
+        shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True, exist_ok=True)
+
+    clip_paths: list[Path] = []
+    for i, spec in enumerate(specs):
+        cp = work / f"c{i:02d}.mp4"
+        if on_log:
+            on_log(f"[renderer] extract clip {i+1}/{len(specs)} ({spec.extract_dur:.1f}s)")
+        _extract_clip(spec, cp, on_log)
+        clip_paths.append(cp)
+
+    xfade_path = work / "xfade.mp4"
+    if on_log:
+        on_log(f"[renderer] xfade {len(clip_paths)} clips…")
+    _xfade_clips(clip_paths, specs, transitions, xfade_path, on_log)
+
     use_music = include_music and music_path is not None
-    filter_script, input_args = build_filter_complex(
-        specs, transitions, ass_path, target_duration, style,
-        voice_path=audio_path, music_path=music_path if use_music else None,
+    if on_log:
+        on_log("[renderer] finalize (grade + subs + audio)…")
+    _finalize(
+        xfade_path,
+        ass_path=ass_path,
+        style=style,
+        voice_path=audio_path,
+        voice_start=audio_start,
+        target_duration=target_duration,
+        music_path=music_path if use_music else None,
+        output_path=output_path,
+        on_log=on_log,
     )
 
-    filter_script_path = tmp_dir / f"{output_path.stem}_filter_complex.txt"
-    filter_script_path.write_text(filter_script, encoding="utf-8")
-
-    cmd = ["ffmpeg", "-y"] + input_args + [
-        "-filter_complex_script", str(filter_script_path),
-        "-map", "[vfinal]", "-map", "[aout]",
-        "-t", f"{target_duration:.3f}",
-        "-r", str(config.TARGET_FPS),
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart",
-        str(output_path),
-    ]
-    run(cmd, on_log=on_log)
+    # Limpia intermedios del vídeo (libera disco; ASS se queda por si debug).
+    shutil.rmtree(work, ignore_errors=True)
     return output_path

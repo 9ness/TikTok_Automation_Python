@@ -7,7 +7,7 @@ Decisiones:
   pesa ~2.5GB) que se reutilizan en cientos de renders y no tiene sentido
   releerlos de Drive en cada job. `VIRALIZACION_ASSETS_PATH` permite
   override; si no se define, autodetecta un default razonable.
-- Los vídeos finales se suben a Drive (`gdrive:VIRALIZACION/<cuenta>_<fecha>/<ponente>/`)
+- Los vídeos finales se suben a Drive (`gdrive:NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/VIRALIZACION/<cuenta>_<fecha>/<ponente>/`)
   vía `services/drive_uploader.py`, pero NO se leen de vuelta desde ahí.
 - Sin cost tracking: este programa no llama a ninguna API de pago (todo
   ffmpeg + Whisper local + rclone). El wrapper `dispatch_job` sigue
@@ -238,7 +238,7 @@ def redis_prefix() -> str:
 # Drive de destino (subida del batch final)
 # ---------------------------------------------------------------------------
 DRIVE_REMOTE = "gdrive:"
-DRIVE_UPLOAD_ROOT = "VIRALIZACION"
+DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/VIRALIZACION"
 
 
 def sanitize_account_name(nombre_cuenta: str) -> str:
@@ -255,6 +255,19 @@ def sanitize_account_name(nombre_cuenta: str) -> str:
 # ---------------------------------------------------------------------------
 TARGET_W, TARGET_H = 1080, 1920
 TARGET_FPS = 30
+
+# Tope de duración del vídeo final (diseño: 20-60s). Audios largos se
+# trocean en ventanas no solapadas por ronda — ver `audio_window_for_round`.
+MAX_VIDEO_DURATION_S = 90.0
+MIN_VIDEO_DURATION_S = 20.0
+
+# Encode final: velocidad + peso TikTok (~15-40MB / 50s).
+FFMPEG_PRESET = "veryfast"
+FFMPEG_CRF = 23
+FFMPEG_AUDIO_BITRATE = "128k"
+# Pre-extract de clips individuales (fase 1 del renderer, anti-OOM).
+FFMPEG_CLIP_PRESET = "ultrafast"
+FFMPEG_CLIP_CRF = 18
 
 HOOK_DUR = 3.0
 PAISAJE_CLIP_TARGET_S = 4.5
@@ -328,3 +341,31 @@ TRANSITION_LANDSCAPE_JITTER_RANGE = (0.7, 1.1)
 # brightness del filtro "película" base — mismo look aprobado, sin ser un
 # valor pelado idéntico en cada render.
 EQ_JITTER_FRAC = 0.05
+
+
+def audio_window_for_round(audio_duration: float, ronda: int) -> tuple[float, float]:
+    """Ventana (start, duration) del audio fuente para esta ronda.
+
+    Si el audio cabe en MAX_VIDEO_DURATION_S devuelve (0, audio_duration).
+    Si es mas largo, trocea en ventanas no solapadas de MAX_VIDEO_DURATION_S;
+    la ronda N usa la ventana ((N-1) % n_windows). Un audio de 163s da ~3
+    trozos distintos de ~55s en vez de un monstruo de 163s.
+    """
+    max_d = float(MAX_VIDEO_DURATION_S)
+    min_d = float(MIN_VIDEO_DURATION_S)
+    if audio_duration <= max_d:
+        return 0.0, float(audio_duration)
+    n_full = max(1, int(audio_duration // max_d))
+    remainder = audio_duration - n_full * max_d
+    n_windows = n_full + (1 if remainder >= min_d else 0)
+    if n_windows <= 0:
+        n_windows = 1
+    idx = (max(1, int(ronda)) - 1) % n_windows
+    start = idx * max_d
+    if start >= audio_duration:
+        start = max(0.0, audio_duration - max_d)
+    dur = min(max_d, audio_duration - start)
+    if dur < min_d and start > 0:
+        start = max(0.0, audio_duration - max_d)
+        dur = min(max_d, audio_duration - start)
+    return float(start), float(dur)
