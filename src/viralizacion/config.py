@@ -307,7 +307,10 @@ SUB_MARGIN_LR = 145
 WHISPER_MODEL_SIZE = "small"
 WHISPER_LANGUAGE = "es"
 
-DEFAULT_MUSIC_ROUNDS = 1
+# Por defecto SIN música de fondo: se añade solo si el operador la marca
+# explícitamente. Antes la ronda 1 salía siempre con "Musica Reels.MP3"
+# aunque no se pidiera.
+DEFAULT_MUSIC_ROUNDS = 0
 
 # ---------------------------------------------------------------------------
 # Anti-fingerprint: jitter aleatorio POR CLIP y POR VÍDEO

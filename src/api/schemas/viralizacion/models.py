@@ -51,7 +51,8 @@ class ViralizacionGenerateRequest(BaseModel):
     ponentes: list[str] = Field(..., min_length=1)
     cantidad: dict[str, int]
     nombre_cuenta: str = Field(..., min_length=1)
-    music_rounds: int = 1
+    # 0 = sin música de fondo (default). >0 = nº de rondas que la llevan.
+    music_rounds: int = 0
     # Estilo por ronda: `round_styles[i]` es la ronda i+1. Vacío = rotación
     # automática. Lo que falte también cae en la rotación.
     round_styles: list[str] = Field(default_factory=list)

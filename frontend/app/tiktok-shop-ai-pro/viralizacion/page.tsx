@@ -22,7 +22,8 @@ export default function ViralizacionPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [cantidad, setCantidad] = useState<Record<string, number>>({});
   const [nombreCuenta, setNombreCuenta] = useState("");
-  const [musicRounds, setMusicRounds] = useState(1);
+  // Sin música de fondo salvo que se marque a propósito.
+  const [musicRounds, setMusicRounds] = useState(0);
   const [success, setSuccess] = useState<{ total: number; position: number } | null>(null);
 
   const ponentes = ponentesQuery.data?.items ?? [];
@@ -197,15 +198,37 @@ export default function ViralizacionPage() {
             una subcarpeta por ponente (p. ej. <code>32_pablo_{today}</code>).
           </p>
         </div>
+        {/* Música de fondo: APAGADA por defecto. Antes se colaba siempre en
+            la ronda 1 aunque no se pidiera. */}
         <div>
-          <span className="mb-1 block text-xs font-medium sm:text-sm">Rondas con música</span>
-          <input
-            type="number"
-            min={0}
-            value={musicRounds}
-            onChange={(e) => setMusicRounds(Math.max(0, Number(e.target.value) || 0))}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm"
-          />
+          <span className="mb-1 block text-xs font-medium sm:text-sm">
+            Música de fondo
+          </span>
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 shrink-0 accent-amber-500"
+              checked={musicRounds > 0}
+              onChange={(e) => setMusicRounds(e.target.checked ? 1 : 0)}
+            />
+            <span className="truncate">
+              {musicRounds > 0 ? "Con música" : "Sin música"}
+            </span>
+          </label>
+          {musicRounds > 0 && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                Rondas con música
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={musicRounds}
+                onChange={(e) => setMusicRounds(Math.max(1, Number(e.target.value) || 1))}
+                className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs"
+              />
+            </div>
+          )}
         </div>
       </section>
 
