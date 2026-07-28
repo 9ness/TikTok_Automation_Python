@@ -12,6 +12,24 @@
 
 ## 🤖 Cola del Agente
 
+- [Viralización] `renderer.py`: el dir `work/` de clips solo se borra en el
+  camino feliz. Si ffmpeg falla, quedan ~220 MB (vídeo 39s) o ~500 MB (90s)
+  huérfanos por vídeo fallido. Envolver en `try/finally`. Relevante: el disco
+  del VPS va al 92%.
+- [Viralización] `MAX_VIDEO_DURATION_S = 90` contradice el diseño (20-60s) y
+  los docstrings ("~55s", "163s → 3 trozos"; con 90 salen 2). Hoy es inerte
+  (todos los audios < 90s). Decidir: bajar a ~55-60 o corregir los docs.
+- [Viralización] `is_valid_mp4(min_duration=MIN_VIDEO_DURATION_S*0.8)` = 16s
+  fijo: un audio corto genera un MP4 correcto que se declara inválido y se
+  borra. Debería medir contra `win_dur` esperado, no contra una constante.
+- [Viralización] `VIRALIZACION_MODULE.md:85` y `:248` siguen documentando
+  `gdrive:VIRALIZACION/...` (la ruta real ya es
+  `NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/VIRALIZACION`).
+- [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
+  `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
+- [Nicho POV BOF] Fase 2: generación de vídeos reutilizando tools de TikTok
+  Shop. Salidas a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
+
 ## ✅ Done
 
 - [2026-05-18] Nicho 4 Construcción POV completo: JobMode + runner + pipeline (Gemini video → MiniMax → anti-copy + subs karaoke) + endpoints `/construccion-pov/enqueue` y `/voices/clone|sample|delete` + sidebar nav + página `/creator-reward/construccion-pov` + hub `/creator-reward/tools/voices` + 40 presets EN MiniMax.
