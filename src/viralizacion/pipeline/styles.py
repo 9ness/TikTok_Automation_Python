@@ -132,10 +132,20 @@ def build_ass_reveal(lines: list[dict], preset: "StylePreset") -> str:
 # Estilo C — Cinemático (karaoke por palabra, blanco/negro)
 # ---------------------------------------------------------------------------
 def _karaoke_text(words: list[dict], active_idx: int) -> str:
+    """Palabra activa en blanco, resto en negro.
+
+    El BORDE va invertido respecto al relleno: la palabra activa (blanca) lleva
+    borde negro y las inactivas (negras) borde blanco. Sin esto la palabra
+    activa era blanca con borde blanco y se perdía sobre paisajes claros
+    (fachadas, cielo, mapas).
+    """
     parts = []
     for j, w in enumerate(words):
-        color = "&HFFFFFF&" if j == active_idx else "&H000000&"
-        parts.append(f"{{\\1c{color}}}{w['word']}")
+        if j == active_idx:
+            fill, outline = "&HFFFFFF&", "&H000000&"
+        else:
+            fill, outline = "&H000000&", "&HFFFFFF&"
+        parts.append(f"{{\\1c{fill}\\3c{outline}}}{w['word']}")
     return " ".join(parts)
 
 

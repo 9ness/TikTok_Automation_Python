@@ -39,16 +39,28 @@ def clips_folder() -> Path:
     return config.assets_root_path() / "paisajes_clips"
 
 
-@lru_cache(maxsize=1)
-def _load_manifest() -> tuple[dict, ...]:
-    path = clips_folder() / MANIFEST_NAME
-    if not path.is_file():
-        return ()
+@lru_cache(maxsize=4)
+def _load_manifest_cached(path_str: str, mtime: float) -> tuple[dict, ...]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(Path(path_str).read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return ()
     return tuple(data.get("clips", []))
+
+
+def _load_manifest() -> tuple[dict, ...]:
+    """Manifiesto cacheado POR MTIME.
+
+    Si se retiran clips del banco (p. ej. al detectar un rótulo que se había
+    colado), el proceso de la API tiene que verlo sin reiniciar el container.
+    Cachear a secas dejaba sirviendo la lista vieja.
+    """
+    path = clips_folder() / MANIFEST_NAME
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return ()
+    return _load_manifest_cached(str(path), mtime)
 
 
 def is_available() -> bool:
