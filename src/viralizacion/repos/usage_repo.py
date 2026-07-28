@@ -66,3 +66,18 @@ def release_paisaje_used(ponente: str, index: int) -> None:
     r = get_viralizacion_redis()
     if r.is_available():
         r.srem(f"paisaje_used:{ponente}", str(index))
+
+
+def reset_paisaje_used(ponente: str) -> int:
+    """Empieza un ciclo nuevo: olvida qué clips de paisaje se han usado.
+
+    No implica repetir material tal cual — de cada clip se saca una ventana
+    temporal y un zoom distintos en cada uso, así que la vuelta siguiente no
+    reproduce los vídeos de la anterior. Es lo que permite seguir generando
+    con un banco finito de clips.
+    """
+    r = _require_redis()
+    used = get_used_paisaje_indices(ponente)
+    for idx in used:
+        r.srem(f"paisaje_used:{ponente}", str(idx))
+    return len(used)

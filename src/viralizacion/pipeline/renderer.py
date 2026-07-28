@@ -83,6 +83,37 @@ def _jittered_paisaje_durations(fill_duration: float, n: int) -> list[float]:
     return durations
 
 
+def distribute_with_caps(total: float, caps: list[float]) -> list[float]:
+    """Reparte `total` entre clips SIN pasarse del material que tiene cada uno.
+
+    Los clips de la biblioteca son planos reales y duran lo que duran (3,3s a
+    17s). Un reparto ciego pediría más segundos de los que un clip tiene y
+    ffmpeg rellenaría con el último fotograma congelado. Aquí lo que sobra de
+    un clip corto se reparte entre los que aún tienen margen.
+    """
+    n = len(caps)
+    if n == 0:
+        return []
+    if total <= 0:
+        return [0.0] * n
+    share = [total / n] * n
+    for _ in range(n):
+        excess = 0.0
+        free = []
+        for i in range(n):
+            if share[i] > caps[i]:
+                excess += share[i] - caps[i]
+                share[i] = caps[i]
+            elif share[i] < caps[i] - 1e-6:
+                free.append(i)
+        if excess <= 1e-6 or not free:
+            break
+        add = excess / len(free)
+        for i in free:
+            share[i] += add
+    return share
+
+
 def _jittered_eq_filter(extra: dict) -> str:
     frac = config.EQ_JITTER_FRAC
     contrast = config.EQ_BASE_CONTRAST * random.uniform(1 - frac, 1 + frac)
@@ -128,16 +159,22 @@ def build_clip_specs(
     hook_video: Path,
     hook_start: float,
     hook_cx_frac: float,
-    paisajes_video: Path,
-    paisaje_segments: list[tuple[float, float]],
+    paisaje_segments: list[tuple[Path, float, float]],
     transitions: list[tuple[str, float]],
     target_duration: float,
 ) -> list[ClipSpec]:
+    """`paisaje_segments` es (fichero, inicio, duración) por clip.
+
+    Cada paisaje puede venir de un FICHERO distinto (biblioteca de clips) o
+    todos del mismo vídeo largo (modo antiguo); al renderer le da igual.
+    El zoom se sortea por clip, así que el mismo material nunca sale con el
+    mismo encuadre dos veces.
+    """
     nominal = [(hook_video, hook_start, config.HOOK_DUR, hook_cx_frac,
                 random.uniform(*config.HOOK_ZOOM_JITTER_RANGE))]
     nominal += [
-        (paisajes_video, s, d, None, random.uniform(*config.PAISAJE_ZOOM_JITTER_RANGE))
-        for s, d in paisaje_segments
+        (src, s, d, None, random.uniform(*config.PAISAJE_ZOOM_JITTER_RANGE))
+        for src, s, d in paisaje_segments
     ]
 
     n = len(nominal)
@@ -385,15 +422,37 @@ def render_video(
     ass_path = tmp_dir / f"{output_path.stem}_subs.ass"
     ass_path.write_text(style.build_ass(lines, style), encoding="utf-8")
 
-    fill_duration = target_duration - config.HOOK_DUR
+    fill_duration = max(0.0, target_duration - config.HOOK_DUR)
     n_needed = len(paisaje_candidates)
-    durations = _jittered_paisaje_durations(fill_duration, n_needed)
-    paisaje_segments = [(c["start"], d) for c, d in zip(paisaje_candidates, durations)]
+
+    # Dos orígenes posibles: biblioteca de clips (cada candidato trae su
+    # propio fichero y su ventana) o el vídeo largo de siempre.
+    from_library = bool(paisaje_candidates and paisaje_candidates[0].get("path"))
+    if from_library:
+        # Cada clip solo tiene el material de SU plano: repartir sin pasarse
+        # o ffmpeg congelaría el último fotograma para rellenar.
+        caps = [float(c.get("dur") or 0.0) for c in paisaje_candidates]
+        if sum(caps) + 1e-3 < fill_duration:
+            raise RuntimeError(
+                f"Los {n_needed} clips asignados suman {sum(caps):.1f}s pero "
+                f"hacen falta {fill_duration:.1f}s de paisaje."
+            )
+        durations = distribute_with_caps(fill_duration, caps)
+        paisaje_segments = [
+            (Path(c["path"]), float(c.get("start") or 0.0), d)
+            for c, d in zip(paisaje_candidates, durations)
+        ]
+    else:
+        durations = _jittered_paisaje_durations(fill_duration, n_needed)
+        paisaje_segments = [
+            (paisajes_video, c["start"], d)
+            for c, d in zip(paisaje_candidates, durations)
+        ]
 
     transitions = build_transitions(1 + len(paisaje_segments), style)
     specs = build_clip_specs(
         hook_video, hook_candidate["start"], hook_candidate["cx_frac"],
-        paisajes_video, paisaje_segments, transitions, target_duration,
+        paisaje_segments, transitions, target_duration,
     )
 
     work = tmp_dir / f"{output_path.stem}_clips"

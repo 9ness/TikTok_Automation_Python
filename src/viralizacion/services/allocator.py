@@ -18,6 +18,7 @@ from src.viralizacion.pipeline.resource_scanner import (
     scan_paisaje_candidates,
 )
 from src.viralizacion.repos import usage_repo
+from src.viralizacion.services import clip_library
 
 
 class PoolExhaustedError(RuntimeError):
@@ -75,6 +76,73 @@ def allocate_hook(ponente: str) -> dict:
 
 def release_hook(ponente: str, index: int) -> None:
     usage_repo.release_hook_used(ponente, index)
+
+
+def allocate_paisaje_clips(ponente: str, n: int) -> list[dict]:
+    """Asigna `n` clips de la biblioteca, uno por LUGAR distinto.
+
+    Cada clip es un plano entero del original, así que el sitio no cambia a
+    mitad de clip. Se elige una ventana aleatoria dentro de cada uno para que
+    el mismo clip nunca salga con el mismo encuadre temporal.
+
+    Los clips agrupados en el mismo `location` (mismo sitio desde otro ángulo)
+    no se mezclan dentro del mismo vídeo: sería volver al bug de "transición
+    pero mismo lugar".
+    """
+    clips = clip_library.all_clips()
+    if not clips:
+        raise PoolExhaustedError(
+            "La biblioteca de clips de paisaje está vacía. Genera los clips "
+            "antes de renderizar (ver VIRALIZACION_MODULE.md)."
+        )
+    used = usage_repo.get_used_paisaje_indices(ponente)
+    available = [c for c in clips if c["index"] not in used]
+
+    # Ciclo nuevo: cuando se agota la vuelta, se reinicia el marcador en vez
+    # de bloquear la generación. NO es repetir material tal cual — de cada
+    # clip se saca una ventana temporal distinta y un zoom distinto, así que
+    # el vídeo resultante no coincide con el de la vuelta anterior. Es lo que
+    # permite seguir generando indefinidamente con un banco finito.
+    if len(available) < n:
+        if len(clips) < n:
+            raise PoolExhaustedError(
+                f"Solo hay {len(clips)} clips en la biblioteca y hacen falta "
+                f"{n} para un vídeo. Añade más material."
+            )
+        usage_repo.reset_paisaje_used(ponente)
+        available = list(clips)
+
+    random.shuffle(available)
+    chosen: list[dict] = []
+    seen_locations: set = set()
+    for c in available:
+        loc = c.get("location", c["index"])
+        if loc in seen_locations:
+            continue
+        seen_locations.add(loc)
+        chosen.append(c)
+        if len(chosen) == n:
+            break
+    # Si los lugares distintos no dan para `n`, se completa con lo que queda
+    # (mejor repetir lugar que fallar el vídeo entero).
+    if len(chosen) < n:
+        for c in available:
+            if c not in chosen:
+                chosen.append(c)
+                if len(chosen) == n:
+                    break
+
+    out: list[dict] = []
+    for c in chosen:
+        start, dur = clip_library.random_window(c)
+        usage_repo.mark_paisaje_used(ponente, c["index"])
+        out.append({
+            "index": c["index"],
+            "path": str(clip_library.clip_path(c)),
+            "start": start,
+            "dur": dur,
+        })
+    return out
 
 
 def allocate_paisaje_segments(ponente: str, n: int) -> list[dict]:

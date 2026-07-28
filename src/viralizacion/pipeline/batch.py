@@ -21,7 +21,7 @@ from src.viralizacion import config
 from src.viralizacion.pipeline import styles, transcriber
 from src.viralizacion.pipeline.ffmpeg_utils import ffprobe_duration, is_valid_mp4
 from src.viralizacion.pipeline.renderer import build_paisaje_segments, render_video
-from src.viralizacion.services import allocator
+from src.viralizacion.services import allocator, clip_library
 from src.viralizacion.services.allocator import PoolExhaustedError
 from src.viralizacion.services.drive_uploader import upload_batch, upload_file
 
@@ -76,6 +76,26 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
                 _start, win_dur = config.audio_window_for_round(full_dur, ronda)
                 fill = max(0.0, win_dur - config.HOOK_DUR)
                 needed_paisajes += build_paisaje_segments(fill)
+        if clip_library.is_available():
+            # Con biblioteca no hay déficit posible salvo que un solo vídeo
+            # pida más clips que los que existen: al agotarse la vuelta se
+            # abre un ciclo nuevo con ventanas y zooms distintos.
+            total_clips = clip_library.clip_count()
+            max_por_video = max(
+                (build_paisaje_segments(
+                    max(0.0, config.audio_window_for_round(
+                        ffprobe_duration(a), r)[1] - config.HOOK_DUR))
+                 for a, nr in zip(audios, rounds) if nr > 0
+                 for r in range(1, nr + 1)),
+                default=0,
+            )
+            if max_por_video > total_clips:
+                errors.append(
+                    f"'{ponente}': un vídeo necesita {max_por_video} clips de "
+                    f"paisaje y la biblioteca solo tiene {total_clips}."
+                )
+            continue
+
         avail_paisajes, total_paisajes = allocator.count_available_paisajes(
             ponente, cache_only=True
         )
@@ -208,7 +228,17 @@ def run_batch(
                 try:
                     hook_c = allocator.allocate_hook(ponente)
                     try:
-                        paisaje_cs = allocator.allocate_paisaje_segments(ponente, n_paisajes)
+                        # Biblioteca de clips si está disponible: cada clip es
+                        # un plano real (un solo lugar) y sin texto. Si no,
+                        # se trocea el vídeo largo como antes.
+                        if clip_library.is_available():
+                            paisaje_cs = allocator.allocate_paisaje_clips(
+                                ponente, n_paisajes
+                            )
+                        else:
+                            paisaje_cs = allocator.allocate_paisaje_segments(
+                                ponente, n_paisajes
+                            )
                     except PoolExhaustedError:
                         allocator.release_hook(ponente, hook_c["index"])
                         raise
