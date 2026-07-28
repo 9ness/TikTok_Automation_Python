@@ -46,6 +46,8 @@ import type {
 export default function NichoPovBofPage() {
   const [source, setSource] = useState("aleatorios_1");
   const [showAll, setShowAll] = useState(false);
+  // Las fotos en crudo van colapsadas: ocupaban toda la pantalla.
+  const [showFotos, setShowFotos] = useState(false);
   // Carpeta elegida a mano. Si es null se usa la "current" del backend
   // (la primera sin completar).
   const [picked, setPicked] = useState<string | null>(null);
@@ -418,9 +420,25 @@ export default function NichoPovBofPage() {
             </div>
           )}
 
+          {/* Las 20 fotos en crudo ocupaban toda la pantalla y estorbaban:
+              el trabajo real se hace en las tarjetas de producto de abajo.
+              Se dejan a un clic por si hace falta revisarlas. */}
           {photos.data && (
+            <button
+              type="button"
+              onClick={() => setShowFotos((v) => !v)}
+              className="flex w-full items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground transition hover:text-foreground sm:text-xs"
+            >
+              <span>
+                {photos.data.items.length} foto(s) en crudo de la carpeta
+              </span>
+              <span>{showFotos ? "ocultar ▲" : "ver ▼"}</span>
+            </button>
+          )}
+
+          {photos.data && showFotos && (
             <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                 {photos.data.items.map((p) => (
                   <a
                     key={p.id}
@@ -442,9 +460,6 @@ export default function NichoPovBofPage() {
                   </a>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {photos.data.items.length} foto(s)
-              </p>
             </>
           )}
 

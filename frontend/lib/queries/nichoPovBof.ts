@@ -107,14 +107,17 @@ export function usePrompts() {
 }
 
 export function useProductos(source: string, folder: string | null) {
+  // El backend devuelve {source, folder, items, textos_extraidos}; se
+  // desenvuelve aquí a la lista para que los componentes no tengan que
+  // conocer la envoltura.
   return useQuery<ProductoItem[]>({
     queryKey: nichoPovBofKeys.productos(source, folder ?? ""),
-    queryFn: () =>
-      api.get<ProductoItem[]>(
+    queryFn: async () =>
+      (await api.get<{ items: ProductoItem[] }>(
         `${ROOT}/productos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
           folder ?? "",
         )}`,
-      ),
+      )).items ?? [],
     enabled: Boolean(source && folder),
   });
 }
@@ -123,7 +126,8 @@ export function useProductos(source: string, folder: string | null) {
 export function useExtraerTextos() {
   const qc = useQueryClient();
   return useMutation<ProductoItem[], Error, ExtraerTextosRequest>({
-    mutationFn: (body) => api.post<ProductoItem[]>(`${ROOT}/extraer-textos`, body),
+    mutationFn: async (body) =>
+      (await api.post<{ items: ProductoItem[] }>(`${ROOT}/extraer-textos`, body)).items ?? [],
     onSuccess: (items, vars) => {
       qc.setQueryData(nichoPovBofKeys.productos(vars.source, vars.folder), items);
     },
@@ -148,7 +152,10 @@ export function useSetEstado() {
 export function useVendidos(source: string) {
   return useQuery<VendidoItem[]>({
     queryKey: nichoPovBofKeys.vendidos(source),
-    queryFn: () => api.get<VendidoItem[]>(`${ROOT}/vendidos?source=${encodeURIComponent(source)}`),
+    queryFn: async () =>
+      (await api.get<{ items: VendidoItem[] }>(
+        `${ROOT}/vendidos?source=${encodeURIComponent(source)}`,
+      )).items ?? [],
     enabled: Boolean(source),
   });
 }
