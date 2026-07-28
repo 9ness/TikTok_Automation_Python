@@ -186,6 +186,49 @@ def build_ass_cinematic(lines: list[dict], preset: "StylePreset") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Barras de cine que se retiran (transición del gancho al paisaje)
+# ---------------------------------------------------------------------------
+def _retracting_bars(
+    alto: int = 77,
+    pasos: int = 14,
+    dur: float | None = None,
+) -> list[str]:
+    """Letterbox que arranca completo y se retira durante el gancho.
+
+    Marca visualmente el paso del gancho al b-roll —que es donde el ojo pide
+    un corte— y evita que las barras se coman encuadre durante todo el vídeo.
+
+    Va en PASOS con `enable` en vez de una expresión continua porque
+    `drawbox` NO evalúa `x/y/w/h` por fotograma: su variable `t` es el GROSOR,
+    no el tiempo, así que una expresión con `t` se evalúa mal y el filtro
+    acaba pintando el frame entero de negro (comprobado). `enable` sí se
+    evalúa por fotograma, así que 14 escalones de ~0,26s dan una retirada que
+    se lee como continua.
+    """
+    if dur is None:
+        # Termina justo al entrar el primer paisaje (gancho + su transición).
+        dur = config.HOOK_DUR + 0.6
+    filtros: list[str] = []
+    paso_dur = dur / pasos
+    for i in range(pasos):
+        h = round(alto * (1 - i / pasos))
+        if h <= 0:
+            continue
+        t0 = i * paso_dur
+        # El último escalón cierra en `dur`; los demás encadenan sin hueco.
+        t1 = dur if i == pasos - 1 else (i + 1) * paso_dur
+        ventana = f":enable='between(t,{t0:.3f},{t1:.3f})'"
+        filtros.append(
+            f"drawbox=x=0:y=0:w={config.TARGET_W}:h={h}:color=black:t=fill{ventana}"
+        )
+        filtros.append(
+            f"drawbox=x=0:y={config.TARGET_H - h}:w={config.TARGET_W}:h={h}"
+            f":color=black:t=fill{ventana}"
+        )
+    return filtros
+
+
+# ---------------------------------------------------------------------------
 # Registro de presets
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -249,10 +292,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         build_ass=build_ass_cinematic,
         vignette_angle="PI/3.5",
         eq_extra={"gamma_r": 1.06, "gamma_b": 0.94},
-        post_subtitle_filters=[
-            f"drawbox=x=0:y=0:w={config.TARGET_W}:h=77:color=black:t=fill",
-            f"drawbox=x=0:y={config.TARGET_H - 77}:w={config.TARGET_W}:h=77:color=black:t=fill",
-        ],
+        post_subtitle_filters=_retracting_bars(),
         ken_burns=0.12,
         vignette_breathe=0.15,
     ),
