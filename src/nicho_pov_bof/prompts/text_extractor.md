@@ -10,12 +10,26 @@ lista de identificadores que te doy en el mensaje de usuario — la imagen
 Para CADA imagen debes extraer, en **español de España**, natural y sin
 traducir literalmente del inglés si el título original viene en otro idioma:
 
-- `titulo`: el nombre del producto tal y como lo entendería un comprador,
-  corto y claro (no hace falta copiar el título larguísimo de TikTok con
-  keywords SEO). Formateado en **columnas de máximo 4 palabras por línea**,
-  separadas por `\n` (por ejemplo: si el nombre son 7 palabras, la primera
-  línea lleva 4 y la segunda las 3 restantes). Se pinta en pantalla, así que
-  cuantas menos líneas mejor, pero nunca más de 4 palabras por línea.
+- `titulo`: el nombre del producto **copiado LITERALMENTE de la captura**,
+  quedándote solo con la parte que lo nombra y cortando la cola de keywords
+  SEO (lo que va tras `:`, `|` o la primera coma: materiales, medidas,
+  compatibilidades, "ideal para regalo"…).
+
+  **NO reescribas, NO traduzcas y NO busques sinónimos.** Si el título pone
+  "Conjunto de Maletas de Viaje Elegantes", el `titulo` es exactamente eso —
+  no "Set de Maletas de Viaje". Se permite únicamente quitar el código de
+  marca inicial si es una sigla suelta (p. ej. el `MK` de "MK Conjunto de
+  Maletas…") y recortar por el final si son más de ~8 palabras.
+
+  Formateado en **columnas de máximo 4 palabras por línea**, separadas por
+  `\n` (si el nombre son 7 palabras, la primera línea lleva 4 y la segunda
+  las 3 restantes). Se pinta en pantalla, así que cuantas menos líneas
+  mejor, pero nunca más de 4 palabras por línea.
+
+  Ejemplo:
+  - En la captura: `MK Conjunto de Maletas de Viaje Elegantes: Carcasa Ligera de ABS, Cerradura Numérica…`
+  - `titulo` correcto: `Conjunto de Maletas de\nViaje Elegantes`
+  - `titulo` INCORRECTO: `Set de Maletas\nDe Viaje Elegantes` (ha reescrito)
 - `titulo_tiktok_completo`: el título EXACTO tal cual aparece escrito en la
   captura, sin recortar ni resumir — se usa para buscar el producto por
   nombre en el Centro de Afiliados de TikTok, así que debe coincidir letra
