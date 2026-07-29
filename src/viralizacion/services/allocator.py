@@ -106,6 +106,11 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
             "La biblioteca de clips de paisaje está vacía. Genera los clips "
             "antes de renderizar (ver VIRALIZACION_MODULE.md)."
         )
+    def _usable(c: dict) -> float:
+        """Material aprovechable del clip: hay que reservar el solape de la
+        transición, que el renderer extrae por fuera de la ventana."""
+        return max(0.0, float(c.get("dur") or 0.0) - config.CLIP_TRANSITION_PAD_S)
+
     used = usage_repo.get_used_paisaje_indices(ponente)
     available = [c for c in clips if c["index"] not in used]
 
@@ -114,21 +119,24 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
     # clip se saca una ventana temporal distinta y un zoom distinto, así que
     # el vídeo resultante no coincide con el de la vuelta anterior. Es lo que
     # permite seguir generando indefinidamente con un banco finito.
-    if len(available) < n:
-        if len(clips) < n:
+    #
+    # Se mira el nº de clips Y LOS SEGUNDOS que suman: mirando solo el número
+    # quedaban vueltas con clips de sobra pero cortos (24 clips = 48,9s) para
+    # un vídeo que pedía 63s, y el ciclo no se reiniciaba — el lote moría con
+    # PoolExhaustedError teniendo la biblioteca entera sin usar.
+    quedan_segundos = sum(_usable(c) for c in available)
+    if len(available) < n or quedan_segundos < min_total_dur:
+        total_segundos = sum(_usable(c) for c in clips)
+        if len(clips) < n or total_segundos < min_total_dur:
             raise PoolExhaustedError(
-                f"Solo hay {len(clips)} clips en la biblioteca y hacen falta "
-                f"{n} para un vídeo. Añade más material."
+                f"La biblioteca tiene {len(clips)} clips con {total_segundos:.0f}s "
+                f"útiles, pero un vídeo pide {n} clips y {min_total_dur:.0f}s. "
+                f"Añade más material de paisaje."
             )
         usage_repo.reset_paisaje_used(ponente)
         available = list(clips)
 
     random.shuffle(available)
-
-    def _usable(c: dict) -> float:
-        """Material aprovechable del clip: hay que reservar el solape de la
-        transición, que el renderer extrae por fuera de la ventana."""
-        return max(0.0, float(c.get("dur") or 0.0) - config.CLIP_TRANSITION_PAD_S)
 
     def _enough(sel: list[dict]) -> bool:
         """`n` clips Y material suficiente.
