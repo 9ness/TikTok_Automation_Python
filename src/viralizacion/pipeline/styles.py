@@ -66,6 +66,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
+def _inicio_siguiente_bloque(
+    lines: list[dict], idx_linea: int, fin_bloque_en_linea: int, tamano: int
+) -> float | None:
+    """Cuándo entra el siguiente bloque de palabras (en esta línea o en la
+    siguiente). Ningún evento puede pasar de ahí: dos eventos ASS solapados
+    NO se sustituyen, se APILAN, y en pantalla se lee el amasijo de las dos
+    frases a la vez.
+    """
+    palabras = lines[idx_linea].get("words") or []
+    if fin_bloque_en_linea < len(palabras):
+        return float(palabras[fin_bloque_en_linea]["start"])
+    for siguiente in lines[idx_linea + 1:]:
+        ws = siguiente.get("words") or []
+        if ws:
+            return float(ws[0]["start"])
+    return None
+
+
 def _dialogue(start: float, end: float, text: str, layer: int = 0) -> str:
     """`layer` decide quién tapa a quién cuando dos eventos coinciden en el
     tiempo: ASS pinta primero las capas bajas. Con todo en 0 mandaba el orden
@@ -239,10 +257,13 @@ def build_ass_stacked(lines: list[dict], preset: "StylePreset") -> str:
     header = _ass_header(style_line)
     events: list[str] = []
 
-    for ln in lines:
+    for idx_linea, ln in enumerate(lines):
         palabras = ln.get("words") or []
         for inicio in range(0, len(palabras), _STACK_MAX):
             grupo = palabras[inicio:inicio + _STACK_MAX]
+            tope = _inicio_siguiente_bloque(
+                lines, idx_linea, inicio + _STACK_MAX, _STACK_MAX,
+            )
             for i in range(len(grupo)):
                 visibles = grupo[: i + 1]
                 partes = []
@@ -266,7 +287,10 @@ def build_ass_stacked(lines: list[dict], preset: "StylePreset") -> str:
                     ev_end = max(ev_end, float(grupo[i]["end"]) + 0.25)
                 if ev_end <= ev_start:
                     ev_end = ev_start + 0.12
-                events.append(_dialogue(ev_start, ev_end, "\\N".join(partes)))
+                if tope is not None:
+                    ev_end = min(ev_end, tope)
+                if ev_end > ev_start:
+                    events.append(_dialogue(ev_start, ev_end, "\\N".join(partes)))
 
     return header + "\n".join(events) + "\n"
 
@@ -327,7 +351,7 @@ def build_ass_cascade(lines: list[dict], preset: "StylePreset") -> str:
     salto = int(base * 0.92)
     margen = 60
 
-    for ln in lines:
+    for idx_linea, ln in enumerate(lines):
         palabras = ln.get("words") or []
         for inicio in range(0, len(palabras), _CASCADA_MAX):
             grupo = palabras[inicio:inicio + _CASCADA_MAX]
@@ -335,10 +359,14 @@ def build_ass_cascade(lines: list[dict], preset: "StylePreset") -> str:
                 float(grupo[-1]["end"]) + 0.25,
                 float(grupo[-1]["start"]) + 0.35,
             )
-            # La cola de 0,25s no puede pisar el bloque siguiente: si no, se
-            # ven cinco palabras a la vez y la cascada se emborrona.
-            if inicio + _CASCADA_MAX < len(palabras):
-                fin_grupo = min(fin_grupo, float(palabras[inicio + _CASCADA_MAX]["start"]))
+            # La cola de 0,25s no puede pisar el bloque siguiente —ni el de
+            # esta línea ni el de la siguiente—: si no, se ven ocho palabras
+            # a la vez, unas encima de otras, y la cascada se emborrona.
+            tope = _inicio_siguiente_bloque(
+                lines, idx_linea, inicio + _CASCADA_MAX, _CASCADA_MAX,
+            )
+            if tope is not None:
+                fin_grupo = min(fin_grupo, tope)
             alto_bloque = salto * (len(grupo) - 1)
             y0 = (config.TARGET_H - alto_bloque) // 2
             # Posiciones y moldes sorteados por bloque: la cascada tiene que
@@ -412,10 +440,25 @@ def build_ass_highlight(lines: list[dict], preset: "StylePreset") -> str:
     header = _ass_header(style_line)
     events: list[str] = []
 
+    # Cuándo entra la frase SIGUIENTE: ningún evento puede pasar de ahí. Dos
+    # eventos ASS solapados no se sustituyen, se APILAN, así que el remate de
+    # una frase se quedaba en pantalla debajo de la siguiente y se leía un
+    # amasijo de las dos ("10 MIL METROS / COGODRILO O / TIRARSE UN AVIÓN…").
+    inicios = [
+        float(l["words"][0]["start"]) for l in lines if l.get("words")
+    ]
+
+    idx_frase = 0
     for ln in lines:
         palabras = ln.get("words") or []
         if not palabras:
             continue
+        idx_frase += 1
+        tope = inicios[idx_frase] if idx_frase < len(inicios) else None
+
+        def _cerrar(t: float) -> float:
+            return min(t, tope) if tope is not None else t
+
         for i, w in enumerate(palabras):
             visibles = palabras[: i + 1]
             texto = " ".join(
@@ -426,14 +469,19 @@ def build_ass_highlight(lines: list[dict], preset: "StylePreset") -> str:
             fin = float(palabras[i + 1]["start"]) if i + 1 < len(palabras) else float(w["end"])
             if fin <= ini:
                 fin = ini + 0.08
-            events.append(_dialogue(ini, fin, texto))
+            fin = _cerrar(fin)
+            if fin > ini:
+                events.append(_dialogue(ini, fin, texto))
 
         # Remate: la frase entera en blanco un instante después de la última
         # palabra. Sin esto el amarillo se queda congelado al final de cada
-        # frase y parece que la palabra sigue sonando.
+        # frase y parece que la palabra sigue sonando. Se recorta si la frase
+        # siguiente ya ha entrado.
         completa = " ".join(f"{{\\1c&HFFFFFF&}}{p['word'].upper()}" for p in palabras)
-        fin_frase = float(palabras[-1]["end"])
-        events.append(_dialogue(fin_frase, fin_frase + 0.35, completa))
+        fin_frase = _cerrar(float(palabras[-1]["end"]))
+        fin_remate = _cerrar(float(palabras[-1]["end"]) + 0.35)
+        if fin_remate > fin_frase:
+            events.append(_dialogue(fin_frase, fin_remate, completa))
 
     return header + "\n".join(events) + "\n"
 
