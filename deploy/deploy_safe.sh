@@ -302,7 +302,11 @@ if [[ -f "${APP_DIR}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1
     if echo "$CHANGED_FILES" | grep -qE "^(Dockerfile\.api|docker-compose\.yml|requirements\.txt)$"; then
         NEEDS_API_REBUILD=true
     fi
-    if echo "$CHANGED_FILES" | grep -qE "^src/(api|editor_auto|fonts_registry\.py|queue/(metrics|manager|models|runners|__init__)\.py|subtitles|pronosticos|tiktok_shop|video_remover|locutor|guionista|logic|word_calibrator|text_hook|font_resolver|diagnostics|cost_tracking)"; then
+    # Cualquier cosa bajo src/ (la imagen hace COPY del repo entero) o los
+    # assets que se hornean dentro. La lista blanca anterior se olvidaba de
+    # `viralizacion` y `nicho_pov_bof`, así que sus cambios se pusheaban y el
+    # autodeploy los daba por desplegados sin reconstruir nada.
+    if echo "$CHANGED_FILES" | grep -qE "^(src/|assets/|prompts/)"; then
         NEEDS_API_REBUILD=true
     fi
     if echo "$CHANGED_FILES" | grep -qE "^frontend/"; then

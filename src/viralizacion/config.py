@@ -359,6 +359,13 @@ EQ_JITTER_FRAC = 0.05
 # abajo la última línea cae justo dentro.
 HIGHLIGHT_MARGIN_V = 600
 
+# Dónde cae el recorte cuadrado dentro del alto disponible: 0.5 = centrado
+# (lo que había), 0.0 = pegado arriba. El gancho no tiene holgura vertical
+# —la fuente 16:9 se escala para cubrir 1080x1920 y encaja EXACTA de alto—,
+# así que la cabeza del ponente queda a ~70px del borde superior y un
+# recorte centrado (empezaba en y=420) la cortaba por los ojos.
+SQUARE_CROP_Y_FRAC = 0.08
+
 SQUARE_SIDE = 940
 SQUARE_RADIUS = 90
 

@@ -20,6 +20,7 @@ Uso:
 """
 from __future__ import annotations
 
+import os
 import random
 import subprocess
 import sys
@@ -37,7 +38,10 @@ from src.viralizacion.pipeline.renderer import (  # noqa: E402
 )
 from src.viralizacion.services import clip_library  # noqa: E402
 
-PONENTE = "pablo"
+# Ponente de las muestras. Se puede cambiar con VIRALIZACION_PREVIEW_PONENTE
+# para revisar el encuadre de otro (el recorte cuadrado depende de dónde
+# caiga su cara).
+PONENTE = os.environ.get("VIRALIZACION_PREVIEW_PONENTE", "pablo")
 OUT_DIR = REPO / "frontend" / "public" / "viralizacion" / "previews"
 WORK = Path("/var/tmp/viralizacion_previews")
 

@@ -615,7 +615,8 @@ def _finalize(
         filters.append(
             f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
             f"scale={side}:{side}:force_original_aspect_ratio=increase,"
-            f"crop={side}:{side}[sq]"
+            f"crop={side}:{side}:(in_w-{side})/2:"
+            f"(in_h-{side})*{config.SQUARE_CROP_Y_FRAC}[sq]"
         )
         filters.append(f"[{mask_idx}:v]format=gray[mk]")
         filters.append("[sq][mk]alphamerge[sqa]")
