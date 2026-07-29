@@ -302,3 +302,4 @@
 - `video_editor._render_text_line` descartaba las líneas sobrantes (`lines[:max_lines]`) y mutilaba el texto sin avisar: el CTA "COMPRUÉBALO TÚ MISMO 👀" salía como "COMPRUÉBALO TÚ". Ahora encoge el cuerpo de letra hasta que cabe.
 - Al apilar PNGs con halo, `getbbox()` no sirve para recortar: la cola tenue del glow son píxeles no nulos. Hay que umbralizar el alpha (`point(a>45)`) o el bloque sale con huecos enormes entre líneas.
 - El cajón de la cola agrupa por `MODE_TO_PROGRAM[mode]`: un modo nuevo que falte ahí NO se pinta en ningún grupo (el contador sí lo cuenta). Le pasó a `nicho_pov_bof_video`.
+- El título que se quema en el vídeo del Nicho POV BOF es `titulo_tiktok_completo` (el real de la ficha), no el resumen de Gemini: es el fiel al producto. Se recorta acumulando TROZOS enteros entre separadores (`|`, `,`, ` - `), no por número de palabras a lo bruto — así no quedan colas como "… Body Serum - Gel".
