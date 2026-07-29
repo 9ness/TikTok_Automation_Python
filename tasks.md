@@ -40,6 +40,19 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
 5. En el menú de **Viralización 1K**, selector **España / Estados Unidos**;
    al elegir uno salen solo los ponentes de ese sitio.
 
+### Bloqueo conocido: duración máxima de vídeo (~75s)
+La biblioteca de paisajes son planos MUY cortos (el más largo 6,8s útiles,
+mediana 2,6s), así que los `MAX_PAISAJE_CLIPS` (12) de un vídeo suman ~72s de
+b-roll → tope real ~75s de vídeo. `MAX_VIDEO_DURATION_S` está puesto en 75
+como guardarraíl: por encima, el allocator mete 20-40 clips y el `xfade` mata
+a ffmpeg por OOM (un decodificador 1080x1920 por clip, VPS de 8 GB; pasó con
+19 clips).
+
+Para vídeos más largos NO basta con subir el tope: hay que montar los
+paisajes **por tandas** (grupos de ~8 y luego concatenar) en vez de un solo
+`xfade` con N entradas. Decisión del operador (2026-07-29): de momento él
+recorta los audios largos en vez de tocar el render.
+
 ### Pendiente de aclarar antes de empezar
 - **Dónde está el material.** Ni `~/viralizacion_assets/` ni
   `TIKTOK_SHOP_AI_PRO/` en Drive tienen nada de las personas nuevas ni de los

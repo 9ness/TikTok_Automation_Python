@@ -258,7 +258,13 @@ TARGET_FPS = 30
 
 # Tope de duración del vídeo final (diseño: 20-60s). Audios largos se
 # trocean en ventanas no solapadas por ronda — ver `audio_window_for_round`.
-MAX_VIDEO_DURATION_S = 90.0
+# Tope real, atado a la BIBLIOTECA de paisajes: el plano más largo da 6,8s
+# útiles y la mediana 2,6s, así que los `MAX_PAISAJE_CLIPS` clips de un vídeo
+# suman ~72s de b-roll. Pedir más obliga al allocator a meter 20-40 clips y
+# ahí el `xfade` (un decodificador 1080x1920 por clip) mata a ffmpeg por OOM
+# en el VPS de 8 GB — pasó con 19 clips. Para vídeos más largos no basta con
+# subir esto: hay que montar los paisajes por tandas (ver tasks.md).
+MAX_VIDEO_DURATION_S = 75.0
 MIN_VIDEO_DURATION_S = 20.0
 
 # Encode final: velocidad + peso TikTok (~15-40MB / 50s).
