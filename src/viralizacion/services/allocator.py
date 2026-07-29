@@ -141,21 +141,36 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
             return False
         return sum(_usable(c) for c in sel) >= min_total_dur
 
-    chosen: list[dict] = []
-    seen_locations: set = set()
-    # Primera pasada: un clip por LUGAR distinto (no mezclar el mismo sitio
-    # desde otro ángulo dentro de un vídeo).
-    for c in available:
-        if _enough(chosen):
-            break
-        loc = c.get("location", c["index"])
-        if loc in seen_locations:
-            continue
-        seen_locations.add(loc)
-        chosen.append(c)
-    # Segunda pasada si aún falta material: mejor repetir lugar que fallar.
+    def _elegir(pool: list[dict]) -> list[dict]:
+        """Un clip por LUGAR distinto hasta cubrir la duración (no mezclar el
+        mismo sitio desde otro ángulo dentro de un vídeo)."""
+        sel: list[dict] = []
+        locs: set = set()
+        for c in pool:
+            if _enough(sel):
+                break
+            loc = c.get("location", c["index"])
+            if loc in locs:
+                continue
+            locs.add(loc)
+            sel.append(c)
+        return sel
+
+    chosen = _elegir(available)
+
+    # Si el sorteo pide demasiados tramos, se rehace priorizando los planos
+    # MÁS LARGOS. El renderer encadena todos los tramos en un solo `xfade`
+    # con un input por clip: con 19 decodificadores de 1080x1920 abiertos a
+    # la vez, ffmpeg murió por OOM (SIGKILL) en el VPS de 8 GB. Con planos
+    # largos hacen falta muchos menos para los mismos segundos.
+    if len(chosen) > config.MAX_PAISAJE_CLIPS:
+        largos = _elegir(sorted(available, key=_usable, reverse=True))
+        if largos and len(largos) < len(chosen):
+            chosen = largos
+
+    # Última pasada si aún falta material: mejor repetir lugar que fallar.
     if not _enough(chosen):
-        for c in available:
+        for c in sorted(available, key=_usable, reverse=True):
             if c in chosen:
                 continue
             chosen.append(c)

@@ -551,7 +551,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         # de renderizar en vídeos largos (~30-60s a 1080x1920x30fps) — se
         # usa como fallback un `noise` bastante más denso/visible que el de
         # Estilo A, que cumple el mismo propósito de "firma" diferenciadora.
-        noise_filter_override="noise=alls=35:allf=t+u:c0s=1",
+        noise_filter_override="noise=alls=14:allf=t+u:c0s=1",
         # Grano fuerte + rayaduras: el más "sucio" y reconocible.
         film_scratches=3,
     ),
@@ -593,7 +593,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         # operador lo descartó, el paisaje en B/N no vende. Ahora es color
         # con contraste alto y la firma visual la ponen las motas de polvo.
         eq_extra={"gamma": 0.95},
-        noise_filter_override="noise=alls=18:allf=t+u",
+        noise_filter_override="noise=alls=11:allf=t+u",
         # Antes `fadeblack` (era el estilo "cine negro"): en un montaje de
         # planos cortos metía un fogonazo a negro cada pocos segundos. Ahora
         # que es a color, encadenado normal.

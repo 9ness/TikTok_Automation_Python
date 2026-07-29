@@ -305,7 +305,14 @@ def _jittered_eq_filter(extra: dict) -> str:
 
 
 def build_paisaje_segments(fill_duration: float) -> int:
-    return max(1, round(fill_duration / config.PAISAJE_CLIP_TARGET_S))
+    """Cuántos tramos de paisaje entran en `fill_duration`.
+
+    Con tope: el `xfade` final abre UN input de vídeo por tramo y con 19
+    decodificadores de 1080x1920 a la vez ffmpeg murió por OOM (SIGKILL) en
+    el VPS de 8 GB. Pasado el tope los tramos simplemente duran más.
+    """
+    n = max(1, round(fill_duration / config.PAISAJE_CLIP_TARGET_S))
+    return min(n, config.MAX_PAISAJE_CLIPS)
 
 
 def build_transitions(n_clips: int, style: "StylePreset | None" = None) -> list[tuple[str, float]]:
@@ -660,6 +667,9 @@ def _finalize(
             "-c:v", "libx264",
             "-preset", config.FFMPEG_PRESET,
             "-crf", str(config.FFMPEG_CRF),
+            # Techo de bitrate: ver config.FFMPEG_MAXRATE.
+            "-maxrate", config.FFMPEG_MAXRATE,
+            "-bufsize", config.FFMPEG_BUFSIZE,
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", config.FFMPEG_AUDIO_BITRATE,
             "-movflags", "+faststart",

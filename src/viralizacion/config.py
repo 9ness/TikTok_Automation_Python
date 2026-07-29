@@ -264,6 +264,14 @@ MIN_VIDEO_DURATION_S = 20.0
 # Encode final: velocidad + peso TikTok (~15-40MB / 50s).
 FFMPEG_PRESET = "veryfast"
 FFMPEG_CRF = 23
+# Techo de bitrate del vídeo final. CRF solo fija CALIDAD, no tamaño: con los
+# estilos de grano fuerte el encoder gastaba ~90 Mbps intentando conservar
+# ruido aleatorio y salían MP4 de 800 MB para 74s (inservibles para subir a
+# TikTok desde el móvil, y llenaron el disco del VPS). TikTok recomienda
+# ~10 Mbps para 1080p, así que este techo no toca los estilos normales
+# (rondan 3-5 Mbps).
+FFMPEG_MAXRATE = "8M"
+FFMPEG_BUFSIZE = "16M"
 FFMPEG_AUDIO_BITRATE = "128k"
 # Pre-extract de clips individuales (fase 1 del renderer, anti-OOM).
 FFMPEG_CLIP_PRESET = "ultrafast"
@@ -271,6 +279,10 @@ FFMPEG_CLIP_CRF = 18
 
 HOOK_DUR = 3.0
 PAISAJE_CLIP_TARGET_S = 4.5
+# A partir de aquí el reparto de paisajes prioriza planos largos. No es un
+# tope duro: es el punto donde importa más no reventar la memoria del xfade
+# (un input de vídeo por clip) que respetar el sorteo aleatorio.
+MAX_PAISAJE_CLIPS = 12
 
 # Umbral de detección de cara en primer plano (altura del bounding box /
 # altura del frame). Igual que el prototipo validado.

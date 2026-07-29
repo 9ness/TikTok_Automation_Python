@@ -174,7 +174,14 @@ def run_batch(
         )
 
         # Un estilo por vídeo, repartido a partes iguales entre los elegidos.
-        plan_estilos = styles.distribute_styles(n_total, styles_pool)
+        #
+        # Sin selección explícita se reparten TODOS, que es lo que promete la
+        # UI ("Sin marcar ninguna se usan todas"). Antes se caía en la
+        # rotación por ronda y, como el nº de rondas sale del reparto de
+        # audios, una tanda de 15 vídeos con 8 audios da 2 rondas y salían
+        # solo 2 de los 8 estilos — los cuadrados no aparecían nunca.
+        pool = [k for k in (styles_pool or styles.STYLE_ORDER) if k in styles.STYLE_PRESETS]
+        plan_estilos = styles.distribute_styles(n_total, pool)
         idx_video = 0
 
         outputs[ponente] = []
@@ -197,11 +204,8 @@ def run_batch(
             full_audio_dur = ffprobe_duration(audio_path)
 
             for ronda in range(1, rounds_needed + 1):
-                if styles_pool:
-                    key = plan_estilos[idx_video] if idx_video < len(plan_estilos) else None
-                    style = styles.STYLE_PRESETS.get(key) or styles.resolve_style(ronda, round_styles)
-                else:
-                    style = styles.resolve_style(ronda, round_styles)
+                key = plan_estilos[idx_video] if idx_video < len(plan_estilos) else None
+                style = styles.STYLE_PRESETS.get(key) or styles.resolve_style(ronda, round_styles)
                 idx_video += 1
                 include_music = ronda <= music_rounds
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
