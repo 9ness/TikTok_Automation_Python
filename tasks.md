@@ -10,6 +10,43 @@
 - [ ] Tras push → SSH al VPS y disparar `deploy_safe.sh` para aplicar
 - [ ] Probar el flujo end-to-end del refactor TikTok Shop: crear producto desde URL → fotos → análisis → presets → /generate con bulk + smart variants
 
+## 🌍 Viralización — ampliar a más ponentes (España) y a Estados Unidos
+
+**Tarea grande y tediosa, NO empezar hasta que el operador lo pida.** Él avisa
+cuando se vaya a dormir; son ~2h. Trabajo repetitivo → repartir entre varios
+subagentes y **verificar SIEMPRE con capturas** (que el recorte no corte la
+cabeza, que no haya texto quemado en los paisajes, etc.).
+
+### Reparto del trabajo
+- **El operador** revisa los AUDIOS: algunos duran 2 min y pico y hay que
+  trocearlos en trozos de ~40s (como se hizo con Pablo y Víctor). Lo hace él
+  por la mañana; no tocar los audios.
+- **Yo** hago los ganchos y los clips de paisaje.
+
+### España
+1. Sacar los **ganchos** (trozos de 3s con la cara en primer plano) de las
+   personas que faltan, además de Pablo Motos y Víctor Küppers.
+2. Ojo al ENCUADRE, que no es igual en todos: Víctor se mueve por el
+   escenario y hubo que centrarlo (`cx_frac` del escaneo de cara); Pablo sale
+   bien de serie. Hay que mirarlo persona a persona.
+
+### Estados Unidos
+3. Mismos ganchos que en España, para cada persona.
+4. **Además**, los clips de PAISAJE de EEUU: mismo proceso que se hizo con los
+   de España (ver `VIRALIZACION_MODULE.md`) — trocear por cada plano/lugar
+   distinto y descartar los que llevan texto o logos encima.
+
+### Producto final
+5. En el menú de **Viralización 1K**, selector **España / Estados Unidos**;
+   al elegir uno salen solo los ponentes de ese sitio.
+
+### Pendiente de aclarar antes de empezar
+- **Dónde está el material.** Ni `~/viralizacion_assets/` ni
+  `TIKTOK_SHOP_AI_PRO/` en Drive tienen nada de las personas nuevas ni de los
+  paisajes de EEUU (solo `pablo`, `victor` y `paisajes` de España). Preguntar
+  la ruta exacta.
+- Cuántas personas hay en cada país y cómo se llaman.
+
 ## 🤖 Cola del Agente
 
 - [Viralización] `renderer.py`: el dir `work/` de clips solo se borra en el
