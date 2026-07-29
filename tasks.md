@@ -30,11 +30,27 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
    escenario y hubo que centrarlo (`cx_frac` del escaneo de cara); Pablo sale
    bien de serie. Hay que mirarlo persona a persona.
 
-### Estados Unidos
-3. Mismos ganchos que en España, para cada persona.
+### Estados Unidos — APLAZADO (2026-07-29)
+Los vídeos de gancho de EEUU **traen audio propio**, así que la metodología no
+es la misma que en España: primero hay que extraer y separar ese audio. El
+operador decide dejarlo para más adelante. Cuando se retome:
+3. Mismos ganchos que en España, para cada persona (+ separar el audio).
 4. **Además**, los clips de PAISAJE de EEUU: mismo proceso que se hizo con los
    de España (ver `VIRALIZACION_MODULE.md`) — trocear por cada plano/lugar
    distinto y descartar los que llevan texto o logos encima.
+
+### Recortes de audio que indicó el operador (Mario, España)
+Solo hay que recortar los de Mario; el resto de España valen tal cual.
+
+| Audio | Dura | Corte indicado | Queda |
+|---|---|---|---|
+| `audio mario 1.MP3` | 1:31 | 1:22 | 82s |
+| `audio mario 2.MP3` | 1:33 | 1:25 | 85s |
+| `audio mario 5.MP3` | 2:02 | 1:25 | 85s |
+
+⚠️ **Siguen por encima del tope de 75s** (ver bloqueo abajo): tal cual, el
+pipeline recortaría por su cuenta los últimos 7-10s. Confirmar con el
+operador si recorta más (~70s) o si se monta por tandas.
 
 ### Producto final
 5. En el menú de **Viralización 1K**, selector **España / Estados Unidos**;
