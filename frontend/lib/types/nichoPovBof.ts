@@ -118,6 +118,23 @@ export interface ProductoUrlRequest {
   producto: string;
 }
 
+export interface ProductosUrlsRequest {
+  source: string;
+  folder: string;
+}
+
+export interface ProductosUrlsResponse {
+  source: string;
+  folder: string;
+  items: ProductoItem[];
+  textos_extraidos: boolean;
+  /** Llamadas de EchoTik consumidas por esta ejecución. */
+  llamadas: number;
+  encontrados: number;
+  sin_resultado: number;
+  aviso: string;
+}
+
 export interface EstadoRequest {
   source: string;
   folder: string;

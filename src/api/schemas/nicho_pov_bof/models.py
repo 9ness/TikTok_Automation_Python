@@ -156,6 +156,28 @@ class ProductoUrlRequest(BaseModel):
     producto: str = Field(..., min_length=1)
 
 
+class ProductosUrlsRequest(BaseModel):
+    """Busca la ficha de TODOS los productos de la carpeta que aún no la
+    tengan. Gasta UNA llamada de EchoTik por producto sin URL — los que ya
+    la tienen no se vuelven a buscar."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+
+
+class ProductosUrlsResponse(BaseModel):
+    """Lista ya actualizada + cuánto costó, para poder avisar al operador."""
+
+    source: str
+    folder: str
+    items: list[ProductoInfo]
+    textos_extraidos: bool = False
+    llamadas: int = 0        # llamadas de EchoTik consumidas
+    encontrados: int = 0     # cuántas fichas se resolvieron
+    sin_resultado: int = 0   # buscados pero EchoTik no los indexa
+    aviso: str = ""          # p. ej. cuota agotada a mitad
+
+
 class ProductoTextosRequest(BaseModel):
     """Marca si el vídeo de ese producto lleva textos y flecha."""
 

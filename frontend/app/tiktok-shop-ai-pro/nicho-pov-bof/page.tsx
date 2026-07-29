@@ -10,6 +10,7 @@ import {
   Download,
   HardDrive,
   LayoutGrid,
+  Link2 as LinkIcon,
   Loader2,
   RefreshCw,
   ShoppingBag,
@@ -33,6 +34,7 @@ import {
   usePrompts,
   useProductos,
   useBuscarProductoUrl,
+  useBuscarUrlsCarpeta,
   useSetEstado,
   useSources,
   useVendidos,
@@ -97,6 +99,7 @@ export default function NichoPovBofPage() {
   const prompts = usePrompts();
   const productos = useProductos(source, folder);
   const extraerTextos = useExtraerTextos();
+  const buscarUrls = useBuscarUrlsCarpeta();
   const vendidos = useVendidos(source);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState("");
@@ -143,6 +146,34 @@ export default function NichoPovBofPage() {
       { source, folder },
       {
         onSuccess: () => toast.success("Textos extraídos"),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  // Cuántos productos costaría el botón de buscar enlaces: los que ya tienen
+  // ficha o aún no tienen título no gastan llamada. Se enseña el número
+  // porque la cuota de EchoTik es un trial de 100 y se acaba.
+  const pendientesUrl = (productos.data ?? []).filter(
+    (p) => !p.product_url && p.titulo_tiktok_completo,
+  ).length;
+
+  function runBuscarUrls() {
+    if (!folder) return;
+    buscarUrls.mutate(
+      { source, folder },
+      {
+        onSuccess: (res) => {
+          if (!res.llamadas) {
+            toast.success("Todos los productos ya tenían enlace");
+          } else {
+            toast.success(
+              `${res.encontrados}/${res.llamadas} enlaces encontrados` +
+                (res.sin_resultado ? ` · ${res.sin_resultado} sin resultado` : ""),
+            );
+          }
+          if (res.aviso) toast.error(res.aviso);
+        },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
       },
     );
@@ -541,6 +572,25 @@ export default function NichoPovBofPage() {
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" /> Obtener textos
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={runBuscarUrls}
+              disabled={buscarUrls.isPending || !pendientesUrl}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/10 disabled:opacity-50"
+            >
+              {buscarUrls.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando enlaces…
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  {pendientesUrl
+                    ? `Buscar enlaces (${pendientesUrl} llamadas)`
+                    : "Enlaces al día"}
                 </>
               )}
             </button>

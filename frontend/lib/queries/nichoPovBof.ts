@@ -14,6 +14,8 @@ import type {
   PhotosListResponse,
   ProductoItem,
   ProductoUrlRequest,
+  ProductosUrlsRequest,
+  ProductosUrlsResponse,
   PromptsResponse,
   SourcesListResponse,
   VendidoItem,
@@ -163,6 +165,19 @@ export function useBuscarProductoUrl() {
         nichoPovBofKeys.productos(vars.source, vars.folder),
         (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
       );
+    },
+  });
+}
+
+/** Busca la ficha de TODOS los productos de la carpeta sin URL. Gasta UNA
+ *  llamada de EchoTik por producto buscado — la respuesta trae el recuento
+ *  (`llamadas`) para poder decírselo al operador. */
+export function useBuscarUrlsCarpeta() {
+  const qc = useQueryClient();
+  return useMutation<ProductosUrlsResponse, Error, ProductosUrlsRequest>({
+    mutationFn: (body) => api.post<ProductosUrlsResponse>(`${ROOT}/productos/urls`, body),
+    onSuccess: (res, vars) => {
+      qc.setQueryData(nichoPovBofKeys.productos(vars.source, vars.folder), res.items);
     },
   });
 }

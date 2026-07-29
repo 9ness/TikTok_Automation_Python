@@ -7,7 +7,8 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/foto-limpia     → descarga la foto limpia de un producto
 - POST /api/v1/nicho-pov-bof/video/upload    → sube el bruto (Veo3/Kling) y encola el montaje
 - POST /api/v1/nicho-pov-bof/producto/estado → marca Subido/Vendió
-- POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop
+- POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop (1)
+- POST /api/v1/nicho-pov-bof/productos/urls  → idem para toda la carpeta
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
@@ -32,6 +33,8 @@ from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
     ProductoEstadoRequest,
     ProductoUrlRequest,
+    ProductosUrlsRequest,
+    ProductosUrlsResponse,
     ProductoInfo,
     ProductosListResponse,
     PromptsResponse,
@@ -359,6 +362,62 @@ def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return _producto_info(body.producto, prod)
+
+
+@router.post("/productos/urls", response_model=ProductosUrlsResponse)
+def buscar_urls_carpeta(body: ProductosUrlsRequest) -> ProductosUrlsResponse:
+    """Busca la ficha de TikTok Shop de toda la carpeta de una tacada.
+
+    Equivalente de carpeta a `/producto/url`, igual que "Obtener textos" lo
+    es de los textos. Gasta UNA llamada de EchoTik POR PRODUCTO sin URL: los
+    que ya la tienen y los que aún no tienen título se saltan sin gastar.
+
+    Si la cuota se agota a mitad se para y se devuelve lo conseguido hasta
+    ahí con un aviso — seguir solo sumaría llamadas fallidas.
+    """
+    from src.tiktok_shop.api import echotik_cloud
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import product_url
+
+    guardados = (product_repo.load_folder(body.source, body.folder).get("productos") or {})
+    llamadas = encontrados = sin_resultado = 0
+    aviso = ""
+
+    for producto, prod in sorted(guardados.items(), key=lambda kv: kv[0]):
+        if prod.get("product_url"):
+            continue
+        titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
+        if not titulo.strip():
+            continue
+        if echotik_cloud.quota_exhausted():
+            aviso = (
+                "EchoTik se quedó sin cuota a mitad — los productos restantes "
+                "se han dejado sin buscar."
+            )
+            break
+
+        llamadas += 1
+        hallado = product_url.find_product_url(titulo, prod.get("tienda", ""))
+        if not hallado:
+            sin_resultado += 1
+            continue
+        try:
+            product_repo.update_product(body.source, body.folder, producto, **hallado)
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
+        encontrados += 1
+
+    lista = _list_productos(body.source, body.folder)
+    return ProductosUrlsResponse(
+        source=lista.source,
+        folder=lista.folder,
+        items=lista.items,
+        textos_extraidos=lista.textos_extraidos,
+        llamadas=llamadas,
+        encontrados=encontrados,
+        sin_resultado=sin_resultado,
+        aviso=aviso,
+    )
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)
