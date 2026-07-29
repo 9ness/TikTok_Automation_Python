@@ -226,22 +226,48 @@ def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 13, passes: int
     return canvas
 
 
-def _titulo_para_video(textos: dict) -> str:
-    """Título que se quema en el vídeo: el `titulo` del extractor.
+# Palabras que no pueden cerrar el título: cortar en ellas lo deja colgando
+# ("Cochecito para Perros Gatos / Plegable 2 en").
+_TITULO_COLGANTES = {
+    "y", "o", "de", "del", "la", "el", "los", "las", "para", "con", "sin",
+    "en", "a", "al", "un", "una", "por", "que", "su", "sus", "e", "u",
+}
 
-    Es el que el prompt (`prompts/text_extractor.md`) genera EXPRESAMENTE
-    para pintar en pantalla: corto, sin las keywords SEO de la ficha y ya
-    repartido en columnas de <=4 palabras con `\n`. El
-    `titulo_tiktok_completo` NO vale aquí — ese existe para buscar el
-    producto en el Centro de Afiliados y son fichas de 200 caracteres.
-    Solo se usa como último recurso si el corto viniera vacío.
+# Líneas del título que se pintan. El extractor devuelve el nombre ENTERO en
+# columnas de 4 palabras (puede dar 5 líneas); en el vídeo solo caben las
+# primeras, que es lo que el operador ponía a mano.
+_TITULO_MAX_LINEAS = 2
+
+
+def _titulo_para_video(textos: dict) -> str:
+    """Título que se quema en el vídeo: las primeras líneas de `titulo`.
+
+    `titulo` viene del extractor (`prompts/text_extractor.md`) como el nombre
+    LITERAL del producto repartido en columnas de 4 palabras. Aquí solo se
+    recortan las líneas que no caben — nada de reformular: el
+    `titulo_tiktok_completo` existe para BUSCAR el producto en el Centro de
+    Afiliados, no para pintarlo.
     """
     corto = (textos.get("titulo") or "").strip()
-    if corto:
-        return corto
-    completo = (textos.get("titulo_tiktok_completo") or "").strip()
-    completo = re.sub(r"\s+", " ", completo.replace("\\", " ")).strip()
-    return " ".join(completo.split()[:8])
+    if not corto:
+        completo = (textos.get("titulo_tiktok_completo") or "").strip()
+        completo = re.sub(r"\s+", " ", completo.replace("\\", " ")).strip()
+        palabras = completo.split()[:_TITULO_MAX_LINEAS * 4]
+        corto = "\n".join(
+            " ".join(palabras[i:i + 4]) for i in range(0, len(palabras), 4)
+        )
+
+    lineas = [l.strip() for l in corto.split("\n") if l.strip()][:_TITULO_MAX_LINEAS]
+    # Sin esto el corte deja la frase a medias ("Plegable 2 en").
+    while lineas:
+        palabras = lineas[-1].split()
+        while palabras and palabras[-1].lower().strip(".,-–|:") in _TITULO_COLGANTES:
+            palabras.pop()
+        if palabras:
+            lineas[-1] = " ".join(palabras)
+            break
+        lineas.pop()
+    return "\n".join(lineas)
 
 
 def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Image.Image":
@@ -299,7 +325,7 @@ def _render_text_block_png(
         # Título: blanco con borde negro, hasta 2 líneas, SIN glow.
         return _render_text_line(
             titulo, font_size=config.TITLE_FONT_SIZE, max_w=max_w,
-            fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=3,
+            fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=_TITULO_MAX_LINEAS,
         )
 
     def _render_cta():

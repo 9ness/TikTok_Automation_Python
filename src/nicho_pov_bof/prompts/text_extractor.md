@@ -10,26 +10,27 @@ lista de identificadores que te doy en el mensaje de usuario — la imagen
 Para CADA imagen debes extraer, en **español de España**, natural y sin
 traducir literalmente del inglés si el título original viene en otro idioma:
 
-- `titulo`: el nombre del producto **copiado LITERALMENTE de la captura**,
-  quedándote solo con la parte que lo nombra y cortando la cola de keywords
-  SEO (lo que va tras `:`, `|` o la primera coma: materiales, medidas,
-  compatibilidades, "ideal para regalo"…).
+- `titulo`: el nombre del producto **copiado LITERALMENTE de la captura** y
+  repartido en **columnas de exactamente 4 palabras por línea**, separadas
+  por `\n`. El nombre va ENTERO: no lo resumas ni lo cortes, aunque salgan
+  cinco líneas — del vídeo se usan luego solo las primeras.
 
-  **NO reescribas, NO traduzcas y NO busques sinónimos.** Si el título pone
-  "Conjunto de Maletas de Viaje Elegantes", el `titulo` es exactamente eso —
-  no "Set de Maletas de Viaje". Se permite únicamente quitar el código de
-  marca inicial si es una sigla suelta (p. ej. el `MK` de "MK Conjunto de
-  Maletas…") y recortar por el final si son más de ~8 palabras.
+  **NO reescribas, NO traduzcas y NO busques sinónimos.** Si la captura pone
+  "Conjunto de Maletas de Viaje Elegantes", eso es lo que va — nunca "Set de
+  Maletas de Viaje". Sí se quitan la cola de keywords SEO (medidas,
+  materiales, compatibilidades, "ideal para regalo"…) y la sigla de marca
+  suelta del principio (el `MK` de "MK Conjunto de Maletas…").
 
-  Formateado en **columnas de máximo 4 palabras por línea**, separadas por
-  `\n` (si el nombre son 7 palabras, la primera línea lleva 4 y la segunda
-  las 3 restantes). Se pinta en pantalla, así que cuantas menos líneas
-  mejor, pero nunca más de 4 palabras por línea.
+  Ejemplo de formato (4 palabras por línea, nombre completo):
 
-  Ejemplo:
-  - En la captura: `MK Conjunto de Maletas de Viaje Elegantes: Carcasa Ligera de ABS, Cerradura Numérica…`
-  - `titulo` correcto: `Conjunto de Maletas de\nViaje Elegantes`
-  - `titulo` INCORRECTO: `Set de Maletas\nDe Viaje Elegantes` (ha reescrito)
+  ```
+  Cochecito para Perros Gatos
+  Plegable 2 en 1
+  con Transportín Carrito para
+  Mascotas Pequeñas Viaje Veterinario
+  Gris
+  ```
+
 - `titulo_tiktok_completo`: el título EXACTO tal cual aparece escrito en la
   captura, sin recortar ni resumir — se usa para buscar el producto por
   nombre en el Centro de Afiliados de TikTok, así que debe coincidir letra
