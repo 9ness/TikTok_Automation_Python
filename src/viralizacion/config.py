@@ -351,6 +351,12 @@ TRANSITION_LANDSCAPE_JITTER_RANGE = (0.7, 1.1)
 # valor pelado idéntico en cada render.
 EQ_JITTER_FRAC = 0.05
 
+# Estilo G "Cuadrado": lado del recuadro y radio de las esquinas, sobre el
+# lienzo 1080x1920. 940 deja margen negro a los lados y bastante arriba y
+# abajo, que es la proporción de los vídeos de referencia.
+SQUARE_SIDE = 940
+SQUARE_RADIUS = 90
+
 
 def audio_window_for_round(audio_duration: float, ronda: int) -> tuple[float, float]:
     """Ventana (start, duration) del audio fuente para esta ronda.

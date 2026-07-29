@@ -185,6 +185,82 @@ def build_ass_cinematic(lines: list[dict], preset: "StylePreset") -> str:
     return header + "\n".join(events) + "\n"
 
 
+
+# ---------------------------------------------------------------------------
+# Estilo G — Cuadrado (palabras que se acumulan, tipografía variada)
+# ---------------------------------------------------------------------------
+# Cómo salen las palabras. Cada una coge un "molde" distinto para que el
+# bloque no parezca un subtítulo corrido sino un montaje hecho a mano, que es
+# lo que hace reconocible este estilo en los vídeos que funcionan.
+#   (mayusculas, cursiva, escala, color)
+_STACK_MOLDES = [
+    (True,  False, 1.00, "&HFFFFFF&"),   # MAYÚS grande, blanco
+    (False, True,  0.82, "&HFFFFFF&"),   # cursiva pequeña
+    (True,  False, 0.92, "&HFFFFFF&"),
+    (False, False, 0.78, "&HFFFFFF&"),   # minúscula pequeña
+    (True,  False, 1.06, "&H00D7FF&"),   # MAYÚS grande AMARILLO (acento)
+    (False, True,  0.86, "&HFFFFFF&"),
+]
+
+# Cuántas palabras se ven a la vez antes de empezar bloque nuevo. Con más de
+# 4 el bloque se come el cuadrado y deja de leerse.
+_STACK_MAX = 4
+
+
+def build_ass_stacked(lines: list[dict], preset: "StylePreset") -> str:
+    """Las palabras van APARECIENDO y se acumulan apiladas, cada una con un
+    molde tipográfico distinto (mayúsculas/cursiva/tamaño/color).
+
+    A diferencia de `build_ass_reveal` (una palabra sola cada vez), aquí se
+    ven las últimas 4 a la vez: se lee la frase entera de un golpe y el
+    bloque llena el cuadrado, que es lo que da el aspecto de los vídeos de
+    referencia. Al llegar a 4 se empieza bloque nuevo en vez de seguir
+    apilando, o el texto se saldría del recuadro.
+    """
+    # Más grande que el resto de estilos: el texto vive DENTRO del cuadrado y
+    # tiene que llenarlo. Con el tamaño normal el bloque se queda flotando
+    # pequeño en medio y pierde la fuerza de los vídeos de referencia.
+    base = int(config.SUB_FONTSIZE * 1.45)
+    style_line = (
+        f"Style: Default,{config.SUB_FONT},{base},"
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&HB0000000&,-1,0,0,0,100,100,0,0,1,3,3,5,"
+        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
+    )
+    header = _ass_header(style_line)
+    events: list[str] = []
+
+    for ln in lines:
+        palabras = ln.get("words") or []
+        for inicio in range(0, len(palabras), _STACK_MAX):
+            grupo = palabras[inicio:inicio + _STACK_MAX]
+            for i in range(len(grupo)):
+                visibles = grupo[: i + 1]
+                partes = []
+                for j, w in enumerate(visibles):
+                    mayus, cursiva, escala, color = _STACK_MOLDES[
+                        (inicio + j) % len(_STACK_MOLDES)
+                    ]
+                    txt = w["word"].upper() if mayus else w["word"].lower()
+                    tags = f"\\1c{color}\\fscx{int(escala*100)}\\fscy{int(escala*100)}"
+                    if cursiva:
+                        tags += "\\i1"
+                    partes.append(f"{{{tags}}}{txt}")
+                ev_start = float(grupo[i]["start"])
+                ev_end = (
+                    float(grupo[i + 1]["start"]) if i + 1 < len(grupo)
+                    else float(grupo[i]["end"])
+                )
+                # La última palabra del grupo se queda un poco más para que dé
+                # tiempo a leer el bloque completo antes de vaciarse.
+                if i == len(grupo) - 1:
+                    ev_end = max(ev_end, float(grupo[i]["end"]) + 0.25)
+                if ev_end <= ev_start:
+                    ev_end = ev_start + 0.12
+                events.append(_dialogue(ev_start, ev_end, "\\N".join(partes)))
+
+    return header + "\n".join(events) + "\n"
+
+
 # ---------------------------------------------------------------------------
 # Barras de cine que se retiran (transición del gancho al paisaje)
 # ---------------------------------------------------------------------------
@@ -262,6 +338,9 @@ class StylePreset:
     light_leaks: int = 0
     # Nº de rayaduras verticales tipo proyector viejo.
     film_scratches: int = 0
+    # Encaja el vídeo en un CUADRADO con esquinas redondeadas centrado sobre
+    # negro (estilo de los vídeos de reflexión que funcionan en TikTok).
+    square_frame: bool = False
 
 
 STYLE_PRESETS: dict[str, StylePreset] = {
@@ -328,6 +407,18 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         film_scratches=5,
         vignette_breathe=0.20,
     ),
+    "cuadrado": StylePreset(
+        key="cuadrado",
+        label="G · Cuadrado",
+        build_ass=build_ass_stacked,
+        square_frame=True,
+        # Sin viñeta ni letterbox: el marco negro ya enmarca la imagen, y
+        # oscurecer los bordes del cuadrado lo ensuciaría.
+        vignette_angle="PI/5.0",
+        eq_extra={"gamma_r": 1.04, "gamma_b": 0.97},
+        transition_landscape=("dissolve", 0.6),
+        ken_burns=0.10,
+    ),
     "golden": StylePreset(
         key="golden",
         label="F · Hora dorada",
@@ -344,7 +435,9 @@ STYLE_PRESETS: dict[str, StylePreset] = {
 }
 
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
-STYLE_ORDER = ["classic", "reveal", "cinematic", "teal_orange", "noir", "golden"]
+STYLE_ORDER = [
+    "classic", "reveal", "cinematic", "teal_orange", "noir", "golden", "cuadrado",
+]
 
 
 def get_style_for_round(round_idx: int) -> StylePreset:

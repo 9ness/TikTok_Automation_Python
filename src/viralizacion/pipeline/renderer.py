@@ -114,6 +114,24 @@ def distribute_with_caps(total: float, caps: list[float]) -> list[float]:
     return share
 
 
+
+def _rounded_square_mask(work: Path, size: int, radius: int) -> Path:
+    """Máscara en escala de grises para redondear las esquinas del cuadrado.
+
+    Se genera una vez por render y se reutiliza: `alphamerge` necesita un
+    canal alfa y ffmpeg no sabe dibujar rectángulos redondeados por sí solo.
+    """
+    from PIL import Image, ImageDraw
+    out = work / f"mask_sq_{size}_{radius}.png"
+    if out.is_file():
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    m = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(m).rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=255)
+    m.save(out)
+    return out
+
+
 def _vignette_filter(style: StylePreset) -> str:
     """Viñeta fija o "respirando" (vaivén lento) según el estilo."""
     if style.vignette_breathe > 0:
@@ -428,10 +446,42 @@ def _finalize(
     # Grading propio del estilo (colorbalance, colorchannelmixer…) ANTES de
     # quemar los subtítulos, para no teñir el texto.
     pre = "".join(f"{f}," for f in [*style.pre_subtitle_filters, *extra_fx])
-    filters.append(
-        f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
-        f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
-    )
+
+    mask_input: list[str] = []
+    if style.square_frame:
+        # El vídeo se mete en un CUADRADO de esquinas redondeadas centrado
+        # sobre negro. Las esquinas se redondean con `alphamerge` + una
+        # máscara PNG: ffmpeg no sabe dibujar rectángulos redondeados.
+        # El texto se quema DESPUÉS de componer, para que quede sobre el
+        # recuadro y no se recorte con él.
+        side, radius = config.SQUARE_SIDE, config.SQUARE_RADIUS
+        mask_path = _rounded_square_mask(ass_path.parent, side, radius)
+        mask_input = ["-i", str(mask_path)]
+        # La máscara se añade como ÚLTIMO input: [0]=vídeo, [1]=voz,
+        # [2]=música si la hay. Sin calcular el índice, con música activada
+        # el filtro leería la pista de audio como si fuera la máscara.
+        mask_idx = 3 if music_path is not None else 2
+        filters.append(
+            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
+            f"scale={side}:{side}:force_original_aspect_ratio=increase,"
+            f"crop={side}:{side}[sq]"
+        )
+        filters.append(f"[{mask_idx}:v]format=gray[mk]")
+        filters.append("[sq][mk]alphamerge[sqa]")
+        filters.append(
+            f"color=black:size={config.TARGET_W}x{config.TARGET_H}"
+            f":rate={config.TARGET_FPS}:duration={target_duration:.3f}[bg]"
+        )
+        filters.append("[bg][sqa]overlay=(W-w)/2:(H-h)/2:format=auto[framed]")
+        filters.append(
+            f"[framed]subtitles=filename='{ass_escaped}':"
+            f"fontsdir='{fontsdir_escaped}',format=yuv420p[{post_label}]"
+        )
+    else:
+        filters.append(
+            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
+            f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
+        )
     if style.post_subtitle_filters:
         filters.append(f"[vsubs]{','.join(style.post_subtitle_filters)}[vfinal]")
 
@@ -456,6 +506,9 @@ def _finalize(
         )
     else:
         filters.append("[voice]alimiter=limit=0.95[aout]")
+
+    # La máscara va la ÚLTIMA para que su índice sea predecible (ver arriba).
+    input_args += mask_input
 
     # OJO: junto al .ass (tmp_dir), NO junto a output_path — el dir de salida
     # se publica entero en Drive y este scratch acababa subido con los MP4.

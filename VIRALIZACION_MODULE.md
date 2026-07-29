@@ -124,12 +124,14 @@ se puede mantener sin persistencia.
 
 ---
 
-## 3 estilos de subtítulo/filtro (rotan por ronda)
+## 7 estilos de subtítulo/filtro (rotan por ronda)
 
 `pipeline/styles.py:STYLE_PRESETS` — registro extensible (`StylePreset`
 dataclass: `build_ass(lines, preset)` + overrides de filtro de vídeo). Añadir
-un 4º estilo = una entrada nueva en el dict, sin tocar el resto del pipeline.
-`get_style_for_round(ronda)` rota A→B→C→A… (`(ronda-1) % 3`).
+un estilo = una entrada nueva en el dict + su clave en `STYLE_ORDER`, sin
+tocar el resto del pipeline. Sin selección explícita, `resolve_style(ronda)`
+rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
+`distribute_styles` reparte los vídeos entre ellos a partes iguales.
 
 - **A "Clásico"** (ronda 1, 4, 7…): línea completa blanca, borde negro fino,
   `Alignment=5` (centrado horizontal Y vertical), `MarginL=MarginR=145`
@@ -157,6 +159,26 @@ un 4º estilo = una entrada nueva en el dict, sin tocar el resto del pipeline.
   (`gamma_r=1.06:gamma_b=0.94`), viñeta más fuerte (`angle=PI/3.5`), y 2
   `drawbox` negros (77px ≈ 4% de 1920) arriba/abajo tipo letterbox
   cinematográfico — no invaden el área de subtítulos (centrados en Y).
+  Las barras no son fijas: `_retracting_bars()` las abre progresivamente
+  durante el gancho (14 `drawbox` escalonados con `enable`, porque `drawbox`
+  no evalúa `t` en su geometría — su `t` es el grosor del trazo).
+
+- **D "Teal & Orange"**, **E "Noir"**, **F "Golden Hour"**: mismo
+  `build_ass` que A pero con grade propio (`eq_extra`), viñeta e intensidad
+  de grano distintas. Son variantes de color, no de tipografía.
+
+- **G "Cuadrado"**: réplica del formato viral — el vídeo se recorta a un
+  cuadrado de `SQUARE_SIDE` px con esquinas redondeadas (`SQUARE_RADIUS`)
+  centrado sobre fondo negro, y las palabras van APILÁNDOSE de una en una
+  (`build_ass_stacked`), cada una con un molde tipográfico distinto de
+  `_STACK_MOLDES` (mayúsculas/cursiva/escala/amarillo), máximo `_STACK_MAX`
+  visibles antes de empezar bloque nuevo. Fuente 1.45× la base: el texto vive
+  dentro del cuadrado y tiene que llenarlo.
+  El redondeo se hace con una máscara PNG generada con PIL
+  (`renderer.py:_rounded_square_mask`) + `alphamerge` — ffmpeg no sabe dibujar
+  rectángulos redondeados. La máscara se añade como **último** input para que
+  su índice sea predecible (`mask_idx = 3 if music_path else 2`); con música
+  activada, un índice fijo leería la pista de audio como si fuera la máscara.
 
 ---
 

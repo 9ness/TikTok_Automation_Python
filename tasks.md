@@ -27,11 +27,17 @@
   `NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/VIRALIZACION`).
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
-- [Nicho POV BOF] Fase 2: generación de vídeos reutilizando tools de TikTok
-  Shop. Salidas a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
-
 ## ✅ Done
 
+- [2026-07-28] [Nicho POV BOF] Fase 2 backend: `services/audio_bank.py` (banco
+  de audios locutados en Drive + recorte de silencios con ffmpeg
+  `silenceremove`, versión procesada cacheada en `_procesados/` sin tocar el
+  original), `JobMode.NICHO_POV_BOF_VIDEO` + `run_nicho_pov_bof_video`
+  (textos guardados → audio preparado → `video_editor.build_video` → copia a
+  Drive `.../videos/<folder>/<producto> <folder>.mp4` → marca `uploaded`) +
+  router `productos.py` (`/prompts`, `/productos`, `/extraer-textos`,
+  `/foto-limpia`, `/video/upload`, `/producto/estado`, `/vendidos`).
+  Frontend pendiente (otro agente en paralelo).
 - [2026-05-18] Nicho 4 Construcción POV completo: JobMode + runner + pipeline (Gemini video → MiniMax → anti-copy + subs karaoke) + endpoints `/construccion-pov/enqueue` y `/voices/clone|sample|delete` + sidebar nav + página `/creator-reward/construccion-pov` + hub `/creator-reward/tools/voices` + 40 presets EN MiniMax.
 
 ## 🔜 Reintento IA con feedback (<90) — DISEÑO APROBADO, pendiente implementar+validar
