@@ -44,6 +44,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   editor_auto: "editor_auto",
   viralizacion_batch: "viralizacion",
   nicho_pov_bof_backup: "viralizacion",
+  nicho_pov_bof_video: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -75,6 +76,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   editor_auto: "Editor Auto",
   viralizacion_batch: "Viralización 1K",
   nicho_pov_bof_backup: "Backup Productos España",
+  nicho_pov_bof_video: "Nicho POV BOF",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -92,6 +94,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   editor_auto: Scissors,
   viralizacion_batch: Video,
   nicho_pov_bof_backup: HardDrive,
+  nicho_pov_bof_video: Film,
 };
 
 /**
@@ -173,6 +176,11 @@ export function describeJobParams(
       break;
     case "nicho_pov_bof_backup":
       out.push(params.force_full ? "copia completa" : "incremental");
+      break;
+    case "nicho_pov_bof_video":
+      if (params.folder) out.push(String(params.folder));
+      if (params.producto) out.push(`producto ${String(params.producto)}`);
+      if (params.con_textos === false) out.push("sin textos");
       break;
   }
   return out;

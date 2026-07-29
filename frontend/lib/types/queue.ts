@@ -18,7 +18,8 @@ export type JobMode =
   | "tiktok_shop_ready_video"
   | "editor_auto"
   | "viralizacion_batch"
-  | "nicho_pov_bof_backup";
+  | "nicho_pov_bof_backup"
+  | "nicho_pov_bof_video";
 
 export interface ActiveJob {
   job_id: string;

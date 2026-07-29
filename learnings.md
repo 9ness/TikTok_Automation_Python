@@ -299,3 +299,6 @@
 - CRF fija CALIDAD, no tamaño: los estilos con `noise=alls` alto (Reveal 35, Noir 18) gastaban ~90 Mbps conservando ruido aleatorio → MP4 de 800 MB para 74s, que llenaron el disco del VPS. Arreglado con techo `-maxrate 8M -bufsize 16M` en el encode final + bajar el grano.
 - El `xfade` final abre UN input de vídeo por tramo de paisaje: con 19 tramos de 1080x1920 ffmpeg muere por OOM (SIGKILL) en 8 GB de RAM. `build_paisaje_segments` topa ahora en `MAX_PAISAJE_CLIPS`.
 - `batch.run_batch` caía en la rotación por ronda cuando `styles_pool` venía vacío, y las rondas salen del reparto de audios: 15 vídeos con 8 audios = 2 rondas = solo 2 estilos de 8. La UI prometía "sin marcar ninguna se usan todas". Ahora vacío = todos, repartidos.
+- `video_editor._render_text_line` descartaba las líneas sobrantes (`lines[:max_lines]`) y mutilaba el texto sin avisar: el CTA "COMPRUÉBALO TÚ MISMO 👀" salía como "COMPRUÉBALO TÚ". Ahora encoge el cuerpo de letra hasta que cabe.
+- Al apilar PNGs con halo, `getbbox()` no sirve para recortar: la cola tenue del glow son píxeles no nulos. Hay que umbralizar el alpha (`point(a>45)`) o el bloque sale con huecos enormes entre líneas.
+- El cajón de la cola agrupa por `MODE_TO_PROGRAM[mode]`: un modo nuevo que falte ahí NO se pinta en ningún grupo (el contador sí lo cuenta). Le pasó a `nicho_pov_bof_video`.

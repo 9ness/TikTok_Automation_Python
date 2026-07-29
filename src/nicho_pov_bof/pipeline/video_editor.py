@@ -131,39 +131,55 @@ def _render_text_line(
     text = (text or "").strip()
     if not text:
         return None
-    font = ImageFont.truetype(_font_path(), font_size)
-    stroke_w = max(3, int(font_size * 0.13))
-    emoji_size = int(font_size * 0.92)
-    gap = int(font_size * 0.06)
     d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
 
-    def w_of(s: str) -> float:
-        return _seg_width(_split_runs(s), font, d0, emoji_size, gap)
+    def _repartir(size: int) -> tuple[list[str], "ImageFont.FreeTypeFont", int, int]:
+        """Reparte el texto en líneas con ese cuerpo de letra.
 
-    # Los saltos de línea que ya trae el texto se RESPETAN: Gemini devuelve el
-    # título repartido en columnas de <=4 palabras y ese reparto está pensado
-    # para leerse de un vistazo. Solo se re-parte una línea si aun así no cabe.
-    lines: list[str] = []
-    for bloque in text.split("\n"):
-        bloque = bloque.strip()
-        if not bloque:
-            continue
-        cur = ""
-        for word in bloque.split():
-            test = (cur + " " + word).strip()
-            if w_of(test) <= max_w or not cur:
-                cur = test
-            else:
-                lines.append(cur)
-                cur = word
-        if cur:
-            lines.append(cur)
+        Los saltos que ya trae el texto se RESPETAN: Gemini devuelve el título
+        repartido en columnas de <=4 palabras y ese reparto está pensado para
+        leerse de un vistazo. Solo se re-parte una línea si aun así no cabe.
+        """
+        f = ImageFont.truetype(_font_path(), size)
+        e_size = int(size * 0.92)
+        g = int(size * 0.06)
 
-    # Si sobran líneas se DESCARTAN las últimas, no se funden en una sola:
-    # fundirlas producía una línea que se salía de la zona segura y aparecía
-    # cortada por los lados en el vídeo.
-    if len(lines) > max_lines:
+        def w(sub: str) -> float:
+            return _seg_width(_split_runs(sub), f, d0, e_size, g)
+
+        out: list[str] = []
+        for bloque in text.split("\n"):
+            bloque = bloque.strip()
+            if not bloque:
+                continue
+            cur = ""
+            for word in bloque.split():
+                test = (cur + " " + word).strip()
+                if w(test) <= max_w or not cur:
+                    cur = test
+                else:
+                    out.append(cur)
+                    cur = word
+            if cur:
+                out.append(cur)
+        return out, f, e_size, g
+
+    # Si no cabe en `max_lines`, se ENCOGE la letra hasta que quepa. Antes se
+    # descartaban las líneas sobrantes y el texto salía mutilado sin avisar:
+    # un CTA de "COMPRUÉBALO TÚ MISMO 👀" aparecía como "COMPRUÉBALO TÚ".
+    for size in range(font_size, max(12, int(font_size * 0.5)) - 1, -2):
+        lines, font, emoji_size, gap = _repartir(size)
+        if len(lines) <= max_lines:
+            font_size = size
+            break
+    else:
+        # Ni al mínimo cabe (texto larguísimo): recortar es el último recurso.
         lines = lines[:max_lines]
+
+    stroke_w = max(3, int(font_size * 0.13))
+
+    def w_of(sub: str) -> float:
+        return _seg_width(_split_runs(sub), font, d0, emoji_size, gap)
 
     line_h = int(font_size * 1.22)
     pad = stroke_w + 10
@@ -189,7 +205,7 @@ def _render_text_line(
     return img
 
 
-def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 16, passes: int = 2) -> "Image.Image":
+def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 13, passes: int = 4) -> "Image.Image":
     """Añade un halo de color detrás del texto: usa el canal alpha del PNG
     como máscara, la rellena de `color` y la difumina con GaussianBlur
     (varias pasadas = glow más suave/ancho); el texto original se pega
@@ -208,6 +224,20 @@ def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 16, passes: int
     canvas = Image.alpha_composite(canvas, glow_layer)
     canvas.paste(img, (pad, pad), img)
     return canvas
+
+
+def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Image.Image":
+    """Recorta el PNG a lo que se ve de verdad, ignorando la cola casi
+    transparente del halo. `margin` deja un pelín para no cortarlo en seco."""
+    alpha = img.split()[-1].point(lambda a: 255 if a > thresh else 0)
+    box = alpha.getbbox()
+    if not box:
+        return img
+    x0, y0, x1, y1 = box
+    return img.crop((
+        max(0, x0 - margin), max(0, y0 - margin),
+        min(img.width, x1 + margin), min(img.height, y1 + margin),
+    ))
 
 
 def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "Image.Image | None":
@@ -267,7 +297,14 @@ def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "
     if not parts:
         return None
 
-    line_gap = 16
+    # El `_add_glow` devuelve un canvas con margen transparente a cada lado.
+    # Al apilar tal cual, ese margen se sumaba entre líneas y el bloque salía
+    # con huecos enormes. `getbbox()` a secas no vale: la cola tenue del halo
+    # son píxeles no nulos y el recorte apenas quitaba nada, así que se mide
+    # sobre el alpha UMBRALIZADO (lo que de verdad se ve).
+    parts = [_crop_visible(p) for p in parts]
+
+    line_gap = 14
     block_w = max(p.width for p in parts)
     block_h = sum(p.height for p in parts) + line_gap * (len(parts) - 1)
 
@@ -337,8 +374,14 @@ def _to_wav_16k_mono(audio_path: Path, out_wav: Path, on_log: OnLog) -> None:
     ], on_log)
 
 
-def _find_arrow_window(audio_path: Path, work_dir: Path, on_log: OnLog) -> tuple[float, float]:
+def _find_arrow_window(
+    audio_path: Path, work_dir: Path, on_log: OnLog, video_dur: float | None = None,
+) -> tuple[float, float]:
     """Devuelve `(t0, t1)`: ventana en la que debe verse la flecha.
+
+    Una vez que aparece se queda HASTA EL FINAL: es la llamada a la acción,
+    y desaparecer a los 3,5s deja el cierre del vídeo sin nada a lo que
+    apuntar (decisión del operador tras ver el primer montaje).
 
     Transcribe el audio locutado con Whisper y busca la primera palabra que
     contenga alguna de `config.ARROW_KEYWORDS`. La flecha entra
@@ -353,7 +396,7 @@ def _find_arrow_window(audio_path: Path, work_dir: Path, on_log: OnLog) -> tuple
         words = transcribe(str(wav_path), model_size="base", language="es")
     except Exception as exc:  # noqa: BLE001 — nunca abortar por esto
         on_log(f"[flecha] Whisper falló ({str(exc)[:120]}) — flecha desde el inicio")
-        return 0.0, config.ARROW_DURATION_S
+        return 0.0, _arrow_end(0.0, video_dur)
 
     hit = None
     for w in words:
@@ -364,15 +407,24 @@ def _find_arrow_window(audio_path: Path, work_dir: Path, on_log: OnLog) -> tuple
 
     if hit is None:
         on_log("[flecha] sin palabra gatillo detectada — flecha desde el inicio")
-        return 0.0, config.ARROW_DURATION_S
+        return 0.0, _arrow_end(0.0, video_dur)
 
     t0 = max(0.0, float(hit["start"]) - config.ARROW_LEAD_S)
     on_log(f"[flecha] '{hit['word']}' detectada en {hit['start']:.2f}s → flecha en {t0:.2f}s")
-    return t0, t0 + config.ARROW_DURATION_S
+    return t0, _arrow_end(t0, video_dur)
+
+
+def _arrow_end(t0: float, video_dur: float | None) -> float:
+    """Fin de la flecha: el final del vídeo (con un pelín de margen para que
+    ffmpeg no corte el último fotograma). Sin duración conocida se cae al
+    valor fijo de config."""
+    if video_dur and video_dur > t0:
+        return video_dur + 1.0
+    return t0 + config.ARROW_DURATION_S
 
 
 def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: Path, on_log: OnLog) -> Path:
-    t0, t1 = _find_arrow_window(audio_path, work_dir, on_log)
+    t0, t1 = _find_arrow_window(audio_path, work_dir, on_log, probe_duration(video_in))
     # Rotamos el punto de partida de la lista de flechas al azar por vídeo:
     # aquí no hay concepto de "versión" (a diferencia de ready_video), así
     # que un índice aleatorio basta para dar variedad entre productos.
