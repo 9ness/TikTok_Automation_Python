@@ -7,6 +7,7 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/foto-limpia     → descarga la foto limpia de un producto
 - POST /api/v1/nicho-pov-bof/video/upload    → sube el bruto (Veo3/Kling) y encola el montaje
 - POST /api/v1/nicho-pov-bof/producto/estado → marca Subido/Vendió
+- POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
@@ -30,6 +31,7 @@ from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
     ProductoEstadoRequest,
+    ProductoUrlRequest,
     ProductoInfo,
     ProductosListResponse,
     PromptsResponse,
@@ -74,6 +76,31 @@ def get_prompts() -> PromptsResponse:
     return PromptsResponse(imagen=imagen, video=video)
 
 
+def _producto_info(producto: str, prod: dict) -> ProductoInfo:
+    """Documento de Redis → respuesta de la API.
+
+    Lo usan los endpoints que devuelven UN producto ya actualizado; la lista
+    completa (`_list_productos`) añade además el emparejado de fotos, que
+    aquí no se conoce.
+    """
+    return ProductoInfo(
+        producto=producto,
+        titulo=prod.get("titulo", ""),
+        titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
+        tienda=prod.get("tienda", ""),
+        caption=prod.get("caption", ""),
+        gancho=prod.get("gancho", ""),
+        cta=prod.get("cta", ""),
+        uploaded=bool(prod.get("uploaded")),
+        sold=bool(prod.get("sold")),
+        video_path=prod.get("video_path"),
+        product_id=prod.get("product_id", ""),
+        product_url=prod.get("product_url", ""),
+        url_match_name=prod.get("url_match_name", ""),
+        url_match_score=float(prod.get("url_match_score") or 0.0),
+    )
+
+
 def _list_productos(source: str, folder: str) -> ProductosListResponse:
     """Compone el emparejado de fotos (`photo_pairing`) con el estado
     guardado en Redis (`product_repo`). Reusada por `/productos` y
@@ -116,6 +143,10 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),
+                product_id=guardado.get("product_id", ""),
+                product_url=guardado.get("product_url", ""),
+                url_match_name=guardado.get("url_match_name", ""),
+                url_match_score=float(guardado.get("url_match_score") or 0.0),
             )
         )
 
@@ -291,18 +322,43 @@ def set_producto_estado(body: ProductoEstadoRequest) -> ProductoInfo:
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    return ProductoInfo(
-        producto=body.producto,
-        titulo=prod.get("titulo", ""),
-        titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
-        tienda=prod.get("tienda", ""),
-        caption=prod.get("caption", ""),
-        gancho=prod.get("gancho", ""),
-        cta=prod.get("cta", ""),
-        uploaded=bool(prod.get("uploaded")),
-        sold=bool(prod.get("sold")),
-        video_path=prod.get("video_path"),
-    )
+    return _producto_info(body.producto, prod)
+
+
+@router.post("/producto/url", response_model=ProductoInfo)
+def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
+    """Averigua la ficha de TikTok Shop del producto y la guarda.
+
+    **Gasta una llamada del plan de EchoTik** (trial de 100), así que si el
+    producto ya tiene URL guardada se devuelve tal cual sin volver a buscar.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import product_url
+
+    prod = product_repo.get_product(body.source, body.folder, body.producto)
+    if not prod:
+        raise _bad_request(f"Producto {body.producto!r} no encontrado en {body.folder!r}.")
+    if prod.get("product_url"):
+        return _producto_info(body.producto, prod)
+
+    titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
+    if not titulo.strip():
+        raise _bad_request(
+            "El producto no tiene título todavía — pulsa 'Obtener textos' primero."
+        )
+
+    hallado = product_url.find_product_url(titulo, prod.get("tienda", ""))
+    if not hallado:
+        # No es un error del servidor: EchoTik simplemente no lo indexa o el
+        # parecido no daba para fiarse. Se devuelve el producto sin URL para
+        # que la UI lo muestre como "no encontrado" en vez de romperse.
+        return _producto_info(body.producto, prod)
+
+    try:
+        prod = product_repo.update_product(body.source, body.folder, body.producto, **hallado)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return _producto_info(body.producto, prod)
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)

@@ -90,6 +90,13 @@ export interface ProductoItem {
   uploaded: boolean;
   sold: boolean;
   video_path: string | null;
+  con_textos?: boolean;
+  /** Ficha en TikTok Shop. Vacío = aún no se ha buscado o no se encontró
+   *  nada con parecido suficiente (averiguarla gasta cuota de EchoTik). */
+  product_id: string;
+  product_url: string;
+  url_match_name: string;
+  url_match_score: number;
 }
 
 /** Item de /vendidos: agrega productos de TODAS las carpetas de la fuente,
@@ -103,6 +110,12 @@ export interface VendidoItem extends ProductoItem {
 export interface ExtraerTextosRequest {
   source: string;
   folder: string;
+}
+
+export interface ProductoUrlRequest {
+  source: string;
+  folder: string;
+  producto: string;
 }
 
 export interface EstadoRequest {

@@ -13,6 +13,7 @@ import type {
   MarkCompletedResponse,
   PhotosListResponse,
   ProductoItem,
+  ProductoUrlRequest,
   PromptsResponse,
   SourcesListResponse,
   VendidoItem,
@@ -145,6 +146,23 @@ export function useSetEstado() {
       );
       // Puede haber entrado o salido de "vendidos".
       void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
+    },
+  });
+}
+
+/** Averigua la ficha de TikTok Shop del producto. GASTA UNA LLAMADA del plan
+ *  de EchoTik (trial de 100), por eso va producto a producto y no de carpeta
+ *  entera. Si no encuentra nada fiable devuelve el producto sin `product_url`
+ *  (no es un error). */
+export function useBuscarProductoUrl() {
+  const qc = useQueryClient();
+  return useMutation<ProductoItem, Error, ProductoUrlRequest>({
+    mutationFn: (body) => api.post<ProductoItem>(`${ROOT}/producto/url`, body),
+    onSuccess: (updated, vars) => {
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(vars.source, vars.folder),
+        (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
+      );
     },
   });
 }

@@ -260,8 +260,17 @@ Navegador del Drive **compartido conmigo** `Productos España` (2 fuentes:
 producto. **Todavía no genera vídeos.**
 
 Módulos en [`src/nicho_pov_bof/`](src/nicho_pov_bof/): `config.py`,
-`repos/{redis_base,progress_repo}.py` (prefijo `nicho_pov_bof:`),
-`services/drive_client.py`. API: `/api/v1/nicho-pov-bof/*`.
+`repos/{redis_base,progress_repo,product_repo}.py` (prefijo `nicho_pov_bof:`),
+`services/{drive_client,photo_pairing,text_extractor,audio_bank,backup_sync,product_url}.py`,
+`pipeline/{duration_match,video_editor}.py`, `prompts/*.md`.
+API: `/api/v1/nicho-pov-bof/*`.
+
+`services/product_url.py` averigua la ficha de TikTok Shop
+(`https://www.tiktok.com/view/product/<id>`) desde el título + la tienda. La
+ÚNICA fuente que da el ID es EchoTik (se descartaron URL canónica, Gemini con
+búsqueda web, Apify, DuckDuckGo, fastmoss, kalodata y la web/API de TikTok) y
+cada búsqueda GASTA UNA LLAMADA del plan — por eso va con botón manual por
+producto, cachea en Redis y descarta resultados con poco parecido.
 
 Dos cosas no obvias:
 - El Drive es *shared-with-me* → **no aparece en el mount FUSE**; se lee por

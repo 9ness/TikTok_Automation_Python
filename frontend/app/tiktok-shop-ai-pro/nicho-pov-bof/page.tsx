@@ -32,6 +32,7 @@ import {
   usePhotos,
   usePrompts,
   useProductos,
+  useBuscarProductoUrl,
   useSetEstado,
   useSources,
   useVendidos,
@@ -647,6 +648,11 @@ function ProductoCard({
   producto: ProductoItem;
 }) {
   const setEstado = useSetEstado();
+  const buscarUrl = useBuscarProductoUrl();
+  // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
+  // indexa el producto). Sin distinguirlo, el botón se quedaba igual que
+  // antes de pulsarlo y el operador volvía a gastar cuota sin saberlo.
+  const urlNoEncontrada = buscarUrl.isSuccess && !producto.product_url;
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
   const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
@@ -760,7 +766,39 @@ function ProductoCard({
         <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} />
         <CopyChip label="✍️ Caption" text={producto.caption ?? ""} />
+        {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
       </div>
+
+      {/* Ficha de TikTok Shop. Cada búsqueda gasta una llamada del plan de
+          EchoTik (trial de 100), por eso es un botón manual por producto y
+          no algo que se dispare solo al abrir la carpeta. */}
+      {producto.product_url ? (
+        <a
+          href={producto.product_url}
+          target="_blank"
+          rel="noreferrer"
+          className="block truncate rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-500"
+          title={producto.url_match_name}
+        >
+          🔗 Ver ficha en TikTok Shop
+          {producto.url_match_score < 0.6 && " · comprueba que es el correcto"}
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled={buscarUrl.isPending || !producto.titulo_tiktok_completo}
+          onClick={() =>
+            buscarUrl.mutate({ source, folder, producto: producto.producto })
+          }
+          className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition disabled:opacity-40"
+        >
+          {buscarUrl.isPending
+            ? "🔎 Buscando…"
+            : urlNoEncontrada
+              ? "❌ EchoTik no lo encuentra — reintentar (1 llamada)"
+              : "🔗 Buscar enlace (gasta 1 llamada EchoTik)"}
+        </button>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">

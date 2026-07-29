@@ -113,6 +113,12 @@ class ProductoInfo(BaseModel):
     # Marcado = el vídeo lleva gancho, título, CTA y flecha. Sin marcar sale
     # limpio (solo voz, encuadre y quitado de marca si es Veo3).
     con_textos: bool = True
+    # Ficha del producto en TikTok Shop, si se llegó a averiguar (EchoTik).
+    # Vacío = todavía no se ha buscado o la búsqueda no encontró nada fiable.
+    product_id: str = ""
+    product_url: str = ""
+    url_match_name: str = ""
+    url_match_score: float = 0.0
 
 
 class ProductosListResponse(BaseModel):
@@ -136,6 +142,18 @@ class ProductoEstadoRequest(BaseModel):
     producto: str = Field(..., min_length=1)
     uploaded: bool | None = None
     sold: bool | None = None
+
+
+class ProductoUrlRequest(BaseModel):
+    """Pide averiguar la ficha de TikTok Shop de UN producto.
+
+    Una petición = UNA llamada del plan de EchoTik (trial de 100), por eso no
+    hay endpoint que lo haga de carpeta entera sin que el operador lo pida
+    producto a producto."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    producto: str = Field(..., min_length=1)
 
 
 class ProductoTextosRequest(BaseModel):
