@@ -463,6 +463,59 @@ def _extract_clip(spec: ClipSpec, out_path: Path, on_log: OnLog | None,
     return out_path
 
 
+def _xfade_por_tandas(
+    clip_paths: list[Path],
+    specs: list[ClipSpec],
+    transitions: list[tuple[str, float]],
+    out_path: Path,
+    on_log: OnLog | None,
+) -> Path:
+    """Monta los tramos en grupos y luego encadena los grupos.
+
+    `transitions[i]` es la transición ENTRE el tramo i y el i+1, así que las
+    de dentro de un grupo se usan al montarlo y la que cae en su frontera se
+    guarda para unir ese grupo con el siguiente.
+    """
+    # Reparto PAREJO en `n_grupos` trozos, no "de `tam` en `tam`": cortando a
+    # tamaño fijo, 8 tramos daban un grupo de 7 y otro de 1, y pegar el suelto
+    # al anterior dejaba un grupo de 8 — otra vez por encima del máximo, que
+    # se volvía a trocear igual: recursión infinita.
+    n = len(clip_paths)
+    tam = config.XFADE_MAX_INPUTS
+    n_grupos = -(-n // tam)
+    base, resto = divmod(n, n_grupos)
+    grupos: list[tuple[int, int]] = []
+    ini = 0
+    for g in range(n_grupos):
+        fin = ini + base + (1 if g < resto else 0)
+        grupos.append((ini, fin))
+        ini = fin
+
+    if on_log:
+        on_log(f"[renderer] xfade por tandas: {len(clip_paths)} tramos en {len(grupos)} grupos")
+
+    parciales: list[Path] = []
+    specs_parciales: list[ClipSpec] = []
+    trans_entre: list[tuple[str, float]] = []
+
+    for idx, (ini, fin) in enumerate(grupos):
+        sub_trans = transitions[ini:fin - 1]
+        parcial = out_path.with_name(f"{out_path.stem}_t{idx:02d}.mp4")
+        _xfade_clips(clip_paths[ini:fin], specs[ini:fin], sub_trans, parcial, on_log)
+        # Duración del grupo: lo que suman sus tramos menos el solape de sus
+        # transiciones internas (es lo que `xfade_offsets` necesita luego).
+        dur = sum(sp.extract_dur for sp in specs[ini:fin]) - sum(t[1] for t in sub_trans)
+        parciales.append(parcial)
+        specs_parciales.append(
+            ClipSpec(src=parcial, start=0.0, nominal_dur=dur,
+                     extract_start=0.0, extract_dur=dur, zoom=1.0)
+        )
+        if fin < len(clip_paths):
+            trans_entre.append(transitions[fin - 1])
+
+    return _xfade_clips(parciales, specs_parciales, trans_entre, out_path, on_log)
+
+
 def _xfade_clips(
     clip_paths: list[Path],
     specs: list[ClipSpec],
@@ -470,10 +523,20 @@ def _xfade_clips(
     out_path: Path,
     on_log: OnLog | None,
 ) -> Path:
-    """Fase 2: xfade sobre clips YA recortados (pocos MB c/u, sin reabrir el 2.5GB)."""
+    """Fase 2: xfade sobre clips YA recortados (pocos MB c/u, sin reabrir el 2.5GB).
+
+    Por TANDAS cuando hay más de `XFADE_MAX_INPUTS` tramos: ffmpeg abre un
+    decodificador 1080x1920 por entrada y con 19 se quedó sin memoria en el
+    VPS de 8 GB. Se montan grupos pequeños y luego se encadenan los grupos
+    entre sí (recursivo), así la memoria no depende del nº de tramos y la
+    duración del vídeo deja de estar limitada por el montaje.
+    """
     if len(clip_paths) == 1:
         shutil.copy2(clip_paths[0], out_path)
         return out_path
+
+    if len(clip_paths) > config.XFADE_MAX_INPUTS:
+        return _xfade_por_tandas(clip_paths, specs, transitions, out_path, on_log)
 
     input_args: list[str] = []
     for p in clip_paths:

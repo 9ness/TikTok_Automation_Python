@@ -38,6 +38,10 @@ PONENTES: dict[str, dict] = {
         "label": "Víctor Küppers",
         "drive_folder": "Victor Kuppers",
     },
+    "mario": {
+        "label": "Mario Alonso Puig",
+        "drive_folder": "Mario Alonso Puig",
+    },
 }
 
 
@@ -258,13 +262,12 @@ TARGET_FPS = 30
 
 # Tope de duración del vídeo final (diseño: 20-60s). Audios largos se
 # trocean en ventanas no solapadas por ronda — ver `audio_window_for_round`.
-# Tope real, atado a la BIBLIOTECA de paisajes: el plano más largo da 6,8s
-# útiles y la mediana 2,6s, así que los `MAX_PAISAJE_CLIPS` clips de un vídeo
-# suman ~72s de b-roll. Pedir más obliga al allocator a meter 20-40 clips y
-# ahí el `xfade` (un decodificador 1080x1920 por clip) mata a ffmpeg por OOM
-# en el VPS de 8 GB — pasó con 19 clips. Para vídeos más largos no basta con
-# subir esto: hay que montar los paisajes por tandas (ver tasks.md).
-MAX_VIDEO_DURATION_S = 75.0
+# El audio va ENTERO: los ponentes traen audios de hasta ~2 min y el operador
+# no quiere recortarlos. Antes esto estaba en 75s porque el `xfade` abría un
+# decodificador 1080x1920 por clip y ffmpeg moría por OOM con 19 tramos; ahora
+# el montaje va por tandas (`XFADE_MAX_INPUTS`) y la memoria no depende del
+# número de tramos.
+MAX_VIDEO_DURATION_S = 130.0
 MIN_VIDEO_DURATION_S = 20.0
 
 # Encode final: velocidad + peso TikTok (~15-40MB / 50s).
@@ -280,15 +283,24 @@ FFMPEG_MAXRATE = "8M"
 FFMPEG_BUFSIZE = "16M"
 FFMPEG_AUDIO_BITRATE = "128k"
 # Pre-extract de clips individuales (fase 1 del renderer, anti-OOM).
+# Cuántos clips entran en UNA pasada de `xfade`. Por encima, el montaje se
+# hace por tandas y luego se unen las tandas: ffmpeg abre un decodificador
+# 1080x1920 por entrada y con 19 se quedó sin memoria en el VPS de 8 GB.
+XFADE_MAX_INPUTS = 7
+
 FFMPEG_CLIP_PRESET = "ultrafast"
 FFMPEG_CLIP_CRF = 18
 
 HOOK_DUR = 3.0
-PAISAJE_CLIP_TARGET_S = 4.5
+# 4,5s dejaba solo 14 clips de la biblioteca "aptos" (un clip aporta
+# `duración - CLIP_TRANSITION_PAD_S`), o sea 63s de b-roll como techo. Con 4,0
+# hay 24 aptos = ~99s, que cubre los audios largos. Medio segundo por corte no
+# se nota; quedarse corto de material sí.
+PAISAJE_CLIP_TARGET_S = 4.0
 # A partir de aquí el reparto de paisajes prioriza planos largos. No es un
 # tope duro: es el punto donde importa más no reventar la memoria del xfade
 # (un input de vídeo por clip) que respetar el sorteo aleatorio.
-MAX_PAISAJE_CLIPS = 12
+MAX_PAISAJE_CLIPS = 34
 
 # Umbral de detección de cara en primer plano (altura del bounding box /
 # altura del frame). Igual que el prototipo validado.
@@ -350,7 +362,7 @@ PAISAJE_ZOOM_JITTER_RANGE = (1.0, 1.18)   # hay margen de sobra, más agresivo
 # Duración individual de cada tramo de paisaje (la MEDIA ronda ~4.5s pero
 # cada clip varía dentro de este rango; la SUMA total siempre cuadra exacta
 # con `fill_duration` — ver `pipeline/renderer.py:_jittered_paisaje_durations`).
-PAISAJE_CLIP_DUR_JITTER_RANGE = (3.5, 5.5)
+PAISAJE_CLIP_DUR_JITTER_RANGE = (3.2, 5.0)
 
 # Margen que hay que dejar libre en cada clip de la biblioteca para el SOLAPE
 # de las transiciones: el renderer extrae `duración + medio fundido` por cada
