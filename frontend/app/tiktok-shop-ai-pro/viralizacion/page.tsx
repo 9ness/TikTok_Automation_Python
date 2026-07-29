@@ -295,7 +295,7 @@ export default function ViralizacionPage() {
         </div>
         {(() => {
           const n = selectedSlugs.reduce((acc, slug) => acc + (cantidad[slug] ?? 5), 0);
-          const nEst = stylesPool.length || (estilos.data?.items?.length ?? 7);
+          const nEst = stylesPool.length || (estilos.data?.items?.length ?? 8);
           if (!n || !nEst) return null;
           const base = Math.floor(n / nEst);
           const resto = n % nEst;

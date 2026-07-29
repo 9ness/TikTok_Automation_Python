@@ -194,6 +194,16 @@ rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
   su índice sea predecible (`mask_idx = 3 if music_path else 2`); con música
   activada, un índice fijo leería la pista de audio como si fuera la máscara.
 
+- **H "Resaltado"**: el marco cuadrado del G con el texto de los vídeos de
+  referencia del operador — Montserrat ExtraBold (de `assets/fonts`, las
+  mismas que usa Creator Reward) en MAYÚSCULAS, abajo dentro del cuadrado
+  (`\an2` + `HIGHLIGHT_MARGIN_V`), la frase se va ESCRIBIENDO palabra a
+  palabra y la que suena en ese instante va en amarillo (`_HIGHLIGHT_COLOR`,
+  ojo: ASS usa BGR). Al acabar la frase hay un remate de 0,35s con todo en
+  blanco, si no el amarillo se queda congelado. La tipografía es por estilo
+  (`StylePreset.font_name` + `fonts_dir`): `font_name` es el nombre de
+  FAMILIA que lee libass ("Montserrat ExtraBold"), no el del fichero.
+
 **Motas de polvo (`film_specks`)** — `renderer.py:_dust_plate` genera con PIL
 una lámina PNG transparente 1.5× el encuadre con ~130 motas y el filtro la
 desplaza con `overlay=x='x0+vx*t'`. Se intentó una mota por `drawbox`+`enable`:

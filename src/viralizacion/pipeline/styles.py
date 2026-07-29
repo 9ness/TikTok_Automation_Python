@@ -17,6 +17,8 @@ de rotación en `STYLE_ORDER`.
   de polvo negras a la deriva.
 - **G "Cuadrado"**: marco cuadrado de esquinas redondeadas sobre fondo negro
   y palabras que se van apilando con tipografía variada.
+- **H "Resaltado"**: mismo marco cuadrado, Montserrat ExtraBold en MAYÚSCULAS
+  abajo, la frase se va escribiendo y la palabra que suena va en amarillo.
 
 Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
 `build_ass` y mete su clave en `STYLE_ORDER` — no hay más sitios que tocar
@@ -287,6 +289,9 @@ _CASCADA_MOLDES = [
     (1.24, "&H00D7FF&", True,  False),   # grande amarilla cursiva
 ]
 
+# Amarillo del resaltado (ASS va en BGR, no RGB).
+_HIGHLIGHT_COLOR = "&H00E9FF&"
+
 # Palabras visibles a la vez antes de vaciar y empezar cascada nueva.
 _CASCADA_MAX = 4
 # Desplazamientos horizontales posibles respecto al centro, en fracción del
@@ -370,6 +375,65 @@ def build_ass_cascade(lines: list[dict], preset: "StylePreset") -> str:
                 events.append(
                     _dialogue(float(w["start"]), fin_grupo, f"{{{tags}}}{txt}", layer=j)
                 )
+
+    return header + "\n".join(events) + "\n"
+
+
+
+# ---------------------------------------------------------------------------
+# Estilo H — Frase en mayúsculas con la palabra hablada en amarillo
+# ---------------------------------------------------------------------------
+def bundled_fonts_dir() -> str:
+    """Carpeta `assets/fonts/` del repo (las que ya usa Creator Reward)."""
+    from src.font_resolver import _bundled_fonts_dir
+
+    return _bundled_fonts_dir()
+
+
+def build_ass_highlight(lines: list[dict], preset: "StylePreset") -> str:
+    """La frase se va ESCRIBIENDO en mayúsculas y la palabra que suena en
+    ese momento va en amarillo; las ya dichas quedan en blanco.
+
+    Es el patrón de los vídeos de referencia del operador: al principio de
+    cada frase se ve una palabra sola y, según avanza, la línea entera con
+    un único término resaltado. No se pinta la frase completa desde el
+    primer instante a propósito — leerla entera antes de oírla mata el
+    efecto de "va apareciendo" que engancha.
+
+    El texto va abajo dentro del cuadrado (`\an2` + `MarginV`), no centrado:
+    en el centro tapa la cara del ponente.
+    """
+    fuente = preset.font_name or config.SUB_FONT
+    style_line = (
+        f"Style: Default,{fuente},{int(config.SUB_FONTSIZE * 1.45)},"
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&HA0000000&,-1,0,0,0,100,100,0,0,1,3.5,2,2,"
+        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},{config.HIGHLIGHT_MARGIN_V},1"
+    )
+    header = _ass_header(style_line)
+    events: list[str] = []
+
+    for ln in lines:
+        palabras = ln.get("words") or []
+        if not palabras:
+            continue
+        for i, w in enumerate(palabras):
+            visibles = palabras[: i + 1]
+            texto = " ".join(
+                f"{{\\1c{_HIGHLIGHT_COLOR if j == i else '&HFFFFFF&'}}}{p['word'].upper()}"
+                for j, p in enumerate(visibles)
+            )
+            ini = float(w["start"])
+            fin = float(palabras[i + 1]["start"]) if i + 1 < len(palabras) else float(w["end"])
+            if fin <= ini:
+                fin = ini + 0.08
+            events.append(_dialogue(ini, fin, texto))
+
+        # Remate: la frase entera en blanco un instante después de la última
+        # palabra. Sin esto el amarillo se queda congelado al final de cada
+        # frase y parece que la palabra sigue sonando.
+        completa = " ".join(f"{{\\1c&HFFFFFF&}}{p['word'].upper()}" for p in palabras)
+        fin_frase = float(palabras[-1]["end"])
+        events.append(_dialogue(fin_frase, fin_frase + 0.35, completa))
 
     return header + "\n".join(events) + "\n"
 
@@ -462,6 +526,11 @@ class StylePreset:
     # Encaja el vídeo en un CUADRADO con esquinas redondeadas centrado sobre
     # negro (estilo de los vídeos de reflexión que funcionan en TikTok).
     square_frame: bool = False
+    # Tipografía propia del estilo. `font_name` es el nombre de FAMILIA que
+    # lee libass (no el del fichero) y `fonts_dir` la carpeta donde buscarla.
+    # None = la global de config (DejaVu Sans del sistema).
+    font_name: str | None = None
+    fonts_dir: str | None = None
 
 
 STYLE_PRESETS: dict[str, StylePreset] = {
@@ -546,6 +615,21 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         transition_landscape=("dissolve", 0.6),
         ken_burns=0.10,
     ),
+    "highlight": StylePreset(
+        key="highlight",
+        label="H · Resaltado",
+        build_ass=build_ass_highlight,
+        # Mismo marco que el estilo G, que es el que funciona.
+        square_frame=True,
+        # Montserrat ExtraBold: es la tipografía de los vídeos de referencia
+        # y ya venía en `assets/fonts` (la usa Creator Reward).
+        font_name="Montserrat ExtraBold",
+        fonts_dir=bundled_fonts_dir(),
+        vignette_angle="PI/5.0",
+        eq_extra={"gamma_r": 1.02, "gamma_b": 0.99},
+        transition_landscape=("dissolve", 0.55),
+        ken_burns=0.10,
+    ),
     "golden": StylePreset(
         key="golden",
         label="F · Hora dorada",
@@ -563,7 +647,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
 
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
 STYLE_ORDER = [
-    "classic", "reveal", "cinematic", "teal_orange", "noir", "golden", "cuadrado",
+    "classic", "reveal", "cinematic", "teal_orange", "noir", "golden",
+    "cuadrado", "highlight",
 ]
 
 

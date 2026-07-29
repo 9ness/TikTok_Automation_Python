@@ -354,6 +354,11 @@ EQ_JITTER_FRAC = 0.05
 # Estilo G "Cuadrado": lado del recuadro y radio de las esquinas, sobre el
 # lienzo 1080x1920. 940 deja margen negro a los lados y bastante arriba y
 # abajo, que es la proporción de los vídeos de referencia.
+# Estilo H: el texto va abajo DENTRO del cuadrado, no en el borde del vídeo.
+# El cuadrado (940px centrado en 1920) acaba en y=1430; con este margen desde
+# abajo la última línea cae justo dentro.
+HIGHLIGHT_MARGIN_V = 600
+
 SQUARE_SIDE = 940
 SQUARE_RADIUS = 90
 

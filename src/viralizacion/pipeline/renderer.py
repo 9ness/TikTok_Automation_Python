@@ -533,7 +533,10 @@ def _finalize(
     ]
 
     ass_escaped = str(ass_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    fontsdir_escaped = config.SUB_FONTSDIR.replace("\\", "\\\\").replace(":", "\\:")
+    # Cada estilo puede traer su propia tipografía (estilo H usa Montserrat
+    # de `assets/fonts`); el resto cae en la global del sistema.
+    fontsdir = style.fonts_dir or config.SUB_FONTSDIR
+    fontsdir_escaped = fontsdir.replace("\\", "\\\\").replace(":", "\\:")
 
     # Inputs en orden FIJO: [0] vídeo, [1] voz, [2] música si la hay. Todo
     # input visual extra (máscara del cuadrado, láminas de polvo) se añade
