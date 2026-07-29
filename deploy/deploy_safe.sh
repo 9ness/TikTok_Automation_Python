@@ -14,7 +14,12 @@ set -uo pipefail   # -e no, queremos continuar incluso con steps que fallen para
                    # dejar tiktok-factory parado
 
 APP_DIR="/home/nebulabsai/TikTok_Automation_Python"
-QUEUE_STATE="${APP_DIR}/temp_work/queue_state.json"
+# La cola la escribe la API DENTRO del container, en el volumen `api_temp`
+# montado en /app/temp_work. El bind del host (${APP_DIR}/temp_work) es otra
+# carpeta distinta: leerla daba un fichero de hace meses y el guardarraíl
+# creía que no había nada corriendo mientras se renderizaba un lote.
+API_CONTAINER="tiktok-api"
+QUEUE_STATE="/app/temp_work/queue_state.json"
 DEPLOY_STATUS="${APP_DIR}/temp_work/deploy_status.json"
 LOG="${APP_DIR}/logs/deploy.log"
 MAX_WAIT_SEC=3600   # 1h máximo esperando que la cola se vacíe
@@ -65,19 +70,16 @@ write_status "running" "\"started_at\":${START_TS}"
 # que los procesa con el código nuevo (gracias a graceful shutdown).
 # ============================================================
 count_running_jobs() {
-    if [[ ! -f "$QUEUE_STATE" ]]; then
-        echo "0"
-        return
-    fi
-    python3 -c "
-import json, sys
+    # Si el container no responde no hay nada renderizando, así que 0 es la
+    # respuesta correcta (y no bloquea un deploy de recuperación).
+    docker exec "$API_CONTAINER" python3 -c "
+import json
 try:
     data = json.load(open('${QUEUE_STATE}'))
-    n = sum(1 for j in data.get('jobs', []) if j.get('status') == 'running')
-    print(n)
+    print(sum(1 for j in data.get('jobs', []) if j.get('status') == 'running'))
 except Exception:
     print(0)
-" 2>/dev/null
+" 2>/dev/null || echo "0"
 }
 
 # ============================================================
