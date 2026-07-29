@@ -24,6 +24,10 @@ secrets/
 *.mp4
 *.mp3
 *.jpg
+# …salvo las miniaturas de muestra de los estilos de Viralización: son parte
+# de la UI (el selector las enseña), pesan ~70KB y se regeneran con
+# scripts/viralizacion_previews.py.
+!frontend/public/viralizacion/previews/*.jpg
 *.png
 *.mov
 
