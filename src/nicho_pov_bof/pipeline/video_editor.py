@@ -233,41 +233,53 @@ _TITULO_COLGANTES = {
     "en", "a", "al", "un", "una", "por", "que", "su", "sus", "e", "u",
 }
 
-# Líneas del título que se pintan. El extractor devuelve el nombre ENTERO en
-# columnas de 4 palabras (puede dar 5 líneas); en el vídeo solo caben las
-# primeras, que es lo que el operador ponía a mano.
+# Líneas del título que se pintan y palabras por línea. El extractor devuelve
+# el nombre ENTERO en columnas de 4 palabras (puede dar 7 líneas); en el
+# vídeo solo caben las primeras, que es lo que el operador ponía a mano.
 _TITULO_MAX_LINEAS = 2
+_TITULO_PALABRAS_LINEA = 4
+
+# Donde acaba el nombre y empieza la ficha técnica. El prompt pide cortar
+# aquí, pero Gemini no lo respeta ("…Viaje Elegantes: Carcasa Ligera de ABS,
+# Cerradura Numérica…"), así que se corta también en código, que es
+# determinista y no cuesta una nueva extracción.
+_TITULO_CORTES = (":", "|", " - ", " – ", ",")
+# Por debajo de esto el trozo de delante no nombra el producto ("Freshly -")
+# y se sigue leyendo hasta el siguiente separador.
+_TITULO_MIN_CHARS = 18
 
 
 def _titulo_para_video(textos: dict) -> str:
-    """Título que se quema en el vídeo: las primeras líneas de `titulo`.
+    """Título que se quema en el vídeo: el nombre del producto, sin ficha.
 
     `titulo` viene del extractor (`prompts/text_extractor.md`) como el nombre
-    LITERAL del producto repartido en columnas de 4 palabras. Aquí solo se
-    recortan las líneas que no caben — nada de reformular: el
-    `titulo_tiktok_completo` existe para BUSCAR el producto en el Centro de
-    Afiliados, no para pintarlo.
+    LITERAL repartido en columnas de 4 palabras. Aquí se corta la cola de
+    keywords SEO y se deja en `_TITULO_MAX_LINEAS` líneas. Nada de
+    reformular: el `titulo_tiktok_completo` existe para BUSCAR el producto en
+    el Centro de Afiliados, no para pintarlo.
     """
-    corto = (textos.get("titulo") or "").strip()
-    if not corto:
-        completo = (textos.get("titulo_tiktok_completo") or "").strip()
-        completo = re.sub(r"\s+", " ", completo.replace("\\", " ")).strip()
-        palabras = completo.split()[:_TITULO_MAX_LINEAS * 4]
-        corto = "\n".join(
-            " ".join(palabras[i:i + 4]) for i in range(0, len(palabras), 4)
-        )
+    bruto = (textos.get("titulo") or "").strip()
+    if not bruto:
+        bruto = (textos.get("titulo_tiktok_completo") or "").strip()
+    if not bruto:
+        return ""
 
-    lineas = [l.strip() for l in corto.split("\n") if l.strip()][:_TITULO_MAX_LINEAS]
-    # Sin esto el corte deja la frase a medias ("Plegable 2 en").
-    while lineas:
-        palabras = lineas[-1].split()
-        while palabras and palabras[-1].lower().strip(".,-–|:") in _TITULO_COLGANTES:
-            palabras.pop()
-        if palabras:
-            lineas[-1] = " ".join(palabras)
-            break
-        lineas.pop()
-    return "\n".join(lineas)
+    # Se aplana y se limpia la basura de escapado de las fichas ("\\Impermeable").
+    plano = re.sub(r"\s+", " ", bruto.replace("\n", " ").replace("\\", " ")).strip()
+
+    for sep in _TITULO_CORTES:
+        cabeza = plano.split(sep, 1)[0].strip()
+        if len(cabeza) >= _TITULO_MIN_CHARS:
+            plano = cabeza
+
+    palabras = plano.split()[:_TITULO_MAX_LINEAS * _TITULO_PALABRAS_LINEA]
+    while palabras and palabras[-1].lower().strip(".,-–|:") in _TITULO_COLGANTES:
+        palabras.pop()
+
+    return "\n".join(
+        " ".join(palabras[i:i + _TITULO_PALABRAS_LINEA])
+        for i in range(0, len(palabras), _TITULO_PALABRAS_LINEA)
+    ).strip(" .,-–|:\n")
 
 
 def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Image.Image":
