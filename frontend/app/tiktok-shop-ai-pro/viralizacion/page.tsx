@@ -246,37 +246,49 @@ export default function ViralizacionPage() {
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Marca las versiones que quieres. Los vídeos se reparten entre ellas a
-          partes iguales. Sin marcar ninguna se usan todas.
+          partes iguales. Sin marcar ninguna se usan todas. Cada muestra son dos
+          fotogramas del mismo vídeo: gancho y paisaje.
         </p>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(estilos.data?.items ?? []).map((s) => {
             const marcado = stylesPool.length === 0 || stylesPool.includes(s.key);
             return (
               <label
                 key={s.key}
-                className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition sm:text-sm ${
+                className={`flex cursor-pointer flex-col gap-1.5 rounded-md border p-1.5 text-xs transition sm:text-sm ${
                   marcado
                     ? "border-amber-500/60 bg-amber-500/10"
-                    : "border-border/60 text-muted-foreground"
+                    : "border-border/60 text-muted-foreground opacity-60"
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 shrink-0 accent-amber-500"
-                  checked={marcado}
-                  onChange={(e) => {
-                    const todos = (estilos.data?.items ?? []).map((x) => x.key);
-                    // Lista vacía = "todas". Al desmarcar la primera hay que
-                    // materializar la lista completa para poder quitar una.
-                    const base = stylesPool.length === 0 ? todos : stylesPool;
-                    setStylesPool(
-                      e.target.checked
-                        ? Array.from(new Set([...base, s.key]))
-                        : base.filter((k) => k !== s.key),
-                    );
-                  }}
+                {/* Miniatura de muestra: sin ella el operador elige a ciegas —
+                    "B · Reveal" no dice nada sobre qué hace el estilo.
+                    Generadas con scripts/viralizacion_previews.py. */}
+                <img
+                  src={`/viralizacion/previews/${s.key}.jpg`}
+                  alt={s.label}
+                  loading="lazy"
+                  className="aspect-[9/8] w-full rounded bg-black object-cover"
                 />
-                <span className="truncate">{s.label}</span>
+                <span className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-amber-500"
+                    checked={marcado}
+                    onChange={(e) => {
+                      const todos = (estilos.data?.items ?? []).map((x) => x.key);
+                      // Lista vacía = "todas". Al desmarcar la primera hay que
+                      // materializar la lista completa para poder quitar una.
+                      const base = stylesPool.length === 0 ? todos : stylesPool;
+                      setStylesPool(
+                        e.target.checked
+                          ? Array.from(new Set([...base, s.key]))
+                          : base.filter((k) => k !== s.key),
+                      );
+                    }}
+                  />
+                  <span className="truncate">{s.label}</span>
+                </span>
               </label>
             );
           })}

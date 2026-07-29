@@ -1,21 +1,30 @@
-"""3 presets de subtítulo/filtro que rotan por "ronda" (para que las
-réplicas se vean distintas si la v1 no viraliza).
+"""Presets de subtítulo/filtro que rotan por "ronda" (para que las réplicas
+se vean distintas si la v1 no viraliza). Registro en `STYLE_PRESETS`, orden
+de rotación en `STYLE_ORDER`.
 
-- **A "Clásico"** (ronda 1, 4, 7…): línea completa blanca, borde negro,
-  centrada — el estilo ya validado por el operador.
-- **B "Reveal"** (ronda 2, 5, 8…): las letras aparecen una a una (efecto
-  "escritura"), con un glow blanco breve en la última letra revelada.
-  + overlay de grano más denso como firma visual extra.
-- **C "Cinemático"** (ronda 3, 6, 9…): karaoke por palabra (palabra activa
-  en blanco, resto en negro) + grade frío/cálido + viñeta más fuerte +
-  barras de letterbox.
+- **A "Clásico"**: línea completa blanca, borde negro, centrada — el estilo
+  ya validado por el operador.
+- **B "Reveal"**: UNA palabra en pantalla cada vez, cambiando de molde
+  tipográfico (`_STACK_MOLDES`) + grano más denso como firma visual.
+- **C "Cinemático"**: karaoke por palabra (palabra activa en blanco, resto
+  en negro) + grade frío/cálido + viñeta más fuerte + barras de letterbox
+  que entran al arrancar el b-roll.
+- **D "Teal & Orange"** (texto como C) y **F "Hora dorada"** (texto como B):
+  reaprovechan un `build_ass` existente y cambian el grade, la viñeta y la
+  transición — son variantes de color.
+- **E "Cascada"**: las palabras caen desordenadas por la pantalla
+  (`\\pos` por palabra, posición y molde sorteados) sobre un plano con motas
+  de polvo negras a la deriva.
+- **G "Cuadrado"**: marco cuadrado de esquinas redondeadas sobre fondo negro
+  y palabras que se van apilando con tipografía variada.
 
-Añadir un 4º estilo en el futuro: define un nuevo `StylePreset` en
-`STYLE_PRESETS` con su propio `build_ass` — no hay más sitios que tocar
+Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
+`build_ass` y mete su clave en `STYLE_ORDER` — no hay más sitios que tocar
 (el runner y el renderer iteran sobre el registro, no hardcodean nombres)."""
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -55,8 +64,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
-def _dialogue(start: float, end: float, text: str) -> str:
-    return f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{text}"
+def _dialogue(start: float, end: float, text: str, layer: int = 0) -> str:
+    """`layer` decide quién tapa a quién cuando dos eventos coinciden en el
+    tiempo: ASS pinta primero las capas bajas. Con todo en 0 mandaba el orden
+    del fichero y las palabras nuevas quedaban DEBAJO de las anteriores."""
+    return f"Dialogue: {layer},{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{text}"
 
 
 # ---------------------------------------------------------------------------
@@ -74,61 +86,57 @@ def build_ass_classic(lines: list[dict], preset: "StylePreset") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Estilo B — Reveal (letra a letra + glow)
+# Estilo B — Reveal (una palabra cada vez, tipografía variada)
 # ---------------------------------------------------------------------------
-def _line_char_timeline(line: dict) -> tuple[str, list[float]]:
-    """Reparte los caracteres de cada palabra uniformemente dentro de su
-    ventana [start, end] (timings de Whisper). Devuelve (full_text_sin_ultimo_espacio,
-    lista de instantes en que cada carácter queda revelado)."""
-    chars: list[str] = []
-    times: list[float] = []
-    for w in line["words"]:
-        word = w["word"]
-        n = max(1, len(word))
-        dur = max(0.0, w["end"] - w["start"])
-        for i, ch in enumerate(word):
-            t = w["start"] + dur * (i + 1) / n
-            chars.append(ch)
-            times.append(t)
-        chars.append(" ")
-        times.append(w["end"])
-    # quita el espacio final sobrante
-    if chars and chars[-1] == " ":
-        chars.pop()
-        times.pop()
-    return "".join(chars), times
-
-
 def build_ass_reveal(lines: list[dict], preset: "StylePreset") -> str:
-    """UNA palabra en pantalla cada vez, grande y con glow.
+    """UNA palabra en pantalla cada vez, cambiando de molde tipográfico.
 
-    Antes se revelaba letra a letra acumulando la frase entera: con frases
-    largas el texto se hacía diminuto y se leía fatal en el móvil. Mostrar
-    una sola palabra a la vez obliga a leerla, aguanta cualquier longitud de
-    frase y encaja mejor con el ritmo del audio.
+    Historia de este estilo: primero revelaba letra a letra acumulando la
+    frase entera (con frases largas el texto se hacía diminuto), luego una
+    palabra sola con glow blanco. El glow (`\\blur` con borde blanco) fundía
+    las letras en un borrón: en el vídeo se veía una mancha, no una palabra.
+
+    Ahora es una palabra a la vez con la tipografía variada del estilo
+    Cuadrado (`_STACK_MOLDES`: mayúsculas/cursiva/escala/amarillo de acento),
+    con borde negro nítido. Se lee siempre y cada palabra entra distinta.
     """
     # Tamaño mayor que el resto de estilos: al haber una sola palabra hay
     # sitio de sobra y el impacto es la gracia del estilo.
     font_size = int(config.SUB_FONTSIZE * 1.35)
     style_line = (
         f"Style: Default,{config.SUB_FONT},{font_size},"
-        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,4,0,5,"
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&HB0000000&,-1,0,0,0,100,100,0,0,1,4,3,5,"
         f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
     )
     header = _ass_header(style_line)
     events: list[str] = []
-    # Glow blanco suave alrededor de la palabra activa.
-    glow_tag = r"{\bord5\blur5\3c&HFFFFFF&\4c&HFFFFFF&}"
 
-    for ln in lines:
-        for w in ln.get("words") or []:
-            start = float(w["start"])
-            end = float(w["end"])
-            # Whisper a veces devuelve palabras de duración ~0; sin un mínimo
-            # la palabra parpadearía y no daría tiempo a leerla.
-            if end - start < 0.12:
-                end = start + 0.12
-            events.append(_dialogue(start, end, f"{glow_tag}{w['word']}"))
+    # Una sola secuencia con TODAS las palabras del vídeo: hace falta para
+    # saber cuándo entra la siguiente (y así no solaparlas) y para que el
+    # molde avance sin reiniciarse en cada línea — reiniciando, las frases
+    # cortas repetían siempre los mismos dos moldes.
+    todas = [w for ln in lines for w in (ln.get("words") or [])]
+
+    for n, w in enumerate(todas):
+        start = float(w["start"])
+        end = float(w["end"])
+        # Whisper a veces devuelve palabras de duración ~0; sin un mínimo la
+        # palabra parpadearía y no daría tiempo a leerla.
+        if end - start < 0.12:
+            end = start + 0.12
+        # …pero ese mínimo no puede invadir la palabra siguiente: dos eventos
+        # ASS solapados se apilan en pantalla y el estilo deja de ser "una
+        # palabra cada vez" (se veían pares como "LO / que").
+        if n + 1 < len(todas):
+            end = min(end, float(todas[n + 1]["start"]))
+        if end <= start:
+            end = start + 0.04
+        mayus, cursiva, escala, color = _STACK_MOLDES[n % len(_STACK_MOLDES)]
+        txt = w["word"].upper() if mayus else w["word"].lower()
+        tags = f"\\1c{color}\\fscx{int(escala * 100)}\\fscy{int(escala * 100)}"
+        if cursiva:
+            tags += "\\i1"
+        events.append(_dialogue(start, end, f"{{{tags}}}{txt}"))
 
     return header + "\n".join(events) + "\n"
 
@@ -187,10 +195,10 @@ def build_ass_cinematic(lines: list[dict], preset: "StylePreset") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Estilo G — Cuadrado (palabras que se acumulan, tipografía variada)
+# Moldes tipográficos (los usan el estilo B "Reveal" y el G "Cuadrado")
 # ---------------------------------------------------------------------------
 # Cómo salen las palabras. Cada una coge un "molde" distinto para que el
-# bloque no parezca un subtítulo corrido sino un montaje hecho a mano, que es
+# texto no parezca un subtítulo corrido sino un montaje hecho a mano, que es
 # lo que hace reconocible este estilo en los vídeos que funcionan.
 #   (mayusculas, cursiva, escala, color)
 _STACK_MOLDES = [
@@ -262,38 +270,148 @@ def build_ass_stacked(lines: list[dict], preset: "StylePreset") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Barras de cine que se retiran (transición del gancho al paisaje)
+# Estilo E — Cascada (palabras desperdigadas bajando por la pantalla)
 # ---------------------------------------------------------------------------
-def _retracting_bars(
-    alto: int = 77,
-    pasos: int = 14,
-    dur: float | None = None,
-) -> list[str]:
-    """Letterbox que arranca completo y se retira durante el gancho.
+# Como `_STACK_MOLDES` pero con más contraste de tamaño: la gracia de este
+# estilo es que alterna una palabra pequeña con otra enorme en amarillo.
+#   (escala, color)
+#   (escala, color, cursiva, mayúsculas)
+_CASCADA_MOLDES = [
+    (0.58, "&HFFFFFF&", False, False),   # pequeña blanca
+    (1.45, "&H00D7FF&", False, False),   # ENORME amarilla
+    (0.68, "&HFFFFFF&", True,  False),   # pequeña cursiva
+    (1.30, "&HFFFFFF&", False, True),    # grande blanca en MAYÚS
+    (0.62, "&H00D7FF&", False, False),   # pequeña amarilla
+    (1.40, "&H00D7FF&", False, True),    # ENORME amarilla en MAYÚS
+    (0.74, "&HFFFFFF&", True,  False),
+    (1.24, "&H00D7FF&", True,  False),   # grande amarilla cursiva
+]
 
-    Marca visualmente el paso del gancho al b-roll —que es donde el ojo pide
-    un corte— y evita que las barras se coman encuadre durante todo el vídeo.
+# Palabras visibles a la vez antes de vaciar y empezar cascada nueva.
+_CASCADA_MAX = 4
+# Desplazamientos horizontales posibles respecto al centro, en fracción del
+# ancho. Se SORTEAN sin repetir dentro de cada bloque en vez de recorrerse en
+# orden: un zigzag fijo izquierda-derecha-izquierda se lee como plantilla y
+# cansa a los pocos vídeos.
+_CASCADA_DX = [-0.20, -0.12, -0.04, 0.04, 0.13, 0.21]
+
+
+def build_ass_cascade(lines: list[dict], preset: "StylePreset") -> str:
+    """Palabras que se acumulan cayendo en zigzag por la pantalla.
+
+    Cada palabra es su PROPIO evento con `\\pos`: en ASS un solo evento con
+    saltos de línea comparte una única posición, así que apilar con `\\N`
+    solo permite un bloque centrado. Con un evento por palabra, varios
+    conviven en pantalla cada uno donde le toca.
+
+    El ancho de cada palabra se estima para no salirse por los lados (con
+    `\\pos` no hay ajuste de línea que valga: lo que se sale, se pierde).
+    """
+    base = int(config.SUB_FONTSIZE * 1.30)
+    style_line = (
+        f"Style: Default,{config.SUB_FONT},{base},"
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&HB0000000&,-1,0,0,0,100,100,0,0,1,4,3,5,"
+        f"0,0,0,1"
+    )
+    header = _ass_header(style_line)
+    events: list[str] = []
+
+    # Alto del bloque: se centra verticalmente el conjunto de la cascada.
+    # Bloque COMPACTO, casi tocándose: en la referencia las palabras se
+    # solapan un poco y forman un grupo, no una lista con aire entre líneas.
+    salto = int(base * 0.92)
+    margen = 60
+
+    for ln in lines:
+        palabras = ln.get("words") or []
+        for inicio in range(0, len(palabras), _CASCADA_MAX):
+            grupo = palabras[inicio:inicio + _CASCADA_MAX]
+            fin_grupo = max(
+                float(grupo[-1]["end"]) + 0.25,
+                float(grupo[-1]["start"]) + 0.35,
+            )
+            # La cola de 0,25s no puede pisar el bloque siguiente: si no, se
+            # ven cinco palabras a la vez y la cascada se emborrona.
+            if inicio + _CASCADA_MAX < len(palabras):
+                fin_grupo = min(fin_grupo, float(palabras[inicio + _CASCADA_MAX]["start"]))
+            alto_bloque = salto * (len(grupo) - 1)
+            y0 = (config.TARGET_H - alto_bloque) // 2
+            # Posiciones y moldes sorteados por bloque: la cascada tiene que
+            # caer desordenada (una arriba a la izquierda, la siguiente abajo
+            # en medio…), no en zigzag regular.
+            desplazamientos = random.sample(_CASCADA_DX, k=min(len(grupo), len(_CASCADA_DX)))
+            molde0 = random.randrange(len(_CASCADA_MOLDES))
+            for j, w in enumerate(grupo):
+                escala, color, cursiva, mayus = _CASCADA_MOLDES[
+                    (molde0 + j) % len(_CASCADA_MOLDES)
+                ]
+                txt = w["word"].upper() if mayus else w["word"].lower()
+                # DejaVu Sans Bold ronda 0.62·tamaño por carácter. Basta para
+                # decidir si hay que encoger o recolocar; no hace falta medir.
+                ancho = len(txt) * base * escala * 0.62
+                if ancho > config.TARGET_W - 2 * margen:
+                    escala *= (config.TARGET_W - 2 * margen) / ancho
+                    ancho = config.TARGET_W - 2 * margen
+                dx = desplazamientos[j % len(desplazamientos)]
+                x = config.TARGET_W / 2 + config.TARGET_W * dx
+                x = min(max(x, ancho / 2 + margen), config.TARGET_W - ancho / 2 - margen)
+                # Altura con holgura: el escalón fijo volvía a marcar patrón.
+                y = y0 + j * salto + random.randint(-10, 10)
+                tags = (
+                    f"\\an5\\pos({int(x)},{int(y)})\\1c{color}"
+                    f"\\fscx{int(escala * 100)}\\fscy{int(escala * 100)}"
+                )
+                if cursiva:
+                    tags += "\\i1"
+                # Cada palabra entra cuando se pronuncia y se queda hasta que
+                # se vacía el grupo: así se lee la frase entera de un golpe.
+                # `layer=j`: al solaparse, la palabra que acaba de entrar tapa
+                # a las anteriores (que es lo que hace la referencia).
+                events.append(
+                    _dialogue(float(w["start"]), fin_grupo, f"{{{tags}}}{txt}", layer=j)
+                )
+
+    return header + "\n".join(events) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Barras de cine que entran con el b-roll
+# ---------------------------------------------------------------------------
+def _entering_bars(
+    alto: int = 165,
+    pasos: int = 14,
+    inicio: float | None = None,
+    dur: float = 0.8,
+) -> list[str]:
+    """Letterbox que arranca a CERO y se cierra al entrar el primer paisaje.
+
+    El gancho es una cara hablando: taparlo con barras desde el fotograma 1
+    no marca nada y encima recorta el encuadre justo donde importa. Las
+    barras entran cuando cambia el plano —que es donde el ojo pide el corte—
+    y ahí sí leen como "esto es una película".
 
     Va en PASOS con `enable` en vez de una expresión continua porque
     `drawbox` NO evalúa `x/y/w/h` por fotograma: su variable `t` es el GROSOR,
     no el tiempo, así que una expresión con `t` se evalúa mal y el filtro
     acaba pintando el frame entero de negro (comprobado). `enable` sí se
-    evalúa por fotograma, así que 14 escalones de ~0,26s dan una retirada que
-    se lee como continua.
+    evalúa por fotograma, así que los escalones dan un cierre que se lee
+    como continuo.
     """
-    if dur is None:
-        # Termina justo al entrar el primer paisaje (gancho + su transición).
-        dur = config.HOOK_DUR + 0.6
+    if inicio is None:
+        # Justo cuando entra el primer paisaje (gancho + su transición).
+        inicio = config.HOOK_DUR + 0.35
     filtros: list[str] = []
     paso_dur = dur / pasos
     for i in range(pasos):
-        h = round(alto * (1 - i / pasos))
+        h = round(alto * (i + 1) / pasos)
         if h <= 0:
             continue
-        t0 = i * paso_dur
-        # El último escalón cierra en `dur`; los demás encadenan sin hueco.
-        t1 = dur if i == pasos - 1 else (i + 1) * paso_dur
-        ventana = f":enable='between(t,{t0:.3f},{t1:.3f})'"
+        t0 = inicio + i * paso_dur
+        if i == pasos - 1:
+            # El último escalón (barra completa) se queda hasta el final.
+            ventana = f":enable='gte(t,{t0:.3f})'"
+        else:
+            ventana = f":enable='between(t,{t0:.3f},{t0 + paso_dur:.3f})'"
         filtros.append(
             f"drawbox=x=0:y=0:w={config.TARGET_W}:h={h}:color=black:t=fill{ventana}"
         )
@@ -338,6 +456,9 @@ class StylePreset:
     light_leaks: int = 0
     # Nº de rayaduras verticales tipo proyector viejo.
     film_scratches: int = 0
+    # Nº de LÁMINAS de polvo superpuestas (cada una son ~130 motas que van
+    # a la deriva, entrando y saliendo del encuadre). 0 = sin polvo.
+    film_specks: int = 0
     # Encaja el vídeo en un CUADRADO con esquinas redondeadas centrado sobre
     # negro (estilo de los vídeos de reflexión que funcionan en TikTok).
     square_frame: bool = False
@@ -371,7 +492,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         build_ass=build_ass_cinematic,
         vignette_angle="PI/3.5",
         eq_extra={"gamma_r": 1.06, "gamma_b": 0.94},
-        post_subtitle_filters=_retracting_bars(),
+        post_subtitle_filters=_entering_bars(),
         ken_burns=0.12,
         vignette_breathe=0.15,
     ),
@@ -394,18 +515,24 @@ STYLE_PRESETS: dict[str, StylePreset] = {
     ),
     "noir": StylePreset(
         key="noir",
-        label="E · Noir",
-        build_ass=build_ass_classic,
-        vignette_angle="PI/3.2",
-        # Contraste alto y color muy lavado (sin llegar a B/N puro).
+        label="E · Cascada",
+        build_ass=build_ass_cascade,
+        # Viñeta suave: con el grade oscuro anterior (era blanco y negro) se
+        # usaba PI/3.2 y en color dejaba las esquinas casi negras.
+        vignette_angle="PI/4.2",
+        # Antes este estilo era blanco y negro (`colorchannelmixer`): el
+        # operador lo descartó, el paisaje en B/N no vende. Ahora es color
+        # con contraste alto y la firma visual la ponen las motas de polvo.
         eq_extra={"gamma": 0.95},
-        pre_subtitle_filters=["colorchannelmixer=.35:.45:.15:0:.35:.45:.15:0:.35:.45:.20:0"],
         noise_filter_override="noise=alls=18:allf=t+u",
-        # Fundido a negro corto y seco, muy de cine negro.
-        transition_landscape=("fadeblack", 0.45),
-        # Sin zoom: quieto, contrastado y rayado — el más sobrio/dramático.
+        # Antes `fadeblack` (era el estilo "cine negro"): en un montaje de
+        # planos cortos metía un fogonazo a negro cada pocos segundos. Ahora
+        # que es a color, encadenado normal.
+        transition_landscape=("fade", 0.5),
+        # Sin zoom: quieto, contrastado y sucio de película.
         film_scratches=5,
-        vignette_breathe=0.20,
+        film_specks=2,
+        vignette_breathe=0.12,
     ),
     "cuadrado": StylePreset(
         key="cuadrado",

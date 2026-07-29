@@ -19,7 +19,11 @@ from pathlib import Path
 from typing import Callable
 
 from src.viralizacion import config
-from src.viralizacion.pipeline.ffmpeg_utils import ffprobe_duration, run
+from src.viralizacion.pipeline.ffmpeg_utils import (
+    ffprobe_duration,
+    leading_silence,
+    run,
+)
 from src.viralizacion.pipeline.styles import StylePreset
 from src.viralizacion.pipeline.transcriber import group_into_phrases
 
@@ -52,6 +56,60 @@ def slice_words(words: list[dict], window_start: float, window_dur: float) -> li
             "end": min(window_dur, we - window_start),
         })
     return out
+
+
+def snap_to_first_word(
+    words: list[dict],
+    window_start: float,
+    window_dur: float,
+    audio_path: Path | None = None,
+    lead_in: float = 0.06,
+    max_salto: float = 1.5,
+) -> float:
+    """Adelanta el arranque de la ventana hasta justo antes de que se hable.
+
+    Los audios de origen traen entre medio segundo y casi dos segundos de aire
+    antes de la primera palabra, y las ventanas de las rondas siguientes caen
+    donde caen — a veces en mitad de una pausa. Ese silencio al empezar un
+    TikTok es scroll asegurado.
+
+    Se cruzan DOS medidas porque ninguna basta sola: Whisper redondea el
+    arranque a 0.00s en audios que de hecho tienen 0,74s de aire
+    (`pablo3_full.mp3`), y `silencedetect` no sabe de palabras — corta donde
+    deja de haber silencio, que puede ser una respiración.
+
+    El criterio es: manda `silencedetect` (mide el fichero, no interpreta), y
+    solo se adelanta hasta la siguiente palabra de Whisper si en ese punto NO
+    hay ninguna sonando. Coger simplemente la más tardía de las dos era
+    peligroso: si Whisper se salta la primera frase, se comería habla real.
+    Por eso además hay tope (`max_salto`) — un hueco largo entre el fin del
+    silencio y la primera palabra significa que ahí hay algo que Whisper no
+    transcribió, y entonces se respeta `silencedetect`.
+
+    Solo adelanta, nunca retrasa. La ventana se ACORTA en lo adelantado (el
+    contenido hablado es el mismo, solo desaparece el silencio de delante).
+    """
+    end = window_start + window_dur
+    base = window_start
+    if audio_path is not None:
+        base += leading_silence(audio_path, start=window_start)
+
+    en_ventana = [
+        w for w in words
+        if float(w["end"]) > window_start and float(w["start"]) < end
+    ]
+    # Si en `base` ya hay una palabra sonando, adelantar más la cortaría.
+    sonando = any(
+        float(w["start"]) - 0.05 <= base <= float(w["end"]) for w in en_ventana
+    )
+    if not sonando:
+        siguientes = [
+            float(w["start"]) for w in en_ventana if float(w["start"]) >= base
+        ]
+        if siguientes and min(siguientes) - base <= max_salto:
+            base = min(siguientes)
+
+    return max(window_start, base - lead_in)
 
 
 def _jittered_paisaje_durations(fill_duration: float, n: int) -> list[float]:
@@ -192,6 +250,42 @@ def _scratches_filter(style: StylePreset, duration: float) -> str:
             f":enable='between(t,{t0:.2f},{t0 + dur:.2f})'"
         )
     return ",".join(parts)
+
+
+def _dust_plate(work: Path, idx: int, dots: int) -> Path:
+    """Lámina PNG transparente con motas de polvo, para superponer a la deriva.
+
+    Se intentó dibujar cada mota con `drawbox` + `enable`: para que hubiera
+    unas cuantas en pantalla a la vez hacían falta cientos de filtros y aun
+    así no se movían (`drawbox` no puede animar su posición — su `t` es el
+    grosor). Con una lámina que se desplaza basta UN `overlay` (que sí evalúa
+    `t` en x/y) para tener decenas de motas moviéndose, y entrando y saliendo
+    del encuadre porque la lámina es más grande que el vídeo.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    out = work / f"dust_{idx}_{dots}.png"
+    if out.is_file():
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    w = int(config.TARGET_W * 1.5)
+    h = int(config.TARGET_H * 1.5)
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    dib = ImageDraw.Draw(img)
+    # Semilla fija por lámina: las dos capas tienen que ser distintas entre
+    # sí, pero no hace falta que cambien en cada render (el anti-fingerprint
+    # lo pone la deriva, que sí se sortea).
+    rnd = random.Random(4200 + idx)
+    for _ in range(dots):
+        x, y = rnd.randrange(w), rnd.randrange(h)
+        r = rnd.choice([2, 2, 3, 3, 4, 5, 7])
+        alpha = rnd.randint(55, 175)
+        # Negras: en blanco parecían nieve/estrellas. El polvo de película
+        # TAPA luz, y sobre paisajes claros se lee mucho mejor en oscuro.
+        tono = (0, 0, 0) if rnd.random() < 0.88 else (255, 255, 255)
+        dib.ellipse([x - r, y - r, x + r, y + r], fill=(*tono, alpha))
+    img.filter(ImageFilter.GaussianBlur(0.8)).save(out)
+    return out
 
 
 def _jittered_eq_filter(extra: dict) -> str:
@@ -441,13 +535,71 @@ def _finalize(
     ass_escaped = str(ass_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     fontsdir_escaped = config.SUB_FONTSDIR.replace("\\", "\\\\").replace(":", "\\:")
 
+    # Inputs en orden FIJO: [0] vídeo, [1] voz, [2] música si la hay. Todo
+    # input visual extra (máscara del cuadrado, láminas de polvo) se añade
+    # detrás con `add_input`, que devuelve su índice. Hardcodear los índices
+    # se rompía en cuanto se activaba la música.
+    input_args = ["-i", str(video_path)]
+    input_args += [
+        "-ss", f"{voice_start:.3f}",
+        "-t", f"{target_duration:.3f}",
+        "-i", str(voice_path),
+    ]
+    audio_filters = [f"[1:a]volume={config.VOICE_VOLUME}[voice]"]
+
+    if music_path is not None:
+        input_args += ["-ss", "0", "-t", f"{target_duration:.3f}", "-i", str(music_path)]
+        fade_start = max(0.0, target_duration - config.MUSIC_FADEOUT_DUR)
+        audio_filters.append(
+            f"[2:a]volume={config.MUSIC_VOLUME},"
+            f"afade=t=out:st={fade_start:.3f}:d={config.MUSIC_FADEOUT_DUR}[music]"
+        )
+        audio_filters.append(
+            "[voice][music]amix=inputs=2:duration=first:normalize=0,"
+            "alimiter=limit=0.95[aout]"
+        )
+    else:
+        audio_filters.append("[voice]alimiter=limit=0.95[aout]")
+
+    siguiente_idx = 3 if music_path is not None else 2
+
+    def add_input(args: list[str]) -> int:
+        nonlocal siguiente_idx
+        input_args.extend(args)
+        siguiente_idx += 1
+        return siguiente_idx - 1
+
     filters: list[str] = []
     post_label = "vsubs" if style.post_subtitle_filters else "vfinal"
     # Grading propio del estilo (colorbalance, colorchannelmixer…) ANTES de
     # quemar los subtítulos, para no teñir el texto.
     pre = "".join(f"{f}," for f in [*style.pre_subtitle_filters, *extra_fx])
 
-    mask_input: list[str] = []
+    def añadir_polvo(entrada: str) -> str:
+        """Encadena las láminas de polvo sobre `entrada` y devuelve la salida."""
+        capas = max(0, style.film_specks)
+        if capas <= 0:
+            return entrada
+        etiqueta = entrada
+        for i in range(capas):
+            plate = _dust_plate(ass_path.parent, i, dots=130)
+            idx = add_input(["-loop", "1", "-t", f"{target_duration:.3f}", "-i", str(plate)])
+            # La lámina es 1.5× el encuadre, así que puede empezar descolocada
+            # y derivar sin dejar ver el borde. Cada capa va a su ritmo: dos
+            # capas a la misma velocidad se leerían como una textura pegada.
+            x0 = random.randint(-int(config.TARGET_W * 0.45), -10)
+            y0 = random.randint(-int(config.TARGET_H * 0.45), -10)
+            vx = random.uniform(-11, 11)
+            vy = random.uniform(-11, 11)
+            salida = f"dust{i}"
+            filters.append(
+                f"[{etiqueta}][{idx}:v]overlay="
+                f"x='{x0}+({vx:.2f})*t':y='{y0}+({vy:.2f})*t'"
+                f":eval=frame:format=auto[{salida}]"
+            )
+            etiqueta = salida
+        return etiqueta
+
     if style.square_frame:
         # El vídeo se mete en un CUADRADO de esquinas redondeadas centrado
         # sobre negro. Las esquinas se redondean con `alphamerge` + una
@@ -456,11 +608,7 @@ def _finalize(
         # recuadro y no se recorte con él.
         side, radius = config.SQUARE_SIDE, config.SQUARE_RADIUS
         mask_path = _rounded_square_mask(ass_path.parent, side, radius)
-        mask_input = ["-i", str(mask_path)]
-        # La máscara se añade como ÚLTIMO input: [0]=vídeo, [1]=voz,
-        # [2]=música si la hay. Sin calcular el índice, con música activada
-        # el filtro leería la pista de audio como si fuera la máscara.
-        mask_idx = 3 if music_path is not None else 2
+        mask_idx = add_input(["-i", str(mask_path)])
         filters.append(
             f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
             f"scale={side}:{side}:force_original_aspect_ratio=increase,"
@@ -473,42 +621,24 @@ def _finalize(
             f":rate={config.TARGET_FPS}:duration={target_duration:.3f}[bg]"
         )
         filters.append("[bg][sqa]overlay=(W-w)/2:(H-h)/2:format=auto[framed]")
+        con_polvo = añadir_polvo("framed")
         filters.append(
-            f"[framed]subtitles=filename='{ass_escaped}':"
+            f"[{con_polvo}]subtitles=filename='{ass_escaped}':"
             f"fontsdir='{fontsdir_escaped}',format=yuv420p[{post_label}]"
         )
     else:
         filters.append(
-            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
-            f"subtitles=filename='{ass_escaped}':fontsdir='{fontsdir_escaped}'[{post_label}]"
+            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}null[graded]"
+        )
+        con_polvo = añadir_polvo("graded")
+        filters.append(
+            f"[{con_polvo}]subtitles=filename='{ass_escaped}':"
+            f"fontsdir='{fontsdir_escaped}'[{post_label}]"
         )
     if style.post_subtitle_filters:
         filters.append(f"[vsubs]{','.join(style.post_subtitle_filters)}[vfinal]")
 
-    input_args = ["-i", str(video_path)]
-    input_args += [
-        "-ss", f"{voice_start:.3f}",
-        "-t", f"{target_duration:.3f}",
-        "-i", str(voice_path),
-    ]
-    filters.append(f"[1:a]volume={config.VOICE_VOLUME}[voice]")
-
-    if music_path is not None:
-        input_args += ["-ss", "0", "-t", f"{target_duration:.3f}", "-i", str(music_path)]
-        fade_start = max(0.0, target_duration - config.MUSIC_FADEOUT_DUR)
-        filters.append(
-            f"[2:a]volume={config.MUSIC_VOLUME},"
-            f"afade=t=out:st={fade_start:.3f}:d={config.MUSIC_FADEOUT_DUR}[music]"
-        )
-        filters.append(
-            "[voice][music]amix=inputs=2:duration=first:normalize=0,"
-            "alimiter=limit=0.95[aout]"
-        )
-    else:
-        filters.append("[voice]alimiter=limit=0.95[aout]")
-
-    # La máscara va la ÚLTIMA para que su índice sea predecible (ver arriba).
-    input_args += mask_input
+    filters.extend(audio_filters)
 
     # OJO: junto al .ass (tmp_dir), NO junto a output_path — el dir de salida
     # se publica entero en Drive y este scratch acababa subido con los MP4.
@@ -566,6 +696,19 @@ def render_video(
         audio_start = _start
     target_duration = float(target_duration)
     audio_start = float(audio_start)
+
+    snapped = snap_to_first_word(words, audio_start, target_duration, audio_path)
+    if snapped > audio_start:
+        # La ventana se acorta en lo adelantado: el habla es la misma, solo
+        # se va el silencio. Si no se restara, el final se saldría del audio
+        # y el vídeo acabaría con un tramo mudo.
+        target_duration = max(0.0, target_duration - (snapped - audio_start))
+        if on_log:
+            on_log(
+                f"[renderer] arranque de audio {audio_start:.2f}s → {snapped:.2f}s "
+                f"(recortado {snapped - audio_start:.2f}s de silencio inicial)"
+            )
+        audio_start = snapped
 
     if on_log:
         on_log(

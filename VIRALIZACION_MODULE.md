@@ -140,16 +140,19 @@ rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
   por vídeo) + `vignette=angle=PI/4.2:mode=forward` (SIEMPRE `forward` —
   `backward` invierte la viñeta y sobreexpone) + `noise=alls=8:allf=t+u`.
 
-- **B "Reveal"**: las letras aparecen una a una. Por cada línea, un evento
-  ASS POR CARÁCTER revelado — el tiempo de cada carácter se interpola
-  linealmente dentro de la ventana `[start,end]` de la PALABRA a la que
-  pertenece (timings de Whisper), repartiendo sus caracteres uniformemente.
-  El último carácter revelado en cada evento lleva un override de
-  blur/glow: `{\bord6\blur6\3c&HFFFFFF&\4c&HFFFFFF&}c{\r}`. Firma visual
-  extra: se probó un overlay de puntos discretos vía `geq` pero resultaba
-  muy lento en vídeos largos (1080x1920x30fps) — **fallback usado**:
-  `noise=alls=35:allf=t+u:c0s=1` (mucho más denso que el grano base de
-  Estilo A), documentado aquí como decisión de diseño, no como olvido.
+- **B "Reveal"**: UNA palabra en pantalla cada vez (68×1.35px), cambiando de
+  molde tipográfico con `_STACK_MOLDES` (mayúsculas/cursiva/escala/amarillo de
+  acento) y borde negro nítido. Dos intentos previos descartados: revelar
+  letra a letra acumulando la frase (con frases largas el texto se hacía
+  diminuto) y una palabra sola con glow blanco (`\bord5\blur5` con borde
+  blanco — fundía las letras en un borrón ilegible, ver captura del operador).
+  El `end` de cada evento se recorta al `start` de la palabra siguiente: el
+  mínimo de 0,12s que evita el parpadeo invadía la siguiente y ASS apilaba los
+  dos eventos ("LO / que" en pantalla a la vez). Firma visual extra: se probó
+  un overlay de puntos discretos vía `geq` pero resultaba muy lento en vídeos
+  largos (1080x1920x30fps) — **fallback usado**: `noise=alls=35:allf=t+u:c0s=1`
+  (mucho más denso que el grano base de Estilo A), documentado aquí como
+  decisión de diseño, no como olvido.
 
 - **C "Cinemático"**: karaoke por palabra — cada línea genera un evento ASS
   POR PALABRA activa, mostrando la FRASE COMPLETA con la palabra actual en
@@ -163,9 +166,20 @@ rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
   durante el gancho (14 `drawbox` escalonados con `enable`, porque `drawbox`
   no evalúa `t` en su geometría — su `t` es el grosor del trazo).
 
-- **D "Teal & Orange"**, **E "Noir"**, **F "Golden Hour"**: mismo
-  `build_ass` que A pero con grade propio (`eq_extra`), viñeta e intensidad
-  de grano distintas. Son variantes de color, no de tipografía.
+- **D "Teal & Orange"** y **F "Hora dorada"**: reaprovechan el `build_ass`
+  de C y de B con grade propio (`eq_extra`), viñeta e intensidad de grano
+  distintas. Son variantes de color, no de tipografía.
+
+- **E "Cascada"**: las palabras caen DESORDENADAS por la pantalla — un evento
+  ASS por palabra con `\pos` (con `\N` todo el bloque comparte una sola
+  posición, así que no hay forma de desperdigarlas). Posición horizontal,
+  molde tipográfico (`_CASCADA_MOLDES`: escala 0.58-1.45, blanco/amarillo,
+  cursiva, mayúsculas) y holgura vertical se SORTEAN por bloque: un zigzag
+  fijo izquierda-derecha se lee como plantilla. El bloque va compacto (salto
+  0.92× el cuerpo) y cada palabra usa `layer=j`, así la que acaba de entrar
+  tapa a las anteriores. Fondo con motas de polvo NEGRAS a la deriva
+  (`film_specks` = nº de láminas; ver abajo). Era el estilo "Noir" en blanco
+  y negro — descartado por el operador, el paisaje en B/N no vende.
 
 - **G "Cuadrado"**: réplica del formato viral — el vídeo se recorta a un
   cuadrado de `SQUARE_SIDE` px con esquinas redondeadas (`SQUARE_RADIUS`)
@@ -179,6 +193,19 @@ rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
   rectángulos redondeados. La máscara se añade como **último** input para que
   su índice sea predecible (`mask_idx = 3 if music_path else 2`); con música
   activada, un índice fijo leería la pista de audio como si fuera la máscara.
+
+**Motas de polvo (`film_specks`)** — `renderer.py:_dust_plate` genera con PIL
+una lámina PNG transparente 1.5× el encuadre con ~130 motas y el filtro la
+desplaza con `overlay=x='x0+vx*t'`. Se intentó una mota por `drawbox`+`enable`:
+hacían falta cientos de filtros para tener unas pocas en pantalla a la vez y
+aun así no se movían (`drawbox` no anima su posición — su `t` es el GROSOR).
+Con láminas basta un `overlay` por capa, las motas entran y salen del
+encuadre solas, y el coste por fotograma es despreciable.
+
+**Índices de input en `_finalize`** — `[0]` vídeo, `[1]` voz, `[2]` música si
+la hay, y a partir de ahí todo input visual extra (máscara del cuadrado,
+láminas de polvo) se añade con el helper `add_input`, que devuelve el índice.
+Hardcodearlos se rompía en cuanto se activaba la música.
 
 ---
 
