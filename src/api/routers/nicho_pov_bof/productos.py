@@ -253,8 +253,14 @@ async def upload_video(
     producto: Annotated[str, Form()],
     sexo: Annotated[str, Form()],
     origen: Annotated[str, Form()],
-    # Marcado por defecto. Sin marcar, el vídeo sale limpio: sin gancho,
-    # título, CTA ni flecha; solo la voz (y sin marca de agua si es Veo3).
+    # Herramientas de edición, cada una por separado. Todas marcadas = el
+    # montaje completo; ninguna = vídeo limpio (solo la voz, y sin marca de
+    # agua si es Veo3). `con_textos` se mantiene por compatibilidad: los
+    # clientes viejos mandaban solo ese y ha de seguir apagándolo todo.
+    con_gancho: Annotated[bool, Form()] = True,
+    con_titulo: Annotated[bool, Form()] = True,
+    con_cta: Annotated[bool, Form()] = True,
+    con_flecha: Annotated[bool, Form()] = True,
     con_textos: Annotated[bool, Form()] = True,
 ) -> VideoUploadResponse:
     """Sube el vídeo bruto generado fuera (Veo3/Kling) y ENCOLA el montaje
@@ -303,7 +309,11 @@ async def upload_video(
             "raw_path": str(raw_path),
             "sexo": sexo_norm,
             "origen": origen_norm,
-            "con_textos": bool(con_textos),
+            # `con_textos=False` de un cliente antiguo apaga las cuatro.
+            "con_gancho": bool(con_gancho) and bool(con_textos),
+            "con_titulo": bool(con_titulo) and bool(con_textos),
+            "con_cta": bool(con_cta) and bool(con_textos),
+            "con_flecha": bool(con_flecha) and bool(con_textos),
         },
         enqueued_by=operator or None,
     )

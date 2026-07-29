@@ -1759,7 +1759,10 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         output_path=output_local,
         work_dir=work_dir,
         layout=video_editor.layout_for_producto(producto),
-        con_textos=bool(p.get("con_textos", True)),
+        con_gancho=bool(p.get("con_gancho", p.get("con_textos", True))),
+        con_titulo=bool(p.get("con_titulo", p.get("con_textos", True))),
+        con_cta=bool(p.get("con_cta", p.get("con_textos", True))),
+        con_flecha=bool(p.get("con_flecha", p.get("con_textos", True))),
         on_log=on_log,
         on_progress=_pipeline_progress,
     )

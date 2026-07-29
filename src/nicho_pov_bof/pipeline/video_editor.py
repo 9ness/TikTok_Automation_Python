@@ -258,7 +258,11 @@ def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Ima
     ))
 
 
-def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "Image.Image | None":
+def _render_text_block_png(
+    textos: dict,
+    layout: str = "gancho_cta_titulo",
+    piezas: "set[str] | None" = None,
+) -> "Image.Image | None":
     """Compone las 3 líneas (gancho / título / CTA) en un único PNG
     apilado verticalmente y centrado, listo para hacer overlay estático
     sobre el vídeo.
@@ -271,9 +275,12 @@ def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "
       que usa el curso de referencia.
     - `gancho_titulo_cta`: el nombre en medio y la llamada cerrando el bloque.
     """
-    gancho = (textos.get("gancho") or "").strip()
-    titulo = _titulo_para_video(textos)
-    cta = (textos.get("cta") or "").strip()
+    # `piezas` elige qué líneas se pintan ("gancho", "titulo", "cta"). None =
+    # todas, que es el comportamiento de siempre.
+    quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
+    gancho = (textos.get("gancho") or "").strip() if "gancho" in quiere else ""
+    titulo = _titulo_para_video(textos) if "titulo" in quiere else ""
+    cta = (textos.get("cta") or "").strip() if "cta" in quiere else ""
     max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
 
     def _render_gancho():
@@ -350,8 +357,9 @@ def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "
 
 
 def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog,
-                     layout: str = "gancho_cta_titulo") -> Path:
-    block = _render_text_block_png(textos or {}, layout)
+                     layout: str = "gancho_cta_titulo",
+                     piezas: "set[str] | None" = None) -> Path:
+    block = _render_text_block_png(textos or {}, layout, piezas)
     if block is None:
         on_log("[4/6] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
@@ -515,10 +523,13 @@ def build_video(
     output_path: Path,
     work_dir: Path,
     layout: str = "gancho_cta_titulo",
-    # Si es False el vídeo sale LIMPIO: sin bloque de texto y sin flecha.
-    # Se mantienen el quitado de marca (Veo3), el encuadre y el audio, que
-    # son lo que hace falta igualmente para publicarlo.
-    con_textos: bool = True,
+    # Herramientas de edición, cada una por separado. Todas activas = el
+    # montaje completo de siempre; ninguna = vídeo limpio (solo se mantienen
+    # quitado de marca, encuadre y audio, que hacen falta igualmente).
+    con_gancho: bool = True,
+    con_titulo: bool = True,
+    con_cta: bool = True,
+    con_flecha: bool = True,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -527,7 +538,10 @@ def build_video(
     `textos` = {"gancho", "titulo", "cta"} (strings, cualquiera puede venir
     vacío — el bloque de texto omite las líneas ausentes).
     `origen` = "veo3" | "kling" (determina si se quita marca de agua).
-    `con_textos=False` → vídeo limpio: ni texto ni flecha, solo la voz.
+    Las cuatro herramientas (`con_gancho`, `con_titulo`, `con_cta`,
+    `con_flecha`) se eligen por separado: se puede pedir solo el nombre del
+    producto, solo la flecha, o cualquier combinación. Con las cuatro a
+    False el vídeo sale limpio, solo con la voz.
 
     Devuelve `output_path`. Nunca deja un archivo a medias en destino: solo
     se escribe ahí en el último paso (mux de audio), tras el cual el vídeo
@@ -558,26 +572,36 @@ def build_video(
     )
     on_progress(0.48, "Duración cuadrada")
 
-    if con_textos:
-        # 4) Bloque de texto
-        on_log("[4/6] Quemando texto (gancho/título/CTA)…")
+    piezas = {
+        nombre for nombre, activa in (
+            ("gancho", con_gancho), ("titulo", con_titulo), ("cta", con_cta),
+        ) if activa
+    }
+
+    # 4) Bloque de texto
+    if piezas:
+        on_log(f"[4/6] Quemando texto ({'/'.join(sorted(piezas))})…")
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
+            piezas,
         )
         on_progress(0.66, "Texto quemado")
+    else:
+        on_log("[4/6] Sin textos: se omite el bloque de texto")
+        texted = matched
+        on_progress(0.66, "Sin textos")
 
-        # 5) Flecha .mov
+    # 5) Flecha .mov
+    if con_flecha:
         on_log("[5/6] Superponiendo flecha…")
         arrowed = _overlay_arrow(
             texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log,
         )
         on_progress(0.84, "Flecha superpuesta")
     else:
-        # Vídeo limpio: se saltan texto y flecha. La flecha también, porque
-        # sin CTA en pantalla apuntaría a un carrito que nadie ha mencionado.
-        on_log("[4-5/6] Sin textos: se omiten bloque de texto y flecha")
-        arrowed = matched
-        on_progress(0.84, "Sin textos")
+        on_log("[5/6] Sin flecha")
+        arrowed = texted
+        on_progress(0.84, "Sin flecha")
 
     # 6) Mux de audio final → destino
     on_log("[6/6] Mezclando audio final…")

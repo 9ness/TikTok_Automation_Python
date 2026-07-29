@@ -110,9 +110,13 @@ class ProductoInfo(BaseModel):
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None
-    # Marcado = el vídeo lleva gancho, título, CTA y flecha. Sin marcar sale
-    # limpio (solo voz, encuadre y quitado de marca si es Veo3).
-    con_textos: bool = True
+    # Herramientas de edición elegibles por separado. Todas activas = el
+    # montaje completo; ninguna = vídeo limpio (solo voz, encuadre y quitado
+    # de marca si es Veo3).
+    con_gancho: bool = True
+    con_titulo: bool = True
+    con_cta: bool = True
+    con_flecha: bool = True
     # Ficha del producto en TikTok Shop, si se llegó a averiguar (EchoTik).
     # Vacío = todavía no se ha buscado o la búsqueda no encontró nada fiable.
     product_id: str = ""
@@ -176,15 +180,6 @@ class ProductosUrlsResponse(BaseModel):
     encontrados: int = 0     # cuántas fichas se resolvieron
     sin_resultado: int = 0   # buscados pero EchoTik no los indexa
     aviso: str = ""          # p. ej. cuota agotada a mitad
-
-
-class ProductoTextosRequest(BaseModel):
-    """Marca si el vídeo de ese producto lleva textos y flecha."""
-
-    source: str = Field(..., min_length=1)
-    folder: str = Field(..., min_length=1)
-    producto: str = Field(..., min_length=1)
-    con_textos: bool = True
 
 
 class VideoUploadResponse(BaseModel):

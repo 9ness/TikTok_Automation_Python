@@ -685,6 +685,16 @@ function CopyChip({ label, text }: { label: string; text: string }) {
   );
 }
 
+type ToolKey = "gancho" | "titulo" | "cta" | "flecha";
+
+/** Herramientas de edición que se pueden pedir por separado. */
+const TOOLS: { key: ToolKey; label: string }[] = [
+  { key: "gancho", label: "🎣 Gancho" },
+  { key: "titulo", label: "📝 Texto producto" },
+  { key: "cta", label: "👉 CTA" },
+  { key: "flecha", label: "⬇️ Flecha" },
+];
+
 /** Tarjeta de producto: textos, sexo/origen, subida de vídeo y toggles
  *  Subido/Vendió. Estado local + servidor para que los toggles se sientan
  *  instantáneos (mismo patrón que `OutcomeBar` del calendario). */
@@ -707,9 +717,13 @@ function ProductoCard({
   const [sold, setSold] = useState(producto.sold);
   const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
   const [origen, setOrigen] = useState<"veo3" | "kling">("veo3");
-  // Marcado por defecto: lo normal es querer gancho, título, CTA y flecha.
-  // Sin marcar, el vídeo sale limpio y solo lleva la voz.
-  const [conTextos, setConTextos] = useState(true);
+  // Herramientas de edición, elegibles por separado. Todas marcadas por
+  // defecto = el montaje completo; desmarcarlas todas deja el vídeo limpio
+  // (solo la voz). Así se puede pedir, p. ej., solo el nombre del producto
+  // o solo la flecha.
+  const [tools, setTools] = useState<Record<ToolKey, boolean>>({
+    gancho: true, titulo: true, cta: true, flecha: true,
+  });
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -756,7 +770,10 @@ function ProductoCard({
     fd.append("producto", producto.producto);
     fd.append("sexo", sexo);
     fd.append("origen", origen);
-    fd.append("con_textos", String(conTextos));
+    fd.append("con_gancho", String(tools.gancho));
+    fd.append("con_titulo", String(tools.titulo));
+    fd.append("con_cta", String(tools.cta));
+    fd.append("con_flecha", String(tools.flecha));
     // XHR (no fetch) para tener progreso real de subida — mismo patrón que
     // `uploadVideo()` en calendar/page.tsx:634.
     const xhr = new XMLHttpRequest();
@@ -885,19 +902,38 @@ function ProductoCard({
         </div>
       </div>
 
-      {/* Marcado por defecto. Sin marcar el vídeo sale limpio: ni gancho, ni
-          título, ni CTA, ni flecha — solo la voz (y sin marca si es Veo3). */}
-      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border/60 px-2 py-1.5 text-[11px]">
-        <input
-          type="checkbox"
-          className="h-4 w-4 shrink-0 accent-emerald-500"
-          checked={conTextos}
-          onChange={(e) => setConTextos(e.target.checked)}
-        />
-        <span className={conTextos ? "" : "text-muted-foreground"}>
-          {conTextos ? "Con textos y flecha" : "Vídeo limpio (solo voz)"}
-        </span>
-      </label>
+      {/* Cada herramienta por separado. Todas marcadas = montaje completo;
+          ninguna = vídeo limpio (solo la voz, y sin marca si es Veo3). */}
+      <div className="space-y-1.5 rounded-md border border-border/60 p-2">
+        <p className="text-[10px] font-medium text-muted-foreground">
+          Qué añadir al vídeo
+        </p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {TOOLS.map((t) => (
+            <label
+              key={t.key}
+              className={`flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-[11px] transition ${
+                tools[t.key] ? "bg-emerald-500/10" : "text-muted-foreground"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-emerald-500"
+                checked={tools[t.key]}
+                onChange={(e) =>
+                  setTools((prev) => ({ ...prev, [t.key]: e.target.checked }))
+                }
+              />
+              <span className="truncate">{t.label}</span>
+            </label>
+          ))}
+        </div>
+        {!Object.values(tools).some(Boolean) && (
+          <p className="text-[10px] text-amber-500">
+            Vídeo limpio: solo la voz, sin nada encima.
+          </p>
+        )}
+      </div>
 
       <input
         ref={fileInputRef}
