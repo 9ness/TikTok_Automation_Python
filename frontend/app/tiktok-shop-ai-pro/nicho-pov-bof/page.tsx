@@ -816,6 +816,10 @@ function ProductoCard({
         <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} />
         <CopyChip label="✍️ Caption" text={producto.caption ?? ""} />
+        {/* Gancho y CTA también copiables: son los textos que se pegan a mano
+            cuando se prefiere montar el vídeo en CapCut en vez de aquí. */}
+        <CopyChip label="🎣 Gancho" text={producto.gancho ?? ""} />
+        <CopyChip label="👉 CTA" text={producto.cta ?? ""} />
         {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
       </div>
 

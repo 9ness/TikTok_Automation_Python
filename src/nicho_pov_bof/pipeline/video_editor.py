@@ -226,69 +226,22 @@ def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 13, passes: int
     return canvas
 
 
-# Separadores donde parten los títulos de TikTok Shop ("… LASTAR para hombre
-# | incluye colonia …"): lo de delante suele ser el producto y lo de detrás
-# la ficha técnica.
-_TITULO_CORTES = ("|", ":", " - ", " – ", ",")
-# Por debajo de esto el trozo de delante del separador no dice qué es el
-# producto ("Freshly |") y se sigue leyendo.
-_TITULO_MIN_CHARS = 18
-# Palabras que no pueden cerrar el título: cortar en ellas deja la frase
-# colgando ("… con Bolsa Térmica y").
-_TITULO_COLGANTES = {
-    "y", "o", "de", "del", "la", "el", "los", "las", "para", "con", "sin",
-    "en", "a", "al", "un", "una", "por", "que", "su", "sus", "e", "u",
-}
+def _titulo_para_video(textos: dict) -> str:
+    """Título que se quema en el vídeo: el `titulo` del extractor.
 
-
-def _titulo_para_video(textos: dict, max_palabras: int = 9) -> str:
-    """Título que se quema en el vídeo.
-
-    Se usa el título REAL de TikTok Shop, no el resumen de Gemini: es el que
-    describe fielmente el producto y es lo que el operador ponía a mano. Pero
-    entero no cabe (son fichas de 200 caracteres), así que se corta por el
-    primer separador fuerte y, si aún es largo, por palabras — el operador
-    ponía "más o menos las dos primeras líneas".
+    Es el que el prompt (`prompts/text_extractor.md`) genera EXPRESAMENTE
+    para pintar en pantalla: corto, sin las keywords SEO de la ficha y ya
+    repartido en columnas de <=4 palabras con `\n`. El
+    `titulo_tiktok_completo` NO vale aquí — ese existe para buscar el
+    producto en el Centro de Afiliados y son fichas de 200 caracteres.
+    Solo se usa como último recurso si el corto viniera vacío.
     """
+    corto = (textos.get("titulo") or "").strip()
+    if corto:
+        return corto
     completo = (textos.get("titulo_tiktok_completo") or "").strip()
-    # Los títulos de TikTok Shop vienen con basura de escapado ("\\Impermeable")
-    # y espacios dobles; sin limpiar salen tal cual quemados en el vídeo.
     completo = re.sub(r"\s+", " ", completo.replace("\\", " ")).strip()
-    if not completo:
-        # Sin título de TikTok se cae al resumen de Gemini, que siempre está.
-        return (textos.get("titulo") or "").strip()
-
-    # Se acumulan TROZOS enteros (los que separan "|", ",", " - "…) mientras
-    # quepan. Cortar a lo bruto por número de palabras dejaba colas absurdas
-    # como "Freshly Cosmetics - Hyaluronic Energy Body Serum - Gel".
-    piezas = [t for t in re.split(r"\s*([|:,]|\s-\s|\s–\s)\s*", completo) if t]
-    corte, usadas = "", 0
-    for i in range(0, len(piezas), 2):
-        trozo = piezas[i].strip()
-        if not trozo:
-            continue
-        n = len(trozo.split())
-        if corte and usadas + n > max_palabras:
-            break
-        sep = piezas[i - 1].strip() if i > 0 else ""
-        # El separador se re-escribe con sus espacios: al partir se pierden y
-        # quedaba "Freshly- Protector Solar".
-        union = " - " if sep in ("-", "–") else f"{sep or ','} "
-        corte = trozo if not corte else f"{corte}{union}{trozo}"
-        usadas += n
-        if usadas >= max_palabras:
-            break
-
-    palabras = (corte or completo).split()
-    if len(palabras) > max_palabras:
-        palabras = palabras[:max_palabras]
-    # Fuera conectores y guiones sueltos del final.
-    while palabras and (
-        palabras[-1].lower().strip(".,-–|:") in _TITULO_COLGANTES
-        or not palabras[-1].strip(".,-–|:")
-    ):
-        palabras.pop()
-    return " ".join(palabras).strip(" .,-–|:")
+    return " ".join(completo.split()[:8])
 
 
 def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Image.Image":
@@ -339,7 +292,7 @@ def _render_text_block_png(textos: dict, layout: str = "gancho_cta_titulo") -> "
         # Título: blanco con borde negro, hasta 2 líneas, SIN glow.
         return _render_text_line(
             titulo, font_size=config.TITLE_FONT_SIZE, max_w=max_w,
-            fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=2,
+            fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=3,
         )
 
     def _render_cta():
