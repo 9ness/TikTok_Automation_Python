@@ -219,6 +219,9 @@ async def upload_video(
     producto: Annotated[str, Form()],
     sexo: Annotated[str, Form()],
     origen: Annotated[str, Form()],
+    # Marcado por defecto. Sin marcar, el vídeo sale limpio: sin gancho,
+    # título, CTA ni flecha; solo la voz (y sin marca de agua si es Veo3).
+    con_textos: Annotated[bool, Form()] = True,
 ) -> VideoUploadResponse:
     """Sube el vídeo bruto generado fuera (Veo3/Kling) y ENCOLA el montaje
     completo (quita marca de agua + normaliza + cuadra duración + textos +
@@ -266,6 +269,7 @@ async def upload_video(
             "raw_path": str(raw_path),
             "sexo": sexo_norm,
             "origen": origen_norm,
+            "con_textos": bool(con_textos),
         },
         enqueued_by=operator or None,
     )

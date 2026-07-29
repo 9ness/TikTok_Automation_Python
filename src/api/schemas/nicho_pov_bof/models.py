@@ -110,6 +110,9 @@ class ProductoInfo(BaseModel):
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None
+    # Marcado = el vídeo lleva gancho, título, CTA y flecha. Sin marcar sale
+    # limpio (solo voz, encuadre y quitado de marca si es Veo3).
+    con_textos: bool = True
 
 
 class ProductosListResponse(BaseModel):
@@ -133,6 +136,15 @@ class ProductoEstadoRequest(BaseModel):
     producto: str = Field(..., min_length=1)
     uploaded: bool | None = None
     sold: bool | None = None
+
+
+class ProductoTextosRequest(BaseModel):
+    """Marca si el vídeo de ese producto lleva textos y flecha."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    producto: str = Field(..., min_length=1)
+    con_textos: bool = True
 
 
 class VideoUploadResponse(BaseModel):

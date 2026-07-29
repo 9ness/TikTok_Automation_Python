@@ -651,6 +651,9 @@ function ProductoCard({
   const [sold, setSold] = useState(producto.sold);
   const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
   const [origen, setOrigen] = useState<"veo3" | "kling">("veo3");
+  // Marcado por defecto: lo normal es querer gancho, título, CTA y flecha.
+  // Sin marcar, el vídeo sale limpio y solo lleva la voz.
+  const [conTextos, setConTextos] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -697,6 +700,7 @@ function ProductoCard({
     fd.append("producto", producto.producto);
     fd.append("sexo", sexo);
     fd.append("origen", origen);
+    fd.append("con_textos", String(conTextos));
     // XHR (no fetch) para tener progreso real de subida — mismo patrón que
     // `uploadVideo()` en calendar/page.tsx:634.
     const xhr = new XMLHttpRequest();
@@ -788,6 +792,20 @@ function ProductoCard({
           ))}
         </div>
       </div>
+
+      {/* Marcado por defecto. Sin marcar el vídeo sale limpio: ni gancho, ni
+          título, ni CTA, ni flecha — solo la voz (y sin marca si es Veo3). */}
+      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border/60 px-2 py-1.5 text-[11px]">
+        <input
+          type="checkbox"
+          className="h-4 w-4 shrink-0 accent-emerald-500"
+          checked={conTextos}
+          onChange={(e) => setConTextos(e.target.checked)}
+        />
+        <span className={conTextos ? "" : "text-muted-foreground"}>
+          {conTextos ? "Con textos y flecha" : "Vídeo limpio (solo voz)"}
+        </span>
+      </label>
 
       <input
         ref={fileInputRef}

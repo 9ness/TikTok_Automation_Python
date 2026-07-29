@@ -445,6 +445,10 @@ def build_video(
     output_path: Path,
     work_dir: Path,
     layout: str = "gancho_cta_titulo",
+    # Si es False el vídeo sale LIMPIO: sin bloque de texto y sin flecha.
+    # Se mantienen el quitado de marca (Veo3), el encuadre y el audio, que
+    # son lo que hace falta igualmente para publicarlo.
+    con_textos: bool = True,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -453,6 +457,7 @@ def build_video(
     `textos` = {"gancho", "titulo", "cta"} (strings, cualquiera puede venir
     vacío — el bloque de texto omite las líneas ausentes).
     `origen` = "veo3" | "kling" (determina si se quita marca de agua).
+    `con_textos=False` → vídeo limpio: ni texto ni flecha, solo la voz.
 
     Devuelve `output_path`. Nunca deja un archivo a medias en destino: solo
     se escribe ahí en el último paso (mux de audio), tras el cual el vídeo
@@ -483,15 +488,26 @@ def build_video(
     )
     on_progress(0.48, "Duración cuadrada")
 
-    # 4) Bloque de texto
-    on_log("[4/6] Quemando texto (gancho/título/CTA)…")
-    texted = _burn_text_block(matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout)
-    on_progress(0.66, "Texto quemado")
+    if con_textos:
+        # 4) Bloque de texto
+        on_log("[4/6] Quemando texto (gancho/título/CTA)…")
+        texted = _burn_text_block(
+            matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
+        )
+        on_progress(0.66, "Texto quemado")
 
-    # 5) Flecha .mov
-    on_log("[5/6] Superponiendo flecha…")
-    arrowed = _overlay_arrow(texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log)
-    on_progress(0.84, "Flecha superpuesta")
+        # 5) Flecha .mov
+        on_log("[5/6] Superponiendo flecha…")
+        arrowed = _overlay_arrow(
+            texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log,
+        )
+        on_progress(0.84, "Flecha superpuesta")
+    else:
+        # Vídeo limpio: se saltan texto y flecha. La flecha también, porque
+        # sin CTA en pantalla apuntaría a un carrito que nadie ha mencionado.
+        on_log("[4-5/6] Sin textos: se omiten bloque de texto y flecha")
+        arrowed = matched
+        on_progress(0.84, "Sin textos")
 
     # 6) Mux de audio final → destino
     on_log("[6/6] Mezclando audio final…")
