@@ -213,7 +213,10 @@ def list_productos(
 
 
 @router.post("/extraer-textos", response_model=ProductosListResponse)
-def extraer_textos(body: ExtraerTextosRequest) -> ProductosListResponse:
+def extraer_textos(
+    body: ExtraerTextosRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> ProductosListResponse:
     """Ejecuta la extracción de textos (Gemini, UNA llamada para toda la
     carpeta) y guarda el resultado. Síncrono a propósito — tarda ~1 min pero
     el operador lo pulsa una sola vez por carpeta."""
@@ -231,7 +234,7 @@ def extraer_textos(body: ExtraerTextosRequest) -> ProductosListResponse:
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
 
-    return _list_productos(body.source, body.folder)
+    return _list_productos(body.source, body.folder, queue)
 
 
 @router.get("/foto-limpia")
@@ -422,7 +425,10 @@ def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
 
 
 @router.post("/productos/urls", response_model=ProductosUrlsResponse)
-def buscar_urls_carpeta(body: ProductosUrlsRequest) -> ProductosUrlsResponse:
+def buscar_urls_carpeta(
+    body: ProductosUrlsRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> ProductosUrlsResponse:
     """Busca la ficha de TikTok Shop de toda la carpeta de una tacada.
 
     Equivalente de carpeta a `/producto/url`, igual que "Obtener textos" lo
@@ -507,7 +513,7 @@ def buscar_urls_carpeta(body: ProductosUrlsRequest) -> ProductosUrlsResponse:
                 raise APIError(str(e), status_code=503) from e
             encontrados += 1
 
-    lista = _list_productos(body.source, body.folder)
+    lista = _list_productos(body.source, body.folder, queue)
     return ProductosUrlsResponse(
         source=lista.source,
         folder=lista.folder,
