@@ -41,6 +41,8 @@ from typing import Callable
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from src.font_resolver import _bundled_fonts_dir
+import cv2
+
 from src.nicho_pov_bof import config
 from src.nicho_pov_bof.pipeline.duration_match import (
     _run,
@@ -70,8 +72,10 @@ _noop_progress: OnProgress = lambda _pct, _label: None
 # poner aquí los colores y subir `_SOMBRA_RADIO`.
 _HOOK_GLOW_COLOR = (0, 0, 0)
 _CTA_GLOW_COLOR = (0, 0, 0)
-_SOMBRA_RADIO = 9
+_SOMBRA_RADIO = 7
 _SOMBRA_PASADAS = 3
+# Desplazamiento de la sombra. Sin desplazar se lee como halo, no como sombra.
+_SOMBRA_OFFSET = (7, 9)
 _TITLE_STROKE = (0, 0, 0)          # título: blanco con borde negro, sin glow
 
 
@@ -202,18 +206,24 @@ def _render_text_line(
     return img
 
 
-def _add_glow(img: "Image.Image", color: tuple, *, radius: int = _SOMBRA_RADIO, passes: int = _SOMBRA_PASADAS) -> "Image.Image":
-    """Añade un halo de color detrás del texto: usa el canal alpha del PNG
-    como máscara, la rellena de `color` y la difumina con GaussianBlur
-    (varias pasadas = glow más suave/ancho); el texto original se pega
-    encima nítido. Devuelve un canvas más grande (margen = 3×radius) para
-    que el halo no quede recortado en los bordes."""
-    pad = radius * 3
+def _add_glow(
+    img: "Image.Image", color: tuple, *,
+    radius: int = _SOMBRA_RADIO, passes: int = _SOMBRA_PASADAS,
+    offset: tuple[int, int] = _SOMBRA_OFFSET,
+) -> "Image.Image":
+    """Sombra proyectada detrás del texto.
+
+    Usa el canal alpha del PNG como máscara, la rellena de `color`, la
+    difumina y la pega DESPLAZADA (`offset`): una sombra simétrica se lee como
+    un halo difuso, no como sombra, y era lo que hacía que el bloque pareciera
+    plano. El texto original va encima nítido.
+    """
+    pad = radius * 3 + max(abs(offset[0]), abs(offset[1]))
     W, H = img.size
     canvas = Image.new("RGBA", (W + pad * 2, H + pad * 2), (0, 0, 0, 0))
     alpha = img.split()[-1]
     glow_alpha = Image.new("L", canvas.size, 0)
-    glow_alpha.paste(alpha, (pad, pad))
+    glow_alpha.paste(alpha, (pad + offset[0], pad + offset[1]))
     glow_layer = Image.new("RGBA", canvas.size, tuple(color) + (0,))
     glow_layer.putalpha(glow_alpha)
     for _ in range(max(1, passes)):
@@ -297,6 +307,7 @@ def _render_text_block_png(
     textos: dict,
     layout: str = "gancho_cta_titulo",
     piezas: "set[str] | None" = None,
+    paleta: dict | None = None,
 ) -> "Image.Image | None":
     """Compone las 3 líneas (gancho / título / CTA) en un único PNG
     apilado verticalmente y centrado, listo para hacer overlay estático
@@ -313,6 +324,7 @@ def _render_text_block_png(
     # `piezas` elige qué líneas se pintan ("gancho", "titulo", "cta"). None =
     # todas, que es el comportamiento de siempre.
     quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
+    pal = paleta or _PALETAS[0]
     gancho = (textos.get("gancho") or "").strip() if "gancho" in quiere else ""
     titulo = _titulo_para_video(textos) if "titulo" in quiere else ""
     cta = (textos.get("cta") or "").strip() if "cta" in quiere else ""
@@ -324,7 +336,7 @@ def _render_text_block_png(
         # Gancho: MAYÚSCULAS, relleno blanco + glow magenta/rosa.
         im = _render_text_line(
             gancho.upper(), font_size=config.HOOK_FONT_SIZE, max_w=max_w,
-            fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=1,
+            fill=pal["gancho"], stroke=(0, 0, 0), max_lines=1,
             fuente=_FUENTE_CURSIVA,
         )
         return _add_glow(im, _HOOK_GLOW_COLOR) if im is not None else None
@@ -333,11 +345,15 @@ def _render_text_block_png(
         if not titulo:
             return None
         # Título: blanco con borde negro, hasta 2 líneas, SIN glow.
-        return _render_text_line(
+        im = _render_text_line(
             titulo, font_size=config.TITLE_FONT_SIZE, max_w=max_w,
             fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=_TITULO_MAX_LINEAS,
             fuente=_FUENTE_RECTA,
         )
+        # El nombre va SIEMPRE en blanco (es lo informativo y tiene que leerse
+        # sobre cualquier plano), pero con la misma sombra que el resto para
+        # que el bloque se vea de una pieza.
+        return _add_glow(im, (0, 0, 0)) if im is not None else None
 
     def _render_cta():
         if not cta:
@@ -345,7 +361,7 @@ def _render_text_block_png(
         # CTA: relleno blanco + glow cyan.
         im = _render_text_line(
             cta.upper(), font_size=config.CTA_FONT_SIZE, max_w=max_w,
-            fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=1,
+            fill=pal["cta"], stroke=(0, 0, 0), max_lines=1,
             fuente=_FUENTE_CURSIVA,
         )
         return _add_glow(im, _CTA_GLOW_COLOR) if im is not None else None
@@ -394,10 +410,132 @@ def _render_text_block_png(
     return block
 
 
+# ---------------------------------------------------------------------------
+# Paleta de color del bloque de texto
+# ---------------------------------------------------------------------------
+# Los textos NO van todos en blanco: el gancho habla de precio/cupón y el
+# color vende tanto como la palabra. Cada paleta es una combinación que
+# funciona en vídeo vertical: el gancho en el color fuerte, el CTA en uno que
+# acompañe sin competir, y el nombre del producto siempre en BLANCO (es la
+# parte informativa y tiene que leerse sobre cualquier fondo).
+#
+# El CTA lleva un tono ANÁLOGO o complementario del gancho, nunca blanco: en
+# blanco el bloque volvía a parecer plano. El nombre del producto sí queda
+# siempre blanco.
+#
+# `familias` son los emojis con los que casa cada paleta, y `tono` el matiz
+# dominante en grados HSV (0=rojo, 60=amarillo, 120=verde, 180=cian) — se usa
+# para elegir una que CONTRASTE con el fondo del vídeo.
+_PALETAS = (
+    {
+        "nombre": "oro",
+        "gancho": (255, 209, 46), "cta": (255, 146, 76), "tono": 50,
+        "familias": "💰🤑💸💵🏷️⚠️",
+    },
+    {
+        "nombre": "coral",
+        "gancho": (255, 94, 87), "cta": (255, 226, 122), "tono": 5,
+        "familias": "🔥😱🤯❗‼️",
+    },
+    {
+        "nombre": "lima",
+        "gancho": (170, 255, 96), "cta": (120, 232, 255), "tono": 95,
+        "familias": "🌿✅🥗♻️💚",
+    },
+    {
+        "nombre": "cian",
+        "gancho": (94, 226, 255), "cta": (255, 214, 92), "tono": 190,
+        "familias": "👀💧❄️🧊💙",
+    },
+    {
+        "nombre": "magenta",
+        "gancho": (255, 120, 214), "cta": (255, 240, 160), "tono": 320,
+        "familias": "💖✨🎀🫣",
+    },
+    {
+        "nombre": "naranja",
+        "gancho": (255, 158, 61), "cta": (255, 240, 150), "tono": 28,
+        "familias": "👇👉🛒📦",
+    },
+)
+
+
+def _tono_dominante(video: Path) -> tuple[float, float]:
+    """Matiz dominante del vídeo y su luminosidad media (0-255).
+
+    Se muestrean tres fotogramas repartidos y se mira SOLO la zona donde va
+    el texto: lo que importa es contra qué se va a leer, no el resto.
+    """
+    import colorsys
+
+    muestras = []
+    for frac in (0.15, 0.5, 0.85):
+        f = video.with_name(f"_tono_{int(frac*100)}.jpg")
+        try:
+            dur = probe_duration(video)
+            _run(["ffmpeg", "-y", "-v", "error", "-ss", f"{dur*frac:.2f}",
+                  "-i", str(video), "-frames:v", "1", "-vf", "scale=160:-1",
+                  str(f)], _noop)
+            img = cv2.imread(str(f))
+            f.unlink(missing_ok=True)
+        except Exception:
+            img = None
+        if img is None:
+            continue
+        h, w = img.shape[:2]
+        banda = img[: int(h * 0.45), :]        # el bloque va arriba
+        b, g, r = [float(x) / 255 for x in banda.reshape(-1, 3).mean(axis=0)]
+        hh, _ss, vv = colorsys.rgb_to_hsv(r, g, b)
+        muestras.append((hh * 360, vv * 255))
+    if not muestras:
+        return 0.0, 128.0
+    return (
+        sum(m[0] for m in muestras) / len(muestras),
+        sum(m[1] for m in muestras) / len(muestras),
+    )
+
+
+def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> dict:
+    """Paleta para este producto: que pegue con los emojis y contraste con el vídeo.
+
+    Tres criterios, en este orden de peso:
+      1. **Emoji**: si el gancho lleva 🔥 la paleta cálida es la que cuadra;
+         con 👀 pide fría. Es la señal más fuerte de intención.
+      2. **Contraste con el fondo**: se penaliza la paleta cuyo matiz esté
+         cerca del dominante del vídeo — un texto naranja sobre un plano
+         naranja no se lee aunque combine.
+      3. **Variedad**: a igualdad de puntos, desempata el nº de producto, así
+         dos productos seguidos de la misma tienda no salen calcados.
+    """
+    emojis = (textos.get("gancho") or "") + (textos.get("cta") or "")
+    tono_fondo, _luz = _tono_dominante(video)
+    desempate = sum(ord(c) for c in str(semilla))
+
+    def puntos(i_p):
+        i, pal = i_p
+        p = 0.0
+        p += 6.0 * sum(1 for e in pal["familias"] if e in emojis)
+        # distancia circular de matiz, normalizada a 0-1
+        d = abs(pal["tono"] - tono_fondo) % 360
+        d = min(d, 360 - d) / 180
+        p += 3.0 * d
+        p += ((desempate + i) % len(_PALETAS)) * 0.1
+        return p
+
+    elegida = max(enumerate(_PALETAS), key=puntos)[1]
+    on_log(
+        f"[3/5] paleta '{elegida['nombre']}' (fondo ~{tono_fondo:.0f}°, "
+        f"emojis {emojis.strip() or '—'})"
+    )
+    return elegida
+
+
 def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog,
                      layout: str = "gancho_cta_titulo",
-                     piezas: "set[str] | None" = None) -> Path:
-    block = _render_text_block_png(textos or {}, layout, piezas)
+                     piezas: "set[str] | None" = None,
+                     semilla: str = "") -> Path:
+    paleta = _elegir_paleta(video_in, textos or {}, semilla, on_log)
+    block = _render_text_block_png(textos or {}, layout, piezas, paleta)
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
@@ -619,7 +757,7 @@ def build_video(
         on_log(f"[3/5] Quemando texto ({'/'.join(sorted(piezas))})…")
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
-            piezas,
+            piezas, semilla=str(output_path.stem),
         )
         on_progress(0.66, "Texto quemado")
     else:
