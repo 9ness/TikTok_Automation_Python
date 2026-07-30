@@ -96,10 +96,25 @@ def build_keyword(titulo_completo: str, tienda: str = "", max_palabras: int = 5)
     return " ".join(partes[:max_palabras]).strip()
 
 
-def keyword_corta(titulo_completo: str, tienda: str = "") -> str:
-    """Segundo intento cuando la primera búsqueda no devuelve NADA: marca + 2
-    palabras. Menos específica, más probabilidad de que el buscador acierte."""
-    return build_keyword(titulo_completo, tienda, max_palabras=4)
+def keyword_sin_marca(titulo_completo: str, tienda: str = "", max_palabras: int = 3) -> str:
+    """Frase del nombre SIN la marca, para el segundo intento.
+
+    EchoTik busca por SUBCADENA, no por palabras: `wotsta` devuelve el producto
+    exacto pero `wotsta silla para juegos asiento` devuelve 0, porque la ficha
+    real dice "WOTSTA-silla para juegos, asiento" y con el guion y la coma la
+    keyword deja de ser subcadena.
+
+    Unas fichas pegan la marca al nombre ("BELLA AURORA Crema de Manos") y ahí
+    gana `build_keyword`; otras la separan ("Freshly - …", "WOTSTA-silla") y
+    entonces hay que buscar solo la frase. No se puede saber de antemano cuál
+    de las dos usa el listado real, así que se prueban en ese orden.
+    """
+    marca = {p for p in _normaliza(tienda).split() if len(p) > 2}
+    palabras = [
+        w for w in build_keyword(titulo_completo, tienda, max_palabras=8).split()
+        if w not in marca
+    ]
+    return " ".join(palabras[:max_palabras]).strip()
 
 
 def _nucleo(titulo_completo: str, tienda: str) -> set[str]:
@@ -175,11 +190,11 @@ def find_product_url(
     if not resultados:
         # Segundo intento con menos palabras: la mayoría de los fallos eran
         # keywords demasiado específicas, no productos ausentes del catálogo.
-        corta = keyword_corta(titulo_completo, tienda)
-        if corta and corta != keyword:
-            log(f"  · sin resultados → reintento con {corta!r} (1 llamada más)")
-            keyword = corta
-            resultados = echotik_cloud.search_products(corta, region=region, limit=10)
+        sin_marca = keyword_sin_marca(titulo_completo, tienda)
+        if sin_marca and sin_marca != keyword:
+            log(f"  · sin resultados → reintento sin marca: {sin_marca!r} (1 llamada más)")
+            keyword = sin_marca
+            resultados = echotik_cloud.search_products(sin_marca, region=region, limit=10)
     if not resultados:
         log("  · sin resultados")
         return None

@@ -814,8 +814,14 @@ function ProductoCard({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold sm:text-sm">
-            {producto.titulo || producto.producto}
+          {/* El número del producto va SIEMPRE delante: es como se llama la
+              carpeta y la foto, y al extraer los textos el título lo tapaba,
+              así que no se sabía con qué producto se estaba trabajando. */}
+          <p className="flex items-baseline gap-1.5 text-xs font-semibold sm:text-sm">
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+              {producto.producto}
+            </span>
+            <span className="truncate">{producto.titulo || "sin título"}</span>
           </p>
           {producto.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">
