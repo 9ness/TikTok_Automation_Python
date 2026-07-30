@@ -64,52 +64,35 @@ def snap_to_first_word(
     window_dur: float,
     audio_path: Path | None = None,
     lead_in: float = 0.06,
-    max_salto: float = 1.5,
 ) -> float:
-    """Adelanta el arranque de la ventana hasta justo antes de que se hable.
+    """Adelanta el arranque de la ventana solo lo que haya de SILENCIO delante.
 
-    Los audios de origen traen entre medio segundo y casi dos segundos de aire
-    antes de la primera palabra, y las ventanas de las rondas siguientes caen
-    donde caen — a veces en mitad de una pausa. Ese silencio al empezar un
-    TikTok es scroll asegurado.
+    Los audios traen entre 0,1 y casi 2 segundos de aire antes de la primera
+    palabra, y eso al empezar un TikTok es scroll asegurado.
 
-    Se cruzan DOS medidas porque ninguna basta sola: Whisper redondea el
-    arranque a 0.00s en audios que de hecho tienen 0,74s de aire
-    (`pablo3_full.mp3`), y `silencedetect` no sabe de palabras — corta donde
-    deja de haber silencio, que puede ser una respiración.
-
-    El criterio es: manda `silencedetect` (mide el fichero, no interpreta), y
-    solo se adelanta hasta la siguiente palabra de Whisper si en ese punto NO
-    hay ninguna sonando. Coger simplemente la más tardía de las dos era
-    peligroso: si Whisper se salta la primera frase, se comería habla real.
-    Por eso además hay tope (`max_salto`) — un hueco largo entre el fin del
-    silencio y la primera palabra significa que ahí hay algo que Whisper no
-    transcribió, y entonces se respeta `silencedetect`.
+    Manda `silencedetect`, que mide el fichero. Antes se cruzaba con los
+    timings de Whisper y se avanzaba hasta "la primera palabra": en
+    `pablo5_full.mp3` ("Pau Donés, unos días antes de morir…") Whisper daba la
+    primera palabra en 1,90s porque se salta el nombre propio, y el arranque
+    se comía "Pau Donés". Whisper NO decide dónde empieza el audio; solo se
+    usa si no hay fichero que medir.
 
     Solo adelanta, nunca retrasa. La ventana se ACORTA en lo adelantado (el
     contenido hablado es el mismo, solo desaparece el silencio de delante).
     """
-    end = window_start + window_dur
-    base = window_start
     if audio_path is not None:
-        base += leading_silence(audio_path, start=window_start)
+        silencio = leading_silence(audio_path, start=window_start)
+        return max(window_start, window_start + silencio - lead_in)
 
-    en_ventana = [
-        w for w in words
-        if float(w["end"]) > window_start and float(w["start"]) < end
+    # Sin fichero (tests, llamadas sintéticas): lo único que queda es Whisper.
+    end = window_start + window_dur
+    siguientes = [
+        float(w["start"]) for w in words
+        if window_start <= float(w["start"]) < end
     ]
-    # Si en `base` ya hay una palabra sonando, adelantar más la cortaría.
-    sonando = any(
-        float(w["start"]) - 0.05 <= base <= float(w["end"]) for w in en_ventana
-    )
-    if not sonando:
-        siguientes = [
-            float(w["start"]) for w in en_ventana if float(w["start"]) >= base
-        ]
-        if siguientes and min(siguientes) - base <= max_salto:
-            base = min(siguientes)
-
-    return max(window_start, base - lead_in)
+    if not siguientes:
+        return window_start
+    return max(window_start, min(siguientes) - lead_in)
 
 
 def _jittered_paisaje_durations(fill_duration: float, n: int) -> list[float]:
@@ -837,9 +820,22 @@ def render_video(
             for c, d in zip(paisaje_candidates, durations)
         ]
 
+    # Gancho ya recortado a 3s si existe: el vídeo fuente pesa 300 MB-1,1 GB
+    # por ponente y no cabe tenerlos todos en el disco del VPS. El encuadre
+    # (`cx_frac`) y el zoom los sigue poniendo el renderer, así que el clip
+    # se guarda sin recortar de ancho y el resultado es idéntico.
+    hook_src, hook_start = hook_video, hook_candidate["start"]
+    clip_gancho = hook_candidate.get("clip")
+    if clip_gancho:
+        candidato = config.ponente_ganchos_dir(ponente) / clip_gancho
+        if candidato.is_file():
+            hook_src, hook_start = candidato, 0.0
+        elif on_log:
+            on_log(f"[renderer] ⚠️ falta el gancho pre-cortado {candidato.name}, uso el vídeo fuente")
+
     transitions = build_transitions(1 + len(paisaje_segments), style)
     specs = build_clip_specs(
-        hook_video, hook_candidate["start"], hook_candidate["cx_frac"],
+        hook_src, hook_start, hook_candidate["cx_frac"],
         paisaje_segments, transitions, target_duration,
     )
 

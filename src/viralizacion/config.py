@@ -42,6 +42,10 @@ PONENTES: dict[str, dict] = {
         "label": "Mario Alonso Puig",
         "drive_folder": "Mario Alonso Puig",
     },
+    "segarra": {
+        "label": "Dr. Manuel Segarra",
+        "drive_folder": "Dr. Manuel Segarra",
+    },
 }
 
 
@@ -206,6 +210,17 @@ def _seed_cache_from_legacy(work: Path, legacy: Path) -> Path:
             # work no escribible o legacy ilegible → devolver legacy (read)
             return legacy
     return work
+
+
+def ponente_ganchos_dir(slug: str) -> Path:
+    """Carpeta de ganchos YA recortados (3s cada uno).
+
+    Existe para no tener el vídeo fuente en el disco del VPS: son de 300 MB a
+    1,1 GB por ponente y con 4-8 ponentes el disco se llena. Recortados pesan
+    ~0,8 MB cada uno (73 ganchos de Mario = 58 MB en vez de 303 MB) y el
+    original se queda solo en Drive, que es de donde vino.
+    """
+    return ponente_folder(slug) / "ganchos"
 
 
 def hook_candidates_cache_path(slug: str) -> Path:
