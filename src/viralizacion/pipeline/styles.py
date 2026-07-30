@@ -717,17 +717,14 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         fonts_dir=bundled_fonts_dir(),
         # Formato normal (NO cuadrado), pero con los bordes bien oscurecidos.
         vignette_angle="PI/3.2",
-        # Revelado cálido y apagado: menos azul, gamma baja, algo de contraste.
-        eq_extra={"gamma": 0.88, "contrast": 1.12, "saturation": 0.45},
-        # Vira a sepia de verdad. `colorbalance` solo no bastaba: sobre un
-        # plano azulado seguía saliendo frío. `colorchannelmixer` mezcla los
-        # canales (matriz de sepia clásica) y luego se recalienta un punto.
-        pre_subtitle_filters=[
-            "colorbalance=rs=0.22:gs=0.04:bs=-0.20"
-            ":rm=0.14:gm=0.02:bm=-0.14:rh=0.08:bh=-0.10",
-        ],
-        # Lo que de verdad lo hace "celuloide": mucho polvo y rayaduras.
-        film_specks=3,
+        # El paisaje se queda EN COLOR y vivo. Se probó un sepia de película
+        # y el operador lo descartó: en blanco y negro o muy antiguo el plano
+        # pierde interés, que es justo lo que vende el vídeo. Lo "de película"
+        # lo ponen el polvo, las rayaduras y la viñeta, no el color.
+        # Solo se baja un punto la gamma para que el texto claro destaque.
+        eq_extra={"gamma": 0.94, "contrast": 1.06},
+        # Lo que de verdad lo hace "celuloide": polvo y rayaduras, no el color.
+        film_specks=2,
         film_scratches=4,
         noise_filter_override="noise=alls=10:allf=t+u",
         transition_landscape=("dissolve", 0.6),

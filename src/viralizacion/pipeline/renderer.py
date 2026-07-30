@@ -261,13 +261,18 @@ def _dust_plate(work: Path, idx: int, dots: int) -> Path:
     rnd = random.Random(4200 + idx)
     for _ in range(dots):
         x, y = rnd.randrange(w), rnd.randrange(h)
-        r = rnd.choice([2, 2, 3, 3, 4, 5, 7])
-        alpha = rnd.randint(55, 175)
-        # Negras: en blanco parecían nieve/estrellas. El polvo de película
-        # TAPA luz, y sobre paisajes claros se lee mucho mejor en oscuro.
-        tono = (0, 0, 0) if rnd.random() < 0.88 else (255, 255, 255)
+        r = rnd.choice([2, 3, 3, 4, 4, 5, 6, 8, 10])
+        # Opacas de verdad. Con alpha 55-175 el polvo se perdía: el operador
+        # directamente no lo veía en los vídeos ("lo que no veo es el polvo
+        # negro"). Es la firma del estilo, tiene que notarse.
+        alpha = rnd.randint(120, 245)
+        # Negras: en blanco parecían nieve/estrellas y el operador las
+        # descartó. Pero el negro sobre un mar oscuro es invisible, así que
+        # una de cada seis se pinta clara — así SIEMPRE hay motas legibles
+        # sea cual sea el plano, sin que parezca que nieva.
+        tono = (0, 0, 0) if rnd.random() < 0.83 else (245, 245, 245)
         dib.ellipse([x - r, y - r, x + r, y + r], fill=(*tono, alpha))
-    img.filter(ImageFilter.GaussianBlur(0.8)).save(out)
+    img.filter(ImageFilter.GaussianBlur(0.6)).save(out)
     return out
 
 
@@ -638,7 +643,7 @@ def _finalize(
             return entrada
         etiqueta = entrada
         for i in range(capas):
-            plate = _dust_plate(ass_path.parent, i, dots=130)
+            plate = _dust_plate(ass_path.parent, i, dots=90)
             idx = add_input(["-loop", "1", "-t", f"{target_duration:.3f}", "-i", str(plate)])
             # La lámina es 1.5× el encuadre, así que puede empezar descolocada
             # y derivar sin dejar ver el borde. Cada capa va a su ritmo: dos
