@@ -319,11 +319,21 @@ def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Ima
     ))
 
 
+def _destello(img: "Image.Image", color: tuple, rot: dict) -> "Image.Image":
+    """Aplica el acabado del rótulo (ancho, densidad y desplazamiento)."""
+    return _add_glow(
+        img, color,
+        radius=rot["radio"], passes=rot["pasadas"],
+        offset=rot["offset"], intensity=rot["intensidad"],
+    )
+
+
 def _render_text_block_png(
     textos: dict,
     layout: str = "gancho_cta_titulo",
     piezas: "set[str] | None" = None,
     paleta: dict | None = None,
+    rotulo: dict | None = None,
 ) -> "Image.Image | None":
     """Compone las 3 líneas (gancho / título / CTA) en un único PNG
     apilado verticalmente y centrado, listo para hacer overlay estático
@@ -341,6 +351,7 @@ def _render_text_block_png(
     # todas, que es el comportamiento de siempre.
     quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
     pal = paleta or _PALETAS[0]
+    rot = rotulo or _ROTULOS[0]
     gancho = (textos.get("gancho") or "").strip() if "gancho" in quiere else ""
     titulo = _titulo_para_video(textos) if "titulo" in quiere else ""
     cta = (textos.get("cta") or "").strip() if "cta" in quiere else ""
@@ -353,9 +364,9 @@ def _render_text_block_png(
         im = _render_text_line(
             gancho.upper(), font_size=config.HOOK_FONT_SIZE, max_w=max_w,
             fill=pal["gancho_fill"], stroke=(0, 0, 0), max_lines=1,
-            fuente=_FUENTE_CURSIVA,
+            fuente=rot["titular"],
         )
-        return _add_glow(im, pal["gancho_glow"]) if im is not None else None
+        return _destello(im, pal["gancho_glow"], rot) if im is not None else None
 
     def _render_titulo():
         if not titulo:
@@ -364,7 +375,7 @@ def _render_text_block_png(
         im = _render_text_line(
             titulo, font_size=config.TITLE_FONT_SIZE, max_w=max_w,
             fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=_TITULO_MAX_LINEAS,
-            fuente=_FUENTE_RECTA,
+            fuente=rot["titulo"],
         )
         # El nombre va SIEMPRE en blanco (es lo informativo y tiene que leerse
         # sobre cualquier plano), pero con la misma sombra que el resto para
@@ -382,9 +393,9 @@ def _render_text_block_png(
         im = _render_text_line(
             cta.upper(), font_size=config.CTA_FONT_SIZE, max_w=max_w,
             fill=pal["cta_fill"], stroke=(0, 0, 0), max_lines=1,
-            fuente=_FUENTE_CURSIVA,
+            fuente=rot["titular"],
         )
-        return _add_glow(im, pal["cta_glow"]) if im is not None else None
+        return _destello(im, pal["cta_glow"], rot) if im is not None else None
 
     orden = (
         (_render_gancho, _render_titulo, _render_cta)
@@ -428,6 +439,58 @@ def _render_text_block_png(
         block.paste(p, (int((block_w - p.width) / 2), y), p)
         y += p.height + line_gap
     return block
+
+
+# ---------------------------------------------------------------------------
+# Rótulos: tipografía + acabado del destello
+# ---------------------------------------------------------------------------
+# Sin variar esto, todos los vídeos salían con la misma letra y el mismo neón
+# y el feed se veía repetitivo. Cada rótulo combina una tipografía (todas
+# gruesas y legibles en vertical) con un acabado distinto del destello:
+#   - radio/pasadas/intensidad → lo ancho y denso del neón
+#   - offset → si el destello va centrado (neón) o desplazado (sombra dura)
+# El nombre del producto lleva su propia fuente, siempre recta y legible.
+_ROTULOS = (
+    {
+        "nombre": "montserrat-neon",
+        "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf",
+        "radio": 6, "pasadas": 3, "intensidad": 2.3, "offset": (0, 0),
+    },
+    {
+        "nombre": "montserrat-recto",
+        "titular": "Montserrat-Black.ttf", "titulo": "Montserrat-ExtraBold.ttf",
+        "radio": 5, "pasadas": 2, "intensidad": 2.6, "offset": (0, 0),
+    },
+    {
+        # Condensada: entra más texto por línea y pega fuerte de titular.
+        "nombre": "anton",
+        "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf",
+        "radio": 7, "pasadas": 3, "intensidad": 2.1, "offset": (0, 0),
+    },
+    {
+        # Neón ancho y suave, más "aura" que borde.
+        "nombre": "rubik-aura",
+        "titular": "Rubik-Bold.ttf", "titulo": "Rubik-Bold.ttf",
+        "radio": 11, "pasadas": 3, "intensidad": 1.7, "offset": (0, 0),
+    },
+    {
+        # Sombra DURA de color (sin difuminar, desplazada): look de cartel.
+        "nombre": "bangers-cartel",
+        "titular": "Bangers-Regular.ttf", "titulo": "Montserrat-ExtraBold.ttf",
+        "radio": 1, "pasadas": 1, "intensidad": 6.0, "offset": (7, 8),
+    },
+    {
+        "nombre": "luckiest",
+        "titular": "LuckiestGuy-Regular.ttf", "titulo": "Rubik-Bold.ttf",
+        "radio": 6, "pasadas": 2, "intensidad": 2.4, "offset": (3, 4),
+    },
+)
+
+
+def _elegir_rotulo(semilla: str) -> dict:
+    """Rótulo de este vídeo. Determinista por producto: el mismo producto
+    re-montado sale igual, pero dos productos seguidos no comparten letra."""
+    return _ROTULOS[sum(ord(c) for c in str(semilla)) % len(_ROTULOS)]
 
 
 # ---------------------------------------------------------------------------
@@ -563,7 +626,9 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      piezas: "set[str] | None" = None,
                      semilla: str = "") -> Path:
     paleta = _elegir_paleta(video_in, textos or {}, semilla, on_log)
-    block = _render_text_block_png(textos or {}, layout, piezas, paleta)
+    rotulo = _elegir_rotulo(semilla)
+    on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
+    block = _render_text_block_png(textos or {}, layout, piezas, paleta, rotulo)
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
