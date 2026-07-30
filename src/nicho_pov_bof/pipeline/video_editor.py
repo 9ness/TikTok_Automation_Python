@@ -305,7 +305,7 @@ def _titulo_para_video(textos: dict) -> str:
     ).strip(" .,-–|:\n")
 
 
-def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 6) -> "Image.Image":
+def _crop_visible(img: "Image.Image", thresh: int = 45, margin: int = 3) -> "Image.Image":
     """Recorta el PNG a lo que se ve de verdad, ignorando la cola casi
     transparente del halo. `margin` deja un pelín para no cortarlo en seco."""
     alpha = img.split()[-1].point(lambda a: 255 if a > thresh else 0)
@@ -334,6 +334,7 @@ def _render_text_block_png(
     piezas: "set[str] | None" = None,
     paleta: dict | None = None,
     rotulo: dict | None = None,
+    on_log: OnLog = _noop,
 ) -> "Image.Image | None":
     """Compone las 3 líneas (gancho / título / CTA) en un único PNG
     apilado verticalmente y centrado, listo para hacer overlay estático
@@ -353,8 +354,12 @@ def _render_text_block_png(
     pal = paleta or _PALETAS[0]
     rot = rotulo or _ROTULOS[0]
     gancho = (textos.get("gancho") or "").strip() if "gancho" in quiere else ""
+    if gancho:
+        gancho = _texto_seguro(gancho, _GANCHO_SEGURO, "gancho", on_log)
     titulo = _titulo_para_video(textos) if "titulo" in quiere else ""
     cta = (textos.get("cta") or "").strip() if "cta" in quiere else ""
+    if cta:
+        cta = _texto_seguro(cta, _CTA_SEGURO, "CTA", on_log)
     max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
 
     def _render_gancho():
@@ -380,11 +385,15 @@ def _render_text_block_png(
         # El nombre va SIEMPRE en blanco (es lo informativo y tiene que leerse
         # sobre cualquier plano), pero con la misma sombra que el resto para
         # que el bloque se vea de una pieza.
-        return (
-            _add_glow(im, _TITULO_SOMBRA, radius=7, passes=3,
-                      offset=_TITULO_SOMBRA_OFFSET, intensity=2.2)
-            if im is not None else None
-        )
+        if im is None:
+            return None
+        # Algunos rótulos dejan el título con SOLO el trazo negro del propio
+        # texto: la sombra ayuda a despegarlo del plano pero engorda el bloque
+        # y en fondos oscuros no aporta nada.
+        if not rot.get("titulo_sombra", True):
+            return im
+        return _add_glow(im, _TITULO_SOMBRA, radius=6, passes=3,
+                         offset=_TITULO_SOMBRA_OFFSET, intensity=1.9)
 
     def _render_cta():
         if not cta:
@@ -414,7 +423,11 @@ def _render_text_block_png(
     # sobre el alpha UMBRALIZADO (lo que de verdad se ve).
     parts = [_crop_visible(p) for p in parts]
 
-    line_gap = 14
+    # Bloque COMPACTO: cada parte ya trae su propio margen (el destello se
+    # recorta a lo que se ve, pero deja unos píxeles), y con 14 quedaba un
+    # hueco visible entre gancho y CTA. El bloque va arriba y cuanto menos
+    # ocupe, menos tapa el producto.
+    line_gap = 4
     block_w = max(p.width for p in parts)
     block_h = sum(p.height for p in parts) + line_gap * (len(parts) - 1)
 
@@ -442,6 +455,66 @@ def _render_text_block_png(
 
 
 # ---------------------------------------------------------------------------
+# Cumplimiento TikTok Shop: qué se puede afirmar en pantalla
+# ---------------------------------------------------------------------------
+# TikTok sanciona el contenido que afirma una BAJADA DE PRECIO o una oferta que
+# luego puede no existir (el precio sube y el vídeo sigue publicado diciendo
+# "rebajado"). Hablar del CUPÓN sí es seguro: o está en la ficha o no está, y
+# no promete que el precio vaya a seguir igual.
+#
+# Este filtro es la última barrera antes de QUEMAR el texto en el vídeo: si la
+# IA se pasa de frenada, aquí se sustituye por algo neutro y se avisa en el
+# log. No se aborta el montaje por esto.
+_TERMINOS_RIESGO = (
+    "oferta", "oferton", "ofertazo", "rebaj", "chollo", "robo", "regalo",
+    "gratis", "barat", "bajon", "bajada", "precio de risa", "precio de locura",
+    "preciazo", "imperdible", "liquidacion", "saldo", "mitad de precio",
+    "descuentazo", "ultima", "ultimas", "solo hoy", "se agota", "aprovecha",
+    # El operador descartó "CUPÓN SORPRESA": prometer sorpresa es prometer algo
+    # que no se puede verificar en la ficha.
+    "sorpresa", "locura", "increible", "brutal", "flipa", "no te lo pierdas",
+)
+# Reemplazos neutros, que dicen la verdad sin prometer nada.
+_GANCHO_SEGURO = "🏷️ CUPÓN DESCUENTO 🏷️"
+_CTA_SEGURO = "👇 MÍRALO ABAJO 👇"
+
+
+def _sin_acentos(txt: str) -> str:
+    import unicodedata
+
+    plano = unicodedata.normalize("NFKD", txt)
+    return "".join(c for c in plano if not unicodedata.combining(c)).lower()
+
+
+def texto_arriesgado(txt: str) -> str | None:
+    """Término problemático que contiene `txt`, o None si es seguro.
+
+    "cupón descuento" es seguro; "descuento" a secas afirma una rebaja.
+    """
+    plano = _sin_acentos(txt or "")
+    if "cupon" in plano:
+        # Con cupón por delante, hablar de descuento es describir el cupón.
+        plano = plano.replace("descuent", "")
+    for t in _TERMINOS_RIESGO:
+        if t in plano:
+            return t
+    if "descuent" in plano:
+        return "descuento (sin mencionar el cupón)"
+    return None
+
+
+def _texto_seguro(txt: str, respaldo: str, etiqueta: str, on_log: OnLog) -> str:
+    riesgo = texto_arriesgado(txt)
+    if not riesgo:
+        return txt
+    on_log(
+        f"[3/5] ⚠️ {etiqueta} {txt!r} puede incumplir las normas de TikTok Shop "
+        f"(término {riesgo!r}) → se usa {respaldo!r}"
+    )
+    return respaldo
+
+
+# ---------------------------------------------------------------------------
 # Rótulos: tipografía + acabado del destello
 # ---------------------------------------------------------------------------
 # Sin variar esto, todos los vídeos salían con la misma letra y el mismo neón
@@ -455,34 +528,41 @@ _ROTULOS = (
         "nombre": "montserrat-neon",
         "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf",
         "radio": 6, "pasadas": 3, "intensidad": 2.3, "offset": (0, 0),
+        "titulo_sombra": True,
     },
     {
         "nombre": "montserrat-recto",
         "titular": "Montserrat-Black.ttf", "titulo": "Montserrat-ExtraBold.ttf",
         "radio": 5, "pasadas": 2, "intensidad": 2.6, "offset": (0, 0),
+        # Solo trazo negro, sin sombra: más limpio y tapa menos producto.
+        "titulo_sombra": False,
     },
     {
         # Condensada: entra más texto por línea y pega fuerte de titular.
         "nombre": "anton",
         "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf",
         "radio": 7, "pasadas": 3, "intensidad": 2.1, "offset": (0, 0),
+        "titulo_sombra": False,
     },
     {
         # Neón ancho y suave, más "aura" que borde.
         "nombre": "rubik-aura",
         "titular": "Rubik-Bold.ttf", "titulo": "Rubik-Bold.ttf",
         "radio": 11, "pasadas": 3, "intensidad": 1.7, "offset": (0, 0),
+        "titulo_sombra": True,
     },
     {
         # Sombra DURA de color (sin difuminar, desplazada): look de cartel.
         "nombre": "bangers-cartel",
         "titular": "Bangers-Regular.ttf", "titulo": "Montserrat-ExtraBold.ttf",
         "radio": 1, "pasadas": 1, "intensidad": 6.0, "offset": (7, 8),
+        "titulo_sombra": False,
     },
     {
         "nombre": "luckiest",
         "titular": "LuckiestGuy-Regular.ttf", "titulo": "Rubik-Bold.ttf",
         "radio": 6, "pasadas": 2, "intensidad": 2.4, "offset": (3, 4),
+        "titulo_sombra": True,
     },
 )
 
@@ -628,7 +708,9 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     paleta = _elegir_paleta(video_in, textos or {}, semilla, on_log)
     rotulo = _elegir_rotulo(semilla)
     on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
-    block = _render_text_block_png(textos or {}, layout, piezas, paleta, rotulo)
+    block = _render_text_block_png(
+        textos or {}, layout, piezas, paleta, rotulo, on_log,
+    )
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
@@ -881,13 +963,22 @@ def build_video(
     return output_path
 
 
-def layout_for_producto(producto: str) -> str:
-    """Reparte las dos disposiciones mitad y mitad, por número de producto.
+# Un CTA que dice "abajo" o "en el enlace" tiene que ser la ÚLTIMA línea:
+# puesto en medio, la flecha y el carrito quedan por debajo del nombre del
+# producto y la mirada no sigue el recorrido.
+_CTA_APUNTA_ABAJO = ("abajo", "enlace", "ficha", "aqui debajo", "te lo dejo")
 
-    Determinista a propósito: el producto 3 siempre sale con el mismo orden,
-    así que al comparar resultados se sabe qué disposición llevaba cada vídeo
-    sin tener que anotarlo aparte.
+
+def layout_for_producto(producto: str, cta: str = "") -> str:
+    """Orden de las tres líneas del bloque.
+
+    Si el CTA apunta hacia abajo manda eso y se pone al final. Si no, se
+    reparten las dos disposiciones mitad y mitad por número de producto —
+    determinista a propósito: el producto 3 siempre sale igual, así que al
+    comparar resultados se sabe qué orden llevaba sin anotarlo aparte.
     """
+    if any(t in _sin_acentos(cta) for t in _CTA_APUNTA_ABAJO):
+        return "gancho_titulo_cta"
     try:
         n = int("".join(c for c in str(producto) if c.isdigit()) or 0)
     except ValueError:
