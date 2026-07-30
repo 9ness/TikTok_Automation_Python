@@ -36,7 +36,7 @@ from src.viralizacion.pipeline.renderer import (  # noqa: E402
     build_paisaje_segments,
     render_video,
 )
-from src.viralizacion.services import clip_library  # noqa: E402
+from src.viralizacion.services import allocator, clip_library  # noqa: E402
 
 # Ponente de las muestras. Se puede cambiar con VIRALIZACION_PREVIEW_PONENTE
 # para revisar el encuadre de otro (el recorte cuadrado depende de dónde
@@ -52,7 +52,9 @@ SAMPLE_DUR = 14.0
 # Instantes de los que se saca cada fotograma: dentro del gancho y ya en
 # pleno b-roll (después de que entren las barras de cine).
 T_GANCHO = 2.0
-T_PAISAJE = 9.0
+# 8.4 y no 9.0: en 9.0 el bloque de texto solía estar en su PRIMERA palabra y
+# los estilos que apilan (D, E, G) parecían no apilar nada.
+T_PAISAJE = 8.4
 
 
 def _muestra(key: str, hook: dict, audio: Path, words: list[dict]) -> Path:
@@ -126,11 +128,13 @@ def main() -> None:
     pedidos = sys.argv[1:] or list(styles.STYLE_ORDER)
     WORK.mkdir(parents=True, exist_ok=True)
 
-    import json
-
-    hook = json.loads(
-        (config.assets_root_path() / PONENTE / "hook_candidates.json").read_text()
-    )["candidates"][0]
+    # Vía `scan_hook_candidates` y NO leyendo el JSON a pelo: es quien
+    # resuelve la ruta del gancho pre-cortado (`clip`). Leyendo el fichero
+    # salía sin ella y el render moría con `-i None`, porque los vídeos de
+    # gancho originales ya no están en disco (se subieron a Drive).
+    # Tampoco se usa `allocator.allocate_hook`: eso marcaría el gancho como
+    # gastado, y una muestra no debe consumir del banco.
+    hook = allocator.scan_hook_candidates(PONENTE)[0]
     audio = config.ponente_audio_files(PONENTE)[0]
     words = transcriber.transcribe_words(
         PONENTE, audio, tmp_dir=WORK / "tmp", on_log=lambda _m: None
