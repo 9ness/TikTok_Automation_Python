@@ -411,6 +411,90 @@ def build_ass_cascade(lines: list[dict], preset: "StylePreset") -> str:
 # ---------------------------------------------------------------------------
 # Estilo H — Frase en mayúsculas con la palabra hablada en amarillo
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Estilo D — Película vieja
+# ---------------------------------------------------------------------------
+# Réplica del estilo con el que una cuenta de referencia (RudySkate) viralizó
+# tres vídeos seguidos de Pablo Motos: serif de alto contraste, MUY pocas
+# palabras a la vez, centradas en mitad de pantalla, y grano/motas de polvo
+# imitando celuloide antiguo.
+#
+# Dos reglas que vienen de mirar los vídeos:
+#   - Nunca hay más de tres palabras en pantalla. El bloque se VACÍA antes de
+#     empezar el siguiente; no se acumulan frases.
+#   - Dentro del bloque las palabras van CRECIENDO hacia abajo, y el bloque
+#     alterna entre letra clara con halo oscuro y letra oscura con halo claro
+#     según el fondo.
+_PELICULA_MAX = 3
+# Escala de cada línea del bloque (crece hacia abajo).
+_PELICULA_ESCALAS = (0.86, 1.05, 1.24)
+# (color de letra, color del halo, grosor del halo). ASS usa BGR, no RGB.
+# El bloque OSCURO necesita el halo más gordo: la letra clara sobre fondo
+# oscuro se lee sola, pero la oscura solo destaca si el halo la recorta bien
+# (y no siempre cae sobre un cielo claro como en los vídeos de referencia).
+_PELICULA_CLARO = ("&HFFFFFF&", "&H101010&", 4)
+_PELICULA_OSCURO = ("&H121212&", "&HF0F0F0&", 7)
+
+
+def build_ass_pelicula(lines: list[dict], preset: "StylePreset") -> str:
+    """Palabras de una en una, apiladas de tres en tres y creciendo, en el
+    centro exacto de la pantalla.
+
+    El `\\an5` (centro vertical) es deliberado: en los vídeos de referencia
+    el texto vive en mitad del plano, no abajo como un subtítulo normal.
+    """
+    base = int(config.SUB_FONTSIZE * 1.75)
+    fuente = preset.font_name or config.SUB_FONT
+    style_line = (
+        f"Style: Default,{fuente},{base},"
+        f"&H00FFFFFF&,&H000000FF&,&H00101010&,&H90000000&,0,0,0,0,100,100,0,0,1,4,3,5,"
+        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
+    )
+    header = _ass_header(style_line)
+    events: list[str] = []
+    n_bloque = 0
+
+    for idx_linea, ln in enumerate(lines):
+        palabras = ln.get("words") or []
+        for inicio in range(0, len(palabras), _PELICULA_MAX):
+            grupo = palabras[inicio:inicio + _PELICULA_MAX]
+            # Tope duro: dos eventos ASS solapados se APILAN en vez de
+            # sustituirse, así que sin esto se verían dos frases a la vez.
+            tope = _inicio_siguiente_bloque(
+                lines, idx_linea, inicio + _PELICULA_MAX, _PELICULA_MAX,
+            )
+            letra, halo, bord = (
+                _PELICULA_CLARO if n_bloque % 2 == 0 else _PELICULA_OSCURO
+            )
+            n_bloque += 1
+
+            for i in range(len(grupo)):
+                visibles = grupo[: i + 1]
+                partes = []
+                for j, w in enumerate(visibles):
+                    escala = _PELICULA_ESCALAS[j % len(_PELICULA_ESCALAS)]
+                    tags = (
+                        f"\\1c{letra}\\3c{halo}\\4c{halo}\\bord{bord}"
+                        f"\\fscx{int(escala * 100)}\\fscy{int(escala * 100)}"
+                    )
+                    partes.append(f"{{{tags}}}{w['word'].lower()}")
+                ev_start = float(grupo[i]["start"])
+                ev_end = (
+                    float(grupo[i + 1]["start"]) if i + 1 < len(grupo)
+                    else float(grupo[i]["end"]) + 0.30
+                )
+                if ev_end <= ev_start:
+                    ev_end = ev_start + 0.12
+                if tope is not None:
+                    ev_end = min(ev_end, tope)
+                if ev_end > ev_start:
+                    events.append(
+                        _dialogue(ev_start, ev_end, "\\N".join(partes), layer=i)
+                    )
+
+    return header + "\n".join(events) + "\n"
+
+
 def bundled_fonts_dir() -> str:
     """Carpeta `assets/fonts/` del repo (las que ya usa Creator Reward)."""
     from src.font_resolver import _bundled_fonts_dir
@@ -570,7 +654,11 @@ class StylePreset:
     film_scratches: int = 0
     # Nº de LÁMINAS de polvo superpuestas (cada una son ~130 motas que van
     # a la deriva, entrando y saliendo del encuadre). 0 = sin polvo.
-    film_specks: int = 0
+    #
+    # Por defecto 1: el operador quiere el polvo de celuloide en TODOS los
+    # estilos, no solo en los "sucios" — es lo que tienen en común los vídeos
+    # que le funcionan. Los estilos que quieran más denso lo suben.
+    film_specks: int = 1
     # Encaja el vídeo en un CUADRADO con esquinas redondeadas centrado sobre
     # negro (estilo de los vídeos de reflexión que funcionan en TikTok).
     square_frame: bool = False
@@ -617,18 +705,35 @@ STYLE_PRESETS: dict[str, StylePreset] = {
     # Solo cambian el GRADING y la TRANSICIÓN respecto a las anteriores; la
     # posición del subtítulo se deja igual a propósito (decisión del operador:
     # mover el texto entre ciclos perjudica la lectura en el feed).
-    "teal_orange": StylePreset(
-        key="teal_orange",
-        label="D · Teal & Orange",
-        build_ass=build_ass_cinematic,
-        vignette_angle="PI/3.8",
-        # Look de blockbuster: sombras frías, pieles cálidas.
-        eq_extra={"gamma_r": 1.10, "gamma_b": 0.90},
-        pre_subtitle_filters=["colorbalance=rs=-0.12:bs=0.18:rm=0.06:bm=-0.05"],
-        # Disolución suave y larga: encadenado "de cine" en vez de corte a negro.
-        transition_landscape=("dissolve", 0.7),
-        ken_burns=0.14,
-        light_leaks=2,
+    # Sustituye al antiguo "D · Teal & Orange", que era un calco de C: mismo
+    # `build_ass_cinematic` y como única personalidad un grade azulado. Este
+    # replica el estilo con el que RudySkate viralizó tres vídeos seguidos de
+    # Pablo Motos el mismo fin de semana.
+    "pelicula": StylePreset(
+        key="pelicula",
+        label="D · Película vieja",
+        build_ass=build_ass_pelicula,
+        font_name="Playfair Display Black",
+        fonts_dir=bundled_fonts_dir(),
+        # Formato normal (NO cuadrado), pero con los bordes bien oscurecidos.
+        vignette_angle="PI/3.2",
+        # Revelado cálido y apagado: menos azul, gamma baja, algo de contraste.
+        eq_extra={"gamma": 0.88, "contrast": 1.12, "saturation": 0.45},
+        # Vira a sepia de verdad. `colorbalance` solo no bastaba: sobre un
+        # plano azulado seguía saliendo frío. `colorchannelmixer` mezcla los
+        # canales (matriz de sepia clásica) y luego se recalienta un punto.
+        pre_subtitle_filters=[
+            "colorbalance=rs=0.22:gs=0.04:bs=-0.20"
+            ":rm=0.14:gm=0.02:bm=-0.14:rh=0.08:bh=-0.10",
+        ],
+        # Lo que de verdad lo hace "celuloide": mucho polvo y rayaduras.
+        film_specks=3,
+        film_scratches=4,
+        noise_filter_override="noise=alls=10:allf=t+u",
+        transition_landscape=("dissolve", 0.6),
+        ken_burns=0.13,
+        vignette_breathe=0.14,
+        light_leaks=1,
     ),
     "noir": StylePreset(
         key="noir",
@@ -695,7 +800,7 @@ STYLE_PRESETS: dict[str, StylePreset] = {
 
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
 STYLE_ORDER = [
-    "classic", "reveal", "cinematic", "teal_orange", "noir", "golden",
+    "classic", "reveal", "cinematic", "pelicula", "noir", "golden",
     "cuadrado", "highlight",
 ]
 
