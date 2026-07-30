@@ -32,6 +32,7 @@ overlay es seguro.
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
 import subprocess
@@ -353,13 +354,10 @@ def _render_text_block_png(
     quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
     pal = paleta or _PALETAS[0]
     rot = rotulo or _ROTULOS[0]
+    # Gancho y CTA ya no salen de `textos`: son fijos (ver `textos_fijos`).
     gancho = (textos.get("gancho") or "").strip() if "gancho" in quiere else ""
-    if gancho:
-        gancho = _texto_seguro(gancho, _GANCHO_SEGURO, "gancho", on_log)
     titulo = _titulo_para_video(textos) if "titulo" in quiere else ""
     cta = (textos.get("cta") or "").strip() if "cta" in quiere else ""
-    if cta:
-        cta = _texto_seguro(cta, _CTA_SEGURO, "CTA", on_log)
     max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
 
     def _render_gancho():
@@ -469,7 +467,10 @@ _TERMINOS_RIESGO = (
     "oferta", "oferton", "ofertazo", "rebaj", "chollo", "robo", "regalo",
     "gratis", "barat", "bajon", "bajada", "precio de risa", "precio de locura",
     "preciazo", "imperdible", "liquidacion", "saldo", "mitad de precio",
-    "descuentazo", "ultima", "ultimas", "solo hoy", "se agota", "aprovecha",
+    "descuentazo", "ultima", "ultimas", "solo hoy", "se agota",
+    # "aprovecha" a secas lo aprueba el mentor en el CTA fijo ("APROVECHA
+    # AHORA"); lo sancionable es atarlo al precio.
+    "aprovecha el precio", "aprovecha la oferta", "aprovecha el descuento",
     # El operador descartó "CUPÓN SORPRESA": prometer sorpresa es prometer algo
     # que no se puede verificar en la ficha.
     "sorpresa", "locura", "increible", "brutal", "flipa", "no te lo pierdas",
@@ -629,6 +630,47 @@ _ROTULOS = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Gancho y CTA: TEXTO FIJO
+# ---------------------------------------------------------------------------
+# Los dicta el mentor del curso (Jonny, 2026-07-30): "Cupón Descuento /
+# Aprovecha ahora y listo". La razón es de cumplimiento, no de estilo — cuanto
+# menos se invente el texto, menos superficie hay para una sanción, y con dos
+# infracciones se suspende la cuenta. Así que ya NO se usa el gancho/CTA que
+# devuelve Gemini: se pintan siempre estos dos.
+#
+# Lo que SÍ sigue variando es el EMOJI (y con él la paleta de color, que se
+# elige a partir del emoji un poco más abajo). Eso es puro aspecto, no afecta
+# a las normas, y es lo que evita que todos los vídeos salgan calcados.
+_GANCHO_TEXTO = "CUPÓN DESCUENTO"
+_CTA_TEXTO = "APROVECHA AHORA"
+# Emojis del gancho: familia de cupón/precio. Los del CTA: acción/mirar.
+_GANCHO_EMOJIS = ("🏷️", "🎟️", "💸", "💰", "💳", "🤑", "🔖", "👀")
+_CTA_EMOJIS = ("👇", "⬇️", "👀", "🔎", "✅", "👉", "🔥", "✨")
+
+
+def textos_fijos(semilla: str) -> dict[str, str]:
+    """Gancho y CTA definitivos para este producto.
+
+    Determinista por producto (misma semilla → mismo emoji), así un remontaje
+    sale igual pero dos productos seguidos no comparten emoji.
+    """
+    # Hace falta un hash de verdad. `sum(ord(...))` ignora la posición ("1",
+    # "9" y "10" caían juntos) y crc32 es lineal, así que los dos índices
+    # salían correlacionados: el mismo emoji de gancho arrastraba siempre el
+    # mismo de CTA. Con SHA-1 y bytes DISTINTOS para cada uno, no.
+    h = hashlib.sha1(str(semilla).encode("utf-8")).digest()
+    eg = _GANCHO_EMOJIS[h[0] % len(_GANCHO_EMOJIS)]
+    # 👀 está en las dos listas; sin excluirlo salía el mismo emoji arriba y
+    # abajo y el bloque parecía un error.
+    cta_libres = [e for e in _CTA_EMOJIS if e != eg]
+    ec = cta_libres[h[7] % len(cta_libres)]
+    return {
+        "gancho": f"{eg} {_GANCHO_TEXTO} {eg}",
+        "cta": f"{ec} {_CTA_TEXTO} {ec}",
+    }
+
+
 def _elegir_rotulo(semilla: str) -> dict:
     """Rótulo de este vídeo. Determinista por producto: el mismo producto
     re-montado sale igual, pero dos productos seguidos no comparten letra."""
@@ -767,11 +809,15 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      layout: str = "gancho_cta_titulo",
                      piezas: "set[str] | None" = None,
                      semilla: str = "") -> Path:
-    paleta = _elegir_paleta(video_in, textos or {}, semilla, on_log)
+    # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
+    # color se decide a partir de sus emojis.
+    textos = {**(textos or {}), **textos_fijos(semilla)}
+    paleta = _elegir_paleta(video_in, textos, semilla, on_log)
     rotulo = _elegir_rotulo(semilla)
+    on_log(f"[3/5] gancho {textos['gancho']!r} · CTA {textos['cta']!r}")
     on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
     block = _render_text_block_png(
-        textos or {}, layout, piezas, paleta, rotulo, on_log,
+        textos, layout, piezas, paleta, rotulo, on_log,
     )
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
@@ -1002,6 +1048,11 @@ def build_video(
     con_titulo: bool = True,
     con_cta: bool = True,
     con_flecha: bool = True,
+    # Identifica al producto y es lo que hace rotar emoji, color y tipografía.
+    # Tiene que venir de fuera: `output_path` es siempre `output.mp4`, así que
+    # usarlo daba la MISMA semilla a todos los vídeos y ni el rótulo ni el
+    # emoji llegaron a variar nunca.
+    semilla: str = "",
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -1052,7 +1103,7 @@ def build_video(
         on_log(f"[3/5] Quemando texto ({'/'.join(sorted(piezas))})…")
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
-            piezas, semilla=str(output_path.stem),
+            piezas, semilla=semilla or str(output_path.stem),
         )
         on_progress(0.66, "Texto quemado")
     else:

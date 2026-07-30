@@ -114,13 +114,11 @@ class ProductoInfo(BaseModel):
     # seguro. Solo se AVISA: el caption lo copia el operador al publicar, no
     # se quema en el vídeo, así que no se sustituye por él.
     caption_riesgo: str = ""
+    # Gancho y CTA son FIJOS por decisión de cumplimiento (los dicta el
+    # mentor del curso): solo rota el emoji. Ya no hay `*_riesgo` para ellos
+    # porque no pueden ser arriesgados.
     gancho: str = ""
-    # Igual que `caption_riesgo`, pero para los textos que SÍ se queman en el
-    # vídeo. Ahí el montaje ya los sustituye por uno neutro; el aviso es para
-    # los botones de COPIAR, que entregan el original tal cual.
-    gancho_riesgo: str = ""
     cta: str = ""
-    cta_riesgo: str = ""
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None

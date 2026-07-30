@@ -45,7 +45,7 @@ from src.api.schemas.nicho_pov_bof import (
 )
 from src.nicho_pov_bof.pipeline.video_editor import (
     caption_arriesgado,
-    texto_arriesgado,
+    textos_fijos,
 )
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
@@ -175,10 +175,8 @@ def _producto_info(
         tienda=prod.get("tienda", ""),
         caption=prod.get("caption", ""),
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
-        gancho=prod.get("gancho", ""),
-        gancho_riesgo=texto_arriesgado(prod.get("gancho", "")) or "",
-        cta=prod.get("cta", ""),
-        cta_riesgo=texto_arriesgado(prod.get("cta", "")) or "",
+        gancho=textos_fijos(f"{producto} {folder}")["gancho"],
+        cta=textos_fijos(f"{producto} {folder}")["cta"],
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
@@ -262,10 +260,12 @@ def _list_productos(
                 caption_riesgo=caption_arriesgado(
                     guardado.get("caption", "")
                 ) or "",
-                gancho=guardado.get("gancho", ""),
-                gancho_riesgo=texto_arriesgado(guardado.get("gancho", "")) or "",
-                cta=guardado.get("cta", ""),
-                cta_riesgo=texto_arriesgado(guardado.get("cta", "")) or "",
+                # Gancho y CTA son FIJOS (los dicta el mentor); lo único que
+                # cambia por producto es el emoji. Se devuelven calculados, no
+                # leídos de Redis, para que lo que copias sea exactamente lo
+                # que se quema en el vídeo.
+                gancho=textos_fijos(f"{producto} {folder}")["gancho"],
+                cta=textos_fijos(f"{producto} {folder}")["cta"],
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),

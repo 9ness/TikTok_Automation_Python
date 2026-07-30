@@ -4,7 +4,7 @@ CON TÍTULO, usando Gemini multimodal.
 Por qué UNA sola llamada con las 10 imágenes y no 10 llamadas sueltas: el
 operador pulsa "Obtener textos" una vez para toda la carpeta (ver paso 5 de
 `NICHO_POV_BOF_MODULE.md`). Además de ser más barato/rápido que 10
-round-trips, es la única forma de que el modelo pueda VARIAR gancho/CTA
+round-trips, es la única forma de que el modelo pueda VARIAR los textos
 entre productos del mismo lote — 10 llamadas aisladas no verían lo que
 generaron las demás y tenderían a repetir la misma fórmula.
 """
@@ -30,13 +30,13 @@ _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "text_extrac
 # Campos que debe traer cada entrada para considerarla válida. Si Gemini deja
 # alguno vacío o el producto entero fuera del JSON, ese producto se omite en
 # vez de tumbar la extracción de los demás.
+# `gancho` y `cta` ya NO se piden: son fijos y los pone el montaje
+# (`video_editor.textos_fijos`), por cumplimiento.
 REQUIRED_FIELDS = (
     "titulo",
     "titulo_tiktok_completo",
     "tienda",
     "caption",
-    "gancho",
-    "cta",
 )
 
 
@@ -45,7 +45,7 @@ def _load_system_prompt() -> str:
 
 
 def _is_valid_entry(entry: object) -> bool:
-    """Una entrada vale si es un dict con los 6 campos, todos string no vacío."""
+    """Una entrada vale si es un dict con los 4 campos, todos string no vacío."""
     if not isinstance(entry, dict):
         return False
     return all(isinstance(entry.get(f), str) and entry.get(f).strip() for f in REQUIRED_FIELDS)
@@ -54,8 +54,9 @@ def _is_valid_entry(entry: object) -> bool:
 def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> dict[str, dict]:
     """Extrae los textos de TODOS los productos de una carpeta en UNA llamada.
 
-    Devuelve `{producto: {titulo, titulo_tiktok_completo, tienda, caption,
-    gancho, cta}}`. La clave `producto` es la misma que usa
+    Devuelve `{producto: {titulo, titulo_tiktok_completo, tienda, caption}}`
+    (gancho y CTA son fijos, los pone `video_editor.textos_fijos`). La clave
+    `producto` es la misma que usa
     `photo_pairing.pair_folder` (el número de producto dentro de la carpeta,
     p.ej. "1".."10"), así el caller puede cruzarla directamente con el resto
     del flujo por producto.

@@ -55,9 +55,13 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   belleza y suplementos es motivo de sanción. Tampoco vale colar la promesa
   en condicional o en pregunta (`¿lista para tener la piel perfecta?`).
 
-  Prohibido igualmente hablar de precio, oferta, rebaja, descuento sin cupón,
-  urgencia o escasez — las mismas reglas que el `gancho`, que están detalladas
-  más abajo.
+  ### PROHIBIDO: hablar de precio o meter prisa
+
+  El precio puede subir mañana y el vídeo sigue publicado, así que nada de
+  `OFERTA`, `REBAJADO`, `CHOLLO`, `BARATO`, `DESCUENTO`, porcentajes ni
+  precios concretos. Tampoco urgencia ni escasez (`ÚLTIMAS UNIDADES`,
+  `SOLO HOY`, `SE AGOTA`, `DATE PRISA`), ni ponerle fecha a nada (`HOY`,
+  `ESTA SEMANA`, `24H`): mañana deja de ser cierto.
 
   ### PERMITIDO: contar qué es y para qué se usa
 
@@ -73,85 +77,17 @@ traducir literalmente del inglés si el título original viene en otro idioma:
     llevar en el bolso.`
   - `Silla de escritorio con respaldo reclinable y reposacabezas, pensada para
     quien pasa horas sentado jugando o trabajando.`
-- `gancho`: el texto que va arriba del vídeo. En MAYÚSCULAS, máximo 4
-  palabras, con UN emoji al principio y el MISMO emoji al final.
 
-  **Va SIEMPRE del CUPÓN o de INVITAR A MIRAR el precio, nunca del producto y
-  nunca afirmando que el precio es bajo.** Es lo que hace que la gente abra el
-  carrito: si el gancho describe el producto (`PIEL PERFECTA YA`) no aporta
-  motivo para pulsar y el CTR se hunde.
+## Gancho y CTA: NO los generes
 
-  ### PROHIBIDO: afirmar rebaja u oferta (TikTok Shop SANCIONA la cuenta)
+El texto de arriba del vídeo y la llamada a la acción son **fijos** y los pone
+el propio montaje (`CUPÓN DESCUENTO` / `APROVECHA AHORA`, con el emoji rotando
+por producto). Es una decisión de cumplimiento: cuanto menos texto se invente,
+menos superficie hay para una sanción de TikTok Shop, y con dos infracciones se
+suspende la cuenta.
 
-  El precio puede subir mañana y el vídeo sigue publicado. Cualquier texto que
-  afirme que está rebajado, que es una oferta o que es barato es contenido
-  descalificable. Están prohibidos, entre otros:
-
-  `OFERTA`, `OFERTÓN`, `REBAJADO`, `REBAJÓN`, `BAJÓN DE PRECIO`,
-  `PRECIO DE RISA`, `PRECIO DE LOCURA`, `PRECIAZO`, `QUÉ CHOLLO`,
-  `ESTO ES UN ROBO`, `REGALO A ESTE PRECIO`, `GRATIS`, `BARATÍSIMO`,
-  `MITAD DE PRECIO`, `DESCUENTAZO`, `APROVECHA EL PRECIO`, `IMPERDIBLE`,
-  `LIQUIDACIÓN`, y `DESCUENTO` a secas (sin nombrar el cupón).
-
-  Tampoco vale inventar urgencia o escasez: `ÚLTIMAS UNIDADES`, `SOLO HOY`,
-  `SE AGOTA`, `ÚLTIMA OPORTUNIDAD`, cuentas atrás, porcentajes concretos ni
-  precios. Ni `SORPRESA`, `LOCURA`, `INCREÍBLE` o `BRUTAL`: prometen algo que
-  no se puede comprobar en la ficha.
-
-  ### PROHIBIDO: ponerle FECHA al cupón
-
-  El vídeo sigue publicado mañana, y la semana que viene. Cualquier texto que
-  ate el cupón a un momento concreto deja de ser cierto solo con que pase el
-  tiempo — es el mismo problema que afirmar una rebaja. Nada de `CUPÓN ACTIVO
-  HOY`, `VÁLIDO HOY`, `DISPONIBLE HOY`, `SOLO 24H`, `ESTA SEMANA`, `CADUCA
-  PRONTO`, `ÚLTIMO DÍA`, `DATE PRISA`, `CORRE` ni `NO ESPERES`.
-
-  Di el cupón sin fecha: `CUPÓN DESCUENTO` vale, `CUPÓN DESCUENTO HOY` no.
-
-  (En el `cta` sí puede aparecer `AHORA` como verbo — `REVÍSALO AHORA` no
-  promete que nada cambie. Lo prohibido es aplicárselo al cupón o al precio.)
-
-  ### PERMITIDO: el cupón, o invitar a comprobar el precio
-
-  Hablar del cupón es seguro (está en la ficha o no está) y decirle a la gente
-  que MIRE el precio tampoco promete nada. Ejemplos válidos — cópiales el
-  ÁNGULO, no las palabras exactas:
-
-  `🏷️ CUPÓN DESCUENTO 🏷️`, `🎟️ CON CUPÓN ACTIVO 🎟️`,
-  `🏷️ CUPÓN DISPONIBLE 🏷️`, `👀 MIRA EL PRECIO 👀`,
-  `🔎 COMPRUEBA EL PRECIO 🔎`, `💳 CUPÓN EN LA FICHA 💳`,
-  `🎟️ MIRA SI HAY CUPÓN 🎟️`.
-
-  Ojo con dar a entender que el precio ha CAMBIADO: `PRECIO ACTUALIZADO` o
-  `NUEVO PRECIO` insinúan una bajada igual que `REBAJADO`. No los uses.
-
-- `cta`: el texto que invita a MIRAR, nunca a comprar y **nunca nombrando
-  una oferta o rebaja** (aplican las mismas prohibiciones que en `gancho`:
-  nada de `MIRA LA OFERTA`). Máximo 4 palabras, con emoji (delante, detrás o
-  ambos; varía el patrón). Ejemplos válidos:
-  `😱 REVÍSALO AHORA 😱`, `👇 REVÍSALO ABAJO 👇`, `DESCÚBRELO AHORA 👀`,
-  `MÍRALO AQUÍ ABAJO 👇`, `COMPRUÉBALO TÚ MISMO 👀`,
-  `🔎 MIRA LA FICHA 🔎`, `👇 TE LO DEJO ABAJO 👇`.
-
-  NO uses verbos de compra (`compra`, `cómpralo`, `llévatelo`, `pídelo`)
-  ni el emoji del carrito 🛒: chirría con el tono del vídeo, que es el de
-  alguien que te enseña un descubrimiento, no el de un anuncio.
-
-## Variedad — MUY IMPORTANTE
-
-Este lote son varios productos del MISMO vídeo/cuenta, publicados en días
-distintos. Si `gancho` y `cta` se repiten iguales o muy parecidos entre
-productos, la cuenta pierde autenticidad y TikTok penaliza el contenido
-repetitivo. Por eso:
-
-- NO uses el mismo `gancho` en dos productos del lote. Varía la fórmula
-  (pregunta, sorpresa, alerta de cupón, urgencia, incredulidad...) y el
-  emoji.
-- NO uses el mismo `cta` en dos productos del lote. Varía el verbo, el
-  orden (emoji antes/después) y si es orden directa o más suave.
-- Aun así, cada `gancho`/`cta` debe encajar con lo que se ve en SU propia
-  imagen (si hay un cupón visible, un gancho de cupón tiene más sentido
-  que uno genérico).
+Así que **no devuelvas `gancho` ni `cta`**. Céntrate en `titulo`,
+`titulo_tiktok_completo`, `tienda` y `caption`.
 
 ## Si una imagen no se lee bien
 
@@ -163,7 +99,7 @@ lo dejes vacío ni inventes una tienda que no aparezca en absoluto.
 
 Devuelve un único objeto JSON cuyas claves son EXACTAMENTE los
 identificadores que te doy en el mensaje de usuario (en el mismo orden que
-las imágenes), y cuyo valor es el objeto con los 6 campos:
+las imágenes), y cuyo valor es el objeto con los 4 campos:
 
 ```
 {
@@ -171,9 +107,7 @@ las imágenes), y cuyo valor es el objeto con los 6 campos:
     "titulo": "...",
     "titulo_tiktok_completo": "...",
     "tienda": "...",
-    "caption": "...",
-    "gancho": "...",
-    "cta": "..."
+    "caption": "..."
   },
   ...
 }
