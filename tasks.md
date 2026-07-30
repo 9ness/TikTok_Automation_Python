@@ -78,6 +78,12 @@ recorta los audios largos en vez de tocar el render.
 
 ## 🤖 Cola del Agente
 
+- [ ] `deploy_safe.sh`: purgar caché de Docker ANTES de construir. El disco
+      llega al 100% cada pocos deploys (hacen falta ~14 GB transitorios) y ya
+      truncó `page.tsx` a 0 bytes una vez.
+- [ ] `list_carpetas` se traga los errores: devuelve [] cuando Drive falla,
+      indistinguible de "no hay carpetas".
+
 - [Viralización] `renderer.py`: el dir `work/` de clips solo se borra en el
   camino feliz. Si ffmpeg falla, quedan ~220 MB (vídeo 39s) o ~500 MB (90s)
   huérfanos por vídeo fallido. Envolver en `try/finally`. Relevante: el disco
@@ -94,6 +100,13 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+
+- **Voz del Nicho POV BOF más alta sin saturar** — normalización por sonoridad
+  en dos pasadas + compresor. De -17/-23 LUFS a -12,5/-14 con picos bajo
+  -0,9 dBTP. (`alimiter` necesita `level=disabled` o re-nivela hacia arriba.)
+- **Caption sin promesas** — el prompt describe en vez de prometer y
+  `caption_arriesgado()` avisa en la ficha si se cuela una.
+- **Botones Ver/Descargar + refresco en caliente** del vídeo montado.
 
 - [2026-07-28] [Nicho POV BOF] Fase 2 backend: `services/audio_bank.py` (banco
   de audios locutados en Drive + recorte de silencios con ffmpeg
