@@ -55,8 +55,16 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
         if not audios:
             errors.append(f"'{ponente}': no hay audios disponibles.")
             continue
-        if config.ponente_gancho_video(ponente) is None:
-            errors.append(f"'{ponente}': no hay vídeo de gancho disponible.")
+        # Vale el vídeo fuente O los ganchos ya pre-cortados. Lo normal es lo
+        # segundo: el fuente pesa 300 MB-1,1 GB por ponente y se borra del VPS
+        # tras pre-cortar (sigue en Drive), así que exigirlo dejaba a TODOS los
+        # ponentes sin poder generar.
+        ganchos_dir = config.ponente_ganchos_dir(ponente)
+        hay_precortados = ganchos_dir.is_dir() and any(ganchos_dir.glob("hook_*.mp4"))
+        if config.ponente_gancho_video(ponente) is None and not hay_precortados:
+            errors.append(
+                f"'{ponente}': no hay ni vídeo de gancho ni ganchos pre-cortados."
+            )
         avail_hooks, total_hooks = allocator.count_available_hooks(
             ponente, cache_only=True
         )
