@@ -111,11 +111,18 @@ export function usePrompts() {
   });
 }
 
-export function useProductos(source: string, folder: string | null) {
+export function useProductos(
+  source: string, folder: string | null, options?: { live?: boolean },
+) {
   // El backend devuelve {source, folder, items, textos_extraidos}; se
   // desenvuelve aquí a la lista para que los componentes no tengan que
   // conocer la envoltura.
+  //
+  // `live` refresca cada pocos segundos mientras hay un montaje en marcha: el
+  // vídeo tarda un par de minutos y antes había que recargar la página a mano
+  // para ver que ya estaba listo.
   return useQuery<ProductoItem[]>({
+    refetchInterval: options?.live ? 6000 : false,
     queryKey: nichoPovBofKeys.productos(source, folder ?? ""),
     queryFn: async () =>
       (await api.get<{ items: ProductoItem[] }>(

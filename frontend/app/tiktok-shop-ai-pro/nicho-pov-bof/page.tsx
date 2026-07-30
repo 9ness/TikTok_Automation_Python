@@ -100,7 +100,10 @@ export default function NichoPovBofPage() {
 
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
-  const productos = useProductos(source, folder);
+  // Mientras algún producto esté marcado como subido pero sin vídeo montado,
+  // hay un job en marcha: se refresca en caliente hasta que aparezca.
+  const [montando, setMontando] = useState(false);
+  const productos = useProductos(source, folder, { live: montando });
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   const vendidos = useVendidos(source);
@@ -181,6 +184,11 @@ export default function NichoPovBofPage() {
       },
     );
   }
+
+  useEffect(() => {
+    const items = productos.data ?? [];
+    setMontando(items.some((p) => p.uploaded && !p.video_path));
+  }, [productos.data]);
 
   const idx = useMemo(
     () => (data && folder ? data.items.findIndex((f) => f.name === folder) : -1),
@@ -1029,21 +1037,23 @@ function ProductoCard({
       {/* Vídeo ya montado: verlo y descargarlo sin salir de aquí. Al remontar
           el producto, `video_listo_at` cambia y la URL con él, así que apunta
           a la versión nueva y no a la cacheada. */}
+      {/* Sin reproductor incrustado: con 10 productos por carpeta, diez vídeos
+          cargando a la vez se come los datos del móvil. Se abre en pestaña. */}
       {producto.video_path && (
-        <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2">
-          <video
-            key={producto.video_listo_at ?? 0}
-            src={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0)}
-            controls
-            playsInline
-            preload="metadata"
-            className="w-full rounded"
-          />
+        <div className="grid grid-cols-2 gap-1.5">
+          <a
+            href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-[11px] font-semibold text-emerald-500"
+          >
+            ▶ Ver vídeo
+          </a>
           <a
             href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
           >
-            <Download className="h-3.5 w-3.5" /> Descargar vídeo montado
+            <Download className="h-3.5 w-3.5" /> Descargar
           </a>
         </div>
       )}
