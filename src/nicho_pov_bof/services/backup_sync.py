@@ -76,6 +76,21 @@ def snapshot_dir() -> Path:
     return d
 
 
+def _id_copiable(fid: str) -> str:
+    """ID que entiende `backend copyid`.
+
+    Para los ACCESOS DIRECTOS de Drive, rclone devuelve en `lsjson` un ID
+    compuesto `idAtajo\tidDestino`. Pasarlo tal cual a `copyid` falla
+    ("failed copyid"), y en `Productos España` hay dos atajos, así que el
+    backup diario moría con 2 fallos de 2. Lo que hay que copiar es el
+    fichero al que apunta el atajo, o sea el trozo de después del tabulador.
+
+    El snapshot SÍ se sigue indexando por el ID compuesto: identifica al
+    objeto tal y como lo ve el origen y así el diff no se confunde.
+    """
+    return fid.rsplit("\t", 1)[-1]
+
+
 def take_snapshot(*, on_log: OnLog = _noop) -> dict:
     """Listado completo del origen indexado por file ID."""
     on_log("[backup] listando el origen (recursivo)…")
@@ -188,7 +203,10 @@ def copy_by_ids(
         path = meta.get("path") or fid
         dest = f"{dest_root}/{_dest_name(path, fid, dup_paths)}"
         try:
-            _rclone(["backend", "copyid", SRC_REMOTE, fid, dest], timeout=900, on_log=_noop)
+            _rclone(
+                ["backend", "copyid", SRC_REMOTE, _id_copiable(fid), dest],
+                timeout=900, on_log=_noop,
+            )
             ok += 1
         except RuntimeError as e:
             failed += 1
