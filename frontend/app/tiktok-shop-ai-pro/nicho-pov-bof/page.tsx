@@ -18,11 +18,13 @@ import {
   Target,
   Upload,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  nichoPovBofKeys,
   buildCleanPhotoDownloadUrl,
   buildVideoUrl,
   buildPhotoUrl,
@@ -42,6 +44,7 @@ import {
   useSources,
   useVendidos,
 } from "@/lib/queries/nichoPovBof";
+import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   BackupCheckResponse,
@@ -100,10 +103,7 @@ export default function NichoPovBofPage() {
 
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
-  // Mientras algún producto esté marcado como subido pero sin vídeo montado,
-  // hay un job en marcha: se refresca en caliente hasta que aparezca.
-  const [montando, setMontando] = useState(false);
-  const productos = useProductos(source, folder, { live: montando });
+  const productos = useProductos(source, folder);
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   const vendidos = useVendidos(source);
@@ -184,11 +184,6 @@ export default function NichoPovBofPage() {
       },
     );
   }
-
-  useEffect(() => {
-    const items = productos.data ?? [];
-    setMontando(items.some((p) => p.uploaded && !p.video_path));
-  }, [productos.data]);
 
   const idx = useMemo(
     () => (data && folder ? data.items.findIndex((f) => f.name === folder) : -1),
@@ -833,6 +828,8 @@ function ProductoCard({
   });
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
+  const [verVideo, setVerVideo] = useState(false);
+  const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // El producto puede llegar actualizado desde otra mutación (p. ej. tras
@@ -892,8 +889,15 @@ function ProductoCard({
       setUploading(false);
       try {
         const resData = JSON.parse(xhr.responseText) as VideoUploadResponse;
-        if (resData.ok) toast.success(resData.message || "En la cola, editando…");
-        else toast.error(resData.message || "Error subiendo el vídeo");
+        if (resData.ok) {
+          toast.success(resData.message || "En la cola, editando…");
+          // Sin esto la lista no se entera de que hay un montaje en marcha y
+          // el sondeo nunca arranca: había que recargar a mano para ver el
+          // botón de Ver/Descargar.
+          void qc.invalidateQueries({
+            queryKey: nichoPovBofKeys.productos(source, folder),
+          });
+        } else toast.error(resData.message || "Error subiendo el vídeo");
       } catch {
         toast.error("Respuesta inválida del servidor");
       }
@@ -1046,18 +1050,18 @@ function ProductoCard({
       {/* Vídeo ya montado: verlo y descargarlo sin salir de aquí. Al remontar
           el producto, `video_listo_at` cambia y la URL con él, así que apunta
           a la versión nueva y no a la cacheada. */}
-      {/* Sin reproductor incrustado: con 10 productos por carpeta, diez vídeos
-          cargando a la vez se come los datos del móvil. Se abre en pestaña. */}
+      {/* El reproductor va en un modal, no incrustado en la ficha: con 10
+          productos por carpeta, diez vídeos cargando a la vez se comen los
+          datos del móvil. El modal solo carga el que se abre. */}
       {producto.video_path && (
         <div className="grid grid-cols-2 gap-1.5">
-          <a
-            href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => setVerVideo(true)}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-[11px] font-semibold text-emerald-500"
           >
             ▶ Ver vídeo
-          </a>
+          </button>
           <a
             href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
@@ -1066,6 +1070,23 @@ function ProductoCard({
           </a>
         </div>
       )}
+
+      <VideoModal
+        open={verVideo}
+        onOpenChange={setVerVideo}
+        title={`Producto ${producto.producto}`}
+        filename={(producto.video_path ?? "").split("/").pop() ?? ""}
+        videoUrl={
+          producto.video_path
+            ? buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0)
+            : null
+        }
+        downloadUrl={
+          producto.video_path
+            ? buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)
+            : null
+        }
+      />
 
       <input
         ref={fileInputRef}
@@ -1087,6 +1108,12 @@ function ProductoCard({
         {uploading ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo {pct}%
+          </>
+        ) : producto.montando ? (
+          // La lista se sondea sola mientras esto sea cierto, así que el
+          // botón de Ver/Descargar aparece solo al terminar.
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Montando el vídeo…
           </>
         ) : (
           <>

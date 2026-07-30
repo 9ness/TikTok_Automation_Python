@@ -196,6 +196,7 @@ def copy_by_ids(
     dup_paths = _duplicated_paths(snap)
     ok = failed = 0
     errors: list[str] = []
+    fallidos: list[str] = []
     total = max(len(file_ids), 1)
 
     for i, fid in enumerate(file_ids, 1):
@@ -210,6 +211,7 @@ def copy_by_ids(
             ok += 1
         except RuntimeError as e:
             failed += 1
+            fallidos.append(fid)
             if len(errors) < 10:
                 errors.append(f"{path}: {e}")
         if on_progress and (i % 10 == 0 or i == len(file_ids)):
@@ -217,7 +219,7 @@ def copy_by_ids(
         if i % 100 == 0:
             on_log(f"[backup] {i}/{len(file_ids)} · {ok} ok · {failed} fallos")
 
-    return {"copied": ok, "failed": failed, "errors": errors}
+    return {"copied": ok, "failed": failed, "errors": errors, "fallidos": fallidos}
 
 
 def run_sync(
@@ -281,7 +283,13 @@ def run_sync(
     prog(0.15, f"Copiando {len(ids)} ficheros…")
     res = copy_by_ids(ids, new_snap, dest, on_log=on_log, on_progress=lambda f, m: prog(0.15 + f * 0.8, m))
 
-    save_snapshot(new_snap, tag)
+    # Los que fallaron NO entran en el snapshot: si entrasen quedarían
+    # marcados como copiados y la siguiente ejecución ya no los vería como
+    # nuevos, así que no se reintentarían JAMÁS. Pasó de verdad — el backup
+    # del 30/07 no supo copiar dos accesos directos y aun así los dio por
+    # guardados. Dejándolos fuera, mañana vuelven a salir como pendientes.
+    a_guardar = {k: v for k, v in new_snap.items() if k not in set(res["fallidos"])}
+    save_snapshot(a_guardar, tag)
     prog(1.0, f"{res['copied']} copiados, {res['failed']} fallos")
 
     if res["failed"]:

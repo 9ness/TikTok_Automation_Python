@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable
 
 from src.nicho_pov_bof import config
+from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 _noop: Callable[[str], None] = lambda _: None
 
@@ -46,6 +48,102 @@ def _cache_get(key: str) -> Any | None:
 
 def _cache_put(key: str, payload: Any) -> None:
     _CACHE[key] = (time.monotonic() + config.LISTING_TTL_S, payload)
+
+
+# ------------------------------------------------------------------
+# Caché persistente en Redis (segunda capa, detrás de la de memoria)
+# ------------------------------------------------------------------
+# Listar un Drive "compartido conmigo" es LENTO de verdad: rclone no puede
+# resolver la ruta de un tirón, va segmento a segmento, y listar las 31
+# carpetas de producto tarda ~41s. Con solo la caché de memoria eso se paga
+# entero cada vez que se reinicia la API y cada vez que vence el TTL, y es lo
+# que hacía que entrar a la página tardase una eternidad.
+#
+# `Productos España` es SOLO LECTURA y su contenido apenas cambia, así que se
+# guarda también en Redis con dos edades:
+#   - hasta `LISTING_TTL_S` se sirve tal cual;
+#   - a partir de ahí se sirve IGUAL DE RÁPIDO (stale) y se dispara un
+#     refresco en segundo plano, así el operador nunca espera a rclone.
+# Solo se descarta del todo pasado `_REDIS_MAX_AGE_S`.
+_REDIS_MAX_AGE_S = 7 * 24 * 3600.0
+_REFRESCANDO: set[str] = set()
+_REFRESCANDO_LOCK = threading.Lock()
+
+
+def _redis_cache_get(key: str) -> tuple[Any, float] | None:
+    """(payload, antigüedad en segundos) o None si no hay nada usable."""
+    try:
+        r = get_nicho_pov_bof_redis()
+        if not r.is_available():
+            return None
+        doc = r.get_json(f"cache:{key}")
+    except Exception:
+        # La caché nunca debe tumbar una petición: si Redis falla, se lista.
+        return None
+    if not isinstance(doc, dict) or "payload" not in doc:
+        return None
+    edad = time.time() - float(doc.get("at") or 0)
+    if edad > _REDIS_MAX_AGE_S:
+        return None
+    return doc["payload"], edad
+
+
+def _redis_cache_put(key: str, payload: Any) -> None:
+    try:
+        r = get_nicho_pov_bof_redis()
+        if r.is_available():
+            r.set_json(f"cache:{key}", {"at": time.time(), "payload": payload})
+    except Exception:
+        pass
+
+
+def _refrescar_en_segundo_plano(key: str, cargar: Callable[[], Any]) -> None:
+    """Relista en un hilo aparte. Como mucho un refresco por clave a la vez."""
+    with _REFRESCANDO_LOCK:
+        if key in _REFRESCANDO:
+            return
+        _REFRESCANDO.add(key)
+
+    def _tarea() -> None:
+        try:
+            payload = cargar()
+            _cache_put(key, payload)
+            _redis_cache_put(key, payload)
+        except Exception:
+            # Si falla se conserva lo que hubiera: es preferible una lista
+            # de hace un rato a un error en pantalla.
+            pass
+        finally:
+            with _REFRESCANDO_LOCK:
+                _REFRESCANDO.discard(key)
+
+    threading.Thread(target=_tarea, daemon=True, name=f"drive-refresh-{key}").start()
+
+
+def _listar_cacheado(key: str, cargar: Callable[[], Any], *, refresh: bool) -> Any:
+    """Memoria → Redis (sirviendo stale) → rclone."""
+    if refresh:
+        payload = cargar()
+        _cache_put(key, payload)
+        _redis_cache_put(key, payload)
+        return payload
+
+    en_memoria = _cache_get(key)
+    if en_memoria is not None:
+        return en_memoria
+
+    en_redis = _redis_cache_get(key)
+    if en_redis is not None:
+        payload, edad = en_redis
+        _cache_put(key, payload)
+        if edad > config.LISTING_TTL_S:
+            _refrescar_en_segundo_plano(key, cargar)
+        return payload
+
+    payload = cargar()
+    _cache_put(key, payload)
+    _redis_cache_put(key, payload)
+    return payload
 
 
 def _run_rclone(args: list[str], *, on_log: Callable[[str], None] = _noop) -> str:
@@ -97,21 +195,18 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
     Devuelve [{"name": "1 Pront Flow", "id": "..."}].
     """
     base = config.source_path(source)  # valida el slug
-    key = f"folders:{source}"
-    if not refresh:
-        cached = _cache_get(key)
-        if cached is not None:
-            return cached
 
-    items = _lsjson(base, dirs_only=True)
-    folders = [
-        {"name": it["Name"], "id": it.get("ID", "")}
-        for it in items
-        if it.get("Name")
-    ]
-    folders.sort(key=lambda f: config.natural_sort_key(f["name"]))
-    _cache_put(key, folders)
-    return folders
+    def cargar() -> list[dict]:
+        items = _lsjson(base, dirs_only=True)
+        folders = [
+            {"name": it["Name"], "id": it.get("ID", "")}
+            for it in items
+            if it.get("Name")
+        ]
+        folders.sort(key=lambda f: config.natural_sort_key(f["name"]))
+        return folders
+
+    return _listar_cacheado(f"folders:{source}", cargar, refresh=refresh)
 
 
 def _assert_known_folder(source: str, folder: str) -> None:
@@ -133,26 +228,22 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     base = config.source_path(source)
     _assert_known_folder(source, folder)
 
-    key = f"photos:{source}:{folder}"
-    if not refresh:
-        cached = _cache_get(key)
-        if cached is not None:
-            return cached
+    def cargar() -> list[dict]:
+        items = _lsjson(f"{base}/{folder}", files_only=True)
+        photos = [
+            {
+                "id": it.get("ID", ""),
+                "name": it["Name"],
+                "size": int(it.get("Size") or 0),
+                "mime": it.get("MimeType", ""),
+            }
+            for it in items
+            if it.get("Name") and config.is_image(it["Name"]) and it.get("ID")
+        ]
+        photos.sort(key=lambda p: config.natural_sort_key(p["name"]))
+        return photos
 
-    items = _lsjson(f"{base}/{folder}", files_only=True)
-    photos = [
-        {
-            "id": it.get("ID", ""),
-            "name": it["Name"],
-            "size": int(it.get("Size") or 0),
-            "mime": it.get("MimeType", ""),
-        }
-        for it in items
-        if it.get("Name") and config.is_image(it["Name"]) and it.get("ID")
-    ]
-    photos.sort(key=lambda p: config.natural_sort_key(p["name"]))
-    _cache_put(key, photos)
-    return photos
+    return _listar_cacheado(f"photos:{source}:{folder}", cargar, refresh=refresh)
 
 
 def probe_dimensions(photo: dict) -> dict:

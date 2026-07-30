@@ -117,6 +117,11 @@ class ProductoInfo(BaseModel):
     # Marca de versión del vídeo montado: cambia en cada montaje y sirve para
     # que el navegador no reutilice el anterior de su caché.
     video_listo_at: int = 0
+    # Hay un montaje de este producto en cola o en curso. Sale de la COLA, no
+    # del estado guardado: el runner escribe `uploaded`/`video_path` a la vez
+    # al terminar, así que lo guardado no distingue "montándose" de "sin
+    # empezar". La ficha lo usa para refrescarse sola hasta que aparezca.
+    montando: bool = False
     # Herramientas de edición elegibles por separado. Todas activas = el
     # montaje completo; ninguna = vídeo limpio (solo voz, encuadre y quitado
     # de marca si es Veo3).
@@ -142,6 +147,9 @@ class ProductosListResponse(BaseModel):
     items: list[ProductoInfo]
     # True una vez que se pulsó "Obtener textos" con éxito para la carpeta.
     textos_extraidos: bool = False
+    # Algún producto de la carpeta se está montando: la UI sondea mientras
+    # sea True y para sola cuando deja de serlo.
+    montando: bool = False
 
 
 class ExtraerTextosRequest(BaseModel):

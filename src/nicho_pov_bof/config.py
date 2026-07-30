@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 
 # ---------------------------------------------------------------------------
 # Drive de origen (SOLO LECTURA)
@@ -90,6 +91,37 @@ LISTING_TTL_S = float(os.getenv("NICHO_POV_BOF_LISTING_TTL_S") or 300)
 RCLONE_TIMEOUT_S = float(os.getenv("NICHO_POV_BOF_RCLONE_TIMEOUT_S") or 120)
 
 
+_SECRETS_RCLONE_CONF = "/app/secrets/rclone.conf"
+
+
+def _copia_escribible(origen: str) -> str:
+    """Copia de `origen` en un sitio donde rclone PUEDA escribir.
+
+    El token de Google caduca cada hora y rclone lo renueva y lo reescribe en
+    el config. Con el config montado read-only no puede: reintenta el guardado
+    DIEZ veces con backoff antes de rendirse, y eso son ~5s tirados en CADA
+    invocación (una lista de carpetas pasaba de 1,4s en el host a 6-9s aquí).
+    Peor aún, al no persistirlo vuelve a pedir un token nuevo la próxima vez.
+
+    Se copia a un sitio escribible y se re-siembra si el operador actualiza el
+    original. rclone se encarga solo de mantener el token al día ahí.
+    """
+    destino_dir = os.getenv("API_TEMP_ROOT") or "temp_work"
+    destino = os.path.join(destino_dir, "rclone_nicho.conf")
+    try:
+        if (
+            not os.path.isfile(destino)
+            or os.path.getmtime(origen) > os.path.getmtime(destino)
+        ):
+            os.makedirs(destino_dir, exist_ok=True)
+            shutil.copyfile(origen, destino)
+            os.chmod(destino, 0o600)
+        return destino
+    except OSError:
+        # Sin sitio escribible se sigue con el original: lento, pero funciona.
+        return origen
+
+
 def rclone_config_path() -> str:
     """Ruta del rclone.conf a usar, o "" para el default de rclone.
 
@@ -100,8 +132,8 @@ def rclone_config_path() -> str:
     explicit = os.getenv("NICHO_POV_BOF_RCLONE_CONFIG")
     if explicit:
         return explicit
-    if os.path.isfile("/app/secrets/rclone.conf"):
-        return "/app/secrets/rclone.conf"
+    if os.path.isfile(_SECRETS_RCLONE_CONF):
+        return _copia_escribible(_SECRETS_RCLONE_CONF)
     return ""
 
 

@@ -45,7 +45,7 @@ from src.api.schemas.nicho_pov_bof import (
 )
 from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
 from src.queue.manager import JobQueue
-from src.queue.models import JobMode
+from src.queue.models import JobMode, JobStatus
 
 router = APIRouter(
     prefix="/api/v1/nicho-pov-bof",
@@ -110,7 +110,34 @@ def _producto_info(producto: str, prod: dict) -> ProductoInfo:
     )
 
 
-def _list_productos(source: str, folder: str) -> ProductosListResponse:
+def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
+    """Números de producto de esta carpeta con un montaje en cola o en curso.
+
+    El runner escribe `uploaded` y `video_path` A LA VEZ, al terminar, así que
+    el estado guardado no distingue "montándose" de "sin empezar" y la ficha
+    no tenía forma de saber cuándo refrescar. La cola sí lo sabe.
+    """
+    if queue is None:
+        return set()
+    try:
+        jobs = queue.get_all()
+    except Exception:
+        return set()
+    activos = {JobStatus.PENDING, JobStatus.RUNNING}
+    return {
+        str(j.params.get("producto"))
+        for j in jobs
+        if j.mode == JobMode.NICHO_POV_BOF_VIDEO
+        and j.status in activos
+        and j.params.get("source") == source
+        and j.params.get("folder") == folder
+        and j.params.get("producto")
+    }
+
+
+def _list_productos(
+    source: str, folder: str, queue: JobQueue | None = None,
+) -> ProductosListResponse:
     """Compone el emparejado de fotos (`photo_pairing`) con el estado
     guardado en Redis (`product_repo`). Reusada por `/productos` y
     `/extraer-textos` (que devuelve la lista ya actualizada)."""
@@ -131,6 +158,7 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
 
     folder_state = product_repo.load_folder(source, folder)
     guardados = folder_state.get("productos") or {}
+    montandose = _productos_montandose(queue, source, folder)
 
     items: list[ProductoInfo] = []
     for pair in pairs:
@@ -162,6 +190,7 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
                 url_match_score=float(guardado.get("url_match_score") or 0.0),
                 url_ventas_30d=int(guardado.get("url_ventas_30d") or 0),
                 url_ventas_total=int(guardado.get("url_ventas_total") or 0),
+                montando=producto in montandose,
             )
         )
 
@@ -170,6 +199,7 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
         folder=folder,
         items=items,
         textos_extraidos=bool(folder_state.get("textos_extraidos")),
+        montando=bool(montandose),
     )
 
 
@@ -177,8 +207,9 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
 def list_productos(
     source: Annotated[str, Query()],
     folder: Annotated[str, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
 ) -> ProductosListResponse:
-    return _list_productos(source, folder)
+    return _list_productos(source, folder, queue)
 
 
 @router.post("/extraer-textos", response_model=ProductosListResponse)
