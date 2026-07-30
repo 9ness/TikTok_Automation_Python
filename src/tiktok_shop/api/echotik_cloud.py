@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Callable
 
 import requests
@@ -40,10 +41,8 @@ TIMEOUT_S = 60
 
 
 def echotik_is_configured() -> bool:
-    return bool(
-        os.environ.get("ECHOTIK_API_USER", "").strip()
-        and os.environ.get("ECHOTIK_API_PASSWORD", "").strip()
-    )
+    usuario, password = _auth()
+    return bool(usuario and password)
 
 
 # ── Seguimiento de cuota agotada ─────────────────────────────────────
@@ -77,7 +76,50 @@ def _base_url() -> str:
     return (os.environ.get("ECHOTIK_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 
 
+# Las credenciales del plan de EchoTik caducan cada pocos días (el operador
+# renueva la cuenta de pruebas), así que se pueden cambiar EN CALIENTE desde la
+# UI y quedan en Redis. Sin esto había que editar el `.env` del VPS y recrear
+# el container, que solo puede hacer quien tiene SSH.
+CREDS_KEY = "echotik:credenciales"
+_CREDS_CACHE: tuple[float, tuple[str, str]] | None = None
+_CREDS_TTL_S = 30.0
+
+
+def guardar_credenciales(usuario: str, password: str) -> bool:
+    """Guarda las credenciales en Redis y vacía la caché."""
+    global _CREDS_CACHE
+    from src.tiktok_shop.repos.redis_base import get_shop_redis
+
+    ok = get_shop_redis().set_json(
+        CREDS_KEY,
+        {"usuario": (usuario or "").strip(), "password": (password or "").strip()},
+    )
+    _CREDS_CACHE = None
+    return bool(ok)
+
+
+def _creds_de_redis() -> tuple[str, str]:
+    global _CREDS_CACHE
+    ahora = time.monotonic()
+    if _CREDS_CACHE and ahora - _CREDS_CACHE[0] < _CREDS_TTL_S:
+        return _CREDS_CACHE[1]
+    par = ("", "")
+    try:
+        from src.tiktok_shop.repos.redis_base import get_shop_redis
+
+        d = get_shop_redis().get_json(CREDS_KEY) or {}
+        par = ((d.get("usuario") or "").strip(), (d.get("password") or "").strip())
+    except Exception:
+        par = ("", "")
+    _CREDS_CACHE = (ahora, par)
+    return par
+
+
 def _auth() -> tuple[str, str]:
+    """Credenciales: manda lo guardado en Redis; el `.env` es el respaldo."""
+    usuario, password = _creds_de_redis()
+    if usuario and password:
+        return usuario, password
     return (
         os.environ.get("ECHOTIK_API_USER", "").strip(),
         os.environ.get("ECHOTIK_API_PASSWORD", "").strip(),

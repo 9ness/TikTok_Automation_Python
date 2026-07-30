@@ -31,6 +31,8 @@ from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
+    EchoTikCredsRequest,
+    EchoTikCredsResponse,
     ProductoEstadoRequest,
     ProductoUrlRequest,
     ProductosUrlsRequest,
@@ -477,6 +479,71 @@ def buscar_urls_carpeta(body: ProductosUrlsRequest) -> ProductosUrlsResponse:
         encontrados=encontrados,
         sin_resultado=sin_resultado,
         aviso=aviso,
+    )
+
+
+def _mascara(usuario: str) -> str:
+    """Deja ver los últimos dígitos para reconocer la cuenta sin exponerla."""
+    u = (usuario or "").strip()
+    return f"…{u[-6:]}" if len(u) > 6 else ("·" * len(u))
+
+
+@router.get("/echotik", response_model=EchoTikCredsResponse)
+def estado_echotik() -> EchoTikCredsResponse:
+    """Qué credenciales de EchoTik están puestas ahora mismo."""
+    from src.tiktok_shop.api import echotik_cloud
+
+    guardadas, _pwd = echotik_cloud._creds_de_redis()
+    usuario, password = echotik_cloud._auth()
+    return EchoTikCredsResponse(
+        ok=True,
+        configurado=bool(usuario and password),
+        usuario_mascara=_mascara(usuario),
+        origen="guardadas" if guardadas else ("env" if usuario else "ninguna"),
+        mensaje=(
+            echotik_cloud.last_quota_error_msg()
+            if echotik_cloud.quota_exhausted() else ""
+        ),
+    )
+
+
+@router.post("/echotik", response_model=EchoTikCredsResponse)
+def guardar_echotik(body: EchoTikCredsRequest) -> EchoTikCredsResponse:
+    """Guarda las credenciales de EchoTik. Se aplican al instante, sin
+    redespliegue: el cliente las lee de Redis y el `.env` queda como respaldo.
+
+    Con `probar=true` gasta UNA llamada verificando que funcionan; si no
+    funcionan NO se guardan, para no dejar el Radar con una cuenta muerta.
+    """
+    from src.tiktok_shop.api import echotik_cloud
+
+    usuario = body.usuario.strip()
+    password = body.password.strip()
+
+    if body.probar:
+        anterior = echotik_cloud._CREDS_CACHE
+        echotik_cloud._CREDS_CACHE = (time.monotonic(), (usuario, password))
+        try:
+            prueba = echotik_cloud.search_products("bella aurora", region="ES", limit=10)
+        finally:
+            echotik_cloud._CREDS_CACHE = anterior
+        if not prueba:
+            return EchoTikCredsResponse(
+                ok=False, configurado=echotik_cloud.echotik_is_configured(),
+                usuario_mascara=_mascara(echotik_cloud._auth()[0]),
+                origen="guardadas" if echotik_cloud._creds_de_redis()[0] else "env",
+                mensaje=("Esas credenciales no devuelven resultados: revisa "
+                         "usuario y contraseña, o la cuota del plan. No se han "
+                         "guardado."),
+            )
+
+    if not echotik_cloud.guardar_credenciales(usuario, password):
+        raise APIError("No se pudieron guardar (¿Redis no configurado?)", status_code=503)
+
+    return EchoTikCredsResponse(
+        ok=True, configurado=True, usuario_mascara=_mascara(usuario),
+        origen="guardadas",
+        mensaje="Credenciales guardadas y en uso" + (" (verificadas)" if body.probar else ""),
     )
 
 

@@ -1,6 +1,8 @@
 """Schemas del Nicho POV BOF."""
 
 from .models import (
+    EchoTikCredsRequest,
+    EchoTikCredsResponse,
     BackupCheckResponse,
     BackupSyncRequest,
     BackupSyncResponse,
@@ -25,6 +27,8 @@ from .models import (
 )
 
 __all__ = [
+    "EchoTikCredsRequest",
+    "EchoTikCredsResponse",
     "BackupCheckResponse",
     "BackupSyncRequest",
     "BackupSyncResponse",

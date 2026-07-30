@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import type {
   BackupCheckResponse,
   BackupSyncResponse,
+  EchoTikCredsRequest,
+  EchoTikCredsResponse,
   EstadoRequest,
   ExtraerTextosRequest,
   FoldersListResponse,
@@ -178,6 +180,25 @@ export function useBuscarUrlsCarpeta() {
     mutationFn: (body) => api.post<ProductosUrlsResponse>(`${ROOT}/productos/urls`, body),
     onSuccess: (res, vars) => {
       qc.setQueryData(nichoPovBofKeys.productos(vars.source, vars.folder), res.items);
+    },
+  });
+}
+
+/** Credenciales de EchoTik. Se aplican en caliente: el cliente las lee de
+ *  Redis, así que no hace falta redespliegue ni tocar el .env del VPS. */
+export function useEchoTikEstado() {
+  return useQuery<EchoTikCredsResponse>({
+    queryKey: [...nichoPovBofKeys.all, "echotik"] as const,
+    queryFn: () => api.get<EchoTikCredsResponse>(`${ROOT}/echotik`),
+  });
+}
+
+export function useGuardarEchoTik() {
+  const qc = useQueryClient();
+  return useMutation<EchoTikCredsResponse, Error, EchoTikCredsRequest>({
+    mutationFn: (body) => api.post<EchoTikCredsResponse>(`${ROOT}/echotik`, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "echotik"] });
     },
   });
 }

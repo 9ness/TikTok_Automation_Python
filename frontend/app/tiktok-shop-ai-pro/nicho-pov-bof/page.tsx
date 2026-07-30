@@ -35,6 +35,8 @@ import {
   useProductos,
   useBuscarProductoUrl,
   useBuscarUrlsCarpeta,
+  useEchoTikEstado,
+  useGuardarEchoTik,
   useSetEstado,
   useSources,
   useVendidos,
@@ -289,6 +291,11 @@ export default function NichoPovBofPage() {
           />
         </div>
       </section>
+
+      {/* Credenciales de EchoTik. El plan de pruebas caduca cada pocos días y
+          antes había que editar el .env del VPS y recrear el container, que
+          solo puede hacer quien tiene SSH. Aquí se cambian en caliente. */}
+      <EchoTikPanel />
 
       {/* Backup del Drive de origen */}
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
@@ -682,6 +689,98 @@ function CopyChip({ label, text }: { label: string; text: string }) {
       <Copy className="h-3 w-3 shrink-0" />
       <span className="truncate">{label}</span>
     </button>
+  );
+}
+
+
+/** Credenciales de EchoTik, cambiables sin redespliegue. */
+function EchoTikPanel() {
+  const estado = useEchoTikEstado();
+  const guardar = useGuardarEchoTik();
+  const [abierto, setAbierto] = useState(false);
+  const [usuario, setUsuario] = useState("");
+  const [password, setPassword] = useState("");
+
+  const d = estado.data;
+  return (
+    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-sm font-semibold">🔑 API de EchoTik (enlaces)</span>
+        <span className="text-[11px] text-muted-foreground">
+          {d
+            ? d.configurado
+              ? `${d.usuario_mascara} · ${d.origen === "guardadas" ? "guardadas aquí" : "del .env"}`
+              : "sin configurar"
+            : "…"}
+        </span>
+      </button>
+
+      {d?.mensaje && !guardar.isPending && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-500">
+          {d.mensaje}
+        </p>
+      )}
+
+      {abierto && (
+        <div className="space-y-2">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Se aplican al instante, sin desplegar nada. Al guardar se gasta UNA
+            llamada comprobando que funcionan; si no funcionan, no se guardan.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
+            placeholder="usuario (el número largo)"
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="contraseña"
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+          />
+          <button
+            type="button"
+            disabled={guardar.isPending || usuario.trim().length < 4 || password.trim().length < 8}
+            onClick={() =>
+              guardar.mutate(
+                { usuario: usuario.trim(), password: password.trim(), probar: true },
+                {
+                  onSuccess: (r) => {
+                    if (r.ok) {
+                      toast.success(r.mensaje);
+                      setUsuario("");
+                      setPassword("");
+                      setAbierto(false);
+                    } else {
+                      toast.error(r.mensaje);
+                    }
+                  },
+                  onError: (e) =>
+                    toast.error(e instanceof ApiError ? e.message : String(e)),
+                },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {guardar.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Comprobando…
+              </>
+            ) : (
+              "Guardar y comprobar (1 llamada)"
+            )}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

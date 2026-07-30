@@ -118,6 +118,21 @@ export interface ProductoUrlRequest {
   producto: string;
 }
 
+export interface EchoTikCredsRequest {
+  usuario: string;
+  password: string;
+  /** Gasta UNA llamada comprobando que funcionan antes de guardarlas. */
+  probar: boolean;
+}
+
+export interface EchoTikCredsResponse {
+  ok: boolean;
+  configurado: boolean;
+  usuario_mascara: string;
+  origen: string;
+  mensaje: string;
+}
+
 export interface ProductosUrlsRequest {
   source: string;
   folder: string;

@@ -186,6 +186,25 @@ class ProductosUrlsResponse(BaseModel):
     aviso: str = ""          # p. ej. cuota agotada a mitad
 
 
+class EchoTikCredsRequest(BaseModel):
+    """Credenciales del plan de EchoTik. Cambian cada pocos días (cuenta de
+    pruebas), así que se guardan en Redis y se aplican EN CALIENTE."""
+
+    usuario: str = Field(..., min_length=4)
+    password: str = Field(..., min_length=8)
+    # Gasta UNA llamada comprobando que funcionan antes de guardarlas.
+    probar: bool = True
+
+
+class EchoTikCredsResponse(BaseModel):
+    ok: bool
+    configurado: bool
+    # Usuario enmascarado, para saber cuál está puesto sin exponerlo.
+    usuario_mascara: str = ""
+    origen: str = ""          # "guardadas" | "env" | "ninguna"
+    mensaje: str = ""
+
+
 class VideoUploadResponse(BaseModel):
     ok: bool
     job_id: str | None = None
