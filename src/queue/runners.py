@@ -1784,8 +1784,12 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     tmp_dest.replace(dest_path)
     on_log(f"[nicho_pov_bof] publicado en Drive: {dest_path}")
 
+    # `video_listo_at` es la marca de versión: el fichero se sobrescribe con
+    # el mismo nombre en cada montaje, así que sin esto el navegador seguiría
+    # sirviendo el vídeo viejo de su caché.
     product_repo.update_product(
         source, folder, producto, uploaded=True, video_path=str(dest_path),
+        video_listo_at=int(time.time()),
     )
 
     # El bruto subido y el work_dir de escalones intermedios ya no hacen

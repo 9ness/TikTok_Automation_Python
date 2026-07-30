@@ -214,6 +214,20 @@ export function useVendidos(source: string) {
   });
 }
 
+/** URL del vídeo YA montado. `v` es la marca de versión: sin ella el
+ *  navegador reutilizaría el vídeo anterior de su caché al remontar. */
+export function buildVideoUrl(
+  source: string, folder: string, producto: string,
+  version = 0, descargar = false,
+): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  return `${base}${ROOT}/video?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+    folder,
+  )}&producto=${encodeURIComponent(producto)}&v=${version}${descargar ? "&descargar=true" : ""}${qs}`;
+}
+
 /** URL de descarga de la foto limpia por nombre de producto (no por file id;
  *  el backend resuelve el par limpia/titulada dentro de la carpeta). */
 export function buildCleanPhotoDownloadUrl(source: string, folder: string, producto: string): string {

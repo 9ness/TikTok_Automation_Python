@@ -98,6 +98,7 @@ def _producto_info(producto: str, prod: dict) -> ProductoInfo:
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
+        video_listo_at=int(prod.get("video_listo_at") or 0),
         product_id=prod.get("product_id", ""),
         product_url=prod.get("product_url", ""),
         url_match_name=prod.get("url_match_name", ""),
@@ -149,6 +150,7 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),
+                video_listo_at=int(guardado.get("video_listo_at") or 0),
                 product_id=guardado.get("product_id", ""),
                 product_url=guardado.get("product_url", ""),
                 url_match_name=guardado.get("url_match_name", ""),
@@ -486,6 +488,38 @@ def _mascara(usuario: str) -> str:
     """Deja ver los últimos dígitos para reconocer la cuenta sin exponerla."""
     u = (usuario or "").strip()
     return f"…{u[-6:]}" if len(u) > 6 else ("·" * len(u))
+
+
+@router.get("/video")
+def descargar_video(
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    descargar: Annotated[bool, Query()] = False,
+) -> FileResponse:
+    """Sirve el vídeo YA montado del producto.
+
+    Se lee del `video_path` guardado, que apunta al fichero publicado en Drive
+    (el mount). Al remontar un producto se sobrescribe con el mismo nombre, así
+    que esto devuelve SIEMPRE la última versión; el frontend añade
+    `video_listo_at` a la URL para que el navegador no sirva la anterior de su
+    caché.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    prod = product_repo.get_product(source, folder, producto)
+    ruta = (prod or {}).get("video_path") or ""
+    if not ruta:
+        raise APIError("Este producto todavía no tiene vídeo montado.", status_code=404)
+    p = Path(ruta)
+    if not p.is_file():
+        raise APIError(
+            f"El vídeo ya no está en {p} (¿borrado de Drive?).", status_code=404,
+        )
+    return FileResponse(
+        str(p), media_type="video/mp4",
+        filename=p.name if descargar else None,
+    )
 
 
 @router.get("/echotik", response_model=EchoTikCredsResponse)

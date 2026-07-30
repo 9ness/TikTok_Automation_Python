@@ -90,6 +90,9 @@ export interface ProductoItem {
   uploaded: boolean;
   sold: boolean;
   video_path: string | null;
+  /** Cambia en cada montaje: se usa para romper la caché del navegador y que
+   *  Ver/Descargar apunten siempre a la última versión. */
+  video_listo_at?: number;
   con_textos?: boolean;
   /** Ficha en TikTok Shop. Vacío = aún no se ha buscado o no se encontró
    *  nada con parecido suficiente (averiguarla gasta cuota de EchoTik). */

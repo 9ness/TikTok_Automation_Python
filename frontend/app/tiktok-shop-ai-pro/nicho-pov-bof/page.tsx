@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
   buildCleanPhotoDownloadUrl,
+  buildVideoUrl,
   buildPhotoUrl,
   useBackupCheck,
   useBackupSync,
@@ -1024,6 +1025,28 @@ function ProductoCard({
           </p>
         )}
       </div>
+
+      {/* Vídeo ya montado: verlo y descargarlo sin salir de aquí. Al remontar
+          el producto, `video_listo_at` cambia y la URL con él, así que apunta
+          a la versión nueva y no a la cacheada. */}
+      {producto.video_path && (
+        <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2">
+          <video
+            key={producto.video_listo_at ?? 0}
+            src={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0)}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full rounded"
+          />
+          <a
+            href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
+          >
+            <Download className="h-3.5 w-3.5" /> Descargar vídeo montado
+          </a>
+        </div>
+      )}
 
       <input
         ref={fileInputRef}

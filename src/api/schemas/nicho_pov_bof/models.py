@@ -110,6 +110,9 @@ class ProductoInfo(BaseModel):
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None
+    # Marca de versión del vídeo montado: cambia en cada montaje y sirve para
+    # que el navegador no reutilice el anterior de su caché.
+    video_listo_at: int = 0
     # Herramientas de edición elegibles por separado. Todas activas = el
     # montaje completo; ninguna = vídeo limpio (solo voz, encuadre y quitado
     # de marca si es Veo3).
