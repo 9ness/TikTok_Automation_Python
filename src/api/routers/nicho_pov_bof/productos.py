@@ -81,15 +81,50 @@ def get_prompts() -> PromptsResponse:
     return PromptsResponse(imagen=imagen, video=video)
 
 
-def _producto_info(producto: str, prod: dict) -> ProductoInfo:
+def _fotos_del_producto(source: str, folder: str, producto: str) -> tuple[str | None, str | None]:
+    """(id foto limpia, id captura con título) de un producto, o (None, None).
+
+    El listado está cacheado, así que esto no vuelve a pegarle al Drive.
+    """
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    try:
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        for pair in photo_pairing.pair_folder(fotos):
+            if pair["producto"] == producto:
+                return (
+                    (pair.get("clean") or {}).get("id"),
+                    (pair.get("titled") or {}).get("id"),
+                )
+    except (ValueError, RuntimeError):
+        # Sin fotos se devuelve el resto del producto igualmente.
+        pass
+    return None, None
+
+
+def _producto_info(
+    producto: str, prod: dict, source: str = "", folder: str = "",
+    queue: JobQueue | None = None,
+) -> ProductoInfo:
     """Documento de Redis → respuesta de la API.
 
-    Lo usan los endpoints que devuelven UN producto ya actualizado; la lista
-    completa (`_list_productos`) añade además el emparejado de fotos, que
-    aquí no se conoce.
+    Lo usan los endpoints que devuelven UN producto ya actualizado. Con
+    `source`/`folder` se rellenan también las fotos: el front SUSTITUYE el
+    producto entero en la lista con esta respuesta, así que si viniera sin
+    ellas la miniatura desaparecía hasta recargar (pasaba al buscar la URL
+    de un producto suelto).
     """
+    clean, titled = (
+        _fotos_del_producto(source, folder, producto) if source and folder
+        else (None, None)
+    )
     return ProductoInfo(
         producto=producto,
+        clean_photo_id=clean,
+        titled_photo_id=titled,
         titulo=prod.get("titulo", ""),
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
@@ -107,6 +142,7 @@ def _producto_info(producto: str, prod: dict) -> ProductoInfo:
         url_match_score=float(prod.get("url_match_score") or 0.0),
         url_ventas_30d=int(prod.get("url_ventas_30d") or 0),
         url_ventas_total=int(prod.get("url_ventas_total") or 0),
+        montando=producto in _productos_montandose(queue, source, folder),
     )
 
 
@@ -371,7 +407,10 @@ async def upload_video(
 
 
 @router.post("/producto/estado", response_model=ProductoInfo)
-def set_producto_estado(body: ProductoEstadoRequest) -> ProductoInfo:
+def set_producto_estado(
+    body: ProductoEstadoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> ProductoInfo:
     """Parche parcial de Subido/Vendió. `update_product` ya ignora los
     campos que vengan `None`, así que el caller puede mandar solo el que
     cambia."""
@@ -385,11 +424,14 @@ def set_producto_estado(body: ProductoEstadoRequest) -> ProductoInfo:
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    return _producto_info(body.producto, prod)
+    return _producto_info(body.producto, prod, body.source, body.folder, queue)
 
 
 @router.post("/producto/url", response_model=ProductoInfo)
-def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
+def buscar_producto_url(
+    body: ProductoUrlRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> ProductoInfo:
     """Averigua la ficha de TikTok Shop del producto y la guarda.
 
     **Gasta una llamada del plan de EchoTik** (trial de 100), así que si el
@@ -402,7 +444,7 @@ def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
     if not prod:
         raise _bad_request(f"Producto {body.producto!r} no encontrado en {body.folder!r}.")
     if prod.get("product_url"):
-        return _producto_info(body.producto, prod)
+        return _producto_info(body.producto, prod, body.source, body.folder, queue)
 
     titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
     if not titulo.strip():
@@ -415,13 +457,13 @@ def buscar_producto_url(body: ProductoUrlRequest) -> ProductoInfo:
         # No es un error del servidor: EchoTik simplemente no lo indexa o el
         # parecido no daba para fiarse. Se devuelve el producto sin URL para
         # que la UI lo muestre como "no encontrado" en vez de romperse.
-        return _producto_info(body.producto, prod)
+        return _producto_info(body.producto, prod, body.source, body.folder, queue)
 
     try:
         prod = product_repo.update_product(body.source, body.folder, body.producto, **hallado)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return _producto_info(body.producto, prod)
+    return _producto_info(body.producto, prod, body.source, body.folder, queue)
 
 
 @router.post("/productos/urls", response_model=ProductosUrlsResponse)
