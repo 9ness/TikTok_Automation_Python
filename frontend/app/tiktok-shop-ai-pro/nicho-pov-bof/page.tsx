@@ -856,11 +856,7 @@ function ProductoCard({
           title={producto.url_match_name}
         >
           🔗 Ver ficha en TikTok Shop
-          {!producto.url_ventas_total
-            ? " · ⚠️ sin ventas, puede estar retirada"
-            : producto.url_match_score < 0.99
-              ? " · comprueba que es el correcto"
-              : ""}
+          {producto.url_match_score < 0.99 && " · comprueba que es el correcto"}
         </a>
       ) : (
         <button

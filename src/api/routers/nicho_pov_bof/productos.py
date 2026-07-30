@@ -400,29 +400,72 @@ def buscar_urls_carpeta(body: ProductosUrlsRequest) -> ProductosUrlsResponse:
     llamadas = encontrados = sin_resultado = 0
     aviso = ""
 
+    # Pendientes: sin enlace y con título. Agrupados por MARCA, porque una
+    # barrida de marca (3 llamadas) resuelve todos sus productos de golpe y
+    # además encuentra fichas que la búsqueda por nombre no ve — EchoTik busca
+    # por subcadena y los títulos del operador no coinciden literalmente.
+    pendientes: dict[str, list[str]] = {}
     for producto, prod in sorted(guardados.items(), key=lambda kv: kv[0]):
         if prod.get("product_url"):
             continue
-        titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
-        if not titulo.strip():
+        if not (prod.get("titulo_tiktok_completo") or prod.get("titulo") or "").strip():
             continue
+        pendientes.setdefault((prod.get("tienda") or "").strip().lower(), []).append(producto)
+
+    PAGINAS_MARCA = 3
+    for _marca, productos in pendientes.items():
         if echotik_cloud.quota_exhausted():
-            aviso = (
-                "EchoTik se quedó sin cuota a mitad — los productos restantes "
-                "se han dejado sin buscar."
-            )
+            aviso = ("EchoTik se quedó sin cuota a mitad — los productos "
+                     "restantes se han dejado sin buscar.")
             break
 
-        llamadas += 1
-        hallado = product_url.find_product_url(titulo, prod.get("tienda", ""))
-        if not hallado:
-            sin_resultado += 1
+        ejemplo = guardados[productos[0]]
+        # Con un solo producto de la marca sale más barato buscarlo por nombre
+        # (1-2 llamadas) que barrer la marca entera (3).
+        if len(productos) == 1:
+            titulo = (ejemplo.get("titulo_tiktok_completo")
+                      or ejemplo.get("titulo") or "")
+            llamadas += 1
+            hallado = product_url.find_product_url(titulo, ejemplo.get("tienda", ""))
+            if hallado is None:
+                llamadas += 1  # el reintento sin marca
+                sin_resultado += 1
+            else:
+                try:
+                    product_repo.update_product(
+                        body.source, body.folder, productos[0], **hallado)
+                except RuntimeError as e:
+                    raise APIError(str(e), status_code=503) from e
+                encontrados += 1
             continue
-        try:
-            product_repo.update_product(body.source, body.folder, producto, **hallado)
-        except RuntimeError as e:
-            raise APIError(str(e), status_code=503) from e
-        encontrados += 1
+
+        candidatos = product_url.barrer_marca(
+            ejemplo.get("tienda", ""), paginas=PAGINAS_MARCA)
+        llamadas += PAGINAS_MARCA
+        for producto in productos:
+            prod = guardados[producto]
+            titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
+            hallado = product_url.elegir_de_candidatos(
+                candidatos, titulo, prod.get("tienda", ""))
+            if hallado:
+                hallado["keyword"] = f"[marca] {ejemplo.get('tienda', '')}"
+            else:
+                # La barrida no lo tiene: se prueba por nombre, que a veces
+                # llega a fichas que no salen listando la marca (le pasa a la
+                # crema de manos de Bella Aurora).
+                llamadas += 1
+                hallado = product_url.find_product_url(titulo, prod.get("tienda", ""))
+                if hallado is None:
+                    llamadas += 1  # el reintento sin marca
+            if not hallado:
+                sin_resultado += 1
+                continue
+            try:
+                product_repo.update_product(
+                    body.source, body.folder, producto, **hallado)
+            except RuntimeError as e:
+                raise APIError(str(e), status_code=503) from e
+            encontrados += 1
 
     lista = _list_productos(body.source, body.folder)
     return ProductosUrlsResponse(

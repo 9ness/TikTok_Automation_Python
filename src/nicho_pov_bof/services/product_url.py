@@ -172,6 +172,94 @@ def match_score(candidato: str, titulo_completo: str, tienda: str = "") -> float
     return len(nucleo & hallados) / len(nucleo)
 
 
+def score_ponderado(
+    candidato: str, titulo_completo: str, tienda: str, catalogo: list[dict],
+) -> float:
+    """Parecido pesando las palabras por lo RARAS que son en el catálogo.
+
+    Con todas las palabras valiendo igual, una "crema de manos" casaba con
+    "Crema Anti-manchas de día" al 67%: comparten "crema" y "antimanchas", que
+    son palabras que lleva medio catálogo de la marca, y se perdía la única
+    que de verdad identifica el producto ("manos").
+
+    Teniendo la lista de candidatos delante se puede medir: la palabra que
+    aparece en 20 de 30 fichas no distingue nada; la que aparece en 2, sí.
+    """
+    nucleo = _nucleo(titulo_completo, tienda)
+    if not nucleo:
+        return 0.0
+    hallados = _tokens(candidato)
+    marca = _marca_distintiva(tienda)
+    if marca and not (marca & hallados):
+        return 0.0
+
+    total = max(1, len(catalogo))
+    pesos = {}
+    for t in nucleo:
+        veces = sum(1 for c in catalogo if t in _tokens(c.get("name", "")))
+        pesos[t] = 1.0 / (1 + veces / total * 4)      # 1.0 rara → 0.2 ubicua
+    suma = sum(pesos.values())
+    acertado = sum(w for t, w in pesos.items() if t in hallados)
+    return acertado / suma if suma else 0.0
+
+
+def elegir_de_candidatos(
+    candidatos: list[dict], titulo_completo: str, tienda: str,
+) -> dict[str, Any] | None:
+    """Elige de una lista YA descargada, sin gastar llamadas."""
+    if not candidatos:
+        return None
+
+    def puntos(p):
+        return score_ponderado(
+            p.get("name", ""), titulo_completo, tienda, candidatos)
+
+    mejor = max(candidatos, key=lambda p: (round(puntos(p), 3), -len(p.get("name") or "")))
+    score = puntos(mejor)
+    if score < MIN_SCORE or not mejor.get("product_id"):
+        return None
+    return {
+        "product_id": mejor["product_id"],
+        "product_url": mejor["tiktok_url"],
+        "url_match_name": mejor.get("name", ""),
+        "url_match_score": round(score, 3),
+    }
+
+
+def barrer_marca(
+    tienda: str, *, region: str = "ES", paginas: int = 3,
+    on_log: OnLog | None = None,
+) -> list[dict]:
+    """Baja el catálogo de una marca de una vez: `paginas` llamadas para todos
+    sus productos de la carpeta, en vez de 1-2 por producto.
+
+    Buscar el nombre exacto falla mucho (EchoTik busca por subcadena y las
+    fichas del operador no coinciden literalmente con el listado), pero
+    buscando la MARCA salen 30 productos y ahí sí está el que falta: el
+    "SPLENDOR serum" no aparecía por nombre y sí en la barrida.
+    """
+    from src.tiktok_shop.api import echotik_cloud
+
+    # En ORDEN, no alfabético: EchoTik busca por subcadena y "aurora bella"
+    # devuelve 6 productos donde "bella aurora" devuelve 30.
+    distintivas = _marca_distintiva(tienda)
+    marca = " ".join(
+        [w for w in _normaliza(tienda).split() if w in distintivas][:2]
+    ) or tienda.strip()
+    if not marca:
+        return []
+    if on_log:
+        on_log(f"🔎 EchoTik marca {marca!r} ({paginas} llamadas para toda la marca)")
+    res = echotik_cloud.search_products(marca, region=region, limit=paginas * 10)
+    # Fichas repetidas: la API devuelve el mismo producto en varias páginas.
+    unicos: dict[str, dict] = {}
+    for p in res:
+        unicos.setdefault(p.get("product_id") or p.get("name", ""), p)
+    if on_log:
+        on_log(f"  · {len(unicos)} productos distintos de la marca")
+    return list(unicos.values())
+
+
 def find_product_url(
     titulo_completo: str,
     tienda: str = "",
@@ -216,15 +304,15 @@ def find_product_url(
         log("  · sin resultados")
         return None
 
-    # Se ordena por parecido y, a igualdad, por VENTAS RECIENTES: EchoTik
-    # guarda fichas históricas y algunas ya están retiradas — al abrirlas
-    # TikTok dice "producto no encontrado". Las ventas de los últimos 30 días
-    # son la señal de que el listado sigue vivo.
+    # Las ventas que devuelve EchoTik NO son fiables (el operador comprobó
+    # productos con ventas reales que la API da a 0), así que no se usan ni
+    # para desempatar ni para avisar. Manda el parecido y, a igualdad, el
+    # nombre más corto: los títulos con menos relleno SEO suelen ser la ficha
+    # principal del producto.
     def orden(p):
         return (
             round(match_score(p.get("name", ""), titulo_completo, tienda), 2),
-            int(p.get("units_sold_30d") or 0),
-            int(p.get("units_sold") or 0),
+            -len(p.get("name") or ""),
         )
 
     mejor = max(resultados, key=orden)
@@ -233,19 +321,11 @@ def find_product_url(
         log(f"  · descartado (parecido {score:.0%}): {mejor.get('name', '')[:60]}")
         return None
 
-    vendidos_30d = int(mejor.get("units_sold_30d") or 0)
-    vendidos = int(mejor.get("units_sold") or 0)
-    if not vendidos:
-        log(f"  ⚠️ {score:.0%} · {mejor['name'][:56]} — SIN ventas registradas, "
-            f"la ficha puede estar retirada")
-    else:
-        log(f"  ✓ {score:.0%} · {mejor['name'][:56]} ({vendidos_30d} uds/30d)")
+    log(f"  ✓ {score:.0%} · {mejor['name'][:60]}")
     return {
         "product_id": mejor["product_id"],
         "product_url": mejor["tiktok_url"],
         "url_match_name": mejor.get("name", ""),
         "url_match_score": round(score, 3),
-        "url_ventas_30d": vendidos_30d,
-        "url_ventas_total": vendidos,
         "keyword": keyword,
     }
