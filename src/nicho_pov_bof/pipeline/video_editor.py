@@ -464,7 +464,11 @@ def _render_text_block_png(
 # IA se pasa de frenada, aquí se sustituye por algo neutro y se avisa en el
 # log. No se aborta el montaje por esto.
 _TERMINOS_RIESGO = (
-    "oferta", "oferton", "ofertazo", "rebaj", "chollo", "robo", "regalo",
+    "oferta", "oferton", "ofertazo", "rebaj", "chollo",
+    # "robo" y "regalo" van con su frase entera: sueltos saltaban dentro de
+    # "antirrobo" y de "ideal para regalo", que son características del
+    # producto, no afirmaciones de precio.
+    "un robo", "regalo a este precio", "te lo regalan", "de regalo",
     "gratis", "barat", "bajon", "bajada", "precio de risa", "precio de locura",
     "preciazo", "imperdible", "liquidacion", "saldo", "mitad de precio",
     "descuentazo", "ultima", "ultimas", "solo hoy", "se agota",
@@ -546,22 +550,40 @@ def texto_arriesgado(txt: str) -> str | None:
 # RESULTADO ("tu piel perfecta", "elimina las manchas"). Nada de eso lo
 # respalda la ficha del producto, y en salud/belleza/suplementos es motivo de
 # sanción. El caption solo debe reformular lo que ya pone el título.
-_TERMINOS_PROMESA = (
+# Promesas SIEMPRE arriesgadas, hable de lo que hable el producto.
+_PROMESA_ABSOLUTA = (
+    "milagro", "milagros", "garantiz", "resultados en", "en 7 dias",
+    "en 30 dias", "para siempre", "te cambia la vida", "cambia tu vida",
+    "el mejor del mercado", "la mejor del mercado", "numero 1",
+    "adios a", "olvidate de", "sin esfuerzo", "definitivamente",
+)
+# Y las que solo lo son si se aplican al CUERPO o a la SALUD. "Perfecta para
+# playa, camping o pícnic" describe un uso y es correcto; "tu piel perfecta"
+# promete un resultado. Sin esta distinción el aviso saltaba en casi todos los
+# captions buenos, y un aviso que salta siempre se acaba ignorando.
+_PROMESA_SI_CUERPO = (
     "perfecta", "perfecto", "elimina", "eliminan", "borra", "cura", "curan",
-    "sana", "adelgaz", "rejuvenec", "milagro", "milagros", "garantiz",
-    "resultados en", "en 7 dias", "en 30 dias", "para siempre",
-    "adios a", "olvidate de", "te cambia la vida", "cambia tu vida",
-    "el mejor del mercado", "la mejor del mercado", "numero 1", "n1",
-    "sin esfuerzo", "al instante", "100%", "definitivamente",
+    "sana", "adelgaz", "rejuvenec", "consigue", "lograras", "tendras",
+    "reduce", "combate", "corrige", "al instante", "100%",
+)
+_PALABRAS_CUERPO = (
+    "piel", "cutis", "rostro", "cara", "pelo", "cabello", "uñas", "unas",
+    "cuerpo", "figura", "peso", "arrugas", "manchas", "acne", "celulitis",
+    "grasa", "dolor", "ansiedad", "sueño", "sueno", "digestion", "salud",
+    "adelgazar", "musculo", "articulacion", "cicatriz", "ojeras", "poros",
 )
 
 
 def caption_arriesgado(txt: str) -> str | None:
     """Promesa o afirmación de precio en el caption, o None si es seguro."""
     plano = _sin_acentos(txt or "")
-    for t in _TERMINOS_PROMESA:
+    for t in _PROMESA_ABSOLUTA:
         if t in plano:
             return t
+    if any(c in plano for c in _PALABRAS_CUERPO):
+        for t in _PROMESA_SI_CUERPO:
+            if t in plano:
+                return t
     # El caption arrastra además las mismas reglas de precio que el gancho.
     return texto_arriesgado(txt)
 
