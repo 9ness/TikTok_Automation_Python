@@ -354,3 +354,5 @@
 - El orden de filtros del renderer de Viralización es `eq → vignette → noise → pre_subtitle_filters → subs`: al probar un grade a mano hay que respetarlo o el resultado engaña (poner `colorbalance` ANTES de `eq=saturation` daba frío donde el render real da sepia).
 - Playfair Display solo se publica como variable font y libass usa la instancia por defecto (Regular, demasiado fina para vídeo). Hay que instanciarla a wght=900 con `fontTools.varLib.instancer` y guardarla estática.
 - El polvo de celuloide en negro DESAPARECE sobre planos oscuros (mar, montaña en sombra). Para que se vea siempre hace falta que ~1 de cada 6 motas sea clara, y alpha alto (120-245; con 55-175 el operador ni lo notaba).
+- La suciedad de película no son círculos: son motas IRREGULARES alargadas, vetas cortas y algún pelo del chasis (y en positivo, negras). Con solo bolitas se lee como confeti.
+- El polvo tenía que MOVERSE rápido, pero una deriva lineal no sirve: la lámina solo tiene 540px de holgura y a 200 px/s se sale del encuadre en 3s. La solución es un vaivén senoidal — rápido y acotado por construcción.

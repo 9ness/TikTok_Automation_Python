@@ -235,8 +235,57 @@ def _scratches_filter(style: StylePreset, duration: float) -> str:
     return ",".join(parts)
 
 
+def _mota_sucia(img, rnd) -> None:
+    """Pinta UNA porquería de película sobre la lámina, en negro.
+
+    La suciedad real de un fotograma no son bolitas: son motas IRREGULARES y
+    alargadas, vetas cortas y algún pelo del chasis. Con solo círculos se leía
+    como confeti. (En película positiva la suciedad es NEGRA — las blancas se
+    descartaron: parecían nieve.)
+    """
+    from PIL import Image, ImageDraw
+
+    w, h = img.size
+    x, y = rnd.randrange(w), rnd.randrange(h)
+    alpha = rnd.randint(120, 245)
+    negro = (0, 0, 0, alpha)
+    forma = rnd.random()
+
+    if forma < 0.60:
+        # Mota: elipse ACHATADA y girada a un ángulo cualquiera. El ancho y el
+        # alto se sortean por separado, así unas salen casi redondas y otras
+        # como una semilla.
+        largo = rnd.randint(7, 26)
+        ancho = max(3, int(largo * rnd.uniform(0.28, 0.95)))
+        sprite = Image.new("RGBA", (largo, ancho), (0, 0, 0, 0))
+        ImageDraw.Draw(sprite).ellipse([0, 0, largo - 1, ancho - 1], fill=negro)
+    elif forma < 0.91:
+        # Veta: un trazo corto, más fino y bastante más largo que la mota.
+        largo = rnd.randint(20, 70)
+        grosor = rnd.randint(2, 4)
+        sprite = Image.new("RGBA", (largo, grosor + 2), (0, 0, 0, 0))
+        d = ImageDraw.Draw(sprite)
+        d.line([(0, grosor), (largo - 1, rnd.randint(0, grosor))],
+               fill=negro, width=grosor)
+    else:
+        # Pelo: largo, finísimo y curvado. Es lo que delata el chasis sucio.
+        largo = rnd.randint(60, 190)
+        comba = rnd.randint(8, 34)
+        sprite = Image.new("RGBA", (largo, comba + 4), (0, 0, 0, 0))
+        d = ImageDraw.Draw(sprite)
+        puntos = [
+            (int(largo * t), int(comba * (t * (1 - t) * 4)) + 1)
+            for t in [i / 12 for i in range(13)]
+        ]
+        d.line(puntos, fill=negro, width=1, joint="curve")
+
+    sprite = sprite.rotate(rnd.uniform(0, 360), expand=True, resample=Image.BICUBIC)
+    img.alpha_composite(sprite, (x, y))
+
+
 def _dust_plate(work: Path, idx: int, dots: int) -> Path:
-    """Lámina PNG transparente con motas de polvo, para superponer a la deriva.
+    """Lámina PNG transparente con suciedad de película, para superponer a la
+    deriva.
 
     Se intentó dibujar cada mota con `drawbox` + `enable`: para que hubiera
     unas cuantas en pantalla a la vez hacían falta cientos de filtros y aun
@@ -245,7 +294,7 @@ def _dust_plate(work: Path, idx: int, dots: int) -> Path:
     `t` en x/y) para tener decenas de motas moviéndose, y entrando y saliendo
     del encuadre porque la lámina es más grande que el vídeo.
     """
-    from PIL import Image, ImageDraw, ImageFilter
+    from PIL import Image, ImageFilter
 
     out = work / f"dust_{idx}_{dots}.png"
     if out.is_file():
@@ -254,24 +303,12 @@ def _dust_plate(work: Path, idx: int, dots: int) -> Path:
     w = int(config.TARGET_W * 1.5)
     h = int(config.TARGET_H * 1.5)
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    dib = ImageDraw.Draw(img)
     # Semilla fija por lámina: las dos capas tienen que ser distintas entre
     # sí, pero no hace falta que cambien en cada render (el anti-fingerprint
     # lo pone la deriva, que sí se sortea).
     rnd = random.Random(4200 + idx)
     for _ in range(dots):
-        x, y = rnd.randrange(w), rnd.randrange(h)
-        r = rnd.choice([2, 3, 3, 4, 4, 5, 6, 8, 10])
-        # Opacas de verdad. Con alpha 55-175 el polvo se perdía: el operador
-        # directamente no lo veía en los vídeos ("lo que no veo es el polvo
-        # negro"). Es la firma del estilo, tiene que notarse.
-        alpha = rnd.randint(120, 245)
-        # Negras: en blanco parecían nieve/estrellas y el operador las
-        # descartó. Pero el negro sobre un mar oscuro es invisible, así que
-        # una de cada seis se pinta clara — así SIEMPRE hay motas legibles
-        # sea cual sea el plano, sin que parezca que nieva.
-        tono = (0, 0, 0) if rnd.random() < 0.83 else (245, 245, 245)
-        dib.ellipse([x - r, y - r, x + r, y + r], fill=(*tono, alpha))
+        _mota_sucia(img, rnd)
     img.filter(ImageFilter.GaussianBlur(0.6)).save(out)
     return out
 
@@ -645,17 +682,28 @@ def _finalize(
         for i in range(capas):
             plate = _dust_plate(ass_path.parent, i, dots=90)
             idx = add_input(["-loop", "1", "-t", f"{target_duration:.3f}", "-i", str(plate)])
-            # La lámina es 1.5× el encuadre, así que puede empezar descolocada
-            # y derivar sin dejar ver el borde. Cada capa va a su ritmo: dos
-            # capas a la misma velocidad se leerían como una textura pegada.
-            x0 = random.randint(-int(config.TARGET_W * 0.45), -10)
-            y0 = random.randint(-int(config.TARGET_H * 0.45), -10)
-            vx = random.uniform(-11, 11)
-            vy = random.uniform(-11, 11)
+            # La lámina es 1.5× el encuadre, así que hay holgura para moverla
+            # sin que se vea el borde: 540px de margen en X y 960 en Y.
+            #
+            # El movimiento es un VAIVÉN, no una deriva. Antes iba a 11 px/s
+            # (100 segundos en cruzar la pantalla): la suciedad parecía
+            # clavada, y la de una película salta constantemente. Con una
+            # deriva rápida no valdría — a 200 px/s la lámina se saldría del
+            # encuadre en 3 segundos. Un seno va rápido y no se sale nunca.
+            #
+            # Cada capa lleva su propia frecuencia y fase; dos capas al mismo
+            # ritmo se leerían como una sola textura pegada.
+            cx, cy = -int(config.TARGET_W * 0.25), -int(config.TARGET_H * 0.25)
+            ax = random.uniform(150, 235)
+            ay = random.uniform(240, 430)
+            fx = random.uniform(1.7, 3.4)
+            fy = random.uniform(1.5, 3.1)
+            ph = random.uniform(0, 6.28)
             salida = f"dust{i}"
             filters.append(
                 f"[{etiqueta}][{idx}:v]overlay="
-                f"x='{x0}+({vx:.2f})*t':y='{y0}+({vy:.2f})*t'"
+                f"x='{cx}+({ax:.0f})*sin({fx:.2f}*t+{ph:.2f})'"
+                f":y='{cy}+({ay:.0f})*cos({fy:.2f}*t+{ph:.2f})'"
                 f":eval=frame:format=auto[{salida}]"
             )
             etiqueta = salida
