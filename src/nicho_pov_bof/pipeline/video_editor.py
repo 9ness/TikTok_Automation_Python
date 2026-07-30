@@ -70,12 +70,20 @@ _noop_progress: OnProgress = lambda _pct, _label: None
 # CapCut es blanco con borde y sombra oscura; el halo magenta/cyan que había
 # antes rompía la armonía del bloque. Para volver al halo de color basta con
 # poner aquí los colores y subir `_SOMBRA_RADIO`.
-_HOOK_GLOW_COLOR = (0, 0, 0)
-_CTA_GLOW_COLOR = (0, 0, 0)
-_SOMBRA_RADIO = 7
+# Destello (neón) del gancho y el CTA: SIMÉTRICO y ancho. Aquí el halo es el
+# efecto buscado, así que no se desplaza; desplazarlo lo convierte en sombra y
+# se pierde el neón.
+# Radio pequeño + realce moderado: el destello tiene que ABRAZAR la letra y
+# apagarse hacia fuera. Con radio 9 e intensidad 3.4 se convertía en una barra
+# de color maciza detrás del texto.
+_SOMBRA_RADIO = 6
 _SOMBRA_PASADAS = 3
-# Desplazamiento de la sombra. Sin desplazar se lee como halo, no como sombra.
-_SOMBRA_OFFSET = (7, 9)
+_SOMBRA_OFFSET = (0, 0)
+_DESTELLO_INTENSIDAD = 2.3
+# El título no lleva neón de color: sombra oscura y desplazada, para que
+# destaque sobre el plano sin competir con el gancho.
+_TITULO_SOMBRA = (0, 0, 0)
+_TITULO_SOMBRA_OFFSET = (5, 7)
 _TITLE_STROKE = (0, 0, 0)          # título: blanco con borde negro, sin glow
 
 
@@ -210,6 +218,7 @@ def _add_glow(
     img: "Image.Image", color: tuple, *,
     radius: int = _SOMBRA_RADIO, passes: int = _SOMBRA_PASADAS,
     offset: tuple[int, int] = _SOMBRA_OFFSET,
+    intensity: float = _DESTELLO_INTENSIDAD,
 ) -> "Image.Image":
     """Sombra proyectada detrás del texto.
 
@@ -228,6 +237,13 @@ def _add_glow(
     glow_layer.putalpha(glow_alpha)
     for _ in range(max(1, passes)):
         glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius))
+    # Cada pasada de blur reparte el alpha y lo deja translúcido: el neón
+    # salía lavado. Se REALZA el alpha ya difuminado para que el color quede
+    # denso pegado a la letra y se apague hacia fuera, que es como se ve un
+    # neón de verdad.
+    if intensity > 1:
+        a = glow_layer.split()[-1].point(lambda v: min(255, int(v * intensity)))
+        glow_layer.putalpha(a)
     canvas = Image.alpha_composite(canvas, glow_layer)
     canvas.paste(img, (pad, pad), img)
     return canvas
@@ -336,10 +352,10 @@ def _render_text_block_png(
         # Gancho: MAYÚSCULAS, relleno blanco + glow magenta/rosa.
         im = _render_text_line(
             gancho.upper(), font_size=config.HOOK_FONT_SIZE, max_w=max_w,
-            fill=pal["gancho"], stroke=(0, 0, 0), max_lines=1,
+            fill=pal["gancho_fill"], stroke=(0, 0, 0), max_lines=1,
             fuente=_FUENTE_CURSIVA,
         )
-        return _add_glow(im, _HOOK_GLOW_COLOR) if im is not None else None
+        return _add_glow(im, pal["gancho_glow"]) if im is not None else None
 
     def _render_titulo():
         if not titulo:
@@ -353,7 +369,11 @@ def _render_text_block_png(
         # El nombre va SIEMPRE en blanco (es lo informativo y tiene que leerse
         # sobre cualquier plano), pero con la misma sombra que el resto para
         # que el bloque se vea de una pieza.
-        return _add_glow(im, (0, 0, 0)) if im is not None else None
+        return (
+            _add_glow(im, _TITULO_SOMBRA, radius=7, passes=3,
+                      offset=_TITULO_SOMBRA_OFFSET, intensity=2.2)
+            if im is not None else None
+        )
 
     def _render_cta():
         if not cta:
@@ -361,10 +381,10 @@ def _render_text_block_png(
         # CTA: relleno blanco + glow cyan.
         im = _render_text_line(
             cta.upper(), font_size=config.CTA_FONT_SIZE, max_w=max_w,
-            fill=pal["cta"], stroke=(0, 0, 0), max_lines=1,
+            fill=pal["cta_fill"], stroke=(0, 0, 0), max_lines=1,
             fuente=_FUENTE_CURSIVA,
         )
-        return _add_glow(im, _CTA_GLOW_COLOR) if im is not None else None
+        return _add_glow(im, pal["cta_glow"]) if im is not None else None
 
     orden = (
         (_render_gancho, _render_titulo, _render_cta)
@@ -419,9 +439,11 @@ def _render_text_block_png(
 # acompañe sin competir, y el nombre del producto siempre en BLANCO (es la
 # parte informativa y tiene que leerse sobre cualquier fondo).
 #
-# El CTA lleva un tono ANÁLOGO o complementario del gancho, nunca blanco: en
-# blanco el bloque volvía a parecer plano. El nombre del producto sí queda
-# siempre blanco.
+# Cada línea lleva RELLENO y DESTELLO (glow de color) por separado, que es lo
+# que hace el operador a mano: en sus vídeos el gancho sale cian con neón azul
+# o blanco con neón rosa, y el CTA verde con neón verde cuando el emoji es ✅.
+# El destello es el efecto, no un adorno: sin él el bloque parece plano.
+# El nombre del producto va siempre blanco con borde negro (es lo informativo).
 #
 # `familias` son los emojis con los que casa cada paleta, y `tono` el matiz
 # dominante en grados HSV (0=rojo, 60=amarillo, 120=verde, 180=cian) — se usa
@@ -429,33 +451,39 @@ def _render_text_block_png(
 _PALETAS = (
     {
         "nombre": "oro",
-        "gancho": (255, 209, 46), "cta": (255, 146, 76), "tono": 50,
-        "familias": "💰🤑💸💵🏷️⚠️",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (255, 176, 0),
+        "cta_fill": (255, 214, 64),     "cta_glow": (255, 110, 0),
+        "tono": 45, "familias": "💰🤑💸💵🏷️⚠️",
     },
     {
-        "nombre": "coral",
-        "gancho": (255, 94, 87), "cta": (255, 226, 122), "tono": 5,
-        "familias": "🔥😱🤯❗‼️",
+        "nombre": "rosa-lima",   # el de la silla gaming del operador
+        "gancho_fill": (255, 255, 255), "gancho_glow": (255, 32, 100),
+        "cta_fill": (126, 255, 128),    "cta_glow": (0, 190, 60),
+        "tono": 340, "familias": "🫣😱🤯🤭❗",
+    },
+    {
+        "nombre": "cian-rojo",   # el de las maletas del operador
+        "gancho_fill": (120, 240, 255), "gancho_glow": (40, 60, 255),
+        "cta_fill": (255, 255, 255),    "cta_glow": (255, 30, 60),
+        "tono": 200, "familias": "🎁👀💧❄️🧊",
     },
     {
         "nombre": "lima",
-        "gancho": (170, 255, 96), "cta": (120, 232, 255), "tono": 95,
-        "familias": "🌿✅🥗♻️💚",
-    },
-    {
-        "nombre": "cian",
-        "gancho": (94, 226, 255), "cta": (255, 214, 92), "tono": 190,
-        "familias": "👀💧❄️🧊💙",
+        "gancho_fill": (176, 255, 106), "gancho_glow": (0, 176, 46),
+        "cta_fill": (255, 255, 255),    "cta_glow": (0, 130, 255),
+        "tono": 100, "familias": "🌿✅🥗♻️💚",
     },
     {
         "nombre": "magenta",
-        "gancho": (255, 120, 214), "cta": (255, 240, 160), "tono": 320,
-        "familias": "💖✨🎀🫣",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (226, 0, 208),
+        "cta_fill": (255, 226, 96),     "cta_glow": (255, 130, 0),
+        "tono": 310, "familias": "💖✨🎀🥳🌟",
     },
     {
-        "nombre": "naranja",
-        "gancho": (255, 158, 61), "cta": (255, 240, 150), "tono": 28,
-        "familias": "👇👉🛒📦",
+        "nombre": "fuego",
+        "gancho_fill": (255, 214, 92),  "gancho_glow": (255, 46, 0),
+        "cta_fill": (255, 255, 255),    "cta_glow": (255, 120, 0),
+        "tono": 20, "familias": "🔥🌞🧨🚀",
     },
 )
 
