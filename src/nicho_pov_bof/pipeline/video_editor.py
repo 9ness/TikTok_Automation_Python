@@ -7,7 +7,8 @@ Drive.
 Orden del pipeline (cada paso escribe un fichero intermedio en `work_dir`
 para poder depurar si algo falla a mitad de camino):
 
-  1. Quitar marca de agua — SOLO si `origen == "veo3"` (Kling no la lleva).
+  1. (ya no hay paso de marca de agua: Veo3 dejó de ponerla en 2026-07, y
+     Kling nunca la puso, así que no había nada que quitar)
   2. Normalizar a 1080x1920 @ 30fps (cover-fit + crop). Se hace ANTES de
      cuadrar duración porque `duration_match` asume que el vídeo YA tiene el
      tamaño final: solo toca duración, no resolución.
@@ -54,7 +55,6 @@ from src.tiktok_shop.pipeline.ready_video import (
     _seg_width,
     _split_runs,
 )
-from src.tiktok_shop.pipeline.watermark_remover import remove_watermark
 
 OnLog = Callable[[str], None]
 OnProgress = Callable[[float, str], None]
@@ -64,9 +64,23 @@ _noop_progress: OnProgress = lambda _pct, _label: None
 # ---------------------------------------------------------------------------
 # Colores del glow (ver spec: gancho magenta/rosa, CTA cyan).
 # ---------------------------------------------------------------------------
-_HOOK_GLOW_COLOR = (255, 0, 170)   # magenta/rosa
-_CTA_GLOW_COLOR = (0, 220, 255)    # cyan
+# Sombra NEGRA, no halo de color. La referencia que montó el operador en
+# CapCut es blanco con borde y sombra oscura; el halo magenta/cyan que había
+# antes rompía la armonía del bloque. Para volver al halo de color basta con
+# poner aquí los colores y subir `_SOMBRA_RADIO`.
+_HOOK_GLOW_COLOR = (0, 0, 0)
+_CTA_GLOW_COLOR = (0, 0, 0)
+_SOMBRA_RADIO = 9
+_SOMBRA_PASADAS = 3
 _TITLE_STROKE = (0, 0, 0)          # título: blanco con borde negro, sin glow
+
+
+# Tipografía de referencia del operador (montada a mano en CapCut): todo
+# Montserrat, con el gancho y el CTA en CURSIVA y el nombre del producto
+# recto y más pequeño. La jerarquía de tamaños es lo que da armonía; con
+# los tres al mismo cuerpo el bloque quedaba plano y "muy básico".
+_FUENTE_CURSIVA = "Montserrat-BlackItalic.ttf"
+_FUENTE_RECTA = "Montserrat-ExtraBold.ttf"
 
 
 def _font_path(name: str = "Montserrat-ExtraBold.ttf") -> str:
@@ -79,24 +93,6 @@ def _font_path(name: str = "Montserrat-ExtraBold.ttf") -> str:
 # ---------------------------------------------------------------------------
 # Paso 1 — Marca de agua
 # ---------------------------------------------------------------------------
-def _strip_watermark(video_in: Path, out_path: Path, origen: str, on_log: OnLog) -> Path:
-    origen = (origen or "").strip().lower()
-    if origen == "veo3":
-        on_log("[1/6] Veo3 → quitando marca de agua…")
-        remove_watermark(
-            str(video_in), str(out_path),
-            watermark_type="veo_flow", log_callback=on_log,
-        )
-        return out_path
-    if origen == "kling":
-        on_log("[1/6] Kling → sin marca de agua, se salta el paso")
-        return video_in
-    # Origen desconocido: nunca abortamos por esto (regla del proyecto de no
-    # romper el pipeline por un dato opcional/raro); asumimos sin marca.
-    on_log(f"[1/6] origen desconocido '{origen}' — se asume sin marca de agua")
-    return video_in
-
-
 # ---------------------------------------------------------------------------
 # Paso 2 — Normalizar resolución/fps
 # ---------------------------------------------------------------------------
@@ -124,6 +120,7 @@ def _normalize_resolution(video_in: Path, out_path: Path, on_log: OnLog) -> Path
 def _render_text_line(
     text: str, *, font_size: int, max_w: int,
     fill: tuple, stroke: tuple, max_lines: int = 1,
+    fuente: str = _FUENTE_RECTA,
 ) -> "Image.Image | None":
     """Renderiza una línea (o varias, hasta `max_lines`) de texto+emoji a
     PNG con relleno + borde. Mismo enfoque que `ready_video._render_text_png`
@@ -140,7 +137,7 @@ def _render_text_line(
         repartido en columnas de <=4 palabras y ese reparto está pensado para
         leerse de un vistazo. Solo se re-parte una línea si aun así no cabe.
         """
-        f = ImageFont.truetype(_font_path(), size)
+        f = ImageFont.truetype(_font_path(fuente), size)
         e_size = int(size * 0.92)
         g = int(size * 0.06)
 
@@ -205,7 +202,7 @@ def _render_text_line(
     return img
 
 
-def _add_glow(img: "Image.Image", color: tuple, *, radius: int = 13, passes: int = 4) -> "Image.Image":
+def _add_glow(img: "Image.Image", color: tuple, *, radius: int = _SOMBRA_RADIO, passes: int = _SOMBRA_PASADAS) -> "Image.Image":
     """Añade un halo de color detrás del texto: usa el canal alpha del PNG
     como máscara, la rellena de `color` y la difumina con GaussianBlur
     (varias pasadas = glow más suave/ancho); el texto original se pega
@@ -328,6 +325,7 @@ def _render_text_block_png(
         im = _render_text_line(
             gancho.upper(), font_size=config.HOOK_FONT_SIZE, max_w=max_w,
             fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=1,
+            fuente=_FUENTE_CURSIVA,
         )
         return _add_glow(im, _HOOK_GLOW_COLOR) if im is not None else None
 
@@ -338,6 +336,7 @@ def _render_text_block_png(
         return _render_text_line(
             titulo, font_size=config.TITLE_FONT_SIZE, max_w=max_w,
             fill=(255, 255, 255), stroke=_TITLE_STROKE, max_lines=_TITULO_MAX_LINEAS,
+            fuente=_FUENTE_RECTA,
         )
 
     def _render_cta():
@@ -345,8 +344,9 @@ def _render_text_block_png(
             return None
         # CTA: relleno blanco + glow cyan.
         im = _render_text_line(
-            cta, font_size=config.CTA_FONT_SIZE, max_w=max_w,
+            cta.upper(), font_size=config.CTA_FONT_SIZE, max_w=max_w,
             fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=1,
+            fuente=_FUENTE_CURSIVA,
         )
         return _add_glow(im, _CTA_GLOW_COLOR) if im is not None else None
 
@@ -399,7 +399,7 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      piezas: "set[str] | None" = None) -> Path:
     block = _render_text_block_png(textos or {}, layout, piezas)
     if block is None:
-        on_log("[4/6] sin textos que quemar — se copia el vídeo tal cual")
+        on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
               str(out_path)], on_log)
         return out_path
@@ -424,7 +424,7 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
         "-c:a", "copy",
         str(out_path),
     ], on_log)
-    on_log(f"[4/6] texto quemado (bloque {block.width}x{block.height}px @ y={y_top})")
+    on_log(f"[3/5] texto quemado (bloque {block.width}x{block.height}px @ y={y_top})")
     return out_path
 
 
@@ -494,7 +494,7 @@ def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: P
     # que un índice aleatorio basta para dar variedad entre productos.
     arrow_mov = _pick_arrow(random.randrange(len(_ARROW_FILES)))
     if not arrow_mov:
-        on_log("[5/6] sin flechas disponibles en disco — se continúa sin ella")
+        on_log("[4/5] sin flechas disponibles en disco — se continúa sin ella")
         return video_in
     # OJO: NO se puede reusar `_overlay_arrow_ffmpeg` de ready_video aquí.
     # Esa función se apoya en `-shortest` para cortar el `-stream_loop -1` de
@@ -525,7 +525,7 @@ def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: P
             "-movflags", "+faststart", str(out_path),
         ], on_log)
     except RuntimeError as e:
-        on_log(f"[5/6] overlay de flecha falló ({e}) — se continúa sin ella")
+        on_log(f"[4/5] overlay de flecha falló ({e}) — se continúa sin ella")
         return video_in
     return out_path
 
@@ -557,7 +557,8 @@ def build_video(
     raw_video: Path,
     audio_path: Path,
     textos: dict,
-    origen: str,
+    # Se conserva por compatibilidad con jobs ya encolados; ya no se usa.
+    origen: str = "",
     output_path: Path,
     work_dir: Path,
     layout: str = "gancho_cta_titulo",
@@ -575,7 +576,6 @@ def build_video(
 
     `textos` = {"gancho", "titulo", "cta"} (strings, cualquiera puede venir
     vacío — el bloque de texto omite las líneas ausentes).
-    `origen` = "veo3" | "kling" (determina si se quita marca de agua).
     Las cuatro herramientas (`con_gancho`, `con_titulo`, `con_cta`,
     `con_flecha`) se eligen por separado: se puede pedir solo el nombre del
     producto, solo la flecha, o cualquier combinación. Con las cuatro a
@@ -593,17 +593,15 @@ def build_video(
 
     on_progress(0.0, "Preparando…")
 
-    # 1) Marca de agua
-    no_wm = _strip_watermark(raw_video, work_dir / "01_no_watermark.mp4", origen, on_log)
-    on_progress(0.10, "Marca de agua")
-
-    # 2) Normalizar resolución/fps
-    on_log("[2/6] Normalizando a 1080x1920 @ 30fps…")
-    normalized = _normalize_resolution(no_wm, work_dir / "02_normalized.mp4", on_log)
+    # 1) Normalizar resolución/fps. Antes había un paso previo de quitado de
+    # marca de agua para Veo3; dejó de ponerla (2026-07) y Kling nunca la
+    # puso, así que el paso solo re-encodeaba el vídeo para nada.
+    on_log("[1/5] Normalizando a 1080x1920 @ 30fps…")
+    normalized = _normalize_resolution(raw_video, work_dir / "01_normalized.mp4", on_log)
     on_progress(0.28, "Normalizado")
 
     # 3) Cuadrar duración con el audio (módulo ya existente, tal cual)
-    on_log("[3/6] Cuadrando duración con el audio…")
+    on_log("[2/5] Cuadrando duración con el audio…")
     audio_dur = probe_duration(audio_path)
     matched = match_video_to_audio(
         normalized, audio_dur, work_dir / "duration", on_log=on_log,
@@ -618,31 +616,31 @@ def build_video(
 
     # 4) Bloque de texto
     if piezas:
-        on_log(f"[4/6] Quemando texto ({'/'.join(sorted(piezas))})…")
+        on_log(f"[3/5] Quemando texto ({'/'.join(sorted(piezas))})…")
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
             piezas,
         )
         on_progress(0.66, "Texto quemado")
     else:
-        on_log("[4/6] Sin textos: se omite el bloque de texto")
+        on_log("[3/5] Sin textos: se omite el bloque de texto")
         texted = matched
         on_progress(0.66, "Sin textos")
 
     # 5) Flecha .mov
     if con_flecha:
-        on_log("[5/6] Superponiendo flecha…")
+        on_log("[4/5] Superponiendo flecha…")
         arrowed = _overlay_arrow(
             texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log,
         )
         on_progress(0.84, "Flecha superpuesta")
     else:
-        on_log("[5/6] Sin flecha")
+        on_log("[4/5] Sin flecha")
         arrowed = texted
         on_progress(0.84, "Sin flecha")
 
     # 6) Mux de audio final → destino
-    on_log("[6/6] Mezclando audio final…")
+    on_log("[5/5] Mezclando audio final…")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _mux_audio(arrowed, audio_path, output_path, on_log)
     on_progress(1.0, "Listo")

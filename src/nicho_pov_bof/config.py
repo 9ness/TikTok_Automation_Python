@@ -127,9 +127,12 @@ SAFE_Y = (0.15, 0.75)
 
 # Bloque de texto: gancho arriba, título del producto en medio, CTA debajo.
 TEXT_BLOCK_Y = 0.17          # centro del bloque, dentro de la zona segura
-HOOK_FONT_SIZE = 64
-TITLE_FONT_SIZE = 58
-CTA_FONT_SIZE = 62
+# Jerarquía clara: el gancho manda, el CTA le sigue y el nombre del producto
+# va notablemente más pequeño. Antes los tres rondaban 60px y el bloque salía
+# plano ("parece muy básico", dixit el operador).
+HOOK_FONT_SIZE = 72
+CTA_FONT_SIZE = 60
+TITLE_FONT_SIZE = 46
 
 # Flecha .mov: abajo a la izquierda, justo encima de la etiqueta naranja de la
 # tienda que pinta TikTok. Mismos valores que `ready_video.py`.

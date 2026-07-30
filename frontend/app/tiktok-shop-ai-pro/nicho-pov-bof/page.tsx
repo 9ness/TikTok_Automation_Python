@@ -695,7 +695,7 @@ const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "flecha", label: "⬇️ Flecha" },
 ];
 
-/** Tarjeta de producto: textos, sexo/origen, subida de vídeo y toggles
+/** Tarjeta de producto: textos, sexo, subida de vídeo y toggles
  *  Subido/Vendió. Estado local + servidor para que los toggles se sientan
  *  instantáneos (mismo patrón que `OutcomeBar` del calendario). */
 function ProductoCard({
@@ -716,7 +716,6 @@ function ProductoCard({
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
   const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
-  const [origen, setOrigen] = useState<"veo3" | "kling">("veo3");
   // Herramientas de edición, elegibles por separado. Todas marcadas por
   // defecto = el montaje completo; desmarcarlas todas deja el vídeo limpio
   // (solo la voz). Así se puede pedir, p. ej., solo el nombre del producto
@@ -769,7 +768,6 @@ function ProductoCard({
     fd.append("folder", folder);
     fd.append("producto", producto.producto);
     fd.append("sexo", sexo);
-    fd.append("origen", origen);
     fd.append("con_gancho", String(tools.gancho));
     fd.append("con_titulo", String(tools.titulo));
     fd.append("con_cta", String(tools.cta));
@@ -871,35 +869,22 @@ function ProductoCard({
         </button>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-          {(["hombre", "mujer"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSexo(s)}
-              className={`flex-1 rounded px-1.5 py-1 transition ${
-                sexo === s ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
-              }`}
-            >
-              {s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
-            </button>
-          ))}
-        </div>
-        <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-          {(["veo3", "kling"] as const).map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() => setOrigen(o)}
-              className={`flex-1 rounded px-1.5 py-1 capitalize transition ${
-                origen === o ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
-              }`}
-            >
-              {o}
-            </button>
-          ))}
-        </div>
+      {/* Ya no se elige el generador (Veo3/Kling): Veo3 dejó de poner marca de
+          agua en 2026-07 y Kling nunca la puso, así que no hay nada que
+          quitar y la elección no cambiaba el resultado. */}
+      <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+        {(["hombre", "mujer"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSexo(s)}
+            className={`flex-1 rounded px-1.5 py-1 transition ${
+              sexo === s ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
+            }`}
+          >
+            {s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
+          </button>
+        ))}
       </div>
 
       {/* Cada herramienta por separado. Todas marcadas = montaje completo;
