@@ -84,24 +84,42 @@ def get_prompts() -> PromptsResponse:
     return PromptsResponse(imagen=imagen, video=video)
 
 
-_AVISOS_FOTO = {
-    "solo hay una foto": (
-        "Solo hay 1 foto en Drive — comprueba que sea la del producto y no "
-        "la de la descripción"
-    ),
-    "indistinguible por forma y peso": (
-        "No se distingue cuál es la foto del producto — compruébala"
-    ),
-    "vacío": "Sin fotos en Drive",
-}
-
-
 def _aviso_foto(pair: dict) -> str:
-    """Mensaje para el operador si el emparejado no es de fiar."""
+    """Mensaje para el operador cuando la foto del producto no es de fiar.
+
+    Distingue el caso "no sé cuál de las dos es" del caso "ninguna sirve":
+    con lo segundo no hay nada que comprobar, hay que ir a la ficha y sacar
+    una captura limpia a mano.
+    """
     if pair.get("confident"):
         return ""
-    razon = pair.get("reason") or ""
-    return _AVISOS_FOTO.get(razon, f"Foto sin confirmar ({razon})")
+
+    from src.nicho_pov_bof.services import photo_pairing
+
+    fotos = [f for f in (pair.get("clean"), pair.get("titled")) if f]
+    fotos += pair.get("extras") or []
+    if not fotos:
+        return "Sin fotos en Drive — saca tú una captura limpia de la ficha"
+
+    # Una foto de producto es prácticamente cuadrada. Si NINGUNA lo es, todo
+    # lo que hay son pantallazos de la ficha (pasa: dos capturas del carrusel,
+    # o solo la captura de la descripción).
+    if not any(photo_pairing._is_squarish(f) for f in fotos):
+        if len(fotos) == 1:
+            cuantas = "La única foto de Drive es un pantallazo de la ficha y no vale"
+        else:
+            cuantas = (
+                f"Las {len(fotos)} fotos de Drive son pantallazos de la ficha "
+                "y ninguna vale"
+            )
+        return f"{cuantas} como imagen del producto — saca tú una captura limpia"
+
+    if pair.get("reason") == "solo hay una foto":
+        return (
+            "Solo hay 1 foto en Drive — comprueba que sea la del producto y "
+            "no la de la descripción"
+        )
+    return "No se distingue cuál es la foto del producto — compruébala"
 
 
 def _fotos_del_producto(
