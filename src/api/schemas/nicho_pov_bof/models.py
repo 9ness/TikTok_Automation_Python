@@ -101,6 +101,11 @@ class ProductoInfo(BaseModel):
     producto: str
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
+    # Aviso cuando el emparejado limpia/captura NO es fiable (vacío si lo es).
+    # `photo_pairing` ya lo sabía, pero no salía de la API y el operador veía
+    # la foto dudosa sin marca — llegó a colarse la captura de la descripción
+    # como si fuera la del producto.
+    foto_aviso: str = ""
     titulo: str = ""
     titulo_tiktok_completo: str = ""
     tienda: str = ""

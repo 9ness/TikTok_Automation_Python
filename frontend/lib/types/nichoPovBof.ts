@@ -97,6 +97,8 @@ export interface ProductoItem {
   video_listo_at?: number;
   /** Hay un montaje de este producto en cola o en curso (lo dice la cola). */
   montando?: boolean;
+  /** Aviso si no se pudo confirmar cuál de las fotos es la del producto. */
+  foto_aviso?: string;
   con_textos?: boolean;
   /** Ficha en TikTok Shop. Vacío = aún no se ha buscado o no se encontró
    *  nada con parecido suficiente (averiguarla gasta cuota de EchoTik). */

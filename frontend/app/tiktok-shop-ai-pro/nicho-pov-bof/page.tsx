@@ -956,6 +956,15 @@ function ProductoCard({
         {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
       </div>
 
+      {/* Cuando no se puede distinguir la foto del producto de la captura de
+          la descripción, se avisa: llegó a colarse una captura de texto como
+          si fuera la foto del producto. */}
+      {producto.foto_aviso && (
+        <p className="text-[11px] text-amber-400 break-words">
+          🖼️ {producto.foto_aviso}
+        </p>
+      )}
+
       {/* El caption no se quema en el vídeo, lo pega el operador al publicar,
           así que no se puede corregir solo: se avisa para revisarlo a mano. */}
       {producto.caption_riesgo && (

@@ -81,8 +81,30 @@ def get_prompts() -> PromptsResponse:
     return PromptsResponse(imagen=imagen, video=video)
 
 
-def _fotos_del_producto(source: str, folder: str, producto: str) -> tuple[str | None, str | None]:
-    """(id foto limpia, id captura con título) de un producto, o (None, None).
+_AVISOS_FOTO = {
+    "solo hay una foto": (
+        "Solo hay 1 foto en Drive — comprueba que sea la del producto y no "
+        "la de la descripción"
+    ),
+    "indistinguible por forma y peso": (
+        "No se distingue cuál es la foto del producto — compruébala"
+    ),
+    "vacío": "Sin fotos en Drive",
+}
+
+
+def _aviso_foto(pair: dict) -> str:
+    """Mensaje para el operador si el emparejado no es de fiar."""
+    if pair.get("confident"):
+        return ""
+    razon = pair.get("reason") or ""
+    return _AVISOS_FOTO.get(razon, f"Foto sin confirmar ({razon})")
+
+
+def _fotos_del_producto(
+    source: str, folder: str, producto: str,
+) -> tuple[str | None, str | None, str]:
+    """(id foto limpia, id captura con título, aviso) de un producto.
 
     El listado está cacheado, así que esto no vuelve a pegarle al Drive.
     """
@@ -98,11 +120,12 @@ def _fotos_del_producto(source: str, folder: str, producto: str) -> tuple[str | 
                 return (
                     (pair.get("clean") or {}).get("id"),
                     (pair.get("titled") or {}).get("id"),
+                    _aviso_foto(pair),
                 )
     except (ValueError, RuntimeError):
         # Sin fotos se devuelve el resto del producto igualmente.
         pass
-    return None, None
+    return None, None, ""
 
 
 def _producto_info(
@@ -117,14 +140,15 @@ def _producto_info(
     ellas la miniatura desaparecía hasta recargar (pasaba al buscar la URL
     de un producto suelto).
     """
-    clean, titled = (
+    clean, titled, aviso = (
         _fotos_del_producto(source, folder, producto) if source and folder
-        else (None, None)
+        else (None, None, "")
     )
     return ProductoInfo(
         producto=producto,
         clean_photo_id=clean,
         titled_photo_id=titled,
+        foto_aviso=aviso,
         titulo=prod.get("titulo", ""),
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
@@ -207,6 +231,7 @@ def _list_productos(
                 producto=producto,
                 clean_photo_id=clean.get("id"),
                 titled_photo_id=titled.get("id"),
+                foto_aviso=_aviso_foto(pair),
                 titulo=guardado.get("titulo", ""),
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),
