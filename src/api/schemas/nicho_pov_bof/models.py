@@ -105,6 +105,10 @@ class ProductoInfo(BaseModel):
     titulo_tiktok_completo: str = ""
     tienda: str = ""
     caption: str = ""
+    # Promesa detectada en el caption ("perfecta", "elimina"…), vacío si es
+    # seguro. Solo se AVISA: el caption lo copia el operador al publicar, no
+    # se quema en el vídeo, así que no se sustituye por él.
+    caption_riesgo: str = ""
     gancho: str = ""
     cta: str = ""
     uploaded: bool = False

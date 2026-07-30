@@ -36,9 +36,43 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   nombre en el Centro de Afiliados de TikTok, así que debe coincidir letra
   a letra con lo que se lee en la imagen.
 - `tienda`: el nombre de la tienda o vendedor que aparece en la captura.
-- `caption`: UNA frase corta y con gancho para el pie del vídeo (el post),
-  en español, SIN emojis y SIN hashtags — los hashtags los añade el
-  operador aparte.
+- `caption`: el pie del vídeo (el post), en español, SIN emojis y SIN
+  hashtags — los hashtags los añade el operador aparte. Una o dos frases.
+
+  Su trabajo es DOBLE: que se entienda qué es el producto y que el vídeo
+  aparezca en las búsquedas. Así que **describe con otras palabras lo que ya
+  pone la ficha** e incluye de forma natural las palabras que alguien
+  teclearía para encontrarlo: qué es, para qué sirve, para quién y el
+  material o formato si es relevante. Nada de eso hace falta inventarlo: sale
+  todo del título de la captura.
+
+  ### PROHIBIDO: prometer un resultado
+
+  El caption no puede afirmar lo que le va a pasar a quien lo compre. `TU PIEL
+  PERFECTA`, `elimina las manchas`, `adiós al dolor de espalda`, `resultados
+  en 7 días`, `el mejor del mercado`, `te cambia la vida` — todo eso es una
+  promesa que ni la ficha respalda ni nadie puede comprobar, y en salud,
+  belleza y suplementos es motivo de sanción. Tampoco vale colar la promesa
+  en condicional o en pregunta (`¿lista para tener la piel perfecta?`).
+
+  Prohibido igualmente hablar de precio, oferta, rebaja, descuento sin cupón,
+  urgencia o escasez — las mismas reglas que el `gancho`, que están detalladas
+  más abajo.
+
+  ### PERMITIDO: contar qué es y para qué se usa
+
+  Describir función, uso, formato, material, ingredientes o público objetivo
+  tal y como aparecen en la ficha. Si la ficha dice "crema hidratante de
+  manos con urea", el caption puede decir que es una crema de manos con urea
+  para hidratar la piel seca; lo que no puede decir es que deja las manos
+  perfectas.
+
+  Ejemplos correctos:
+
+  - `Crema de manos con urea para piel seca y agrietada. Formato pequeño para
+    llevar en el bolso.`
+  - `Silla de escritorio con respaldo reclinable y reposacabezas, pensada para
+    quien pasa horas sentado jugando o trabajando.`
 - `gancho`: el texto que va arriba del vídeo. En MAYÚSCULAS, máximo 4
   palabras, con UN emoji al principio y el MISMO emoji al final.
 

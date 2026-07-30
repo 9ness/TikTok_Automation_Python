@@ -43,6 +43,7 @@ from src.api.schemas.nicho_pov_bof import (
     SoldProductsResponse,
     VideoUploadResponse,
 )
+from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode
 
@@ -93,6 +94,7 @@ def _producto_info(producto: str, prod: dict) -> ProductoInfo:
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
         caption=prod.get("caption", ""),
+        caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
         gancho=prod.get("gancho", ""),
         cta=prod.get("cta", ""),
         uploaded=bool(prod.get("uploaded")),
@@ -145,6 +147,9 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),
                 caption=guardado.get("caption", ""),
+                caption_riesgo=caption_arriesgado(
+                    guardado.get("caption", "")
+                ) or "",
                 gancho=guardado.get("gancho", ""),
                 cta=guardado.get("cta", ""),
                 uploaded=bool(guardado.get("uploaded")),

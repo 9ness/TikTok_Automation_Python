@@ -85,6 +85,8 @@ export interface ProductoItem {
   titulo_tiktok_completo: string | null;
   tienda: string | null;
   caption: string | null;
+  /** Promesa detectada en el caption; vacío/null si es seguro publicarlo. */
+  caption_riesgo: string | null;
   gancho: string | null;
   cta: string | null;
   uploaded: boolean;

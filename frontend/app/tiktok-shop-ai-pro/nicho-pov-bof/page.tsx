@@ -952,6 +952,15 @@ function ProductoCard({
         {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
       </div>
 
+      {/* El caption no se quema en el vídeo, lo pega el operador al publicar,
+          así que no se puede corregir solo: se avisa para revisarlo a mano. */}
+      {producto.caption_riesgo && (
+        <p className="text-[11px] text-amber-400 break-words">
+          ⚠️ El caption dice «{producto.caption_riesgo}» — promete un resultado
+          que la ficha no respalda. Revísalo antes de publicar.
+        </p>
+      )}
+
       {/* Ficha de TikTok Shop. Cada búsqueda gasta una llamada del plan de
           EchoTik (trial de 100), por eso es un botón manual por producto y
           no algo que se dispare solo al abrir la carpeta. */}

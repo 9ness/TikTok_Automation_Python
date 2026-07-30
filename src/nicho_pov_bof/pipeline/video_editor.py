@@ -503,6 +503,33 @@ def texto_arriesgado(txt: str) -> str | None:
     return None
 
 
+# El caption no se quema en el vídeo — lo copia el operador al publicar — así
+# que aquí no se sustituye nada, solo se AVISA en la ficha.
+#
+# Su riesgo es distinto al del gancho: no es el precio, es prometer un
+# RESULTADO ("tu piel perfecta", "elimina las manchas"). Nada de eso lo
+# respalda la ficha del producto, y en salud/belleza/suplementos es motivo de
+# sanción. El caption solo debe reformular lo que ya pone el título.
+_TERMINOS_PROMESA = (
+    "perfecta", "perfecto", "elimina", "eliminan", "borra", "cura", "curan",
+    "sana", "adelgaz", "rejuvenec", "milagro", "milagros", "garantiz",
+    "resultados en", "en 7 dias", "en 30 dias", "para siempre",
+    "adios a", "olvidate de", "te cambia la vida", "cambia tu vida",
+    "el mejor del mercado", "la mejor del mercado", "numero 1", "n1",
+    "sin esfuerzo", "al instante", "100%", "definitivamente",
+)
+
+
+def caption_arriesgado(txt: str) -> str | None:
+    """Promesa o afirmación de precio en el caption, o None si es seguro."""
+    plano = _sin_acentos(txt or "")
+    for t in _TERMINOS_PROMESA:
+        if t in plano:
+            return t
+    # El caption arrastra además las mismas reglas de precio que el gancho.
+    return texto_arriesgado(txt)
+
+
 def _texto_seguro(txt: str, respaldo: str, etiqueta: str, on_log: OnLog) -> str:
     riesgo = texto_arriesgado(txt)
     if not riesgo:
