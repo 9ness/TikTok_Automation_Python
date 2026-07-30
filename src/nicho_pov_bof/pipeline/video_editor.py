@@ -846,6 +846,63 @@ def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: P
 # ---------------------------------------------------------------------------
 # Paso 6 — Mezcla de audio
 # ---------------------------------------------------------------------------
+# Cadena de voz: compresor suave + realce de habla. Sube el cuerpo de la voz
+# sin dejar que los picos suban con ella, que es lo que permite después
+# normalizar alto sin saturar.
+_VOZ_CADENA = (
+    "acompressor=threshold=-20dB:ratio=4:attack=5:release=120:makeup=2,"
+    "speechnorm=e=8:r=0.0008:l=1"
+)
+# Objetivo de sonoridad. Los audios llegan a -17/-21 LUFS y así quedan en
+# torno a -12, que es "tocando la línea roja" con picos por debajo de -1 dBTP.
+# Subir +16 dB a pelo, como pedía el operador, saturaría: sus audios ya traen
+# picos en -0,7 dBTP. Medido: mujer1 pasa de -20,9 a -11,8 LUFS (+9 dB).
+_VOZ_LUFS = -11.0
+# Pico objetivo con margen: con TP=-1.0 y el limitador a 0.97 el resultado
+# medía +0,2 dBTP (el pico REAL, con sobremuestreo, se cuela por encima del
+# pico de muestra) y eso recorta al codificar a AAC.
+_VOZ_TP = -1.5
+
+
+def _medir_voz(audio_in: Path, on_log: OnLog) -> dict[str, str]:
+    """Primera pasada de `loudnorm`: mide para poder clavar el objetivo.
+
+    En una sola pasada `loudnorm` va a ciegas y se queda corto; con la medida
+    delante aplica la ganancia exacta sin pasarse del pico permitido.
+    """
+    r = subprocess.run(
+        ["ffmpeg", "-v", "info", "-i", str(audio_in), "-af",
+         f"{_VOZ_CADENA},loudnorm=I={_VOZ_LUFS}:TP={_VOZ_TP}:LRA=7:print_format=json",
+         "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    medidas: dict[str, str] = {}
+    for clave in ("input_i", "input_tp", "input_lra", "input_thresh"):
+        m = re.search(rf'"{clave}"\s*:\s*"?(-?[\d.]+)"?', r.stderr)
+        if m:
+            medidas[clave] = m.group(1)
+    if len(medidas) < 4:
+        on_log("[5/5] ⚠️ no pude medir la sonoridad — se normaliza en una pasada")
+        return {}
+    return medidas
+
+
+def _filtro_voz(audio_in: Path, on_log: OnLog) -> str:
+    med = _medir_voz(audio_in, on_log)
+    norm = f"loudnorm=I={_VOZ_LUFS}:TP={_VOZ_TP}:LRA=7"
+    if med:
+        norm += (
+            f":measured_I={med['input_i']}:measured_TP={med['input_tp']}"
+            f":measured_LRA={med['input_lra']}:measured_thresh={med['input_thresh']}"
+        )
+        on_log(f"[5/5] voz a {_VOZ_LUFS} LUFS (venía a {med['input_i']})")
+    # El limitador es la red de seguridad para transitorios sueltos.
+    # `level=disabled` es IMPRESCINDIBLE: por defecto `alimiter` RE-NIVELA la
+    # salida hacia el límite, así que bajar el límite subía el volumen en vez
+    # de bajarlo y el pico acababa por encima de 0 dBTP.
+    return f"{_VOZ_CADENA},{norm},alimiter=limit=0.9:level=disabled"
+
+
 def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) -> Path:
     """Sustituye la pista de audio del vídeo por `audio_in` (la locución ya
     recortada de silencios). El vídeo llega mudo desde el paso 3
@@ -855,6 +912,7 @@ def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) ->
         "ffmpeg", "-y", "-v", "error",
         "-i", str(video_in), "-i", str(audio_in),
         "-map", "0:v:0", "-map", "1:a:0",
+        "-af", _filtro_voz(audio_in, on_log),
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
         "-shortest", "-movflags", "+faststart",
         str(out_path),
