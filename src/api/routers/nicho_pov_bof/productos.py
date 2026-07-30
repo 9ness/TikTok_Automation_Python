@@ -43,7 +43,10 @@ from src.api.schemas.nicho_pov_bof import (
     SoldProductsResponse,
     VideoUploadResponse,
 )
-from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
+from src.nicho_pov_bof.pipeline.video_editor import (
+    caption_arriesgado,
+    texto_arriesgado,
+)
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -155,7 +158,9 @@ def _producto_info(
         caption=prod.get("caption", ""),
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
         gancho=prod.get("gancho", ""),
+        gancho_riesgo=texto_arriesgado(prod.get("gancho", "")) or "",
         cta=prod.get("cta", ""),
+        cta_riesgo=texto_arriesgado(prod.get("cta", "")) or "",
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
@@ -240,7 +245,9 @@ def _list_productos(
                     guardado.get("caption", "")
                 ) or "",
                 gancho=guardado.get("gancho", ""),
+                gancho_riesgo=texto_arriesgado(guardado.get("gancho", "")) or "",
                 cta=guardado.get("cta", ""),
+                cta_riesgo=texto_arriesgado(guardado.get("cta", "")) or "",
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),

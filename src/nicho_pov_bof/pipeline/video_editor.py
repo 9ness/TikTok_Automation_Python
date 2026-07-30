@@ -479,6 +479,36 @@ _GANCHO_SEGURO = "🏷️ CUPÓN DESCUENTO 🏷️"
 _CTA_SEGURO = "👇 MÍRALO ABAJO 👇"
 
 
+# Poner FECHA a la oferta es tan inseguro como afirmarla: el vídeo sigue
+# publicado mañana y "CUPÓN ACTIVO HOY" ya no es cierto. Se colaba porque solo
+# estaba prohibido "SOLO HOY".
+#
+# Van por PALABRA COMPLETA, no por subcadena: "hoy" dentro de "hoyo" no es un
+# aviso.
+#
+# Los que caducan por sí solos, digan lo que digan alrededor:
+_TERMINOS_TIEMPO = (
+    "activo hoy", "valido hoy", "disponible hoy", "esta semana", "este mes",
+    "tiempo limitado", "por poco tiempo", "24h", "48h", "24 horas",
+    "48 horas", "caduca", "expira", "termina pronto", "acaba pronto",
+    "date prisa", "no esperes", "ultimo dia", "ultimos dias",
+    "quedan pocas", "quedan pocos", "corre",
+)
+# Y los genéricos, que SOLO preocupan si se están aplicando al cupón o al
+# precio. "REVÍSALO AHORA" es un CTA perfectamente válido — no promete que
+# nada vaya a cambiar; "CUPÓN ACTIVO AHORA" sí.
+_TIEMPO_GENERICO = ("hoy", "manana", "ahora", "ahora mismo", "ya mismo")
+_CONTEXTO_OFERTA = ("cupon", "precio", "oferta", "descuent", "rebaj", "euro")
+
+
+def _regex_palabras(terminos: tuple[str, ...]) -> "re.Pattern[str]":
+    return re.compile(r"\b(" + "|".join(re.escape(t) for t in terminos) + r")\b")
+
+
+_RE_TIEMPO = _regex_palabras(_TERMINOS_TIEMPO)
+_RE_TIEMPO_GENERICO = _regex_palabras(_TIEMPO_GENERICO)
+
+
 def _sin_acentos(txt: str) -> str:
     import unicodedata
 
@@ -498,6 +528,11 @@ def texto_arriesgado(txt: str) -> str | None:
     for t in _TERMINOS_RIESGO:
         if t in plano:
             return t
+    m = _RE_TIEMPO.search(plano)
+    if not m and any(c in plano for c in _CONTEXTO_OFERTA):
+        m = _RE_TIEMPO_GENERICO.search(plano)
+    if m:
+        return f"{m.group(1)} (pone fecha a algo que mañana puede no ser cierto)"
     if "descuent" in plano:
         return "descuento (sin mencionar el cupón)"
     return None

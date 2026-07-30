@@ -974,6 +974,16 @@ function ProductoCard({
         </p>
       )}
 
+      {/* El montaje ya los cambia por uno neutro al quemarlos en el vídeo,
+          pero los botones de copiar entregan el original tal cual. */}
+      {(producto.gancho_riesgo || producto.cta_riesgo) && (
+        <p className="text-[11px] text-amber-400 break-words">
+          ⚠️ {producto.gancho_riesgo ? "Gancho" : "CTA"} arriesgado («
+          {producto.gancho_riesgo || producto.cta_riesgo}»). El vídeo lo
+          sustituye solo, pero no lo copies tal cual.
+        </p>
+      )}
+
       {/* Ficha de TikTok Shop. Cada búsqueda gasta una llamada del plan de
           EchoTik (trial de 100), por eso es un botón manual por producto y
           no algo que se dispare solo al abrir la carpeta. */}

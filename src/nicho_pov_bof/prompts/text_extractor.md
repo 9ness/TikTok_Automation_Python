@@ -98,6 +98,19 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   precios. Ni `SORPRESA`, `LOCURA`, `INCREÍBLE` o `BRUTAL`: prometen algo que
   no se puede comprobar en la ficha.
 
+  ### PROHIBIDO: ponerle FECHA al cupón
+
+  El vídeo sigue publicado mañana, y la semana que viene. Cualquier texto que
+  ate el cupón a un momento concreto deja de ser cierto solo con que pase el
+  tiempo — es el mismo problema que afirmar una rebaja. Nada de `CUPÓN ACTIVO
+  HOY`, `VÁLIDO HOY`, `DISPONIBLE HOY`, `SOLO 24H`, `ESTA SEMANA`, `CADUCA
+  PRONTO`, `ÚLTIMO DÍA`, `DATE PRISA`, `CORRE` ni `NO ESPERES`.
+
+  Di el cupón sin fecha: `CUPÓN DESCUENTO` vale, `CUPÓN DESCUENTO HOY` no.
+
+  (En el `cta` sí puede aparecer `AHORA` como verbo — `REVÍSALO AHORA` no
+  promete que nada cambie. Lo prohibido es aplicárselo al cupón o al precio.)
+
   ### PERMITIDO: el cupón, o invitar a comprobar el precio
 
   Hablar del cupón es seguro (está en la ficha o no está) y decirle a la gente
@@ -106,8 +119,11 @@ traducir literalmente del inglés si el título original viene en otro idioma:
 
   `🏷️ CUPÓN DESCUENTO 🏷️`, `🎟️ CON CUPÓN ACTIVO 🎟️`,
   `🏷️ CUPÓN DISPONIBLE 🏷️`, `👀 MIRA EL PRECIO 👀`,
-  `🔎 COMPRUEBA EL PRECIO 🔎`, `📌 PRECIO ACTUALIZADO 📌`,
-  `🆕 NUEVO PRECIO 🆕`, `💳 CUPÓN EN LA FICHA 💳`.
+  `🔎 COMPRUEBA EL PRECIO 🔎`, `💳 CUPÓN EN LA FICHA 💳`,
+  `🎟️ MIRA SI HAY CUPÓN 🎟️`.
+
+  Ojo con dar a entender que el precio ha CAMBIADO: `PRECIO ACTUALIZADO` o
+  `NUEVO PRECIO` insinúan una bajada igual que `REBAJADO`. No los uses.
 
 - `cta`: el texto que invita a MIRAR, nunca a comprar y **nunca nombrando
   una oferta o rebaja** (aplican las mismas prohibiciones que en `gancho`:

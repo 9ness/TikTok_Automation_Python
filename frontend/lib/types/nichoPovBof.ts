@@ -87,6 +87,10 @@ export interface ProductoItem {
   caption: string | null;
   /** Promesa detectada en el caption; vacío/null si es seguro publicarlo. */
   caption_riesgo: string | null;
+  /** Riesgo en el gancho/CTA. El vídeo los sustituye solo; esto avisa por si
+   *  los copias a mano. */
+  gancho_riesgo?: string;
+  cta_riesgo?: string;
   gancho: string | null;
   cta: string | null;
   uploaded: boolean;
