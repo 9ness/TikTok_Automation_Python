@@ -123,6 +123,10 @@ class ProductoInfo(BaseModel):
     product_url: str = ""
     url_match_name: str = ""
     url_match_score: float = 0.0
+    # Ventas del listado encontrado. Con 0 la ficha suele estar RETIRADA y al
+    # abrirla TikTok responde "producto no encontrado".
+    url_ventas_30d: int = 0
+    url_ventas_total: int = 0
 
 
 class ProductosListResponse(BaseModel):

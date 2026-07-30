@@ -100,6 +100,8 @@ def _producto_info(producto: str, prod: dict) -> ProductoInfo:
         product_url=prod.get("product_url", ""),
         url_match_name=prod.get("url_match_name", ""),
         url_match_score=float(prod.get("url_match_score") or 0.0),
+        url_ventas_30d=int(prod.get("url_ventas_30d") or 0),
+        url_ventas_total=int(prod.get("url_ventas_total") or 0),
     )
 
 
@@ -149,6 +151,8 @@ def _list_productos(source: str, folder: str) -> ProductosListResponse:
                 product_url=guardado.get("product_url", ""),
                 url_match_name=guardado.get("url_match_name", ""),
                 url_match_score=float(guardado.get("url_match_score") or 0.0),
+                url_ventas_30d=int(guardado.get("url_ventas_30d") or 0),
+                url_ventas_total=int(guardado.get("url_ventas_total") or 0),
             )
         )
 

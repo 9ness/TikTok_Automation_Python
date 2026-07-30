@@ -97,6 +97,10 @@ export interface ProductoItem {
   product_url: string;
   url_match_name: string;
   url_match_score: number;
+  /** Ventas del listado encontrado. Con 0 suele estar retirado y TikTok
+   *  responde "producto no encontrado" al abrirlo. */
+  url_ventas_30d?: number;
+  url_ventas_total?: number;
 }
 
 /** Item de /vendidos: agrega productos de TODAS las carpetas de la fuente,

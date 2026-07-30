@@ -31,6 +31,15 @@ OnLog = Callable[[str], None]
 # una crema antiedad comparten "crema" y poco más).
 MIN_SCORE = 0.6
 
+# Palabras de razón social que NO identifican la marca: las lleva media
+# industria. Sin quitarlas, "Freshly Cosmetics" casaba con "DONNA COSMETICS
+# SERUM FACIAL DE FRUTAS" y se ataba la URL de otra marca.
+_MARCA_GENERICA = {
+    "cosmetics", "cosmetica", "beauty", "store", "shop", "official", "oficial",
+    "espana", "spain", "group", "brand", "company", "sociedad", "limited",
+    "iberia", "europe", "global", "team", "studio", "labs", "lab",
+}
+
 # Ruido de los títulos de TikTok Shop: no distingue un producto de otro y
 # ensucia tanto la keyword de búsqueda como la comparación.
 _RELLENO = {
@@ -117,6 +126,14 @@ def keyword_sin_marca(titulo_completo: str, tienda: str = "", max_palabras: int 
     return " ".join(palabras[:max_palabras]).strip()
 
 
+def _marca_distintiva(tienda: str) -> set[str]:
+    """Palabras de la tienda que de verdad identifican la marca."""
+    return {
+        p for p in _normaliza(tienda).split()
+        if len(p) > 3 and p not in _MARCA_GENERICA
+    }
+
+
 def _nucleo(titulo_completo: str, tienda: str) -> set[str]:
     """Palabras que IDENTIFICAN el producto, sin la marca ni el relleno.
 
@@ -148,7 +165,7 @@ def match_score(candidato: str, titulo_completo: str, tienda: str = "") -> float
 
     # La MARCA es condición, no puntos: "Neutrogena Crema de Manos" comparte el
     # núcleo entero con una crema de manos de Bella Aurora y no es el producto.
-    marca = {p for p in _normaliza(tienda).split() if len(p) > 3}
+    marca = _marca_distintiva(tienda)
     if marca and not (marca & hallados):
         return 0.0
 
@@ -199,20 +216,36 @@ def find_product_url(
         log("  · sin resultados")
         return None
 
-    mejor = max(
-        resultados,
-        key=lambda p: match_score(p.get("name", ""), titulo_completo, tienda),
-    )
+    # Se ordena por parecido y, a igualdad, por VENTAS RECIENTES: EchoTik
+    # guarda fichas históricas y algunas ya están retiradas — al abrirlas
+    # TikTok dice "producto no encontrado". Las ventas de los últimos 30 días
+    # son la señal de que el listado sigue vivo.
+    def orden(p):
+        return (
+            round(match_score(p.get("name", ""), titulo_completo, tienda), 2),
+            int(p.get("units_sold_30d") or 0),
+            int(p.get("units_sold") or 0),
+        )
+
+    mejor = max(resultados, key=orden)
     score = match_score(mejor.get("name", ""), titulo_completo, tienda)
     if score < MIN_SCORE or not mejor.get("product_id"):
         log(f"  · descartado (parecido {score:.0%}): {mejor.get('name', '')[:60]}")
         return None
 
-    log(f"  ✓ {score:.0%} · {mejor['name'][:60]}")
+    vendidos_30d = int(mejor.get("units_sold_30d") or 0)
+    vendidos = int(mejor.get("units_sold") or 0)
+    if not vendidos:
+        log(f"  ⚠️ {score:.0%} · {mejor['name'][:56]} — SIN ventas registradas, "
+            f"la ficha puede estar retirada")
+    else:
+        log(f"  ✓ {score:.0%} · {mejor['name'][:56]} ({vendidos_30d} uds/30d)")
     return {
         "product_id": mejor["product_id"],
         "product_url": mejor["tiktok_url"],
         "url_match_name": mejor.get("name", ""),
         "url_match_score": round(score, 3),
+        "url_ventas_30d": vendidos_30d,
+        "url_ventas_total": vendidos,
         "keyword": keyword,
     }
