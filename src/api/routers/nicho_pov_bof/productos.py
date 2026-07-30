@@ -52,7 +52,6 @@ router = APIRouter(
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
 _ALLOWED_SEXOS = ("hombre", "mujer")
-_ALLOWED_ORIGENES = ("veo3", "kling")
 
 
 def _bad_request(msg: str) -> APIError:
@@ -252,7 +251,10 @@ async def upload_video(
     folder: Annotated[str, Form()],
     producto: Annotated[str, Form()],
     sexo: Annotated[str, Form()],
-    origen: Annotated[str, Form()],
+    # Ya no se elige (Veo3 dejó de poner marca de agua); se mantiene OPCIONAL
+    # para los clientes que lo sigan enviando. Sin default daba 422 en cuanto
+    # el frontend dejó de mandarlo.
+    origen: Annotated[str, Form()] = "",
     # Herramientas de edición, cada una por separado. Todas marcadas = el
     # montaje completo; ninguna = vídeo limpio (solo la voz, y sin marca de
     # agua si es Veo3). `con_textos` se mantiene por compatibilidad: los
@@ -274,9 +276,10 @@ async def upload_video(
     sexo_norm = (sexo or "").strip().lower()
     if sexo_norm not in _ALLOWED_SEXOS:
         raise _bad_request(f"sexo debe ser 'hombre' o 'mujer', recibido: {sexo!r}")
+    # `origen` ya no se valida: no cambia nada del montaje desde que Veo3 dejó
+    # de poner marca de agua. Se guarda tal cual llegue (vacío incluido) solo
+    # como dato del job.
     origen_norm = (origen or "").strip().lower()
-    if origen_norm not in _ALLOWED_ORIGENES:
-        raise _bad_request(f"origen debe ser 'veo3' o 'kling', recibido: {origen!r}")
 
     filename = (file.filename or "").lower()
     ext = next((e for e in _ALLOWED_VIDEO_EXTS if filename.endswith(e)), "")

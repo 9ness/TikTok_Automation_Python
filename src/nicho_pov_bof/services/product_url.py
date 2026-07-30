@@ -26,7 +26,10 @@ from typing import Any, Callable
 OnLog = Callable[[str], None]
 
 # Por debajo de esto no se acepta el resultado: es otro producto.
-MIN_SCORE = 0.34
+# Fracción del núcleo del nombre que debe aparecer en el candidato. Con 0.34
+# entraban productos distintos de la misma marca (una crema de manos frente a
+# una crema antiedad comparten "crema" y poco más).
+MIN_SCORE = 0.6
 
 # Ruido de los títulos de TikTok Shop: no distingue un producto de otro y
 # ensucia tanto la keyword de búsqueda como la comparación.
@@ -39,10 +42,17 @@ _RELLENO = {
 
 
 def _normaliza(texto: str) -> str:
-    """Minúsculas, sin acentos y sin puntuación — para comparar y trocear."""
+    """Minúsculas, sin acentos y sin puntuación — para comparar y trocear.
+
+    """
     plano = unicodedata.normalize("NFKD", texto)
     plano = "".join(c for c in plano if not unicodedata.combining(c))
-    return re.sub(r"[^a-z0-9ñ ]+", " ", plano.lower())
+    plano = plano.lower()
+    # Los prefijos unidos por guion se PEGAN ("Anti-Manchas" -> "antimanchas",
+    # que es como se llama el producto de verdad); el resto de guiones separan
+    # ("WOTSTA-silla" -> "wotsta silla", que sí son dos palabras).
+    plano = re.sub(r"\b(anti|multi|super|ultra|pre|post|sub|semi)-", r"\1", plano)
+    return re.sub(r"[^a-z0-9ñ ]+", " ", plano)
 
 
 def _tokens(texto: str) -> set[str]:
@@ -52,67 +62,82 @@ def _tokens(texto: str) -> set[str]:
     }
 
 
-def build_keyword(titulo_completo: str, tienda: str = "", max_palabras: int = 7) -> str:
-    """Keyword de búsqueda a partir del título largo de TikTok Shop.
+def build_keyword(titulo_completo: str, tienda: str = "", max_palabras: int = 5) -> str:
+    """Keyword de búsqueda: MARCA + las primeras palabras del nombre.
 
-    Los títulos vienen con toda la ficha técnica dentro ("MK Conjunto de
-    Maletas de Viaje Elegantes: Carcasa Ligera de ABS, Cerradura Numérica,
-    4 Ruedas…"). Mandar eso entero no encuentra nada, así que se trocea por
-    los separadores fuertes y se cogen los primeros trozos con contenido.
+    La marca es imprescindible. Buscando "crema manos antimanchas" EchoTik
+    devuelve 0 resultados; con "bella aurora crema de manos" devuelve los tres
+    productos correctos. Antes solo se añadía si la keyword quedaba corta, y
+    ahí se perdían casi todos.
 
-    Quedarse con el PRIMER trozo a secas no vale: media catálogo empieza por
-    la marca ("Freshly - Protector Solar…", "Freshly Cosmetics - Hyaluronic
-    Energy Body Serum…") y la keyword salía "freshly", que devuelve el
-    catálogo entero de la tienda. Los trozos que son solo marca se saltan.
+    Cortar por el primer separador tampoco vale: media catálogo escribe
+    "BELLA AURORA - Crema de Manos…" y el primer trozo es SOLO la marca. Se
+    van acumulando trozos hasta juntar palabras que describan el producto.
+
+    Las palabras funcionales ("de", "para") se dejan: el buscador las tolera y
+    quitarlas rompe expresiones como "crema DE manos".
     """
-    marca = _tokens(tienda) | {t for t in _normaliza(tienda).split() if t}
-    trozos = re.split(r"[:|,–—]|\s-\s", titulo_completo.strip())
+    marca = [p for p in _normaliza(tienda).split() if len(p) > 2][:2]
+    ruido = {"ml", "gr", "kg", "cm", "mm", "uds", "unidades", "spf"}
 
-    palabras: list[str] = []
-    for trozo in trozos:
-        utiles = [
-            p for p in _normaliza(trozo).split()
-            if len(p) > 2 and p not in _RELLENO
-        ]
-        if not utiles:
-            continue
-        # Trozo que es solo la marca: no distingue nada, al siguiente.
-        if not palabras and all(p in marca for p in utiles):
-            continue
-        palabras.extend(utiles)
-        if len(palabras) >= 4:
+    propias: list[str] = []
+    for trozo in re.split(r"[:|,]|\s-\s|\s–\s", titulo_completo):
+        for w in _normaliza(trozo).split():
+            if w.isdigit() or w in ruido or len(w) < 2:
+                continue
+            # No repetir la marca dentro de las palabras propias.
+            if w in marca and not propias:
+                continue
+            propias.append(w)
+        if len(propias) >= max_palabras:
             break
 
-    if not palabras:
-        palabras = [p for p in _normaliza(titulo_completo).split() if len(p) > 2]
-    keyword = " ".join(palabras[:max_palabras])
+    partes = marca + [w for w in propias if w not in marca]
+    return " ".join(partes[:max_palabras]).strip()
 
-    # La marca solo se añade si la keyword se quedó pobre ("sillón gaming"):
-    # con 3+ palabras propias, meterla estrecha la búsqueda sin necesidad.
-    primera_marca = next(iter(_normaliza(tienda).split()), "")
-    if primera_marca and primera_marca not in keyword and len(palabras) < 3:
-        keyword = f"{primera_marca} {keyword}"
-    return keyword.strip()
+
+def keyword_corta(titulo_completo: str, tienda: str = "") -> str:
+    """Segundo intento cuando la primera búsqueda no devuelve NADA: marca + 2
+    palabras. Menos específica, más probabilidad de que el buscador acierte."""
+    return build_keyword(titulo_completo, tienda, max_palabras=4)
+
+
+def _nucleo(titulo_completo: str, tienda: str) -> set[str]:
+    """Palabras que IDENTIFICAN el producto, sin la marca ni el relleno.
+
+    Se toman del principio del nombre, no de toda la ficha: el resto es SEO
+    ("Anti-edad, Despigmentante, Tratamiento Reparador Hidratante…") y lo
+    comparten media docena de productos de la misma marca.
+    """
+    marca = {p for p in _normaliza(tienda).split() if len(p) > 2}
+    palabras = [
+        w for w in build_keyword(titulo_completo, tienda, max_palabras=6).split()
+        if w not in marca and w not in _RELLENO and len(w) > 2
+    ]
+    return set(palabras)
 
 
 def match_score(candidato: str, titulo_completo: str, tienda: str = "") -> float:
-    """Cuánto se parece el nombre encontrado al producto que buscamos (0-1).
+    """Cuánto se parece el nombre encontrado al producto buscado (0-1).
 
-    Es la proporción de palabras con contenido del producto que aparecen en
-    el candidato. Encontrar la marca suma aparte: dos productos distintos de
-    la misma tienda se parecen menos que el mismo producto escrito de otra
-    forma, pero la marca es una señal fuerte de que no es un producto al azar.
+    Se mide sobre el NÚCLEO del nombre. Compararlo contra la ficha entera no
+    distinguía productos de la misma marca: para una crema de manos, el
+    "B7 Crema Antimanchas y Antiedad" sacaba 51% y la crema de manos correcta
+    60% — nueve puntos, indistinguible. Sobre el núcleo ("crema manos") el
+    correcto saca 100% y el otro 50%.
     """
-    buscados = _tokens(titulo_completo)
-    if not buscados:
+    nucleo = _nucleo(titulo_completo, tienda)
+    if not nucleo:
         return 0.0
     hallados = _tokens(candidato)
-    solape = len(buscados & hallados) / len(buscados)
 
-    marca = _tokens(tienda)
-    if marca and marca & hallados:
-        solape = min(1.0, solape + 0.15)
-    return solape
+    # La MARCA es condición, no puntos: "Neutrogena Crema de Manos" comparte el
+    # núcleo entero con una crema de manos de Bella Aurora y no es el producto.
+    marca = {p for p in _normaliza(tienda).split() if len(p) > 3}
+    if marca and not (marca & hallados):
+        return 0.0
+
+    return len(nucleo & hallados) / len(nucleo)
 
 
 def find_product_url(
@@ -147,6 +172,14 @@ def find_product_url(
     log(f"🔎 EchoTik '{keyword}' (1 llamada)")
     # limit=10 = UNA página = UNA llamada. Subirlo pagina y multiplica el gasto.
     resultados = echotik_cloud.search_products(keyword, region=region, limit=10)
+    if not resultados:
+        # Segundo intento con menos palabras: la mayoría de los fallos eran
+        # keywords demasiado específicas, no productos ausentes del catálogo.
+        corta = keyword_corta(titulo_completo, tienda)
+        if corta and corta != keyword:
+            log(f"  · sin resultados → reintento con {corta!r} (1 llamada más)")
+            keyword = corta
+            resultados = echotik_cloud.search_products(corta, region=region, limit=10)
     if not resultados:
         log("  · sin resultados")
         return None
