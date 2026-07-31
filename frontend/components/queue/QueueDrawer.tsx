@@ -27,6 +27,10 @@ type SubmoduleFilter = "all" | JobMode;
 const CR_SUBMODULES: JobMode[] = ["presidents", "pronosticos", "copyright", "subs_auto"];
 
 export function QueueDrawer() {
+  const esAdmin = useQueueStore((s) => s.esAdmin);
+  const otros = useQueueStore((s) => s.otros);
+  const verDe = useQueueStore((s) => s.verDe);
+  const setVerDe = useQueueStore((s) => s.setVerDe);
   const open = useDrawerStore((s) => s.queueOpen);
   const close = useDrawerStore((s) => s.closeQueue);
   const activeMap = useQueueStore((s) => s.active);
@@ -101,6 +105,40 @@ export function QueueDrawer() {
             <X className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Multiusuario: cada uno ve LO SUYO. El admin puede mirar la de otro
+            y se le avisa, en pequeño, de quién tiene algo en marcha — pediste
+            que no ocupara. */}
+        {esAdmin && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b px-4 pb-2 text-[11px]">
+            <span className="text-muted-foreground">Viendo:</span>
+            {[{ v: "", n: "La mía" }, { v: "todos", n: "Todas" }].concat(
+              Object.keys(otros).map((u) => ({ v: u, n: u })),
+            ).map((o) => (
+              <button
+                key={o.v || "mia"}
+                type="button"
+                onClick={() => setVerDe(o.v)}
+                className={cn(
+                  "rounded border px-1.5 py-0.5 transition",
+                  verDe === o.v
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/40",
+                )}
+              >
+                {o.n}
+              </button>
+            ))}
+            {Object.entries(otros).length > 0 && verDe === "" && (
+              <span className="text-amber-500">
+                ·{" "}
+                {Object.entries(otros)
+                  .map(([u, n]) => `${u}: ${n}`)
+                  .join(" · ")}
+              </span>
+            )}
+          </div>
+        )}
 
         {disconnected && (
           <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">

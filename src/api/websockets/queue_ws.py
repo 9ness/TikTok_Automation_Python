@@ -59,6 +59,16 @@ def _visible_para(job: Job, usuario: str, admin: bool) -> bool:
     return admin and not duenio
 
 
+def _activos_de_otros(queue: JobQueue, usuario: str) -> dict[str, int]:
+    """Cuántos trabajos activos tiene cada uno de los DEMÁS."""
+    fuera: dict[str, int] = {}
+    for j in queue.get_all():
+        duenio = _duenio(j)
+        if duenio and duenio != usuario and j.status.value in ("pending", "running"):
+            fuera[duenio] = fuera.get(duenio, 0) + 1
+    return fuera
+
+
 def _job_payload(job: Job) -> dict[str, Any]:
     """Snapshot mínimo de un job para el WebSocket (subset de fields
     relevantes para la UI). Excluye `logs` por tamaño."""
@@ -147,7 +157,7 @@ class ConnectionManager:
 
     async def serve(
         self, websocket: WebSocket, queue: JobQueue, usuario: str = "",
-        admin: bool = False,
+        admin: bool = False, ver_de: str = "",
     ) -> None:
         """Bucle principal por conexión: snapshot inicial + loop de polling
         + recepción de pings del cliente. Termina cuando el cliente desconecta.
@@ -156,20 +166,33 @@ class ConnectionManager:
         solo en el REST porque la interfaz se alimenta de ESTE socket — filtrar
         únicamente el endpoint REST no habría servido de nada.
         """
+        # Un admin puede mirar la cola de otro (o la de todos). A quien no lo
+        # es se le ignora: la URL del socket también se escribe a mano.
+        mirado = ver_de if admin else ""
+        efectivo = "" if mirado == "todos" else (mirado or usuario)
+
         # 1. Snapshot inicial
         snapshot = {
             j.id: _job_payload(j) for j in queue.get_all()
-            if _visible_para(j, usuario, admin)
+            if _visible_para(j, efectivo, admin and not mirado)
         }
         await self._send_json(websocket, {
             "type": "snapshot",
-            "data": {"jobs": list(snapshot.values())},
+            "data": {
+                "jobs": list(snapshot.values()),
+                "viendo": efectivo or "todos",
+                "es_admin": admin,
+                "otros": _activos_de_otros(queue, usuario) if admin else {},
+            },
         })
 
         # 2. Tarea de polling concurrente con la recepción de mensajes
         recv_task = asyncio.create_task(self._receive_loop(websocket))
         poll_task = asyncio.create_task(
-            self._poll_loop(websocket, queue, snapshot, usuario, admin)
+            self._poll_loop(
+                websocket, queue, snapshot, efectivo,
+                admin and not mirado, usuario if admin else "",
+            )
         )
         try:
             done, pending = await asyncio.wait(
@@ -205,7 +228,9 @@ class ConnectionManager:
         snapshot: dict[str, dict],
         usuario: str = "",
         admin: bool = False,
+        avisar_de_otros: str = "",
     ) -> None:
+        otros_previo: dict[str, int] = {}
         try:
             while True:
                 await asyncio.sleep(self.poll_interval_s)
@@ -213,6 +238,15 @@ class ConnectionManager:
                     j.id: _job_payload(j) for j in queue.get_all()
                     if _visible_para(j, usuario, admin)
                 }
+                # Aviso al admin de que otro tiene trabajos en marcha. Solo se
+                # manda cuando CAMBIA, para no llenar el socket de ruido.
+                if avisar_de_otros:
+                    otros = _activos_de_otros(queue, avisar_de_otros)
+                    if otros != otros_previo:
+                        otros_previo = otros
+                        await self._send_json(websocket, {
+                            "type": "otros", "data": {"otros": otros},
+                        })
                 updates, progress, removed = _diff_jobs(snapshot, current)
                 if updates:
                     await self._send_json(websocket, {
@@ -269,6 +303,7 @@ router = APIRouter(tags=["websockets"])
 async def queue_ws(
     websocket: WebSocket,
     api_key: str | None = Query(default=None),
+    de: str | None = Query(default=None),
     queue: JobQueue = Depends(get_queue),
     settings: APISettings = Depends(get_settings),
     manager: ConnectionManager = Depends(get_connection_manager),
@@ -288,7 +323,9 @@ async def queue_ws(
 
     await manager.connect(websocket)
     try:
-        await manager.serve(websocket, queue, quien, users.es_admin(quien))
+        await manager.serve(
+            websocket, queue, quien, users.es_admin(quien), (de or "").strip(),
+        )
     except WebSocketDisconnect:
         pass
     except Exception as e:

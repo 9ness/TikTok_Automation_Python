@@ -16,6 +16,12 @@ export interface QueueState {
   recent: ActiveJob[];
   // Estado del WebSocket
   connection: ConnectionState;
+  /** Multiusuario: de quién es la cola que se ve y qué tienen los demás. */
+  viendo: string;
+  esAdmin: boolean;
+  otros: Record<string, number>;
+  /** Cola de quién quiere ver el admin ("" = la suya, "todos" = mezcladas). */
+  verDe: string;
   lastError: string | null;
 
   // Actions
@@ -28,6 +34,9 @@ export interface QueueState {
   /** Quita un job individual del listado de "Recientes". */
   dismissRecent: (id: string) => void;
   setConnection: (state: ConnectionState, error?: string | null) => void;
+  setOtros: (otros: Record<string, number>) => void;
+  setViendo: (viendo: string, esAdmin: boolean) => void;
+  setVerDe: (verDe: string) => void;
   reset: () => void;
 }
 
@@ -39,6 +48,10 @@ export const useQueueStore = create<QueueState>((set) => ({
   active: {},
   recent: [],
   connection: "disconnected",
+  viendo: "",
+  esAdmin: false,
+  otros: {},
+  verDe: "",
   lastError: null,
 
   setSnapshot: (jobs) =>
@@ -96,11 +109,18 @@ export const useQueueStore = create<QueueState>((set) => ({
   dismissRecent: (id) =>
     set((state) => ({ recent: state.recent.filter((j) => j.job_id !== id) })),
 
+  setOtros: (otros: Record<string, number>) => set(() => ({ otros })),
+  setViendo: (viendo: string, esAdmin: boolean) =>
+    set(() => ({ viendo, esAdmin })),
+  setVerDe: (verDe: string) => set(() => ({ verDe })),
   setConnection: (connection, error = null) =>
     set(() => ({ connection, lastError: error })),
 
   reset: () =>
-    set(() => ({ active: {}, recent: [], connection: "disconnected", lastError: null })),
+    set(() => ({
+      active: {}, recent: [], connection: "disconnected", lastError: null,
+      viendo: "", esAdmin: false, otros: {},
+    })),
 }));
 
 // Selectors

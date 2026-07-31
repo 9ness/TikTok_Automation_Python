@@ -10,10 +10,14 @@ const PING_INTERVAL_MS = 30_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 
-function buildWsUrl(): string {
-  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
-  const base = `${api.wsUrl}/ws/queue`;
-  return apiKey ? `${base}?api_key=${encodeURIComponent(apiKey)}` : base;
+function buildWsUrl(de: string): string {
+  const params = new URLSearchParams();
+  const apiK = process.env.NEXT_PUBLIC_API_KEY;
+  if (apiK) params.set("api_key", apiK);
+  // `de` solo lo respeta el backend si quien mira es admin.
+  if (de) params.set("de", de);
+  const qs = params.toString();
+  return qs ? `${api.wsUrl}/ws/queue?${qs}` : `${api.wsUrl}/ws/queue`;
 }
 
 /**
@@ -28,11 +32,16 @@ function buildWsUrl(): string {
  * llamadas crean conexiones extra; usa `QueueWebSocketProvider`.
  */
 export function useQueueWebSocket(): void {
+  // De quién ver la cola. Solo lo respeta el backend si eres admin; al
+  // cambiarlo se reconecta el socket con el filtro nuevo.
+  const verDe = useQueueStore((s) => s.verDe);
   const setSnapshot = useQueueStore((s) => s.setSnapshot);
   const upsertJobs = useQueueStore((s) => s.upsertJobs);
   const applyProgress = useQueueStore((s) => s.applyProgress);
   const removeJobs = useQueueStore((s) => s.removeJobs);
   const setConnection = useQueueStore((s) => s.setConnection);
+  const setViendo = useQueueStore((s) => s.setViendo);
+  const setOtros = useQueueStore((s) => s.setOtros);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,7 +78,7 @@ export function useQueueWebSocket(): void {
       setConnection("connecting");
       let ws: WebSocket;
       try {
-        ws = new WebSocket(buildWsUrl());
+        ws = new WebSocket(buildWsUrl(verDe));
       } catch (e) {
         setConnection("disconnected", e instanceof Error ? e.message : "WS error");
         scheduleReconnect();
@@ -98,6 +107,11 @@ export function useQueueWebSocket(): void {
         switch (payload.type) {
           case "snapshot":
             setSnapshot(payload.data.jobs);
+            setViendo(payload.data.viendo ?? "", payload.data.es_admin ?? false);
+            setOtros(payload.data.otros ?? {});
+            break;
+          case "otros":
+            setOtros(payload.data.otros ?? {});
             break;
           case "update":
             upsertJobs(payload.data.jobs);

@@ -53,11 +53,25 @@ export interface QueueStateResponse {
 // ---------------------------------------------------------------------------
 // WebSocket frame
 // ---------------------------------------------------------------------------
-export type WsEventType = "snapshot" | "update" | "progress" | "removed" | "pong";
+export type WsEventType =
+  | "snapshot" | "update" | "progress" | "removed" | "pong" | "otros";
 
 export interface WsSnapshotEvent {
   type: "snapshot";
-  data: { jobs: ActiveJob[] };
+  data: {
+    jobs: ActiveJob[];
+    /** De quién es la cola que se está viendo ("todos" si se mezclan). */
+    viendo?: string;
+    es_admin?: boolean;
+    /** Trabajos activos de CADA UNO de los demás. Solo llega al admin. */
+    otros?: Record<string, number>;
+  };
+}
+
+/** Cambió el número de trabajos activos de los demás (solo admin). */
+export interface WsOtrosEvent {
+  type: "otros";
+  data: { otros: Record<string, number> };
 }
 export interface WsUpdateEvent {
   type: "update";
@@ -81,4 +95,5 @@ export type WsEvent =
   | WsUpdateEvent
   | WsProgressEvent
   | WsRemovedEvent
+  | WsOtrosEvent
   | WsPongEvent;
