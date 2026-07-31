@@ -137,6 +137,51 @@ def rclone_config_path() -> str:
     return ""
 
 
+# Cuántos días se conserva la copia local de un vídeo ya publicado.
+VIDEO_CACHE_DIAS = 10
+
+
+def video_cache_dir() -> str:
+    """Dir local con una copia de los vídeos ya montados.
+
+    El vídeo bueno vive en Drive, pero servir la descarga DESDE el mount es
+    lentísimo la primera vez: si el fichero no está en la caché de rclone,
+    hay que bajarlo entero de Google antes del primer byte — medido, 36
+    segundos para 17 MB. El operador lo notaba al descargar varios seguidos.
+
+    Con una copia local la descarga es instantánea. Se limpia sola pasados
+    `VIDEO_CACHE_DIAS` para que no engorde el disco del VPS.
+    """
+    root = os.getenv("API_TEMP_ROOT") or "temp_work"
+    return os.path.join(root, "nicho_pov_bof_videos")
+
+
+def video_cache_path(folder: str, producto: str) -> str:
+    """Ruta de la copia local de un vídeo. Nombre plano y saneado."""
+    seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{producto}__{folder}")
+    return os.path.join(video_cache_dir(), f"{seguro}.mp4")
+
+
+def limpiar_video_cache(dias: int = VIDEO_CACHE_DIAS) -> int:
+    """Borra copias locales viejas. Devuelve cuántas."""
+    import time
+
+    carpeta = video_cache_dir()
+    if not os.path.isdir(carpeta):
+        return 0
+    limite = time.time() - dias * 86400
+    borrados = 0
+    for nombre in os.listdir(carpeta):
+        ruta = os.path.join(carpeta, nombre)
+        try:
+            if os.path.isfile(ruta) and os.path.getmtime(ruta) < limite:
+                os.unlink(ruta)
+                borrados += 1
+        except OSError:
+            continue
+    return borrados
+
+
 def photo_cache_dir() -> str:
     """Dir local donde se cachean las fotos descargadas por file ID.
 

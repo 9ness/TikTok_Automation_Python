@@ -111,11 +111,45 @@ export default function NichoPovBofPage() {
   const vendidos = useVendidos(source);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState("");
+  const [downloadingVideos, setDownloadingVideos] = useState(false);
+  const [videoProgress, setVideoProgress] = useState("");
+  const totalProductos = productos.data?.length ?? 0;
+  const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
 
   function copyText(label: string, text: string | undefined) {
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success(`${label} copiado`);
+  }
+
+  /** Descarga los vídeos ya montados de la carpeta, uno a uno.
+   *
+   *  Igual que las fotos: el navegador móvil cancela las descargas
+   *  simultáneas, así que van en fila con un retardo entre medias. */
+  async function downloadVideos() {
+    if (!folder || !productos.data?.length) return;
+    const items = productos.data.filter((p) => p.video_path);
+    if (!items.length) {
+      toast.error("Ningún producto tiene vídeo montado todavía");
+      return;
+    }
+    setDownloadingVideos(true);
+    try {
+      for (const [i, p] of items.entries()) {
+        setVideoProgress(`${i + 1}/${items.length}`);
+        const a = document.createElement("a");
+        a.href = buildVideoUrl(source, folder, p.producto, p.video_listo_at ?? 0, true);
+        a.download = `${folder}_${p.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        if (i < items.length - 1) await new Promise((r) => setTimeout(r, 900));
+      }
+      toast.success(`${items.length} vídeo(s) descargados`);
+    } finally {
+      setDownloadingVideos(false);
+      setVideoProgress("");
+    }
   }
 
   async function downloadCleanPhotos() {
@@ -570,6 +604,25 @@ export default function NichoPovBofPage() {
               ) : (
                 <>
                   <Download className="h-3.5 w-3.5" /> Descargar fotos limpias
+                </>
+              )}
+            </button>
+            {/* Cuenta cuántos productos tienen ya vídeo: de un vistazo se ve
+                si falta alguno por montar sin repasar la lista entera. */}
+            <button
+              type="button"
+              onClick={() => void downloadVideos()}
+              disabled={downloadingVideos || !conVideo}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              {downloadingVideos ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {videoProgress}
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" /> Descargar vídeos ({conVideo}/
+                  {totalProductos})
                 </>
               )}
             </button>
@@ -1294,8 +1347,12 @@ function ProductoCard({
           >
             ▶ Ver vídeo
           </button>
+          {/* `download` es lo que diferencia esto del botón de la cola: sin
+              él el navegador NAVEGA a la URL (parece que carga una página)
+              en vez de descargar directamente. */}
           <a
             href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)}
+            download={`${folder}_${producto.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_")}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
           >
             <Download className="h-3.5 w-3.5" /> Descargar

@@ -1785,6 +1785,22 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     tmp_dest.replace(dest_path)
     on_log(f"[nicho_pov_bof] publicado en Drive: {dest_path}")
 
+    # Copia LOCAL para servir las descargas. Bajarlo del mount de Drive la
+    # primera vez cuesta ~36s para 17 MB (hay que traerlo entero de Google
+    # antes del primer byte); desde disco es instantáneo. Se limpia sola a
+    # los `VIDEO_CACHE_DIAS`.
+    try:
+        cache = Path(config.video_cache_path(folder, producto))
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(output_local, cache)
+        borradas = config.limpiar_video_cache()
+        if borradas:
+            on_log(f"[nicho_pov_bof] caché de vídeos: {borradas} antigua(s) borrada(s)")
+    except OSError as e:
+        # Sin copia local se sigue sirviendo desde Drive: más lento, pero
+        # funciona. No es motivo para tumbar el montaje.
+        on_log(f"[nicho_pov_bof] ⚠️ no pude guardar la copia local: {e}")
+
     # `video_listo_at` es la marca de versión: el fichero se sobrescribe con
     # el mismo nombre en cada montaje, así que sin esto el navegador seguiría
     # sirviendo el vídeo viejo de su caché.

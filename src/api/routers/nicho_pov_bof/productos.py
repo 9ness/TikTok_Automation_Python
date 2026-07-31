@@ -45,6 +45,9 @@ from src.api.schemas.nicho_pov_bof import (
     SoldProductsResponse,
     VideoUploadResponse,
 )
+import shutil
+
+from src.nicho_pov_bof import config as nicho_config
 from src.nicho_pov_bof.services import audience
 from src.nicho_pov_bof.services import emojis as emojis_svc
 from src.nicho_pov_bof.pipeline.video_editor import (
@@ -664,10 +667,27 @@ def descargar_video(
     ruta = (prod or {}).get("video_path") or ""
     if not ruta:
         raise APIError("Este producto todavía no tiene vídeo montado.", status_code=404)
-    p = Path(ruta)
+
+    # Primero la copia LOCAL. Servir desde el mount de Drive cuesta ~36s hasta
+    # el primer byte si el fichero no está en la caché de rclone (hay que
+    # traerlo entero de Google); desde disco es instantáneo. Es lo que hacía
+    # que al descargar varios seguidos alguno se quedara colgado.
+    p = Path(nicho_config.video_cache_path(folder, producto))
+    if not p.is_file():
+        p = Path(ruta)
+        # Se copia al vuelo para que la SIGUIENTE descarga ya sea rápida:
+        # los vídeos montados antes de que existiera la caché no la tienen.
+        if p.is_file():
+            try:
+                destino = Path(nicho_config.video_cache_path(folder, producto))
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, destino)
+                p = destino
+            except OSError:
+                pass
     if not p.is_file():
         raise APIError(
-            f"El vídeo ya no está en {p} (¿borrado de Drive?).", status_code=404,
+            f"El vídeo ya no está en {ruta} (¿borrado de Drive?).", status_code=404,
         )
     return FileResponse(
         str(p), media_type="video/mp4",
