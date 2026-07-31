@@ -45,6 +45,7 @@ from src.api.schemas.nicho_pov_bof import (
     SoldProductsResponse,
     VideoUploadResponse,
 )
+from src.nicho_pov_bof.services import audience
 from src.nicho_pov_bof.pipeline.video_editor import (
     caption_arriesgado,
     textos_fijos,
@@ -179,6 +180,9 @@ def _producto_info(
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
         gancho=textos_fijos(f"{producto} {folder}")["gancho"],
         cta=textos_fijos(f"{producto} {folder}")["cta"],
+        sexo_sugerido=audience.sexo_sugerido(
+            prod.get("titulo", ""), prod.get("titulo_tiktok_completo", ""),
+        ),
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
@@ -268,6 +272,10 @@ def _list_productos(
                 # que se quema en el vídeo.
                 gancho=textos_fijos(f"{producto} {folder}")["gancho"],
                 cta=textos_fijos(f"{producto} {folder}")["cta"],
+                sexo_sugerido=audience.sexo_sugerido(
+                    guardado.get("titulo", ""),
+                    guardado.get("titulo_tiktok_completo", ""),
+                ),
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),

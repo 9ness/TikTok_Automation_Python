@@ -97,6 +97,8 @@ export interface ProductoItem {
   video_listo_at?: number;
   /** Hay un montaje de este producto en cola o en curso (lo dice la cola). */
   montando?: boolean;
+  /** Voz que encaja con el producto; solo es el valor inicial de la ficha. */
+  sexo_sugerido?: "hombre" | "mujer";
   /** Aviso si no se pudo confirmar cuál de las fotos es la del producto. */
   foto_aviso?: string;
   con_textos?: boolean;

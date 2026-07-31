@@ -119,6 +119,9 @@ class ProductoInfo(BaseModel):
     # porque no pueden ser arriesgados.
     gancho: str = ""
     cta: str = ""
+    # Voz que encaja con el producto ("mujer" en cosmética/pelo, "hombre" en
+    # el resto). Es solo el valor por defecto de la ficha, se puede cambiar.
+    sexo_sugerido: str = "hombre"
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None

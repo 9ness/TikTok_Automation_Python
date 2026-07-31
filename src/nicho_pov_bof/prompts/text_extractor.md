@@ -37,14 +37,20 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   a letra con lo que se lee en la imagen.
 - `tienda`: el nombre de la tienda o vendedor que aparece en la captura.
 - `caption`: el pie del vídeo (el post), en español, SIN emojis y SIN
-  hashtags — los hashtags los añade el operador aparte. Una o dos frases.
+  hashtags — los hashtags los pone el operador aparte y se pegan solos.
 
-  Su trabajo es DOBLE: que se entienda qué es el producto y que el vídeo
-  aparezca en las búsquedas. Así que **describe con otras palabras lo que ya
-  pone la ficha** e incluye de forma natural las palabras que alguien
-  teclearía para encontrarlo: qué es, para qué sirve, para quién y el
-  material o formato si es relevante. Nada de eso hace falta inventarlo: sale
-  todo del título de la captura.
+  **UNA sola frase corta**, del estilo de la que pone la cuenta de referencia:
+  marca + qué es el producto, en 5-9 palabras. Nada de explicar
+  características ni enumerar materiales — eso alarga el post y no aporta.
+
+  Ejemplos del formato exacto que se busca:
+
+  - `Shorkey Sillón doble playa con sombrilla`
+  - `mixsoon Esencia centella asiática 100ml`
+  - `Bella Aurora crema de manos antimanchas`
+
+  Sale todo del título de la captura: se traduce al español si hace falta y
+  se recorta a lo esencial. No inventes datos que no estén ahí.
 
   ### PROHIBIDO: prometer un resultado
 
@@ -62,21 +68,6 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   precios concretos. Tampoco urgencia ni escasez (`ÚLTIMAS UNIDADES`,
   `SOLO HOY`, `SE AGOTA`, `DATE PRISA`), ni ponerle fecha a nada (`HOY`,
   `ESTA SEMANA`, `24H`): mañana deja de ser cierto.
-
-  ### PERMITIDO: contar qué es y para qué se usa
-
-  Describir función, uso, formato, material, ingredientes o público objetivo
-  tal y como aparecen en la ficha. Si la ficha dice "crema hidratante de
-  manos con urea", el caption puede decir que es una crema de manos con urea
-  para hidratar la piel seca; lo que no puede decir es que deja las manos
-  perfectas.
-
-  Ejemplos correctos:
-
-  - `Crema de manos con urea para piel seca y agrietada. Formato pequeño para
-    llevar en el bolso.`
-  - `Silla de escritorio con respaldo reclinable y reposacabezas, pensada para
-    quien pasa horas sentado jugando o trabajando.`
 
 ## Gancho y CTA: NO los generes
 

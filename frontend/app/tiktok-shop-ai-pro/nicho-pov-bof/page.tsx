@@ -37,6 +37,8 @@ import {
   usePrompts,
   useProductos,
   useBuscarProductoUrl,
+  useHashtags,
+  useGuardarHashtags,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -300,6 +302,7 @@ export default function NichoPovBofPage() {
           antes había que editar el .env del VPS y recrear el container, que
           solo puede hacer quien tiene SSH. Aquí se cambian en caliente. */}
       <EchoTikPanel />
+      <HashtagsPanel />
 
       {/* Backup del Drive de origen */}
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
@@ -678,6 +681,74 @@ export default function NichoPovBofPage() {
 
 /** Botón compacto: copia el texto al portapapeles sin mostrarlo. Mismo
  *  patrón que `CopyChip` de `calendar/page.tsx:1044`. */
+function HashtagsPanel() {
+  const tagsQuery = useHashtags();
+  const guardar = useGuardarHashtags();
+  const [nuevo, setNuevo] = useState("");
+  const tags = tagsQuery.data ?? [];
+
+  function aplicar(siguientes: string[]) {
+    guardar.mutate(siguientes, {
+      onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+    });
+  }
+
+  return (
+    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      <p className="text-xs font-semibold">🏷️ Hashtags del caption</p>
+      <p className="text-[11px] text-muted-foreground">
+        Se pegan al final de TODOS los captions al copiarlos. Cámbialos según
+        la campaña.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((t) => (
+          <span
+            key={t}
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px]"
+          >
+            {t}
+            <button
+              type="button"
+              aria-label={`Quitar ${t}`}
+              onClick={() => aplicar(tags.filter((x) => x !== t))}
+              className="text-muted-foreground transition hover:text-destructive"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {tags.length === 0 && !tagsQuery.isLoading && (
+          <span className="text-[11px] text-muted-foreground">Ninguno.</span>
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const t = nuevo.trim();
+          if (!t) return;
+          aplicar([...tags, t]);
+          setNuevo("");
+        }}
+        className="flex gap-1.5"
+      >
+        <input
+          value={nuevo}
+          onChange={(e) => setNuevo(e.target.value)}
+          placeholder="#rebajasdeverano"
+          className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs"
+        />
+        <button
+          type="submit"
+          disabled={guardar.isPending || !nuevo.trim()}
+          className="rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition hover:border-foreground/30 disabled:opacity-50"
+        >
+          Añadir
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function CopyChip({ label, text }: { label: string; text: string }) {
   if (!text) return null;
   return (
@@ -818,7 +889,11 @@ function ProductoCard({
   const urlNoEncontrada = buscarUrl.isSuccess && !producto.product_url;
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
-  const [sexo, setSexo] = useState<"hombre" | "mujer">("hombre");
+  // Arranca con la voz que encaja con el producto (mujer en cosmética y
+  // pelo, hombre en el resto). El operador la cambia con un clic si falla.
+  const [sexo, setSexo] = useState<"hombre" | "mujer">(
+    producto.sexo_sugerido === "mujer" ? "mujer" : "hombre",
+  );
   // Herramientas de edición, elegibles por separado. Todas marcadas por
   // defecto = el montaje completo; desmarcarlas todas deja el vídeo limpio
   // (solo la voz). Así se puede pedir, p. ej., solo el nombre del producto
@@ -830,6 +905,7 @@ function ProductoCard({
   const [pct, setPct] = useState(0);
   const [verVideo, setVerVideo] = useState(false);
   const qc = useQueryClient();
+  const hashtags = useHashtags().data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // El producto puede llegar actualizado desde otra mutación (p. ej. tras
@@ -948,7 +1024,16 @@ function ProductoCard({
         <CopyChip label="📝 Título" text={producto.titulo ?? ""} />
         <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} />
-        <CopyChip label="✍️ Caption" text={producto.caption ?? ""} />
+        {/* El caption se copia YA con los hashtags pegados: es lo que se
+            pega tal cual en TikTok, no hay que juntarlo a mano. */}
+        <CopyChip
+          label="✍️ Caption"
+          text={
+            producto.caption
+              ? [producto.caption, hashtags.join(" ")].filter(Boolean).join(" ")
+              : ""
+          }
+        />
         {/* Gancho y CTA también copiables: son los textos que se pegan a mano
             cuando se prefiere montar el vídeo en CapCut en vez de aquí. */}
         <CopyChip label="🎣 Gancho" text={producto.gancho ?? ""} />
