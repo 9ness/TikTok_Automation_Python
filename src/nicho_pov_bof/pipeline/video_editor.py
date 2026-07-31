@@ -276,11 +276,14 @@ _TITULO_MIN_CHARS = 18
 def _titulo_para_video(textos: dict) -> str:
     """Título que se quema en el vídeo: el nombre del producto, sin ficha.
 
-    `titulo` viene del extractor (`prompts/text_extractor.md`) como el nombre
-    LITERAL repartido en columnas de 4 palabras. Aquí se corta la cola de
-    keywords SEO y se deja en `_TITULO_MAX_LINEAS` líneas. Nada de
-    reformular: el `titulo_tiktok_completo` existe para BUSCAR el producto en
-    el Centro de Afiliados, no para pintarlo.
+    `titulo` viene del extractor (`prompts/text_extractor.md`) ya en español
+    y corto (marca + qué es, 5-9 palabras), repartido en líneas de ~4. Aquí
+    solo se limpia y se topa a `_TITULO_MAX_LINEAS` líneas por si se pasa.
+
+    El recorte agresivo de antes (cortar en el primer `:` o `,`) tenía
+    sentido cuando el título era la copia LITERAL de la ficha, con su cola de
+    keywords SEO. Ahora que llega ya resumido, cortar por el primer signo se
+    comía media frase — así que solo se aplica si aun así viene largo.
     """
     bruto = (textos.get("titulo") or "").strip()
     if not bruto:
@@ -288,13 +291,30 @@ def _titulo_para_video(textos: dict) -> str:
     if not bruto:
         return ""
 
+    # Si ya viene corto y repartido, se RESPETA su reparto: Gemini equilibra
+    # las líneas ("Shorkey Sillón doble / playa con sombrilla") y volver a
+    # partir a 4 palabras lo desequilibra (4 + 2).
+    lineas = [
+        re.sub(r"\s+", " ", ln.replace("\\", " ")).strip()
+        for ln in bruto.splitlines()
+    ]
+    lineas = [ln for ln in lineas if ln]
+    if (
+        1 <= len(lineas) <= _TITULO_MAX_LINEAS
+        and sum(len(ln.split()) for ln in lineas)
+        <= _TITULO_MAX_LINEAS * _TITULO_PALABRAS_LINEA
+    ):
+        return "\n".join(lineas).strip(" .,-–|:\n")
+
     # Se aplana y se limpia la basura de escapado de las fichas ("\\Impermeable").
     plano = re.sub(r"\s+", " ", bruto.replace("\n", " ").replace("\\", " ")).strip()
 
-    for sep in _TITULO_CORTES:
-        cabeza = plano.split(sep, 1)[0].strip()
-        if len(cabeza) >= _TITULO_MIN_CHARS:
-            plano = cabeza
+    # Solo si viene largo de verdad: un título ya resumido no hay que podarlo.
+    if len(plano.split()) > _TITULO_MAX_LINEAS * _TITULO_PALABRAS_LINEA:
+        for sep in _TITULO_CORTES:
+            cabeza = plano.split(sep, 1)[0].strip()
+            if len(cabeza) >= _TITULO_MIN_CHARS:
+                plano = cabeza
 
     palabras = plano.split()[:_TITULO_MAX_LINEAS * _TITULO_PALABRAS_LINEA]
     while palabras and palabras[-1].lower().strip(".,-–|:") in _TITULO_COLGANTES:
