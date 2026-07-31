@@ -541,6 +541,54 @@ def _xfade_por_tandas(
     return _xfade_clips(parciales, specs_parciales, trans_entre, out_path, on_log)
 
 
+# ---------------------------------------------------------------------------
+# Transición "papel quemado"
+# ---------------------------------------------------------------------------
+# La usan las cuentas del mentor (@danigumoficial, @rudyskateoficial) al pasar
+# del gancho al b-roll: un borde de fuego ondulado que se come el plano.
+#
+# No hay `transition=burn` en ffmpeg y no queríamos depender de un vídeo de
+# stock, así que se pinta con `xfade=transition=custom`, que evalúa una
+# expresión por píxel. De arriba a abajo del borde hay cuatro zonas, que es lo
+# que hace que parezca fuego y no un barrido:
+#
+#   ya quemado → B (el clip nuevo)
+#   0-12px     → blanco incandescente
+#   12-48px    → naranja
+#   48-100px   → carbón, desvaneciendo hacia el plano intacto
+#   más allá   → A (el clip viejo)
+#
+# `ld(4)` corrige que en yuv420p los planos de color miden la MITAD: sin eso
+# las franjas de color salían del doble de grosor que las de luz.
+_BURN_ZONAS = (12, 48, 100)
+_BURN_EXPR = (
+    "st(4, if(eq(PLANE,0),1,0.5))"
+    ";st(0, 30*ld(4)*sin(X/(31*ld(4)))*0.6 + 30*ld(4)*sin(X/(11*ld(4))+2.1)*0.4)"
+    ";st(1, H*(1-P)*1.25 - H*0.12 + ld(0))"
+    ";st(2, ld(1) - Y)"
+    f";st(5, {_BURN_ZONAS[0]}*ld(4));st(6, {_BURN_ZONAS[1]}*ld(4))"
+    f";st(7, {_BURN_ZONAS[2]}*ld(4))"
+    ";if(lt(ld(2),0), B,"
+    " if(lt(ld(2),ld(5)), if(eq(PLANE,0),252,if(eq(PLANE,1),124,146)),"
+    " if(lt(ld(2),ld(6)), if(eq(PLANE,0),178,if(eq(PLANE,1),58,214)),"
+    " if(lt(ld(2),ld(7)),"
+    " st(8,(ld(2)-ld(6))/(ld(7)-ld(6)));A*ld(8)"
+    " + (1-ld(8))*(if(eq(PLANE,0),28,if(eq(PLANE,1),118,142))),"
+    " A))))"
+)
+
+
+def _xfade_expr(ttype: str) -> str:
+    """Fragmento `transition=...` para el grafo de filtros.
+
+    Los `;` de la expresión hay que escaparlos: dentro de un filter_complex
+    separan filtros, y sin escapar ffmpeg parte el grafo por la mitad.
+    """
+    if ttype != "burn":
+        return f"transition={ttype}"
+    return "transition=custom:expr='" + _BURN_EXPR.replace(";", r"\;") + "'"
+
+
 def _xfade_clips(
     clip_paths: list[Path],
     specs: list[ClipSpec],
@@ -574,7 +622,7 @@ def _xfade_clips(
         out_label = f"x{i}"
         ttype, tdur = transitions[i - 1]
         filters.append(
-            f"[{prev}][{i}:v]xfade=transition={ttype}:"
+            f"[{prev}][{i}:v]xfade={_xfade_expr(ttype)}:"
             f"duration={tdur}:offset={offsets[i-1]:.3f}[{out_label}]"
         )
         prev = out_label

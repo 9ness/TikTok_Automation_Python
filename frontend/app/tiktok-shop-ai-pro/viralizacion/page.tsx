@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Palette, Rocket } from "lucide-react";
+import { ChevronDown, ExternalLink, Loader2, Palette, Rocket, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
@@ -13,6 +13,60 @@ import {
   useRoundPlan,
 } from "@/lib/queries/viralizacion";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
+
+/** Cuentas del mentor del curso que ya siguen esta misma estrategia.
+ *  Sirven de referencia viva: qué sube, con qué frecuencia y qué hashtags
+ *  usa. Se sabe que son suyas porque hace un año tienen vídeos orgánicos en
+ *  los que sale él. */
+const CUENTAS_EJEMPLO = [
+  { handle: "@danigumoficial", nota: "Reflexiones + b-roll, misma plantilla" },
+  { handle: "@rudyskateoficial", nota: "Pablo Motos, estilo Película vieja" },
+];
+
+function CuentasEjemplo() {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <section className="rounded-xl border border-border/60 bg-card">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold sm:text-sm"
+      >
+        <Users className="h-4 w-4 shrink-0 text-amber-500" />
+        <span className="flex-1">Cuentas de ejemplo</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            abierto ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {abierto && (
+        <div className="space-y-1.5 border-t border-border/60 p-3 pt-2.5">
+          <p className="text-[11px] text-muted-foreground">
+            Cuentas del mentor con esta misma estrategia — mira qué prueba, qué
+            sube y qué hashtags usa.
+          </p>
+          {CUENTAS_EJEMPLO.map((c) => (
+            <a
+              key={c.handle}
+              href={`https://www.tiktok.com/${c.handle}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-2 transition hover:border-foreground/30"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium">{c.handle}</p>
+                <p className="truncate text-[10px] text-muted-foreground">{c.nota}</p>
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function ViralizacionPage() {
   const openQueue = useDrawerStore((s) => s.openQueue);
@@ -96,6 +150,8 @@ export default function ViralizacionPage() {
           hacer crecer una cuenta hasta 1000 seguidores.
         </p>
       </header>
+
+      <CuentasEjemplo />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold sm:text-base">Ponentes</h2>

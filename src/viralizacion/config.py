@@ -326,7 +326,11 @@ FACE_SAMPLE_STEP_S = 1.0
 PAISAJES_SKIP_HEAD_S = 60.0
 PAISAJES_SKIP_TAIL_S = 60.0
 
-TRANSITION_HOOK = ("hblur", 0.35)
+# Papel quemado al pasar del gancho al b-roll: es la transición que usan las
+# cuentas del mentor y funciona en TODOS los estilos, así que va en config y
+# no por estilo. Dura más que el `hblur` de antes (0.35) porque el borde de
+# fuego tiene que recorrer la pantalla entera para leerse.
+TRANSITION_HOOK = ("burn", 0.75)
 TRANSITION_LANDSCAPE = ("fadeblack", 0.9)
 
 VOICE_VOLUME = 1.0
