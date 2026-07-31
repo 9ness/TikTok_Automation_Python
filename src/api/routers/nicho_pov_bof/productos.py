@@ -33,6 +33,8 @@ from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
     EchoTikCredsRequest,
     EchoTikCredsResponse,
+    HashtagsRequest,
+    HashtagsResponse,
     ProductoEstadoRequest,
     ProductoUrlRequest,
     ProductosUrlsRequest,
@@ -713,6 +715,26 @@ def guardar_echotik(body: EchoTikCredsRequest) -> EchoTikCredsResponse:
         origen="guardadas",
         mensaje="Credenciales guardadas y en uso" + (" (verificadas)" if body.probar else ""),
     )
+
+
+@router.get("/hashtags", response_model=HashtagsResponse)
+def get_hashtags() -> HashtagsResponse:
+    """Hashtags que se pegan al final de todos los captions."""
+    from src.nicho_pov_bof.repos import product_repo
+
+    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags())
+
+
+@router.post("/hashtags", response_model=HashtagsResponse)
+def set_hashtags(body: HashtagsRequest) -> HashtagsResponse:
+    """Guarda la lista completa (la UI manda siempre el conjunto entero)."""
+    from src.nicho_pov_bof.repos import product_repo
+
+    try:
+        tags = product_repo.save_hashtags(body.tags)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return HashtagsResponse(ok=True, tags=tags)
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)

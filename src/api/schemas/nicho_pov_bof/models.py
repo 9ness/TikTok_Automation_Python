@@ -239,3 +239,14 @@ class SoldProductsResponse(BaseModel):
     # (titulo, video_path, gancho, cta...) — el schema exacto por producto
     # ya lo valida `ProductoInfo`, aquí basta un dict de paso.
     items: list[dict]
+
+
+class HashtagsResponse(BaseModel):
+    ok: bool = True
+    # Hashtags que se pegan al final de TODOS los captions. Son de cuenta, no
+    # de producto: el operador los cambia por campaña.
+    tags: list[str] = Field(default_factory=list)
+
+
+class HashtagsRequest(BaseModel):
+    tags: list[str] = Field(default_factory=list)

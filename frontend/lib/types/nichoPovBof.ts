@@ -172,3 +172,9 @@ export interface VideoUploadResponse {
   job_id: string | null;
   message: string;
 }
+
+export interface HashtagsResponse {
+  ok: boolean;
+  /** Hashtags que se pegan al final de todos los captions. */
+  tags: string[];
+}

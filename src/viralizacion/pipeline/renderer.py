@@ -545,48 +545,52 @@ def _xfade_por_tandas(
 # Transición "papel quemado"
 # ---------------------------------------------------------------------------
 # La usan las cuentas del mentor (@danigumoficial, @rudyskateoficial) al pasar
-# del gancho al b-roll: un borde de fuego ondulado que se come el plano.
+# del gancho al b-roll: el paisaje entra POR ARRIBA y en el borde hay una
+# línea incandescente fina. A los dos lados la imagen queda NÍTIDA — no es una
+# disolución, es un corte con fuego en el filo.
 #
-# No hay `transition=burn` en ffmpeg y no queríamos depender de un vídeo de
-# stock, así que se pinta con `xfade=transition=custom`, que evalúa una
-# expresión por píxel. De arriba a abajo del borde hay cuatro zonas, que es lo
-# que hace que parezca fuego y no un barrido:
+# No existe `transition=burn` en ffmpeg y no hacía falta un vídeo de stock:
+# `transition=custom` evalúa una expresión por píxel y con eso basta. Dos
+# cosas costaron encontrarse:
 #
-#   ya quemado → B (el clip nuevo)
-#   0-12px     → blanco incandescente
-#   12-48px    → naranja
-#   48-100px   → carbón, desvaneciendo hacia el plano intacto
-#   más allá   → A (el clip viejo)
+#   - NO se puede usar `st()`/`ld()`. ffmpeg evalúa el filtro en paralelo por
+#     franjas y esas variables son COMPARTIDAS entre hilos: se pisan y cada
+#     fila coge basura de otra. El resultado parecía "borroso" pero era una
+#     carrera entre hilos. Por eso cada subexpresión va repetida en línea.
+#   - En `xfade` la `P` va de 1 a 0, no de 0 a 1. Sin el `(1-P)` la transición
+#     iba al revés (el gancho se comía al paisaje).
 #
-# `ld(4)` corrige que en yuv420p los planos de color miden la MITAD: sin eso
-# las franjas de color salían del doble de grosor que las de luz.
-_BURN_ZONAS = (12, 48, 100)
+# `_BURN_ESCALA_PLANO` corrige que en yuv420p los planos de color miden la
+# mitad: sin eso la línea salía del doble de grosor en color que en luz.
+_BURN_ESCALA_PLANO = "(if(eq(PLANE,0),1,0.5))"
+# Ondulación del filo: dos senos de periodo largo. Muy suave a propósito — en
+# la referencia el borde es casi recto, no una llama.
+_BURN_BORDE = (
+    f"((1-P)*H*1.06 - H*0.03"
+    f" + 9*{_BURN_ESCALA_PLANO}*sin(X/(95*{_BURN_ESCALA_PLANO})+0.6)"
+    f" + 4*{_BURN_ESCALA_PLANO}*sin(X/(31*{_BURN_ESCALA_PLANO})+2.2))"
+)
+_BURN_DIST = f"(Y - {_BURN_BORDE})"
+# Núcleo blanco incandescente y halo naranja, en YUV.
+_BURN_NUCLEO = "(if(eq(PLANE,0),253,if(eq(PLANE,1),126,142)))"
+_BURN_HALO = "(if(eq(PLANE,0),200,if(eq(PLANE,1),52,220)))"
+# Destello inicial: un fogonazo de luz justo al empezar a quemarse, como en
+# los vídeos de referencia. Solo sobre la luz, que en color viraría el tono.
+_BURN_DESTELLO = (
+    "(if(eq(PLANE,0), 80*exp(-pow(((1-P)-0.13)/0.085,2)), 0))"
+)
 _BURN_EXPR = (
-    "st(4, if(eq(PLANE,0),1,0.5))"
-    ";st(0, 30*ld(4)*sin(X/(31*ld(4)))*0.6 + 30*ld(4)*sin(X/(11*ld(4))+2.1)*0.4)"
-    ";st(1, H*(1-P)*1.25 - H*0.12 + ld(0))"
-    ";st(2, ld(1) - Y)"
-    f";st(5, {_BURN_ZONAS[0]}*ld(4));st(6, {_BURN_ZONAS[1]}*ld(4))"
-    f";st(7, {_BURN_ZONAS[2]}*ld(4))"
-    ";if(lt(ld(2),0), B,"
-    " if(lt(ld(2),ld(5)), if(eq(PLANE,0),252,if(eq(PLANE,1),124,146)),"
-    " if(lt(ld(2),ld(6)), if(eq(PLANE,0),178,if(eq(PLANE,1),58,214)),"
-    " if(lt(ld(2),ld(7)),"
-    " st(8,(ld(2)-ld(6))/(ld(7)-ld(6)));A*ld(8)"
-    " + (1-ld(8))*(if(eq(PLANE,0),28,if(eq(PLANE,1),118,142))),"
-    " A))))"
+    f"if(lt(abs({_BURN_DIST}),3*{_BURN_ESCALA_PLANO}),{_BURN_NUCLEO},"
+    f"if(lt(abs({_BURN_DIST}),11*{_BURN_ESCALA_PLANO}),{_BURN_HALO},"
+    f"if(lt({_BURN_DIST},0),B+{_BURN_DESTELLO},A+{_BURN_DESTELLO})))"
 )
 
 
 def _xfade_expr(ttype: str) -> str:
-    """Fragmento `transition=...` para el grafo de filtros.
-
-    Los `;` de la expresión hay que escaparlos: dentro de un filter_complex
-    separan filtros, y sin escapar ffmpeg parte el grafo por la mitad.
-    """
+    """Fragmento `transition=...` para el grafo de filtros."""
     if ttype != "burn":
         return f"transition={ttype}"
-    return "transition=custom:expr='" + _BURN_EXPR.replace(";", r"\;") + "'"
+    return f"transition=custom:expr='{_BURN_EXPR}'"
 
 
 def _xfade_clips(

@@ -126,3 +126,45 @@ def sold_products(source: str | None = None) -> list[dict]:
                         **prod,
                     })
     return out
+
+
+# ---------------------------------------------------------------------------
+# Hashtags del caption
+# ---------------------------------------------------------------------------
+# Van aparte del producto porque son los MISMOS para toda la cuenta: el
+# operador los cambia según la campaña del momento (#rebajasdeverano…) y se
+# pegan al final de cada caption. Guardarlos por producto obligaría a
+# editarlos diez veces.
+_HASHTAGS_KEY = "hashtags"
+# Los de la cuenta de referencia del mentor, como punto de partida.
+HASHTAGS_DEFECTO = ["#rebajasdeverano", "#tiktokshop", "#ofertas"]
+
+
+def get_hashtags() -> list[str]:
+    """Hashtags configurados. Si nunca se han tocado, los de partida."""
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return list(HASHTAGS_DEFECTO)
+    doc = r.get_json(_HASHTAGS_KEY)
+    if not isinstance(doc, dict) or "tags" not in doc:
+        return list(HASHTAGS_DEFECTO)
+    return [str(t) for t in (doc.get("tags") or []) if str(t).strip()]
+
+
+def save_hashtags(tags: list[str]) -> list[str]:
+    """Guarda la lista (ya normalizada) y la devuelve.
+
+    Una lista VACÍA es un estado válido: significa "no quiero hashtags", y
+    hay que poder distinguirlo de "nunca los he configurado".
+    """
+    limpios: list[str] = []
+    for t in tags:
+        t = str(t).strip().lstrip("#").strip()
+        if not t:
+            continue
+        tag = f"#{t}"
+        if tag.lower() not in {x.lower() for x in limpios}:
+            limpios.append(tag)
+    r = _require_redis()
+    r.set_json(_HASHTAGS_KEY, {"tags": limpios, "updated_at": _now()})
+    return limpios

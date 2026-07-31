@@ -3,6 +3,8 @@
 from .models import (
     EchoTikCredsRequest,
     EchoTikCredsResponse,
+    HashtagsRequest,
+    HashtagsResponse,
     BackupCheckResponse,
     BackupSyncRequest,
     BackupSyncResponse,
@@ -29,6 +31,8 @@ from .models import (
 __all__ = [
     "EchoTikCredsRequest",
     "EchoTikCredsResponse",
+    "HashtagsRequest",
+    "HashtagsResponse",
     "BackupCheckResponse",
     "BackupSyncRequest",
     "BackupSyncResponse",

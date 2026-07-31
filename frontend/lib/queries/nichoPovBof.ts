@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  HashtagsResponse,
   BackupCheckResponse,
   BackupSyncResponse,
   EchoTikCredsRequest,
@@ -207,6 +208,24 @@ export function useGuardarEchoTik() {
     mutationFn: (body) => api.post<EchoTikCredsResponse>(`${ROOT}/echotik`, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "echotik"] });
+    },
+  });
+}
+
+/** Hashtags de cuenta (los mismos para todos los captions). */
+export function useHashtags() {
+  return useQuery<string[]>({
+    queryKey: [...nichoPovBofKeys.all, "hashtags"] as const,
+    queryFn: async () => (await api.get<HashtagsResponse>(`${ROOT}/hashtags`)).tags ?? [],
+  });
+}
+
+export function useGuardarHashtags() {
+  const qc = useQueryClient();
+  return useMutation<HashtagsResponse, Error, string[]>({
+    mutationFn: (tags) => api.post<HashtagsResponse>(`${ROOT}/hashtags`, { tags }),
+    onSuccess: (res) => {
+      qc.setQueryData([...nichoPovBofKeys.all, "hashtags"], res.tags ?? []);
     },
   });
 }
