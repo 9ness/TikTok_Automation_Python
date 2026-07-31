@@ -59,6 +59,10 @@ class ViralizacionGenerateRequest(BaseModel):
     # Estilos elegidos: los vídeos se reparten entre ellos a partes iguales,
     # sin depender de cuántas rondas salgan del reparto de audios. Vacío = los 6.
     styles_pool: list[str] = Field(default_factory=list)
+    # Audios elegidos por ponente: {"pablo": ["pablo1_largo.mp3", ...]}.
+    # Vacío = todos los del banco. Sirve para tirar solo de los largos, que
+    # retienen más.
+    audios: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ViralizacionGenerateResponse(BaseModel):
@@ -80,3 +84,12 @@ class CuentasEjemploResponse(BaseModel):
 
 class CuentasEjemploRequest(BaseModel):
     cuentas: list[CuentaEjemplo] = Field(default_factory=list)
+
+
+class AudioItem(BaseModel):
+    nombre: str
+    duracion_s: float
+
+
+class AudiosListResponse(BaseModel):
+    items: list[AudioItem] = Field(default_factory=list)

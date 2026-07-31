@@ -10,7 +10,6 @@ Resiliencia:
 
 from __future__ import annotations
 
-import random
 import traceback
 import uuid
 from datetime import date
@@ -29,28 +28,54 @@ OnLog = Callable[[str], None]
 OnProgress = Callable[[float, str], None]
 
 
-def _rounds_per_audio(total: int, n_audios: int) -> list[int]:
-    """Cuántos vídeos salen de cada audio, repartidos LO MÁS PAREJO posible.
+def _audios_de(ponente: str, elegidos: dict[str, list[str]] | None) -> list:
+    """Audios a usar: los elegidos por el operador, o todos.
 
-    Antes se calculaba `ceil(total/n_audios)` y se iba dando ese tope a cada
-    uno hasta agotar: con 10 vídeos y 8 audios daba [2,2,2,2,2,0,0,0] y los
-    tres últimos NO se usaban nunca. El operador lo notó porque justo ahí
-    estaban los dos que mejor le funcionaban (el de más de un minuto y el de
-    Pau Donés).
-
-    Ahora: reparto entero y el resto se sortea entre los audios, para que las
-    "vueltas de más" no caigan siempre en los mismos.
+    Si lo que llega no casa con ningún fichero del banco se usan todos, en vez
+    de quedarse a cero: es preferible generar de más que no generar nada por
+    un nombre mal escrito.
     """
-    if n_audios <= 0:
+    todos = config.ponente_audio_files(ponente)
+    quiere = {n.strip() for n in (elegidos or {}).get(ponente, []) if n.strip()}
+    if not quiere:
+        return todos
+    filtrados = [a for a in todos if a.name in quiere]
+    return filtrados or todos
+
+
+def _rounds_per_audio(total: int, duraciones: list[float]) -> list[int]:
+    """Cuántos vídeos salen de cada audio. Los LARGOS se llevan los de más.
+
+    Dos cosas que costaron descubrirse:
+
+    1. Antes se calculaba `ceil(total/n)` y se daba ese tope a cada uno hasta
+       agotar: con 10 vídeos y 8 audios salía [2,2,2,2,2,0,0,0] y los tres
+       ÚLTIMOS no se usaban NUNCA. Ahí estaban justo los dos que mejor
+       funcionaban.
+    2. Los audios largos retienen más y son los que viralizan: de los vídeos
+       del operador, los dos más vistos salieron del único audio que pasaba
+       del minuto.
+
+    Así que: reparto entero para que todos entren, y las vueltas SOBRANTES
+    para los más largos. Si se piden menos vídeos que audios (base 0), se
+    quedan los `total` más largos.
+    """
+    n = len(duraciones)
+    if n <= 0:
         return []
-    base, resto = divmod(max(0, total), n_audios)
-    out = [base] * n_audios
-    for i in random.sample(range(n_audios), resto):
+    base, resto = divmod(max(0, total), n)
+    out = [base] * n
+    por_duracion = sorted(range(n), key=lambda i: duraciones[i], reverse=True)
+    for i in por_duracion[:resto]:
         out[i] += 1
     return out
 
 
-def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
+def preflight_check(
+    ponentes: list[str],
+    cantidad: dict[str, int],
+    audios_elegidos: dict[str, list[str]] | None = None,
+) -> list[str]:
     errors: list[str] = []
     for ponente in ponentes:
         if not config.is_known_ponente(ponente):
@@ -59,7 +84,7 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
         total = cantidad.get(ponente, 0)
         if total <= 0:
             continue
-        audios = config.ponente_audio_files(ponente)
+        audios = _audios_de(ponente, audios_elegidos)
         if not audios:
             errors.append(f"'{ponente}': no hay audios disponibles.")
             continue
@@ -83,12 +108,12 @@ def preflight_check(ponentes: list[str], cantidad: dict[str, int]) -> list[str]:
             errors.append(
                 f"'{ponente}': no hay ningún candidato de gancho detectado."
             )
-        rounds = _rounds_per_audio(total, len(audios))
+        duraciones = [ffprobe_duration(a) for a in audios]
+        rounds = _rounds_per_audio(total, duraciones)
         needed_paisajes = 0
-        for audio_path, n_rounds in zip(audios, rounds):
+        for audio_path, n_rounds, full_dur in zip(audios, rounds, duraciones):
             if n_rounds <= 0:
                 continue
-            full_dur = ffprobe_duration(audio_path)
             # Estimar con la ventana más larga posible por ronda (tope MAX).
             for ronda in range(1, n_rounds + 1):
                 _start, win_dur = config.audio_window_for_round(full_dur, ronda)
@@ -141,10 +166,13 @@ def run_batch(
     # partes iguales, independientemente de cuántas rondas salgan del reparto
     # de audios. Vacío = los 6.
     styles_pool: list[str] | None = None,
+    # Audios elegidos por el operador, por ponente. Vacío = todos los del
+    # banco. Permite tirar solo de los largos, que son los que retienen.
+    audios_elegidos: dict[str, list[str]] | None = None,
     on_log: OnLog = lambda _msg: None,
     on_progress: OnProgress = lambda _pct, _label: None,
 ) -> dict:
-    errors = preflight_check(ponentes, cantidad)
+    errors = preflight_check(ponentes, cantidad, audios_elegidos)
     if errors:
         raise RuntimeError("Validación previa falló:\n- " + "\n- ".join(errors))
 
@@ -180,13 +208,17 @@ def run_batch(
 
         hook_video = config.ponente_gancho_video(ponente)
         paisajes_video = config.paisajes_video()
-        audios = config.ponente_audio_files(ponente)
+        audios = _audios_de(ponente, audios_elegidos)
         n_audios = len(audios)
-        rounds_per_audio = _rounds_per_audio(n_total, n_audios)
+        duraciones_audio = [ffprobe_duration(a) for a in audios]
+        rounds_per_audio = _rounds_per_audio(n_total, duraciones_audio)
 
         on_log(
             f"[batch][{ponente}] {n_total} vídeos / {n_audios} audios → "
-            f"rondas por audio: {rounds_per_audio}"
+            + " · ".join(
+                f"{a.name} {d:.0f}s ×{n}"
+                for a, d, n in zip(audios, duraciones_audio, rounds_per_audio)
+            )
         )
 
         # Un estilo por vídeo, repartido a partes iguales entre los elegidos.

@@ -20,6 +20,8 @@ from src.api.schemas.viralizacion import (
     RoundPlan,
     RoundPlanResponse,
     StyleChoice,
+    AudioItem,
+    AudiosListResponse,
     CuentaEjemplo,
     CuentasEjemploRequest,
     CuentasEjemploResponse,
@@ -120,6 +122,26 @@ def set_cuentas_ejemplo(body: CuentasEjemploRequest) -> CuentasEjemploResponse:
     )
 
 
+@router.get("/audios", response_model=AudiosListResponse)
+def list_audios(ponente: Annotated[str, Query()]) -> AudiosListResponse:
+    """Audios del banco de un ponente, del más largo al más corto.
+
+    Se ordenan por duración porque es el criterio con el que el operador
+    elige: los largos retienen más y son los que le viralizan.
+    """
+    from src.viralizacion import config
+    from src.viralizacion.pipeline.ffmpeg_utils import ffprobe_duration
+
+    if not config.is_known_ponente(ponente):
+        raise APIError(f"Ponente desconocido: {ponente!r}", status_code=400)
+    items = [
+        AudioItem(nombre=a.name, duracion_s=round(ffprobe_duration(a), 1))
+        for a in config.ponente_audio_files(ponente)
+    ]
+    items.sort(key=lambda a: a.duracion_s, reverse=True)
+    return AudiosListResponse(items=items)
+
+
 @router.get("/estilos", response_model=StylesListResponse)
 def list_estilos() -> StylesListResponse:
     from src.viralizacion.pipeline import styles
@@ -183,7 +205,7 @@ def generate(
             details={"ponentes": ponentes, "cantidad": cantidad},
         )
 
-    errors = preflight_check(ponentes, cantidad)
+    errors = preflight_check(ponentes, cantidad, body.audios or None)
     if errors:
         raise InvalidEnqueueRequestError(
             "Validación previa falló:\n- " + "\n- ".join(errors),
@@ -200,6 +222,7 @@ def generate(
         "music_rounds": int(body.music_rounds),
         "round_styles": [s for s in (body.round_styles or []) if s],
         "styles_pool": [s for s in (body.styles_pool or []) if s],
+        "audios": {k: list(v) for k, v in (body.audios or {}).items() if v},
     }
     job = queue.enqueue(JobMode.VIRALIZACION_BATCH, title=title, params=params)
 
