@@ -113,18 +113,32 @@ def get_queue_state(
     # Cada uno ve LO SUYO. Un admin puede pedir la de otro o la de todos; a
     # quien no lo es se le ignora el parámetro (no basta con ocultarlo en la
     # interfaz: la URL se puede escribir a mano).
+    # Los trabajos de antes del multiusuario se guardaron como
+    # "api-key-user" (o sin dueño): son del admin, que era el único que había.
+    # Sin esto le desaparecerían de la cola al activar el filtro.
+    _HUERFANOS = {"", "api-key-user", "anonymous", "None"}
+
+    def _duenio(j) -> str:
+        quien = (j.enqueued_by or "").strip()
+        return "" if quien in _HUERFANOS else quien
+
     admin = users.es_admin(usuario)
     quiere = (de or "").strip() if admin else ""
     if quiere != "todos":
         objetivo = quiere or usuario
         if objetivo:
-            all_jobs = [j for j in all_jobs if (j.enqueued_by or "") == objetivo]
+            es_admin_objetivo = users.es_admin(objetivo)
+            all_jobs = [
+                j for j in all_jobs
+                # Al admin le tocan también los huérfanos (los de antes).
+                if _duenio(j) == objetivo or (es_admin_objetivo and not _duenio(j))
+            ]
 
     # Aviso para el admin: cuántos trabajos hay de los DEMÁS ahora mismo.
     otros: dict[str, int] = {}
     if admin:
         for j in queue.get_all():
-            duenio = (j.enqueued_by or "").strip()
+            duenio = _duenio(j)
             if duenio and duenio != usuario and j.status in (
                 JobStatus.PENDING, JobStatus.RUNNING
             ):

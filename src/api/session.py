@@ -14,7 +14,7 @@ import os
 import time
 from hashlib import sha256
 
-from fastapi import Request
+from fastapi import Request, WebSocket
 
 from src.api import users
 
@@ -63,8 +63,11 @@ def _verify(token: str, key: str) -> dict | None:
 
 
 
-def usuario_de_request(request: Request) -> str | None:
+def usuario_de_request(request: "Request | WebSocket") -> str | None:
     """Username del cookie, o None si no hay sesión válida.
+
+    Acepta también un `WebSocket`: la cola en vivo va por ahí y también tiene
+    que saber quién mira.
 
     En modo dev (sin `AUTH_COOKIE_KEY`) devuelve el usuario forzado por
     `WEB_USER` o el primero de la lista, para no exigir login en local.

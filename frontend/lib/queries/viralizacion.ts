@@ -69,6 +69,23 @@ export function useGuardarCuentasEjemplo() {
   });
 }
 
+export interface AudioItem {
+  nombre: string;
+  duracion_s: number;
+}
+
+/** Audios del banco de un ponente, del más largo al más corto. */
+export function useAudios(ponente: string | null) {
+  return useQuery<AudioItem[]>({
+    queryKey: [...viralizacionKeys.all, "audios", ponente ?? ""] as const,
+    queryFn: async () =>
+      (await api.get<{ items: AudioItem[] }>(
+        `${ROOT}/audios?ponente=${encodeURIComponent(ponente ?? "")}`,
+      )).items ?? [],
+    enabled: Boolean(ponente),
+  });
+}
+
 /** Cuántos vídeos caen en cada ronda — define cuántos selectores mostrar. */
 export function useRoundPlan(ponente: string | null, cantidad: number) {
   return useQuery<RoundPlanResponse>({

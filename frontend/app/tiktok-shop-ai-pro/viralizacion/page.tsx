@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  useAudios,
   useCuentasEjemplo,
   useGuardarCuentasEjemplo,
   type CuentaEjemplo,
@@ -133,12 +134,109 @@ function CuentasEjemplo() {
   );
 }
 
+/** mm:ss — es como el operador mira los audios (los elige por duración). */
+function mmss(segundos: number): string {
+  const s = Math.round(segundos);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Qué audios usar de un ponente. Sin marcar ninguno = todos.
+ *
+ *  Existe porque los audios LARGOS retienen más: los dos vídeos más vistos
+ *  del operador salieron del único que pasaba del minuto, así que quiere
+ *  poder tirar solo de esos. */
+function AudiosDePonente({
+  slug,
+  label,
+  elegidos,
+  onChange,
+}: {
+  slug: string;
+  label: string;
+  elegidos: string[];
+  onChange: (nombres: string[]) => void;
+}) {
+  const audios = useAudios(slug);
+  const items = audios.data ?? [];
+  if (audios.isLoading) {
+    return <p className="text-[11px] text-muted-foreground">Cargando audios…</p>;
+  }
+  if (!items.length) return null;
+
+  const marcado = (n: string) => elegidos.length === 0 || elegidos.includes(n);
+  const largos = items.filter((a) => a.duracion_s >= 60).map((a) => a.nombre);
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-border/60 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold">Audios de {label}</p>
+        <div className="flex gap-1">
+          {largos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(largos)}
+              className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
+            >
+              Solo +1 min ({largos.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
+          >
+            Todos
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {items.map((a) => (
+          <label
+            key={a.nombre}
+            className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-[11px] hover:bg-muted/40"
+          >
+            <input
+              type="checkbox"
+              checked={marcado(a.nombre)}
+              onChange={(e) => {
+                // La lista vacía significa "todos": al desmarcar el primero
+                // hay que materializarla, si no se entendería al revés.
+                const base = elegidos.length ? elegidos : items.map((x) => x.nombre);
+                const next = e.target.checked
+                  ? [...base, a.nombre]
+                  : base.filter((n) => n !== a.nombre);
+                onChange(next.length === items.length ? [] : next);
+              }}
+              className="h-3 w-3 shrink-0"
+            />
+            <span className="min-w-0 flex-1 truncate">{a.nombre.replace(/\.mp3$/i, "")}</span>
+            <span
+              className={`shrink-0 tabular-nums ${
+                a.duracion_s >= 60 ? "font-semibold text-emerald-500" : "text-muted-foreground"
+              }`}
+            >
+              {mmss(a.duracion_s)}
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        {elegidos.length === 0
+          ? `Se usarán los ${items.length}.`
+          : `Se usarán ${elegidos.length} de ${items.length}.`}
+      </p>
+    </div>
+  );
+}
+
 export default function ViralizacionPage() {
   const openQueue = useDrawerStore((s) => s.openQueue);
   const ponentesQuery = usePonentes();
   const generate = useGenerateViralizacion();
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  // Audios elegidos por ponente. Lista vacía = todos los del banco.
+  const [audiosPorPonente, setAudiosPorPonente] = useState<Record<string, string[]>>({});
   const [cantidad, setCantidad] = useState<Record<string, number>>({});
   const [nombreCuenta, setNombreCuenta] = useState("");
   // Sin música de fondo salvo que se marque a propósito.
@@ -193,6 +291,11 @@ export default function ViralizacionPage() {
       music_rounds: musicRounds,
       round_styles: roundStyles,
       styles_pool: stylesPool,
+      audios: Object.fromEntries(
+        selectedSlugs
+          .map((slug) => [slug, audiosPorPonente[slug] ?? []])
+          .filter(([, lista]) => (lista as string[]).length > 0),
+      ),
     };
     try {
       const res = await generate.mutateAsync(body);
@@ -276,6 +379,18 @@ export default function ViralizacionPage() {
                         }))
                       }
                       className="w-16 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+                    />
+                  </div>
+                )}
+                {isSelected && (
+                  <div className="pl-6">
+                    <AudiosDePonente
+                      slug={p.slug}
+                      label={p.label ?? p.slug}
+                      elegidos={audiosPorPonente[p.slug] ?? []}
+                      onChange={(nombres) =>
+                        setAudiosPorPonente((prev) => ({ ...prev, [p.slug]: nombres }))
+                      }
                     />
                   </div>
                 )}

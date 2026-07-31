@@ -35,6 +35,30 @@ logger = logging.getLogger("api.websockets.queue")
 DEFAULT_POLL_INTERVAL_S = 1.0
 
 
+# Trabajos de antes del multiusuario: se guardaron como "api-key-user" (o
+# sin dueño). Son del admin, que era el único que había.
+_SIN_DUENIO = {"", "api-key-user", "anonymous", "None"}
+
+
+def _duenio(job: Job) -> str:
+    quien = (job.enqueued_by or "").strip()
+    return "" if quien in _SIN_DUENIO else quien
+
+
+def _visible_para(job: Job, usuario: str, admin: bool) -> bool:
+    """Cada uno ve LO SUYO; el admin ve además los huérfanos.
+
+    Sin sesión (acceso por API key a secas) se ven todos: es el caso de una
+    máquina, no de una persona.
+    """
+    if not usuario:
+        return True
+    duenio = _duenio(job)
+    if duenio == usuario:
+        return True
+    return admin and not duenio
+
+
 def _job_payload(job: Job) -> dict[str, Any]:
     """Snapshot mínimo de un job para el WebSocket (subset de fields
     relevantes para la UI). Excluye `logs` por tamaño."""
@@ -121,11 +145,22 @@ class ConnectionManager:
     def active_count(self) -> int:
         return len(self._connections)
 
-    async def serve(self, websocket: WebSocket, queue: JobQueue) -> None:
+    async def serve(
+        self, websocket: WebSocket, queue: JobQueue, usuario: str = "",
+        admin: bool = False,
+    ) -> None:
         """Bucle principal por conexión: snapshot inicial + loop de polling
-        + recepción de pings del cliente. Termina cuando el cliente desconecta."""
+        + recepción de pings del cliente. Termina cuando el cliente desconecta.
+
+        `usuario` filtra lo que se manda: la cola es por persona. Va aquí y no
+        solo en el REST porque la interfaz se alimenta de ESTE socket — filtrar
+        únicamente el endpoint REST no habría servido de nada.
+        """
         # 1. Snapshot inicial
-        snapshot = {j.id: _job_payload(j) for j in queue.get_all()}
+        snapshot = {
+            j.id: _job_payload(j) for j in queue.get_all()
+            if _visible_para(j, usuario, admin)
+        }
         await self._send_json(websocket, {
             "type": "snapshot",
             "data": {"jobs": list(snapshot.values())},
@@ -133,7 +168,9 @@ class ConnectionManager:
 
         # 2. Tarea de polling concurrente con la recepción de mensajes
         recv_task = asyncio.create_task(self._receive_loop(websocket))
-        poll_task = asyncio.create_task(self._poll_loop(websocket, queue, snapshot))
+        poll_task = asyncio.create_task(
+            self._poll_loop(websocket, queue, snapshot, usuario, admin)
+        )
         try:
             done, pending = await asyncio.wait(
                 {recv_task, poll_task},
@@ -166,11 +203,16 @@ class ConnectionManager:
         websocket: WebSocket,
         queue: JobQueue,
         snapshot: dict[str, dict],
+        usuario: str = "",
+        admin: bool = False,
     ) -> None:
         try:
             while True:
                 await asyncio.sleep(self.poll_interval_s)
-                current = {j.id: _job_payload(j) for j in queue.get_all()}
+                current = {
+                    j.id: _job_payload(j) for j in queue.get_all()
+                    if _visible_para(j, usuario, admin)
+                }
                 updates, progress, removed = _diff_jobs(snapshot, current)
                 if updates:
                     await self._send_json(websocket, {
@@ -238,9 +280,15 @@ async def queue_ws(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="invalid api_key")
         return
 
+    # Quién mira: sale del cookie de sesión, igual que en el resto de la API.
+    from src.api import users
+    from src.api.session import usuario_de_request
+
+    quien = usuario_de_request(websocket) or ""
+
     await manager.connect(websocket)
     try:
-        await manager.serve(websocket, queue)
+        await manager.serve(websocket, queue, quien, users.es_admin(quien))
     except WebSocketDisconnect:
         pass
     except Exception as e:
