@@ -4,9 +4,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
+export interface UsuarioFicha {
+  username: string;
+  nombre: string;
+  rol: "admin" | "pro";
+  tiene_pin: boolean;
+}
+
 export interface MeResponse {
   username: string | null;
+  nombre?: string | null;
+  rol?: "admin" | "pro" | null;
   available_users: string[];
+  /** Ficha de cada usuario: sirve para saber quién tiene que CREAR su PIN
+   *  la primera vez y quién solo tiene que entrar. */
+  usuarios?: UsuarioFicha[];
 }
 
 export function useMe() {
@@ -27,6 +39,22 @@ export function useLogin() {
   >({
     mutationFn: (body) =>
       api.post<{ username: string; exp: number }>(`/api/v1/auth/login`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+}
+
+/** Primera entrada: elegir el PIN. Solo vale si ese usuario no tiene aún. */
+export function useCrearPin() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; username: string },
+    Error,
+    { username: string; pin: string; pin2: string }
+  >({
+    mutationFn: (body) =>
+      api.post<{ ok: boolean; username: string }>(`/api/v1/auth/crear-pin`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["auth", "me"] });
     },

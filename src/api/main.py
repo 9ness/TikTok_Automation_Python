@@ -91,6 +91,8 @@ from src.api.routers import (
     voices_sample_router,
 )
 from src.api.websockets import queue_ws_router
+from src.api.session import usuario_de_request
+from src.api import users as _users
 
 
 load_dotenv()
@@ -281,3 +283,38 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+# ---------------------------------------------------------------------------
+# Permisos por rol
+# ---------------------------------------------------------------------------
+# Los usuarios `pro` (Ana, Mauro) solo usan Tiktok Shop AI Pro. Esconder el
+# menú en el frontend no basta: la URL se escribe a mano, así que se corta
+# aquí. Se listan los prefijos PERMITIDOS, no los prohibidos — si mañana se
+# añade un programa nuevo, queda fuera por defecto en vez de quedar abierto
+# por olvido.
+_PREFIJOS_PRO = (
+    "/api/v1/viralizacion",
+    "/api/v1/nicho-pov-bof",
+    "/api/v1/queue",
+    "/api/v1/auth",
+    "/api/v1/health",
+    "/ws/queue",
+)
+
+
+@app.middleware("http")
+async def _permisos_por_rol(request, call_next):
+    ruta = request.url.path
+    if ruta.startswith("/api/") or ruta.startswith("/ws/"):
+        quien = usuario_de_request(request) or ""
+        if quien and not _users.es_admin(quien):
+            if not any(ruta.startswith(p) for p in _PREFIJOS_PRO):
+                from fastapi.responses import JSONResponse
+
+                return JSONResponse(
+                    {"error": "Tu usuario no tiene acceso a esta sección.",
+                     "code": "forbidden", "details": {}},
+                    status_code=403,
+                )
+    return await call_next(request)

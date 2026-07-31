@@ -145,8 +145,23 @@ const NAV: NavGroup[] = [
   },
 ];
 
+/** Qué ve cada rol. Los `pro` (Ana, Mauro) solo entran a subir productos:
+ *  dashboard, ajustes, costes o los otros programas no les hacen falta y
+ *  solo estorban. El backend además lo comprueba por su cuenta — esconder
+ *  el menú no basta, la URL se puede escribir a mano. */
+const BASES_PRO = ["/tiktok-shop-ai-pro"];
+
+function navPara(rol: string | null | undefined): NavGroup[] {
+  if (rol !== "pro") return NAV;
+  return NAV.filter((n) => {
+    const base = n.kind === "single" ? n.item.href : n.basePath;
+    return BASES_PRO.some((b) => base === b || base.startsWith(`${b}/`));
+  });
+}
+
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const me = useMe();
   // Estado de cada grupo expandido — auto-abrir si la ruta actual cae dentro.
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -192,7 +207,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {NAV.map((node) =>
+          {navPara(me.data?.rol).map((node) =>
             node.kind === "single" ? (
               <SidebarLink
                 key={node.item.href}

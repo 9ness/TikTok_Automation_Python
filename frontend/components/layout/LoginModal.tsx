@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
-import { useLogin, useMe } from "@/lib/queries/auth";
+import { useCrearPin, useLogin, useMe } from "@/lib/queries/auth";
 
 /** Modal de login que tapa toda la pantalla cuando no hay sesión.
  *  Solo se renderiza si `/api/v1/auth/me` devuelve `username === null`
@@ -17,9 +18,24 @@ import { useLogin, useMe } from "@/lib/queries/auth";
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const me = useMe();
   const login = useLogin();
+  const router = useRouter();
+  const pathname = usePathname();
+  const crearPin = useCrearPin();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [pin2, setPin2] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Un `pro` que abra la raíz (o cualquier sección que no es suya) acabaría
+  // en una página vacía llena de 403. Se le lleva a lo suyo.
+  const rol = me.data?.rol;
+  useEffect(() => {
+    if (!me.data?.username || rol !== "pro") return;
+    if (!pathname.startsWith("/tiktok-shop-ai-pro")) {
+      // typedRoutes exige la aserción: la ruta es literal y existe.
+      router.replace("/tiktok-shop-ai-pro/nicho-pov-bof" as never);
+    }
+  }, [me.data?.username, rol, pathname, router]);
 
   // Mientras carga el `/me`, mostramos el layout normal — los hijos pueden
   // que también requieran auth pero los queries fallarán con 401 y los
@@ -29,10 +45,27 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   if (me.data?.username) return <>{children}</>;
   // Sin sesión → bloqueo total con form de login.
 
+  // Quien no tiene PIN todavía es que entra por primera vez: en vez de
+  // pedirle una contraseña que no existe, se le hace elegirla.
+  const ficha = (me.data?.usuarios ?? []).find((u) => u.username === username);
+  const primeraVez = Boolean(username) && ficha != null && !ficha.tiene_pin;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
+      if (primeraVez) {
+        if (password !== pin2) {
+          setError("Los dos PIN no coinciden.");
+          return;
+        }
+        await crearPin.mutateAsync({
+          username: username.trim(), pin: password, pin2,
+        });
+        setPassword("");
+        setPin2("");
+        return;
+      }
       await login.mutateAsync({ username: username.trim(), password });
       setPassword("");
     } catch (err) {
@@ -67,7 +100,9 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             NebulabsAI
           </h1>
           <p className="text-xs text-muted-foreground">
-            Inicia sesión para continuar
+            {primeraVez
+              ? "Primera vez: elige tu PIN"
+              : "¿Quién eres?"}
           </p>
         </header>
 
@@ -84,11 +119,18 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
               required
             >
               <option value="">— elige usuario —</option>
-              {userOptions.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
+              {(me.data?.usuarios ?? []).length > 0
+                ? (me.data?.usuarios ?? []).map((u) => (
+                    <option key={u.username} value={u.username}>
+                      {u.nombre}
+                      {u.tiene_pin ? "" : " · crear PIN"}
+                    </option>
+                  ))
+                : userOptions.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
             </select>
           ) : (
             <Input
@@ -104,17 +146,38 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
         <div className="space-y-1.5">
           <Label htmlFor="password" className="text-xs">
-            Contraseña
+            {primeraVez ? "Elige tu PIN (mínimo 4)" : "PIN"}
           </Label>
           <Input
             id="password"
             type="password"
+            inputMode="numeric"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete={primeraVez ? "new-password" : "current-password"}
             required
           />
         </div>
+
+        {primeraVez && (
+          <div className="space-y-1.5">
+            <Label htmlFor="pin2" className="text-xs">
+              Repite el PIN
+            </Label>
+            <Input
+              id="pin2"
+              type="password"
+              inputMode="numeric"
+              value={pin2}
+              onChange={(e) => setPin2(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Se guarda en este dispositivo, no tendrás que escribirlo cada vez.
+            </p>
+          </div>
+        )}
 
         {error && (
           <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -126,14 +189,20 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           type="submit"
           size="lg"
           className="w-full"
-          disabled={login.isPending || !username || !password}
+          disabled={
+            login.isPending ||
+            crearPin.isPending ||
+            !username ||
+            !password ||
+            (primeraVez && !pin2)
+          }
         >
-          {login.isPending ? (
+          {login.isPending || crearPin.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <LogIn className="h-4 w-4" />
           )}
-          Entrar
+          {primeraVez ? "Crear PIN y entrar" : "Entrar"}
         </Button>
       </form>
     </div>
