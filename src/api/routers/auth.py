@@ -29,7 +29,9 @@ from hashlib import sha256
 from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel
 
+from src.api import users
 from src.api.dependencies import get_current_user
+from src.api.session import _cookie_config, _sign, _verify
 from src.api.exceptions import APIError, UnauthorizedError
 
 
@@ -41,71 +43,9 @@ router = APIRouter(
 
 
 def _available_users() -> list[str]:
-    """Lista de usuarios definidos en `.env` (USERNAME_*)."""
-    out: list[str] = []
-    for env_key, val in os.environ.items():
-        if env_key.startswith("USERNAME_") and val.strip():
-            out.append(val.strip())
-    return sorted(set(out))
-
-
-def _load_credentials() -> dict[str, str]:
-    """Devuelve {username: password_hash} leído de los pares
-    USERNAME_<KEY> / PASSWORD_HASH_<KEY> del entorno."""
-    creds: dict[str, str] = {}
-    keys: set[str] = set()
-    for env_key in os.environ:
-        if env_key.startswith("USERNAME_"):
-            keys.add(env_key[len("USERNAME_"):])
-    for k in keys:
-        username = os.getenv(f"USERNAME_{k}", "").strip()
-        pwd_hash = os.getenv(f"PASSWORD_HASH_{k}", "").strip()
-        if username and pwd_hash:
-            creds[username] = pwd_hash
-    return creds
-
-
-def _cookie_config() -> tuple[str, str, int]:
-    """(cookie_key, cookie_name, expiry_days). Lanza si falta cookie_key."""
-    key = os.getenv("AUTH_COOKIE_KEY", "").strip()
-    name = os.getenv("AUTH_COOKIE_NAME", "tiktok_factory_auth").strip() or "tiktok_factory_auth"
-    try:
-        days = int(os.getenv("AUTH_COOKIE_EXPIRY_DAYS", "30"))
-    except ValueError:
-        days = 30
-    return key, name, days
-
-
-def _sign(payload: dict, key: str) -> str:
-    """Devuelve `b64(payload).b64(hmac)`. Payload es JSON corto."""
-    body = base64.urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-    ).decode()
-    sig = hmac.new(key.encode(), body.encode(), sha256).digest()
-    sig_b = base64.urlsafe_b64encode(sig).decode()
-    return f"{body}.{sig_b}"
-
-
-def _verify(token: str, key: str) -> dict | None:
-    """Devuelve el payload si la firma es válida y no ha expirado, si no None."""
-    if not token or "." not in token:
-        return None
-    body, sig_b = token.rsplit(".", 1)
-    try:
-        expected = hmac.new(key.encode(), body.encode(), sha256).digest()
-        actual = base64.urlsafe_b64decode(sig_b.encode())
-    except Exception:
-        return None
-    if not hmac.compare_digest(expected, actual):
-        return None
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(body.encode()).decode())
-    except Exception:
-        return None
-    exp = payload.get("exp")
-    if isinstance(exp, (int, float)) and time.time() > exp:
-        return None
-    return payload
+    """Usuarios que pueden entrar. Ya no salen de `.env`: la lista vive en
+    `src/api/users.py`, con su rol."""
+    return [u["username"] for u in users.listar()]
 
 
 def _verify_password(password: str, bcrypt_hash: str) -> bool:
@@ -126,6 +66,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class CrearPinRequest(BaseModel):
+    username: str
+    pin: str
+    pin2: str
+
+
 @router.get("/me")
 def get_me(
     request: Request,
@@ -135,39 +81,92 @@ def get_me(
     `username` = null si no hay cookie válido. Fallback histórico (solo en
     modo dev sin AUTH_COOKIE_KEY): devuelve `WEB_USER` o el primer
     USERNAME_*."""
-    available = _available_users()
+    fichas = users.listar()
+    available = [u["username"] for u in fichas]
     cookie_key, cookie_name, _ = _cookie_config()
     # Modo dev: sin AUTH_COOKIE_KEY no exigimos login.
     if not cookie_key:
         forced = os.getenv("WEB_USER", "").strip()
+        quien = forced or (available[0] if available else "ness")
         return {
-            "username": forced or (available[0] if available else "ness"),
+            "username": quien,
+            "nombre": users.nombre_de(quien),
+            "rol": users.rol_de(quien),
             "available_users": available,
+            "usuarios": fichas,
         }
     token = request.cookies.get(cookie_name)
     payload = _verify(token, cookie_key) if token else None
     username = payload.get("u") if payload else None
-    # Validar que el user del cookie aún existe en .env (revocación
-    # implícita si borras al usuario del .env).
-    if username and username not in _load_credentials():
+    # Si el usuario desaparece de la lista, la sesión deja de valer.
+    if username and not users.existe(username):
         username = None
-    return {"username": username, "available_users": available}
+    return {
+        "username": username,
+        "nombre": users.nombre_de(username) if username else None,
+        "rol": users.rol_de(username) if username else None,
+        "available_users": available,
+        "usuarios": fichas,
+    }
+
+
+@router.post("/crear-pin")
+def crear_pin(payload: CrearPinRequest, response: Response) -> dict:
+    """Primera entrada de un usuario: elige su PIN y queda dentro.
+
+    Solo se permite si NO tiene PIN todavía. Cambiarlo después no se hace
+    aquí — para eso habría que estar identificado, y no hace falta hoy: son
+    tres personas y el PIN se lo pone cada una la primera vez.
+    """
+    if not users.existe(payload.username):
+        raise UnauthorizedError("Usuario desconocido.")
+    if users.tiene_pin(payload.username):
+        raise APIError(
+            "Este usuario ya tiene PIN. Entra con él.", status_code=409,
+        )
+    if payload.pin != payload.pin2:
+        raise APIError("Los dos PIN no coinciden.", status_code=400)
+    try:
+        users.guardar_pin(payload.username, payload.pin)
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    # Se entra directamente: acabar de crear el PIN y tener que escribirlo
+    # otra vez sería absurdo.
+    cookie_key, cookie_name, expiry_days = _cookie_config()
+    if cookie_key:
+        exp = int(time.time()) + expiry_days * 86400
+        token = _sign({"u": payload.username, "exp": exp}, cookie_key)
+        response.set_cookie(
+            key=cookie_name, value=token, max_age=expiry_days * 86400,
+            httponly=True, samesite="lax", secure=True, path="/",
+        )
+    return {
+        "ok": True,
+        "username": payload.username,
+        "nombre": users.nombre_de(payload.username),
+        "rol": users.rol_de(payload.username),
+    }
 
 
 @router.post("/login")
 def login(payload: LoginRequest, response: Response) -> dict:
-    creds = _load_credentials()
     cookie_key, cookie_name, expiry_days = _cookie_config()
     if not cookie_key:
         raise APIError(
             "Auth no configurada (falta AUTH_COOKIE_KEY en .env)."
         )
-    if not creds:
+    if not users.existe(payload.username):
+        raise UnauthorizedError("Usuario o contraseña inválidos.")
+    pwd_hash = users.hash_de(payload.username)
+    if not pwd_hash:
         raise APIError(
-            "No hay usuarios configurados (define USERNAME_X y PASSWORD_HASH_X en .env)."
+            "Este usuario todavía no tiene PIN. Créalo desde la pantalla de "
+            "entrada.", status_code=409,
         )
-    pwd_hash = creds.get(payload.username)
-    if not pwd_hash or not _verify_password(payload.password, pwd_hash):
+    if not _verify_password(payload.password, pwd_hash):
         raise UnauthorizedError("Usuario o contraseña inválidos.")
 
     exp = int(time.time()) + expiry_days * 86400

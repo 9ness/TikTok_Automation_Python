@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, Header, Query
+from fastapi import Request, Depends, Header, Query
 
 from src.api.config import APISettings, get_settings
 from src.api.exceptions import UnauthorizedError
@@ -70,6 +70,31 @@ def get_voice_repo(redis: Annotated[ShopRedis, Depends(get_redis)]) -> VoiceRepo
 
 def get_generation_repo(redis: Annotated[ShopRedis, Depends(get_redis)]) -> GenerationRepo:
     return GenerationRepo(redis)
+
+
+def get_web_user(request: Request) -> str:
+    """Quién está usando la app (persona), no la API key.
+
+    `get_current_user` devuelve `api-key-user`: sirve para AUTORIZAR, pero no
+    dice QUIÉN es. Esto lee el cookie firmado y da el username real, que es lo
+    que separa la cola y el progreso de cada uno.
+
+    Devuelve "" si no hay sesión — el caller decide si eso es un error.
+    """
+    from src.api.session import usuario_de_request
+
+    return usuario_de_request(request) or ""
+
+
+def exigir_admin(request: Request) -> str:
+    """Como `get_web_user` pero rechaza a quien no sea admin."""
+    from src.api import users
+    from src.api.session import usuario_de_request
+
+    quien = usuario_de_request(request) or ""
+    if not users.es_admin(quien):
+        raise UnauthorizedError("Hace falta ser administrador.")
+    return quien
 
 
 def get_current_user(

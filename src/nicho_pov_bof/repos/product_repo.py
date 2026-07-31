@@ -20,8 +20,28 @@ from contextlib import contextmanager
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 
+# Lo que es de CADA UNO y no se comparte. Todo lo demás (título, tienda,
+# caption, emojis, enlace de la ficha) es un dato objetivo del producto: sale
+# de la foto de Drive, cuesta llamadas de Gemini y de EchoTik conseguirlo, y
+# no cambia según quién lo mire. Compartirlo evita gastar la cuota tres veces
+# en el mismo producto.
+CAMPOS_PRIVADOS = frozenset({
+    "uploaded", "sold", "video_path", "video_listo_at",
+})
+
+
 def _key(source: str, folder: str) -> str:
+    """Documento COMPARTIDO de la carpeta (textos y enlaces)."""
     return f"folder:{source}:{folder}"
+
+
+def _key_privado(source: str, folder: str, usuario: str) -> str:
+    """Documento PRIVADO de un usuario para esa carpeta.
+
+    `ness` se queda en el documento compartido: es donde está su histórico y
+    moverlo sería reescribir meses de trabajo sin ganar nada.
+    """
+    return f"folder:{source}:{folder}:u:{usuario}"
 
 
 def _now() -> str:
@@ -38,6 +58,29 @@ def _require_redis():
     return r
 
 
+def _es_compartido(usuario: str) -> bool:
+    """`ness` escribe en el documento de siempre; el resto en el suyo."""
+    return not usuario or usuario == "ness"
+
+
+def load_folder_para(source: str, folder: str, usuario: str = "") -> dict:
+    """Carpeta vista por `usuario`: lo compartido + lo suyo por encima."""
+    base = load_folder(source, folder)
+    if _es_compartido(usuario):
+        return base
+    privado = get_nicho_pov_bof_redis().get_json(
+        _key_privado(source, folder, usuario)
+    ) or {}
+    productos = base.setdefault("productos", {})
+    # Lo privado de OTRO no debe verse: se quitan esos campos de la base y se
+    # ponen los del usuario que mira.
+    for pid, prod in productos.items():
+        for campo in CAMPOS_PRIVADOS:
+            prod.pop(campo, None)
+        prod.update((privado.get("productos") or {}).get(pid, {}))
+    return base
+
+
 def load_folder(source: str, folder: str) -> dict:
     """Estado de una carpeta. `{}` si aún no se ha guardado nada."""
     r = get_nicho_pov_bof_redis()
@@ -51,8 +94,12 @@ def save_folder(source: str, folder: str, data: dict) -> None:
     _require_redis().set_json(_key(source, folder), data)
 
 
-def get_product(source: str, folder: str, producto: str) -> dict:
-    return (load_folder(source, folder).get("productos") or {}).get(producto, {})
+def get_product(
+    source: str, folder: str, producto: str, usuario: str = ""
+) -> dict:
+    return (
+        load_folder_para(source, folder, usuario).get("productos") or {}
+    ).get(producto, {})
 
 
 @contextmanager
@@ -85,14 +132,39 @@ def _cerrojo_carpeta(source: str, folder: str, espera_s: float = 12.0):
             r.delete(clave)
 
 
-def update_product(source: str, folder: str, producto: str, **fields) -> dict:
+def update_product(
+    source: str, folder: str, producto: str, usuario: str = "", **fields
+) -> dict:
     """Parche parcial sobre un producto. Devuelve el producto ya actualizado.
 
-    Se lee-modifica-escribe el documento entero de la carpeta, así que va
-    dentro del cerrojo de carpeta (ver `_cerrojo_carpeta`).
+    Reparte los campos: lo privado (`CAMPOS_PRIVADOS`) va al documento del
+    usuario, el resto al compartido. Todo dentro del cerrojo de carpeta, que
+    es lo que evita que dos trabajos simultáneos se pisen.
     """
+    privados = {k: v for k, v in fields.items() if k in CAMPOS_PRIVADOS}
+    comunes = {k: v for k, v in fields.items() if k not in CAMPOS_PRIVADOS}
+
     with _cerrojo_carpeta(source, folder):
-        return _update_product_sin_cerrojo(source, folder, producto, **fields)
+        prod = {}
+        if comunes:
+            prod = _update_product_sin_cerrojo(source, folder, producto, **comunes)
+        if not privados:
+            return prod or get_product(source, folder, producto, usuario)
+        if _es_compartido(usuario):
+            return _update_product_sin_cerrojo(
+                source, folder, producto, **privados
+            )
+        clave = _key_privado(source, folder, usuario)
+        r = _require_redis()
+        doc = r.get_json(clave) or {}
+        productos = doc.setdefault("productos", {})
+        mio = productos.setdefault(producto, {})
+        mio.update({k: v for k, v in privados.items() if v is not None})
+        if mio.get("sold"):
+            mio["uploaded"] = True
+        mio["updated_at"] = _now()
+        r.set_json(clave, doc)
+        return {**prod, **mio}
 
 
 def _update_product_sin_cerrojo(

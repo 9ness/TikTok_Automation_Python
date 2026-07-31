@@ -11,8 +11,15 @@ from __future__ import annotations
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 
-def _key(source: str) -> str:
-    return f"completed:{source}"
+def _key(source: str, usuario: str = "") -> str:
+    """Clave del progreso. Es POR USUARIO: cada uno va por su carpeta.
+
+    El histórico (sin usuario) se conserva como clave de `ness`, que es quien
+    lo generó — así no pierde por dónde iba al separar las cuentas.
+    """
+    if not usuario or usuario == "ness":
+        return f"completed:{source}"
+    return f"completed:{source}:{usuario}"
 
 
 def _require_redis():
@@ -26,21 +33,21 @@ def _require_redis():
     return r
 
 
-def get_completed(source: str) -> set[str]:
+def get_completed(source: str, usuario: str = "") -> set[str]:
     """Nombres de carpeta marcados como completados en esta fuente."""
-    return set(_require_redis().smembers(_key(source)))
+    return set(_require_redis().smembers(_key(source, usuario)))
 
 
-def is_completed(source: str, folder: str) -> bool:
-    return _require_redis().sismember(_key(source), folder)
+def is_completed(source: str, folder: str, usuario: str = "") -> bool:
+    return _require_redis().sismember(_key(source, usuario), folder)
 
 
-def mark_completed(source: str, folder: str) -> None:
-    _require_redis().sadd(_key(source), folder)
+def mark_completed(source: str, folder: str, usuario: str = "") -> None:
+    _require_redis().sadd(_key(source, usuario), folder)
 
 
-def unmark_completed(source: str, folder: str) -> None:
+def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
     """Rollback — degrada en silencio si Redis no está (igual que viralización)."""
     r = get_nicho_pov_bof_redis()
     if r.is_available():
-        r.srem(_key(source), folder)
+        r.srem(_key(source, usuario), folder)

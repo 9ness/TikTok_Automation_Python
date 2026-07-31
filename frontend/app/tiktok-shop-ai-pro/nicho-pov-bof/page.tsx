@@ -573,67 +573,19 @@ export default function NichoPovBofPage() {
             <p className="text-sm font-semibold">Automatización de vídeos</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => copyText("Prompt imagen", prompts.data?.imagen)}
-              disabled={!prompts.data?.imagen}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
-            </button>
-            <button
-              type="button"
-              onClick={() => copyText("Prompt vídeo", prompts.data?.video)}
-              disabled={!prompts.data?.video}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              <Clapperboard className="h-3.5 w-3.5" /> Prompt vídeo
-            </button>
-          </div>
-
-          {/* Dos por fila también en móvil (antes se apilaban en cuatro
-              filas y ocupaban media pantalla). Las etiquetas van cortas y
-              con `truncate` para que quepan a media anchura. */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => void downloadCleanPhotos()}
-              disabled={downloadingPhotos || !productos.data?.length}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              {downloadingPhotos ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {downloadProgress}
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">Fotos ({conFoto}/{totalProductos})</span>
-                </>
-              )}
-            </button>
-            {/* Cuenta cuántos productos tienen ya vídeo: de un vistazo se ve
-                si falta alguno por montar sin repasar la lista entera. */}
-            <button
-              type="button"
-              onClick={() => void downloadVideos()}
-              disabled={downloadingVideos || !conVideo}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              {downloadingVideos ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {videoProgress}
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    Vídeos ({conVideo}/{totalProductos})
-                  </span>
-                </>
-              )}
-            </button>
+          {/* En el orden en que se usan: primero se sacan los textos,
+              luego se copian los prompts para generar fuera, y al final
+              se descarga. Antes estaban mezclados y no se sabía por dónde
+              empezar en una carpeta nueva. */}
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                1
+              </span>
+              <p className="text-[11px] font-semibold">Preparar</p>
+              <p className="truncate text-[10px] text-muted-foreground">textos y ficha del producto</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={runExtraerTextos}
@@ -674,6 +626,83 @@ export default function NichoPovBofPage() {
                 </>
               )}
             </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                2
+              </span>
+              <p className="text-[11px] font-semibold">Generar fuera</p>
+              <p className="truncate text-[10px] text-muted-foreground">copia el prompt y las fotos</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => copyText("Prompt imagen", prompts.data?.imagen)}
+              disabled={!prompts.data?.imagen}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
+            </button>
+            <button
+              type="button"
+              onClick={() => copyText("Prompt vídeo", prompts.data?.video)}
+              disabled={!prompts.data?.video}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              <Clapperboard className="h-3.5 w-3.5" /> Prompt vídeo
+            </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                3
+              </span>
+              <p className="text-[11px] font-semibold">Descargar</p>
+              <p className="truncate text-[10px] text-muted-foreground">fotos para generar · vídeos ya montados</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => void downloadCleanPhotos()}
+              disabled={downloadingPhotos || !productos.data?.length}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              {downloadingPhotos ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {downloadProgress}
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Fotos ({conFoto}/{totalProductos})</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void downloadVideos()}
+              disabled={downloadingVideos || !conVideo}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              {downloadingVideos ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {videoProgress}
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    Vídeos ({conVideo}/{totalProductos})
+                  </span>
+                </>
+              )}
+            </button>
+            </div>
           </div>
 
           {productos.isLoading && (
