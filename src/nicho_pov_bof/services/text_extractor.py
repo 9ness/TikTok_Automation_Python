@@ -44,11 +44,31 @@ def _load_system_prompt() -> str:
     return _PROMPT_PATH.read_text(encoding="utf-8")
 
 
+# Rellenos que devuelve el modelo cuando no ha sabido leer la imagen. El
+# prompt le pide que NUNCA deje un campo vacío (para que no se salte
+# productos), y el efecto secundario es que a veces escribe esto. Si se
+# colara, acabaría QUEMADO en el vídeo como si fuera el nombre del producto.
+_RELLENOS = (
+    "informacion no disponible", "información no disponible",
+    "no disponible", "no visible", "desconocido", "sin titulo",
+    "sin título", "n/a", "na", "-", "?",
+)
+
+
+def _es_relleno(valor: str) -> bool:
+    return valor.strip().strip(".").lower() in _RELLENOS
+
+
 def _is_valid_entry(entry: object) -> bool:
-    """Una entrada vale si es un dict con los 4 campos, todos string no vacío."""
+    """Vale si es un dict con los 4 campos, todos string no vacío y ninguno
+    un relleno del tipo "Información no disponible"."""
     if not isinstance(entry, dict):
         return False
-    return all(isinstance(entry.get(f), str) and entry.get(f).strip() for f in REQUIRED_FIELDS)
+    for f in REQUIRED_FIELDS:
+        v = entry.get(f)
+        if not isinstance(v, str) or not v.strip() or _es_relleno(v):
+            return False
+    return True
 
 
 def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> dict[str, dict]:
@@ -69,13 +89,23 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     photos = drive_client.list_photos(source, folder)
     pairs = photo_pairing.pair_folder(photos)
 
-    # Sin captura con título no hay de dónde sacar texto para ese producto.
-    usable = [p for p in pairs if p.get("titled")]
-    skipped = [p["producto"] for p in pairs if not p.get("titled")]
+    # Lo normal es leer la captura con título. Pero hay productos que en Drive
+    # solo tienen UNA foto, y a veces esa foto es el pantallazo de la
+    # DESCRIPCIÓN — que también lleva el nombre del producto y la tienda. Antes
+    # se omitían y el producto se quedaba "sin título" para siempre; ahora se
+    # manda lo que haya y que Gemini lea lo que pueda.
+    usable = [p for p in pairs if p.get("titled") or p.get("clean")]
+    skipped = [p["producto"] for p in pairs if not (p.get("titled") or p.get("clean"))]
     if skipped:
-        on_log(f"[text_extractor] sin captura con título, se omiten: {skipped}")
+        on_log(f"[text_extractor] sin ninguna foto, se omiten: {skipped}")
+    respaldo = [p["producto"] for p in usable if not p.get("titled")]
+    if respaldo:
+        on_log(
+            "[text_extractor] sin captura con título, se prueba con la única "
+            f"foto que hay: {respaldo}"
+        )
     if not usable:
-        on_log("[text_extractor] ninguna captura con título en la carpeta")
+        on_log("[text_extractor] ninguna foto utilizable en la carpeta")
         return {}
 
     # Descarga las capturas (cacheadas en disco por drive_client.fetch_photo,
@@ -85,7 +115,7 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     ids: list[str] = []
     image_paths: list[str] = []
     for pair in usable:
-        titled = pair["titled"]
+        titled = pair.get("titled") or pair["clean"]
         try:
             suffix = Path(titled.get("name", "")).suffix or ".jpg"
             path = drive_client.fetch_photo(titled["id"], suffix=suffix)
@@ -98,34 +128,53 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
         on_log("[text_extractor] no se pudo descargar ninguna captura")
         return {}
 
-    on_log(f"[text_extractor] pidiendo a Gemini {len(image_paths)} textos ({ids})…")
     system_prompt = _load_system_prompt()
-    user_prompt = (
-        "Identificadores en el MISMO orden que las imágenes adjuntas "
-        f"(imagen 1 = primer identificador, imagen 2 = segundo, etc.): "
-        f"{json.dumps(ids, ensure_ascii=False)}"
-    )
 
-    try:
-        raw = generate_json(system_prompt, user_prompt, images=image_paths)
-    except Exception as e:
-        # Gemini caído / cuota agotada / JSON inválido: sin textos esta vez,
-        # pero la carpeta sigue navegable — el operador puede reintentar el
-        # botón sin perder nada (las fotos ya están cacheadas en disco).
-        on_log(f"[text_extractor] Gemini falló: {e}")
-        return {}
+    def _pedir(lote_ids: list[str], lote_paths: list[str]) -> dict[str, dict]:
+        """Una llamada a Gemini con las imágenes dadas."""
+        on_log(f"[text_extractor] pidiendo a Gemini {len(lote_paths)} textos ({lote_ids})…")
+        user_prompt = (
+            "Identificadores en el MISMO orden que las imágenes adjuntas "
+            f"(imagen 1 = primer identificador, imagen 2 = segundo, etc.): "
+            f"{json.dumps(lote_ids, ensure_ascii=False)}"
+        )
+        try:
+            raw = generate_json(system_prompt, user_prompt, images=lote_paths)
+        except Exception as e:
+            # Gemini caído / cuota agotada / JSON inválido: sin textos esta
+            # vez, pero la carpeta sigue navegable — se puede reintentar el
+            # botón sin perder nada (las fotos ya están cacheadas en disco).
+            on_log(f"[text_extractor] Gemini falló: {e}")
+            return {}
+        if not isinstance(raw, dict):
+            on_log(
+                f"[text_extractor] Gemini devolvió un tipo inesperado: "
+                f"{type(raw).__name__}"
+            )
+            return {}
+        salida: dict[str, dict] = {}
+        for pid in lote_ids:
+            entry = raw.get(pid)
+            if _is_valid_entry(entry):
+                salida[pid] = {f: entry[f].strip() for f in REQUIRED_FIELDS}
+        return salida
 
-    if not isinstance(raw, dict):
-        on_log(f"[text_extractor] Gemini devolvió un tipo inesperado: {type(raw).__name__}")
-        return {}
+    result = _pedir(ids, image_paths)
 
-    result: dict[str, dict] = {}
-    for producto_id in ids:
-        entry = raw.get(producto_id)
-        if _is_valid_entry(entry):
-            result[producto_id] = {f: entry[f].strip() for f in REQUIRED_FIELDS}
-        else:
-            on_log(f"[text_extractor] respuesta incompleta para producto {producto_id}, se omite")
+    # Reintento de los que se hayan quedado fuera. En un lote de 10 imágenes
+    # el modelo se deja alguna suelta (pasó con una captura muy alta,
+    # 943x2048, que a solas sí leía bien). Cuesta UNA llamada más y solo
+    # cuando hace falta, así que sale a cuenta frente a dejar el producto sin
+    # título hasta que el operador se dé cuenta.
+    faltan = [i for i in ids if i not in result]
+    if faltan and len(faltan) < len(ids):
+        on_log(f"[text_extractor] reintentando los que faltan: {faltan}")
+        paths_faltan = [image_paths[ids.index(i)] for i in faltan]
+        result.update(_pedir(faltan, paths_faltan))
+
+    for pid in ids:
+        if pid not in result:
+            on_log(f"[text_extractor] sin texto utilizable para producto {pid}")
 
     on_log(f"[text_extractor] {len(result)}/{len(ids)} productos con texto extraído")
     return result

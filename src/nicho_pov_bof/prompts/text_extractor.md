@@ -87,11 +87,25 @@ suspende la cuenta.
 Así que **no devuelvas `gancho` ni `cta`**. Céntrate en `titulo`,
 `titulo_tiktok_completo`, `tienda` y `caption`.
 
+## Si la imagen es la pantalla de DESCRIPCIÓN
+
+Lo normal es que cada imagen sea la captura del producto con su título
+encima. Pero algún producto solo tiene en Drive el pantallazo de la
+**descripción** (un panel de texto con "Descripción del producto"). Ese
+también sirve: el nombre completo y la tienda salen arriba del panel.
+Sácalos de ahí igual y aplica las mismas reglas de traducir y acortar.
+
 ## Si una imagen no se lee bien
 
 Si el título, la tienda o cualquier otro dato no se distingue con claridad
 en la imagen, rellena ese campo con tu mejor estimación razonable — nunca
 lo dejes vacío ni inventes una tienda que no aparezca en absoluto.
+
+Lo que NO vale es escribir rellenos tipo `Información no disponible`, `No
+visible` o `N/A`: eso se quema en el vídeo como si fuera el nombre del
+producto. Aunque solo distingas parte del título, escribe esa parte — con la
+marca y dos palabras de qué es ya vale. Devuelve SIEMPRE una entrada por cada
+identificador que te den.
 
 ## Formato de salida — JSON ESTRICTO, sin texto adicional ni fences
 

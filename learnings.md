@@ -360,3 +360,5 @@
 - En una expresión de filtro ffmpeg NO se pueden usar `st()`/`ld()` si el filtro hace slice threading: esas variables son COMPARTIDAS entre hilos y cada franja pisa a las otras. El síntoma engaña — parece un difuminado o ruido, pero es una carrera. Hay que repetir las subexpresiones en línea.
 - En `xfade=transition=custom` la variable `P` va de 1 a 0, no de 0 a 1. Sin `(1-P)` la transición va al revés.
 - El sexo de la voz del Nicho POV BOF se deduce del título por palabras clave (cosmética, pelo, "mujer" literal → mujer; el resto → hombre). Ojo con los tratamientos capilares y los aceites corporales: son media lista de Freshly/Kertox y sin "capilar"/"estrias" caían en hombre.
+- Decirle a Gemini en el prompt "si no puedes leerlo es preferible que omitas ese producto" le da permiso para no intentarlo: devolvía `{}` en la imagen que le costaba. Hay que prohibir el relleno pero EXIGIR una entrada por identificador ("aunque solo distingas parte del título, escribe esa parte").
+- En un lote de 10 imágenes Gemini se deja alguna suelta de forma intermitente. Un reintento automático con solo las que faltan (1 llamada extra, solo cuando hace falta) lo resuelve.
