@@ -29,7 +29,7 @@ PRO = "pro"
 # El `key` es el username real (el que viaja en el cookie). `ness` se queda
 # como estaba a propósito: cambiarlo invalidaría su sesión y su contraseña.
 USUARIOS: dict[str, dict] = {
-    "ness": {"nombre": "Néstor", "rol": ADMIN},
+    "ness": {"nombre": "ness", "rol": ADMIN},
     "mauro": {"nombre": "Mauro", "rol": PRO},
     "ana": {"nombre": "Ana", "rol": PRO},
 }

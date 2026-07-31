@@ -156,9 +156,14 @@ def video_cache_dir() -> str:
     return os.path.join(root, "nicho_pov_bof_videos")
 
 
-def video_cache_path(folder: str, producto: str) -> str:
-    """Ruta de la copia local de un vídeo. Nombre plano y saneado."""
-    seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{producto}__{folder}")
+def video_cache_path(folder: str, producto: str, usuario: str = "") -> str:
+    """Ruta de la copia local de un vídeo. Nombre plano y saneado.
+
+    Lleva el usuario porque cada uno monta SU vídeo del mismo producto: sin
+    esto, Ana se descargaría el de ness.
+    """
+    quien = usuario or "ness"
+    seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{quien}__{producto}__{folder}")
     return os.path.join(video_cache_dir(), f"{seguro}.mp4")
 
 

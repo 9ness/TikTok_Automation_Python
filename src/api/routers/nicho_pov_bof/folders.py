@@ -19,7 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import FileResponse
 
-from src.api.dependencies import get_current_user, get_queue
+from src.api.dependencies import get_current_user, get_web_user, get_queue
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     BackupCheckResponse,
@@ -64,6 +64,7 @@ def list_sources() -> SourcesListResponse:
 def list_folders(
     source: Annotated[str, Query()],
     refresh: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FoldersListResponse:
     from src.nicho_pov_bof.repos import progress_repo
     from src.nicho_pov_bof.services import drive_client
@@ -75,7 +76,7 @@ def list_folders(
     except RuntimeError as e:
         raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
 
-    completed = progress_repo.get_completed(source)
+    completed = progress_repo.get_completed(source, usuario)
     items = [
         ProductFolder(name=f["name"], id=f["id"], completed=f["name"] in completed)
         for f in folders
@@ -196,7 +197,10 @@ def backup_sync_enqueue(
 
 
 @router.post("/complete", response_model=MarkCompletedResponse)
-def mark_completed(body: MarkCompletedRequest) -> MarkCompletedResponse:
+def mark_completed(
+    body: MarkCompletedRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> MarkCompletedResponse:
     from src.nicho_pov_bof.repos import progress_repo
     from src.nicho_pov_bof.services import drive_client
 
@@ -213,10 +217,10 @@ def mark_completed(body: MarkCompletedRequest) -> MarkCompletedResponse:
 
     try:
         if body.completed:
-            progress_repo.mark_completed(body.source, body.folder)
+            progress_repo.mark_completed(body.source, body.folder, usuario)
         else:
-            progress_repo.unmark_completed(body.source, body.folder)
-        completed = progress_repo.get_completed(body.source)
+            progress_repo.unmark_completed(body.source, body.folder, usuario)
+        completed = progress_repo.get_completed(body.source, usuario)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 

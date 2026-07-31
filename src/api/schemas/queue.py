@@ -37,6 +37,12 @@ class ActiveJobResponse(BaseModel):
 
 
 class QueueStateResponse(BaseModel):
+    # Multiusuario: de quién es la cola que se está viendo, si quien mira es
+    # admin, y cuántos trabajos activos tiene cada uno de los demás (para el
+    # aviso discreto del admin).
+    viendo: str = ""
+    es_admin: bool = False
+    activos_de_otros: dict[str, int] = Field(default_factory=dict)
     active_jobs: list[ActiveJobResponse]  # pending + running, en orden de cola
     pending_count: int
     running_count: int

@@ -27,7 +27,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from src.api.dependencies import get_current_user, get_queue
+from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
@@ -158,7 +158,7 @@ def _fotos_del_producto(
 
 def _producto_info(
     producto: str, prod: dict, source: str = "", folder: str = "",
-    queue: JobQueue | None = None,
+    queue: JobQueue | None = None, usuario: str = "",
 ) -> ProductoInfo:
     """Documento de Redis → respuesta de la API.
 
@@ -230,7 +230,7 @@ def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> s
 
 
 def _list_productos(
-    source: str, folder: str, queue: JobQueue | None = None,
+    source: str, folder: str, queue: JobQueue | None = None, usuario: str = "",
 ) -> ProductosListResponse:
     """Compone el emparejado de fotos (`photo_pairing`) con el estado
     guardado en Redis (`product_repo`). Reusada por `/productos` y
@@ -250,7 +250,8 @@ def _list_productos(
     photos = [drive_client.probe_dimensions(p) for p in photos]
     pairs = photo_pairing.pair_folder(photos)
 
-    folder_state = product_repo.load_folder(source, folder)
+    # Vista del usuario: textos y enlaces compartidos, su progreso privado.
+    folder_state = product_repo.load_folder_para(source, folder, usuario)
     guardados = folder_state.get("productos") or {}
     montandose = _productos_montandose(queue, source, folder)
 
@@ -316,14 +317,16 @@ def list_productos(
     source: Annotated[str, Query()],
     folder: Annotated[str, Query()],
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductosListResponse:
-    return _list_productos(source, folder, queue)
+    return _list_productos(source, folder, queue, usuario)
 
 
 @router.post("/extraer-textos", response_model=ProductosListResponse)
 def extraer_textos(
     body: ExtraerTextosRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductosListResponse:
     """Ejecuta la extracción de textos (Gemini, UNA llamada para toda la
     carpeta) y guarda el resultado. Síncrono a propósito — tarda ~1 min pero
@@ -342,7 +345,7 @@ def extraer_textos(
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
 
-    return _list_productos(body.source, body.folder, queue)
+    return _list_productos(body.source, body.folder, queue, usuario)
 
 
 @router.get("/foto-limpia")
@@ -400,7 +403,7 @@ def download_clean_photo(
 @router.post("/video/upload")
 async def upload_video(
     queue: Annotated[JobQueue, Depends(get_queue)],
-    operator: Annotated[str, Depends(get_current_user)],
+    operator: Annotated[str, Depends(get_web_user)],
     file: Annotated[UploadFile, File()],
     source: Annotated[str, Form()],
     folder: Annotated[str, Form()],
@@ -482,6 +485,7 @@ async def upload_video(
 def set_producto_estado(
     body: ProductoEstadoRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductoInfo:
     """Parche parcial de Subido/Vendió. `update_product` ya ignora los
     campos que vengan `None`, así que el caller puede mandar solo el que
@@ -490,19 +494,20 @@ def set_producto_estado(
 
     try:
         prod = product_repo.update_product(
-            body.source, body.folder, body.producto,
+            body.source, body.folder, body.producto, usuario=usuario,
             uploaded=body.uploaded, sold=body.sold,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    return _producto_info(body.producto, prod, body.source, body.folder, queue)
+    return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
 @router.post("/producto/url", response_model=ProductoInfo)
 def buscar_producto_url(
     body: ProductoUrlRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductoInfo:
     """Averigua la ficha de TikTok Shop del producto y la guarda.
 
@@ -512,11 +517,11 @@ def buscar_producto_url(
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import product_url
 
-    prod = product_repo.get_product(body.source, body.folder, body.producto)
+    prod = product_repo.get_product(body.source, body.folder, body.producto, usuario)
     if not prod:
         raise _bad_request(f"Producto {body.producto!r} no encontrado en {body.folder!r}.")
     if prod.get("product_url"):
-        return _producto_info(body.producto, prod, body.source, body.folder, queue)
+        return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
     titulo = prod.get("titulo_tiktok_completo") or prod.get("titulo") or ""
     if not titulo.strip():
@@ -529,19 +534,20 @@ def buscar_producto_url(
         # No es un error del servidor: EchoTik simplemente no lo indexa o el
         # parecido no daba para fiarse. Se devuelve el producto sin URL para
         # que la UI lo muestre como "no encontrado" en vez de romperse.
-        return _producto_info(body.producto, prod, body.source, body.folder, queue)
+        return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
     try:
         prod = product_repo.update_product(body.source, body.folder, body.producto, **hallado)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return _producto_info(body.producto, prod, body.source, body.folder, queue)
+    return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
 @router.post("/productos/urls", response_model=ProductosUrlsResponse)
 def buscar_urls_carpeta(
     body: ProductosUrlsRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductosUrlsResponse:
     """Busca la ficha de TikTok Shop de toda la carpeta de una tacada.
 
@@ -627,7 +633,7 @@ def buscar_urls_carpeta(
                 raise APIError(str(e), status_code=503) from e
             encontrados += 1
 
-    lista = _list_productos(body.source, body.folder, queue)
+    lista = _list_productos(body.source, body.folder, queue, usuario)
     return ProductosUrlsResponse(
         source=lista.source,
         folder=lista.folder,
@@ -652,6 +658,7 @@ def descargar_video(
     folder: Annotated[str, Query()],
     producto: Annotated[str, Query()],
     descargar: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
     """Sirve el vídeo YA montado del producto.
 
@@ -663,7 +670,7 @@ def descargar_video(
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    prod = product_repo.get_product(source, folder, producto)
+    prod = product_repo.get_product(source, folder, producto, usuario)
     ruta = (prod or {}).get("video_path") or ""
     if not ruta:
         raise APIError("Este producto todavía no tiene vídeo montado.", status_code=404)
@@ -672,14 +679,14 @@ def descargar_video(
     # el primer byte si el fichero no está en la caché de rclone (hay que
     # traerlo entero de Google); desde disco es instantáneo. Es lo que hacía
     # que al descargar varios seguidos alguno se quedara colgado.
-    p = Path(nicho_config.video_cache_path(folder, producto))
+    p = Path(nicho_config.video_cache_path(folder, producto, usuario))
     if not p.is_file():
         p = Path(ruta)
         # Se copia al vuelo para que la SIGUIENTE descarga ya sea rápida:
         # los vídeos montados antes de que existiera la caché no la tienen.
         if p.is_file():
             try:
-                destino = Path(nicho_config.video_cache_path(folder, producto))
+                destino = Path(nicho_config.video_cache_path(folder, producto, usuario))
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, destino)
                 p = destino

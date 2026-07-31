@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from fastapi.responses import FileResponse
 
 from src.api.config import APISettings, get_settings
-from src.api.dependencies import get_current_user, get_queue
+from src.api import users
+from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import (
     JobNotFoundError,
     UnauthorizedError,
@@ -95,11 +96,39 @@ def get_queue_state(
         description="CSV de modos para filtrar (ej. 'tiktok_shop,presidents'). Default: todos.",
     ),
     finished_limit: int = Query(default=5, ge=1, le=100),
+    de: str | None = Query(
+        default=None,
+        description=(
+            "De quién ver los trabajos. Solo un admin puede pedir los de "
+            "otro; 'todos' los mezcla. Por defecto, los propios."
+        ),
+    ),
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> QueueStateResponse:
     mode_filter = _parse_mode_filter(mode)
     all_jobs = queue.get_all()
     if mode_filter is not None:
         all_jobs = [j for j in all_jobs if j.mode in mode_filter]
+
+    # Cada uno ve LO SUYO. Un admin puede pedir la de otro o la de todos; a
+    # quien no lo es se le ignora el parámetro (no basta con ocultarlo en la
+    # interfaz: la URL se puede escribir a mano).
+    admin = users.es_admin(usuario)
+    quiere = (de or "").strip() if admin else ""
+    if quiere != "todos":
+        objetivo = quiere or usuario
+        if objetivo:
+            all_jobs = [j for j in all_jobs if (j.enqueued_by or "") == objetivo]
+
+    # Aviso para el admin: cuántos trabajos hay de los DEMÁS ahora mismo.
+    otros: dict[str, int] = {}
+    if admin:
+        for j in queue.get_all():
+            duenio = (j.enqueued_by or "").strip()
+            if duenio and duenio != usuario and j.status in (
+                JobStatus.PENDING, JobStatus.RUNNING
+            ):
+                otros[duenio] = otros.get(duenio, 0) + 1
     active = [
         j for j in all_jobs
         if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
@@ -111,6 +140,9 @@ def get_queue_state(
         pending_count=sum(1 for j in active if j.status == JobStatus.PENDING),
         running_count=sum(1 for j in active if j.status == JobStatus.RUNNING),
         recent_completed=[_to_response(j) for j in finished[:finished_limit]],
+        viendo=quiere or usuario or "",
+        es_admin=admin,
+        activos_de_otros=otros,
     )
 
 

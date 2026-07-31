@@ -1777,7 +1777,16 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         )
     # Nombre literal pedido por el módulo: "<producto> <folder>.mp4"
     # (p. ej. "1 Pront Flow.mp4"), agrupado bajo la carpeta de origen.
-    dest_dir = root / config.DRIVE_UPLOAD_ROOT / "videos" / folder
+    #
+    # Cada usuario tiene su subcarpeta: montan el MISMO producto por separado
+    # y el nombre del fichero es idéntico, así que sin esto el vídeo de uno
+    # sobrescribiría el del otro en Drive. `ness` se queda en la raíz de
+    # siempre para no mover su histórico.
+    quien = (job.enqueued_by or "").strip()
+    dest_dir = root / config.DRIVE_UPLOAD_ROOT / "videos"
+    if quien and quien != "ness":
+        dest_dir = dest_dir / quien
+    dest_dir = dest_dir / folder
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_path = dest_dir / f"{producto} {folder}.mp4"
     tmp_dest = dest_path.with_name(dest_path.name + ".part")
@@ -1790,7 +1799,7 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # antes del primer byte); desde disco es instantáneo. Se limpia sola a
     # los `VIDEO_CACHE_DIAS`.
     try:
-        cache = Path(config.video_cache_path(folder, producto))
+        cache = Path(config.video_cache_path(folder, producto, quien))
         cache.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(output_local, cache)
         borradas = config.limpiar_video_cache()
@@ -1805,8 +1814,8 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # el mismo nombre en cada montaje, así que sin esto el navegador seguiría
     # sirviendo el vídeo viejo de su caché.
     product_repo.update_product(
-        source, folder, producto, uploaded=True, video_path=str(dest_path),
-        video_listo_at=int(time.time()),
+        source, folder, producto, usuario=quien, uploaded=True,
+        video_path=str(dest_path), video_listo_at=int(time.time()),
     )
 
     # El bruto subido y el work_dir de escalones intermedios ya no hacen
