@@ -688,7 +688,9 @@ _GANCHO_TEXTO = "CUPÓN DESCUENTO"
 _CTA_TEXTO = "APROVECHA AHORA"
 # Emojis del gancho: familia de cupón/precio. Los del CTA: acción/mirar.
 _GANCHO_EMOJIS = ("🏷️", "🎟️", "💸", "💰", "💳", "🤑", "🔖", "👀")
-_CTA_EMOJIS = ("👇", "⬇️", "👀", "🔎", "✅", "👉", "🔥", "✨")
+# Sin 👉: el enlace del producto está ABAJO, y la flecha del vídeo apunta
+# abajo, así que un dedo a la derecha contradice a lo que se ve.
+_CTA_EMOJIS = ("👇", "⬇️", "👀", "🔎", "✅", "🔥", "✨")
 
 
 def textos_fijos(semilla: str) -> dict[str, str]:
