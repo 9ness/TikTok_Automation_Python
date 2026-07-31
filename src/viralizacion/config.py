@@ -307,10 +307,16 @@ FFMPEG_CLIP_PRESET = "ultrafast"
 FFMPEG_CLIP_CRF = 18
 
 HOOK_DUR = 3.0
-# 4,5s dejaba solo 14 clips de la biblioteca "aptos" (un clip aporta
-# `duración - CLIP_TRANSITION_PAD_S`), o sea 63s de b-roll como techo. Con 4,0
-# hay 24 aptos = ~99s, que cubre los audios largos. Medio segundo por corte no
-# se nota; quedarse corto de material sí.
+# Cuántos tramos de paisaje se PIDEN. Ojo: subirlo NO alarga los planos.
+# Medido contra la biblioteca real, subiéndolo de 4,0 a 4,6 el plano medio se
+# quedó igual (2,6s → 2,8s en un vídeo de 60s). El motivo es que el asignador
+# tiene que reunir clips hasta que la SUMA de lo aprovechable cubra el hueco,
+# y como cada clip solo aporta `duración - CLIP_TRANSITION_PAD_S` (≈2,6s de
+# los 3,9s que dura un plano típico), acaba usando cada clip A TOPE.
+#
+# O sea: la duración de cada paisaje ya está al máximo que da el material.
+# Para planos más largos hace falta metraje con planos más largos, no tocar
+# este número.
 PAISAJE_CLIP_TARGET_S = 4.0
 # A partir de aquí el reparto de paisajes prioriza planos largos. No es un
 # tope duro: es el punto donde importa más no reventar la memoria del xfade
@@ -326,12 +332,14 @@ FACE_SAMPLE_STEP_S = 1.0
 PAISAJES_SKIP_HEAD_S = 60.0
 PAISAJES_SKIP_TAIL_S = 60.0
 
-# Papel quemado al pasar del gancho al b-roll: es la transición que usan las
-# cuentas del mentor y funciona en TODOS los estilos, así que va en config y
-# no por estilo. Dura más que el `hblur` de antes (0.35) porque el borde de
-# fuego tiene que recorrer la pantalla entera para leerse.
-TRANSITION_HOOK = ("burn", 0.75)
-TRANSITION_LANDSCAPE = ("fadeblack", 0.9)
+# El paso del gancho al b-roll ya no tiene transición propia: usa la misma
+# que entre paisajes (ver `renderer.build_transitions`). Se conserva la
+# constante porque hay jobs viejos en cola que la referencian.
+TRANSITION_HOOK = ("fadeblack", 0.9)
+# 0,9s se veía brusco, pero cada décima que dura el fundido es una décima
+# MENOS de paisaje limpio (el fundido solapa los dos planos). Con 1,15s se
+# perdían 0,3s de cada paisaje, que ya son cortos. 1,05 es el punto medio.
+TRANSITION_LANDSCAPE = ("fadeblack", 1.05)
 
 VOICE_VOLUME = 1.0
 MUSIC_VOLUME = 0.75

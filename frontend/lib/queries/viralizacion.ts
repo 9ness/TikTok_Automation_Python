@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
@@ -37,6 +37,35 @@ export function useEstilos() {
   return useQuery<StylesListResponse>({
     queryKey: [...viralizacionKeys.all, "estilos"] as const,
     queryFn: () => api.get<StylesListResponse>(`${ROOT}/estilos`),
+  });
+}
+
+export interface CuentaEjemplo {
+  handle: string;
+  nota: string;
+}
+
+/** Cuentas de TikTok de referencia. Se guardan en Redis: el operador las
+ *  añade sobre la marcha y no tiene sentido desplegar por cada una. */
+export function useCuentasEjemplo() {
+  return useQuery<CuentaEjemplo[]>({
+    queryKey: [...viralizacionKeys.all, "cuentas-ejemplo"] as const,
+    queryFn: async () =>
+      (await api.get<{ cuentas: CuentaEjemplo[] }>(`${ROOT}/cuentas-ejemplo`))
+        .cuentas ?? [],
+  });
+}
+
+export function useGuardarCuentasEjemplo() {
+  const qc = useQueryClient();
+  return useMutation<{ cuentas: CuentaEjemplo[] }, Error, CuentaEjemplo[]>({
+    mutationFn: (cuentas) =>
+      api.post<{ cuentas: CuentaEjemplo[] }>(`${ROOT}/cuentas-ejemplo`, { cuentas }),
+    onSuccess: (res) => {
+      qc.setQueryData(
+        [...viralizacionKeys.all, "cuentas-ejemplo"], res.cuentas ?? [],
+      );
+    },
   });
 }
 

@@ -66,3 +66,17 @@ class ViralizacionGenerateResponse(BaseModel):
     title: str
     position_in_queue: int
     total_videos: int
+
+
+class CuentaEjemplo(BaseModel):
+    handle: str = ""
+    nota: str = ""
+
+
+class CuentasEjemploResponse(BaseModel):
+    ok: bool = True
+    cuentas: list[CuentaEjemplo] = Field(default_factory=list)
+
+
+class CuentasEjemploRequest(BaseModel):
+    cuentas: list[CuentaEjemplo] = Field(default_factory=list)

@@ -247,7 +247,10 @@ def _mota_sucia(img, rnd) -> None:
 
     w, h = img.size
     x, y = rnd.randrange(w), rnd.randrange(h)
-    alpha = rnd.randint(120, 245)
+    # Punto medio buscado en dos pasadas con el operador: con 55-175 no veía
+    # el polvo, con 120-245 tapaba demasiado ("que no se note tanto la
+    # suciedad negra"). Se nota que está sin comerse el plano.
+    alpha = rnd.randint(70, 150)
     negro = (0, 0, 0, alpha)
     forma = rnd.random()
 
@@ -283,34 +286,71 @@ def _mota_sucia(img, rnd) -> None:
     img.alpha_composite(sprite, (x, y))
 
 
-def _dust_plate(work: Path, idx: int, dots: int) -> Path:
-    """Lámina PNG transparente con suciedad de película, para superponer a la
-    deriva.
+# Cuántos fotogramas distintos de suciedad se generan, y a cuántos por
+# segundo se pasan. La suciedad de una película CAMBIA de un fotograma a
+# otro: no es una textura que se desliza.
+#
+# El ritmo importa tanto como el cambio: a 15/s quedaba nervioso, como
+# interferencia. A 7/s la suciedad "respira" — es el ritmo de la referencia
+# que pasó el operador. Con 30 fotogramas el ciclo dura ~4,3s.
+_DUST_FRAMES = 30
+_DUST_FPS = 7
+# Se sube al cambiar el dibujo de las motas, para invalidar la caché en disco.
+_DUST_VERSION = 2
+# Movimiento DIAGONAL muy lento encima del cambio de fotograma. En los vídeos
+# de referencia la porquería baja en diagonal; a esta velocidad no se lee como
+# una lámina deslizándose (para eso está el cambio de fotograma), solo le
+# quita el aire de "sellos estampados siempre en el mismo sitio".
+#
+# Va con un seno, no en línea recta: la lámina solo tiene 162px de holgura en
+# X y 288 en Y, y con una deriva lineal de 9 px/s un vídeo de 130s la movería
+# 1170px — se vería el borde. El seno queda acotado por construcción.
+_DUST_VAIVEN_X = 70.0
+_DUST_VAIVEN_Y = 120.0
+_DUST_VAIVEN_FX = 0.11
+_DUST_VAIVEN_FY = 0.08
 
-    Se intentó dibujar cada mota con `drawbox` + `enable`: para que hubiera
-    unas cuantas en pantalla a la vez hacían falta cientos de filtros y aun
-    así no se movían (`drawbox` no puede animar su posición — su `t` es el
-    grosor). Con una lámina que se desplaza basta UN `overlay` (que sí evalúa
-    `t` en x/y) para tener decenas de motas moviéndose, y entrando y saliendo
-    del encuadre porque la lámina es más grande que el vídeo.
+
+def _dust_sequence(work: Path, idx: int, dots: int) -> tuple[Path, int]:
+    """Secuencia PNG de suciedad de película. Devuelve (patrón, nº frames).
+
+    Se cachea en `config.cache_folder()` y NO en el temporal del render:
+    generar 30 láminas cuesta ~10s por capa, y son idénticas para todos los
+    vídeos. En una tanda de 25 eso eran ~8 minutos de nada.
+
+    Antes esto era UNA lámina que se desplazaba por el encuadre, y se notaba:
+    todas las motas viajaban en bloque, como una calcomanía deslizándose por
+    encima del vídeo. La suciedad de verdad aparece y desaparece en cada
+    fotograma, sin relación entre uno y el siguiente.
     """
     from PIL import Image, ImageFilter
 
-    out = work / f"dust_{idx}_{dots}.png"
-    if out.is_file():
-        return out
-    out.parent.mkdir(parents=True, exist_ok=True)
-    w = int(config.TARGET_W * 1.5)
-    h = int(config.TARGET_H * 1.5)
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    # Semilla fija por lámina: las dos capas tienen que ser distintas entre
-    # sí, pero no hace falta que cambien en cada render (el anti-fingerprint
-    # lo pone la deriva, que sí se sortea).
+    # `_DUST_VERSION` en el nombre: las láminas se cachean entre vídeos, así
+    # que al cambiar cómo se dibujan (opacidad, formas…) hay que invalidar lo
+    # guardado o se seguirían usando las viejas para siempre.
+    carpeta = work / f"dust_seq_v{_DUST_VERSION}_{idx}_{dots}"
+    patron = carpeta / "d_%03d.png"
+    if carpeta.is_dir() and len(list(carpeta.glob("d_*.png"))) >= _DUST_FRAMES:
+        return patron, _DUST_FRAMES
+    carpeta.mkdir(parents=True, exist_ok=True)
+    # Algo más grande que el encuadre: con la deriva diagonal, una lámina
+    # justa dejaría ver el borde por arriba y por la izquierda.
+    w = int(config.TARGET_W * 1.15)
+    h = int(config.TARGET_H * 1.15)
+    # Semilla fija por capa: dos capas tienen que ser distintas entre sí, pero
+    # no hace falta regenerarlas en cada render (se cachean en disco).
     rnd = random.Random(4200 + idx)
-    for _ in range(dots):
-        _mota_sucia(img, rnd)
-    img.filter(ImageFilter.GaussianBlur(0.6)).save(out)
-    return out
+    for f in range(_DUST_FRAMES):
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        # Cuántas motas hay en ESTE fotograma: varía, porque en una película
+        # unos fotogramas salen limpios y otros llenos de porquería.
+        n = max(1, int(dots * rnd.uniform(0.45, 1.25)))
+        for _ in range(n):
+            _mota_sucia(img, rnd)
+        img.filter(ImageFilter.GaussianBlur(0.6)).save(
+            carpeta / f"d_{f:03d}.png"
+        )
+    return patron, _DUST_FRAMES
 
 
 def _jittered_eq_filter(extra: dict) -> str:
@@ -354,11 +394,16 @@ def build_transitions(n_clips: int, style: "StylePreset | None" = None) -> list[
     lo, hi = config.TRANSITION_LANDSCAPE_JITTER_RANGE
     # El jitter escala la duración base del estilo, no una constante global.
     scale = tbase / config.TRANSITION_LANDSCAPE[1] if config.TRANSITION_LANDSCAPE[1] else 1.0
-    landscape = [
+    # El paso del gancho al primer paisaje usa LA MISMA transición que el
+    # resto. Se probó una de papel quemado (el borde de fuego bajando) porque
+    # aparecía en unas cuentas de referencia, pero el operador comprobó que en
+    # los vídeos que llevan el filtro de película no la usan: va el mismo
+    # fundido que entre paisajes. Una transición distinta solo para el primer
+    # corte llama la atención y rompe el ritmo.
+    return [
         (ttype, round(random.uniform(lo, hi) * scale, 3))
-        for _ in range(n_clips - 2)
+        for _ in range(n_clips - 1)
     ]
-    return [config.TRANSITION_HOOK] + landscape
 
 
 def build_clip_specs(
@@ -541,58 +586,6 @@ def _xfade_por_tandas(
     return _xfade_clips(parciales, specs_parciales, trans_entre, out_path, on_log)
 
 
-# ---------------------------------------------------------------------------
-# Transición "papel quemado"
-# ---------------------------------------------------------------------------
-# La usan las cuentas del mentor (@danigumoficial, @rudyskateoficial) al pasar
-# del gancho al b-roll: el paisaje entra POR ARRIBA y en el borde hay una
-# línea incandescente fina. A los dos lados la imagen queda NÍTIDA — no es una
-# disolución, es un corte con fuego en el filo.
-#
-# No existe `transition=burn` en ffmpeg y no hacía falta un vídeo de stock:
-# `transition=custom` evalúa una expresión por píxel y con eso basta. Dos
-# cosas costaron encontrarse:
-#
-#   - NO se puede usar `st()`/`ld()`. ffmpeg evalúa el filtro en paralelo por
-#     franjas y esas variables son COMPARTIDAS entre hilos: se pisan y cada
-#     fila coge basura de otra. El resultado parecía "borroso" pero era una
-#     carrera entre hilos. Por eso cada subexpresión va repetida en línea.
-#   - En `xfade` la `P` va de 1 a 0, no de 0 a 1. Sin el `(1-P)` la transición
-#     iba al revés (el gancho se comía al paisaje).
-#
-# `_BURN_ESCALA_PLANO` corrige que en yuv420p los planos de color miden la
-# mitad: sin eso la línea salía del doble de grosor en color que en luz.
-_BURN_ESCALA_PLANO = "(if(eq(PLANE,0),1,0.5))"
-# Ondulación del filo: dos senos de periodo largo. Muy suave a propósito — en
-# la referencia el borde es casi recto, no una llama.
-_BURN_BORDE = (
-    f"((1-P)*H*1.06 - H*0.03"
-    f" + 9*{_BURN_ESCALA_PLANO}*sin(X/(95*{_BURN_ESCALA_PLANO})+0.6)"
-    f" + 4*{_BURN_ESCALA_PLANO}*sin(X/(31*{_BURN_ESCALA_PLANO})+2.2))"
-)
-_BURN_DIST = f"(Y - {_BURN_BORDE})"
-# Núcleo blanco incandescente y halo naranja, en YUV.
-_BURN_NUCLEO = "(if(eq(PLANE,0),253,if(eq(PLANE,1),126,142)))"
-_BURN_HALO = "(if(eq(PLANE,0),200,if(eq(PLANE,1),52,220)))"
-# Destello inicial: un fogonazo de luz justo al empezar a quemarse, como en
-# los vídeos de referencia. Solo sobre la luz, que en color viraría el tono.
-_BURN_DESTELLO = (
-    "(if(eq(PLANE,0), 80*exp(-pow(((1-P)-0.13)/0.085,2)), 0))"
-)
-_BURN_EXPR = (
-    f"if(lt(abs({_BURN_DIST}),3*{_BURN_ESCALA_PLANO}),{_BURN_NUCLEO},"
-    f"if(lt(abs({_BURN_DIST}),11*{_BURN_ESCALA_PLANO}),{_BURN_HALO},"
-    f"if(lt({_BURN_DIST},0),B+{_BURN_DESTELLO},A+{_BURN_DESTELLO})))"
-)
-
-
-def _xfade_expr(ttype: str) -> str:
-    """Fragmento `transition=...` para el grafo de filtros."""
-    if ttype != "burn":
-        return f"transition={ttype}"
-    return f"transition=custom:expr='{_BURN_EXPR}'"
-
-
 def _xfade_clips(
     clip_paths: list[Path],
     specs: list[ClipSpec],
@@ -626,7 +619,7 @@ def _xfade_clips(
         out_label = f"x{i}"
         ttype, tdur = transitions[i - 1]
         filters.append(
-            f"[{prev}][{i}:v]xfade={_xfade_expr(ttype)}:"
+            f"[{prev}][{i}:v]xfade=transition={ttype}:"
             f"duration={tdur}:offset={offsets[i-1]:.3f}[{out_label}]"
         )
         prev = out_label
@@ -732,31 +725,26 @@ def _finalize(
             return entrada
         etiqueta = entrada
         for i in range(capas):
-            plate = _dust_plate(ass_path.parent, i, dots=90)
-            idx = add_input(["-loop", "1", "-t", f"{target_duration:.3f}", "-i", str(plate)])
-            # La lámina es 1.5× el encuadre, así que hay holgura para moverla
-            # sin que se vea el borde: 540px de margen en X y 960 en Y.
-            #
-            # El movimiento es un VAIVÉN, no una deriva. Antes iba a 11 px/s
-            # (100 segundos en cruzar la pantalla): la suciedad parecía
-            # clavada, y la de una película salta constantemente. Con una
-            # deriva rápida no valdría — a 200 px/s la lámina se saldría del
-            # encuadre en 3 segundos. Un seno va rápido y no se sale nunca.
-            #
-            # Cada capa lleva su propia frecuencia y fase; dos capas al mismo
-            # ritmo se leerían como una sola textura pegada.
-            cx, cy = -int(config.TARGET_W * 0.25), -int(config.TARGET_H * 0.25)
-            ax = random.uniform(150, 235)
-            ay = random.uniform(240, 430)
-            fx = random.uniform(1.7, 3.4)
-            fy = random.uniform(1.5, 3.1)
-            ph = random.uniform(0, 6.28)
+            patron, _n = _dust_sequence(config.cache_folder(), i, dots=90)
+            # `-stream_loop -1` repite la secuencia todo el vídeo; el
+            # `framerate` decide cada cuánto salta la suciedad. NO se mueve la
+            # lámina: el cambio de fotograma ya es el movimiento.
+            idx = add_input([
+                "-framerate", str(_DUST_FPS),
+                "-stream_loop", "-1",
+                "-t", f"{target_duration:.3f}",
+                "-i", str(patron),
+            ])
+            # Cada capa con su fase, para que no se lean como una sola.
+            cx = -int(config.TARGET_W * 0.075)
+            cy = -int(config.TARGET_H * 0.075)
+            ph = 1.9 * i
             salida = f"dust{i}"
             filters.append(
                 f"[{etiqueta}][{idx}:v]overlay="
-                f"x='{cx}+({ax:.0f})*sin({fx:.2f}*t+{ph:.2f})'"
-                f":y='{cy}+({ay:.0f})*cos({fy:.2f}*t+{ph:.2f})'"
-                f":eval=frame:format=auto[{salida}]"
+                f"x='{cx}+{_DUST_VAIVEN_X:.0f}*sin({_DUST_VAIVEN_FX}*t+{ph:.1f})'"
+                f":y='{cy}+{_DUST_VAIVEN_Y:.0f}*sin({_DUST_VAIVEN_FY}*t+{ph:.1f})'"
+                f":eval=frame:format=auto:shortest=0[{salida}]"
             )
             etiqueta = salida
         return etiqueta

@@ -20,6 +20,9 @@ from src.api.schemas.viralizacion import (
     RoundPlan,
     RoundPlanResponse,
     StyleChoice,
+    CuentaEjemplo,
+    CuentasEjemploRequest,
+    CuentasEjemploResponse,
     StylesListResponse,
     ViralizacionGenerateRequest,
     ViralizacionGenerateResponse,
@@ -88,6 +91,33 @@ def list_carpetas() -> CarpetasListResponse:
     from src.viralizacion.services import drive_uploader
 
     return CarpetasListResponse(items=drive_uploader.list_carpetas())
+
+
+@router.get("/cuentas-ejemplo", response_model=CuentasEjemploResponse)
+def get_cuentas_ejemplo() -> CuentasEjemploResponse:
+    """Cuentas de TikTok de referencia que mira el operador."""
+    from src.viralizacion.repos import cuentas_repo
+
+    return CuentasEjemploResponse(
+        ok=True,
+        cuentas=[CuentaEjemplo(**c) for c in cuentas_repo.get_cuentas()],
+    )
+
+
+@router.post("/cuentas-ejemplo", response_model=CuentasEjemploResponse)
+def set_cuentas_ejemplo(body: CuentasEjemploRequest) -> CuentasEjemploResponse:
+    """Guarda la lista entera (la UI manda siempre el conjunto completo)."""
+    from src.viralizacion.repos import cuentas_repo
+
+    try:
+        guardadas = cuentas_repo.save_cuentas(
+            [c.model_dump() for c in body.cuentas]
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return CuentasEjemploResponse(
+        ok=True, cuentas=[CuentaEjemplo(**c) for c in guardadas],
+    )
 
 
 @router.get("/estilos", response_model=StylesListResponse)

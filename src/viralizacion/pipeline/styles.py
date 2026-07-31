@@ -669,135 +669,65 @@ class StylePreset:
     fonts_dir: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# Base común a TODOS los estilos
+# ---------------------------------------------------------------------------
+# Decisión del operador tras ver la muestra: entre un ciclo y otro solo debe
+# cambiar la TIPOGRAFÍA. Nada de un grade cálido aquí y otro azulado allá, ni
+# fundidos a blanco en unos y disoluciones en otros — eso hacía que la cuenta
+# pareciera de cinco personas distintas.
+#
+# Los valores son los del antiguo "Película vieja", que es el look que validó
+# en vídeo: paisaje EN COLOR, apenas oscurecido, con viñeta cerrada y la
+# suciedad de celuloide encima.
+_BASE = dict(
+    vignette_angle="PI/3.2",
+    eq_extra={"gamma": 0.94, "contrast": 1.06},
+    transition_landscape=("fadeblack", 1.05),
+    film_specks=2,
+    film_scratches=4,
+    noise_filter_override="noise=alls=10:allf=t+u",
+    ken_burns=0.13,
+    vignette_breathe=0.14,
+)
+
 STYLE_PRESETS: dict[str, StylePreset] = {
     "classic": StylePreset(
-        key="classic",
-        label="A · Clásico",
-        build_ass=build_ass_classic,
-        # Limpio: solo el plano respirando. Es el estilo ya validado.
-        ken_burns=0.10,
+        key="classic", label="A · Clásico", build_ass=build_ass_classic, **_BASE,
     ),
     "reveal": StylePreset(
-        key="reveal",
-        label="B · Reveal",
-        build_ass=build_ass_reveal,
-        # Firma visual extra: grano/"polvo" más denso que el base (alls=8).
-        # NOTA (decisión de diseño, ver VIRALIZACION_MODULE.md): se intentó
-        # un overlay de puntos discretos vía `geq` pero resultaba muy lento
-        # de renderizar en vídeos largos (~30-60s a 1080x1920x30fps) — se
-        # usa como fallback un `noise` bastante más denso/visible que el de
-        # Estilo A, que cumple el mismo propósito de "firma" diferenciadora.
-        noise_filter_override="noise=alls=14:allf=t+u:c0s=1",
-        # Grano fuerte + rayaduras: el más "sucio" y reconocible.
-        film_scratches=3,
+        key="reveal", label="B · Reveal", build_ass=build_ass_reveal, **_BASE,
     ),
     "cinematic": StylePreset(
-        key="cinematic",
-        label="C · Cinemático",
-        build_ass=build_ass_cinematic,
-        vignette_angle="PI/3.5",
-        eq_extra={"gamma_r": 1.06, "gamma_b": 0.94},
-        post_subtitle_filters=_entering_bars(),
-        ken_burns=0.12,
-        vignette_breathe=0.15,
+        key="cinematic", label="C · Karaoke", build_ass=build_ass_cinematic,
+        **_BASE,
     ),
-    # --- Variantes cinematográficas (D/E/F) -------------------------------
-    # Solo cambian el GRADING y la TRANSICIÓN respecto a las anteriores; la
-    # posición del subtítulo se deja igual a propósito (decisión del operador:
-    # mover el texto entre ciclos perjudica la lectura en el feed).
-    # Sustituye al antiguo "D · Teal & Orange", que era un calco de C: mismo
-    # `build_ass_cinematic` y como única personalidad un grade azulado. Este
-    # replica el estilo con el que RudySkate viralizó tres vídeos seguidos de
-    # Pablo Motos el mismo fin de semana.
     "pelicula": StylePreset(
-        key="pelicula",
-        label="D · Película vieja",
-        build_ass=build_ass_pelicula,
-        font_name="Playfair Display Black",
-        fonts_dir=bundled_fonts_dir(),
-        # Formato normal (NO cuadrado), pero con los bordes bien oscurecidos.
-        vignette_angle="PI/3.2",
-        # El paisaje se queda EN COLOR y vivo. Se probó un sepia de película
-        # y el operador lo descartó: en blanco y negro o muy antiguo el plano
-        # pierde interés, que es justo lo que vende el vídeo. Lo "de película"
-        # lo ponen el polvo, las rayaduras y la viñeta, no el color.
-        # Solo se baja un punto la gamma para que el texto claro destaque.
-        eq_extra={"gamma": 0.94, "contrast": 1.06},
-        # Lo que de verdad lo hace "celuloide": polvo y rayaduras, no el color.
-        film_specks=2,
-        film_scratches=4,
-        noise_filter_override="noise=alls=10:allf=t+u",
-        transition_landscape=("dissolve", 0.6),
-        ken_burns=0.13,
-        vignette_breathe=0.14,
-        light_leaks=1,
+        key="pelicula", label="D · Serif apilado", build_ass=build_ass_pelicula,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
+        **_BASE,
     ),
     "noir": StylePreset(
-        key="noir",
-        label="E · Cascada",
-        build_ass=build_ass_cascade,
-        # Viñeta suave: con el grade oscuro anterior (era blanco y negro) se
-        # usaba PI/3.2 y en color dejaba las esquinas casi negras.
-        vignette_angle="PI/4.2",
-        # Antes este estilo era blanco y negro (`colorchannelmixer`): el
-        # operador lo descartó, el paisaje en B/N no vende. Ahora es color
-        # con contraste alto y la firma visual la ponen las motas de polvo.
-        eq_extra={"gamma": 0.95},
-        noise_filter_override="noise=alls=11:allf=t+u",
-        # Antes `fadeblack` (era el estilo "cine negro"): en un montaje de
-        # planos cortos metía un fogonazo a negro cada pocos segundos. Ahora
-        # que es a color, encadenado normal.
-        transition_landscape=("fade", 0.5),
-        # Sin zoom: quieto, contrastado y sucio de película.
-        film_scratches=5,
-        film_specks=2,
-        vignette_breathe=0.12,
+        key="noir", label="E · Cascada", build_ass=build_ass_cascade, **_BASE,
     ),
+    # G y H mantienen el MARCO CUADRADO: sus subtítulos están medidos para él
+    # (`config.HIGHLIGHT_MARGIN_V` coloca el texto contando con el recuadro),
+    # así que quitarlo no sería "mismo filtro", sería romperlos.
     "cuadrado": StylePreset(
-        key="cuadrado",
-        label="G · Cuadrado",
-        build_ass=build_ass_stacked,
-        square_frame=True,
-        # Sin viñeta ni letterbox: el marco negro ya enmarca la imagen, y
-        # oscurecer los bordes del cuadrado lo ensuciaría.
-        vignette_angle="PI/5.0",
-        eq_extra={"gamma_r": 1.04, "gamma_b": 0.97},
-        transition_landscape=("dissolve", 0.6),
-        ken_burns=0.10,
+        key="cuadrado", label="G · Cuadrado", build_ass=build_ass_stacked,
+        square_frame=True, **_BASE,
     ),
     "highlight": StylePreset(
-        key="highlight",
-        label="H · Resaltado",
-        build_ass=build_ass_highlight,
-        # Mismo marco que el estilo G, que es el que funciona.
+        key="highlight", label="H · Resaltado", build_ass=build_ass_highlight,
         square_frame=True,
-        # Montserrat ExtraBold: es la tipografía de los vídeos de referencia
-        # y ya venía en `assets/fonts` (la usa Creator Reward).
-        font_name="Montserrat ExtraBold",
-        fonts_dir=bundled_fonts_dir(),
-        vignette_angle="PI/5.0",
-        eq_extra={"gamma_r": 1.02, "gamma_b": 0.99},
-        transition_landscape=("dissolve", 0.55),
-        ken_burns=0.10,
-    ),
-    "golden": StylePreset(
-        key="golden",
-        label="F · Hora dorada",
-        build_ass=build_ass_reveal,
-        vignette_angle="PI/4.5",
-        # Cálido y luminoso, tipo atardecer.
-        eq_extra={"gamma_r": 1.12, "gamma_g": 1.02, "gamma_b": 0.88},
-        pre_subtitle_filters=["colorbalance=rs=0.10:gs=0.03:bs=-0.10"],
-        # Fundido a blanco: rompe visualmente con todos los demás ciclos.
-        transition_landscape=("fadewhite", 0.5),
-        ken_burns=0.12,
-        light_leaks=3,
+        font_name="Montserrat ExtraBold", fonts_dir=bundled_fonts_dir(),
+        **_BASE,
     ),
 }
 
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
 STYLE_ORDER = [
-    "classic", "reveal", "cinematic", "pelicula", "noir", "golden",
+    "classic", "reveal", "cinematic", "pelicula", "noir",
     "cuadrado", "highlight",
 ]
 

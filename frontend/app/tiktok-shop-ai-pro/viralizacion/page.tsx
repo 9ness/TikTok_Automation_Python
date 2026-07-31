@@ -6,6 +6,9 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  useCuentasEjemplo,
+  useGuardarCuentasEjemplo,
+  type CuentaEjemplo,
   useCarpetas,
   useEstilos,
   useGenerateViralizacion,
@@ -14,17 +17,23 @@ import {
 } from "@/lib/queries/viralizacion";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 
-/** Cuentas del mentor del curso que ya siguen esta misma estrategia.
- *  Sirven de referencia viva: qué sube, con qué frecuencia y qué hashtags
- *  usa. Se sabe que son suyas porque hace un año tienen vídeos orgánicos en
- *  los que sale él. */
-const CUENTAS_EJEMPLO = [
-  { handle: "@danigumoficial", nota: "Reflexiones + b-roll, misma plantilla" },
-  { handle: "@rudyskateoficial", nota: "Pablo Motos, estilo Película vieja" },
-];
-
+/** Cuentas de TikTok que ya siguen esta estrategia: sirven para mirar qué
+ *  suben, con qué frecuencia y con qué hashtags. La lista es editable y vive
+ *  en Redis — el operador va encontrando cuentas nuevas y no tiene sentido un
+ *  despliegue por cada una. */
 function CuentasEjemplo() {
   const [abierto, setAbierto] = useState(false);
+  const [nueva, setNueva] = useState("");
+  const cuentasQuery = useCuentasEjemplo();
+  const guardar = useGuardarCuentasEjemplo();
+  const cuentas = cuentasQuery.data ?? [];
+
+  function aplicar(siguientes: CuentaEjemplo[]) {
+    guardar.mutate(siguientes, {
+      onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+    });
+  }
+
   return (
     <section className="rounded-xl border border-border/60 bg-card">
       <button
@@ -35,6 +44,9 @@ function CuentasEjemplo() {
       >
         <Users className="h-4 w-4 shrink-0 text-amber-500" />
         <span className="flex-1">Cuentas de ejemplo</span>
+        <span className="text-[11px] font-normal text-muted-foreground">
+          {cuentas.length}
+        </span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
             abierto ? "rotate-180" : ""
@@ -42,26 +54,79 @@ function CuentasEjemplo() {
         />
       </button>
       {abierto && (
-        <div className="space-y-1.5 border-t border-border/60 p-3 pt-2.5">
+        <div className="space-y-2 border-t border-border/60 p-3 pt-2.5">
           <p className="text-[11px] text-muted-foreground">
-            Cuentas del mentor con esta misma estrategia — mira qué prueba, qué
-            sube y qué hashtags usa.
+            Cuentas con esta misma estrategia — mira qué prueban, qué suben y
+            qué hashtags usan.
           </p>
-          {CUENTAS_EJEMPLO.map((c) => (
-            <a
+
+          {cuentas.map((c) => (
+            <div
               key={c.handle}
-              href={`https://www.tiktok.com/${c.handle}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-2 transition hover:border-foreground/30"
+              className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-2"
             >
-              <div className="min-w-0 flex-1">
+              <a
+                href={`https://www.tiktok.com/${c.handle}`}
+                target="_blank"
+                rel="noreferrer"
+                className="min-w-0 flex-1"
+              >
                 <p className="truncate text-xs font-medium">{c.handle}</p>
-                <p className="truncate text-[10px] text-muted-foreground">{c.nota}</p>
-              </div>
-              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            </a>
+                {c.nota && (
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {c.nota}
+                  </p>
+                )}
+              </a>
+              <a
+                href={`https://www.tiktok.com/${c.handle}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Abrir ${c.handle}`}
+                className="shrink-0 text-muted-foreground transition hover:text-foreground"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              <button
+                type="button"
+                aria-label={`Quitar ${c.handle}`}
+                onClick={() => aplicar(cuentas.filter((x) => x.handle !== c.handle))}
+                className="shrink-0 text-muted-foreground transition hover:text-destructive"
+              >
+                ×
+              </button>
+            </div>
           ))}
+          {cuentas.length === 0 && !cuentasQuery.isLoading && (
+            <p className="text-[11px] text-muted-foreground">Ninguna todavía.</p>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const h = nueva.trim();
+              if (!h) return;
+              aplicar([...cuentas, { handle: h, nota: "" }]);
+              setNueva("");
+            }}
+            className="flex gap-1.5"
+          >
+            {/* Acepta el @usuario o la URL entera pegada: al compartir desde
+                la app sale la URL, y obligar a recortarla solo da errores. */}
+            <input
+              value={nueva}
+              onChange={(e) => setNueva(e.target.value)}
+              placeholder="@usuario o la URL de TikTok"
+              className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs"
+            />
+            <button
+              type="submit"
+              disabled={guardar.isPending || !nueva.trim()}
+              className="rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              Añadir
+            </button>
+          </form>
         </div>
       )}
     </section>
