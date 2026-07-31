@@ -749,6 +749,108 @@ function HashtagsPanel() {
   );
 }
 
+/** Ver la foto de un producto en grande y descargarla suelta.
+ *
+ *  Muestra TAMBIÉN la captura con título cuando existe: es la forma rápida de
+ *  cazar un emparejado raro (pasó con una carpeta donde la foto limpia de un
+ *  producto estaba guardada con el número de otro). */
+function FotoModal({
+  open,
+  onOpenChange,
+  producto,
+  source,
+  folder,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  producto: ProductoItem;
+  source: string;
+  folder: string;
+}) {
+  const [cual, setCual] = useState<"limpia" | "titulo">("limpia");
+  const id =
+    cual === "limpia" ? producto.clean_photo_id : producto.titled_photo_id;
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={() => onOpenChange(false)}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-2 overflow-y-auto rounded-lg border bg-card p-3"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+            Producto {producto.producto}
+          </p>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-label="Cerrar"
+            className="rounded-sm p-1 text-muted-foreground hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+
+        {producto.titled_photo_id && (
+          <div className="grid grid-cols-2 gap-1">
+            {(["limpia", "titulo"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setCual(k)}
+                className={`rounded-md border px-2 py-1 text-[11px] transition ${
+                  cual === k
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                    : "border-border/60 text-muted-foreground"
+                }`}
+              >
+                {k === "limpia" ? "Foto del producto" : "Captura con título"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {id ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={buildPhotoUrl(source, folder, id)}
+            alt={`Producto ${producto.producto}`}
+            className="w-full rounded-md border border-border/60 object-contain"
+          />
+        ) : (
+          <p className="py-8 text-center text-xs text-muted-foreground">
+            No hay esta foto en Drive.
+          </p>
+        )}
+
+        {producto.clean_photo_id && (
+          <a
+            href={buildCleanPhotoDownloadUrl(source, folder, producto.producto)}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] font-medium transition hover:border-foreground/30"
+          >
+            <Download className="h-3.5 w-3.5" /> Descargar la foto del producto
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CopyChip({ label, text }: { label: string; text: string }) {
   if (!text) return null;
   return (
@@ -904,6 +1006,7 @@ function ProductoCard({
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
   const [verVideo, setVerVideo] = useState(false);
+  const [verFoto, setVerFoto] = useState(false);
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -989,13 +1092,20 @@ function ProductoCard({
     <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
       <div className="flex gap-2">
         {producto.clean_photo_id ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={buildPhotoUrl(source, folder, producto.clean_photo_id)}
-            alt={producto.producto}
-            loading="lazy"
-            className="h-16 w-16 shrink-0 rounded-lg border border-border/60 object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => setVerFoto(true)}
+            title="Ver la foto en grande"
+            className="shrink-0"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={buildPhotoUrl(source, folder, producto.clean_photo_id)}
+              alt={producto.producto}
+              loading="lazy"
+              className="h-16 w-16 rounded-lg border border-border/60 object-cover transition hover:border-foreground/40"
+            />
+          </button>
         ) : (
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 text-center text-[9px] text-muted-foreground">
             sin foto
@@ -1039,7 +1149,32 @@ function ProductoCard({
         <CopyChip label="🎣 Gancho" text={producto.gancho ?? ""} />
         <CopyChip label="👉 CTA" text={producto.cta ?? ""} />
         {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
+        {producto.clean_photo_id && (
+          <>
+            <button
+              type="button"
+              onClick={() => setVerFoto(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+            >
+              🔍 Ver foto
+            </button>
+            <a
+              href={buildCleanPhotoDownloadUrl(source, folder, producto.producto)}
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+            >
+              <Download className="h-3 w-3" /> Foto
+            </a>
+          </>
+        )}
       </div>
+
+      <FotoModal
+        open={verFoto}
+        onOpenChange={setVerFoto}
+        producto={producto}
+        source={source}
+        folder={folder}
+      />
 
       {/* Cuando no se puede distinguir la foto del producto de la captura de
           la descripción, se avisa: llegó a colarse una captura de texto como
