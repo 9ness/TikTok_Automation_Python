@@ -38,6 +38,10 @@ REQUIRED_FIELDS = (
     "tienda",
     "caption",
 )
+# Opcionales: si no vienen, el producto NO se descarta. `emojis` se añadió
+# después, así que los productos extraídos antes no lo tienen y hay un
+# respaldo por palabras clave en `services/emojis.py`.
+OPTIONAL_FIELDS = ("emojis",)
 
 
 def _load_system_prompt() -> str:
@@ -156,7 +160,12 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
         for pid in lote_ids:
             entry = raw.get(pid)
             if _is_valid_entry(entry):
-                salida[pid] = {f: entry[f].strip() for f in REQUIRED_FIELDS}
+                doc = {f: entry[f].strip() for f in REQUIRED_FIELDS}
+                for f in OPTIONAL_FIELDS:
+                    v = entry.get(f)
+                    if isinstance(v, str) and v.strip():
+                        doc[f] = v.strip()
+                salida[pid] = doc
         return salida
 
     result = _pedir(ids, image_paths)

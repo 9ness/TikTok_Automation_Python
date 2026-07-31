@@ -1140,7 +1140,9 @@ function ProductoCard({
           label="✍️ Caption"
           text={
             producto.caption
-              ? [producto.caption, hashtags.join(" ")].filter(Boolean).join(" ")
+              ? [producto.caption, producto.emojis, hashtags.join(" ")]
+                  .filter(Boolean)
+                  .join(" ")
               : ""
           }
         />

@@ -46,6 +46,7 @@ from src.api.schemas.nicho_pov_bof import (
     VideoUploadResponse,
 )
 from src.nicho_pov_bof.services import audience
+from src.nicho_pov_bof.services import emojis as emojis_svc
 from src.nicho_pov_bof.pipeline.video_editor import (
     caption_arriesgado,
     textos_fijos,
@@ -177,6 +178,9 @@ def _producto_info(
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
         caption=prod.get("caption", ""),
+        emojis=prod.get("emojis") or emojis_svc.emojis_para(
+            producto, prod.get("titulo", ""), prod.get("caption", ""),
+        ),
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
         gancho=textos_fijos(f"{producto} {folder}")["gancho"],
         cta=textos_fijos(f"{producto} {folder}")["cta"],
@@ -263,6 +267,11 @@ def _list_productos(
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),
                 caption=guardado.get("caption", ""),
+                emojis=guardado.get("emojis") or emojis_svc.emojis_para(
+                    producto,
+                    guardado.get("titulo", ""),
+                    guardado.get("caption", ""),
+                ),
                 caption_riesgo=caption_arriesgado(
                     guardado.get("caption", "")
                 ) or "",

@@ -110,6 +110,10 @@ class ProductoInfo(BaseModel):
     titulo_tiktok_completo: str = ""
     tienda: str = ""
     caption: str = ""
+    # Dos emojis para el caption: una reacción + uno del producto. Los da
+    # Gemini; si el producto se extrajo antes de que existiera el campo, se
+    # deducen del título (`services/emojis.py`).
+    emojis: str = ""
     # Promesa detectada en el caption ("perfecta", "elimina"…), vacío si es
     # seguro. Solo se AVISA: el caption lo copia el operador al publicar, no
     # se quema en el vídeo, así que no se sustituye por él.

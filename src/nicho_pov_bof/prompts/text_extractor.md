@@ -76,6 +76,18 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   `SOLO HOY`, `SE AGOTA`, `DATE PRISA`), ni ponerle fecha a nada (`HOY`,
   `ESTA SEMANA`, `24H`): mañana deja de ser cierto.
 
+- `emojis`: **exactamente DOS emojis** que acompañen al caption, sin espacios
+  entre ellos. El primero es una REACCIÓN genérica (😍 🤯 😱 👀 🔥 👏 🙌 ✨);
+  el segundo tiene que ver con el PRODUCTO en concreto.
+
+  El segundo es el que aporta: para una silla de camping, algo de acampada o
+  de exterior (🏕️ ⛺ 🌲); para una crema, algo de cuidado facial (🧴 ✨); para
+  un escurreplatos, de cocina (🍽️ 🧽); para una mochila, 🎒. Si no se te
+  ocurre nada que encaje, repite una reacción antes que poner uno que no
+  tenga que ver.
+
+  Ejemplos: `😍🏕️`, `🤯🧴`, `👀🎒`, `🔥🍽️`.
+
 ## Gancho y CTA: NO los generes
 
 El texto de arriba del vídeo y la llamada a la acción son **fijos** y los pone
@@ -111,7 +123,7 @@ identificador que te den.
 
 Devuelve un único objeto JSON cuyas claves son EXACTAMENTE los
 identificadores que te doy en el mensaje de usuario (en el mismo orden que
-las imágenes), y cuyo valor es el objeto con los 4 campos:
+las imágenes), y cuyo valor es el objeto con los 5 campos:
 
 ```
 {
@@ -119,7 +131,8 @@ las imágenes), y cuyo valor es el objeto con los 4 campos:
     "titulo": "...",
     "titulo_tiktok_completo": "...",
     "tienda": "...",
-    "caption": "..."
+    "caption": "...",
+    "emojis": "..."
   },
   ...
 }
