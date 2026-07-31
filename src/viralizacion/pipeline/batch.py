@@ -10,7 +10,7 @@ Resiliencia:
 
 from __future__ import annotations
 
-import math
+import random
 import traceback
 import uuid
 from datetime import date
@@ -30,15 +30,23 @@ OnProgress = Callable[[float, str], None]
 
 
 def _rounds_per_audio(total: int, n_audios: int) -> list[int]:
+    """Cuántos vídeos salen de cada audio, repartidos LO MÁS PAREJO posible.
+
+    Antes se calculaba `ceil(total/n_audios)` y se iba dando ese tope a cada
+    uno hasta agotar: con 10 vídeos y 8 audios daba [2,2,2,2,2,0,0,0] y los
+    tres últimos NO se usaban nunca. El operador lo notó porque justo ahí
+    estaban los dos que mejor le funcionaban (el de más de un minuto y el de
+    Pau Donés).
+
+    Ahora: reparto entero y el resto se sortea entre los audios, para que las
+    "vueltas de más" no caigan siempre en los mismos.
+    """
     if n_audios <= 0:
         return []
-    r = math.ceil(total / n_audios)
-    out: list[int] = []
-    remaining = total
-    for _ in range(n_audios):
-        take = min(r, remaining)
-        out.append(take)
-        remaining -= take
+    base, resto = divmod(max(0, total), n_audios)
+    out = [base] * n_audios
+    for i in random.sample(range(n_audios), resto):
+        out[i] += 1
     return out
 
 
