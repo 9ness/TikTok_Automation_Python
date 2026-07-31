@@ -94,6 +94,21 @@ def split_pair(group: list[dict]) -> dict:
         return {"clean": squarish[0], "titled": titled, "confident": True,
                 "reason": "forma", "extras": extras}
 
+    # 1b) Varias cuadradas y una sola captura: gana la que comparte ANCHO con
+    # la captura. Las dos salen del mismo pantallazo del móvil, así que miden
+    # lo mismo de ancho; una foto de otro producto traspapelada en la carpeta
+    # (pasa: el `2.png` de un producto que era de otro) no coincide.
+    # Sin esto se decidía por peso y se colaba la foto ajena.
+    if len(squarish) > 1 and len(odd) == 1:
+        titled = odd[0]
+        w_titled = int(titled.get("width") or 0)
+        iguales = [p for p in squarish if int(p.get("width") or 0) == w_titled]
+        if len(iguales) == 1:
+            clean = iguales[0]
+            extras = [p for p in items if p not in (clean, titled)]
+            return {"clean": clean, "titled": titled, "confident": True,
+                    "reason": "mismo ancho que la captura", "extras": extras}
+
     # 2) Por peso: la captura lleva texto y UI, pesa más.
     by_size = sorted(items, key=lambda p: int(p.get("size") or 0))
     clean, titled = by_size[0], by_size[-1]
