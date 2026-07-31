@@ -88,6 +88,19 @@ class NichoPovBofRedis:
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)
         return result == "OK"
 
+    def set_nx(self, key: str, value: str, ttl_s: int) -> bool:
+        """SET key value NX EX ttl. True si lo cogió (no existía).
+
+        Es la primitiva de cerrojo: el TTL evita que un proceso muerto deje
+        la llave puesta para siempre.
+        """
+        k = self._enc(self._full_key(key))
+        result = self._post(f"set/{k}/{self._enc(value)}/nx/ex/{int(ttl_s)}")
+        return result == "OK"
+
+    def delete(self, key: str) -> bool:
+        return self._post(f"del/{self._enc(self._full_key(key))}") is not None
+
     def sadd(self, key: str, member: str) -> bool:
         result = self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(member)}")
         return result is not None

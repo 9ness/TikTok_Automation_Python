@@ -115,6 +115,8 @@ export default function NichoPovBofPage() {
   const [videoProgress, setVideoProgress] = useState("");
   const totalProductos = productos.data?.length ?? 0;
   const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
+  const conFoto = (productos.data ?? []).filter((p) => p.clean_photo_id).length;
+  const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
 
   function copyText(label: string, text: string | undefined) {
     if (!text) return;
@@ -590,7 +592,10 @@ export default function NichoPovBofPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {/* Dos por fila también en móvil (antes se apilaban en cuatro
+              filas y ocupaban media pantalla). Las etiquetas van cortas y
+              con `truncate` para que quepan a media anchura. */}
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => void downloadCleanPhotos()}
@@ -603,7 +608,8 @@ export default function NichoPovBofPage() {
                 </>
               ) : (
                 <>
-                  <Download className="h-3.5 w-3.5" /> Descargar fotos limpias
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Fotos ({conFoto}/{totalProductos})</span>
                 </>
               )}
             </button>
@@ -621,8 +627,10 @@ export default function NichoPovBofPage() {
                 </>
               ) : (
                 <>
-                  <Download className="h-3.5 w-3.5" /> Descargar vídeos ({conVideo}/
-                  {totalProductos})
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    Vídeos ({conVideo}/{totalProductos})
+                  </span>
                 </>
               )}
             </button>
@@ -634,11 +642,13 @@ export default function NichoPovBofPage() {
             >
               {extraerTextos.isPending ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extrayendo… (~1 min)
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  <span className="truncate">Extrayendo…</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5" /> Obtener textos
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Textos ({conTexto}/{totalProductos})</span>
                 </>
               )}
             </button>
@@ -650,14 +660,17 @@ export default function NichoPovBofPage() {
             >
               {buscarUrls.isPending ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando enlaces…
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  <span className="truncate">Buscando…</span>
                 </>
               ) : (
                 <>
-                  <LinkIcon className="h-3.5 w-3.5" />
-                  {pendientesUrl
-                    ? `Buscar enlaces (${pendientesUrl} llamadas)`
-                    : "Enlaces al día"}
+                  <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {pendientesUrl
+                      ? `Enlaces (${pendientesUrl} llamadas)`
+                      : "Enlaces al día"}
+                  </span>
                 </>
               )}
             </button>

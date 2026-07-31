@@ -12,6 +12,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import os
+import random
+import time
+from contextlib import contextmanager
+
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 
@@ -50,13 +55,49 @@ def get_product(source: str, folder: str, producto: str) -> dict:
     return (load_folder(source, folder).get("productos") or {}).get(producto, {})
 
 
+@contextmanager
+def _cerrojo_carpeta(source: str, folder: str, espera_s: float = 12.0):
+    """Cerrojo por carpeta mientras se lee-modifica-escribe su documento.
+
+    Hace falta de verdad: la cola corre hasta CUATRO trabajos a la vez y cada
+    uno guarda el documento ENTERO de la carpeta. Cuando varios vídeos del
+    mismo lote terminaban a la vez se pisaban y ganaba el último — de nueve
+    vídeos montados solo se guardaron seis, y el "Subido" se quedaba sin
+    marcar por lo mismo.
+
+    Si no se consigue el cerrojo se sigue igualmente: es mejor arriesgarse a
+    perder una escritura que dejar el vídeo sin registrar.
+    """
+    r = get_nicho_pov_bof_redis()
+    clave = f"lock:folder:{source}:{folder}"
+    mio = False
+    if r.is_available():
+        limite = time.monotonic() + espera_s
+        while time.monotonic() < limite:
+            if r.set_nx(clave, str(os.getpid()), ttl_s=30):
+                mio = True
+                break
+            time.sleep(0.15 + random.random() * 0.2)
+    try:
+        yield mio
+    finally:
+        if mio:
+            r.delete(clave)
+
+
 def update_product(source: str, folder: str, producto: str, **fields) -> dict:
     """Parche parcial sobre un producto. Devuelve el producto ya actualizado.
 
-    Se lee-modifica-escribe el documento entero de la carpeta. Con 10
-    productos y un solo operador no hay carrera real que justifique algo más
-    complejo.
+    Se lee-modifica-escribe el documento entero de la carpeta, así que va
+    dentro del cerrojo de carpeta (ver `_cerrojo_carpeta`).
     """
+    with _cerrojo_carpeta(source, folder):
+        return _update_product_sin_cerrojo(source, folder, producto, **fields)
+
+
+def _update_product_sin_cerrojo(
+    source: str, folder: str, producto: str, **fields
+) -> dict:
     data = load_folder(source, folder)
     productos = data.setdefault("productos", {})
     prod = productos.setdefault(producto, {})
