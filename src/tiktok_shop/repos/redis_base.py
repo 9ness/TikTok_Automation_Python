@@ -129,6 +129,16 @@ class ShopRedis:
         )
         return result == "OK"
 
+    def set_nx(self, key: str, value: str, ttl_s: int) -> bool:
+        """SET key value NX EX ttl. True si lo cogió (no existía).
+
+        Es la primitiva de cerrojo: el TTL evita que un proceso muerto deje la
+        llave puesta para siempre.
+        """
+        k = self._enc(self._full_key(key))
+        result = self._post(f"set/{k}/{self._enc(value)}/nx/ex/{int(ttl_s)}")
+        return result == "OK"
+
     def delete(self, key: str) -> bool:
         result = self._get(f"del/{self._enc(self._full_key(key))}")
         return bool(result)

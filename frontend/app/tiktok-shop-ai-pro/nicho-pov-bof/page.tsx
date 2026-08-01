@@ -1002,7 +1002,10 @@ function EchoTikPanel() {
 
   const puedeGuardar = usuario.trim().length >= 4 && password.trim().length >= 8;
   const listaCuentas = cuentas.data ?? [];
-  const libres = listaCuentas.filter((c) => c.disponible && !c.activa).length;
+  // Cuenta también la que está en uso: si le quedan llamadas, es una cuenta
+  // con llamadas libres. Excluirla decía "0 con llamadas libres" con la única
+  // cuenta en verde justo debajo.
+  const libres = listaCuentas.filter((c) => c.disponible).length;
 
   const d = estado.data;
   return (
@@ -1113,9 +1116,22 @@ function EchoTikPanel() {
           seca no se tira, se aparta y se vuelve a ella cuando le renueva. */}
       {listaCuentas.length > 0 && (
         <div className="space-y-1.5 border-t border-border/60 pt-2">
-          <p className="text-[11px] text-muted-foreground">
-            Cuentas guardadas · {libres} con llamadas libres
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground">
+              Cuentas guardadas · {libres} con llamadas libres
+            </p>
+            {/* Añadir estaba escondido detrás del título del panel y no se
+                encontraba. Aquí, pegado a la lista, es donde se busca. */}
+            {!abierto && (
+              <button
+                type="button"
+                onClick={() => setAbierto(true)}
+                className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[11px] transition hover:border-emerald-500 hover:text-emerald-500"
+              >
+                + Añadir cuenta
+              </button>
+            )}
+          </div>
           {listaCuentas.map((c) => {
             const renueva = diaCorto(c.renueva_at);
             return (
