@@ -28,6 +28,9 @@ secrets/
 # de la UI (el selector las enseña), pesan ~70KB y se regeneran con
 # scripts/viralizacion_previews.py.
 !frontend/public/viralizacion/previews/*.jpg
+# …y las portadas recortadas de los módulos del curso: son la cabecera de cada
+# submenú de nicho en Tiktok Shop AI Pro (~60KB cada una).
+!frontend/public/tiktok-shop-ai-pro/modulos/*.jpg
 *.png
 *.mov
 

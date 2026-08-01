@@ -30,7 +30,6 @@ import {
   ShieldOff,
   ShoppingBag,
   Sparkles,
-  Target,
   Trophy,
   Users,
   Video,
@@ -40,6 +39,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { MODULOS } from "@/lib/tiktok-shop-ai-pro/modulos";
 import { Button } from "@/components/ui/button";
 import { QueueBadge } from "@/components/queue/QueueBadge";
 import { DiagnosticsPanel } from "@/components/layout/DiagnosticsPanel";
@@ -115,7 +115,13 @@ const NAV: NavGroup[] = [
     icon: Rocket,
     items: [
       { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
-      { href: "/tiktok-shop-ai-pro/nicho-pov-bof", label: "Nicho POV BOF", icon: Target },
+      // Un item por módulo del curso, en orden de módulo. La lista vive en
+      // `lib/tiktok-shop-ai-pro/modulos.ts` para no repetirla en cada página.
+      ...MODULOS.map((m) => ({
+        href: `/tiktok-shop-ai-pro/${m.slug}`,
+        label: m.label,
+        icon: m.icon,
+      })),
     ],
   },
   {
