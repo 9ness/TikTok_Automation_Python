@@ -105,11 +105,14 @@ services:
     # hasta este timeout antes de SIGKILL. El proceso api lo captura en
     # `lifespan` y llama a `JobQueue.start_draining()` + `wait_for_drain()`
     # — los workers terminan el job en curso, salen limpios, el proceso
-    # exit, y solo entonces docker arranca el container nuevo. 30 minutos
-    # cubre los jobs más largos (Atlas Standard saturado). Si los jobs
-    # no terminan en 30min, docker hace SIGKILL como hard limit (último
-    # recurso para no bloquear el deploy indefinidamente).
-    stop_grace_period: 1800s
+    # exit, y solo entonces docker arranca el container nuevo. Si los jobs
+    # no terminan a tiempo, docker hace SIGKILL como hard limit.
+    #
+    # Eran 30 min y no bastaban: un lote de Viralización de 13 vídeos tarda
+    # ~2h30 y se lo llevó por delante un SIGKILL a mitad. 2h de gracia cubren
+    # los lotes reales. La red de seguridad de verdad es el guardarraíl de
+    # `deploy/deploy_safe.sh`, que ya no recrea nada con jobs corriendo.
+    stop_grace_period: 7200s
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
       interval: 30s

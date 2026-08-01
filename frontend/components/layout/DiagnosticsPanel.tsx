@@ -296,6 +296,14 @@ function DeployState({
           {state}
         </span>
       </div>
+      {/* `deferred` = había vídeos renderizando y el deploy NO se hizo, a
+          propósito. Sin explicarlo parece un fallo, y lo que toca es volver a
+          lanzarlo cuando la cola se vacíe. */}
+      {state === "deferred" && (
+        <p className="text-[11px] leading-relaxed text-amber-500">
+          Aplazado: había jobs renderizando. Entra con el push siguiente.
+        </p>
+      )}
       {eventTs && (
         <KV
           label={state === "running" ? "empezó" : "cuándo"}

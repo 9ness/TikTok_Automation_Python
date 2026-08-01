@@ -22,7 +22,12 @@ API_CONTAINER="tiktok-api"
 QUEUE_STATE="/app/temp_work/queue_state.json"
 DEPLOY_STATUS="${APP_DIR}/temp_work/deploy_status.json"
 LOG="${APP_DIR}/logs/deploy.log"
-MAX_WAIT_SEC=3600   # 1h máximo esperando que la cola se vacíe
+# Máximo esperando que la cola se vacíe. Eran 1h y NO llegaba: un lote de
+# Viralización de 13 vídeos tarda ~2h30. Al cumplirse la hora el deploy tiraba
+# igual y mataba el lote a mitad ("Interrumpido (la app se reinició mientras
+# procesaba)"). 6h cubre cualquier lote; si se pasa de ahí, algo está colgado y
+# el deploy se APLAZA — nunca se pisa un render.
+MAX_WAIT_SEC=21600
 POLL_INTERVAL=30
 LOCK_FILE="/tmp/tiktok-deploy.lock"
 
@@ -105,8 +110,14 @@ while true; do
         break
     fi
     if [[ $elapsed -ge $MAX_WAIT_SEC ]]; then
-        echo "[deploy_safe] ⚠️ TIMEOUT (${MAX_WAIT_SEC}s) — quedan ${n_running} job(s) RUNNING. Procedo igual (graceful shutdown los terminará)."
-        break
+        # NO se procede. El graceful shutdown NO salva un job largo: son 30
+        # min de gracia y luego SIGKILL, así que "procedo igual" era matar el
+        # render. Regla del operador: no se despliega hasta que terminen los
+        # vídeos que hay en cola. El deploy se aplaza y entra con el push
+        # siguiente (o relanzando este script a mano).
+        echo "[deploy_safe] ⛔ TIMEOUT (${MAX_WAIT_SEC}s) con ${n_running} job(s) RUNNING — deploy APLAZADO, no se toca nada."
+        write_status "deferred" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"note\":\"jobs_running\""
+        exit 0
     fi
     echo "[deploy_safe] ${n_running} job(s) running — esperando ${POLL_INTERVAL}s (transcurridos ${elapsed}s/${MAX_WAIT_SEC}s)"
     sleep $POLL_INTERVAL

@@ -18,7 +18,8 @@ export interface GitInfo {
 }
 
 export interface DeployStatus {
-  state?: "running" | "success" | "failed";
+  /** `deferred`: había jobs renderizando, así que el deploy NO se hizo. */
+  state?: "running" | "success" | "failed" | "deferred";
   current_sha?: string;
   current_sha_full?: string;
   target_sha?: string;

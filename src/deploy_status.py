@@ -7,7 +7,8 @@ la UI siempre muestre algo.
 
 Estructura del JSON:
 {
-    "state": "running|success|failed",
+    "state": "running|success|failed|deferred",   # deferred = había
+                                                   # jobs renderizando y NO se desplegó
     "current_sha": "5ea1505",
     "current_sha_full": "5ea15054...",
     "previous_sha": "f5875e7",
@@ -67,7 +68,7 @@ def get_status() -> dict:
     """Devuelve el estado actual. Siempre devuelve un dict (nunca None).
 
     Campos garantizados:
-        - state: "running" | "success" | "failed" | "unknown"
+        - state: "running" | "success" | "failed" | "deferred" | "unknown"
         - current_sha: str ("?" si no se puede determinar)
         - age_seconds: int (segundos desde el último cambio relevante)
 
