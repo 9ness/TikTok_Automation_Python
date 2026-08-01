@@ -307,7 +307,7 @@ export default function ViralizacionPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-4 sm:p-6 md:p-10">
+    <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
           <Rocket className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />
@@ -318,8 +318,6 @@ export default function ViralizacionPage() {
           hacer crecer una cuenta hasta 1000 seguidores.
         </p>
       </header>
-
-      <CuentasEjemplo />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold sm:text-base">Ponentes</h2>
@@ -567,6 +565,10 @@ export default function ViralizacionPage() {
           </button>
         )}
       </div>
+
+      {/* Material de consulta, no parte del flujo: se mira de vez en cuando,
+          así que va DESPUÉS del botón de generar y no antes de los ponentes. */}
+      <CuentasEjemplo />
     </div>
   );
 }
