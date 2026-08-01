@@ -47,6 +47,7 @@ import {
   useVendidos,
 } from "@/lib/queries/nichoPovBof";
 import { VideoModal } from "@/components/ui/video-modal";
+import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   BackupCheckResponse,
@@ -267,6 +268,15 @@ export default function NichoPovBofPage() {
 
   return (
     <div className="container mx-auto space-y-5 p-4 sm:p-6 md:p-10">
+      {/* Portada del módulo 6 del curso — la misma que abre los demás nichos,
+          para que todos los submenús se reconozcan de un vistazo. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={portadaDe("nicho-pov-bof")}
+        alt="Creación de Nicho POV BOF"
+        className="h-auto w-full rounded-xl border border-border/60"
+      />
+
       <header className="flex items-center gap-3">
         <Target className="h-6 w-6 shrink-0 text-emerald-500" />
         <div className="min-w-0">
