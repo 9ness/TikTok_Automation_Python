@@ -584,8 +584,16 @@ def buscar_urls_carpeta(
     PAGINAS_MARCA = 3
     for _marca, productos in pendientes.items():
         if echotik_cloud.quota_exhausted():
-            aviso = ("EchoTik se quedó sin cuota a mitad — los productos "
-                     "restantes se han dejado sin buscar.")
+            # Distinguir los dos casos importa: parar a mitad es normal, pero
+            # parar SIN haber llamado ni una vez significa que la cuenta en uso
+            # ya estaba seca — y lo que hay que hacer es cambiarla, no reintentar.
+            aviso = (
+                "EchoTik se quedó sin cuota a mitad — los productos restantes "
+                "se han dejado sin buscar."
+                if llamadas
+                else "La cuenta de EchoTik en uso está sin cuota — cambia a "
+                     "otra en ⚙️ Configuración y vuelve a darle."
+            )
             break
 
         ejemplo = guardados[productos[0]]

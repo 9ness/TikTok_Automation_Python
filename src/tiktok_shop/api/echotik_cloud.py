@@ -67,13 +67,48 @@ def _mark_quota_error(text: str) -> bool:
             echotik_cuentas_repo.marcar_sin_cuota(_auth()[0])
         except Exception:
             pass
+        _invalidar_quota_cache()
         return True
     return False
 
 
+_QUOTA_CACHE: tuple[float, bool] | None = None
+_QUOTA_TTL_S = 5.0
+
+
+def _invalidar_quota_cache() -> None:
+    global _QUOTA_CACHE
+    _QUOTA_CACHE = None
+
+
 def quota_exhausted() -> bool:
-    """True si la última llamada relevante a EchoTik dio cuota agotada."""
-    return _LAST_QUOTA_ERROR is not None
+    """True si la cuenta EN USO se quedó sin cuota.
+
+    Manda lo que dice el banco de cuentas (Redis), no la global del proceso.
+    La API corre con varios workers y la global era un desastre en las dos
+    direcciones: la marcaba uno solo (los demás seguían gastando llamadas), y
+    al cambiar de cuenta NO se limpiaba — el bucle de enlaces se paraba antes
+    de la primera llamada, con la cuenta nueva intacta, diciendo "sin cuota a
+    mitad" sin haber hecho ninguna.
+
+    La global se queda como respaldo para cuando la cuenta no está en el banco
+    o Redis no responde.
+    """
+    global _QUOTA_CACHE
+    ahora = time.monotonic()
+    if _QUOTA_CACHE and ahora - _QUOTA_CACHE[0] < _QUOTA_TTL_S:
+        return _QUOTA_CACHE[1]
+    seca = _LAST_QUOTA_ERROR is not None
+    try:
+        from src.tiktok_shop.repos import echotik_cuentas_repo
+
+        c = echotik_cuentas_repo.buscar(_auth()[0])
+        if c:
+            seca = not echotik_cuentas_repo.disponible(c)
+    except Exception:
+        pass
+    _QUOTA_CACHE = (ahora, seca)
+    return seca
 
 
 def last_quota_error_msg() -> str:
@@ -202,9 +237,18 @@ def _get(
         elif log_callback:
             log_callback(f"  ⚠️ EchoTik code={body.get('code')}: {body.get('message')}")
         return None
-    # Éxito → limpiar el flag de cuota (si se había recargado el plan).
+    # Éxito → la cuenta tiene cuota. Se limpia la marca en los DOS sitios: la
+    # global de este proceso y la del banco, que es la que ven los demás
+    # workers.
     global _LAST_QUOTA_ERROR
     _LAST_QUOTA_ERROR = None
+    try:
+        from src.tiktok_shop.repos import echotik_cuentas_repo
+
+        echotik_cuentas_repo.marcar_con_cuota(creds[0])
+    except Exception:
+        pass
+    _invalidar_quota_cache()
     return body.get("data")
 
 

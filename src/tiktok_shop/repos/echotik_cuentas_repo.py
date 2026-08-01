@@ -223,6 +223,30 @@ def marcar_sin_cuota(usuario: str) -> None:
         pass
 
 
+def marcar_con_cuota(usuario: str) -> None:
+    """Quita la marca de agotada: una llamada acaba de funcionar.
+
+    No escribe si no estaba marcada — se llama tras CADA petición con éxito y
+    lo normal es que no haya nada que hacer.
+    """
+    usuario = (usuario or "").strip()
+    if not usuario:
+        return
+    try:
+        actual = buscar(usuario)
+        if not actual or not actual["sin_cuota_at"]:
+            return
+        with _cerrojo():
+            cuentas = [_normalizar(c) for c in _cargar()]
+            for c in cuentas:
+                if c["usuario"] == usuario and c["sin_cuota_at"]:
+                    c["sin_cuota_at"] = None
+                    _guardar(cuentas)
+                    return
+    except Exception:
+        pass
+
+
 def renueva_at(cuenta: dict) -> float | None:
     """Cuándo vuelve a tener llamadas, o None si nunca se ha usado."""
     primero = cuenta.get("primer_uso_at")
