@@ -235,6 +235,36 @@ class EchoTikCredsResponse(BaseModel):
     mensaje: str = ""
 
 
+class EchoTikCuenta(BaseModel):
+    """Una cuenta del banco. La contraseña NUNCA sale de aquí."""
+
+    usuario: str              # completo: hace falta para activarla o borrarla
+    usuario_mascara: str = ""
+    nota: str = ""
+    activa: bool = False      # es la que está en uso ahora mismo
+    llamadas: int = 0         # gastadas en el ciclo actual
+    primer_uso_at: float | None = None
+    ultimo_uso_at: float | None = None
+    # Cuándo se estima que le vuelven las 100 llamadas (primer uso + 30 días).
+    renueva_at: float | None = None
+    disponible: bool = True   # se puede usar ya
+    sin_cuota: bool = False   # dio "Usage Limit Exceeded" en este ciclo
+
+
+class EchoTikCuentasResponse(BaseModel):
+    ok: bool = True
+    items: list[EchoTikCuenta] = []
+    mensaje: str = ""
+
+
+class EchoTikCuentaRequest(BaseModel):
+    """Alta de una cuenta en el banco, sin ponerla en uso."""
+
+    usuario: str = Field(..., min_length=4)
+    password: str = Field(..., min_length=8)
+    nota: str = ""
+
+
 class VideoUploadResponse(BaseModel):
     ok: bool
     job_id: str | None = None

@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   Sparkles,
   Upload,
+  X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +42,10 @@ import {
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
+  useEchoTikCuentas,
+  useGuardarCuentaEchoTik,
+  useActivarCuentaEchoTik,
+  useBorrarCuentaEchoTik,
   useSetEstado,
   useSources,
   useVendidos,
@@ -973,13 +978,31 @@ function CopyChip({ label, text }: { label: string; text: string }) {
 }
 
 
+/** Fecha corta ("28 ago"), o "" si no hay. Las horas no importan aquí: lo que
+ *  se mira es si ya pasó el mes. */
+function diaCorto(ts: number | null | undefined): string {
+  if (!ts) return "";
+  return new Date(ts * 1000).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
 /** Credenciales de EchoTik, cambiables sin redespliegue. */
 function EchoTikPanel() {
   const estado = useEchoTikEstado();
   const guardar = useGuardarEchoTik();
+  const cuentas = useEchoTikCuentas();
+  const guardarCuenta = useGuardarCuentaEchoTik();
+  const activarCuenta = useActivarCuentaEchoTik();
+  const borrarCuenta = useBorrarCuentaEchoTik();
   const [abierto, setAbierto] = useState(false);
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
+
+  const puedeGuardar = usuario.trim().length >= 4 && password.trim().length >= 8;
+  const listaCuentas = cuentas.data ?? [];
+  const libres = listaCuentas.filter((c) => c.disponible && !c.activa).length;
 
   const d = estado.data;
   return (
@@ -1028,7 +1051,7 @@ function EchoTikPanel() {
           />
           <button
             type="button"
-            disabled={guardar.isPending || usuario.trim().length < 4 || password.trim().length < 8}
+            disabled={guardar.isPending || !puedeGuardar}
             onClick={() =>
               guardar.mutate(
                 { usuario: usuario.trim(), password: password.trim(), probar: true },
@@ -1055,9 +1078,114 @@ function EchoTikPanel() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Comprobando…
               </>
             ) : (
-              "Guardar y comprobar (1 llamada)"
+              "Usar ahora (gasta 1 llamada)"
             )}
           </button>
+
+          {/* Guardar SIN activar: para ir apuntando cuentas de respaldo según
+              se van creando, sin tocar la que está funcionando ni gastarle
+              una llamada a la nueva. */}
+          <button
+            type="button"
+            disabled={guardarCuenta.isPending || !puedeGuardar}
+            onClick={() =>
+              guardarCuenta.mutate(
+                { usuario: usuario.trim(), password: password.trim(), nota: "" },
+                {
+                  onSuccess: (r) => {
+                    toast.success(r.mensaje || "Cuenta guardada");
+                    setUsuario("");
+                    setPassword("");
+                  },
+                  onError: (e) =>
+                    toast.error(e instanceof ApiError ? e.message : String(e)),
+                },
+              )
+            }
+            className="w-full rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+          >
+            Guardar de respaldo (sin usarla, 0 llamadas)
+          </button>
+        </div>
+      )}
+
+      {/* Banco de cuentas. El plan gratis da 100 llamadas AL MES: una cuenta
+          seca no se tira, se aparta y se vuelve a ella cuando le renueva. */}
+      {listaCuentas.length > 0 && (
+        <div className="space-y-1.5 border-t border-border/60 pt-2">
+          <p className="text-[11px] text-muted-foreground">
+            Cuentas guardadas · {libres} con llamadas libres
+          </p>
+          {listaCuentas.map((c) => {
+            const renueva = diaCorto(c.renueva_at);
+            return (
+              <div
+                key={c.usuario}
+                className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                  c.activa
+                    ? "border-emerald-500/60 bg-emerald-500/10"
+                    : "border-border/60"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    c.disponible ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                  title={c.disponible ? "Con llamadas" : "Agotada este ciclo"}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">
+                    {c.usuario_mascara}
+                    {c.activa && (
+                      <span className="ml-1 text-[10px] font-normal text-emerald-500">
+                        en uso
+                      </span>
+                    )}
+                  </p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {c.primer_uso_at
+                      ? `${c.llamadas}/100 · ${
+                          c.disponible
+                            ? `renueva ~${renueva}`
+                            : `libre ~${renueva}`
+                        }`
+                      : "sin estrenar"}
+                  </p>
+                </div>
+                {!c.activa && (
+                  <button
+                    type="button"
+                    disabled={activarCuenta.isPending}
+                    onClick={() =>
+                      activarCuenta.mutate(c.usuario, {
+                        onSuccess: (r) => toast.success(r.mensaje || "Activada"),
+                        onError: (e) =>
+                          toast.error(e instanceof ApiError ? e.message : String(e)),
+                      })
+                    }
+                    className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[11px] transition hover:border-emerald-500 hover:text-emerald-500 disabled:opacity-50"
+                  >
+                    Usar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={borrarCuenta.isPending}
+                  onClick={() =>
+                    borrarCuenta.mutate(c.usuario, {
+                      onSuccess: () => toast.success("Cuenta borrada"),
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    })
+                  }
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:text-destructive disabled:opacity-50"
+                  aria-label={`Borrar ${c.usuario_mascara}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

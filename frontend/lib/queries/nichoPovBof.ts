@@ -9,6 +9,9 @@ import type {
   BackupSyncResponse,
   EchoTikCredsRequest,
   EchoTikCredsResponse,
+  EchoTikCuenta,
+  EchoTikCuentaRequest,
+  EchoTikCuentasResponse,
   EstadoRequest,
   ExtraerTextosRequest,
   FoldersListResponse,
@@ -210,6 +213,53 @@ export function useGuardarEchoTik() {
       void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "echotik"] });
     },
   });
+}
+
+/** Banco de cuentas de EchoTik. Guardar y activar van por separado: se apuntan
+ *  cuentas de respaldo sin tocar la que está en uso, y al mes se vuelve a la
+ *  que ya tenga la cuota renovada. */
+const cuentasKey = [...nichoPovBofKeys.all, "echotik", "cuentas"] as const;
+
+export function useEchoTikCuentas() {
+  return useQuery<EchoTikCuenta[]>({
+    queryKey: cuentasKey,
+    queryFn: async () =>
+      (await api.get<EchoTikCuentasResponse>(`${ROOT}/echotik/cuentas`)).items ?? [],
+  });
+}
+
+function useCuentasMutation<V>(fn: (v: V) => Promise<EchoTikCuentasResponse>) {
+  const qc = useQueryClient();
+  return useMutation<EchoTikCuentasResponse, Error, V>({
+    mutationFn: fn,
+    onSuccess: (res) => {
+      qc.setQueryData(cuentasKey, res.items ?? []);
+      // La cuenta activa cambia → el panel de credenciales tiene que refrescar.
+      void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "echotik"] });
+    },
+  });
+}
+
+export function useGuardarCuentaEchoTik() {
+  return useCuentasMutation<EchoTikCuentaRequest>((body) =>
+    api.post<EchoTikCuentasResponse>(`${ROOT}/echotik/cuentas`, body),
+  );
+}
+
+export function useActivarCuentaEchoTik() {
+  return useCuentasMutation<string>((usuario) =>
+    api.post<EchoTikCuentasResponse>(
+      `${ROOT}/echotik/cuentas/activar?usuario=${encodeURIComponent(usuario)}`,
+    ),
+  );
+}
+
+export function useBorrarCuentaEchoTik() {
+  return useCuentasMutation<string>((usuario) =>
+    api.del<EchoTikCuentasResponse>(
+      `${ROOT}/echotik/cuentas?usuario=${encodeURIComponent(usuario)}`,
+    ),
+  );
 }
 
 /** Hashtags de cuenta (los mismos para todos los captions). */

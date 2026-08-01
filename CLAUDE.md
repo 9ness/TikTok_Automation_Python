@@ -270,7 +270,11 @@ API: `/api/v1/nicho-pov-bof/*`.
 ÚNICA fuente que da el ID es EchoTik (se descartaron URL canónica, Gemini con
 búsqueda web, Apify, DuckDuckGo, fastmoss, kalodata y la web/API de TikTok) y
 cada búsqueda GASTA UNA LLAMADA del plan — por eso va con botón manual por
-producto, cachea en Redis y descarta resultados con poco parecido.
+producto, cachea en Redis y descarta resultados con poco parecido. El plan
+gratis son 100 llamadas/MES, así que una cuenta seca vuelve a servir al mes:
+`tiktok_shop/repos/echotik_cuentas_repo.py` guarda el banco de cuentas con la
+fecha de su primera llamada (`echotik:cuentas`) y la UI deja volver a la que ya
+haya renovado.
 
 Dos cosas no obvias:
 - El Drive es *shared-with-me* → **no aparece en el mount FUSE**; se lee por

@@ -59,6 +59,14 @@ def _mark_quota_error(text: str) -> bool:
     if "usage limit" in low or "increase quota" in low or "quota" in low:
         import time
         _LAST_QUOTA_ERROR = (time.time(), text[:200])
+        # Deja constancia en el banco de cuentas: es lo que permite saber que
+        # esta cuenta está seca y cuándo vuelve a tener llamadas.
+        try:
+            from src.tiktok_shop.repos import echotik_cuentas_repo
+
+            echotik_cuentas_repo.marcar_sin_cuota(_auth()[0])
+        except Exception:
+            pass
         return True
     return False
 
@@ -95,6 +103,14 @@ def guardar_credenciales(usuario: str, password: str) -> bool:
         {"usuario": (usuario or "").strip(), "password": (password or "").strip()},
     )
     _CREDS_CACHE = None
+    # Toda cuenta que se pone en uso entra en el banco: es la única forma de
+    # que dentro de un mes se sepa que existió y que ya le renovó la cuota.
+    try:
+        from src.tiktok_shop.repos import echotik_cuentas_repo
+
+        echotik_cuentas_repo.guardar(usuario, password)
+    except Exception:
+        pass
     return bool(ok)
 
 
@@ -138,12 +154,23 @@ def _get(
     `base` permite apuntar a otra versión de la API (ver V3_BASE_URL).
     """
     url = f"{(base or _base_url()).rstrip('/')}/{path.lstrip('/')}"
+    creds = _auth()
     try:
-        r = requests.get(url, params=params, auth=_auth(), timeout=TIMEOUT_S)
+        r = requests.get(url, params=params, auth=creds, timeout=TIMEOUT_S)
     except requests.RequestException as e:
         if log_callback:
             log_callback(f"  ⚠️ EchoTik network error: {e}")
         return None
+
+    # Consumida: la petición ha salido, así que cuenta contra las 100/mes de
+    # ESTA cuenta aunque el servidor conteste un error. Es lo que permite saber
+    # luego cuándo renueva y a cuál volver.
+    try:
+        from src.tiktok_shop.repos import echotik_cuentas_repo
+
+        echotik_cuentas_repo.registrar_uso(creds[0])
+    except Exception:
+        pass
 
     # Cost tracking — cada request cuenta (aunque falle ya consumió cuota).
     try:

@@ -146,6 +146,34 @@ export interface EchoTikCredsResponse {
   mensaje: string;
 }
 
+/** Una cuenta del banco de EchoTik. El plan gratis da 100 llamadas al mes, así
+ *  que una cuenta seca vuelve a servir pasado el mes: por eso interesa
+ *  `renueva_at` (primer uso + 30 días) y no solo si está agotada. */
+export interface EchoTikCuenta {
+  usuario: string;
+  usuario_mascara: string;
+  nota: string;
+  activa: boolean;
+  llamadas: number;
+  primer_uso_at: number | null;
+  ultimo_uso_at: number | null;
+  renueva_at: number | null;
+  disponible: boolean;
+  sin_cuota: boolean;
+}
+
+export interface EchoTikCuentasResponse {
+  ok: boolean;
+  items: EchoTikCuenta[];
+  mensaje: string;
+}
+
+export interface EchoTikCuentaRequest {
+  usuario: string;
+  password: string;
+  nota: string;
+}
+
 export interface ProductosUrlsRequest {
   source: string;
   folder: string;

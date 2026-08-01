@@ -33,6 +33,9 @@ from src.api.schemas.nicho_pov_bof import (
     ExtraerTextosRequest,
     EchoTikCredsRequest,
     EchoTikCredsResponse,
+    EchoTikCuenta,
+    EchoTikCuentaRequest,
+    EchoTikCuentasResponse,
     HashtagsRequest,
     HashtagsResponse,
     ProductoEstadoRequest,
@@ -758,6 +761,114 @@ def guardar_echotik(body: EchoTikCredsRequest) -> EchoTikCredsResponse:
         ok=True, configurado=True, usuario_mascara=_mascara(usuario),
         origen="guardadas",
         mensaje="Credenciales guardadas y en uso" + (" (verificadas)" if body.probar else ""),
+    )
+
+
+# ── Banco de cuentas ──────────────────────────────────────────────────
+# El plan gratis da 100 llamadas al mes: una cuenta seca vuelve a servir al mes
+# siguiente. Se guardan todas con la fecha de su primera llamada para saber a
+# cuál volver en vez de tener que abrir una nueva cada vez.
+def _a_schema(c: dict, activo: str) -> EchoTikCuenta:
+    from src.tiktok_shop.repos import echotik_cuentas_repo
+
+    return EchoTikCuenta(
+        usuario=c["usuario"],
+        usuario_mascara=_mascara(c["usuario"]),
+        nota=c["nota"],
+        activa=c["usuario"] == activo,
+        llamadas=c["llamadas"],
+        primer_uso_at=c["primer_uso_at"],
+        ultimo_uso_at=c["ultimo_uso_at"],
+        renueva_at=echotik_cuentas_repo.renueva_at(c),
+        disponible=echotik_cuentas_repo.disponible(c),
+        sin_cuota=bool(c["sin_cuota_at"]),
+    )
+
+
+@router.get("/echotik/cuentas", response_model=EchoTikCuentasResponse)
+def listar_cuentas_echotik() -> EchoTikCuentasResponse:
+    """Cuentas guardadas, con lo gastado y cuándo les renueva la cuota."""
+    from src.tiktok_shop.api import echotik_cloud
+    from src.tiktok_shop.repos import echotik_cuentas_repo
+
+    activo, clave_activa = echotik_cloud._auth()
+    # La cuenta que ya estaba en uso antes de existir el banco no está en él:
+    # se apunta con su contraseña la primera vez que se mira la lista. Si no,
+    # aparecería más tarde sin clave (al registrar su primera llamada) y no se
+    # podría volver a ella.
+    if activo and clave_activa and not echotik_cuentas_repo.buscar(activo):
+        try:
+            echotik_cuentas_repo.guardar(activo, clave_activa)
+        except Exception:
+            pass
+    return EchoTikCuentasResponse(
+        items=[_a_schema(c, activo) for c in echotik_cuentas_repo.listar()],
+    )
+
+
+@router.post("/echotik/cuentas", response_model=EchoTikCuentasResponse)
+def guardar_cuenta_echotik(body: EchoTikCuentaRequest) -> EchoTikCuentasResponse:
+    """Añade una cuenta al banco SIN ponerla en uso ni gastarle una llamada.
+
+    Guardar y activar van por separado a propósito: así se puede ir apuntando
+    cuentas de respaldo según se crean, sin tocar la que está funcionando.
+    """
+    from src.tiktok_shop.api import echotik_cloud
+    from src.tiktok_shop.repos import echotik_cuentas_repo
+
+    try:
+        echotik_cuentas_repo.guardar(body.usuario, body.password, body.nota)
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    activo = echotik_cloud._auth()[0]
+    return EchoTikCuentasResponse(
+        items=[_a_schema(c, activo) for c in echotik_cuentas_repo.listar()],
+        mensaje="Cuenta guardada — actívala cuando la necesites.",
+    )
+
+
+@router.post("/echotik/cuentas/activar", response_model=EchoTikCuentasResponse)
+def activar_cuenta_echotik(
+    usuario: Annotated[str, Query(min_length=4)],
+) -> EchoTikCuentasResponse:
+    """Pone esa cuenta como la que se usa. No gasta ninguna llamada."""
+    from src.tiktok_shop.api import echotik_cloud
+    from src.tiktok_shop.repos import echotik_cuentas_repo
+
+    cuenta = echotik_cuentas_repo.buscar(usuario)
+    if not cuenta:
+        raise APIError("Esa cuenta no está guardada.", status_code=404)
+    if not cuenta["password"]:
+        raise APIError(
+            "De esa cuenta solo se guardó el usuario (venía del .env). Vuelve "
+            "a guardarla con su contraseña para poder activarla.",
+            status_code=400,
+        )
+    if not echotik_cloud.guardar_credenciales(cuenta["usuario"], cuenta["password"]):
+        raise APIError("No se pudo activar (¿Redis no configurado?)", status_code=503)
+
+    return EchoTikCuentasResponse(
+        items=[_a_schema(c, cuenta["usuario"]) for c in echotik_cuentas_repo.listar()],
+        mensaje=f"En uso: {_mascara(cuenta['usuario'])}",
+    )
+
+
+@router.delete("/echotik/cuentas", response_model=EchoTikCuentasResponse)
+def borrar_cuenta_echotik(
+    usuario: Annotated[str, Query(min_length=4)],
+) -> EchoTikCuentasResponse:
+    from src.tiktok_shop.api import echotik_cloud
+    from src.tiktok_shop.repos import echotik_cuentas_repo
+
+    if not echotik_cuentas_repo.borrar(usuario):
+        raise APIError("Esa cuenta no está guardada.", status_code=404)
+    activo = echotik_cloud._auth()[0]
+    return EchoTikCuentasResponse(
+        items=[_a_schema(c, activo) for c in echotik_cuentas_repo.listar()],
+        mensaje="Cuenta borrada.",
     )
 
 
