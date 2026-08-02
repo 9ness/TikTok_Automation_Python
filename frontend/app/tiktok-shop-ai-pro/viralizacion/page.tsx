@@ -27,6 +27,7 @@ import {
   useDescartarPropuesta,
   usePropuestasClips,
   useSubirAudioLargo,
+  type AudioItem,
 } from "@/lib/queries/viralizacion";
 import type { PonenteInfo } from "@/lib/types/viralizacion";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
@@ -404,7 +405,21 @@ function AudiosDePonente({
 
   const marcado = (n: string) => elegidos.length === 0 || elegidos.includes(n);
   const largos = items.filter((a) => a.duracion_s >= 60).map((a) => a.nombre);
-  const nuevos = items.filter((a) => a.origen === "clip").map((a) => a.nombre);
+  const clips = items.filter((a) => a.origen === "clip");
+  const nuevos = clips.map((a) => a.nombre);
+  // "Los últimos" = los clips de la ÚLTIMA CHARLA analizada, no los de la
+  // última hora. Agrupar por tiempo era difuso (dos análisis seguidos caían
+  // juntos); el fichero de origen sí es exacto: `clip_<origen>_cN.mp3`.
+  const recientes = (() => {
+    const origen = (n: string) => n.replace(/^clip_/i, "").replace(/_c\d+\.mp3$/i, "");
+    const ultimo = clips.reduce<AudioItem | null>(
+      (mejor, a) => ((a.creado_at ?? 0) > (mejor?.creado_at ?? 0) ? a : mejor),
+      null,
+    );
+    if (!ultimo) return [];
+    const base = origen(ultimo.nombre);
+    return clips.filter((a) => origen(a.nombre) === base).map((a) => a.nombre);
+  })();
 
   return (
     <div className="space-y-1.5 rounded-lg border border-border/60 p-2">
@@ -428,6 +443,15 @@ function AudiosDePonente({
               className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-amber-500 hover:text-amber-500"
             >
               Solo clips ({nuevos.length})
+            </button>
+          )}
+          {recientes.length > 0 && recientes.length < nuevos.length && (
+            <button
+              type="button"
+              onClick={() => onChange(recientes)}
+              className="rounded border border-amber-500/60 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500 transition hover:bg-amber-500/20"
+            >
+              Solo la última charla ({recientes.length})
             </button>
           )}
           <button
@@ -471,6 +495,17 @@ function AudiosDePonente({
             <span className="min-w-0 flex-1 truncate">
               {a.nombre.replace(/^clip_/i, "").replace(/\.mp3$/i, "")}
             </span>
+            {/* La fecha ordena mentalmente el banco: cuáles son los de siempre
+                y cuáles acaban de entrar. Solo en los clips — los audios base
+                llevan ahí desde el principio. */}
+            {a.origen === "clip" && a.creado_at ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {new Date(a.creado_at * 1000).toLocaleDateString("es-ES", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            ) : null}
             <span
               className={`shrink-0 tabular-nums ${
                 a.duracion_s >= 60 ? "font-semibold text-emerald-500" : "text-muted-foreground"

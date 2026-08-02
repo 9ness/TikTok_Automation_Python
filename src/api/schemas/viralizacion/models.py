@@ -93,6 +93,9 @@ class AudioItem(BaseModel):
     # "clip"  = sacado de una charla larga por el cortador automático.
     # Se eligen igual; la distinción es para saber qué está probando.
     origen: str = "base"
+    # Cuándo entró al banco (epoch). Con 20 audios hace falta saber cuáles son
+    # los recién llegados para probar SOLO esos en la siguiente tanda.
+    creado_at: float = 0.0
 
 
 class AudiosListResponse(BaseModel):

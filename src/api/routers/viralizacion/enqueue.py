@@ -147,6 +147,7 @@ def list_audios(ponente: Annotated[str, Query()]) -> AudiosListResponse:
             nombre=a.name,
             duracion_s=round(ffprobe_duration(a), 1),
             origen="clip" if es_clip(a.name) else "base",
+            creado_at=a.stat().st_mtime,
         )
         for a in config.ponente_audio_files(ponente)
     ]

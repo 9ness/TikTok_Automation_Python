@@ -78,6 +78,8 @@ export interface AudioItem {
   duracion_s: number;
   /** "base" = recortado a mano · "clip" = sacado de una charla larga. */
   origen?: "base" | "clip";
+  /** Cuándo entró al banco (epoch, segundos). */
+  creado_at?: number;
 }
 
 /** Audios del banco de un ponente, del más largo al más corto. */
