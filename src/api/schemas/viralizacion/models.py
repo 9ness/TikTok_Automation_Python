@@ -89,6 +89,10 @@ class CuentasEjemploRequest(BaseModel):
 class AudioItem(BaseModel):
     nombre: str
     duracion_s: float
+    # "base"  = recortado a mano por el operador.
+    # "clip"  = sacado de una charla larga por el cortador automático.
+    # Se eligen igual; la distinción es para saber qué está probando.
+    origen: str = "base"
 
 
 class AudiosListResponse(BaseModel):

@@ -140,8 +140,14 @@ def list_audios(ponente: Annotated[str, Query()]) -> AudiosListResponse:
 
     if not config.is_known_ponente(ponente):
         raise APIError(f"Ponente desconocido: {ponente!r}", status_code=400)
+    from src.viralizacion.pipeline.clip_cutter import es_clip
+
     items = [
-        AudioItem(nombre=a.name, duracion_s=round(ffprobe_duration(a), 1))
+        AudioItem(
+            nombre=a.name,
+            duracion_s=round(ffprobe_duration(a), 1),
+            origen="clip" if es_clip(a.name) else "base",
+        )
         for a in config.ponente_audio_files(ponente)
     ]
     items.sort(key=lambda a: a.duracion_s, reverse=True)

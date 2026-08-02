@@ -316,11 +316,21 @@ def analizar(
 # ---------------------------------------------------------------------------
 # 5. Cortar de verdad
 # ---------------------------------------------------------------------------
+# Prefijo de los clips sacados de una charla larga. Los audios "base" son los
+# que el operador recortó a mano; estos los ha propuesto la máquina, y quiere
+# poder distinguirlos de un vistazo aunque se elijan igual.
+PREFIJO_CLIP = "clip_"
+
+
+def es_clip(nombre: str) -> bool:
+    return nombre.lower().startswith(PREFIJO_CLIP)
+
+
 def _nombre_libre(carpeta: Path, base: str, i: int) -> Path:
-    """`<base>_c1.mp3`, saltando los que ya existan."""
+    """`clip_<base>_c1.mp3`, saltando los que ya existan."""
     n = i
     while True:
-        p = carpeta / f"{base}_c{n}.mp3"
+        p = carpeta / f"{PREFIJO_CLIP}{base}_c{n}.mp3"
         if not p.exists():
             return p
         n += 1

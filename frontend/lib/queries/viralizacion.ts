@@ -76,6 +76,8 @@ export function useGuardarCuentasEjemplo() {
 export interface AudioItem {
   nombre: string;
   duracion_s: number;
+  /** "base" = recortado a mano · "clip" = sacado de una charla larga. */
+  origen?: "base" | "clip";
 }
 
 /** Audios del banco de un ponente, del más largo al más corto. */

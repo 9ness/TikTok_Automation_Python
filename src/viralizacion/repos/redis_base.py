@@ -90,6 +90,10 @@ class ViralizacionRedis:
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)
         return result == "OK"
 
+    def delete(self, key: str) -> bool:
+        result = self._post(f"del/{self._enc(self._full_key(key))}")
+        return result is not None
+
     def sadd(self, key: str, member: str) -> bool:
         result = self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(member)}")
         return result is not None

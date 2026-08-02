@@ -404,6 +404,7 @@ function AudiosDePonente({
 
   const marcado = (n: string) => elegidos.length === 0 || elegidos.includes(n);
   const largos = items.filter((a) => a.duracion_s >= 60).map((a) => a.nombre);
+  const nuevos = items.filter((a) => a.origen === "clip").map((a) => a.nombre);
 
   return (
     <div className="space-y-1.5 rounded-lg border border-border/60 p-2">
@@ -417,6 +418,16 @@ function AudiosDePonente({
               className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
             >
               Solo +1 min ({largos.length})
+            </button>
+          )}
+          {/* Para probar de golpe los arranques nuevos sacados de YouTube. */}
+          {nuevos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(nuevos)}
+              className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-amber-500 hover:text-amber-500"
+            >
+              Solo clips ({nuevos.length})
             </button>
           )}
           <button
@@ -448,7 +459,18 @@ function AudiosDePonente({
               }}
               className="h-3 w-3 shrink-0"
             />
-            <span className="min-w-0 flex-1 truncate">{a.nombre.replace(/\.mp3$/i, "")}</span>
+            {/* Los clips sacados de una charla larga se marcan: se eligen
+                igual que los demás, pero el operador quiere saber cuáles ha
+                propuesto la máquina y cuáles recortó él. */}
+            {a.origen === "clip" && (
+              <Scissors
+                className="h-3 w-3 shrink-0 text-amber-500"
+                aria-label="clip automático"
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate">
+              {a.nombre.replace(/^clip_/i, "").replace(/\.mp3$/i, "")}
+            </span>
             <span
               className={`shrink-0 tabular-nums ${
                 a.duracion_s >= 60 ? "font-semibold text-emerald-500" : "text-muted-foreground"
