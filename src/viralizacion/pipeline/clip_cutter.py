@@ -35,10 +35,12 @@ def _noop(_: str) -> None:
     return None
 
 
-# Duraciones. Lo que retiene es el minuto largo: por debajo de 55s el vídeo se
-# queda en nada y por encima de 110s se cae la retención. El mínimo se valida
-# DESPUÉS de ajustar a silencios, porque el ajuste puede recortar unas décimas.
-MIN_CLIP_S = 55.0
+# Duraciones. Lo que retiene es el minuto largo, pero el suelo es 50s: con 55
+# se perdió el cierre de una charla ("La vida no es para temerla, es para
+# vivirla") porque el tramo daba 54. Se apunta a 60-90 desde el prompt; esto
+# es solo el mínimo por debajo del cual no vale la pena. Se valida DESPUÉS de
+# ajustar a silencios, porque el ajuste puede recortar unas décimas.
+MIN_CLIP_S = 50.0
 MAX_CLIP_S = 110.0
 
 # Margen que se le deja al ajuste a silencio para buscar alrededor del punto
@@ -171,7 +173,7 @@ def proponer(
     Va en DOS pasadas. En la primera el modelo tiende a quedarse con el clip
     más evidente y dar el audio por terminado: en una charla de 3 minutos sacó
     uno de 99s y dejó los 74 finales sin mirar, con dos ganchos buenos dentro.
-    Así que si queda un hueco de 55s o más, se le vuelve a preguntar SOLO por
+    Así que si queda un hueco de 50s o más, se le vuelve a preguntar SOLO por
     ese tramo. Sale gratis (key FREE) y es lo que da variedad de arranques,
     que es justo para lo que existe esto.
     """
@@ -198,7 +200,7 @@ def proponer(
             f"Ya se han elegido estos trozos y NO se pueden repetir:\n"
             + "\n".join(f"- {c.inicio:.1f}s a {c.fin:.1f}s ({c.tema})" for c in clips)
             + f"\n\nBusca AHORA clips solo dentro de estos tramos libres: {tramos}.\n"
-            f"Si un tramo libre da para un clip de 55s o más que arranque con "
+            f"Si un tramo libre da para un clip de 50s o más que arranque con "
             f"gancho propio, devuélvelo. Si no da, devuelve la lista vacía.\n"
             f"NO fuerces un clip para rellenar: si el tramo libre empieza a "
             f"mitad de una frase o de una idea ya contada, no vale — devolver "

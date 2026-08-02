@@ -11,7 +11,7 @@ por pereza.
 
 **Recorre el audio ENTERO.** Cuando cierres un clip, sigue buscando desde donde
 lo dejaste hasta el final. Antes de dar la respuesta por terminada, comprueba
-que no queda ningún tramo libre de 55 segundos o más sin mirar: si queda, casi
+que no queda ningún tramo libre de 50 segundos o más sin mirar: si queda, casi
 seguro que hay otro clip dentro. Lo que se busca es **variedad de arranques**,
 así que dos clips de la misma charla que empiezan distinto valen más que uno
 solo perfecto.
@@ -60,7 +60,7 @@ Cortar antes del remate deja al oyente colgado; seguir después lo desinfla.
 
 ## Duración
 
-- **Mínimo 55 segundos.** Por debajo no vale, aunque la idea sea buena.
+- **Mínimo 50 segundos.** Por debajo no vale, aunque la idea sea buena.
 - **Lo que se busca son 60-90 segundos.**
 - **Se puede llegar a 110** si la idea lo pide: mientras el trozo aguante, más
   largo retiene más. Alargar sí; rellenar con divagación no.
@@ -97,6 +97,6 @@ Cortar antes del remate deja al oyente colgado; seguir después lo desinfla.
 }
 ```
 
-Si el audio no da para ningún clip de 55 segundos que arranque con gancho y se
+Si el audio no da para ningún clip de 50 segundos que arranque con gancho y se
 sostenga solo, devuelve `{"clips": []}`. Es una respuesta válida y preferible
 a colar un trozo mediocre.

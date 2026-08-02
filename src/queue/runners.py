@@ -1702,7 +1702,7 @@ def run_viralizacion_clips(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
     clips_repo.guardar(ponente, fichero, clip_cutter.a_dict(clips))
 
     if not clips:
-        on_log("[viralizacion] ningún trozo aguanta 55s con gancho propio.")
+        on_log("[viralizacion] ningún trozo aguanta 50s con gancho propio.")
     on_progress(1.0, f"✂️ {len(clips)} clip(s) propuestos")
     return str(audio_path)
 

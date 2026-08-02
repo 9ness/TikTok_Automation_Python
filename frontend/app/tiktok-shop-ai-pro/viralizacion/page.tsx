@@ -296,7 +296,7 @@ function CortarAudioLargo({ ponentes }: { ponentes: PonenteInfo[] }) {
 
                 {prop.clips.length === 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    Ningún trozo aguanta 55s con gancho propio. Descártalo.
+                    Ningún trozo aguanta 50s con gancho propio. Descártalo.
                   </p>
                 )}
 
