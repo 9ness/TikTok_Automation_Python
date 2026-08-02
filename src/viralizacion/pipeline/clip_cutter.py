@@ -253,6 +253,14 @@ COLCHON_GANCHO_S = 0.12
 # Y un poco de aire después de la última, para que no se corte en seco.
 COLA_CIERRE_S = 0.25
 
+# Despedidas de plató. Estos monólogos SIEMPRE acaban así ("Buenas noches",
+# "Hasta mañana") y detrás vienen aplausos: quedarse con la cola del audio
+# metía las dos cosas. Se recortan solo si están al FINAL del todo.
+_DESPEDIDAS = {
+    "buenas", "noches", "tardes", "dias", "buenos", "hasta", "manana",
+    "luego", "gracias", "muchas", "adios", "chao", "nos", "vemos",
+}
+
 
 def alinear_con_gancho(
     clips: list[ClipPropuesto], words: list[dict], *, on_log: OnLog | None = None,
@@ -366,9 +374,28 @@ def alinear_con_cierre(
     return salida, fijos
 
 
+def _fin_hablado(words: list[dict]) -> float:
+    """Fin de la última palabra que NO es despedida.
+
+    Sin esto, quedarse con la cola del audio significaba acabar en "…lo que te
+    hace feliz. **Buenas noches**" y nueve segundos de aplausos.
+    """
+    utiles = [w for w in words if _plano(str(w.get("word") or ""))]
+    i = len(utiles) - 1
+    # Como mucho seis palabras de despedida: más allá ya sería contenido.
+    tope = max(0, len(utiles) - 6)
+    while i >= tope and _plano(str(utiles[i].get("word") or ""))[0] in _DESPEDIDAS:
+        i -= 1
+    if i < 0:
+        return 0.0
+    w = utiles[i]
+    return float(w.get("end") or w.get("start") or 0.0)
+
+
 def estirar_hasta_el_final(
     clips: list[ClipPropuesto], duracion: float,
-    *, fines_fijos: set[int] | None = None, on_log: OnLog | None = None,
+    *, words: list[dict] | None = None,
+    fines_fijos: set[int] | None = None, on_log: OnLog | None = None,
 ) -> list[ClipPropuesto]:
     """Si la cola que sobra no da para otro clip, se la queda el último.
 
@@ -385,15 +412,22 @@ def estirar_hasta_el_final(
     log = on_log or _noop
     if (len(clips) - 1) in (fines_fijos or set()):
         return clips
+    # No hasta el final del FICHERO, sino hasta la última palabra que importa:
+    # detrás hay despedida y aplausos.
+    tope = duracion
+    if words:
+        hablado = _fin_hablado(words)
+        if hablado > 0:
+            tope = min(duracion, round(hablado + COLA_CIERRE_S, 2))
     ultimo = clips[-1]
-    cola = duracion - ultimo.fin
+    cola = tope - ultimo.fin
     if cola <= 0.5 or cola >= MIN_CLIP_S:
         return clips
-    if duracion - ultimo.inicio > MAX_ESTIRADO_S:
+    if tope - ultimo.inicio > MAX_ESTIRADO_S:
         return clips
     log(f"[clip_cutter] {ultimo.tema!r}: +{cola:.0f}s hasta el final (la cola sola no daba un clip)")
     return clips[:-1] + [ClipPropuesto(
-        inicio=ultimo.inicio, fin=round(duracion, 2), gancho=ultimo.gancho,
+        inicio=ultimo.inicio, fin=round(tope, 2), gancho=ultimo.gancho,
         tema=ultimo.tema, porque=ultimo.porque, cierre=ultimo.cierre,
     )]
 
@@ -529,7 +563,7 @@ def analizar(
         inicios_fijos=fijos, fines_fijos=fines_fijos, on_log=on_log,
     )
     return estirar_hasta_el_final(
-        clips, duracion, fines_fijos=fines_fijos, on_log=on_log,
+        clips, duracion, words=words, fines_fijos=fines_fijos, on_log=on_log,
     )
 
 
