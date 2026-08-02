@@ -129,6 +129,17 @@ def ponente_originales_folder(slug: str) -> Path:
     return ponente_audios_folder(slug) / "_originales"
 
 
+# Todo lo que ffmpeg abre como audio. La lista era `.mp3/.wav/.m4a` y dejaba
+# fuera lo que sale de descargar de YouTube (`.opus`, `.webm`, `.m4a` dentro de
+# `.mp4`): el fichero se copiaba a la carpeta y simplemente no aparecía en el
+# banco, sin ningún aviso. El pipeline no necesita que sea MP3 — Whisper y el
+# render pasan por ffmpeg igual.
+AUDIO_EXTS = (
+    ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga", ".opus",
+    ".flac", ".wma", ".webm", ".mp4", ".mov", ".mkv",
+)
+
+
 def ponente_audio_files(slug: str) -> list[Path]:
     """Lista ordenada (alfabética, determinista) de audios del ponente."""
     folder = ponente_audios_folder(slug)
@@ -136,7 +147,7 @@ def ponente_audio_files(slug: str) -> list[Path]:
         return []
     return sorted(
         p for p in folder.iterdir()
-        if p.suffix.lower() in (".mp3", ".wav", ".m4a")
+        if p.is_file() and p.suffix.lower() in AUDIO_EXTS
     )
 
 
@@ -165,7 +176,7 @@ def musica_file() -> Path | None:
         return None
     files = sorted(
         p for p in folder.iterdir()
-        if p.suffix.lower() in (".mp3", ".wav", ".m4a")
+        if p.is_file() and p.suffix.lower() in AUDIO_EXTS
     )
     return files[0] if files else None
 

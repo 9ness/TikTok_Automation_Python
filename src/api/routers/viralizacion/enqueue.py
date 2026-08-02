@@ -246,7 +246,6 @@ def generate(
 # Subir → analizar (cola) → revisar la propuesta → cortar solo lo elegido.
 # La revisión no es un lujo: un corte que empieza a media frase no se nota
 # hasta que el vídeo está montado y subido.
-_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".mp4", ".aac", ".ogg", ".opus", ".webm"}
 
 
 @router.post("/audios/subir", response_model=SubirAudioLargoResponse,
@@ -268,10 +267,12 @@ async def subir_audio_largo(
 
     nombre = Path(file.filename or "").name
     ext = Path(nombre).suffix.lower()
-    if ext not in _AUDIO_EXTS:
+    # La lista sale de `config.AUDIO_EXTS`: si aquí se aceptara algo que el
+    # banco luego no lista, el fichero se subiría y desaparecería sin más.
+    if ext not in config.AUDIO_EXTS:
         raise APIError(
             f"Formato no soportado: {nombre!r}. Acepta: "
-            f"{', '.join(sorted(_AUDIO_EXTS))}.",
+            f"{', '.join(sorted(config.AUDIO_EXTS))}.",
             status_code=400,
         )
 
