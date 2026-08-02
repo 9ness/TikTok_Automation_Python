@@ -1,0 +1,305 @@
+"""Saca clips de ~1 minuto de un audio largo de YouTube.
+
+El operador encuentra charlas de 3-10 minutos del mismo ponente que empiezan
+distinto a las que ya tiene. De ahí no sirve el audio entero: hay que encontrar
+**dónde arranca cada idea con gancho y dónde cierra**, que es justo lo que no
+se puede hacer con reglas de silencios.
+
+Cómo:
+1. Whisper (local, ya cacheado) da la transcripción con timings por palabra.
+2. Gemini lee esa transcripción con marcas de tiempo y propone los cortes. Va
+   con la key FREE, así que el Programa 4 sigue sin gastar un céntimo.
+3. Los cortes se **ajustan a un silencio real** del fichero: Gemini razona
+   sobre el texto y clava el punto ±0.5s, pero cortar en mitad de una sílaba
+   se oye fatal. `silencedetect` decide el fotograma exacto.
+
+La propuesta se guarda y NO se corta nada hasta que el operador elige: un clip
+mal cortado no se detecta hasta que el vídeo está montado y subido.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Callable
+
+from src.viralizacion import config
+
+OnLog = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    return None
+
+
+# Duraciones. Lo que retiene es el minuto largo: por debajo de 55s el vídeo se
+# queda en nada y por encima de 110s se cae la retención. El mínimo se valida
+# DESPUÉS de ajustar a silencios, porque el ajuste puede recortar unas décimas.
+MIN_CLIP_S = 55.0
+MAX_CLIP_S = 110.0
+
+# Margen que se le deja al ajuste a silencio para buscar alrededor del punto
+# que dio Gemini. Más de 1.5s y se comería palabras de la idea.
+SNAP_VENTANA_S = 1.5
+
+_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "clip_cutter.md"
+
+
+@dataclass
+class ClipPropuesto:
+    inicio: float
+    fin: float
+    gancho: str
+    tema: str
+    porque: str
+
+    @property
+    def duracion(self) -> float:
+        return max(0.0, self.fin - self.inicio)
+
+
+# ---------------------------------------------------------------------------
+# 1. Transcripción → texto con marcas de tiempo
+# ---------------------------------------------------------------------------
+def transcripcion_marcada(words: list[dict], cada_s: float = 5.0) -> str:
+    """Texto corrido con un `[mm:ss.d]` cada `cada_s` segundos.
+
+    Se marca por tiempo y no por palabra porque un timestamp pegado a cada
+    palabra multiplica por cinco los tokens y el modelo pierde el hilo de lo
+    que se está contando, que es lo único que tiene que juzgar.
+    """
+    partes: list[str] = []
+    siguiente = 0.0
+    for w in words:
+        inicio = float(w.get("start") or 0.0)
+        if inicio >= siguiente:
+            partes.append(f"\n[{int(inicio // 60):02d}:{inicio % 60:04.1f}] ")
+            siguiente = inicio + cada_s
+        partes.append(str(w.get("word") or "").strip())
+    return " ".join(p for p in partes if p).replace("\n ", "\n")
+
+
+# ---------------------------------------------------------------------------
+# 2. Gemini propone los cortes
+# ---------------------------------------------------------------------------
+def _parse_respuesta(raw: str, duracion: float) -> list[ClipPropuesto]:
+    """JSON del modelo → clips saneados. Descarta lo que no cuadre.
+
+    El modelo acierta el contenido pero se inventa décimas: hay que recortar a
+    la duración real y tirar lo que se salga de rango antes de enseñárselo a
+    nadie.
+    """
+    texto = (raw or "").strip()
+    # Por si cuela un ```json ... ``` pese a pedirle que no.
+    if texto.startswith("```"):
+        texto = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", texto).strip()
+    try:
+        doc = json.loads(texto)
+    except json.JSONDecodeError:
+        return []
+
+    salida: list[ClipPropuesto] = []
+    for c in (doc.get("clips") or []) if isinstance(doc, dict) else []:
+        try:
+            inicio = max(0.0, float(c.get("inicio")))
+            fin = min(duracion, float(c.get("fin")))
+        except (TypeError, ValueError):
+            continue
+        if fin - inicio < MIN_CLIP_S:
+            continue
+        if fin - inicio > MAX_CLIP_S:
+            fin = inicio + MAX_CLIP_S
+        salida.append(ClipPropuesto(
+            inicio=round(inicio, 1),
+            fin=round(fin, 1),
+            gancho=str(c.get("gancho") or "").strip()[:200],
+            tema=str(c.get("tema") or "").strip()[:80],
+            porque=str(c.get("porque") or "").strip()[:200],
+        ))
+
+    # Sin solapes: el modelo a veces devuelve dos clips que comparten 10s y el
+    # mismo trozo saldría en dos vídeos distintos, que es justo lo que se
+    # intenta evitar con todo el banco de candidatos.
+    salida.sort(key=lambda c: c.inicio)
+    limpios: list[ClipPropuesto] = []
+    for c in salida:
+        if limpios and c.inicio < limpios[-1].fin:
+            continue
+        limpios.append(c)
+    return limpios
+
+
+def proponer(
+    words: list[dict], duracion: float, *, on_log: OnLog | None = None,
+) -> list[ClipPropuesto]:
+    """Pide a Gemini los cortes. Lista vacía si no hay nada aprovechable."""
+    log = on_log or _noop
+    from src.tiktok_shop.api import gemini
+
+    system = _PROMPT_PATH.read_text(encoding="utf-8")
+    user = (
+        f"Duración total del audio: {duracion:.1f} segundos.\n\n"
+        f"Transcripción:\n{transcripcion_marcada(words)}"
+    )
+    log("[clip_cutter] pidiendo cortes a Gemini…")
+    raw = gemini.generate_text(system, user, expect_json=True, temperature=0.4)
+    clips = _parse_respuesta(raw, duracion)
+    log(f"[clip_cutter] {len(clips)} clip(s) propuestos")
+    return clips
+
+
+# ---------------------------------------------------------------------------
+# 3. Ajuste a silencio real
+# ---------------------------------------------------------------------------
+def _silencios(path: Path, noise_db: int = -32, min_dur: float = 0.18) -> list[tuple[float, float]]:
+    """`[(silence_start, silence_end), ...]` de todo el fichero."""
+    out = subprocess.run(
+        ["ffmpeg", "-v", "info", "-i", str(path),
+         "-af", f"silencedetect=noise={noise_db}dB:d={min_dur}", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    tramos: list[tuple[float, float]] = []
+    abierto: float | None = None
+    for linea in out.stderr.splitlines():
+        if "silence_start:" in linea:
+            try:
+                abierto = float(linea.split("silence_start:")[1].split()[0])
+            except (IndexError, ValueError):
+                abierto = None
+        elif "silence_end:" in linea and abierto is not None:
+            try:
+                fin = float(linea.split("silence_end:")[1].split()[0])
+            except (IndexError, ValueError):
+                abierto = None
+                continue
+            tramos.append((abierto, fin))
+            abierto = None
+    return tramos
+
+
+def ajustar_a_silencio(
+    clips: list[ClipPropuesto], audio_path: Path, duracion: float,
+    *, on_log: OnLog | None = None,
+) -> list[ClipPropuesto]:
+    """Mueve inicio/fin al silencio más cercano, dentro de `SNAP_VENTANA_S`.
+
+    El inicio se lleva al FIN del silencio (justo cuando arranca la voz) y el
+    fin al PRINCIPIO del siguiente (justo cuando la voz calla): así el clip no
+    empieza con aire muerto ni se corta una palabra por la mitad.
+
+    El ajuste es cosmético — quien decide si el trozo vale es el modelo — así
+    que cuando mover los bordes deja el clip unas décimas por debajo del
+    mínimo, se recupera estirando en vez de tirar el clip.
+    """
+    log = on_log or _noop
+    tramos = _silencios(audio_path)
+    if not tramos:
+        log("[clip_cutter] sin silencios detectables — se dejan los cortes tal cual")
+        return clips
+
+    arranques = sorted(t[1] for t in tramos)          # dónde vuelve a hablar
+    # El final del fichero es un sitio perfectamente válido para acabar, y a
+    # menudo el único: sin esto, un clip que llega hasta el final del audio se
+    # descartaba por no encontrar silencio al que agarrarse.
+    paradas = sorted([t[0] for t in tramos] + [duracion])   # dónde calla
+
+    def mas_cerca(valor: float, candidatos: list[float]) -> float:
+        dentro = [c for c in candidatos if abs(c - valor) <= SNAP_VENTANA_S]
+        return min(dentro, key=lambda c: abs(c - valor)) if dentro else valor
+
+    ajustados: list[ClipPropuesto] = []
+    for c in clips:
+        inicio = round(mas_cerca(c.inicio, arranques), 2)
+        fin = round(mas_cerca(c.fin, paradas), 2)
+
+        if fin - inicio < MIN_CLIP_S:
+            # 1º estirar el final al siguiente sitio donde calla.
+            posteriores = [s for s in paradas if s >= inicio + MIN_CLIP_S]
+            if posteriores:
+                fin = round(min(posteriores), 2)
+        if fin - inicio < MIN_CLIP_S:
+            # 2º retroceder el arranque al silencio anterior. Se pierde un
+            # poco de gancho pero se salva el clip.
+            anteriores = [a for a in arranques if a <= fin - MIN_CLIP_S]
+            if anteriores:
+                inicio = round(max(anteriores), 2)
+        if fin - inicio < MIN_CLIP_S:
+            log(f"[clip_cutter] descartado {c.tema!r}: se queda en {fin - inicio:.1f}s")
+            continue
+
+        ajustados.append(ClipPropuesto(
+            inicio=inicio, fin=round(min(fin, inicio + MAX_CLIP_S), 2),
+            gancho=c.gancho, tema=c.tema, porque=c.porque,
+        ))
+    return ajustados
+
+
+# ---------------------------------------------------------------------------
+# 4. Analizar de punta a punta
+# ---------------------------------------------------------------------------
+def analizar(
+    ponente: str, audio_path: Path, *, tmp_dir: Path, on_log: OnLog | None = None,
+) -> list[ClipPropuesto]:
+    """Transcribe, propone y ajusta. No escribe ningún MP3."""
+    log = on_log or _noop
+    from src.viralizacion.pipeline.ffmpeg_utils import ffprobe_duration
+    from src.viralizacion.pipeline.transcriber import transcribe_words
+
+    duracion = ffprobe_duration(audio_path)
+    log(f"[clip_cutter] {audio_path.name} · {duracion:.1f}s")
+    if duracion < MIN_CLIP_S:
+        log("[clip_cutter] el audio ya es más corto que el mínimo — nada que cortar")
+        return []
+
+    words = transcribe_words(ponente, audio_path, tmp_dir=tmp_dir, on_log=on_log)
+    clips = proponer(words, duracion, on_log=on_log)
+    return ajustar_a_silencio(clips, audio_path, duracion, on_log=on_log)
+
+
+# ---------------------------------------------------------------------------
+# 5. Cortar de verdad
+# ---------------------------------------------------------------------------
+def _nombre_libre(carpeta: Path, base: str, i: int) -> Path:
+    """`<base>_c1.mp3`, saltando los que ya existan."""
+    n = i
+    while True:
+        p = carpeta / f"{base}_c{n}.mp3"
+        if not p.exists():
+            return p
+        n += 1
+
+
+def cortar(
+    ponente: str, audio_path: Path, clips: list[ClipPropuesto],
+    *, on_log: OnLog | None = None,
+) -> list[Path]:
+    """Escribe un MP3 por clip en la carpeta de audios del ponente.
+
+    Se re-codifica (no `-c copy`) a propósito: copiando el stream el corte cae
+    en el frame MP3 más cercano y se cuela un trocito de la palabra anterior.
+    """
+    log = on_log or _noop
+    destino = config.ponente_audios_folder(ponente)
+    destino.mkdir(parents=True, exist_ok=True)
+    base = re.sub(r"[^a-zA-Z0-9]+", "_", audio_path.stem).strip("_").lower() or "clip"
+
+    salidas: list[Path] = []
+    for i, c in enumerate(clips, start=1):
+        out = _nombre_libre(destino, base, i)
+        cmd = [
+            "ffmpeg", "-y", "-ss", f"{c.inicio:.3f}", "-to", f"{c.fin:.3f}",
+            "-i", str(audio_path), "-vn", "-ac", "1",
+            "-b:a", config.FFMPEG_AUDIO_BITRATE, str(out), "-loglevel", "error",
+        ]
+        log("+ " + " ".join(cmd))
+        subprocess.run(cmd, check=True)
+        log(f"[clip_cutter] {out.name} · {c.duracion:.1f}s · {c.tema}")
+        salidas.append(out)
+    return salidas
+
+
+def a_dict(clips: list[ClipPropuesto]) -> list[dict]:
+    return [{**asdict(c), "duracion": round(c.duracion, 1)} for c in clips]

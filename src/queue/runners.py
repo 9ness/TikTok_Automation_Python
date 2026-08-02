@@ -1665,6 +1665,46 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
 
 
 # ============================================================
+# RUNNER: VIRALIZACIÓN — TROCEAR UN AUDIO LARGO EN CLIPS
+# ============================================================
+def run_viralizacion_clips(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Analiza una charla larga y propone clips de ~1 minuto.
+
+    Va a la cola y no a la petición HTTP porque Whisper sobre 3-10 minutos de
+    audio tarda minutos: el navegador cortaría antes.
+
+    NO corta nada — deja la propuesta en Redis para que el operador elija.
+    Sigue sin coste: Whisper es local y Gemini va con la key FREE.
+
+    Params: ponente, fichero (nombre dentro de `audios/_originales/`).
+    """
+    from src.viralizacion import config
+    from src.viralizacion.pipeline import clip_cutter
+    from src.viralizacion.repos import clips_repo
+
+    ponente = str(job.params.get("ponente") or "").strip()
+    fichero = str(job.params.get("fichero") or "").strip()
+    if not ponente or not fichero:
+        raise ValueError("Faltan `ponente` o `fichero`.")
+
+    audio_path = config.ponente_originales_folder(ponente) / fichero
+    if not audio_path.is_file():
+        raise FileNotFoundError(f"No existe el audio {audio_path}")
+
+    on_progress(0.1, f"🎧 Transcribiendo {fichero}…")
+    tmp_dir = config.work_root() / "clips" / job.id
+    clips = clip_cutter.analizar(ponente, audio_path, tmp_dir=tmp_dir, on_log=on_log)
+
+    on_progress(0.9, "💾 Guardando propuesta…")
+    clips_repo.guardar(ponente, fichero, clip_cutter.a_dict(clips))
+
+    if not clips:
+        on_log("[viralizacion] ningún trozo aguanta 55s con gancho propio.")
+    on_progress(1.0, f"✂️ {len(clips)} clip(s) propuestos")
+    return str(audio_path)
+
+
+# ============================================================
 # RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
 # ============================================================
 def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2211,6 +2251,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
     JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
+    JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
 }
@@ -2230,6 +2271,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
     JobMode.VIRALIZACION_BATCH: "viralizacion",
+    JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
 }

@@ -7,12 +7,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from src.api.dependencies import get_current_user, get_queue
-from src.api.exceptions import InvalidEnqueueRequestError
+from src.api.exceptions import APIError, InvalidEnqueueRequestError
 from src.api.schemas.viralizacion import (
     CarpetasListResponse,
     PonenteInfo,
@@ -22,6 +23,11 @@ from src.api.schemas.viralizacion import (
     StyleChoice,
     AudioItem,
     AudiosListResponse,
+    CortarClipsRequest,
+    CortarClipsResponse,
+    PropuestaClips,
+    PropuestasListResponse,
+    SubirAudioLargoResponse,
     CuentaEjemplo,
     CuentasEjemploRequest,
     CuentasEjemploResponse,
@@ -231,4 +237,128 @@ def generate(
         title=title,
         position_in_queue=_position_in_queue(queue, job.id),
         total_videos=total_videos,
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Cortar audios largos de YouTube en clips de ~1 minuto
+# ═════════════════════════════════════════════════════════════════════
+# Subir → analizar (cola) → revisar la propuesta → cortar solo lo elegido.
+# La revisión no es un lujo: un corte que empieza a media frase no se nota
+# hasta que el vídeo está montado y subido.
+_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".mp4", ".aac", ".ogg", ".opus", ".webm"}
+
+
+@router.post("/audios/subir", response_model=SubirAudioLargoResponse,
+             status_code=status.HTTP_201_CREATED)
+async def subir_audio_largo(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    file: Annotated[UploadFile, File()],
+    ponente: Annotated[str, Form()],
+) -> SubirAudioLargoResponse:
+    """Guarda la charla larga y encola su análisis. No corta nada todavía."""
+    import re
+    import shutil
+
+    from src.viralizacion import config
+
+    ponente = (ponente or "").strip()
+    if not config.is_known_ponente(ponente):
+        raise APIError(f"Ponente desconocido: {ponente!r}", status_code=400)
+
+    nombre = Path(file.filename or "").name
+    ext = Path(nombre).suffix.lower()
+    if ext not in _AUDIO_EXTS:
+        raise APIError(
+            f"Formato no soportado: {nombre!r}. Acepta: "
+            f"{', '.join(sorted(_AUDIO_EXTS))}.",
+            status_code=400,
+        )
+
+    # Nombre saneado: el fichero acaba dando nombre a los clips
+    # (`<base>_c1.mp3`), y un nombre de YouTube trae de todo.
+    base = re.sub(r"[^a-zA-Z0-9]+", "_", Path(nombre).stem).strip("_").lower()
+    destino_dir = config.ponente_originales_folder(ponente)
+    destino_dir.mkdir(parents=True, exist_ok=True)
+    destino = destino_dir / f"{base or 'audio'}{ext}"
+    n = 2
+    while destino.exists():
+        destino = destino_dir / f"{base or 'audio'}_{n}{ext}"
+        n += 1
+
+    with destino.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+
+    job = queue.enqueue(
+        JobMode.VIRALIZACION_CLIPS,
+        title=f"✂️ Cortar audio largo · {ponente} · {destino.name}",
+        params={"ponente": ponente, "fichero": destino.name},
+    )
+    return SubirAudioLargoResponse(
+        job_id=job.id, ponente=ponente, fichero=destino.name,
+        mensaje="Analizando — la propuesta de cortes aparece al terminar.",
+    )
+
+
+@router.get("/audios/propuestas", response_model=PropuestasListResponse)
+def listar_propuestas() -> PropuestasListResponse:
+    """Propuestas de corte pendientes de revisar."""
+    from src.viralizacion.repos import clips_repo
+
+    return PropuestasListResponse(
+        items=[PropuestaClips(**d) for d in clips_repo.listar()],
+    )
+
+
+@router.post("/audios/cortar", response_model=CortarClipsResponse)
+def cortar_clips(body: CortarClipsRequest) -> CortarClipsResponse:
+    """Crea los MP3 de los clips elegidos y cierra la propuesta.
+
+    El corte en sí son segundos de ffmpeg, así que va aquí y no en la cola:
+    lo lento (Whisper + Gemini) ya se hizo al analizar.
+    """
+    from src.viralizacion import config
+    from src.viralizacion.pipeline import clip_cutter
+    from src.viralizacion.repos import clips_repo
+
+    doc = clips_repo.get(body.ponente, body.fichero)
+    if not doc:
+        raise APIError("Esa propuesta ya no existe.", status_code=404)
+
+    todos = doc.get("clips") or []
+    elegidos = [todos[i] for i in body.indices if 0 <= i < len(todos)]
+    if not elegidos:
+        raise APIError("Ninguno de los índices existe en la propuesta.", status_code=400)
+
+    audio_path = config.ponente_originales_folder(body.ponente) / body.fichero
+    if not audio_path.is_file():
+        raise APIError(f"Ya no está el audio {body.fichero!r}.", status_code=404)
+
+    clips = [
+        clip_cutter.ClipPropuesto(
+            inicio=float(c["inicio"]), fin=float(c["fin"]),
+            gancho=c.get("gancho", ""), tema=c.get("tema", ""),
+            porque=c.get("porque", ""),
+        )
+        for c in elegidos
+    ]
+    creados = clip_cutter.cortar(body.ponente, audio_path, clips)
+    clips_repo.borrar(body.ponente, body.fichero)
+    return CortarClipsResponse(
+        creados=[p.name for p in creados],
+        mensaje=f"{len(creados)} clip(s) añadidos al banco de {body.ponente}.",
+    )
+
+
+@router.delete("/audios/propuestas", response_model=PropuestasListResponse)
+def descartar_propuesta(
+    ponente: Annotated[str, Query()],
+    fichero: Annotated[str, Query()],
+) -> PropuestasListResponse:
+    """Tira la propuesta entera (ningún corte valía)."""
+    from src.viralizacion.repos import clips_repo
+
+    clips_repo.borrar(ponente, fichero)
+    return PropuestasListResponse(
+        items=[PropuestaClips(**d) for d in clips_repo.listar()],
     )

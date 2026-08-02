@@ -28,6 +28,7 @@ class JobMode(str, Enum):
     TIKTOK_SHOP_AUTO_DAY = "tiktok_shop_auto_day"  # Radar v2: llenar 1 día solo
     EDITOR_AUTO = "editor_auto"
     VIRALIZACION_BATCH = "viralizacion_batch"
+    VIRALIZACION_CLIPS = "viralizacion_clips"  # trocear audio largo en clips
     NICHO_POV_BOF_BACKUP = "nicho_pov_bof_backup"  # copia/diff del Drive compartido
     NICHO_POV_BOF_VIDEO = "nicho_pov_bof_video"  # montaje final por producto
 
@@ -53,6 +54,7 @@ MODE_LABELS = {
     JobMode.TIKTOK_SHOP_AUTO_DAY: "🎯 Día automático (ADS frescos)",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
     JobMode.VIRALIZACION_BATCH: "🚀 Viralización 1K",
+    JobMode.VIRALIZACION_CLIPS: "✂️ Cortar audio largo",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",
     JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
 }

@@ -119,6 +119,16 @@ def ponente_gancho_video(slug: str) -> Path | None:
     return videos[0] if videos else None
 
 
+def ponente_originales_folder(slug: str) -> Path:
+    """Audios largos sin trocear (charlas de YouTube subidas por el operador).
+
+    Va DENTRO de `audios/` y con nombre `_originales` porque `ponente_audio_files`
+    no entra en subcarpetas: así el audio de 8 minutos no aparece como si fuera
+    un candidato para un vídeo.
+    """
+    return ponente_audios_folder(slug) / "_originales"
+
+
 def ponente_audio_files(slug: str) -> list[Path]:
     """Lista ordenada (alfabética, determinista) de audios del ponente."""
     folder = ponente_audios_folder(slug)

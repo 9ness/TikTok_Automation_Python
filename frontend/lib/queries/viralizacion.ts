@@ -5,6 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
   CarpetasListResponse,
+  CortarClipsResponse,
+  PropuestaClips,
+  PropuestasListResponse,
+  SubirAudioLargoResponse,
   PonentesListResponse,
   RoundPlanResponse,
   StylesListResponse,
@@ -102,5 +106,64 @@ export function useGenerateViralizacion() {
   return useMutation<ViralizacionGenerateResponse, Error, ViralizacionGenerateRequest>({
     mutationFn: (body) =>
       api.post<ViralizacionGenerateResponse>(`${ROOT}/generate`, body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cortar audios largos de YouTube en clips de ~1 minuto
+// ---------------------------------------------------------------------------
+const propuestasKey = [...viralizacionKeys.all, "propuestas"] as const;
+
+/** Propuestas de corte pendientes de revisar.
+ *
+ *  Refresca sola cada 20s: el análisis (Whisper + Gemini) corre en la cola y
+ *  la propuesta aparece cuando el job acaba, sin que haya que recargar. */
+export function usePropuestasClips() {
+  return useQuery<PropuestaClips[]>({
+    queryKey: propuestasKey,
+    queryFn: async () =>
+      (await api.get<PropuestasListResponse>(`${ROOT}/audios/propuestas`)).items ?? [],
+    refetchInterval: 20_000,
+  });
+}
+
+export function useSubirAudioLargo() {
+  return useMutation<SubirAudioLargoResponse, Error, { ponente: string; file: File }>({
+    mutationFn: ({ ponente, file }) => {
+      const fd = new FormData();
+      fd.append("ponente", ponente);
+      fd.append("file", file);
+      return api.post<SubirAudioLargoResponse>(`${ROOT}/audios/subir`, fd);
+    },
+  });
+}
+
+export function useCortarClips() {
+  const qc = useQueryClient();
+  return useMutation<
+    CortarClipsResponse,
+    Error,
+    { ponente: string; fichero: string; indices: number[] }
+  >({
+    mutationFn: (body) => api.post<CortarClipsResponse>(`${ROOT}/audios/cortar`, body),
+    onSuccess: (_res, vars) => {
+      void qc.invalidateQueries({ queryKey: propuestasKey });
+      // Los clips nuevos entran en el banco → el selector de audios cambia.
+      void qc.invalidateQueries({
+        queryKey: [...viralizacionKeys.all, "audios", vars.ponente],
+      });
+    },
+  });
+}
+
+export function useDescartarPropuesta() {
+  const qc = useQueryClient();
+  return useMutation<PropuestasListResponse, Error, { ponente: string; fichero: string }>({
+    mutationFn: ({ ponente, fichero }) =>
+      api.del<PropuestasListResponse>(
+        `${ROOT}/audios/propuestas?ponente=${encodeURIComponent(ponente)}` +
+          `&fichero=${encodeURIComponent(fichero)}`,
+      ),
+    onSuccess: (res) => qc.setQueryData(propuestasKey, res.items ?? []),
   });
 }

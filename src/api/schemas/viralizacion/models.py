@@ -93,3 +93,52 @@ class AudioItem(BaseModel):
 
 class AudiosListResponse(BaseModel):
     items: list[AudioItem] = Field(default_factory=list)
+
+
+class ClipPropuesto(BaseModel):
+    """Un corte que Gemini propone, todavía SIN cortar."""
+
+    inicio: float
+    fin: float
+    duracion: float
+    # Con qué frase arranca — es lo que decide si el vídeo retiene.
+    gancho: str = ""
+    tema: str = ""
+    porque: str = ""
+
+
+class PropuestaClips(BaseModel):
+    ponente: str
+    fichero: str
+    clips: list[ClipPropuesto] = []
+    at: float | None = None
+
+
+class PropuestasListResponse(BaseModel):
+    items: list[PropuestaClips] = []
+
+
+class SubirAudioLargoResponse(BaseModel):
+    ok: bool = True
+    job_id: str | None = None
+    ponente: str = ""
+    fichero: str = ""
+    mensaje: str = ""
+
+
+class CortarClipsRequest(BaseModel):
+    """Qué clips de la propuesta se convierten en MP3.
+
+    Van por índice y no por tiempos: si el operador tuviera que mandarlos,
+    cualquier redondeo del navegador movería el corte que ya se validó.
+    """
+
+    ponente: str = Field(..., min_length=1)
+    fichero: str = Field(..., min_length=1)
+    indices: list[int] = Field(..., min_length=1)
+
+
+class CortarClipsResponse(BaseModel):
+    ok: bool = True
+    creados: list[str] = []
+    mensaje: str = ""

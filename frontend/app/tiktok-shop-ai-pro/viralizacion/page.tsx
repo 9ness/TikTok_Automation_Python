@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ExternalLink, Loader2, Palette, Rocket, Users } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Palette,
+  Rocket,
+  Scissors,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
@@ -15,7 +23,12 @@ import {
   useGenerateViralizacion,
   usePonentes,
   useRoundPlan,
+  useCortarClips,
+  useDescartarPropuesta,
+  usePropuestasClips,
+  useSubirAudioLargo,
 } from "@/lib/queries/viralizacion";
+import type { PonenteInfo } from "@/lib/types/viralizacion";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 
 /** Cuentas de TikTok que ya siguen esta estrategia: sirven para mirar qué
@@ -138,6 +151,232 @@ function CuentasEjemplo() {
 function mmss(segundos: number): string {
   const s = Math.round(segundos);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Trocear una charla larga de YouTube en clips de ~1 minuto.
+ *
+ *  El operador encuentra charlas de 3-10 min del mismo ponente que empiezan
+ *  distinto a lo que ya tiene. De ahí no sirve el audio entero: hay que saber
+ *  dónde arranca cada idea con gancho propio y dónde cierra. Lo propone Gemini
+ *  sobre la transcripción de Whisper y los cortes se ajustan a un silencio real.
+ *
+ *  Se REVISA antes de cortar: un clip que empieza a media frase no se nota
+ *  hasta que el vídeo está montado y subido. */
+function CortarAudioLargo({ ponentes }: { ponentes: PonenteInfo[] }) {
+  const [abierto, setAbierto] = useState(false);
+  const [ponente, setPonente] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  // Qué clips van marcados, por "<fichero>:<índice>". Todos marcados de
+  // entrada: lo normal es querer los que propone y descartar alguno suelto.
+  const [quitados, setQuitados] = useState<Set<string>>(new Set());
+
+  const subir = useSubirAudioLargo();
+  const cortar = useCortarClips();
+  const descartar = useDescartarPropuesta();
+  const propuestas = usePropuestasClips();
+  const openQueue = useDrawerStore((s) => s.openQueue);
+
+  const pendientes = propuestas.data ?? [];
+  const elegido = ponente || ponentes[0]?.slug || "";
+
+  function marcado(fichero: string, i: number) {
+    return !quitados.has(`${fichero}:${i}`);
+  }
+
+  function alternar(fichero: string, i: number) {
+    setQuitados((prev) => {
+      const next = new Set(prev);
+      const k = `${fichero}:${i}`;
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }
+
+  function enviar() {
+    if (!file || !elegido) return;
+    subir.mutate(
+      { ponente: elegido, file },
+      {
+        onSuccess: (r) => {
+          toast.success(r.mensaje);
+          setFile(null);
+          openQueue();
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-border/60 bg-card">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold sm:text-sm"
+      >
+        <Scissors className="h-4 w-4 shrink-0 text-amber-500" />
+        <span className="flex-1">Cortar audio largo</span>
+        {pendientes.length > 0 && (
+          <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-black">
+            {pendientes.length}
+          </span>
+        )}
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            abierto ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {abierto && (
+        <div className="space-y-3 border-t border-border/60 p-3 pt-2.5">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Sube una charla de YouTube (3-10 min) y se buscan los trozos que
+            arrancan con gancho propio y cierran la idea, de 55 a 110 segundos.
+            No corta nada hasta que tú elijas.
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            {ponentes.map((p) => (
+              <button
+                key={p.slug}
+                type="button"
+                onClick={() => setPonente(p.slug)}
+                className={`truncate rounded-lg border px-3 py-2 text-xs transition ${
+                  elegido === p.slug
+                    ? "border-amber-500 bg-amber-500/10 font-semibold text-amber-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <input
+            type="file"
+            accept="audio/*,video/mp4"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+          />
+          <button
+            type="button"
+            disabled={!file || !elegido || subir.isPending}
+            onClick={enviar}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+          >
+            {subir.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…
+              </>
+            ) : (
+              "Analizar (unos minutos)"
+            )}
+          </button>
+
+          {pendientes.map((prop) => {
+            const indices = prop.clips
+              .map((_c, i) => i)
+              .filter((i) => marcado(prop.fichero, i));
+            return (
+              <div
+                key={`${prop.ponente}/${prop.fichero}`}
+                className="space-y-2 rounded-lg border border-border/60 p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-xs font-semibold">
+                    {prop.fichero}
+                  </p>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {prop.ponente}
+                  </span>
+                </div>
+
+                {prop.clips.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Ningún trozo aguanta 55s con gancho propio. Descártalo.
+                  </p>
+                )}
+
+                {prop.clips.map((c, i) => (
+                  <label
+                    key={`${c.inicio}-${c.fin}`}
+                    className={`flex cursor-pointer gap-2 rounded-lg border p-2 transition ${
+                      marcado(prop.fichero, i)
+                        ? "border-amber-500/60 bg-amber-500/5"
+                        : "border-border/60 opacity-60"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={marcado(prop.fichero, i)}
+                      onChange={() => alternar(prop.fichero, i)}
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-amber-500"
+                    />
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="text-[11px] font-medium">
+                        {mmss(c.inicio)} → {mmss(c.fin)}
+                        <span className="ml-1.5 text-muted-foreground">
+                          ({Math.round(c.duracion)}s) · {c.tema}
+                        </span>
+                      </p>
+                      {/* El gancho es lo que decide si el vídeo retiene: se
+                          enseña entero para poder juzgarlo de un vistazo. */}
+                      {c.gancho && (
+                        <p className="text-[11px] italic leading-snug text-foreground/90">
+                          “{c.gancho}”
+                        </p>
+                      )}
+                      {c.porque && (
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          {c.porque}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={descartar.isPending}
+                    onClick={() =>
+                      descartar.mutate(
+                        { ponente: prop.ponente, fichero: prop.fichero },
+                        { onSuccess: () => toast.success("Propuesta descartada") },
+                      )
+                    }
+                    className="rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-destructive disabled:opacity-50"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={indices.length === 0 || cortar.isPending}
+                    onClick={() =>
+                      cortar.mutate(
+                        { ponente: prop.ponente, fichero: prop.fichero, indices },
+                        {
+                          onSuccess: (r) => toast.success(r.mensaje),
+                          onError: (e) =>
+                            toast.error(e instanceof ApiError ? e.message : String(e)),
+                        },
+                      )
+                    }
+                    className="rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    {cortar.isPending ? "Cortando…" : `Crear ${indices.length}`}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 }
 
 /** Qué audios usar de un ponente. Sin marcar ninguno = todos.
@@ -568,6 +807,7 @@ export default function ViralizacionPage() {
 
       {/* Material de consulta, no parte del flujo: se mira de vez en cuando,
           así que va DESPUÉS del botón de generar y no antes de los ponentes. */}
+      <CortarAudioLargo ponentes={ponentes} />
       <CuentasEjemplo />
     </div>
   );

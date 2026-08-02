@@ -58,3 +58,39 @@ export interface ViralizacionGenerateResponse {
   position_in_queue: number;
   total_videos: number;
 }
+
+/** Un corte propuesto sobre un audio largo, todavía sin cortar. */
+export interface ClipPropuesto {
+  inicio: number;
+  fin: number;
+  duracion: number;
+  /** Frase con la que arranca — es lo que decide si el vídeo retiene. */
+  gancho: string;
+  tema: string;
+  porque: string;
+}
+
+export interface PropuestaClips {
+  ponente: string;
+  fichero: string;
+  clips: ClipPropuesto[];
+  at: number | null;
+}
+
+export interface PropuestasListResponse {
+  items: PropuestaClips[];
+}
+
+export interface SubirAudioLargoResponse {
+  ok: boolean;
+  job_id: string | null;
+  ponente: string;
+  fichero: string;
+  mensaje: string;
+}
+
+export interface CortarClipsResponse {
+  ok: boolean;
+  creados: string[];
+  mensaje: string;
+}
