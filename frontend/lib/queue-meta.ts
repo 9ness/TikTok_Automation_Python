@@ -43,6 +43,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   construccion_pov: "creator_reward",
   editor_auto: "editor_auto",
   viralizacion_batch: "viralizacion",
+  viralizacion_clips: "viralizacion",
   nicho_pov_bof_backup: "viralizacion",
   nicho_pov_bof_video: "viralizacion",
 };
@@ -75,6 +76,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   construccion_pov: "Construcción POV",
   editor_auto: "Editor Auto",
   viralizacion_batch: "Viralización 1K",
+  viralizacion_clips: "Cortar audio largo",
   nicho_pov_bof_backup: "Backup Productos España",
   nicho_pov_bof_video: "Nicho POV BOF",
 };
@@ -93,6 +95,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   construccion_pov: HardHat,
   editor_auto: Scissors,
   viralizacion_batch: Video,
+  viralizacion_clips: Scissors,
   nicho_pov_bof_backup: HardDrive,
   nicho_pov_bof_video: Film,
 };
@@ -173,6 +176,10 @@ export function describeJobParams(
         out.push(params.ponentes.join(", "));
       if (params.nombre_cuenta) out.push(String(params.nombre_cuenta));
       if (params.music_rounds != null) out.push(`música ${String(params.music_rounds)}`);
+      break;
+    case "viralizacion_clips":
+      if (params.ponente) out.push(String(params.ponente));
+      if (params.fichero) out.push(String(params.fichero));
       break;
     case "nicho_pov_bof_backup":
       out.push(params.force_full ? "copia completa" : "incremental");

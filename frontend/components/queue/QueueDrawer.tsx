@@ -67,8 +67,14 @@ export function QueueDrawer() {
     const ts = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "tiktok_shop");
     const cr = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "creator_reward");
     const ea = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "editor_auto");
-    const vi = filtered.filter((j) => MODE_TO_PROGRAM[j.mode] === "viralizacion");
-    return { ts, cr, ea, vi };
+    // El último grupo recoge lo suyo Y todo lo que no encajó en los
+    // anteriores. Con `=== "viralizacion"` a secas, un modo nuevo que aún no
+    // esté en MODE_TO_PROGRAM se contaba en el badge pero no se pintaba en
+    // ningún sitio: el job existía y era invisible hasta terminar.
+    const resto = filtered.filter(
+      (j) => !ts.includes(j) && !cr.includes(j) && !ea.includes(j),
+    );
+    return { ts, cr, ea, vi: resto };
   }, [filtered]);
 
   if (!open) return null;

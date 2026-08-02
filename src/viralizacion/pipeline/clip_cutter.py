@@ -295,10 +295,18 @@ def ajustar_a_silencio(
 # 4. Analizar de punta a punta
 # ---------------------------------------------------------------------------
 def analizar(
-    ponente: str, audio_path: Path, *, tmp_dir: Path, on_log: OnLog | None = None,
+    ponente: str, audio_path: Path, *, tmp_dir: Path,
+    on_log: OnLog | None = None,
+    on_paso: Callable[[float, str], None] | None = None,
 ) -> list[ClipPropuesto]:
-    """Transcribe, propone y ajusta. No escribe ningún MP3."""
+    """Transcribe, propone y ajusta. No escribe ningún MP3.
+
+    `on_paso` va por fases y no por porcentaje real: Whisper no informa de su
+    avance, y sin ningún aviso la cola se queda clavada en el 10% varios
+    minutos y parece colgada.
+    """
     log = on_log or _noop
+    paso = on_paso or (lambda _p, _m: None)
     from src.viralizacion.pipeline.ffmpeg_utils import ffprobe_duration
     from src.viralizacion.pipeline.transcriber import transcribe_words
 
@@ -308,8 +316,13 @@ def analizar(
         log("[clip_cutter] el audio ya es más corto que el mínimo — nada que cortar")
         return []
 
+    paso(0.15, f"🎧 Transcribiendo {duracion / 60:.1f} min con Whisper…")
     words = transcribe_words(ponente, audio_path, tmp_dir=tmp_dir, on_log=on_log)
+
+    paso(0.65, "🧠 Buscando dónde empieza y acaba cada idea…")
     clips = proponer(words, duracion, on_log=on_log)
+
+    paso(0.9, f"✂️ Ajustando {len(clips)} corte(s) al silencio más cercano…")
     return ajustar_a_silencio(clips, audio_path, duracion, on_log=on_log)
 
 

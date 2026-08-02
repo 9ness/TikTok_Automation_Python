@@ -1691,9 +1691,12 @@ def run_viralizacion_clips(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
     if not audio_path.is_file():
         raise FileNotFoundError(f"No existe el audio {audio_path}")
 
-    on_progress(0.1, f"🎧 Transcribiendo {fichero}…")
+    on_progress(0.05, f"🎧 Preparando {fichero}…")
     tmp_dir = config.work_root() / "clips" / job.id
-    clips = clip_cutter.analizar(ponente, audio_path, tmp_dir=tmp_dir, on_log=on_log)
+    clips = clip_cutter.analizar(
+        ponente, audio_path, tmp_dir=tmp_dir, on_log=on_log,
+        on_paso=on_progress,
+    )
 
     on_progress(0.9, "💾 Guardando propuesta…")
     clips_repo.guardar(ponente, fichero, clip_cutter.a_dict(clips))
