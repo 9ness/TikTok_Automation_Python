@@ -33,6 +33,22 @@ NO sirven de gancho: "y entonces claro…", "como decíamos", "bueno, pues…",
 "eso es lo que os contaba", conectores sueltos, ni nada que remita a algo que
 no se ha oído.
 
+Cuidado especial con las preguntas que **apuntan hacia atrás**: "¿Cómo se sale
+de ahí?" suena a gancho pero no lo es — quien llega nuevo no sabe de dónde hay
+que salir. Una pregunta solo vale de gancho si se entiende sin haber oído nada
+antes ("¿Qué fácil es dar consejos cuando tú estás bien?" sí vale).
+
+**Empieza en el gancho, no en lo que lo presenta.** Casi siempre hay una
+entradilla de programa delante — "esta noche va de consejos porque…", "hoy
+vamos a hablar de…", "en el monólogo de hoy…", "os voy a contar una cosa" — y
+esa entradilla sitúa al oyente en un plató, no en la idea. Córtala: el clip
+arranca en la frase que engancha por sí sola.
+
+Ejemplo. Se oye: *"Esta noche va de consejos porque ¿qué fácil es dar consejos
+cuando tú estás bien y ves a una persona pasándolo mal?"*. El clip NO empieza
+en "Esta noche va de consejos"; empieza en **"¿Qué fácil es dar consejos
+cuando tú estás bien…?"**. Son dos segundos menos y un arranque mucho mejor.
+
 **El principio del audio suele ser ya un buen gancho** — el ponente arranca
 fuerte. Si lo es, el primer clip empieza ahí. Los siguientes clips tienen que
 arrancar en un gancho NUEVO más adelante, no en la continuación del anterior.

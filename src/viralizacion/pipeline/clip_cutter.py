@@ -45,6 +45,12 @@ MAX_CLIP_S = 110.0
 # que dio Gemini. Más de 1.5s y se comería palabras de la idea.
 SNAP_VENTANA_S = 1.5
 
+# Separación mínima entre el final de un clip y el arranque del siguiente. Un
+# clip que empieza 0.2s después de acabar el anterior no es un clip nuevo: es
+# la misma frase partida. Pasó tal cual — uno cerraba en "...sin contemplaciones
+# con crudeza" y el siguiente arrancaba en "con crudeza y aceptar lo que venga".
+SEPARACION_MIN_S = 2.0
+
 _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "clip_cutter.md"
 
 
@@ -120,13 +126,18 @@ def _parse_respuesta(raw: str, duracion: float) -> list[ClipPropuesto]:
             porque=str(c.get("porque") or "").strip()[:200],
         ))
 
-    # Sin solapes: el modelo a veces devuelve dos clips que comparten 10s y el
-    # mismo trozo saldría en dos vídeos distintos, que es justo lo que se
-    # intenta evitar con todo el banco de candidatos.
+    # Sin solapes NI clips pegados: el modelo a veces devuelve dos que comparten
+    # 10s (el mismo trozo saldría en dos vídeos, justo lo que se evita con todo
+    # el banco de candidatos) o uno que arranca donde acaba el anterior, que es
+    # la misma frase partida en dos.
     salida.sort(key=lambda c: c.inicio)
+    return _sin_pegados(salida)
+
+
+def _sin_pegados(clips: list[ClipPropuesto]) -> list[ClipPropuesto]:
     limpios: list[ClipPropuesto] = []
-    for c in salida:
-        if limpios and c.inicio < limpios[-1].fin:
+    for c in sorted(clips, key=lambda x: x.inicio):
+        if limpios and c.inicio < limpios[-1].fin + SEPARACION_MIN_S:
             continue
         limpios.append(c)
     return limpios
@@ -148,7 +159,7 @@ def _huecos(clips: list[ClipPropuesto], duracion: float) -> list[tuple[float, fl
 def _pedir(system: str, user: str, duracion: float) -> list[ClipPropuesto]:
     from src.tiktok_shop.api import gemini
 
-    raw = gemini.generate_text(system, user, expect_json=True, temperature=0.4)
+    raw = gemini.generate_text(system, user, expect_json=True, temperature=0.15)
     return _parse_respuesta(raw, duracion)
 
 
@@ -188,7 +199,10 @@ def proponer(
             + "\n".join(f"- {c.inicio:.1f}s a {c.fin:.1f}s ({c.tema})" for c in clips)
             + f"\n\nBusca AHORA clips solo dentro de estos tramos libres: {tramos}.\n"
             f"Si un tramo libre da para un clip de 55s o más que arranque con "
-            f"gancho propio, devuélvelo. Si no da, devuelve la lista vacía.\n\n"
+            f"gancho propio, devuélvelo. Si no da, devuelve la lista vacía.\n"
+            f"NO fuerces un clip para rellenar: si el tramo libre empieza a "
+            f"mitad de una frase o de una idea ya contada, no vale — devolver "
+            f"la lista vacía es la respuesta correcta.\n\n"
             f"Transcripción completa:\n{marcada}",
             duracion,
         )
@@ -199,14 +213,88 @@ def proponer(
             if any(a - 0.5 <= c.inicio and c.fin <= b + 0.5 for a, b in libres)
         ]
         log(f"[clip_cutter] 2ª pasada: {len(nuevos)} clip(s) más")
-        clips = sorted(clips + nuevos, key=lambda c: c.inicio)
+        clips = _sin_pegados(clips + nuevos)
 
     log(f"[clip_cutter] {len(clips)} clip(s) propuestos")
     return clips
 
 
 # ---------------------------------------------------------------------------
-# 3. Ajuste a silencio real
+# 3. Alinear el arranque con el gancho que declara el modelo
+# ---------------------------------------------------------------------------
+def _plano(txt: str) -> list[str]:
+    """Palabras en minúsculas, sin signos ni acentos, para comparar."""
+    import unicodedata
+
+    sin = unicodedata.normalize("NFKD", txt or "")
+    sin = "".join(c for c in sin if not unicodedata.combining(c))
+    return [w for w in re.split(r"[^a-z0-9]+", sin.lower()) if w]
+
+
+# Cuánto se le deja mover el arranque respecto de lo que dijo el modelo. Más
+# que esto y ya no estaríamos corrigiendo una entradilla, sino eligiendo otro
+# trozo distinto.
+VENTANA_GANCHO_S = 25.0
+
+# Aire antes de la primera palabra para no comerse el primer fonema.
+COLCHON_GANCHO_S = 0.12
+
+
+def alinear_con_gancho(
+    clips: list[ClipPropuesto], words: list[dict], *, on_log: OnLog | None = None,
+) -> tuple[list[ClipPropuesto], set[int]]:
+    """Empieza el clip en la primera palabra del `gancho` que declara el modelo.
+
+    El modelo describe bien POR DÓNDE engancha pero luego da un `inicio` unos
+    segundos antes, incluyendo la entradilla de programa: decía que el gancho
+    era "¿qué fácil es dar consejos…" y arrancaba en "Esta noche va de
+    consejos porque…". Como el texto del gancho sí es fiable, se busca en los
+    timings de Whisper y manda ese punto.
+
+    Devuelve también qué clips quedaron fijados, para que el ajuste a silencio
+    no vuelva a arrastrar el arranque hacia atrás.
+    """
+    log = on_log or _noop
+    planas = [(_plano(str(w.get("word") or "")), float(w.get("start") or 0.0)) for w in words]
+    secuencia = [(p[0], t) for p, t in planas if p]  # una palabra por entrada
+
+    salida: list[ClipPropuesto] = []
+    fijos: set[int] = set()
+    for idx, c in enumerate(clips):
+        objetivo = _plano(c.gancho)[:5]
+        if len(objetivo) < 3:
+            salida.append(c)
+            continue
+
+        encontrado: float | None = None
+        for i in range(len(secuencia) - len(objetivo) + 1):
+            t = secuencia[i][1]
+            if abs(t - c.inicio) > VENTANA_GANCHO_S:
+                continue
+            if [w for w, _ in secuencia[i:i + len(objetivo)]] == objetivo:
+                encontrado = t
+                break
+
+        if encontrado is None or abs(encontrado - c.inicio) < 0.2:
+            salida.append(c)
+            continue
+
+        nuevo = round(max(0.0, encontrado - COLCHON_GANCHO_S), 2)
+        if c.fin - nuevo < MIN_CLIP_S:
+            log(f"[clip_cutter] {c.tema!r}: el gancho real dejaría {c.fin - nuevo:.0f}s, se deja como estaba")
+            salida.append(c)
+            continue
+
+        log(f"[clip_cutter] {c.tema!r}: arranque {c.inicio:.1f}s → {nuevo:.1f}s (primera palabra del gancho)")
+        salida.append(ClipPropuesto(
+            inicio=nuevo, fin=c.fin, gancho=c.gancho, tema=c.tema, porque=c.porque,
+        ))
+        fijos.add(idx)
+    return salida, fijos
+
+
+# ---------------------------------------------------------------------------
+# 4. Ajuste a silencio real
 # ---------------------------------------------------------------------------
 def _silencios(path: Path, noise_db: int = -32, min_dur: float = 0.18) -> list[tuple[float, float]]:
     """`[(silence_start, silence_end), ...]` de todo el fichero."""
@@ -236,7 +324,7 @@ def _silencios(path: Path, noise_db: int = -32, min_dur: float = 0.18) -> list[t
 
 def ajustar_a_silencio(
     clips: list[ClipPropuesto], audio_path: Path, duracion: float,
-    *, on_log: OnLog | None = None,
+    *, inicios_fijos: set[int] | None = None, on_log: OnLog | None = None,
 ) -> list[ClipPropuesto]:
     """Mueve inicio/fin al silencio más cercano, dentro de `SNAP_VENTANA_S`.
 
@@ -264,9 +352,13 @@ def ajustar_a_silencio(
         dentro = [c for c in candidatos if abs(c - valor) <= SNAP_VENTANA_S]
         return min(dentro, key=lambda c: abs(c - valor)) if dentro else valor
 
+    fijos = inicios_fijos or set()
     ajustados: list[ClipPropuesto] = []
-    for c in clips:
-        inicio = round(mas_cerca(c.inicio, arranques), 2)
+    for idx, c in enumerate(clips):
+        # Un arranque ya alineado con la primera palabra del gancho NO se
+        # toca: el silencio más cercano suele estar justo ANTES, y moverlo
+        # allí volvería a colar la entradilla que se acaba de quitar.
+        inicio = c.inicio if idx in fijos else round(mas_cerca(c.inicio, arranques), 2)
         fin = round(mas_cerca(c.fin, paradas), 2)
 
         if fin - inicio < MIN_CLIP_S:
@@ -274,7 +366,7 @@ def ajustar_a_silencio(
             posteriores = [s for s in paradas if s >= inicio + MIN_CLIP_S]
             if posteriores:
                 fin = round(min(posteriores), 2)
-        if fin - inicio < MIN_CLIP_S:
+        if fin - inicio < MIN_CLIP_S and idx not in fijos:
             # 2º retroceder el arranque al silencio anterior. Se pierde un
             # poco de gancho pero se salva el clip.
             anteriores = [a for a in arranques if a <= fin - MIN_CLIP_S]
@@ -322,8 +414,11 @@ def analizar(
     paso(0.65, "🧠 Buscando dónde empieza y acaba cada idea…")
     clips = proponer(words, duracion, on_log=on_log)
 
-    paso(0.9, f"✂️ Ajustando {len(clips)} corte(s) al silencio más cercano…")
-    return ajustar_a_silencio(clips, audio_path, duracion, on_log=on_log)
+    paso(0.9, f"✂️ Afinando {len(clips)} corte(s)…")
+    clips, fijos = alinear_con_gancho(clips, words, on_log=on_log)
+    return ajustar_a_silencio(
+        clips, audio_path, duracion, inicios_fijos=fijos, on_log=on_log,
+    )
 
 
 # ---------------------------------------------------------------------------
