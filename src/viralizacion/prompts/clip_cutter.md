@@ -6,7 +6,15 @@ puede sacar un clip que funcione solo**, para usarlos como voz en off de un
 vídeo corto de TikTok.
 
 No hay que aprovechar el audio entero: de tres minutos puede que solo salgan
-dos trozos, o uno, o ninguno. **Prefiere devolver menos y buenos.**
+dos trozos, o uno, o ninguno. Lo que se descarta se descarta por flojo, nunca
+por pereza.
+
+**Recorre el audio ENTERO.** Cuando cierres un clip, sigue buscando desde donde
+lo dejaste hasta el final. Antes de dar la respuesta por terminada, comprueba
+que no queda ningún tramo libre de 55 segundos o más sin mirar: si queda, casi
+seguro que hay otro clip dentro. Lo que se busca es **variedad de arranques**,
+así que dos clips de la misma charla que empiezan distinto valen más que uno
+solo perfecto.
 
 ## Lo más importante: DÓNDE EMPIEZA cada clip
 

@@ -132,21 +132,75 @@ def _parse_respuesta(raw: str, duracion: float) -> list[ClipPropuesto]:
     return limpios
 
 
+def _huecos(clips: list[ClipPropuesto], duracion: float) -> list[tuple[float, float]]:
+    """Tramos sin usar de al menos `MIN_CLIP_S`, en orden."""
+    libres: list[tuple[float, float]] = []
+    cursor = 0.0
+    for c in sorted(clips, key=lambda x: x.inicio):
+        if c.inicio - cursor >= MIN_CLIP_S:
+            libres.append((cursor, c.inicio))
+        cursor = max(cursor, c.fin)
+    if duracion - cursor >= MIN_CLIP_S:
+        libres.append((cursor, duracion))
+    return libres
+
+
+def _pedir(system: str, user: str, duracion: float) -> list[ClipPropuesto]:
+    from src.tiktok_shop.api import gemini
+
+    raw = gemini.generate_text(system, user, expect_json=True, temperature=0.4)
+    return _parse_respuesta(raw, duracion)
+
+
 def proponer(
     words: list[dict], duracion: float, *, on_log: OnLog | None = None,
 ) -> list[ClipPropuesto]:
-    """Pide a Gemini los cortes. Lista vacía si no hay nada aprovechable."""
-    log = on_log or _noop
-    from src.tiktok_shop.api import gemini
+    """Pide a Gemini los cortes. Lista vacía si no hay nada aprovechable.
 
+    Va en DOS pasadas. En la primera el modelo tiende a quedarse con el clip
+    más evidente y dar el audio por terminado: en una charla de 3 minutos sacó
+    uno de 99s y dejó los 74 finales sin mirar, con dos ganchos buenos dentro.
+    Así que si queda un hueco de 55s o más, se le vuelve a preguntar SOLO por
+    ese tramo. Sale gratis (key FREE) y es lo que da variedad de arranques,
+    que es justo para lo que existe esto.
+    """
+    log = on_log or _noop
     system = _PROMPT_PATH.read_text(encoding="utf-8")
-    user = (
-        f"Duración total del audio: {duracion:.1f} segundos.\n\n"
-        f"Transcripción:\n{transcripcion_marcada(words)}"
-    )
+    marcada = transcripcion_marcada(words)
+
     log("[clip_cutter] pidiendo cortes a Gemini…")
-    raw = gemini.generate_text(system, user, expect_json=True, temperature=0.4)
-    clips = _parse_respuesta(raw, duracion)
+    clips = _pedir(
+        system,
+        f"Duración total del audio: {duracion:.1f} segundos.\n\n"
+        f"Transcripción:\n{marcada}",
+        duracion,
+    )
+    log(f"[clip_cutter] 1ª pasada: {len(clips)} clip(s)")
+
+    libres = _huecos(clips, duracion)
+    if libres:
+        tramos = ", ".join(f"{a:.1f}s-{b:.1f}s" for a, b in libres)
+        log(f"[clip_cutter] quedan {len(libres)} tramo(s) sin usar ({tramos}) — 2ª pasada")
+        extra = _pedir(
+            system,
+            f"Duración total del audio: {duracion:.1f} segundos.\n\n"
+            f"Ya se han elegido estos trozos y NO se pueden repetir:\n"
+            + "\n".join(f"- {c.inicio:.1f}s a {c.fin:.1f}s ({c.tema})" for c in clips)
+            + f"\n\nBusca AHORA clips solo dentro de estos tramos libres: {tramos}.\n"
+            f"Si un tramo libre da para un clip de 55s o más que arranque con "
+            f"gancho propio, devuélvelo. Si no da, devuelve la lista vacía.\n\n"
+            f"Transcripción completa:\n{marcada}",
+            duracion,
+        )
+        # Solo lo que cae de verdad en un hueco: si el modelo se sale, sería
+        # un solape con un clip ya aceptado y el mismo trozo saldría dos veces.
+        nuevos = [
+            c for c in extra
+            if any(a - 0.5 <= c.inicio and c.fin <= b + 0.5 for a, b in libres)
+        ]
+        log(f"[clip_cutter] 2ª pasada: {len(nuevos)} clip(s) más")
+        clips = sorted(clips + nuevos, key=lambda c: c.inicio)
+
     log(f"[clip_cutter] {len(clips)} clip(s) propuestos")
     return clips
 
