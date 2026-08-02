@@ -38,6 +38,10 @@ de ahí?" suena a gancho pero no lo es — quien llega nuevo no sabe de dónde h
 que salir. Una pregunta solo vale de gancho si se entiende sin haber oído nada
 antes ("¿Qué fácil es dar consejos cuando tú estás bien?" sí vale).
 
+Lo mismo con las objeciones anunciadas: "habrá quien diga: es que mi actitud no
+me gusta…" empieza en **"Es que mi actitud no me gusta"**, no en el "habrá quien
+diga" que la presenta.
+
 **Empieza en el gancho, no en lo que lo presenta.** Casi siempre hay una
 entradilla de programa delante — "esta noche va de consejos porque…", "hoy
 vamos a hablar de…", "en el monólogo de hoy…", "os voy a contar una cosa" — y
@@ -57,6 +61,14 @@ arrancar en un gancho NUEVO más adelante, no en la continuación del anterior.
 
 Donde la idea **cierra**: la conclusión, el remate, la frase que resume.
 Cortar antes del remate deja al oyente colgado; seguir después lo desinfla.
+
+Termina en una frase COMPLETA. Nunca en "y", "pero", "porque" ni a mitad de una
+enumeración: se oye como si se hubiera cortado la luz.
+
+Y si lo que queda hasta el final del audio es menos de 50 segundos, **llega
+hasta el final** siempre que el clip no pase de 110: el remate de una charla
+suele ser lo mejor que tiene, y dejarlo fuera para no llegar al mínimo es
+tirarlo a la basura.
 
 ## Duración
 
@@ -90,6 +102,7 @@ Cortar antes del remate deja al oyente colgado; seguir después lo desinfla.
       "inicio": 12.4,
       "fin": 78.9,
       "gancho": "la frase exacta con la que arranca, tal cual se oye",
+      "cierre": "las últimas palabras del clip, tal cual se oyen",
       "tema": "de qué va, en 3-6 palabras",
       "porque": "por qué engancha y por qué se sostiene solo, en una frase"
     }

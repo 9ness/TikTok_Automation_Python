@@ -43,6 +43,11 @@ def _noop(_: str) -> None:
 MIN_CLIP_S = 50.0
 MAX_CLIP_S = 110.0
 
+# Tope solo para el caso de quedarse con la cola del audio. Se permite pasar de
+# 110 porque la alternativa es tirar el remate de la charla, y el operador
+# prefiere alargar: cuanto más aguanta el clip, más retención.
+MAX_ESTIRADO_S = 125.0
+
 # Margen que se le deja al ajuste a silencio para buscar alrededor del punto
 # que dio Gemini. Más de 1.5s y se comería palabras de la idea.
 SNAP_VENTANA_S = 1.5
@@ -63,6 +68,9 @@ class ClipPropuesto:
     gancho: str
     tema: str
     porque: str
+    # Últimas palabras del clip tal cual se oyen. Igual que `gancho`, sirve
+    # para clavar el corte donde de verdad cierra la idea.
+    cierre: str = ""
 
     @property
     def duracion(self) -> float:
@@ -126,6 +134,7 @@ def _parse_respuesta(raw: str, duracion: float) -> list[ClipPropuesto]:
             gancho=str(c.get("gancho") or "").strip()[:200],
             tema=str(c.get("tema") or "").strip()[:80],
             porque=str(c.get("porque") or "").strip()[:200],
+            cierre=str(c.get("cierre") or "").strip()[:200],
         ))
 
     # Sin solapes NI clips pegados: el modelo a veces devuelve dos que comparten
@@ -241,6 +250,9 @@ VENTANA_GANCHO_S = 25.0
 # Aire antes de la primera palabra para no comerse el primer fonema.
 COLCHON_GANCHO_S = 0.12
 
+# Y un poco de aire después de la última, para que no se corte en seco.
+COLA_CIERRE_S = 0.25
+
 
 def alinear_con_gancho(
     clips: list[ClipPropuesto], words: list[dict], *, on_log: OnLog | None = None,
@@ -289,10 +301,101 @@ def alinear_con_gancho(
 
         log(f"[clip_cutter] {c.tema!r}: arranque {c.inicio:.1f}s → {nuevo:.1f}s (primera palabra del gancho)")
         salida.append(ClipPropuesto(
-            inicio=nuevo, fin=c.fin, gancho=c.gancho, tema=c.tema, porque=c.porque,
+            inicio=nuevo, fin=c.fin, gancho=c.gancho, tema=c.tema,
+            porque=c.porque, cierre=c.cierre,
         ))
         fijos.add(idx)
     return salida, fijos
+
+
+def alinear_con_cierre(
+    clips: list[ClipPropuesto], words: list[dict], *, on_log: OnLog | None = None,
+) -> tuple[list[ClipPropuesto], set[int]]:
+    """Termina el clip donde acaban las palabras de `cierre` que declara el modelo.
+
+    Simétrico a `alinear_con_gancho`, y por el mismo motivo: el modelo sabe
+    dónde cierra la idea pero el número que da se queda corto. Uno acabó en
+    "sabes que te estás engañando **y**" — el remate ("...y que la suerte te dio
+    una oportunidad") venía dos segundos después. Y el ajuste a silencio no
+    salva eso: ahí hay una pausa de verdad, es una respiración a mitad de frase.
+    """
+    log = on_log or _noop
+    secuencia = [
+        (_plano(str(w.get("word") or "")), float(w.get("start") or 0.0),
+         float(w.get("end") or w.get("start") or 0.0))
+        for w in words
+    ]
+    secuencia = [(p[0], ini, fin) for p, ini, fin in secuencia if p]
+
+    salida: list[ClipPropuesto] = []
+    fijos: set[int] = set()
+    for idx, c in enumerate(clips):
+        objetivo = _plano(c.cierre)[-5:]
+        if len(objetivo) < 3:
+            salida.append(c)
+            continue
+
+        # Se busca en TODO el audio, no alrededor del `fin` declarado: el
+        # modelo da los dos datos por separado y no siempre cuadran. En uno
+        # decía que cerraba en "…la suerte te dio una oportunidad" (1:04) y
+        # ponía `fin` en 1:41, a mitad de otra frase. El texto es el fiable;
+        # el número solo desempata si hay varias apariciones.
+        candidatos: list[float] = []
+        for i in range(len(secuencia) - len(objetivo) + 1):
+            if [w for w, _, _ in secuencia[i:i + len(objetivo)]] == objetivo:
+                candidatos.append(secuencia[i + len(objetivo) - 1][2])
+
+        validos = [
+            t for t in candidatos
+            if MIN_CLIP_S <= (t + COLA_CIERRE_S) - c.inicio <= MAX_CLIP_S
+        ]
+        encontrado = min(validos, key=lambda t: abs(t - c.fin)) if validos else None
+
+        if encontrado is None or abs(encontrado - c.fin) < 0.2:
+            salida.append(c)
+            continue
+
+        nuevo_fin = round(encontrado + COLA_CIERRE_S, 2)
+
+        log(f"[clip_cutter] {c.tema!r}: final {c.fin:.1f}s → {nuevo_fin:.1f}s (última palabra del cierre)")
+        salida.append(ClipPropuesto(
+            inicio=c.inicio, fin=nuevo_fin, gancho=c.gancho, tema=c.tema,
+            porque=c.porque, cierre=c.cierre,
+        ))
+        fijos.add(idx)
+    return salida, fijos
+
+
+def estirar_hasta_el_final(
+    clips: list[ClipPropuesto], duracion: float,
+    *, fines_fijos: set[int] | None = None, on_log: OnLog | None = None,
+) -> list[ClipPropuesto]:
+    """Si la cola que sobra no da para otro clip, se la queda el último.
+
+    El remate de un monólogo es lo mejor que tiene ("Entre lo que está bien y lo
+    que está mal, elige lo que te hace feliz") y se estaba quedando fuera: 41
+    segundos sueltos al final, que no llegan al mínimo para ser un clip propio y
+    tampoco los recogía nadie. Solo se estira si cabe dentro del máximo.
+
+    NO se estira si el modelo ya dijo dónde cierra ese clip: hacerlo colaba la
+    despedida del plató ("…elige lo que te hace feliz. **Buenas noches**").
+    """
+    if not clips:
+        return clips
+    log = on_log or _noop
+    if (len(clips) - 1) in (fines_fijos or set()):
+        return clips
+    ultimo = clips[-1]
+    cola = duracion - ultimo.fin
+    if cola <= 0.5 or cola >= MIN_CLIP_S:
+        return clips
+    if duracion - ultimo.inicio > MAX_ESTIRADO_S:
+        return clips
+    log(f"[clip_cutter] {ultimo.tema!r}: +{cola:.0f}s hasta el final (la cola sola no daba un clip)")
+    return clips[:-1] + [ClipPropuesto(
+        inicio=ultimo.inicio, fin=round(duracion, 2), gancho=ultimo.gancho,
+        tema=ultimo.tema, porque=ultimo.porque, cierre=ultimo.cierre,
+    )]
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +429,8 @@ def _silencios(path: Path, noise_db: int = -32, min_dur: float = 0.18) -> list[t
 
 def ajustar_a_silencio(
     clips: list[ClipPropuesto], audio_path: Path, duracion: float,
-    *, inicios_fijos: set[int] | None = None, on_log: OnLog | None = None,
+    *, inicios_fijos: set[int] | None = None,
+    fines_fijos: set[int] | None = None, on_log: OnLog | None = None,
 ) -> list[ClipPropuesto]:
     """Mueve inicio/fin al silencio más cercano, dentro de `SNAP_VENTANA_S`.
 
@@ -355,13 +459,14 @@ def ajustar_a_silencio(
         return min(dentro, key=lambda c: abs(c - valor)) if dentro else valor
 
     fijos = inicios_fijos or set()
+    fijos_fin = fines_fijos or set()
     ajustados: list[ClipPropuesto] = []
     for idx, c in enumerate(clips):
         # Un arranque ya alineado con la primera palabra del gancho NO se
         # toca: el silencio más cercano suele estar justo ANTES, y moverlo
         # allí volvería a colar la entradilla que se acaba de quitar.
         inicio = c.inicio if idx in fijos else round(mas_cerca(c.inicio, arranques), 2)
-        fin = round(mas_cerca(c.fin, paradas), 2)
+        fin = c.fin if idx in fijos_fin else round(mas_cerca(c.fin, paradas), 2)
 
         if fin - inicio < MIN_CLIP_S:
             # 1º estirar el final al siguiente sitio donde calla.
@@ -380,7 +485,7 @@ def ajustar_a_silencio(
 
         ajustados.append(ClipPropuesto(
             inicio=inicio, fin=round(min(fin, inicio + MAX_CLIP_S), 2),
-            gancho=c.gancho, tema=c.tema, porque=c.porque,
+            gancho=c.gancho, tema=c.tema, porque=c.porque, cierre=c.cierre,
         ))
     return ajustados
 
@@ -418,8 +523,13 @@ def analizar(
 
     paso(0.9, f"✂️ Afinando {len(clips)} corte(s)…")
     clips, fijos = alinear_con_gancho(clips, words, on_log=on_log)
-    return ajustar_a_silencio(
-        clips, audio_path, duracion, inicios_fijos=fijos, on_log=on_log,
+    clips, fines_fijos = alinear_con_cierre(clips, words, on_log=on_log)
+    clips = ajustar_a_silencio(
+        clips, audio_path, duracion,
+        inicios_fijos=fijos, fines_fijos=fines_fijos, on_log=on_log,
+    )
+    return estirar_hasta_el_final(
+        clips, duracion, fines_fijos=fines_fijos, on_log=on_log,
     )
 
 
