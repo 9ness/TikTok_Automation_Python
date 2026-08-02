@@ -562,9 +562,37 @@ def analizar(
         clips, audio_path, duracion,
         inicios_fijos=fijos, fines_fijos=fines_fijos, on_log=on_log,
     )
-    return estirar_hasta_el_final(
+    clips = estirar_hasta_el_final(
         clips, duracion, words=words, fines_fijos=fines_fijos, on_log=on_log,
     )
+    return _sin_despedida(clips, words, on_log=on_log)
+
+
+def _sin_despedida(
+    clips: list[ClipPropuesto], words: list[dict], *, on_log: OnLog | None = None,
+) -> list[ClipPropuesto]:
+    """Recorta la despedida de plató del último clip, venga de donde venga.
+
+    No basta con controlarlo al estirar la cola: el propio modelo la incluye a
+    veces en el `cierre` que declara ("…elige lo que te hace feliz. Buenas
+    noches"), y entonces el corte se alinea con ella.
+    """
+    log = on_log or _noop
+    tope = _fin_hablado(words)
+    if tope <= 0:
+        return clips
+    tope = round(tope + COLA_CIERRE_S, 2)
+    salida: list[ClipPropuesto] = []
+    for c in clips:
+        if c.fin <= tope or tope - c.inicio < MIN_CLIP_S:
+            salida.append(c)
+            continue
+        log(f"[clip_cutter] {c.tema!r}: final {c.fin:.1f}s → {tope:.1f}s (fuera la despedida)")
+        salida.append(ClipPropuesto(
+            inicio=c.inicio, fin=tope, gancho=c.gancho, tema=c.tema,
+            porque=c.porque, cierre=c.cierre,
+        ))
+    return salida
 
 
 # ---------------------------------------------------------------------------
