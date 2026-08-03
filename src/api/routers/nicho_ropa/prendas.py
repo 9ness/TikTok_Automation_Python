@@ -55,6 +55,7 @@ def get_prompts() -> PromptsRopaResponse:
             imagen=config.prompt_imagen(),
             video_con_manos=config.prompt_video(True),
             video_sin_manos=config.prompt_video(False),
+            video_percha=config.prompt_video_percha(),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e

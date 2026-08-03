@@ -25,16 +25,16 @@ el operador pasó por enlace (`10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL`) resultó ser
 | `Ropa/Ropa Mujer/2 Pantalon corto` | `11enOhq4DL_lmdttQWqgowmA1MRqrR3_0` | 10 → ~5 | **Sin conectar** |
 | `Ropa/Ropa Mujer/Bikinis` | `1T-nqij3xl4Dp-h2JvGJofCq6Wzoia25a` | 14 → ~7 | **Sin conectar** |
 
-⚠️ **Preguntar antes de conectarlas**: "Ropa Mujer" puede ser del módulo 7 (CON
-personas) y no del 8. Los prompts que las acompañan (`Pronts/Ropa/Maniqui Ropa
-Mujer.docx`, `Pantalon Mujer Cesped.docx`) llevan modelo.
+✅ **RESUELTO (2026-08-03): las tres carpetas de `Ropa Mujer` son del MÓDULO 7
+(ropa CON personas)**, lo confirmó el operador. NO conectarlas al módulo 8. Se
+quedan para cuando se monte el menú "Nicho Ropa".
 
 **Prompts de `Camisetas／Conjuntos/Ropa/Pronts/`** — 6, y solo DOS son sin personas:
 
 | Prompt | ¿Sin personas? | Nicho |
 |---|---|---|
 | `Pronts/Pronts.docx` | ✅ | Es EXACTAMENTE el que ya está implementado (alfombra + luces LED) |
-| `Ropa Percha.docx` | ✅ | **FALTA POR AÑADIR** — prenda colgada en percha de madera, sin modelos, mano que acaricia + zoom in/out |
+| `Ropa Percha.docx` | ✅ | ✅ **AÑADIDO** — prenda colgada en percha, sin modelos, mano que acaricia + zoom in/out. Sale como "Vídeo · percha" en la pantalla del nicho |
 | `Pront Generico.docx` | ❌ modelo | Módulo 7 (con personas) |
 | `Pront Movil Generico.docx` | ❌ chica con móvil | Módulo 7 |
 | `Pront Pantalones.docx` | ❌ modelo | Módulo 7 |

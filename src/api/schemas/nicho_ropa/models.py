@@ -18,6 +18,8 @@ class PromptsRopaResponse(BaseModel):
     imagen: str
     video_con_manos: str
     video_sin_manos: str
+    # Segundo escenario del nicho: la prenda colgada en una percha, sin nadie.
+    video_percha: str = ""
 
 
 class PrendaInfo(BaseModel):

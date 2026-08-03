@@ -66,6 +66,20 @@ def prompt_video(con_manos: bool) -> str:
     return " ".join(texto.replace(LINEA_MANOS, "").split())
 
 
+def prompt_video_percha() -> str:
+    """Segundo estilo del nicho: la prenda colgada en una percha, sin nadie.
+
+    Sale de `Camisetas／Conjuntos/Ropa/Pronts/Ropa Percha.docx`. No estaba en la
+    carpeta de Skool — apareció al mirar el Drive de productos. Es el otro
+    prompt de los seis de ropa que NO lleva modelo (los demás sí, y esos son
+    del módulo 7).
+
+    Va aparte y no como variante del de alfombra porque no comparte texto: es
+    otro escenario entero, no la misma toma con o sin manos.
+    """
+    return (prompts_dir() / "prompt_video_percha.md").read_text(encoding="utf-8").strip()
+
+
 def prompt_imagen() -> str:
     return (prompts_dir() / "prompt_imagen.md").read_text(encoding="utf-8").strip()
 

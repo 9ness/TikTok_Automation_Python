@@ -110,7 +110,7 @@ export default function NichoRopaPage() {
         <p className="text-[11px] text-muted-foreground">
           Copia el prompt y la foto de la prenda al generador.
         </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <button
             type="button"
             onClick={() => copiar("Prompt de imagen", prompts.data?.imagen)}
@@ -133,6 +133,14 @@ export default function NichoRopaPage() {
             className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
           >
             <ClipboardCopy className="h-3.5 w-3.5" /> Vídeo · sin manos
+          </button>
+          {/* Otro escenario distinto, no una variante del de alfombra. */}
+          <button
+            type="button"
+            onClick={() => copiar("Prompt percha", prompts.data?.video_percha)}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" /> Vídeo · percha
           </button>
         </div>
         <button

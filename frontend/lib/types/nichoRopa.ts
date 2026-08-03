@@ -5,6 +5,8 @@ export interface PromptsRopaResponse {
   /** Los dos se derivan del mismo texto: la diferencia es la frase de la mano. */
   video_con_manos: string;
   video_sin_manos: string;
+  /** Otro escenario: la prenda colgada en una percha, sin nadie. */
+  video_percha: string;
 }
 
 export interface PrendaItem {
