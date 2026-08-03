@@ -92,7 +92,28 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     """
     photos = drive_client.list_photos(source, folder)
     pairs = photo_pairing.pair_folder(photos)
+    return extract_from_pairs(
+        pairs,
+        system_prompt=_load_system_prompt(),
+        fetch=drive_client.fetch_photo,
+        on_log=on_log,
+    )
 
+
+def extract_from_pairs(
+    pairs: list[dict],
+    *,
+    system_prompt: str,
+    fetch,
+    on_log: OnLog = _noop,
+) -> dict[str, dict]:
+    """El motor de la extracción, sin saber de dónde salen las fotos.
+
+    Lo usan los dos nichos que leen capturas de TikTok Shop (POV BOF y Ropa
+    Sin Personas): cambia el prompt y de qué Drive se bajan las fotos, pero la
+    validación, el descarte de rellenos ("Información no disponible") y el
+    reintento de los que el modelo se deja son idénticos.
+    """
     # Lo normal es leer la captura con título. Pero hay productos que en Drive
     # solo tienen UNA foto, y a veces esa foto es el pantallazo de la
     # DESCRIPCIÓN — que también lleva el nombre del producto y la tienda. Antes
@@ -122,7 +143,7 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
         titled = pair.get("titled") or pair["clean"]
         try:
             suffix = Path(titled.get("name", "")).suffix or ".jpg"
-            path = drive_client.fetch_photo(titled["id"], suffix=suffix)
+            path = fetch(titled["id"], suffix=suffix)
             image_paths.append(str(path))
             ids.append(pair["producto"])
         except Exception as e:
@@ -131,8 +152,6 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     if not image_paths:
         on_log("[text_extractor] no se pudo descargar ninguna captura")
         return {}
-
-    system_prompt = _load_system_prompt()
 
     def _pedir(lote_ids: list[str], lote_paths: list[str]) -> dict[str, dict]:
         """Una llamada a Gemini con las imágenes dadas."""

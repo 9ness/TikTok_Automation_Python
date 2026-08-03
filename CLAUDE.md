@@ -41,6 +41,7 @@ nichos.
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
+| 👕 Nicho Ropa Sin Personas | `NICHO_ROPA_VIDEO` | Módulo 8 del curso: prendas de una carpeta de Drive compartida POR ENLACE → textos/caption → prompts (vídeo con y sin manos) → montaje 9:16 SIN texto quemado y MUDO |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
 
@@ -285,6 +286,21 @@ Dos cosas no obvias:
 
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
 Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
+
+### Nicho Ropa Sin Personas (mismo programa, módulo 8)
+
+Módulos en [`src/nicho_ropa/`](src/nicho_ropa/) (prefijo Redis `nicho_ropa:`).
+API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
+- La carpeta de fotos se comparte **por enlace**, no está en "Compartido
+  conmigo" → se lee con `--drive-root-folder-id`, no con `--drive-shared-with-me`.
+- Es UNA sola carpeta con todas las prendas dentro (`NICHO_ROPA_FOLDER_ID`).
+- El vídeo **no lleva ningún texto quemado** y sale **mudo** (la música la pone
+  el operador al publicar); se le puede añadir voz hombre/mujer si se pide.
+- El prompt de vídeo tiene versión CON y SIN manos: se guarda un solo texto y
+  la variante sin manos se deriva quitando `config.LINEA_MANOS`.
+
+Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
+motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.
 
 ---
 

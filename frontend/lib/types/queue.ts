@@ -20,7 +20,8 @@ export type JobMode =
   | "viralizacion_batch"
   | "viralizacion_clips"
   | "nicho_pov_bof_backup"
-  | "nicho_pov_bof_video";
+  | "nicho_pov_bof_video"
+  | "nicho_ropa_video";
 
 export interface ActiveJob {
   job_id: string;

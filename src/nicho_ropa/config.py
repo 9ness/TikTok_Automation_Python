@@ -68,3 +68,27 @@ def prompt_video(con_manos: bool) -> str:
 
 def prompt_imagen() -> str:
     return (prompts_dir() / "prompt_imagen.md").read_text(encoding="utf-8").strip()
+
+
+# ---------------------------------------------------------------------------
+# Salida
+# ---------------------------------------------------------------------------
+# Mismo patrón que el resto del Programa 4: todo cuelga de TIKTOK_SHOP_AI_PRO.
+DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas"
+
+
+def video_dir() -> Path:
+    """Dónde quedan los vídeos montados.
+
+    Va al mismo Drive montado que el resto del Programa 4, bajo su propia
+    carpeta. Si el mount no está (dev local), cae a `API_TEMP_ROOT`.
+    """
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    if raiz:
+        destino = raiz / DRIVE_UPLOAD_ROOT / "videos"
+    else:
+        destino = Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_ropa" / "videos"
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino

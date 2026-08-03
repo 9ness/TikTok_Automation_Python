@@ -1708,6 +1708,55 @@ def run_viralizacion_clips(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
 
 
 # ============================================================
+# RUNNER: NICHO ROPA SIN PERSONAS — ENCUADRE + MUDO
+# ============================================================
+def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo de UNA prenda: encuadre 9:16 y sin audio.
+
+    Este nicho no lleva NADA quemado encima (ni gancho, ni título, ni CTA), y
+    va mudo a propósito — la música la pone el operador al publicar. Si pide
+    voz, se sortea una del banco del otro nicho.
+
+    Params: producto, raw_path, y opcionalmente sexo ("hombre"|"mujer").
+    """
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.pipeline import video_editor
+    from src.nicho_ropa.repos import product_repo
+
+    p = job.params
+    producto = str(p["producto"])
+    raw_path = Path(p["raw_path"])
+    sexo = (p.get("sexo") or "").strip().lower()
+
+    if not raw_path.is_file():
+        raise FileNotFoundError(f"No está el vídeo subido: {raw_path}")
+
+    voz = None
+    if sexo in ("hombre", "mujer"):
+        from src.nicho_pov_bof.services import audio_bank
+
+        on_progress(0.1, f"🔊 Eligiendo voz ({sexo})…")
+        try:
+            voz = audio_bank.prepare(audio_bank.pick_random(sexo), on_log=on_log)
+        except Exception as e:
+            # Sin voz el vídeo sigue valiendo (de hecho es el modo por
+            # defecto), así que no se tira el montaje por esto.
+            on_log(f"[nicho_ropa] no se pudo preparar la voz: {e} — sale mudo")
+
+    on_progress(0.4, "🎬 Encuadrando a 9:16…")
+    salida = Path(ropa_config.video_dir()) / f"{producto}.mp4"
+    video_editor.montar(raw_path, salida, voz=voz, on_log=on_log)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.update_product(
+        producto, video_path=str(salida), video_listo_at=int(time.time()),
+        uploaded=True,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
+# ============================================================
 # RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
 # ============================================================
 def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2257,6 +2306,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
+    JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
 }
 
 
@@ -2277,6 +2327,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
+    JobMode.NICHO_ROPA_VIDEO: "viralizacion",
 }
 
 

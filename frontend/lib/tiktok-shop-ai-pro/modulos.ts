@@ -69,6 +69,7 @@ export const MODULOS: ModuloNicho[] = [
     icon: Layers,
     drive: "Nicho Ropa Sin Personas",
     resumen: "Ropa que vende sin mostrar caras: contenido limpio y de producto.",
+    listo: true,
   },
   {
     slug: "nicho-general",

@@ -20,6 +20,7 @@ import {
   Rocket,
   Scissors,
   ShieldOff,
+  Shirt,
   ShoppingBag,
   Trophy,
   Video,
@@ -46,6 +47,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   viralizacion_clips: "viralizacion",
   nicho_pov_bof_backup: "viralizacion",
   nicho_pov_bof_video: "viralizacion",
+  nicho_ropa_video: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -79,6 +81,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   viralizacion_clips: "Cortar audio largo",
   nicho_pov_bof_backup: "Backup Productos España",
   nicho_pov_bof_video: "Nicho POV BOF",
+  nicho_ropa_video: "Nicho Ropa",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -98,6 +101,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   viralizacion_clips: Scissors,
   nicho_pov_bof_backup: HardDrive,
   nicho_pov_bof_video: Film,
+  nicho_ropa_video: Shirt,
 };
 
 /**
@@ -183,6 +187,10 @@ export function describeJobParams(
       break;
     case "nicho_pov_bof_backup":
       out.push(params.force_full ? "copia completa" : "incremental");
+      break;
+    case "nicho_ropa_video":
+      if (params.producto) out.push(`prenda ${String(params.producto)}`);
+      out.push(params.sexo ? `voz ${String(params.sexo)}` : "mudo");
       break;
     case "nicho_pov_bof_video":
       if (params.folder) out.push(String(params.folder));

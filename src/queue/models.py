@@ -31,6 +31,7 @@ class JobMode(str, Enum):
     VIRALIZACION_CLIPS = "viralizacion_clips"  # trocear audio largo en clips
     NICHO_POV_BOF_BACKUP = "nicho_pov_bof_backup"  # copia/diff del Drive compartido
     NICHO_POV_BOF_VIDEO = "nicho_pov_bof_video"  # montaje final por producto
+    NICHO_ROPA_VIDEO = "nicho_ropa_video"  # ropa sin personas: encuadre + mudo
 
 
 class JobStatus(str, Enum):
@@ -57,6 +58,7 @@ MODE_LABELS = {
     JobMode.VIRALIZACION_CLIPS: "✂️ Cortar audio largo",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",
     JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
+    JobMode.NICHO_ROPA_VIDEO: "👕 Vídeo Nicho Ropa",
 }
 
 
