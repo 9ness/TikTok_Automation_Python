@@ -45,3 +45,9 @@ onnxruntime>=1.20
 # auth (API key); estos dos paquetes son los específicos de Drive API.
 google-api-python-client>=2.150
 google-auth>=2.35
+
+# Separa voz y acompañamiento. Los clips sacados de YouTube traen la música de
+# fondo del programa, y quitarla deja la voz sola para el vídeo. Torch ya está
+# (lo pide faster-whisper), así que esto solo añade el envoltorio y el modelo
+# se baja la primera vez (~80 MB, cacheado).
+demucs==4.1.0
