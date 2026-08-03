@@ -24,6 +24,8 @@ import {
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
 import { VideoModal } from "@/components/ui/video-modal";
+import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 
 export default function NichoRopaPage() {
@@ -212,6 +214,7 @@ function PrendaCard({
   // Vacío = mudo, que es el modo por defecto de este nicho.
   const [sexo, setSexo] = useState("");
   const [verVideo, setVerVideo] = useState(false);
+  const [verFoto, setVerFoto] = useState(false);
 
   function elegirArchivo(file: File | null) {
     if (!file) return;
@@ -232,13 +235,20 @@ function PrendaCard({
     <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
       <div className="flex gap-2.5">
         {prenda.clean_photo_id ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={buildFotoRopaUrl(prenda.clean_photo_id)}
-            alt={`Prenda ${prenda.producto}`}
-            loading="lazy"
-            className="h-20 w-20 shrink-0 rounded-lg object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => setVerFoto(true)}
+            title="Ver la foto limpia y la captura con título"
+            className="shrink-0"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={buildFotoRopaUrl(prenda.clean_photo_id)}
+              alt={`Prenda ${prenda.producto}`}
+              loading="lazy"
+              className="h-20 w-20 rounded-lg object-cover transition hover:opacity-80"
+            />
+          </button>
         ) : (
           <div className="h-20 w-20 shrink-0 rounded-lg bg-muted" />
         )}
@@ -276,15 +286,20 @@ function PrendaCard({
         </p>
       )}
 
+      {/* Los mismos tres botones que en el Nicho POV BOF: el caption para
+          publicar, y el título de TikTok y la tienda para poder BUSCAR el
+          producto en el Centro de Afiliados. */}
+      {(caption || prenda.titulo_tiktok_completo || prenda.tienda) && (
+        <div className="flex flex-wrap gap-1">
+          <CopyChip label="✍️ Caption" text={caption} />
+          <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} />
+          <CopyChip label="🏪 Tienda" text={prenda.tienda} />
+        </div>
+      )}
       {caption && (
-        <button
-          type="button"
-          onClick={() => onCopiar("Caption", caption)}
-          className="flex w-full items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-left text-[11px] transition hover:border-foreground/30"
-        >
-          <ClipboardCopy className="h-3 w-3 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{caption}</span>
-        </button>
+        <p className="rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+          {caption}
+        </p>
       )}
 
       <div className="grid grid-cols-3 gap-1">
@@ -333,6 +348,23 @@ function PrendaCard({
           Ver / descargar
         </button>
       </div>
+
+      <FotoModal
+        open={verFoto}
+        onOpenChange={setVerFoto}
+        titulo={`Prenda ${prenda.producto}`}
+        urlLimpia={
+          prenda.clean_photo_id ? buildFotoRopaUrl(prenda.clean_photo_id) : null
+        }
+        urlTitulo={
+          prenda.titled_photo_id ? buildFotoRopaUrl(prenda.titled_photo_id) : null
+        }
+        urlDescarga={
+          prenda.clean_photo_id
+            ? buildFotoLimpiaRopaUrl(prenda.producto, carpeta)
+            : null
+        }
+      />
 
       <VideoModal
         open={verVideo}
