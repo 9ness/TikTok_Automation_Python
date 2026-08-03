@@ -55,7 +55,10 @@ def separar_voz(
     """
     if not disponible():
         raise RuntimeError(
-            "Demucs no está instalado en este entorno (ver requirements.txt)."
+            "Demucs no está instalado. Se instala a mano porque meterlo en "
+            "requirements.txt obliga a reconstruir la capa de pip entera y el "
+            "disco del VPS no da:\n"
+            "    docker exec tiktok-api pip install --no-cache-dir demucs==4.1.0"
         )
     trabajo = Path(tmp_dir or tempfile.mkdtemp(prefix="voz_limpia_"))
     trabajo.mkdir(parents=True, exist_ok=True)

@@ -46,8 +46,9 @@ onnxruntime>=1.20
 google-api-python-client>=2.150
 google-auth>=2.35
 
-# Separa voz y acompañamiento. Los clips sacados de YouTube traen la música de
-# fondo del programa, y quitarla deja la voz sola para el vídeo. Torch ya está
-# (lo pide faster-whisper), así que esto solo añade el envoltorio y el modelo
-# se baja la primera vez (~80 MB, cacheado).
-demucs==4.1.0
+# demucs (separar voz de música) NO va aquí a propósito. Meterlo obliga a
+# reconstruir la capa de pip entera, y eso pide ~10 GB de temporal: dos deploys
+# nocturnos seguidos murieron con "No space left on device" y dejaron la API
+# sin actualizar. Se instala a mano cuando haga falta, que es cada muchos días:
+#     docker exec tiktok-api pip install --no-cache-dir demucs==4.1.0
+# Ver `src/viralizacion/pipeline/voz_limpia.py`.
