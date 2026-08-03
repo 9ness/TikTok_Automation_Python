@@ -10,6 +10,66 @@
 - [ ] Tras push → SSH al VPS y disparar `deploy_safe.sh` para aplicar
 - [ ] Probar el flujo end-to-end del refactor TikTok Shop: crear producto desde URL → fotos → análisis → presets → /generate con bulk + smart variants
 
+## 🗂️ Drive "Productos España" — mapa de carpetas por nicho (2026-08-03)
+
+Explorado entero. Tenía 16 subcarpetas, no las 2 que conocíamos. La carpeta que
+el operador pasó por enlace (`10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL`) resultó ser
+`Camisetas／Conjuntos/Jonny/1`.
+
+### Ropa — hay MÁS producto y un prompt más
+
+| Carpeta | ID | Fotos | Nota |
+|---|---|---|---|
+| `Camisetas／Conjuntos/Jonny/1` | `10jSRau…` | 16 → **8 prendas** | Ya conectada |
+| `Ropa/Ropa Mujer/1 Mono` | `1MXBSXZRwqbo1F25OAM-MhO-qTf4SmxyK` | 14 → ~7 | **Sin conectar** |
+| `Ropa/Ropa Mujer/2 Pantalon corto` | `11enOhq4DL_lmdttQWqgowmA1MRqrR3_0` | 10 → ~5 | **Sin conectar** |
+| `Ropa/Ropa Mujer/Bikinis` | `1T-nqij3xl4Dp-h2JvGJofCq6Wzoia25a` | 14 → ~7 | **Sin conectar** |
+
+⚠️ **Preguntar antes de conectarlas**: "Ropa Mujer" puede ser del módulo 7 (CON
+personas) y no del 8. Los prompts que las acompañan (`Pronts/Ropa/Maniqui Ropa
+Mujer.docx`, `Pantalon Mujer Cesped.docx`) llevan modelo.
+
+**Prompts de `Camisetas／Conjuntos/Ropa/Pronts/`** — 6, y solo DOS son sin personas:
+
+| Prompt | ¿Sin personas? | Nicho |
+|---|---|---|
+| `Pronts/Pronts.docx` | ✅ | Es EXACTAMENTE el que ya está implementado (alfombra + luces LED) |
+| `Ropa Percha.docx` | ✅ | **FALTA POR AÑADIR** — prenda colgada en percha de madera, sin modelos, mano que acaricia + zoom in/out |
+| `Pront Generico.docx` | ❌ modelo | Módulo 7 (con personas) |
+| `Pront Movil Generico.docx` | ❌ chica con móvil | Módulo 7 |
+| `Pront Pantalones.docx` | ❌ modelo | Módulo 7 |
+| `Pront Pijamas.docx` | ❌ modelo | Módulo 7 — **esto es lo de los pijamas que preguntó el operador: NO es de este nicho** |
+| `Pront Vestidos.docx` | ❌ modelo | Módulo 7 |
+
+### El nombre de la carpeta ES el prompt a usar
+
+Descubrimiento útil para automatizar: las carpetas de producto se llaman igual
+que los prompts de escenario. `Zapatillas/13 Terraza Mesa` + `Suplementos/1
+Terraza Mesa` ↔ `Pronts/BOF Videos 8 Segundos/Terraza Mesa BOF.docx`. Es decir,
+el nombre de la carpeta dice con qué prompt se monta. Eso permite elegir el
+prompt SOLO, sin que el operador lo diga.
+
+Escenarios que hay (`Pronts (1)`, dos versiones de cada uno):
+- **BOF 8 segundos**: Almacén Suelo · Almacén Mesa · Maquinaria · Mujer Terraza
+  Mesa · Deck Muebles · Terraza Césped · Terraza Mesa
+- **MOF 15 segundos**: Almacén Suelo · Almacén Mesa · Terraza Césped · Terraza Mesa
+- General: `Pront General Kling.docx`
+
+### Resto de carpetas → a qué nicho van
+
+| Carpeta | Contenido | Nicho |
+|---|---|---|
+| `Zapatillas/` | 6 carpetas `13-18 Terraza Mesa` | Módulo 12 — Zapatos |
+| `Zapatos Mujer/` | 20 fotos sueltas | Módulo 12 — Zapatos |
+| `Gorras/` | Por persona (Bilal, Claudia, Claudio, Jonny, Víctor) + `1Pronts` + `Tiendas Asignadas.docx` | Módulo 11 — Gorras |
+| `Carruseles/` | `Productos Carruseles` + `Pronts Carruseles` | Módulo 14 — Carruseles |
+| `Creativos/` | 8 fotos | Módulo 13 — Creativos Profesionales |
+| `Suplementos/` | 4 carpetas `Terraza Mesa` | POV BOF / General |
+| `Top Ventas/` | Abril 2026 · Mayo 2026 · Productos Alumnos | Referencia, no producción |
+| `BILAL PRODUCTOS ESPAÑA/` | 19+ carpetas numeradas | Sin asignar — preguntar |
+| `No Tocar/` | Bilal · Mikomika · Varios + 20 fotos | **No tocar** (lo dice el nombre) |
+| `Sin Existencias ZHIMING_SPAIN/` | `3 Pront Flow`, `4 Pront Flow` | Descartado (sin stock) |
+
 ## 🌍 Viralización — ampliar a más ponentes (España) y a Estados Unidos
 
 **Tarea grande y tediosa, NO empezar hasta que el operador lo pida.** Él avisa
