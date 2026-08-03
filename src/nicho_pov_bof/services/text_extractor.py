@@ -32,16 +32,19 @@ _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "text_extrac
 # vez de tumbar la extracción de los demás.
 # `gancho` y `cta` ya NO se piden: son fijos y los pone el montaje
 # (`video_editor.textos_fijos`), por cumplimiento.
+# `tienda` NO está aquí: si el modelo no la lee bien, se prefiere quedarse con
+# el producto (título + caption, que es lo que se publica) y dejar la tienda
+# vacía, en vez de tirar el producto entero. Antes se perdía la ficha completa
+# por no distinguirse el nombre de la tienda en la captura.
 REQUIRED_FIELDS = (
     "titulo",
     "titulo_tiktok_completo",
-    "tienda",
     "caption",
 )
 # Opcionales: si no vienen, el producto NO se descarta. `emojis` se añadió
 # después, así que los productos extraídos antes no lo tienen y hay un
 # respaldo por palabras clave en `services/emojis.py`.
-OPTIONAL_FIELDS = ("emojis",)
+OPTIONAL_FIELDS = ("emojis", "tienda")
 
 
 def _load_system_prompt() -> str:
@@ -56,11 +59,19 @@ _RELLENOS = (
     "informacion no disponible", "información no disponible",
     "no disponible", "no visible", "desconocido", "sin titulo",
     "sin título", "n/a", "na", "-", "?",
+    # Salidos de capturas reales de ropa donde la tienda no se leía: el modelo
+    # se inventaba una palabra suelta en inglés en vez de dejarlo en blanco.
+    "encountered", "unknown", "not visible", "store", "tienda",
 )
 
 
 def _es_relleno(valor: str) -> bool:
-    return valor.strip().strip(".").lower() in _RELLENOS
+    v = valor.strip().strip(".").lower()
+    # "[Tienda no visible en la captura]" y similares: el modelo avisa entre
+    # corchetes de que no lo ve, y eso acababa pintado como si fuera el dato.
+    if v.startswith("[") and v.endswith("]"):
+        return True
+    return v in _RELLENOS
 
 
 def _is_valid_entry(entry: object) -> bool:
@@ -182,7 +193,10 @@ def extract_from_pairs(
                 doc = {f: entry[f].strip() for f in REQUIRED_FIELDS}
                 for f in OPTIONAL_FIELDS:
                     v = entry.get(f)
-                    if isinstance(v, str) and v.strip():
+                    # Los opcionales se limpian igual: mejor vacío (y el botón
+                    # sale desactivado) que un relleno pintado como si fuera
+                    # el nombre real de la tienda.
+                    if isinstance(v, str) and v.strip() and not _es_relleno(v):
                         doc[f] = v.strip()
                 salida[pid] = doc
         return salida

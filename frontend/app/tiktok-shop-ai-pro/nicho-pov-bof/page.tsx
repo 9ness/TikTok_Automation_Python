@@ -1392,7 +1392,7 @@ function ProductoCard({
       <div className="flex flex-wrap gap-1">
         <CopyChip label="📝 Título" text={producto.titulo ?? ""} />
         <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
-        <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} />
+        <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} siempre />
         {/* El caption se copia YA con los hashtags pegados: es lo que se
             pega tal cual en TikTok, no hay que juntarlo a mano. */}
         <CopyChip

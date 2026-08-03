@@ -289,13 +289,11 @@ function PrendaCard({
       {/* Los mismos tres botones que en el Nicho POV BOF: el caption para
           publicar, y el título de TikTok y la tienda para poder BUSCAR el
           producto en el Centro de Afiliados. */}
-      {(caption || prenda.titulo_tiktok_completo || prenda.tienda) && (
-        <div className="flex flex-wrap gap-1">
-          <CopyChip label="✍️ Caption" text={caption} />
-          <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} />
-          <CopyChip label="🏪 Tienda" text={prenda.tienda} />
-        </div>
-      )}
+      <div className="flex flex-wrap gap-1">
+        <CopyChip label="✍️ Caption" text={caption} siempre />
+        <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} siempre />
+        <CopyChip label="🏪 Tienda" text={prenda.tienda} siempre />
+      </div>
       {caption && (
         <p className="rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
           {caption}

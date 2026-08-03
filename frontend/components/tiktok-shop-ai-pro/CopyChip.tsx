@@ -10,8 +10,33 @@ import { toast } from "sonner";
  *  se manejen IGUAL: tres personas suben productos y la interfaz tiene que
  *  resultarles familiar de un nicho a otro.
  */
-export function CopyChip({ label, text }: { label: string; text: string }) {
-  if (!text) return null;
+export function CopyChip({
+  label,
+  text,
+  siempre = false,
+}: {
+  label: string;
+  text: string;
+  /** Enseñarlo DESACTIVADO cuando no hay texto, en vez de esconderlo.
+   *
+   *  Para los campos que siempre deberían estar (caption, título, tienda): si
+   *  el botón desaparece, parece que la pantalla ha cambiado. Desactivado se
+   *  ve de un vistazo que ese dato falta. Los opcionales (gancho, enlace…)
+   *  siguen escondiéndose. */
+  siempre?: boolean;
+}) {
+  if (!text && !siempre) return null;
+  if (!text) {
+    return (
+      <span
+        title={`Sin ${label.toLowerCase()}`}
+        className="inline-flex max-w-full cursor-not-allowed items-center gap-1 truncate rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground/40"
+      >
+        <Copy className="h-3 w-3 shrink-0" />
+        <span className="truncate">{label}</span>
+      </span>
+    );
+  }
   return (
     <button
       type="button"
