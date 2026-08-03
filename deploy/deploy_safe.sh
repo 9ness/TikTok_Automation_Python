@@ -333,6 +333,30 @@ dc() {
     (cd "$APP_DIR" && docker compose --env-file .env "$@")
 }
 
+# ============================================================
+# Sitio en disco ANTES de construir
+# ============================================================
+# Un build de Docker necesita varios GB de temporal. La caché de build llegó a
+# ocupar 19 GB y un deploy nocturno se quedó a medias con "No space left on
+# device" — con la API a medio recrear y nadie mirando. Se poda lo que no se
+# esté usando (`--filter until=24h` conserva lo reciente, que es lo que acelera
+# los builds seguidos).
+if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
+    LIBRE_GB=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+    echo "[deploy_safe] disco libre antes de construir: ${LIBRE_GB}G"
+    if [[ "${LIBRE_GB:-0}" -lt 15 ]]; then
+        echo "[deploy_safe] 🧹 menos de 15G — podando caché de build de Docker…"
+        docker builder prune -f --filter "until=24h" 2>&1 | tail -1
+        LIBRE_GB=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+        echo "[deploy_safe] disco libre tras podar: ${LIBRE_GB}G"
+    fi
+    if [[ "${LIBRE_GB:-0}" -lt 5 ]]; then
+        echo "[deploy_safe] ⛔ solo quedan ${LIBRE_GB}G — NO se construye, se aplaza."
+        write_status "deferred" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"note\":\"sin_disco\""
+        exit 0
+    fi
+fi
+
 if [[ "$NEEDS_API_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🐳 cambios en API/deps detectados — rebuild api…"
     write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_api\""

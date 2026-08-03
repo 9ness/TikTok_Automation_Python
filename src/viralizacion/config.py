@@ -29,24 +29,55 @@ from pathlib import Path
 # "Skool/Estrategia viralización/España/" en Drive (compartido con la cuenta
 # del operador) de donde se descargaron los recursos originales — se guarda
 # solo como referencia/documentación, el pipeline SIEMPRE lee de local.
+# `pais` decide dos cosas que antes eran globales: en qué idioma transcribe
+# Whisper (Billy Graham habla inglés) y de qué pool salen los paisajes — con
+# uno solo, los vídeos de EEUU saldrían con b-roll de España.
 PONENTES: dict[str, dict] = {
     "pablo": {
         "label": "Pablo Motos",
         "drive_folder": "Pablo Motos",
+        "pais": "es",
     },
     "victor": {
         "label": "Víctor Küppers",
         "drive_folder": "Victor Kuppers",
+        "pais": "es",
     },
     "mario": {
         "label": "Mario Alonso Puig",
         "drive_folder": "Mario Alonso Puig",
+        "pais": "es",
     },
     "segarra": {
         "label": "Dr. Manuel Segarra",
         "drive_folder": "Dr. Manuel Segarra",
+        "pais": "es",
+    },
+    "billy": {
+        "label": "Billy Graham",
+        "drive_folder": "Billy Graham",
+        "pais": "us",
     },
 }
+
+# Idioma de Whisper por país. Antes era la constante global
+# `WHISPER_LANGUAGE = "es"`, que con un ponente en inglés transcribía fonética
+# española y los subtítulos salían ilegibles.
+IDIOMA_POR_PAIS = {"es": "es", "us": "en"}
+
+PAIS_LABEL = {"es": "España", "us": "Estados Unidos"}
+
+
+def pais_de(slug: str) -> str:
+    return PONENTES.get(slug, {}).get("pais", "es")
+
+
+def idioma_de(slug: str) -> str:
+    return IDIOMA_POR_PAIS.get(pais_de(slug), "es")
+
+
+def ponentes_de_pais(pais: str) -> list[str]:
+    return [s for s, m in PONENTES.items() if m.get("pais", "es") == pais]
 
 
 def is_known_ponente(slug: str) -> bool:
@@ -151,12 +182,19 @@ def ponente_audio_files(slug: str) -> list[Path]:
     )
 
 
-def paisajes_folder() -> Path:
-    return assets_root_path() / "paisajes"
+def paisajes_folder(pais: str = "es") -> Path:
+    """Carpeta del vídeo fuente de paisajes.
+
+    España se queda en `paisajes/` tal cual para no romper lo que ya existe;
+    los países nuevos cuelgan con sufijo (`paisajes_us/`).
+    """
+    if pais == "es":
+        return assets_root_path() / "paisajes"
+    return assets_root_path() / f"paisajes_{pais}"
 
 
-def paisajes_video() -> Path | None:
-    folder = paisajes_folder()
+def paisajes_video(pais: str = "es") -> Path | None:
+    folder = paisajes_folder(pais)
     if not folder.is_dir():
         return None
     videos = sorted(
