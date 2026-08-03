@@ -271,6 +271,15 @@ class VideoUploadResponse(BaseModel):
     message: str
 
 
+class UnidadesRequest(BaseModel):
+    """Suma `delta` unidades vendidas (puede ser negativo). Nunca baja de 1."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    producto: str = Field(..., min_length=1)
+    delta: int = 1
+
+
 class SoldProductsResponse(BaseModel):
     # Cada item trae source/folder/producto + los campos guardados
     # (titulo, video_path, gancho, cta...) — el schema exacto por producto

@@ -83,6 +83,29 @@ class NichoPovBofRedis:
         except json.JSONDecodeError:
             return None
 
+    def mget_json(self, keys: list[str]) -> list[dict | None]:
+        """MGET en un solo roundtrip. Con Upstash REST, N `get_json` son N
+        latencias seguidas; esto las convierte en una.
+
+        Devuelve una lista paralela a `keys`: dict decodificado o None.
+        """
+        if not keys:
+            return []
+        encoded = "/".join(self._enc(self._full_key(k)) for k in keys)
+        raw_list = self._get(f"mget/{encoded}")
+        if not raw_list:
+            return [None] * len(keys)
+        out: list[dict | None] = []
+        for raw in raw_list:
+            if raw is None:
+                out.append(None)
+                continue
+            try:
+                out.append(json.loads(raw) if isinstance(raw, str) else raw)
+            except (json.JSONDecodeError, TypeError):
+                out.append(None)
+        return out
+
     def set_json(self, key: str, value: dict | list) -> bool:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)

@@ -46,6 +46,7 @@ from src.api.schemas.nicho_pov_bof import (
     ProductosListResponse,
     PromptsResponse,
     SoldProductsResponse,
+    UnidadesRequest,
     VideoUploadResponse,
 )
 import shutil
@@ -503,7 +504,28 @@ def set_producto_estado(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
+    info = _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
+
+    # El ranking de vendidos lleva su propio índice con una copia de lo que
+    # hace falta para pintarlo (foto incluida). Se escribe AQUÍ, en el único
+    # sitio donde se marca la venta, y no recorriendo las 31 carpetas después.
+    if body.sold is not None:
+        try:
+            if body.sold:
+                product_repo.marcar_vendido(
+                    body.source, body.folder, body.producto,
+                    titulo=info.titulo or "", tienda=info.tienda or "",
+                    clean_photo_id=info.clean_photo_id or "",
+                    product_url=info.product_url or "",
+                )
+            else:
+                product_repo.desmarcar_vendido(body.source, body.folder, body.producto)
+        except Exception:
+            # Que no se caiga el marcado por un fallo del ranking: el dato
+            # bueno (`sold`) ya está guardado en el producto.
+            pass
+
+    return info
 
 
 @router.post("/producto/url", response_model=ProductoInfo)
@@ -902,8 +924,33 @@ def set_hashtags(body: HashtagsRequest) -> HashtagsResponse:
 
 @router.get("/vendidos", response_model=SoldProductsResponse)
 def list_sold(source: Annotated[str | None, Query()] = None) -> SoldProductsResponse:
-    """Productos marcados como vendidos, con foto y título — apartado de
-    referencia para inspirarse en lo que ya ha funcionado."""
+    """Ranking de vendidos, del que más unidades al que menos.
+
+    Sale del índice propio (dos llamadas a Redis). Antes se recorrían las 31
+    carpetas de cada fuente producto a producto: ocho segundos para encontrar
+    dos ventas, y sin foto.
+    """
     from src.nicho_pov_bof.repos import product_repo
 
-    return SoldProductsResponse(items=product_repo.sold_products(source))
+    items = product_repo.ranking_vendidos()
+    if source:
+        items = [i for i in items if i.get("source") == source]
+    return SoldProductsResponse(items=items)
+
+
+@router.post("/vendidos/unidades", response_model=SoldProductsResponse)
+def sumar_unidades_vendidas(body: UnidadesRequest) -> SoldProductsResponse:
+    """Suma (o resta) unidades a un producto ya vendido.
+
+    Un producto que REPITE venta es la señal más valiosa que hay aquí, y no
+    había forma de anotarla: vendiera una vez o cinco, se veía igual.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    try:
+        product_repo.sumar_unidades(body.source, body.folder, body.producto, body.delta)
+    except ValueError as e:
+        raise APIError(str(e), status_code=404) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return SoldProductsResponse(items=product_repo.ranking_vendidos())

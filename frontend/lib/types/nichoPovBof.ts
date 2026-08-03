@@ -116,8 +116,21 @@ export interface ProductoItem {
  *  así que trae `folder` (no está en ProductoItem porque ahí el folder ya
  *  viene fijado por query param). Se necesita para poder construir la URL
  *  de la foto con `buildPhotoUrl(source, folder, id)`. */
-export interface VendidoItem extends ProductoItem {
+/** Entrada del ranking de vendidos. No es un `ProductoItem`: viene de su
+ *  propio índice en Redis con una copia de lo justo para pintarlo, porque
+ *  recorrer las 31 carpetas para encontrar dos ventas costaba 8 segundos. */
+export interface VendidoItem {
+  source: string;
   folder: string;
+  producto: string;
+  titulo: string;
+  tienda: string;
+  clean_photo_id: string;
+  product_url: string;
+  /** Cuántas se han vendido. Un producto que repite es la mejor señal. */
+  unidades: number;
+  vendido_at: number;
+  updated_at: number;
 }
 
 export interface ExtraerTextosRequest {

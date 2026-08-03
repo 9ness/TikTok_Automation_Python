@@ -281,3 +281,90 @@ def save_hashtags(tags: list[str]) -> list[str]:
     r = _require_redis()
     r.set_json(_HASHTAGS_KEY, {"tags": limpios, "updated_at": _now()})
     return limpios
+
+
+# ---------------------------------------------------------------------------
+# Vendidos: índice propio + unidades
+# ---------------------------------------------------------------------------
+# Recorrer las 31 carpetas de cada fuente para encontrar dos productos vendidos
+# costaba 8 SEGUNDOS de Redis. Y el resultado no traía foto, porque
+# `clean_photo_id` se calcula al listar y nunca se guardaba.
+#
+# Así que los vendidos llevan su propio índice, con una copia de lo poco que
+# hace falta para pintarlos. Se escribe al marcar "vendió", que pasa dos veces
+# al día; leerlo son dos llamadas a Redis en vez de sesenta.
+_VENDIDOS_INDEX = "vendidos:index"
+
+
+def _ref_vendido(source: str, folder: str, producto: str) -> str:
+    return f"{source}|{folder}|{producto}"
+
+
+def _key_vendido(ref: str) -> str:
+    return f"vendido:{ref}"
+
+
+def marcar_vendido(
+    source: str, folder: str, producto: str,
+    *, titulo: str = "", tienda: str = "", clean_photo_id: str = "",
+    product_url: str = "", unidades: int = 1,
+) -> dict:
+    """Entra (o actualiza) en el ranking de vendidos."""
+    r = _require_redis()
+    ref = _ref_vendido(source, folder, producto)
+    doc = r.get_json(_key_vendido(ref)) or {}
+    doc.update({
+        "source": source, "folder": folder, "producto": producto,
+        "titulo": titulo or doc.get("titulo", ""),
+        "tienda": tienda or doc.get("tienda", ""),
+        "clean_photo_id": clean_photo_id or doc.get("clean_photo_id", ""),
+        "product_url": product_url or doc.get("product_url", ""),
+        "unidades": max(1, int(doc.get("unidades") or 0) or unidades),
+        "vendido_at": doc.get("vendido_at") or time.time(),
+        "updated_at": time.time(),
+    })
+    r.set_json(_key_vendido(ref), doc)
+    r.sadd(_VENDIDOS_INDEX, ref)
+    return doc
+
+
+def desmarcar_vendido(source: str, folder: str, producto: str) -> None:
+    r = _require_redis()
+    ref = _ref_vendido(source, folder, producto)
+    r.delete(_key_vendido(ref))
+    r.srem(_VENDIDOS_INDEX, ref)
+
+
+def sumar_unidades(source: str, folder: str, producto: str, delta: int) -> dict:
+    """Suma (o resta) unidades vendidas. Nunca baja de 1.
+
+    Existe porque un producto que repite venta es la señal más valiosa que hay
+    aquí, y no había forma de anotarla: el armario vendió una segunda unidad y
+    se quedaba como "1 venta" igual que los que solo vendieron una vez.
+    """
+    r = _require_redis()
+    ref = _ref_vendido(source, folder, producto)
+    doc = r.get_json(_key_vendido(ref))
+    if not doc:
+        raise ValueError("Ese producto no está marcado como vendido.")
+    doc["unidades"] = max(1, int(doc.get("unidades") or 1) + int(delta))
+    doc["updated_at"] = time.time()
+    r.set_json(_key_vendido(ref), doc)
+    return doc
+
+
+def ranking_vendidos() -> list[dict]:
+    """Vendidos de más a menos unidades. Dos llamadas a Redis."""
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return []
+    refs = [str(x) for x in r.smembers(_VENDIDOS_INDEX) if x]
+    if not refs:
+        return []
+    docs = r.mget_json([_key_vendido(ref) for ref in refs])
+    salida = [d for d in docs if isinstance(d, dict)]
+    salida.sort(
+        key=lambda d: (int(d.get("unidades") or 1), d.get("vendido_at") or 0),
+        reverse=True,
+    )
+    return salida

@@ -291,6 +291,22 @@ export function useVendidos(source: string) {
   });
 }
 
+/** Suma (o resta) unidades vendidas. El ranking vuelve ya reordenado. */
+export function useSumarUnidades() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: VendidoItem[] },
+    Error,
+    { source: string; folder: string; producto: string; delta: number }
+  >({
+    mutationFn: (body) =>
+      api.post<{ items: VendidoItem[] }>(`${ROOT}/vendidos/unidades`, body),
+    onSuccess: (res, vars) => {
+      qc.setQueryData(nichoPovBofKeys.vendidos(vars.source), res.items ?? []);
+    },
+  });
+}
+
 /** URL del vídeo YA montado. `v` es la marca de versión: sin ella el
  *  navegador reutilizaría el vídeo anterior de su caché al remontar. */
 export function buildVideoUrl(

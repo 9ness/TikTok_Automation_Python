@@ -49,6 +49,7 @@ import {
   useSetEstado,
   useSources,
   useVendidos,
+  useSumarUnidades,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -68,6 +69,7 @@ export default function NichoPovBofPage() {
   // Carpeta elegida a mano. Si es null se usa la "current" del backend
   // (la primera sin completar).
   const [picked, setPicked] = useState<string | null>(null);
+  const [verVendidos, setVerVendidos] = useState(false);
 
   const sources = useSources();
   const folders = useFolders(source);
@@ -115,6 +117,9 @@ export default function NichoPovBofPage() {
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   const vendidos = useVendidos(source);
+  const totalVendidos = (vendidos.data ?? []).reduce(
+    (n, v) => n + (v.unidades || 1), 0,
+  );
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState("");
   const [downloadingVideos, setDownloadingVideos] = useState(false);
@@ -337,7 +342,27 @@ export default function NichoPovBofPage() {
             style={{ width: `${pct}%` }}
           />
         </div>
+
+        {/* Lo que ya vendió es lo que dice qué buscar, así que va ARRIBA y a
+            un toque. Antes vivía al final de la página, detrás de todo. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+          {totalVendidos > 0 && (
+            <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-black">
+              {totalVendidos}
+            </span>
+          )}
+        </button>
       </section>
+
+      {verVendidos && (
+        <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
+      )}
 
       {/* Todo esto se toca de uvas a peras (la clave de EchoTik cuando caduca,
           los hashtags al cambiar de campaña, la copia si sospechas que han
@@ -740,49 +765,149 @@ export default function NichoPovBofPage() {
         </section>
       )}
 
-      {/* Productos que vendieron */}
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        <div className="flex items-center gap-2">
+    </div>
+  );
+}
+
+/** Ranking de lo que ya ha vendido, en pantalla flotante.
+ *
+ *  Es el dato más valioso de todo el flujo — dice qué tipo de producto buscar —
+ *  y estaba enterrado al final de la página, tardando ocho segundos y sin
+ *  fotos. Ahora sale de su propio índice en Redis (dos llamadas) y se abre
+ *  desde arriba con un toque.
+ *
+ *  Lo importante es poder sumar unidades: un producto que REPITE venta vale
+ *  mucho más que uno que vendió una vez, y no había forma de anotarlo. */
+function VendidosModal({ source, onClose }: { source: string; onClose: () => void }) {
+  const vendidos = useVendidos(source);
+  const sumar = useSumarUnidades();
+  const items = vendidos.data ?? [];
+  const total = items.reduce((n, v) => n + (v.unidades || 1), 0);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+      <div className="relative flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-border/60 bg-card shadow-xl sm:max-h-[80vh] sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-2xl">
+        <div className="flex items-center gap-2 border-b border-border/60 p-3">
           <ShoppingBag className="h-4 w-4 shrink-0 text-amber-500" />
-          <p className="text-sm font-semibold">Productos que vendieron</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Productos que vendieron</p>
+            <p className="text-[11px] text-muted-foreground">
+              {items.length} producto(s) · {total} unidad(es)
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-md p-1 text-muted-foreground transition hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {vendidos.isLoading && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
-          </div>
-        )}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+          {vendidos.isLoading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
+            </div>
+          )}
+          {!vendidos.isLoading && items.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Todavía ninguno. Marca “Vendió” en la ficha de un producto y
+              aparecerá aquí.
+            </p>
+          )}
 
-        {vendidos.data && vendidos.data.length === 0 && (
-          <p className="text-xs text-muted-foreground">Todavía ninguno.</p>
-        )}
+          {items.map((v, i) => (
+            <div
+              key={`${v.folder}-${v.producto}`}
+              className="flex items-center gap-2.5 rounded-lg border border-border/60 p-2"
+            >
+              {/* La posición ordena el ranking de un vistazo. */}
+              <span className="w-4 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                {i + 1}
+              </span>
+              {v.clean_photo_id ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={buildPhotoUrl(v.source, v.folder, v.clean_photo_id)}
+                  alt={v.titulo || v.producto}
+                  loading="lazy"
+                  className="h-12 w-12 shrink-0 rounded-md object-cover"
+                />
+              ) : (
+                <div className="h-12 w-12 shrink-0 rounded-md bg-muted" />
+              )}
 
-        {vendidos.data && vendidos.data.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-            {vendidos.data.map((v) => (
-              <div
-                key={`${v.folder}-${v.producto}`}
-                className="flex items-center gap-2 rounded-lg border border-border/60 p-1.5"
-              >
-                {v.clean_photo_id ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={buildPhotoUrl(source, v.folder, v.clean_photo_id)}
-                    alt={v.producto}
-                    loading="lazy"
-                    className="h-10 w-10 shrink-0 rounded object-cover"
-                  />
-                ) : (
-                  <div className="h-10 w-10 shrink-0 rounded bg-muted" />
-                )}
-                <p className="min-w-0 flex-1 truncate text-[11px] font-medium">
-                  {v.titulo || v.producto}
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 text-[11px] font-medium leading-snug">
+                  {v.titulo || `Producto ${v.producto}`}
+                </p>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {v.folder} · {v.tienda || "sin tienda"}
                 </p>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+
+              {/* Sumar unidades: un producto que repite es la mejor señal que
+                  hay aquí de qué buscar en el Drive. */}
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  disabled={sumar.isPending || (v.unidades || 1) <= 1}
+                  onClick={() =>
+                    sumar.mutate({
+                      source: v.source, folder: v.folder,
+                      producto: v.producto, delta: -1,
+                    })
+                  }
+                  aria-label="Quitar una unidad"
+                  className="h-7 w-7 rounded-md border border-border/60 text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+                >
+                  −
+                </button>
+                <span className="w-8 text-center text-sm font-bold tabular-nums text-amber-500">
+                  {v.unidades || 1}
+                </span>
+                <button
+                  type="button"
+                  disabled={sumar.isPending}
+                  onClick={() =>
+                    sumar.mutate(
+                      {
+                        source: v.source, folder: v.folder,
+                        producto: v.producto, delta: 1,
+                      },
+                      {
+                        onSuccess: () => toast.success("Una venta más anotada"),
+                        onError: (e) =>
+                          toast.error(e instanceof ApiError ? e.message : String(e)),
+                      },
+                    )
+                  }
+                  aria-label="Sumar una unidad"
+                  className="h-7 w-7 rounded-md bg-amber-500 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
