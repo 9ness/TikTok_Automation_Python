@@ -59,10 +59,12 @@ _RELLENOS = (
     "informacion no disponible", "información no disponible",
     "no disponible", "no visible", "desconocido", "sin titulo",
     "sin título", "n/a", "na", "-", "?",
-    # Salidos de capturas reales de ropa donde la tienda no se leía: el modelo
-    # se inventaba una palabra suelta en inglés en vez de dejarlo en blanco.
-    "encountered", "unknown", "not visible", "store", "tienda",
 )
+# OJO: no meter aquí palabras sueltas "que suenan a relleno". Se añadió
+# "encountered" pensando que el modelo se lo inventaba y resultó ser el nombre
+# REAL de una tienda ("Vendido por Encountered"), así que se estaba borrando un
+# dato bueno. Un relleno se reconoce por la FORMA (frase de disculpa, corchetes),
+# no por la palabra.
 
 
 def _es_relleno(valor: str) -> bool:
@@ -102,7 +104,10 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     pudo extraer se devuelve igual.
     """
     photos = drive_client.list_photos(source, folder)
-    pairs = photo_pairing.pair_folder(photos)
+    pairs = [
+        photo_pairing.desempatar_por_contenido(par, drive_client.fetch_photo)
+        for par in photo_pairing.pair_folder(photos)
+    ]
     return extract_from_pairs(
         pairs,
         system_prompt=_load_system_prompt(),

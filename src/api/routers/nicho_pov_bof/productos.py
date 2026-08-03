@@ -149,6 +149,9 @@ def _fotos_del_producto(
         ]
         for pair in photo_pairing.pair_folder(fotos):
             if pair["producto"] == producto:
+                pair = photo_pairing.desempatar_por_contenido(
+                    pair, drive_client.fetch_photo,
+                )
                 return (
                     (pair.get("clean") or {}).get("id"),
                     (pair.get("titled") or {}).get("id"),

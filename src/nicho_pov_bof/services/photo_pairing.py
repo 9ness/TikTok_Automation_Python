@@ -137,3 +137,72 @@ def pair_folder(photos: Iterable[dict]) -> list[dict]:
 def needs_review(pairs: Iterable[dict]) -> list[dict]:
     """Pares cuyo reparto limpia/captura no está claro (irían a Gemini)."""
     return [p for p in pairs if not p.get("confident")]
+
+
+# ---------------------------------------------------------------------------
+# Desempate por CONTENIDO, cuando la forma y el peso no bastan
+# ---------------------------------------------------------------------------
+# Pasó con una prenda cuyas dos fotos medían exactamente lo mismo (1320x2868):
+# una era la ficha entera (título, precio, "Vendido por…") y la otra el visor
+# del carrusel con la prenda sobre bandas negras. Al no poder distinguirlas se
+# asignaron AL REVÉS, así que la extracción leyó la foto sin texto y dijo que
+# la tienda no se veía — cuando sí estaba, en la otra.
+#
+# La señal que las separa a simple vista es el fondo: el visor del carrusel
+# tiene bandas NEGRAS arriba y abajo; la ficha tiene un panel BLANCO de
+# información debajo. Se mira una franja de píxeles, no hace falta OCR.
+_NEGRO_MAX = 40      # por debajo de esto, píxel "negro"
+_BLANCO_MIN = 210    # por encima de esto, píxel "blanco"
+
+
+def _perfil_bandas(path: str) -> tuple[float, float]:
+    """(fracción de filas casi negras, fracción de filas casi blancas)."""
+    from PIL import Image
+
+    with Image.open(path) as im:
+        gris = im.convert("L").resize((32, 96))
+        filas = [
+            sum(gris.getpixel((x, y)) for x in range(32)) / 32
+            for y in range(96)
+        ]
+    negras = sum(1 for v in filas if v <= _NEGRO_MAX) / len(filas)
+    blancas = sum(1 for v in filas if v >= _BLANCO_MIN) / len(filas)
+    return negras, blancas
+
+
+def desempatar_por_contenido(pair: dict, fetch) -> dict:
+    """Reordena limpia/captura mirando las imágenes. Solo si hacía falta.
+
+    `fetch(file_id, suffix=...)` devuelve la ruta local (ya cacheada). Si algo
+    falla se devuelve el par tal cual: es un afinado, no un requisito.
+    """
+    if pair.get("confident"):
+        return pair
+    clean, titled = pair.get("clean"), pair.get("titled")
+    if not clean or not titled:
+        return pair
+    try:
+        from pathlib import Path
+
+        perfiles = {}
+        for etiqueta, foto in (("clean", clean), ("titled", titled)):
+            ruta = fetch(foto["id"], suffix=Path(foto.get("name", "")).suffix or ".jpg")
+            perfiles[etiqueta] = _perfil_bandas(str(ruta))
+    except Exception:
+        return pair
+
+    # La ficha es la que tiene MÁS blanco (el panel de información) y menos
+    # banda negra. Si la que está puesta como "limpia" es más ficha que la
+    # otra, se intercambian.
+    def puntua(p: tuple[float, float]) -> float:
+        negras, blancas = p
+        return blancas - negras
+
+    if puntua(perfiles["clean"]) > puntua(perfiles["titled"]):
+        return {
+            **pair,
+            "clean": titled,
+            "titled": clean,
+            "reason": (pair.get("reason") or "") + " · desempatado por contenido",
+        }
+    return pair

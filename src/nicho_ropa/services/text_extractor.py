@@ -40,7 +40,12 @@ def pares(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
             drive_client.probe_dimensions(f)
             for f in drive_client.list_photos(carpeta, refresh=refresh)
         ]
-        return photo_pairing.pair_folder(fotos)
+        # El desempate mira las imágenes, así que solo se hace con los pares
+        # que la forma y el peso no distinguen — normalmente ninguno.
+        return [
+            photo_pairing.desempatar_por_contenido(par, drive_client.fetch_photo)
+            for par in photo_pairing.pair_folder(fotos)
+        ]
 
     return pov_drive._listar_cacheado(
         f"nicho_ropa:pares:{carpeta}", cargar, refresh=refresh,
