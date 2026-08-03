@@ -1,0 +1,1 @@
+Este producto, visto desde arriba, sobre una alfombra y en un ambiente moderno con luces LED del color acorde al producto. El producto debe verse completo. No añadir gráficos, efectos ni textos. Ultrarealista, 4K.

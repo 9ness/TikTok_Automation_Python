@@ -1,0 +1,1 @@
+Este producto, visto desde arriba, sobre una alfombra y en un ambiente moderno con luces LED del color acorde al producto. Una mano aparece en escena y acaricia la ropa. La cámara realiza un pequeño y leve zoom, así como un leve giro. El producto debe verse completo. No añadir gráficos, efectos ni textos. Ultrarealista, 4K.
