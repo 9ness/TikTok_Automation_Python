@@ -23,12 +23,28 @@ def _noop(_: str) -> None:
 
 
 def pares(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
-    """Productos de la carpeta, con su foto limpia y su captura con título."""
-    fotos = [
-        drive_client.probe_dimensions(f)
-        for f in drive_client.list_photos(carpeta, refresh=refresh)
-    ]
-    return photo_pairing.pair_folder(fotos)
+    """Productos de la carpeta, con su foto limpia y su captura con título.
+
+    Se cachea el RESULTADO, no solo el listado: emparejar exige medir cada
+    foto, y medirla exige descargarla. Con 16 fotos eso eran 18 segundos la
+    primera vez que se abría la pantalla, y volvían a serlo en cuanto se
+    reiniciaba la API o entraba por otro worker. Cacheado en Redis, la espera
+    se paga UNA vez para todos.
+    """
+    from src.nicho_pov_bof.services import drive_client as pov_drive
+
+    carpeta = carpeta or config.CARPETA_DEFECTO
+
+    def cargar() -> list[dict]:
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(carpeta, refresh=refresh)
+        ]
+        return photo_pairing.pair_folder(fotos)
+
+    return pov_drive._listar_cacheado(
+        f"nicho_ropa:pares:{carpeta}", cargar, refresh=refresh,
+    )
 
 
 def extract_texts(carpeta: str = "", *, on_log: OnLog = _noop) -> dict[str, dict]:

@@ -15,16 +15,9 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import time
-from typing import Any
 
 from src.nicho_pov_bof import config as pov_config
 from src.nicho_ropa import config
-
-# Listar la carpeta tarda segundos y no cambia mientras se trabaja: se cachea
-# en memoria del proceso con TTL corto, igual que en el otro nicho.
-_CACHE: dict[str, tuple[float, Any]] = {}
-_CACHE_TTL_S = 300.0
 
 _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 
@@ -63,30 +56,36 @@ def list_photos(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
     Devuelve `[{"id","name","size","mime"}]`. El `id` es el identificador
     canónico: dentro de la carpeta hay nombres REPETIDOS (`5.PNG` dos veces,
     la foto limpia y la captura), igual que en el Nicho POV BOF.
+
+    Cacheado con la misma máquina que el otro nicho (memoria → Redis sirviendo
+    lo viejo mientras refresca por detrás → rclone). La clave lleva su propio
+    prefijo aunque el documento viva en el namespace del POV BOF: duplicar
+    sesenta líneas de caché para cambiar el prefijo no compensa.
     """
     carpeta = carpeta or config.CARPETA_DEFECTO
-    clave = f"photos:{config.carpeta_id(carpeta)}"
-    if not refresh:
-        hit = _CACHE.get(clave)
-        if hit and time.monotonic() - hit[0] < _CACHE_TTL_S:
-            return hit[1]
 
-    items = json.loads(
-        _run_rclone(["lsjson", config.DRIVE_REMOTE, "--files-only"], carpeta) or "[]"
+    def cargar() -> list[dict]:
+        items = json.loads(
+            _run_rclone(["lsjson", config.DRIVE_REMOTE, "--files-only"], carpeta) or "[]"
+        )
+        fotos = [
+            {
+                "id": it.get("ID", ""),
+                "name": it.get("Name", ""),
+                "size": int(it.get("Size") or 0),
+                "mime": it.get("MimeType", ""),
+            }
+            for it in items
+            if pov_config.is_image(it.get("Name", "")) and it.get("ID")
+        ]
+        fotos.sort(key=lambda f: pov_config.natural_sort_key(f["name"]))
+        return fotos
+
+    from src.nicho_pov_bof.services import drive_client as pov_drive
+
+    return pov_drive._listar_cacheado(
+        f"nicho_ropa:photos:{carpeta}", cargar, refresh=refresh,
     )
-    fotos = [
-        {
-            "id": it.get("ID", ""),
-            "name": it.get("Name", ""),
-            "size": int(it.get("Size") or 0),
-            "mime": it.get("MimeType", ""),
-        }
-        for it in items
-        if pov_config.is_image(it.get("Name", "")) and it.get("ID")
-    ]
-    fotos.sort(key=lambda f: pov_config.natural_sort_key(f["name"]))
-    _CACHE[clave] = (time.monotonic(), fotos)
-    return fotos
 
 
 def fetch_photo(file_id: str, *, suffix: str = ".jpg"):
