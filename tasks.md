@@ -30,14 +30,49 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
    escenario y hubo que centrarlo (`cx_frac` del escaneo de cara); Pablo sale
    bien de serie. Hay que mirarlo persona a persona.
 
-### Estados Unidos — APLAZADO (2026-07-29)
-Los vídeos de gancho de EEUU **traen audio propio**, así que la metodología no
-es la misma que en España: primero hay que extraer y separar ese audio. El
-operador decide dejarlo para más adelante. Cuando se retome:
-3. Mismos ganchos que en España, para cada persona (+ separar el audio).
-4. **Además**, los clips de PAISAJE de EEUU: mismo proceso que se hizo con los
-   de España (ver `VIRALIZACION_MODULE.md`) — trocear por cada plano/lugar
-   distinto y descartar los que llevan texto o logos encima.
+### Estados Unidos — SOLO BILLY GRAHAM (decidido 2026-08-03)
+
+**No empezar hasta que el operador lo diga; lo pedirá POR LA NOCHE** para que
+corra mientras duerme (descargar y trocear un vídeo de paisajes son horas).
+
+Material localizado en Drive (compartido, `--drive-shared-with-me`):
+`Skool/Estrategia viralización/Estados Unidos/`
+
+| Carpeta | Contenido |
+|---|---|
+| `Billy Graham/Videos Gancho/` | 2 sermones completos: *Jesus Calls You by Name* (309 MB) y *The Holy Spirit and You* (291 MB) |
+| `Billy Graham/Voces Billy/` | **31 MP3** ya troceados, casi todos ~2.3 MB (≈1 min) → no hace falta el cortador de clips |
+| `Videos Paisajes/` | 4 vídeos, **22 GB en total** (5.9 + 3.1 + 2.9 + 10.0 GB) |
+| `Warren Buffet/`, `Dante Gabel/`, `Hombre podcast/` | **APLAZADOS** |
+
+**Por qué solo Billy Graham:** los de Warren Buffett son vídeos YA MONTADOS, así
+que habría que cogerlos tal cual y quitarles el copyright cambiando paisajes o
+similar — mucho más difícil. Billy Graham es el caso limpio: sermón en bruto +
+voces sueltas.
+
+Qué hay que hacer:
+1. **Ganchos.** Sacarlos de los 2 sermones. Ojo: hay que **mirar dónde se le ve
+   a él bien encuadrado y que no haya texto quemado** (estos sermones llevan
+   rótulos y subtítulos incrustados que estropean el gancho). Mismo escaneo de
+   cara que en España, pero revisando a mano con capturas.
+2. **Paisajes.** Con **UN solo vídeo basta**, dice el operador: 4 son demasiado
+   contenido. Elegir uno y trocearlo como se hizo con España
+   (ver `VIRALIZACION_MODULE.md`), descartando los planos con texto o logos.
+   ⚠️ **Disco:** quedan ~11 GB libres y el más pequeño pesa 2.9 GB. Descargar
+   UNO, trocearlo, y BORRAR el fuente al terminar — es lo que ya se hizo con
+   España (ver `paisajes/_fuente_en_drive/LEEME.txt`).
+3. **Voces:** las 31 ya sirven tal cual. No tocarlas de entrada.
+
+Tres cosas del código que HOY asumen España y hay que tocar:
+- `config.WHISPER_LANGUAGE = "es"` es **global** → Billy Graham habla inglés.
+  Tiene que pasar a ser por ponente.
+- `config.paisajes_folder()` es **una sola carpeta compartida** por todos los
+  ponentes → hacen falta dos pools (paisajes ES / paisajes US), o los vídeos de
+  Billy Graham saldrían con paisajes de España.
+- `PONENTES` no tiene país; hace falta para el selector España/EEUU del punto 5.
+
+Más adelante: probar a subir con esa persona y ver si funciona antes de meter
+al resto.
 
 ### Recortes de audio que indicó el operador (Mario, España)
 Solo hay que recortar los de Mario; el resto de España valen tal cual.
@@ -70,11 +105,11 @@ paisajes **por tandas** (grupos de ~8 y luego concatenar) en vez de un solo
 recorta los audios largos en vez de tocar el render.
 
 ### Pendiente de aclarar antes de empezar
-- **Dónde está el material.** Ni `~/viralizacion_assets/` ni
-  `TIKTOK_SHOP_AI_PRO/` en Drive tienen nada de las personas nuevas ni de los
-  paisajes de EEUU (solo `pablo`, `victor` y `paisajes` de España). Preguntar
-  la ruta exacta.
-- Cuántas personas hay en cada país y cómo se llaman.
+- ~~Dónde está el material~~ → localizado (ver tabla de EEUU arriba).
+- **Cuál de los 4 vídeos de paisajes de EEUU** se trocea. Por tamaño, el de
+  2.9 GB (*MOST STUNNING 8K HDR*) es el que menos disco pide; el de 5.9 GB
+  (*Maravillas de Estados Unidos, 80 lugares*) es el que más variedad de sitios
+  tendría. Preguntar antes de descargar.
 
 ## 🤖 Cola del Agente
 
