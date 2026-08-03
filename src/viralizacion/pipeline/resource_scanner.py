@@ -115,9 +115,9 @@ def load_hook_candidates_cached(ponente: str) -> list[dict]:
         return []
 
 
-def load_paisaje_candidates_cached() -> list[dict]:
+def load_paisaje_candidates_cached(pais: str = "es") -> list[dict]:
     """Lee SOLO la caché de paisaje (sin trocear). Vacío si no existe."""
-    cache_path = config.paisaje_candidates_cache_path()
+    cache_path = config.paisaje_candidates_cache_path(pais)
     if not cache_path.exists():
         return []
     try:
@@ -170,17 +170,19 @@ def scan_hook_candidates(ponente: str, *, force: bool = False) -> list[dict]:
     return candidates
 
 
-def scan_paisaje_candidates(*, force: bool = False) -> list[dict]:
+def scan_paisaje_candidates(pais: str = "es", *, force: bool = False) -> list[dict]:
     """Devuelve la lista de candidatos de paisaje `{index, start, dur}`,
     compartida entre ponentes (mismo vídeo fuente), cacheada en disco."""
-    cache_path = config.paisaje_candidates_cache_path()
+    cache_path = config.paisaje_candidates_cache_path(pais)
     if cache_path.exists() and not force:
         data = json.loads(cache_path.read_text())
         return data.get("candidates", [])
 
-    video = config.paisajes_video()
+    video = config.paisajes_video(pais)
     if video is None:
-        raise FileNotFoundError(f"No se encontró vídeo de paisajes en {config.paisajes_folder()}")
+        raise FileNotFoundError(
+            f"No se encontró vídeo de paisajes en {config.paisajes_folder(pais)}"
+        )
 
     duration = ffprobe_duration(video)
     start_range = config.PAISAJES_SKIP_HEAD_S

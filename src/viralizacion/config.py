@@ -60,9 +60,9 @@ PONENTES: dict[str, dict] = {
     },
 }
 
-# Idioma de Whisper por país. Antes era la constante global
-# `WHISPER_LANGUAGE = "es"`, que con un ponente en inglés transcribía fonética
-# española y los subtítulos salían ilegibles.
+# Idioma de Whisper por país. Antes era una constante global "es", y con un
+# ponente en inglés Whisper transcribía fonética española: los subtítulos
+# salían ilegibles.
 IDIOMA_POR_PAIS = {"es": "es", "us": "en"}
 
 PAIS_LABEL = {"es": "España", "us": "Estados Unidos"}
@@ -290,11 +290,19 @@ def hook_candidates_cache_path(slug: str) -> Path:
     )
 
 
-def paisaje_candidates_cache_path() -> Path:
-    """JSON de paisajes: escribible en work_root; se siembra desde assets si existe."""
+def paisaje_candidates_cache_path(pais: str = "es") -> Path:
+    """JSON de paisajes: escribible en work_root; se siembra desde assets si existe.
+
+    Uno por país. España conserva el nombre de siempre para no invalidar la
+    biblioteca ya troceada (304 clips); los demás llevan sufijo.
+    """
+    nombre = (
+        "paisaje_candidates.json" if pais == "es"
+        else f"paisaje_candidates_{pais}.json"
+    )
     return _seed_cache_from_legacy(
-        work_root() / "paisaje_candidates.json",
-        paisajes_folder() / "paisaje_candidates.json",
+        work_root() / nombre,
+        paisajes_folder(pais) / nombre,
     )
 
 

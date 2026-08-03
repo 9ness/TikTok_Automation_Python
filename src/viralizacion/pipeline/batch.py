@@ -119,11 +119,11 @@ def preflight_check(
                 _start, win_dur = config.audio_window_for_round(full_dur, ronda)
                 fill = max(0.0, win_dur - config.HOOK_DUR)
                 needed_paisajes += build_paisaje_segments(fill)
-        if clip_library.is_available():
+        if clip_library.is_available(config.pais_de(ponente)):
             # Con biblioteca no hay déficit posible salvo que un solo vídeo
             # pida más clips que los que existen: al agotarse la vuelta se
             # abre un ciclo nuevo con ventanas y zooms distintos.
-            total_clips = clip_library.clip_count()
+            total_clips = clip_library.clip_count(config.pais_de(ponente))
             max_por_video = max(
                 (build_paisaje_segments(
                     max(0.0, config.audio_window_for_round(
@@ -207,7 +207,7 @@ def run_batch(
             continue
 
         hook_video = config.ponente_gancho_video(ponente)
-        paisajes_video = config.paisajes_video()
+        paisajes_video = config.paisajes_video(config.pais_de(ponente))
         audios = _audios_de(ponente, audios_elegidos)
         n_audios = len(audios)
         duraciones_audio = [ffprobe_duration(a) for a in audios]
@@ -299,7 +299,7 @@ def run_batch(
                         # Biblioteca de clips si está disponible: cada clip es
                         # un plano real (un solo lugar) y sin texto. Si no,
                         # se trocea el vídeo largo como antes.
-                        if clip_library.is_available():
+                        if clip_library.is_available(config.pais_de(ponente)):
                             paisaje_cs = allocator.allocate_paisaje_clips(
                                 ponente, n_paisajes, min_total_dur=fill_duration,
                             )

@@ -49,7 +49,13 @@ def transcribe_words(
 
     if on_log:
         on_log(f"[transcriber] transcribiendo {audio_path.name} (Whisper {config.WHISPER_MODEL_SIZE})…")
-    words = transcribe(str(wav_path), model_size=config.WHISPER_MODEL_SIZE, language=config.WHISPER_LANGUAGE)
+    # El idioma sale del PONENTE, no de una constante global: Billy Graham
+    # habla inglés y con "es" Whisper transcribía fonética española, así que
+    # los subtítulos salían ilegibles.
+    idioma = config.idioma_de(ponente)
+    words = transcribe(
+        str(wav_path), model_size=config.WHISPER_MODEL_SIZE, language=idioma,
+    )
 
     cache_path.write_text(json.dumps(words, ensure_ascii=False, indent=2))
     return words

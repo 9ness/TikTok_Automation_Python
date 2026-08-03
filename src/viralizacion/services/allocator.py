@@ -43,16 +43,20 @@ def count_available_hooks(ponente: str, *, cache_only: bool = False) -> tuple[in
 
 
 def count_available_paisajes(ponente: str, *, cache_only: bool = False) -> tuple[int, int]:
-    """Devuelve (disponibles, total) de candidatos de paisaje para `ponente`
-    (el pool es compartido entre ponentes, pero el uso se rastrea por
-    separado — por eso el resultado es específico de `ponente`).
+    """Devuelve (disponibles, total) de candidatos de paisaje para `ponente`.
+
+    El pool es compartido entre ponentes DEL MISMO PAÍS, pero el uso se
+    rastrea por separado — por eso el resultado es específico de `ponente`.
+    España y Estados Unidos tienen bibliotecas distintas: con una sola, los
+    vídeos de Billy Graham saldrían con paisajes de España.
 
     `cache_only=True` (UI): no trocea el vídeo — solo lee JSON cache.
     """
+    pais = config.pais_de(ponente)
     candidates = (
-        load_paisaje_candidates_cached()
+        load_paisaje_candidates_cached(pais)
         if cache_only
-        else scan_paisaje_candidates()
+        else scan_paisaje_candidates(pais)
     )
     used = usage_repo.get_used_paisaje_indices(ponente)
     available = [c for c in candidates if c["index"] not in used]
@@ -100,7 +104,7 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
     no se mezclan dentro del mismo vídeo: sería volver al bug de "transición
     pero mismo lugar".
     """
-    clips = clip_library.all_clips()
+    clips = clip_library.all_clips(config.pais_de(ponente))
     if not clips:
         raise PoolExhaustedError(
             "La biblioteca de clips de paisaje está vacía. Genera los clips "
@@ -197,7 +201,7 @@ def allocate_paisaje_clips(ponente: str, n: int, min_total_dur: float = 0.0) -> 
         usage_repo.mark_paisaje_used(ponente, c["index"])
         out.append({
             "index": c["index"],
-            "path": str(clip_library.clip_path(c)),
+            "path": str(clip_library.clip_path(c, config.pais_de(ponente))),
             # Duración COMPLETA del plano: es el tope real. El renderer decide
             # cuánto usa de cada uno y sortea el desplazamiento dentro.
             "dur": float(c.get("dur") or 0.0),
@@ -209,7 +213,7 @@ def allocate_paisaje_segments(ponente: str, n: int) -> list[dict]:
     """Asigna (y marca como usados) `n` candidatos de paisaje no usados por
     `ponente`. Lanza `PoolExhaustedError` con el déficit exacto si no hay
     suficientes."""
-    candidates = scan_paisaje_candidates()
+    candidates = scan_paisaje_candidates(config.pais_de(ponente))
     used = usage_repo.get_used_paisaje_indices(ponente)
     available = [c for c in candidates if c["index"] not in used]
     if len(available) < n:

@@ -31,12 +31,18 @@ from src.viralizacion import config
 MANIFEST_NAME = "clips_manifest.json"
 
 
-def clips_folder() -> Path:
-    """Carpeta de la biblioteca. Hermana de `paisajes/` en los assets."""
+def clips_folder(pais: str = "es") -> Path:
+    """Carpeta de la biblioteca, UNA POR PAÍS.
+
+    España conserva `paisajes_clips/` tal cual para no invalidar los 304 clips
+    ya revisados; los demás cuelgan con sufijo (`paisajes_clips_us/`). Sin
+    esto, un vídeo de Billy Graham saldría con b-roll de España.
+    """
     override = os.getenv("VIRALIZACION_CLIPS_PATH")
-    if override:
+    if override and pais == "es":
         return Path(override)
-    return config.assets_root_path() / "paisajes_clips"
+    sufijo = "" if pais == "es" else f"_{pais}"
+    return config.assets_root_path() / f"paisajes_clips{sufijo}"
 
 
 @lru_cache(maxsize=4)
@@ -48,14 +54,14 @@ def _load_manifest_cached(path_str: str, mtime: float) -> tuple[dict, ...]:
     return tuple(data.get("clips", []))
 
 
-def _load_manifest() -> tuple[dict, ...]:
+def _load_manifest(pais: str = "es") -> tuple[dict, ...]:
     """Manifiesto cacheado POR MTIME.
 
     Si se retiran clips del banco (p. ej. al detectar un rótulo que se había
     colado), el proceso de la API tiene que verlo sin reiniciar el container.
     Cachear a secas dejaba sirviendo la lista vieja.
     """
-    path = clips_folder() / MANIFEST_NAME
+    path = clips_folder(pais) / MANIFEST_NAME
     try:
         mtime = path.stat().st_mtime
     except OSError:
@@ -63,21 +69,21 @@ def _load_manifest() -> tuple[dict, ...]:
     return _load_manifest_cached(str(path), mtime)
 
 
-def is_available() -> bool:
+def is_available(pais: str = "es") -> bool:
     """True si la biblioteca existe y tiene clips utilizables."""
-    return len(_load_manifest()) > 0
+    return len(_load_manifest(pais)) > 0
 
 
-def all_clips() -> list[dict]:
-    return [dict(c) for c in _load_manifest()]
+def all_clips(pais: str = "es") -> list[dict]:
+    return [dict(c) for c in _load_manifest(pais)]
 
 
-def clip_count() -> int:
-    return len(_load_manifest())
+def clip_count(pais: str = "es") -> int:
+    return len(_load_manifest(pais))
 
 
-def clip_path(entry: dict) -> Path:
-    return clips_folder() / entry["file"]
+def clip_path(entry: dict, pais: str = "es") -> Path:
+    return clips_folder(pais) / entry["file"]
 
 
 def random_window(clip: dict) -> tuple[float, float]:
