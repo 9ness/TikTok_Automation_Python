@@ -95,6 +95,32 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
    escenario y hubo que centrarlo (`cx_frac` del escaneo de cara); Pablo sale
    bien de serie. Hay que mirarlo persona a persona.
 
+### Estados Unidos — EN CURSO (noche del 2026-08-03)
+
+**Hecho ya:**
+- Código preparado: `PONENTES` lleva `pais`, el idioma de Whisper sale del
+  ponente (`idioma_de`) en vez de una constante global, y los paisajes tienen
+  pool por país (`paisajes_folder("us")`, `paisaje_candidates_cache_path("us")`,
+  `allocator` mira `pais_de(ponente)`). Billy Graham dado de alta como `billy`.
+- Descargado a `~/viralizacion_assets/billy/`: los **2 sermones** (630 MB) y las
+  **30 voces** (~85 MB).
+
+**Pendiente, y OJO CON EL DISCO:**
+1. **Precortar los ganchos** de los 2 sermones y BORRAR los .mp4 (630 MB) —
+   `scripts/viralizacion_precortar_ganchos.py`. Hay que revisar a mano que el
+   trozo no pille rótulos: estos sermones llevan texto sobreimpreso.
+2. **Paisajes.** El de 5,9 GB (*Maravillas de Estados Unidos*) **NO CABE**: se
+   intentó y el disco llegó al 97%, con la descarga a medias. Se abortó y se
+   borró el parcial. Usar el de **2,9 GB** (*MOST STUNNING 8K HDR*), que además
+   pega más con un sermón que los rascacielos de NYC. Descargar → trocear a
+   `paisajes_clips_us/` → **borrar el fuente**.
+3. `clip_library.clips_folder()` sigue siendo única (`paisajes_clips/`): hay que
+   hacerla por país antes de que Billy Graham pueda renderizar, o usará los
+   clips de España.
+
+**Disco:** el build de Docker con `demucs` dejó la caché en ~20 GB. Antes de
+descargar nada, `docker builder prune -f` y comprobar que quedan >8 GB.
+
 ### Estados Unidos — SOLO BILLY GRAHAM (decidido 2026-08-03)
 
 **No empezar hasta que el operador lo diga; lo pedirá POR LA NOCHE** para que
