@@ -97,29 +97,37 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
 
 ### Estados Unidos — EN CURSO (noche del 2026-08-03)
 
-**Hecho ya:**
-- Código preparado: `PONENTES` lleva `pais`, el idioma de Whisper sale del
-  ponente (`idioma_de`) en vez de una constante global, y los paisajes tienen
-  pool por país (`paisajes_folder("us")`, `paisaje_candidates_cache_path("us")`,
-  `allocator` mira `pais_de(ponente)`). Billy Graham dado de alta como `billy`.
-- Descargado a `~/viralizacion_assets/billy/`: los **2 sermones** (630 MB) y las
-  **30 voces** (~85 MB).
+**Hecho y commiteado** (`a39026b`):
+- `PONENTES` lleva `pais`; el idioma de Whisper sale del ponente (`idioma_de`)
+  en vez de una constante global; paisajes con pool por país
+  (`paisajes_folder("us")`, `paisajes_clips_us/`, `paisaje_candidates_us.json`);
+  `allocator`, `batch` y `clip_library` miran `pais_de(ponente)`.
+- Billy Graham dado de alta como `billy`.
+- Descargado a `~/viralizacion_assets/billy/`: los **2 sermones** (630 MB, 27,5
+  min cada uno) y las **30 voces**.
 
-**Pendiente, y OJO CON EL DISCO:**
-1. **Precortar los ganchos** de los 2 sermones y BORRAR los .mp4 (630 MB) —
-   `scripts/viralizacion_precortar_ganchos.py`. Hay que revisar a mano que el
-   trozo no pille rótulos: estos sermones llevan texto sobreimpreso.
-2. **Paisajes.** El de 5,9 GB (*Maravillas de Estados Unidos*) **NO CABE**: se
-   intentó y el disco llegó al 97%, con la descarga a medias. Se abortó y se
-   borró el parcial. Usar el de **2,9 GB** (*MOST STUNNING 8K HDR*), que además
-   pega más con un sermón que los rascacielos de NYC. Descargar → trocear a
-   `paisajes_clips_us/` → **borrar el fuente**.
-3. `clip_library.clips_folder()` sigue siendo única (`paisajes_clips/`): hay que
-   hacerla por país antes de que Billy Graham pueda renderizar, o usará los
-   clips de España.
+**⚠️ SIN DESPLEGAR.** El código está en `main` pero la imagen de la API no se
+pudo reconstruir: ver abajo.
 
-**Disco:** el build de Docker con `demucs` dejó la caché en ~20 GB. Antes de
-descargar nada, `docker builder prune -f` y comprobar que quedan >8 GB.
+**Lo que sé de los sermones (ya mirado):**
+- Los dos son 1920x1080 pero el contenido real es 4:3 con **barras decoradas a
+  los lados**, y llevan **rótulos quemados en TODOS los fotogramas**: logo
+  "Billy Graham Classics" abajo a la izquierda y "877-772-4559 /
+  PeaceWithGod.tv" abajo a la derecha (banda y≈860-980).
+- **Buena noticia:** el recorte 9:16 centrado (607x1080 desde x=656) sale
+  LIMPIO — ni logo, ni teléfono, ni barras. Comprobado con captura.
+- **Cuidado:** eso vale con la cara centrada. Si el escaneo de caras da un
+  `cx_frac` muy a la derecha, el recorte puede rozar el teléfono. Hay que
+  limitar el desplazamiento horizontal o recortar la banda de abajo antes
+  (`crop=1740x860+90+0`) y dejar que el renderer encuadre libre.
+
+**Siguiente paso:** `scan_hook_candidates("billy")` sobre UN sermón (27,5 min,
+muestreo cada 1s), revisar candidatos a ojo, precortar con
+`scripts/viralizacion_precortar_ganchos.py` y BORRAR los .mp4.
+
+**Paisajes:** el de 5,9 GB no cabe (se intentó, disco al 97%, abortado y
+borrado el parcial). Usar el de **2,9 GB** (*MOST STUNNING 8K HDR*), que además
+pega más con un sermón que los rascacielos de NYC.
 
 ### Estados Unidos — SOLO BILLY GRAHAM (decidido 2026-08-03)
 
