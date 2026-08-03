@@ -22,6 +22,15 @@ class PromptsRopaResponse(BaseModel):
     video_percha: str = ""
 
 
+class CarpetaRopa(BaseModel):
+    slug: str
+    label: str
+
+
+class CarpetasRopaResponse(BaseModel):
+    items: list[CarpetaRopa] = Field(default_factory=list)
+
+
 class PrendaInfo(BaseModel):
     producto: str
     clean_photo_id: str | None = None
@@ -43,6 +52,7 @@ class PrendaInfo(BaseModel):
 
 
 class PrendasListResponse(BaseModel):
+    carpeta: str = ""
     items: list[PrendaInfo] = Field(default_factory=list)
     textos_extraidos: bool = False
     montando: bool = False

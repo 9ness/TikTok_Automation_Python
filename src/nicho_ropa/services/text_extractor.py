@@ -22,20 +22,20 @@ def _noop(_: str) -> None:
     return None
 
 
-def pares(*, refresh: bool = False) -> list[dict]:
+def pares(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
     """Productos de la carpeta, con su foto limpia y su captura con título."""
     fotos = [
         drive_client.probe_dimensions(f)
-        for f in drive_client.list_photos(refresh=refresh)
+        for f in drive_client.list_photos(carpeta, refresh=refresh)
     ]
     return photo_pairing.pair_folder(fotos)
 
 
-def extract_texts(*, on_log: OnLog = _noop) -> dict[str, dict]:
+def extract_texts(carpeta: str = "", *, on_log: OnLog = _noop) -> dict[str, dict]:
     """`{producto: {titulo, titulo_tiktok_completo, tienda, caption, emojis}}`."""
     system = (config.prompts_dir() / "text_extractor.md").read_text(encoding="utf-8")
     return motor.extract_from_pairs(
-        pares(),
+        pares(carpeta),
         system_prompt=system,
         fetch=drive_client.fetch_photo,
         on_log=on_log,

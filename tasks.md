@@ -25,9 +25,14 @@ el operador pasó por enlace (`10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL`) resultó ser
 | `Ropa/Ropa Mujer/2 Pantalon corto` | `11enOhq4DL_lmdttQWqgowmA1MRqrR3_0` | 10 → ~5 | **Sin conectar** |
 | `Ropa/Ropa Mujer/Bikinis` | `1T-nqij3xl4Dp-h2JvGJofCq6Wzoia25a` | 14 → ~7 | **Sin conectar** |
 
-✅ **RESUELTO (2026-08-03): las tres carpetas de `Ropa Mujer` son del MÓDULO 7
-(ropa CON personas)**, lo confirmó el operador. NO conectarlas al módulo 8. Se
-quedan para cuando se monte el menú "Nicho Ropa".
+✅ **RESUELTO (2026-08-03).** Las tres carpetas de `Ropa Mujer` son la materia
+prima del MÓDULO 7 (ropa CON personas, que va con producto de mujer). Pero
+**una misma prenda vale para los dos nichos**: puesta por una modelo (módulo 7)
+o colgada en percha (módulo 8). Lo que cambia es el prompt, no la foto.
+
+Por eso las cuatro carpetas están conectadas al módulo 8 con un selector, y
+cuando se monte el 7 se conectarán también allí. La relación carpeta→nicho NO
+es 1 a 1.
 
 **Prompts de `Camisetas／Conjuntos/Ropa/Pronts/`** — 6, y solo DOS son sin personas:
 

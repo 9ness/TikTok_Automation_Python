@@ -29,10 +29,10 @@ _CACHE_TTL_S = 300.0
 _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 
 
-def _run_rclone(args: list[str]) -> str:
+def _run_rclone(args: list[str], carpeta: str) -> str:
     cmd = [
         "rclone", *args,
-        "--drive-root-folder-id", config.carpeta_id(),
+        "--drive-root-folder-id", config.carpeta_id(carpeta),
     ]
     conf = pov_config.rclone_config_path()
     if conf:
@@ -57,20 +57,23 @@ def _run_rclone(args: list[str]) -> str:
     return proc.stdout
 
 
-def list_photos(*, refresh: bool = False) -> list[dict]:
+def list_photos(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
     """Fotos de la carpeta, en orden natural.
 
     Devuelve `[{"id","name","size","mime"}]`. El `id` es el identificador
     canónico: dentro de la carpeta hay nombres REPETIDOS (`5.PNG` dos veces,
     la foto limpia y la captura), igual que en el Nicho POV BOF.
     """
-    clave = f"photos:{config.carpeta_id()}"
+    carpeta = carpeta or config.CARPETA_DEFECTO
+    clave = f"photos:{config.carpeta_id(carpeta)}"
     if not refresh:
         hit = _CACHE.get(clave)
         if hit and time.monotonic() - hit[0] < _CACHE_TTL_S:
             return hit[1]
 
-    items = json.loads(_run_rclone(["lsjson", config.DRIVE_REMOTE, "--files-only"]) or "[]")
+    items = json.loads(
+        _run_rclone(["lsjson", config.DRIVE_REMOTE, "--files-only"], carpeta) or "[]"
+    )
     fotos = [
         {
             "id": it.get("ID", ""),

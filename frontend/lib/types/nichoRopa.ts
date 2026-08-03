@@ -9,6 +9,15 @@ export interface PromptsRopaResponse {
   video_percha: string;
 }
 
+export interface CarpetaRopa {
+  slug: string;
+  label: string;
+}
+
+export interface CarpetasRopaResponse {
+  items: CarpetaRopa[];
+}
+
 export interface PrendaItem {
   producto: string;
   clean_photo_id: string | null;
@@ -30,6 +39,7 @@ export interface PrendaItem {
 }
 
 export interface PrendasListResponse {
+  carpeta: string;
   items: PrendaItem[];
   textos_extraidos: boolean;
   montando: boolean;

@@ -26,6 +26,8 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_ropa import (
+    CarpetaRopa,
+    CarpetasRopaResponse,
     PrendaInfo,
     PrendasListResponse,
     PromptsRopaResponse,
@@ -61,7 +63,21 @@ def get_prompts() -> PromptsRopaResponse:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
 
 
-def _montando(queue: JobQueue | None) -> set[str]:
+@router.get("/carpetas", response_model=CarpetasRopaResponse)
+def list_carpetas() -> CarpetasRopaResponse:
+    """Carpetas de producto disponibles.
+
+    Las de mujer (mono, pantalón corto, bikinis) son las del nicho CON
+    personas, pero la misma prenda vale aquí colgada en percha: lo que cambia
+    es el prompt, no la foto.
+    """
+    return CarpetasRopaResponse(items=[
+        CarpetaRopa(slug=slug, label=meta["label"])
+        for slug, meta in config.CARPETAS.items()
+    ])
+
+
+def _montando(queue: JobQueue | None, carpeta: str) -> set[str]:
     """Prendas con un montaje en cola o en curso.
 
     Sale de la COLA y no del estado guardado, por lo mismo que en el otro
@@ -75,6 +91,8 @@ def _montando(queue: JobQueue | None) -> set[str]:
         for job in queue.list_jobs():
             if job.mode != JobMode.NICHO_ROPA_VIDEO:
                 continue
+            if str(job.params.get("carpeta") or config.CARPETA_DEFECTO) != carpeta:
+                continue
             if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
                 activos.add(str(job.params.get("producto")))
     except Exception:
@@ -85,20 +103,24 @@ def _montando(queue: JobQueue | None) -> set[str]:
 @router.get("/prendas", response_model=PrendasListResponse)
 def list_prendas(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    carpeta: Annotated[str, Query()] = "",
     refresh: Annotated[bool, Query()] = False,
 ) -> PrendasListResponse:
     """Prendas de la carpeta, con su foto limpia, su captura y sus textos."""
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
     from src.nicho_pov_bof.services import emojis as emojis_svc
 
+    carpeta = carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
     try:
-        pares = text_extractor.pares(refresh=refresh)
+        pares = text_extractor.pares(carpeta, refresh=refresh)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    doc = product_repo.load()
+    doc = product_repo.load(carpeta)
     guardados = doc.get("productos") or {}
-    activos = _montando(queue)
+    activos = _montando(queue, carpeta)
 
     items = []
     for par in pares:
@@ -125,6 +147,7 @@ def list_prendas(
             montando=pid in activos,
         ))
     return PrendasListResponse(
+        carpeta=carpeta,
         items=items,
         textos_extraidos=bool(doc.get("textos_extraidos")),
         montando=bool(activos),
@@ -134,14 +157,16 @@ def list_prendas(
 @router.post("/extraer-textos", response_model=PrendasListResponse)
 def extraer_textos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    carpeta: Annotated[str, Query()] = "",
 ) -> PrendasListResponse:
     """Lee las capturas con Gemini y guarda título, tienda, caption y emojis.
 
     Va síncrono como en el otro nicho: es UNA llamada con todas las imágenes.
     """
+    carpeta = carpeta or config.CARPETA_DEFECTO
     logs: list[str] = []
     try:
-        textos = text_extractor.extract_texts(on_log=logs.append)
+        textos = text_extractor.extract_texts(carpeta, on_log=logs.append)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     if not textos:
@@ -150,10 +175,10 @@ def extraer_textos(
             status_code=502,
         )
     try:
-        product_repo.save_extracted_texts(textos)
+        product_repo.save_extracted_texts(carpeta, textos)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return list_prendas(queue=queue)
+    return list_prendas(queue=queue, carpeta=carpeta)
 
 
 def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
@@ -178,9 +203,12 @@ def get_foto(file_id: Annotated[str, Query()]) -> FileResponse:
 
 
 @router.get("/foto-limpia")
-def get_foto_limpia(producto: Annotated[str, Query()]) -> FileResponse:
+def get_foto_limpia(
+    producto: Annotated[str, Query()],
+    carpeta: Annotated[str, Query()] = "",
+) -> FileResponse:
     """Descarga la foto de la prenda — la que se le da al generador."""
-    for par in text_extractor.pares():
+    for par in text_extractor.pares(carpeta or config.CARPETA_DEFECTO):
         if par["producto"] == producto:
             clean = par.get("clean") or par.get("titled")
             if not clean:
@@ -197,6 +225,7 @@ async def upload_video(
     operator: Annotated[str, Depends(get_web_user)],
     file: Annotated[UploadFile, File()],
     producto: Annotated[str, Form()],
+    carpeta: Annotated[str, Form()] = "",
     # Vacío = mudo, que es el modo por defecto de este nicho.
     sexo: Annotated[str, Form()] = "",
 ) -> VideoRopaUploadResponse:
@@ -226,9 +255,13 @@ async def upload_video(
 
     job = queue.enqueue(
         JobMode.NICHO_ROPA_VIDEO,
-        title=f"👕 Vídeo Nicho Ropa · prenda {producto}",
+        title=(
+            f"👕 Vídeo Nicho Ropa · {config.carpeta_label(carpeta or config.CARPETA_DEFECTO)}"
+            f" · prenda {producto}"
+        ),
         params={
             "producto": producto,
+            "carpeta": carpeta or config.CARPETA_DEFECTO,
             "raw_path": str(destino),
             "sexo": sexo_norm,
             "operator": operator,
@@ -246,10 +279,11 @@ async def upload_video(
 @router.get("/video")
 def get_video(
     producto: Annotated[str, Query()],
+    carpeta: Annotated[str, Query()] = "",
     descargar: Annotated[bool, Query()] = False,
 ) -> FileResponse:
     """Sirve el vídeo ya montado."""
-    prod = product_repo.get_product(producto)
+    prod = product_repo.get_product(carpeta or config.CARPETA_DEFECTO, producto)
     ruta = prod.get("video_path")
     if not ruta or not Path(ruta).is_file():
         raise APIError(f"La prenda {producto} no tiene vídeo montado.", status_code=404)

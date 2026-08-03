@@ -26,20 +26,54 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 DRIVE_REMOTE = "gdrive:"
 
-# La carpeta compartida por enlace. Con `--drive-root-folder-id` rclone la trata
-# como la raíz, así que los paths van vacíos ("gdrive:").
+# Carpetas de producto, dentro del Drive compartido "Productos España". Con
+# `--drive-root-folder-id` rclone trata la carpeta como la raíz del remote, así
+# que los paths van vacíos ("gdrive:").
 #
-# https://drive.google.com/drive/folders/10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL
-CARPETA_DEFECTO = "10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL"
+# Una MISMA prenda vale para los dos nichos de ropa: en percha (sin nadie) o
+# puesta por una modelo. Lo que cambia es el prompt, no la foto — por eso estas
+# carpetas no son exclusivas de este módulo aunque el curso las separe.
+CARPETAS: dict[str, dict[str, str]] = {
+    "camisetas": {
+        "label": "Camisetas / Conjuntos",
+        "id": "10jSRauIlUVFXo3Dr6RCi8iO1gIY2TDIL",
+    },
+    "mono": {
+        "label": "Mono (mujer)",
+        "id": "1MXBSXZRwqbo1F25OAM-MhO-qTf4SmxyK",
+    },
+    "pantalon_corto": {
+        "label": "Pantalón corto (mujer)",
+        "id": "11enOhq4DL_lmdttQWqgowmA1MRqrR3_0",
+    },
+    "bikinis": {
+        "label": "Bikinis",
+        "id": "1T-nqij3xl4Dp-h2JvGJofCq6Wzoia25a",
+    },
+}
 
-# Nombre con el que se enseña esa carpeta y con el que se guarda su progreso.
-# El identificador real es el ID; esto es solo etiqueta.
-CARPETA_LABEL = "Camisetas"
+CARPETA_DEFECTO = "camisetas"
 
 
-def carpeta_id() -> str:
-    """ID de la carpeta de productos. Override por `.env` sin desplegar."""
-    return (os.getenv("NICHO_ROPA_FOLDER_ID") or CARPETA_DEFECTO).strip()
+def es_carpeta_conocida(slug: str) -> bool:
+    return slug in CARPETAS
+
+
+def carpeta_label(slug: str) -> str:
+    return CARPETAS.get(slug, {}).get("label", slug)
+
+
+def carpeta_id(slug: str = "") -> str:
+    """ID de Drive de una carpeta. Override global por `.env` para pruebas."""
+    forzado = (os.getenv("NICHO_ROPA_FOLDER_ID") or "").strip()
+    if forzado:
+        return forzado
+    meta = CARPETAS.get(slug or CARPETA_DEFECTO)
+    if not meta:
+        raise ValueError(
+            f"Carpeta desconocida: {slug!r}. Válidas: {sorted(CARPETAS)}"
+        )
+    return meta["id"]
 
 
 def redis_prefix() -> str:

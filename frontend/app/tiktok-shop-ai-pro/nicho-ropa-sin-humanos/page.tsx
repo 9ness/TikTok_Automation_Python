@@ -16,6 +16,7 @@ import {
   buildFotoLimpiaRopaUrl,
   buildFotoRopaUrl,
   buildVideoRopaUrl,
+  useCarpetasRopa,
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
@@ -26,7 +27,11 @@ import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 
 export default function NichoRopaPage() {
-  const prendas = usePrendas();
+  // Las carpetas de mujer son las del nicho CON personas, pero la misma prenda
+  // vale aquí colgada en percha: lo que cambia es el prompt, no la foto.
+  const [carpeta, setCarpeta] = useState("camisetas");
+  const carpetas = useCarpetasRopa();
+  const prendas = usePrendas(carpeta);
   const prompts = usePromptsRopa();
   const extraer = useExtraerTextosRopa();
 
@@ -46,7 +51,7 @@ export default function NichoRopaPage() {
     // Una a una con retardo: el navegador móvil cancela las simultáneas.
     for (const [i, p] of conFoto.entries()) {
       const a = document.createElement("a");
-      a.href = buildFotoLimpiaRopaUrl(p.producto);
+      a.href = buildFotoLimpiaRopaUrl(p.producto, carpeta);
       a.download = `ropa_${p.producto}.jpg`;
       document.body.appendChild(a);
       a.click();
@@ -66,6 +71,22 @@ export default function NichoRopaPage() {
       />
 
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+        <div className="grid grid-cols-2 gap-2">
+          {(carpetas.data?.items ?? []).map((c) => (
+            <button
+              key={c.slug}
+              type="button"
+              onClick={() => setCarpeta(c.slug)}
+              className={`truncate rounded-lg border px-3 py-2 text-xs transition ${
+                carpeta === c.slug
+                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
         <p className="text-xs font-medium sm:text-sm">
           {items.length} prenda(s) · {conTexto} con texto · {conVideo} con vídeo
         </p>
@@ -83,7 +104,7 @@ export default function NichoRopaPage() {
           type="button"
           disabled={extraer.isPending || items.length === 0}
           onClick={() =>
-            extraer.mutate(undefined, {
+            extraer.mutate(carpeta, {
               onSuccess: () => toast.success("Textos extraídos"),
               onError: (e) =>
                 toast.error(e instanceof ApiError ? e.message : String(e)),
@@ -166,7 +187,12 @@ export default function NichoRopaPage() {
       <section className="space-y-2">
         <p className="text-sm font-semibold">3 · Prendas</p>
         {items.map((p) => (
-          <PrendaCard key={p.producto} prenda={p} onCopiar={copiar} />
+          <PrendaCard
+            key={p.producto}
+            prenda={p}
+            carpeta={carpeta}
+            onCopiar={copiar}
+          />
         ))}
       </section>
     </div>
@@ -175,9 +201,11 @@ export default function NichoRopaPage() {
 
 function PrendaCard({
   prenda,
+  carpeta,
   onCopiar,
 }: {
   prenda: PrendaItem;
+  carpeta: string;
   onCopiar: (label: string, texto?: string) => void;
 }) {
   const subir = useSubirVideoRopa();
@@ -188,7 +216,7 @@ function PrendaCard({
   function elegirArchivo(file: File | null) {
     if (!file) return;
     subir.mutate(
-      { producto: prenda.producto, file, sexo },
+      { producto: prenda.producto, carpeta, file, sexo },
       {
         onSuccess: (r) => toast.success(r.message),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
@@ -313,12 +341,12 @@ function PrendaCard({
         filename={`ropa_${prenda.producto}.mp4`}
         videoUrl={
           prenda.video_path
-            ? buildVideoRopaUrl(prenda.producto, prenda.video_listo_at)
+            ? buildVideoRopaUrl(prenda.producto, carpeta, prenda.video_listo_at)
             : null
         }
         downloadUrl={
           prenda.video_path
-            ? buildVideoRopaUrl(prenda.producto, prenda.video_listo_at, true)
+            ? buildVideoRopaUrl(prenda.producto, carpeta, prenda.video_listo_at, true)
             : null
         }
         localPath={prenda.video_path}

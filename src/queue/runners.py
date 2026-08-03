@@ -1723,8 +1723,11 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     from src.nicho_ropa.pipeline import video_editor
     from src.nicho_ropa.repos import product_repo
 
+    ropa_config_carpeta_defecto = lambda: ropa_config.CARPETA_DEFECTO
+
     p = job.params
     producto = str(p["producto"])
+    carpeta = str(p.get("carpeta") or ropa_config_carpeta_defecto())
     raw_path = Path(p["raw_path"])
     sexo = (p.get("sexo") or "").strip().lower()
 
@@ -1744,13 +1747,13 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             on_log(f"[nicho_ropa] no se pudo preparar la voz: {e} — sale mudo")
 
     on_progress(0.4, "🎬 Encuadrando a 9:16…")
-    salida = Path(ropa_config.video_dir()) / f"{producto}.mp4"
+    salida = Path(ropa_config.video_dir()) / carpeta / f"{producto}.mp4"
     video_editor.montar(raw_path, salida, voz=voz, on_log=on_log)
 
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
-        producto, video_path=str(salida), video_listo_at=int(time.time()),
-        uploaded=True,
+        carpeta, producto, video_path=str(salida),
+        video_listo_at=int(time.time()), uploaded=True,
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)

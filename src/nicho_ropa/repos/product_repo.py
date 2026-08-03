@@ -15,8 +15,12 @@ from datetime import datetime, timezone
 
 from src.nicho_ropa.repos.redis_base import get_nicho_ropa_redis
 
-_KEY = "productos"
-_LOCK = "lock:productos"
+def _key(carpeta: str) -> str:
+    return f"productos:{carpeta}"
+
+
+def _lock(carpeta: str) -> str:
+    return f"lock:productos:{carpeta}"
 
 
 def _now() -> str:
@@ -34,7 +38,7 @@ def _require_redis():
 
 
 @contextmanager
-def _cerrojo(espera_s: float = 10.0):
+def _cerrojo(carpeta: str, espera_s: float = 10.0):
     """Mismo cerrojo que en los otros repos: se guarda el documento ENTERO y
     la API corre con varios workers, así que sin él se pierden escrituras."""
     r = get_nicho_ropa_redis()
@@ -42,7 +46,7 @@ def _cerrojo(espera_s: float = 10.0):
     if r.is_available():
         limite = time.monotonic() + espera_s
         while time.monotonic() < limite:
-            if r.set_nx(_LOCK, str(os.getpid()), ttl_s=30):
+            if r.set_nx(_lock(carpeta), str(os.getpid()), ttl_s=30):
                 mio = True
                 break
             time.sleep(0.15 + random.random() * 0.2)
@@ -50,25 +54,25 @@ def _cerrojo(espera_s: float = 10.0):
         yield mio
     finally:
         if mio:
-            r.delete(_LOCK)
+            r.delete(_lock(carpeta))
 
 
-def load() -> dict:
+def load(carpeta: str) -> dict:
     r = get_nicho_ropa_redis()
     if not r.is_available():
         return {}
-    return r.get_json(_KEY) or {}
+    return r.get_json(_key(carpeta)) or {}
 
 
-def get_product(producto: str) -> dict:
-    return (load().get("productos") or {}).get(str(producto)) or {}
+def get_product(carpeta: str, producto: str) -> dict:
+    return (load(carpeta).get("productos") or {}).get(str(producto)) or {}
 
 
-def save_extracted_texts(textos: dict[str, dict]) -> dict:
+def save_extracted_texts(carpeta: str, textos: dict[str, dict]) -> dict:
     """Guarda lo que devolvió Gemini, sin pisar el estado de los vídeos."""
-    with _cerrojo():
+    with _cerrojo(carpeta):
         r = _require_redis()
-        doc = r.get_json(_KEY) or {}
+        doc = r.get_json(_key(carpeta)) or {}
         productos = doc.setdefault("productos", {})
         for pid, campos in textos.items():
             prod = productos.setdefault(str(pid), {})
@@ -76,18 +80,18 @@ def save_extracted_texts(textos: dict[str, dict]) -> dict:
             prod["textos_at"] = _now()
         doc["textos_extraidos"] = True
         doc["updated_at"] = _now()
-        r.set_json(_KEY, doc)
+        r.set_json(_key(carpeta), doc)
         return doc
 
 
-def update_product(producto: str, **campos) -> dict:
+def update_product(carpeta: str, producto: str, **campos) -> dict:
     """Parche parcial. Ignora los campos que vengan `None`."""
-    with _cerrojo():
+    with _cerrojo(carpeta):
         r = _require_redis()
-        doc = r.get_json(_KEY) or {}
+        doc = r.get_json(_key(carpeta)) or {}
         productos = doc.setdefault("productos", {})
         prod = productos.setdefault(str(producto), {})
         prod.update({k: v for k, v in campos.items() if v is not None})
         prod["updated_at"] = _now()
-        r.set_json(_KEY, doc)
+        r.set_json(_key(carpeta), doc)
         return prod
