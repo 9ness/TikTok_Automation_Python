@@ -49,8 +49,33 @@ def _is_client_edit_job(job: Job) -> bool:
 _PERSIST_FILENAME = "queue_state.json"
 
 
+def leer_jobs(persist_dir: str | Path) -> list[dict]:
+    """Lee los trabajos del fichero de estado SIN construir una `JobQueue`.
+
+    Existe por un incidente real: para "mirar la cola" desde fuera (un
+    `docker exec ... get_queue()`) se instanciaba una JobQueue en un proceso
+    nuevo, y eso NO es una lectura — el constructor marca como FALLIDOS los
+    jobs que encuentre en RUNNING (`_reset_orphans`, que da por hecho que si
+    hay uno corriendo es que la app se reinició) y además arranca hilos
+    trabajadores que pueden llevarse jobs pendientes y morir con el proceso.
+    Consultar la cola mató un lote de 27 vídeos a los 40 segundos de empezar.
+
+    Esto devuelve los diccionarios en crudo. Para mirar, siempre esto.
+    """
+    import json
+
+    ruta = Path(persist_dir) / _PERSIST_FILENAME
+    try:
+        return json.loads(ruta.read_text(encoding="utf-8")).get("jobs", [])
+    except (OSError, ValueError):
+        return []
+
+
 class JobQueue:
-    def __init__(self, persist_dir: str | Path):
+    def __init__(self, persist_dir: str | Path, *, readonly: bool = False):
+        """`readonly=True` para inspeccionar sin efectos: ni marca fallidos
+        los RUNNING ajenos ni arranca hilos que compitan por los pendientes.
+        Aun así, para solo mirar es mejor `leer_jobs()`."""
         self._jobs: list[Job] = []
         self._lock = threading.RLock()
         self._cond = threading.Condition(self._lock)
@@ -60,7 +85,9 @@ class JobQueue:
         self._dispatch: Callable[[Job], None] | None = None
 
         self._load_state()
-        self._reset_orphans()
+        self._readonly = readonly
+        if not readonly:
+            self._reset_orphans()
 
         # Multi-worker: cada thread procesa un job a la vez. Permite que
         # mientras un worker está bloqueado esperando Atlas (que puede
@@ -78,6 +105,8 @@ class JobQueue:
         n_workers = max(1, min(4, n_workers))
 
         self._workers: list[threading.Thread] = []
+        if readonly:
+            return
         for i in range(n_workers):
             t = threading.Thread(
                 target=self._worker_loop,
