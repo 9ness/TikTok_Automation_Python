@@ -95,39 +95,29 @@ cabeza, que no haya texto quemado en los paisajes, etc.).
    escenario y hubo que centrarlo (`cx_frac` del escaneo de cara); Pablo sale
    bien de serie. Hay que mirarlo persona a persona.
 
-### Estados Unidos — EN CURSO (noche del 2026-08-03)
+### Estados Unidos — Billy Graham (4 ago, mañana)
 
-**Hecho y commiteado** (`a39026b`):
-- `PONENTES` lleva `pais`; el idioma de Whisper sale del ponente (`idioma_de`)
-  en vez de una constante global; paisajes con pool por país
-  (`paisajes_folder("us")`, `paisajes_clips_us/`, `paisaje_candidates_us.json`);
-  `allocator`, `batch` y `clip_library` miran `pais_de(ponente)`.
-- Billy Graham dado de alta como `billy`.
-- Descargado a `~/viralizacion_assets/billy/`: los **2 sermones** (630 MB, 27,5
-  min cada uno) y las **30 voces**.
+**Hecho y desplegado:**
+- Imagen de la API de 12 GB a **4,6 GB** (torch CPU-only; el VPS no tiene GPU).
+  Con eso el disco pasó de 11 a 23 GB libres y los deploys vuelven a caber.
+- País por ponente, idioma de Whisper por ponente, pool de paisajes por país.
+- **161 ganchos** precortados y verificados con capturas: sin logo, sin
+  teléfono y con la cara bien encuadrada. Sermones fuente borrados.
+- Voces: 30 MP3 ya en `billy/audios/`.
 
-**⚠️ SIN DESPLEGAR.** El código está en `main` pero la imagen de la API no se
-pudo reconstruir: ver abajo.
+**Lo aprendido con los sermones (por si se añade otro ponente de EEUU):**
+el logo llega hasta x=900 y el teléfono empieza en x=1300, así que entre los
+dos NO cabe un recorte 9:16 — mover el encuadre no sirve. Se declara
+`recorte_util` en `PONENTES` (aquí, quitar de y=770 abajo) y se aplica al
+precortar, así el renderer vuelve a encuadrar libre.
 
-**Lo que sé de los sermones (ya mirado):**
-- Los dos son 1920x1080 pero el contenido real es 4:3 con **barras decoradas a
-  los lados**, y llevan **rótulos quemados en TODOS los fotogramas**: logo
-  "Billy Graham Classics" abajo a la izquierda y "877-772-4559 /
-  PeaceWithGod.tv" abajo a la derecha (banda y≈860-980).
-- **Buena noticia:** el recorte 9:16 centrado (607x1080 desde x=656) sale
-  LIMPIO — ni logo, ni teléfono, ni barras. Comprobado con captura.
-- **Cuidado:** eso vale con la cara centrada. Si el escaneo de caras da un
-  `cx_frac` muy a la derecha, el recorte puede rozar el teléfono. Hay que
-  limitar el desplazamiento horizontal o recortar la banda de abajo antes
-  (`crop=1740x860+90+0`) y dejar que el renderer encuadre libre.
+**En marcha:** trocear el vídeo de paisajes de EEUU (151 min, 80 lugares) a
+`paisajes_clips_us/`. El recorte 9:16 centrado ya deja fuera la marca "EPIC" y
+el nombre del sitio, así que el OCR de descarte se pasa SOBRE EL RECORTE, no
+sobre el fotograma entero.
 
-**Siguiente paso:** `scan_hook_candidates("billy")` sobre UN sermón (27,5 min,
-muestreo cada 1s), revisar candidatos a ojo, precortar con
-`scripts/viralizacion_precortar_ganchos.py` y BORRAR los .mp4.
-
-**Paisajes:** el de 5,9 GB no cabe (se intentó, disco al 97%, abortado y
-borrado el parcial). Usar el de **2,9 GB** (*MOST STUNNING 8K HDR*), que además
-pega más con un sermón que los rascacielos de NYC.
+**Falta después:** borrar el vídeo fuente (6,2 GB) y probar un lote de Billy
+Graham de punta a punta.
 
 ### Estados Unidos — SOLO BILLY GRAHAM (decidido 2026-08-03)
 
