@@ -12,6 +12,8 @@ Se descarta lo que no sirve, que es la mitad del trabajo:
   SOBRE EL RECORTE, no sobre el fotograma entero — si no, se descartaría casi
   todo por texto que el espectador nunca va a ver. Lo que sí cae son las
   cartelas de título ("THE WAVE", "SALARES DE BONNEVILLE"), que ocupan el centro.
+  El detector está en `services/rotulos.py` y muestrea VARIOS fotogramas: las
+  cartelas entran animadas y con uno solo se colaban (ver ese módulo).
 - Planos demasiado oscuros o planos (un fundido a negro, un cielo liso).
 - Planos más cortos que `MIN_DUR`: no dan ni para un tramo de b-roll.
 
@@ -25,14 +27,13 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 from src.viralizacion import config  # noqa: E402
-from src.viralizacion.services import clip_library  # noqa: E402
+from src.viralizacion.services import clip_library, rotulos  # noqa: E402
 
 # Un plano más corto no da ni para un tramo; más largo se corta al usarlo.
 MIN_DUR = 3.0
@@ -78,36 +79,6 @@ def _luma_media(path: Path) -> float:
     )
     vals = [float(m.group(1)) for m in re.finditer(r"YAVG=([0-9.]+)", proc.stderr)]
     return sum(vals) / len(vals) if vals else 0.0
-
-
-def _tiene_texto(path: Path, lector) -> bool:
-    """True si se lee texto en el clip YA RECORTADO.
-
-    Se mira un fotograma del centro: las cartelas de título duran todo el
-    plano, así que con uno basta y no hay que pagar OCR por fotograma.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        frame = Path(tmp) / "f.jpg"
-        # A 480px de ancho. El OCR sobre el fotograma completo (1080x1920)
-        # tarda 26 SEGUNDOS por clip; aquí baja a 4. Lo que se busca son
-        # cartelas de título con letras enormes, que se leen igual reducidas.
-        subprocess.run(
-            ["ffmpeg", "-v", "error", "-ss", "0.5", "-i", str(path),
-             "-frames:v", "1", "-vf", "scale=480:-2", str(frame), "-y"],
-            check=True, capture_output=True,
-        )
-        if not frame.is_file():
-            return False
-        try:
-            hallado = lector.readtext(str(frame), detail=1)
-        except Exception:
-            return False
-    # Se ignora el ruido: una letra suelta en un cartel de carretera no es un
-    # rótulo. Lo que se busca son palabras legibles y con confianza alta.
-    return any(
-        conf > 0.55 and len(str(txt).strip()) >= 4
-        for _caja, txt, conf in hallado
-    )
 
 
 def trocear(pais: str, tope: int) -> int:
@@ -168,7 +139,7 @@ def trocear(pais: str, tope: int) -> int:
             out.unlink(missing_ok=True)
             descartados["oscuro"] += 1
             continue
-        if _tiene_texto(out, lector):
+        if rotulos.tiene_texto(out, lector):
             out.unlink(missing_ok=True)
             descartados["texto"] += 1
             continue
