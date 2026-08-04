@@ -91,6 +91,11 @@ export interface ProductoItem {
   caption_riesgo: string | null;
   gancho: string | null;
   cta: string | null;
+  /** Ya metido en el escaparate de TikTok. Es el paso que MÁS tiempo cuesta
+   *  del día: hay que buscar cada producto a mano en el Marketplace porque
+   *  EchoTik solo da con la ficha 1 de cada 4 veces y su cuota gratis (100
+   *  llamadas al mes) no llega ni de lejos al volumen diario. */
+  en_escaparate: boolean;
   uploaded: boolean;
   sold: boolean;
   video_path: string | null;
@@ -208,6 +213,7 @@ export interface EstadoRequest {
   source: string;
   folder: string;
   producto: string;
+  en_escaparate?: boolean;
   uploaded?: boolean;
   sold?: boolean;
 }

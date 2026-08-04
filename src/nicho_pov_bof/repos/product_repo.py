@@ -26,7 +26,7 @@ from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 # no cambia según quién lo mire. Compartirlo evita gastar la cuota tres veces
 # en el mismo producto.
 CAMPOS_PRIVADOS = frozenset({
-    "uploaded", "sold", "video_path", "video_listo_at",
+    "en_escaparate", "uploaded", "sold", "video_path", "video_listo_at",
 })
 
 

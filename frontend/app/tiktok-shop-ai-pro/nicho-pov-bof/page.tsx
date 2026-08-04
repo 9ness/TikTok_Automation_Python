@@ -14,6 +14,7 @@ import {
   RefreshCw,
   ShoppingBag,
   Sparkles,
+  Store,
   Upload,
   X,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
@@ -71,6 +73,7 @@ export default function NichoPovBofPage() {
   // (la primera sin completar).
   const [picked, setPicked] = useState<string | null>(null);
   const [verVendidos, setVerVendidos] = useState(false);
+  const [verEscaparate, setVerEscaparate] = useState(false);
 
   const sources = useSources();
   const folders = useFolders(source);
@@ -129,6 +132,12 @@ export default function NichoPovBofPage() {
   const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
   const conFoto = (productos.data ?? []).filter((p) => p.clean_photo_id).length;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
+  // Meter el producto en el escaparate es el paso más lento del día y no se
+  // puede automatizar (ver EscaparateModal), así que el pendiente se enseña
+  // arriba, en el botón, sin tener que abrir nada.
+  const pendientesEscaparate = (productos.data ?? []).filter(
+    (p) => !p.en_escaparate,
+  ).length;
 
   function copyText(label: string, text: string | undefined) {
     if (!text) return;
@@ -359,10 +368,42 @@ export default function NichoPovBofPage() {
             </span>
           )}
         </button>
+        {/* El escaparate es el cuello de botella real del día: no se puede
+            automatizar (EchoTik da con la ficha 1 de cada 4 veces y su cuota
+            gratis no llega), así que al menos se abre de un toque desde
+            arriba, igual que los vendidos. */}
+        {folder && totalProductos > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate
+                  ? "bg-sky-500 text-black"
+                  : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
       </section>
 
       {verVendidos && (
         <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
+      )}
+
+      {verEscaparate && folder && (
+        <EscaparateModal
+          source={source}
+          folder={folder}
+          productos={productos.data ?? []}
+          onClose={() => setVerEscaparate(false)}
+        />
       )}
 
       {/* Todo esto se toca de uvas a peras (la clave de EchoTik cuando caduca,
@@ -1250,6 +1291,7 @@ function ProductoCard({
   const urlNoEncontrada = buscarUrl.isSuccess && !producto.product_url;
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
+  const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   // Arranca con la voz que encaja con el producto (mujer en cosmética y
   // pelo, hombre en el resto). El operador la cambia con un clic si falla.
   const [sexo, setSexo] = useState<"hombre" | "mujer">(
@@ -1275,13 +1317,24 @@ function ProductoCard({
   useEffect(() => {
     setUploaded(producto.uploaded);
     setSold(producto.sold);
-  }, [producto.uploaded, producto.sold]);
+    setEnEscaparate(producto.en_escaparate);
+  }, [producto.uploaded, producto.sold, producto.en_escaparate]);
 
-  const pushEstado = (patch: { uploaded?: boolean; sold?: boolean }) => {
+  const pushEstado = (patch: {
+    uploaded?: boolean;
+    sold?: boolean;
+    en_escaparate?: boolean;
+  }) => {
     setEstado.mutate(
       { source, folder, producto: producto.producto, ...patch },
       { onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)) },
     );
+  };
+
+  const toggleEscaparate = () => {
+    const v = !enEscaparate;
+    setEnEscaparate(v);
+    pushEstado({ en_escaparate: v });
   };
 
   const toggleUploaded = () => {
@@ -1631,6 +1684,19 @@ function ProductoCard({
       </button>
 
       <div className="flex gap-1.5">
+        {/* Va PRIMERO porque es lo primero que pasa de verdad: el producto
+            entra en el escaparate antes de que se publique nada. */}
+        <button
+          type="button"
+          onClick={toggleEscaparate}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            enEscaparate
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          🏪 Escaparate
+        </button>
         <button
           type="button"
           onClick={toggleUploaded}

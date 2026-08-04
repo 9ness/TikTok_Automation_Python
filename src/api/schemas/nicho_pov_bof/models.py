@@ -126,6 +126,11 @@ class ProductoInfo(BaseModel):
     # Voz que encaja con el producto ("mujer" en cosmética/pelo, "hombre" en
     # el resto). Es solo el valor por defecto de la ficha, se puede cambiar.
     sexo_sugerido: str = "hombre"
+    # Ya está metido en el escaparate de TikTok. Es un paso ANTERIOR a subir el
+    # vídeo y el que más tiempo cuesta (se busca el producto a mano en el
+    # Marketplace, porque EchoTik solo encuentra la ficha 1 de cada 4 veces y
+    # su cuota gratis no da para el volumen diario).
+    en_escaparate: bool = False
     uploaded: bool = False
     sold: bool = False
     video_path: str | None = None
@@ -178,6 +183,7 @@ class ProductoEstadoRequest(BaseModel):
     source: str = Field(..., min_length=1)
     folder: str = Field(..., min_length=1)
     producto: str = Field(..., min_length=1)
+    en_escaparate: bool | None = None
     uploaded: bool | None = None
     sold: bool | None = None
 

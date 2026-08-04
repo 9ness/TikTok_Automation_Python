@@ -197,6 +197,7 @@ def _producto_info(
         sexo_sugerido=audience.sexo_sugerido(
             prod.get("titulo", ""), prod.get("titulo_tiktok_completo", ""),
         ),
+        en_escaparate=bool(prod.get("en_escaparate")),
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
@@ -296,6 +297,7 @@ def _list_productos(
                     guardado.get("titulo", ""),
                     guardado.get("titulo_tiktok_completo", ""),
                 ),
+                en_escaparate=bool(guardado.get("en_escaparate")),
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),
@@ -494,14 +496,21 @@ def set_producto_estado(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductoInfo:
-    """Parche parcial de Subido/Vendió. `update_product` ya ignora los
-    campos que vengan `None`, así que el caller puede mandar solo el que
-    cambia."""
+    """Parche parcial de Escaparate/Subido/Vendió. `update_product` ya ignora
+    los campos que vengan `None`, así que el caller puede mandar solo el que
+    cambia.
+
+    `en_escaparate` NO se deduce de `uploaded`, aunque en la vida real haya que
+    meter el producto en el escaparate antes de publicar: `uploaded` lo pone
+    solo el runner al terminar el MONTAJE, que no es lo mismo que publicar.
+    Deducirlo daría por hecho trabajo que nadie ha hecho.
+    """
     from src.nicho_pov_bof.repos import product_repo
 
     try:
         prod = product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
+            en_escaparate=body.en_escaparate,
             uploaded=body.uploaded, sold=body.sold,
         )
     except RuntimeError as e:
