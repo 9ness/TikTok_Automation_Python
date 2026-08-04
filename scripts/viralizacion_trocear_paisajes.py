@@ -155,7 +155,11 @@ def trocear(pais: str, tope: int) -> int:
             ["ffmpeg", "-v", "error", "-ss", f"{inicio:.3f}", "-t", f"{dur:.3f}",
              "-i", str(video),
              "-vf", (f"crop=ih*{w}/{h}:ih,scale={w}:{h},fps={config.TARGET_FPS},setsar=1"),
-             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+             # `ultrafast`: el cuello de botella es codificar 1080x1920, y estos
+             # clips se vuelven a codificar en el render final, así que aquí no
+             # compensa apurar el bitrate. Con `veryfast` eran ~20s por clip
+             # (dos horas la biblioteca entera); así baja a la mitad.
+             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
              "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", str(out), "-y"],
             check=True, capture_output=True,
         )
