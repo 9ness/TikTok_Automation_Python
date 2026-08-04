@@ -53,6 +53,16 @@ def count_available_paisajes(ponente: str, *, cache_only: bool = False) -> tuple
     `cache_only=True` (UI): no trocea el vídeo — solo lee JSON cache.
     """
     pais = config.pais_de(ponente)
+
+    # Si hay biblioteca de clips, es de donde va a tirar el render — contar el
+    # JSON de tramos daría 0 y en la pantalla parecería que no hay paisajes.
+    # Pasó con Estados Unidos, que nació ya con biblioteca y sin JSON.
+    if clip_library.is_available(pais):
+        total = clip_library.clip_count(pais)
+        # La biblioteca no se agota: al dar la vuelta se reabre un ciclo con
+        # ventanas y zooms distintos, así que "disponibles" son todos.
+        return total, total
+
     candidates = (
         load_paisaje_candidates_cached(pais)
         if cache_only
