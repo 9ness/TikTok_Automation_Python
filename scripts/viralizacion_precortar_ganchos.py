@@ -41,10 +41,16 @@ def precortar(slug: str) -> int:
     for c in data.get("candidates", []):
         out = destino / f"hook_{c['index']:04d}.mp4"
         if not out.is_file():
+            # Si el ponente tiene gráficos quemados que no se pueden esquivar
+            # moviendo el encuadre (ver `recorte_util_de`), se recortan AQUÍ:
+            # así el clip que queda en disco ya está limpio.
+            recorte = config.recorte_util_de(slug)
+            vf = [f"crop={recorte[2]}:{recorte[3]}:{recorte[0]}:{recorte[1]}"] if recorte else []
             subprocess.run(
                 ["ffmpeg", "-v", "error", "-y",
                  "-ss", f"{float(c['start']):.3f}", "-t", f"{config.HOOK_DUR:.3f}",
                  "-i", str(fuente),
+                 *(["-vf", ",".join(vf)] if vf else []),
                  # Re-encode corto: con `-c copy` el corte salta al keyframe
                  # anterior y el gancho empezaría en otro sitio.
                  "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",

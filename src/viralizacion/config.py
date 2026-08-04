@@ -57,13 +57,16 @@ PONENTES: dict[str, dict] = {
         "label": "Billy Graham",
         "drive_folder": "Billy Graham",
         "pais": "us",
-        # Los sermones llevan rótulos QUEMADOS en todos los fotogramas: logo
-        # abajo a la izquierda y "877-772-4559 / PeaceWithGod.tv" abajo a la
-        # derecha. El recorte 9:16 los deja fuera mientras se quede centrado,
-        # pero con la cara muy a la derecha (cx_frac 0.65-0.68) el teléfono
-        # entra en cuadro — comprobado con capturas. Se limita el encuadre a
-        # la franja donde se sabe que no hay texto.
-        "cx_seguro": (0.34, 0.62),
+        # Los sermones llevan rótulos QUEMADOS en todos los fotogramas: el
+        # logo "Billy Graham Classics" abajo a la izquierda (llega hasta
+        # x=900, medido) y "877-772-4559 / PeaceWithGod.tv" abajo a la
+        # derecha (desde x=1300). Entre los dos NO cabe un recorte 9:16, así
+        # que no hay forma de esquivarlos moviendo el encuadre: hay que
+        # quitar la banda de abajo. El texto empieza en y=777.
+        "recorte_util": (0, 0, 1920, 770),
+        # Ya sin texto, el único límite son las barras decoradas de los
+        # laterales.
+        "cx_seguro": (0.28, 0.72),
     },
 }
 
@@ -73,6 +76,16 @@ PONENTES: dict[str, dict] = {
 IDIOMA_POR_PAIS = {"es": "es", "us": "en"}
 
 PAIS_LABEL = {"es": "España", "us": "Estados Unidos"}
+
+
+def recorte_util_de(slug: str) -> tuple[int, int, int, int] | None:
+    """`(x, y, w, h)` del trozo del fotograma que se puede usar, o None.
+
+    Sirve para quitar gráficos quemados que no se pueden esquivar moviendo el
+    encuadre. Se aplica al PRECORTAR el gancho, así que los clips que quedan en
+    disco ya están limpios y el renderer encuadra libre sobre ellos.
+    """
+    return PONENTES.get(slug, {}).get("recorte_util")
 
 
 def cx_seguro_de(slug: str) -> tuple[float, float] | None:
