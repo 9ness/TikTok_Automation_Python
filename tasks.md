@@ -208,13 +208,10 @@ recorta los audios largos en vez de tocar el render.
 - [ ] `list_carpetas` se traga los errores: devuelve [] cuando Drive falla,
       indistinguible de "no hay carpetas".
 
-- [Viralización] `renderer.py`: el dir `work/` de clips solo se borra en el
-  camino feliz. Si ffmpeg falla, quedan ~220 MB (vídeo 39s) o ~500 MB (90s)
-  huérfanos por vídeo fallido. Envolver en `try/finally`. Relevante: el disco
-  del VPS va al 92%.
-- [Viralización] `MAX_VIDEO_DURATION_S = 90` contradice el diseño (20-60s) y
-  los docstrings ("~55s", "163s → 3 trozos"; con 90 salen 2). Hoy es inerte
-  (todos los audios < 90s). Decidir: bajar a ~55-60 o corregir los docs.
+- [Viralización] `MAX_VIDEO_DURATION_S = 130` contradice el diseño (20-60s) y
+  los docstrings ("~55s", "163s → 3 trozos"; con 130 sale 1 trozo + resto). Ya
+  NO es inerte: Billy Graham tiene 6 audios de más de 90s y uno de 180s que se
+  parte en 130s + 50s. Decidir: bajar el tope o corregir los docs.
 - [Viralización] `is_valid_mp4(min_duration=MIN_VIDEO_DURATION_S*0.8)` = 16s
   fijo: un audio corto genera un MP4 correcto que se declara inválido y se
   borra. Debería medir contra `win_dur` esperado, no contra una constante.
@@ -224,6 +221,19 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+
+- [2026-08-04] [Viralización] Rótulos que se colaban en los paisajes: el filtro
+  miraba UN fotograma a 0,5s y las cartelas entran animadas. `services/rotulos.py`
+  muestrea 5. Retirados 22 clips de 300 en EE.UU. (mapas `UNITED STATES`,
+  cartelas de sitio y 5 con el botón `SUSCRIBIRSE`). España comprobada por
+  muestreo y NO tocada: sus 2 positivos eran letreros filmados.
+- [2026-08-04] [Viralización] `renderer.py`: el `work/` de clips se borra ya en
+  `try/finally`, no solo en el camino feliz.
+- [2026-08-04] [Nicho POV BOF] Modo escaparate: pendientes agrupados por tienda
+  (una búsqueda en el Marketplace por tienda en vez de una por producto) con
+  estado `en_escaparate` privado por usuario.
+- [2026-08-04] [Nicho POV BOF] Buscador de productos en las 35 carpetas (dos
+  `mget`, 0,5s) para dar con el que vendió y marcarlo desde el resultado.
 
 - **Voz del Nicho POV BOF más alta sin saturar** — normalización por sonoridad
   en dos pasadas + compresor. De -17/-23 LUFS a -12,5/-14 con picos bajo

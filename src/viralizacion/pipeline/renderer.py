@@ -937,34 +937,39 @@ def render_video(
         shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True, exist_ok=True)
 
-    clip_paths: list[Path] = []
-    for i, spec in enumerate(specs):
-        cp = work / f"c{i:02d}.mp4"
+    # `try/finally`: los intermedios se borran FALLE O NO. Sin esto solo se
+    # limpiaba el camino feliz, y cada vídeo que reventaba dejaba ~250 MB
+    # tirados — con un lote de 30 corriendo de noche y 25 GB libres, eso es
+    # lo único que podría llenar el disco sin que nadie lo esté mirando.
+    try:
+        clip_paths: list[Path] = []
+        for i, spec in enumerate(specs):
+            cp = work / f"c{i:02d}.mp4"
+            if on_log:
+                on_log(f"[renderer] extract clip {i+1}/{len(specs)} ({spec.extract_dur:.1f}s)")
+            _extract_clip(spec, cp, on_log, ken_burns=style.ken_burns)
+            clip_paths.append(cp)
+
+        xfade_path = work / "xfade.mp4"
         if on_log:
-            on_log(f"[renderer] extract clip {i+1}/{len(specs)} ({spec.extract_dur:.1f}s)")
-        _extract_clip(spec, cp, on_log, ken_burns=style.ken_burns)
-        clip_paths.append(cp)
+            on_log(f"[renderer] xfade {len(clip_paths)} clips…")
+        _xfade_clips(clip_paths, specs, transitions, xfade_path, on_log)
 
-    xfade_path = work / "xfade.mp4"
-    if on_log:
-        on_log(f"[renderer] xfade {len(clip_paths)} clips…")
-    _xfade_clips(clip_paths, specs, transitions, xfade_path, on_log)
-
-    use_music = include_music and music_path is not None
-    if on_log:
-        on_log("[renderer] finalize (grade + subs + audio)…")
-    _finalize(
-        xfade_path,
-        ass_path=ass_path,
-        style=style,
-        voice_path=audio_path,
-        voice_start=audio_start,
-        target_duration=target_duration,
-        music_path=music_path if use_music else None,
-        output_path=output_path,
-        on_log=on_log,
-    )
-
-    # Limpia intermedios del vídeo (libera disco; ASS se queda por si debug).
-    shutil.rmtree(work, ignore_errors=True)
-    return output_path
+        use_music = include_music and music_path is not None
+        if on_log:
+            on_log("[renderer] finalize (grade + subs + audio)…")
+        _finalize(
+            xfade_path,
+            ass_path=ass_path,
+            style=style,
+            voice_path=audio_path,
+            voice_start=audio_start,
+            target_duration=target_duration,
+            music_path=music_path if use_music else None,
+            output_path=output_path,
+            on_log=on_log,
+        )
+        return output_path
+    finally:
+        # El ASS se queda fuera de `work`, así que sigue disponible para depurar.
+        shutil.rmtree(work, ignore_errors=True)
