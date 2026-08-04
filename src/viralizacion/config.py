@@ -57,6 +57,13 @@ PONENTES: dict[str, dict] = {
         "label": "Billy Graham",
         "drive_folder": "Billy Graham",
         "pais": "us",
+        # Los sermones llevan rótulos QUEMADOS en todos los fotogramas: logo
+        # abajo a la izquierda y "877-772-4559 / PeaceWithGod.tv" abajo a la
+        # derecha. El recorte 9:16 los deja fuera mientras se quede centrado,
+        # pero con la cara muy a la derecha (cx_frac 0.65-0.68) el teléfono
+        # entra en cuadro — comprobado con capturas. Se limita el encuadre a
+        # la franja donde se sabe que no hay texto.
+        "cx_seguro": (0.34, 0.62),
     },
 }
 
@@ -66,6 +73,14 @@ PONENTES: dict[str, dict] = {
 IDIOMA_POR_PAIS = {"es": "es", "us": "en"}
 
 PAIS_LABEL = {"es": "España", "us": "Estados Unidos"}
+
+
+def cx_seguro_de(slug: str) -> tuple[float, float] | None:
+    """Franja horizontal donde el recorte no pilla gráficos quemados.
+
+    None = el vídeo del ponente está limpio y se puede encuadrar libremente.
+    """
+    return PONENTES.get(slug, {}).get("cx_seguro")
 
 
 def pais_de(slug: str) -> str:

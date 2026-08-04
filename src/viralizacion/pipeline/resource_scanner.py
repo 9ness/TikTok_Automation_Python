@@ -81,6 +81,25 @@ def _find_runs(samples: list[dict], max_gap: float = 1.5) -> list[list[dict]]:
     return runs
 
 
+def _limitar_a_zona_segura(candidates: list[dict], ponente: str) -> list[dict]:
+    """Recorta `cx_frac` a la franja sin rótulos quemados del ponente.
+
+    Solo aplica a quien la tenga declarada. En Billy Graham, dos candidatos de
+    161 salían con la cara tan a la derecha que el recorte metía el teléfono
+    sobreimpreso en cuadro.
+    """
+    zona = config.cx_seguro_de(ponente)
+    if not zona:
+        return candidates
+    lo, hi = zona
+    for c in candidates:
+        cx = float(c.get("cx_frac", 0.5))
+        if cx < lo or cx > hi:
+            c["cx_frac"] = round(min(hi, max(lo, cx)), 4)
+            c["cx_limitado"] = True
+    return candidates
+
+
 def _chop_hook_run(run: list[dict]) -> list[dict]:
     """Trocea un tramo continuo de cara en candidatos NO SOLAPADOS de
     exactamente HOOK_DUR segundos. `cx_frac` de cada candidato = media de
@@ -162,6 +181,8 @@ def scan_hook_candidates(ponente: str, *, force: bool = False) -> list[dict]:
         for c in _chop_hook_run(run):
             candidates.append({"index": idx, "start": c["start"], "cx_frac": c["cx_frac"]})
             idx += 1
+
+    candidates = _limitar_a_zona_segura(candidates, ponente)
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(
