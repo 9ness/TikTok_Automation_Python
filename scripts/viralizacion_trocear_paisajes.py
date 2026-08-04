@@ -67,10 +67,13 @@ def _luma_media(path: Path) -> float:
     # `-v info` NO es un descuido: `metadata=print` escribe por stderr con
     # nivel info, y con `-v error` no sale NADA. Con eso la media daba 0 y
     # TODOS los clips se descartaban por oscuros — 38 de cada 39.
+    # Un fotograma de cada 15 y a 240px: medir el brillo NO necesita ver los
+    # 30 fps a resolución completa, y así pasa de 4,7s a menos de 1 por clip.
     proc = subprocess.run(
         ["ffmpeg", "-hide_banner", "-v", "info", "-i", str(path),
-         "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG",
-         "-f", "null", "-"],
+         "-vf", ("select='not(mod(n\\,15))',scale=240:-2,"
+                 "signalstats,metadata=print:key=lavfi.signalstats.YAVG"),
+         "-vsync", "0", "-f", "null", "-"],
         capture_output=True, text=True,
     )
     vals = [float(m.group(1)) for m in re.finditer(r"YAVG=([0-9.]+)", proc.stderr)]
@@ -85,9 +88,12 @@ def _tiene_texto(path: Path, lector) -> bool:
     """
     with tempfile.TemporaryDirectory() as tmp:
         frame = Path(tmp) / "f.jpg"
+        # A 480px de ancho. El OCR sobre el fotograma completo (1080x1920)
+        # tarda 26 SEGUNDOS por clip; aquí baja a 4. Lo que se busca son
+        # cartelas de título con letras enormes, que se leen igual reducidas.
         subprocess.run(
             ["ffmpeg", "-v", "error", "-ss", "0.5", "-i", str(path),
-             "-frames:v", "1", str(frame), "-y"],
+             "-frames:v", "1", "-vf", "scale=480:-2", str(frame), "-y"],
             check=True, capture_output=True,
         )
         if not frame.is_file():
