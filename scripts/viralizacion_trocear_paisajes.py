@@ -64,8 +64,11 @@ def detectar_cortes(video: Path) -> list[float]:
 
 def _luma_media(path: Path) -> float:
     """Brillo medio del clip (0-255). Sirve para tirar fundidos y noches."""
+    # `-v info` NO es un descuido: `metadata=print` escribe por stderr con
+    # nivel info, y con `-v error` no sale NADA. Con eso la media daba 0 y
+    # TODOS los clips se descartaban por oscuros — 38 de cada 39.
     proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path),
+        ["ffmpeg", "-hide_banner", "-v", "info", "-i", str(path),
          "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG",
          "-f", "null", "-"],
         capture_output=True, text=True,
@@ -109,9 +112,18 @@ def trocear(pais: str, tope: int) -> int:
     destino = clip_library.clips_folder(pais)
     destino.mkdir(parents=True, exist_ok=True)
 
-    print(f"Detectando cambios de plano en {video.name}… (tarda)", flush=True)
-    cortes = detectar_cortes(video)
-    print(f"  {len(cortes)} cortes", flush=True)
+    # La detección de planos sobre 2,5 h de vídeo tarda ~20 min: se cachea
+    # para poder ajustar los filtros sin repetirla.
+    cache = Path("/app/temp_work") / f"cortes_{pais}.json"
+    if cache.is_file():
+        cortes = json.loads(cache.read_text())
+        print(f"  {len(cortes)} cortes (de caché)", flush=True)
+    else:
+        print(f"Detectando cambios de plano en {video.name}… (tarda)", flush=True)
+        cortes = detectar_cortes(video)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(cortes))
+        print(f"  {len(cortes)} cortes", flush=True)
 
     import easyocr
 
