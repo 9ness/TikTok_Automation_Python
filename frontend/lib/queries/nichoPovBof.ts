@@ -18,6 +18,7 @@ import type {
   MarkCompletedRequest,
   MarkCompletedResponse,
   PhotosListResponse,
+  ProductoBuscado,
   ProductoItem,
   ProductoUrlRequest,
   ProductosUrlsRequest,
@@ -39,7 +40,32 @@ export const nichoPovBofKeys = {
   productos: (source: string, folder: string) =>
     [...nichoPovBofKeys.all, "productos", source, folder] as const,
   vendidos: (source: string) => [...nichoPovBofKeys.all, "vendidos", source] as const,
+  buscar: (source: string, q: string) =>
+    [...nichoPovBofKeys.all, "buscar", source, q] as const,
 };
+
+/** Busca un producto por nombre, tienda o carpeta en TODAS las carpetas.
+ *
+ *  Sirve para lo de siempre: llega el aviso de una venta y hay que dar con el
+ *  producto sin acordarse de en cuál de las 35 carpetas estaba. Sin `q` (o con
+ *  menos de 2 letras) no se llama: barrer todo por una sola letra devolvería
+ *  media base de datos.
+ */
+export function useBuscarProductos(source: string, q: string) {
+  const limpio = q.trim();
+  return useQuery<{ items: ProductoBuscado[]; total: number }>({
+    queryKey: nichoPovBofKeys.buscar(source, limpio),
+    queryFn: () =>
+      api.get<{ items: ProductoBuscado[]; total: number }>(
+        `${ROOT}/buscar?q=${encodeURIComponent(limpio)}` +
+          (source ? `&source=${encodeURIComponent(source)}` : ""),
+      ),
+    enabled: limpio.length >= 2,
+    // Los resultados no cambian mientras escribes: evita repetir el barrido
+    // al borrar una letra y volver a ponerla.
+    staleTime: 30_000,
+  });
+}
 
 export function useSources() {
   return useQuery<SourcesListResponse>({

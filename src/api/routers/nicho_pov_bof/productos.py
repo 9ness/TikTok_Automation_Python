@@ -9,6 +9,7 @@ automatización de los vídeos por producto.
 - POST /api/v1/nicho-pov-bof/producto/estado → marca Subido/Vendió
 - POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop (1)
 - POST /api/v1/nicho-pov-bof/productos/urls  → idem para toda la carpeta
+- GET  /api/v1/nicho-pov-bof/buscar          → busca un producto en TODAS las carpetas
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
@@ -30,6 +31,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
+    BuscarProductosResponse,
     ExtraerTextosRequest,
     EchoTikCredsRequest,
     EchoTikCredsResponse,
@@ -38,6 +40,7 @@ from src.api.schemas.nicho_pov_bof import (
     EchoTikCuentasResponse,
     HashtagsRequest,
     HashtagsResponse,
+    ProductoBuscado,
     ProductoEstadoRequest,
     ProductoUrlRequest,
     ProductosUrlsRequest,
@@ -932,6 +935,49 @@ def set_hashtags(body: HashtagsRequest) -> HashtagsResponse:
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return HashtagsResponse(ok=True, tags=tags)
+
+
+@router.get("/buscar", response_model=BuscarProductosResponse)
+def buscar_productos(
+    q: Annotated[str, Query(min_length=2)],
+    source: Annotated[str | None, Query()] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> BuscarProductosResponse:
+    """Busca un producto por nombre, tienda o carpeta en TODAS las carpetas.
+
+    La foto se resuelve DESPUÉS de recortar los resultados: emparejarlas
+    cuesta ~0,25s por carpeta y hacerlo de las 35 para enseñar cinco sería
+    pagar cuatro segundos de más en cada tecla.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    try:
+        encontrados, total = product_repo.buscar_productos(
+            q, usuario=usuario, source=source,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    items: list[ProductoBuscado] = []
+    for d in encontrados:
+        clean, _titled, _aviso = _fotos_del_producto(
+            d["source"], d["folder"], d["producto"],
+        )
+        items.append(
+            ProductoBuscado(
+                source=d["source"], folder=d["folder"], producto=d["producto"],
+                titulo=d.get("titulo") or "",
+                titulo_tiktok_completo=d.get("titulo_tiktok_completo") or "",
+                tienda=d.get("tienda") or "",
+                clean_photo_id=clean or "",
+                product_url=d.get("product_url") or "",
+                en_escaparate=bool(d.get("en_escaparate")),
+                uploaded=bool(d.get("uploaded")),
+                sold=bool(d.get("sold")),
+                unidades=int(d.get("unidades") or 0),
+            )
+        )
+    return BuscarProductosResponse(items=items, total=total)
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)

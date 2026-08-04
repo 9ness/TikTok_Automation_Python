@@ -1,6 +1,7 @@
 """Schemas del Nicho POV BOF."""
 
 from .models import (
+    BuscarProductosResponse,
     EchoTikCredsRequest,
     EchoTikCredsResponse,
     EchoTikCuenta,
@@ -18,6 +19,7 @@ from .models import (
     PhotoInfo,
     PhotosListResponse,
     ProductFolder,
+    ProductoBuscado,
     ProductoEstadoRequest,
     ProductoInfo,
     ProductosListResponse,
@@ -33,6 +35,8 @@ from .models import (
 )
 
 __all__ = [
+    "BuscarProductosResponse",
+    "ProductoBuscado",
     "EchoTikCredsRequest",
     "EchoTikCredsResponse",
     "EchoTikCuenta",

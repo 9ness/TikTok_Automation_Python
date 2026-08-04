@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 
 import os
 import random
+import re
 import time
+import unicodedata
 from contextlib import contextmanager
 
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
@@ -210,6 +212,118 @@ def folder_summary(source: str, folder: str) -> dict:
         "sold": sum(1 for p in productos.values() if p.get("sold")),
         "con_textos": sum(1 for p in productos.values() if p.get("titulo")),
     }
+
+
+def _normaliza(texto: str) -> str:
+    """Minúsculas y sin acentos, para que 'bikini' encuentre 'Bikiní'."""
+    plano = unicodedata.normalize("NFKD", str(texto or "").lower())
+    return "".join(c for c in plano if not unicodedata.combining(c))
+
+
+def buscar_productos(
+    consulta: str, *, usuario: str = "", source: str | None = None,
+    limite: int = 20,
+) -> tuple[list[dict], int]:
+    """Busca en TODAS las carpetas por título, tienda o carpeta.
+
+    Existe para lo de siempre: llega el aviso de una venta con el nombre del
+    producto y hay que dar con él para marcarlo, sin acordarse de en cuál de
+    las 35 carpetas estaba.
+
+    Barre las carpetas con DOS `mget` (uno de lo compartido y otro de lo
+    privado del usuario) en vez de leerlas una a una: 35 lecturas sueltas eran
+    lo que hacía que el ranking de vendidos tardase ocho segundos.
+
+    Devuelve `(resultados, total)`. El total va aparte porque los resultados
+    vienen recortados a `limite` y quien llama tiene que poder decir "hay más".
+    """
+    from src.nicho_pov_bof import config
+    from src.nicho_pov_bof.services import drive_client
+
+    palabras = [p for p in _normaliza(consulta).split() if p]
+    if not palabras:
+        return [], 0
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return [], 0
+
+    entradas: list[tuple[str, str]] = []
+    for src in ([source] if source else list(config.SOURCES)):
+        try:
+            entradas += [(src, c["name"]) for c in drive_client.list_product_folders(src)]
+        except Exception:
+            # Una fuente ilegible no debe dejar sin buscar a la otra.
+            continue
+    if not entradas:
+        return [], 0
+
+    compartidos = r.mget_json([_key(s, f) for s, f in entradas])
+    privados = (
+        [] if _es_compartido(usuario)
+        else r.mget_json([_key_privado(s, f, usuario) for s, f in entradas])
+    )
+
+    encontrados: list[dict] = []
+    for i, (src, folder) in enumerate(entradas):
+        doc = compartidos[i] if i < len(compartidos) else None
+        productos = ((doc or {}).get("productos") or {})
+        mios = ((privados[i] if i < len(privados) else None) or {}).get("productos") or {}
+        for pid, prod in productos.items():
+            if _es_compartido(usuario):
+                estado = dict(prod)
+            else:
+                estado = {k: v for k, v in prod.items() if k not in CAMPOS_PRIVADOS}
+                estado.update(mios.get(pid, {}))
+
+            # La carpeta y el número entran en la búsqueda a propósito: a
+            # veces lo que se recuerda es "el 4 de la carpeta 11".
+            texto = _normaliza(" ".join([
+                str(estado.get("titulo") or ""),
+                str(estado.get("titulo_tiktok_completo") or ""),
+                str(estado.get("tienda") or ""),
+                folder, pid,
+            ]))
+            if not all(p in texto for p in palabras):
+                continue
+
+            # Lo que encaja por NOMBRE va antes de lo que solo encaja por
+            # carpeta: buscando "11" interesa más el producto que se llama así
+            # que los diez de la carpeta 11.
+            por_nombre = _normaliza(" ".join([
+                str(estado.get("titulo") or ""),
+                str(estado.get("titulo_tiktok_completo") or ""),
+                str(estado.get("tienda") or ""),
+            ]))
+            encontrados.append({
+                "source": src, "folder": folder, "producto": pid,
+                "_score": 1 if all(p in por_nombre for p in palabras) else 0,
+                **estado,
+            })
+
+    # Orden NATURAL, no alfabético: ordenando como texto, "10 Pront Flow" va
+    # antes que "4 Pront Flow" y buscar "pront flow 4" sacaba primero la 10.
+    def _natural(texto: str) -> list:
+        return [
+            int(t) if t.isdigit() else t
+            for t in re.split(r"(\d+)", _normaliza(texto))
+        ]
+
+    encontrados.sort(
+        key=lambda d: (-d["_score"], _natural(d["folder"]), _natural(d["producto"]))
+    )
+    total = len(encontrados)
+    recortados = encontrados[:limite]
+
+    # Unidades vendidas, solo de los que se van a devolver.
+    refs = [_ref_vendido(d["source"], d["folder"], d["producto"]) for d in recortados]
+    if refs:
+        docs = r.mget_json([_key_vendido(ref) for ref in refs])
+        for d, vendido in zip(recortados, docs):
+            d["unidades"] = int((vendido or {}).get("unidades") or 0)
+
+    for d in recortados:
+        d.pop("_score", None)
+    return recortados, total
 
 
 def sold_products(source: str | None = None) -> list[dict]:

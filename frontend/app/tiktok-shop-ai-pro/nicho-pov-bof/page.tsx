@@ -12,6 +12,7 @@ import {
   Link2 as LinkIcon,
   Loader2,
   RefreshCw,
+  Search,
   ShoppingBag,
   Sparkles,
   Store,
@@ -50,6 +51,7 @@ import {
   useSources,
   useVendidos,
   useSumarUnidades,
+  useBuscarProductos,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -60,6 +62,7 @@ import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   BackupCheckResponse,
+  ProductoBuscado,
   ProductoItem,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
@@ -825,6 +828,12 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
   const sumar = useSumarUnidades();
   const items = vendidos.data ?? [];
   const total = items.reduce((n, v) => n + (v.unidades || 1), 0);
+  // El buscador vive AQUÍ, y no en su propio botón, porque se usa para una
+  // cosa: llega el aviso de una venta con el nombre del producto y hay que
+  // dar con él para marcarlo. Esta es la pantalla de las ventas.
+  const [busca, setBusca] = useState("");
+  const buscando = busca.trim().length >= 2;
+  const resultados = useBuscarProductos(source, busca);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -846,9 +855,13 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
         <div className="flex items-center gap-2 border-b border-border/60 p-3">
           <ShoppingBag className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Productos que vendieron</p>
+            <p className="text-sm font-semibold">
+              {buscando ? "Buscar producto" : "Productos que vendieron"}
+            </p>
             <p className="text-[11px] text-muted-foreground">
-              {items.length} producto(s) · {total} unidad(es)
+              {buscando
+                ? `${resultados.data?.total ?? 0} encontrado(s)`
+                : `${items.length} producto(s) · ${total} unidad(es)`}
             </p>
           </div>
           <button
@@ -861,6 +874,54 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
           </button>
         </div>
 
+        <div className="border-b border-border/60 p-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nombre, tienda o carpeta…"
+              className="w-full rounded-lg border border-border/60 bg-background py-2 pl-8 pr-8 text-xs outline-none transition focus:border-sky-500"
+            />
+            {busca && (
+              <button
+                type="button"
+                onClick={() => setBusca("")}
+                aria-label="Limpiar"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {buscando ? (
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+            {resultados.isLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando…
+              </div>
+            )}
+            {!resultados.isLoading && !resultados.data?.items.length && (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Nada con “{busca}”. Prueba con una palabra del título o con la
+                tienda.
+              </p>
+            )}
+            {(resultados.data?.items ?? []).map((r) => (
+              <ResultadoBusqueda key={`${r.source}-${r.folder}-${r.producto}`} item={r} />
+            ))}
+            {/* Sin esto, veinte resultados parecen TODOS los que hay. */}
+            {(resultados.data?.total ?? 0) > (resultados.data?.items.length ?? 0) && (
+              <p className="pt-1 text-center text-[10px] text-muted-foreground">
+                Se enseñan {resultados.data?.items.length} de{" "}
+                {resultados.data?.total}. Afina la búsqueda para ver el resto.
+              </p>
+            )}
+          </div>
+        ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
           {vendidos.isLoading && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -949,7 +1010,84 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
             </div>
           ))}
         </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** Una fila del buscador: enseña de qué carpeta es y deja marcar la venta
+ *  sin salir de aquí — que es justo para lo que se busca.
+ *
+ *  Marcar "Vendió" desde el resultado escribe en la carpeta de ese producto,
+ *  no en la que esté abierta en la página. */
+function ResultadoBusqueda({ item }: { item: ProductoBuscado }) {
+  const setEstado = useSetEstado();
+  const qc = useQueryClient();
+  const [vendido, setVendido] = useState(item.sold);
+
+  useEffect(() => setVendido(item.sold), [item.sold]);
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border/60 p-2">
+      {item.clean_photo_id ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={buildPhotoUrl(item.source, item.folder, item.clean_photo_id)}
+          alt={item.titulo || item.producto}
+          loading="lazy"
+          className="h-12 w-12 shrink-0 rounded-md object-cover"
+        />
+      ) : (
+        <div className="h-12 w-12 shrink-0 rounded-md bg-muted" />
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-[11px] font-medium leading-snug">
+          {item.titulo || `Producto ${item.producto}`}
+        </p>
+        {/* De qué carpeta es: es lo que no recuerdas cuando llega la venta. */}
+        <p className="truncate text-[10px] text-muted-foreground">
+          {item.folder} · nº {item.producto}
+          {item.tienda ? ` · ${item.tienda}` : ""}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        disabled={setEstado.isPending}
+        onClick={() => {
+          const v = !vendido;
+          setVendido(v);
+          setEstado.mutate(
+            {
+              source: item.source, folder: item.folder,
+              producto: item.producto, sold: v,
+            },
+            {
+              onSuccess: () => {
+                toast.success(v ? "Marcado como vendido" : "Desmarcado");
+                // El resultado que se está viendo trae `sold` dentro, así que
+                // hay que rehacer la búsqueda para que no se quede atrás.
+                void qc.invalidateQueries({
+                  queryKey: [...nichoPovBofKeys.all, "buscar"],
+                });
+              },
+              onError: (e) => {
+                setVendido(!v);
+                toast.error(e instanceof ApiError ? e.message : String(e));
+              },
+            },
+          );
+        }}
+        className={`shrink-0 rounded-md border px-2 py-1.5 text-[11px] font-medium transition disabled:opacity-50 ${
+          vendido
+            ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+            : "border-border/60 text-muted-foreground hover:border-emerald-500 hover:text-emerald-500"
+        }`}
+      >
+        💰 {vendido ? `Vendió${item.unidades > 1 ? ` ×${item.unidades}` : ""}` : "Vendió"}
+      </button>
     </div>
   );
 }

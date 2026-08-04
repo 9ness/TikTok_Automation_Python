@@ -188,6 +188,37 @@ class ProductoEstadoRequest(BaseModel):
     sold: bool | None = None
 
 
+class ProductoBuscado(BaseModel):
+    """Un producto encontrado por el buscador, con su carpeta.
+
+    No es un `ProductoInfo`: el buscador barre las 35 carpetas de las dos
+    fuentes, así que hace falta saber DE DÓNDE es cada resultado, y sobra casi
+    todo lo demás (caption, gancho, prompts…) que costaría resolver 124 veces.
+    """
+
+    source: str
+    folder: str
+    producto: str
+    titulo: str = ""
+    titulo_tiktok_completo: str = ""
+    tienda: str = ""
+    clean_photo_id: str = ""
+    product_url: str = ""
+    en_escaparate: bool = False
+    uploaded: bool = False
+    sold: bool = False
+    # Unidades si ya está en el ranking de vendidos, para poder sumar otra
+    # venta desde el propio resultado sin ir a buscarlo a su carpeta.
+    unidades: int = 0
+
+
+class BuscarProductosResponse(BaseModel):
+    items: list[ProductoBuscado]
+    # Cuántos encajaban en total: los resultados vienen recortados para no
+    # pagar el emparejado de fotos de veinte carpetas.
+    total: int = 0
+
+
 class ProductoUrlRequest(BaseModel):
     """Pide averiguar la ficha de TikTok Shop de UN producto.
 

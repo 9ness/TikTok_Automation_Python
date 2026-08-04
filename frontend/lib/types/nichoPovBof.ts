@@ -229,3 +229,23 @@ export interface HashtagsResponse {
   /** Hashtags que se pegan al final de todos los captions. */
   tags: string[];
 }
+
+/** Resultado del buscador global. No es un `ProductoItem`: barre las 35
+ *  carpetas de las dos fuentes, así que trae `folder` y `source` (hacen falta
+ *  para la foto y para marcar la venta), y deja fuera lo caro de resolver
+ *  (caption, gancho, prompts…). */
+export interface ProductoBuscado {
+  source: string;
+  folder: string;
+  producto: string;
+  titulo: string;
+  titulo_tiktok_completo: string;
+  tienda: string;
+  clean_photo_id: string;
+  product_url: string;
+  en_escaparate: boolean;
+  uploaded: boolean;
+  sold: boolean;
+  /** Unidades si ya está en el ranking; 0 si todavía no vendió. */
+  unidades: number;
+}
