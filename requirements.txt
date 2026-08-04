@@ -1,3 +1,10 @@
+# Índice de PyTorch para CPU. Este VPS NO tiene GPU y las librerías CUDA que
+# arrastra el torch normal ocupan 2,7 GB (+1,3 GB del propio torch): la imagen
+# se iba a 12 GB y reconstruirla necesitaba otros 12 libres, así que tres
+# deploys seguidos murieron con el disco al 100%. Los builds `+cpu` solo
+# existen en este índice, y el sufijo obliga a pip a cogerlos de aquí.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # `packaging` arriba del todo para que pip lo resuelva antes que cualquier
 # wheel que lo importe al instalarse (silero-vad 5.x lo necesita en su
 # __init__.py). Si va al final, ciertos pip resolvers lo dejan en una
@@ -36,7 +43,10 @@ python-multipart>=0.0.9
 # Silero VAD requiere torchaudio. La 2.5.x es la compatible con torch 2.5.1
 # que ya está pinneado por el resto del stack; versiones >=2.10 dan
 # `OSError WinError 127` al cargar `_torchaudio.dll`.
-torchaudio==2.5.1
+torch==2.5.1+cpu
+torchaudio==2.5.1+cpu
+# La pareja de torch 2.5.1; la piden easyocr y demucs.
+torchvision==0.20.1+cpu
 silero-vad>=5.1
 onnxruntime>=1.20
 # Google Drive API — compartir carpetas entrada/salida del usuario con
