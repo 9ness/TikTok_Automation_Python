@@ -5,8 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { buildPhotoUrl, useSetEstado } from "@/lib/queries/nichoPovBof";
+import {
+  buildCleanPhotoDownloadUrl,
+  buildPhotoUrl,
+  useSetEstado,
+} from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
+import { FotoModal } from "./FotoModal";
 
 /** Checklist para meter los productos de la carpeta en el escaparate.
  *
@@ -42,6 +47,12 @@ export function EscaparateModal({
   // Cuál se está guardando: sin esto, con la lista entera deshabilitada por
   // `isPending` no se sabe a qué producto le diste.
   const [guardando, setGuardando] = useState<string | null>(null);
+  // Producto cuya foto se está mirando en grande. Hace falta porque dos
+  // productos de la misma tienda pueden ser casi idénticos (dos colchones,
+  // la misma plataforma vibratoria dos veces) y con la miniatura de 44px no
+  // hay quien los distinga: la ficha grande es lo que evita meter el que no
+  // era en el escaparate.
+  const [fotoDe, setFotoDe] = useState<ProductoItem | null>(null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -165,13 +176,20 @@ export function EscaparateModal({
                     }`}
                   >
                     {p.clean_photo_id ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={buildPhotoUrl(source, folder, p.clean_photo_id)}
-                        alt={p.titulo || p.producto}
-                        loading="lazy"
-                        className="h-11 w-11 shrink-0 rounded-md object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setFotoDe(p)}
+                        title="Ver la foto del producto y la de la ficha"
+                        className="shrink-0 rounded-md transition hover:ring-2 hover:ring-sky-500"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={buildPhotoUrl(source, folder, p.clean_photo_id)}
+                          alt={p.titulo || p.producto}
+                          loading="lazy"
+                          className="h-11 w-11 rounded-md object-cover"
+                        />
+                      </button>
                     ) : (
                       <div className="h-11 w-11 shrink-0 rounded-md bg-muted" />
                     )}
@@ -219,6 +237,25 @@ export function EscaparateModal({
             );
           })}
         </div>
+
+        {fotoDe && (
+          <FotoModal
+            open
+            onOpenChange={(v) => !v && setFotoDe(null)}
+            titulo={fotoDe.titulo || `Producto ${fotoDe.producto}`}
+            urlLimpia={
+              fotoDe.clean_photo_id
+                ? buildPhotoUrl(source, folder, fotoDe.clean_photo_id)
+                : null
+            }
+            urlTitulo={
+              fotoDe.titled_photo_id
+                ? buildPhotoUrl(source, folder, fotoDe.titled_photo_id)
+                : null
+            }
+            urlDescarga={buildCleanPhotoDownloadUrl(source, folder, fotoDe.producto)}
+          />
+        )}
 
         {hechos.length > 0 && (
           <button
