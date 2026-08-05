@@ -852,7 +852,8 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
 def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog,
                      layout: str = "gancho_cta_titulo",
                      piezas: "set[str] | None" = None,
-                     semilla: str = "") -> Path:
+                     semilla: str = "",
+                     y_frac: float | None = None) -> Path:
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
@@ -875,7 +876,9 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     # Centro del bloque en TEXT_BLOCK_Y (dentro de la zona segura vertical);
     # clamp para que no se salga por arriba si el bloque es muy alto (3
     # líneas con emojis grandes).
-    y_center = config.TEXT_BLOCK_Y * config.TARGET_H
+    # `y_frac` deja mover el bloque: el Nicho Ropa Con Personas lo quiere en
+    # el CENTRO, sobre la prenda, en vez de en la franja de siempre.
+    y_center = (config.TEXT_BLOCK_Y if y_frac is None else y_frac) * config.TARGET_H
     y_top = int(y_center - block.height / 2)
     safe_top = int(config.SAFE_Y[0] * config.TARGET_H)
     y_top = max(safe_top, y_top)
@@ -1097,6 +1100,9 @@ def build_video(
     # usarlo daba la MISMA semilla a todos los vídeos y ni el rótulo ni el
     # emoji llegaron a variar nunca.
     semilla: str = "",
+    # Altura del bloque de texto (0-1). None = la de siempre. El Nicho Ropa
+    # Con Personas lo pide centrado sobre la prenda.
+    y_frac: float | None = None,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -1147,7 +1153,7 @@ def build_video(
         on_log(f"[3/5] Quemando texto ({'/'.join(sorted(piezas))})…")
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
-            piezas, semilla=semilla or str(output_path.stem),
+            piezas, semilla=semilla or str(output_path.stem), y_frac=y_frac,
         )
         on_progress(0.66, "Texto quemado")
     else:

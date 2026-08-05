@@ -38,3 +38,47 @@ class RopaPersonasPromptsResponse(BaseModel):
     # Para cuando la IA se niega a vestir a la chica (bikinis, lencería): se
     # aísla la prenda sobre fondo blanco y se usa esa imagen como referencia.
     extraer_prenda: str
+
+
+# ---------------------------------------------------------------------------
+# Prendas
+# ---------------------------------------------------------------------------
+class CarpetaRopaPersonas(BaseModel):
+    slug: str
+    label: str
+
+
+class CarpetasRopaPersonasResponse(BaseModel):
+    items: list[CarpetaRopaPersonas] = Field(default_factory=list)
+
+
+class PrendaPersonasInfo(BaseModel):
+    """Una prenda con sus dos fotos, sus textos y su vídeo."""
+
+    producto: str
+    clean_photo_id: str | None = None
+    titled_photo_id: str | None = None
+    foto_aviso: str = ""
+    titulo: str = ""
+    titulo_tiktok_completo: str = ""
+    tienda: str = ""
+    caption: str = ""
+    # El emoji que acompaña al título quemado en el vídeo.
+    emojis: str = ""
+    caption_riesgo: str = ""
+    uploaded: bool = False
+    video_path: str | None = None
+    video_listo_at: int = 0
+    montando: bool = False
+
+
+class PrendasPersonasListResponse(BaseModel):
+    carpeta: str
+    items: list[PrendaPersonasInfo] = Field(default_factory=list)
+    textos_extraidos: bool = False
+    montando: bool = False
+
+
+class VideoRopaPersonasUploadResponse(BaseModel):
+    job_id: str
+    message: str

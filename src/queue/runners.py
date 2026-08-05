@@ -17,6 +17,7 @@ import glob
 import hashlib
 import os
 import shutil
+import tempfile
 import time
 import traceback
 from datetime import datetime
@@ -1760,6 +1761,65 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
 
 
 # ============================================================
+# RUNNER: NICHO ROPA CON PERSONAS — MONTAJE DEL VÍDEO
+# ============================================================
+def run_nicho_ropa_personas_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo de UNA prenda puesta por la modelo.
+
+    A diferencia del módulo 8 (sin personas), aquí SIEMPRE lleva voz —una de
+    las cinco locutoras, sorteada— y el título del producto quemado en el
+    CENTRO, sobre la prenda, con su emoji, más la flecha del CTA.
+
+    Params: producto, carpeta, raw_path.
+    """
+    from src.nicho_ropa_personas import config as rp_config
+    from src.nicho_ropa_personas.pipeline import video_editor
+    from src.nicho_ropa_personas.repos import product_repo
+
+    p = job.params
+    producto = str(p["producto"])
+    carpeta = str(p.get("carpeta") or rp_config.CARPETA_DEFECTO)
+    raw_path = Path(p["raw_path"])
+    if not raw_path.is_file():
+        raise FileNotFoundError(f"No está el vídeo subido: {raw_path}")
+
+    guardado = product_repo.get_product(carpeta, producto)
+    titulo = str(guardado.get("titulo") or "").strip()
+    if not titulo:
+        # Sin título el vídeo sale sin texto, que en este nicho es medio
+        # vídeo: se avisa fuerte en vez de dejarlo pasar en silencio.
+        on_log(
+            "[ropa_personas] esta prenda no tiene título extraído — el vídeo "
+            "saldrá SIN texto. Pulsa 'Obtener textos' y vuelve a montarlo."
+        )
+
+    salida = Path(rp_config.video_dir()) / carpeta / f"{producto}.mp4"
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix=f"ropa_personas_{producto}_"))
+    try:
+        video_editor.montar(
+            raw_video=raw_path,
+            titulo=titulo,
+            emojis=str(guardado.get("emojis") or ""),
+            output_path=salida,
+            work_dir=work,
+            semilla=f"{carpeta}/{producto}",
+            on_log=on_log,
+            on_progress=on_progress,
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.update_product(
+        carpeta, producto, video_path=str(salida),
+        video_listo_at=int(time.time()), uploaded=True,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
+# ============================================================
 # RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
 # ============================================================
 def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2310,6 +2370,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
+    JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
 }
 
 
@@ -2331,6 +2392,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",
+    JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",
 }
 
 

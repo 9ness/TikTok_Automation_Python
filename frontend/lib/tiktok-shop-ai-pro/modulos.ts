@@ -60,6 +60,7 @@ export const MODULOS: ModuloNicho[] = [
     icon: Shirt,
     drive: "Nicho Ropa Con Personas",
     resumen: "Estilo POV frente al espejo, grabándose con el móvil.",
+    listo: true,
   },
   {
     slug: "nicho-ropa-sin-humanos",

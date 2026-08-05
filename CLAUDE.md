@@ -41,7 +41,7 @@ nichos.
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
-| 👗 Nicho Ropa Con Personas | (en construcción) | Módulo 7: la prenda PUESTA por una modelo creada con IA (ficha JSON por usuario) |
+| 👗 Nicho Ropa Con Personas | `NICHO_ROPA_PERSONAS_VIDEO` | Módulo 7: la prenda PUESTA por una modelo creada con IA (ficha JSON por usuario) |
 | 👕 Nicho Ropa Sin Personas | `NICHO_ROPA_VIDEO` | Módulo 8 del curso: prendas de una carpeta de Drive compartida POR ENLACE → textos/caption → prompts (vídeo con y sin manos) → montaje 9:16 SIN texto quemado y MUDO |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.

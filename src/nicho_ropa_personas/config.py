@@ -91,3 +91,23 @@ TEXTO_ANCHO_FRAC = 0.78
 # lo normal es que falte vídeo. Se alarga rebobinando el final, igual que en el
 # POV BOF (ralentizar deforma el gesto de la mano y canta).
 VIDEO_TARGET_S = 8.0
+
+
+# ---------------------------------------------------------------------------
+# Salida
+# ---------------------------------------------------------------------------
+DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas"
+
+
+def video_dir() -> Path:
+    """Dónde quedan los vídeos montados. Al Drive montado, como el resto del
+    Programa 4; si no hay mount (dev local), a `API_TEMP_ROOT`."""
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    if raiz:
+        destino = raiz / DRIVE_UPLOAD_ROOT / "videos"
+    else:
+        destino = Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_ropa_personas" / "videos"
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino
