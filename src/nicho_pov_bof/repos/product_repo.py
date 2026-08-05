@@ -326,6 +326,57 @@ def buscar_productos(
     return recortados, total
 
 
+def productos_recuperados(usuario: str = "") -> list[dict]:
+    """Productos que aparecieron DESPUÉS de haber trabajado ya su carpeta.
+
+    Temporal, para una sola cosa: hasta ahora se perdían productos por dos
+    fallos —fotos sin extensión que no se listaban y dos productos fundidos
+    bajo el mismo número—, así que en carpetas ya terminadas hay fichas que
+    nadie ha visto. Sin esto habría que repasar las 35 carpetas a mano.
+
+    Un producto es "recuperado" si su carpeta YA tiene textos extraídos (o sea,
+    se trabajó) pero él no. Los de carpetas sin empezar no cuentan: esos no se
+    han perdido, es que todavía no les toca.
+    """
+    from src.nicho_pov_bof import config
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    out: list[dict] = []
+    for src in config.SOURCES:
+        try:
+            carpetas = drive_client.list_product_folders(src)
+        except Exception:
+            continue
+        for carpeta in carpetas:
+            folder = carpeta["name"]
+            doc = load_folder_para(src, folder, usuario)
+            guardados = doc.get("productos") or {}
+            try:
+                fotos = [
+                    drive_client.probe_dimensions(f)
+                    for f in drive_client.list_photos(src, folder)
+                ]
+                pares = photo_pairing.pair_folder(fotos)
+            except Exception:
+                continue
+            procesada = bool(doc.get("textos_extraidos")) or any(
+                (guardados.get(p["producto"]) or {}).get("titulo") for p in pares
+            )
+            if not procesada:
+                continue
+            for par in pares:
+                pid = par["producto"]
+                if (guardados.get(pid) or {}).get("titulo"):
+                    continue
+                out.append({
+                    "source": src,
+                    "folder": folder,
+                    "producto": pid,
+                    "clean_photo_id": (par.get("clean") or {}).get("id") or "",
+                })
+    return out
+
+
 def sold_products(source: str | None = None) -> list[dict]:
     """Productos marcados como vendidos, para el apartado de referencia.
 

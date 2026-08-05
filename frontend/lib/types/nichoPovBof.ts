@@ -249,3 +249,13 @@ export interface ProductoBuscado {
   /** Unidades si ya está en el ranking; 0 si todavía no vendió. */
   unidades: number;
 }
+
+/** Producto que apareció DESPUÉS de haber trabajado ya su carpeta, porque
+ *  antes se perdía (fotos sin extensión, o dos productos fundidos bajo el
+ *  mismo número). Lista TEMPORAL: cuando no queden, se puede quitar. */
+export interface ProductoRecuperado {
+  source: string;
+  folder: string;
+  producto: string;
+  clean_photo_id: string;
+}

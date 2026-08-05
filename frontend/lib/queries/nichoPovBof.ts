@@ -20,6 +20,7 @@ import type {
   PhotosListResponse,
   ProductoBuscado,
   ProductoItem,
+  ProductoRecuperado,
   ProductoUrlRequest,
   ProductosUrlsRequest,
   ProductosUrlsResponse,
@@ -42,6 +43,7 @@ export const nichoPovBofKeys = {
   vendidos: (source: string) => [...nichoPovBofKeys.all, "vendidos", source] as const,
   buscar: (source: string, q: string) =>
     [...nichoPovBofKeys.all, "buscar", source, q] as const,
+  recuperados: () => [...nichoPovBofKeys.all, "recuperados"] as const,
 };
 
 /** Busca un producto por nombre, tienda o carpeta en TODAS las carpetas.
@@ -64,6 +66,20 @@ export function useBuscarProductos(source: string, q: string) {
     // Los resultados no cambian mientras escribes: evita repetir el barrido
     // al borrar una letra y volver a ponerla.
     staleTime: 30_000,
+  });
+}
+
+/** Productos que aparecieron tarde en carpetas ya trabajadas.
+ *
+ *  Recorre las 35 carpetas emparejando fotos (unos segundos), así que solo se
+ *  pide cuando el operador abre la lista, nunca al cargar la página. */
+export function useProductosRecuperados(enabled: boolean) {
+  return useQuery<ProductoRecuperado[]>({
+    queryKey: nichoPovBofKeys.recuperados(),
+    queryFn: async () =>
+      (await api.get<{ items: ProductoRecuperado[] }>(`${ROOT}/recuperados`)).items ?? [],
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

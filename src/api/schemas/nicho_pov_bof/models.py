@@ -219,6 +219,17 @@ class BuscarProductosResponse(BaseModel):
     total: int = 0
 
 
+class ProductoRecuperado(BaseModel):
+    source: str
+    folder: str
+    producto: str
+    clean_photo_id: str = ""
+
+
+class RecuperadosResponse(BaseModel):
+    items: list[ProductoRecuperado] = Field(default_factory=list)
+
+
 class ProductoUrlRequest(BaseModel):
     """Pide averiguar la ficha de TikTok Shop de UN producto.
 

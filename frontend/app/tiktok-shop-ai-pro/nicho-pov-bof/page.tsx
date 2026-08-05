@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Link2 as LinkIcon,
   Loader2,
+  PackageSearch,
   RefreshCw,
   Search,
   ShoppingBag,
@@ -52,6 +53,7 @@ import {
   useVendidos,
   useSumarUnidades,
   useBuscarProductos,
+  useProductosRecuperados,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -64,6 +66,7 @@ import type {
   BackupCheckResponse,
   ProductoBuscado,
   ProductoItem,
+  ProductoRecuperado,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
 
@@ -77,6 +80,7 @@ export default function NichoPovBofPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verRecuperados, setVerRecuperados] = useState(false);
 
   const sources = useSources();
   const folders = useFolders(source);
@@ -394,7 +398,30 @@ export default function NichoPovBofPage() {
             </span>
           </button>
         )}
+        {/* TEMPORAL: hasta ahora se perdían productos (fotos sin extensión,
+            y dos productos fundidos bajo el mismo número). En carpetas ya
+            terminadas quedan fichas que nadie ha visto, y sin esto habría que
+            repasar las 35 a mano. Cuando no quede ninguno, se puede quitar. */}
+        <button
+          type="button"
+          onClick={() => setVerRecuperados(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-semibold text-fuchsia-500 transition hover:bg-fuchsia-500/20"
+        >
+          <PackageSearch className="h-3.5 w-3.5" />
+          Productos recuperados
+        </button>
       </section>
+
+      {verRecuperados && (
+        <RecuperadosModal
+          onClose={() => setVerRecuperados(false)}
+          onIr={(r) => {
+            setSource(r.source);
+            setPicked(r.folder);
+            setVerRecuperados(false);
+          }}
+        />
+      )}
 
       {verVendidos && (
         <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
@@ -803,7 +830,13 @@ export default function NichoPovBofPage() {
           {productos.data && productos.data.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {productos.data.map((p) => (
-                <ProductoCard key={p.producto} source={source} folder={folder} producto={p} />
+                <ProductoCard
+                  key={p.producto}
+                  source={source}
+                  folder={folder}
+                  producto={p}
+                  carpetaHecha={Boolean(productos.data?.some((x) => x.titulo))}
+                />
               ))}
             </div>
           )}
@@ -1011,6 +1044,131 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
           ))}
         </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Productos que aparecieron DESPUÉS de haberse trabajado ya su carpeta.
+ *
+ *  Herramienta TEMPORAL. Existe porque dos fallos escondían productos: fotos
+ *  guardadas sin extensión en el nombre, que no se listaban, y dos productos
+ *  distintos con el mismo número, que se fundían en uno. Ya arreglados, pero
+ *  en las carpetas que el operador dio por terminadas quedan fichas que nadie
+ *  llegó a ver. Cuando la lista salga vacía, se puede borrar todo esto.
+ *
+ *  Va por carpeta y no en una fuente aparte porque el producto SIGUE siendo de
+ *  su carpeta: se salta a ella y se trabaja ahí, con sus prompts y su vídeo. */
+function RecuperadosModal({
+  onClose,
+  onIr,
+}: {
+  onClose: () => void;
+  onIr: (r: ProductoRecuperado) => void;
+}) {
+  const recuperados = useProductosRecuperados(true);
+  const items = recuperados.data ?? [];
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Agrupados por carpeta: se van a trabajar de carpeta en carpeta.
+  const porCarpeta = new Map<string, ProductoRecuperado[]>();
+  for (const r of items) {
+    const k = `${r.source}|${r.folder}`;
+    const l = porCarpeta.get(k);
+    if (l) l.push(r);
+    else porCarpeta.set(k, [r]);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+      <div className="relative flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-border/60 bg-card shadow-xl sm:max-h-[80vh] sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-2xl">
+        <div className="flex items-center gap-2 border-b border-border/60 p-3">
+          <PackageSearch className="h-4 w-4 shrink-0 text-fuchsia-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Productos recuperados</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {recuperados.isLoading
+                ? "repasando las 35 carpetas…"
+                : `${items.length} sin trabajar en carpetas que ya diste por hechas`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-md p-1 text-muted-foreground transition hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+          {recuperados.isLoading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Emparejando fotos…
+            </div>
+          )}
+          {!recuperados.isLoading && items.length === 0 && (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              Ninguno. Todas las carpetas que has terminado están completas.
+            </p>
+          )}
+
+          {[...porCarpeta.entries()].map(([k, rs]) => {
+            const [src, folder] = k.split("|");
+            return (
+              <div key={k} className="space-y-1.5">
+                <p className="text-[11px] font-semibold text-fuchsia-500">
+                  {folder}
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · {src === "aleatorios_1" ? "1 Prod Aleatorios" : "2 Prod Aleatorios 2"}
+                    {" · "}{rs.length} producto(s)
+                  </span>
+                </p>
+                {rs.map((r) => (
+                  <button
+                    key={`${r.folder}-${r.producto}`}
+                    type="button"
+                    onClick={() => onIr(r)}
+                    className="flex w-full items-center gap-2.5 rounded-lg border border-border/60 p-2 text-left transition hover:border-fuchsia-500/60"
+                  >
+                    {r.clean_photo_id ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={buildPhotoUrl(r.source, r.folder, r.clean_photo_id)}
+                        alt={r.producto}
+                        loading="lazy"
+                        className="h-12 w-12 shrink-0 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 shrink-0 rounded-md bg-muted" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium">Producto {r.producto}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        sin textos — ir a su carpeta
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1416,10 +1574,16 @@ function ProductoCard({
   source,
   folder,
   producto,
+  carpetaHecha = false,
 }: {
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** La carpeta ya tiene textos en OTROS productos. Sirve para marcar al que
+   *  se quedó sin ellos: es un producto que apareció tarde (antes se perdían
+   *  los de fotos sin extensión y los fundidos bajo un mismo número), y sin
+   *  marca pasa desapercibido entre nueve que están completos. */
+  carpetaHecha?: boolean;
 }) {
   const setEstado = useSetEstado();
   const buscarUrl = useBuscarProductoUrl();
@@ -1571,6 +1735,15 @@ function ProductoCard({
             </span>
             <span className="truncate">{producto.titulo || "sin título"}</span>
           </p>
+          {/* Se quedó sin textos en una carpeta donde los demás sí los tienen:
+              apareció tarde (antes se perdían los productos con fotos sin
+              extensión y los fundidos bajo un mismo número). Sin la marca
+              pasa desapercibido entre nueve completos. */}
+          {carpetaHecha && !producto.titulo && (
+            <p className="mt-0.5 inline-flex items-center gap-1 rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-fuchsia-500">
+              🆕 Recuperado — vuelve a pulsar “Textos”
+            </p>
+          )}
           {producto.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">
               {producto.titulo_tiktok_completo}

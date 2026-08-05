@@ -10,6 +10,7 @@ automatización de los vídeos por producto.
 - POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop (1)
 - POST /api/v1/nicho-pov-bof/productos/urls  → idem para toda la carpeta
 - GET  /api/v1/nicho-pov-bof/buscar          → busca un producto en TODAS las carpetas
+- GET  /api/v1/nicho-pov-bof/recuperados     → productos que aparecieron tarde (temporal)
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
@@ -41,6 +42,7 @@ from src.api.schemas.nicho_pov_bof import (
     HashtagsRequest,
     HashtagsResponse,
     ProductoBuscado,
+    ProductoRecuperado,
     ProductoEstadoRequest,
     ProductoUrlRequest,
     ProductosUrlsRequest,
@@ -48,6 +50,7 @@ from src.api.schemas.nicho_pov_bof import (
     ProductoInfo,
     ProductosListResponse,
     PromptsResponse,
+    RecuperadosResponse,
     SoldProductsResponse,
     UnidadesRequest,
     VideoUploadResponse,
@@ -978,6 +981,23 @@ def buscar_productos(
             )
         )
     return BuscarProductosResponse(items=items, total=total)
+
+
+@router.get("/recuperados", response_model=RecuperadosResponse)
+def list_recuperados(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> RecuperadosResponse:
+    """Productos que aparecieron después de haber trabajado ya su carpeta.
+
+    Recorre las 35 carpetas emparejando fotos, así que tarda unos segundos: se
+    abre a mano desde un botón, no al cargar la página. Es una herramienta
+    TEMPORAL para repescar lo que se perdió; cuando no queden, la lista sale
+    vacía y se puede quitar.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    items = [ProductoRecuperado(**d) for d in product_repo.productos_recuperados(usuario)]
+    return RecuperadosResponse(items=items)
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)
