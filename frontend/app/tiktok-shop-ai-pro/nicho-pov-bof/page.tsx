@@ -326,6 +326,21 @@ export default function NichoPovBofPage() {
           ))}
         </div>
 
+        {/* Va aquí, con las fuentes, porque se entra igual que a una: es un
+            sitio del que sacar productos, no un informe. TEMPORAL. */}
+        <button
+          type="button"
+          onClick={() => setVerRecuperados((v) => !v)}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition sm:text-sm ${
+            verRecuperados
+              ? "border-fuchsia-500 bg-fuchsia-500/15 font-semibold text-fuchsia-500"
+              : "border-fuchsia-500/40 text-fuchsia-500 hover:bg-fuchsia-500/10"
+          }`}
+        >
+          <PackageSearch className="h-3.5 w-3.5" />
+          Productos recuperados
+        </button>
+
         <div className="mb-2 flex items-center justify-between text-xs sm:text-sm">
           <span className="font-medium">
             {done} / {total} completadas
@@ -398,18 +413,6 @@ export default function NichoPovBofPage() {
             </span>
           </button>
         )}
-        {/* TEMPORAL: hasta ahora se perdían productos (fotos sin extensión,
-            y dos productos fundidos bajo el mismo número). En carpetas ya
-            terminadas quedan fichas que nadie ha visto, y sin esto habría que
-            repasar las 35 a mano. Cuando no quede ninguno, se puede quitar. */}
-        <button
-          type="button"
-          onClick={() => setVerRecuperados(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-semibold text-fuchsia-500 transition hover:bg-fuchsia-500/20"
-        >
-          <PackageSearch className="h-3.5 w-3.5" />
-          Productos recuperados
-        </button>
       </section>
 
       {verVendidos && (

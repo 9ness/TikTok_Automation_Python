@@ -334,9 +334,14 @@ def productos_recuperados(usuario: str = "") -> list[dict]:
     bajo el mismo número—, así que en carpetas ya terminadas hay fichas que
     nadie ha visto. Sin esto habría que repasar las 35 carpetas a mano.
 
-    Un producto es "recuperado" si su carpeta YA tiene textos extraídos (o sea,
-    se trabajó) pero él no. Los de carpetas sin empezar no cuentan: esos no se
-    han perdido, es que todavía no les toca.
+    Un producto entra en la lista si su carpeta YA se trabajó pero él no tiene
+    textos. Los de carpetas sin empezar no cuentan: esos no se han perdido, es
+    que todavía no les toca.
+
+    **Una vez dentro, se queda.** La lista se guarda en un índice de Redis y no
+    se recalcula desde cero: si saliera solo mientras le faltan textos,
+    desaparecería justo al extraerlos — que es cuando el operador todavía tiene
+    que hacerle el vídeo, y se quedaría sin forma de encontrarlo entre 350.
     """
     from src.nicho_pov_bof import config
     from src.nicho_pov_bof.services import drive_client, photo_pairing
@@ -368,13 +373,63 @@ def productos_recuperados(usuario: str = "") -> list[dict]:
                 pid = par["producto"]
                 if (guardados.get(pid) or {}).get("titulo"):
                     continue
-                out.append({
-                    "source": src,
-                    "folder": folder,
-                    "producto": pid,
-                    "clean_photo_id": (par.get("clean") or {}).get("id") or "",
-                })
-    return out
+                _marcar_recuperado(src, folder, pid)
+
+    return _leer_recuperados()
+
+
+_RECUPERADOS_INDEX = "recuperados:index"
+
+
+def _marcar_recuperado(source: str, folder: str, producto: str) -> None:
+    r = get_nicho_pov_bof_redis()
+    if r.is_available():
+        r.sadd(_RECUPERADOS_INDEX, f"{source}|{folder}|{producto}")
+
+
+def _leer_recuperados() -> list[dict]:
+    """Los del índice, con su foto. Vale aunque ya tengan textos o vídeo."""
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return []
+    refs = sorted(str(x) for x in r.smembers(_RECUPERADOS_INDEX) if x)
+
+    # Las fotos se resuelven por CARPETA, no por producto: cinco productos de
+    # cuatro carpetas son cuatro emparejados, no cinco.
+    cache: dict[tuple[str, str], dict[str, str]] = {}
+    salida: list[dict] = []
+    for ref in refs:
+        partes = ref.split("|")
+        if len(partes) != 3:
+            continue
+        src, folder, pid = partes
+        clave = (src, folder)
+        if clave not in cache:
+            try:
+                fotos = [
+                    drive_client.probe_dimensions(f)
+                    for f in drive_client.list_photos(src, folder)
+                ]
+                cache[clave] = {
+                    p["producto"]: (p.get("clean") or {}).get("id") or ""
+                    for p in photo_pairing.pair_folder(fotos)
+                }
+            except Exception:
+                cache[clave] = {}
+        salida.append({
+            "source": src, "folder": folder, "producto": pid,
+            "clean_photo_id": cache[clave].get(pid, ""),
+        })
+    return salida
+
+
+def olvidar_recuperado(source: str, folder: str, producto: str) -> None:
+    """Saca un producto de la lista de recuperados (ya está hecho)."""
+    r = get_nicho_pov_bof_redis()
+    if r.is_available():
+        r.srem(_RECUPERADOS_INDEX, f"{source}|{folder}|{producto}")
 
 
 def sold_products(source: str | None = None) -> list[dict]:
