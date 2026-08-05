@@ -91,6 +91,7 @@ from src.api.routers import (
     nicho_ropa_personas_chicas_router,
     nicho_ropa_personas_prendas_router,
     nicho_bof_cine_router,
+    nicho_gorras_router,
     voices_router,
     voices_sample_router,
 )
@@ -279,6 +280,7 @@ def create_app() -> FastAPI:
     app.include_router(nicho_ropa_personas_chicas_router)
     app.include_router(nicho_ropa_personas_prendas_router)
     app.include_router(nicho_bof_cine_router)
+    app.include_router(nicho_gorras_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)
@@ -306,6 +308,7 @@ _PREFIJOS_PRO = (
     "/api/v1/nicho-pov-bof",
     "/api/v1/nicho-ropa",
     "/api/v1/nicho-bof-cine",
+    "/api/v1/nicho-gorras",
     "/api/v1/queue",
     "/api/v1/auth",
     "/api/v1/health",

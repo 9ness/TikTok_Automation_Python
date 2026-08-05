@@ -47,6 +47,7 @@ from .nicho_ropa_personas import (
     prendas_router as nicho_ropa_personas_prendas_router,
 )
 from .nicho_bof_cine import productos_router as nicho_bof_cine_router
+from .nicho_gorras import gorras_router as nicho_gorras_router
 from .nicho_pov_bof import (
     folders_router as nicho_pov_bof_folders_router,
     productos_router as nicho_pov_bof_productos_router,
@@ -109,4 +110,5 @@ __all__ = [
     "nicho_ropa_personas_chicas_router",
     "nicho_ropa_personas_prendas_router",
     "nicho_bof_cine_router",
+    "nicho_gorras_router",
 ]

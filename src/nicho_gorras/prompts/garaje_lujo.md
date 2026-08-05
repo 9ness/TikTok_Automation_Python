@@ -1,0 +1,3 @@
+<!-- Garaje de lujo — prompt del curso, tal cual. Se copia y se pega fuera. -->
+
+La gorra de la imagen referencia colocada sobre un soporte moderno, elegante y futurista en el centro de un garaje de lujo con iluminación LED, más gorras de fondo y un Ferrari descapotable moderno aparcado detrás. Ambiente oscuro, premium y sofisticado. La cámara se mueve lentamente haciendo un paneo lateral suave de lado a lado, dejando la gorra siempre en el centro, sin bordearla por completo y sin mostrar nunca la parte trasera. Movimiento limpio, fluido y sutil mientras el Ferrari y las luces LED permanecen desenfocados en el fondo. Calidad ultra realista, limpia y cinematográfica.

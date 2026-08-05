@@ -98,6 +98,7 @@ export const MODULOS: ModuloNicho[] = [
     titulo: "Creación de Nicho de Gorras",
     icon: Crown,
     drive: "Nicho Gorras",
+    listo: true,
     resumen: "Gorras: catálogo amplio, producción rápida y repetible.",
   },
   {
