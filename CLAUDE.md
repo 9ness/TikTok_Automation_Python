@@ -41,6 +41,7 @@ nichos.
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
+| 👗 Nicho Ropa Con Personas | (en construcción) | Módulo 7: la prenda PUESTA por una modelo creada con IA (ficha JSON por usuario) |
 | 👕 Nicho Ropa Sin Personas | `NICHO_ROPA_VIDEO` | Módulo 8 del curso: prendas de una carpeta de Drive compartida POR ENLACE → textos/caption → prompts (vídeo con y sin manos) → montaje 9:16 SIN texto quemado y MUDO |
 
 Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
@@ -301,6 +302,24 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
 
 Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
 motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.
+
+### Nicho Ropa Con Personas (mismo programa, módulo 7)
+
+Módulos en [`src/nicho_ropa_personas/`](src/nicho_ropa_personas/) (prefijo
+Redis `nicho_ropa_personas:`). API: `/api/v1/nicho-ropa-personas/*`. La prenda
+va PUESTA por una modelo generada con IA. Usa las MISMAS carpetas de prendas
+que el módulo 8 (se importan de `nicho_ropa.config`): la foto vale para los dos
+nichos, cambia el prompt.
+
+Paso propio que no tiene ningún otro nicho: **crear la chica**. El operador
+sube una foto de internet, Gemini la mete en la plantilla del curso
+(`prompts/plantilla_chica.json`) y sale una ficha JSON que se guarda con nombre
+y se copia en cada vídeo. Es **por usuario** — la cara es la identidad de la
+cuenta. La plantilla ya trae el bloque `clothing`, así que crear a la chica y
+vestirla con el producto es UN prompt, no dos.
+
+Audios locutados (5 voces de mujer, se sortea una):
+`TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer/`.
 
 ---
 

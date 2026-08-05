@@ -1,0 +1,67 @@
+{
+  "subject": {
+    "description": "Extremely attractive young blonde woman with long naturally wavy hair, standing barefoot in front of a large floor mirror inside a luxurious contemporary loft-style bedroom. She is taking a mirror selfie, holding a smartphone in one hand while the other hand rests casually in her pocket. Her full body is visible from head to toe, standing naturally with a relaxed posture.",
+    "age": "early 20s",
+    "expression": "soft neutral expression, slightly serious with relaxed lips and natural gaze",
+    "hair_color": "golden blonde",
+    "style": "long loose naturally wavy blonde hair with soft volume and a relaxed effortless look"
+  },
+  "clothing": {
+    "source": "The subject MUST wear exactly the clothing shown in the provided reference image.",
+    "instructions": [
+      "Replicate the outfit from the reference image with absolute accuracy.",
+      "Match every garment, color, fabric, texture, stitching, fit, proportions, accessories, patterns, logos (if present), and small details.",
+      "Do not reinterpret, redesign, replace, simplify, or omit any part of the outfit.",
+      "The clothing must look naturally worn on the subject while preserving every visual characteristic of the reference.",
+      "If multiple reference images are provided, use the outfit from the designated clothing reference image only."
+    ]
+  },
+  "face": {
+    "makeup": "very light natural makeup, realistic skin texture, subtle glow"
+  },
+  "accessories": {
+    "jewelry": {
+      "earrings": "small minimal gold earrings",
+      "necklace": "thin delicate gold necklace"
+    }
+  },
+  "device": {
+    "type": "smartphone",
+    "position": "held in hand, mirror selfie perspective",
+    "visibility": "visible in the frame"
+  },
+  "pose": {
+    "stance": "relaxed standing pose with one leg slightly forward",
+    "arms": "one hand holding the phone, the other inside the shorts pocket"
+  },
+  "photography": {
+    "camera_style": "mirror selfie, smartphone photography",
+    "angle": "straight-on reflection",
+    "shot_type": "full body shot",
+    "aspect_ratio": "9:16 vertical",
+    "focus": "sharp natural focus across entire body",
+    "quality": "ultra photorealistic, DSLR quality, extremely sharp, natural skin texture, highly detailed"
+  },
+  "background": {
+    "setting": "luxurious contemporary loft bedroom",
+    "elements": [
+      "large floor-to-ceiling mirror with a thin black frame",
+      "floating king-size bed with textured beige bedding",
+      "warm oak wood slat accent wall behind the bed",
+      "modern pendant lights hanging from the ceiling",
+      "large floor-to-ceiling windows with sheer curtains",
+      "light travertine stone flooring",
+      "minimal designer armchair in one corner",
+      "subtle indoor plants",
+      "soft indirect LED lighting integrated into the walls"
+    ]
+  },
+  "lighting": {
+    "type": "natural daylight mixed with warm ambient lighting",
+    "direction": "soft daylight entering through the floor-to-ceiling windows",
+    "effect": "balanced cinematic lighting with soft shadows and realistic skin tones"
+  },
+  "atmosphere": {
+    "mood": "luxurious, clean, modern, aesthetic lifestyle vibe"
+  }
+}

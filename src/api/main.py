@@ -88,6 +88,7 @@ from src.api.routers import (
     nicho_pov_bof_folders_router,
     nicho_pov_bof_productos_router,
     nicho_ropa_prendas_router,
+    nicho_ropa_personas_chicas_router,
     voices_router,
     voices_sample_router,
 )
@@ -273,6 +274,7 @@ def create_app() -> FastAPI:
     app.include_router(nicho_pov_bof_folders_router)
     app.include_router(nicho_pov_bof_productos_router)
     app.include_router(nicho_ropa_prendas_router)
+    app.include_router(nicho_ropa_personas_chicas_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)
