@@ -202,6 +202,25 @@ recorta los audios largos en vez de tocar el render.
 
 ## 🤖 Cola del Agente
 
+- [ ] **[Programa 4] Cuenta Piloto** — menú nuevo DEBAJO de "Viralización 1K".
+      Pedido el 5 ago. Vídeos ORGÁNICOS (nada de IA en la imagen), pero con la
+      MISMA edición que el Nicho POV BOF.
+      - **Producto por subida, no de Drive.** El usuario sube DOS fotos —la
+        limpia y la de la descripción— y de ahí salen los textos con Gemini,
+        igual que en POV BOF pero sobre ficheros subidos. Es la primera vez en
+        el proyecto que las fotos no vienen de Drive: hay que guardar el par
+        (¿`API_TEMP_ROOT` + Drive de salida?) y no depender de `drive_client`.
+      - **Por usuario**: los productos de uno no los ve otro (como las chicas
+        del módulo 7).
+      - **VARIOS vídeos por producto.** Ojo: hoy TODOS los nichos guardan un
+        único `video_path` por producto. Aquí hace falta una lista, y la
+        pantalla tiene que dejar subir otro vídeo del mismo producto una y otra
+        vez sin pisar el anterior.
+      - **Edición idéntica al POV BOF**: se reutiliza `build_video` con gancho,
+        título, CTA y flecha, y voz hombre/mujer elegida por el operador (la
+        voz SÍ puede ser IA; lo orgánico es la imagen).
+      - Visualmente, como el resto de nichos del programa.
+
 - [ ] `deploy_safe.sh`: purgar caché de Docker ANTES de construir. El disco
       llega al 100% cada pocos deploys (hacen falta ~14 GB transitorios) y ya
       truncó `page.tsx` a 0 bytes una vez.
