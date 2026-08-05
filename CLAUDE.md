@@ -40,6 +40,7 @@ nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
+| 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
 | 🎬 Nicho BOF Cinematográfico | `NICHO_BOF_CINE_VIDEO` | Módulo 10: como POV BOF pero sin mano — DOS clips de 5s con paneo, pegados y cuadrados por velocidad |
@@ -323,6 +324,23 @@ vestirla con el producto es UN prompt, no dos.
 Audios locutados (5 voces de mujer, se sortea una):
 `TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer/`.
 
+### Cuenta Piloto (mismo programa, no es un módulo del curso)
+
+Módulos en [`src/cuenta_piloto/`](src/cuenta_piloto/) (prefijo Redis
+`cuenta_piloto:`). API: `/api/v1/cuenta-piloto/*`. Vídeo ORGÁNICO (la imagen no
+la genera IA; la voz sí) con la MISMA edición del POV BOF — se reutiliza
+`build_video` tal cual.
+
+Tres cosas que no hace ningún otro nicho:
+- **El producto nace de una SUBIDA.** Las dos fotos (limpia + ficha) las sube el
+  operador; no hay Drive que recorrer ni emparejado que adivinar. Las fotos NO
+  pueden ir a `api_uploads/` (se purga a las 24h): van al Drive montado en
+  `TIKTOK_SHOP_AI_PRO/Cuenta_Piloto/<usuario>/`.
+- **Es por usuario**: un documento Redis por operador, sin doc compartido.
+- **VARIOS vídeos por producto** — `videos` es una LISTA y se añade con
+  `product_repo.add_video()` bajo cerrojo. En el resto de nichos hay un solo
+  `video_path` y el segundo montaje pisa al primero.
+
 ---
 
 ## Variables de entorno (`.env`)
@@ -387,6 +405,7 @@ PIXABAY_API_KEY=...
 # Auto-detect si no se define (prueba "~/viralizacion_assets").
 # VIRALIZACION_ASSETS_PATH="/home/nebulabsai/viralizacion_assets"
 # VIRALIZACION_REDIS_PREFIX=viralizacion:   # default
+# CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
 ```
 
 ---

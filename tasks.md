@@ -202,25 +202,6 @@ recorta los audios largos en vez de tocar el render.
 
 ## 🤖 Cola del Agente
 
-- [ ] **[Programa 4] Cuenta Piloto** — menú nuevo DEBAJO de "Viralización 1K".
-      Pedido el 5 ago. Vídeos ORGÁNICOS (nada de IA en la imagen), pero con la
-      MISMA edición que el Nicho POV BOF.
-      - **Producto por subida, no de Drive.** El usuario sube DOS fotos —la
-        limpia y la de la descripción— y de ahí salen los textos con Gemini,
-        igual que en POV BOF pero sobre ficheros subidos. Es la primera vez en
-        el proyecto que las fotos no vienen de Drive: hay que guardar el par
-        (¿`API_TEMP_ROOT` + Drive de salida?) y no depender de `drive_client`.
-      - **Por usuario**: los productos de uno no los ve otro (como las chicas
-        del módulo 7).
-      - **VARIOS vídeos por producto.** Ojo: hoy TODOS los nichos guardan un
-        único `video_path` por producto. Aquí hace falta una lista, y la
-        pantalla tiene que dejar subir otro vídeo del mismo producto una y otra
-        vez sin pisar el anterior.
-      - **Edición idéntica al POV BOF**: se reutiliza `build_video` con gancho,
-        título, CTA y flecha, y voz hombre/mujer elegida por el operador (la
-        voz SÍ puede ser IA; lo orgánico es la imagen).
-      - Visualmente, como el resto de nichos del programa.
-
 - [ ] `deploy_safe.sh`: purgar caché de Docker ANTES de construir. El disco
       llega al 100% cada pocos deploys (hacen falta ~14 GB transitorios) y ya
       truncó `page.tsx` a 0 bytes una vez.
@@ -240,6 +221,18 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+
+- [2026-08-05] [Programa 4] **Cuenta Piloto** completa: `src/cuenta_piloto/`
+  (config + `repos/{redis_base,product_repo}` + `services/{photo_store,text_extractor}`
+  + `pipeline/video_editor`), `JobMode.CUENTA_PILOTO_VIDEO` + `run_cuenta_piloto_video`,
+  router `/api/v1/cuenta-piloto/*` (8 endpoints), página
+  `/tiktok-shop-ai-pro/cuenta-piloto` + item de sidebar, 12 tests.
+  Lo nuevo respecto al resto de nichos: producto creado SUBIENDO las dos fotos
+  (primer nicho sin Drive), aislamiento por usuario y **lista de vídeos** por
+  producto (`add_video`, bajo cerrojo) en vez del `video_path` único.
+  De paso, `queue-meta.ts` y la union `JobMode` del frontend, a las que les
+  faltaban `nicho_ropa_personas_video` y `nicho_bof_cine_video` desde que se
+  crearon esos nichos.
 
 - [2026-08-04] [Viralización] Rótulos que se colaban en los paisajes: el filtro
   miraba UN fotograma a 0,5s y las cartelas entran animadas. `services/rotulos.py`

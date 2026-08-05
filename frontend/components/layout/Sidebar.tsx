@@ -13,6 +13,7 @@ import {
   Crown,
   CreditCard,
   DollarSign,
+  FlaskConical,
   HardHat,
   History,
   Image as ImageIcon,
@@ -115,6 +116,9 @@ const NAV: NavGroup[] = [
     icon: Rocket,
     items: [
       { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
+      // La Cuenta Piloto no es un módulo del curso (no lleva número), así que
+      // va suelta aquí y no en `modulos.ts`.
+      { href: "/tiktok-shop-ai-pro/cuenta-piloto", label: "Cuenta Piloto", icon: FlaskConical },
       // Un item por módulo del curso, en orden de módulo. La lista vive en
       // `lib/tiktok-shop-ai-pro/modulos.ts` para no repetirla en cada página.
       ...MODULOS.map((m) => ({

@@ -1887,6 +1887,81 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
 
 
 # ============================================================
+# RUNNER: CUENTA PILOTO — MONTAJE DEL VÍDEO ORGÁNICO
+# ============================================================
+def run_cuenta_piloto_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta UN vídeo de un producto de la Cuenta Piloto.
+
+    La edición es la del Nicho POV BOF; lo distinto es que el bruto es
+    ORGÁNICO (grabado, no generado) y que el resultado se AÑADE a la lista de
+    vídeos del producto en vez de sustituir al anterior: aquí se prueban
+    varios ángulos del mismo producto.
+
+    Params: producto, raw_path, sexo, operator, con_gancho/titulo/cta/flecha.
+    """
+    from src.cuenta_piloto import config as cp_config
+    from src.cuenta_piloto.pipeline import video_editor
+    from src.cuenta_piloto.repos import product_repo
+
+    p = job.params
+    producto = str(p["producto"])
+    operator = str(p.get("operator") or job.enqueued_by or "")
+    raw_path = Path(p["raw_path"])
+    if not raw_path.is_file():
+        raise FileNotFoundError(f"No está el vídeo subido: {raw_path}")
+    sexo = (p.get("sexo") or "hombre").strip().lower()
+
+    on_progress(0.03, "📝 Leyendo textos guardados…")
+    guardado = product_repo.get_product(operator, producto)
+    textos = {
+        "gancho": guardado.get("gancho", ""),
+        "titulo": guardado.get("titulo", ""),
+        "cta": guardado.get("cta", ""),
+    }
+    if not any(textos.values()):
+        on_log(
+            "[cuenta_piloto] este producto no tiene textos — el vídeo saldrá "
+            "sin bloque de texto. Pulsa 'Obtener textos' y vuelve a montarlo."
+        )
+
+    # Nombre correlativo dentro del producto: `3_v2.mp4` es el segundo vídeo
+    # del producto 3. Sin el correlativo el segundo montaje pisaría al primero
+    # en disco aunque Redis guardase los dos.
+    carpeta = cp_config.videos_dir(operator, producto)
+    n = 1 + len([v for v in (guardado.get("videos") or []) if isinstance(v, dict)])
+    salida = carpeta / f"{producto}_v{n}.mp4"
+    while salida.exists():
+        n += 1
+        salida = carpeta / f"{producto}_v{n}.mp4"
+
+    work = Path(tempfile.mkdtemp(prefix=f"cuenta_piloto_{producto}_"))
+    try:
+        video_editor.montar(
+            raw_video=raw_path,
+            textos=textos,
+            sexo=sexo,
+            output_path=salida,
+            work_dir=work,
+            semilla=f"{operator}/{producto}/v{n}",
+            con_gancho=bool(p.get("con_gancho", True)),
+            con_titulo=bool(p.get("con_titulo", True)),
+            con_cta=bool(p.get("con_cta", True)),
+            con_flecha=bool(p.get("con_flecha", True)),
+            on_log=on_log,
+            on_progress=on_progress,
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.add_video(
+        operator, producto, path=str(salida), sexo=sexo, job_id=job.id,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
+# ============================================================
 # RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
 # ============================================================
 def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2439,6 +2514,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
     JobMode.NICHO_BOF_CINE_VIDEO: run_nicho_bof_cine_video,
+    JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
 }
 
 
@@ -2462,6 +2538,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",
     JobMode.NICHO_BOF_CINE_VIDEO: "viralizacion",
+    JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
 }
 
 

@@ -13,6 +13,7 @@ import {
   Captions,
   Crown,
   Film,
+  FlaskConical,
   HardDrive,
   HardHat,
   Package,
@@ -48,6 +49,9 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   nicho_pov_bof_backup: "viralizacion",
   nicho_pov_bof_video: "viralizacion",
   nicho_ropa_video: "viralizacion",
+  nicho_ropa_personas_video: "viralizacion",
+  nicho_bof_cine_video: "viralizacion",
+  cuenta_piloto_video: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -82,6 +86,9 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   nicho_pov_bof_backup: "Backup Productos España",
   nicho_pov_bof_video: "Nicho POV BOF",
   nicho_ropa_video: "Nicho Ropa",
+  nicho_ropa_personas_video: "Nicho Ropa Con Personas",
+  nicho_bof_cine_video: "Nicho BOF Cinematográfico",
+  cuenta_piloto_video: "Cuenta Piloto",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -102,6 +109,9 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   nicho_pov_bof_backup: HardDrive,
   nicho_pov_bof_video: Film,
   nicho_ropa_video: Shirt,
+  nicho_ropa_personas_video: Shirt,
+  nicho_bof_cine_video: Film,
+  cuenta_piloto_video: FlaskConical,
 };
 
 /**
@@ -196,6 +206,19 @@ export function describeJobParams(
       if (params.folder) out.push(String(params.folder));
       if (params.producto) out.push(`producto ${String(params.producto)}`);
       if (params.con_textos === false) out.push("sin textos");
+      break;
+    case "nicho_ropa_personas_video":
+      if (params.carpeta) out.push(String(params.carpeta));
+      if (params.producto) out.push(`prenda ${String(params.producto)}`);
+      break;
+    case "nicho_bof_cine_video":
+      if (params.folder) out.push(String(params.folder));
+      if (params.producto) out.push(`producto ${String(params.producto)}`);
+      if (params.sexo) out.push(`voz ${String(params.sexo)}`);
+      break;
+    case "cuenta_piloto_video":
+      if (params.producto) out.push(`producto ${String(params.producto)}`);
+      if (params.sexo) out.push(`voz ${String(params.sexo)}`);
       break;
   }
   return out;
