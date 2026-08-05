@@ -548,3 +548,35 @@ def audio_window_for_round(audio_duration: float, ronda: int) -> tuple[float, fl
         start = max(0.0, audio_duration - max_d)
         dur = min(max_d, audio_duration - start)
     return float(start), float(dur)
+
+
+# ---------------------------------------------------------------------------
+# CTA final hablado (solo Pablo Motos)
+# ---------------------------------------------------------------------------
+# Una coletilla al final del vídeo ("no te olvides de seguirme…") para medir si
+# sube la conversión a seguidor. Víctor Küppers ya la trae DENTRO de sus
+# audios, así que esto es solo para Pablo.
+#
+# Va SIN SUBTÍTULOS a propósito (decisión del operador): eso evita tener que
+# recolocar los tiempos de las palabras — los subtítulos se acaban donde acaba
+# la voz del clip y el CTA suena detrás.
+CTA_PONENTES = ("pablo",)
+
+
+def cta_dir(ponente: str) -> Path:
+    return ponente_folder(ponente) / "cta"
+
+
+def cta_files(ponente: str) -> list[Path]:
+    """Audios de CTA disponibles, en orden estable. Vacío = no hay."""
+    d = cta_dir(ponente)
+    if not d.is_dir():
+        return []
+    return sorted(
+        p for p in d.iterdir()
+        if p.is_file() and p.suffix.lower() in AUDIO_EXTS
+    )
+
+
+def admite_cta(ponente: str) -> bool:
+    return ponente in CTA_PONENTES and bool(cta_files(ponente))

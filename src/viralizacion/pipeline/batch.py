@@ -169,6 +169,9 @@ def run_batch(
     # Audios elegidos por el operador, por ponente. Vacío = todos los del
     # banco. Permite tirar solo de los largos, que son los que retienen.
     audios_elegidos: dict[str, list[str]] | None = None,
+    # "no" | "todos" | "mitad". Solo aplica a los ponentes de `CTA_PONENTES`
+    # que además tengan audios en su carpeta `cta/`.
+    cta_final: str = "no",
     on_log: OnLog = lambda _msg: None,
     on_progress: OnProgress = lambda _pct, _label: None,
 ) -> dict:
@@ -236,6 +239,12 @@ def run_batch(
         ponente_out_dir = staging_root / ponente
         ponente_tmp_dir = tmp_root / ponente
 
+        # CTA final hablado. Solo Pablo (Víctor ya lo trae en sus audios) y
+        # solo si hay ficheros en su carpeta `cta/`.
+        ctas = config.cta_files(ponente) if config.admite_cta(ponente) else []
+        modo_cta = (cta_final or "no").strip().lower() if ctas else "no"
+        n_con_cta = 0
+
         for audio_idx0, audio_path in enumerate(audios):
             audio_idx = audio_idx0 + 1
             rounds_needed = rounds_per_audio[audio_idx0]
@@ -258,6 +267,15 @@ def run_batch(
                 include_music = ronda <= music_rounds
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
                 out_path = ponente_out_dir / filename
+
+                # A la MITAD se reparte alternando DENTRO de cada audio, no
+                # al azar: con azar puro pueden tocar todos los del mismo
+                # audio, y entonces se estaría comparando el audio y no el
+                # CTA — que es lo que se quiere medir.
+                cta_audio = None
+                if modo_cta == "todos" or (modo_cta == "mitad" and ronda % 2 == 1):
+                    cta_audio = ctas[n_con_cta % len(ctas)]
+                    n_con_cta += 1
 
                 audio_start, win_dur = config.audio_window_for_round(full_audio_dur, ronda)
                 fill_duration = max(0.0, win_dur - config.HOOK_DUR)
@@ -326,6 +344,7 @@ def run_batch(
                         tmp_dir=ponente_tmp_dir,
                         on_log=on_log,
                         audio_start=audio_start,
+                        cta_audio=cta_audio,
                         target_duration=win_dur,
                     )
 

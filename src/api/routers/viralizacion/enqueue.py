@@ -236,6 +236,7 @@ def generate(
         "round_styles": [s for s in (body.round_styles or []) if s],
         "styles_pool": [s for s in (body.styles_pool or []) if s],
         "audios": {k: list(v) for k, v in (body.audios or {}).items() if v},
+        "cta_final": (body.cta_final or "no").strip().lower(),
     }
     job = queue.enqueue(JobMode.VIRALIZACION_BATCH, title=title, params=params)
 

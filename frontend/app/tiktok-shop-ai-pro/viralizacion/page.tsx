@@ -537,6 +537,9 @@ export default function ViralizacionPage() {
   const [nombreCuenta, setNombreCuenta] = useState("");
   // Sin música de fondo salvo que se marque a propósito.
   const [musicRounds, setMusicRounds] = useState(0);
+  // CTA final hablado. Solo tiene sentido con Pablo: Víctor ya lo trae dentro
+  // de sus audios, así que el selector no se enseña si no está él.
+  const [ctaFinal, setCtaFinal] = useState<"no" | "todos" | "mitad">("no");
   const [success, setSuccess] = useState<{ total: number; position: number } | null>(null);
 
   const ponentes = ponentesQuery.data?.items ?? [];
@@ -587,6 +590,7 @@ export default function ViralizacionPage() {
       music_rounds: musicRounds,
       round_styles: roundStyles,
       styles_pool: stylesPool,
+      cta_final: ctaFinal,
       audios: Object.fromEntries(
         selectedSlugs
           .map((slug) => [slug, audiosPorPonente[slug] ?? []])
@@ -734,6 +738,42 @@ export default function ViralizacionPage() {
         </div>
         {/* Música de fondo: APAGADA por defecto. Antes se colaba siempre en
             la ronda 1 aunque no se pidiera. */}
+        {/* CTA final hablado. Solo con Pablo: Víctor ya lo trae dentro de sus
+            audios, así que enseñarlo con él sería ofrecer duplicarlo. */}
+        {selectedSlugs.includes("pablo") && (
+          <div>
+            <span className="mb-1 block text-xs font-medium sm:text-sm">
+              CTA final hablado
+            </span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                ["no", "Sin CTA"],
+                ["mitad", "A la mitad"],
+                ["todos", "A todos"],
+              ] as const).map(([valor, etiqueta]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setCtaFinal(valor)}
+                  className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
+                    ctaFinal === valor
+                      ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
+                      : "border-border text-muted-foreground hover:border-foreground/40"
+                  }`}
+                >
+                  {etiqueta}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+              Una coletilla al final («no te olvides de seguirme…»), sin
+              subtítulos. «A la mitad» la reparte alternando dentro de cada
+              audio, para que compares el CTA y no el audio. Solo Pablo — Víctor
+              ya la lleva en los suyos.
+            </p>
+          </div>
+        )}
+
         <div>
           <span className="mb-1 block text-xs font-medium sm:text-sm">
             Música de fondo

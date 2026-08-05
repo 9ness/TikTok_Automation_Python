@@ -50,6 +50,11 @@ export interface ViralizacionGenerateRequest {
   round_styles?: string[];
   /** Estilos elegidos; los vídeos se reparten entre ellos a partes iguales. */
   styles_pool?: string[];
+  /** Audios elegidos por ponente. Vacío = todos los del banco. */
+  audios?: Record<string, string[]>;
+  /** CTA final hablado: "no" | "todos" | "mitad". Solo aplica a Pablo Motos
+   *  — Víctor Küppers ya lo trae dentro de sus propios audios. */
+  cta_final?: string;
 }
 
 export interface ViralizacionGenerateResponse {

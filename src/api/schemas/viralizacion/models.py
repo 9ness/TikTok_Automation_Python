@@ -63,6 +63,10 @@ class ViralizacionGenerateRequest(BaseModel):
     # Vacío = todos los del banco. Sirve para tirar solo de los largos, que
     # retienen más.
     audios: dict[str, list[str]] = Field(default_factory=dict)
+    # CTA final hablado ("no te olvides de seguirme…"): "no" | "todos" |
+    # "mitad". Solo se aplica a Pablo Motos — Víctor Küppers ya lo trae dentro
+    # de sus propios audios. Va SIN subtítulos.
+    cta_final: str = "no"
 
 
 class ViralizacionGenerateResponse(BaseModel):

@@ -655,11 +655,23 @@ def _finalize(
     voice_path: Path,
     voice_start: float,
     target_duration: float,
+    # Duración de la VOZ, que con CTA es menor que la total del vídeo. None =
+    # la total (el caso de siempre).
+    voice_duration: float | None = None,
     music_path: Path | None,
     output_path: Path,
     on_log: OnLog | None,
+    cta_path: Path | None = None,
+    cta_delay: float = 0.0,
 ) -> Path:
-    """Fase 3: grade + subtítulos + audio (1 input de vídeo corto)."""
+    """Fase 3: grade + subtítulos + audio (1 input de vídeo corto).
+
+    El CTA final, si lo hay, entra como una pista APARTE retrasada hasta
+    `cta_delay` en vez de pegarse al fichero de voz. Así los tiempos de las
+    palabras no se mueven ni un milímetro y los subtítulos se acaban donde
+    acaba la voz del clip — que es justo lo que se pide: el CTA suena, pero no
+    se rotula.
+    """
     eq_filter = _jittered_eq_filter(style.eq_extra)
     vignette_filter = _vignette_filter(style)
     noise_filter = style.noise_filter_override or config.NOISE_FILTER_BASE
@@ -683,13 +695,17 @@ def _finalize(
     # detrás con `add_input`, que devuelve su índice. Hardcodear los índices
     # se rompía en cuanto se activaba la música.
     input_args = ["-i", str(video_path)]
+    voz_dur = target_duration if voice_duration is None else float(voice_duration)
     input_args += [
         "-ss", f"{voice_start:.3f}",
-        "-t", f"{target_duration:.3f}",
+        "-t", f"{voz_dur:.3f}",
         "-i", str(voice_path),
     ]
     audio_filters = [f"[1:a]volume={config.VOICE_VOLUME}[voice]"]
 
+    # La MÚSICA va justo detrás de la voz para no mover el índice [2:a] que
+    # ya usaba su filtro; el CTA entra después, sea cual sea el caso.
+    pistas = ["[voice]"]
     if music_path is not None:
         input_args += ["-ss", "0", "-t", f"{target_duration:.3f}", "-i", str(music_path)]
         fade_start = max(0.0, target_duration - config.MUSIC_FADEOUT_DUR)
@@ -697,14 +713,30 @@ def _finalize(
             f"[2:a]volume={config.MUSIC_VOLUME},"
             f"afade=t=out:st={fade_start:.3f}:d={config.MUSIC_FADEOUT_DUR}[music]"
         )
-        audio_filters.append(
-            "[voice][music]amix=inputs=2:duration=first:normalize=0,"
-            "alimiter=limit=0.95[aout]"
-        )
-    else:
-        audio_filters.append("[voice]alimiter=limit=0.95[aout]")
+        pistas.append("[music]")
 
-    siguiente_idx = 3 if music_path is not None else 2
+    idx_cta = 3 if music_path is not None else 2
+    if cta_path is not None:
+        # `adelay` en ms por canal: el CTA arranca cuando acaba la voz.
+        ms = int(max(0.0, cta_delay) * 1000)
+        input_args += ["-i", str(cta_path)]
+        audio_filters.append(
+            f"[{idx_cta}:a]volume={config.VOICE_VOLUME},adelay={ms}|{ms}[cta]"
+        )
+        pistas.append("[cta]")
+
+    if len(pistas) == 1:
+        audio_filters.append("[voice]alimiter=limit=0.95[aout]")
+    else:
+        # `longest` cuando hay CTA: suena DESPUÉS de la voz, así que con
+        # `first` (que se ata a la voz) se cortaría entero.
+        dur_mode = "longest" if cta_path is not None else "first"
+        audio_filters.append(
+            f"{''.join(pistas)}amix=inputs={len(pistas)}:duration={dur_mode}:"
+            "normalize=0,alimiter=limit=0.95[aout]"
+        )
+
+    siguiente_idx = idx_cta + (1 if cta_path is not None else 0)
 
     def add_input(args: list[str]) -> int:
         nonlocal siguiente_idx
@@ -839,6 +871,9 @@ def render_video(
     on_log: OnLog | None = None,
     audio_start: float = 0.0,
     target_duration: float | None = None,
+    # CTA final hablado (solo Pablo). Suena DESPUÉS de la voz del clip y no
+    # lleva subtítulos: los tiempos de las palabras no se tocan.
+    cta_audio: Path | None = None,
 ) -> Path:
     tmp_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -863,9 +898,25 @@ def render_video(
             )
         audio_start = snapped
 
+    # El CTA suena DESPUÉS de la voz, así que el vídeo dura esos segundos más.
+    # La ventana de voz no se toca: los subtítulos siguen acabando donde acaba
+    # el clip hablado, que es lo que se busca (el CTA no se rotula).
+    voz_dur = target_duration
+    if cta_audio is not None:
+        cta_dur = ffprobe_duration(cta_audio)
+        if cta_dur > 0:
+            target_duration = voz_dur + cta_dur
+            if on_log:
+                on_log(
+                    f"[renderer] CTA final {cta_audio.name} (+{cta_dur:.1f}s, "
+                    "sin subtítulos)"
+                )
+        else:
+            cta_audio = None
+
     if on_log:
         on_log(
-            f"[renderer] ventana audio {audio_start:.1f}s+{target_duration:.1f}s "
+            f"[renderer] ventana audio {audio_start:.1f}s+{voz_dur:.1f}s "
             f"(fuente {full_audio_dur:.1f}s)"
         )
 
@@ -965,9 +1016,12 @@ def render_video(
             voice_path=audio_path,
             voice_start=audio_start,
             target_duration=target_duration,
+            voice_duration=voz_dur,
             music_path=music_path if use_music else None,
             output_path=output_path,
             on_log=on_log,
+            cta_path=cta_audio,
+            cta_delay=voz_dur,
         )
         return output_path
     finally:
