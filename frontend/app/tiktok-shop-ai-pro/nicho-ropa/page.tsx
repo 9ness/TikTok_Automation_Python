@@ -133,13 +133,14 @@ export default function NichoRopaPersonasPage() {
           ))}
         </div>
 
-        {/* Estas carpetas solo traen la foto de la prenda, sin la captura de
-            la ficha, así que no hay texto que leer: el título se escribe en
-            cada tarjeta. Decirlo evita pulsar "Obtener textos" en balde. */}
+        {/* Estas carpetas no traen captura de la ficha, así que el título no
+            se LEE: se saca mirando la foto. Se explica porque el resultado es
+            un nombre descriptivo, no el título del listado de TikTok. */}
         <p className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-2.5 py-2 text-[10px] leading-relaxed text-sky-500">
-          Estas carpetas no traen la captura de la ficha, solo la foto de la
-          prenda. Escribe tú el título en cada una — es lo que se quema en el
-          centro del vídeo.
+          Aquí no hay captura de la ficha, así que el título sale de mirar la
+          foto de la prenda: un nombre corto («Short deportivo rosa con
+          cordón»). Es lo que se quema en el centro del vídeo — puedes
+          cambiarlo escribiendo encima.
         </p>
 
         <button

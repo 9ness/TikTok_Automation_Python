@@ -148,17 +148,33 @@ def extraer_textos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
 ) -> PrendasPersonasListResponse:
-    """Lee las capturas con Gemini: título, tienda, caption y emojis.
+    """Pone el título a cada prenda.
 
-    Mismo extractor que el módulo 8 —son las mismas capturas— pero el
-    resultado se guarda en el estado de ESTE nicho.
+    Dos caminos según lo que tenga la carpeta:
+
+    - **Con captura de la ficha** → se LEE el título del listado, como en el
+      módulo 8 (mismo extractor, mismas capturas).
+    - **Sin captura** (las tres de ropa de mujer) → no hay texto que leer, así
+      que se MIRA la foto y Gemini le pone un nombre corto. El operador lo
+      corrige si alguno no encaja, en vez de escribir 38 a mano.
     """
-    from src.nicho_ropa.services import text_extractor
+    from src.nicho_ropa.services import drive_client, text_extractor
 
     carpeta = carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
     logs: list[str] = []
     try:
-        textos = text_extractor.extract_texts(carpeta, on_log=logs.append)
+        if carpeta in config.SIN_CAPTURA_DE_FICHA:
+            from src.nicho_ropa_personas.services import titulador
+
+            textos = titulador.titular(
+                text_extractor.pares(carpeta),
+                drive_client.fetch_photo,
+                on_log=logs.append,
+            )
+        else:
+            textos = text_extractor.extract_texts(carpeta, on_log=logs.append)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     if not textos:
