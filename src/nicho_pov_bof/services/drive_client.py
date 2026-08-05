@@ -236,6 +236,11 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
                 "name": it["Name"],
                 "size": int(it.get("Size") or 0),
                 "mime": it.get("MimeType", ""),
+                # Cuándo se subió. Es lo único que separa dos productos cuyas
+                # cuatro fotos se llaman EXACTAMENTE igual (`8.PNG` x4): cada
+                # pareja se subió con segundos de diferencia y con días entre
+                # una y otra. Ver `photo_pairing.group_by_product`.
+                "mtime": it.get("ModTime", ""),
             }
             for it in items
             if it.get("Name") and it.get("ID")

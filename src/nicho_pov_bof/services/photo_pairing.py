@@ -28,6 +28,9 @@ from typing import Iterable
 # Fuera de esta banda de ratio (alto/ancho) una imagen ya no es "de producto":
 # es un pantallazo alto de móvil o una tira ancha de escritorio.
 SQUARE_MIN, SQUARE_MAX = 0.60, 1.50
+# Por encima de este alto/ancho la foto es una captura de la ficha (pantallazo
+# de móvil), no la foto del producto: 1320x2868 son 2,17.
+TALL_MIN = 1.80
 # Cuánto más debe pesar la captura para decidir por peso cuando la forma no
 # separa.
 SIZE_RATIO_CONFIDENT = 1.25
@@ -60,11 +63,80 @@ def _is_squarish(photo: dict) -> bool | None:
 
 
 def group_by_product(photos: Iterable[dict]) -> dict[str, list[dict]]:
-    """Agrupa las fotos de una carpeta por producto."""
-    groups: dict[str, list[dict]] = {}
+    """Agrupa las fotos de una carpeta por producto.
+
+    Un mismo NÚMERO puede corresponder a DOS productos distintos: el operador
+    guarda las capturas y a veces repite número entre tandas, así que en una
+    carpeta conviven `2` y `2.PNG` que no son la misma ficha (distinto
+    tamaño, distinto producto). Fundirlos escondía 15 productos en 10
+    carpetas — carpetas de 20 fotos que salían con 8 productos.
+
+    Se separan solo cuando el reparto es LIMPIO: si los ficheros de un número
+    se agrupan por nombre exacto en bloques de exactamente dos (ficha +
+    limpia), cada bloque es un producto. Si no cuadra, se deja como estaba —
+    `4(1).PNG` y `4.PNG` SÍ son el mismo producto (el "(1)" lo pone Drive al
+    repetirse el nombre), y ahí no hay nada que separar.
+    """
+    por_numero: dict[str, list[dict]] = {}
     for p in photos:
-        groups.setdefault(_stem_key(p["name"]), []).append(p)
+        por_numero.setdefault(_stem_key(p["name"]), []).append(p)
+
+    groups: dict[str, list[dict]] = {}
+    for numero, fotos in por_numero.items():
+        bloques: dict[str, list[dict]] = {}
+        for p in fotos:
+            bloques.setdefault(p["name"], []).append(p)
+
+        if len(bloques) < 2 or any(len(v) != 2 for v in bloques.values()):
+            por_fecha = _bloques_por_fecha(fotos)
+            if por_fecha:
+                bloques = {str(i): b for i, b in enumerate(por_fecha)}
+            else:
+                groups[numero] = fotos
+                continue
+
+        # Los que YA se veían (con extensión) conservan el número pelado: su
+        # progreso está guardado en Redis con esa clave y moverlo apuntaría
+        # los textos ya extraídos a las fotos del otro producto.
+        orden = sorted(
+            bloques.items(),
+            key=lambda kv: (0 if _tiene_extension(kv[0]) else 1, kv[0]),
+        )
+        for i, (_nombre, bloque) in enumerate(orden):
+            sufijo = "" if i == 0 else chr(ord("a") + i)  # 2, 2b, 2c…
+            groups[f"{numero}{sufijo}"] = bloque
     return groups
+
+
+def _bloques_por_fecha(fotos: list[dict]) -> list[list[dict]] | None:
+    """Parte un número en productos usando CUÁNDO se subió cada foto.
+
+    Última vía, para cuando los ficheros se llaman exactamente igual y el
+    nombre no separa nada (una carpeta tenía cuatro `8.PNG`). Las dos fotos de
+    un producto se suben seguidas —segundos— y entre un producto y otro pasan
+    días, así que ordenando por fecha salen parejas evidentes.
+
+    Solo se acepta si CADA pareja queda con una ficha (alta) y una foto de
+    producto (no alta). Si no cuadra, se devuelve None y el número se deja
+    entero: es preferible un producto de más con fotos de sobra que dos
+    productos con las fotos cruzadas.
+    """
+    if len(fotos) < 4 or len(fotos) % 2 or not all(f.get("mtime") for f in fotos):
+        return None
+
+    ordenadas = sorted(fotos, key=lambda f: str(f.get("mtime")))
+    parejas = [ordenadas[i:i + 2] for i in range(0, len(ordenadas), 2)]
+    for pareja in parejas:
+        altas = [f for f in pareja if (_ratio(f) or 0) >= TALL_MIN]
+        if len(altas) != 1:
+            return None
+    return parejas
+
+
+def _tiene_extension(name: str) -> bool:
+    from src.nicho_pov_bof import config
+
+    return "." in name and config.is_image(name)
 
 
 def split_pair(group: list[dict]) -> dict:
@@ -130,7 +202,15 @@ def pair_folder(photos: Iterable[dict]) -> list[dict]:
         pair = split_pair(group)
         pair["producto"] = key
         out.append(pair)
-    out.sort(key=lambda p: (len(p["producto"]), p["producto"]))
+    # Orden: por número y, dentro, por sufijo — el 2b va pegado al 2, no
+    # detrás del 10.
+    def _orden(p: dict) -> tuple:
+        m = re.match(r"^(\d+)([a-z]*)$", p["producto"])
+        if not m:
+            return (10**6, p["producto"])
+        return (int(m.group(1)), m.group(2))
+
+    out.sort(key=_orden)
     return out
 
 
