@@ -82,3 +82,17 @@ class PrendasPersonasListResponse(BaseModel):
 class VideoRopaPersonasUploadResponse(BaseModel):
     job_id: str
     message: str
+
+
+class TituloPrendaRequest(BaseModel):
+    """Título escrito a mano.
+
+    Hace falta porque las carpetas de ropa de mujer NO traen captura de la
+    ficha —solo la foto de la prenda—, así que no hay texto que Gemini pueda
+    leer. Y el título es justo lo que se quema en el centro del vídeo: sin él
+    el nicho no hace nada.
+    """
+
+    carpeta: str = Field(..., min_length=1)
+    producto: str = Field(..., min_length=1)
+    titulo: str = Field(default="", max_length=120)

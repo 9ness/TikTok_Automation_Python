@@ -9,6 +9,7 @@ from .models import (
     PrendasPersonasListResponse,
     RenombrarChicaRequest,
     RopaPersonasPromptsResponse,
+    TituloPrendaRequest,
     VideoRopaPersonasUploadResponse,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "PrendasPersonasListResponse",
     "RenombrarChicaRequest",
     "RopaPersonasPromptsResponse",
+    "TituloPrendaRequest",
     "VideoRopaPersonasUploadResponse",
 ]

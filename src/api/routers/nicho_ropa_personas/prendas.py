@@ -3,15 +3,19 @@
 - GET  /api/v1/nicho-ropa-personas/carpetas       → carpetas de prenda
 - GET  /api/v1/nicho-ropa-personas/prendas        → prendas + textos + vídeo
 - POST /api/v1/nicho-ropa-personas/extraer-textos → lee las capturas con Gemini
+- POST /api/v1/nicho-ropa-personas/prenda/titulo  → título escrito a mano
 - GET  /api/v1/nicho-ropa-personas/foto           → foto por file ID
 - GET  /api/v1/nicho-ropa-personas/foto-limpia    → descarga la foto de la prenda
 - POST /api/v1/nicho-ropa-personas/video/upload   → sube el bruto y encola
 - GET  /api/v1/nicho-ropa-personas/video          → sirve el vídeo montado
 
-Las FOTOS son las mismas que las del módulo 8 (mismas carpetas de Drive), así
-que se reutiliza su lector y su extractor de textos. Lo que NO se comparte es
-el estado: haber hecho una prenda en percha no es haberla hecho puesta por la
-modelo, y compartirlo daría por hechas prendas que no lo están.
+Solo ropa de MUJER: las tres carpetas que en Drive cuelgan de "Ropa Mujer".
+Las camisetas y conjuntos son del módulo 8, en percha.
+
+Esas tres carpetas NO traen captura de la ficha (solo la foto de la prenda,
+`IMG_4482.PNG`…), así que no hay texto que leer: el título se escribe a mano
+con `POST /prenda/titulo`. El endpoint de extracción se conserva para carpetas
+que sí tengan capturas.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from src.api.schemas.nicho_ropa_personas import (
     CarpetasRopaPersonasResponse,
     PrendaPersonasInfo,
     PrendasPersonasListResponse,
+    TituloPrendaRequest,
     VideoRopaPersonasUploadResponse,
 )
 from src.nicho_ropa_personas import config
@@ -101,6 +106,7 @@ def list_prendas(
     doc = product_repo.load(carpeta)
     guardados = doc.get("productos") or {}
     activos = _montando(queue, carpeta)
+    sin_ficha = carpeta in config.SIN_CAPTURA_DE_FICHA
 
     items = []
     for par in pares:
@@ -110,7 +116,10 @@ def list_prendas(
             producto=pid,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
-            foto_aviso="" if par.get("confident") else (
+            # En las carpetas sin captura de ficha, tener UNA sola foto es lo
+            # normal: avisar en las 38 prendas era ruido que escondía los
+            # avisos de verdad.
+            foto_aviso="" if (par.get("confident") or sin_ficha) else (
                 "No se distingue cuál es la foto de la prenda — compruébala"
             ),
             titulo=prod.get("titulo", ""),
@@ -159,6 +168,29 @@ def extraer_textos(
         )
     try:
         product_repo.save_extracted_texts(carpeta, textos)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return list_prendas(queue=queue, carpeta=carpeta)
+
+
+@router.post("/prenda/titulo", response_model=PrendasPersonasListResponse)
+def set_titulo(
+    body: TituloPrendaRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> PrendasPersonasListResponse:
+    """Título escrito a mano — es el que se quema en el centro del vídeo.
+
+    Las tres carpetas de ropa de mujer no traen captura de la ficha, así que
+    aquí no hay nada que extraer con Gemini: lo escribe el operador. Vaciarlo
+    es válido (deja la prenda sin texto).
+    """
+    carpeta = body.carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    try:
+        product_repo.update_product(
+            carpeta, body.producto, titulo=body.titulo.strip(),
+        )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return list_prendas(queue=queue, carpeta=carpeta)

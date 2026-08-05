@@ -32,6 +32,7 @@ import {
   usePrendasPersonas,
   usePromptsRopaPersonas,
   useSubirVideoRopaPersonas,
+  useTituloPrenda,
   videoRopaPersonasUrl,
 } from "@/lib/queries/nichoRopaPersonas";
 import type { PrendaPersonas } from "@/lib/types/nichoRopaPersonas";
@@ -131,6 +132,15 @@ export default function NichoRopaPersonasPage() {
             </button>
           ))}
         </div>
+
+        {/* Estas carpetas solo traen la foto de la prenda, sin la captura de
+            la ficha, así que no hay texto que leer: el título se escribe en
+            cada tarjeta. Decirlo evita pulsar "Obtener textos" en balde. */}
+        <p className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-2.5 py-2 text-[10px] leading-relaxed text-sky-500">
+          Estas carpetas no traen la captura de la ficha, solo la foto de la
+          prenda. Escribe tú el título en cada una — es lo que se quema en el
+          centro del vídeo.
+        </p>
 
         <button
           type="button"
@@ -300,6 +310,26 @@ function ChicasPanel() {
 
 function PrendaCard({ carpeta, prenda }: { carpeta: string; prenda: PrendaPersonas }) {
   const subir = useSubirVideoRopaPersonas();
+  const guardar = useTituloPrenda();
+  const [titulo, setTitulo] = useState(prenda.titulo);
+
+  // Se guarda al salir del campo, no en cada tecla: son 38 prendas y no hace
+  // falta una escritura a Redis por letra.
+  function guardarTitulo() {
+    const limpio = titulo.trim();
+    if (limpio === prenda.titulo) return;
+    guardar.mutate(
+      { carpeta, producto: prenda.producto, titulo: limpio },
+      {
+        onSuccess: () => toast.success("Título guardado"),
+        onError: (err) => {
+          setTitulo(prenda.titulo);
+          toast.error(err instanceof ApiError ? err.message : String(err));
+        },
+      },
+    );
+  }
+
   const [verFoto, setVerFoto] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -332,13 +362,26 @@ function PrendaCard({ carpeta, prenda }: { carpeta: string; prenda: PrendaPerson
           <div className="h-16 w-16 shrink-0 rounded-md bg-muted" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="flex items-baseline gap-1.5 text-xs font-semibold">
+          <div className="flex items-center gap-1.5">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               {prenda.producto}
             </span>
-            <span className="truncate">{prenda.titulo || "sin título"}</span>
-          </p>
-          {/* Lo que se va a quemar en el centro del vídeo, tal cual. */}
+            {/* El título se ESCRIBE aquí: estas carpetas no traen captura de
+                la ficha, así que no hay nada que Gemini pueda leer. Y es lo
+                que se quema en el centro del vídeo. */}
+            <input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              onBlur={guardarTitulo}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              placeholder="Escribe el título…"
+              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-semibold outline-none transition hover:border-border/60 focus:border-fuchsia-500"
+            />
+            {guardar.isPending && (
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          {/* Lo que se va a quemar, tal cual va a salir. */}
           {prenda.titulo && (
             <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
               en el vídeo: {prenda.titulo} {prenda.emojis}

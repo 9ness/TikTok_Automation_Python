@@ -101,6 +101,20 @@ export function useExtraerTextosRopaPersonas() {
   });
 }
 
+/** Título escrito a mano: es el que se quema en el centro del vídeo. */
+export function useTituloPrenda() {
+  const qc = useQueryClient();
+  return useMutation<
+    PrendasPersonasResponse,
+    Error,
+    { carpeta: string; producto: string; titulo: string }
+  >({
+    mutationFn: (body) =>
+      api.post<PrendasPersonasResponse>(`${ROOT}/prenda/titulo`, body),
+    onSuccess: (data) => qc.setQueryData(ropaPersonasKeys.prendas(data.carpeta), data),
+  });
+}
+
 export function useSubirVideoRopaPersonas() {
   const qc = useQueryClient();
   return useMutation<

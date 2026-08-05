@@ -29,12 +29,43 @@ from pathlib import Path
 REDIS_PREFIX = os.getenv("NICHO_ROPA_PERSONAS_REDIS_PREFIX", "nicho_ropa_personas:")
 
 # ---------------------------------------------------------------------------
-# Prendas: las MISMAS carpetas de Drive que el módulo 8
+# Prendas: SOLO ropa de mujer
 # ---------------------------------------------------------------------------
-# Una prenda vale para los dos nichos: en percha o puesta por la modelo. Lo que
-# cambia es el prompt, no la foto. Se importan en vez de copiarlas para que
-# añadir una carpeta nueva valga para los dos.
-from src.nicho_ropa.config import CARPETAS, CARPETA_DEFECTO, es_carpeta_conocida  # noqa: E402,F401
+# Este nicho enseña la prenda puesta por una modelo, así que solo tiene sentido
+# con ropa de mujer. En Drive están todas juntas bajo una carpeta que se llama
+# literalmente "Ropa Mujer" (`Productos España/Ropa/Ropa Mujer`), y son estas
+# tres. Las camisetas y conjuntos NO entran: esos van al módulo 8, en percha.
+#
+# Se declaran aquí en vez de importarlas del módulo 8 justamente por eso: los
+# dos nichos ya no comparten el mismo conjunto de carpetas.
+CARPETAS: dict[str, dict[str, str]] = {
+    "mono": {
+        "label": "Mono",
+        "id": "1MXBSXZRwqbo1F25OAM-MhO-qTf4SmxyK",
+    },
+    "pantalon_corto": {
+        "label": "Pantalón corto",
+        "id": "11enOhq4DL_lmdttQWqgowmA1MRqrR3_0",
+    },
+    "bikinis": {
+        "label": "Bikinis",
+        "id": "1T-nqij3xl4Dp-h2JvGJofCq6Wzoia25a",
+    },
+}
+
+CARPETA_DEFECTO = "mono"
+
+
+def es_carpeta_conocida(slug: str) -> bool:
+    return slug in CARPETAS
+
+
+# Estas tres carpetas NO traen captura de la ficha, solo la foto de la prenda
+# (los ficheros son `IMG_4482.PNG`…). O sea que no hay ningún texto que leer:
+# el título se escribe A MANO en la ficha de cada prenda. La extracción con
+# Gemini se conserva para carpetas que sí tengan capturas, pero aquí no da
+# nada — y decirlo en la pantalla evita que el operador la pulse en balde.
+SIN_CAPTURA_DE_FICHA = frozenset({"mono", "pantalon_corto", "bikinis"})
 
 
 def prompts_dir() -> Path:
