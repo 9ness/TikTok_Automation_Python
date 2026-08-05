@@ -985,6 +985,7 @@ def buscar_productos(
 
 @router.get("/recuperados", response_model=RecuperadosResponse)
 def list_recuperados(
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> RecuperadosResponse:
     """Productos que aparecieron después de haber trabajado ya su carpeta.
@@ -996,8 +997,25 @@ def list_recuperados(
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    items = [ProductoRecuperado(**d) for d in product_repo.productos_recuperados(usuario)]
-    return RecuperadosResponse(items=items)
+    from src.nicho_pov_bof.repos import product_repo as _pr
+
+    items: list[ProductoRecuperado] = []
+    carpetas: list[str] = []
+    for d in product_repo.productos_recuperados(usuario):
+        prod = _pr.get_product(d["source"], d["folder"], d["producto"], usuario)
+        items.append(
+            ProductoRecuperado(
+                source=d["source"],
+                folder=d["folder"],
+                producto=_producto_info(
+                    d["producto"], prod, d["source"], d["folder"], queue, usuario,
+                ),
+            )
+        )
+        etiqueta = f'{d["source"]}|{d["folder"]}'
+        if etiqueta not in carpetas:
+            carpetas.append(etiqueta)
+    return RecuperadosResponse(items=items, carpetas=carpetas)
 
 
 @router.get("/vendidos", response_model=SoldProductsResponse)

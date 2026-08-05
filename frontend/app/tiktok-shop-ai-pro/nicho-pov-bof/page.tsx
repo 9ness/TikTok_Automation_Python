@@ -412,17 +412,6 @@ export default function NichoPovBofPage() {
         </button>
       </section>
 
-      {verRecuperados && (
-        <RecuperadosModal
-          onClose={() => setVerRecuperados(false)}
-          onIr={(r) => {
-            setSource(r.source);
-            setPicked(r.folder);
-            setVerRecuperados(false);
-          }}
-        />
-      )}
-
       {verVendidos && (
         <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
       )}
@@ -675,8 +664,12 @@ export default function NichoPovBofPage() {
         </section>
       )}
 
+      {verRecuperados && (
+        <SeccionRecuperados onCerrar={() => setVerRecuperados(false)} />
+      )}
+
       {/* Fase 2 — automatización de vídeos por producto */}
-      {data && folder && (
+      {!verRecuperados && data && folder && (
         <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-purple-500" />
@@ -1049,128 +1042,124 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
   );
 }
 
-/** Productos que aparecieron DESPUÉS de haberse trabajado ya su carpeta.
+/** Los recuperados como una CARPETA DE TRABAJO más, no como un índice.
  *
- *  Herramienta TEMPORAL. Existe porque dos fallos escondían productos: fotos
- *  guardadas sin extensión en el nombre, que no se listaban, y dos productos
- *  distintos con el mismo número, que se fundían en uno. Ya arreglados, pero
- *  en las carpetas que el operador dio por terminadas quedan fichas que nadie
- *  llegó a ver. Cuando la lista salga vacía, se puede borrar todo esto.
+ *  El operador quiere hacerlos todos de una sentada, así que aquí están las
+ *  fichas enteras —textos, prompts, vídeo, escaparate— y no un listado que te
+ *  manda a buscarlos carpeta por carpeta.
  *
- *  Va por carpeta y no en una fuente aparte porque el producto SIGUE siendo de
- *  su carpeta: se salta a ella y se trabaja ahí, con sus prompts y su vídeo. */
-function RecuperadosModal({
-  onClose,
-  onIr,
-}: {
-  onClose: () => void;
-  onIr: (r: ProductoRecuperado) => void;
-}) {
+ *  Cada ficha trabaja contra SU carpeta de origen (`item.source`/`item.folder`),
+ *  que es de donde salen sus fotos y donde se guarda su progreso: esto es una
+ *  vista, no una carpeta de verdad.
+ *
+ *  Temporal: existe porque dos fallos escondían productos (fotos sin extensión
+ *  y dos productos fundidos bajo un mismo número). Cuando no queden, fuera.
+ */
+function SeccionRecuperados({ onCerrar }: { onCerrar: () => void }) {
   const recuperados = useProductosRecuperados(true);
-  const items = recuperados.data ?? [];
+  const extraerTextos = useExtraerTextos();
+  const [extrayendo, setExtrayendo] = useState(false);
+  const items = recuperados.data?.items ?? [];
+  const carpetas = recuperados.data?.carpetas ?? [];
+  const sinTextos = items.filter((r) => !r.producto.titulo).length;
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+  /** Relanza la extracción en las carpetas implicadas, una detrás de otra.
+   *
+   *  Los textos se extraen por CARPETA (Gemini lee las diez fichas de golpe),
+   *  así que para rellenar cinco productos hay que pasar por sus cuatro
+   *  carpetas. Se hace aquí para no obligar a ir a cada una. */
+  async function textosDeTodas() {
+    setExtrayendo(true);
+    try {
+      for (const clave of carpetas) {
+        const src = clave.split("|")[0] ?? "";
+        const folder = clave.split("|").slice(1).join("|");
+        if (!src || !folder) continue;
+        try {
+          await extraerTextos.mutateAsync({ source: src, folder });
+        } catch (e) {
+          toast.error(
+            `${folder}: ${e instanceof ApiError ? e.message : String(e)}`,
+          );
+        }
+      }
+      await recuperados.refetch();
+      toast.success("Textos actualizados");
+    } finally {
+      setExtrayendo(false);
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  // Agrupados por carpeta: se van a trabajar de carpeta en carpeta.
-  const porCarpeta = new Map<string, ProductoRecuperado[]>();
-  for (const r of items) {
-    const k = `${r.source}|${r.folder}`;
-    const l = porCarpeta.get(k);
-    if (l) l.push(r);
-    else porCarpeta.set(k, [r]);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button
-        type="button"
-        aria-label="Cerrar"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      />
-      <div className="relative flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-border/60 bg-card shadow-xl sm:max-h-[80vh] sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-2xl">
-        <div className="flex items-center gap-2 border-b border-border/60 p-3">
-          <PackageSearch className="h-4 w-4 shrink-0 text-fuchsia-500" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Productos recuperados</p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              {recuperados.isLoading
-                ? "repasando las 35 carpetas…"
-                : `${items.length} sin trabajar en carpetas que ya diste por hechas`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="rounded-md p-1 text-muted-foreground transition hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <section className="space-y-3 rounded-xl border border-fuchsia-500/40 bg-card p-3">
+      <div className="flex items-center gap-2">
+        <PackageSearch className="h-4 w-4 shrink-0 text-fuchsia-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Productos recuperados</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {recuperados.isLoading
+              ? "repasando las 35 carpetas…"
+              : `${items.length} de ${carpetas.length} carpeta(s) que ya diste por hechas`}
+          </p>
         </div>
-
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-          {recuperados.isLoading && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Emparejando fotos…
-            </div>
-          )}
-          {!recuperados.isLoading && items.length === 0 && (
-            <p className="py-6 text-center text-xs text-muted-foreground">
-              Ninguno. Todas las carpetas que has terminado están completas.
-            </p>
-          )}
-
-          {[...porCarpeta.entries()].map(([k, rs]) => {
-            const [src, folder] = k.split("|");
-            return (
-              <div key={k} className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-fuchsia-500">
-                  {folder}
-                  <span className="ml-1 font-normal text-muted-foreground">
-                    · {src === "aleatorios_1" ? "1 Prod Aleatorios" : "2 Prod Aleatorios 2"}
-                    {" · "}{rs.length} producto(s)
-                  </span>
-                </p>
-                {rs.map((r) => (
-                  <button
-                    key={`${r.folder}-${r.producto}`}
-                    type="button"
-                    onClick={() => onIr(r)}
-                    className="flex w-full items-center gap-2.5 rounded-lg border border-border/60 p-2 text-left transition hover:border-fuchsia-500/60"
-                  >
-                    {r.clean_photo_id ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={buildPhotoUrl(r.source, r.folder, r.clean_photo_id)}
-                        alt={r.producto}
-                        loading="lazy"
-                        className="h-12 w-12 shrink-0 rounded-md object-cover"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 shrink-0 rounded-md bg-muted" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium">Producto {r.producto}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        sin textos — ir a su carpeta
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+        >
+          Volver
+        </button>
       </div>
-    </div>
+
+      {recuperados.isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Emparejando fotos…
+        </div>
+      )}
+
+      {!recuperados.isLoading && items.length === 0 && (
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          Ninguno. Todas las carpetas que has terminado están completas. 🎉
+        </p>
+      )}
+
+      {sinTextos > 0 && (
+        <button
+          type="button"
+          onClick={() => void textosDeTodas()}
+          disabled={extrayendo}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-fuchsia-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-50"
+        >
+          {extrayendo ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extrayendo…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              Textos de los {sinTextos} que faltan ({carpetas.length} carpetas)
+            </>
+          )}
+        </button>
+      )}
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((r) => (
+          <div key={`${r.source}-${r.folder}-${r.producto.producto}`} className="space-y-1">
+            {/* De qué carpeta salió: sin esto no se sabe dónde vive el
+                producto ni por qué está aquí. */}
+            <p className="truncate text-[10px] font-semibold text-fuchsia-500">
+              {r.folder}
+            </p>
+            <ProductoCard
+              source={r.source}
+              folder={r.folder}
+              producto={r.producto}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

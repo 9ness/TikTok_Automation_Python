@@ -220,14 +220,24 @@ class BuscarProductosResponse(BaseModel):
 
 
 class ProductoRecuperado(BaseModel):
+    """Un recuperado con su producto ENTERO, no solo una referencia.
+
+    Se trabajan todos juntos como si fueran una carpeta más, así que la ficha
+    necesita lo mismo que en su carpeta de origen (textos, prompts, vídeo). El
+    `source`/`folder` viaja al lado porque cada uno es de una carpeta distinta
+    y las acciones (extraer textos, montar, marcar) van contra la SUYA.
+    """
+
     source: str
     folder: str
-    producto: str
-    clean_photo_id: str = ""
+    producto: ProductoInfo
 
 
 class RecuperadosResponse(BaseModel):
     items: list[ProductoRecuperado] = Field(default_factory=list)
+    # Carpetas implicadas, para poder relanzar la extracción de textos de
+    # todas de una vez sin ir carpeta por carpeta.
+    carpetas: list[str] = Field(default_factory=list)
 
 
 class ProductoUrlRequest(BaseModel):

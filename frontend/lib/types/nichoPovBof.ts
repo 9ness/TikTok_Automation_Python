@@ -256,6 +256,6 @@ export interface ProductoBuscado {
 export interface ProductoRecuperado {
   source: string;
   folder: string;
-  producto: string;
-  clean_photo_id: string;
+  /** El producto ENTERO: se trabaja aquí mismo, como en su carpeta. */
+  producto: ProductoItem;
 }

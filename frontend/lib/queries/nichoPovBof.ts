@@ -74,10 +74,10 @@ export function useBuscarProductos(source: string, q: string) {
  *  Recorre las 35 carpetas emparejando fotos (unos segundos), así que solo se
  *  pide cuando el operador abre la lista, nunca al cargar la página. */
 export function useProductosRecuperados(enabled: boolean) {
-  return useQuery<ProductoRecuperado[]>({
+  return useQuery<{ items: ProductoRecuperado[]; carpetas: string[] }>({
     queryKey: nichoPovBofKeys.recuperados(),
-    queryFn: async () =>
-      (await api.get<{ items: ProductoRecuperado[] }>(`${ROOT}/recuperados`)).items ?? [],
+    queryFn: () =>
+      api.get<{ items: ProductoRecuperado[]; carpetas: string[] }>(`${ROOT}/recuperados`),
     enabled,
     staleTime: 5 * 60_000,
   });
