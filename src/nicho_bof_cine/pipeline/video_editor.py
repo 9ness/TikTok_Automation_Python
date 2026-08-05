@@ -11,9 +11,15 @@ Aquí el plano es un paneo de cámara continuo alrededor del producto: si va y
 vuelve, se ve clarísimo. Ralentizar un paneo un 5% no lo nota nadie, así que se
 estira el vídeo hasta la duración de la voz.
 
-El cambio de velocidad tiene tope (`VELOCIDAD_MIN/MAX`). Pasado ese punto el
-movimiento empieza a arrastrarse, y entonces es mejor dejar que el montador de
-siempre recorte o alargue como sabe.
+El factor sale de la voz de CADA vídeo, no de una constante. Si lo que pide la
+voz se pasa del rango razonable (`VELOCIDAD_MIN/MAX` — más allá el movimiento
+se arrastra y se nota), se aplica el tope y el resto lo cuadra el ajuste de
+duración de siempre. Así el vídeo acaba clavado con la voz en todos los casos,
+y en el rebobinado solo cae lo que la velocidad no ha podido absorber:
+
+    voz 10,2s → velocidad 0,98 → listo
+    voz 11,5s → velocidad 0,87 → listo
+    voz 14,0s → velocidad 0,85 (tope) + 1,7s de ajuste
 """
 
 from __future__ import annotations
@@ -65,25 +71,34 @@ def ajustar_velocidad(
 ) -> tuple[Path, float]:
     """Estira o encoge el vídeo hasta `objetivo_s` cambiando la velocidad.
 
-    Devuelve `(ruta, factor)`. Con factor 1.0 no se ha tocado nada — o porque
-    ya cuadraba, o porque el ajuste se salía del rango razonable y es mejor
-    dejárselo al montador de siempre.
+    El factor sale de la duración de la voz de ESTE vídeo, no de una constante:
+    cada frase locutada dura lo suyo. Si lo que pide la voz se sale del rango
+    razonable, se aplica el tope y el resto lo cuadra después el ajuste de
+    duración de siempre — así el hueco nunca cae entero en el rebobinado, que
+    es lo que se ve en un paneo.
+
+    Devuelve `(ruta, factor)`; 1.0 = no se ha tocado nada.
     """
     dur = probe_duration(video)
     if dur <= 0 or objetivo_s <= 0:
         return video, 1.0
 
-    # factor < 1 = más lento (el vídeo dura más).
-    factor = dur / objetivo_s
-    if not (config.VELOCIDAD_MIN <= factor <= config.VELOCIDAD_MAX):
-        on_log(
-            f"[cine] el ajuste pedía velocidad {factor:.2f} "
-            f"(vídeo {dur:.1f}s, voz {objetivo_s:.1f}s): fuera de rango, "
-            "se deja que el montador recorte o alargue"
-        )
-        return video, 1.0
+    # factor < 1 = más lento (el vídeo dura más). Sale de la voz de ESTE
+    # vídeo, no de una constante: cada frase locutada dura lo suyo.
+    pedido = dur / objetivo_s
+    # Se aplica lo que quepa dentro del rango razonable y NO se renuncia al
+    # resto: lo que la velocidad no cubra lo remata después el ajuste de
+    # siempre (recortar o alargar), igual que en el POV BOF. Antes, con una
+    # voz muy larga, se descartaba el ajuste entero y todo el hueco caía en el
+    # rebobinado — que es justo lo que canta en un paneo.
+    factor = min(max(pedido, config.VELOCIDAD_MIN), config.VELOCIDAD_MAX)
     if abs(factor - 1.0) < 0.01:
         return video, 1.0
+    if abs(pedido - factor) > 0.01:
+        on_log(
+            f"[cine] la voz pedía velocidad {pedido:.2f}; se aplica {factor:.2f} "
+            "(el tope) y el resto lo cuadra el ajuste de duración"
+        )
 
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(video),
