@@ -75,7 +75,9 @@ def _sin_comentario(texto: str) -> str:
 # Mismo patrón que el Nicho POV BOF, pero solo voz de mujer: las cinco frases
 # están grabadas con cinco voces distintas y se sortea una por vídeo, así que
 # el operador no decide nada por producto.
-AUDIO_DRIVE_SUBDIR = "TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer"
+# Ruta COMPLETA desde la raíz del mount, igual que `DRIVE_UPLOAD_ROOT` del
+# POV BOF: el mount empieza en "Mi unidad", no dentro de NEBULABS.
+AUDIO_DRIVE_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer"
 
 # ---------------------------------------------------------------------------
 # Montaje
