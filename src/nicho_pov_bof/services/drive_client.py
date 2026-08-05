@@ -238,7 +238,8 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
                 "mime": it.get("MimeType", ""),
             }
             for it in items
-            if it.get("Name") and config.is_image(it["Name"]) and it.get("ID")
+            if it.get("Name") and it.get("ID")
+            and config.is_image(it["Name"], it.get("MimeType", ""))
         ]
         photos.sort(key=lambda p: config.natural_sort_key(p["name"]))
         return photos

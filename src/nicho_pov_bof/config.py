@@ -65,8 +65,20 @@ def source_path(source: str) -> str:
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
-def is_image(name: str) -> bool:
-    return os.path.splitext(name)[1].lower() in IMAGE_EXTS
+def is_image(name: str, mime: str = "") -> bool:
+    """¿Es una foto? Por extensión o, si no la tiene, por el tipo que da Drive.
+
+    El `mime` NO es un adorno: en estas carpetas hay fotos guardadas SIN
+    extensión — el fichero se llama `1`, `2`, `3` a secas — y mirando solo el
+    nombre se descartaban enteras. De las cuatro carpetas de
+    "2 Prod Aleatorios 2", dos salían con CERO productos en la web y otra con
+    dos, cuando en Drive las cuatro tienen sus diez productos. `rclone lsjson`
+    ya trae el `MimeType` real (`image/png`, `image/jpeg`), así que no cuesta
+    nada preguntárselo.
+    """
+    if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
+        return True
+    return str(mime or "").lower().startswith("image/")
 
 
 def natural_sort_key(name: str) -> tuple:

@@ -76,7 +76,8 @@ def list_photos(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
                 "mime": it.get("MimeType", ""),
             }
             for it in items
-            if pov_config.is_image(it.get("Name", "")) and it.get("ID")
+            if it.get("ID")
+            and pov_config.is_image(it.get("Name", ""), it.get("MimeType", ""))
         ]
         fotos.sort(key=lambda f: pov_config.natural_sort_key(f["name"]))
         return fotos
