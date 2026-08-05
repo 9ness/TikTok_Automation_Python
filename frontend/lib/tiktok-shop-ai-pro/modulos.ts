@@ -88,6 +88,7 @@ export const MODULOS: ModuloNicho[] = [
     titulo: "Creación de Nicho BOF Cinematográfico",
     icon: Film,
     drive: "Nicho Cinematografico",
+    listo: true,
     resumen: "Convertir el producto en una historia visual con estética de cine.",
   },
   {

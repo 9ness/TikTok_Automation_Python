@@ -1820,6 +1820,72 @@ def run_nicho_ropa_personas_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
 
 # ============================================================
+# RUNNER: NICHO BOF CINEMATOGRÁFICO — MONTAJE DEL VÍDEO
+# ============================================================
+def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo de UN producto a partir de sus DOS clips.
+
+    Se pegan los dos (~5s cada uno), se cuadra la duración con la voz
+    cambiando la VELOCIDAD —un paneo de cámara ralentizado un 5% no se nota,
+    pero rebobinarlo como en el POV BOF sí— y de ahí en adelante es el mismo
+    montaje: gancho, título, CTA, flecha y voz.
+
+    Params: source, folder, producto, clip1_path, clip2_path, sexo.
+    """
+    from src.nicho_bof_cine import config as cine_config
+    from src.nicho_bof_cine.pipeline import video_editor
+    from src.nicho_bof_cine.repos import product_repo
+    from src.nicho_pov_bof.pipeline.video_editor import layout_for_producto
+    from src.nicho_pov_bof.services import audio_bank
+
+    p = job.params
+    source, folder = str(p["source"]), str(p["folder"])
+    producto = str(p["producto"])
+    operator = str(p.get("operator") or "")
+    clips = [Path(p["clip1_path"]), Path(p["clip2_path"])]
+    for c in clips:
+        if not c.is_file():
+            raise FileNotFoundError(f"No está el clip subido: {c}")
+
+    sexo = (p.get("sexo") or "hombre").strip().lower()
+    on_progress(0.05, f"🔊 Eligiendo voz ({sexo})…")
+    voz = audio_bank.prepare(audio_bank.pick_random(sexo), on_log=on_log)
+
+    guardado = product_repo.get_product(source, folder, producto, operator)
+    textos = {
+        "gancho": guardado.get("gancho", ""),
+        "titulo": guardado.get("titulo", ""),
+        "cta": guardado.get("cta", ""),
+    }
+
+    salida = Path(cine_config.video_dir()) / source / folder / f"{producto}.mp4"
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix=f"cine_{producto}_"))
+    try:
+        video_editor.montar(
+            clips=clips,
+            audio_path=voz,
+            textos=textos,
+            output_path=salida,
+            work_dir=work,
+            layout=layout_for_producto(producto, textos.get("cta", "")),
+            semilla=f"{source}/{folder}/{producto}",
+            on_log=on_log,
+            on_progress=on_progress,
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.update_product(
+        source, folder, producto, usuario=operator,
+        video_path=str(salida), video_listo_at=int(time.time()), uploaded=True,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
+# ============================================================
 # RUNNER: NICHO POV BOF — BACKUP / SYNC DEL DRIVE COMPARTIDO
 # ============================================================
 def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2371,6 +2437,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
+    JobMode.NICHO_BOF_CINE_VIDEO: run_nicho_bof_cine_video,
 }
 
 
@@ -2393,6 +2460,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",
+    JobMode.NICHO_BOF_CINE_VIDEO: "viralizacion",
 }
 
 

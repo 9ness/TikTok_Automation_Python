@@ -34,6 +34,8 @@ class JobMode(str, Enum):
     NICHO_ROPA_VIDEO = "nicho_ropa_video"  # ropa sin personas: encuadre + mudo
     # Ropa CON personas: título centrado sobre la prenda + flecha + voz de mujer.
     NICHO_ROPA_PERSONAS_VIDEO = "nicho_ropa_personas_video"
+    # BOF cinematográfico: DOS clips de 5s pegados + ajuste por velocidad.
+    NICHO_BOF_CINE_VIDEO = "nicho_bof_cine_video"
 
 
 class JobStatus(str, Enum):
@@ -62,6 +64,7 @@ MODE_LABELS = {
     JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
     JobMode.NICHO_ROPA_VIDEO: "👕 Vídeo Nicho Ropa",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "👗 Vídeo Ropa Con Personas",
+    JobMode.NICHO_BOF_CINE_VIDEO: "🎬 Vídeo BOF Cinematográfico",
 }
 
 
