@@ -156,6 +156,12 @@ export function EscaparateModal({
                         title="Copiar el nombre de la tienda para buscarla en el Marketplace"
                       >
                         <Store className="h-3 w-3 shrink-0" />
+                        {/* "Vendido por" y no el nombre a secas: la TIENDA no
+                            es la MARCA del título, y verlas juntas confunde
+                            (la tienda TEENO vende colchones DEWINNER, y el
+                            grupo parecía mal montado). Es literalmente lo que
+                            pone la ficha de TikTok. */}
+                        <span className="shrink-0 font-normal opacity-70">Vendido por</span>
                         <span className="truncate">{tienda}</span>
                         <ClipboardCopy className="h-3 w-3 shrink-0 opacity-60" />
                       </button>
