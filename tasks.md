@@ -202,6 +202,23 @@ recorta los audios largos en vez de tocar el render.
 
 ## 🤖 Cola del Agente
 
+- [ ] **[Viralización] CTA final de audio (solo Pablo Motos)** — pedido por el
+      operador el 5 ago. Añadir una coletilla hablada al final ("no te olvides
+      de seguirme…") para medir si sube la conversión a seguidor.
+      - **Solo `pablo`.** Víctor Küppers ya la trae dentro de sus audios, así
+        que el selector no debe aparecer para él.
+      - Audios en `~/viralizacion_assets/pablo/cta/` (varios → se rota).
+      - Tres opciones en el formulario: sin CTA · a todos · a la mitad.
+      - **La mitad se reparte alternando dentro de CADA audio**, no al azar:
+        con azar puro pueden tocar los 13 del mismo audio y entonces se estaría
+        comparando el audio, no el CTA — que es lo que el operador quiere medir.
+      - **SIN SUBTÍTULOS en el CTA** (decisión del operador). Eso evita lo
+        único difícil: no hay que recolocar los tiempos de las palabras. Los
+        subtítulos se acaban donde acaba la voz del clip y el CTA va detrás.
+      - Implementación: pegar el CTA al final del audio de la ventana, subir
+        `target_duration` esos segundos y dejar `words` como está. El vídeo se
+        alarga con el mismo mecanismo que ya cuadra duración.
+
 - [ ] `deploy_safe.sh`: purgar caché de Docker ANTES de construir. El disco
       llega al 100% cada pocos deploys (hacen falta ~14 GB transitorios) y ya
       truncó `page.tsx` a 0 bytes una vez.
