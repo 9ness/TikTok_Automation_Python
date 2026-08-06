@@ -13,6 +13,9 @@ class PonenteInfo(BaseModel):
     hooks_total: int
     paisajes_available: int
     paisajes_total: int
+    # Cuántos audios de CTA final tiene este ponente. 0 = la opción no puede
+    # hacer nada, y la UI tiene que decirlo en vez de dejar elegirla en balde.
+    n_ctas: int = 0
 
 
 class PonentesListResponse(BaseModel):

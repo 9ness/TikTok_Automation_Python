@@ -7,6 +7,8 @@ export interface PonenteInfo {
   slug: string;
   label: string;
   n_audios: number;
+  /** Audios de CTA final. 0 = la opción no puede hacer nada. */
+  n_ctas?: number;
   hooks_available: number;
   hooks_total: number;
   paisajes_available: number;

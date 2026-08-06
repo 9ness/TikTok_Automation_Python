@@ -23,6 +23,7 @@ from src.viralizacion.pipeline.ffmpeg_utils import (
     ffprobe_duration,
     leading_silence,
     run,
+    trailing_silence,
 )
 from src.viralizacion.pipeline.styles import StylePreset
 from src.viralizacion.pipeline.transcriber import group_into_phrases
@@ -56,6 +57,13 @@ def slice_words(words: list[dict], window_start: float, window_dur: float) -> li
             "end": min(window_dur, we - window_start),
         })
     return out
+
+
+# Cola muda al final del audio: por debajo de esto es el aire normal de una
+# frase y no se toca; por encima, se recorta dejando `RESPIRO` de margen para
+# no cortar la última sílaba en seco.
+COLA_MUDA_MIN_S = 1.2
+COLA_MUDA_RESPIRO_S = 0.5
 
 
 def snap_to_first_word(
@@ -174,7 +182,13 @@ def _rounded_square_mask(work: Path, size: int, radius: int) -> Path:
 
 
 def _vignette_filter(style: StylePreset) -> str:
-    """Viñeta fija o "respirando" (vaivén lento) según el estilo."""
+    """Viñeta fija o "respirando" (vaivén lento) según el estilo.
+
+    Cadena vacía si el estilo la tiene apagada (los cuadrados, que van
+    limpios). El que la monta se encarga de no dejar comas sueltas.
+    """
+    if not style.vignette:
+        return ""
     if style.vignette_breathe > 0:
         # Periodo largo y aleatorio: es un latido de fondo, no un parpadeo.
         period = random.uniform(6.0, 10.0)
@@ -353,10 +367,12 @@ def _dust_sequence(work: Path, idx: int, dots: int) -> tuple[Path, int]:
     return patron, _DUST_FRAMES
 
 
-def _jittered_eq_filter(extra: dict) -> str:
+def _jittered_eq_filter(extra: dict, saturation_mul: float = 1.0) -> str:
     frac = config.EQ_JITTER_FRAC
     contrast = config.EQ_BASE_CONTRAST * random.uniform(1 - frac, 1 + frac)
-    saturation = config.EQ_BASE_SATURATION * random.uniform(1 - frac, 1 + frac)
+    saturation = (
+        config.EQ_BASE_SATURATION * saturation_mul * random.uniform(1 - frac, 1 + frac)
+    )
     brightness = config.EQ_BASE_BRIGHTNESS * random.uniform(1 - frac, 1 + frac)
     parts = [
         f"contrast={contrast:.4f}",
@@ -672,9 +688,12 @@ def _finalize(
     acaba la voz del clip — que es justo lo que se pide: el CTA suena, pero no
     se rotula.
     """
-    eq_filter = _jittered_eq_filter(style.eq_extra)
+    eq_filter = _jittered_eq_filter(style.eq_extra, style.saturation_mul)
     vignette_filter = _vignette_filter(style)
-    noise_filter = style.noise_filter_override or config.NOISE_FILTER_BASE
+    noise_filter = (
+        (style.noise_filter_override or config.NOISE_FILTER_BASE)
+        if style.film_grain else ""
+    )
     # Efectos de cine del estilo. Van ANTES de los subtítulos para que el
     # destello no lave el texto ni la rayadura lo cruce por encima.
     extra_fx = [
@@ -749,6 +768,12 @@ def _finalize(
     # Grading propio del estilo (colorbalance, colorchannelmixer…) ANTES de
     # quemar los subtítulos, para no teñir el texto.
     pre = "".join(f"{f}," for f in [*style.pre_subtitle_filters, *extra_fx])
+    # Cadena de color+suciedad, SIN comas huérfanas: los estilos limpios
+    # (cuadrados) dejan la viñeta y el grano vacíos, y un `,,` en el
+    # filtergraph revienta ffmpeg entero.
+    grade = "".join(
+        f"{f}," for f in (eq_filter, vignette_filter, noise_filter) if f
+    )
 
     def añadir_polvo(entrada: str) -> str:
         """Encadena las láminas de polvo sobre `entrada` y devuelve la salida."""
@@ -791,7 +816,7 @@ def _finalize(
         mask_path = _rounded_square_mask(ass_path.parent, side, radius)
         mask_idx = add_input(["-i", str(mask_path)])
         filters.append(
-            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}"
+            f"[0:v]{grade}{pre}"
             f"scale={side}:{side}:force_original_aspect_ratio=increase,"
             f"crop={side}:{side}:(in_w-{side})/2:"
             f"(in_h-{side})*{config.SQUARE_CROP_Y_FRAC}[sq]"
@@ -810,7 +835,7 @@ def _finalize(
         )
     else:
         filters.append(
-            f"[0:v]{eq_filter},{vignette_filter},{noise_filter},{pre}null[graded]"
+            f"[0:v]{grade}{pre}null[graded]"
         )
         con_polvo = añadir_polvo("graded")
         filters.append(
@@ -897,6 +922,23 @@ def render_video(
                 f"(recortado {snapped - audio_start:.2f}s de silencio inicial)"
             )
         audio_start = snapped
+
+    # Y lo mismo por el otro lado: hay audios del banco con una COLA MUDA
+    # larga (uno de Pablo dura 51s y deja de hablar en el 41). Sin esto el
+    # vídeo se hacía tan largo como el audio y acababa con diez segundos de
+    # nada, que desde fuera parece que el vídeo está roto.
+    cola = trailing_silence(audio_path, audio_start + target_duration)
+    if cola > COLA_MUDA_MIN_S:
+        # Se deja un respiro para no cortar la última sílaba en seco.
+        recorte = cola - COLA_MUDA_RESPIRO_S
+        nueva = max(config.MIN_VIDEO_DURATION_S, target_duration - recorte)
+        if nueva < target_duration:
+            if on_log:
+                on_log(
+                    f"[renderer] cola muda de {cola:.1f}s al final del audio → "
+                    f"ventana {target_duration:.1f}s → {nueva:.1f}s"
+                )
+            target_duration = nueva
 
     # El CTA suena DESPUÉS de la voz, así que el vídeo dura esos segundos más.
     # La ventana de voz no se toca: los subtítulos siguen acabando donde acaba

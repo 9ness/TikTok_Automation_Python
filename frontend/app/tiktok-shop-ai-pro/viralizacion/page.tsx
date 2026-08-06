@@ -544,6 +544,8 @@ export default function ViralizacionPage() {
 
   const ponentes = ponentesQuery.data?.items ?? [];
   const selectedSlugs = Object.keys(selected).filter((slug) => selected[slug]);
+  // Coletillas de CTA grabadas para Pablo (0 = no se puede ofrecer).
+  const ctasPablo = ponentes.find((p) => p.slug === "pablo")?.n_ctas ?? 0;
 
   // Estilo por ronda. El plan se calcula sobre el primer ponente elegido: el
   // reparto en rondas depende de cuántos audios tiene, y las rondas son el
@@ -745,32 +747,46 @@ export default function ViralizacionPage() {
             <span className="mb-1 block text-xs font-medium sm:text-sm">
               CTA final hablado
             </span>
-            <div className="grid grid-cols-3 gap-1.5">
-              {([
-                ["no", "Sin CTA"],
-                ["mitad", "A la mitad"],
-                ["todos", "A todos"],
-              ] as const).map(([valor, etiqueta]) => (
-                <button
-                  key={valor}
-                  type="button"
-                  onClick={() => setCtaFinal(valor)}
-                  className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
-                    ctaFinal === valor
-                      ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
-                      : "border-border text-muted-foreground hover:border-foreground/40"
-                  }`}
-                >
-                  {etiqueta}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-              Una coletilla al final («no te olvides de seguirme…»), sin
-              subtítulos. «A la mitad» la reparte alternando dentro de cada
-              audio, para que compares el CTA y no el audio. Solo Pablo — Víctor
-              ya la lleva en los suyos.
-            </p>
+            {/* Sin audios grabados la opción no puede hacer NADA: elegirla
+                daba vídeos sin coletilla y sin avisar de por qué. */}
+            {ctasPablo === 0 ? (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-500">
+                No hay ninguna coletilla grabada todavía, así que esta opción no
+                haría nada. Graba la frase («no te olvides de seguirme…») y
+                deja el audio en <code>viralizacion_assets/pablo/cta/</code>;
+                en cuanto haya uno, aquí salen las opciones.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    ["no", "Sin CTA"],
+                    ["mitad", "A la mitad"],
+                    ["todos", "A todos"],
+                  ] as const).map(([valor, etiqueta]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      onClick={() => setCtaFinal(valor)}
+                      className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
+                        ctaFinal === valor
+                          ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
+                          : "border-border text-muted-foreground hover:border-foreground/40"
+                      }`}
+                    >
+                      {etiqueta}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  {ctasPablo} coletilla{ctasPablo > 1 ? "s" : ""} grabada
+                  {ctasPablo > 1 ? "s" : ""}, sin subtítulos. «A la mitad» la
+                  reparte alternando dentro de cada audio, para que compares el
+                  CTA y no el audio. Solo Pablo — Víctor ya la lleva en los
+                  suyos.
+                </p>
+              </>
+            )}
           </div>
         )}
 

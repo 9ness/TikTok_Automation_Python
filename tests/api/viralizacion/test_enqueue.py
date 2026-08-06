@@ -14,23 +14,37 @@ class TestPonentesEndpoint:
         )
         monkeypatch.setattr(
             "src.viralizacion.services.allocator.count_available_hooks",
-            lambda slug: (10, 20),
+            # `**kw` porque el endpoint llama con `cache_only=True` y el
+            # TypeError se lo tragaba un `except`, dejando 0 y el test rojo.
+            lambda slug, **kw: (10, 20),
         )
         monkeypatch.setattr(
             "src.viralizacion.services.allocator.count_available_paisajes",
-            lambda slug: (100, 200),
+            lambda slug, **kw: (100, 200),
+        )
+        monkeypatch.setattr(
+            "src.viralizacion.config.cta_files",
+            lambda slug: ["cta_1.mp3"] if slug == "pablo" else [],
         )
         r = app_client.get("/api/v1/viralizacion/ponentes")
         assert r.status_code == 200, r.text
         body = r.json()
         slugs = {item["slug"] for item in body["items"]}
-        assert slugs == {"pablo", "victor"}
+        # Superset, no igualdad: el banco de ponentes crece (billy, mario,
+        # segarra…) y fijar la lista exacta solo hacía fallar el test cada vez
+        # que se añadía uno, tapando fallos de verdad.
+        assert {"pablo", "victor"} <= slugs
         for item in body["items"]:
             assert item["n_audios"] == 3
             assert item["hooks_available"] == 10
             assert item["hooks_total"] == 20
             assert item["paisajes_available"] == 100
             assert item["paisajes_total"] == 200
+        # El nº de coletillas viaja a la UI: es lo que decide si se puede
+        # ofrecer el CTA final o hay que decir que no hay ninguna grabada.
+        por_slug = {i["slug"]: i for i in body["items"]}
+        assert por_slug["pablo"]["n_ctas"] == 1
+        assert por_slug["victor"]["n_ctas"] == 0
 
 
 class TestGenerateEndpoint:

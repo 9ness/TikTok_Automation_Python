@@ -20,6 +20,11 @@ de rotación en `STYLE_ORDER`.
 - **H "Resaltado"**: mismo marco cuadrado, Montserrat ExtraBold en MAYÚSCULAS
   abajo, la frase se va escribiendo y la palabra que suena va en amarillo.
 
+Los dos cuadrados (G y H) son los ÚNICOS limpios: van con `_LIMPIO` y no con
+`_BASE`, o sea solo color, transiciones y texto — sin polvo, rayaduras, grano
+ni viñeta. Es una decisión del operador sobre esas dos versiones en concreto,
+no un descuido.
+
 Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
 `build_ass` y mete su clave en `STYLE_ORDER` — no hay más sitios que tocar
 (el runner y el renderer iteran sobre el registro, no hardcodean nombres)."""
@@ -659,6 +664,14 @@ class StylePreset:
     # estilos, no solo en los "sucios" — es lo que tienen en común los vídeos
     # que le funcionan. Los estilos que quieran más denso lo suben.
     film_specks: int = 1
+    # Viñeta y grano de la base "película". Se pueden apagar ENTEROS para los
+    # estilos limpios, que solo quieren el color (ver `_LIMPIO`).
+    vignette: bool = True
+    film_grain: bool = True
+    # Multiplicador de saturación sobre `config.EQ_BASE_SATURATION`. Se usa
+    # esto en vez de meter `saturation` en `eq_extra` porque `eq_extra` PISA
+    # el valor y se llevaría por delante el jitter anti-huella.
+    saturation_mul: float = 1.0
     # Encaja el vídeo en un CUADRADO con esquinas redondeadas centrado sobre
     # negro (estilo de los vídeos de reflexión que funcionan en TikTok).
     square_frame: bool = False
@@ -691,6 +704,33 @@ _BASE = dict(
     vignette_breathe=0.14,
 )
 
+# Base de los estilos CUADRADOS (G y H). El operador los quiere LIMPIOS: solo
+# el filtro de color, las transiciones y los textos. Nada de efectos por
+# pantalla — fuera el polvo de celuloide, las rayaduras, el grano y la viñeta,
+# que son justo lo que ensucia el recuadro.
+#
+# El color sube pero se queda REALISTA: se deja el contraste base (1.14, que
+# `_BASE` bajaba a 1.06) y se sube la saturación un 12% con `saturation_mul`,
+# NO metiéndola en `eq_extra` — ahí pisaría el jitter que evita que todos los
+# vídeos salgan con el grado idéntico.
+#
+# También se quita el Ken Burns: los paisajes ya son vídeo y se mueven solos,
+# así que el zoom lento solo añadía un efecto encima de lo que se pidió dejar.
+_LIMPIO = dict(
+    vignette=False,
+    film_grain=False,
+    film_specks=0,
+    film_scratches=0,
+    ken_burns=0.0,
+    vignette_breathe=0.0,
+    saturation_mul=1.12,
+    # Sin `gamma`/`contrast` que oscurezcan: los de `config` ya abren la
+    # imagen (gamma 1.08, brillo 0.06) y es lo que da el aire limpio.
+    eq_extra={},
+    # La transición NO se toca: es de lo que el operador pidió conservar.
+    transition_landscape=("fadeblack", 1.05),
+)
+
 STYLE_PRESETS: dict[str, StylePreset] = {
     "classic": StylePreset(
         key="classic", label="A · Clásico", build_ass=build_ass_classic, **_BASE,
@@ -713,15 +753,17 @@ STYLE_PRESETS: dict[str, StylePreset] = {
     # G y H mantienen el MARCO CUADRADO: sus subtítulos están medidos para él
     # (`config.HIGHLIGHT_MARGIN_V` coloca el texto contando con el recuadro),
     # así que quitarlo no sería "mismo filtro", sería romperlos.
+    # Van con `_LIMPIO`, no con `_BASE`: son los únicos SIN suciedad de
+    # celuloide, a propósito.
     "cuadrado": StylePreset(
         key="cuadrado", label="G · Cuadrado", build_ass=build_ass_stacked,
-        square_frame=True, **_BASE,
+        square_frame=True, **_LIMPIO,
     ),
     "highlight": StylePreset(
         key="highlight", label="H · Resaltado", build_ass=build_ass_highlight,
         square_frame=True,
         font_name="Montserrat ExtraBold", fonts_dir=bundled_fonts_dir(),
-        **_BASE,
+        **_LIMPIO,
     ),
 }
 

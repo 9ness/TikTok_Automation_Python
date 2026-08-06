@@ -242,7 +242,17 @@ def run_batch(
         # CTA final hablado. Solo Pablo (Víctor ya lo trae en sus audios) y
         # solo si hay ficheros en su carpeta `cta/`.
         ctas = config.cta_files(ponente) if config.admite_cta(ponente) else []
-        modo_cta = (cta_final or "no").strip().lower() if ctas else "no"
+        pedido_cta = (cta_final or "no").strip().lower()
+        modo_cta = pedido_cta if ctas else "no"
+        # Si se pidió CTA y no hay audios, los vídeos salen SIN coletilla. Antes
+        # eso pasaba en silencio y el operador lo descubría viendo el vídeo
+        # ("la parte del CTA no dice nada"): ahora se avisa en el log del job.
+        if pedido_cta != "no" and not ctas:
+            on_log(
+                f"⚠️ '{ponente}': pediste CTA final pero no hay ningún audio en "
+                f"{config.cta_dir(ponente)} — los vídeos saldrán SIN coletilla. "
+                "Graba la frase, déjala ahí y vuelve a lanzar la tanda."
+            )
         n_con_cta = 0
 
         for audio_idx0, audio_path in enumerate(audios):
@@ -268,12 +278,17 @@ def run_batch(
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
                 out_path = ponente_out_dir / filename
 
-                # A la MITAD se reparte alternando DENTRO de cada audio, no
-                # al azar: con azar puro pueden tocar todos los del mismo
-                # audio, y entonces se estaría comparando el audio y no el
-                # CTA — que es lo que se quiere medir.
+                # A la MITAD se reparte ALTERNANDO vídeo sí, vídeo no, no al
+                # azar: con azar puro pueden tocar todos los del mismo audio y
+                # entonces se estaría comparando el audio y no el CTA, que es
+                # lo que se quiere medir.
+                #
+                # Se alterna por el CONTADOR DE VÍDEOS, no por `ronda`: lo
+                # normal es 1 ronda por audio (23 audios = 23 vídeos, todos
+                # `ronda=1`), así que `ronda % 2` daba 1 siempre y "a la mitad"
+                # se los llevaba TODOS.
                 cta_audio = None
-                if modo_cta == "todos" or (modo_cta == "mitad" and ronda % 2 == 1):
+                if modo_cta == "todos" or (modo_cta == "mitad" and idx_video % 2 == 1):
                     cta_audio = ctas[n_con_cta % len(ctas)]
                     n_con_cta += 1
 

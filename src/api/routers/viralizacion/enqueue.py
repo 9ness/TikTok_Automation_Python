@@ -81,6 +81,7 @@ def list_ponentes() -> PonentesListResponse:
             slug=slug,
             label=meta["label"],
             n_audios=n_audios,
+            n_ctas=len(config.cta_files(slug)),
             hooks_available=hooks_available,
             hooks_total=hooks_total,
             paisajes_available=paisajes_available,
