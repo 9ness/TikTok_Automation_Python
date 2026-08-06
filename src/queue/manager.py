@@ -30,9 +30,18 @@ from .models import Job, JobMode, JobStatus
 
 
 # Modos que NO pueden correr en paralelo entre sí (máx 1 RUNNING a la vez),
-# aunque haya varios workers. Quitar-marca usa Replicate ProPainter, que con
-# <$5 de crédito limita a ráfaga de 1 req → 2 jobs simultáneos dan 429.
-_EXCLUSIVE_MODES: set[JobMode] = {JobMode.TIKTOK_SHOP_WATERMARK}
+# aunque haya varios workers. El segundo espera en cola, no falla.
+#
+# - Quitar-marca: usa Replicate ProPainter, que con <$5 de crédito limita a
+#   ráfaga de 1 req → 2 jobs simultáneos dan 429.
+# - Viralización: una tanda son 20-40 renders de ffmpeg seguidos. Dos a la vez
+#   en 4 vCPU no terminan antes, terminan las dos a la mitad de velocidad, y
+#   además compiten por el MISMO banco de ganchos: la segunda lo agota, recicla
+#   y repite planos que la primera acaba de gastar.
+_EXCLUSIVE_MODES: set[JobMode] = {
+    JobMode.TIKTOK_SHOP_WATERMARK,
+    JobMode.VIRALIZACION_BATCH,
+}
 
 
 def _is_client_edit_job(job: Job) -> bool:
