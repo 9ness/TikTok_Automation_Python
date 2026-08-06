@@ -745,14 +745,19 @@ def _finalize(
         pistas.append("[cta]")
 
     if len(pistas) == 1:
-        audio_filters.append("[voice]alimiter=limit=0.95[aout]")
+        audio_filters.append(
+            # `level=disabled` es IMPRESCINDIBLE: por defecto `alimiter`
+            # RE-NIVELA la salida hacia el límite, o sea que en vez de
+            # limitar SUBE. Sin esto los vídeos salían a +0,07 dBTP.
+            "[voice]alimiter=limit=0.89:level=disabled[aout]"
+        )
     else:
         # `longest` cuando hay CTA: suena DESPUÉS de la voz, así que con
         # `first` (que se ata a la voz) se cortaría entero.
         dur_mode = "longest" if cta_path is not None else "first"
         audio_filters.append(
             f"{''.join(pistas)}amix=inputs={len(pistas)}:duration={dur_mode}:"
-            "normalize=0,alimiter=limit=0.95[aout]"
+            "normalize=0,alimiter=limit=0.89:level=disabled[aout]"
         )
 
     siguiente_idx = idx_cta + (1 if cta_path is not None else 0)

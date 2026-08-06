@@ -119,5 +119,9 @@ def limpiar_en_sitio(audio: Path, *, on_log: OnLog = _noop) -> Path:
     with tempfile.TemporaryDirectory(prefix="voz_limpia_") as tmp:
         salida = Path(tmp) / audio.name
         limpiar(respaldo, salida, tmp_dir=Path(tmp) / "demucs", on_log=on_log)
-        shutil.copy2(salida, audio)
+        # `copyfile` y NO `copy2`: copy2 preserva metadatos (utime/permisos) y
+        # eso revienta con EPERM cuando el fichero es de OTRO usuario, que es
+        # lo normal aquí — los audios los sube el operador desde el host y esto
+        # corre dentro del container. El contenido es lo único que importa.
+        shutil.copyfile(salida, audio)
     return audio

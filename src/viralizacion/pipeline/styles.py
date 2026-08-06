@@ -2,28 +2,21 @@
 se vean distintas si la v1 no viraliza). Registro en `STYLE_PRESETS`, orden
 de rotación en `STYLE_ORDER`.
 
-- **A "Clásico"**: línea completa blanca, borde negro, centrada — el estilo
-  ya validado por el operador.
-- **B "Reveal"**: UNA palabra en pantalla cada vez, cambiando de molde
-  tipográfico (`_STACK_MOLDES`) + grano más denso como firma visual.
-- **C "Cinemático"**: karaoke por palabra (palabra activa en blanco, resto
-  en negro) + grade frío/cálido + viñeta más fuerte + barras de letterbox
-  que entran al arrancar el b-roll.
-- **D "Teal & Orange"** (texto como C) y **F "Hora dorada"** (texto como B):
-  reaprovechan un `build_ass` existente y cambian el grade, la viñeta y la
-  transición — son variantes de color.
-- **E "Cascada"**: las palabras caen desordenadas por la pantalla
-  (`\\pos` por palabra, posición y molde sorteados) sobre un plano con motas
-  de polvo negras a la deriva.
-- **G "Cuadrado"**: marco cuadrado de esquinas redondeadas sobre fondo negro
-  y palabras que se van apilando con tipografía variada.
-- **H "Resaltado"**: mismo marco cuadrado, Montserrat ExtraBold en MAYÚSCULAS
-  abajo, la frase se va escribiendo y la palabra que suena va en amarillo.
+Son SEIS: tres estilos de texto, cada uno en dos acabados.
 
-Los dos cuadrados (G y H) son los ÚNICOS limpios: van con `_LIMPIO` y no con
-`_BASE`, o sea solo color, transiciones y texto — sin polvo, rayaduras, grano
-ni viñeta. Es una decisión del operador sobre esas dos versiones en concreto,
-no un descuido.
+- **A "Clásico"**: línea completa blanca, borde negro, centrada.
+- **B "Reveal"**: UNA palabra en pantalla cada vez, cambiando de molde
+  tipográfico (`_STACK_MOLDES`).
+- **C "Karaoke"**: palabra a palabra, la activa en blanco y el resto en negro.
+- **A2 / B2 / C2**: los mismos tres, con la MISMA tipografía y el mismo
+  movimiento, pero con el acabado LIMPIO (`_LIMPIO`): sin polvo de celuloide,
+  sin rayaduras, sin grano y sin viñeta, y con el color más claro y saturado.
+
+Hubo otros cuatro que se retiraron el 6 ago 2026 porque no viralizaban: D
+"Serif apilado", E "Cascada" y los dos del marco cuadrado, G y H. De los
+cuadrados sobrevive lo bueno que tenían — su filtro claro es el de A2/B2/C2.
+Sus `build_ass` se conservan más abajo (no estorban y volver a darles de alta
+es una línea en el registro).
 
 Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
 `build_ass` y mete su clave en `STYLE_ORDER` — no hay más sitios que tocar
@@ -704,10 +697,12 @@ _BASE = dict(
     vignette_breathe=0.14,
 )
 
-# Base de los estilos CUADRADOS (G y H). El operador los quiere LIMPIOS: solo
-# el filtro de color, las transiciones y los textos. Nada de efectos por
-# pantalla — fuera el polvo de celuloide, las rayaduras, el grano y la viñeta,
-# que son justo lo que ensucia el recuadro.
+# Base de las versiones LIMPIAS (A2, B2, C2): solo el filtro de color, las
+# transiciones y los textos. Nada de efectos por pantalla — fuera el polvo de
+# celuloide, las rayaduras, el grano y la viñeta.
+#
+# Nació para los cuadrados G y H; cuando se retiraron (no viralizaban), su
+# filtro se quedó, que era lo bueno que tenían.
 #
 # El color sube pero se queda REALISTA: se deja el contraste base (1.14, que
 # `_BASE` bajaba a 1.06) y se sube la saturación un 12% con `saturation_mul`,
@@ -732,6 +727,7 @@ _LIMPIO = dict(
 )
 
 STYLE_PRESETS: dict[str, StylePreset] = {
+    # --- Los tres de siempre, con la suciedad de celuloide ---
     "classic": StylePreset(
         key="classic", label="A · Clásico", build_ass=build_ass_classic, **_BASE,
     ),
@@ -739,38 +735,33 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         key="reveal", label="B · Reveal", build_ass=build_ass_reveal, **_BASE,
     ),
     "cinematic": StylePreset(
-        key="cinematic", label="C · Karaoke", build_ass=build_ass_cinematic,
-        **_BASE,
+        key="cinematic", label="C · Karaoke", build_ass=build_ass_cinematic, **_BASE,
     ),
-    "pelicula": StylePreset(
-        key="pelicula", label="D · Serif apilado", build_ass=build_ass_pelicula,
-        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
-        **_BASE,
+    # --- Los mismos tres, LIMPIOS ---
+    # Misma tipografía y mismo movimiento de subtítulo que su original: lo
+    # único que cambia es el filtro. Sin polvo, sin rayaduras, sin grano y sin
+    # viñeta, y con el color claro y saturado que el operador validó en los
+    # cuadrados. A pantalla completa: el marco cuadrado era de G/H, que se
+    # retiraron.
+    "classic_claro": StylePreset(
+        key="classic_claro", label="A2 · Clásico claro",
+        build_ass=build_ass_classic, **_LIMPIO,
     ),
-    "noir": StylePreset(
-        key="noir", label="E · Cascada", build_ass=build_ass_cascade, **_BASE,
+    "reveal_claro": StylePreset(
+        key="reveal_claro", label="B2 · Reveal claro",
+        build_ass=build_ass_reveal, **_LIMPIO,
     ),
-    # G y H mantienen el MARCO CUADRADO: sus subtítulos están medidos para él
-    # (`config.HIGHLIGHT_MARGIN_V` coloca el texto contando con el recuadro),
-    # así que quitarlo no sería "mismo filtro", sería romperlos.
-    # Van con `_LIMPIO`, no con `_BASE`: son los únicos SIN suciedad de
-    # celuloide, a propósito.
-    "cuadrado": StylePreset(
-        key="cuadrado", label="G · Cuadrado", build_ass=build_ass_stacked,
-        square_frame=True, **_LIMPIO,
-    ),
-    "highlight": StylePreset(
-        key="highlight", label="H · Resaltado", build_ass=build_ass_highlight,
-        square_frame=True,
-        font_name="Montserrat ExtraBold", fonts_dir=bundled_fonts_dir(),
-        **_LIMPIO,
+    "cinematic_claro": StylePreset(
+        key="cinematic_claro", label="C2 · Karaoke claro",
+        build_ass=build_ass_cinematic, **_LIMPIO,
     ),
 }
 
+
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
 STYLE_ORDER = [
-    "classic", "reveal", "cinematic", "pelicula", "noir",
-    "cuadrado", "highlight",
+    "classic", "reveal", "cinematic",
+    "classic_claro", "reveal_claro", "cinematic_claro",
 ]
 
 

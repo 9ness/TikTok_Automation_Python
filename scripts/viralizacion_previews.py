@@ -128,10 +128,14 @@ def main() -> None:
     pedidos = sys.argv[1:] or list(styles.STYLE_ORDER)
     WORK.mkdir(parents=True, exist_ok=True)
 
-    # Vía `scan_hook_candidates` y NO leyendo el JSON a pelo: es quien
-    # resuelve la ruta del gancho pre-cortado (`clip`). Leyendo el fichero
-    # salía sin ella y el render moría con `-i None`, porque los vídeos de
-    # gancho originales ya no están en disco (se subieron a Drive).
+    # La ruta del gancho pre-cortado (`clip`) sale de la CACHÉ en disco, no
+    # de este escaneo: `scan_hook_candidates` solo la devuelve si la caché ya
+    # existe (si tiene que re-escanear, el resultado NO trae `clip` y el render
+    # muere con `-i None`, porque los vídeos de gancho originales ya no están
+    # en disco — se subieron a Drive).
+    #
+    # O sea que este script NECESITA el `work_root` real. Pasarle un
+    # `API_TEMP_ROOT` distinto lo manda a una caché vacía y falla así.
     # Tampoco se usa `allocator.allocate_hook`: eso marcaría el gancho como
     # gastado, y una muestra no debe consumir del banco.
     hook = allocator.scan_hook_candidates(PONENTE)[0]

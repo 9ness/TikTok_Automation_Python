@@ -215,6 +215,14 @@ def run_batch(
     staging_root.mkdir(parents=True, exist_ok=True)
 
     music_path = config.musica_file()
+    # Normalizada a un nivel fijo: `MUSIC_VOLUME` era un multiplicador sobre lo
+    # que trajera el mp3, así que el resultado dependía de cómo estuviera
+    # masterizada la canción. Normalizando primero, el ajuste significa siempre
+    # "cuánto por debajo de la voz" y cambiar de canción no descoloca la mezcla.
+    if music_path is not None:
+        from src.viralizacion.services import musica as musica_svc
+
+        music_path = musica_svc.preparar(music_path, on_log=on_log)
 
     total_videos = sum(max(0, cantidad.get(p, 0)) for p in ponentes)
     done = 0

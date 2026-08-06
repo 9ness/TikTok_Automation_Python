@@ -437,7 +437,12 @@ TRANSITION_HOOK = ("fadeblack", 0.9)
 TRANSITION_LANDSCAPE = ("fadeblack", 1.05)
 
 VOICE_VOLUME = 1.0
-MUSIC_VOLUME = 0.75
+# Sobre la música YA NORMALIZADA a -24 LUFS (`services/musica.py`), no sobre el
+# fichero crudo. Medido aislando la música por resta: 1.5 la deja 4 dB por
+# debajo de la voz, que es el nivel que eligió el operador escuchando muestras
+# ("se escucha más"). Con 1.0 quedaría a -7 dB y con 0.75 a -10, que era lo de
+# antes y le sonaba flojo.
+MUSIC_VOLUME = 1.5
 MUSIC_FADEOUT_DUR = 0.5
 
 EQ_BASE_CONTRAST = 1.14
