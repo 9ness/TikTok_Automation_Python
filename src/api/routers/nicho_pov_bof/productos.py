@@ -535,6 +535,7 @@ def set_producto_estado(
                     titulo=info.titulo or "", tienda=info.tienda or "",
                     clean_photo_id=info.clean_photo_id or "",
                     product_url=info.product_url or "",
+                    nicho=(body.nicho or "").strip(),
                 )
             else:
                 product_repo.desmarcar_vendido(body.source, body.folder, body.producto)
@@ -1018,8 +1019,23 @@ def list_recuperados(
     return RecuperadosResponse(items=items, carpetas=carpetas)
 
 
+@router.get("/vendidos/nichos")
+def list_nichos_venta() -> dict:
+    """Nichos a los que se puede atribuir una venta.
+
+    Se sirven desde el backend y no se hardcodean en la pantalla para que
+    añadir un nicho sea tocar UN sitio.
+    """
+    from src.nicho_pov_bof.repos.product_repo import NICHOS_VENTA
+
+    return {"items": [{"key": k, "label": v} for k, v in NICHOS_VENTA.items()]}
+
+
 @router.get("/vendidos", response_model=SoldProductsResponse)
-def list_sold(source: Annotated[str | None, Query()] = None) -> SoldProductsResponse:
+def list_sold(
+    source: Annotated[str | None, Query()] = None,
+    nicho: Annotated[str | None, Query()] = None,
+) -> SoldProductsResponse:
     """Ranking de vendidos, del que más unidades al que menos.
 
     Sale del índice propio (dos llamadas a Redis). Antes se recorrían las 31
@@ -1028,7 +1044,8 @@ def list_sold(source: Annotated[str | None, Query()] = None) -> SoldProductsResp
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    items = product_repo.ranking_vendidos()
+    # Sin `nicho` salen TODOS mezclados, que es la vista por defecto.
+    items = product_repo.ranking_vendidos(nicho or "")
     if source:
         items = [i for i in items if i.get("source") == source]
     return SoldProductsResponse(items=items)

@@ -555,12 +555,20 @@ def _xfade_por_tandas(
     transitions: list[tuple[str, float]],
     out_path: Path,
     on_log: OnLog | None,
+    nivel: int = 0,
 ) -> Path:
     """Monta los tramos en grupos y luego encadena los grupos.
 
     `transitions[i]` es la transición ENTRE el tramo i y el i+1, así que las
     de dentro de un grupo se usan al montarlo y la que cae en su frontera se
     guarda para unir ese grupo con el siguiente.
+
+    `nivel` va en el NOMBRE de los parciales y no es cosmético. Cuando salen
+    más grupos que `XFADE_MAX_INPUTS`, los parciales se vuelven a agrupar; sin
+    el nivel, esa segunda vuelta generaba los MISMOS nombres (`xfade_t00`…) y
+    el grupo 0 acababa escribiendo sobre su propia entrada → ffmpeg 234 y el
+    vídeo perdido. Pasaba a partir de 50 tramos, o sea solo en los vídeos
+    largos: 22 de 23 salían bien y el largo moría.
     """
     # Reparto PAREJO en `n_grupos` trozos, no "de `tam` en `tam`": cortando a
     # tamaño fijo, 8 tramos daban un grupo de 7 y otro de 1, y pegar el suelto
@@ -586,8 +594,11 @@ def _xfade_por_tandas(
 
     for idx, (ini, fin) in enumerate(grupos):
         sub_trans = transitions[ini:fin - 1]
-        parcial = out_path.with_name(f"{out_path.stem}_t{idx:02d}.mp4")
-        _xfade_clips(clip_paths[ini:fin], specs[ini:fin], sub_trans, parcial, on_log)
+        parcial = out_path.with_name(f"{out_path.stem}_n{nivel}t{idx:02d}.mp4")
+        _xfade_clips(
+            clip_paths[ini:fin], specs[ini:fin], sub_trans, parcial, on_log,
+            nivel=nivel + 1,
+        )
         # Duración del grupo: lo que suman sus tramos menos el solape de sus
         # transiciones internas (es lo que `xfade_offsets` necesita luego).
         dur = sum(sp.extract_dur for sp in specs[ini:fin]) - sum(t[1] for t in sub_trans)
@@ -599,7 +610,9 @@ def _xfade_por_tandas(
         if fin < len(clip_paths):
             trans_entre.append(transitions[fin - 1])
 
-    return _xfade_clips(parciales, specs_parciales, trans_entre, out_path, on_log)
+    return _xfade_clips(
+        parciales, specs_parciales, trans_entre, out_path, on_log, nivel=nivel + 1,
+    )
 
 
 def _xfade_clips(
@@ -608,6 +621,7 @@ def _xfade_clips(
     transitions: list[tuple[str, float]],
     out_path: Path,
     on_log: OnLog | None,
+    nivel: int = 0,
 ) -> Path:
     """Fase 2: xfade sobre clips YA recortados (pocos MB c/u, sin reabrir el 2.5GB).
 
@@ -622,7 +636,18 @@ def _xfade_clips(
         return out_path
 
     if len(clip_paths) > config.XFADE_MAX_INPUTS:
-        return _xfade_por_tandas(clip_paths, specs, transitions, out_path, on_log)
+        return _xfade_por_tandas(
+            clip_paths, specs, transitions, out_path, on_log, nivel=nivel,
+        )
+
+    # Red de seguridad: ffmpeg NO puede escribir en un fichero que está
+    # leyendo (sale con 234 y se pierde el vídeo). Si alguna vez vuelve a
+    # coincidir un nombre, mejor un error que dice qué pasa que un exit code.
+    if any(Path(p) == Path(out_path) for p in clip_paths):
+        raise RuntimeError(
+            f"xfade: la salida {out_path.name} es también una de sus entradas. "
+            "Es un choque de nombres entre niveles de agrupación."
+        )
 
     input_args: list[str] = []
     for p in clip_paths:

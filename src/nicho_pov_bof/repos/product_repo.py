@@ -513,7 +513,25 @@ def save_hashtags(tags: list[str]) -> list[str]:
 # Así que los vendidos llevan su propio índice, con una copia de lo poco que
 # hace falta para pintarlos. Se escribe al marcar "vendió", que pasa dos veces
 # al día; leerlo son dos llamadas a Redis en vez de sesenta.
+# El índice es UNO SOLO para todos los nichos, a propósito: el operador quiere
+# poder verlo todo junto Y filtrar por nicho, y eso con índices separados
+# obligaría a leer N índices y mezclarlos. Cada venta lleva apuntado de qué
+# nicho salió (`nicho`), y ese dato lo pone él al marcarla — no se adivina,
+# porque el mismo producto se graba con varios nichos y solo él sabe cuál
+# vendió.
 _VENDIDOS_INDEX = "vendidos:index"
+
+# Nichos que pueden atribuirse una venta. La clave es lo que se guarda; la
+# etiqueta, lo que se enseña.
+NICHOS_VENTA: dict[str, str] = {
+    "pov_bof": "POV BOF",
+    "pov_bof_largo": "POV BOF Largo",
+    "bof_cine": "BOF Cinematográfico",
+    "ropa": "Ropa",
+    "ropa_personas": "Ropa Con Personas",
+    "gorras": "Gorras",
+    "otro": "Otro",
+}
 
 
 def _ref_vendido(source: str, folder: str, producto: str) -> str:
@@ -527,9 +545,15 @@ def _key_vendido(ref: str) -> str:
 def marcar_vendido(
     source: str, folder: str, producto: str,
     *, titulo: str = "", tienda: str = "", clean_photo_id: str = "",
-    product_url: str = "", unidades: int = 1,
+    product_url: str = "", unidades: int = 1, nicho: str = "",
 ) -> dict:
-    """Entra (o actualiza) en el ranking de vendidos."""
+    """Entra (o actualiza) en el ranking de vendidos.
+
+    `nicho` lo elige el operador: el mismo producto se graba con varios nichos
+    y solo él sabe con cuál vendió. Si no llega, se conserva el que ya tuviera
+    y si no había ninguno queda vacío (= "sin atribuir"), que en el ranking se
+    ve igual pero no cuenta para ningún nicho.
+    """
     r = _require_redis()
     ref = _ref_vendido(source, folder, producto)
     doc = r.get_json(_key_vendido(ref)) or {}
@@ -539,6 +563,7 @@ def marcar_vendido(
         "tienda": tienda or doc.get("tienda", ""),
         "clean_photo_id": clean_photo_id or doc.get("clean_photo_id", ""),
         "product_url": product_url or doc.get("product_url", ""),
+        "nicho": (nicho or doc.get("nicho") or "").strip(),
         "unidades": max(1, int(doc.get("unidades") or 0) or unidades),
         "vendido_at": doc.get("vendido_at") or time.time(),
         "updated_at": time.time(),
@@ -573,8 +598,12 @@ def sumar_unidades(source: str, folder: str, producto: str, delta: int) -> dict:
     return doc
 
 
-def ranking_vendidos() -> list[dict]:
-    """Vendidos de más a menos unidades. Dos llamadas a Redis."""
+def ranking_vendidos(nicho: str = "") -> list[dict]:
+    """Vendidos de más a menos unidades. Dos llamadas a Redis.
+
+    `nicho` vacío = TODOS mezclados, que es la vista por defecto. Con nicho se
+    filtra a las ventas atribuidas a ese.
+    """
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return []
@@ -583,6 +612,8 @@ def ranking_vendidos() -> list[dict]:
         return []
     docs = r.mget_json([_key_vendido(ref) for ref in refs])
     salida = [d for d in docs if isinstance(d, dict)]
+    if nicho:
+        salida = [d for d in salida if (d.get("nicho") or "") == nicho]
     salida.sort(
         key=lambda d: (int(d.get("unidades") or 1), d.get("vendido_at") or 0),
         reverse=True,

@@ -186,6 +186,9 @@ class ProductoEstadoRequest(BaseModel):
     en_escaparate: bool | None = None
     uploaded: bool | None = None
     sold: bool | None = None
+    # A qué nicho se le apunta la venta. Lo elige el operador: el mismo
+    # producto se graba con varios nichos y solo él sabe con cuál vendió.
+    nicho: str = ""
 
 
 class ProductoBuscado(BaseModel):
