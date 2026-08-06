@@ -289,6 +289,13 @@ Dos cosas no obvias:
   veces). El identificador canónico de una foto es su **file ID**, y se
   descarga con `rclone backend copyid`.
 
+Tiene una TERCERA fuente, «Mis productos», que NO es del curso: la sube el
+operador (foto limpia + ficha) y vive en su Drive
+(`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos/`), en carpetas de 10. Las
+fotos se guardan con el MISMO convenio de nombres del Drive compartido
+(`3.png` / `3(1).png`) para que emparejado, textos, ficha y montaje funcionen
+sin código especial (`services/mis_productos.py`).
+
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
 Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
 

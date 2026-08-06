@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  useCrearMiProducto,
   nichoPovBofKeys,
   buildCleanPhotoDownloadUrl,
   buildVideoUrl,
@@ -325,6 +326,9 @@ export default function NichoPovBofPage() {
             </button>
           ))}
         </div>
+
+        {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
+        {source === "mis_productos" && <AltaMiProducto />}
 
         {/* Va aquí, con las fuentes, porque se entra igual que a una: es un
             sitio del que sacar productos, no un informe. TEMPORAL. */}
@@ -852,6 +856,91 @@ export default function NichoPovBofPage() {
  *
  *  Lo importante es poder sumar unidades: un producto que REPITE venta vale
  *  mucho más que uno que vendió una vez, y no había forma de anotarlo. */
+/** Alta de productos PROPIOS. Solo sale en la fuente "Mis productos".
+ *
+ *  Las otras dos fuentes son carpetas del Drive del curso, de solo lectura;
+ *  esta es la del operador. Sube la foto limpia y la captura de la ficha y el
+ *  backend las guarda con el MISMO convenio de nombres del curso, así que a
+ *  partir de ahí el producto se comporta igual que cualquier otro: textos,
+ *  caption, gancho, CTA, escaparate, vendidos y montaje del vídeo.
+ */
+function AltaMiProducto() {
+  const crear = useCrearMiProducto();
+  const [limpia, setLimpia] = useState<File | null>(null);
+  const [ficha, setFicha] = useState<File | null>(null);
+  const refLimpia = useRef<HTMLInputElement>(null);
+  const refFicha = useRef<HTMLInputElement>(null);
+
+  function enviar() {
+    if (!limpia) {
+      toast.error("Falta la foto del producto.");
+      return;
+    }
+    crear.mutate(
+      { fotoLimpia: limpia, fotoFicha: ficha },
+      {
+        onSuccess: (r) => {
+          toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
+          setLimpia(null);
+          setFicha(null);
+          if (refLimpia.current) refLimpia.current.value = "";
+          if (refFicha.current) refFicha.current.value = "";
+        },
+        onError: (e) =>
+          toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  const campo = (
+    ref: React.RefObject<HTMLInputElement>,
+    titulo: string,
+    ayuda: string,
+    archivo: File | null,
+    set: (f: File | null) => void,
+  ) => (
+    <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-emerald-500/60">
+      <span className="text-[11px] font-semibold">{titulo}</span>
+      <span className="text-[10px] text-muted-foreground">{ayuda}</span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        onChange={(e) => set(e.target.files?.[0] ?? null)}
+        className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
+      />
+      {archivo && (
+        <span className="truncate text-[10px] text-emerald-500">
+          ✓ {archivo.name}
+        </span>
+      )}
+    </label>
+  );
+
+  return (
+    <section className="space-y-2 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3">
+      <p className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
+        {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
+      </div>
+      <button
+        type="button"
+        disabled={crear.isPending || !limpia}
+        onClick={enviar}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+      >
+        {crear.isPending ? "Subiendo…" : "Añadir producto"}
+      </button>
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Las carpetas se llenan de 10 en 10: al llegar al 11 se abre la siguiente
+        sola. Después se usa igual que un producto del curso — textos, caption,
+        voz y vídeo.
+      </p>
+    </section>
+  );
+}
+
 function VendidosModal({ source, onClose }: { source: string; onClose: () => void }) {
   const vendidos = useVendidos(source);
   const sumar = useSumarUnidades();

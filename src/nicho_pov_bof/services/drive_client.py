@@ -194,6 +194,13 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
 
     Devuelve [{"name": "1 Pront Flow", "id": "..."}].
     """
+    # Fuente propia: las carpetas son del Drive MONTADO, no del compartido, y
+    # se leen del disco. Sin caché: son cuatro entradas y cambian al subir.
+    if config.es_fuente_propia(source):
+        from src.nicho_pov_bof.services import mis_productos
+
+        return mis_productos.listar_carpetas_como_drive()
+
     base = config.source_path(source)  # valida el slug
 
     def cargar() -> list[dict]:
@@ -225,6 +232,11 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     Devuelve [{"id","name","size","mime"}]. El `id` es el identificador
     canónico (hay nombres duplicados).
     """
+    if config.es_fuente_propia(source):
+        from src.nicho_pov_bof.services import mis_productos
+
+        return mis_productos.listar_fotos_como_drive(folder)
+
     base = config.source_path(source)
     _assert_known_folder(source, folder)
 
@@ -282,6 +294,15 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     Se cachea en disco bajo `API_TEMP_ROOT` — la misma foto no se re-descarga
     en cada scroll de la UI.
     """
+    # Las fotos propias llevan la RUTA como id (no hay ID de Google). Se
+    # detectan porque empiezan por "/" — un ID de Drive nunca lo hace.
+    if str(file_id).startswith("/"):
+        from src.nicho_pov_bof.services import mis_productos
+
+        cache_dir = Path(config.photo_cache_dir())
+        nombre = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(file_id))
+        return mis_productos.copiar_a(cache_dir / nombre, file_id)
+
     if not _FILE_ID_RE.match(file_id or ""):
         raise ValueError(f"file_id inválido: {file_id!r}")
 

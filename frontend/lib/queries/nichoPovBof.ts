@@ -137,6 +137,38 @@ export function useBackupSync() {
 }
 
 /** URL de la foto (api_key por query — un <img> no manda headers). */
+/** Alta de un producto PROPIO: se suben las dos fotos y el backend las guarda
+ *  con el convenio de nombres del Drive del curso, así que a partir de ahí es
+ *  un producto más. Devuelve en qué carpeta cayó (se llenan de 10 en 10). */
+export function useCrearMiProducto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { source: string; carpeta: string; producto: string },
+    Error,
+    { fotoLimpia: File; fotoFicha?: File | null }
+  >({
+    mutationFn: async ({ fotoLimpia, fotoFicha }) => {
+      const fd = new FormData();
+      fd.append("foto_limpia", fotoLimpia);
+      if (fotoFicha) fd.append("foto_ficha", fotoFicha);
+      return api.post(`${ROOT}/mis-productos`, fd);
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
+export function useBorrarMiProducto() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, { carpeta: string; producto: string }>({
+    mutationFn: ({ carpeta, producto }) =>
+      api.del(
+        `${ROOT}/mis-productos?carpeta=${encodeURIComponent(carpeta)}` +
+          `&producto=${encodeURIComponent(producto)}`,
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 export function buildPhotoUrl(source: string, folder: string, fileId: string): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;

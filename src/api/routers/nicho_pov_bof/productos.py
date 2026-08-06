@@ -496,6 +496,70 @@ async def upload_video(
     return VideoUploadResponse(ok=True, job_id=job.id, message="En la cola, procesando…")
 
 
+@router.post("/mis-productos")
+async def crear_mi_producto(
+    foto_limpia: Annotated[UploadFile, File()],
+    foto_ficha: Annotated[UploadFile | None, File()] = None,
+) -> dict:
+    """Alta de un producto PROPIO subiendo sus dos fotos.
+
+    A partir de aquí se comporta igual que uno del curso: las fotos se guardan
+    con el mismo convenio de nombres (`3.png` / `3(1).png`), así que el
+    emparejado, los textos, la ficha y el montaje funcionan sin nada especial.
+
+    Las carpetas se llenan de diez en diez; al pasar el tope se abre la
+    siguiente sola.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    async def _leer(archivo: UploadFile, que: str) -> bytes:
+        if not archivo:
+            return b""
+        nombre = (archivo.filename or "").lower()
+        if not any(nombre.endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp")):
+            raise _bad_request(
+                f"{que} tiene un formato no soportado ({archivo.filename!r}). "
+                "Acepta jpg, jpeg, png o webp."
+            )
+        datos = await archivo.read()
+        if not datos:
+            raise _bad_request(f"{que} llegó vacía.")
+        if len(datos) > 12 * 1024 * 1024:
+            raise _bad_request(
+                f"{que} pesa {len(datos) / 1e6:.0f} MB; el tope son 12 MB."
+            )
+        return datos
+
+    limpia = await _leer(foto_limpia, "La foto del producto")
+    ficha = await _leer(foto_ficha, "La captura de la ficha") if foto_ficha else b""
+
+    try:
+        creado = mis_productos.guardar_producto(
+            limpia, ficha or None,
+            nombre_limpia=foto_limpia.filename or "",
+            nombre_ficha=(foto_ficha.filename or "") if foto_ficha else "",
+        )
+    except OSError as e:
+        raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
+
+    return {"source": "mis_productos", **creado}
+
+
+@router.delete("/mis-productos")
+def borrar_mi_producto(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+) -> dict:
+    """Quita las fotos de un producto propio. Solo vale para `mis_productos`."""
+    from src.nicho_pov_bof.services import mis_productos
+
+    if not mis_productos.borrar_producto(carpeta, producto):
+        raise APIError(
+            f"No existe el producto {producto} en {carpeta}.", status_code=404,
+        )
+    return {"ok": True}
+
+
 @router.post("/producto/estado", response_model=ProductoInfo)
 def set_producto_estado(
     body: ProductoEstadoRequest,

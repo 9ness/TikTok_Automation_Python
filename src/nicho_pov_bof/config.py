@@ -20,6 +20,7 @@ Decisiones:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import re
 import shutil
 
@@ -46,7 +47,44 @@ SOURCES: dict[str, dict[str, str]] = {
         "label": "2 Prod Aleatorios 2",
         "folder": "2 Prod Aleatorios 2",
     },
+    # Los productos que sube el OPERADOR, no los del Drive del curso. Viven en
+    # SU Drive (el montado), no en el compartido, así que se leen del mount y
+    # no por rclone: `propia` es lo que activa esa rama en `drive_client`.
+    #
+    # Las fotos se guardan con el MISMO convenio de nombres que el Drive
+    # compartido (`3.png` = limpia, `3(1).png` = ficha). Gracias a eso, todo lo
+    # de después —emparejado, textos, ficha, escaparate, vendidos, montaje—
+    # funciona sin una sola línea extra.
+    "mis_productos": {
+        "label": "Mis productos",
+        "folder": "mis_productos",
+        "propia": "1",
+    },
 }
+
+# Cuántos productos entran en cada carpeta de "Mis productos". Diez, como las
+# del curso: pasada de ahí se abre la siguiente, para no acabar con una carpeta
+# de 200 imposible de mirar.
+MIS_PRODUCTOS_POR_CARPETA = 10
+MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
+
+
+def es_fuente_propia(source: str) -> bool:
+    """True si la fuente son productos subidos por el operador (no del curso)."""
+    return bool((SOURCES.get(source) or {}).get("propia"))
+
+
+def mis_productos_dir() -> Path:
+    """Raíz de "Mis productos" en el Drive MONTADO (no el compartido)."""
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / MIS_PRODUCTOS_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "mis_productos"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino
 
 
 def source_path(source: str) -> str:
