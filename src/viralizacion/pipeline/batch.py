@@ -187,6 +187,12 @@ def run_batch(
     cantidad: dict[str, int],
     nombre_cuenta: str,
     music_rounds: int = config.DEFAULT_MUSIC_ROUNDS,
+    # "no" | "mitad" | "todos". Sustituye a `music_rounds`, que contaba RONDAS
+    # y no vídeos: con 1 ronda por audio (lo normal) "1 ronda" daba música a
+    # todos, pero al pedir más vídeos que audios se quedaban sin ella la mitad
+    # y en silencio. `music_rounds` se respeta si no se manda esto, para no
+    # romper los jobs ya encolados.
+    musica: str = "",
     # Estilo elegido por el operador para cada ronda: `round_styles[i]` es la
     # ronda i+1. Lo que no se especifique cae en la rotación automática.
     round_styles: list[str] | None = None,
@@ -317,7 +323,14 @@ def run_batch(
                 key = plan_estilos[idx_video] if idx_video < len(plan_estilos) else None
                 style = styles.STYLE_PRESETS.get(key) or styles.resolve_style(ronda, round_styles)
                 idx_video += 1
-                include_music = ronda <= music_rounds
+                modo_mus = (musica or "").strip().lower()
+                if modo_mus in ("no", "mitad", "todos"):
+                    include_music = (
+                        modo_mus == "todos"
+                        or (modo_mus == "mitad" and idx_video % 2 == 1)
+                    )
+                else:
+                    include_music = ronda <= music_rounds
                 filename = f"{ponente}{ronda}_{audio_idx}.mp4"
                 out_path = ponente_out_dir / filename
 

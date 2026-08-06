@@ -56,6 +56,8 @@ export interface ViralizacionGenerateRequest {
   audios?: Record<string, string[]>;
   /** CTA final hablado: "no" | "todos" | "mitad". Solo aplica a Pablo Motos
    *  — Víctor Küppers ya lo trae dentro de sus propios audios. */
+  /** "no" | "mitad" | "todos" — sustituye a `music_rounds`. */
+  musica?: string;
   cta_final?: string;
 }
 

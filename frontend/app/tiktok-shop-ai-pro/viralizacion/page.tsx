@@ -380,6 +380,15 @@ function CortarAudioLargo({ ponentes }: { ponentes: PonenteInfo[] }) {
   );
 }
 
+/** Valor imposible como nombre de fichero: marca "ninguno elegido todavía".
+ *
+ *  Hace falta porque la lista VACÍA ya significa "todos" (contrato del
+ *  backend, `_audios_de`). Sin este centinela, desmarcar todas las casillas
+ *  daba silenciosamente TODOS los audios — justo lo contrario de lo que ve el
+ *  operador en pantalla. Al enviar se limpia y se exige elegir al menos uno.
+ */
+const AUDIO_NINGUNO = "__ninguno__";
+
 /** Qué audios usar de un ponente. Sin marcar ninguno = todos.
  *
  *  Existe porque los audios LARGOS retienen más: los dos vídeos más vistos
@@ -403,7 +412,9 @@ function AudiosDePonente({
   }
   if (!items.length) return null;
 
-  const marcado = (n: string) => elegidos.length === 0 || elegidos.includes(n);
+  const ninguno = elegidos.length === 1 && elegidos[0] === AUDIO_NINGUNO;
+  const marcado = (n: string) =>
+    !ninguno && (elegidos.length === 0 || elegidos.includes(n));
   const largos = items.filter((a) => a.duracion_s >= 60).map((a) => a.nombre);
   const clips = items.filter((a) => a.origen === "clip");
   const nuevos = clips.map((a) => a.nombre);
@@ -459,7 +470,14 @@ function AudiosDePonente({
             onClick={() => onChange([])}
             className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
           >
-            Todos
+            Todos ({items.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange([AUDIO_NINGUNO])}
+            className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
+          >
+            Ninguno
           </button>
         </div>
       </div>
@@ -475,11 +493,23 @@ function AudiosDePonente({
               onChange={(e) => {
                 // La lista vacía significa "todos": al desmarcar el primero
                 // hay que materializarla, si no se entendería al revés.
-                const base = elegidos.length ? elegidos : items.map((x) => x.nombre);
+                const base = ninguno
+                  ? []
+                  : elegidos.length
+                    ? elegidos
+                    : items.map((x) => x.nombre);
                 const next = e.target.checked
                   ? [...base, a.nombre]
                   : base.filter((n) => n !== a.nombre);
-                onChange(next.length === items.length ? [] : next);
+                // Vacío = "todos" para el backend, así que al quedarse sin
+                // ninguna marcada se pone el centinela, no `[]`.
+                onChange(
+                  next.length === items.length
+                    ? []
+                    : next.length === 0
+                      ? [AUDIO_NINGUNO]
+                      : next,
+                );
               }}
               className="h-3 w-3 shrink-0"
             />
@@ -536,7 +566,10 @@ export default function ViralizacionPage() {
   const [cantidad, setCantidad] = useState<Record<string, number>>({});
   const [nombreCuenta, setNombreCuenta] = useState("");
   // Sin música de fondo salvo que se marque a propósito.
-  const [musicRounds, setMusicRounds] = useState(0);
+  // "no" | "mitad" | "todos", igual que el CTA. Antes era un contador de
+  // RONDAS y "1 ronda" parecía "todos": lo era mientras no pidieras más
+  // vídeos que audios, y a partir de ahí se quedaban sin música la mitad.
+  const [musica, setMusica] = useState<"no" | "mitad" | "todos">("no");
   // CTA final hablado. Solo tiene sentido con Pablo: Víctor ya lo trae dentro
   // de sus audios, así que el selector no se enseña si no está él.
   const [ctaFinal, setCtaFinal] = useState<"no" | "todos" | "mitad">("no");
@@ -582,6 +615,18 @@ export default function ViralizacionPage() {
 
   async function submit() {
     if (!canSubmit) return;
+    // Sin ningún audio marcado no se puede generar: el backend entiende la
+    // lista vacía como "todos" y saldría una tanda que nadie ha pedido.
+    const sinAudios = selectedSlugs.filter((slug) => {
+      const lista = audiosPorPonente[slug] ?? [];
+      return lista.length === 1 && lista[0] === AUDIO_NINGUNO;
+    });
+    if (sinAudios.length) {
+      toast.error(
+        `Marca al menos un audio de ${sinAudios.join(", ")} (o pulsa «Todos»).`,
+      );
+      return;
+    }
     setSuccess(null);
     const body = {
       ponentes: selectedSlugs,
@@ -589,9 +634,10 @@ export default function ViralizacionPage() {
         selectedSlugs.map((slug) => [slug, cantidad[slug] ?? 5]),
       ),
       nombre_cuenta: nombreCuenta.trim(),
-      music_rounds: musicRounds,
+      music_rounds: musica === "no" ? 0 : 1,
       round_styles: roundStyles,
       styles_pool: stylesPool,
+      musica,
       cta_final: ctaFinal,
       audios: Object.fromEntries(
         selectedSlugs
@@ -794,31 +840,34 @@ export default function ViralizacionPage() {
           <span className="mb-1 block text-xs font-medium sm:text-sm">
             Música de fondo
           </span>
-          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 shrink-0 accent-amber-500"
-              checked={musicRounds > 0}
-              onChange={(e) => setMusicRounds(e.target.checked ? 1 : 0)}
-            />
-            <span className="truncate">
-              {musicRounds > 0 ? "Con música" : "Sin música"}
-            </span>
-          </label>
-          {musicRounds > 0 && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                Rondas con música
-              </span>
-              <input
-                type="number"
-                min={1}
-                value={musicRounds}
-                onChange={(e) => setMusicRounds(Math.max(1, Number(e.target.value) || 1))}
-                className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs"
-              />
-            </div>
-          )}
+          {/* Mismo vocabulario que el CTA. Antes era un contador de RONDAS y
+              "1 ronda" parecía "todos": lo era mientras no pidieras más vídeos
+              que audios, y a partir de ahí la mitad salían sin música sin que
+              nada lo dijera. */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {([
+              ["no", "Sin música"],
+              ["mitad", "A la mitad"],
+              ["todos", "A todos"],
+            ] as const).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => setMusica(valor)}
+                className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
+                  musica === valor
+                    ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
+                    : "border-border text-muted-foreground hover:border-foreground/40"
+                }`}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+            «A todos» la pone en todos los vídeos, pidas los que pidas. «A la
+            mitad» alterna vídeo sí, vídeo no, para comparar con y sin.
+          </p>
         </div>
       </section>
 

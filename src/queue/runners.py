@@ -1629,6 +1629,7 @@ def run_viralizacion_batch(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         cantidad=dict(p.get("cantidad") or {}),
         nombre_cuenta=p.get("nombre_cuenta") or "sin_nombre",
         music_rounds=int(p.get("music_rounds", 1)),
+        musica=str(p.get("musica", "")),
         round_styles=list(p.get("round_styles") or []) or None,
         styles_pool=list(p.get("styles_pool") or []) or None,
         audios_elegidos=dict(p.get("audios") or {}) or None,

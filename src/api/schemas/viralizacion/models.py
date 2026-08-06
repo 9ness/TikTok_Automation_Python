@@ -69,6 +69,7 @@ class ViralizacionGenerateRequest(BaseModel):
     # CTA final hablado ("no te olvides de seguirme…"): "no" | "todos" |
     # "mitad". Solo se aplica a Pablo Motos — Víctor Küppers ya lo trae dentro
     # de sus propios audios. Va SIN subtítulos.
+    musica: str = ""
     cta_final: str = "no"
 
 
