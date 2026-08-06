@@ -242,6 +242,13 @@ def run_batch(
         # CTA final hablado. Solo Pablo (Víctor ya lo trae en sus audios) y
         # solo si hay ficheros en su carpeta `cta/`.
         ctas = config.cta_files(ponente) if config.admite_cta(ponente) else []
+        # Nivelada al volumen de la voz: el fichero grabado viene 6 dB por
+        # debajo y colado tal cual "ni se aprecia". Se hace UNA vez por tanda,
+        # no por vídeo (la versión procesada queda cacheada).
+        if ctas:
+            from src.viralizacion.services import cta_audio
+
+            ctas = [cta_audio.preparar(c, on_log=on_log) for c in ctas]
         pedido_cta = (cta_final or "no").strip().lower()
         modo_cta = pedido_cta if ctas else "no"
         # Si se pidió CTA y no hay audios, los vídeos salen SIN coletilla. Antes
