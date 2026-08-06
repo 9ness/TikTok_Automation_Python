@@ -1641,6 +1641,19 @@ function EchoTikPanel() {
 type ToolKey = "gancho" | "titulo" | "cta" | "flecha";
 
 /** Herramientas de edición que se pueden pedir por separado. */
+// Nichos a los que se puede atribuir una venta. Se listan aquí y no se piden
+// al backend porque son seis y no cambian entre renders; el backend tiene la
+// lista buena (`NICHOS_VENTA` en `product_repo`) y valida.
+const NICHOS_VENTA: [string, string][] = [
+  ["pov_bof", "POV BOF"],
+  ["pov_bof_largo", "POV BOF Largo"],
+  ["bof_cine", "BOF Cine"],
+  ["ropa", "Ropa"],
+  ["ropa_personas", "Ropa Personas"],
+  ["gorras", "Gorras"],
+  ["otro", "Otro"],
+];
+
 const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "gancho", label: "🎣 Gancho" },
   { key: "titulo", label: "📝 Texto producto" },
@@ -1674,6 +1687,7 @@ function ProductoCard({
   const urlNoEncontrada = buscarUrl.isSuccess && !producto.product_url;
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
+  const [eligiendoNicho, setEligiendoNicho] = useState(false);
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   // Arranca con la voz que encaja con el producto (mujer en cosmética y
   // pelo, hombre en el resto). El operador la cambia con un clic si falla.
@@ -1707,6 +1721,9 @@ function ProductoCard({
     uploaded?: boolean;
     sold?: boolean;
     en_escaparate?: boolean;
+    // A qué nicho se le apunta la venta. Lo elige el operador: el mismo
+    // producto se graba con varios nichos y solo él sabe con cuál vendió.
+    nicho?: string;
   }) => {
     setEstado.mutate(
       { source, folder, producto: producto.producto, ...patch },
@@ -1726,13 +1743,25 @@ function ProductoCard({
     pushEstado({ uploaded: v });
   };
 
+  // Al ENCENDER se pregunta el nicho; al apagar no hay nada que atribuir.
   const toggleSold = () => {
-    const v = !sold;
-    setSold(v);
+    if (!sold) {
+      setEligiendoNicho(true);
+      return;
+    }
+    setSold(false);
+    pushEstado({ sold: false });
+  };
+
+  const confirmarVenta = (nicho: string) => {
+    setEligiendoNicho(false);
+    setSold(true);
     // Vender implica haberlo subido — mismo criterio que OutcomeBar del
     // calendario: evita el estado imposible "vendió pero no subido".
-    if (v && !uploaded) setUploaded(true);
-    pushEstado(v && !uploaded ? { sold: v, uploaded: true } : { sold: v });
+    if (!uploaded) setUploaded(true);
+    pushEstado(
+      uploaded ? { sold: true, nicho } : { sold: true, uploaded: true, nicho },
+    );
   };
 
   const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -2112,6 +2141,33 @@ function ProductoCard({
           💰 Vendió
         </button>
       </div>
+
+      {/* Al marcar la venta hay que decir de QUÉ nicho salió: el mismo
+          producto se graba con varios y adivinarlo sería inventar el dato. */}
+      {eligiendoNicho && (
+        <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2">
+          <p className="text-[11px] font-semibold">¿Con qué nicho vendió?</p>
+          <div className="grid grid-cols-2 gap-1">
+            {NICHOS_VENTA.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => confirmarVenta(key)}
+                className="truncate rounded border border-border/60 px-2 py-1 text-[10px] transition hover:border-emerald-500 hover:text-emerald-500"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setEligiendoNicho(false)}
+            className="w-full rounded px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

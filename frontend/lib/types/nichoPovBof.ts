@@ -216,6 +216,8 @@ export interface EstadoRequest {
   en_escaparate?: boolean;
   uploaded?: boolean;
   sold?: boolean;
+  /** A qué nicho se le apunta la venta. Solo se manda al marcar "vendió". */
+  nicho?: string;
 }
 
 export interface VideoUploadResponse {
