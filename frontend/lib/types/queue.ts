@@ -24,7 +24,8 @@ export type JobMode =
   | "nicho_ropa_video"
   | "nicho_ropa_personas_video"
   | "nicho_bof_cine_video"
-  | "cuenta_piloto_video";
+  | "cuenta_piloto_video"
+  | "nicho_pov_bof_largo_video";
 
 export interface ActiveJob {
   job_id: string;

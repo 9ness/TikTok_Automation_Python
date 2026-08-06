@@ -38,6 +38,8 @@ class JobMode(str, Enum):
     NICHO_BOF_CINE_VIDEO = "nicho_bof_cine_video"
     # Cuenta Piloto: vídeo orgánico subido + la edición del POV BOF.
     CUENTA_PILOTO_VIDEO = "cuenta_piloto_video"
+    # POV BOF Largo: DOS clips de 10s + guion locutado por IA (Fish).
+    NICHO_POV_BOF_LARGO_VIDEO = "nicho_pov_bof_largo_video"
 
 
 class JobStatus(str, Enum):
@@ -68,6 +70,7 @@ MODE_LABELS = {
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "👗 Vídeo Ropa Con Personas",
     JobMode.NICHO_BOF_CINE_VIDEO: "🎬 Vídeo BOF Cinematográfico",
     JobMode.CUENTA_PILOTO_VIDEO: "🧪 Vídeo Cuenta Piloto",
+    JobMode.NICHO_POV_BOF_LARGO_VIDEO: "🎙️ Vídeo POV BOF Largo",
 }
 
 

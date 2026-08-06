@@ -119,6 +119,7 @@ const NAV: NavGroup[] = [
       // La Cuenta Piloto no es un módulo del curso (no lleva número), así que
       // va suelta aquí y no en `modulos.ts`.
       { href: "/tiktok-shop-ai-pro/cuenta-piloto", label: "Cuenta Piloto", icon: FlaskConical },
+      { href: "/tiktok-shop-ai-pro/pov-bof-largo", label: "POV BOF Largo", icon: Mic },
       // Un item por módulo del curso, en orden de módulo. La lista vive en
       // `lib/tiktok-shop-ai-pro/modulos.ts` para no repetirla en cada página.
       ...MODULOS.map((m) => ({

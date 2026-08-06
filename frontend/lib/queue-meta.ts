@@ -14,6 +14,7 @@ import {
   Crown,
   Film,
   FlaskConical,
+  Mic,
   HardDrive,
   HardHat,
   Package,
@@ -52,6 +53,7 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   nicho_ropa_personas_video: "viralizacion",
   nicho_bof_cine_video: "viralizacion",
   cuenta_piloto_video: "viralizacion",
+  nicho_pov_bof_largo_video: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -89,6 +91,7 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   nicho_ropa_personas_video: "Nicho Ropa Con Personas",
   nicho_bof_cine_video: "Nicho BOF Cinematográfico",
   cuenta_piloto_video: "Cuenta Piloto",
+  nicho_pov_bof_largo_video: "POV BOF Largo",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -112,6 +115,7 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   nicho_ropa_personas_video: Shirt,
   nicho_bof_cine_video: Film,
   cuenta_piloto_video: FlaskConical,
+  nicho_pov_bof_largo_video: Mic,
 };
 
 /**
@@ -217,6 +221,11 @@ export function describeJobParams(
       if (params.sexo) out.push(`voz ${String(params.sexo)}`);
       break;
     case "cuenta_piloto_video":
+      if (params.producto) out.push(`producto ${String(params.producto)}`);
+      if (params.sexo) out.push(`voz ${String(params.sexo)}`);
+      break;
+    case "nicho_pov_bof_largo_video":
+      if (params.folder) out.push(String(params.folder));
       if (params.producto) out.push(`producto ${String(params.producto)}`);
       if (params.sexo) out.push(`voz ${String(params.sexo)}`);
       break;

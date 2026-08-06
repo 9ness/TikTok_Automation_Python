@@ -40,6 +40,7 @@ nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
+| 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; dura ~20s, así que van DOS clips de 10s |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
@@ -324,6 +325,25 @@ vestirla con el producto es UN prompt, no dos.
 Audios locutados (5 voces de mujer, se sortea una):
 `TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer/`.
 
+### Nicho POV BOF Largo (mismo programa)
+
+Módulos en [`src/nicho_pov_bof_largo/`](src/nicho_pov_bof_largo/) (prefijo
+Redis `nicho_pov_bof_largo:`). API: `/api/v1/nicho-pov-bof-largo/*`. Es el POV
+BOF con la voz cambiada: en vez de una frase genérica del banco, un **guion
+escrito para ESE producto** (prompt del curso, literal en `prompts/guion.md`)
+y locutado con **Fish Audio** (`FISH_API_KEY`, modelo gratuito
+`s2.1-pro-free`). Como el guion dura ~20s y no ~11, el vídeo son **DOS clips
+de 10s** pegados; la duración la manda la voz y el vídeo se recorta a ella.
+
+Cosas que ya costaron una vez:
+- El documento del curso pide 260 caracteres "para 15 segundos", pero su propio
+  ejemplo tiene 357 y a 18,2 car/s eso son 20s. **No se recorta**: forzarlo con
+  reintentos deja el guion telegráfico. Solo se avisa.
+- Los textos del producto (título, tienda, caption) se **leen** del Nicho POV
+  BOF, no se re-extraen: costarían las llamadas de Gemini dos veces.
+- La cadena de nivelado del POV BOF (`TP=-1.5`) NO vale para Fish: daba +0,20
+  dBTP. Aquí es `TP=-2.0` con limitador 0.89.
+
 ### Cuenta Piloto (mismo programa, no es un módulo del curso)
 
 Módulos en [`src/cuenta_piloto/`](src/cuenta_piloto/) (prefijo Redis
@@ -406,6 +426,8 @@ PIXABAY_API_KEY=...
 # VIRALIZACION_ASSETS_PATH="/home/nebulabsai/viralizacion_assets"
 # VIRALIZACION_REDIS_PREFIX=viralizacion:   # default
 # CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
+# FISH_API_KEY=sk-fish-...                   # TTS del POV BOF Largo
+# NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
 ```
 
 ---

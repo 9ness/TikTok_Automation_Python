@@ -1887,6 +1887,124 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
 
 
 # ============================================================
+# RUNNER: NICHO POV BOF LARGO — GUION LOCUTADO + DOS CLIPS
+# ============================================================
+def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo de UN producto: guion escrito por IA, locutado y sobre
+    DOS clips de 10s pegados.
+
+    Es el Nicho POV BOF con la voz cambiada: en vez de una frase genérica del
+    banco, un guion que habla de ESE producto. Como dura más (~20s), hacen
+    falta dos clips; y como la voz manda, el vídeo se recorta a su duración.
+
+    Params: source, folder, producto, clip1_path, clip2_path, sexo, operator,
+    con_gancho/titulo/cta/flecha.
+    """
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.pipeline import video_editor
+    from src.nicho_pov_bof_largo.repos import product_repo
+    from src.nicho_pov_bof_largo.services import guionista, voz as voz_svc
+
+    p = job.params
+    source, folder = str(p["source"]), str(p["folder"])
+    producto = str(p["producto"])
+    operator = str(p.get("operator") or job.enqueued_by or "")
+    clips = [Path(p["clip1_path"]), Path(p["clip2_path"])]
+    for c in clips:
+        if not c.is_file():
+            raise FileNotFoundError(f"No está el clip subido: {c}")
+    sexo = (p.get("sexo") or "hombre").strip().lower()
+
+    on_progress(0.03, "📝 Leyendo textos del producto…")
+    textos = product_repo.textos_producto(source, folder, producto, operator)
+    if not textos.get("titulo"):
+        on_log(
+            "[pov_bof_largo] este producto no tiene textos extraídos — el guion "
+            "saldrá genérico. Pásale antes 'Obtener textos' en el POV BOF."
+        )
+
+    # El guion se guarda: si el operador remonta el mismo producto, se
+    # reutiliza en vez de gastar otra llamada a Gemini y salir distinto.
+    guardado = product_repo.get_product(source, folder, producto, operator)
+    escrito = {k: guardado.get(k) for k in ("guion", "subliminal", "nombre_guion")}
+    if not escrito.get("guion"):
+        on_progress(0.10, "✍️ Escribiendo el guion…")
+        foto = None
+        try:
+            from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+            fotos = [
+                drive_client.probe_dimensions(f)
+                for f in drive_client.list_photos(source, folder)
+            ]
+            par = next(
+                (x for x in photo_pairing.pair_folder(fotos)
+                 if str(x.get("producto")) == producto), None,
+            )
+            limpia = (par or {}).get("clean") or {}
+            if limpia.get("id"):
+                foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+        except Exception as e:
+            on_log(f"[pov_bof_largo] sin foto para el guion ({e}) — solo texto")
+        escrito = guionista.escribir(
+            titulo=textos.get("titulo", ""),
+            tienda=textos.get("tienda", ""),
+            caption=textos.get("caption", ""),
+            foto=foto,
+            on_log=on_log,
+        )
+        product_repo.update_product(
+            source, folder, producto, usuario=operator,
+            guion=escrito["guion"], subliminal=escrito["subliminal"],
+            nombre_guion=escrito["nombre"],
+        )
+    else:
+        on_log("[pov_bof_largo] reutilizando el guion ya escrito")
+    on_log(f"[pov_bof_largo] guion ({len(escrito['guion'])} car.): {escrito['guion']}")
+
+    on_progress(0.22, f"🔊 Locutando ({sexo})…")
+    work = Path(tempfile.mkdtemp(prefix=f"pov_largo_{producto}_"))
+    try:
+        audio = work / "voz.mp3"
+        info = voz_svc.sintetizar(
+            escrito["guion"], audio, sexo=sexo, on_log=on_log,
+        )
+
+        salida = Path(largo_config.video_dir()) / source / folder / f"{producto}.mp4"
+        salida.parent.mkdir(parents=True, exist_ok=True)
+
+        def _progreso(pct: float, label: str) -> None:
+            on_progress(0.30 + pct * 0.62, label)
+
+        video_editor.montar(
+            clips=clips,
+            audio_path=audio,
+            textos=textos,
+            output_path=salida,
+            work_dir=work,
+            producto=producto,
+            semilla=f"{source}/{folder}/{producto}",
+            con_gancho=bool(p.get("con_gancho", True)),
+            con_titulo=bool(p.get("con_titulo", True)),
+            con_cta=bool(p.get("con_cta", True)),
+            con_flecha=bool(p.get("con_flecha", True)),
+            on_log=on_log,
+            on_progress=_progreso,
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.update_product(
+        source, folder, producto, usuario=operator,
+        video_path=str(salida), video_listo_at=int(time.time()), uploaded=True,
+        voz_label=info["voz_label"], voz_sexo=sexo,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
+# ============================================================
 # RUNNER: CUENTA PILOTO — MONTAJE DEL VÍDEO ORGÁNICO
 # ============================================================
 def run_cuenta_piloto_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2515,6 +2633,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
     JobMode.NICHO_BOF_CINE_VIDEO: run_nicho_bof_cine_video,
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
+    JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
 }
 
 
@@ -2539,6 +2658,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",
     JobMode.NICHO_BOF_CINE_VIDEO: "viralizacion",
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
+    JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
 }
 
 
