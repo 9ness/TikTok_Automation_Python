@@ -71,11 +71,25 @@ def _rounds_per_audio(total: int, duraciones: list[float]) -> list[int]:
     return out
 
 
+def _segundos_de_cta(ponente: str, cta_final: str) -> float:
+    """Lo que alarga la coletilla, 0 si este ponente no lleva o no se pidió."""
+    if (cta_final or "no").strip().lower() == "no":
+        return 0.0
+    if not config.admite_cta(ponente):
+        return 0.0
+    ctas = config.cta_files(ponente)
+    return max((ffprobe_duration(c) for c in ctas), default=0.0)
+
+
 def preflight_check(
     ponentes: list[str],
     cantidad: dict[str, int],
     audios_elegidos: dict[str, list[str]] | None = None,
+    cta_final: str = "no",
 ) -> list[str]:
+    """`cta_final` importa: la coletilla alarga cada vídeo ~7s y por tanto
+    pide MÁS paisaje. Sin contarlo, el preflight decía que había pool de sobra
+    y el render abortaba después por falta de clips."""
     errors: list[str] = []
     for ponente in ponentes:
         if not config.is_known_ponente(ponente):
@@ -110,6 +124,7 @@ def preflight_check(
             )
         duraciones = [ffprobe_duration(a) for a in audios]
         rounds = _rounds_per_audio(total, duraciones)
+        dur_cta = _segundos_de_cta(ponente, cta_final)
         needed_paisajes = 0
         for audio_path, n_rounds, full_dur in zip(audios, rounds, duraciones):
             if n_rounds <= 0:
@@ -117,7 +132,7 @@ def preflight_check(
             # Estimar con la ventana más larga posible por ronda (tope MAX).
             for ronda in range(1, n_rounds + 1):
                 _start, win_dur = config.audio_window_for_round(full_dur, ronda)
-                fill = max(0.0, win_dur - config.HOOK_DUR)
+                _total, fill = reparto_con_cta(win_dur, dur_cta)
                 needed_paisajes += build_paisaje_segments(fill)
         if clip_library.is_available(config.pais_de(ponente)):
             # Con biblioteca no hay déficit posible salvo que un solo vídeo
@@ -125,9 +140,9 @@ def preflight_check(
             # abre un ciclo nuevo con ventanas y zooms distintos.
             total_clips = clip_library.clip_count(config.pais_de(ponente))
             max_por_video = max(
-                (build_paisaje_segments(
-                    max(0.0, config.audio_window_for_round(
-                        ffprobe_duration(a), r)[1] - config.HOOK_DUR))
+                (build_paisaje_segments(reparto_con_cta(
+                    config.audio_window_for_round(ffprobe_duration(a), r)[1],
+                    dur_cta)[1])
                  for a, nr in zip(audios, rounds) if nr > 0
                  for r in range(1, nr + 1)),
                 default=0,
@@ -153,6 +168,19 @@ def preflight_check(
     return errors
 
 
+def reparto_con_cta(win_dur: float, dur_cta: float) -> tuple[float, float]:
+    """`(duración del vídeo, segundos de paisaje)` contando el CTA.
+
+    El CTA suena DESPUÉS de la voz, así que alarga el vídeo y hace falta MÁS
+    paisaje para taparlo. Está aquí fuera, y no en línea, porque olvidarse de
+    sumarlo fue un bug real: el reparto se hacía con la ventana de voz sola y
+    el render abortaba con "los 13 clips dan 36,3s pero hacen falta 43,1s" —
+    justo los ~7s del CTA.
+    """
+    total = float(win_dur) + max(0.0, float(dur_cta))
+    return total, max(0.0, total - config.HOOK_DUR)
+
+
 def run_batch(
     *,
     ponentes: list[str],
@@ -175,7 +203,7 @@ def run_batch(
     on_log: OnLog = lambda _msg: None,
     on_progress: OnProgress = lambda _pct, _label: None,
 ) -> dict:
-    errors = preflight_check(ponentes, cantidad, audios_elegidos)
+    errors = preflight_check(ponentes, cantidad, audios_elegidos, cta_final)
     if errors:
         raise RuntimeError("Validación previa falló:\n- " + "\n- ".join(errors))
 
@@ -300,13 +328,20 @@ def run_batch(
                     n_con_cta += 1
 
                 audio_start, win_dur = config.audio_window_for_round(full_audio_dur, ronda)
-                fill_duration = max(0.0, win_dur - config.HOOK_DUR)
+                # El CTA suena DESPUÉS de la voz, así que el vídeo dura esos
+                # segundos de más y hace falta MÁS paisaje para taparlos. Sin
+                # sumarlo aquí el reparto se queda corto y el render aborta con
+                # "los N clips dan X s pero hacen falta Y" — que es exactamente
+                # lo que pasó la primera vez que el CTA llegó a ejecutarse.
+                dur_cta = ffprobe_duration(cta_audio) if cta_audio is not None else 0.0
+                dur_total, fill_duration = reparto_con_cta(win_dur, dur_cta)
                 n_paisajes = build_paisaje_segments(fill_duration)
 
                 progress_base = done / total_videos if total_videos else 0.0
                 on_progress(
                     progress_base,
-                    f"🎬 Generando {filename} ({style.label}, {win_dur:.0f}s)…",
+                    f"🎬 Generando {filename} ({style.label}, {dur_total:.0f}s"
+                    + (f" con CTA)…" if dur_cta else ")…"),
                 )
 
                 if is_valid_mp4(out_path, min_duration=config.MIN_VIDEO_DURATION_S * 0.8):

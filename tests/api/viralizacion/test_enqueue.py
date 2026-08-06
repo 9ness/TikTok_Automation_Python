@@ -53,7 +53,8 @@ class TestGenerateEndpoint:
     ):
         monkeypatch.setattr(
             "src.viralizacion.pipeline.batch.preflight_check",
-            lambda ponentes, cantidad: [],
+            # `*a, **kw`: el endpoint pasa tambien los audios y `cta_final`.
+            lambda ponentes, cantidad, *a, **kw: [],
         )
         r = app_client.post(
             "/api/v1/viralizacion/generate",
@@ -105,7 +106,9 @@ class TestGenerateEndpoint:
     ):
         monkeypatch.setattr(
             "src.viralizacion.pipeline.batch.preflight_check",
-            lambda ponentes, cantidad: ["'pablo': pool de gancho insuficiente — pedidos 5, disponibles 2."],
+            lambda ponentes, cantidad, *a, **kw: [
+                "'pablo': pool de gancho insuficiente — pedidos 5, disponibles 2."
+            ],
         )
         r = app_client.post(
             "/api/v1/viralizacion/generate",

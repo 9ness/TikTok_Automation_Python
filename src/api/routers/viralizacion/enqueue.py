@@ -219,7 +219,10 @@ def generate(
             details={"ponentes": ponentes, "cantidad": cantidad},
         )
 
-    errors = preflight_check(ponentes, cantidad, body.audios or None)
+    errors = preflight_check(
+        ponentes, cantidad, body.audios or None,
+        cta_final=(body.cta_final or "no"),
+    )
     if errors:
         raise InvalidEnqueueRequestError(
             "Validación previa falló:\n- " + "\n- ".join(errors),
