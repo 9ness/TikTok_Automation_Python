@@ -5,12 +5,14 @@ de rotación en `STYLE_ORDER`.
 Son SEIS: tres estilos de texto, cada uno en dos acabados.
 
 - **A "Clásico"**: línea completa blanca, borde negro, centrada.
-- **B "Reveal"**: UNA palabra en pantalla cada vez, cambiando de molde
-  tipográfico (`_STACK_MOLDES`).
+- **B "Frases"**: trozos de hasta 3 palabras, centrados, en Playfair Display
+  Black. Sustituyó al antiguo "Reveal" palabra a palabra: con una sola palabra
+  no se coge el sentido de la frase.
 - **C "Karaoke"**: palabra a palabra, la activa en blanco y el resto en negro.
 - **A2 / B2 / C2**: los mismos tres, con la MISMA tipografía y el mismo
   movimiento, pero con el acabado LIMPIO (`_LIMPIO`): sin polvo de celuloide,
-  sin rayaduras, sin grano y sin viñeta, y con el color más claro y saturado.
+  sin rayaduras y sin grano, con el color más claro y saturado y los bordes
+  oscurecidos con una viñeta algo más suave que la de A/B/C.
 
 Hubo otros cuatro que se retiraron el 6 ago 2026 porque no viralizaban: D
 "Serif apilado", E "Cascada" y los dos del marco cuadrado, G y H. De los
@@ -104,7 +106,64 @@ def build_ass_classic(lines: list[dict], preset: "StylePreset") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Estilo B — Reveal (una palabra cada vez, tipografía variada)
+# Estilo B — Frases cortas (máx. 3 palabras) en serif
+# ---------------------------------------------------------------------------
+# Cuántas palabras caben en pantalla a la vez. Tres es lo que se ve en la
+# referencia que pasó el operador ("tienes que ser"): se lee de un golpe, sin
+# tener que barrer la línea con la vista como en A y C.
+FRASE_MAX_PALABRAS = 3
+
+
+def build_ass_frases(lines: list[dict], preset: "StylePreset") -> str:
+    """Trozos de hasta `FRASE_MAX_PALABRAS` palabras, centrados, en serif.
+
+    Sustituye al antiguo "Reveal" palabra a palabra. Con una sola palabra el
+    espectador no llega a coger el sentido de la frase; con tres sí, y sigue
+    entrando de golpe (que es lo que aquella variante buscaba).
+
+    La tipografía es Playfair Display Black —la serif de la referencia—, en
+    blanco con sombra oscura difuminada: sobre paisaje claro el blanco a pelo
+    se pierde, y un borde duro le da aire de subtítulo de karaoke, que es justo
+    lo que este estilo NO es.
+    """
+    font = preset.font_name or config.SUB_FONT
+    # Grande: en la referencia tres palabras ocupan ~la mitad del ancho. Con el
+    # cuerpo base se quedaba en un tercio y parecía un subtítulo de película,
+    # no el rótulo protagonista que es en este estilo.
+    size = int(config.SUB_FONTSIZE * 1.9)
+    style_line = (
+        f"Style: Default,{font},{size},"
+        # blanco, sin secundario; contorno y sombra en negro translúcido
+        f"&H00FFFFFF&,&H000000FF&,&H64000000&,&H78000000&,-1,0,0,0,100,100,0,0,1,3,2,5,"
+        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
+    )
+    header = _ass_header(style_line)
+
+    todas = [w for ln in lines for w in (ln.get("words") or [])]
+    events: list[str] = []
+    for i in range(0, len(todas), FRASE_MAX_PALABRAS):
+        grupo = todas[i:i + FRASE_MAX_PALABRAS]
+        start = float(grupo[0]["start"])
+        end = float(grupo[-1]["end"])
+        # No invadir el grupo siguiente: dos eventos ASS solapados se APILAN en
+        # pantalla y se leen las dos frases a la vez.
+        siguiente = i + FRASE_MAX_PALABRAS
+        if siguiente < len(todas):
+            end = min(end, float(todas[siguiente]["start"]))
+        if end - start < 0.20:
+            end = start + 0.20
+        texto = " ".join(w["word"].strip() for w in grupo if w["word"].strip())
+        if not texto:
+            continue
+        # `\blur` difumina contorno y sombra: es lo que da el halo suave de la
+        # referencia en vez de un borde recortado.
+        events.append(_dialogue(start, end, f"{{\\blur1.4}}{texto}"))
+
+    return header + "\n".join(events) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Estilo B (antiguo) — Reveal palabra a palabra
 # ---------------------------------------------------------------------------
 def build_ass_reveal(lines: list[dict], preset: "StylePreset") -> str:
     """UNA palabra en pantalla cada vez, cambiando de molde tipográfico.
@@ -712,7 +771,12 @@ _BASE = dict(
 # También se quita el Ken Burns: los paisajes ya son vídeo y se mueven solos,
 # así que el zoom lento solo añadía un efecto encima de lo que se pidió dejar.
 _LIMPIO = dict(
-    vignette=False,
+    # Bordes oscurecidos, como la referencia que pasó el operador: el centro
+    # queda claro y las esquinas caen. Es LO ÚNICO que se recupera de la base
+    # sucia — ni polvo, ni rayaduras, ni grano. Fija, sin vaivén: el latido de
+    # `_BASE` es de "película vieja" y aquí desentona.
+    vignette=True,
+    vignette_angle="PI/3.6",
     film_grain=False,
     film_specks=0,
     film_scratches=0,
@@ -732,7 +796,8 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         key="classic", label="A · Clásico", build_ass=build_ass_classic, **_BASE,
     ),
     "reveal": StylePreset(
-        key="reveal", label="B · Reveal", build_ass=build_ass_reveal, **_BASE,
+        key="reveal", label="B · Frases", build_ass=build_ass_frases,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(), **_BASE,
     ),
     "cinematic": StylePreset(
         key="cinematic", label="C · Karaoke", build_ass=build_ass_cinematic, **_BASE,
@@ -748,8 +813,9 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         build_ass=build_ass_classic, **_LIMPIO,
     ),
     "reveal_claro": StylePreset(
-        key="reveal_claro", label="B2 · Reveal claro",
-        build_ass=build_ass_reveal, **_LIMPIO,
+        key="reveal_claro", label="B2 · Frases claro",
+        build_ass=build_ass_frases,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(), **_LIMPIO,
     ),
     "cinematic_claro": StylePreset(
         key="cinematic_claro", label="C2 · Karaoke claro",

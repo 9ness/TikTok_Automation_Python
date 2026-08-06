@@ -23,10 +23,13 @@ from typing import Callable
 OnLog = Callable[[str], None]
 _noop: OnLog = lambda _m: None
 
-# En medio de lo que miden sus vídeos (-10,3 a -12,8 LUFS). Subir más no gana
-# nada: TikTok normaliza al reproducir y solo se gana riesgo de recorte.
-CTA_LUFS = -12.5
-CTA_TP = -1.5
+# EL MISMO objetivo que la voz de los ponentes, importado y no copiado: si un
+# día se cambia el de la voz y aquí quedara un número a mano, el CTA volvería a
+# sonar a distinto nivel — que es justo el fallo que ya se corrigió una vez.
+from src.viralizacion.pipeline.voz_limpia import LUFS_OBJETIVO, TECHO_TP
+
+CTA_LUFS = LUFS_OBJETIVO
+CTA_TP = TECHO_TP
 
 # Compresión ANTES de normalizar, la misma cadena del Nicho POV BOF. Sin esto
 # no se llega al objetivo: la grabación tiene 17 dB de cresta (media -20,9 dB,
