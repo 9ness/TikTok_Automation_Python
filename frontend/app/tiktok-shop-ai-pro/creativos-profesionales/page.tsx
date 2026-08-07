@@ -53,10 +53,14 @@ export default function CreativosProPage() {
   const conTexto = items.filter((p) => p.titulo).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
 
+  // Se bajan las fotos CON LA DESCRIPCIÓN (la captura de la ficha), no las
+  // limpias: el prompt del creativo pide integrar los beneficios del producto,
+  // y esos solo están en la ficha. Con la foto limpia el generador no tiene de
+  // dónde sacarlos y se los inventa — que es justo lo que el prompt prohíbe.
   async function descargarFotos() {
-    const conFoto = items.filter((p) => p.clean_photo_id);
+    const conFoto = items.filter((p) => p.titled_photo_id);
     if (!folder || !conFoto.length) {
-      toast.error("No hay fotos en esta carpeta");
+      toast.error("Ningún producto de esta carpeta tiene foto de la ficha");
       return;
     }
     // Una a una con un respiro: varias descargas simultáneas se bloquean o se
@@ -64,8 +68,8 @@ export default function CreativosProPage() {
     for (const [i, p] of conFoto.entries()) {
       setBajando(`${i + 1}/${conFoto.length}`);
       const a = document.createElement("a");
-      a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto);
-      a.download = `${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      a.href = buildPhotoUrl(source, folder, p.titled_photo_id!);
+      a.download = `${folder}_${p.producto}_ficha`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -204,7 +208,9 @@ export default function CreativosProPage() {
             className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
-            {bajando ? `Bajando ${bajando}` : `Fotos (${items.filter((p) => p.clean_photo_id).length})`}
+            {bajando
+              ? `Bajando ${bajando}`
+              : `Fotos ficha (${items.filter((p) => p.titled_photo_id).length})`}
           </button>
         </div>
 
