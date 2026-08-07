@@ -117,6 +117,7 @@ export const MODULOS: ModuloNicho[] = [
     titulo: "Creación de Creativos Profesionales",
     icon: Palette,
     resumen: "Anuncios de alto CTR pensados para las reglas de TikTok Shop.",
+      listo: true,
   },
   {
     slug: "carruseles",

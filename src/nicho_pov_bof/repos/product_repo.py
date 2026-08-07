@@ -527,6 +527,7 @@ NICHOS_VENTA: dict[str, str] = {
     "pov_bof": "POV BOF",
     "pov_bof_largo": "POV BOF Largo",
     "bof_cine": "BOF Cinematográfico",
+    "creativos": "Creativos Pro",
     "ropa": "Ropa",
     "ropa_personas": "Ropa Con Personas",
     "gorras": "Gorras",
