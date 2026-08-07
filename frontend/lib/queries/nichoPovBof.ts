@@ -395,13 +395,26 @@ export function buildVideoUrl(
   )}&producto=${encodeURIComponent(producto)}&v=${version}${descargar ? "&descargar=true" : ""}${qs}`;
 }
 
-/** URL de descarga de la foto limpia por nombre de producto (no por file id;
- *  el backend resuelve el par limpia/titulada dentro de la carpeta). */
-export function buildCleanPhotoDownloadUrl(source: string, folder: string, producto: string): string {
+/** URL de descarga de una foto por nombre de producto (no por file id; el
+ *  backend resuelve el par limpia/titulada dentro de la carpeta).
+ *
+ *  Hay que pasar por ESTE endpoint y no por `buildPhotoUrl`: el atributo
+ *  `download` de un `<a>` se ignora cuando la URL es de otro origen —y la API
+ *  lo es—, así que lo que fuerza la descarga es el `Content-Disposition:
+ *  attachment` que pone este endpoint. Con la URL de ver, el móvil abre la
+ *  imagen en una pestaña y no baja nada.
+ *
+ *  `variante`: "limpia" (default, la que anima el POV BOF) o "ficha" (la
+ *  captura con la descripción, que es la que pide Creativos Pro).
+ */
+export function buildCleanPhotoDownloadUrl(
+  source: string, folder: string, producto: string,
+  variante: "limpia" | "ficha" = "limpia",
+): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   return `${base}${ROOT}/foto-limpia?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
-  )}&producto=${encodeURIComponent(producto)}${qs}`;
+  )}&producto=${encodeURIComponent(producto)}&variante=${variante}${qs}`;
 }

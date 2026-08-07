@@ -4,7 +4,8 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/prompts         → los 2 prompts fijos (imagen/vídeo)
 - GET  /api/v1/nicho-pov-bof/productos       → productos emparejados + estado
 - POST /api/v1/nicho-pov-bof/extraer-textos  → extrae título/tienda/caption con Gemini
-- GET  /api/v1/nicho-pov-bof/foto-limpia     → descarga la foto limpia de un producto
+- GET  /api/v1/nicho-pov-bof/foto-limpia     → descarga una foto del producto
+                                              (`variante=limpia|ficha`)
 - POST /api/v1/nicho-pov-bof/video/upload    → sube el bruto (Veo3/Kling) y encola el montaje
 - POST /api/v1/nicho-pov-bof/producto/estado → marca Subido/Vendió
 - POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop (1)
@@ -24,7 +25,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -368,13 +369,25 @@ def download_clean_photo(
     source: Annotated[str, Query()],
     folder: Annotated[str, Query()],
     producto: Annotated[str, Query()],
+    variante: Annotated[Literal["limpia", "ficha"], Query()] = "limpia",
 ) -> FileResponse:
-    """Descarga la FOTO LIMPIA (sin título) de un producto, con un nombre que
-    agrupa por carpeta al ordenar en la galería del móvil.
+    """Descarga una de las dos fotos del producto, con un nombre que agrupa por
+    carpeta al ordenar en la galería del móvil.
+
+    `variante` decide cuál, y el default es "limpia" porque es lo que quiere el
+    POV BOF: la foto sin texto encima, que es la que se anima. Creativos Pro
+    pide la "ficha" (la captura con la descripción): su prompt tiene que sacar
+    los beneficios del producto de algún sitio, y en la foto limpia no están.
 
     Auth por `?api_key=`: `get_current_user` (dependencia del router) ya
     acepta el api_key por query además de por header — necesario porque este
     endpoint va en un `<a download>` que no manda headers.
+
+    Y por eso este endpoint existe en vez de tirar del `/photo` de ver: el
+    atributo `download` de un `<a>` **se ignora cuando la URL es de otro
+    origen**, y la API lo es. Lo que fuerza la descarga es el
+    `Content-Disposition: attachment` que pone `FileResponse(filename=...)`.
+    Con `/photo` el móvil abre la imagen en una pestaña y no baja nada.
     """
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
@@ -388,11 +401,15 @@ def download_clean_photo(
     photos = [drive_client.probe_dimensions(p) for p in photos]
     pairs = photo_pairing.pair_folder(photos)
     pair = next((pr for pr in pairs if pr["producto"] == producto), None)
-    clean = (pair or {}).get("clean")
+    clean = (pair or {}).get("clean" if variante == "limpia" else "titled")
     if not clean:
+        que = "foto limpia" if variante == "limpia" else "foto de la ficha"
         raise PhotoNotFoundError(
-            f"No hay foto limpia para el producto {producto!r} en {folder!r}.",
-            details={"source": source, "folder": folder, "producto": producto},
+            f"No hay {que} para el producto {producto!r} en {folder!r}.",
+            details={
+                "source": source, "folder": folder,
+                "producto": producto, "variante": variante,
+            },
         )
 
     suffix = os.path.splitext(clean.get("name", ""))[1].lower() or ".jpg"
@@ -403,9 +420,12 @@ def download_clean_photo(
 
     # Nombre de descarga: "<carpeta sin espacios>_<NN>.<ext>" — así, al bajar
     # varias fotos al móvil, quedan agrupadas y ordenadas por carpeta+número
-    # en vez de mezcladas con el nombre suelto "3.png" que trae Drive.
+    # en vez de mezcladas con el nombre suelto "3.png" que trae Drive. La ficha
+    # lleva sufijo para que no pise a la limpia del mismo producto si se bajan
+    # las dos (mismo nombre = "archivo(1)" y ya no se sabe cuál es cuál).
     folder_slug = re.sub(r"\s+", "_", folder.strip())
-    filename = f"{folder_slug}_{producto.zfill(2)}{suffix}"
+    marca = "" if variante == "limpia" else "_ficha"
+    filename = f"{folder_slug}_{producto.zfill(2)}{marca}{suffix}"
 
     return FileResponse(
         path,

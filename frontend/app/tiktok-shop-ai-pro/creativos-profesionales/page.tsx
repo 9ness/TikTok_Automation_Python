@@ -68,7 +68,11 @@ export default function CreativosProPage() {
     for (const [i, p] of conFoto.entries()) {
       setBajando(`${i + 1}/${conFoto.length}`);
       const a = document.createElement("a");
-      a.href = buildPhotoUrl(source, folder, p.titled_photo_id!);
+      // Por el endpoint de descarga, NO por el de ver: `download` se ignora
+      // entre orígenes distintos y la API es otro origen, así que quien fuerza
+      // la descarga es el Content-Disposition del backend. Con la URL de ver,
+      // el móvil abría las fotos en pestañas y no bajaba ninguna.
+      a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto, "ficha");
       a.download = `${folder}_${p.producto}_ficha`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
       document.body.appendChild(a);
       a.click();
@@ -409,13 +413,16 @@ function CreativoCard({
         </div>
       )}
 
+      {/* Se baja la de la FICHA también aquí, no solo en la descarga masiva:
+          el creativo necesita los beneficios del producto y solo están ahí. */}
       <FotoModal
         open={verFoto}
         onOpenChange={setVerFoto}
         titulo={p.titulo ?? `Producto ${p.producto}`}
         urlLimpia={limpia}
         urlTitulo={ficha}
-        urlDescarga={buildCleanPhotoDownloadUrl(source, folder, p.producto)}
+        urlDescarga={buildCleanPhotoDownloadUrl(source, folder, p.producto, "ficha")}
+        textoDescarga="Descargar la foto con la descripción"
       />
     </div>
   );

@@ -16,6 +16,7 @@ export function FotoModal({
   urlLimpia,
   urlTitulo,
   urlDescarga,
+  textoDescarga = "Descargar la foto del producto",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -23,6 +24,10 @@ export function FotoModal({
   urlLimpia: string | null;
   urlTitulo: string | null;
   urlDescarga?: string | null;
+  /** Qué foto baja el botón. Se dice porque no siempre es la misma: Creativos
+   *  Pro baja la de la ficha y el POV BOF la limpia, y un botón que no aclara
+   *  cuál de las dos trae hace dudar antes de pulsarlo. */
+  textoDescarga?: string;
 }) {
   const [cual, setCual] = useState<"limpia" | "titulo">("limpia");
   const src = cual === "limpia" ? urlLimpia : urlTitulo;
@@ -99,7 +104,7 @@ export function FotoModal({
             href={urlDescarga}
             className="flex items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] font-medium transition hover:border-foreground/30"
           >
-            <Download className="h-3.5 w-3.5" /> Descargar la foto del producto
+            <Download className="h-3.5 w-3.5" /> {textoDescarga}
           </a>
         )}
       </div>
