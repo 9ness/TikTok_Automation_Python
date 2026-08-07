@@ -120,3 +120,56 @@ class TestFuenteEnElMenu:
         assert config.es_fuente_propia("mis_productos")
         assert not config.es_fuente_propia("aleatorios_1")
         assert not config.es_fuente_propia("aleatorios_2")
+
+
+class TestCacheDeFotos:
+    """Las fotos propias NO se pueden cachear como las del curso.
+
+    Un file ID de Drive es inmutable: ese contenido no cambia nunca, así que
+    se cachea un día. Pero en «Mis productos» el identificador es la RUTA, y
+    la ruta se REUTILIZA — borras un producto, subes otro y
+    `Mis Productos 1/1.jpg` pasa a ser una foto distinta con la MISMA URL.
+
+    Pasó de verdad: el operador subió tres productos y la pantalla le enseñó
+    las fotos de antes durante 24h. El servidor mandaba los bytes correctos;
+    era el navegador.
+    """
+
+    def test_las_propias_no_se_cachean(self, tmp_path, monkeypatch):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+        import src.nicho_pov_bof.services.drive_client as dc
+
+        foto = tmp_path / "1.jpg"
+        foto.write_bytes(b"\xff\xd8\xff")
+        monkeypatch.setattr(
+            dc, "list_photos",
+            lambda *a, **k: [{"id": str(foto), "name": "1.jpg", "mime": "image/jpeg"}],
+        )
+        c = TestClient(app)
+        r = c.get(
+            "/api/v1/nicho-pov-bof/photo",
+            params={"source": "mis_productos", "folder": "F", "file_id": str(foto)},
+        )
+        assert r.status_code == 200
+        assert "no-cache" in r.headers.get("cache-control", "")
+
+    def test_las_del_curso_siguen_cacheando(self, tmp_path, monkeypatch):
+        """No hay que perder el cacheo donde SÍ es correcto: son 2.200 fotos
+        y sin caché la pantalla va a tirones."""
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+        import src.nicho_pov_bof.services.drive_client as dc
+
+        foto = tmp_path / "1.jpg"
+        foto.write_bytes(b"\xff\xd8\xff")
+        monkeypatch.setattr(
+            dc, "list_photos",
+            lambda *a, **k: [{"id": str(foto), "name": "1.jpg", "mime": "image/jpeg"}],
+        )
+        c = TestClient(app)
+        r = c.get(
+            "/api/v1/nicho-pov-bof/photo",
+            params={"source": "aleatorios_1", "folder": "F", "file_id": str(foto)},
+        )
+        assert "max-age=86400" in r.headers.get("cache-control", "")

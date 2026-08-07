@@ -149,11 +149,20 @@ def get_photo(
     except (ValueError, RuntimeError) as e:
         raise APIError(f"No se pudo descargar la foto: {e}", status_code=502) from e
 
+    from src.nicho_pov_bof import config as pov_config
+
+    # Un file ID de Drive es inmutable → se puede cachear un día entero. Pero
+    # en "Mis productos" el identificador es la RUTA, y esa se REUTILIZA: al
+    # borrar un producto y subir otro, `Mis Productos 1/1.jpg` pasa a ser una
+    # foto distinta con la misma URL. Cacheando agresivo, el navegador seguía
+    # enseñando la anterior durante 24h — que es exactamente lo que pasó.
+    propia = pov_config.es_fuente_propia(source)
     return FileResponse(
         path,
         media_type=match.get("mime") or "image/jpeg",
-        # El contenido de un file ID es inmutable → cachea agresivo.
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={
+            "Cache-Control": "no-cache" if propia else "public, max-age=86400",
+        },
     )
 
 

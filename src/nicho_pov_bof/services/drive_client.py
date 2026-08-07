@@ -297,11 +297,12 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     # Las fotos propias llevan la RUTA como id (no hay ID de Google). Se
     # detectan porque empiezan por "/" — un ID de Drive nunca lo hace.
     if str(file_id).startswith("/"):
-        from src.nicho_pov_bof.services import mis_productos
-
-        cache_dir = Path(config.photo_cache_dir())
-        nombre = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(file_id))
-        return mis_productos.copiar_a(cache_dir / nombre, file_id)
+        # Ya está en disco: se sirve tal cual. Copiarla a la caché no ahorraba
+        # nada y añadía una copia que se podía quedar vieja.
+        ruta = Path(file_id)
+        if not ruta.is_file():
+            raise ValueError(f"no está la foto: {file_id}")
+        return ruta
 
     if not _FILE_ID_RE.match(file_id or ""):
         raise ValueError(f"file_id inválido: {file_id!r}")
