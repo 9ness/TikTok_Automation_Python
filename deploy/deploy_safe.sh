@@ -54,9 +54,17 @@ exec >> "$LOG" 2>&1
 # ============================================================
 # Lock para evitar deploys concurrentes (si llegan 2 pushes muy seguidos)
 # ============================================================
+# Marca de "ha llegado un push mientras yo trabajaba". El deploy en curso la
+# mira al terminar y se relanza. Sin esto, el segundo push se perdía EN
+# SILENCIO: pasó el 7 ago 2026 con dos commits a un minuto de distancia — el
+# arreglo se quedó en GitHub y en producción seguía el código viejo, sin que
+# nada lo dijera.
+PENDING_FILE="/tmp/tiktok-deploy.pending"
+
 exec 200>"$LOCK_FILE"
 if ! flock -n 200; then
-    echo "[deploy_safe] $(date -Iseconds) — otro deploy está en marcha, saliendo."
+    echo "[deploy_safe] $(date -Iseconds) — otro deploy está en marcha; dejo aviso y salgo."
+    touch "$PENDING_FILE"
     exit 0
 fi
 
@@ -443,3 +451,31 @@ else
 fi
 
 echo "[deploy_safe] $(date -Iseconds) — COMPLETADO"
+
+# ============================================================
+# ¿Llegó algo mientras desplegábamos?
+# ============================================================
+# Dos motivos para volver a mirar:
+#   - Un push que rebotó contra el lock (dejó `PENDING_FILE`).
+#   - Un push que entró DESPUÉS de nuestro `git pull` — el webhook lo dio por
+#     atendido porque había un deploy en marcha, pero ese deploy ya no lo
+#     incluía.
+# Se compara con el remoto y no con el fichero, que es el dato que no engaña.
+RELANZADO="${DEPLOY_RELANZADO:-0}"
+rm -f "$PENDING_FILE"
+git -C "$APP_DIR" fetch origin main --quiet 2>/dev/null || true
+NUEVO_SHA=$(git -C "$APP_DIR" rev-parse origin/main 2>/dev/null || echo "")
+ACTUAL_SHA=$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || echo "")
+
+if [[ -n "$NUEVO_SHA" && "$NUEVO_SHA" != "$ACTUAL_SHA" ]]; then
+    # Tope de relanzamientos: si cada vuelta encuentra algo nuevo (alguien
+    # pusheando sin parar), mejor parar y que lo lance el siguiente webhook
+    # que quedarse dando vueltas toda la noche.
+    if [[ "$RELANZADO" -ge 3 ]]; then
+        echo "[deploy_safe] ⚠️ origin/main sigue avanzando tras 3 vueltas — lo dejo para el próximo push."
+    else
+        echo "[deploy_safe] origin/main avanzó a ${NUEVO_SHA:0:7} durante el deploy — relanzando."
+        flock -u 200          # soltar el lock ANTES de volver a entrar
+        exec env DEPLOY_RELANZADO=$((RELANZADO + 1)) "$0" "$@"
+    fi
+fi
