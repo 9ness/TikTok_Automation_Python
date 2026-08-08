@@ -61,3 +61,8 @@ STOP.md
 # Claude Code session locks
 .claude/*.lock
 tsconfig.tsbuildinfo
+
+# Proyecto Android generado por Bubblewrap — se recrea en cada build de la APK.
+# Lo único que se versiona de `android/` es twa-manifest.json.
+/android/*
+!/android/twa-manifest.json
