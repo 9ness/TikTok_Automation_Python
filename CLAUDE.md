@@ -516,6 +516,7 @@ herramientas del mismo grupo en el futuro.
 | [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Playbook de depuración del cortador de vídeo** — LEER antes de tocar `silence_cutter.py`: jerarquía de señales (silero>energía>Whisper), pipeline, casuística de bugs reales (proteína…), cómo diagnosticar una queja, gotchas de cola/deploy, auto-corrección |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |
+| [`APK.md`](APK.md) | **APK Android (TWA)** — por qué TWA y no Capacitor (descargas), cómo se genera, cuándo hay que rehacerla, gotchas de Bubblewrap |
 | [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local (uvicorn + npm run dev), troubleshooting WS/cache |
 | [`deploy/README.md`](deploy/README.md) | Despliegue VPS Hetzner + Docker stack + Tailscale Funnel + webhook |
 | [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Runbook SSH al server (IP, paths, comandos comunes) |
