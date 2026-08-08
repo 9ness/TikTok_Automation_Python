@@ -60,3 +60,4 @@ LAUNCH.md
 STOP.md
 # Claude Code session locks
 .claude/*.lock
+tsconfig.tsbuildinfo

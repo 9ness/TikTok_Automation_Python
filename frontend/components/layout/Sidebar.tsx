@@ -377,7 +377,11 @@ export function Sidebar() {
       {/* Mobile trigger + drawer — sticky para que el botón Cola y el menú
           queden siempre visibles al hacer scroll. backdrop-blur + bg con
           alpha para que se vea el contenido por debajo desplazándose. */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:hidden">
+      {/* La altura suma el `safe-area-inset-top`: instalada o en la APK no hay
+          barra del navegador que aparte el contenido, y sin esto el logo y el
+          botón de Cola quedan debajo del reloj y la batería. En el navegador
+          normal el inset es 0 y la barra mide lo de siempre. */}
+      <div className="sticky top-0 z-40 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b bg-background/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/70 md:hidden">
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

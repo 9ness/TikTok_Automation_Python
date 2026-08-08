@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nebulabsai.tiktokauto",
+      "sha256_cert_fingerprints": [
+        "49:97:C9:EC:2A:63:68:FA:D2:A2:07:9C:05:D8:46:AC:A4:B4:46:5D:6B:E1:61:BD:97:F1:0A:B5:96:5F:6C:AF"
+      ]
+    }
+  }
+]

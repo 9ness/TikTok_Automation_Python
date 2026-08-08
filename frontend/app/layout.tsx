@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 
 import "./globals.css";
@@ -18,6 +18,25 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "TikTok Automation",
   description: "Generación automatizada de vídeos virales para TikTok",
+  // El manifest es lo que convierte la web en instalable: sin él Android no
+  // ofrece "añadir a pantalla de inicio" y la APK (TWA) no arranca.
+  manifest: "/manifest.json",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  // iOS no lee el manifest: necesita sus propias metas para abrirse sin la
+  // barra de Safari cuando se añade a la pantalla de inicio.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TikTok Auto",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  // `viewport-fit=cover` + los `env(safe-area-inset-*)` del CSS: en pantalla
+  // completa (APK o instalada) no hay barra del navegador que aparte el
+  // contenido de la muesca y de la barra de gestos.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
