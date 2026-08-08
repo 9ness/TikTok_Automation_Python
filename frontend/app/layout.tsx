@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 
 import "./globals.css";
+import { AppInstallBanner } from "@/components/layout/AppInstallBanner";
 import { LoginGate } from "@/components/layout/LoginModal";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "./providers";
@@ -55,6 +56,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {children}
               </main>
             </div>
+            {/* Dentro del LoginGate: el aviso de instalar la app no tiene
+                sentido en la pantalla de login. */}
+            <AppInstallBanner />
           </LoginGate>
         </Providers>
       </body>
