@@ -55,3 +55,19 @@ antes de empezar y avisa en claro si no responde.
   se abre con barra de navegador.
 - De `android/` **solo se versiona `twa-manifest.json`**; el resto del proyecto
   Android lo regenera Bubblewrap en cada build.
+
+## Se reinicia al volver de segundo plano
+
+Es Android, no la APK: cuando necesita memoria mata el proceso, y eso **no se
+puede evitar** desde una app web. Lo que sí se ha hecho:
+
+- `alwaysRetainTaskState` ya viene puesto por Bubblewrap (el workflow lo
+  comprueba y falla si algún día dejara de ponerlo). Eso evita el caso de
+  "vuelvo del lanzador y me deja en la pantalla de inicio".
+- `RestaurarPantalla` (frontend): al arrancar de cero **con la app instalada**,
+  si estabas en otra pantalla hace menos de 6 h, vuelve a ella. En el navegador
+  normal no actúa, que ahí sería un secuestro.
+
+Lo que más ayuda está en el móvil y no en el código: **Ajustes → Apps → TikTok
+Auto → Batería → Sin restricciones**. Con la optimización agresiva (Xiaomi,
+Samsung, Huawei…) el sistema la mata a los pocos minutos.

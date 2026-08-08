@@ -89,6 +89,21 @@ jobs:
         working-directory: android
         run: bubblewrap update --skipVersionUpgrade
 
+      - name: Comprobar que la tarea no se reinicia sola
+        working-directory: android
+        # `alwaysRetainTaskState` evita que Android borre las pantallas de la
+        # tarea cuando la app lleva un rato en segundo plano y vuelves desde el
+        # lanzador. La plantilla de Bubblewrap YA lo pone; esto es una alarma
+        # por si un día deja de ponerlo, no un parche.
+        #
+        # Ojo: no arregla que el sistema mate el proceso por falta de memoria.
+        # Eso no se puede evitar desde una app web — se compensa en el
+        # frontend volviendo a la pantalla donde estabas (RestaurarPantalla).
+        run: |
+          grep -q 'android:alwaysRetainTaskState="true"' app/src/main/AndroidManifest.xml \
+            || { echo "::error::Bubblewrap ya no pone alwaysRetainTaskState — hay que parchear el AndroidManifest a mano"; exit 1; }
+          echo "alwaysRetainTaskState presente"
+
       - name: Construir y firmar la APK
         working-directory: android
         env:
