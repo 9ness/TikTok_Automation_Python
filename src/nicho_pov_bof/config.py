@@ -74,8 +74,26 @@ def es_fuente_propia(source: str) -> bool:
     return bool((SOURCES.get(source) or {}).get("propia"))
 
 
+# Ruta ya resuelta y creada. Se recuerda porque el `mkdir` de abajo va contra
+# el Drive MONTADO y en frío cuesta 45 SEGUNDOS medidos: rclone tiene que ir a
+# Google a resolver los cuatro niveles de la ruta. Como esta función la llaman
+# todas las demás de "Mis productos" (listar carpetas, listar fotos, contar
+# productos…), una sola carga de la pantalla lo pagaba varias veces y la
+# pantalla tardaba más de medio minuto en salir, frente a los 0,45s de las
+# carpetas del Drive compartido.
+#
+# Dentro del proceso la ruta no cambia nunca, así que se calcula una vez. Si el
+# Drive se desmonta hay que reiniciar la API — que es justo lo que ya pasa
+# cuando se desmonta, porque no hay nada que leer.
+_MIS_PRODUCTOS_DIR: Path | None = None
+
+
 def mis_productos_dir() -> Path:
     """Raíz de "Mis productos" en el Drive MONTADO (no el compartido)."""
+    global _MIS_PRODUCTOS_DIR
+    if _MIS_PRODUCTOS_DIR is not None:
+        return _MIS_PRODUCTOS_DIR
+
     from src.nicho_pov_bof.services.audio_bank import mount_root
 
     raiz = mount_root()
@@ -84,6 +102,7 @@ def mis_productos_dir() -> Path:
         else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "mis_productos"
     )
     destino.mkdir(parents=True, exist_ok=True)
+    _MIS_PRODUCTOS_DIR = destino
     return destino
 
 

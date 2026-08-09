@@ -21,12 +21,47 @@ from __future__ import annotations
 
 import re
 import shutil
+import time
 from pathlib import Path
+from typing import Any, Callable
 
 from src.nicho_pov_bof import config
 
 _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 _PREFIJO = "Mis Productos"
+
+# ---------------------------------------------------------------------------
+# Caché de listados
+# ---------------------------------------------------------------------------
+# Estas carpetas viven en el Drive MONTADO, y tocar por primera vez una ruta
+# honda del mount cuesta CARO: medido, 37s para un simple `is_dir()` sobre una
+# ruta que rclone no tenía cacheada. Da igual la llamada —`mkdir`, `stat`,
+# `iterdir`—, lo que se paga es que rclone resuelva la ruta contra Google.
+#
+# Las fuentes del curso ya esquivan esto con su caché de dos capas
+# (`drive_client`), pero la rama de "Mis productos" se la saltaba entera y por
+# eso la pantalla tardaba ~36s en salir frente a los 0,45s de las otras.
+#
+# Aquí basta con una caché en memoria y corta, PERO con una diferencia que las
+# del curso no necesitan: esta carpeta se ESCRIBE. Si el operador sube un
+# producto y el listado sigue cacheado, sube y no lo ve. Por eso cualquier
+# escritura la invalida entera (`_invalidar`), en vez de esperar al TTL.
+_TTL_S = 120.0
+_LISTADOS: dict[str, tuple[float, Any]] = {}
+
+
+def _memo(clave: str, calcular: Callable[[], Any]) -> Any:
+    hit = _LISTADOS.get(clave)
+    if hit and time.monotonic() < hit[0]:
+        return hit[1]
+    valor = calcular()
+    _LISTADOS[clave] = (time.monotonic() + _TTL_S, valor)
+    return valor
+
+
+def _invalidar() -> None:
+    """Tras escribir. Se tira todo: son cuatro entradas, no compensa hilar."""
+    _LISTADOS.clear()
 
 
 def _num_carpeta(nombre: str) -> int:
@@ -36,13 +71,17 @@ def _num_carpeta(nombre: str) -> int:
 
 def carpetas() -> list[str]:
     """Carpetas existentes, en orden natural. Vacío si aún no hay ninguna."""
-    raiz = config.mis_productos_dir()
-    if not raiz.is_dir():
-        return []
-    return sorted(
-        (d.name for d in raiz.iterdir() if d.is_dir() and not d.name.startswith(".")),
-        key=_num_carpeta,
-    )
+
+    def leer() -> list[str]:
+        raiz = config.mis_productos_dir()
+        if not raiz.is_dir():
+            return []
+        return sorted(
+            (d.name for d in raiz.iterdir() if d.is_dir() and not d.name.startswith(".")),
+            key=_num_carpeta,
+        )
+
+    return _memo("carpetas", leer)
 
 
 def _productos_en(carpeta: str) -> set[str]:
@@ -105,6 +144,8 @@ def guardar_producto(
     if ficha:
         (destino / f"{producto}(1){_extension(nombre_ficha)}").write_bytes(ficha)
 
+    # Sin esto el operador sube el producto y no lo ve hasta que vence el TTL.
+    _invalidar()
     return {"carpeta": carpeta, "producto": producto}
 
 
@@ -118,6 +159,8 @@ def borrar_producto(carpeta: str, producto: str) -> bool:
         if f.is_file() and re.match(rf"^{re.escape(producto)}(\(\d+\))?$", f.stem):
             f.unlink(missing_ok=True)
             borradas += 1
+    if borradas:
+        _invalidar()
     return borradas > 0
 
 
@@ -133,22 +176,26 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
     Google, aquí no hay tal cosa y la ruta es igual de única. `fetch_photo` lo
     detecta y sirve el fichero directamente.
     """
-    d = config.mis_productos_dir() / carpeta
-    if not d.is_dir():
-        return []
-    fotos = [
-        {
-            "id": str(f),
-            "name": f.name,
-            "size": f.stat().st_size,
-            "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
-            "mtime": "",
-        }
-        for f in d.iterdir()
-        if f.is_file() and f.suffix.lower() in _EXTS
-    ]
-    fotos.sort(key=lambda p: config.natural_sort_key(p["name"]))
-    return fotos
+
+    def leer() -> list[dict]:
+        d = config.mis_productos_dir() / carpeta
+        if not d.is_dir():
+            return []
+        fotos = [
+            {
+                "id": str(f),
+                "name": f.name,
+                "size": f.stat().st_size,
+                "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
+                "mtime": "",
+            }
+            for f in d.iterdir()
+            if f.is_file() and f.suffix.lower() in _EXTS
+        ]
+        fotos.sort(key=lambda p: config.natural_sort_key(p["name"]))
+        return fotos
+
+    return _memo(f"fotos:{carpeta}", leer)
 
 
 def copiar_a(destino: Path, foto_id: str) -> Path:

@@ -22,6 +22,10 @@ from src.nicho_pov_bof.services import mis_productos, photo_pairing
 @pytest.fixture(autouse=True)
 def raiz_temporal(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(mis_productos.config, "mis_productos_dir", lambda: tmp_path)
+    # Los listados se cachean (el Drive montado es lentísimo en frío) y la
+    # caché vive en el módulo, no en la instancia: sin limpiarla, un test
+    # heredaría las carpetas del tmp_path del anterior.
+    mis_productos._invalidar()
     return tmp_path
 
 
