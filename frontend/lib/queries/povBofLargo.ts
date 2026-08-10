@@ -8,14 +8,22 @@ import { ANCHO_MINIATURA, ANCHO_VISOR } from "@/lib/queries/nichoPovBof";
 // Se re-exporta para que las pantallas de este nicho no tengan que importar
 // del POV BOF solo para pedir la foto grande del visor.
 export { ANCHO_VISOR };
+import type { VendidoItem } from "@/lib/types/nichoPovBof";
 import type {
   ClipLargoUploadResponse,
+  EstadoLargoRequest,
+  FoldersLargoResponse,
+  MarkCompletedLargoResponse,
   ProductoLargo,
   ProductosLargoResponse,
   VocesLargo,
 } from "@/lib/types/povBofLargo";
 
 const ROOT = "/api/v1/nicho-pov-bof-largo";
+// El ranking de vendidos es transversal y vive en el POV BOF; aquí se filtra
+// por el nicho para ver solo las ventas atribuidas al Largo.
+const POV_ROOT = "/api/v1/nicho-pov-bof";
+const NICHO = "pov_bof_largo";
 
 export const largoKeys = {
   all: ["pov-bof-largo"] as const,
@@ -24,6 +32,7 @@ export const largoKeys = {
   folders: (source: string) => [...largoKeys.all, "folders", source] as const,
   productos: (source: string, folder: string) =>
     [...largoKeys.all, "productos", source, folder] as const,
+  vendidos: (source: string) => [...largoKeys.all, "vendidos", source] as const,
 };
 
 export function useVocesLargo() {
@@ -44,16 +53,27 @@ export function useSourcesLargo() {
   });
 }
 
+/** Carpetas del Drive compartido con el progreso PROPIO de este nicho. */
 export function useFoldersLargo(source: string) {
-  return useQuery<string[]>({
+  return useQuery<FoldersLargoResponse>({
     queryKey: largoKeys.folders(source),
-    queryFn: async () =>
-      (
-        await api.get<{ items: { name: string }[] }>(
-          `${ROOT}/folders?source=${encodeURIComponent(source)}`,
-        )
-      ).items.map((c) => c.name),
+    queryFn: () =>
+      api.get<FoldersLargoResponse>(
+        `${ROOT}/folders?source=${encodeURIComponent(source)}`,
+      ),
     enabled: Boolean(source),
+  });
+}
+
+export function useMarkCompletedLargo(source: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    MarkCompletedLargoResponse,
+    Error,
+    { source: string; folder: string; completed: boolean }
+  >({
+    mutationFn: (body) => api.post<MarkCompletedLargoResponse>(`${ROOT}/complete`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: largoKeys.folders(source) }),
   });
 }
 
@@ -82,6 +102,57 @@ export function useEscribirGuion() {
       (await api.post<{ producto: ProductoLargo }>(`${ROOT}/guion`, body)).producto,
     onSuccess: (_p, v) =>
       void qc.invalidateQueries({ queryKey: largoKeys.productos(v.source, v.folder) }),
+  });
+}
+
+/** Escaparate / Subido / Vendió — progreso INDIVIDUAL del Largo. */
+export function useSetEstadoLargo() {
+  const qc = useQueryClient();
+  return useMutation<ProductoLargo, Error, EstadoLargoRequest>({
+    mutationFn: (body) => api.post<ProductoLargo>(`${ROOT}/producto/estado`, body),
+    onSuccess: (updated, vars) => {
+      qc.setQueryData<ProductosLargoResponse>(
+        largoKeys.productos(vars.source, vars.folder),
+        (old) =>
+          old
+            ? {
+                ...old,
+                items: old.items.map((p) =>
+                  p.producto === updated.producto ? updated : p,
+                ),
+              }
+            : old,
+      );
+      // Puede haber entrado o salido del ranking de vendidos.
+      void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) });
+    },
+  });
+}
+
+/** Ranking de vendidos atribuidos a este nicho (índice compartido, filtrado). */
+export function useVendidosLargo(source: string) {
+  return useQuery<VendidoItem[]>({
+    queryKey: largoKeys.vendidos(source),
+    queryFn: async () =>
+      (await api.get<{ items: VendidoItem[] }>(
+        `${POV_ROOT}/vendidos?source=${encodeURIComponent(source)}&nicho=${NICHO}`,
+      )).items ?? [],
+    enabled: Boolean(source),
+  });
+}
+
+/** Suma (o resta) unidades vendidas. Reordena el ranking del nicho. */
+export function useSumarUnidadesLargo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: VendidoItem[] },
+    Error,
+    { source: string; folder: string; producto: string; delta: number }
+  >({
+    mutationFn: (body) =>
+      api.post<{ items: VendidoItem[] }>(`${POV_ROOT}/vendidos/unidades`, body),
+    onSuccess: (_res, vars) =>
+      void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) }),
   });
 }
 
@@ -147,9 +218,9 @@ export function fotoLargoUrl(
 }
 
 export function videoLargoUrl(
-  source: string, folder: string, producto: string, descargar = false,
+  source: string, folder: string, producto: string, version = 0, descargar = false,
 ): string {
   return `${base()}${ROOT}/video?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
-  )}&producto=${encodeURIComponent(producto)}&descargar=${descargar}${keyQs()}`;
+  )}&producto=${encodeURIComponent(producto)}&v=${version}&descargar=${descargar}${keyQs()}`;
 }

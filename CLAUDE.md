@@ -343,6 +343,13 @@ y locutado con **Fish Audio** (`FISH_API_KEY`, modelo gratuito
 `s2.1-pro-free`). Como el guion dura ~20s y no ~11, el vídeo son **DOS clips
 de 10s** pegados; la duración la manda la voz y el vídeo se recorta a ella.
 
+Su pantalla es un CALCO de la del POV BOF (misma UI y flujo) — solo cambia que
+se sube el guion + DOS clips. Comparte catálogo/carpetas/textos/fotos con el POV
+BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
+(`progress_repo` propio + `/complete`), escaparate/subido/vendió (`/producto/estado`)
+y guion/clips/vídeo viven en `nicho_pov_bof_largo:`. El ranking de vendidos es el
+único índice transversal (se apunta con `nicho="pov_bof_largo"`).
+
 Cosas que ya costaron una vez:
 - El documento del curso pide 260 caracteres "para 15 segundos", pero su propio
   ejemplo tiene 357 y a 18,2 car/s eso son 20s. **No se recorta**: forzarlo con

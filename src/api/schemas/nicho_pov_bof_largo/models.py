@@ -22,8 +22,11 @@ class ProductoLargo(BaseModel):
     producto: str
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
-    # Textos del producto — vienen del Nicho POV BOF, no se extraen aquí.
+    foto_aviso: str = ""
+    # Textos y enlaces del producto — vienen del Nicho POV BOF (dato objetivo
+    # del producto, compartido), no se extraen ni se buscan aquí.
     titulo: str = ""
+    titulo_tiktok_completo: str = ""
     tienda: str = ""
     caption: str = ""
     emojis: str = ""
@@ -31,7 +34,10 @@ class ProductoLargo(BaseModel):
     cta: str = ""
     caption_riesgo: str = ""
     sexo_sugerido: str = ""
-    # Lo propio de este nicho.
+    product_url: str = ""
+    url_match_name: str = ""
+    url_match_score: float = 0.0
+    # Lo propio de este nicho (progreso INDIVIDUAL, aislado del POV BOF).
     guion: str = ""
     subliminal: str = ""
     guion_caracteres: int = 0
@@ -39,7 +45,9 @@ class ProductoLargo(BaseModel):
     clip2: bool = False
     voz_label: str = ""
     voz_sexo: str = ""
+    en_escaparate: bool = False
     uploaded: bool = False
+    sold: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
     montando: bool = False
@@ -50,6 +58,50 @@ class ProductosLargoResponse(BaseModel):
     folder: str
     items: list[ProductoLargo] = Field(default_factory=list)
     montando: bool = False
+
+
+class ProductoEstadoLargoRequest(BaseModel):
+    """Parche parcial de Escaparate/Subido/Vendió (progreso individual). Solo
+    se aplican los campos no `None`."""
+
+    source: str
+    folder: str
+    producto: str
+    en_escaparate: bool | None = None
+    uploaded: bool | None = None
+    sold: bool | None = None
+    # A qué nicho se atribuye la venta en el ranking compartido. Aquí siempre
+    # es "pov_bof_largo"; se acepta por si la UI lo manda explícito.
+    nicho: str | None = None
+
+
+class FolderLargo(BaseModel):
+    name: str
+    id: str = ""
+    completed: bool = False
+
+
+class FoldersLargoResponse(BaseModel):
+    source: str
+    items: list[FolderLargo] = Field(default_factory=list)
+    total: int = 0
+    completed_count: int = 0
+    current: str | None = None
+
+
+class MarkCompletedLargoRequest(BaseModel):
+    source: str
+    folder: str
+    completed: bool = True
+
+
+class MarkCompletedLargoResponse(BaseModel):
+    source: str
+    folder: str
+    completed: bool
+    completed_count: int = 0
+    total: int = 0
+    next_folder: str | None = None
 
 
 class GuionLargoRequest(BaseModel):

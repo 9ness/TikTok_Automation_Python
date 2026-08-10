@@ -1,16 +1,20 @@
 """Endpoints del Nicho POV BOF Largo (Programa 4 — Tiktok Shop AI Pro).
 
-- GET  /api/v1/nicho-pov-bof-largo/voces       → banco de voces por sexo
-- GET  /api/v1/nicho-pov-bof-largo/sources     → las 2 fuentes de Drive
-- GET  /api/v1/nicho-pov-bof-largo/folders     → carpetas de productos
-- GET  /api/v1/nicho-pov-bof-largo/productos   → productos + guion + estado
-- POST /api/v1/nicho-pov-bof-largo/guion       → escribe (o reescribe) el guion
-- POST /api/v1/nicho-pov-bof-largo/clip/upload → sube 1 de los 2 clips
-- GET  /api/v1/nicho-pov-bof-largo/video       → sirve el vídeo montado
+- GET  /api/v1/nicho-pov-bof-largo/voces          → banco de voces por sexo
+- GET  /api/v1/nicho-pov-bof-largo/sources        → las fuentes de Drive
+- GET  /api/v1/nicho-pov-bof-largo/folders        → carpetas + progreso PROPIO
+- POST /api/v1/nicho-pov-bof-largo/complete       → marca carpeta hecha (propio)
+- GET  /api/v1/nicho-pov-bof-largo/productos      → productos + guion + estado
+- POST /api/v1/nicho-pov-bof-largo/producto/estado→ escaparate/subido/vendió
+- POST /api/v1/nicho-pov-bof-largo/guion          → escribe (o reescribe) guion
+- POST /api/v1/nicho-pov-bof-largo/clip/upload    → sube 1 de los 2 clips
+- GET  /api/v1/nicho-pov-bof-largo/video          → sirve el vídeo montado
 
 Las fotos y los TEXTOS del producto salen del Nicho POV BOF: aquí no se extrae
-nada, solo se consulta. Lo que se guarda de propio es el guion, los clips y el
-vídeo montado, y va por usuario.
+nada, solo se consulta (mismo Drive, mismas carpetas). Lo PROPIO —guion, clips,
+vídeo montado y el progreso (carpeta hecha, escaparate, subido, vendió)— es
+INDIVIDUAL de este nicho y va por usuario. El ranking de vendidos es el único
+dato transversal: se apunta en el índice compartido con `nicho="pov_bof_largo"`.
 """
 
 from __future__ import annotations
@@ -28,8 +32,13 @@ from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_pov_bof_largo import (
     ClipLargoUploadResponse,
+    FolderLargo,
+    FoldersLargoResponse,
     GuionLargoRequest,
     GuionLargoResponse,
+    MarkCompletedLargoRequest,
+    MarkCompletedLargoResponse,
+    ProductoEstadoLargoRequest,
     ProductoLargo,
     ProductosLargoResponse,
     VocesLargoResponse,
@@ -69,12 +78,19 @@ def list_sources() -> dict:
     ]}
 
 
-@router.get("/folders")
+@router.get("/folders", response_model=FoldersLargoResponse)
 def list_folders(
     source: Annotated[str, Query()],
     refresh: Annotated[bool, Query()] = False,
-) -> dict:
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FoldersLargoResponse:
+    """Carpetas del Drive COMPARTIDO con el progreso PROPIO de este nicho.
+
+    Las carpetas son las mismas del POV BOF; qué está completado sale del
+    progreso individual del Largo (`progress_repo` con prefijo propio).
+    """
     from src.nicho_pov_bof.services import drive_client
+    from src.nicho_pov_bof_largo.repos import progress_repo
 
     try:
         carpetas = drive_client.list_product_folders(source, refresh=refresh)
@@ -82,7 +98,63 @@ def list_folders(
         raise _bad(str(e)) from e
     except RuntimeError as e:
         raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
-    return {"items": [{"name": c.get("name")} for c in carpetas]}
+
+    completed = progress_repo.get_completed(source, usuario)
+    items = [
+        FolderLargo(
+            name=c.get("name"), id=c.get("id", ""),
+            completed=c.get("name") in completed,
+        )
+        for c in carpetas
+    ]
+    current = next((i.name for i in items if not i.completed), None)
+    return FoldersLargoResponse(
+        source=source,
+        items=items,
+        total=len(items),
+        completed_count=sum(1 for i in items if i.completed),
+        current=current,
+    )
+
+
+@router.post("/complete", response_model=MarkCompletedLargoResponse)
+def mark_completed(
+    body: MarkCompletedLargoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> MarkCompletedLargoResponse:
+    """Marca/desmarca una carpeta como hecha EN ESTE NICHO. Progreso propio."""
+    from src.nicho_pov_bof.services import drive_client
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    try:
+        carpetas = drive_client.list_product_folders(body.source)
+    except ValueError as e:
+        raise _bad(str(e)) from e
+    except RuntimeError as e:
+        raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
+
+    names = [c["name"] for c in carpetas]
+    if body.folder not in names:
+        raise _bad(f"Carpeta desconocida en {body.source!r}: {body.folder!r}")
+
+    try:
+        if body.completed:
+            progress_repo.mark_completed(body.source, body.folder, usuario)
+        else:
+            progress_repo.unmark_completed(body.source, body.folder, usuario)
+        completed = progress_repo.get_completed(body.source, usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    next_folder = next((n for n in names if n not in completed), None)
+    return MarkCompletedLargoResponse(
+        source=body.source,
+        folder=body.folder,
+        completed=body.completed,
+        completed_count=sum(1 for n in names if n in completed),
+        total=len(names),
+        next_folder=next_folder,
+    )
 
 
 def _montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
@@ -136,7 +208,9 @@ def _listar(
             producto=pid,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
+            # Textos y enlaces: compartidos con el POV BOF (los extrae/busca él).
             titulo=textos.get("titulo", ""),
+            titulo_tiktok_completo=textos.get("titulo_tiktok_completo", ""),
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
             emojis=textos.get("emojis") or emojis_svc.emojis_para(
@@ -148,6 +222,10 @@ def _listar(
             sexo_sugerido=audience.sexo_sugerido(
                 textos.get("titulo", ""), textos.get("titulo_tiktok_completo", ""),
             ),
+            product_url=str(textos.get("product_url") or ""),
+            url_match_name=str(textos.get("url_match_name") or ""),
+            url_match_score=float(textos.get("url_match_score") or 0.0),
+            # Lo propio: guion, clips, voz, vídeo y estado INDIVIDUAL.
             guion=guion,
             subliminal=str(mio.get("subliminal") or ""),
             guion_caracteres=len(guion),
@@ -155,7 +233,9 @@ def _listar(
             clip2=bool(mio.get("clip2_path")),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
+            en_escaparate=bool(mio.get("en_escaparate")),
             uploaded=bool(mio.get("uploaded")),
+            sold=bool(mio.get("sold")),
             video_path=mio.get("video_path"),
             video_listo_at=int(mio.get("video_listo_at") or 0),
             montando=pid in activos,
@@ -173,6 +253,66 @@ def list_productos(
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductosLargoResponse:
     return _listar(source, folder, queue, usuario)
+
+
+@router.post("/producto/estado", response_model=ProductoLargo)
+def set_producto_estado(
+    body: ProductoEstadoLargoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductoLargo:
+    """Escaparate / Subido / Vendió — progreso INDIVIDUAL de este nicho.
+
+    Se guarda en el documento propio del Largo (no toca el estado del POV BOF).
+    La venta se refleja ADEMÁS en el ranking de vendidos, que es un índice
+    ÚNICO y compartido entre nichos: se apunta con `nicho="pov_bof_largo"` para
+    que el operador pueda verlo filtrado. El ranking vive en el POV BOF porque
+    es transversal (ver `product_repo.marcar_vendido`).
+    """
+    try:
+        campos: dict = {}
+        if body.en_escaparate is not None:
+            campos["en_escaparate"] = body.en_escaparate
+        if body.uploaded is not None:
+            campos["uploaded"] = body.uploaded
+        if body.sold is not None:
+            campos["sold"] = body.sold
+            # Vender implica haberlo subido — mismo criterio que el POV BOF.
+            if body.sold:
+                campos["uploaded"] = True
+        if campos:
+            product_repo.update_product(
+                body.source, body.folder, body.producto, usuario=usuario, **campos,
+            )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    listado = _listar(body.source, body.folder, queue, usuario)
+    item = next((x for x in listado.items if x.producto == body.producto), None)
+    if item is None:
+        raise APIError(f"No existe el producto {body.producto}.", status_code=404)
+
+    # Ranking de vendidos: índice único compartido, atribuido a este nicho.
+    if body.sold is not None:
+        from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+        try:
+            if body.sold:
+                pov_repo.marcar_vendido(
+                    body.source, body.folder, body.producto,
+                    titulo=item.titulo or "", tienda=item.tienda or "",
+                    clean_photo_id=item.clean_photo_id or "",
+                    product_url=item.product_url or "",
+                    nicho="pov_bof_largo",
+                )
+            else:
+                pov_repo.desmarcar_vendido(body.source, body.folder, body.producto)
+        except Exception:
+            # El dato bueno (`sold`) ya está guardado; que no se caiga por el
+            # ranking.
+            pass
+
+    return item
 
 
 @router.post("/guion", response_model=GuionLargoResponse)

@@ -202,41 +202,6 @@ recorta los audios largos en vez de tocar el render.
 
 ## 🤖 Cola del Agente
 
-### [ ] Unificar la pantalla del POV BOF Largo con la del POV BOF ⬅️ SIGUIENTE
-
-Lo pidió el operador el 2026-08-06: *"el POV BOF Largo es visualmente diferente
-al POV BOF, quiero que se parezca lo máximo posible"*. Son el MISMO catálogo de
-productos; lo único que cambia de verdad es que la voz es un guion escrito por
-IA y locutado con Fish, y que van dos clips de 10s en vez de uno.
-
-**Los dos ficheros:**
-- `frontend/app/tiktok-shop-ai-pro/nicho-pov-bof/page.tsx` — 2.173 líneas (el bueno)
-- `frontend/app/tiktok-shop-ai-pro/pov-bof-largo/page.tsx` — 401 líneas (el pobre)
-
-**Lo que le falta al Largo** (comprobado por grep, no de memoria): barra de
-Escaparate + Vendidos con contador, botón "Textos" (extraer con Gemini), botón
-de descargar todas las fotos, chips de hashtags, la caja de "Mis productos"
-(`AltaMiProducto`) y el selector de fuente con las tres carpetas. Ya comparte
-`CopyChip` y `FotoModal` en `frontend/components/tiktok-shop-ai-pro/`.
-
-**Ya está hecho y NO hay que rehacerlo:** las ventas se apuntan por nicho —
-`NICHOS_VENTA` en `src/nicho_pov_bof/repos/product_repo.py:526` ya incluye
-`pov_bof_largo`, y `marcar_vendido(..., nicho=)` / `ranking_vendidos(nicho=)`
-aceptan el filtro.
-
-**Cómo abordarlo:** el camino sano es extraer de `nicho-pov-bof/page.tsx` los
-bloques comunes a `components/tiktok-shop-ai-pro/` y que las dos páginas los
-consuman, NO copiar y pegar (ya somos 8 nichos con pantalla casi igual: cine,
-ropa, ropa-personas, gorras, cuenta-piloto, creativos… cada copia nueva es otro
-sitio donde arreglar el mismo bug). Es un refactor grande: **abrirlo en sesión
-nueva y limpia**, no de cola de otra tarea.
-
-**Cuidado con dos cosas que ya mordieron:**
-- Nada de `export const` en un `page.tsx` de Next: rompe el type-check de rutas.
-  Lo compartido va a `components/` o `lib/`.
-- Todo mobile-first (el operador trabaja desde el móvil): `grid-cols-2
-  sm:grid-cols-N`, diálogos `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`.
-
 - [ ] `deploy_safe.sh`: purgar caché de Docker ANTES de construir. El disco
       llega al 100% cada pocos deploys (hacen falta ~14 GB transitorios) y ya
       truncó `page.tsx` a 0 bytes una vez.
@@ -256,6 +221,19 @@ nueva y limpia**, no de cola de otra tarea.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+
+- [2026-08-10] [POV BOF Largo] **Pantalla unificada con la del POV BOF** a
+  paridad completa (mismo catálogo/carpetas, progreso INDIVIDUAL; NO se fusionan
+  menús ni se toca el POV BOF). Backend: `progress_repo` propio + `/folders` con
+  progreso + `/complete` + `/producto/estado` + `_listar`/`ProductoLargo`
+  ampliados (compartido: textos/enlaces; propio: carpeta hecha, escaparate,
+  subido, vendió, guion, clips, vídeo). Ranking de vendidos = índice transversal
+  con `nicho="pov_bof_largo"`. Frontend: `pov-bof-largo/page.tsx` reescrita
+  (fuentes+mis productos, carpetas, config EchoTik/hashtags/backup, extraer
+  textos + enlaces + prompts + descargas, vendidos, escaparate, tarjeta con
+  guion + DOS clips); `EscaparateModal` parametrizado con `marcarEstado`. Nota:
+  el bloque "Productos recuperados" es una herramienta temporal del POV BOF y no
+  se llevó al Largo.
 
 - [2026-08-05] [Programa 4] **Cuenta Piloto** completa: `src/cuenta_piloto/`
   (config + `repos/{redis_base,product_repo}` + `services/{photo_store,text_extractor}`

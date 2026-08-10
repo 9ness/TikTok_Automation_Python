@@ -32,18 +32,28 @@ import { FotoModal } from "./FotoModal";
  *     que de verdad cuesta es perder el sitio y repasar lo ya hecho. Se
  *     pueden volver a ver para corregir un error, pero estorbando lo mínimo.
  */
+type MarcarEstado = (
+  vars: { source: string; folder: string; producto: string; en_escaparate: boolean },
+  opts?: { onSettled?: () => void; onError?: (e: unknown) => void },
+) => void;
+
 export function EscaparateModal({
   source,
   folder,
   productos,
   onClose,
+  marcarEstado,
 }: {
   source: string;
   folder: string;
   productos: ProductoItem[];
   onClose: () => void;
+  /** Mutación de "en_escaparate". Por defecto la del POV BOF; otros nichos
+   *  (p. ej. POV BOF Largo) pasan la suya para escribir en su propio progreso. */
+  marcarEstado?: MarcarEstado;
 }) {
   const setEstado = useSetEstado();
+  const marcar_ = marcarEstado ?? setEstado.mutate;
   const [verHechos, setVerHechos] = useState(false);
   // Cuál se está guardando: sin esto, con la lista entera deshabilitada por
   // `isPending` no se sabe a qué producto le diste.
@@ -94,7 +104,7 @@ export function EscaparateModal({
 
   function marcar(p: ProductoItem, valor: boolean) {
     setGuardando(p.producto);
-    setEstado.mutate(
+    marcar_(
       { source, folder, producto: p.producto, en_escaparate: valor },
       {
         onSettled: () => setGuardando(null),
