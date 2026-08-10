@@ -126,6 +126,30 @@ class TestFuenteEnElMenu:
         assert not config.es_fuente_propia("aleatorios_2")
 
 
+class TestPrecalentado:
+    """La caché solo sirve si está caliente, y en frío está SIEMPRE justo
+    después de un deploy — que es cuando el operador abre la app."""
+
+    def test_renueva_la_caducidad_aunque_la_cache_siga_fresca(self):
+        """El fallo sutil: llamar a `carpetas()` a secas devuelve lo cacheado
+        sin retrasar la caducidad, así que el TTL vencería igual."""
+        _subir(1)
+        mis_productos.precalentar()
+        antes = mis_productos._LISTADOS["carpetas"][0]
+        mis_productos.precalentar()
+        assert mis_productos._LISTADOS["carpetas"][0] > antes
+
+    def test_calienta_tambien_las_fotos_de_la_ultima_carpeta(self):
+        """Es la que se abre, y está un nivel más hondo del mount: se paga
+        aparte del listado de carpetas."""
+        _subir(11)
+        mis_productos.precalentar()
+        assert "fotos:Mis Productos 2" in mis_productos._LISTADOS
+
+    def test_sin_carpetas_no_revienta(self):
+        assert mis_productos.precalentar() == 0
+
+
 class TestCacheDeFotos:
     """Las fotos propias NO se pueden cachear como las del curso.
 

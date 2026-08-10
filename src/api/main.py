@@ -165,9 +165,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     sweeper_stop = asyncio.Event()
     sweeper_task = asyncio.create_task(sweeper_loop(sweeper_stop))
 
+    # Nicho POV BOF · "Mis productos" vive en el Drive MONTADO, y tocar en frío
+    # una ruta honda del mount cuesta 20-37s. Se precalienta al arrancar y cada
+    # 10 min para que el operador no se coma esa espera al abrir la pantalla
+    # justo después de un deploy (que es cuando siempre está fría).
+    from src.nicho_pov_bof.services.mis_productos import bucle_precalentado
+
+    calentador_stop = asyncio.Event()
+    calentador_task = asyncio.create_task(bucle_precalentado(calentador_stop))
+
     try:
         yield
     finally:
+        calentador_stop.set()
+        try:
+            await asyncio.wait_for(calentador_task, timeout=5)
+        except asyncio.TimeoutError:
+            calentador_task.cancel()
         sweeper_stop.set()
         try:
             await asyncio.wait_for(sweeper_task, timeout=5)

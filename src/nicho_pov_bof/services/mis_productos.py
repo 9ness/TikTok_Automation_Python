@@ -42,11 +42,17 @@ _PREFIJO = "Mis Productos"
 # (`drive_client`), pero la rama de "Mis productos" se la saltaba entera y por
 # eso la pantalla tardaba ~36s en salir frente a los 0,45s de las otras.
 #
-# Aquí basta con una caché en memoria y corta, PERO con una diferencia que las
-# del curso no necesitan: esta carpeta se ESCRIBE. Si el operador sube un
-# producto y el listado sigue cacheado, sube y no lo ve. Por eso cualquier
-# escritura la invalida entera (`_invalidar`), en vez de esperar al TTL.
-_TTL_S = 120.0
+# Aquí basta con una caché en memoria, PERO con una diferencia que las del
+# curso no necesitan: esta carpeta se ESCRIBE. Si el operador sube un producto
+# y el listado sigue cacheado, sube y no lo ve. Por eso cualquier escritura la
+# invalida entera (`_invalidar`), en vez de esperar al TTL.
+#
+# El TTL es largo A PROPÓSITO. Con uno corto, quien entrara pasados dos minutos
+# volvía a pagar los 20-37s, que es justo la queja original; y como el único
+# que escribe aquí es la propia app —y avisa—, lo que protege el TTL es solo el
+# caso raro de tocar la carpeta a mano en Drive. Encima va `bucle_precalentado`
+# refrescándolo antes de que venza, así que en la práctica nunca se enfría.
+_TTL_S = 900.0
 _LISTADOS: dict[str, tuple[float, Any]] = {}
 
 
@@ -196,6 +202,60 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
         return fotos
 
     return _memo(f"fotos:{carpeta}", leer)
+
+
+# ---------------------------------------------------------------------------
+# Precalentado
+# ---------------------------------------------------------------------------
+# La caché de arriba deja la pantalla en <1s… mientras esté caliente. En frío
+# sigue costando 20-37s, y en frío está siempre justo después de un deploy o
+# tras un rato sin entrar, que es EXACTAMENTE cuando el operador abre la app.
+#
+# Por eso se refresca desde fuera: al arrancar la API y luego cada pocos
+# minutos, antes de que venza el TTL. Es una llamada a rclone cada 10 min —
+# nada al lado de lo que ya hace el mount (`--poll-interval 15s`).
+_REFRESCO_S = 600.0
+
+
+def precalentar() -> int:
+    """Recalcula el listado y renueva la caché, esté fresca o no.
+
+    Devuelve cuántas carpetas hay (para el log). Llamar a `carpetas()` a secas
+    NO valdría: si la caché aún vive, devuelve lo cacheado sin renovar la
+    fecha de caducidad, y el TTL vencería igual con el operador delante.
+    """
+    _LISTADOS.pop("carpetas", None)
+    nombres = carpetas()
+    if nombres:
+        # También las fotos de la última carpeta, que es la que se abre: son
+        # un nivel más hondo del mount y se pagan aparte.
+        ultima = nombres[-1]
+        _LISTADOS.pop(f"fotos:{ultima}", None)
+        listar_fotos_como_drive(ultima)
+    return len(nombres)
+
+
+async def bucle_precalentado(stop) -> None:
+    """Mantiene caliente el listado mientras la API viva.
+
+    El `to_thread` no es decorativo: `iterdir()` sobre el mount bloquea
+    decenas de segundos y en el loop de asyncio se llevaría por delante a
+    todas las peticiones en curso.
+    """
+    import asyncio
+    import logging
+
+    log = logging.getLogger("api")
+    while not stop.is_set():
+        try:
+            n = await asyncio.to_thread(precalentar)
+            log.debug("mis_productos precalentado: %d carpetas", n)
+        except Exception as e:  # Drive caído, permisos… no es motivo de caída
+            log.warning("precalentado de mis_productos falló: %s", e)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=_REFRESCO_S)
+        except asyncio.TimeoutError:
+            pass
 
 
 def copiar_a(destino: Path, foto_id: str) -> Path:
