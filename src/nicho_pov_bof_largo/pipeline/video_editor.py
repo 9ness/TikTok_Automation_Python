@@ -1,16 +1,20 @@
 """Montaje del Nicho POV BOF Largo.
 
-Capa fina: se pegan los DOS clips y de ahí en adelante es el montador del Nicho
-POV BOF sin tocar nada — mismo bloque de gancho/título/CTA, misma flecha, mismo
-mux de audio.
+Capa fina: se cuadran los DOS clips con la voz y se pegan; de ahí en adelante es
+el montador del Nicho POV BOF sin tocar nada — mismo bloque de gancho/título/CTA,
+misma flecha, mismo mux de audio.
 
-Lo que NO se hace aquí, a diferencia del BOF Cinematográfico: **no se toca la
-velocidad**. Allí hay que estirar porque el plano es un paneo continuo y el
-rebobinado canta; aquí sobra vídeo casi siempre (dos clips de 10s contra un
-guion de ~18-20s), y lo que pidió el operador es justamente que *"si el audio
-son 18 segundos pues se corta el vídeo al final"*. De eso ya se encarga
-`match_video_to_audio` dentro de `build_video`: recorta a la duración exacta de
-la voz, y si por lo que sea faltara vídeo lo alarga rebobinando.
+**No se toca la velocidad ni se recorta el guion** (el prompt del curso va tal
+cual). La duración la manda SIEMPRE la voz, y como los guiones salen de ~18 a
+~25s según la voz, el vídeo se ajusta a esa duración.
+
+Reparto entre clips (lo que pidió el operador): en vez de cuadrar el vídeo
+entero contra el audio —que dejaba TODO el alargue al final, sobre el segundo
+clip— cada clip se cuadra a SU parte del audio (`audio/2` cada uno). Así, con
+una voz de 25s, en vez de un clip de 10s y otro de 15s salen dos de ~12,5s: el
+rebobinado se reparte y se nota menos. La técnica de alargar/recortar es la
+misma de siempre (`match_video_to_audio`: rebobina el tramo final si falta,
+recorta si sobra); solo cambia que se aplica por clip.
 """
 
 from __future__ import annotations
@@ -19,6 +23,10 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from src.nicho_pov_bof.pipeline.duration_match import (
+    match_video_to_audio,
+    probe_duration,
+)
 from src.nicho_pov_bof.pipeline.video_editor import build_video, layout_for_producto
 
 OnLog = Callable[[str], None]
@@ -58,6 +66,42 @@ def concatenar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     return destino
 
 
+def _concatenar_cuadrado(
+    clips: list[Path], audio_path: Path, work_dir: Path, on_log: OnLog = _noop,
+) -> Path:
+    """Cuadra cada clip con SU parte del audio y luego los pega.
+
+    Reparte la duración de la voz a partes iguales entre los clips (`audio/N`).
+    Cada clip se alarga o recorta a su objetivo con `match_video_to_audio` —el
+    mismo rebobinado de tramo final que usa el POV BOF—, así que el alargue no
+    cae entero sobre el último clip. La suma da la duración del audio; el
+    `match_video_to_audio` que hace `build_video` después ya solo recorta al
+    milímetro.
+
+    Si no se puede medir el audio (raro), se cae al pegado directo de siempre y
+    que `build_video` cuadre el conjunto.
+    """
+    try:
+        audio_dur = probe_duration(audio_path)
+    except Exception as e:
+        on_log(f"[pov_bof_largo] no se pudo medir el audio ({e}); pego sin cuadrar por clip")
+        return concatenar(clips, work_dir / "00_pegado.mp4", on_log)
+
+    n = max(1, len(clips))
+    objetivo = audio_dur / n
+    on_log(
+        f"[pov_bof_largo] voz {audio_dur:.2f}s repartida entre {n} clips → "
+        f"~{objetivo:.2f}s cada uno"
+    )
+    cuadrados: list[Path] = []
+    for i, clip in enumerate(clips, start=1):
+        destino = work_dir / f"clip{i}_cuadrado"
+        cuadrados.append(
+            match_video_to_audio(clip, objetivo, destino, on_log=on_log)
+        )
+    return concatenar(cuadrados, work_dir / "00_pegado.mp4", on_log)
+
+
 def montar(
     *,
     clips: list[Path],
@@ -78,8 +122,10 @@ def montar(
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    on_progress(0.02, f"🔗 Uniendo {len(clips)} clips…")
-    pegado = concatenar([Path(c) for c in clips], work_dir / "00_pegado.mp4", on_log)
+    on_progress(0.02, f"🔗 Cuadrando y uniendo {len(clips)} clips…")
+    pegado = _concatenar_cuadrado(
+        [Path(c) for c in clips], Path(audio_path), work_dir, on_log,
+    )
 
     def _progreso(pct: float, label: str) -> None:
         on_progress(0.05 + pct * 0.95, label)

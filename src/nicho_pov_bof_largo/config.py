@@ -120,6 +120,25 @@ VOZ_LUFS = -11.0
 VOZ_TP = -2.0
 VOZ_LIMITER = 0.89
 
+# ---------------------------------------------------------------------------
+# Recorte de silencios (para que el vídeo no quede más largo de la cuenta)
+# ---------------------------------------------------------------------------
+# Fish a veces deja aire muerto al principio/final y alguna pausa larga entre
+# frases. Se recorta, pero SIN dejarlo telegráfico:
+#   - Principio: se quita el silencio de entrada dejando una pizca (0,08s) para
+#     que no empiece cortado de golpe.
+#   - Medio y final (`stop_periods=-1`): las pausas de más de `stop_duration`
+#     se capan a `stop_silence` (~0,3s) en vez de eliminarse; así una pausa de
+#     1,5s baja a 0,3s pero SIGUE habiendo pausa — respira, no atropella.
+# `detection=peak` es conservador: solo cuenta como silencio lo que baje de
+# -40 dB de pico, así que no se come el arranque suave de una palabra.
+VOZ_SILENCIO = (
+    "silenceremove="
+    "start_periods=1:start_silence=0.08:start_threshold=-40dB:"
+    "stop_periods=-1:stop_duration=0.4:stop_silence=0.3:stop_threshold=-40dB:"
+    "detection=peak"
+)
+
 
 # ---------------------------------------------------------------------------
 # Salida

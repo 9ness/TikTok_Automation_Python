@@ -10,6 +10,12 @@ Dos cosas que no son obvias:
    una voz de Fish, esos mismos valores dieron **+0,20 dBTP** — o sea recorte
    audible, justo lo que se quiere evitar. Con `TP=-2.0` y 0.89 queda en
    -13,1/-13,6 LUFS con picos en -1,1/-1,6 dBTP: alto y limpio.
+
+3. **Se recortan silencios** (`config.VOZ_SILENCIO`) para que el vídeo no quede
+   más largo de la cuenta: fuera el aire muerto del principio/final y las
+   pausas internas largas se capan (~0,3s) sin eliminarlas, para que siga
+   sonando orgánico. Va primero en la cadena para que el nivelado mida el audio
+   ya ajustado.
 """
 
 from __future__ import annotations
@@ -146,7 +152,10 @@ def _medir(audio: Path, extra: str = "") -> dict[str, str]:
 
 
 def _nivelar(crudo: Path, destino: Path, *, on_log: OnLog = _noop) -> dict:
-    med = _medir(crudo, config.VOZ_CADENA)
+    # El recorte de silencios va PRIMERO y forma parte de la cadena, para que la
+    # medición de sonoridad y el render final vean el mismo audio ya ajustado.
+    pre = f"{config.VOZ_SILENCIO},{config.VOZ_CADENA}"
+    med = _medir(crudo, pre)
     norm = f"loudnorm=I={config.VOZ_LUFS}:TP={config.VOZ_TP}:LRA=7"
     if len(med) == 4:
         norm += (
@@ -159,7 +168,7 @@ def _nivelar(crudo: Path, destino: Path, *, on_log: OnLog = _noop) -> dict:
     # salida hacia el límite, así que bajar el límite SUBE el volumen.
     subprocess.run(
         ["ffmpeg", "-y", "-v", "error", "-i", str(crudo), "-af",
-         f"{config.VOZ_CADENA},{norm},alimiter=limit={config.VOZ_LIMITER}:level=disabled",
+         f"{pre},{norm},alimiter=limit={config.VOZ_LIMITER}:level=disabled",
          str(destino)],
         check=True, capture_output=True,
     )
