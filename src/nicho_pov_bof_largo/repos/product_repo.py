@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import random
 import time
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -114,3 +115,62 @@ def textos_producto(source: str, folder: str, producto: str, usuario: str = "") 
     from src.nicho_pov_bof.repos import product_repo as pov
 
     return pov.get_product(source, folder, producto, usuario) or {}
+
+
+# ---------------------------------------------------------------------------
+# Escaparate: índice GLOBAL por (tienda | nombre)
+# ---------------------------------------------------------------------------
+# El escaparate es meter el producto en el Marketplace de TikTok, y eso se hace
+# UNA vez por producto — da igual en qué carpeta aparezca. El mismo producto
+# está repetido en varias carpetas del Drive del curso (p. ej. la carpeta 1 y la
+# 20), así que en vez de marcar el escaparate carpeta a carpeta, se guarda en un
+# índice por CLAVE = tienda + nombre exacto. Marcado en cualquier carpeta →
+# aparece marcado en todas las que sean el mismo producto.
+#
+# Es un SET por usuario, igual que el progreso de carpetas.
+_ESCAPARATE_INDEX = "escaparate"
+
+
+def _norm(s: str) -> str:
+    """minúsculas, sin acentos, espacios colapsados — para comparar 'exacto'
+    sin que un acento o un espacio de más rompa la coincidencia."""
+    s = unicodedata.normalize("NFKD", (s or "").strip().lower())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.split())
+
+
+def clave_escaparate(tienda: str, titulo: str) -> str:
+    """Clave del producto en el escaparate: `tienda|nombre`. Vacía si no hay
+    nombre (sin textos aún no se puede deduplicar)."""
+    nombre = _norm(titulo)
+    if not nombre:
+        return ""
+    return f"{_norm(tienda)}|{nombre}"
+
+
+def _key_escaparate(usuario: str = "") -> str:
+    if not usuario or usuario == "ness":
+        return _ESCAPARATE_INDEX
+    return f"{_ESCAPARATE_INDEX}:{usuario}"
+
+
+def escaparate_index(usuario: str = "") -> set[str]:
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available():
+        return set()
+    return set(r.smembers(_key_escaparate(usuario)))
+
+
+def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> None:
+    """Mete/saca del escaparate el producto (tienda|nombre). Degrada en silencio
+    si no hay clave (sin textos) o si Redis no está."""
+    clave = clave_escaparate(tienda, titulo)
+    if not clave:
+        return
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available():
+        return
+    if on:
+        r.sadd(_key_escaparate(usuario), clave)
+    else:
+        r.srem(_key_escaparate(usuario), clave)

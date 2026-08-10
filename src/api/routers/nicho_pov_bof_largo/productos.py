@@ -195,6 +195,9 @@ def _listar(
     pares = photo_pairing.pair_folder(fotos)
     propio = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
     activos = _montandose(queue, source, folder)
+    # Escaparate GLOBAL por (tienda|nombre): un producto marcado en cualquier
+    # carpeta sale marcado en todas las que sean el mismo producto.
+    esc_index = product_repo.escaparate_index(usuario)
 
     items: list[ProductoLargo] = []
     for par in pares:
@@ -233,7 +236,13 @@ def _listar(
             clip2=bool(mio.get("clip2_path")),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
-            en_escaparate=bool(mio.get("en_escaparate")),
+            en_escaparate=(
+                product_repo.clave_escaparate(
+                    textos.get("tienda", ""), textos.get("titulo", "")
+                ) in esc_index
+                if textos.get("titulo")
+                else bool(mio.get("en_escaparate"))
+            ),
             uploaded=bool(mio.get("uploaded")),
             sold=bool(mio.get("sold")),
             video_path=mio.get("video_path"),
@@ -261,18 +270,22 @@ def set_producto_estado(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductoLargo:
-    """Escaparate / Subido / Vendió — progreso INDIVIDUAL de este nicho.
+    """Escaparate / Subido / Vendió.
 
-    Se guarda en el documento propio del Largo (no toca el estado del POV BOF).
-    La venta se refleja ADEMÁS en el ranking de vendidos, que es un índice
-    ÚNICO y compartido entre nichos: se apunta con `nicho="pov_bof_largo"` para
-    que el operador pueda verlo filtrado. El ranking vive en el POV BOF porque
-    es transversal (ver `product_repo.marcar_vendido`).
+    - **Subido**: progreso INDIVIDUAL de este nicho (documento propio del Largo).
+    - **Escaparate**: índice GLOBAL por (tienda|nombre). Meter un producto en el
+      escaparate es una acción única por producto (da igual la carpeta), así que
+      marcado en una carpeta aparece marcado en todas las que sean el mismo
+      producto.
+    - **Vendió**: ranking de vendidos, que es un índice ÚNICO y GLOBAL entre
+      todos los nichos (no se clasifica por nicho): una venta marcada aquí se ve
+      igual en el POV BOF y viceversa (ver `product_repo.marcar_vendido`).
     """
+    textos = product_repo.textos_producto(
+        body.source, body.folder, body.producto, usuario
+    )
     try:
         campos: dict = {}
-        if body.en_escaparate is not None:
-            campos["en_escaparate"] = body.en_escaparate
         if body.uploaded is not None:
             campos["uploaded"] = body.uploaded
         if body.sold is not None:
@@ -284,6 +297,11 @@ def set_producto_estado(
             product_repo.update_product(
                 body.source, body.folder, body.producto, usuario=usuario, **campos,
             )
+        if body.en_escaparate is not None:
+            product_repo.set_escaparate(
+                textos.get("tienda", ""), textos.get("titulo", ""),
+                body.en_escaparate, usuario,
+            )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
@@ -292,7 +310,7 @@ def set_producto_estado(
     if item is None:
         raise APIError(f"No existe el producto {body.producto}.", status_code=404)
 
-    # Ranking de vendidos: índice único compartido, atribuido a este nicho.
+    # Ranking de vendidos: índice único y GLOBAL, sin clasificar por nicho.
     if body.sold is not None:
         from src.nicho_pov_bof.repos import product_repo as pov_repo
 
@@ -303,7 +321,6 @@ def set_producto_estado(
                     titulo=item.titulo or "", tienda=item.tienda or "",
                     clean_photo_id=item.clean_photo_id or "",
                     product_url=item.product_url or "",
-                    nicho="pov_bof_largo",
                 )
             else:
                 pov_repo.desmarcar_vendido(body.source, body.folder, body.producto)

@@ -964,7 +964,7 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
           <ShoppingBag className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">
-              {buscando ? "Buscar producto" : "Vendidos (POV BOF Largo)"}
+              {buscando ? "Buscar producto" : "Productos que vendieron"}
             </p>
             <p className="text-[11px] text-muted-foreground">
               {buscando

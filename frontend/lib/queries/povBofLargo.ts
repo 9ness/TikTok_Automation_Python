@@ -20,10 +20,9 @@ import type {
 } from "@/lib/types/povBofLargo";
 
 const ROOT = "/api/v1/nicho-pov-bof-largo";
-// El ranking de vendidos es transversal y vive en el POV BOF; aquí se filtra
-// por el nicho para ver solo las ventas atribuidas al Largo.
+// El ranking de vendidos es GLOBAL entre todos los nichos (mismo índice, no se
+// clasifica por nicho) y vive en el POV BOF.
 const POV_ROOT = "/api/v1/nicho-pov-bof";
-const NICHO = "pov_bof_largo";
 
 export const largoKeys = {
   all: ["pov-bof-largo"] as const,
@@ -129,13 +128,13 @@ export function useSetEstadoLargo() {
   });
 }
 
-/** Ranking de vendidos atribuidos a este nicho (índice compartido, filtrado). */
+/** Ranking de vendidos GLOBAL (índice único compartido con todos los nichos). */
 export function useVendidosLargo(source: string) {
   return useQuery<VendidoItem[]>({
     queryKey: largoKeys.vendidos(source),
     queryFn: async () =>
       (await api.get<{ items: VendidoItem[] }>(
-        `${POV_ROOT}/vendidos?source=${encodeURIComponent(source)}&nicho=${NICHO}`,
+        `${POV_ROOT}/vendidos?source=${encodeURIComponent(source)}`,
       )).items ?? [],
     enabled: Boolean(source),
   });
