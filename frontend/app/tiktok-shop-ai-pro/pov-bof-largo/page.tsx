@@ -104,6 +104,7 @@ export default function PovBofLargoPage() {
   const items = productosQ.data?.items ?? [];
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
+  const guionBatch = useEscribirGuion();
   const vendidos = useVendidosLargo(activaSource);
   const totalVendidos = (vendidos.data ?? []).reduce((n, v) => n + (v.unidades || 1), 0);
 
@@ -116,12 +117,15 @@ export default function PovBofLargoPage() {
   const [downloadProgress, setDownloadProgress] = useState("");
   const [downloadingVideos, setDownloadingVideos] = useState(false);
   const [videoProgress, setVideoProgress] = useState("");
+  const [generandoGuiones, setGenerandoGuiones] = useState(false);
+  const [guionProgress, setGuionProgress] = useState("");
 
   const totalProductos = items.length;
   const conVideo = items.filter((p) => p.video_path).length;
   const conFoto = items.filter((p) => p.clean_photo_id).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
+  const sinGuion = items.filter((p) => p.titulo && !p.guion).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const pendientesUrl = items.filter(
     (p) => !p.product_url && p.titulo_tiktok_completo,
@@ -214,6 +218,36 @@ export default function PovBofLargoPage() {
     } finally {
       setDownloadingPhotos(false);
       setDownloadProgress("");
+    }
+  }
+
+  /** Escribe el guion de TODOS los productos de la carpeta que ya tienen
+   *  textos y aún no lo tienen. Uno detrás de otro (cada uno gasta una llamada
+   *  a Gemini), igual que "Textos" pero por guion. */
+  async function generarTodosGuiones() {
+    if (!folder) return;
+    const pend = items.filter((p) => p.titulo && !p.guion);
+    if (!pend.length) {
+      toast.error("Todos los productos con textos ya tienen guion");
+      return;
+    }
+    setGenerandoGuiones(true);
+    try {
+      let ok = 0;
+      for (const [i, p] of pend.entries()) {
+        setGuionProgress(`${i + 1}/${pend.length}`);
+        try {
+          await guionBatch.mutateAsync({ source: activaSource, folder, producto: p.producto });
+          ok++;
+        } catch (e) {
+          toast.error(`Producto ${p.producto}: ${err(e)}`);
+        }
+      }
+      toast.success(`${ok}/${pend.length} guiones escritos`);
+      invalidarProductos();
+    } finally {
+      setGenerandoGuiones(false);
+      setGuionProgress("");
     }
   }
 
@@ -697,6 +731,30 @@ export default function PovBofLargoPage() {
                 )}
               </button>
             </div>
+            {/* Guion para todos los productos de la carpeta a la vez, en vez de
+                pulsarlo en cada tarjeta. Necesitan tener textos primero. */}
+            <button
+              type="button"
+              onClick={() => void generarTodosGuiones()}
+              disabled={generandoGuiones || !sinGuion}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/60 px-3 py-2 text-xs font-semibold text-violet-500 transition hover:bg-violet-500/10 disabled:opacity-50"
+            >
+              {generandoGuiones ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  <span className="truncate">Escribiendo guiones {guionProgress}…</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {sinGuion
+                      ? `Escribir todos los guiones (${sinGuion})`
+                      : `Guiones al día (${conGuion}/${totalProductos})`}
+                  </span>
+                </>
+              )}
+            </button>
           </div>
 
           <div className="space-y-1.5">
