@@ -29,6 +29,7 @@ import {
   useProductos,
   useSetEstado,
   useSources,
+  ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
@@ -274,8 +275,17 @@ function CreativoCard({
   const [sold, setSold] = useState(p.sold);
   const [eligiendoNicho, setEligiendoNicho] = useState(false);
 
+  // Dos tamaños a propósito: la tarjeta pinta una miniatura y el visor pide una
+  // más grande solo al abrirlo. A tamaño original una carpeta se llevaba ~300 MB
+  // de RAM en el móvil y Chrome cerraba la app (ver `ANCHO_MINIATURA`).
   const limpia = p.clean_photo_id ? buildPhotoUrl(source, folder, p.clean_photo_id) : null;
   const ficha = p.titled_photo_id ? buildPhotoUrl(source, folder, p.titled_photo_id) : null;
+  const limpiaVisor = p.clean_photo_id
+    ? buildPhotoUrl(source, folder, p.clean_photo_id, ANCHO_VISOR)
+    : null;
+  const fichaVisor = p.titled_photo_id
+    ? buildPhotoUrl(source, folder, p.titled_photo_id, ANCHO_VISOR)
+    : null;
 
   // Los hashtags son COMUNES a todos los nichos: si se añade uno en POV BOF
   // aparece aquí. Lo pidió así el operador.
@@ -419,8 +429,8 @@ function CreativoCard({
         open={verFoto}
         onOpenChange={setVerFoto}
         titulo={p.titulo ?? `Producto ${p.producto}`}
-        urlLimpia={limpia}
-        urlTitulo={ficha}
+        urlLimpia={limpiaVisor}
+        urlTitulo={fichaVisor}
         urlDescarga={buildCleanPhotoDownloadUrl(source, folder, p.producto, "ficha")}
         textoDescarga="Descargar la foto con la descripción"
       />

@@ -56,10 +56,27 @@ antes de empezar y avisa en claro si no responde.
 - De `android/` **solo se versiona `twa-manifest.json`**; el resto del proyecto
   Android lo regenera Bubblewrap en cada build.
 
-## Se reinicia al volver de segundo plano
+## Se cierra sola
 
-Es Android, no la APK: cuando necesita memoria mata el proceso, y eso **no se
-puede evitar** desde una app web. Lo que sí se ha hecho:
+Había DOS causas distintas y se confundían entre sí.
+
+### 1. Se quedaba sin memoria en las pantallas de fotos (esta sí era culpa nuestra)
+
+Lo que ocupa en el móvil no es el fichero, es el **bitmap descodificado**: ancho
+× alto × 4 bytes. Una ficha de Drive es 1320×2868 → **15 MB por foto**, y una
+carpeta de diez productos son veinte fotos → ~300 MB. Chrome mata la pestaña por
+memoria y en una TWA eso se ve exactamente igual que "Android ha cerrado la
+app". Por eso pasaba "a veces": dependía de la pantalla.
+
+Arreglado sirviendo las fotos encogidas (`?w=` en `/nicho-pov-bof/photo`,
+`services/thumbs.py`): 400 px en las cuadrículas —1,4 MB, 10× menos— y 900 px al
+abrir el visor, que es una sola foto. El original se sigue sirviendo donde
+importa: las descargas (`/foto-limpia`) y el montaje del vídeo.
+
+### 2. Android matando el proceso (esta no tiene arreglo)
+
+Cuando el sistema necesita memoria mata la app, y eso **no se puede evitar**
+desde una app web. Lo que sí se ha hecho:
 
 - `alwaysRetainTaskState` ya viene puesto por Bubblewrap (el workflow lo
   comprueba y falla si algún día dejara de ponerlo). Eso evita el caso de

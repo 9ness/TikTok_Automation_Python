@@ -9,6 +9,7 @@ import {
   buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useSetEstado,
+  ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 import { FotoModal } from "./FotoModal";
@@ -251,12 +252,12 @@ export function EscaparateModal({
             titulo={fotoDe.titulo || `Producto ${fotoDe.producto}`}
             urlLimpia={
               fotoDe.clean_photo_id
-                ? buildPhotoUrl(source, folder, fotoDe.clean_photo_id)
+                ? buildPhotoUrl(source, folder, fotoDe.clean_photo_id, ANCHO_VISOR)
                 : null
             }
             urlTitulo={
               fotoDe.titled_photo_id
-                ? buildPhotoUrl(source, folder, fotoDe.titled_photo_id)
+                ? buildPhotoUrl(source, folder, fotoDe.titled_photo_id, ANCHO_VISOR)
                 : null
             }
             urlDescarga={buildCleanPhotoDownloadUrl(source, folder, fotoDe.producto)}

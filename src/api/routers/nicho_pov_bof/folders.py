@@ -119,11 +119,17 @@ def get_photo(
     source: Annotated[str, Query()],
     folder: Annotated[str, Query()],
     file_id: Annotated[str, Query()],
+    w: Annotated[int | None, Query(ge=64, le=4000)] = None,
 ) -> FileResponse:
     """Sirve los bytes de una foto. Auth por `?api_key=` (va en un <img src>).
 
     El `file_id` se valida contra el listado real de la carpeta — no se
     descarga un ID arbitrario que mande el cliente.
+
+    Con `w` se sirve encogida a ese ancho. No es un lujo de red: el móvil
+    guarda cada foto descodificada (ancho × alto × 4 bytes), y con las fichas a
+    tamaño original una carpeta se comía ~300 MB y Chrome mataba la pestaña —
+    en la APK eso es la app cerrándose sola. Ver `services/thumbs.py`.
     """
     import os
 
@@ -149,6 +155,14 @@ def get_photo(
     except (ValueError, RuntimeError) as e:
         raise APIError(f"No se pudo descargar la foto: {e}", status_code=502) from e
 
+    media_type = match.get("mime") or "image/jpeg"
+    if w:
+        from src.nicho_pov_bof.services import thumbs
+
+        encogida = thumbs.miniatura(path, w)
+        if encogida != path:
+            path, media_type = encogida, "image/jpeg"
+
     from src.nicho_pov_bof import config as pov_config
 
     # Un file ID de Drive es inmutable → se puede cachear un día entero. Pero
@@ -159,7 +173,7 @@ def get_photo(
     propia = pov_config.es_fuente_propia(source)
     return FileResponse(
         path,
-        media_type=match.get("mime") or "image/jpeg",
+        media_type=media_type,
         headers={
             "Cache-Control": "no-cache" if propia else "public, max-age=86400",
         },

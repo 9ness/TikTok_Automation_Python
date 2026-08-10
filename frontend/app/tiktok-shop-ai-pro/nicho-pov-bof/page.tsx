@@ -55,6 +55,7 @@ import {
   useSumarUnidades,
   useBuscarProductos,
   useProductosRecuperados,
+  ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -630,7 +631,10 @@ export default function NichoPovBofPage() {
                 {photos.data.items.map((p) => (
                   <a
                     key={p.id}
-                    href={buildPhotoUrl(source, folder, p.id)}
+                    // La cuadrícula pinta miniaturas, pero el enlace abre la
+                    // foto DE VERDAD: es una sola, en su propia pestaña, y el
+                    // que la abre quiere verla tal cual está en Drive.
+                    href={buildPhotoUrl(source, folder, p.id, null)}
                     target="_blank"
                     rel="noreferrer"
                     className="group relative aspect-square overflow-hidden rounded-lg border border-border/60 bg-muted"
@@ -1909,12 +1913,12 @@ function ProductoCard({
         titulo={`Producto ${producto.producto}`}
         urlLimpia={
           producto.clean_photo_id
-            ? buildPhotoUrl(source, folder, producto.clean_photo_id)
+            ? buildPhotoUrl(source, folder, producto.clean_photo_id, ANCHO_VISOR)
             : null
         }
         urlTitulo={
           producto.titled_photo_id
-            ? buildPhotoUrl(source, folder, producto.titled_photo_id)
+            ? buildPhotoUrl(source, folder, producto.titled_photo_id, ANCHO_VISOR)
             : null
         }
         urlDescarga={

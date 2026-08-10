@@ -23,6 +23,7 @@ import {
   useSubirClipLargo,
   useVocesLargo,
   videoLargoUrl,
+  ANCHO_VISOR,
 } from "@/lib/queries/povBofLargo";
 import type { ProductoLargo } from "@/lib/types/povBofLargo";
 
@@ -167,8 +168,16 @@ function ProductoCard({
   const [cta, setCta] = useState(true);
   const [flecha, setFlecha] = useState(true);
 
+  // Miniatura para la tarjeta, más grande solo al abrir el visor: a tamaño
+  // original el móvil se quedaba sin memoria (ver `ANCHO_MINIATURA`).
   const limpia = p.clean_photo_id ? fotoLargoUrl(source, folder, p.clean_photo_id) : null;
   const ficha = p.titled_photo_id ? fotoLargoUrl(source, folder, p.titled_photo_id) : null;
+  const limpiaVisor = p.clean_photo_id
+    ? fotoLargoUrl(source, folder, p.clean_photo_id, ANCHO_VISOR)
+    : null;
+  const fichaVisor = p.titled_photo_id
+    ? fotoLargoUrl(source, folder, p.titled_photo_id, ANCHO_VISOR)
+    : null;
 
   function subirClip(slot: 1 | 2, file: File) {
     subir.mutate(
@@ -393,8 +402,8 @@ function ProductoCard({
         open={verFoto}
         onOpenChange={setVerFoto}
         titulo={p.titulo || `Producto ${p.producto}`}
-        urlLimpia={limpia}
-        urlTitulo={ficha}
+        urlLimpia={limpiaVisor}
+        urlTitulo={fichaVisor}
       />
     </div>
   );

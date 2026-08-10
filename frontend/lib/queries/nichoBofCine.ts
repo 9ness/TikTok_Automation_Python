@@ -3,6 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { ANCHO_MINIATURA, ANCHO_VISOR } from "@/lib/queries/nichoPovBof";
+
+// Se re-exporta para que las pantallas de este nicho no tengan que importar
+// del POV BOF solo para pedir la foto grande del visor.
+export { ANCHO_VISOR };
 import type {
   CineFoldersResponse,
   CinePrompts,
@@ -115,10 +120,15 @@ function keyQs(): string {
   return k ? `&api_key=${encodeURIComponent(k)}` : "";
 }
 
-export function cineFotoUrl(source: string, folder: string, fileId: string): string {
+/** `ancho` encoge la foto en el servidor — ver `ANCHO_MINIATURA` en
+ *  `nichoPovBof.ts`: sin esto el móvil se queda sin memoria y cierra la app. */
+export function cineFotoUrl(
+  source: string, folder: string, fileId: string, ancho: number | null = ANCHO_MINIATURA,
+): string {
+  const w = ancho ? `&w=${ancho}` : "";
   return `${base()}/api/v1/nicho-pov-bof/photo?source=${encodeURIComponent(
     source,
-  )}&folder=${encodeURIComponent(folder)}&file_id=${encodeURIComponent(fileId)}${keyQs()}`;
+  )}&folder=${encodeURIComponent(folder)}&file_id=${encodeURIComponent(fileId)}${w}${keyQs()}`;
 }
 
 export function cineFotoLimpiaUrl(source: string, folder: string, producto: string): string {

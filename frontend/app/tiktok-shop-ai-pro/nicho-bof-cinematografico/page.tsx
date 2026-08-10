@@ -29,6 +29,7 @@ import {
   useCinePrompts,
   useCineSources,
   useCineSubirClip,
+  ANCHO_VISOR,
 } from "@/lib/queries/nichoBofCine";
 import type { CineProducto } from "@/lib/types/nichoBofCine";
 
@@ -256,6 +257,14 @@ function CineCard({
   const ficha = producto.titled_photo_id
     ? cineFotoUrl(source, folder, producto.titled_photo_id)
     : null;
+  // El visor pide una copia mayor solo al abrirse; la tarjeta se conforma con
+  // la miniatura. A tamaño original el móvil se quedaba sin memoria.
+  const limpiaVisor = producto.clean_photo_id
+    ? cineFotoUrl(source, folder, producto.clean_photo_id, ANCHO_VISOR)
+    : null;
+  const fichaVisor = producto.titled_photo_id
+    ? cineFotoUrl(source, folder, producto.titled_photo_id, ANCHO_VISOR)
+    : null;
 
   function onFile(slot: 1 | 2) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,8 +425,8 @@ function CineCard({
         open={verFoto}
         onOpenChange={setVerFoto}
         titulo={producto.titulo || `Producto ${producto.producto}`}
-        urlLimpia={limpia}
-        urlTitulo={ficha}
+        urlLimpia={limpiaVisor}
+        urlTitulo={fichaVisor}
         urlDescarga={cineFotoLimpiaUrl(source, folder, producto.producto)}
       />
       <VideoModal

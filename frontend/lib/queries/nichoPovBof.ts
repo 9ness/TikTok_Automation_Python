@@ -169,13 +169,32 @@ export function useBorrarMiProducto() {
   });
 }
 
-export function buildPhotoUrl(source: string, folder: string, fileId: string): string {
+/** Ancho por defecto de las fotos que se PINTAN.
+ *
+ *  Es lo que impedía que la APK se cerrara sola: el móvil guarda cada foto
+ *  descodificada (ancho × alto × 4 bytes), así que una ficha de 1320×2868 son
+ *  15 MB de RAM y una carpeta de diez productos se plantaba en ~300 MB. Chrome
+ *  mata la pestaña por memoria y en la APK eso se ve como la app cerrándose.
+ *  A 400 px la misma foto ocupa 1,4 MB y en una tarjeta no se nota.
+ *
+ *  El original NO se toca donde importa: las descargas van por `/foto-limpia`
+ *  y el vídeo se monta en el servidor leyendo el fichero de Drive.
+ */
+export const ANCHO_MINIATURA = 400;
+/** Para el visor: se ve a ~384 px de ancho, pero con pantallas 2-3x conviene
+ *  el doble largo. Es UNA foto a la vez, no veinte. */
+export const ANCHO_VISOR = 900;
+
+export function buildPhotoUrl(
+  source: string, folder: string, fileId: string, ancho: number | null = ANCHO_MINIATURA,
+): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  const w = ancho ? `&w=${ancho}` : "";
   return `${base}${ROOT}/photo?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
-  )}&file_id=${encodeURIComponent(fileId)}${qs}`;
+  )}&file_id=${encodeURIComponent(fileId)}${w}${qs}`;
 }
 
 // --- Fase 2: automatización de vídeos ----------------------------------
