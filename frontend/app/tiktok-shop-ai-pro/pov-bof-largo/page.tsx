@@ -60,7 +60,6 @@ import {
   useProductosLargo,
   useSetEstadoLargo,
   useSourcesLargo,
-  useSubirClipLargo,
   useSumarUnidadesLargo,
   useVendidosLargo,
   useVocesLargo,
@@ -1484,7 +1483,6 @@ function ProductoCard({
 }) {
   const qc = useQueryClient();
   const guion = useEscribirGuion();
-  const subir = useSubirClipLargo();
   const setEstado = useSetEstadoLargo();
   const buscarUrl = useBuscarProductoUrl();
   const hashtags = useHashtags().data ?? [];
@@ -1492,6 +1490,8 @@ function ProductoCard({
 
   const [verFoto, setVerFoto] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
+  const [subiendo, setSubiendo] = useState<1 | 2 | null>(null);
+  const [pct, setPct] = useState(0);
   const [sexo, setSexo] = useState<"hombre" | "mujer">(
     p.sexo_sugerido === "mujer" ? "mujer" : "hombre",
   );
@@ -1516,21 +1516,61 @@ function ProductoCard({
     );
   }
 
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
+
+  // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
   function subirClip(slot: 1 | 2, file: File) {
-    subir.mutate(
-      {
-        source, folder, producto: p.producto, slot, sexo, file,
-        conGancho: tools.gancho, conTitulo: tools.titulo, conCta: tools.cta, conFlecha: tools.flecha,
-      },
-      {
-        onSuccess: (r) => toast.success(r.message),
-        onError: (e) => toast.error(err(e)),
-        onSettled: () => {
-          const r = refs[slot].current;
-          if (r) r.value = "";
-        },
-      },
-    );
+    setSubiendo(slot);
+    setPct(0);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("source", source);
+    fd.append("folder", folder);
+    fd.append("producto", p.producto);
+    fd.append("slot", String(slot));
+    fd.append("sexo", sexo);
+    fd.append("con_gancho", String(tools.gancho));
+    fd.append("con_titulo", String(tools.titulo));
+    fd.append("con_cta", String(tools.cta));
+    fd.append("con_flecha", String(tools.flecha));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof-largo/clip/upload`);
+    if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      setSubiendo(null);
+      const ref = refs[slot].current;
+      if (ref) ref.value = "";
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const r = JSON.parse(xhr.responseText) as { message?: string };
+          toast.success(r.message || "Clip subido");
+        } catch {
+          toast.success("Clip subido");
+        }
+        void qc.invalidateQueries({ queryKey: largoKeys.productos(source, folder) });
+      } else {
+        let msg = "Error subiendo el clip";
+        try {
+          const r = JSON.parse(xhr.responseText) as { detail?: string; message?: string };
+          msg = r.detail || r.message || msg;
+        } catch {
+          /* respuesta no-JSON */
+        }
+        toast.error(msg);
+      }
+    };
+    xhr.onerror = () => {
+      setSubiendo(null);
+      const ref = refs[slot].current;
+      if (ref) ref.value = "";
+      toast.error("Error de red al subir");
+    };
+    xhr.send(fd);
   }
 
   return (
@@ -1742,6 +1782,7 @@ function ProductoCard({
       <div className="grid grid-cols-2 gap-1.5">
         {([1, 2] as const).map((slot) => {
           const puesto = slot === 1 ? p.clip1 : p.clip2;
+          const subiendoEste = subiendo === slot;
           return (
             <label
               key={slot}
@@ -1749,15 +1790,24 @@ function ProductoCard({
                 puesto
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-border/60 hover:border-violet-500/60"
-              } ${!p.guion ? "pointer-events-none opacity-40" : ""}`}
+              } ${!p.guion || (subiendo !== null && !subiendoEste) ? "pointer-events-none opacity-40" : ""}`}
             >
-              <Upload className="h-3.5 w-3.5 shrink-0" />
-              {puesto ? `Clip ${slot} ✓` : `Clip ${slot}`}
+              {subiendoEste ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  Subiendo {pct}%
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5 shrink-0" />
+                  {puesto ? `Clip ${slot} ✓` : `Clip ${slot}`}
+                </>
+              )}
               <input
                 ref={refs[slot]}
                 type="file"
                 accept="video/*"
-                disabled={subir.isPending || !p.guion}
+                disabled={subiendo !== null || !p.guion}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) subirClip(slot, f);
