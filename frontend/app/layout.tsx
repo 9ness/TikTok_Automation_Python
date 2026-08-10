@@ -3,6 +3,7 @@ import { Rubik } from "next/font/google";
 
 import "./globals.css";
 import { AppInstallBanner } from "@/components/layout/AppInstallBanner";
+import { ChivatoCierres } from "@/components/layout/ChivatoCierres";
 import { LoginGate } from "@/components/layout/LoginModal";
 import { RestaurarPantalla } from "@/components/layout/RestaurarPantalla";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -61,6 +62,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 sentido en la pantalla de login. */}
             <AppInstallBanner />
             <RestaurarPantalla />
+            {/* Temporal: cuenta al servidor cómo terminó la sesión anterior,
+                para saber si la app la mata Android o la reventamos nosotros. */}
+            <ChivatoCierres />
           </LoginGate>
         </Providers>
       </body>

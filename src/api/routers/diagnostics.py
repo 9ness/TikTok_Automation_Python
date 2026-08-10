@@ -27,6 +27,7 @@ compose.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -37,6 +38,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_current_user
+
+logger = logging.getLogger("api")
 
 
 router = APIRouter(
@@ -219,6 +222,50 @@ def diagnostics_deploy(tail: int = 80) -> dict:
     status = _read_json(_host_or_local("temp_work/deploy_status.json")) or {}
     log_text = _tail_file(_host_or_local("logs/deploy.log"), n=tail)
     return {"status": status, "log_tail": log_text}
+
+
+# ---------------------------------------------------------------------------
+# Chivato de cierres de la app
+# ---------------------------------------------------------------------------
+# La APK "se cierra sola" y desde el servidor NO se puede saber por qué: cuando
+# Chrome muere no manda nada. Lo único que queda es que la app, al arrancar,
+# cuente cómo terminó la vez anterior — y para eso hay que apuntarlo aquí.
+#
+# Lo que de verdad se quiere distinguir son tres cosas que se confunden entre
+# sí y piden arreglos opuestos:
+#   · murió con la app EN PANTALLA        → algo la revienta (memoria, un error)
+#   · murió con la app EN SEGUNDO PLANO   → Android matando el proceso
+#   · el operador la cerró él             → no hay nada que arreglar
+#
+# Se guarda en memoria y en el log. No va a Redis a propósito: son cuatro datos
+# de depuración de una sola persona, no un histórico que valga la pena persistir.
+_CIERRES: list[dict] = []
+_MAX_CIERRES = 200
+
+
+@router.post("/cliente")
+def diagnostics_cliente(evento: dict) -> dict:
+    """Recibe un aviso del navegador (cierre anormal o error suelto).
+
+    Nunca falla: si el chivato se rompiera y devolviera un 500, la app pasaría
+    a reintentar en bucle justo cuando ya va mal.
+    """
+    try:
+        evento = {k: v for k, v in list(evento.items())[:20]}
+        evento["recibido"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        _CIERRES.append(evento)
+        del _CIERRES[:-_MAX_CIERRES]
+        logger.info("chivato cliente | %s", json.dumps(evento, ensure_ascii=False)[:800])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("chivato cliente ilegible: %s", e)
+    return {"ok": True}
+
+
+@router.get("/cliente")
+def diagnostics_cliente_listar(tail: int = 50) -> dict:
+    """Lo que ha ido contando la app. Se pierde al reiniciar la API — es para
+    mirar un problema en caliente, no un histórico."""
+    return {"items": _CIERRES[-tail:], "total": len(_CIERRES)}
 
 
 @router.get("/app-logs")
