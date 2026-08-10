@@ -1490,8 +1490,13 @@ function ProductoCard({
 
   const [verFoto, setVerFoto] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
-  const [subiendo, setSubiendo] = useState<1 | 2 | null>(null);
-  const [pct, setPct] = useState(0);
+  // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
+  // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
+  // las demás (subir clips de varios productos a la vez).
+  const [pcts, setPcts] = useState<{ 1: number | null; 2: number | null }>({
+    1: null,
+    2: null,
+  });
   const [sexo, setSexo] = useState<"hombre" | "mujer">(
     p.sexo_sugerido === "mujer" ? "mujer" : "hombre",
   );
@@ -1520,9 +1525,9 @@ function ProductoCard({
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
+  // Cada slot va por su cuenta: no se bloquea el otro clip ni las demás fichas.
   function subirClip(slot: 1 | 2, file: File) {
-    setSubiendo(slot);
-    setPct(0);
+    setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
     fd.append("file", file);
     fd.append("source", source);
@@ -1539,10 +1544,11 @@ function ProductoCard({
     xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof-largo/clip/upload`);
     if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+      if (e.lengthComputable)
+        setPcts((prev) => ({ ...prev, [slot]: Math.round((e.loaded / e.total) * 100) }));
     };
     xhr.onload = () => {
-      setSubiendo(null);
+      setPcts((prev) => ({ ...prev, [slot]: null }));
       const ref = refs[slot].current;
       if (ref) ref.value = "";
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -1565,7 +1571,7 @@ function ProductoCard({
       }
     };
     xhr.onerror = () => {
-      setSubiendo(null);
+      setPcts((prev) => ({ ...prev, [slot]: null }));
       const ref = refs[slot].current;
       if (ref) ref.value = "";
       toast.error("Error de red al subir");
@@ -1782,7 +1788,8 @@ function ProductoCard({
       <div className="grid grid-cols-2 gap-1.5">
         {([1, 2] as const).map((slot) => {
           const puesto = slot === 1 ? p.clip1 : p.clip2;
-          const subiendoEste = subiendo === slot;
+          const pctSlot = pcts[slot];
+          const subiendoEste = pctSlot !== null;
           return (
             <label
               key={slot}
@@ -1790,12 +1797,12 @@ function ProductoCard({
                 puesto
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-border/60 hover:border-violet-500/60"
-              } ${!p.guion || (subiendo !== null && !subiendoEste) ? "pointer-events-none opacity-40" : ""}`}
+              } ${!p.guion || subiendoEste ? "pointer-events-none opacity-60" : ""}`}
             >
               {subiendoEste ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                  Subiendo {pct}%
+                  Subiendo {pctSlot}%
                 </>
               ) : (
                 <>
@@ -1807,7 +1814,7 @@ function ProductoCard({
                 ref={refs[slot]}
                 type="file"
                 accept="video/*"
-                disabled={subiendo !== null || !p.guion}
+                disabled={subiendoEste || !p.guion}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) subirClip(slot, f);
