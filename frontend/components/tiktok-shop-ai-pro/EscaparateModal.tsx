@@ -44,6 +44,8 @@ export function EscaparateModal({
   productos,
   onClose,
   marcarEstado,
+  fotoUrl,
+  descargaUrl,
 }: {
   source: string;
   folder: string;
@@ -52,9 +54,29 @@ export function EscaparateModal({
   /** Mutación de "en_escaparate". Por defecto la del POV BOF; otros nichos
    *  (p. ej. POV BOF Largo) pasan la suya para escribir en su propio progreso. */
   marcarEstado?: MarcarEstado;
+  /** Cómo se pide la foto. Por defecto la del POV BOF (`source/folder/file_id`);
+   *  los nichos con Drive propio (gorras, ropa, cuenta piloto) piden por otra
+   *  vía y pasan la suya. */
+  fotoUrl?: (p: ProductoItem, ancho: number) => string | null;
+  /** URL de descarga de la foto limpia. Sin ella, no se ofrece descarga. */
+  descargaUrl?: (p: ProductoItem) => string | null;
 }) {
   const setEstado = useSetEstado();
   const marcar_ = marcarEstado ?? setEstado.mutate;
+  const foto = (p: ProductoItem, ancho: number) =>
+    fotoUrl
+      ? fotoUrl(p, ancho)
+      : p.clean_photo_id
+        ? buildPhotoUrl(source, folder, p.clean_photo_id, ancho)
+        : null;
+  const fotoFicha = (p: ProductoItem, ancho: number) =>
+    fotoUrl
+      ? null
+      : p.titled_photo_id
+        ? buildPhotoUrl(source, folder, p.titled_photo_id, ancho)
+        : null;
+  const descarga = (p: ProductoItem) =>
+    descargaUrl ? descargaUrl(p) : buildCleanPhotoDownloadUrl(source, folder, p.producto);
   const [verHechos, setVerHechos] = useState(false);
   // Cuál se está guardando: sin esto, con la lista entera deshabilitada por
   // `isPending` no se sabe a qué producto le diste.
@@ -193,7 +215,7 @@ export function EscaparateModal({
                         : "border-border/60"
                     }`}
                   >
-                    {p.clean_photo_id ? (
+                    {foto(p, ANCHO_CHIP) ? (
                       <button
                         type="button"
                         onClick={() => setFotoDe(p)}
@@ -202,7 +224,7 @@ export function EscaparateModal({
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={buildPhotoUrl(source, folder, p.clean_photo_id, ANCHO_CHIP)}
+                          src={foto(p, ANCHO_CHIP) as string}
                           alt={p.titulo || p.producto}
                           loading="lazy"
                           className="h-11 w-11 rounded-md object-cover"
@@ -261,17 +283,9 @@ export function EscaparateModal({
             open
             onOpenChange={(v) => !v && setFotoDe(null)}
             titulo={fotoDe.titulo || `Producto ${fotoDe.producto}`}
-            urlLimpia={
-              fotoDe.clean_photo_id
-                ? buildPhotoUrl(source, folder, fotoDe.clean_photo_id, ANCHO_VISOR)
-                : null
-            }
-            urlTitulo={
-              fotoDe.titled_photo_id
-                ? buildPhotoUrl(source, folder, fotoDe.titled_photo_id, ANCHO_VISOR)
-                : null
-            }
-            urlDescarga={buildCleanPhotoDownloadUrl(source, folder, fotoDe.producto)}
+            urlLimpia={foto(fotoDe, ANCHO_VISOR)}
+            urlTitulo={fotoFicha(fotoDe, ANCHO_VISOR)}
+            urlDescarga={descarga(fotoDe)}
           />
         )}
 
