@@ -32,6 +32,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_bof_cine import (
+    CineEstadoRequest,
     CineFoldersResponse,
     CineMarkCompletedRequest,
     CineMarkCompletedResponse,
@@ -184,6 +185,10 @@ def _listar(
     estado = product_repo.load_folder_para(source, folder, usuario)
     guardados = estado.get("productos") or {}
     activos = _montandose(queue, source, folder)
+    # Una sola lectura del índice de escaparate para toda la carpeta.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    escaparate = pov_repo.escaparate_index(usuario)
 
     items: list[CineProductoInfo] = []
     for par in pares:
@@ -211,6 +216,10 @@ def _listar(
             # puede montar o falta material.
             clip1=bool(g.get("clip1_path")),
             clip2=bool(g.get("clip2_path")),
+            en_escaparate=(
+                pov_repo.clave_escaparate(g.get("tienda", ""), g.get("titulo", ""))
+                in escaparate
+            ),
             uploaded=bool(g.get("uploaded")),
             video_path=g.get("video_path"),
             video_listo_at=int(g.get("video_listo_at") or 0),
@@ -223,6 +232,40 @@ def _listar(
         textos_extraidos=bool(estado.get("textos_extraidos")),
         montando=bool(activos),
     )
+
+
+@router.post("/producto/estado", response_model=CineProductoInfo)
+def set_producto_estado(
+    body: CineEstadoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> CineProductoInfo:
+    """Mete o saca el producto del escaparate.
+
+    No se guarda en el producto sino en el índice ÚNICO por (tienda|nombre):
+    el mismo producto sale en varias carpetas y se graba con varios nichos,
+    pero al Marketplace se sube UNA vez. Marcado aquí, sale marcado en el POV
+    BOF y en el resto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    guardado = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+    if not guardado.get("titulo"):
+        raise APIError(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate.",
+            status_code=400,
+        )
+    pov_repo.set_escaparate(
+        guardado.get("tienda", ""), guardado.get("titulo", ""),
+        body.en_escaparate, usuario,
+    )
+
+    listado = _listar(body.source, body.folder, queue, usuario)
+    for item in listado.items:
+        if item.producto == body.producto:
+            return item
+    raise APIError(f"No existe el producto {body.producto}.", status_code=404)
 
 
 @router.get("/productos", response_model=CineProductosListResponse)

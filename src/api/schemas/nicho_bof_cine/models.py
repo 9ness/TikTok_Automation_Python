@@ -71,6 +71,9 @@ class CineProductoInfo(BaseModel):
     # monta nada: con uno saldría un vídeo a medias.
     clip1: bool = False
     clip2: bool = False
+    # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
+    # los demás nichos — al Marketplace el producto se sube una sola vez.
+    en_escaparate: bool = False
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
@@ -90,3 +93,16 @@ class CineVideoUploadResponse(BaseModel):
     job_id: str = ""
     encolado: bool = False
     message: str
+
+
+class CineEstadoRequest(BaseModel):
+    """Marcar/desmarcar el producto en el escaparate.
+
+    El escaparate es único por producto (tienda|nombre) y compartido con los
+    demás nichos: al Marketplace se sube una sola vez.
+    """
+
+    source: str
+    folder: str
+    producto: str
+    en_escaparate: bool

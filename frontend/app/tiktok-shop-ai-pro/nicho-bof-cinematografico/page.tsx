@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Sparkles,
+  Store,
   Upload,
 } from "lucide-react";
 import Image from "next/image";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
@@ -29,9 +31,11 @@ import {
   useCinePrompts,
   useCineSources,
   useCineSubirClip,
+  useSetEstadoCine,
   ANCHO_VISOR,
 } from "@/lib/queries/nichoBofCine";
 import type { CineProducto } from "@/lib/types/nichoBofCine";
+import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 function copiar(label: string, texto: string) {
   navigator.clipboard.writeText(texto);
@@ -50,6 +54,8 @@ export default function NichoBofCinePage() {
   const prompts = useCinePrompts();
 
   const items = productos.data?.items ?? [];
+  const [verEscaparate, setVerEscaparate] = useState(false);
+  const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const listos = items.filter((p) => p.clip1 && p.clip2).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
@@ -221,6 +227,31 @@ export default function NichoBofCinePage() {
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
             {(productos.error as Error)?.message ?? "No se pudieron cargar los productos."}
           </p>
+        )}
+
+        {/* El escaparate es común a todos los nichos: si el producto ya se
+            metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}
+        {folder && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
+
+        {verEscaparate && folder && (
+          <EscaparateModalCine source={source} folder={folder} productos={items}
+            onClose={() => setVerEscaparate(false)} />
         )}
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -440,5 +471,37 @@ function CineCard({
         )}
       />
     </div>
+  );
+}
+
+
+/** El escaparate del BOF Cine escribe en el índice común (su propio endpoint),
+ *  pero sus productos son LOS MISMOS del POV BOF, así que el modal vale tal
+ *  cual: mismas fotos, mismas carpetas. */
+function EscaparateModalCine({
+  source,
+  folder,
+  productos,
+  onClose,
+}: {
+  source: string;
+  folder: string;
+  productos: CineProducto[];
+  onClose: () => void;
+}) {
+  const setEstado = useSetEstadoCine(source, folder);
+  return (
+    <EscaparateModal
+      source={source}
+      folder={folder}
+      productos={productos as unknown as ProductoItem[]}
+      onClose={onClose}
+      marcarEstado={(vars, opts) =>
+        setEstado.mutate(
+          { producto: vars.producto, en_escaparate: vars.en_escaparate },
+          opts,
+        )
+      }
+    />
   );
 }

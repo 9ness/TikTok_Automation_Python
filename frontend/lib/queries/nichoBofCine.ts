@@ -146,3 +146,20 @@ export function cineVideoUrl(
     producto,
   )}&descargar=${descargar}&v=${v}${keyQs()}`;
 }
+
+/** Mete o saca el producto del escaparate. El estado es ÚNICO por producto
+ *  (tienda|nombre) y compartido con los demás nichos: si ya se metió desde el
+ *  POV BOF o desde otra carpeta, aquí ya sale hecho. */
+export function useSetEstadoCine(source: string, folder: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { producto: string; en_escaparate: boolean }
+  >({
+    mutationFn: (body) =>
+      api.post(`${ROOT}/producto/estado`, { source, folder, ...body }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: cineKeys.productos(source, folder) }),
+  });
+}
