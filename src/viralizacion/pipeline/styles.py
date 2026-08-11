@@ -179,12 +179,13 @@ def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
     """
     font = preset.font_name or config.SUB_FONT
     size = int(config.SUB_FONTSIZE * preset.sub_scale)
+    margen = preset.sub_margin_lr or config.SUB_MARGIN_LR
     style_line = (
         f"Style: Default,{font},{size},"
         # Blanca. El contorno y la sombra del ESTILO van a cero: los pone cada
         # capa con sus propias etiquetas.
         f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H90000000&,-1,0,0,0,100,100,0,0,1,0,0,5,"
-        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
+        f"{margen},{margen},0,1"
     )
     header = _ass_header(style_line)
 
@@ -202,12 +203,11 @@ def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
         palabras = [w["word"].strip().lower() for w in grupo if w["word"].strip()]
         if not palabras:
             continue
-        # Dos líneas: la última palabra baja. Con dos palabras o menos cabe de
-        # sobra en un renglón y partirla quedaría raro.
-        texto = (
-            "\\N".join([" ".join(palabras[:-1]), palabras[-1]])
-            if len(palabras) >= 3 else " ".join(palabras)
-        )
+        # UNA línea. Partirla siempre en dos (que es como nació este estilo)
+        # hacía la letra enorme y todas las frases iguales; el estilo B, que es
+        # el que funciona, cabe casi siempre en un renglón y solo baja cuando no
+        # cabe. De eso se encarga libass con `WrapStyle: 0` y el margen.
+        texto = " ".join(palabras)
         halo = (
             f"{{\\bord{preset.halo_bord}\\blur{preset.halo_blur}"
             f"\\3c{preset.halo_color}\\3a{preset.halo_alpha}\\shad0}}"
@@ -808,6 +808,11 @@ class StylePreset:
     # Sombra bajo la letra. Solo hace falta con halo BLANCO: sobre paisaje claro
     # el blanco sobre blanco se deshace y hay que despegarlo del fondo.
     halo_sombra: float = 0.0
+    # Margen lateral propio. El de `config` (145 px, 13,4%) está pensado para
+    # frases de una línea con el cuerpo de B; estos van algo más anchos para que
+    # tres palabras quepan en UN renglón sin encoger la letra. No se baja más:
+    # por debajo de ~110 px el texto empieza a rozar la botonera de TikTok.
+    sub_margin_lr: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -889,19 +894,19 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         key="reflexion_luz", label="D · Reflexión · resplandor blanco",
         build_ass=build_ass_reflexion,
         font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.70, **_HALO_BLANCO, **_LIMPIO,
+        sub_scale=1.70, sub_margin_lr=125, **_HALO_BLANCO, **_LIMPIO,
     ),
     "reflexion_sombra": StylePreset(
         key="reflexion_sombra", label="E · Reflexión · halo negro",
         build_ass=build_ass_reflexion,
         font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.70, **_HALO_NEGRO, **_LIMPIO,
+        sub_scale=1.70, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
     ),
     "reflexion_serif": StylePreset(
         key="reflexion_serif", label="F · Reflexión · PT Serif",
         build_ass=build_ass_reflexion,
         font_name="PT Serif", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.65, **_HALO_NEGRO, **_LIMPIO,
+        sub_scale=1.55, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
     ),
 }
 
