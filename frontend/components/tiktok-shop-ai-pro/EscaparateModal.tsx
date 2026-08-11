@@ -9,6 +9,7 @@ import {
   buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useSetEstado,
+  ANCHO_CHIP,
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
@@ -201,7 +202,7 @@ export function EscaparateModal({
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={buildPhotoUrl(source, folder, p.clean_photo_id)}
+                          src={buildPhotoUrl(source, folder, p.clean_photo_id, ANCHO_CHIP)}
                           alt={p.titulo || p.producto}
                           loading="lazy"
                           className="h-11 w-11 rounded-md object-cover"

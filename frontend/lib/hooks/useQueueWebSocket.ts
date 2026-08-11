@@ -9,6 +9,9 @@ import type { WsEvent } from "@/lib/types/queue";
 const PING_INTERVAL_MS = 30_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
+/** Cuánto se espera con la app escondida antes de soltar el socket. Un minuto
+ *  para no cortar por mirar una notificación y volver. */
+const HIDDEN_CLOSE_MS = 60_000;
 
 function buildWsUrl(de: string): string {
   const params = new URLSearchParams();
@@ -147,8 +150,44 @@ export function useQueueWebSocket(): void {
 
     connect();
 
+    // Con la app de fondo no hay nadie mirando la cola, pero el socket seguía
+    // abierto haciendo ping cada pocos segundos: gasta batería y mantiene
+    // trabajo vivo en un proceso que Android ya está mirando con lupa para
+    // matarlo (es lo que dice el chivato que pasa). Se suelta al minuto de
+    // esconderse y se vuelve a conectar al volver — el servidor manda un
+    // `snapshot` al reconectar, así que no se pierde ningún job.
+    let dormir: ReturnType<typeof setTimeout> | null = null;
+
+    function alCambiarVisibilidad() {
+      if (document.visibilityState === "hidden") {
+        dormir = setTimeout(() => {
+          stoppedRef.current = true;
+          clearTimers();
+          const ws = wsRef.current;
+          if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
+          wsRef.current = null;
+          setConnection("disconnected");
+        }, HIDDEN_CLOSE_MS);
+        return;
+      }
+      if (dormir) {
+        clearTimeout(dormir);
+        dormir = null;
+      }
+      // Al volver: si se había soltado, reconectar de inmediato.
+      if (!wsRef.current) {
+        stoppedRef.current = false;
+        attemptRef.current = 0;
+        connect();
+      }
+    }
+
+    document.addEventListener("visibilitychange", alCambiarVisibilidad);
+
     return () => {
       stoppedRef.current = true;
+      if (dormir) clearTimeout(dormir);
+      document.removeEventListener("visibilitychange", alCambiarVisibilidad);
       clearTimers();
       const ws = wsRef.current;
       if (ws && ws.readyState !== WebSocket.CLOSED) {

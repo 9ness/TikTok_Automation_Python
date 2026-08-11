@@ -243,6 +243,48 @@ _CIERRES: list[dict] = []
 _MAX_CIERRES = 200
 
 
+def _fichero_cierres() -> Path:
+    """Dónde se guardan los avisos: al lado del estado de la cola.
+
+    Ese directorio es un VOLUMEN de Docker, así que sobrevive al rebuild del
+    contenedor — que es justo lo que hacía falta: los avisos vivían solo en
+    memoria y un deploy se llevó por delante el histórico entero de cierres.
+    (`logs/` del host no vale: está montado en solo lectura.)
+    """
+    base = Path("/app/temp_work")
+    if not base.is_dir():
+        base = Path(__file__).resolve().parents[3] / "temp_work"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "chivato_cierres.jsonl"
+
+
+def _guardar_cierre(evento: dict) -> None:
+    try:
+        f = _fichero_cierres()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        with f.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(evento, ensure_ascii=False) + "\n")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("no se pudo guardar el chivato: %s", e)
+
+
+def _leer_cierres(tail: int) -> list[dict]:
+    try:
+        f = _fichero_cierres()
+        if not f.is_file():
+            return []
+        lineas = f.read_text(encoding="utf-8").splitlines()[-max(1, tail):]
+    except OSError:
+        return []
+    salida = []
+    for linea in lineas:
+        try:
+            salida.append(json.loads(linea))
+        except json.JSONDecodeError:
+            continue
+    return salida
+
+
 @router.post("/cliente")
 def diagnostics_cliente(evento: dict) -> dict:
     """Recibe un aviso del navegador (cierre anormal o error suelto).
@@ -255,6 +297,7 @@ def diagnostics_cliente(evento: dict) -> dict:
         evento["recibido"] = time.strftime("%Y-%m-%d %H:%M:%S")
         _CIERRES.append(evento)
         del _CIERRES[:-_MAX_CIERRES]
+        _guardar_cierre(evento)
         logger.info("chivato cliente | %s", json.dumps(evento, ensure_ascii=False)[:800])
     except Exception as e:  # noqa: BLE001
         logger.warning("chivato cliente ilegible: %s", e)
@@ -263,9 +306,13 @@ def diagnostics_cliente(evento: dict) -> dict:
 
 @router.get("/cliente")
 def diagnostics_cliente_listar(tail: int = 50) -> dict:
-    """Lo que ha ido contando la app. Se pierde al reiniciar la API — es para
-    mirar un problema en caliente, no un histórico."""
-    return {"items": _CIERRES[-tail:], "total": len(_CIERRES)}
+    """Lo que ha ido contando la app. Ahora se guarda en fichero, así que
+    aguanta reinicios y deploys: sirve para ver el patrón de varios días, no
+    solo el problema en caliente."""
+    guardados = _leer_cierres(tail)
+    if not guardados:
+        return {"items": _CIERRES[-tail:], "total": len(_CIERRES)}
+    return {"items": guardados, "total": len(guardados)}
 
 
 @router.get("/app-logs")

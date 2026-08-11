@@ -3,11 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-import { ANCHO_MINIATURA, ANCHO_VISOR } from "@/lib/queries/nichoPovBof";
+import { ANCHO_CHIP, ANCHO_MINIATURA, ANCHO_VISOR } from "@/lib/queries/nichoPovBof";
 
-// Se re-exporta para que las pantallas de este nicho no tengan que importar
-// del POV BOF solo para pedir la foto grande del visor.
-export { ANCHO_VISOR };
+// Se re-exportan para que las pantallas de este nicho no tengan que importar
+// del POV BOF solo para pedir la foto al tamaño que toca.
+export { ANCHO_CHIP, ANCHO_VISOR };
 import type { VendidoItem } from "@/lib/types/nichoPovBof";
 import type {
   ClipLargoUploadResponse,

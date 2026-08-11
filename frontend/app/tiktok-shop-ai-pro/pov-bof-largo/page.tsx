@@ -51,6 +51,7 @@ import {
   usePrompts,
 } from "@/lib/queries/nichoPovBof";
 import {
+  ANCHO_CHIP,
   ANCHO_VISOR,
   fotoLargoUrl,
   largoKeys,
@@ -1051,7 +1052,7 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
                 {v.clean_photo_id ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={fotoLargoUrl(v.source, v.folder, v.clean_photo_id)}
+                    src={fotoLargoUrl(v.source, v.folder, v.clean_photo_id, ANCHO_CHIP)}
                     alt={v.titulo || v.producto}
                     loading="lazy"
                     className="h-12 w-12 shrink-0 rounded-md object-cover"
@@ -1123,7 +1124,7 @@ function ResultadoBusqueda({ item }: { item: ProductoBuscado }) {
       {item.clean_photo_id ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={fotoLargoUrl(item.source, item.folder, item.clean_photo_id)}
+          src={fotoLargoUrl(item.source, item.folder, item.clean_photo_id, ANCHO_CHIP)}
           alt={item.titulo || item.producto}
           loading="lazy"
           className="h-12 w-12 shrink-0 rounded-md object-cover"
@@ -1506,7 +1507,9 @@ function ProductoCard({
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
 
-  const limpia = p.clean_photo_id ? fotoLargoUrl(source, folder, p.clean_photo_id) : null;
+  const limpia = p.clean_photo_id
+    ? fotoLargoUrl(source, folder, p.clean_photo_id, ANCHO_CHIP)
+    : null;
   const limpiaVisor = p.clean_photo_id
     ? fotoLargoUrl(source, folder, p.clean_photo_id, ANCHO_VISOR)
     : null;

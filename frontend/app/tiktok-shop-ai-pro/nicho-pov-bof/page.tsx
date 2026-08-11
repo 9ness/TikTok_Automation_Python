@@ -55,6 +55,7 @@ import {
   useSumarUnidades,
   useBuscarProductos,
   useProductosRecuperados,
+  ANCHO_CHIP,
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
@@ -1069,7 +1070,7 @@ function VendidosModal({ source, onClose }: { source: string; onClose: () => voi
               {v.clean_photo_id ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={buildPhotoUrl(v.source, v.folder, v.clean_photo_id)}
+                  src={buildPhotoUrl(v.source, v.folder, v.clean_photo_id, ANCHO_CHIP)}
                   alt={v.titulo || v.producto}
                   loading="lazy"
                   className="h-12 w-12 shrink-0 rounded-md object-cover"
@@ -1276,7 +1277,7 @@ function ResultadoBusqueda({ item }: { item: ProductoBuscado }) {
       {item.clean_photo_id ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={buildPhotoUrl(item.source, item.folder, item.clean_photo_id)}
+          src={buildPhotoUrl(item.source, item.folder, item.clean_photo_id, ANCHO_CHIP)}
           alt={item.titulo || item.producto}
           loading="lazy"
           className="h-12 w-12 shrink-0 rounded-md object-cover"
@@ -1828,7 +1829,7 @@ function ProductoCard({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={buildPhotoUrl(source, folder, producto.clean_photo_id)}
+              src={buildPhotoUrl(source, folder, producto.clean_photo_id, ANCHO_CHIP)}
               alt={producto.producto}
               loading="lazy"
               className="h-16 w-16 rounded-lg border border-border/60 object-cover transition hover:border-foreground/40"

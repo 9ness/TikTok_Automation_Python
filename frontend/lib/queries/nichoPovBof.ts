@@ -184,6 +184,15 @@ export const ANCHO_MINIATURA = 400;
 /** Para el visor: se ve a ~384 px de ancho, pero con pantallas 2-3x conviene
  *  el doble largo. Es UNA foto a la vez, no veinte. */
 export const ANCHO_VISOR = 900;
+/** Para los sellos de 44-64 px (ficha de producto, vendidos, escaparate).
+ *
+ *  Ahí `ANCHO_MINIATURA` era 6 veces más grande de lo que se pinta, y lo que
+ *  ocupa en el móvil es el bitmap DESCODIFICADO, no el fichero: 400 px de ancho
+ *  son ~1,4 MB por foto, y una carpeta de diez productos ~28 MB de nada. A 160
+ *  px (2,5× para pantallas densas) la misma foto son ~0,22 MB. Cuanto menos
+ *  ocupa el proceso, menos papeletas tiene de que Android lo mate al dejarlo
+ *  de fondo — que es lo que sale en el chivato. */
+export const ANCHO_CHIP = 160;
 
 export function buildPhotoUrl(
   source: string, folder: string, fileId: string, ancho: number | null = ANCHO_MINIATURA,
