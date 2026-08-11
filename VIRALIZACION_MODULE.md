@@ -124,85 +124,49 @@ se puede mantener sin persistencia.
 
 ---
 
-## 7 estilos de subtítulo/filtro (rotan por ronda)
+## 6 estilos de subtítulo/filtro (rotan por ronda)
 
 `pipeline/styles.py:STYLE_PRESETS` — registro extensible (`StylePreset`
 dataclass: `build_ass(lines, preset)` + overrides de filtro de vídeo). Añadir
 un estilo = una entrada nueva en el dict + su clave en `STYLE_ORDER`, sin
 tocar el resto del pipeline. Sin selección explícita, `resolve_style(ronda)`
 rota por `STYLE_ORDER`; si el operador elige un subconjunto (`styles_pool`),
-`distribute_styles` reparte los vídeos entre ellos a partes iguales.
+`distribute_styles` reparte los vídeos entre ellos a partes iguales. La UI los
+pide a la API (`style_choices()`), así que no hay nombres duplicados en el
+frontend.
 
-- **A "Clásico"** (ronda 1, 4, 7…): línea completa blanca, borde negro fino,
-  `Alignment=5` (centrado horizontal Y vertical), `MarginL=MarginR=145`
-  (13.4% — evita la UI de TikTok), DejaVu Sans Bold 68px. Filtro base:
-  `eq=contrast~1.14:saturation~1.25:brightness~0.06:gamma=1.08` (jitter ±5%
-  por vídeo) + `vignette=angle=PI/4.2:mode=forward` (SIEMPRE `forward` —
-  `backward` invierte la viñeta y sobreexpone) + `noise=alls=8:allf=t+u`.
+**Todos comparten el acabado `_LIMPIO`**: color claro y saturado (`saturation_mul`
+1.12), viñeta suave y NADA de polvo, rayaduras ni grano. El acabado "sucio" de
+película vieja se retiró el 11 ago 2026 con sus tres estilos (ver más abajo).
 
-- **B "Reveal"**: UNA palabra en pantalla cada vez (68×1.35px), cambiando de
-  molde tipográfico con `_STACK_MOLDES` (mayúsculas/cursiva/escala/amarillo de
-  acento) y borde negro nítido. Dos intentos previos descartados: revelar
-  letra a letra acumulando la frase (con frases largas el texto se hacía
-  diminuto) y una palabra sola con glow blanco (`\bord5\blur5` con borde
-  blanco — fundía las letras en un borrón ilegible, ver captura del operador).
-  El `end` de cada evento se recorta al `start` de la palabra siguiente: el
-  mínimo de 0,12s que evita el parpadeo invadía la siguiente y ASS apilaba los
-  dos eventos ("LO / que" en pantalla a la vez). Firma visual extra: se probó
-  un overlay de puntos discretos vía `geq` pero resultaba muy lento en vídeos
-  largos (1080x1920x30fps) — **fallback usado**: `noise=alls=35:allf=t+u:c0s=1`
-  (mucho más denso que el grano base de Estilo A), documentado aquí como
-  decisión de diseño, no como olvido.
+- **A "Clásico"**: línea completa blanca con borde negro fino, `Alignment=5`
+  (centrado horizontal Y vertical), `MarginL=MarginR=145` (13,4% — evita la UI
+  de TikTok), DejaVu Sans Bold 68px.
+- **B "Frases"**: trozos de hasta `FRASE_MAX_PALABRAS` (3) palabras en Playfair
+  Display Black a 1,9× el cuerpo base, con contorno oscuro difuminado
+  (`\blur1.4`). Es el que mejor viraliza y del que salen los tres de reflexión.
+- **C "Karaoke"**: palabra a palabra, la que suena en blanco y el resto oscuro.
+- **D/E/F "Reflexión"** (`build_ass_reflexion`): el patrón de B pero en
+  MINÚSCULAS, con la frase partida en DOS líneas (la última palabra baja) y un
+  RESPLANDOR difuminado en vez del contorno duro. Se eligieron con muestras
+  sobre un fotograma real de paisaje:
+  - **D** Playfair + halo BLANCO (`_HALO_BLANCO`). Lleva además una sombra
+    oscura mínima: sin ella, blanco con halo blanco sobre paisaje claro se
+    derrite y no hay quien lo lea (probado).
+  - **E** Playfair + halo NEGRO (`_HALO_NEGRO`).
+  - **F** PT Serif Bold + el mismo halo negro.
 
-- **C "Cinemático"**: karaoke por palabra — cada línea genera un evento ASS
-  POR PALABRA activa, mostrando la FRASE COMPLETA con la palabra actual en
-  blanco (`{\1c&HFFFFFF&}`) y el resto en negro (`{\1c&H000000&}`).
-  `OutlineColour=&H00FFFFFF&` (blanco) para que las palabras negras no se
-  fundan con fondos oscuros. Filtro extra: grade frío/cálido
-  (`gamma_r=1.06:gamma_b=0.94`), viñeta más fuerte (`angle=PI/3.5`), y 2
-  `drawbox` negros (77px ≈ 4% de 1920) arriba/abajo tipo letterbox
-  cinematográfico — no invaden el área de subtítulos (centrados en Y).
-  Las barras no son fijas: `_retracting_bars()` las abre progresivamente
-  durante el gancho (14 `drawbox` escalonados con `enable`, porque `drawbox`
-  no evalúa `t` en su geometría — su `t` es el grosor del trazo).
+  El resplandor son DOS capas ASS: el halo difuminado en `layer=0` y la letra
+  nítida en `layer=1`. Con una sola capa (borde grueso + `\blur` sobre el propio
+  texto) el difuminado se come el filo de la letra.
 
-- **D "Teal & Orange"** y **F "Hora dorada"**: reaprovechan el `build_ass`
-  de C y de B con grade propio (`eq_extra`), viñeta e intensidad de grano
-  distintas. Son variantes de color, no de tipografía.
+**Estilos retirados** — el 6 ago 2026 cayeron D "Serif apilado", E "Cascada" y
+los cuadrados G "Película" y H "Resaltado"; el 11 ago 2026, los tres "sucios"
+(A/B/C con polvo de celuloide, rayaduras y grano), y sus versiones limpias
+A2/B2/C2 pasaron a llamarse A/B/C. Motivo en los cuatro casos: no viralizaban.
+Sus `build_ass` siguen en el fichero — no estorban y volver a darles de alta es
+una línea en el registro.
 
-- **E "Cascada"**: las palabras caen DESORDENADAS por la pantalla — un evento
-  ASS por palabra con `\pos` (con `\N` todo el bloque comparte una sola
-  posición, así que no hay forma de desperdigarlas). Posición horizontal,
-  molde tipográfico (`_CASCADA_MOLDES`: escala 0.58-1.45, blanco/amarillo,
-  cursiva, mayúsculas) y holgura vertical se SORTEAN por bloque: un zigzag
-  fijo izquierda-derecha se lee como plantilla. El bloque va compacto (salto
-  0.92× el cuerpo) y cada palabra usa `layer=j`, así la que acaba de entrar
-  tapa a las anteriores. Fondo con motas de polvo NEGRAS a la deriva
-  (`film_specks` = nº de láminas; ver abajo). Era el estilo "Noir" en blanco
-  y negro — descartado por el operador, el paisaje en B/N no vende.
-
-- **G "Cuadrado"**: réplica del formato viral — el vídeo se recorta a un
-  cuadrado de `SQUARE_SIDE` px con esquinas redondeadas (`SQUARE_RADIUS`)
-  centrado sobre fondo negro, y las palabras van APILÁNDOSE de una en una
-  (`build_ass_stacked`), cada una con un molde tipográfico distinto de
-  `_STACK_MOLDES` (mayúsculas/cursiva/escala/amarillo), máximo `_STACK_MAX`
-  visibles antes de empezar bloque nuevo. Fuente 1.45× la base: el texto vive
-  dentro del cuadrado y tiene que llenarlo.
-  El redondeo se hace con una máscara PNG generada con PIL
-  (`renderer.py:_rounded_square_mask`) + `alphamerge` — ffmpeg no sabe dibujar
-  rectángulos redondeados. La máscara se añade como **último** input para que
-  su índice sea predecible (`mask_idx = 3 if music_path else 2`); con música
-  activada, un índice fijo leería la pista de audio como si fuera la máscara.
-
-- **H "Resaltado"**: el marco cuadrado del G con el texto de los vídeos de
-  referencia del operador — Montserrat ExtraBold (de `assets/fonts`, las
-  mismas que usa Creator Reward) en MAYÚSCULAS, abajo dentro del cuadrado
-  (`\an2` + `HIGHLIGHT_MARGIN_V`), la frase se va ESCRIBIENDO palabra a
-  palabra y la que suena en ese instante va en amarillo (`_HIGHLIGHT_COLOR`,
-  ojo: ASS usa BGR). Al acabar la frase hay un remate de 0,35s con todo en
-  blanco, si no el amarillo se queda congelado. La tipografía es por estilo
-  (`StylePreset.font_name` + `fonts_dir`): `font_name` es el nombre de
-  FAMILIA que lee libass ("Montserrat ExtraBold"), no el del fichero.
 
 **Motas de polvo (`film_specks`)** — `renderer.py:_dust_plate` genera con PIL
 una lámina PNG transparente 1.5× el encuadre con ~130 motas y el filtro la

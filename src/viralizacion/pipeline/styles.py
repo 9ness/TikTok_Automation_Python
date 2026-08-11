@@ -2,23 +2,24 @@
 se vean distintas si la v1 no viraliza). Registro en `STYLE_PRESETS`, orden
 de rotación en `STYLE_ORDER`.
 
-Son SEIS: tres estilos de texto, cada uno en dos acabados.
+Son SEIS, todos con el acabado LIMPIO (`_LIMPIO`): color claro y saturado,
+viñeta suave y NADA de polvo de celuloide, rayaduras ni grano.
 
 - **A "Clásico"**: línea completa blanca, borde negro, centrada.
-- **B "Frases"**: trozos de hasta 3 palabras, centrados, en Playfair Display
-  Black. Sustituyó al antiguo "Reveal" palabra a palabra: con una sola palabra
-  no se coge el sentido de la frase.
+- **B "Frases"**: trozos de hasta 3 palabras en Playfair Display Black, con
+  contorno oscuro. Es el que mejor funciona y del que salen los tres nuevos.
 - **C "Karaoke"**: palabra a palabra, la activa en blanco y el resto en negro.
-- **A2 / B2 / C2**: los mismos tres, con la MISMA tipografía y el mismo
-  movimiento, pero con el acabado LIMPIO (`_LIMPIO`): sin polvo de celuloide,
-  sin rayaduras y sin grano, con el color más claro y saturado y los bordes
-  oscurecidos con una viñeta algo más suave que la de A/B/C.
+- **D / E / F "Reflexión"**: el patrón de B —frases cortas, sin texto gigante—
+  pero en MINÚSCULAS, partidas en dos líneas y con un RESPLANDOR difuminado en
+  vez del contorno duro, que daba aire de subtítulo de karaoke. Cambia la
+  tipografía y el color del halo (ver `_HALO_*`).
 
-Hubo otros cuatro que se retiraron el 6 ago 2026 porque no viralizaban: D
-"Serif apilado", E "Cascada" y los dos del marco cuadrado, G y H. De los
-cuadrados sobrevive lo bueno que tenían — su filtro claro es el de A2/B2/C2.
-Sus `build_ass` se conservan más abajo (no estorban y volver a darles de alta
-es una línea en el registro).
+Historia: hasta el 11 ago 2026 había otros tres estilos "sucios" (A/B/C con
+polvo de celuloide, rayaduras y grano). Se retiraron porque no viralizaban
+—el operador los tenía apagados— y sus versiones limpias (A2/B2/C2) pasaron a
+llamarse A/B/C. Antes ya se habían retirado D "Serif apilado", E "Cascada" y
+los cuadrados G y H, por lo mismo; sus `build_ass` se conservan más abajo (no
+estorban y volver a darles de alta es una línea en el registro).
 
 Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
 `build_ass` y mete su clave en `STYLE_ORDER` — no hay más sitios que tocar
@@ -158,6 +159,66 @@ def build_ass_frases(lines: list[dict], preset: "StylePreset") -> str:
         # `\blur` difumina contorno y sombra: es lo que da el halo suave de la
         # referencia en vez de un borde recortado.
         events.append(_dialogue(start, end, f"{{\\blur1.4}}{texto}"))
+
+    return header + "\n".join(events) + "\n"
+
+
+def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
+    """Frases cortas en minúsculas, partidas en dos líneas, con resplandor.
+
+    Es el estilo B con la referencia que pasó el operador delante: minúsculas
+    (el bloque en mayúsculas grita y aquí se busca lo contrario), la frase
+    partida en dos renglones —tres palabras en una sola línea ocupan casi todo
+    el ancho y obligan a encoger la letra— y un RESPLANDOR difuminado en lugar
+    del contorno duro, que le daba aire de subtítulo de karaoke.
+
+    El resplandor son dos capas: el halo difuminado debajo y la letra nítida
+    encima. Con una sola capa (borde grueso y difuminado sobre el propio texto)
+    el difuminado se come el filo de la letra y sobre paisaje claro se vuelve
+    ilegible — probado.
+    """
+    font = preset.font_name or config.SUB_FONT
+    size = int(config.SUB_FONTSIZE * preset.sub_scale)
+    style_line = (
+        f"Style: Default,{font},{size},"
+        # Blanca. El contorno y la sombra del ESTILO van a cero: los pone cada
+        # capa con sus propias etiquetas.
+        f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H90000000&,-1,0,0,0,100,100,0,0,1,0,0,5,"
+        f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
+    )
+    header = _ass_header(style_line)
+
+    todas = [w for ln in lines for w in (ln.get("words") or [])]
+    events: list[str] = []
+    for i in range(0, len(todas), FRASE_MAX_PALABRAS):
+        grupo = todas[i:i + FRASE_MAX_PALABRAS]
+        start = float(grupo[0]["start"])
+        end = float(grupo[-1]["end"])
+        siguiente = i + FRASE_MAX_PALABRAS
+        if siguiente < len(todas):
+            end = min(end, float(todas[siguiente]["start"]))
+        if end - start < 0.20:
+            end = start + 0.20
+        palabras = [w["word"].strip().lower() for w in grupo if w["word"].strip()]
+        if not palabras:
+            continue
+        # Dos líneas: la última palabra baja. Con dos palabras o menos cabe de
+        # sobra en un renglón y partirla quedaría raro.
+        texto = (
+            "\\N".join([" ".join(palabras[:-1]), palabras[-1]])
+            if len(palabras) >= 3 else " ".join(palabras)
+        )
+        halo = (
+            f"{{\\bord{preset.halo_bord}\\blur{preset.halo_blur}"
+            f"\\3c{preset.halo_color}\\3a{preset.halo_alpha}\\shad0}}"
+        )
+        letra = (
+            f"{{\\bord0\\shad{preset.halo_sombra}"
+            + (r"\4c&H00000000&\4a&H80&" if preset.halo_sombra else "")
+            + r"\blur0.4}"
+        )
+        events.append(_dialogue(start, end, halo + texto, layer=0))
+        events.append(_dialogue(start, end, letra + texto, layer=1))
 
     return header + "\n".join(events) + "\n"
 
@@ -732,6 +793,21 @@ class StylePreset:
     # None = la global de config (DejaVu Sans del sistema).
     font_name: str | None = None
     fonts_dir: str | None = None
+    # --- Rótulo de los estilos "reflexión" (D/E/F) --------------------------
+    # Cuerpo de letra como múltiplo de `config.SUB_FONTSIZE`. B usa 1.9; estos
+    # van algo más pequeños porque parten la frase en DOS líneas.
+    sub_scale: float = 1.9
+    # Resplandor difuminado alrededor de la letra: color, grosor, difuminado y
+    # transparencia (`&HXX&`, más alto = más transparente). Se pinta en una capa
+    # DEBAJO del texto; la letra va nítida encima. Es lo que distingue a estos
+    # estilos del contorno duro de B.
+    halo_color: str = "&H000000&"
+    halo_bord: float = 4.0
+    halo_blur: float = 10.0
+    halo_alpha: str = "&H55&"
+    # Sombra bajo la letra. Solo hace falta con halo BLANCO: sobre paisaje claro
+    # el blanco sobre blanco se deshace y hay que despegarlo del fondo.
+    halo_sombra: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -745,17 +821,6 @@ class StylePreset:
 # Los valores son los del antiguo "Película vieja", que es el look que validó
 # en vídeo: paisaje EN COLOR, apenas oscurecido, con viñeta cerrada y la
 # suciedad de celuloide encima.
-_BASE = dict(
-    vignette_angle="PI/3.2",
-    eq_extra={"gamma": 0.94, "contrast": 1.06},
-    transition_landscape=("fadeblack", 1.05),
-    film_specks=2,
-    film_scratches=4,
-    noise_filter_override="noise=alls=10:allf=t+u",
-    ken_burns=0.13,
-    vignette_breathe=0.14,
-)
-
 # Base de las versiones LIMPIAS (A2, B2, C2): solo el filtro de color, las
 # transiciones y los textos. Nada de efectos por pantalla — fuera el polvo de
 # celuloide, las rayaduras, el grano y la viñeta.
@@ -790,44 +855,61 @@ _LIMPIO = dict(
     transition_landscape=("fadeblack", 1.05),
 )
 
+# Los tres nuevos comparten patrón (frases cortas, minúsculas, dos líneas) y
+# solo cambian en la letra y el resplandor. Se eligieron viendo muestras sobre
+# un fotograma real de paisaje, no de catálogo.
+_HALO_BLANCO = dict(
+    halo_color="&HFFFFFF&", halo_bord=5.0, halo_blur=10.0, halo_alpha="&H50&",
+    # Sombra oscura mínima: sin ella, el blanco con halo blanco sobre paisaje
+    # claro se derrite y no hay quien lea la letra.
+    halo_sombra=2.0,
+)
+_HALO_NEGRO = dict(
+    halo_color="&H000000&", halo_bord=4.0, halo_blur=10.0, halo_alpha="&H55&",
+    halo_sombra=0.0,
+)
+
 STYLE_PRESETS: dict[str, StylePreset] = {
-    # --- Los tres de siempre, con la suciedad de celuloide ---
-    "classic": StylePreset(
-        key="classic", label="A · Clásico", build_ass=build_ass_classic, **_BASE,
-    ),
-    "reveal": StylePreset(
-        key="reveal", label="B · Frases", build_ass=build_ass_frases,
-        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(), **_BASE,
-    ),
-    "cinematic": StylePreset(
-        key="cinematic", label="C · Karaoke", build_ass=build_ass_cinematic, **_BASE,
-    ),
-    # --- Los mismos tres, LIMPIOS ---
-    # Misma tipografía y mismo movimiento de subtítulo que su original: lo
-    # único que cambia es el filtro. Sin polvo, sin rayaduras, sin grano y sin
-    # viñeta, y con el color claro y saturado que el operador validó en los
-    # cuadrados. A pantalla completa: el marco cuadrado era de G/H, que se
-    # retiraron.
+    # --- Los tres de siempre (antes A2/B2/C2) ---
     "classic_claro": StylePreset(
-        key="classic_claro", label="A2 · Clásico claro",
+        key="classic_claro", label="A · Clásico",
         build_ass=build_ass_classic, **_LIMPIO,
     ),
     "reveal_claro": StylePreset(
-        key="reveal_claro", label="B2 · Frases claro",
+        key="reveal_claro", label="B · Frases",
         build_ass=build_ass_frases,
         font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(), **_LIMPIO,
     ),
     "cinematic_claro": StylePreset(
-        key="cinematic_claro", label="C2 · Karaoke claro",
+        key="cinematic_claro", label="C · Karaoke",
         build_ass=build_ass_cinematic, **_LIMPIO,
+    ),
+    # --- Los tres de reflexión ---
+    "reflexion_luz": StylePreset(
+        key="reflexion_luz", label="D · Reflexión · resplandor blanco",
+        build_ass=build_ass_reflexion,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.70, **_HALO_BLANCO, **_LIMPIO,
+    ),
+    "reflexion_sombra": StylePreset(
+        key="reflexion_sombra", label="E · Reflexión · halo negro",
+        build_ass=build_ass_reflexion,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.70, **_HALO_NEGRO, **_LIMPIO,
+    ),
+    "reflexion_serif": StylePreset(
+        key="reflexion_serif", label="F · Reflexión · PT Serif",
+        build_ass=build_ass_reflexion,
+        font_name="PT Serif", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.65, **_HALO_NEGRO, **_LIMPIO,
     ),
 }
 
 
 # Orden de rotación automática cuando el operador no elige estilo por ronda.
 STYLE_ORDER = [
-    "classic", "reveal", "cinematic",
     "classic_claro", "reveal_claro", "cinematic_claro",
+    "reflexion_luz", "reflexion_sombra", "reflexion_serif",
 ]
 
 
