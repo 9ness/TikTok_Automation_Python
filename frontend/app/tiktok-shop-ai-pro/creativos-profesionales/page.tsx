@@ -7,6 +7,7 @@ import {
   Loader2,
   Sparkles,
   Store,
+  ShoppingBag,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
@@ -53,6 +55,7 @@ export default function CreativosProPage() {
 
   const [bajando, setBajando] = useState("");
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verVendidos, setVerVendidos] = useState(false);
 
   const items = productos.data ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
@@ -228,6 +231,21 @@ export default function CreativosProPage() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
           </div>
+        )}
+
+        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
+            buscar, así que se abre desde cualquier nicho. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+        </button>
+
+        {verVendidos && (
+          <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
         )}
 
         {/* El escaparate es el mismo para todos los nichos: si el producto ya

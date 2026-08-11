@@ -8,6 +8,7 @@ import {
   Sparkles,
   Store,
   Upload,
+  ShoppingBag,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/queries/nichoRopa";
 import { VideoModal } from "@/components/ui/video-modal";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
@@ -46,6 +48,7 @@ export default function NichoRopaPage() {
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   function copiar(label: string, texto?: string) {
@@ -132,6 +135,21 @@ export default function NichoRopaPage() {
             </>
           )}
         </button>
+
+        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
+            buscar, así que se abre desde cualquier nicho. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+        </button>
+
+        {verVendidos && (
+          <VendidosModal conBuscador={false} onClose={() => setVerVendidos(false)} />
+        )}
 
         {/* El escaparate es común a todos los nichos: si el producto ya se
             metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}

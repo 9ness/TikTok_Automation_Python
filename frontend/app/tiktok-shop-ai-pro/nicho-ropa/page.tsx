@@ -11,6 +11,7 @@ import {
   Trash2,
   Upload,
   UserPlus,
+  ShoppingBag,
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -20,6 +21,7 @@ import { ApiError } from "@/lib/api";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -58,6 +60,7 @@ export default function NichoRopaPersonasPage() {
   const items = prendas.data?.items ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   return (
@@ -173,6 +176,21 @@ export default function NichoRopaPersonasPage() {
             </>
           )}
         </button>
+
+        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
+            buscar, así que se abre desde cualquier nicho. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+        </button>
+
+        {verVendidos && (
+          <VendidosModal conBuscador={false} onClose={() => setVerVendidos(false)} />
+        )}
 
         {/* El escaparate es común a todos los nichos: si el producto ya se
             metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}

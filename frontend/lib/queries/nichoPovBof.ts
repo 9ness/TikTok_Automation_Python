@@ -382,14 +382,16 @@ export function useGuardarHashtags() {
   });
 }
 
+/** Ranking de vendidos. Sin `source` salen TODOS, que es lo que piden los
+ *  nichos con catálogo propio (gorras, ropa, cuenta piloto): el índice es único
+ *  y global, así que el ranking es el mismo se mire desde donde se mire. */
 export function useVendidos(source: string) {
   return useQuery<VendidoItem[]>({
     queryKey: nichoPovBofKeys.vendidos(source),
     queryFn: async () =>
       (await api.get<{ items: VendidoItem[] }>(
-        `${ROOT}/vendidos?source=${encodeURIComponent(source)}`,
+        `${ROOT}/vendidos${source ? `?source=${encodeURIComponent(source)}` : ""}`,
       )).items ?? [],
-    enabled: Boolean(source),
   });
 }
 

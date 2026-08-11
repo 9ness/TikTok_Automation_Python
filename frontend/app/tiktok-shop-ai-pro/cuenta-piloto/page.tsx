@@ -9,12 +9,14 @@ import {
   Store,
   Trash2,
   Upload,
+  ShoppingBag,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
@@ -41,6 +43,7 @@ export default function CuentaPilotoPage() {
   const items = productos.data ?? [];
   const sinTitulo = items.filter((p) => p.tiene_ficha && !p.titulo).length;
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   return (
@@ -89,6 +92,21 @@ export default function CuentaPilotoPage() {
               </>
             )}
           </button>
+        )}
+
+        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
+            buscar, así que se abre desde cualquier nicho. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+        </button>
+
+        {verVendidos && (
+          <VendidosModal conBuscador={false} onClose={() => setVerVendidos(false)} />
         )}
 
         {/* El escaparate es común a todos los nichos: si el mismo producto ya

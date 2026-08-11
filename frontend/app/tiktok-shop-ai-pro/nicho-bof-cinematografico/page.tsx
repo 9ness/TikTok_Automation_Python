@@ -4,6 +4,7 @@ import {
   Check,
   Clapperboard,
   Download,
+  ShoppingBag,
   Image as ImageIcon,
   Loader2,
   Sparkles,
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -56,6 +58,7 @@ export default function NichoBofCinePage() {
 
   const items = productos.data?.items ?? [];
   const [verEscaparate, setVerEscaparate] = useState(false);
+  const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const listos = items.filter((p) => p.clip1 && p.clip2).length;
@@ -228,6 +231,21 @@ export default function NichoBofCinePage() {
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
             {(productos.error as Error)?.message ?? "No se pudieron cargar los productos."}
           </p>
+        )}
+
+        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
+            buscar, así que se abre desde cualquier nicho. */}
+        <button
+          type="button"
+          onClick={() => setVerVendidos(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Productos que vendieron
+        </button>
+
+        {verVendidos && (
+          <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
         )}
 
         {/* El escaparate es común a todos los nichos: si el producto ya se
