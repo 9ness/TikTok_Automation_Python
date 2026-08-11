@@ -10,6 +10,8 @@ export const creativosKeys = {
   all: ["nicho-creativos"] as const,
   prompt: () => [...creativosKeys.all, "prompt"] as const,
   folders: (source: string) => [...creativosKeys.all, "folders", source] as const,
+  subidos: (source: string, folder: string) =>
+    [...creativosKeys.all, "subidos", source, folder] as const,
 };
 
 export interface PromptCreativos {
@@ -60,5 +62,40 @@ export function useCompletarCarpetaCreativos() {
     mutationFn: (body) => api.post(`${ROOT}/complete`, body),
     onSuccess: (_r, v) =>
       void qc.invalidateQueries({ queryKey: creativosKeys.folders(v.source) }),
+  });
+}
+
+/** Qué creativos de la carpeta ya se han publicado.
+ *
+ *  Va aparte de la lista de productos (que es la del POV BOF) porque es lo
+ *  ÚNICO que este nicho guarda por su cuenta: "subido" allí es el vídeo y aquí
+ *  el creativo, y son dos publicaciones distintas del mismo producto. */
+export function useSubidosCreativos(source: string, folder: string | null) {
+  return useQuery<string[]>({
+    queryKey: creativosKeys.subidos(source, folder ?? ""),
+    queryFn: async () =>
+      (
+        await api.get<{ items: string[] }>(
+          `${ROOT}/subidos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+            folder ?? "",
+          )}`,
+        )
+      ).items ?? [],
+    enabled: Boolean(source && folder),
+  });
+}
+
+/** Lo marca el operador a mano: aquí no hay montaje que termine. */
+export function useMarcarSubidoCreativo(source: string, folder: string | null) {
+  const qc = useQueryClient();
+  return useMutation<{ items: string[] }, Error, { producto: string; uploaded: boolean }>({
+    mutationFn: (body) =>
+      api.post<{ items: string[] }>(`${ROOT}/subido`, {
+        source,
+        folder: folder ?? "",
+        ...body,
+      }),
+    onSuccess: (res) =>
+      qc.setQueryData(creativosKeys.subidos(source, folder ?? ""), res.items ?? []),
   });
 }

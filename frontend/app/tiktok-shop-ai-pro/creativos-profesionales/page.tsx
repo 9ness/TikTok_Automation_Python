@@ -21,7 +21,9 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   useCompletarCarpetaCreativos,
   useFoldersCreativos,
+  useMarcarSubidoCreativo,
   usePromptCreativos,
+  useSubidosCreativos,
 } from "@/lib/queries/nichoCreativos";
 // El catálogo es EL MISMO del Nicho POV BOF: fuentes, fotos, textos, hashtags,
 // escaparate y vendidos. Duplicarlo habría significado extraer los textos dos
@@ -52,6 +54,10 @@ export default function CreativosProPage() {
   const prompt = usePromptCreativos();
   const extraer = useExtraerTextos();
   const completar = useCompletarCarpetaCreativos();
+  // Qué creativos ya se publicaron: propio de este nicho, se marca a mano.
+  const subidos = useSubidosCreativos(source, folder);
+  const marcarSubido = useMarcarSubidoCreativo(source, folder);
+  const yaSubidos = new Set(subidos.data ?? []);
 
   const [bajando, setBajando] = useState("");
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -279,7 +285,19 @@ export default function CreativosProPage() {
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {items.map((p) => (
-            <CreativoCard key={p.producto} source={source} folder={folder!} producto={p} />
+            <CreativoCard
+              key={p.producto}
+              source={source}
+              folder={folder!}
+              producto={p}
+              subido={yaSubidos.has(p.producto)}
+              onSubido={(v) =>
+                marcarSubido.mutate(
+                  { producto: p.producto, uploaded: v },
+                  { onError: (e) => toast.error(err(e)) },
+                )
+              }
+            />
           ))}
         </div>
 
@@ -315,17 +333,22 @@ function CreativoCard({
   source,
   folder,
   producto: p,
+  subido,
+  onSubido,
 }: {
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** Si el CREATIVO de este producto ya se publicó. Es propio de este nicho:
+   *  "subido" en el POV BOF es el vídeo, y son dos publicaciones distintas. */
+  subido: boolean;
+  onSubido: (v: boolean) => void;
 }) {
   const [verFoto, setVerFoto] = useState(false);
   const setEstado = useSetEstado();
   const hashtags = useHashtags();
   const [enEscaparate, setEnEscaparate] = useState(p.en_escaparate);
   const [sold, setSold] = useState(p.sold);
-  const [eligiendoNicho, setEligiendoNicho] = useState(false);
 
   // Dos tamaños a propósito: la tarjeta pinta una miniatura y el visor pide una
   // más grande solo al abrirlo. A tamaño original una carpeta se llevaba ~300 MB
@@ -413,15 +436,25 @@ function CreativoCard({
         >
           🏪 Escaparate
         </button>
+        {/* Lo marca el operador a mano: aquí no hay montaje que termine, el
+            creativo se genera fuera. */}
+        <button
+          type="button"
+          onClick={() => onSubido(!subido)}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            subido
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-border/60 text-muted-foreground"
+          }`}
+        >
+          📤 Subido
+        </button>
         <button
           type="button"
           onClick={() => {
-            if (sold) {
-              setSold(false);
-              push({ sold: false });
-              return;
-            }
-            setEligiendoNicho(true);
+            const v = !sold;
+            setSold(v);
+            push({ sold: v });
           }}
           className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
             sold
@@ -433,47 +466,6 @@ function CreativoCard({
         </button>
       </div>
 
-      {/* La venta se atribuye a un nicho: el mismo producto se trabaja con
-          varios y adivinarlo sería inventar el dato. Aquí se propone
-          "creativos" por defecto, pero puede haber vendido por otro. */}
-      {eligiendoNicho && (
-        <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2">
-          <p className="text-[11px] font-semibold">¿Con qué nicho vendió?</p>
-          <div className="grid grid-cols-2 gap-1">
-            {(
-              [
-                ["creativos", "Creativos Pro"],
-                ["pov_bof", "POV BOF"],
-                ["pov_bof_largo", "POV BOF Largo"],
-                ["bof_cine", "BOF Cine"],
-                ["ropa", "Ropa"],
-                ["gorras", "Gorras"],
-                ["otro", "Otro"],
-              ] as [string, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => {
-                  setEligiendoNicho(false);
-                  setSold(true);
-                  push({ sold: true, nicho: key });
-                }}
-                className="truncate rounded border border-border/60 px-2 py-1 text-[10px] transition hover:border-emerald-500 hover:text-emerald-500"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setEligiendoNicho(false)}
-            className="w-full rounded px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
 
       {/* Se baja la de la FICHA también aquí, no solo en la descarga masiva:
           el creativo necesita los beneficios del producto y solo están ahí. */}

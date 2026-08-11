@@ -7,6 +7,8 @@ que la pantalla usa los endpoints de aquél y aquí solo vive lo que es propio:
 - GET  /prompt   → el prompt del creativo + el formato (3:4)
 - GET  /folders  → las carpetas con el progreso DE ESTE NICHO
 - POST /complete → marcar/desmarcar carpeta hecha
+- GET  /subidos  → qué creativos de la carpeta ya se publicaron
+- POST /subido   → marcar/desmarcar uno como publicado
 
 Duplicar productos/textos/estado habría significado extraer los textos dos
 veces con Gemini y que las dos copias se separaran en cuanto alguien corrigiera
@@ -40,6 +42,15 @@ class CompletarRequest(BaseModel):
     source: str
     folder: str
     completed: bool = True
+
+
+class SubidoRequest(BaseModel):
+    """Marcar a mano que el creativo de ese producto ya está publicado."""
+
+    source: str
+    folder: str
+    producto: str
+    uploaded: bool
 
 
 @router.get("/prompt", response_model=PromptCreativosResponse)
@@ -107,3 +118,36 @@ def marcar_completada(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return {"ok": True}
+
+
+@router.get("/subidos")
+def list_subidos(
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Números de producto cuyo creativo ya se publicó.
+
+    Va aparte de la lista de productos (que es la del POV BOF) para no duplicar
+    allí un campo que solo entiende este nicho: la pantalla junta las dos cosas.
+    """
+    from src.nicho_creativos.repos import subidos_repo
+
+    return {"items": sorted(subidos_repo.subidos(source, folder, usuario))}
+
+
+@router.post("/subido")
+def marcar_subido(
+    body: SubidoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Lo marca el operador a mano: aquí no hay montaje que termine, el creativo
+    se genera fuera. Es PROPIO de este nicho — "subido" en el POV BOF es el
+    vídeo, y esto es el creativo."""
+    from src.nicho_creativos.repos import subidos_repo
+
+    try:
+        subidos_repo.marcar(body.source, body.folder, body.producto, body.uploaded, usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"items": sorted(subidos_repo.subidos(body.source, body.folder, usuario))}
