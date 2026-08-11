@@ -615,6 +615,17 @@ def set_producto_estado(
     """
     from src.nicho_pov_bof.repos import product_repo
 
+    # Los textos se leen APARTE y no del `update_product` de abajo: los tres
+    # campos que toca este endpoint son privados, así que a un usuario que no
+    # sea `ness` la respuesta le vuelve solo con lo suyo, SIN título ni tienda —
+    # y sin ellos no hay clave de escaparate y la marca se perdía en silencio.
+    textos = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+    if body.en_escaparate is not None and not textos.get("titulo"):
+        raise _bad_request(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate. Pásale 'Textos' antes."
+        )
+
     try:
         prod = product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
@@ -626,7 +637,7 @@ def set_producto_estado(
         # sube una sola vez. Así queda marcado en todos los sitios a la vez.
         if body.en_escaparate is not None:
             product_repo.set_escaparate(
-                prod.get("tienda", ""), prod.get("titulo", ""),
+                textos.get("tienda", ""), textos.get("titulo", ""),
                 body.en_escaparate, usuario,
             )
     except RuntimeError as e:
