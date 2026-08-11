@@ -33,6 +33,8 @@ export interface PrendaPersonas {
   /** El emoji que se quema junto al título. */
   emojis: string;
   caption_riesgo: string;
+  /** Escaparate: índice único por (tienda|nombre), común a todos los nichos. */
+  en_escaparate: boolean;
   uploaded: boolean;
   video_path: string | null;
   video_listo_at: number;

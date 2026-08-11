@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCopy, Download, Loader2, Sparkles } from "lucide-react";
+import { ClipboardCopy, Download, Loader2, Sparkles, Store } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import {
@@ -17,8 +18,10 @@ import {
   useGorras,
   useGorrasCarpetas,
   useGorrasPrompts,
+  useSetEstadoGorras,
 } from "@/lib/queries/nichoGorras";
 import type { Gorra } from "@/lib/types/nichoGorras";
+import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 export default function NichoGorrasPage() {
   const carpetas = useGorrasCarpetas();
@@ -30,6 +33,8 @@ export default function NichoGorrasPage() {
 
   const items = gorras.data?.items ?? [];
   const conTexto = items.filter((g) => g.titulo).length;
+  const [verEscaparate, setVerEscaparate] = useState(false);
+  const pendientesEscaparate = items.filter((g) => !g.en_escaparate).length;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24">
@@ -123,6 +128,34 @@ export default function NichoGorrasPage() {
             </>
           )}
         </button>
+
+        {/* El escaparate es común a todos los nichos: si el producto ya se
+            metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}
+        {activa && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
+
+        {verEscaparate && activa && (
+          <EscaparateModalGorras
+            carpeta={activa}
+            gorras={items}
+            onClose={() => setVerEscaparate(false)}
+          />
+        )}
 
         {gorras.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -222,5 +255,38 @@ function GorraCard({ carpeta, gorra }: { carpeta: string; gorra: Gorra }) {
         urlDescarga={gorraFotoLimpiaUrl(carpeta, gorra.producto)}
       />
     </div>
+  );
+}
+
+/** El escaparate de las gorras escribe en el índice común (su propio
+ *  endpoint), pero su Drive es otro: las fotos no se piden por
+ *  `source/folder` sino por file ID, así que se le pasan las URLs a mano. */
+function EscaparateModalGorras({
+  carpeta,
+  gorras,
+  onClose,
+}: {
+  carpeta: string;
+  gorras: Gorra[];
+  onClose: () => void;
+}) {
+  const setEstado = useSetEstadoGorras(carpeta);
+  return (
+    <EscaparateModal
+      source=""
+      folder={carpeta}
+      productos={gorras as unknown as ProductoItem[]}
+      onClose={onClose}
+      marcarEstado={(vars, opts) =>
+        setEstado.mutate(
+          { producto: vars.producto, en_escaparate: vars.en_escaparate },
+          opts,
+        )
+      }
+      // El endpoint de foto de este nicho no redimensiona: se ignora el ancho.
+      fotoUrl={(p) => (p.clean_photo_id ? gorraFotoUrl(p.clean_photo_id) : null)}
+      fotoFichaUrl={(p) => (p.titled_photo_id ? gorraFotoUrl(p.titled_photo_id) : null)}
+      descargaUrl={(p) => gorraFotoLimpiaUrl(carpeta, p.producto)}
+    />
   );
 }

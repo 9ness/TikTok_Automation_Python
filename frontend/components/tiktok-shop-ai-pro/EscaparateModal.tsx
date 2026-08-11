@@ -46,6 +46,7 @@ export function EscaparateModal({
   marcarEstado,
   fotoUrl,
   descargaUrl,
+  fotoFichaUrl,
 }: {
   source: string;
   folder: string;
@@ -60,6 +61,9 @@ export function EscaparateModal({
   fotoUrl?: (p: ProductoItem, ancho: number) => string | null;
   /** URL de descarga de la foto limpia. Sin ella, no se ofrece descarga. */
   descargaUrl?: (p: ProductoItem) => string | null;
+  /** La captura de la ficha, para el visor. Sin ella solo se enseña la limpia
+   *  (los nichos con Drive propio pueden no tenerla a mano). */
+  fotoFichaUrl?: (p: ProductoItem, ancho: number) => string | null;
 }) {
   const setEstado = useSetEstado();
   const marcar_ = marcarEstado ?? setEstado.mutate;
@@ -69,12 +73,13 @@ export function EscaparateModal({
       : p.clean_photo_id
         ? buildPhotoUrl(source, folder, p.clean_photo_id, ancho)
         : null;
-  const fotoFicha = (p: ProductoItem, ancho: number) =>
-    fotoUrl
-      ? null
-      : p.titled_photo_id
-        ? buildPhotoUrl(source, folder, p.titled_photo_id, ancho)
-        : null;
+  const fotoFicha = (p: ProductoItem, ancho: number) => {
+    if (fotoFichaUrl) return fotoFichaUrl(p, ancho);
+    if (fotoUrl) return null;
+    return p.titled_photo_id
+      ? buildPhotoUrl(source, folder, p.titled_photo_id, ancho)
+      : null;
+  };
   const descarga = (p: ProductoItem) =>
     descargaUrl ? descargaUrl(p) : buildCleanPhotoDownloadUrl(source, folder, p.producto);
   const [verHechos, setVerHechos] = useState(false);

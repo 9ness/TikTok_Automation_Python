@@ -31,6 +31,8 @@ export interface PrendaItem {
   emojis: string;
   /** Promesa detectada en el caption; vacío si es seguro publicarlo. */
   caption_riesgo: string;
+  /** Escaparate: índice único por (tienda|nombre), común a todos los nichos. */
+  en_escaparate: boolean;
   uploaded: boolean;
   video_path: string | null;
   video_listo_at: number;

@@ -7,6 +7,7 @@ import {
   Loader2,
   Scissors,
   Sparkles,
+  Store,
   Trash2,
   Upload,
   UserPlus,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
@@ -31,11 +33,13 @@ import {
   useExtraerTextosRopaPersonas,
   usePrendasPersonas,
   usePromptsRopaPersonas,
+  useSetEstadoRopaPersonas,
   useSubirVideoRopaPersonas,
   useTituloPrenda,
   videoRopaPersonasUrl,
 } from "@/lib/queries/nichoRopaPersonas";
 import type { PrendaPersonas } from "@/lib/types/nichoRopaPersonas";
+import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 function copiar(label: string, texto: string) {
   navigator.clipboard.writeText(texto);
@@ -52,6 +56,8 @@ export default function NichoRopaPersonasPage() {
 
   const items = prendas.data?.items ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
+  const [verEscaparate, setVerEscaparate] = useState(false);
+  const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24">
@@ -167,6 +173,34 @@ export default function NichoRopaPersonasPage() {
           )}
         </button>
 
+        {/* El escaparate es común a todos los nichos: si el producto ya se
+            metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}
+        {activa && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
+
+        {verEscaparate && activa && (
+          <EscaparateModalRopaPersonas
+            carpeta={activa}
+            prendas={items}
+            onClose={() => setVerEscaparate(false)}
+          />
+        )}
+
         {prendas.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando prendas…
@@ -185,6 +219,40 @@ export default function NichoRopaPersonasPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** El escaparate de este nicho escribe en el índice común (por su propio
+ *  endpoint), pero las fotos NO vienen del Drive del POV BOF: aquí se piden
+ *  por file ID, así que se le pasan al modal las URLs de este nicho. Por eso
+ *  `source` va vacío — no existe ese concepto en la ropa. */
+function EscaparateModalRopaPersonas({
+  carpeta,
+  prendas,
+  onClose,
+}: {
+  carpeta: string;
+  prendas: PrendaPersonas[];
+  onClose: () => void;
+}) {
+  const setEstado = useSetEstadoRopaPersonas(carpeta);
+  return (
+    <EscaparateModal
+      source=""
+      folder={carpeta}
+      productos={prendas as unknown as ProductoItem[]}
+      onClose={onClose}
+      marcarEstado={(vars, opts) =>
+        setEstado.mutate(
+          { producto: vars.producto, en_escaparate: vars.en_escaparate },
+          opts,
+        )
+      }
+      fotoUrl={(p) =>
+        p.clean_photo_id ? fotoRopaPersonasUrl(p.clean_photo_id) : null
+      }
+      descargaUrl={(p) => fotoLimpiaRopaPersonasUrl(carpeta, p.producto)}
+    />
   );
 }
 

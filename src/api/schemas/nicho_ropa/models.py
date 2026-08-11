@@ -44,6 +44,9 @@ class PrendaInfo(BaseModel):
     emojis: str = ""
     # Promesa detectada en el caption; vacío si es seguro publicarlo.
     caption_riesgo: str = ""
+    # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
+    # los demás nichos — al Marketplace el producto se sube una sola vez.
+    en_escaparate: bool = False
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
@@ -56,6 +59,18 @@ class PrendasListResponse(BaseModel):
     items: list[PrendaInfo] = Field(default_factory=list)
     textos_extraidos: bool = False
     montando: bool = False
+
+
+class PrendaEstadoRequest(BaseModel):
+    """Marcar/desmarcar la prenda en el escaparate.
+
+    El escaparate es único por producto (tienda|nombre) y compartido con los
+    demás nichos: al Marketplace se sube una sola vez.
+    """
+
+    carpeta: str
+    producto: str
+    en_escaparate: bool
 
 
 class VideoRopaUploadResponse(BaseModel):

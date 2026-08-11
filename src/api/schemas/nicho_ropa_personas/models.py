@@ -66,6 +66,9 @@ class PrendaPersonasInfo(BaseModel):
     # El emoji que acompaña al título quemado en el vídeo.
     emojis: str = ""
     caption_riesgo: str = ""
+    # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
+    # los demás nichos — al Marketplace el producto se sube una sola vez.
+    en_escaparate: bool = False
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
@@ -96,3 +99,15 @@ class TituloPrendaRequest(BaseModel):
     carpeta: str = Field(..., min_length=1)
     producto: str = Field(..., min_length=1)
     titulo: str = Field(default="", max_length=120)
+
+
+class PrendaPersonasEstadoRequest(BaseModel):
+    """Marcar/desmarcar la prenda en el escaparate.
+
+    El escaparate es único por producto (tienda|nombre) y compartido con los
+    demás nichos: al Marketplace se sube una sola vez.
+    """
+
+    carpeta: str
+    producto: str
+    en_escaparate: bool

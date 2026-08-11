@@ -20,6 +20,8 @@ export interface ProductoPiloto {
   gancho: string;
   cta: string;
   caption_riesgo: string;
+  /** Escaparate: índice único por (tienda|nombre), común a todos los nichos. */
+  en_escaparate: boolean;
   tiene_ficha: boolean;
   videos: VideoPiloto[];
   creado_at: number;

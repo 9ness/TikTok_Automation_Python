@@ -4,6 +4,7 @@
 - GET  /api/v1/nicho-ropa-personas/prendas        → prendas + textos + vídeo
 - POST /api/v1/nicho-ropa-personas/extraer-textos → lee las capturas con Gemini
 - POST /api/v1/nicho-ropa-personas/prenda/titulo  → título escrito a mano
+- POST /api/v1/nicho-ropa-personas/prenda/estado  → mete/saca del escaparate
 - GET  /api/v1/nicho-ropa-personas/foto           → foto por file ID
 - GET  /api/v1/nicho-ropa-personas/foto-limpia    → descarga la foto de la prenda
 - POST /api/v1/nicho-ropa-personas/video/upload   → sube el bruto y encola
@@ -34,6 +35,7 @@ from src.api.exceptions import APIError
 from src.api.schemas.nicho_ropa_personas import (
     CarpetaRopaPersonas,
     CarpetasRopaPersonasResponse,
+    PrendaPersonasEstadoRequest,
     PrendaPersonasInfo,
     PrendasPersonasListResponse,
     TituloPrendaRequest,
@@ -90,8 +92,10 @@ def list_prendas(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
     refresh: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasPersonasListResponse:
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import emojis as emojis_svc
     from src.nicho_ropa.services import text_extractor
 
@@ -107,6 +111,9 @@ def list_prendas(
     guardados = doc.get("productos") or {}
     activos = _montando(queue, carpeta)
     sin_ficha = carpeta in config.SIN_CAPTURA_DE_FICHA
+    # Una sola lectura del índice de escaparate para toda la carpeta: son 38
+    # prendas y preguntar por cada una serían 38 viajes a Redis.
+    escaparate = pov_repo.escaparate_index(usuario)
 
     items = []
     for par in pares:
@@ -130,6 +137,12 @@ def list_prendas(
                 pid, prod.get("titulo", ""), prod.get("caption", ""),
             ),
             caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
+            en_escaparate=(
+                pov_repo.clave_escaparate(
+                    prod.get("tienda", ""), prod.get("titulo", ""),
+                )
+                in escaparate
+            ),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -147,6 +160,7 @@ def list_prendas(
 def extraer_textos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasPersonasListResponse:
     """Pone el título a cada prenda.
 
@@ -186,13 +200,14 @@ def extraer_textos(
         product_repo.save_extracted_texts(carpeta, textos)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return list_prendas(queue=queue, carpeta=carpeta)
+    return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
 
 
 @router.post("/prenda/titulo", response_model=PrendasPersonasListResponse)
 def set_titulo(
     body: TituloPrendaRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasPersonasListResponse:
     """Título escrito a mano — es el que se quema en el centro del vídeo.
 
@@ -209,7 +224,45 @@ def set_titulo(
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return list_prendas(queue=queue, carpeta=carpeta)
+    return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
+
+
+@router.post("/prenda/estado", response_model=PrendaPersonasInfo)
+def set_prenda_estado(
+    body: PrendaPersonasEstadoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> PrendaPersonasInfo:
+    """Mete o saca la prenda del escaparate.
+
+    No se guarda en la prenda sino en el índice ÚNICO por (tienda|nombre): el
+    mismo producto sale en varias carpetas y se graba con varios nichos, pero
+    al Marketplace se sube UNA vez. Marcado aquí, sale marcado en el POV BOF y
+    en el resto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    carpeta = body.carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+
+    guardado = product_repo.get_product(carpeta, body.producto)
+    if not guardado.get("titulo"):
+        raise APIError(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate.",
+            status_code=400,
+        )
+    pov_repo.set_escaparate(
+        guardado.get("tienda", ""), guardado.get("titulo", ""),
+        body.en_escaparate, usuario,
+    )
+
+    listado = list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
+    for item in listado.items:
+        if item.producto == body.producto:
+            return item
+    raise APIError(f"No existe la prenda {body.producto}.", status_code=404)
 
 
 def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:

@@ -26,6 +26,8 @@ export interface Gorra {
   caption: string;
   emojis: string;
   caption_riesgo: string;
+  /** Escaparate: índice único por (tienda|nombre), común a todos los nichos. */
+  en_escaparate: boolean;
 }
 
 export interface GorrasListResponse {

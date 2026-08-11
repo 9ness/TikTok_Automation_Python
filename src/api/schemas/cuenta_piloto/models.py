@@ -24,6 +24,9 @@ class ProductoPiloto(BaseModel):
     gancho: str = ""
     cta: str = ""
     caption_riesgo: str = ""
+    # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
+    # los demás nichos — al Marketplace el producto se sube una sola vez.
+    en_escaparate: bool = False
     tiene_ficha: bool = False
     videos: list[VideoPiloto] = Field(default_factory=list)
     creado_at: float = 0
@@ -52,3 +55,19 @@ class TextosPilotoRequest(BaseModel):
 class VideoPilotoUploadResponse(BaseModel):
     job_id: str
     message: str
+
+
+class EstadoPilotoRequest(BaseModel):
+    """Marcar/desmarcar el producto en el escaparate.
+
+    El escaparate es único por producto (tienda|nombre) y compartido con los
+    demás nichos: al Marketplace se sube una sola vez.
+
+    El campo se llama `producto` y no `id` aunque en `ProductoPiloto` el
+    identificador sea `id`: es el nombre que ya usan el resto de endpoints de
+    este nicho (`TextosPilotoRequest`, los query params) y el que manda el
+    modal del escaparate, común a todos los nichos.
+    """
+
+    producto: str
+    en_escaparate: bool

@@ -3,6 +3,7 @@
 - GET  /api/v1/nicho-ropa/prompts        → imagen + vídeo (con y sin manos)
 - GET  /api/v1/nicho-ropa/prendas        → prendas emparejadas + textos
 - POST /api/v1/nicho-ropa/extraer-textos → lee las capturas con Gemini
+- POST /api/v1/nicho-ropa/producto/estado → mete/saca del escaparate
 - GET  /api/v1/nicho-ropa/foto           → sirve una foto por file ID
 - GET  /api/v1/nicho-ropa/foto-limpia    → descarga la foto de la prenda
 - POST /api/v1/nicho-ropa/video/upload   → sube el bruto y encola el montaje
@@ -28,6 +29,7 @@ from src.api.exceptions import APIError
 from src.api.schemas.nicho_ropa import (
     CarpetaRopa,
     CarpetasRopaResponse,
+    PrendaEstadoRequest,
     PrendaInfo,
     PrendasListResponse,
     PromptsRopaResponse,
@@ -105,9 +107,11 @@ def list_prendas(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
     refresh: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasListResponse:
     """Prendas de la carpeta, con su foto limpia, su captura y sus textos."""
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import emojis as emojis_svc
 
     carpeta = carpeta or config.CARPETA_DEFECTO
@@ -121,6 +125,8 @@ def list_prendas(
     doc = product_repo.load(carpeta)
     guardados = doc.get("productos") or {}
     activos = _montando(queue, carpeta)
+    # Una sola lectura del índice de escaparate para toda la carpeta.
+    escaparate = pov_repo.escaparate_index(usuario)
 
     items = []
     for par in pares:
@@ -141,6 +147,10 @@ def list_prendas(
                 pid, prod.get("titulo", ""), prod.get("caption", ""),
             ),
             caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
+            en_escaparate=(
+                pov_repo.clave_escaparate(prod.get("tienda", ""), prod.get("titulo", ""))
+                in escaparate
+            ),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -154,10 +164,48 @@ def list_prendas(
     )
 
 
+@router.post("/producto/estado", response_model=PrendaInfo)
+def set_producto_estado(
+    body: PrendaEstadoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> PrendaInfo:
+    """Mete o saca la prenda del escaparate.
+
+    No se guarda en el producto sino en el índice ÚNICO por (tienda|nombre):
+    el mismo producto sale en varias carpetas y se graba con varios nichos,
+    pero al Marketplace se sube UNA vez. Marcado aquí, sale marcado en el POV
+    BOF y en el resto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    carpeta = body.carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    guardado = product_repo.get_product(carpeta, body.producto)
+    if not guardado.get("titulo"):
+        raise APIError(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate.",
+            status_code=400,
+        )
+    pov_repo.set_escaparate(
+        guardado.get("tienda", ""), guardado.get("titulo", ""),
+        body.en_escaparate, usuario,
+    )
+
+    listado = list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
+    for item in listado.items:
+        if item.producto == body.producto:
+            return item
+    raise APIError(f"No existe la prenda {body.producto}.", status_code=404)
+
+
 @router.post("/extraer-textos", response_model=PrendasListResponse)
 def extraer_textos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasListResponse:
     """Lee las capturas con Gemini y guarda título, tienda, caption y emojis.
 
@@ -178,7 +226,7 @@ def extraer_textos(
         product_repo.save_extracted_texts(carpeta, textos)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return list_prendas(queue=queue, carpeta=carpeta)
+    return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
 
 
 def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:

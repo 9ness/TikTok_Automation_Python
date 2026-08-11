@@ -1,4 +1,5 @@
 from .models import (
+    EstadoPilotoRequest,
     ProductoPiloto,
     ProductoPilotoResponse,
     ProductosPilotoResponse,
@@ -8,6 +9,7 @@ from .models import (
 )
 
 __all__ = [
+    "EstadoPilotoRequest",
     "ProductoPiloto",
     "ProductoPilotoResponse",
     "ProductosPilotoResponse",

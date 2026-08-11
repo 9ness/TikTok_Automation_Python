@@ -6,6 +6,7 @@ import {
   Loader2,
   Plus,
   Sparkles,
+  Store,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   fotoPilotoUrl,
@@ -21,10 +23,12 @@ import {
   useCrearProductoPiloto,
   useExtraerTextosPiloto,
   useProductosPiloto,
+  useSetEstadoPiloto,
   useSubirVideoPiloto,
   videoPilotoUrl,
 } from "@/lib/queries/cuentaPiloto";
 import type { ProductoPiloto } from "@/lib/types/cuentaPiloto";
+import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 function error(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -36,6 +40,8 @@ export default function CuentaPilotoPage() {
 
   const items = productos.data ?? [];
   const sinTitulo = items.filter((p) => p.tiene_ficha && !p.titulo).length;
+  const [verEscaparate, setVerEscaparate] = useState(false);
+  const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24">
@@ -85,6 +91,33 @@ export default function CuentaPilotoPage() {
           </button>
         )}
 
+        {/* El escaparate es común a todos los nichos: si el mismo producto ya
+            se metió desde el POV BOF, aquí sale hecho. */}
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
+
+        {verEscaparate && (
+          <EscaparateModalPiloto
+            productos={items}
+            onClose={() => setVerEscaparate(false)}
+          />
+        )}
+
         {productos.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
@@ -108,6 +141,41 @@ export default function CuentaPilotoPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** El escaparate de este nicho escribe en el índice común (por su propio
+ *  endpoint). Dos adaptaciones: aquí el producto se identifica por `id` y el
+ *  modal espera `producto`, así que se mapea antes; y las fotos no salen del
+ *  Drive del POV BOF sino de este nicho, por eso `source`/`folder` van vacíos
+ *  y se le pasan las URLs propias. */
+function EscaparateModalPiloto({
+  productos,
+  onClose,
+}: {
+  productos: ProductoPiloto[];
+  onClose: () => void;
+}) {
+  const setEstado = useSetEstadoPiloto();
+  return (
+    <EscaparateModal
+      source=""
+      // Aquí no hay carpetas: `folder` solo se usa como rótulo de la cabecera
+      // del modal, y dejarlo vacío deja un “·” colgando.
+      folder="Mis productos"
+      productos={
+        productos.map((p) => ({ ...p, producto: p.id })) as unknown as ProductoItem[]
+      }
+      onClose={onClose}
+      marcarEstado={(vars, opts) =>
+        setEstado.mutate(
+          { producto: vars.producto, en_escaparate: vars.en_escaparate },
+          opts,
+        )
+      }
+      fotoUrl={(p) => fotoPilotoUrl(p.producto, "limpia")}
+      descargaUrl={(p) => fotoPilotoUrl(p.producto, "limpia", true)}
+    />
   );
 }
 

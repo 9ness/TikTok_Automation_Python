@@ -6,6 +6,7 @@ import {
   Download,
   Loader2,
   Sparkles,
+  Store,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
@@ -20,13 +21,16 @@ import {
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
+  useSetEstadoRopa,
   useSubirVideoRopa,
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
 import { VideoModal } from "@/components/ui/video-modal";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
+import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 export default function NichoRopaPage() {
   // Las carpetas de mujer son las del nicho CON personas, pero la misma prenda
@@ -40,6 +44,8 @@ export default function NichoRopaPage() {
   const items = prendas.data?.items ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
+  const [verEscaparate, setVerEscaparate] = useState(false);
+  const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
 
   function copiar(label: string, texto?: string) {
     if (!texto) return;
@@ -125,7 +131,35 @@ export default function NichoRopaPage() {
             </>
           )}
         </button>
+
+        {/* El escaparate es común a todos los nichos: si el producto ya se
+            metió desde el POV BOF o desde otra carpeta, aquí sale hecho. */}
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
+          >
+            <Store className="h-3.5 w-3.5" />
+            Meter en el escaparate
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-bold ${
+                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
+              }`}
+            >
+              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+            </span>
+          </button>
+        )}
       </section>
+
+      {verEscaparate && (
+        <EscaparateModalRopa
+          carpeta={carpeta}
+          prendas={items}
+          onClose={() => setVerEscaparate(false)}
+        />
+      )}
 
       {/* Paso 2 — prompts */}
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
@@ -382,5 +416,39 @@ function PrendaCard({
         localPath={prenda.video_path}
       />
     </div>
+  );
+}
+
+/** El escaparate de la ropa escribe en el índice común (su propio endpoint),
+ *  pero su Drive es otro: las fotos no se piden por `source/folder` sino por
+ *  file ID, así que se le pasan las URLs a mano. Tampoco hay `source`: es UNA
+ *  carpeta compartida por enlace. */
+function EscaparateModalRopa({
+  carpeta,
+  prendas,
+  onClose,
+}: {
+  carpeta: string;
+  prendas: PrendaItem[];
+  onClose: () => void;
+}) {
+  const setEstado = useSetEstadoRopa(carpeta);
+  return (
+    <EscaparateModal
+      source=""
+      folder={carpeta}
+      productos={prendas as unknown as ProductoItem[]}
+      onClose={onClose}
+      marcarEstado={(vars, opts) =>
+        setEstado.mutate(
+          { producto: vars.producto, en_escaparate: vars.en_escaparate },
+          opts,
+        )
+      }
+      // El endpoint de foto de este nicho no redimensiona: se ignora el ancho.
+      fotoUrl={(p) => (p.clean_photo_id ? buildFotoRopaUrl(p.clean_photo_id) : null)}
+      fotoFichaUrl={(p) => (p.titled_photo_id ? buildFotoRopaUrl(p.titled_photo_id) : null)}
+      descargaUrl={(p) => buildFotoLimpiaRopaUrl(p.producto, carpeta)}
+    />
   );
 }

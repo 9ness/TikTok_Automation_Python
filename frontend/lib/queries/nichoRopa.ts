@@ -86,6 +86,18 @@ export function useSubirVideoRopa() {
   });
 }
 
+/** Mete o saca la prenda del escaparate. El estado es ÚNICO por producto
+ *  (tienda|nombre) y compartido con los demás nichos: si ya se metió desde el
+ *  POV BOF o desde otra carpeta, aquí ya sale hecho. */
+export function useSetEstadoRopa(carpeta: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { producto: string; en_escaparate: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/producto/estado`, { carpeta, ...body }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
 function conApiKey(path: string): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;

@@ -4,6 +4,7 @@
 - GET  /api/v1/nicho-gorras/carpetas       → las 8 de la tienda
 - GET  /api/v1/nicho-gorras/gorras         → gorras emparejadas + textos
 - POST /api/v1/nicho-gorras/extraer-textos → lee las fichas con Gemini
+- POST /api/v1/nicho-gorras/producto/estado → mete/saca del escaparate
 - GET  /api/v1/nicho-gorras/foto           → foto por file ID
 - GET  /api/v1/nicho-gorras/foto-limpia    → descarga la foto de la gorra
 
@@ -19,9 +20,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_gorras import (
+    GorraEstadoRequest,
     GorraInfo,
     GorrasCarpeta,
     GorrasCarpetasResponse,
@@ -60,9 +62,10 @@ def list_carpetas() -> GorrasCarpetasResponse:
     ])
 
 
-def _listar(carpeta: str) -> GorrasListResponse:
+def _listar(carpeta: str, usuario: str = "") -> GorrasListResponse:
     from src.nicho_gorras.services import text_extractor
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import emojis as emojis_svc
 
     try:
@@ -72,6 +75,8 @@ def _listar(carpeta: str) -> GorrasListResponse:
 
     doc = product_repo.load(carpeta)
     guardados = doc.get("productos") or {}
+    # Una sola lectura del índice de escaparate para toda la carpeta.
+    escaparate = pov_repo.escaparate_index(usuario)
     items = []
     for par in pares:
         pid = par["producto"]
@@ -91,6 +96,10 @@ def _listar(carpeta: str) -> GorrasListResponse:
                 pid, g.get("titulo", ""), g.get("caption", ""),
             ),
             caption_riesgo=caption_arriesgado(g.get("caption", "")) or "",
+            en_escaparate=(
+                pov_repo.clave_escaparate(g.get("tienda", ""), g.get("titulo", ""))
+                in escaparate
+            ),
         ))
     return GorrasListResponse(
         carpeta=carpeta, items=items,
@@ -99,15 +108,56 @@ def _listar(carpeta: str) -> GorrasListResponse:
 
 
 @router.get("/gorras", response_model=GorrasListResponse)
-def list_gorras(carpeta: Annotated[str, Query()] = "") -> GorrasListResponse:
+def list_gorras(
+    carpeta: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> GorrasListResponse:
     carpeta = carpeta or config.CARPETA_DEFECTO
     if not config.es_carpeta_conocida(carpeta):
         raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
-    return _listar(carpeta)
+    return _listar(carpeta, usuario)
+
+
+@router.post("/producto/estado", response_model=GorraInfo)
+def set_producto_estado(
+    body: GorraEstadoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> GorraInfo:
+    """Mete o saca la gorra del escaparate.
+
+    No se guarda en el producto sino en el índice ÚNICO por (tienda|nombre):
+    el mismo producto sale en varias carpetas y se graba con varios nichos,
+    pero al Marketplace se sube UNA vez. Marcado aquí, sale marcado en el POV
+    BOF y en el resto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    carpeta = body.carpeta or config.CARPETA_DEFECTO
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    guardado = product_repo.get_product(carpeta, body.producto)
+    if not guardado.get("titulo"):
+        raise APIError(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate.",
+            status_code=400,
+        )
+    pov_repo.set_escaparate(
+        guardado.get("tienda", ""), guardado.get("titulo", ""),
+        body.en_escaparate, usuario,
+    )
+
+    for item in _listar(carpeta, usuario).items:
+        if item.producto == body.producto:
+            return item
+    raise APIError(f"No existe la gorra {body.producto}.", status_code=404)
 
 
 @router.post("/extraer-textos", response_model=GorrasListResponse)
-def extraer_textos(carpeta: Annotated[str, Query()] = "") -> GorrasListResponse:
+def extraer_textos(
+    carpeta: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> GorrasListResponse:
     from src.nicho_gorras.services import text_extractor
 
     carpeta = carpeta or config.CARPETA_DEFECTO
@@ -127,7 +177,7 @@ def extraer_textos(carpeta: Annotated[str, Query()] = "") -> GorrasListResponse:
         product_repo.save_extracted_texts(carpeta, textos)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return _listar(carpeta)
+    return _listar(carpeta, usuario)
 
 
 def _servir(file_id: str, descargar: bool, nombre: str) -> FileResponse:

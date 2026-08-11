@@ -1,6 +1,7 @@
 """Schemas del Nicho Gorras."""
 
 from .models import (
+    GorraEstadoRequest,
     GorraInfo,
     GorrasCarpeta,
     GorrasCarpetasResponse,
@@ -10,6 +11,7 @@ from .models import (
 )
 
 __all__ = [
+    "GorraEstadoRequest",
     "GorraInfo",
     "GorrasCarpeta",
     "GorrasCarpetasResponse",

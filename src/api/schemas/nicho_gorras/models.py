@@ -39,9 +39,24 @@ class GorraInfo(BaseModel):
     caption: str = ""
     emojis: str = ""
     caption_riesgo: str = ""
+    # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
+    # los demás nichos — al Marketplace el producto se sube una sola vez.
+    en_escaparate: bool = False
 
 
 class GorrasListResponse(BaseModel):
     carpeta: str
     items: list[GorraInfo] = Field(default_factory=list)
     textos_extraidos: bool = False
+
+
+class GorraEstadoRequest(BaseModel):
+    """Marcar/desmarcar la gorra en el escaparate.
+
+    El escaparate es único por producto (tienda|nombre) y compartido con los
+    demás nichos: al Marketplace se sube una sola vez.
+    """
+
+    carpeta: str
+    producto: str
+    en_escaparate: bool

@@ -4,6 +4,7 @@
 - POST   /api/v1/cuenta-piloto/productos      → alta subiendo las DOS fotos
 - POST   /api/v1/cuenta-piloto/extraer-textos → relee las fichas con Gemini
 - PATCH  /api/v1/cuenta-piloto/producto       → corrige los textos a mano
+- POST   /api/v1/cuenta-piloto/producto/estado → mete/saca del escaparate
 - DELETE /api/v1/cuenta-piloto/producto       → borra producto + ficheros
 - GET    /api/v1/cuenta-piloto/foto           → sirve la foto limpia o la ficha
 - POST   /api/v1/cuenta-piloto/video/upload   → sube un bruto y encola el montaje
@@ -27,6 +28,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.cuenta_piloto import (
+    EstadoPilotoRequest,
     ProductoPiloto,
     ProductoPilotoResponse,
     ProductosPilotoResponse,
@@ -71,8 +73,22 @@ def _montandose(queue: JobQueue | None, usuario: str) -> set[str]:
     return activos
 
 
-def _a_schema(prod: dict, *, montando: bool = False) -> ProductoPiloto:
+def _escaparate(usuario: str) -> set[str]:
+    """Claves del escaparate del usuario, de una sola lectura.
+
+    Se pide UNA vez por listado y se pasa a `_a_schema`: preguntar producto a
+    producto serían N viajes a Redis para pintar la misma pantalla.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    return pov_repo.escaparate_index(usuario)
+
+
+def _a_schema(
+    prod: dict, *, montando: bool = False, escaparate: set[str] | None = None,
+) -> ProductoPiloto:
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import emojis as emojis_svc
 
     pid = str(prod.get("id") or "")
@@ -93,6 +109,15 @@ def _a_schema(prod: dict, *, montando: bool = False) -> ProductoPiloto:
         gancho=fijos["gancho"],
         cta=fijos["cta"],
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
+        # El escaparate es un índice ÚNICO por (tienda|nombre) compartido con
+        # los demás nichos: el mismo producto se sube al Marketplace una vez.
+        en_escaparate=bool(
+            escaparate is not None
+            and pov_repo.clave_escaparate(
+                prod.get("tienda", ""), prod.get("titulo", ""),
+            )
+            in escaparate
+        ),
         tiene_ficha=bool(prod.get("foto_ficha")),
         videos=[
             VideoPiloto(
@@ -115,8 +140,9 @@ def list_productos(
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductosPilotoResponse:
     activos = _montandose(queue, usuario)
+    escaparate = _escaparate(usuario)
     return ProductosPilotoResponse(items=[
-        _a_schema(p, montando=str(p.get("id")) in activos)
+        _a_schema(p, montando=str(p.get("id")) in activos, escaparate=escaparate)
         for p in product_repo.listar(usuario)
     ])
 
@@ -164,7 +190,9 @@ async def crear_producto(
         except Exception:
             pass
 
-    return ProductoPilotoResponse(producto=_a_schema(prod))
+    return ProductoPilotoResponse(
+        producto=_a_schema(prod, escaparate=_escaparate(usuario)),
+    )
 
 
 async def _leer_foto(archivo: UploadFile, que: str) -> bytes:
@@ -246,7 +274,40 @@ def editar_textos(
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return ProductoPilotoResponse(producto=_a_schema(prod))
+    return ProductoPilotoResponse(
+        producto=_a_schema(prod, escaparate=_escaparate(usuario)),
+    )
+
+
+@router.post("/producto/estado", response_model=ProductoPilotoResponse)
+def set_producto_estado(
+    body: EstadoPilotoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductoPilotoResponse:
+    """Mete o saca el producto del escaparate.
+
+    No se guarda en el producto sino en el índice ÚNICO por (tienda|nombre):
+    el mismo producto se graba con varios nichos, pero al Marketplace se sube
+    UNA vez. Marcado aquí, sale marcado en el POV BOF y en el resto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    prod = product_repo.get_product(usuario, body.producto)
+    if not prod:
+        raise APIError(f"No existe el producto {body.producto}.", status_code=404)
+    if not prod.get("titulo"):
+        raise APIError(
+            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
+            "se puede saber si ya está en el escaparate.",
+            status_code=400,
+        )
+    pov_repo.set_escaparate(
+        prod.get("tienda", ""), prod.get("titulo", ""),
+        body.en_escaparate, usuario,
+    )
+    return ProductoPilotoResponse(
+        producto=_a_schema(prod, escaparate=_escaparate(usuario)),
+    )
 
 
 @router.delete("/producto", response_model=ProductosPilotoResponse)

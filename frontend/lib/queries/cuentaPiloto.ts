@@ -88,6 +88,21 @@ export function useBorrarProductoPiloto() {
   });
 }
 
+/** Mete o saca el producto del escaparate. El estado es ÚNICO por producto
+ *  (tienda|nombre) y compartido con los demás nichos: si el mismo producto ya
+ *  se metió desde el POV BOF, aquí ya sale hecho. */
+export function useSetEstadoPiloto() {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { producto: string; en_escaparate: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pilotoKeys.productos() }),
+  });
+}
+
 /** Sube un vídeo orgánico. Se puede repetir: cada montaje se AÑADE. */
 export function useSubirVideoPiloto() {
   const qc = useQueryClient();

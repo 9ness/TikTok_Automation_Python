@@ -55,6 +55,18 @@ export function useExtraerTextosGorras() {
   });
 }
 
+/** Mete o saca la gorra del escaparate. El estado es ÚNICO por producto
+ *  (tienda|nombre) y compartido con los demás nichos: si ya se metió desde el
+ *  POV BOF o desde otra carpeta, aquí ya sale hecho. */
+export function useSetEstadoGorras(carpeta: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { producto: string; en_escaparate: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/producto/estado`, { carpeta, ...body }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: gorrasKeys.gorras(carpeta) }),
+  });
+}
+
 function base(): string {
   return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 }

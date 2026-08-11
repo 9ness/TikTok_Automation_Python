@@ -115,6 +115,22 @@ export function useTituloPrenda() {
   });
 }
 
+/** Mete o saca la prenda del escaparate. El estado es ÚNICO por producto
+ *  (tienda|nombre) y compartido con los demás nichos: si ya se metió desde el
+ *  POV BOF o desde otra carpeta, aquí ya sale hecho. */
+export function useSetEstadoRopaPersonas(carpeta: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { producto: string; en_escaparate: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/prenda/estado`, { carpeta, ...body }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ropaPersonasKeys.prendas(carpeta) }),
+  });
+}
+
 export function useSubirVideoRopaPersonas() {
   const qc = useQueryClient();
   return useMutation<
