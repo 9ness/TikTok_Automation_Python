@@ -182,6 +182,8 @@ def _producto_info(
     ellas la miniatura desaparecía hasta recargar (pasaba al buscar la URL
     de un producto suelto).
     """
+    from src.nicho_pov_bof.repos import product_repo
+
     clean, titled, aviso = (
         _fotos_del_producto(source, folder, producto) if source and folder
         else (None, None, "")

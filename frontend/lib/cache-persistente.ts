@@ -36,6 +36,15 @@ const PREFIJOS = [
   "cuenta-piloto",
 ];
 
+function vacio(data: unknown): boolean {
+  if (Array.isArray(data)) return data.length === 0;
+  if (data && typeof data === "object") {
+    const items = (data as { items?: unknown[] }).items;
+    if (Array.isArray(items)) return items.length === 0;
+  }
+  return data === undefined || data === null;
+}
+
 function interesa(key: readonly unknown[]): boolean {
   return typeof key[0] === "string" && PREFIJOS.includes(key[0]);
 }
@@ -70,7 +79,12 @@ export function hidratar(qc: QueryClient): void {
         continue;
       }
       // Solo si no hay nada ya: lo recién pedido siempre manda sobre esto.
-      if (qc.getQueryData(key) === undefined) qc.setQueryData(key, data);
+      // `updatedAt` con la fecha ORIGINAL es imprescindible: sin él React
+      // Query da el dato por recién traído y NO refresca hasta pasado el
+      // `staleTime`, así que te comes lo guardado aunque esté mal.
+      if (qc.getQueryData(key) === undefined) {
+        qc.setQueryData(key, data, { updatedAt: ts });
+      }
     } catch {
       try {
         localStorage.removeItem(clave);
@@ -88,6 +102,9 @@ export function vigilar(qc: QueryClient): () => void {
     if (!query || query.state.status !== "success") return;
     const key = query.queryKey as readonly unknown[];
     if (!interesa(key)) return;
+    // Una lista vacía no se distingue de 'no ha cargado' y es lo peor que
+    // se puede pintar: mejor esperar al servidor.
+    if (vacio(query.state.data)) return;
     try {
       const cuerpo = JSON.stringify({
         key,

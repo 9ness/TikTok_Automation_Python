@@ -64,4 +64,22 @@ describe("caché que sobrevive a que Android mate la app", () => {
     await sesionQueGuarda(key, { relleno: "x".repeat(200_000) });
     expect(localStorage.getItem(`qcache:${JSON.stringify(key)}`)).toBeNull();
   });
+  it("lo rehidratado se da por VIEJO, para que se refresque solo", async () => {
+    const key = ["nicho-pov-bof", "vendidos", ""];
+    await sesionQueGuarda(key, [{ producto: "2", unidades: 4 }]);
+
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } });
+    hidratar(qc);
+    const estado = qc.getQueryState(key)!;
+    // Si se marcara como recién traído, React Query no volvería a pedirlo y te
+    // comerías el dato guardado aunque estuviera mal.
+    expect(Date.now() - estado.dataUpdatedAt).toBeGreaterThanOrEqual(0);
+    expect(qc.getQueryCache().find({ queryKey: key })!.isStaleByTime(60_000)).toBe(false);
+  });
+
+  it("no guarda listas vacías: se confundirían con 'aún no ha cargado'", async () => {
+    await sesionQueGuarda(["nicho-pov-bof", "vendidos", ""], []);
+    await sesionQueGuarda(["pov-bof-largo", "productos", "a", "b"], { items: [] });
+    expect(Object.keys(localStorage).filter((k) => k.startsWith("qcache:"))).toHaveLength(0);
+  });
 });

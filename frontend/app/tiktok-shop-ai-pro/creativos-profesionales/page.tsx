@@ -245,7 +245,7 @@ export default function CreativosProPage() {
         </button>
 
         {verVendidos && (
-          <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
+          <VendidosModal onClose={() => setVerVendidos(false)} />
         )}
 
         {/* El escaparate es el mismo para todos los nichos: si el producto ya

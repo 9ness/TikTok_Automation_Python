@@ -424,7 +424,7 @@ export default function NichoPovBofPage() {
       </section>
 
       {verVendidos && (
-        <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
+        <VendidosModal onClose={() => setVerVendidos(false)} />
       )}
 
       {verEscaparate && folder && (

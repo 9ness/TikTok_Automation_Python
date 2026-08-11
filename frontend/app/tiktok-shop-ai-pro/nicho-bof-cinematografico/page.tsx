@@ -245,7 +245,7 @@ export default function NichoBofCinePage() {
         </button>
 
         {verVendidos && (
-          <VendidosModal source={source} onClose={() => setVerVendidos(false)} />
+          <VendidosModal onClose={() => setVerVendidos(false)} />
         )}
 
         {/* El escaparate es común a todos los nichos: si el producto ya se

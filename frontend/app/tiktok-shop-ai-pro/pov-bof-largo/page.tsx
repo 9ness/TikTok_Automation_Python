@@ -440,7 +440,7 @@ export default function PovBofLargoPage() {
       </section>
 
       {verVendidos && (
-        <VendidosModal source={activaSource} onClose={() => setVerVendidos(false)} />
+        <VendidosModal onClose={() => setVerVendidos(false)} />
       )}
 
       {verEscaparate && folder && (
