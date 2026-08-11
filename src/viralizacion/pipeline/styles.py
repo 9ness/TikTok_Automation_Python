@@ -794,8 +794,10 @@ class StylePreset:
     font_name: str | None = None
     fonts_dir: str | None = None
     # --- Rótulo de los estilos "reflexión" (D/E/F) --------------------------
-    # Cuerpo de letra como múltiplo de `config.SUB_FONTSIZE`. B usa 1.9; estos
-    # van algo más pequeños porque parten la frase en DOS líneas.
+    # Cuerpo de letra como múltiplo de `config.SUB_FONTSIZE`. Igual que B
+    # (1.9), o su equivalente óptico en otra tipografía: se midió que subir el
+    # cuerpo NO hace que se partan más frases (3 de 20 en todos los casos), así
+    # que quedarse corto solo restaba presencia en pantalla.
     sub_scale: float = 1.9
     # Resplandor difuminado alrededor de la letra: color, grosor, difuminado y
     # transparencia (`&HXX&`, más alto = más transparente). Se pinta en una capa
@@ -894,19 +896,19 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         key="reflexion_luz", label="D · Reflexión · resplandor blanco",
         build_ass=build_ass_reflexion,
         font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.70, sub_margin_lr=125, **_HALO_BLANCO, **_LIMPIO,
+        sub_scale=1.90, sub_margin_lr=125, **_HALO_BLANCO, **_LIMPIO,
     ),
     "reflexion_sombra": StylePreset(
         key="reflexion_sombra", label="E · Reflexión · halo negro",
         build_ass=build_ass_reflexion,
         font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.70, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
+        sub_scale=1.90, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
     ),
     "reflexion_serif": StylePreset(
         key="reflexion_serif", label="F · Reflexión · PT Serif",
         build_ass=build_ass_reflexion,
         font_name="PT Serif", fonts_dir=bundled_fonts_dir(),
-        sub_scale=1.55, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
+        sub_scale=1.75, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
     ),
 }
 
