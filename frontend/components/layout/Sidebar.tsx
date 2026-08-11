@@ -162,12 +162,50 @@ const NAV: NavGroup[] = [
  *  el menú no basta, la URL se puede escribir a mano. */
 const BASES_PRO = ["/tiktok-shop-ai-pro"];
 
+const BASE_AI_PRO = "/tiktok-shop-ai-pro";
+
+/** Lo que se usa a diario va primero; el resto sigue debajo en su orden. */
+const ORDEN_AI_PRO = [
+  `${BASE_AI_PRO}/viralizacion`,
+  `${BASE_AI_PRO}/nicho-pov-bof`,
+  `${BASE_AI_PRO}/creativos-profesionales`,
+  `${BASE_AI_PRO}/pov-bof-largo`,
+];
+
+/** Lo único que necesitan hoy Ana y Mauro. Es solo el MENÚ: las demás
+ *  pantallas siguen existiendo si se escribe la URL. */
+const ITEMS_PRO = [`${BASE_AI_PRO}/cuenta-piloto`];
+
+function esAiPro(n: NavGroup): boolean {
+  return n.kind === "group" && n.basePath === BASE_AI_PRO;
+}
+
+/** Reordena dejando delante los de `orden`; el resto conserva el suyo (el
+ *  `sort` de JS es estable). */
+function ordenar<T extends { href: string }>(items: T[], orden: string[]): T[] {
+  const puesto = (href: string) => {
+    const i = orden.indexOf(href);
+    return i === -1 ? orden.length : i;
+  };
+  return [...items].sort((a, b) => puesto(a.href) - puesto(b.href));
+}
+
 function navPara(rol: string | null | undefined): NavGroup[] {
-  if (rol !== "pro") return NAV;
+  if (rol !== "pro") {
+    return NAV.map((n) =>
+      esAiPro(n) && n.kind === "group"
+        ? { ...n, items: ordenar(n.items, ORDEN_AI_PRO) }
+        : n,
+    );
+  }
   return NAV.filter((n) => {
     const base = n.kind === "single" ? n.item.href : n.basePath;
     return BASES_PRO.some((b) => base === b || base.startsWith(`${b}/`));
-  });
+  }).map((n) =>
+    esAiPro(n) && n.kind === "group"
+      ? { ...n, items: n.items.filter((i) => ITEMS_PRO.includes(i.href)) }
+      : n,
+  );
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
