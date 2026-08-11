@@ -348,9 +348,24 @@ se sube el guion + DOS clips. Comparte catálogo/carpetas/textos/fotos con el PO
 BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
 (`progress_repo` propio + `/complete`), subido y guion/clips/vídeo viven en
 `nicho_pov_bof_largo:` (`/producto/estado`). Dos progresos son GLOBALES a
-propósito: **vendidos** (índice único compartido con todos los nichos, sin
-clasificar por nicho) y **escaparate** (índice por `tienda|nombre` — marcar un
-producto en una carpeta lo marca en todas las que sean el mismo producto).
+propósito (ver "Escaparate y vendidos" abajo).
+
+### Escaparate y vendidos — transversales a TODOS los nichos
+
+Dos cosas NO son de ningún nicho: se hacen una sola vez por producto porque la
+cuenta de TikTok es la misma. Las dos viven en
+[`src/nicho_pov_bof/repos/product_repo.py`](src/nicho_pov_bof/repos/product_repo.py)
+y los demás nichos las reusan (no dupliques índices por nicho):
+
+- **Escaparate** — `escaparate:index[:usuario]`, clave `norm(tienda)|norm(titulo)`
+  (`clave_escaparate` / `escaparate_index` / `set_escaparate`). El mismo producto
+  sale repetido en varias carpetas del Drive y se graba con varios nichos:
+  marcado en uno, aparece marcado en todos. Sin textos extraídos la clave es
+  vacía y no deduplica.
+- **Vendidos** — `vendidos:index`, ranking único y global; **no** se clasifica
+  por nicho (`NICHOS_VENTA` queda solo por compatibilidad del dato antiguo).
+
+Ambos son **por usuario**: Ana y Mauro son otras personas con su propia cuenta.
 
 Cosas que ya costaron una vez:
 - El documento del curso pide 260 caracteres "para 15 segundos", pero su propio
