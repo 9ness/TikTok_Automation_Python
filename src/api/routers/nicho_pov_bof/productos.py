@@ -204,7 +204,16 @@ def _producto_info(
         sexo_sugerido=audience.sexo_sugerido(
             prod.get("titulo", ""), prod.get("titulo_tiktok_completo", ""),
         ),
-        en_escaparate=bool(prod.get("en_escaparate")),
+        # El escaparate sale del índice ÚNICO por (tienda|nombre): el mismo
+        # producto está repetido en varias carpetas y se graba con varios
+        # nichos, pero al Marketplace se sube UNA vez. El flag viejo por
+        # producto se sigue mirando para no perder lo ya marcado.
+        en_escaparate=(
+            product_repo.en_escaparate(
+                prod.get("tienda", ""), prod.get("titulo", ""), usuario,
+            )
+            or bool(prod.get("en_escaparate"))
+        ),
         uploaded=bool(prod.get("uploaded")),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
@@ -269,6 +278,8 @@ def _list_productos(
     folder_state = product_repo.load_folder_para(source, folder, usuario)
     guardados = folder_state.get("productos") or {}
     montandose = _productos_montandose(queue, source, folder)
+    # Una sola lectura del índice para toda la carpeta, no una por producto.
+    escaparate = product_repo.escaparate_index(usuario)
 
     items: list[ProductoInfo] = []
     for pair in pairs:
@@ -304,7 +315,12 @@ def _list_productos(
                     guardado.get("titulo", ""),
                     guardado.get("titulo_tiktok_completo", ""),
                 ),
-                en_escaparate=bool(guardado.get("en_escaparate")),
+                en_escaparate=(
+                    product_repo.clave_escaparate(
+                        guardado.get("tienda", ""), guardado.get("titulo", ""),
+                    ) in escaparate
+                    or bool(guardado.get("en_escaparate"))
+                ),
                 uploaded=bool(guardado.get("uploaded")),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),
@@ -603,6 +619,14 @@ def set_producto_estado(
             en_escaparate=body.en_escaparate,
             uploaded=body.uploaded, sold=body.sold,
         )
+        # Y en el índice ÚNICO por (tienda|nombre): el mismo producto sale en
+        # varias carpetas y se graba con varios nichos, pero al Marketplace se
+        # sube una sola vez. Así queda marcado en todos los sitios a la vez.
+        if body.en_escaparate is not None:
+            product_repo.set_escaparate(
+                prod.get("tienda", ""), prod.get("titulo", ""),
+                body.en_escaparate, usuario,
+            )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
@@ -1046,6 +1070,7 @@ def buscar_productos(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
+    escaparate = product_repo.escaparate_index(usuario)
     items: list[ProductoBuscado] = []
     for d in encontrados:
         clean, _titled, _aviso = _fotos_del_producto(
@@ -1059,7 +1084,12 @@ def buscar_productos(
                 tienda=d.get("tienda") or "",
                 clean_photo_id=clean or "",
                 product_url=d.get("product_url") or "",
-                en_escaparate=bool(d.get("en_escaparate")),
+                en_escaparate=(
+                    product_repo.clave_escaparate(
+                        d.get("tienda") or "", d.get("titulo") or "",
+                    ) in escaparate
+                    or bool(d.get("en_escaparate"))
+                ),
                 uploaded=bool(d.get("uploaded")),
                 sold=bool(d.get("sold")),
                 unidades=int(d.get("unidades") or 0),

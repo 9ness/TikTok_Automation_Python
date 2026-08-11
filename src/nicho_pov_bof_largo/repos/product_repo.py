@@ -24,7 +24,6 @@ from __future__ import annotations
 import os
 import random
 import time
-import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -118,59 +117,41 @@ def textos_producto(source: str, folder: str, producto: str, usuario: str = "") 
 
 
 # ---------------------------------------------------------------------------
-# Escaparate: índice GLOBAL por (tienda | nombre)
+# Escaparate: el índice es TRANSVERSAL, no de este nicho
 # ---------------------------------------------------------------------------
-# El escaparate es meter el producto en el Marketplace de TikTok, y eso se hace
-# UNA vez por producto — da igual en qué carpeta aparezca. El mismo producto
-# está repetido en varias carpetas del Drive del curso (p. ej. la carpeta 1 y la
-# 20), así que en vez de marcar el escaparate carpeta a carpeta, se guarda en un
-# índice por CLAVE = tienda + nombre exacto. Marcado en cualquier carpeta →
-# aparece marcado en todas las que sean el mismo producto.
+# Meter el producto en el Marketplace se hace UNA vez por producto, aunque el
+# mismo producto se grabe con este nicho, con el POV BOF y con Creativos Pro: la
+# cuenta de TikTok es la misma. Por eso el índice vive en el POV BOF (que es
+# donde están también los vendidos, por lo mismo) y aquí solo se reenvía.
 #
-# Es un SET por usuario, igual que el progreso de carpetas.
-_ESCAPARATE_INDEX = "escaparate"
+# Al principio esto tenía su propio SET (`nicho_pov_bof_largo:escaparate`), y
+# eso hacía justo lo que no se quería: marcarlo aquí no se veía allí. Lo que se
+# marcó entonces se sigue leyendo para no perderlo.
+from src.nicho_pov_bof.repos import product_repo as _pov  # noqa: E402
+
+clave_escaparate = _pov.clave_escaparate
 
 
-def _norm(s: str) -> str:
-    """minúsculas, sin acentos, espacios colapsados — para comparar 'exacto'
-    sin que un acento o un espacio de más rompa la coincidencia."""
-    s = unicodedata.normalize("NFKD", (s or "").strip().lower())
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    return " ".join(s.split())
-
-
-def clave_escaparate(tienda: str, titulo: str) -> str:
-    """Clave del producto en el escaparate: `tienda|nombre`. Vacía si no hay
-    nombre (sin textos aún no se puede deduplicar)."""
-    nombre = _norm(titulo)
-    if not nombre:
-        return ""
-    return f"{_norm(tienda)}|{nombre}"
-
-
-def _key_escaparate(usuario: str = "") -> str:
-    if not usuario or usuario == "ness":
-        return _ESCAPARATE_INDEX
-    return f"{_ESCAPARATE_INDEX}:{usuario}"
-
-
-def escaparate_index(usuario: str = "") -> set[str]:
+def _legacy_index(usuario: str) -> set[str]:
+    """Lo marcado cuando este nicho tenía índice propio."""
     r = get_nicho_pov_bof_largo_redis()
     if not r.is_available():
         return set()
-    return set(r.smembers(_key_escaparate(usuario)))
+    clave = "escaparate" if _slug_usuario(usuario) == "ness" else f"escaparate:{usuario}"
+    return {str(x) for x in r.smembers(clave) if x}
+
+
+def escaparate_index(usuario: str = "") -> set[str]:
+    return _pov.escaparate_index(usuario) | _legacy_index(usuario)
 
 
 def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> None:
-    """Mete/saca del escaparate el producto (tienda|nombre). Degrada en silencio
-    si no hay clave (sin textos) o si Redis no está."""
-    clave = clave_escaparate(tienda, titulo)
-    if not clave:
-        return
-    r = get_nicho_pov_bof_largo_redis()
-    if not r.is_available():
-        return
-    if on:
-        r.sadd(_key_escaparate(usuario), clave)
-    else:
-        r.srem(_key_escaparate(usuario), clave)
+    _pov.set_escaparate(tienda, titulo, on, usuario)
+    # Al desmarcar hay que quitarlo TAMBIÉN del índice viejo; si no, seguiría
+    # apareciendo marcado por la unión de arriba.
+    if not on:
+        clave = clave_escaparate(tienda, titulo)
+        r = get_nicho_pov_bof_largo_redis()
+        if clave and r.is_available():
+            k = "escaparate" if _slug_usuario(usuario) == "ness" else f"escaparate:{usuario}"
+            r.srem(k, clave)

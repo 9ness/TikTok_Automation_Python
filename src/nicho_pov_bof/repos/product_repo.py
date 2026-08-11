@@ -504,6 +504,66 @@ def save_hashtags(tags: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Escaparate: índice ÚNICO por producto (tienda + nombre), por usuario
+# ---------------------------------------------------------------------------
+# Meter un producto en el escaparate del Marketplace se hace UNA vez por
+# producto: da igual en qué carpeta salga y con qué nicho se grabe, la cuenta de
+# TikTok es la misma. Marcarlo carpeta a carpeta y nicho a nicho obligaba a
+# recordar cuáles ya estaban — y el mismo producto aparece repetido en varias
+# carpetas del Drive del curso.
+#
+# Por eso el estado NO vive en el producto, sino en un índice con clave
+# `tienda|nombre`: marcado desde cualquier sitio, se ve marcado en todos.
+#
+# Es POR USUARIO y no se comparte: Ana y Mauro son otras personas con su propia
+# cuenta de TikTok, así que su escaparate no es el de `ness`.
+_ESCAPARATE_INDEX = "escaparate:index"
+
+
+def clave_escaparate(tienda: str, titulo: str) -> str:
+    """`tienda|nombre` normalizados. Vacía si no hay nombre — sin textos
+    extraídos todavía no se puede saber si dos productos son el mismo."""
+    nombre = " ".join(_normaliza(titulo).split())
+    if not nombre:
+        return ""
+    return f"{' '.join(_normaliza(tienda).split())}|{nombre}"
+
+
+def _key_escaparate(usuario: str = "") -> str:
+    if _es_compartido(usuario):
+        return _ESCAPARATE_INDEX
+    return f"{_ESCAPARATE_INDEX}:{usuario}"
+
+
+def escaparate_index(usuario: str = "") -> set[str]:
+    """Claves de los productos ya metidos en el escaparate por ese usuario."""
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return set()
+    return {str(x) for x in r.smembers(_key_escaparate(usuario)) if x}
+
+
+def en_escaparate(tienda: str, titulo: str, usuario: str = "") -> bool:
+    clave = clave_escaparate(tienda, titulo)
+    return bool(clave) and clave in escaparate_index(usuario)
+
+
+def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> None:
+    """Mete o saca el producto del escaparate. Degrada en silencio si aún no
+    hay textos (sin nombre no hay clave) o si Redis no está."""
+    clave = clave_escaparate(tienda, titulo)
+    if not clave:
+        return
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    if on:
+        r.sadd(_key_escaparate(usuario), clave)
+    else:
+        r.srem(_key_escaparate(usuario), clave)
+
+
+# ---------------------------------------------------------------------------
 # Vendidos: índice propio + unidades
 # ---------------------------------------------------------------------------
 # Recorrer las 31 carpetas de cada fuente para encontrar dos productos vendidos
