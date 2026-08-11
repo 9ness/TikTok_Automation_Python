@@ -62,6 +62,27 @@ def _bad(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
 
+def _clip_puesto(ruta, desde: float = 0.0) -> bool:
+    """¿Hay un clip de ESTA ronda en ese slot?
+
+    Dos motivos para no fiarse del path guardado a secas:
+
+    - Las subidas viven en `api_uploads/` y se purgan a las 24h, así que la ruta
+      puede apuntar a un fichero que ya no está.
+    - `desde` (el `video_listo_at` del último montaje) descarta los clips de la
+      ronda ANTERIOR. Es lo que arregla solos a los productos de antes del
+      cambio, que se quedaron con los paths de su montaje previo guardados: sin
+      esto, resubir el clip 1 montaba otra vez con el clip 2 viejo.
+    """
+    if not ruta:
+        return False
+    f = Path(str(ruta))
+    try:
+        return f.is_file() and (not desde or f.stat().st_mtime >= desde - 1)
+    except OSError:
+        return False
+
+
 @router.get("/voces", response_model=VocesLargoResponse)
 def list_voces() -> VocesLargoResponse:
     return VocesLargoResponse(
@@ -232,8 +253,8 @@ def _listar(
             guion=guion,
             subliminal=str(mio.get("subliminal") or ""),
             guion_caracteres=len(guion),
-            clip1=bool(mio.get("clip1_path")),
-            clip2=bool(mio.get("clip2_path")),
+            clip1=_clip_puesto(mio.get("clip1_path"), float(mio.get("video_listo_at") or 0)),
+            clip2=_clip_puesto(mio.get("clip2_path"), float(mio.get("video_listo_at") or 0)),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             en_escaparate=(
@@ -428,6 +449,14 @@ async def upload_clip(
 
     Con un solo clip no hay nada que montar: el guion dura ~20s y un clip son
     10s, así que faltaría medio vídeo.
+
+    **Cada montaje empieza de cero.** Al encolar se olvidan los dos clips
+    (`clipN_path=""`), así que subir una versión nueva de un producto YA montado
+    vuelve a pedir los DOS clips. Antes no era así y salía caro: los paths
+    viejos seguían guardados para siempre, así que al resubir el clip 1 se
+    encolaba al instante un montaje con *clip1 nuevo + clip2 viejo*, y al
+    resubir el clip 2 se encolaba OTRO — dos trabajos por producto, el primero
+    con material mezclado.
     """
     from src.api.temp_storage import upload_subdir
 
@@ -472,10 +501,22 @@ async def upload_clip(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    if not (prod.get("clip1_path") and prod.get("clip2_path")):
+    montado_at = float(prod.get("video_listo_at") or 0)
+    if not (
+        _clip_puesto(prod.get("clip1_path"), montado_at)
+        and _clip_puesto(prod.get("clip2_path"), montado_at)
+    ):
         falta = 2 if slot == 1 else 1
         return ClipLargoUploadResponse(
             encolado=False, message=f"Clip {slot} guardado. Falta el clip {falta}.",
+        )
+
+    # Red de seguridad para la carrera de los dos clips subidos a la vez: si el
+    # otro ya disparó el montaje, no se encola un segundo trabajo igual.
+    if producto in _montandose(queue, source, folder):
+        return ClipLargoUploadResponse(
+            encolado=False,
+            message=f"Clip {slot} guardado. Ya hay un montaje en marcha para este producto.",
         )
 
     job = queue.enqueue(
@@ -490,6 +531,19 @@ async def upload_clip(
         },
         enqueued_by=usuario or None,
     )
+
+    # Ronda consumida: los clips ya viajan en los params del job, así que
+    # olvidarlos aquí no afecta al montaje en curso y deja el producto listo
+    # para una versión nueva (que volverá a pedir los dos clips).
+    try:
+        product_repo.update_product(
+            source, folder, producto, usuario=usuario,
+            clip1_path="", clip2_path="",
+        )
+    except RuntimeError:
+        # El montaje ya está encolado; que no falle la respuesta por esto.
+        pass
+
     return ClipLargoUploadResponse(
         job_id=job.id, encolado=True,
         message="Los dos clips están: locutando y montando.",
