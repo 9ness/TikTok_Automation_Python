@@ -17,6 +17,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -48,7 +49,7 @@ function copiar(label: string, texto: string) {
 
 export default function NichoRopaPersonasPage() {
   const carpetas = useCarpetasRopaPersonas();
-  const [carpeta, setCarpeta] = useState("");
+  const [carpeta, setCarpeta] = useEstadoRecordado("ropa-personas:carpeta", "");
   const activa = carpeta || carpetas.data?.[0]?.slug || "";
   const prendas = usePrendasPersonas(activa);
   const extraer = useExtraerTextosRopaPersonas();

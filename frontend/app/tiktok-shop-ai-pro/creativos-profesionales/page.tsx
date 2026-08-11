@@ -12,6 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
@@ -41,9 +42,9 @@ function err(e: unknown): string {
 
 export default function CreativosProPage() {
   const sources = useSources();
-  const [source, setSource] = useState("aleatorios_1");
+  const [source, setSource] = useEstadoRecordado("creativos:fuente", "aleatorios_1");
   const folders = useFoldersCreativos(source);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useEstadoRecordado<string | null>("creativos:carpeta", null);
   const folder = picked ?? folders.data?.current ?? null;
   const productos = useProductos(source, folder);
   const prompt = usePromptCreativos();

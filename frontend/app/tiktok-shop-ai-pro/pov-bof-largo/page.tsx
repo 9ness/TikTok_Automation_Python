@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -82,12 +83,12 @@ const CAR_POR_SEG = 18.2;
 export default function PovBofLargoPage() {
   const qc = useQueryClient();
   const sources = useSourcesLargo();
-  const [source, setSource] = useState("");
+  const [source, setSource] = useEstadoRecordado("povbof-largo:fuente", "");
   const activaSource = source || sources.data?.[0]?.slug || "";
 
   const [showAll, setShowAll] = useState(false);
   const [showFotos, setShowFotos] = useState(false);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useEstadoRecordado<string | null>("povbof-largo:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
 

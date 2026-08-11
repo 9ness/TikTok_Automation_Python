@@ -25,6 +25,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   useCrearMiProducto,
   nichoPovBofKeys,
@@ -74,13 +75,13 @@ import type {
 } from "@/lib/types/nichoPovBof";
 
 export default function NichoPovBofPage() {
-  const [source, setSource] = useState("aleatorios_1");
+  const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
   const [showAll, setShowAll] = useState(false);
   // Las fotos en crudo van colapsadas: ocupaban toda la pantalla.
   const [showFotos, setShowFotos] = useState(false);
   // Carpeta elegida a mano. Si es null se usa la "current" del backend
   // (la primera sin completar).
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useEstadoRecordado<string | null>("povbof:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verRecuperados, setVerRecuperados] = useState(false);
