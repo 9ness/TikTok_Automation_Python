@@ -1374,6 +1374,7 @@ function ProductoCard({
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
+  const [verGuion, setVerGuion] = useState(false);
   const sortear = useSortearGuionPlazos();
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
@@ -1785,12 +1786,27 @@ function ProductoCard({
            que pedir otro es gratis. */
         producto.guion ? (
           <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
-            <p className="text-[10px] leading-relaxed">{producto.guion}</p>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">
-                {producto.guion_caracteres} car. · ~
-                {Math.round(producto.guion_caracteres / CAR_POR_SEG)}s
+            {/* Plegado, como en el POV BOF Largo: el guion se lee una vez y
+                luego solo estorba entre el precio y los clips. */}
+            <button
+              type="button"
+              onClick={() => setVerGuion((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
+            >
+              <span>
+                🎬 Guion de plazos
+                <span className="ml-1 opacity-70">
+                  {producto.guion_caracteres} car. · ~
+                  {Math.round(producto.guion_caracteres / CAR_POR_SEG)}s
+                </span>
               </span>
+              <span>{verGuion ? "▾" : "▸"}</span>
+            </button>
+            {verGuion && (
+            <>
+            <p className="text-[10px] leading-relaxed">{producto.guion}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CopyChip label="🎬 Guion" text={producto.guion ?? ""} />
               <button
                 type="button"
                 disabled={sortear.isPending}
@@ -1809,6 +1825,8 @@ function ProductoCard({
                 Otro guion
               </button>
             </div>
+            </>
+            )}
           </div>
         ) : (
           <button

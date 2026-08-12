@@ -1317,6 +1317,7 @@ function ProductoCard({
 
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
+  const [verGuion, setVerGuion] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1476,11 +1477,10 @@ function ProductoCard({
             p.caption ? [p.caption, p.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : ""
           }
         />
-        {/* Gancho y CTA los quema el montaje; copiarlos solo hacía ruido.
-            El guion y el subliminal SÍ se quedan: el subliminal no lo pone el
-            vídeo, así que copiarlo es la única forma de llevarlo al post. */}
-        <CopyChip label="🎬 Guion" text={p.guion ?? ""} />
-        <CopyChip label="💬 Subliminal" text={p.subliminal ?? ""} />
+        {/* Gancho y CTA los quema el montaje. Copiar el guion y el subliminal
+            se ha bajado DENTRO del guion plegado: ahí siguen a mano (el
+            subliminal no lo pone el vídeo, solo se copia) sin ocupar sitio en
+            la ficha. */}
         {p.product_url && <CopyChip label="🔗 Enlace" text={p.product_url} />}
         {p.clean_photo_id && (
           <a
@@ -1546,14 +1546,31 @@ function ProductoCard({
         </button>
       ))}
 
-      {/* El guion es lo primero: sin él no se puede subir clip. */}
+      {/* El guion es lo primero: sin él no se puede subir clip. Va plegado
+          porque se lee UNA vez, al escribirlo; después solo estorba entre el
+          precio y los clips. La cabecera ya dice lo que se mira de reojo
+          (cuánto dura) sin abrirlo. */}
       {p.guion ? (
         <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
-          <p className="text-[10px] leading-relaxed">{p.guion}</p>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">
-              {p.guion_caracteres} car. · ~{Math.round(p.guion_caracteres / CAR_POR_SEG)}s
+          <button
+            type="button"
+            onClick={() => setVerGuion((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
+          >
+            <span>
+              🎬 Guion
+              <span className="ml-1 opacity-70">
+                {p.guion_caracteres} car. · ~{Math.round(p.guion_caracteres / CAR_POR_SEG)}s
+              </span>
             </span>
+            <span>{verGuion ? "▾" : "▸"}</span>
+          </button>
+          {verGuion && (
+          <>
+          <p className="text-[10px] leading-relaxed">{p.guion}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CopyChip label="🎬 Guion" text={p.guion ?? ""} />
+            <CopyChip label="💬 Subliminal" text={p.subliminal ?? ""} />
             <button
               type="button"
               disabled={guion.isPending}
@@ -1569,6 +1586,8 @@ function ProductoCard({
               Otro guion
             </button>
           </div>
+          </>
+          )}
         </div>
       ) : (
         <button
