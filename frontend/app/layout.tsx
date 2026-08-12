@@ -63,9 +63,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     3.5rem + el safe-area y va en z-40): con `top-0` se quedaba
                     tapada por ella y no se veía. En escritorio no hay cabecera,
                     así que va arriba del todo. */}
-                <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 md:top-0">
+                {/* FIJA, no `sticky`: `main` tiene `overflow-y-auto` pero no
+                    altura acotada, así que quien hace scroll de verdad es la
+                    página — y un `sticky` dentro de `main` se va con el
+                    contenido (se veía flotando a media pantalla y desaparecía
+                    al bajar). Fija se queda pegada a la viewport siempre.
+                    En móvil, justo debajo de la cabecera; en escritorio, a la
+                    derecha de la barra lateral (16rem). */}
+                <div className="fixed inset-x-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 md:left-64 md:top-0">
                   <BarraCuota />
                 </div>
+                {/* Hueco del mismo alto: sin esto la barra taparía lo primero
+                    de cada pantalla. */}
+                <div className="h-8 md:h-8" aria-hidden />
                 {children}
               </main>
             </div>

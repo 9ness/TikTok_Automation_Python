@@ -49,11 +49,11 @@ export function BarraCuota() {
   const { videos, carruseles } = cuota.data;
 
   return (
-    <div className="border-b border-border/60 bg-background/80 px-3 py-1.5 backdrop-blur">
+    <div className="border-b border-border/60 bg-background/95 px-3 py-1.5 backdrop-blur">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center gap-3 text-left"
+        className="flex h-5 w-full items-center gap-3 text-left"
         title="Tocar para ajustar a mano lo subido hoy"
       >
         <Medidor etiqueta="Vídeos" datos={videos} />

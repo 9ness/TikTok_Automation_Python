@@ -11,7 +11,6 @@ import {
   LayoutGrid,
   Link2 as LinkIcon,
   Loader2,
-  PackageSearch,
   RefreshCw,
   Search,
   ShoppingBag,
@@ -56,7 +55,6 @@ import {
   useVendidos,
   useSumarUnidades,
   useBuscarProductos,
-  useProductosRecuperados,
   ANCHO_CHIP,
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
@@ -72,7 +70,6 @@ import type {
   BackupCheckResponse,
   ProductoBuscado,
   ProductoItem,
-  ProductoRecuperado,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
 
@@ -91,7 +88,6 @@ export default function NichoPovBofPage() {
   const [picked, setPicked] = useEstadoRecordado<string | null>("povbof:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
-  const [verRecuperados, setVerRecuperados] = useState(false);
 
   const sources = useSources();
   const folders = useFolders(source);
@@ -321,13 +317,15 @@ export default function NichoPovBofPage() {
           y el hueco entre ambas costaban ~60px de scroll en móvil para dos
           líneas de contenido. */}
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        <div className="grid grid-cols-2 gap-2">
+        {/* Las tres fuentes en una sola fila: son tres y caben, y así no se
+            come una línea entera de pantalla en el móvil. */}
+        <div className="grid grid-cols-3 gap-1.5">
           {(sources.data?.items ?? []).map((s) => (
             <button
               key={s.slug}
               type="button"
               onClick={() => switchSource(s.slug)}
-              className={`truncate rounded-lg border px-3 py-2 text-xs transition sm:text-sm ${
+              className={`truncate rounded-lg border px-2 py-2 text-[11px] transition sm:text-xs ${
                 source === s.slug
                   ? "border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/30"
@@ -341,20 +339,6 @@ export default function NichoPovBofPage() {
         {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
         {source === "mis_productos" && <AltaMiProducto />}
 
-        {/* Va aquí, con las fuentes, porque se entra igual que a una: es un
-            sitio del que sacar productos, no un informe. TEMPORAL. */}
-        <button
-          type="button"
-          onClick={() => setVerRecuperados((v) => !v)}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition sm:text-sm ${
-            verRecuperados
-              ? "border-fuchsia-500 bg-fuchsia-500/15 font-semibold text-fuchsia-500"
-              : "border-fuchsia-500/40 text-fuchsia-500 hover:bg-fuchsia-500/10"
-          }`}
-        >
-          <PackageSearch className="h-3.5 w-3.5" />
-          Productos recuperados
-        </button>
 
         <div className="mb-2 flex items-center justify-between text-xs sm:text-sm">
           <span className="font-medium">
@@ -685,12 +669,9 @@ export default function NichoPovBofPage() {
         </section>
       )}
 
-      {verRecuperados && (
-        <SeccionRecuperados onCerrar={() => setVerRecuperados(false)} />
-      )}
 
       {/* Fase 2 — automatización de vídeos por producto */}
-      {!verRecuperados && data && folder && (
+      {data && folder && (
         <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-purple-500" />
@@ -970,126 +951,6 @@ function AltaMiProducto() {
 }
 
 
-/** Los recuperados como una CARPETA DE TRABAJO más, no como un índice.
- *
- *  El operador quiere hacerlos todos de una sentada, así que aquí están las
- *  fichas enteras —textos, prompts, vídeo, escaparate— y no un listado que te
- *  manda a buscarlos carpeta por carpeta.
- *
- *  Cada ficha trabaja contra SU carpeta de origen (`item.source`/`item.folder`),
- *  que es de donde salen sus fotos y donde se guarda su progreso: esto es una
- *  vista, no una carpeta de verdad.
- *
- *  Temporal: existe porque dos fallos escondían productos (fotos sin extensión
- *  y dos productos fundidos bajo un mismo número). Cuando no queden, fuera.
- */
-function SeccionRecuperados({ onCerrar }: { onCerrar: () => void }) {
-  const recuperados = useProductosRecuperados(true);
-  const extraerTextos = useExtraerTextos();
-  const [extrayendo, setExtrayendo] = useState(false);
-  const items = recuperados.data?.items ?? [];
-  const carpetas = recuperados.data?.carpetas ?? [];
-  const sinTextos = items.filter((r) => !r.producto.titulo).length;
-
-  /** Relanza la extracción en las carpetas implicadas, una detrás de otra.
-   *
-   *  Los textos se extraen por CARPETA (Gemini lee las diez fichas de golpe),
-   *  así que para rellenar cinco productos hay que pasar por sus cuatro
-   *  carpetas. Se hace aquí para no obligar a ir a cada una. */
-  async function textosDeTodas() {
-    setExtrayendo(true);
-    try {
-      for (const clave of carpetas) {
-        const src = clave.split("|")[0] ?? "";
-        const folder = clave.split("|").slice(1).join("|");
-        if (!src || !folder) continue;
-        try {
-          await extraerTextos.mutateAsync({ source: src, folder });
-        } catch (e) {
-          toast.error(
-            `${folder}: ${e instanceof ApiError ? e.message : String(e)}`,
-          );
-        }
-      }
-      await recuperados.refetch();
-      toast.success("Textos actualizados");
-    } finally {
-      setExtrayendo(false);
-    }
-  }
-
-  return (
-    <section className="space-y-3 rounded-xl border border-fuchsia-500/40 bg-card p-3">
-      <div className="flex items-center gap-2">
-        <PackageSearch className="h-4 w-4 shrink-0 text-fuchsia-500" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Productos recuperados</p>
-          <p className="truncate text-[11px] text-muted-foreground">
-            {recuperados.isLoading
-              ? "repasando las 35 carpetas…"
-              : `${items.length} de ${carpetas.length} carpeta(s) que ya diste por hechas`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onCerrar}
-          className="rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
-        >
-          Volver
-        </button>
-      </div>
-
-      {recuperados.isLoading && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Emparejando fotos…
-        </div>
-      )}
-
-      {!recuperados.isLoading && items.length === 0 && (
-        <p className="py-6 text-center text-xs text-muted-foreground">
-          Ninguno. Todas las carpetas que has terminado están completas. 🎉
-        </p>
-      )}
-
-      {sinTextos > 0 && (
-        <button
-          type="button"
-          onClick={() => void textosDeTodas()}
-          disabled={extrayendo}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-fuchsia-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-50"
-        >
-          {extrayendo ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extrayendo…
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-3.5 w-3.5" />
-              Textos de los {sinTextos} que faltan ({carpetas.length} carpetas)
-            </>
-          )}
-        </button>
-      )}
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {items.map((r) => (
-          <div key={`${r.source}-${r.folder}-${r.producto.producto}`} className="space-y-1">
-            {/* De qué carpeta salió: sin esto no se sabe dónde vive el
-                producto ni por qué está aquí. */}
-            <p className="truncate text-[10px] font-semibold text-fuchsia-500">
-              {r.folder}
-            </p>
-            <ProductoCard
-              source={r.source}
-              folder={r.folder}
-              producto={r.producto}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 
 /** Botón compacto: copia el texto al portapapeles sin mostrarlo. Mismo
