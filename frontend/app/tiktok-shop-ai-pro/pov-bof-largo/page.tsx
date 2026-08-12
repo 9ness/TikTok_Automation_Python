@@ -137,7 +137,13 @@ export default function PovBofLargoPage() {
   const conGuion = items.filter((p) => p.guion).length;
   const subidos = items.filter((p) => p.uploaded).length;
   const enEscaparate = items.filter((p) => p.en_escaparate).length;
-  const sinGuion = items.filter((p) => p.titulo && !p.guion).length;
+  /** Le falta el guion o el que tiene es del otro modo (escrito antes de que
+   *  existieran los plazos, o antes de corregir el precio). Los desfasados
+   *  cuentan como pendientes: si no, el botón dice "guiones al día" mientras
+   *  media carpeta lleva un guion sin la frase de plazos. */
+  const pendienteGuion = (p: ProductoLargo) =>
+    Boolean(p.titulo) && (!p.guion || p.modo_plazos !== p.guion_plazos);
+  const sinGuion = items.filter(pendienteGuion).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const pendientesUrl = items.filter(
     (p) => !p.product_url && p.titulo_tiktok_completo,
@@ -250,7 +256,7 @@ export default function PovBofLargoPage() {
    *  a Gemini), igual que "Textos" pero por guion. */
   async function generarTodosGuiones() {
     if (!folder) return;
-    const pend = items.filter((p) => p.titulo && !p.guion);
+    const pend = items.filter(pendienteGuion);
     if (!pend.length) {
       toast.error("Todos los productos con textos ya tienen guion");
       return;
@@ -261,7 +267,12 @@ export default function PovBofLargoPage() {
       for (const [i, p] of pend.entries()) {
         setGuionProgress(`${i + 1}/${pend.length}`);
         try {
-          await guionBatch.mutateAsync({ source: activaSource, folder, producto: p.producto });
+          await guionBatch.mutateAsync({
+            source: activaSource, folder, producto: p.producto,
+            // Sin esto el endpoint reaprovecharía el guion desfasado y el
+            // lote no arreglaría nada.
+            rehacer: Boolean(p.guion),
+          });
           ok++;
         } catch (e) {
           toast.error(`Producto ${p.producto}: ${err(e)}`);
@@ -1318,6 +1329,10 @@ function ProductoCard({
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
+  // El guion guardado se escribió en el otro modo (con o sin la frase de
+  // plazos). No es un error: pasa con todo lo escrito antes de que existieran
+  // los plazos y cada vez que se corrige un precio.
+  const guionDesfasado = Boolean(p.guion) && p.modo_plazos !== p.guion_plazos;
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1557,8 +1572,8 @@ function ProductoCard({
             onClick={() => setVerGuion((v) => !v)}
             className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
           >
-            <span>
-              🎬 Guion
+            <span className={guionDesfasado ? "text-amber-500" : undefined}>
+              {guionDesfasado ? "⚠️ 🎬 Guion" : "🎬 Guion"}
               <span className="ml-1 opacity-70">
                 {p.guion_caracteres} car. · ~{Math.round(p.guion_caracteres / CAR_POR_SEG)}s
               </span>
@@ -1567,6 +1582,17 @@ function ProductoCard({
           </button>
           {verGuion && (
           <>
+          {/* El guion guardado puede ser del OTRO modo: escrito antes de que
+              existieran los plazos, o antes de corregir el precio. El montaje
+              lo reescribe solo, pero sin decirlo aquí parecería que el vídeo
+              va a llevar este texto. */}
+          {guionDesfasado && (
+            <p className="rounded bg-amber-500/10 px-1.5 py-1 text-[10px] text-amber-500">
+              {p.modo_plazos
+                ? "Este guion no lleva la frase de plazos (se escribió antes). Se reescribe solo al montar, o púlsalo ahora."
+                : "Este guion lleva la frase de plazos y el producto ya no llega al umbral. Se reescribe solo al montar."}
+            </p>
+          )}
           <p className="text-[10px] leading-relaxed">{p.guion}</p>
           <div className="flex flex-wrap items-center gap-1.5">
             <CopyChip label="🎬 Guion" text={p.guion ?? ""} />
@@ -1583,7 +1609,7 @@ function ProductoCard({
               className="ml-auto flex items-center gap-1 rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
             >
               <RefreshCw className={`h-3 w-3 ${guion.isPending ? "animate-spin" : ""}`} />
-              Otro guion
+              {guionDesfasado ? "Reescribir" : "Otro guion"}
             </button>
           </div>
           </>
