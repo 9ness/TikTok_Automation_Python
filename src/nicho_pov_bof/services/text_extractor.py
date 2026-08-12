@@ -44,7 +44,7 @@ REQUIRED_FIELDS = (
 # Opcionales: si no vienen, el producto NO se descarta. `emojis` se añadió
 # después, así que los productos extraídos antes no lo tienen y hay un
 # respaldo por palabras clave en `services/emojis.py`.
-OPTIONAL_FIELDS = ("emojis", "tienda")
+OPTIONAL_FIELDS = ("emojis", "tienda", "precio")
 
 
 def _load_system_prompt() -> str:
@@ -241,6 +241,12 @@ def extract_from_pairs(
                 doc = {f: entry[f].strip() for f in REQUIRED_FIELDS}
                 for f in OPTIONAL_FIELDS:
                     v = entry.get(f)
+                    # El precio se pide como número y el modelo lo manda tal
+                    # cual la mitad de las veces (45.9, no "45.9"). Sin esto se
+                    # tiraba en silencio y el producto salía sin precio, que es
+                    # justo lo que decide si lleva el guion de plazos.
+                    if f == "precio" and isinstance(v, (int, float)):
+                        v = f"{v:g}"
                     # Los opcionales se limpian igual: mejor vacío (y el botón
                     # sale desactivado) que un relleno pintado como si fuera
                     # el nombre real de la tienda.

@@ -148,6 +148,14 @@ export default function NichoPovBofPage() {
   const totalProductos = productos.data?.length ?? 0;
   const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
   const conFoto = (productos.data ?? []).filter((p) => p.clean_photo_id).length;
+  // Los dos flujos de generación de la carpeta, contados sobre los que tienen
+  // foto (que son los que se pueden bajar).
+  const conPlazos = (productos.data ?? []).filter(
+    (p) => p.clean_photo_id && p.modo_plazos,
+  ).length;
+  const conViejo = (productos.data ?? []).filter(
+    (p) => p.clean_photo_id && !p.modo_plazos,
+  ).length;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
   const subidos = (productos.data ?? []).filter((p) => p.uploaded).length;
   const enEscaparate = (productos.data ?? []).filter((p) => p.en_escaparate).length;
@@ -194,11 +202,23 @@ export default function NichoPovBofPage() {
     }
   }
 
-  async function downloadCleanPhotos() {
+  /** `filtro` separa los dos flujos, que no se generan igual: los de plazos
+   *  necesitan DOS clips y los de siempre uno solo, así que bajar la carpeta
+   *  entera obligaba a ir mirando el precio producto a producto. */
+  async function downloadCleanPhotos(filtro: "todas" | "plazos" | "viejo" = "todas") {
     if (!folder || !productos.data?.length) return;
-    const items = productos.data.filter((p) => p.clean_photo_id);
+    const items = productos.data.filter(
+      (p) =>
+        p.clean_photo_id &&
+        (filtro === "todas" ||
+          (filtro === "plazos" ? p.modo_plazos : !p.modo_plazos)),
+    );
     if (!items.length) {
-      toast.error("No hay fotos limpias en esta carpeta");
+      toast.error(
+        filtro === "todas"
+          ? "No hay fotos limpias en esta carpeta"
+          : `No hay productos ${filtro === "plazos" ? "de plazos" : "con guion viejo"} con foto`,
+      );
       return;
     }
     setDownloadingPhotos(true);
@@ -211,7 +231,9 @@ export default function NichoPovBofPage() {
         setDownloadProgress(`${i + 1}/${items.length}`);
         const a = document.createElement("a");
         a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto);
-        a.download = `${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        // El sufijo evita mezclar los dos flujos en la carpeta de Descargas.
+        const sufijo = filtro === "todas" ? "" : `_${filtro}`;
+        a.download = `${folder}_${p.producto}${sufijo}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -824,6 +846,32 @@ export default function NichoPovBofPage() {
               )}
             </button>
             </div>
+            {/* Los dos flujos por separado: el de plazos son dos clips por
+                producto y el de siempre uno. Solo aparecen si la carpeta
+                tiene de los dos tipos — con precios sin leer no hay nada que
+                separar. */}
+            {conPlazos > 0 && conViejo > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void downloadCleanPhotos("plazos")}
+                  disabled={downloadingPhotos}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-[11px] text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">💳 Con plazos ({conPlazos})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void downloadCleanPhotos("viejo")}
+                  disabled={downloadingPhotos}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Guion viejo ({conViejo})</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {productos.isLoading && (
@@ -1313,6 +1361,13 @@ function ProductoCard({
   });
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
+  // Progreso POR CLIP en los productos de plazos (null = ese no se está
+  // subiendo). Cada slot va por su cuenta: se puede subir el clip 2 mientras
+  // el 1 va por la mitad, y una ficha no bloquea a las demás.
+  const [pctsClip, setPctsClip] = useState<{ 1: number | null; 2: number | null }>({
+    1: null, 2: null,
+  });
+  const clipRefs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   const qc = useQueryClient();
@@ -1366,9 +1421,12 @@ function ProductoCard({
   const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
-  function uploadVideo(file: File) {
-    setUploading(true);
-    setPct(0);
+  function uploadVideo(file: File, slot: 0 | 1 | 2 = 0) {
+    if (slot) setPctsClip((prev) => ({ ...prev, [slot]: 0 }));
+    else {
+      setUploading(true);
+      setPct(0);
+    }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("source", source);
@@ -1379,16 +1437,24 @@ function ProductoCard({
     fd.append("con_titulo", String(tools.titulo));
     fd.append("con_cta", String(tools.cta));
     fd.append("con_flecha", String(tools.flecha));
+    if (slot) fd.append("slot", String(slot));
     // XHR (no fetch) para tener progreso real de subida — mismo patrón que
     // `uploadVideo()` en calendar/page.tsx:634.
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof/video/upload`);
     if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+      if (!e.lengthComputable) return;
+      const v = Math.round((e.loaded / e.total) * 100);
+      if (slot) setPctsClip((prev) => ({ ...prev, [slot]: v }));
+      else setPct(v);
+    };
+    const acabar = () => {
+      if (slot) setPctsClip((prev) => ({ ...prev, [slot]: null }));
+      else setUploading(false);
     };
     xhr.onload = () => {
-      setUploading(false);
+      acabar();
       try {
         const resData = JSON.parse(xhr.responseText) as VideoUploadResponse;
         if (resData.ok) {
@@ -1405,7 +1471,7 @@ function ProductoCard({
       }
     };
     xhr.onerror = () => {
-      setUploading(false);
+      acabar();
       toast.error("Error de red al subir");
     };
     xhr.send(fd);
@@ -1444,6 +1510,21 @@ function ProductoCard({
             </span>
             <span className="truncate">{producto.titulo || "sin título"}</span>
           </p>
+          {/* El precio decide el guion, así que se ve de un vistazo: por
+              encima del umbral el vídeo lleva el guion de plazos (Klarna) y
+              son dos clips en vez de uno. */}
+          {producto.precio > 0 && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-[10px]">
+              <span className="font-mono font-semibold">
+                {producto.precio.toFixed(2).replace(".", ",")} €
+              </span>
+              {producto.modo_plazos && (
+                <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
+                  💳 Plazos · 2 clips
+                </span>
+              )}
+            </p>
+          )}
           {/* Se quedó sin textos en una carpeta donde los demás sí los tienen:
               apareció tarde (antes se perdían los productos con fotos sin
               extensión y los fundidos bajo un mismo número). Sin la marca
@@ -1670,6 +1751,58 @@ function ProductoCard({
         }
       />
 
+      {producto.modo_plazos ? (
+        /* Producto de plazos: el guion de Klarna dura ~15s, así que hacen
+           falta DOS clips y no se monta hasta tener los dos. */
+        <div className="grid grid-cols-2 gap-1.5">
+          {([1, 2] as const).map((slot) => {
+            const puesto = slot === 1 ? producto.clip1 : producto.clip2;
+            const pctSlot = pctsClip[slot];
+            const subiendoEste = pctSlot !== null;
+            return (
+              <label
+                key={slot}
+                className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-[11px] font-medium transition ${
+                  puesto
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                    : "border-border/60 hover:border-violet-500/60"
+                } ${subiendoEste ? "pointer-events-none opacity-60" : ""}`}
+              >
+                {subiendoEste ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    Subiendo {pctSlot}%
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3.5 w-3.5 shrink-0" />
+                    {puesto ? `Clip ${slot} ✓` : `Clip ${slot}`}
+                  </>
+                )}
+                <input
+                  ref={clipRefs[slot]}
+                  type="file"
+                  accept="video/*"
+                  disabled={subiendoEste}
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadVideo(f, slot);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
+      {producto.montando && producto.modo_plazos ? (
+        <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locutando y montando…
+        </p>
+      ) : null}
+
+      {!producto.modo_plazos && (
       <input
         ref={fileInputRef}
         type="file"
@@ -1681,6 +1814,8 @@ function ProductoCard({
           e.target.value = "";
         }}
       />
+      )}
+      {!producto.modo_plazos && (
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
@@ -1703,6 +1838,7 @@ function ProductoCard({
           </>
         )}
       </button>
+      )}
 
       <div className="flex gap-1.5">
         {/* Va PRIMERO porque es lo primero que pasa de verdad: el producto

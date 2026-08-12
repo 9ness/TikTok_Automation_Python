@@ -76,6 +76,11 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   `SOLO HOY`, `SE AGOTA`, `DATE PRISA`), ni ponerle fecha a nada (`HOY`,
   `ESTA SEMANA`, `24H`): mañana deja de ser cierto.
 
+- `precio`: el precio del producto tal cual lo pinta TikTok, SOLO el número en
+  euros y con punto decimal (`34.99`). Si hay precio rebajado y precio tachado,
+  el que vale es el REBAJADO (el que se paga hoy). Si no se ve ningún precio,
+  no devuelvas el campo — es preferible vacío a inventado: con este número se
+  decide qué guion lleva el vídeo.
 - `emojis`: **exactamente DOS emojis** que acompañen al caption, sin espacios
   entre ellos. El primero es una REACCIÓN genérica (😍 🤯 😱 👀 🔥 👏 🙌 ✨);
   el segundo tiene que ver con el PRODUCTO en concreto.
@@ -97,7 +102,7 @@ menos superficie hay para una sanción de TikTok Shop, y con dos infracciones se
 suspende la cuenta.
 
 Así que **no devuelvas `gancho` ni `cta`**. Céntrate en `titulo`,
-`titulo_tiktok_completo`, `tienda` y `caption`.
+`titulo_tiktok_completo`, `tienda`, `caption` y `precio`.
 
 ## Si la imagen es la pantalla de DESCRIPCIÓN
 

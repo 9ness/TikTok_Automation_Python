@@ -131,6 +131,14 @@ class ProductoInfo(BaseModel):
     # Marketplace, porque EchoTik solo encuentra la ficha 1 de cada 4 veces y
     # su cuota gratis no da para el volumen diario).
     en_escaparate: bool = False
+    # Precio leído de la ficha. Decide el guion: por encima de
+    # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
+    # Fish, dos clips); por debajo, el audio grabado de siempre.
+    precio: float = 0
+    modo_plazos: bool = False
+    # Solo en modo plazos: cuáles de los dos clips están ya subidos.
+    clip1: bool = False
+    clip2: bool = False
     uploaded: bool = False
     # Cuándo se marcó como subido (epoch). Sirve para comprobar que un
     # producto repetido quedó bien marcado: si la hora cambia, entró.

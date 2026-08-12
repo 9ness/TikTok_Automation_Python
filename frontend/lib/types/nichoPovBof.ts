@@ -99,6 +99,12 @@ export interface ProductoItem {
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;
+  /** Precio leído de la ficha (0 = no se pudo leer). */
+  precio: number;
+  /** Precio por encima del umbral → guion de plazos y vídeo de dos clips. */
+  modo_plazos: boolean;
+  clip1: boolean;
+  clip2: boolean;
   sold: boolean;
   video_path: string | null;
   /** Cambia en cada montaje: se usa para romper la caché del navegador y que

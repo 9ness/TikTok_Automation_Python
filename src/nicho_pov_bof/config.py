@@ -319,3 +319,54 @@ def redis_prefix() -> str:
 # ---------------------------------------------------------------------------
 # Mismo patrón que VIRALIZACION: todo cuelga de TIKTOK_SHOP_AI_PRO.
 DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF"
+
+
+# ---------------------------------------------------------------------------
+# Guion de plazos (Klarna)
+# ---------------------------------------------------------------------------
+# Klarna financia a partir de 30 €, pero aquí el listón se pone más alto: con
+# cupones el pedido baja y un producto de 32 € puede quedarse por debajo de los
+# 30, dejando el guion mintiendo. 40 € deja margen.
+PRECIO_MIN_PLAZOS = float(os.getenv("PRECIO_MIN_PLAZOS", "40"))
+
+
+def precio_num(valor) -> float:
+    """Pasa a número el precio leído de la ficha. 0 si no hay nada legible.
+
+    Llega escrito como le da la gana al vendedor: `45,90`, `45.90`, `€45`,
+    `1.299,00`, `45,90 €`. Con un `float()` a secas se caían el símbolo y, peor,
+    los miles: un sofá de `1.299,00` daba 0 y se iba al guion de siempre, que es
+    justo el producto que MÁS pide el de plazos.
+    """
+    txt = re.sub(r"[^0-9.,]", "", str(valor or ""))
+    if not txt:
+        return 0.0
+    coma, punto = txt.rfind(","), txt.rfind(".")
+    if coma >= 0 and punto >= 0:
+        # Manda el ÚLTIMO: el otro es separador de miles.
+        decimal, miles = (",", ".") if coma > punto else (".", ",")
+        txt = txt.replace(miles, "").replace(decimal, ".")
+    elif coma >= 0 or punto >= 0:
+        sep = "," if coma >= 0 else "."
+        # Un solo separador con TRES cifras detrás y ninguna más es de miles
+        # (`1.299`); con dos o menos es decimal (`45,90`).
+        cuerpo, _, cola = txt.rpartition(sep)
+        txt = (
+            cuerpo + cola
+            if len(cola) == 3 and sep not in cuerpo and cuerpo
+            else txt.replace(sep, ".")
+        )
+    try:
+        return max(0.0, float(txt))
+    except ValueError:
+        return 0.0
+
+
+def guiones_plazos() -> list[str]:
+    """Los guiones del documento del curso, uno por línea. Se sortea uno."""
+    ruta = Path(__file__).resolve().parent / "prompts" / "guiones_plazos.md"
+    return [
+        linea[2:].strip()
+        for linea in ruta.read_text(encoding="utf-8").splitlines()
+        if linea.startswith("- ") and len(linea) > 40
+    ]

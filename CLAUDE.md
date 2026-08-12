@@ -297,6 +297,13 @@ fotos se guardan con el MISMO convenio de nombres del Drive compartido
 (`3.png` / `3(1).png`) para que emparejado, textos, ficha y montaje funcionen
 sin código especial (`services/mis_productos.py`).
 
+Los productos CAROS van por otro camino: al extraer textos se lee también el
+**precio** y, por encima de `PRECIO_MIN_PLAZOS` (40 €), el vídeo lleva uno de
+los guiones de Klarna del curso (`prompts/guiones_plazos.md`, sorteado y
+locutado con Fish en voz de hombre o mujer al azar) y se monta con **DOS clips**
+usando el editor del POV BOF Largo — `JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`. Por
+debajo del umbral, todo sigue igual: un clip y el audio del banco.
+
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
 Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
 

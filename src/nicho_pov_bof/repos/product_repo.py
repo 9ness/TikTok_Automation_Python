@@ -31,6 +31,10 @@ CAMPOS_PRIVADOS = frozenset({
     "en_escaparate", "uploaded", "sold", "video_path", "video_listo_at",
     # Cuándo se marcó como subido. Es del usuario, como el propio `uploaded`.
     "uploaded_at",
+    # Vídeo de plazos: los dos clips brutos y la voz que le tocó. Cada operador
+    # sube SUS clips del mismo producto, así que si esto viviera en el documento
+    # compartido el clip de uno dispararía el montaje del otro.
+    "clip1_path", "clip2_path", "guion_plazos", "voz_label", "voz_sexo",
 })
 
 

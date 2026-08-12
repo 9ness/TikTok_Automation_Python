@@ -82,6 +82,32 @@ def _bad_request(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
 
+def _precio_y_modo(prod: dict) -> tuple[float, bool]:
+    """Precio del producto y si le toca el guion de plazos.
+
+    Sin precio leído NO se asume nada: se queda con el guion de siempre. Es
+    preferible a colar un guion que promete financiación en un producto de 12 €
+    (el operador puede escribir el precio a mano si Gemini no lo pilló).
+    """
+    precio = nicho_config.precio_num(prod.get("precio"))
+    return precio, precio >= nicho_config.PRECIO_MIN_PLAZOS
+
+
+def _clip_vigente(ruta, desde: float = 0.0) -> bool:
+    """¿Hay un clip de ESTA ronda en ese slot?
+
+    No basta con que el path esté guardado: el fichero se purga a las 24h y,
+    sobre todo, un clip anterior al último montaje ya se consumió. Sin esto,
+    resubir el clip 1 encolaría un montaje con el clip 2 de la ronda pasada.
+    """
+    if not ruta:
+        return False
+    f = Path(str(ruta))
+    if not f.is_file():
+        return False
+    return f.stat().st_mtime >= desde
+
+
 def _contar_subida(tipo: str, referencia: str, subido: bool, usuario: str) -> None:
     """Suma (o resta) la publicación en el tope diario de la cuenta.
 
@@ -220,6 +246,13 @@ def _producto_info(
         sexo_sugerido=audience.sexo_sugerido(
             prod.get("titulo", ""), prod.get("titulo_tiktok_completo", ""),
         ),
+        precio=_precio_y_modo(prod)[0],
+        modo_plazos=_precio_y_modo(prod)[1],
+        # Vigente, no "guardado": el fichero temporal se purga a las 24h y un
+        # clip anterior al último montaje ya se consumió. Marcarlo con ✓ haría
+        # creer que solo falta el otro.
+        clip1=_clip_vigente(prod.get("clip1_path"), float(prod.get("video_listo_at") or 0)),
+        clip2=_clip_vigente(prod.get("clip2_path"), float(prod.get("video_listo_at") or 0)),
         # El escaparate sale del índice ÚNICO por (tienda|nombre): el mismo
         # producto está repetido en varias carpetas y se graba con varios
         # nichos, pero al Marketplace se sube UNA vez. El flag viejo por
@@ -262,7 +295,10 @@ def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> s
     return {
         str(j.params.get("producto"))
         for j in jobs
-        if j.mode == JobMode.NICHO_POV_BOF_VIDEO
+        # Los dos modos montan en esta carpeta: el normal (un vídeo) y el de
+        # plazos (dos clips). Si solo se mirara uno, el de plazos no pintaría
+        # el "montando…" y la guardia contra el doble encolado no vería nada.
+        if j.mode in (JobMode.NICHO_POV_BOF_VIDEO, JobMode.NICHO_POV_BOF_PLAZOS_VIDEO)
         and j.status in activos
         and j.params.get("source") == source
         and j.params.get("folder") == folder
@@ -331,6 +367,14 @@ def _list_productos(
                 sexo_sugerido=audience.sexo_sugerido(
                     guardado.get("titulo", ""),
                     guardado.get("titulo_tiktok_completo", ""),
+                ),
+                precio=_precio_y_modo(guardado)[0],
+                modo_plazos=_precio_y_modo(guardado)[1],
+                clip1=_clip_vigente(
+                    guardado.get("clip1_path"), float(guardado.get("video_listo_at") or 0),
+                ),
+                clip2=_clip_vigente(
+                    guardado.get("clip2_path"), float(guardado.get("video_listo_at") or 0),
                 ),
                 en_escaparate=(
                     product_repo.clave_escaparate(
@@ -491,6 +535,10 @@ async def upload_video(
     con_cta: Annotated[bool, Form()] = True,
     con_flecha: Annotated[bool, Form()] = True,
     con_textos: Annotated[bool, Form()] = True,
+    # Solo en productos de plazos (precio >= PRECIO_MIN_PLAZOS): el vídeo son
+    # DOS clips, así que cada subida dice cuál es. 0 = producto normal, un
+    # único vídeo, como toda la vida.
+    slot: Annotated[int, Form()] = 0,
 ) -> VideoUploadResponse:
     """Sube el vídeo bruto generado fuera (Veo3/Kling) y ENCOLA el montaje
     completo (quita marca de agua + normaliza + cuadra duración + textos +
@@ -507,6 +555,8 @@ async def upload_video(
     # de poner marca de agua. Se guarda tal cual llegue (vacío incluido) solo
     # como dato del job.
     origen_norm = (origen or "").strip().lower()
+    if slot not in (0, 1, 2):
+        raise _bad_request(f"slot debe ser 0, 1 o 2, recibido: {slot}")
 
     filename = (file.filename or "").lower()
     ext = next((e for e in _ALLOWED_VIDEO_EXTS if filename.endswith(e)), "")
@@ -529,6 +579,15 @@ async def upload_video(
     finally:
         await file.close()
 
+    if slot:
+        return _plazos_clip(
+            queue, source, folder, producto, slot, raw_path, sexo_norm, operator,
+            con_gancho=bool(con_gancho) and bool(con_textos),
+            con_titulo=bool(con_titulo) and bool(con_textos),
+            con_cta=bool(con_cta) and bool(con_textos),
+            con_flecha=bool(con_flecha) and bool(con_textos),
+        )
+
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_VIDEO,
         title=f"🎬 Nicho POV BOF: producto {producto} · {folder}",
@@ -548,6 +607,80 @@ async def upload_video(
         enqueued_by=operator or None,
     )
     return VideoUploadResponse(ok=True, job_id=job.id, message="En la cola, procesando…")
+
+
+def _plazos_clip(
+    queue: JobQueue,
+    source: str,
+    folder: str,
+    producto: str,
+    slot: int,
+    raw_path: Path,
+    sexo: str,
+    operator: str,
+    **flags: bool,
+) -> VideoUploadResponse:
+    """Guarda uno de los dos clips del vídeo de plazos y encola cuando están los dos.
+
+    El guion de Klarna dura ~15s y un clip son 10s: con uno solo faltaría un
+    tercio del vídeo, así que no hay nada que montar hasta tener los dos.
+
+    Cada montaje empieza de cero — al encolar se olvidan los dos paths, igual
+    que en el POV BOF Largo, para que resubir un producto ya montado vuelva a
+    pedir los dos clips en vez de mezclar uno nuevo con otro viejo.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    try:
+        prod = product_repo.update_product(
+            source, folder, producto, usuario=operator,
+            **{f"clip{slot}_path": str(raw_path)},
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+    montado_at = float(prod.get("video_listo_at") or 0)
+    if not (
+        _clip_vigente(prod.get("clip1_path"), montado_at)
+        and _clip_vigente(prod.get("clip2_path"), montado_at)
+    ):
+        falta = 2 if slot == 1 else 1
+        return VideoUploadResponse(
+            ok=True, job_id="",
+            message=f"Clip {slot} guardado. Falta el clip {falta}.",
+        )
+
+    # Los dos clips subidos a la vez: si el otro ya disparó el montaje, no se
+    # encola un segundo trabajo con el mismo material.
+    if producto in _productos_montandose(queue, source, folder):
+        return VideoUploadResponse(
+            ok=True, job_id="",
+            message=f"Clip {slot} guardado. Ya hay un montaje en marcha para este producto.",
+        )
+
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_PLAZOS_VIDEO,
+        title=f"💳 POV BOF plazos: producto {producto} · {folder}",
+        params={
+            "source": source, "folder": folder, "producto": producto,
+            "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
+            "sexo": sexo, "operator": operator,
+            **{k: bool(v) for k, v in flags.items()},
+        },
+        enqueued_by=operator or None,
+    )
+    try:
+        product_repo.update_product(
+            source, folder, producto, usuario=operator,
+            clip1_path="", clip2_path="",
+        )
+    except RuntimeError:
+        # El montaje ya está encolado; que no falle la respuesta por esto.
+        pass
+    return VideoUploadResponse(
+        ok=True, job_id=job.id,
+        message="Los dos clips están: locutando el guion de plazos y montando.",
+    )
 
 
 @router.post("/mis-productos")

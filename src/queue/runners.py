@@ -2005,6 +2005,139 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     return str(salida)
 
 
+
+def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el vídeo de un producto CARO (>= `PRECIO_MIN_PLAZOS`) con el guion
+    de plazos.
+
+    Es el Nicho POV BOF con dos cambios y nada más:
+
+    - La voz no sale del banco de audios grabados, sino de locutar con Fish uno
+      de los guiones de Klarna del curso (`config.guiones_plazos()`), sorteado.
+      Se sortea también el sexo: el guion no habla de quién lo dice.
+    - Como ese guion dura ~15s y un clip son 10s, el vídeo son DOS clips
+      pegados, con la misma lógica del POV BOF Largo (la voz manda la duración
+      y el salto al clip 2 cae en una pausa).
+
+    El resto —textos, flecha, publicación en Drive, caché local— es idéntico al
+    POV BOF, así que el vídeo aterriza donde el operador ya lo busca.
+
+    Params: source, folder, producto, clip1_path, clip2_path, sexo, operator,
+    con_gancho/titulo/cta/flecha.
+    """
+    import random
+
+    from src.nicho_pov_bof import config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import audio_bank
+    from src.nicho_pov_bof_largo.pipeline import video_editor
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    p = job.params
+    source, folder = str(p["source"]), str(p["folder"])
+    producto = str(p["producto"])
+    quien = str(p.get("operator") or job.enqueued_by or "").strip()
+    clips = [Path(p["clip1_path"]), Path(p["clip2_path"])]
+    for c in clips:
+        if not c.is_file():
+            raise FileNotFoundError(f"No está el clip subido: {c}")
+
+    on_progress(0.03, "📝 Leyendo textos del producto…")
+    textos = product_repo.get_product(source, folder, producto, quien)
+    if not textos.get("titulo"):
+        on_log(
+            "[pov_bof_plazos] este producto no tiene textos extraídos — el "
+            "bloque de texto saldrá vacío (¿faltó 'Obtener textos'?)"
+        )
+
+    # Semilla estable por producto: remontar el mismo producto repite guion y
+    # sexo. Si se sorteara de nuevo, dos montajes del mismo vídeo sonarían
+    # distintos y el operador no sabría cuál publicó.
+    rng = random.Random(f"plazos|{source}|{folder}|{producto}|{quien}")
+    guiones = config.guiones_plazos()
+    if not guiones:
+        raise RuntimeError(
+            "No hay guiones de plazos cargados "
+            "(src/nicho_pov_bof/prompts/guiones_plazos.md)."
+        )
+    guion = rng.choice(guiones)
+    sexo = (p.get("sexo") or "").strip().lower()
+    if sexo not in ("hombre", "mujer"):
+        sexo = rng.choice(["hombre", "mujer"])
+    on_log(f"[pov_bof_plazos] guion ({len(guion)} car., voz {sexo}): {guion}")
+
+    on_progress(0.10, f"🔊 Locutando el guion de plazos ({sexo})…")
+    work_dir = clips[0].parent / f"work_plazos_{producto}_{int(time.time())}"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    output_local = work_dir / "output.mp4"
+    try:
+        audio = work_dir / "voz.mp3"
+        info = voz_svc.sintetizar(guion, audio, sexo=sexo, rng=rng, on_log=on_log)
+        on_log(
+            f"[pov_bof_plazos] voz: {info.get('voz_label')} · "
+            f"{info.get('duracion', 0):.1f}s"
+        )
+
+        def _progreso(pct: float, label: str) -> None:
+            on_progress(0.18 + pct * 0.74, label)
+
+        video_editor.montar(
+            clips=clips,
+            audio_path=audio,
+            textos=textos,
+            output_path=output_local,
+            work_dir=work_dir,
+            producto=producto,
+            semilla=f"{producto} {folder}",
+            con_gancho=bool(p.get("con_gancho", True)),
+            con_titulo=bool(p.get("con_titulo", True)),
+            con_cta=bool(p.get("con_cta", True)),
+            con_flecha=bool(p.get("con_flecha", True)),
+            on_log=on_log,
+            on_progress=_progreso,
+        )
+
+        on_progress(0.94, "☁️ Publicando en Drive…")
+        root = audio_bank.mount_root()
+        if root is None:
+            raise RuntimeError(
+                "No se encontró el mount de Drive (DRIVE_MOUNT_ROOT / /mnt/drive "
+                "/ ~/gdrive) — no se puede publicar el vídeo final."
+            )
+        dest_dir = root / config.DRIVE_UPLOAD_ROOT / "videos"
+        if quien and quien != "ness":
+            dest_dir = dest_dir / quien
+        dest_dir = dest_dir / folder
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / f"{producto} {folder}.mp4"
+        tmp_dest = dest_path.with_name(dest_path.name + ".part")
+        shutil.copy2(output_local, tmp_dest)
+        tmp_dest.replace(dest_path)
+        on_log(f"[pov_bof_plazos] publicado en Drive: {dest_path}")
+
+        try:
+            cache = Path(config.video_cache_path(folder, producto, quien))
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(output_local, cache)
+            config.limpiar_video_cache()
+        except OSError as e:
+            on_log(f"[pov_bof_plazos] ⚠️ no pude guardar la copia local: {e}")
+    finally:
+        for c in clips:
+            try:
+                c.unlink(missing_ok=True)
+            except OSError:
+                pass
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+    product_repo.update_product(
+        source, folder, producto, usuario=quien,
+        video_path=str(dest_path), video_listo_at=int(time.time()),
+        guion_plazos=guion, voz_label=info.get("voz_label", ""), voz_sexo=sexo,
+    )
+    on_progress(1.0, "✅ Listo")
+    return str(dest_path)
+
 # ============================================================
 # RUNNER: CUENTA PILOTO — MONTAJE DEL VÍDEO ORGÁNICO
 # ============================================================
@@ -2635,6 +2768,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_BOF_CINE_VIDEO: run_nicho_bof_cine_video,
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
+    JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: run_nicho_pov_bof_plazos_video,
 }
 
 
@@ -2660,6 +2794,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_BOF_CINE_VIDEO: "viralizacion",
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
+    JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "viralizacion",
 }
 
 
