@@ -1370,6 +1370,7 @@ function ProductoCard({
   const clipRefs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
+  const [verTools, setVerTools] = useState(false);
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1510,21 +1511,6 @@ function ProductoCard({
             </span>
             <span className="truncate">{producto.titulo || "sin título"}</span>
           </p>
-          {/* El precio decide el guion, así que se ve de un vistazo: por
-              encima del umbral el vídeo lleva el guion de plazos (Klarna) y
-              son dos clips en vez de uno. */}
-          {producto.precio > 0 && (
-            <p className="mt-0.5 flex items-center gap-1.5 text-[10px]">
-              <span className="font-mono font-semibold">
-                {producto.precio.toFixed(2).replace(".", ",")} €
-              </span>
-              {producto.modo_plazos && (
-                <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
-                  💳 Plazos · 2 clips
-                </span>
-              )}
-            </p>
-          )}
           {/* Se quedó sin textos en una carpeta donde los demás sí los tienen:
               apareció tarde (antes se perdían los productos con fotos sin
               extensión y los fundidos bajo un mismo número). Sin la marca
@@ -1539,12 +1525,33 @@ function ProductoCard({
               {producto.titulo_tiktok_completo}
             </p>
           )}
+          {/* El precio decide el guion (por encima del umbral son dos clips y
+              el guion de plazos), así que se ve pegado al producto. Cuando la
+              carpeta tiene textos pero no se pudo leer el precio se dice: en
+              silencio parecería barato y se iría al guion de siempre. */}
+          {producto.titulo && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+              {producto.precio > 0 ? (
+                <span className="font-mono font-semibold">
+                  {producto.precio.toFixed(2).replace(".", ",")} €
+                </span>
+              ) : (
+                <span className="text-muted-foreground">precio sin detectar</span>
+              )}
+              {producto.modo_plazos && (
+                <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
+                  💳 Plazos · 2 clips
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Copiar textos extraídos — solo se muestran los que tengan valor */}
       <div className="flex flex-wrap gap-1">
-        <CopyChip label="📝 Título" text={producto.titulo ?? ""} />
+        {/* El "Título" a secas no se copiaba nunca (el que se pega en TikTok
+            es el completo), así que solo hacía ruido en la ficha. */}
         <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} siempre />
         {/* El caption se copia YA con los hashtags pegados: es lo que se
@@ -1559,20 +1566,13 @@ function ProductoCard({
               : ""
           }
         />
-        {/* Gancho y CTA también copiables: son los textos que se pegan a mano
-            cuando se prefiere montar el vídeo en CapCut en vez de aquí. */}
-        <CopyChip label="🎣 Gancho" text={producto.gancho ?? ""} />
-        <CopyChip label="👉 CTA" text={producto.cta ?? ""} />
+        {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
+            mano solo se usaban cuando el vídeo se hacía en CapCut. */}
         {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
         {producto.clean_photo_id && (
           <>
-            <button
-              type="button"
-              onClick={() => setVerFoto(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
-            >
-              🔍 Ver foto
-            </button>
+            {/* Sin botón "Ver foto": la miniatura de arriba ya abre el visor
+                y el botón repetía la misma acción en cada ficha. */}
             <a
               href={buildCleanPhotoDownloadUrl(source, folder, producto.producto)}
               className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
@@ -1676,9 +1676,23 @@ function ProductoCard({
       {/* Cada herramienta por separado. Todas marcadas = montaje completo;
           ninguna = vídeo limpio (solo la voz, y sin marca si es Veo3). */}
       <div className="space-y-1.5 rounded-md border border-border/60 p-2">
-        <p className="text-[10px] font-medium text-muted-foreground">
-          Qué añadir al vídeo
-        </p>
+        {/* Plegado por defecto: casi siempre van las cuatro marcadas, así que
+            desplegado solo ocupaba media pantalla en el móvil. El resumen dice
+            cuántas van sin abrirlo. */}
+        <button
+          type="button"
+          onClick={() => setVerTools((v) => !v)}
+          className="flex w-full items-center justify-between text-[10px] font-medium text-muted-foreground"
+        >
+          <span>
+            Qué añadir al vídeo
+            <span className="ml-1 opacity-70">
+              ({Object.values(tools).filter(Boolean).length}/{TOOLS.length})
+            </span>
+          </span>
+          <span>{verTools ? "▾" : "▸"}</span>
+        </button>
+        {verTools && (
         <div className="grid grid-cols-2 gap-1.5">
           {TOOLS.map((t) => (
             <label
@@ -1699,6 +1713,7 @@ function ProductoCard({
             </label>
           ))}
         </div>
+        )}
         {!Object.values(tools).some(Boolean) && (
           <p className="text-[10px] text-amber-500">
             Vídeo limpio: solo la voz, sin nada encima.
