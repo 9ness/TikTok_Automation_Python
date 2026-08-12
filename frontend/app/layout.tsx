@@ -58,9 +58,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
                 {/* Lo que queda por publicar hoy, en el marco: el tope es de la
                     CUENTA de TikTok, no de un nicho, así que tiene que verse
-                    desde cualquier pantalla. Pegada arriba para que no se
-                    pierda al hacer scroll. */}
-                <div className="sticky top-0 z-30">
+                    desde cualquier pantalla, también al hacer scroll.
+                    En móvil se pega JUSTO DEBAJO de la cabecera (que mide
+                    3.5rem + el safe-area y va en z-40): con `top-0` se quedaba
+                    tapada por ella y no se veía. En escritorio no hay cabecera,
+                    así que va arriba del todo. */}
+                <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 md:top-0">
                   <BarraCuota />
                 </div>
                 {children}

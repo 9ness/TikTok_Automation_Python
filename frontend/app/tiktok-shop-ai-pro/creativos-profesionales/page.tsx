@@ -66,6 +66,7 @@ export default function CreativosProPage() {
 
   const items = productos.data ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
+  const subidosCarpeta = items.filter((p) => horasSubida[p.producto]).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
 
@@ -232,6 +233,19 @@ export default function CreativosProPage() {
               ? `Bajando ${bajando}`
               : `Fotos ficha (${items.filter((p) => p.titled_photo_id).length})`}
           </button>
+        </div>
+
+        {/* Cuántos creativos de ESTA carpeta has publicado ya. Que la carpeta
+            esté completada no significa que estén todos subidos: puede haber
+            productos sin stock o descartados. */}
+        <div
+          className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            subidosCarpeta === items.length && items.length > 0
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+              : "border-border/60 text-muted-foreground"
+          }`}
+        >
+          📤 Subidos {subidosCarpeta}/{items.length}
         </div>
 
         {productos.isLoading && (

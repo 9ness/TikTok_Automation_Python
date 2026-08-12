@@ -150,6 +150,7 @@ export default function NichoPovBofPage() {
   const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
   const conFoto = (productos.data ?? []).filter((p) => p.clean_photo_id).length;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
+  const subidos = (productos.data ?? []).filter((p) => p.uploaded).length;
   // Meter el producto en el escaparate es el paso más lento del día y no se
   // puede automatizar (ver EscaparateModal), así que el pendiente se enseña
   // arriba, en el botón, sin tener que abrir nada.
@@ -727,6 +728,19 @@ export default function NichoPovBofPage() {
                 </>
               )}
             </button>
+
+            {/* Cuántos productos de ESTA carpeta has publicado ya. Que la
+                carpeta esté "completada" no significa que estén todos subidos:
+                puede haber productos sin stock o descartados. */}
+            <div
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                subidos === totalProductos && totalProductos > 0
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-border/60 text-muted-foreground"
+              }`}
+            >
+              📤 Subidos {subidos}/{totalProductos}
+            </div>
 
             {MOSTRAR_ECHOTIK && (<button
               type="button"

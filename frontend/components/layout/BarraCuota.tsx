@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
@@ -19,6 +19,31 @@ import { useAjustarCuota, useCuotaHoy, type CuotaTipo } from "@/lib/queries/cuot
 export function BarraCuota() {
   const cuota = useCuotaHoy();
   const [abierto, setAbierto] = useState(false);
+  // El color de la barra se ve de reojo, pero al llegar al umbral hay que
+  // ENTERARSE: salta un aviso, una sola vez por tipo y día (si no, cada
+  // refresco del contador sería otro toast).
+  const avisado = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    const d = cuota.data;
+    if (!d) return;
+    for (const [tipo, etiqueta] of [
+      ["videos", "vídeos"],
+      ["carruseles", "carruseles"],
+    ] as const) {
+      const c = d[tipo];
+      const clave = `${d.fecha}:${tipo}:${c.lleno ? "tope" : "aviso"}`;
+      if (!c.avisar || avisado.current[clave]) continue;
+      avisado.current[clave] = true;
+      const quedan = Math.max(0, c.tope - c.usados);
+      if (c.lleno) {
+        toast.error(`Tope de ${etiqueta} del día: ${c.usados}/${c.tope}. Para ya.`);
+      } else {
+        toast.warning(
+          `Llevas ${c.usados} ${etiqueta} hoy — te quedan ${quedan} para el tope de ${c.tope}.`,
+        );
+      }
+    }
+  }, [cuota.data]);
 
   if (!cuota.data) return null;
   const { videos, carruseles } = cuota.data;
@@ -66,7 +91,9 @@ function Medidor({ etiqueta, datos }: { etiqueta: string; datos: CuotaTipo }) {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5">
       <span className={`shrink-0 text-[10px] font-medium ${texto}`}>
+        {datos.avisar && "⚠️ "}
         {etiqueta} {datos.usados}/{datos.tope}
+        {datos.avisar && !datos.lleno && ` · quedan ${datos.tope - datos.usados}`}
       </span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <span

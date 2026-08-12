@@ -131,6 +131,7 @@ export default function PovBofLargoPage() {
   const conFoto = items.filter((p) => p.clean_photo_id).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
+  const subidos = items.filter((p) => p.uploaded).length;
   const sinGuion = items.filter((p) => p.titulo && !p.guion).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const pendientesUrl = items.filter(
@@ -719,6 +720,21 @@ export default function PovBofLargoPage() {
                   </>
                 )}
               </button>
+
+            {/* Cuántos productos de ESTA carpeta has publicado ya. Que la
+                carpeta esté "completada" no significa que estén todos subidos:
+                puede haber productos sin stock o descartados. */}
+            <div
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                subidos === totalProductos && totalProductos > 0
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-border/60 text-muted-foreground"
+              }`}
+            >
+              📤 Subidos {subidos}/{totalProductos}
+            </div>
+
+              {MOSTRAR_ECHOTIK && (
               <button
                 type="button"
                 onClick={runBuscarUrls}
@@ -736,6 +752,7 @@ export default function PovBofLargoPage() {
                   </span>
                 )}
               </button>
+              )}
             </div>
             {/* Guion para todos los productos de la carpeta a la vez, en vez de
                 pulsarlo en cada tarjeta. Necesitan tener textos primero. */}
