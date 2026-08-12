@@ -9,7 +9,7 @@ import {
   Store,
   ShoppingBag,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
@@ -286,7 +286,7 @@ export default function CreativosProPage() {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {items.map((p) => (
             <CreativoCard
-              key={p.producto}
+              key={`${source}-${folder}-${p.producto}`}
               source={source}
               folder={folder!}
               producto={p}
@@ -349,6 +349,16 @@ function CreativoCard({
   const hashtags = useHashtags();
   const [enEscaparate, setEnEscaparate] = useState(p.en_escaparate);
   const [sold, setSold] = useState(p.sold);
+
+  // Sin esto, las tarjetas mienten al cambiar de carpeta: React reutiliza el
+  // componente cuando la `key` coincide (los productos se numeran 1..10 en
+  // TODAS las carpetas), y `useState` solo mira su valor inicial la primera
+  // vez. Resultado: entrabas en una carpeta nueva y salían marcados los
+  // productos que lo estaban en la anterior. Mismo arreglo que en el POV BOF.
+  useEffect(() => {
+    setEnEscaparate(p.en_escaparate);
+    setSold(p.sold);
+  }, [p.en_escaparate, p.sold]);
 
   // Dos tamaños a propósito: la tarjeta pinta una miniatura y el visor pide una
   // más grande solo al abrirlo. A tamaño original una carpeta se llevaba ~300 MB
