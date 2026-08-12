@@ -132,6 +132,9 @@ class ProductoInfo(BaseModel):
     # su cuota gratis no da para el volumen diario).
     en_escaparate: bool = False
     uploaded: bool = False
+    # Cuándo se marcó como subido (epoch). Sirve para comprobar que un
+    # producto repetido quedó bien marcado: si la hora cambia, entró.
+    uploaded_at: float = 0
     sold: bool = False
     video_path: str | None = None
     # Marca de versión del vídeo montado: cambia en cada montaje y sirve para

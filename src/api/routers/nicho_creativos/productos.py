@@ -150,4 +150,16 @@ def marcar_subido(
         subidos_repo.marcar(body.source, body.folder, body.producto, body.uploaded, usuario)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+
+    # Un creativo publicado es un CARRUSEL para el tope diario de la cuenta.
+    try:
+        from src.cuotas.repos import cuota_repo
+
+        cuota_repo.marcar(
+            "carruseles",
+            f"creativos|{body.source}|{body.folder}|{body.producto}",
+            usuario, body.uploaded,
+        )
+    except Exception:
+        pass
     return {"items": sorted(subidos_repo.subidos(body.source, body.folder, usuario))}

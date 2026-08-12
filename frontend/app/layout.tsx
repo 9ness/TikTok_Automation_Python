@@ -6,6 +6,7 @@ import { AppInstallBanner } from "@/components/layout/AppInstallBanner";
 import { ChivatoCierres } from "@/components/layout/ChivatoCierres";
 import { LoginGate } from "@/components/layout/LoginModal";
 import { RestaurarPantalla } from "@/components/layout/RestaurarPantalla";
+import { BarraCuota } from "@/components/layout/BarraCuota";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "./providers";
 
@@ -55,6 +56,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   desborda la página entera (el scroll horizontal interno de
                   tablas/etc. sigue funcionando dentro de su propio contenedor). */}
               <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
+                {/* Lo que queda por publicar hoy, en el marco: el tope es de la
+                    CUENTA de TikTok, no de un nicho, así que tiene que verse
+                    desde cualquier pantalla. Pegada arriba para que no se
+                    pierda al hacer scroll. */}
+                <div className="sticky top-0 z-30">
+                  <BarraCuota />
+                </div>
                 {children}
               </main>
             </div>

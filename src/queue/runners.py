@@ -1756,7 +1756,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
         carpeta, producto, video_path=str(salida),
-        video_listo_at=int(time.time()), uploaded=True,
+        video_listo_at=int(time.time()),
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)
@@ -1815,7 +1815,7 @@ def run_nicho_ropa_personas_video(job: Job, on_log: OnLog, on_progress: OnProgre
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
         carpeta, producto, video_path=str(salida),
-        video_listo_at=int(time.time()), uploaded=True,
+        video_listo_at=int(time.time()),
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)
@@ -1881,7 +1881,7 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
         source, folder, producto, usuario=operator,
-        video_path=str(salida), video_listo_at=int(time.time()), uploaded=True,
+        video_path=str(salida), video_listo_at=int(time.time()),
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)
@@ -1998,7 +1998,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
         source, folder, producto, usuario=operator,
-        video_path=str(salida), video_listo_at=int(time.time()), uploaded=True,
+        video_path=str(salida), video_listo_at=int(time.time()),
         voz_label=info["voz_label"], voz_sexo=sexo,
     )
     on_progress(1.0, "✅ Listo")
@@ -2231,7 +2231,7 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # el mismo nombre en cada montaje, así que sin esto el navegador seguiría
     # sirviendo el vídeo viejo de su caché.
     product_repo.update_product(
-        source, folder, producto, usuario=quien, uploaded=True,
+        source, folder, producto, usuario=quien,
         video_path=str(dest_path), video_listo_at=int(time.time()),
     )
 

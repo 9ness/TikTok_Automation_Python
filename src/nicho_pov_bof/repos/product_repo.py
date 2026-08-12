@@ -29,6 +29,8 @@ from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 # en el mismo producto.
 CAMPOS_PRIVADOS = frozenset({
     "en_escaparate", "uploaded", "sold", "video_path", "video_listo_at",
+    # Cuándo se marcó como subido. Es del usuario, como el propio `uploaded`.
+    "uploaded_at",
 })
 
 
@@ -143,6 +145,14 @@ def update_product(
     usuario, el resto al compartido. Todo dentro del cerrojo de carpeta, que
     es lo que evita que dos trabajos simultáneos se pisen.
     """
+    # La hora de subida se sella aquí y no la manda el caller: es lo que deja
+    # comprobar de un vistazo si un producto repetido se marcó bien (si la hora
+    # cambia, el toque llegó).
+    if fields.get("uploaded") is True:
+        fields.setdefault("uploaded_at", time.time())
+    elif fields.get("uploaded") is False:
+        fields["uploaded_at"] = 0
+
     privados = {k: v for k, v in fields.items() if k in CAMPOS_PRIVADOS}
     comunes = {k: v for k, v in fields.items() if k not in CAMPOS_PRIVADOS}
 

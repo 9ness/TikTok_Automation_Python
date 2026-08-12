@@ -326,6 +326,20 @@ def set_producto_estado(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
+    # "Subido" lo marca el operador al publicar: es lo que alimenta el tope
+    # diario de la cuenta (el mismo para todos los nichos).
+    if body.uploaded is not None:
+        try:
+            from src.cuotas.repos import cuota_repo
+
+            cuota_repo.marcar(
+                "videos",
+                f"pov_bof_largo|{body.source}|{body.folder}|{body.producto}",
+                usuario, body.uploaded,
+            )
+        except Exception:
+            pass
+
     listado = _listar(body.source, body.folder, queue, usuario)
     item = next((x for x in listado.items if x.producto == body.producto), None)
     if item is None:

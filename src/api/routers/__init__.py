@@ -59,6 +59,7 @@ from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
 from .deploy import router as deploy_router
+from .cuotas import cuotas_router
 from .diagnostics import router as diagnostics_router
 from .fonts import file_router as fonts_file_router, router as fonts_router
 
@@ -86,6 +87,7 @@ __all__ = [
     "fonts_file_router",
     "auth_router",
     "deploy_router",
+    "cuotas_router",
     "diagnostics_router",
     "editor_auto_enqueue_router",
     "editor_auto_folders_router",

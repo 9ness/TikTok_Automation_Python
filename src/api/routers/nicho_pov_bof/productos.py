@@ -82,6 +82,20 @@ def _bad_request(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
 
+def _contar_subida(tipo: str, referencia: str, subido: bool, usuario: str) -> None:
+    """Suma (o resta) la publicación en el tope diario de la cuenta.
+
+    Nunca tumba la petición: el dato bueno es el del producto, y quedarse sin
+    contador es molesto pero no impide trabajar.
+    """
+    try:
+        from src.cuotas.repos import cuota_repo
+
+        cuota_repo.marcar(tipo, referencia, usuario, subido)
+    except Exception:
+        pass
+
+
 def _prompts_dir() -> Path:
     import src.nicho_pov_bof as _pkg
 
@@ -217,6 +231,7 @@ def _producto_info(
             or bool(prod.get("en_escaparate"))
         ),
         uploaded=bool(prod.get("uploaded")),
+        uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
         video_path=prod.get("video_path"),
         video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -324,6 +339,7 @@ def _list_productos(
                     or bool(guardado.get("en_escaparate"))
                 ),
                 uploaded=bool(guardado.get("uploaded")),
+                uploaded_at=float(guardado.get("uploaded_at") or 0),
                 sold=bool(guardado.get("sold")),
                 video_path=guardado.get("video_path"),
                 video_listo_at=int(guardado.get("video_listo_at") or 0),
@@ -642,6 +658,15 @@ def set_producto_estado(
             )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+
+    # "Subido" lo marca el operador cuando publica en TikTok, y es lo que
+    # alimenta el tope diario de la cuenta. Se guarda la hora para poder
+    # comprobar de un vistazo que un producto repetido quedó bien marcado.
+    if body.uploaded is not None:
+        _contar_subida(
+            "videos", f"pov_bof|{body.source}|{body.folder}|{body.producto}",
+            body.uploaded, usuario,
+        )
 
     info = _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
