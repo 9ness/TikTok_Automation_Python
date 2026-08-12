@@ -247,6 +247,7 @@ def _producto_info(
             prod.get("titulo", ""), prod.get("titulo_tiktok_completo", ""),
         ),
         precio=_precio_y_modo(prod)[0],
+        precio_lista=nicho_config.precio_num(prod.get("precio_lista")),
         modo_plazos=_precio_y_modo(prod)[1],
         # Vigente, no "guardado": el fichero temporal se purga a las 24h y un
         # clip anterior al último montaje ya se consumió. Marcarlo con ✓ haría
@@ -369,6 +370,7 @@ def _list_productos(
                     guardado.get("titulo_tiktok_completo", ""),
                 ),
                 precio=_precio_y_modo(guardado)[0],
+                precio_lista=nicho_config.precio_num(guardado.get("precio_lista")),
                 modo_plazos=_precio_y_modo(guardado)[1],
                 clip1=_clip_vigente(
                     guardado.get("clip1_path"), float(guardado.get("video_listo_at") or 0),

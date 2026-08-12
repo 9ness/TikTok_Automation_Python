@@ -76,11 +76,23 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   `SOLO HOY`, `SE AGOTA`, `DATE PRISA`), ni ponerle fecha a nada (`HOY`,
   `ESTA SEMANA`, `24H`): mañana deja de ser cierto.
 
-- `precio`: el precio del producto tal cual lo pinta TikTok, SOLO el número en
-  euros y con punto decimal (`34.99`). Si hay precio rebajado y precio tachado,
-  el que vale es el REBAJADO (el que se paga hoy). Si no se ve ningún precio,
-  no devuelvas el campo — es preferible vacío a inventado: con este número se
-  decide qué guion lleva el vídeo.
+- `precio`: **lo que paga hoy el comprador**, solo el número en euros y con
+  punto decimal (`29.50`). Con este número se decide qué guion lleva el vídeo,
+  así que míralo bien:
+
+  - TikTok pinta el precio **partido en dos tamaños**: los euros en grande y
+    los céntimos pequeños al lado (`34` + `,70 €` es `34.70`). No te quedes
+    solo con la parte grande.
+  - Si debajo hay una línea del tipo **`Paga 29,50 € con cupones`**, ESE es el
+    precio que vale, no el de arriba. Lo mismo con un precio tachado: manda el
+    que se paga, nunca el tachado.
+  - `precio_lista`: si hay dos precios (el normal y el de cupones/rebaja),
+    pon aquí el NORMAL, el de antes del descuento (`34.70`). Si solo hay uno,
+    no devuelvas este campo.
+
+  El precio sale en TODAS estas capturas, justo debajo de la foto. Si de
+  verdad no se lee ninguno, no devuelvas el campo — pero es la excepción, no
+  lo normal.
 - `emojis`: **exactamente DOS emojis** que acompañen al caption, sin espacios
   entre ellos. El primero es una REACCIÓN genérica (😍 🤯 😱 👀 🔥 👏 🙌 ✨);
   el segundo tiene que ver con el PRODUCTO en concreto.
@@ -102,7 +114,7 @@ menos superficie hay para una sanción de TikTok Shop, y con dos infracciones se
 suspende la cuenta.
 
 Así que **no devuelvas `gancho` ni `cta`**. Céntrate en `titulo`,
-`titulo_tiktok_completo`, `tienda`, `caption` y `precio`.
+`titulo_tiktok_completo`, `tienda`, `caption`, `emojis` y `precio`.
 
 ## Si la imagen es la pantalla de DESCRIPCIÓN
 
@@ -128,7 +140,7 @@ identificador que te den.
 
 Devuelve un único objeto JSON cuyas claves son EXACTAMENTE los
 identificadores que te doy en el mensaje de usuario (en el mismo orden que
-las imágenes), y cuyo valor es el objeto con los 5 campos:
+las imágenes), y cuyo valor es el objeto con estos campos:
 
 ```
 {
@@ -137,11 +149,14 @@ las imágenes), y cuyo valor es el objeto con los 5 campos:
     "titulo_tiktok_completo": "...",
     "tienda": "...",
     "caption": "...",
-    "emojis": "..."
+    "emojis": "...",
+    "precio": "29.50",
+    "precio_lista": "34.70"
   },
   ...
 }
 ```
 
-No añadas claves extra, no añadas comentarios, no envuelvas el JSON en
-```json``` ni en ningún otro texto.
+`precio_lista` es el único que puede faltar (cuando no hay descuento). Los
+demás van siempre. No añadas claves extra, no añadas comentarios, no envuelvas
+el JSON en ```json``` ni en ningún otro texto.

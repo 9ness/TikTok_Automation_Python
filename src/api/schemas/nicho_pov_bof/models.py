@@ -135,6 +135,10 @@ class ProductoInfo(BaseModel):
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.
     precio: float = 0
+    # El precio de antes del descuento, solo para verlo. La decisión la manda
+    # `precio` (lo que se paga hoy): con cupones por debajo de 30 € Klarna no
+    # deja financiar, así que el guion de plazos mentiría.
+    precio_lista: float = 0
     modo_plazos: bool = False
     # Solo en modo plazos: cuáles de los dos clips están ya subidos.
     clip1: bool = False

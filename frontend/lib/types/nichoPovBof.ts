@@ -101,6 +101,8 @@ export interface ProductoItem {
   uploaded_at: number;
   /** Precio leído de la ficha (0 = no se pudo leer). */
   precio: number;
+  /** Precio de antes del descuento (0 si no hay). Solo informativo. */
+  precio_lista: number;
   /** Precio por encima del umbral → guion de plazos y vídeo de dos clips. */
   modo_plazos: boolean;
   clip1: boolean;

@@ -1532,9 +1532,18 @@ function ProductoCard({
           {producto.titulo && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               {producto.precio > 0 ? (
-                <span className="font-mono font-semibold">
-                  {producto.precio.toFixed(2).replace(".", ",")} €
-                </span>
+                <>
+                  {/* El tachado explica por qué un producto de 34,70 no lleva
+                      plazos: con cupones se paga 29,50 y Klarna pide 30. */}
+                  {producto.precio_lista > producto.precio && (
+                    <span className="font-mono text-muted-foreground line-through">
+                      {producto.precio_lista.toFixed(2).replace(".", ",")} €
+                    </span>
+                  )}
+                  <span className="font-mono font-semibold">
+                    {producto.precio.toFixed(2).replace(".", ",")} €
+                  </span>
+                </>
               ) : (
                 <span className="text-muted-foreground">precio sin detectar</span>
               )}
