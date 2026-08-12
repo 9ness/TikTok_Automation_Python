@@ -2083,7 +2083,10 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
             "No hay guiones de plazos cargados "
             "(src/nicho_pov_bof/prompts/guiones_plazos.md)."
         )
-    guion = rng.choice(guiones)
+    # Si el operador ya lo sorteó desde la ficha, se respeta: es el texto que
+    # ha leído y aprobado. Solo se sortea aquí cuando no hay ninguno.
+    guardado = product_repo.get_product(source, folder, producto, quien)
+    guion = str(guardado.get("guion_plazos") or "").strip() or rng.choice(guiones)
     sexo = (p.get("sexo") or "").strip().lower()
     if sexo not in ("hombre", "mujer"):
         sexo = rng.choice(["hombre", "mujer"])

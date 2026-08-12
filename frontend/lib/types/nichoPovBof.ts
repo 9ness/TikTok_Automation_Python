@@ -107,6 +107,9 @@ export interface ProductoItem {
   modo_plazos: boolean;
   clip1: boolean;
   clip2: boolean;
+  /** Solo en plazos: el guion del curso que le ha tocado. */
+  guion: string;
+  guion_caracteres: number;
   sold: boolean;
   video_path: string | null;
   /** Cambia en cada montaje: se usa para romper la caché del navegador y que

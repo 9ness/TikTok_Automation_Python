@@ -143,6 +143,9 @@ class ProductoInfo(BaseModel):
     # Solo en modo plazos: cuáles de los dos clips están ya subidos.
     clip1: bool = False
     clip2: bool = False
+    # El guion de plazos que le ha tocado, para poder leerlo antes de montar.
+    guion: str = ""
+    guion_caracteres: int = 0
     uploaded: bool = False
     # Cuándo se marcó como subido (epoch). Sirve para comprobar que un
     # producto repetido quedó bien marcado: si la hora cambia, entró.
@@ -190,6 +193,16 @@ class ProductosListResponse(BaseModel):
 class ExtraerTextosRequest(BaseModel):
     source: str = Field(..., min_length=1)
     folder: str = Field(..., min_length=1)
+
+
+class GuionPlazosRequest(BaseModel):
+    """Sortea (o vuelve a sortear) el guion de plazos de un producto."""
+
+    source: str
+    folder: str
+    producto: str
+    # Cambiarlo aunque ya tenga uno: al operador no le convence el que salió.
+    rehacer: bool = False
 
 
 class ProductoEstadoRequest(BaseModel):

@@ -51,6 +51,7 @@ import {
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
   useSetEstado,
+  useSortearGuionPlazos,
   useSources,
   useVendidos,
   useSumarUnidades,
@@ -77,6 +78,8 @@ import type {
  *  volumen diario y de momento no lo usa. Poniéndolo a `true` vuelven el panel
  *  de credenciales y los botones de buscar la ficha del producto. */
 const MOSTRAR_ECHOTIK = false;
+// Ritmo medido con las voces reales de Fish, igual que en el POV BOF Largo.
+const CAR_POR_SEG = 18.2;
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
@@ -1371,6 +1374,7 @@ function ProductoCard({
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
+  const sortear = useSortearGuionPlazos();
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1775,9 +1779,58 @@ function ProductoCard({
         }
       />
 
+      {producto.modo_plazos && (
+        /* Lo que va a decir la voz, a la vista antes de montar. Se sortea de
+           los cinco textos del curso y no gasta ninguna llamada de API, así
+           que pedir otro es gratis. */
+        producto.guion ? (
+          <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
+            <p className="text-[10px] leading-relaxed">{producto.guion}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">
+                {producto.guion_caracteres} car. · ~
+                {Math.round(producto.guion_caracteres / CAR_POR_SEG)}s
+              </span>
+              <button
+                type="button"
+                disabled={sortear.isPending}
+                onClick={() =>
+                  sortear.mutate(
+                    { source, folder, producto: producto.producto, rehacer: true },
+                    {
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${sortear.isPending ? "animate-spin" : ""}`} />
+                Otro guion
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={sortear.isPending}
+            onClick={() =>
+              sortear.mutate(
+                { source, folder, producto: producto.producto },
+                { onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)) },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-1.5 text-xs font-medium text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${sortear.isPending ? "animate-spin" : ""}`} />
+            Ver el guion de plazos
+          </button>
+        )
+      )}
+
       {producto.modo_plazos ? (
-        /* Producto de plazos: el guion de Klarna dura ~15s, así que hacen
-           falta DOS clips y no se monta hasta tener los dos. */
+        /* Producto de plazos: el guion dura ~15s, así que hacen falta DOS
+           clips y no se monta hasta tener los dos. */
         <div className="grid grid-cols-2 gap-1.5">
           {([1, 2] as const).map((slot) => {
             const puesto = slot === 1 ? producto.clip1 : producto.clip2;

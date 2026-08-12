@@ -33,6 +33,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
+    GuionPlazosRequest,
     BuscarProductosResponse,
     ExtraerTextosRequest,
     EchoTikCredsRequest,
@@ -252,6 +253,8 @@ def _producto_info(
         # Vigente, no "guardado": el fichero temporal se purga a las 24h y un
         # clip anterior al último montaje ya se consumió. Marcarlo con ✓ haría
         # creer que solo falta el otro.
+        guion=str(prod.get("guion_plazos") or ""),
+        guion_caracteres=len(str(prod.get("guion_plazos") or "")),
         clip1=_clip_vigente(prod.get("clip1_path"), float(prod.get("video_listo_at") or 0)),
         clip2=_clip_vigente(prod.get("clip2_path"), float(prod.get("video_listo_at") or 0)),
         # El escaparate sale del índice ÚNICO por (tienda|nombre): el mismo
@@ -372,6 +375,8 @@ def _list_productos(
                 precio=_precio_y_modo(guardado)[0],
                 precio_lista=nicho_config.precio_num(guardado.get("precio_lista")),
                 modo_plazos=_precio_y_modo(guardado)[1],
+                guion=str(guardado.get("guion_plazos") or ""),
+                guion_caracteres=len(str(guardado.get("guion_plazos") or "")),
                 clip1=_clip_vigente(
                     guardado.get("clip1_path"), float(guardado.get("video_listo_at") or 0),
                 ),
@@ -747,6 +752,50 @@ def borrar_mi_producto(
             f"No existe el producto {producto} en {carpeta}.", status_code=404,
         )
     return {"ok": True}
+
+
+@router.post("/producto/guion-plazos", response_model=ProductoInfo)
+def sortear_guion_plazos(
+    body: GuionPlazosRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductoInfo:
+    """Asigna a un producto de plazos uno de los guiones del curso.
+
+    No gasta ninguna llamada a ninguna API: son cinco textos fijos y aquí solo
+    se sortea cuál toca. Existe para que el operador LEA lo que va a decir la
+    voz antes de montar (y pueda pedir otro si no le convence), en vez de
+    enterarse con el vídeo ya hecho.
+    """
+    import random
+
+    from src.nicho_pov_bof.repos import product_repo
+
+    prod = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+    if not _precio_y_modo(prod)[1]:
+        raise _bad_request(
+            "Este producto no es de plazos: su precio no llega al umbral, así "
+            "que lleva el audio de siempre."
+        )
+    guiones = nicho_config.guiones_plazos()
+    if not guiones:
+        raise APIError("No hay guiones de plazos cargados.", status_code=500)
+
+    actual = str(prod.get("guion_plazos") or "").strip()
+    if actual and not body.rehacer:
+        return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
+    # Al pedir otro se descarta el que ya tenía: con cinco textos, repetir el
+    # mismo es lo más probable que puede pasar y parecería que no ha hecho nada.
+    opciones = [g for g in guiones if g != actual] or guiones
+    nuevo = random.choice(opciones)
+    try:
+        prod = product_repo.update_product(
+            body.source, body.folder, body.producto, usuario=usuario,
+            guion_plazos=nuevo,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
 @router.post("/producto/estado", response_model=ProductoInfo)

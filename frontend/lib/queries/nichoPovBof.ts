@@ -272,6 +272,27 @@ export function useSetEstado() {
   });
 }
 
+/** Sortea el guion de plazos del producto (o pide otro distinto).
+ *
+ *  No gasta ninguna llamada de API: son cinco textos fijos del curso. Sirve
+ *  para leer lo que va a decir la voz ANTES de montar. */
+export function useSortearGuionPlazos() {
+  const qc = useQueryClient();
+  return useMutation<
+    ProductoItem,
+    Error,
+    { source: string; folder: string; producto: string; rehacer?: boolean }
+  >({
+    mutationFn: (body) => api.post<ProductoItem>(`${ROOT}/producto/guion-plazos`, body),
+    onSuccess: (updated, vars) => {
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(vars.source, vars.folder),
+        (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
+      );
+    },
+  });
+}
+
 /** Averigua la ficha de TikTok Shop del producto. GASTA UNA LLAMADA del plan
  *  de EchoTik (trial de 100), por eso va producto a producto y no de carpeta
  *  entera. Si no encuentra nada fiable devuelve el producto sin `product_url`
