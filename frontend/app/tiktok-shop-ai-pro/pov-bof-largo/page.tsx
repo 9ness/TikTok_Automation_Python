@@ -111,7 +111,8 @@ export default function PovBofLargoPage() {
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionBatch = useEscribirGuion();
-  const vendidos = useVendidosLargo(activaSource);
+  // Global, igual que el listado (ver el mismo comentario en el POV BOF).
+  const vendidos = useVendidosLargo("");
   const totalVendidos = (vendidos.data ?? []).reduce((n, v) => n + (v.unidades || 1), 0);
 
   const [backup, setBackup] = useState<BackupCheckResponse | null>(null);

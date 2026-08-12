@@ -134,7 +134,10 @@ export default function NichoPovBofPage() {
   const productos = useProductos(source, folder);
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
-  const vendidos = useVendidos(source);
+  // SIN fuente: el ranking es global y el listado que se abre también, así
+  // que el número del botón tiene que contar lo mismo. Con `source` decía 2
+  // (solo la fuente abierta) y al abrirlo salían 43.
+  const vendidos = useVendidos("");
   const totalVendidos = (vendidos.data ?? []).reduce(
     (n, v) => n + (v.unidades || 1), 0,
   );
