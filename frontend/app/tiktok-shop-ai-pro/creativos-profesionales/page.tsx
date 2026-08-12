@@ -235,32 +235,32 @@ export default function CreativosProPage() {
           </button>
         </div>
 
-        {/* Cuántos creativos de ESTA carpeta has publicado ya. Que la carpeta
-            esté completada no significa que estén todos subidos: puede haber
-            productos sin stock o descartados. */}
-        <div
-          className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-            subidosCarpeta === items.length && items.length > 0
-              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-              : "border-border/60 text-muted-foreground"
-          }`}
-        >
-          📤 Subidos {subidosCarpeta}/{items.length}
+        {/* Los dos EN LA MISMA LÍNEA: se leen juntos, que de eso se trata —
+            comparar lo que está en el escaparate con lo que ya se publicó.
+            Que la carpeta esté completada no significa que todo esté subido:
+            puede haber productos sin stock o descartados. */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <div
+            className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
+              subidosCarpeta === items.length && items.length > 0
+                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                : "border-border/60 text-muted-foreground"
+            }`}
+          >
+            📤 Subidos {subidosCarpeta}/{items.length}
+          </div>
+          <button
+            type="button"
+            onClick={() => setVerEscaparate(true)}
+            className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold transition ${
+              enEscaparate === items.length && items.length > 0
+                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+            }`}
+          >
+            🏪 Escaparate {enEscaparate}/{items.length}
+          </button>
         </div>
-
-        {/* Al lado de "Subidos" para comparar de un vistazo cuántos están en el
-            escaparate y cuántos ya publicados. */}
-        <button
-          type="button"
-          onClick={() => setVerEscaparate(true)}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-            enEscaparate === items.length && items.length > 0
-              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-              : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
-          }`}
-        >
-          🏪 Escaparate {enEscaparate}/{items.length}
-        </button>
 
         {productos.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

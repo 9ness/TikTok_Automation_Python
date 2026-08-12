@@ -705,10 +705,10 @@ export default function PovBofLargoPage() {
                   </>
                 )}
               </button>
+            </div>
 
-            {/* Cuántos productos de ESTA carpeta has publicado ya. Que la
-                carpeta esté "completada" no significa que estén todos subidos:
-                puede haber productos sin stock o descartados. */}
+            {/* Subidos y escaparate en la misma línea (ver POV BOF). */}
+            <div className="grid grid-cols-2 gap-1.5">
             <div
               className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
                 subidos === totalProductos && totalProductos > 0
