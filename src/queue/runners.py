@@ -1890,6 +1890,18 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
 # ============================================================
 # RUNNER: NICHO POV BOF LARGO — GUION LOCUTADO + DOS CLIPS
 # ============================================================
+def _es_plazos(textos: dict) -> bool:
+    """¿Al producto le toca el guion con la frase de financiación?
+
+    El precio lo extrae el POV BOF (aquí solo se lee) y el umbral es el suyo:
+    son el mismo producto y la misma cuenta, así que no puede haber dos
+    criterios distintos según el nicho desde el que se grabe.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    return pov_config.precio_num(textos.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+
+
 def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UN producto: guion escrito por IA, locutado y sobre
     DOS clips de 10s pegados.
@@ -1928,6 +1940,13 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # reutiliza en vez de gastar otra llamada a Gemini y salir distinto.
     guardado = product_repo.get_product(source, folder, producto, operator)
     escrito = {k: guardado.get(k) for k in ("guion", "subliminal", "nombre_guion")}
+    plazos = _es_plazos(textos)
+    # Un guion guardado en el OTRO modo no vale: si el producto es de plazos y
+    # el guion se escribió sin la frase de financiación (o al revés, porque se
+    # corrigió el precio), reutilizarlo daría un vídeo que no dice lo que toca.
+    if escrito.get("guion") and bool(guardado.get("guion_plazos")) != plazos:
+        on_log("[pov_bof_largo] el guion guardado es del otro modo; lo reescribo")
+        escrito = {}
     if not escrito.get("guion"):
         on_progress(0.10, "✍️ Escribiendo el guion…")
         foto = None
@@ -1952,12 +1971,13 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
             foto=foto,
+            plazos=plazos,
             on_log=on_log,
         )
         product_repo.update_product(
             source, folder, producto, usuario=operator,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
-            nombre_guion=escrito["nombre"],
+            nombre_guion=escrito["nombre"], guion_plazos=plazos,
         )
     else:
         on_log("[pov_bof_largo] reutilizando el guion ya escrito")

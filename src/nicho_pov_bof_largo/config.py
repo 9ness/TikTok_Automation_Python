@@ -55,8 +55,22 @@ def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 
 
-def prompt_guion() -> str:
-    return (prompts_dir() / "guion.md").read_text(encoding="utf-8").strip()
+def prompt_guion(plazos: bool = False) -> str:
+    """El prompt del curso, con el bloque de plazos pegado si toca.
+
+    El de `guion.md` va LITERAL y nunca se toca. Lo de plazos es un añadido al
+    final (`guion_plazos.md`), no una versión aparte: así el guion de un
+    producto caro es el mismo de siempre con una frase más, y cualquier cambio
+    del curso se sigue aplicando a los dos.
+    """
+    base = (prompts_dir() / "guion.md").read_text(encoding="utf-8").strip()
+    if not plazos:
+        return base
+    extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
+    # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini solo
+    # se le manda lo que va después del separador.
+    _, _, cuerpo = extra.partition("\n---\n")
+    return f"{base}\n\n{cuerpo.strip()}"
 
 
 # ---------------------------------------------------------------------------

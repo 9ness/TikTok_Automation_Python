@@ -36,9 +36,14 @@ def escribir(
     tienda: str = "",
     caption: str = "",
     foto: Path | None = None,
+    plazos: bool = False,
     on_log: OnLog = _noop,
 ) -> dict:
     """`{nombre, guion, subliminal}` para un producto.
+
+    `plazos` mete en el prompt la frase de financiación (productos por encima
+    del umbral de precio). Es lo ÚNICO que cambia: misma estructura, mismo
+    formato de salida.
 
     `foto` es la foto limpia. El prompt insiste en NO mandar la foto sola, así
     que siempre va acompañada de la descripción; si no hay foto se manda solo
@@ -53,7 +58,11 @@ def escribir(
         descripcion += f" Descripción: {caption.strip()}"
 
     imagenes = [str(foto)] if foto else None
-    datos = generate_json(config.prompt_guion() + _FORMATO, descripcion, images=imagenes)
+    if plazos:
+        on_log("[nicho_pov_bof_largo] guion con la frase de plazos (producto caro)")
+    datos = generate_json(
+        config.prompt_guion(plazos) + _FORMATO, descripcion, images=imagenes,
+    )
     if not isinstance(datos, dict):
         raise ValueError(f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}")
 

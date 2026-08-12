@@ -130,6 +130,9 @@ export default function PovBofLargoPage() {
   const totalProductos = items.length;
   const conVideo = items.filter((p) => p.video_path).length;
   const conFoto = items.filter((p) => p.clean_photo_id).length;
+  // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
+  const conPlazos = items.filter((p) => p.clean_photo_id && p.modo_plazos).length;
+  const conViejo = items.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
   const subidos = items.filter((p) => p.uploaded).length;
@@ -204,11 +207,22 @@ export default function PovBofLargoPage() {
     }
   }
 
-  async function downloadCleanPhotos() {
+  /** `filtro` separa los dos flujos: los de plazos llevan un guion con la
+   *  frase de financiación y los demás el de siempre, así que conviene
+   *  generarlos por tandas y no ir mirando el precio producto a producto. */
+  async function downloadCleanPhotos(filtro: "todas" | "plazos" | "viejo" = "todas") {
     if (!folder) return;
-    const conF = items.filter((p) => p.clean_photo_id);
+    const conF = items.filter(
+      (p) =>
+        p.clean_photo_id &&
+        (filtro === "todas" || (filtro === "plazos" ? p.modo_plazos : !p.modo_plazos)),
+    );
     if (!conF.length) {
-      toast.error("No hay fotos limpias en esta carpeta");
+      toast.error(
+        filtro === "todas"
+          ? "No hay fotos limpias en esta carpeta"
+          : `No hay productos ${filtro === "plazos" ? "de plazos" : "con guion viejo"} con foto`,
+      );
       return;
     }
     setDownloadingPhotos(true);
@@ -217,7 +231,8 @@ export default function PovBofLargoPage() {
         setDownloadProgress(`${i + 1}/${conF.length}`);
         const a = document.createElement("a");
         a.href = buildCleanPhotoDownloadUrl(activaSource, folder, p.producto);
-        a.download = `${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        const sufijo = filtro === "todas" ? "" : `_${filtro}`;
+        a.download = `${folder}_${p.producto}${sufijo}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -850,6 +865,30 @@ export default function PovBofLargoPage() {
                 )}
               </button>
             </div>
+            {/* Los dos flujos por separado. Solo salen si la carpeta tiene de
+                los dos tipos: sin precios leídos no hay nada que separar. */}
+            {conPlazos > 0 && conViejo > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void downloadCleanPhotos("plazos")}
+                  disabled={downloadingPhotos}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-[11px] text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">💳 Con plazos ({conPlazos})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void downloadCleanPhotos("viejo")}
+                  disabled={downloadingPhotos}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Guion viejo ({conViejo})</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {productosQ.isLoading && (
@@ -1277,6 +1316,7 @@ function ProductoCard({
   const refs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
 
   const [verFoto, setVerFoto] = useState(false);
+  const [verTools, setVerTools] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1397,11 +1437,37 @@ function ProductoCard({
           {p.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">{p.titulo_tiktok_completo}</p>
           )}
+          {/* El precio decide QUÉ guion escribe la IA: por encima del umbral
+              lleva la frase de financiación. Los dos clips van igual. */}
+          {p.titulo && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+              {p.precio > 0 ? (
+                <>
+                  {p.precio_lista > p.precio && (
+                    <span className="font-mono text-muted-foreground line-through">
+                      {p.precio_lista.toFixed(2).replace(".", ",")} €
+                    </span>
+                  )}
+                  <span className="font-mono font-semibold">
+                    {p.precio.toFixed(2).replace(".", ",")} €
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">precio sin detectar</span>
+              )}
+              {p.modo_plazos && (
+                <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
+                  💳 Guion con plazos
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1">
-        <CopyChip label="📝 Título" text={p.titulo ?? ""} />
+        {/* Igual que en el POV BOF: el "Título" a secas no se pega en ningún
+            sitio (el que va a TikTok es el completo). */}
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
         <CopyChip
@@ -1410,8 +1476,9 @@ function ProductoCard({
             p.caption ? [p.caption, p.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : ""
           }
         />
-        <CopyChip label="🎣 Gancho" text={p.gancho ?? ""} />
-        <CopyChip label="👉 CTA" text={p.cta ?? ""} />
+        {/* Gancho y CTA los quema el montaje; copiarlos solo hacía ruido.
+            El guion y el subliminal SÍ se quedan: el subliminal no lo pone el
+            vídeo, así que copiarlo es la única forma de llevarlo al post. */}
         <CopyChip label="🎬 Guion" text={p.guion ?? ""} />
         <CopyChip label="💬 Subliminal" text={p.subliminal ?? ""} />
         {p.product_url && <CopyChip label="🔗 Enlace" text={p.product_url} />}
@@ -1550,7 +1617,22 @@ function ProductoCard({
 
       {/* Qué añadir al vídeo */}
       <div className="space-y-1.5 rounded-md border border-border/60 p-2">
-        <p className="text-[10px] font-medium text-muted-foreground">Qué añadir al vídeo</p>
+        {/* Plegado por defecto, como en el POV BOF: casi siempre van las
+            cuatro y desplegado se comía media pantalla en el móvil. */}
+        <button
+          type="button"
+          onClick={() => setVerTools((v) => !v)}
+          className="flex w-full items-center justify-between text-[10px] font-medium text-muted-foreground"
+        >
+          <span>
+            Qué añadir al vídeo
+            <span className="ml-1 opacity-70">
+              ({Object.values(tools).filter(Boolean).length}/{TOOLS.length})
+            </span>
+          </span>
+          <span>{verTools ? "▾" : "▸"}</span>
+        </button>
+        {verTools && (
         <div className="grid grid-cols-2 gap-1.5">
           {TOOLS.map((t) => (
             <label
@@ -1569,6 +1651,7 @@ function ProductoCard({
             </label>
           ))}
         </div>
+        )}
         {!Object.values(tools).some(Boolean) && (
           <p className="text-[10px] text-amber-500">Vídeo limpio: solo la voz, sin nada encima.</p>
         )}

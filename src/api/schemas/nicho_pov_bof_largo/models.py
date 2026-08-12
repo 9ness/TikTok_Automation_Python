@@ -37,8 +37,15 @@ class ProductoLargo(BaseModel):
     product_url: str = ""
     url_match_name: str = ""
     url_match_score: float = 0.0
+    # Precio y modo de guion — el dato lo extrae el POV BOF, aquí se lee.
+    precio: float = 0
+    precio_lista: float = 0
+    modo_plazos: bool = False
     # Lo propio de este nicho (progreso INDIVIDUAL, aislado del POV BOF).
     guion: str = ""
+    # En qué modo se escribió el guion guardado. Si no cuadra con
+    # `modo_plazos`, se reescribe al montar.
+    guion_plazos: bool = False
     subliminal: str = ""
     guion_caracteres: int = 0
     clip1: bool = False

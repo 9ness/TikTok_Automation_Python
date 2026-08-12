@@ -58,6 +58,24 @@ router = APIRouter(
 _EXTS_VIDEO = {".mp4", ".mov", ".mkv", ".webm"}
 
 
+def _precio(textos: dict, campo: str = "precio") -> float:
+    from src.nicho_pov_bof import config as pov_config
+
+    return pov_config.precio_num(textos.get(campo))
+
+
+def _es_plazos(textos: dict) -> bool:
+    """¿Al producto le toca el guion con la frase de financiación?
+
+    El precio lo extrae el POV BOF (aquí solo se lee) y el umbral es el suyo:
+    son el mismo producto y la misma cuenta, así que no puede haber dos
+    criterios distintos según el nicho desde el que se grabe.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    return pov_config.precio_num(textos.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+
+
 def _bad(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
@@ -249,6 +267,10 @@ def _listar(
             product_url=str(textos.get("product_url") or ""),
             url_match_name=str(textos.get("url_match_name") or ""),
             url_match_score=float(textos.get("url_match_score") or 0.0),
+            precio=_precio(textos),
+            precio_lista=_precio(textos, "precio_lista"),
+            modo_plazos=_es_plazos(textos),
+            guion_plazos=bool(mio.get("guion_plazos")),
             # Lo propio: guion, clips, voz, vídeo y estado INDIVIDUAL.
             guion=guion,
             subliminal=str(mio.get("subliminal") or ""),
@@ -387,12 +409,19 @@ def escribir_guion(
     guardado = product_repo.get_product(
         body.source, body.folder, body.producto, usuario
     )
-    if guardado.get("guion") and not body.rehacer:
-        return _uno(body, queue, usuario)
-
     textos = product_repo.textos_producto(
         body.source, body.folder, body.producto, usuario
     )
+    plazos = _es_plazos(textos)
+    # Se reaprovecha el guion salvo que sea del otro modo: un producto de
+    # plazos con un guion escrito sin la frase de financiación no vale.
+    if (
+        guardado.get("guion")
+        and not body.rehacer
+        and bool(guardado.get("guion_plazos")) == plazos
+    ):
+        return _uno(body, queue, usuario)
+
     if not textos.get("titulo"):
         raise _bad(
             "Este producto no tiene textos extraídos todavía. Pásale "
@@ -423,6 +452,7 @@ def escribir_guion(
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
             foto=foto,
+            plazos=plazos,
         )
     except ValueError as e:
         raise APIError(str(e), status_code=422) from e
@@ -433,7 +463,7 @@ def escribir_guion(
         product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
-            nombre_guion=escrito["nombre"],
+            nombre_guion=escrito["nombre"], guion_plazos=plazos,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

@@ -31,8 +31,15 @@ export interface ProductoLargo {
   product_url: string;
   url_match_name: string;
   url_match_score: number;
+  /** Precio leído por el POV BOF (0 = no detectado) y el de antes del descuento. */
+  precio: number;
+  precio_lista: number;
+  /** Por encima del umbral: el guion lleva la frase de financiación. */
+  modo_plazos: boolean;
   /** Lo propio de este nicho: el guion que locuta la IA. */
   guion: string;
+  /** En qué modo se escribió el guion guardado. */
+  guion_plazos: boolean;
   subliminal: string;
   guion_caracteres: number;
   clip1: boolean;

@@ -350,6 +350,11 @@ y locutado con **Fish Audio** (`FISH_API_KEY`, modelo gratuito
 `s2.1-pro-free`). Como el guion dura ~20s y no ~11, el vídeo son **DOS clips
 de 10s** pegados; la duración la manda la voz y el vídeo se recorta a ella.
 
+Si el producto pasa de `PRECIO_MIN_PLAZOS`, al guion se le añade el bloque de
+`prompts/guion_plazos.md` (una frase de financiación, sin nombrar la pasarela):
+misma estructura del curso, un párrafo más en el prompt. `guion_plazos` guarda
+en qué modo se escribió y se reescribe si el precio lo cambia.
+
 Su pantalla es un CALCO de la del POV BOF (misma UI y flujo) — solo cambia que
 se sube el guion + DOS clips. Comparte catálogo/carpetas/textos/fotos con el POV
 BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
