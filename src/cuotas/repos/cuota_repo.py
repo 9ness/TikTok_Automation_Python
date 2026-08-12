@@ -53,7 +53,10 @@ def _guardar(usuario: str, doc: dict, fecha: str = "") -> None:
             "Redis (Upstash) no está configurado — no se puede llevar la cuenta "
             "de lo publicado hoy."
         )
-    r.set_json(_key(usuario, fecha), doc)
+    # Igual que en Creativos: una escritura que falla en silencio es peor que
+    # un error, porque el contador sigue pintando un número que no existe.
+    if not r.set_json(_key(usuario, fecha), doc):
+        raise RuntimeError("Redis no aceptó guardar el contador del día.")
 
 
 def marcar(tipo: str, referencia: str, usuario: str = "", subido: bool = True) -> dict:

@@ -59,4 +59,13 @@ def marcar(
         doc[str(producto)] = time.time()
     else:
         doc.pop(str(producto), None)
-    r.set_json(clave, doc)
+    # Se comprueba que la escritura CONFIRMA. Sin esto el fallo es mudo: la
+    # pantalla se pinta como si hubiera guardado y al recargar no está. Pasó de
+    # verdad — al cambiar el formato de SET a JSON, Redis rechazaba el `set`
+    # sobre las claves viejas (tipo distinto) y el "Subido" se perdía.
+    if not r.set_json(clave, doc):
+        raise RuntimeError(
+            "Redis no aceptó guardar qué creativos has subido. Vuelve a "
+            "intentarlo; si sigue igual, avisa (puede ser un dato en formato "
+            "antiguo)."
+        )
