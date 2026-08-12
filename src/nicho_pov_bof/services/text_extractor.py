@@ -116,6 +116,47 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
     )
 
 
+def _sellar_id(path, producto: str):
+    """Escribe `#<producto>` en una banda arriba de la captura.
+
+    El identificador viajaba SOLO en el texto del prompt ("imagen 1 = primer
+    identificador…"), y con 8-10 imágenes en una tanda el modelo se desalinea:
+    pasó en una carpeta entera, donde cada producto se quedó con el título del
+    siguiente. Si el número va DENTRO de la imagen no hay orden que perder.
+
+    Si algo falla (PIL, disco), se devuelve la foto original: mejor arriesgarse
+    al desajuste que quedarse sin textos.
+    """
+    from pathlib import Path as _Path
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+
+        origen = _Path(str(path))
+        destino = origen.with_name(f"{origen.stem}__id{producto}.jpg")
+        if destino.is_file():
+            return destino
+        with Image.open(origen) as im:
+            im = im.convert("RGB")
+            banda = max(48, im.height // 22)
+            lienzo = Image.new("RGB", (im.width, im.height + banda), "white")
+            lienzo.paste(im, (0, banda))
+            dib = ImageDraw.Draw(lienzo)
+            try:
+                fuente = ImageFont.truetype(
+                    str(_Path(__file__).resolve().parents[3] / "assets" / "fonts"
+                        / "Montserrat-Black.ttf"),
+                    int(banda * 0.7),
+                )
+            except Exception:
+                fuente = ImageFont.load_default()
+            dib.text((12, 4), f"#{producto}", fill="black", font=fuente)
+            lienzo.save(destino, quality=88)
+        return destino
+    except Exception:
+        return path
+
+
 def extract_from_pairs(
     pairs: list[dict],
     *,
@@ -160,7 +201,7 @@ def extract_from_pairs(
         try:
             suffix = Path(titled.get("name", "")).suffix or ".jpg"
             path = fetch(titled["id"], suffix=suffix)
-            image_paths.append(str(path))
+            image_paths.append(str(_sellar_id(path, pair["producto"])))
             ids.append(pair["producto"])
         except Exception as e:
             on_log(f"[text_extractor] no se pudo descargar producto {pair['producto']}: {e}")
@@ -173,8 +214,10 @@ def extract_from_pairs(
         """Una llamada a Gemini con las imágenes dadas."""
         on_log(f"[text_extractor] pidiendo a Gemini {len(lote_paths)} textos ({lote_ids})…")
         user_prompt = (
-            "Identificadores en el MISMO orden que las imágenes adjuntas "
-            f"(imagen 1 = primer identificador, imagen 2 = segundo, etc.): "
+            "Cada imagen lleva su identificador ESCRITO en una banda blanca "
+            "arriba del todo, con el formato `#<id>`. Usa SIEMPRE ese número "
+            "para devolver los textos de esa imagen; ignora el orden en que "
+            "te lleguen. Identificadores esperados: "
             f"{json.dumps(lote_ids, ensure_ascii=False)}"
         )
         try:
