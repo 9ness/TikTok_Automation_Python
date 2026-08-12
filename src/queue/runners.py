@@ -2050,10 +2050,13 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
             "bloque de texto saldrá vacío (¿faltó 'Obtener textos'?)"
         )
 
-    # Semilla estable por producto: remontar el mismo producto repite guion y
-    # sexo. Si se sorteara de nuevo, dos montajes del mismo vídeo sonarían
-    # distintos y el operador no sabría cuál publicó.
-    rng = random.Random(f"plazos|{source}|{folder}|{producto}|{quien}")
+    # Semilla por TRABAJO, no por producto: cada montaje vuelve a sortear guion
+    # y voz. Al principio era estable por producto (para que remontar diera lo
+    # mismo) y el efecto real fue que el operador probó dos veces el mismo
+    # producto y le salió la misma voz las dos veces. Con cinco guiones y
+    # dieciséis voces, lo que se quiere es variedad; el `job.id` la da y
+    # además deja el sorteo reproducible desde el log si hace falta.
+    rng = random.Random(f"plazos|{job.id}")
     guiones = config.guiones_plazos()
     if not guiones:
         raise RuntimeError(

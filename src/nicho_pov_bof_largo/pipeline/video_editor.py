@@ -33,21 +33,31 @@ from src.nicho_pov_bof.pipeline.duration_match import (
     match_video_to_audio,
     probe_duration,
 )
-from src.nicho_pov_bof.pipeline.video_editor import build_video, layout_for_producto
+from src.nicho_pov_bof.pipeline.video_editor import (
+    _VOZ_CADENA,
+    _VOZ_LUFS,
+    _VOZ_TP,
+    build_video,
+    layout_for_producto,
+)
 
 OnLog = Callable[[str], None]
 OnProgress = Callable[[float, str], None]
 
 _noop: OnLog = lambda _msg: None
 
-# Qué cuenta como pausa de verdad. La voz sale de Fish con los silencios
-# capados a ~0,3s (`voz.py`), así que una respiración entre frases mide eso;
-# por debajo de 0,22s es el hueco entre dos palabras y cortar ahí se ve.
-_PAUSA_REAL_S = 0.22
-# Hasta dónde puede descentrarse el corte cuando la pausa buena está lejos del
-# medio, y ventana cerrada para cuando hay que conformarse con un hueco corto.
-_VENTANA_ANCHA = 0.18
-_VENTANA_CENTRADA = 0.30
+# Hasta dónde puede descentrarse el corte. Fuera de [20%, 80%] el reparto
+# entre los dos clips se desmadra y uno acaba casi entero a base de rebobinado.
+_VENTANA = 0.20
+# Dos pausas que se diferencian en menos de esto son igual de buenas al oído,
+# así que decide la que reparta mejor el metraje.
+_EMPATE_S = 0.06
+# La cadena que el mux del POV BOF le aplica a la voz. Se IMPORTA, no se copia:
+# si allí se toca el compresor y aquí no, se medirían pausas que en el vídeo no
+# existen — que es justo el bug que esto arregla. Un rename revienta al cargar
+# el módulo, que es lo que se quiere.
+_CADENA_MUX = _VOZ_CADENA
+_LOUDNORM_MUX = f"loudnorm=I={_VOZ_LUFS}:TP={_VOZ_TP}:LRA=7"
 _noop_progress: OnProgress = lambda _p, _m: None
 
 
@@ -81,16 +91,37 @@ def concatenar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     return destino
 
 
+def _voz_como_se_oye(audio_path: Path, work_dir: Path, on_log: OnLog) -> Path:
+    """Rinde la voz con la MISMA cadena que le mete el mux al vídeo.
+
+    Hace falta porque las pausas se miden sobre esto, no sobre el mp3 crudo:
+    `speechnorm` levanta los tramos bajos y una pausa de 0,50s en el original
+    queda en 0,11s en lo que acaba oyendo el espectador. Eligiendo sobre el
+    crudo se cortaba en sitios que suenan a mitad de frase.
+    """
+    salida = work_dir / "voz_oida.wav"
+    try:
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(audio_path),
+            "-af", f"{_CADENA_MUX},{_LOUDNORM_MUX}", str(salida),
+        ], on_log)
+        return salida
+    except RuntimeError as e:
+        # Sin esto no hay corte inteligente, pero tampoco es motivo para tumbar
+        # el montaje: se mide sobre el crudo como antes.
+        on_log(f"[pov_bof_largo] no pude procesar la voz para medir pausas ({e}); mido en crudo")
+        return audio_path
+
+
 def _detectar_silencios(audio_path: Path) -> list[tuple[float, float]]:
     """Tramos de silencio (inicio, fin) de la voz, vía `silencedetect`.
 
-    Umbral -35 dB y 0,10s: se recogen hasta los huecos entre palabras y luego
-    `_punto_de_corte` decide cuáles valen. Filtrar aquí dejaba fuera candidatos
-    que en algún guion son lo único que hay.
+    Umbral -35 dB y 0,08s: se recogen hasta los huecos entre palabras y luego
+    `_punto_de_corte` decide cuáles valen.
     """
     proc = subprocess.run(
         ["ffmpeg", "-hide_banner", "-i", str(audio_path),
-         "-af", "silencedetect=noise=-35dB:d=0.10", "-f", "null", "-"],
+         "-af", "silencedetect=noise=-35dB:d=0.08", "-f", "null", "-"],
         capture_output=True, text=True,
     )
     silencios: list[tuple[float, float]] = []
@@ -107,48 +138,44 @@ def _detectar_silencios(audio_path: Path) -> list[tuple[float, float]]:
     return silencios
 
 
-def _punto_de_corte(audio_path: Path, dur: float, on_log: OnLog) -> float | None:
-    """Instante donde partir los DOS clips para que el cambio caiga en una
-    pausa de la voz, no a mitad de palabra.
+def _punto_de_corte(
+    audio_path: Path, dur: float, work_dir: Path, on_log: OnLog,
+) -> float | None:
+    """Instante donde partir los DOS clips, en la pausa MÁS LARGA de la voz.
 
-    Manda que sea una pausa DE VERDAD, no que quede centrada. Antes se cogía el
-    silencio más cercano a la mitad dentro de [30%, 70%] y se partía por la
-    mitad exacta si no había ninguno ahí — y eso es justo lo que pasaba: en un
-    guion de 13,4s la única pausa larga (0,72s) caía al 20%, fuera de la
-    ventana, así que el corte se iba al centro… en mitad de una palabra.
+    Se mide sobre la voz ya procesada (`_voz_como_se_oye`), que es la que suena
+    en el vídeo, y gana la pausa más larga dentro de la ventana — no la más
+    centrada. Antes mandaba la cercanía al medio y el corte acababa en un hueco
+    de 0,3s (0,1s reales al oírlo) mientras la voz seguía hablando; un silencio
+    grande algo descentrado se nota mucho menos que uno pequeño en el sitio.
 
-    Ahora se buscan primero las pausas largas en una ventana ancha
-    (`_VENTANA_ANCHA`) y solo si no hay ninguna se acepta un hueco corto, y ya
-    en la ventana centrada. La ventana ancha no puede abrirse del todo: un
-    corte al 10% deja al segundo clip cubriendo el 90% de la voz a base de
-    rebobinado, y ahí sí se nota el truco.
+    La ventana existe porque el reparto no puede desmadrarse: cortar al 10%
+    deja el 90% de la voz sobre el segundo clip a base de rebobinado, y ahí sí
+    se ve el truco. Sin ninguna pausa dentro, se parte por la mitad.
     """
+    medible = _voz_como_se_oye(audio_path, work_dir, on_log)
     objetivo = dur / 2
+    lo, hi = dur * _VENTANA, dur * (1 - _VENTANA)
     candidatos = [
-        (inicio, fin, fin - inicio, (inicio + fin) / 2)
-        for inicio, fin in _detectar_silencios(audio_path)
+        (fin - inicio, (inicio + fin) / 2)
+        for inicio, fin in _detectar_silencios(medible)
+        if lo <= (inicio + fin) / 2 <= hi
     ]
-
-    def _elegir(minimo: float, margen: float) -> tuple[float, float] | None:
-        lo, hi = dur * margen, dur * (1 - margen)
-        validos = [
-            (centro, larga) for _i, _f, larga, centro in candidatos
-            if larga >= minimo and lo <= centro <= hi
-        ]
-        return min(validos, key=lambda x: abs(x[0] - objetivo)) if validos else None
-
-    # 1) pausa de verdad (una respiración entre frases), aunque quede
-    #    descentrada; 2) si no la hay, cualquier hueco pero ya centrado.
-    elegido = _elegir(_PAUSA_REAL_S, _VENTANA_ANCHA) or _elegir(0.0, _VENTANA_CENTRADA)
-    if elegido is None:
+    if not candidatos:
         on_log(
-            "[pov_bof_largo] la voz no tiene ni una pausa aprovechable; "
+            "[pov_bof_largo] la voz no tiene ninguna pausa aprovechable; "
             "parto por la mitad (el cambio se notará)"
         )
         return None
-    centro, larga = elegido
+    # Empates: entre dos pausas parecidas de largas, la más centrada reparte
+    # mejor el metraje entre los dos clips.
+    mejor = max(candidatos, key=lambda c: c[0])[0]
+    larga, centro = min(
+        (c for c in candidatos if c[0] >= mejor - _EMPATE_S),
+        key=lambda c: abs(c[1] - objetivo),
+    )
     on_log(
-        f"[pov_bof_largo] corte en una pausa de {larga:.2f}s a {centro:.2f}s "
+        f"[pov_bof_largo] corte en la pausa de {larga:.2f}s a {centro:.2f}s "
         f"({100 * centro / dur:.0f}% de la voz; la mitad exacta era {objetivo:.2f}s)"
     )
     return centro
@@ -181,7 +208,7 @@ def _concatenar_cuadrado(
 
     n = max(1, len(clips))
     if n == 2:
-        corte = _punto_de_corte(audio_path, audio_dur, on_log)
+        corte = _punto_de_corte(audio_path, audio_dur, work_dir, on_log)
         primero = corte if corte is not None else audio_dur / 2
         objetivos = [primero, audio_dur - primero]
     else:
