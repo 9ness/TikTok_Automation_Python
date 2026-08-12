@@ -67,7 +67,7 @@ export default function CreativosProPage() {
   const items = productos.data ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
   const subidosCarpeta = items.filter((p) => horasSubida[p.producto]).length;
-  const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
+  const enEscaparate = items.filter((p) => p.en_escaparate).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
 
   // Se bajan las fotos CON LA DESCRIPCIÓN (la captura de la ficha), no las
@@ -248,6 +248,20 @@ export default function CreativosProPage() {
           📤 Subidos {subidosCarpeta}/{items.length}
         </div>
 
+        {/* Al lado de "Subidos" para comparar de un vistazo cuántos están en el
+            escaparate y cuántos ya publicados. */}
+        <button
+          type="button"
+          onClick={() => setVerEscaparate(true)}
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+            enEscaparate === items.length && items.length > 0
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+              : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+          }`}
+        >
+          🏪 Escaparate {enEscaparate}/{items.length}
+        </button>
+
         {productos.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
@@ -271,23 +285,6 @@ export default function CreativosProPage() {
 
         {/* El escaparate es el mismo para todos los nichos: si el producto ya
             se metió desde el POV BOF (o desde otra carpeta), aquí sale hecho. */}
-        {folder && items.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setVerEscaparate(true)}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
-          >
-            <Store className="h-3.5 w-3.5" />
-            Meter en el escaparate
-            <span
-              className={`rounded-full px-1.5 text-[10px] font-bold ${
-                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
-              }`}
-            >
-              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
-            </span>
-          </button>
-        )}
 
         {verEscaparate && folder && (
           <EscaparateModal

@@ -133,6 +133,7 @@ export default function PovBofLargoPage() {
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
   const subidos = items.filter((p) => p.uploaded).length;
+  const enEscaparate = items.filter((p) => p.en_escaparate).length;
   const sinGuion = items.filter((p) => p.titulo && !p.guion).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const pendientesUrl = items.filter(
@@ -426,23 +427,6 @@ export default function PovBofLargoPage() {
             </span>
           )}
         </button>
-        {folder && totalProductos > 0 && (
-          <button
-            type="button"
-            onClick={() => setVerEscaparate(true)}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20"
-          >
-            <Store className="h-3.5 w-3.5" />
-            Meter en el escaparate
-            <span
-              className={`rounded-full px-1.5 text-[10px] font-bold ${
-                pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
-              }`}
-            >
-              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
-            </span>
-          </button>
-        )}
       </section>
 
       {verVendidos && (
@@ -734,6 +718,19 @@ export default function PovBofLargoPage() {
             >
               📤 Subidos {subidos}/{totalProductos}
             </div>
+
+              {/* Junto a "Subidos" para comparar de un vistazo. */}
+              <button
+                type="button"
+                onClick={() => setVerEscaparate(true)}
+                className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                  enEscaparate === totalProductos && totalProductos > 0
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                    : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+                }`}
+              >
+                🏪 Escaparate {enEscaparate}/{totalProductos}
+              </button>
 
               {MOSTRAR_ECHOTIK && (
               <button

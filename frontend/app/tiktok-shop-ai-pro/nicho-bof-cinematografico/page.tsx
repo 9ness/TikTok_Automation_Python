@@ -263,7 +263,7 @@ export default function NichoBofCinePage() {
                 pendientesEscaparate ? "bg-sky-500 text-black" : "bg-emerald-500 text-black"
               }`}
             >
-              {pendientesEscaparate ? `${pendientesEscaparate} sin meter` : "al día"}
+              {`${items.length - pendientesEscaparate}/${items.length}`}
             </span>
           </button>
         )}
