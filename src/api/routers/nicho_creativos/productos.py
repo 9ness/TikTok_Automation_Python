@@ -133,7 +133,9 @@ def list_subidos(
     """
     from src.nicho_creativos.repos import subidos_repo
 
-    return {"items": sorted(subidos_repo.subidos(source, folder, usuario))}
+    # `items` = números de producto; `horas` = cuándo se marcó cada uno.
+    marcados = subidos_repo.subidos(source, folder, usuario)
+    return {"items": sorted(marcados), "horas": marcados}
 
 
 @router.post("/subido")
@@ -162,4 +164,5 @@ def marcar_subido(
         )
     except Exception:
         pass
-    return {"items": sorted(subidos_repo.subidos(body.source, body.folder, usuario))}
+    marcados = subidos_repo.subidos(body.source, body.folder, usuario)
+    return {"items": sorted(marcados), "horas": marcados}

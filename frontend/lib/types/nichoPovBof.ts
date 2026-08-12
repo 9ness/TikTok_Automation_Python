@@ -97,6 +97,8 @@ export interface ProductoItem {
    *  llamadas al mes) no llega ni de lejos al volumen diario. */
   en_escaparate: boolean;
   uploaded: boolean;
+  /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
+  uploaded_at: number;
   sold: boolean;
   video_path: string | null;
   /** Cambia en cada montaje: se usa para romper la caché del navegador y que

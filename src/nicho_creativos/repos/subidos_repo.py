@@ -12,11 +12,15 @@ que lo grabe.)
 Tampoco lo pone ningún runner: en Creativos Pro no hay montaje que termine, la
 imagen se genera fuera. Lo marca el operador cuando sube el creativo.
 
-Key: `nicho_creativos:subidos:<source>:<carpeta>[:usuario]` → SET de números de
-producto.
+Se guarda `producto -> hora` y no un simple SET: el operador quiere ver A QUÉ
+HORA marcó cada uno, para saber si al repetir un producto el toque entró.
+
+Key: `nicho_creativos:subidos:<source>:<carpeta>[:usuario]` → {producto: epoch}
 """
 
 from __future__ import annotations
+
+import time
 
 from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
 
@@ -30,13 +34,14 @@ def _key(source: str, folder: str, usuario: str = "") -> str:
     return f"{base}:{usuario}"
 
 
-def subidos(source: str, folder: str, usuario: str = "") -> set[str]:
-    """Productos de esa carpeta ya publicados. Vacío si Redis no está: es un
+def subidos(source: str, folder: str, usuario: str = "") -> dict[str, float]:
+    """`{producto: hora}` de los ya publicados. Vacío si Redis no está: es un
     dato de progreso, no vale la pena tumbar la pantalla por él."""
     r = get_nicho_creativos_redis()
     if not r.is_available():
-        return set()
-    return {str(x) for x in r.smembers(_key(source, folder, usuario)) if x}
+        return {}
+    doc = r.get_json(_key(source, folder, usuario)) or {}
+    return {str(k): float(v or 0) for k, v in doc.items()}
 
 
 def marcar(
@@ -48,7 +53,10 @@ def marcar(
             "Redis (Upstash) no está configurado — no se puede guardar qué "
             "creativos has subido."
         )
+    clave = _key(source, folder, usuario)
+    doc = r.get_json(clave) or {}
     if subido:
-        r.sadd(_key(source, folder, usuario), str(producto))
+        doc[str(producto)] = time.time()
     else:
-        r.srem(_key(source, folder, usuario), str(producto))
+        doc.pop(str(producto), None)
+    r.set_json(clave, doc)

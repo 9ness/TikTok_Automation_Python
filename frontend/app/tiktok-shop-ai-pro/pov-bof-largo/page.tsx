@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -80,6 +81,9 @@ function err(e: unknown): string {
 }
 
 const CAR_POR_SEG = 18.2;
+
+/** EchoTik apagado (ver la misma bandera en el Nicho POV BOF). */
+const MOSTRAR_ECHOTIK = false;
 
 export default function PovBofLargoPage() {
   const qc = useQueryClient();
@@ -1425,7 +1429,7 @@ function ProductoCard({
       )}
 
       {/* Ficha de TikTok Shop (EchoTik, 1 llamada por búsqueda). */}
-      {p.product_url ? (
+      {MOSTRAR_ECHOTIK && (p.product_url ? (
         <a
           href={p.product_url}
           target="_blank"
@@ -1458,7 +1462,7 @@ function ProductoCard({
               ? "❌ EchoTik no lo encuentra — reintentar (1 llamada)"
               : "🔗 Buscar enlace (gasta 1 llamada EchoTik)"}
         </button>
-      )}
+      ))}
 
       {/* El guion es lo primero: sin él no se puede subir clip. */}
       {p.guion ? (
@@ -1665,6 +1669,9 @@ function ProductoCard({
           }`}
         >
           📤 Subido
+          {p.uploaded && p.uploaded_at ? (
+            <span className="ml-1 font-normal opacity-80">{horaCorta(p.uploaded_at)}</span>
+          ) : null}
         </button>
         <button
           type="button"

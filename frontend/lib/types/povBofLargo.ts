@@ -42,6 +42,8 @@ export interface ProductoLargo {
   // Progreso INDIVIDUAL de este nicho.
   en_escaparate: boolean;
   uploaded: boolean;
+  /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
+  uploaded_at: number;
   sold: boolean;
   video_path: string | null;
   video_listo_at: number;

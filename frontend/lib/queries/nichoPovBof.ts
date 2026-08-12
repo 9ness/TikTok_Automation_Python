@@ -264,6 +264,10 @@ export function useSetEstado() {
       );
       // Puede haber entrado o salido de "vendidos".
       void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
+      // Y si lo que cambió fue "Subido", el tope diario ya no es el mismo.
+      if (vars.uploaded !== undefined) {
+        void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
+      }
     },
   });
 }

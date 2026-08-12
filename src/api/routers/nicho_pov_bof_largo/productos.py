@@ -265,6 +265,7 @@ def _listar(
                 else bool(mio.get("en_escaparate"))
             ),
             uploaded=bool(mio.get("uploaded")),
+            uploaded_at=float(mio.get("uploaded_at") or 0),
             sold=bool(mio.get("sold")),
             video_path=mio.get("video_path"),
             video_listo_at=int(mio.get("video_listo_at") or 0),
@@ -309,6 +310,9 @@ def set_producto_estado(
         campos: dict = {}
         if body.uploaded is not None:
             campos["uploaded"] = body.uploaded
+            # La hora la sella el servidor: es lo que deja comprobar que un
+            # producto repetido se marcó bien (si cambia, el toque entró).
+            campos["uploaded_at"] = time.time() if body.uploaded else 0
         if body.sold is not None:
             campos["sold"] = body.sold
             # Vender implica haberlo subido — mismo criterio que el POV BOF.

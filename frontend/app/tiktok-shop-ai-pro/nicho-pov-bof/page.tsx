@@ -25,6 +25,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   useCrearMiProducto,
@@ -74,6 +75,11 @@ import type {
   ProductoRecuperado,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
+
+/** EchoTik apagado a petición del operador: su cuota gratis no da para el
+ *  volumen diario y de momento no lo usa. Poniéndolo a `true` vuelven el panel
+ *  de credenciales y los botones de buscar la ficha del producto. */
+const MOSTRAR_ECHOTIK = false;
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
@@ -445,7 +451,7 @@ export default function NichoPovBofPage() {
         subtitle="EchoTik · hashtags · copia de seguridad — el Drive de origen es de solo lectura"
       >
         <div className="space-y-3">
-          <EchoTikPanel />
+          {MOSTRAR_ECHOTIK && <EchoTikPanel />}
           <HashtagsPanel />
 
           {/* Backup del Drive de origen */}
@@ -721,7 +727,8 @@ export default function NichoPovBofPage() {
                 </>
               )}
             </button>
-            <button
+
+            {MOSTRAR_ECHOTIK && (<button
               type="button"
               onClick={runBuscarUrls}
               disabled={buscarUrls.isPending || !pendientesUrl}
@@ -742,7 +749,7 @@ export default function NichoPovBofPage() {
                   </span>
                 </>
               )}
-            </button>
+            </button>)}
             </div>
           </div>
 
@@ -1661,7 +1668,8 @@ function ProductoCard({
       {/* Ficha de TikTok Shop. Cada búsqueda gasta una llamada del plan de
           EchoTik (trial de 100), por eso es un botón manual por producto y
           no algo que se dispare solo al abrir la carpeta. */}
-      {producto.product_url ? (
+      {/* Ficha de TikTok Shop: escondida mientras EchoTik esté apagado. */}
+      {MOSTRAR_ECHOTIK && (producto.product_url ? (
         <a
           href={producto.product_url}
           target="_blank"
@@ -1687,7 +1695,7 @@ function ProductoCard({
               ? "❌ EchoTik no lo encuentra — reintentar (1 llamada)"
               : "🔗 Buscar enlace (gasta 1 llamada EchoTik)"}
         </button>
-      )}
+      ))}
 
       {/* Ya no se elige el generador (Veo3/Kling): Veo3 dejó de poner marca de
           agua en 2026-07 y Kling nunca la puso, así que no hay nada que
@@ -1843,6 +1851,11 @@ function ProductoCard({
           }`}
         >
           📤 Subido
+          {uploaded && producto.uploaded_at ? (
+            <span className="ml-1 font-normal opacity-80">
+              {horaCorta(producto.uploaded_at)}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"

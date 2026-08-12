@@ -124,6 +124,9 @@ export function useSetEstadoLargo() {
       );
       // Puede haber entrado o salido del ranking de vendidos.
       void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) });
+      if (vars.uploaded !== undefined) {
+        void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
+      }
     },
   });
 }

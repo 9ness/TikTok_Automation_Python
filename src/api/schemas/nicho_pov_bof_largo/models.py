@@ -47,6 +47,7 @@ class ProductoLargo(BaseModel):
     voz_sexo: str = ""
     en_escaparate: bool = False
     uploaded: bool = False
+    uploaded_at: float = 0
     sold: bool = False
     video_path: str | None = None
     video_listo_at: int = 0

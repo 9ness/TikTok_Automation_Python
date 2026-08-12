@@ -71,16 +71,16 @@ export function useCompletarCarpetaCreativos() {
  *  ÚNICO que este nicho guarda por su cuenta: "subido" allí es el vídeo y aquí
  *  el creativo, y son dos publicaciones distintas del mismo producto. */
 export function useSubidosCreativos(source: string, folder: string | null) {
-  return useQuery<string[]>({
+  return useQuery<Record<string, number>>({
     queryKey: creativosKeys.subidos(source, folder ?? ""),
     queryFn: async () =>
       (
-        await api.get<{ items: string[] }>(
+        await api.get<{ items: string[]; horas: Record<string, number> }>(
           `${ROOT}/subidos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
             folder ?? "",
           )}`,
         )
-      ).items ?? [],
+      ).horas ?? {},
     enabled: Boolean(source && folder),
   });
 }
@@ -88,14 +88,21 @@ export function useSubidosCreativos(source: string, folder: string | null) {
 /** Lo marca el operador a mano: aquí no hay montaje que termine. */
 export function useMarcarSubidoCreativo(source: string, folder: string | null) {
   const qc = useQueryClient();
-  return useMutation<{ items: string[] }, Error, { producto: string; uploaded: boolean }>({
+  return useMutation<
+    { items: string[]; horas: Record<string, number> },
+    Error,
+    { producto: string; uploaded: boolean }
+  >({
     mutationFn: (body) =>
-      api.post<{ items: string[] }>(`${ROOT}/subido`, {
+      api.post<{ items: string[]; horas: Record<string, number> }>(`${ROOT}/subido`, {
         source,
         folder: folder ?? "",
         ...body,
       }),
-    onSuccess: (res) =>
-      qc.setQueryData(creativosKeys.subidos(source, folder ?? ""), res.items ?? []),
+    onSuccess: (res) => {
+      qc.setQueryData(creativosKeys.subidos(source, folder ?? ""), res.horas ?? {});
+      // Un creativo publicado cuenta como carrusel en el tope del día.
+      void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
+    },
   });
 }

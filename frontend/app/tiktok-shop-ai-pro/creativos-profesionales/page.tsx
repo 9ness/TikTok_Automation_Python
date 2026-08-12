@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -57,7 +58,7 @@ export default function CreativosProPage() {
   // Qué creativos ya se publicaron: propio de este nicho, se marca a mano.
   const subidos = useSubidosCreativos(source, folder);
   const marcarSubido = useMarcarSubidoCreativo(source, folder);
-  const yaSubidos = new Set(subidos.data ?? []);
+  const horasSubida = subidos.data ?? {};
 
   const [bajando, setBajando] = useState("");
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -290,7 +291,8 @@ export default function CreativosProPage() {
               source={source}
               folder={folder!}
               producto={p}
-              subido={yaSubidos.has(p.producto)}
+              subido={Boolean(horasSubida[p.producto])}
+              subidoAt={horasSubida[p.producto] ?? 0}
               onSubido={(v) =>
                 marcarSubido.mutate(
                   { producto: p.producto, uploaded: v },
@@ -334,6 +336,7 @@ function CreativoCard({
   folder,
   producto: p,
   subido,
+  subidoAt,
   onSubido,
 }: {
   source: string;
@@ -342,6 +345,8 @@ function CreativoCard({
   /** Si el CREATIVO de este producto ya se publicó. Es propio de este nicho:
    *  "subido" en el POV BOF es el vídeo, y son dos publicaciones distintas. */
   subido: boolean;
+  /** Cuándo se marcó (epoch). Se enseña para comprobar que el toque entró. */
+  subidoAt: number;
   onSubido: (v: boolean) => void;
 }) {
   const [verFoto, setVerFoto] = useState(false);
@@ -458,6 +463,9 @@ function CreativoCard({
           }`}
         >
           📤 Subido
+          {subido && subidoAt ? (
+            <span className="ml-1 font-normal opacity-80">{horaCorta(subidoAt)}</span>
+          ) : null}
         </button>
         <button
           type="button"
