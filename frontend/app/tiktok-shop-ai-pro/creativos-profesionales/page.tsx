@@ -203,6 +203,30 @@ export default function CreativosProPage() {
         </div>
       </section>
 
+      {/* Cerrar la carpeta va ARRIBA, no al final de la lista: con diez
+          productos había que recorrerlos todos para llegar al botón, y es lo
+          que se pulsa nada más terminar. */}
+      {folder && (
+        <button
+          type="button"
+          disabled={completar.isPending}
+          onClick={() =>
+            completar.mutate(
+              { source, folder, completed: !hecha },
+              { onError: (e) => toast.error(err(e)) },
+            )
+          }
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+            hecha
+              ? "border-border/60 text-muted-foreground"
+              : "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+          }`}
+        >
+          <Check className="h-3.5 w-3.5" />
+          {hecha ? "Desmarcar carpeta" : "Carpeta completada"}
+        </button>
+      )}
+
       {/* Un solo prompt, y el formato pegado a él: copiarlo y generar en
           cuadrado es el error fácil de este nicho. */}
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
@@ -356,26 +380,6 @@ export default function CreativosProPage() {
           ))}
         </div>
 
-        {folder && (
-          <button
-            type="button"
-            disabled={completar.isPending}
-            onClick={() =>
-              completar.mutate(
-                { source, folder, completed: !hecha },
-                { onError: (e) => toast.error(err(e)) },
-              )
-            }
-            className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-              hecha
-                ? "border-border/60 text-muted-foreground"
-                : "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-            }`}
-          >
-            <Check className="h-3.5 w-3.5" />
-            {hecha ? "Desmarcar carpeta" : "Carpeta completada"}
-          </button>
-        )}
       </section>
     </div>
   );
