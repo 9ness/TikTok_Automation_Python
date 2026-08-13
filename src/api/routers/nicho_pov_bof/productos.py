@@ -549,69 +549,74 @@ def _ruta_de_token(token: str) -> Path:
     return ruta
 
 
-@router.post("/video/lote", response_model=VideoLoteResponse)
-async def subir_lote(
-    files: Annotated[list[UploadFile], File()],
+@router.post("/video/lote/subir")
+async def subir_uno_del_lote(
+    file: Annotated[UploadFile, File()],
     source: Annotated[str, Form()],
     folder: Annotated[str, Form()],
-    # Los productos a los que va la tanda, separados por comas. Cuantos menos,
-    # mejor empareja: es la lista contra la que compara.
-    productos: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
-) -> VideoLoteResponse:
-    """Sube varios vídeos de golpe y dice de qué producto es cada uno.
+) -> dict:
+    """Guarda UN vídeo de la tanda y devuelve su identificador.
 
-    NO encola nada: devuelve el reparto propuesto para que el operador lo
-    repase. El montaje se lanza después con `/video/lote/confirmar`.
-
-    Se sube una sola vez: los brutos se quedan en la carpeta de subidas y el
-    confirmar los reusa por su identificador.
+    Van de uno en uno para poder enseñar el porcentaje de cada fichero: en una
+    sola petición el botón se quedaba minutos diciendo "subiendo" sin que se
+    supiera si quedaba mucho. Aquí no se reconoce nada todavía.
     """
     from src.api.temp_storage import upload_subdir
+
+    nombre = (file.filename or "").lower()
+    ext = next((e for e in _ALLOWED_VIDEO_EXTS if nombre.endswith(e)), "")
+    if not ext:
+        raise _bad_request(
+            f"Formato de vídeo no soportado: {file.filename!r}. "
+            f"Acepta: {', '.join(sorted(_ALLOWED_VIDEO_EXTS))}."
+        )
+    dest = upload_subdir("nicho_pov_bof")
+    stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
+    token = f"lote_{stub}_{int(time.time() * 1000)}_{os.getpid()}{ext}"
+    try:
+        with (dest / token).open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+    except Exception as e:
+        raise APIError(f"No se pudo guardar {file.filename!r}: {e}", status_code=500) from e
+    finally:
+        await file.close()
+    return {"token": token, "archivo": file.filename or token}
+
+
+@router.post("/video/lote/repartir", response_model=VideoLoteResponse)
+def repartir_lote(
+    body: dict,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> VideoLoteResponse:
+    """Dice de qué producto es cada vídeo ya subido. No encola nada.
+
+    Recibe los identificadores que devolvió `/video/lote/subir`, así que los
+    vídeos no viajan dos veces.
+    """
     from src.nicho_pov_bof.services import emparejador
 
-    dest = upload_subdir("nicho_pov_bof")
-    guardados: list[tuple[str, str]] = []  # (token, nombre original)
-    for f in files:
-        nombre = (f.filename or "").lower()
-        ext = next((e for e in _ALLOWED_VIDEO_EXTS if nombre.endswith(e)), "")
-        if not ext:
-            raise _bad_request(
-                f"Formato de vídeo no soportado: {f.filename!r}. "
-                f"Acepta: {', '.join(sorted(_ALLOWED_VIDEO_EXTS))}."
-            )
-        stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
-        token = f"lote_{stub}_{int(time.time() * 1000)}_{len(guardados)}{ext}"
-        try:
-            with (dest / token).open("wb") as out:
-                shutil.copyfileobj(f.file, out)
-        except Exception as e:
-            raise APIError(f"No se pudo guardar {f.filename!r}: {e}", status_code=500) from e
-        finally:
-            await f.close()
-        guardados.append((token, f.filename or token))
+    source = str(body.get("source") or "")
+    folder = str(body.get("folder") or "")
+    tokens = [str(x) for x in (body.get("tokens") or [])]
+    if not tokens:
+        raise _bad_request("no llegó ningún vídeo que repartir.")
+    rutas = [_ruta_de_token(t) for t in tokens]
 
-    candidatos = [p.strip() for p in (productos or "").split(",") if p.strip()]
-    if not candidatos:
-        # Sin lista, se compara contra todo lo que tenga foto en la carpeta.
-        candidatos = [
-            p.producto for p in _list_productos(source, folder, None, usuario).items
-            if p.clean_photo_id
-        ]
-
-    # Los de plazos llevan DOS clips, así que pueden llevarse dos vídeos de la
-    # tanda; el resto, uno.
-    fichas = {p.producto: p for p in _list_productos(source, folder, None, usuario).items}
-    dobles = {pid for pid in candidatos if getattr(fichas.get(pid), "modo_plazos", False)}
+    fichas = _list_productos(source, folder, None, usuario).items
+    candidatos = [p.producto for p in fichas if p.clean_photo_id]
+    # Los de plazos llevan DOS clips: pueden llevarse dos vídeos de la tanda.
+    dobles = {p.producto for p in fichas if p.modo_plazos}
     reparto = emparejador.emparejar(
-        source, folder, [dest / t for t, _ in guardados], candidatos, dobles=dobles,
+        source, folder, rutas, candidatos, dobles=dobles,
     )
     items = [
         VideoLoteItem(
-            token=token, archivo=nombre,
+            token=tok, archivo=tok,
             producto=str(r.get("producto") or ""), por_que=str(r.get("por_que") or ""),
         )
-        for (token, nombre), r in zip(guardados, reparto)
+        for tok, r in zip(tokens, reparto)
     ]
     return VideoLoteResponse(
         source=source, folder=folder, items=items,

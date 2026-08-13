@@ -63,6 +63,18 @@ def _fotogramas(video: Path, destino: Path, etiqueta: str) -> list[str]:
     return salidas
 
 
+def _letras(productos: list[str]) -> dict[str, str]:
+    """Una letra por producto para el prompt: A, B, C…
+
+    Los productos se llaman 1, 2, 3… y las imágenes van numeradas, así que al
+    pedirle "el número del producto" contestaba con el NÚMERO DE IMAGEN: dijo
+    "Producto 12" para un catálogo que llegaba al 8, habiendo reconocido bien
+    el producto. Con letras no hay dos numeraciones que confundir.
+    """
+    abecedario = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return {p: (abecedario[i] if i < len(abecedario) else f"P{i}") for i, p in enumerate(productos)}
+
+
 def _prompt(
     n_videos: int, fotos_por_video: list[int], productos: list[str],
     dobles: set[str] | None = None,
@@ -70,16 +82,18 @@ def _prompt(
     bloques = []
     i = 1
     for v, cuantos in enumerate(fotos_por_video, start=1):
-        bloques.append(f"- Vídeo {v}: imágenes {i} a {i + cuantos - 1}")
+        bloques.append(f"- Vídeo {v}: las siguientes {cuantos} imágenes")
         i += cuantos
     dobles = dobles or set()
+    letra = _letras(productos)
     catalogo = "\n".join(
-        f"- Producto {p}: imagen {i + n}"
+        f"- Producto {letra[p]}"
         + (" (DE DOS CLIPS: puede salir en dos vídeos)" if p in dobles else "")
-        for n, p in enumerate(productos)
+        for p in productos
     )
     return (
-        f"Te paso {i - 1 + len(productos)} imágenes en orden.\n\n"
+        f"Te paso {i - 1 + len(productos)} imágenes en orden: primero los "
+        f"fotogramas de los vídeos y después el catálogo.\n\n"
         f"FOTOGRAMAS DE {n_videos} VÍDEO(S):\n" + "\n".join(bloques) + "\n\n"
         f"CATÁLOGO DE PRODUCTOS:\n{catalogo}\n\n"
         "Cada vídeo se generó a partir de la foto de UNO de esos productos. "
@@ -87,7 +101,12 @@ def _prompt(
         "Reglas:\n"
         + (
             "- Cada producto sale en UN solo vídeo, salvo los marcados como DE "
-            "DOS CLIPS, que salen en DOS (son dos planos del mismo producto).\n"
+            "DOS CLIPS, que salen en DOS.\n"
+            "- Esos dos clips son DOS PLANOS DEL MISMO PRODUCTO y pueden verse "
+            "muy distintos entre sí: otro ángulo, más cerca, otra luz, otra "
+            "habitación, la mano tapando una parte. Que no se parezcan ENTRE "
+            "ELLOS no significa que sean productos distintos; compara cada uno "
+            "con el catálogo por separado.\n"
             if dobles else
             "- Un producto no puede repetirse en dos vídeos: reparte.\n"
         )
@@ -102,8 +121,8 @@ def _prompt(
         "- Antes de dar un id, comprueba que coinciden los DETALLES concretos "
         "(mismo estampado, mismas etiquetas, mismo remate lateral), no solo "
         "que sean el mismo tipo de producto.\n\n"
-        'Responde SOLO: {"videos": [{"video": 1, "producto": "<id> o vacío", '
-        '"por_que": "6 palabras"}, ...]}'
+        'Responde SOLO con la LETRA del producto: {"videos": [{"video": 1, '
+        '"producto": "<letra> o vacío", "por_que": "6 palabras"}, ...]}'
     )
 
 
@@ -188,6 +207,8 @@ def emparejar(
             return vacio
 
         dobles = {str(d) for d in (dobles or set())} & set(ids)
+        letra = _letras(ids)
+        por_letra = {v: k for k, v in letra.items()}
         datos = generate_json(
             _prompt(len(videos), por_video, ids, dobles), "",
             images=imagenes + catalogo,
@@ -201,7 +222,10 @@ def emparejar(
                 idx = int(fila.get("video", 0)) - 1
             except (TypeError, ValueError):
                 continue
-            pid = _id_de(fila.get("producto"), ids)
+            # Contesta la letra; se traduce al id real. Se acepta también el
+            # id a secas por si algún día contesta con él.
+            bruto = str(fila.get("producto") or "").strip()
+            pid = por_letra.get(bruto.upper(), "") or _id_de(bruto, ids)
             # Se ignora lo que no cuadre: un id inventado, uno fuera de los
             # elegidos o un producto repetido. Vale más dejarlo sin asignar que
             # meter el vídeo del colchón en el sofá.

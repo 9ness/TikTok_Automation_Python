@@ -19,6 +19,7 @@ dato transversal: se apunta en el índice compartido con `nicho="pov_bof_largo"`
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import time
@@ -505,55 +506,74 @@ def _ruta_de_token(token: str) -> Path:
     return ruta
 
 
-@router.post("/video/lote", response_model=LoteLargoResponse)
-async def subir_lote(
-    files: Annotated[list[UploadFile], File()],
+@router.post("/video/lote/subir")
+async def subir_uno_del_lote(
+    file: Annotated[UploadFile, File()],
     source: Annotated[str, Form()],
     folder: Annotated[str, Form()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Guarda UN vídeo de la tanda y devuelve su identificador.
+
+    Van de uno en uno para poder enseñar el porcentaje de cada fichero: en una
+    sola petición el botón se quedaba minutos diciendo "subiendo" sin que se
+    supiera si quedaba mucho. Aquí no se reconoce nada todavía.
+    """
+    from src.api.temp_storage import upload_subdir
+
+    nombre = (file.filename or "").lower()
+    ext = next((e for e in _EXTS_VIDEO if nombre.endswith(e)), "")
+    if not ext:
+        raise _bad(
+            f"Formato de vídeo no soportado: {file.filename!r}. "
+            f"Acepta: {', '.join(sorted(_EXTS_VIDEO))}."
+        )
+    dest = upload_subdir("nicho_pov_bof_largo")
+    stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
+    token = f"lote_{stub}_{int(time.time() * 1000)}_{os.getpid()}{ext}"
+    try:
+        with (dest / token).open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+    except Exception as e:
+        raise APIError(f"No se pudo guardar {file.filename!r}: {e}", status_code=500) from e
+    finally:
+        await file.close()
+    return {"token": token, "archivo": file.filename or token}
+
+
+@router.post("/video/lote/repartir", response_model=LoteLargoResponse)
+def repartir_lote(
+    body: dict,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> LoteLargoResponse:
-    """Sube los clips de la carpeta de golpe y dice de qué producto es cada uno.
+    """Dice de qué producto es cada vídeo ya subido. No encola nada.
 
-    Aquí TODOS los productos llevan dos clips, así que cada uno puede llevarse
-    dos vídeos de la tanda. No encola nada: el operador repasa y confirma.
+    Recibe los identificadores que devolvió `/video/lote/subir`, así que los
+    vídeos no viajan dos veces.
     """
-    from src.api.temp_storage import upload_subdir
     from src.nicho_pov_bof.services import emparejador
 
-    dest = upload_subdir("nicho_pov_bof_largo")
-    guardados: list[tuple[str, str]] = []
-    for f in files:
-        nombre = (f.filename or "").lower()
-        ext = next((e for e in _EXTS_VIDEO if nombre.endswith(e)), "")
-        if not ext:
-            raise _bad(
-                f"Formato de vídeo no soportado: {f.filename!r}. "
-                f"Acepta: {', '.join(sorted(_EXTS_VIDEO))}."
-            )
-        stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
-        token = f"lote_{stub}_{int(time.time() * 1000)}_{len(guardados)}{ext}"
-        try:
-            with (dest / token).open("wb") as out:
-                shutil.copyfileobj(f.file, out)
-        except Exception as e:
-            raise APIError(f"No se pudo guardar {f.filename!r}: {e}", status_code=500) from e
-        finally:
-            await f.close()
-        guardados.append((token, f.filename or token))
+    source = str(body.get("source") or "")
+    folder = str(body.get("folder") or "")
+    tokens = [str(x) for x in (body.get("tokens") or [])]
+    if not tokens:
+        raise _bad("no llegó ningún vídeo que repartir.")
+    rutas = [_ruta_de_token(t) for t in tokens]
 
     fichas = _listar(source, folder, queue, usuario).items
     candidatos = [p.producto for p in fichas if p.clean_photo_id]
+    # Aquí TODOS llevan dos clips.
+    dobles = set(candidatos)
     reparto = emparejador.emparejar(
-        source, folder, [dest / t for t, _ in guardados], candidatos,
-        dobles=set(candidatos),
+        source, folder, rutas, candidatos, dobles=dobles,
     )
     items = [
         LoteLargoItem(
-            token=token, archivo=nombre,
+            token=tok, archivo=tok,
             producto=str(r.get("producto") or ""), por_que=str(r.get("por_que") or ""),
         )
-        for (token, nombre), r in zip(guardados, reparto)
+        for tok, r in zip(tokens, reparto)
     ]
     return LoteLargoResponse(
         source=source, folder=folder, items=items,

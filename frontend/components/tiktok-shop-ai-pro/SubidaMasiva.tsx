@@ -6,8 +6,9 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  subirUno,
   useConfirmarLote,
-  useSubirLote,
+  useRepartirLote,
   type LoteItem,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
@@ -40,31 +41,52 @@ export function SubidaMasiva({
    *  eso se encarga su endpoint, no esta pantalla. */
   root?: string;
 }) {
-  const subir = useSubirLote(root);
+  const repartir = useRepartirLote(root);
   const confirmar = useConfirmarLote(root);
+  // Por dónde va la subida: qué fichero y su porcentaje.
+  const [progreso, setProgreso] = useState<{ n: number; total: number; pct: number } | null>(null);
+  const [reconociendo, setReconociendo] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const [reparto, setReparto] = useState<LoteItem[] | null>(null);
   const [sexo, setSexo] = useState<"auto" | "hombre" | "mujer">("auto");
 
   const conFoto = productos.filter((p) => p.clean_photo_id);
 
-  function enviar(files: File[]) {
+  /** Sube la tanda con progreso de verdad y luego pide el reparto.
+   *
+   *  Antes iba todo en una petición y el botón decía "subiendo y reconociendo"
+   *  durante minutos, sin saber si quedaba mucho. Ahora se ve por dónde va:
+   *  "vídeo 2 de 3 · 47%".
+   */
+  async function enviar(files: File[]) {
     if (!files.length) return;
-    subir.mutate(
-      // Sin lista: se compara contra toda la carpeta. Marcar antes a qué
-      // productos ibas era un paso más para ahorrar poco, y si te dejabas uno
-      // su vídeo se quedaba sin sitio.
-      { source, folder, productos: [], files },
-      {
-        onSuccess: (r) => {
-          setReparto(r.items);
-          toast.success(
-            `${r.reconocidos}/${r.items.length} vídeos reconocidos. Repasa y confirma.`,
-          );
-        },
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
-      },
-    );
+    try {
+      const tokens: string[] = [];
+      const nombres = new Map<string, string>();
+      for (const [i, file] of files.entries()) {
+        setProgreso({ n: i + 1, total: files.length, pct: 0 });
+        const tok = await subirUno({
+          source, folder, file, root,
+          onProgreso: (pct) => setProgreso({ n: i + 1, total: files.length, pct }),
+        });
+        tokens.push(tok);
+        // El servidor solo conoce el token; el nombre de verdad lo tenemos
+        // aquí y es lo que hay que enseñar al repasar.
+        nombres.set(tok, file.name);
+      }
+      setProgreso({ n: files.length, total: files.length, pct: 100 });
+      setReconociendo(true);
+      const r = await repartir.mutateAsync({ source, folder, tokens });
+      setReparto(r.items.map((x) => ({ ...x, archivo: nombres.get(x.token) ?? x.archivo })));
+      toast.success(
+        `${r.reconocidos}/${r.items.length} vídeos reconocidos. Repasa y confirma.`,
+      );
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setProgreso(null);
+      setReconociendo(false);
+    }
   }
 
   const listos = (reparto ?? []).filter((i) => i.producto).length;
@@ -91,10 +113,15 @@ export function SubidaMasiva({
           </p>
 
           <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600">
-            {subir.isPending ? (
+            {progreso ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo y
-                reconociendo…
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Vídeo{" "}
+                {progreso.n} de {progreso.total} · {progreso.pct}%
+              </>
+            ) : reconociendo ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reconociendo los
+                productos…
               </>
             ) : (
               <>
@@ -105,7 +132,7 @@ export function SubidaMasiva({
               type="file"
               accept="video/*"
               multiple
-              disabled={subir.isPending}
+              disabled={Boolean(progreso) || reconociendo}
               className="hidden"
               onChange={(e) => {
                 const f = Array.from(e.target.files ?? []);

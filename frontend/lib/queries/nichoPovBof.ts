@@ -514,22 +514,58 @@ export interface LoteResponse {
 
 /** Sube varios vídeos de golpe y devuelve de qué producto cree que es cada uno.
  *  NO encola nada: el operador repasa y confirma después. */
-/** `root` decide el nicho: el POV BOF y el Largo tienen sus propios endpoints
- *  (allí cada producto lleva DOS clips), pero la pantalla es la misma. */
-export function useSubirLote(root: string = ROOT) {
+/** Sube UN vídeo de la tanda y devuelve su identificador.
+ *
+ *  Con XHR y no con fetch para tener porcentaje de verdad: son ficheros de
+ *  10-30 MB y sin progreso el botón se queda minutos sin decir nada. Van de
+ *  uno en uno a propósito — varios a la vez desde el móvil se atragantan.
+ */
+export function subirUno(v: {
+  source: string;
+  folder: string;
+  file: File;
+  root: string;
+  onProgreso?: (pct: number) => void;
+}): Promise<string> {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const key = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  const fd = new FormData();
+  fd.append("file", v.file);
+  fd.append("source", v.source);
+  fd.append("folder", v.folder);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${base}${v.root}/video/lote/subir`);
+    if (key) xhr.setRequestHeader("X-API-Key", key);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) v.onProgreso?.(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        const d = JSON.parse(xhr.responseText) as { token?: string; error?: string };
+        if (xhr.status >= 400 || !d.token) {
+          reject(new Error(d.error || `No se pudo subir ${v.file.name}`));
+          return;
+        }
+        resolve(d.token);
+      } catch {
+        reject(new Error(`Respuesta inválida al subir ${v.file.name}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error(`Error de red subiendo ${v.file.name}`));
+    xhr.send(fd);
+  });
+}
+
+/** Con los vídeos ya subidos, dice de qué producto es cada uno. */
+export function useRepartirLote(root: string = ROOT) {
   return useMutation<
     LoteResponse,
     Error,
-    { source: string; folder: string; productos: string[]; files: File[] }
+    { source: string; folder: string; tokens: string[] }
   >({
-    mutationFn: (v) => {
-      const fd = new FormData();
-      for (const f of v.files) fd.append("files", f);
-      fd.append("source", v.source);
-      fd.append("folder", v.folder);
-      fd.append("productos", v.productos.join(","));
-      return api.post<LoteResponse>(`${root}/video/lote`, fd);
-    },
+    mutationFn: (body) => api.post<LoteResponse>(`${root}/video/lote/repartir`, body),
   });
 }
 
