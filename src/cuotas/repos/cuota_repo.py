@@ -75,11 +75,19 @@ def marcar(tipo: str, referencia: str, usuario: str = "", subido: bool = True) -
 
 
 def ajustar(tipo: str, valor: int, usuario: str = "") -> dict:
-    """Fija el ajuste manual del día (lo subido fuera de la app)."""
+    """Fija el ajuste manual del día (lo subido fuera de la app).
+
+    Admite NEGATIVOS: poner -3 resta tres al contador. Hace falta para cuando
+    se marca de más (un producto tocado dos veces, algo que al final no se
+    publicó), que antes no había forma de deshacer si ya no estaba marcado.
+
+    El ajuste se guarda tal cual; lo que no puede bajar de cero es el TOTAL, y
+    de eso se encarga `resumen`.
+    """
     if tipo not in TIPOS:
         raise ValueError(f"tipo debe ser {' o '.join(TIPOS)}, recibido: {tipo!r}")
     doc = _doc(usuario)
-    doc[f"ajuste_{tipo}"] = max(0, int(valor))
+    doc[f"ajuste_{tipo}"] = int(valor)
     _guardar(usuario, doc)
     return resumen(usuario)
 
@@ -87,6 +95,46 @@ def ajustar(tipo: str, valor: int, usuario: str = "") -> dict:
 def hora_de(tipo: str, referencia: str, usuario: str = "") -> float:
     """Cuándo se marcó (0 si no está marcado hoy)."""
     return float((_doc(usuario).get(tipo) or {}).get(referencia) or 0)
+
+
+def resumen_mes(usuario: str = "", mes: str = "") -> dict:
+    """Lo publicado cada día del mes, para el historial.
+
+    `mes` en formato `YYYY-MM` (por defecto, el de hoy). Se leen los días de
+    una tacada (`mget_json`): son 31 claves y pedirlas una a una hacía 31
+    viajes a Redis para pintar un calendario.
+    """
+    from calendar import monthrange
+
+    mes = mes or config.hoy()[:7]
+    try:
+        anio, num = int(mes[:4]), int(mes[5:7])
+        dias = monthrange(anio, num)[1]
+    except (ValueError, IndexError) as e:
+        raise ValueError(f"mes debe ser YYYY-MM, recibido: {mes!r}") from e
+
+    fechas = [f"{mes}-{d:02d}" for d in range(1, dias + 1)]
+    r = get_cuotas_redis()
+    docs = (
+        r.mget_json([_key(usuario, f) for f in fechas])
+        if r.is_available() else [None] * len(fechas)
+    )
+
+    salida = {"mes": mes, "usuario": _slug(usuario), "dias": [], "total": {}}
+    totales = dict.fromkeys(TIPOS, 0)
+    for fecha, doc in zip(fechas, docs):
+        doc = doc or {}
+        dia = {"fecha": fecha}
+        for tipo in TIPOS:
+            n = max(0, len(doc.get(tipo) or {}) + int(doc.get(f"ajuste_{tipo}") or 0))
+            dia[tipo] = n
+            totales[tipo] += n
+        salida["dias"].append(dia)
+    salida["total"] = totales
+    salida["topes"] = {
+        "videos": config.TOPE_VIDEOS, "carruseles": config.TOPE_CARRUSELES,
+    }
+    return salida
 
 
 def resumen(usuario: str = "") -> dict:
@@ -100,7 +148,9 @@ def resumen(usuario: str = "") -> dict:
     for tipo, (tope, aviso) in topes.items():
         marcados = doc.get(tipo) or {}
         ajuste = int(doc.get(f"ajuste_{tipo}") or 0)
-        usados = len(marcados) + ajuste
+        # Nunca por debajo de cero: un ajuste negativo puede pasarse de lo que
+        # hay marcado y un contador en -2 no significa nada.
+        usados = max(0, len(marcados) + ajuste)
         salida[tipo] = {
             "usados": usados,
             "marcados": len(marcados),

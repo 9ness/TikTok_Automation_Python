@@ -1,6 +1,7 @@
 """Topes diarios de publicación (transversal a todos los nichos).
 
 - GET  /api/v1/cuotas/hoy    → lo publicado hoy y sus topes
+- GET  /api/v1/cuotas/mes    → lo publicado cada día del mes (historial)
 - POST /api/v1/cuotas/ajuste → fija a mano lo subido fuera de la app
 
 El contador NO es de un nicho: el límite es de la cuenta de TikTok, y da igual
@@ -36,6 +37,18 @@ class AjusteRequest(BaseModel):
 @router.get("/hoy")
 def cuota_hoy(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
     return cuota_repo.resumen(usuario)
+
+
+@router.get("/mes")
+def cuota_mes(
+    mes: str = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Lo publicado cada día del mes. `mes` en `YYYY-MM` (por defecto, este)."""
+    try:
+        return cuota_repo.resumen_mes(usuario, mes)
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
 
 
 @router.post("/ajuste")

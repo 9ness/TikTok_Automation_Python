@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useAjustarCuota, useCuotaHoy, type CuotaTipo } from "@/lib/queries/cuotas";
+import {
+  useAjustarCuota,
+  useCuotaHoy,
+  useCuotaMes,
+  type CuotaTipo,
+} from "@/lib/queries/cuotas";
 
 /** Lo que se puede publicar hoy en la cuenta, en una sola línea.
  *
@@ -19,32 +24,9 @@ import { useAjustarCuota, useCuotaHoy, type CuotaTipo } from "@/lib/queries/cuot
 export function BarraCuota() {
   const cuota = useCuotaHoy();
   const [abierto, setAbierto] = useState(false);
-  // El color de la barra se ve de reojo, pero al llegar al umbral hay que
-  // ENTERARSE: salta un aviso, una sola vez por tipo y día (si no, cada
-  // refresco del contador sería otro toast).
-  const avisado = useRef<Record<string, boolean>>({});
-  useEffect(() => {
-    const d = cuota.data;
-    if (!d) return;
-    for (const [tipo, etiqueta] of [
-      ["videos", "vídeos"],
-      ["carruseles", "carruseles"],
-    ] as const) {
-      const c = d[tipo];
-      const clave = `${d.fecha}:${tipo}:${c.lleno ? "tope" : "aviso"}`;
-      if (!c.avisar || avisado.current[clave]) continue;
-      avisado.current[clave] = true;
-      const quedan = Math.max(0, c.tope - c.usados);
-      if (c.lleno) {
-        toast.error(`Tope de ${etiqueta} del día: ${c.usados}/${c.tope}. Para ya.`);
-      } else {
-        toast.warning(
-          `Llevas ${c.usados} ${etiqueta} hoy — te quedan ${quedan} para el tope de ${c.tope}.`,
-        );
-      }
-    }
-  }, [cuota.data]);
-
+  const [verHistorial, setVerHistorial] = useState(false);
+  // Sin avisos emergentes al cruzar el umbral: el color de la barra y el ⚠️
+  // ya lo dicen, y saltaban en medio de lo que estuvieras haciendo.
   if (!cuota.data) return null;
   const { videos, carruseles } = cuota.data;
 
@@ -68,6 +50,14 @@ export function BarraCuota() {
           </p>
           <Ajuste tipo="videos" etiqueta="Vídeos ya subidos hoy" datos={videos} />
           <Ajuste tipo="carruseles" etiqueta="Carruseles ya subidos hoy" datos={carruseles} />
+          <button
+            type="button"
+            onClick={() => setVerHistorial((v) => !v)}
+            className="w-full rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+          >
+            📅 {verHistorial ? "Ocultar historial" : "Historial del mes"}
+          </button>
+          {verHistorial && <Historial />}
         </div>
       )}
     </div>
@@ -120,9 +110,10 @@ function Ajuste({
   return (
     <div className="flex items-center gap-2">
       <span className="min-w-0 flex-1 truncate text-[11px]">{etiqueta}</span>
+      {/* Sin `min`: se admiten negativos. Poner -3 resta tres, que es la única
+          forma de deshacer un marcado de más cuando ya no está marcado. */}
       <input
         type="number"
-        min={0}
         value={valor}
         onChange={(e) => setValor(e.target.value)}
         className="w-16 rounded-md border border-border/60 bg-background px-2 py-1 text-xs"
@@ -147,6 +138,78 @@ function Ajuste({
       <span className="shrink-0 text-[10px] text-muted-foreground">
         +{datos.marcados} marcados
       </span>
+    </div>
+  );
+}
+
+/** Calendario del mes: cuántos vídeos y carruseles se publicaron cada día.
+ *
+ *  El contador diario se reinicia a medianoche y hasta ahora lo de ayer se
+ *  perdía de vista. Cada día guarda su propia clave en Redis, así que el
+ *  historial ya estaba: solo faltaba enseñarlo.
+ */
+function Historial() {
+  const [desfase, setDesfase] = useState(0);
+  const mes = useMemo(() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + desfase);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [desfase]);
+  const datos = useCuotaMes(mes, true);
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="space-y-1.5 rounded-md border border-border/60 p-2">
+      <div className="flex items-center justify-between text-[11px]">
+        <button
+          type="button"
+          onClick={() => setDesfase((d) => d - 1)}
+          className="rounded px-1.5 text-muted-foreground transition hover:text-foreground"
+        >
+          ‹
+        </button>
+        <span className="font-semibold">{mes}</span>
+        <button
+          type="button"
+          disabled={desfase >= 0}
+          onClick={() => setDesfase((d) => Math.min(0, d + 1))}
+          className="rounded px-1.5 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+        >
+          ›
+        </button>
+      </div>
+
+      {datos.data && (
+        <p className="text-[10px] text-muted-foreground">
+          Total del mes: <b className="text-foreground">{datos.data.total.videos}</b> vídeos ·{" "}
+          <b className="text-foreground">{datos.data.total.carruseles}</b> carruseles
+        </p>
+      )}
+
+      {/* Solo los días con algo: un calendario entero de casillas vacías ocupa
+          media pantalla en el móvil para no decir nada. */}
+      <div className="max-h-48 space-y-0.5 overflow-y-auto">
+        {(datos.data?.dias ?? [])
+          .filter((d) => d.videos || d.carruseles)
+          .map((d) => (
+            <div
+              key={d.fecha}
+              className={`flex items-center gap-2 rounded px-1.5 py-0.5 text-[10px] ${
+                d.fecha === hoy ? "bg-muted font-semibold" : ""
+              }`}
+            >
+              <span className="w-10 shrink-0 text-muted-foreground">
+                {d.fecha.slice(8)}/{d.fecha.slice(5, 7)}
+              </span>
+              <span className="text-emerald-500">🎬 {d.videos}</span>
+              <span className="text-sky-500">🎠 {d.carruseles}</span>
+            </div>
+          ))}
+        {datos.data && !datos.data.dias.some((d) => d.videos || d.carruseles) && (
+          <p className="text-[10px] text-muted-foreground">Nada publicado este mes.</p>
+        )}
+      </div>
     </div>
   );
 }
