@@ -501,7 +501,7 @@ function DayProductCard({
               )}
               {e.commission_eur > 0 && <> · 💰 {e.commission_eur.toFixed(2)}€/venta</>}
               {" · "}🎯 {e.problem_videos_count}
-              {aiReady && <> · 🎥 {e.presets_count} · 🎠 {e.carousels_count}</>}
+              {aiReady && <> · 🎥 {e.presets_count} · 📸 {e.carousels_count}</>}
             </p>
             {/* Cómo encontrar el producto.
                 NO se pone enlace a `tiktok.com/view/product/<id>`: TikTok lo
@@ -734,7 +734,7 @@ function ProductPrompts({ productId }: { productId: string }) {
       <div className="mb-2 flex flex-wrap gap-1.5">
         <TabBtn active={tab === "problem"} onClick={() => setTab("problem")}>🎯 Vídeos problema ({(problemVideos.length || (product.problem_videos?.length ?? 0))})</TabBtn>
         <TabBtn active={tab === "video"} onClick={() => setTab("video")}>🎥 Vídeos IA ({presets.length})</TabBtn>
-        <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>🎠 Carruseles ({carousels.length})</TabBtn>
+        <TabBtn active={tab === "carousel"} onClick={() => setTab("carousel")}>📸 Carruseles ({carousels.length})</TabBtn>
         <TabBtn active={tab === "templates"} onClick={() => setTab("templates")}>⚡ Plantillas ({tpls.data?.templates.length ?? 0})</TabBtn>
         <TabBtn active={tab === "hooks"} onClick={() => setTab("hooks")}>🎣 Hooks BOFU</TabBtn>
       </div>

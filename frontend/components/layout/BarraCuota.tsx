@@ -210,7 +210,7 @@ function Historial() {
           return (
             <div
               key={d.fecha}
-              title={`${d.fecha}: ${d.videos} vídeos · ${d.carruseles} carruseles`}
+              title={`${d.fecha}: 🎬 ${d.videos} vídeos · 📸 ${d.carruseles} carruseles`}
               className={`rounded border p-0.5 leading-tight ${
                 esHoy
                   ? "border-foreground/60"
@@ -235,8 +235,8 @@ function Historial() {
         })}
       </div>
       <p className="text-[9px] text-muted-foreground">
-        <span className="text-emerald-500">verde</span> vídeos ·{" "}
-        <span className="text-sky-500">azul</span> carruseles
+        <span className="text-emerald-500">🎬 vídeos</span> ·{" "}
+        <span className="text-sky-500">📸 carruseles</span>
       </p>
     </div>
   );
