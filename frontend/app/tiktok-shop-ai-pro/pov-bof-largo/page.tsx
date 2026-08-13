@@ -31,6 +31,7 @@ import {
   verTopVendidos,
 } from "@/lib/topVendidos";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -85,6 +86,15 @@ function err(e: unknown): string {
 }
 
 const CAR_POR_SEG = 18.2;
+
+/** Los dos flujos de la carpeta: el guion lleva la frase de plazos o no, según
+ *  el precio. Se bajan por separado porque no se generan igual. */
+type Filtro = "todas" | "plazos" | "viejo";
+
+function cuadra(p: { modo_plazos: boolean }, filtro: Filtro): boolean {
+  if (filtro === "todas") return true;
+  return filtro === "plazos" ? p.modo_plazos : !p.modo_plazos;
+}
 
 /** EchoTik apagado (ver la misma bandera en el Nicho POV BOF). */
 const MOSTRAR_ECHOTIK = false;
@@ -151,6 +161,8 @@ export default function PovBofLargoPage() {
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
   const conPlazos = items.filter((p) => p.clean_photo_id && p.modo_plazos).length;
   const conViejo = items.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
+  const videosPlazos = items.filter((p) => p.video_path && p.modo_plazos).length;
+  const videosViejo = items.filter((p) => p.video_path && !p.modo_plazos).length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
   const subidos = items.filter((p) => p.uploaded).length;
@@ -205,11 +217,15 @@ export default function PovBofLargoPage() {
     );
   }
 
-  async function downloadVideos() {
+  async function downloadVideos(filtro: Filtro = "todas") {
     if (!folder) return;
-    const conV = items.filter((p) => p.video_path);
+    const conV = items.filter((p) => p.video_path && cuadra(p, filtro));
     if (!conV.length) {
-      toast.error("Ningún producto tiene vídeo montado todavía");
+      toast.error(
+        filtro === "todas"
+          ? "Ningún producto tiene vídeo montado todavía"
+          : `Ningún vídeo ${filtro === "plazos" ? "de plazos" : "de guion normal"} montado`,
+      );
       return;
     }
     setDownloadingVideos(true);
@@ -218,7 +234,8 @@ export default function PovBofLargoPage() {
         setVideoProgress(`${i + 1}/${conV.length}`);
         const a = document.createElement("a");
         a.href = videoLargoUrl(activaSource, folder, p.producto, p.video_listo_at ?? 0, true);
-        a.download = `${folder}_${p.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        const sufijo = filtro === "todas" ? "" : `_${filtro}`;
+        a.download = `${folder}_${p.producto}${sufijo}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -234,13 +251,9 @@ export default function PovBofLargoPage() {
   /** `filtro` separa los dos flujos: los de plazos llevan un guion con la
    *  frase de financiación y los demás el de siempre, así que conviene
    *  generarlos por tandas y no ir mirando el precio producto a producto. */
-  async function downloadCleanPhotos(filtro: "todas" | "plazos" | "viejo" = "todas") {
+  async function downloadCleanPhotos(filtro: Filtro = "todas") {
     if (!folder) return;
-    const conF = items.filter(
-      (p) =>
-        p.clean_photo_id &&
-        (filtro === "todas" || (filtro === "plazos" ? p.modo_plazos : !p.modo_plazos)),
-    );
+    const conF = items.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!conF.length) {
       toast.error(
         filtro === "todas"
@@ -850,66 +863,52 @@ export default function PovBofLargoPage() {
               <p className="text-[11px] font-semibold">Descargar</p>
               <p className="truncate text-[10px] text-muted-foreground">fotos para generar · vídeos ya montados</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
+            {/* Una fila por cosa: el total y los dos flujos al lado (ver
+                POV BOF), para bajar solo lo que toca. */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <BotonDescarga
                 onClick={() => void downloadCleanPhotos()}
-                disabled={downloadingPhotos || !totalProductos}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                {downloadingPhotos ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {downloadProgress}
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Fotos ({conFoto}/{totalProductos})</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => void downloadVideos()}
-                disabled={downloadingVideos || !conVideo}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                {downloadingVideos ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {videoProgress}
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Vídeos ({conVideo}/{totalProductos})</span>
-                  </>
-                )}
-              </button>
+                cargando={downloadingPhotos}
+                progreso={downloadProgress}
+                disabled={!conFoto}
+                etiqueta={`Fotos ${conFoto}/${totalProductos}`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadCleanPhotos("viejo")}
+                cargando={false}
+                disabled={downloadingPhotos || !conViejo}
+                etiqueta={`Normal (${conViejo})`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadCleanPhotos("plazos")}
+                cargando={false}
+                disabled={downloadingPhotos || !conPlazos}
+                etiqueta={`💳 Plazos (${conPlazos})`}
+                acento
+              />
             </div>
-            {/* Los dos flujos por separado. Solo salen si la carpeta tiene de
-                los dos tipos: sin precios leídos no hay nada que separar. */}
-            {conPlazos > 0 && conViejo > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void downloadCleanPhotos("plazos")}
-                  disabled={downloadingPhotos}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-[11px] text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">💳 Con plazos ({conPlazos})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void downloadCleanPhotos("viejo")}
-                  disabled={downloadingPhotos}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">Guion viejo ({conViejo})</span>
-                </button>
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-1.5">
+              <BotonDescarga
+                onClick={() => void downloadVideos()}
+                cargando={downloadingVideos}
+                progreso={videoProgress}
+                disabled={!conVideo}
+                etiqueta={`Vídeos ${conVideo}/${totalProductos}`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadVideos("viejo")}
+                cargando={false}
+                disabled={downloadingVideos || !videosViejo}
+                etiqueta={`Normal (${videosViejo})`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadVideos("plazos")}
+                cargando={false}
+                disabled={downloadingVideos || !videosPlazos}
+                etiqueta={`💳 Plazos (${videosPlazos})`}
+                acento
+              />
+            </div>
           </div>
 
           {productosQ.isLoading && (

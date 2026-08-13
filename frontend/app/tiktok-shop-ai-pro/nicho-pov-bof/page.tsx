@@ -67,6 +67,7 @@ import {
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -87,6 +88,16 @@ import type {
 const MOSTRAR_ECHOTIK = false;
 // Ritmo medido con las voces reales de Fish, igual que en el POV BOF Largo.
 const CAR_POR_SEG = 18.2;
+
+/** Los dos flujos de la carpeta. Un producto lleva guion de plazos o el de
+ *  siempre según su precio, y cada uno se genera distinto (dos clips o uno),
+ *  así que se bajan por separado. `todas` es la carpeta entera. */
+type Filtro = "todas" | "plazos" | "viejo";
+
+function cuadra(p: { modo_plazos: boolean }, filtro: Filtro): boolean {
+  if (filtro === "todas") return true;
+  return filtro === "plazos" ? p.modo_plazos : !p.modo_plazos;
+}
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
@@ -185,6 +196,14 @@ export default function NichoPovBofPage() {
   const conViejo = (productos.data ?? []).filter(
     (p) => p.clean_photo_id && !p.modo_plazos,
   ).length;
+  // Lo mismo para los vídeos ya montados: bajar 20 para quedarse con 3 es lo
+  // que se quería evitar.
+  const videosPlazos = (productos.data ?? []).filter(
+    (p) => p.video_path && p.modo_plazos,
+  ).length;
+  const videosViejo = (productos.data ?? []).filter(
+    (p) => p.video_path && !p.modo_plazos,
+  ).length;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
   const subidos = (productos.data ?? []).filter((p) => p.uploaded).length;
   const enEscaparate = (productos.data ?? []).filter((p) => p.en_escaparate).length;
@@ -205,11 +224,15 @@ export default function NichoPovBofPage() {
    *
    *  Igual que las fotos: el navegador móvil cancela las descargas
    *  simultáneas, así que van en fila con un retardo entre medias. */
-  async function downloadVideos() {
+  async function downloadVideos(filtro: Filtro = "todas") {
     if (!folder || !productos.data?.length) return;
-    const items = productos.data.filter((p) => p.video_path);
+    const items = productos.data.filter((p) => p.video_path && cuadra(p, filtro));
     if (!items.length) {
-      toast.error("Ningún producto tiene vídeo montado todavía");
+      toast.error(
+        filtro === "todas"
+          ? "Ningún producto tiene vídeo montado todavía"
+          : `Ningún vídeo ${filtro === "plazos" ? "de plazos" : "de guion normal"} montado`,
+      );
       return;
     }
     setDownloadingVideos(true);
@@ -218,7 +241,8 @@ export default function NichoPovBofPage() {
         setVideoProgress(`${i + 1}/${items.length}`);
         const a = document.createElement("a");
         a.href = buildVideoUrl(source, folder, p.producto, p.video_listo_at ?? 0, true);
-        a.download = `${folder}_${p.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        const sufijo = filtro === "todas" ? "" : `_${filtro}`;
+        a.download = `${folder}_${p.producto}${sufijo}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -234,14 +258,9 @@ export default function NichoPovBofPage() {
   /** `filtro` separa los dos flujos, que no se generan igual: los de plazos
    *  necesitan DOS clips y los de siempre uno solo, así que bajar la carpeta
    *  entera obligaba a ir mirando el precio producto a producto. */
-  async function downloadCleanPhotos(filtro: "todas" | "plazos" | "viejo" = "todas") {
+  async function downloadCleanPhotos(filtro: Filtro = "todas") {
     if (!folder || !productos.data?.length) return;
-    const items = productos.data.filter(
-      (p) =>
-        p.clean_photo_id &&
-        (filtro === "todas" ||
-          (filtro === "plazos" ? p.modo_plazos : !p.modo_plazos)),
-    );
+    const items = productos.data.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!items.length) {
       toast.error(
         filtro === "todas"
@@ -849,70 +868,53 @@ export default function NichoPovBofPage() {
               <p className="text-[11px] font-semibold">Descargar</p>
               <p className="truncate text-[10px] text-muted-foreground">fotos para generar · vídeos ya montados</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => void downloadCleanPhotos()}
-              disabled={downloadingPhotos || !productos.data?.length}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              {downloadingPhotos ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {downloadProgress}
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">Fotos ({conFoto}/{totalProductos})</span>
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => void downloadVideos()}
-              disabled={downloadingVideos || !conVideo}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              {downloadingVideos ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Descargando {videoProgress}
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    Vídeos ({conVideo}/{totalProductos})
-                  </span>
-                </>
-              )}
-            </button>
+            {/* Una fila por cosa: el total y los dos flujos al lado, para
+                bajar solo lo que toca sin ir mirando el precio producto a
+                producto. */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <BotonDescarga
+                onClick={() => void downloadCleanPhotos()}
+                cargando={downloadingPhotos}
+                progreso={downloadProgress}
+                disabled={!conFoto}
+                etiqueta={`Fotos ${conFoto}/${totalProductos}`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadCleanPhotos("viejo")}
+                cargando={false}
+                disabled={downloadingPhotos || !conViejo}
+                etiqueta={`Normal (${conViejo})`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadCleanPhotos("plazos")}
+                cargando={false}
+                disabled={downloadingPhotos || !conPlazos}
+                etiqueta={`💳 Plazos (${conPlazos})`}
+                acento
+              />
             </div>
-            {/* Los dos flujos por separado: el de plazos son dos clips por
-                producto y el de siempre uno. Solo aparecen si la carpeta
-                tiene de los dos tipos — con precios sin leer no hay nada que
-                separar. */}
-            {conPlazos > 0 && conViejo > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void downloadCleanPhotos("plazos")}
-                  disabled={downloadingPhotos}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-[11px] text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">💳 Con plazos ({conPlazos})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void downloadCleanPhotos("viejo")}
-                  disabled={downloadingPhotos}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">Guion viejo ({conViejo})</span>
-                </button>
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-1.5">
+              <BotonDescarga
+                onClick={() => void downloadVideos()}
+                cargando={downloadingVideos}
+                progreso={videoProgress}
+                disabled={!conVideo}
+                etiqueta={`Vídeos ${conVideo}/${totalProductos}`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadVideos("viejo")}
+                cargando={false}
+                disabled={downloadingVideos || !videosViejo}
+                etiqueta={`Normal (${videosViejo})`}
+              />
+              <BotonDescarga
+                onClick={() => void downloadVideos("plazos")}
+                cargando={false}
+                disabled={downloadingVideos || !videosPlazos}
+                etiqueta={`💳 Plazos (${videosPlazos})`}
+                acento
+              />
+            </div>
           </div>
 
           {productos.isLoading && (
