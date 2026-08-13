@@ -495,3 +495,64 @@ export function buildCleanPhotoDownloadUrl(
     folder,
   )}&producto=${encodeURIComponent(producto)}&variante=${variante}${qs}`;
 }
+
+// --- Subida en tanda -------------------------------------------------------
+
+export interface LoteItem {
+  token: string;
+  archivo: string;
+  producto: string;
+  por_que: string;
+}
+
+export interface LoteResponse {
+  source: string;
+  folder: string;
+  items: LoteItem[];
+  reconocidos: number;
+}
+
+/** Sube varios vídeos de golpe y devuelve de qué producto cree que es cada uno.
+ *  NO encola nada: el operador repasa y confirma después. */
+export function useSubirLote() {
+  return useMutation<
+    LoteResponse,
+    Error,
+    { source: string; folder: string; productos: string[]; files: File[] }
+  >({
+    mutationFn: (v) => {
+      const fd = new FormData();
+      for (const f of v.files) fd.append("files", f);
+      fd.append("source", v.source);
+      fd.append("folder", v.folder);
+      fd.append("productos", v.productos.join(","));
+      return api.post<LoteResponse>(`${ROOT}/video/lote`, fd);
+    },
+  });
+}
+
+export function useConfirmarLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { encolados: number; pendientes: number; mensajes: string[] },
+    Error,
+    {
+      source: string;
+      folder: string;
+      items: { token: string; producto: string }[];
+      sexo: string;
+      con_gancho: boolean;
+      con_titulo: boolean;
+      con_cta: boolean;
+      con_flecha: boolean;
+    }
+  >({
+    mutationFn: (body) =>
+      api.post<{ encolados: number; pendientes: number; mensajes: string[] }>(
+        `${ROOT}/video/lote/confirmar`,
+        body,
+      ),
+    onSuccess: (_r, v) =>
+      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.productos(v.source, v.folder) }),
+  });
+}

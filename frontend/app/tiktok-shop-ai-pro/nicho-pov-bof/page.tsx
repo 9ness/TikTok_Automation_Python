@@ -68,6 +68,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -933,6 +934,12 @@ export default function NichoPovBofPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
               {(productos.error as Error)?.message ?? "No se pudieron cargar los productos."}
             </p>
+          )}
+
+          {/* Subir toda la tanda de golpe. Va justo antes de las fichas: es lo
+              que se hace al volver de generar los vídeos. */}
+          {folder && productos.data && productos.data.length > 0 && (
+            <SubidaMasiva source={source} folder={folder} productos={productos.data} />
           )}
 
           {/* Solo en Top vendidos: ahí el orden importa (los que más venden

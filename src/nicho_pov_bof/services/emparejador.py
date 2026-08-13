@@ -83,9 +83,15 @@ def _prompt(n_videos: int, fotos_por_video: list[int], productos: list[str]) -> 
         "- Puede haber productos parecidos (varios carritos, varios colchones). "
         "Fíjate en la forma exacta, el color, el material, las ruedas, el "
         "número de plazas y los detalles, no en el tipo genérico.\n"
-        "- Si de verdad no reconoces un vídeo en el catálogo, deja su producto "
-        'en "".\n\n'
-        'Responde SOLO: {"videos": [{"video": 1, "producto": "<id>", '
+        "- MUY IMPORTANTE: puede que el producto del vídeo NO esté en el "
+        "catálogo. No es una lista donde haya que elegir por fuerza. Si el del "
+        "vídeo no es NINGUNO de los de arriba —aunque se le parezca en tipo, "
+        "color o estilo—, deja su producto en \"\". Un vídeo mal asignado "
+        "estropea el montaje; decir que no está no cuesta nada.\n"
+        "- Antes de dar un id, comprueba que coinciden los DETALLES concretos "
+        "(mismo estampado, mismas etiquetas, mismo remate lateral), no solo "
+        "que sean el mismo tipo de producto.\n\n"
+        'Responde SOLO: {"videos": [{"video": 1, "producto": "<id> o vacío", '
         '"por_que": "6 palabras"}, ...]}'
     )
 

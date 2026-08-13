@@ -34,6 +34,10 @@ from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     GuionPlazosRequest,
+    VideoLoteConfirmarRequest,
+    VideoLoteConfirmarResponse,
+    VideoLoteItem,
+    VideoLoteResponse,
     BuscarProductosResponse,
     ExtraerTextosRequest,
     EchoTikCredsRequest,
@@ -517,6 +521,151 @@ def download_clean_photo(
         media_type=clean.get("mime") or "image/jpeg",
         filename=filename,  # Starlette pone Content-Disposition: attachment
         headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Subida en tanda: varios vídeos de golpe, repartidos solos
+# ---------------------------------------------------------------------------
+_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _ruta_de_token(token: str) -> Path:
+    """Resuelve el identificador de un bruto ya subido.
+
+    El cliente devuelve el token tal cual se lo dimos, así que hay que tratarlo
+    como lo que es: texto que llega de fuera. Se valida el formato y se
+    comprueba que el fichero cae DENTRO de la carpeta de subidas — sin esto, un
+    `../` apuntaría a cualquier sitio del disco.
+    """
+    from src.api.temp_storage import upload_subdir
+
+    if not _TOKEN_RE.match(token or ""):
+        raise _bad_request(f"identificador de vídeo inválido: {token!r}")
+    base = upload_subdir("nicho_pov_bof").resolve()
+    ruta = (base / token).resolve()
+    if base not in ruta.parents or not ruta.is_file():
+        raise _bad_request("ese vídeo ya no está (se purgan a las 24h). Vuelve a subirlo.")
+    return ruta
+
+
+@router.post("/video/lote", response_model=VideoLoteResponse)
+async def subir_lote(
+    files: Annotated[list[UploadFile], File()],
+    source: Annotated[str, Form()],
+    folder: Annotated[str, Form()],
+    # Los productos a los que va la tanda, separados por comas. Cuantos menos,
+    # mejor empareja: es la lista contra la que compara.
+    productos: Annotated[str, Form()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> VideoLoteResponse:
+    """Sube varios vídeos de golpe y dice de qué producto es cada uno.
+
+    NO encola nada: devuelve el reparto propuesto para que el operador lo
+    repase. El montaje se lanza después con `/video/lote/confirmar`.
+
+    Se sube una sola vez: los brutos se quedan en la carpeta de subidas y el
+    confirmar los reusa por su identificador.
+    """
+    from src.api.temp_storage import upload_subdir
+    from src.nicho_pov_bof.services import emparejador
+
+    dest = upload_subdir("nicho_pov_bof")
+    guardados: list[tuple[str, str]] = []  # (token, nombre original)
+    for f in files:
+        nombre = (f.filename or "").lower()
+        ext = next((e for e in _ALLOWED_VIDEO_EXTS if nombre.endswith(e)), "")
+        if not ext:
+            raise _bad_request(
+                f"Formato de vídeo no soportado: {f.filename!r}. "
+                f"Acepta: {', '.join(sorted(_ALLOWED_VIDEO_EXTS))}."
+            )
+        stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
+        token = f"lote_{stub}_{int(time.time() * 1000)}_{len(guardados)}{ext}"
+        try:
+            with (dest / token).open("wb") as out:
+                shutil.copyfileobj(f.file, out)
+        except Exception as e:
+            raise APIError(f"No se pudo guardar {f.filename!r}: {e}", status_code=500) from e
+        finally:
+            await f.close()
+        guardados.append((token, f.filename or token))
+
+    candidatos = [p.strip() for p in (productos or "").split(",") if p.strip()]
+    if not candidatos:
+        # Sin lista, se compara contra todo lo que tenga foto en la carpeta.
+        candidatos = [
+            p.producto for p in _list_productos(source, folder, None, usuario).items
+            if p.clean_photo_id
+        ]
+
+    reparto = emparejador.emparejar(
+        source, folder, [dest / t for t, _ in guardados], candidatos,
+    )
+    items = [
+        VideoLoteItem(
+            token=token, archivo=nombre,
+            producto=str(r.get("producto") or ""), por_que=str(r.get("por_que") or ""),
+        )
+        for (token, nombre), r in zip(guardados, reparto)
+    ]
+    return VideoLoteResponse(
+        source=source, folder=folder, items=items,
+        reconocidos=sum(1 for i in items if i.producto),
+    )
+
+
+@router.post("/video/lote/confirmar", response_model=VideoLoteConfirmarResponse)
+def confirmar_lote(
+    body: VideoLoteConfirmarRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> VideoLoteConfirmarResponse:
+    """Encola el montaje de cada vídeo ya repasado por el operador.
+
+    Los productos de plazos llevan DOS clips, así que ahí el vídeo se guarda en
+    el primer hueco libre y solo se encola cuando están los dos — igual que al
+    subirlos de uno en uno.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    encolados, pendientes, mensajes = 0, 0, []
+    for item in body.items:
+        if not item.producto:
+            continue
+        ruta = _ruta_de_token(item.token)
+        prod = product_repo.get_product(body.source, body.folder, item.producto, usuario)
+        flags = {
+            "con_gancho": bool(body.con_gancho), "con_titulo": bool(body.con_titulo),
+            "con_cta": bool(body.con_cta), "con_flecha": bool(body.con_flecha),
+        }
+        if _precio_y_modo(prod)[1]:
+            montado_at = float(prod.get("video_listo_at") or 0)
+            slot = 1 if not _clip_vigente(prod.get("clip1_path"), montado_at) else 2
+            r = _plazos_clip(
+                queue, body.source, body.folder, item.producto, slot, ruta,
+                body.sexo, usuario, **flags,
+            )
+            if r.job_id:
+                encolados += 1
+            else:
+                pendientes += 1
+                mensajes.append(f"Producto {item.producto}: {r.message}")
+            continue
+
+        job = queue.enqueue(
+            JobMode.NICHO_POV_BOF_VIDEO,
+            title=f"🎬 Nicho POV BOF: producto {item.producto} · {body.folder}",
+            params={
+                "source": body.source, "folder": body.folder,
+                "producto": item.producto, "raw_path": str(ruta),
+                "sexo": body.sexo, "origen": "", **flags,
+            },
+            enqueued_by=usuario or None,
+        )
+        encolados += 1 if job else 0
+    return VideoLoteConfirmarResponse(
+        encolados=encolados, pendientes=pendientes, mensajes=mensajes[:6],
     )
 
 

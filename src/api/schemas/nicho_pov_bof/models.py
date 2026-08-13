@@ -202,6 +202,45 @@ class ExtraerTextosRequest(BaseModel):
     folder: str = Field(..., min_length=1)
 
 
+class VideoLoteItem(BaseModel):
+    """Un vídeo de la tanda, con el producto que le ha tocado."""
+
+    # Identificador del bruto ya subido (no es una ruta: se resuelve en el
+    # servidor contra la carpeta de subidas).
+    token: str
+    archivo: str = ""
+    producto: str = ""
+    # Por qué lo ha emparejado ahí. Se enseña para que el operador pueda
+    # descartarlo de un vistazo sin abrir el vídeo.
+    por_que: str = ""
+
+
+class VideoLoteResponse(BaseModel):
+    source: str
+    folder: str
+    items: list[VideoLoteItem] = Field(default_factory=list)
+    reconocidos: int = 0
+
+
+class VideoLoteConfirmarRequest(BaseModel):
+    """Lo que confirma el operador tras repasar el reparto."""
+
+    source: str
+    folder: str
+    items: list[VideoLoteItem] = Field(default_factory=list)
+    sexo: str = "auto"
+    con_gancho: bool = True
+    con_titulo: bool = True
+    con_cta: bool = True
+    con_flecha: bool = True
+
+
+class VideoLoteConfirmarResponse(BaseModel):
+    encolados: int = 0
+    pendientes: int = 0
+    mensajes: list[str] = Field(default_factory=list)
+
+
 class GuionPlazosRequest(BaseModel):
     """Sortea (o vuelve a sortear) el guion de plazos de un producto."""
 
