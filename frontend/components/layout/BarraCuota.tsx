@@ -158,6 +158,11 @@ function Historial() {
   }, [desfase]);
   const datos = useCuotaMes(mes, true);
   const hoy = new Date().toISOString().slice(0, 10);
+  // Cuántas casillas vacías van antes del día 1 para que caiga en su columna.
+  const hueco = useMemo(() => {
+    const primero = new Date(`${mes}-01T00:00:00`).getDay();
+    return (primero + 6) % 7; // domingo (0) pasa a ser la última columna
+  }, [mes]);
 
   return (
     <div className="space-y-1.5 rounded-md border border-border/60 p-2">
@@ -187,29 +192,52 @@ function Historial() {
         </p>
       )}
 
-      {/* Solo los días con algo: un calendario entero de casillas vacías ocupa
-          media pantalla en el móvil para no decir nada. */}
-      <div className="max-h-48 space-y-0.5 overflow-y-auto">
-        {(datos.data?.dias ?? [])
-          .filter((d) => d.videos || d.carruseles)
-          .map((d) => (
+      {/* Calendario de verdad: una casilla por día y las columnas por día de
+          la semana, para ver de un vistazo en qué días de la semana se publica
+          y cuáles se quedaron en blanco. */}
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] text-muted-foreground">
+        {["L", "M", "X", "J", "V", "S", "D"].map((d, i) => (
+          <span key={`${d}${i}`}>{d}</span>
+        ))}
+        {/* Huecos hasta que empieza el mes. La semana arranca en LUNES, que es
+            como se mira aquí; `getDay()` devuelve 0 para el domingo. */}
+        {Array.from({ length: hueco }).map((_, i) => (
+          <span key={`h${i}`} />
+        ))}
+        {(datos.data?.dias ?? []).map((d) => {
+          const algo = d.videos || d.carruseles;
+          const esHoy = d.fecha === hoy;
+          return (
             <div
               key={d.fecha}
-              className={`flex items-center gap-2 rounded px-1.5 py-0.5 text-[10px] ${
-                d.fecha === hoy ? "bg-muted font-semibold" : ""
+              title={`${d.fecha}: ${d.videos} vídeos · ${d.carruseles} carruseles`}
+              className={`rounded border p-0.5 leading-tight ${
+                esHoy
+                  ? "border-foreground/60"
+                  : algo
+                    ? "border-border/60"
+                    : "border-transparent bg-muted/30"
               }`}
             >
-              <span className="w-10 shrink-0 text-muted-foreground">
-                {d.fecha.slice(8)}/{d.fecha.slice(5, 7)}
-              </span>
-              <span className="text-emerald-500">🎬 {d.videos}</span>
-              <span className="text-sky-500">🎠 {d.carruseles}</span>
+              <div className={`text-[9px] ${esHoy ? "font-bold" : "text-muted-foreground"}`}>
+                {Number(d.fecha.slice(8))}
+              </div>
+              {algo ? (
+                <>
+                  <div className="text-[9px] font-semibold text-emerald-500">{d.videos}</div>
+                  <div className="text-[9px] font-semibold text-sky-500">{d.carruseles}</div>
+                </>
+              ) : (
+                <div className="text-[9px] text-muted-foreground/40">·</div>
+              )}
             </div>
-          ))}
-        {datos.data && !datos.data.dias.some((d) => d.videos || d.carruseles) && (
-          <p className="text-[10px] text-muted-foreground">Nada publicado este mes.</p>
-        )}
+          );
+        })}
       </div>
+      <p className="text-[9px] text-muted-foreground">
+        <span className="text-emerald-500">verde</span> vídeos ·{" "}
+        <span className="text-sky-500">azul</span> carruseles
+      </p>
     </div>
   );
 }
