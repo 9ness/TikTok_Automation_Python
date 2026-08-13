@@ -2307,6 +2307,24 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     sexo = p["sexo"]
     origen = p.get("origen", "")
 
+    # "auto": la mano del vídeo decide la voz. Se hace AQUÍ y no al subir
+    # porque el bruto ya está en disco local (sacar cinco fotogramas es
+    # instantáneo) y porque así el operador no espera mirando la pantalla.
+    #
+    # Sin mano visible o si falla la detección se usa MUJER, que es la regla
+    # del operador: mujer salvo que se vea reloj o vello. Se guarda lo detectado
+    # junto al producto para compararlo luego con lo que él elige a mano — es la
+    # única forma de saber si algún día se puede quitar el selector.
+    deteccion = {}
+    if sexo == "auto":
+        from src.nicho_pov_bof.services import mano
+
+        on_progress(0.04, "🖐️ Mirando la mano del vídeo…")
+        deteccion = mano.detectar(raw_path, on_log=on_log)
+        sexo = deteccion.get("sexo") or "mujer"
+        if not deteccion.get("sexo"):
+            on_log("[nicho_pov_bof] no se ve mano; voz de mujer (la de por defecto)")
+
     on_progress(0.02, "📝 Leyendo textos guardados…")
     textos = product_repo.get_product(source, folder, producto)
     if not textos:
@@ -2394,6 +2412,11 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     product_repo.update_product(
         source, folder, producto, usuario=quien,
         video_path=str(dest_path), video_listo_at=int(time.time()),
+        # Qué mano se detectó y con qué voz se montó al final. Guardarlo es lo
+        # que permitirá decidir con datos si el selector puede desaparecer.
+        mano_detectada=deteccion.get("sexo", ""),
+        mano_votos=f"{deteccion.get('votos', 0)}/{deteccion.get('total', 0)}",
+        voz_sexo=sexo,
     )
 
     # El bruto subido y el work_dir de escalones intermedios ya no hacen

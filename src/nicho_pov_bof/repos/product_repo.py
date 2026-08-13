@@ -35,6 +35,8 @@ CAMPOS_PRIVADOS = frozenset({
     # sube SUS clips del mismo producto, así que si esto viviera en el documento
     # compartido el clip de uno dispararía el montaje del otro.
     "clip1_path", "clip2_path", "guion_plazos", "voz_label", "voz_sexo",
+    # Qué mano detectó la IA en el vídeo de ESTE usuario y con cuántos votos.
+    "mano_detectada", "mano_votos",
 })
 
 

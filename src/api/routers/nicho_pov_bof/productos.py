@@ -77,7 +77,10 @@ router = APIRouter(
 )
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
-_ALLOWED_SEXOS = ("hombre", "mujer")
+# "auto" = que lo decida mirando la mano del vídeo (`services/mano.py`). Se
+# resuelve en el montaje, no aquí: el bruto ya está en disco y sacar los
+# fotogramas ahí no hace esperar a quien sube.
+_ALLOWED_SEXOS = ("hombre", "mujer", "auto")
 
 
 def _bad_request(msg: str) -> APIError:
@@ -562,7 +565,9 @@ async def upload_video(
 
     sexo_norm = (sexo or "").strip().lower()
     if sexo_norm not in _ALLOWED_SEXOS:
-        raise _bad_request(f"sexo debe ser 'hombre' o 'mujer', recibido: {sexo!r}")
+        raise _bad_request(
+            f"sexo debe ser 'hombre', 'mujer' o 'auto', recibido: {sexo!r}"
+        )
     # `origen` ya no se valida: no cambia nada del montaje desde que Veo3 dejó
     # de poner marca de agua. Se guarda tal cual llegue (vacío incluido) solo
     # como dato del job.

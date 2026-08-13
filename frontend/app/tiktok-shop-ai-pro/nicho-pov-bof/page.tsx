@@ -1468,11 +1468,10 @@ function ProductoCard({
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
-  // Arranca con la voz que encaja con el producto (mujer en cosmética y
-  // pelo, hombre en el resto). El operador la cambia con un clic si falla.
-  const [sexo, setSexo] = useState<"hombre" | "mujer">(
-    producto.sexo_sugerido === "mujer" ? "mujer" : "hombre",
-  );
+  // Arranca en automático: el montaje mira la mano del vídeo y elige la voz
+  // (mujer salvo que vea reloj o vello, que es la regla del operador). Se
+  // puede forzar a mano si el vídeo es de los dudosos.
+  const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
   // Herramientas de edición, elegibles por separado. Todas marcadas por
   // defecto = el montaje completo; desmarcarlas todas deja el vídeo limpio
   // (solo la voz). Así se puede pedir, p. ej., solo el nombre del producto
@@ -1806,16 +1805,21 @@ function ProductoCard({
           agua en 2026-07 y Kling nunca la puso, así que no hay nada que
           quitar y la elección no cambiaba el resultado. */}
       <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-        {(["hombre", "mujer"] as const).map((s) => (
+        {(["auto", "hombre", "mujer"] as const).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSexo(s)}
+            title={
+              s === "auto"
+                ? "Mira la mano del vídeo y elige la voz: mujer salvo que se vea reloj o vello"
+                : undefined
+            }
             className={`flex-1 rounded px-1.5 py-1 transition ${
               sexo === s ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
             }`}
           >
-            {s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
+            {s === "auto" ? "🖐️ Auto" : s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
           </button>
         ))}
       </div>
