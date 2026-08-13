@@ -1,0 +1,199 @@
+"""De qué producto es cada vídeo que sube el operador.
+
+El vídeo se genera FUERA (Magnific, Veo3, Kling) a partir de la foto limpia del
+producto, así que al volver son diez ficheros con nombres que no dicen nada y
+hay que ir subiéndolos de uno en uno a su ficha. Esto los reparte solos: saca
+unos fotogramas de cada vídeo y le pregunta a Gemini cuál del catálogo es.
+
+Lo que hace que funcione, medido con un vídeo real del operador (un carro de
+jardín, en una carpeta donde había otros DOS carritos parecidos):
+
+- **Se pregunta por todos los vídeos a la vez**, no uno por uno, y se le pide un
+  reparto SIN REPETIR. Dos vídeos no pueden ser del mismo producto, y saberlo
+  descarta la mayoría de las confusiones entre productos gemelos.
+- **Varios fotogramas por vídeo.** En el primero la mano suele tapar medio
+  producto.
+- **El operador elige antes a qué productos sube**, así que el catálogo a
+  comparar son cinco cosas y no treinta.
+
+Nunca decide solo: devuelve la propuesta y la ficha la enseña para confirmar.
+Una asignación equivocada se ve de un vistazo (miniatura del vídeo al lado de
+la foto) y se corrige con un toque; colarla en el montaje sería mucho peor.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Callable
+
+OnLog = Callable[[str], None]
+_noop: OnLog = lambda _m: None
+
+# Fotogramas por vídeo. Tres bastan: el producto sale en plano casi todo el
+# rato y cada uno que se añade encarece la llamada.
+FOTOGRAMAS = 3
+ANCHO = 540
+
+
+def _fotogramas(video: Path, destino: Path, etiqueta: str) -> list[str]:
+    try:
+        dur = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip())
+    except Exception:
+        dur = 10.0
+    salidas = []
+    for i in range(FOTOGRAMAS):
+        # Ni el primer instante ni el último: ahí la mano entra o sale y el
+        # producto se ve a medias.
+        t = dur * (i + 1) / (FOTOGRAMAS + 1)
+        f = destino / f"{etiqueta}_{i}.jpg"
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video),
+             "-frames:v", "1", "-vf", f"scale={ANCHO}:-1", str(f)],
+            capture_output=True,
+        )
+        if f.is_file() and f.stat().st_size > 0:
+            salidas.append(str(f))
+    return salidas
+
+
+def _prompt(n_videos: int, fotos_por_video: list[int], productos: list[str]) -> str:
+    bloques = []
+    i = 1
+    for v, cuantos in enumerate(fotos_por_video, start=1):
+        bloques.append(f"- Vídeo {v}: imágenes {i} a {i + cuantos - 1}")
+        i += cuantos
+    catalogo = "\n".join(
+        f"- Producto {p}: imagen {i + n}" for n, p in enumerate(productos)
+    )
+    return (
+        f"Te paso {i - 1 + len(productos)} imágenes en orden.\n\n"
+        f"FOTOGRAMAS DE {n_videos} VÍDEO(S):\n" + "\n".join(bloques) + "\n\n"
+        f"CATÁLOGO DE PRODUCTOS:\n{catalogo}\n\n"
+        "Cada vídeo se generó a partir de la foto de UNO de esos productos. "
+        "Dime de cuál es cada vídeo.\n\n"
+        "Reglas:\n"
+        "- Un producto no puede repetirse en dos vídeos: reparte.\n"
+        "- Puede haber productos parecidos (varios carritos, varios colchones). "
+        "Fíjate en la forma exacta, el color, el material, las ruedas, el "
+        "número de plazas y los detalles, no en el tipo genérico.\n"
+        "- Si de verdad no reconoces un vídeo en el catálogo, deja su producto "
+        'en "".\n\n'
+        'Responde SOLO: {"videos": [{"video": 1, "producto": "<id>", '
+        '"por_que": "6 palabras"}, ...]}'
+    )
+
+
+def _id_de(valor: object, ids: list[str]) -> str:
+    """Saca el id del producto de lo que conteste el modelo.
+
+    Se le pide el id a secas y contesta "Producto 2" la mitad de las veces.
+    Rechazarlo por eso dejaba sin asignar un vídeo que había reconocido bien.
+    Se acepta el id exacto o el que aparezca como palabra suelta dentro del
+    texto; lo que no se hace nunca es adivinar (un "2" dentro de "12" no vale).
+    """
+    txt = str(valor or "").strip()
+    if not txt:
+        return ""
+    if txt in ids:
+        return txt
+    piezas = re.split(r"[^0-9A-Za-z_]+", txt)
+    for pid in sorted(ids, key=len, reverse=True):
+        if pid in piezas:
+            return pid
+    return ""
+
+
+def emparejar(
+    source: str,
+    folder: str,
+    videos: list[Path],
+    productos: list[str],
+    *,
+    on_log: OnLog = _noop,
+) -> list[dict]:
+    """`[{video: <índice 0..n>, producto, por_que}]`, uno por vídeo.
+
+    `productos` son los candidatos (los que marcó el operador). Si algo falla
+    se devuelve la lista con `producto` vacío: la ficha la enseñará sin asignar
+    y él la rellena, que es mejor que no poder subir nada.
+    """
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+    from src.tiktok_shop.api.gemini import generate_json
+
+    vacio = [{"video": i, "producto": "", "por_que": ""} for i in range(len(videos))]
+    if not videos or not productos:
+        return vacio
+
+    trabajo = Path(tempfile.mkdtemp(prefix="emparejar_"))
+    try:
+        imagenes: list[str] = []
+        por_video: list[int] = []
+        for i, v in enumerate(videos):
+            fr = _fotogramas(Path(v), trabajo, f"v{i}")
+            if not fr:
+                on_log(f"[emparejador] sin fotogramas del vídeo {i + 1}")
+            por_video.append(len(fr))
+            imagenes += fr
+        if not imagenes:
+            return vacio
+
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        pares = {str(p["producto"]): p for p in photo_pairing.pair_folder(fotos)}
+        from src.nicho_pov_bof.services import thumbs
+
+        catalogo, ids = [], []
+        for pid in productos:
+            limpia = (pares.get(str(pid), {}).get("clean") or {}).get("id")
+            if not limpia:
+                continue
+            foto = drive_client.fetch_photo(limpia, suffix=".jpg")
+            # Encogidas: las del Drive vienen a 1-2 MB y diez a tamaño completo
+            # hacían que Gemini devolviera 504. Al ancho del vídeo se distinguen
+            # igual de bien (probado).
+            catalogo.append(str(thumbs.miniatura(foto, ANCHO)))
+            ids.append(str(pid))
+        if not catalogo:
+            on_log("[emparejador] ninguno de los productos elegidos tiene foto limpia")
+            return vacio
+
+        datos = generate_json(
+            _prompt(len(videos), por_video, ids), "", images=imagenes + catalogo,
+        )
+        salida = {i: {"video": i, "producto": "", "por_que": ""} for i in range(len(videos))}
+        usados: set[str] = set()
+        for fila in (datos or {}).get("videos") or []:
+            try:
+                idx = int(fila.get("video", 0)) - 1
+            except (TypeError, ValueError):
+                continue
+            pid = _id_de(fila.get("producto"), ids)
+            # Se ignora lo que no cuadre: un id inventado, uno fuera de los
+            # elegidos o un producto repetido. Vale más dejarlo sin asignar que
+            # meter el vídeo del colchón en el sofá.
+            if idx not in salida or pid not in ids or pid in usados:
+                continue
+            usados.add(pid)
+            salida[idx] = {
+                "video": idx, "producto": pid,
+                "por_que": str(fila.get("por_que") or "")[:80],
+            }
+        hechos = sum(1 for x in salida.values() if x["producto"])
+        on_log(f"[emparejador] {hechos}/{len(videos)} vídeos reconocidos")
+        return [salida[i] for i in range(len(videos))]
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[emparejador] no se pudo emparejar ({e}); se subirán sin asignar")
+        return vacio
+    finally:
+        import shutil
+
+        shutil.rmtree(trabajo, ignore_errors=True)
