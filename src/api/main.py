@@ -342,6 +342,28 @@ _PREFIJOS_PRO = (
 
 
 @app.middleware("http")
+async def _sin_cache_en_json(request, call_next):
+    """Que ninguna respuesta de datos se quede pegada en la caché del cliente.
+
+    Ninguna respuesta JSON llevaba `Cache-Control`, y sin cabecera el WebView de
+    la APK puede reutilizar la anterior por su cuenta: el operador añadía un
+    producto, la app volvía a pedir el listado y le devolvían el de antes, así
+    que parecía que no se había guardado (estaba guardado).
+
+    Solo se pone cuando NADIE la ha puesto ya: las fotos y los vídeos fijan la
+    suya a propósito (un file ID de Drive es inmutable y se cachea un día) y no
+    hay que pisarla.
+    """
+    respuesta = await call_next(request)
+    if (
+        request.url.path.startswith("/api/")
+        and "cache-control" not in respuesta.headers
+    ):
+        respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+@app.middleware("http")
 async def _permisos_por_rol(request, call_next):
     ruta = request.url.path
     if ruta.startswith("/api/") or ruta.startswith("/ws/"):

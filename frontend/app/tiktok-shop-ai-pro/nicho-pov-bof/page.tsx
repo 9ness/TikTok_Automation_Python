@@ -140,6 +140,7 @@ export default function NichoPovBofPage() {
 
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
+  const qc = useQueryClient();
   const productos = useProductos(source, folder);
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
   // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima
@@ -387,7 +388,20 @@ export default function NichoPovBofPage() {
         </div>
 
         {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
-        {source === "mis_productos" && <AltaMiProducto />}
+        {source === "mis_productos" && (
+          /* Al crear se salta a la carpeta donde ha caído: las carpetas se
+             llenan de diez en diez, así que el producto nuevo puede ir a la
+             SIGUIENTE y quedarse invisible mientras miras la anterior. */
+          <AltaMiProducto
+            onCreado={(carpeta) => {
+              setPicked(carpeta);
+              void qc.refetchQueries({
+                queryKey: nichoPovBofKeys.productos(source, carpeta),
+              });
+              void qc.refetchQueries({ queryKey: nichoPovBofKeys.folders(source) });
+            }}
+          />
+        )}
         {source === "top_vendidos" && <SincronizarTopVendidos />}
 
 
@@ -1008,7 +1022,7 @@ function SincronizarTopVendidos() {
 }
 
 
-function AltaMiProducto() {
+function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) {
   const crear = useCrearMiProducto();
   const [limpia, setLimpia] = useState<File | null>(null);
   const [ficha, setFicha] = useState<File | null>(null);
@@ -1025,6 +1039,7 @@ function AltaMiProducto() {
       {
         onSuccess: (r) => {
           toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
+          onCreado?.(r.carpeta);
           setLimpia(null);
           setFicha(null);
           if (refLimpia.current) refLimpia.current.value = "";
