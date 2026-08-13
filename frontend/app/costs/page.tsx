@@ -23,13 +23,17 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-type Program = "all" | "creator_reward" | "tiktok_shop" | "editor_auto";
+type Program = "all" | "creator_reward" | "tiktok_shop" | "editor_auto" | "web";
 
 const PROGRAMS: { value: Program; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "creator_reward", label: "Creator Reward" },
   { value: "tiktok_shop", label: "TikTok Shop" },
   { value: "editor_auto", label: "Editor Auto" },
+  // Lo que se lanza desde la web y no pasa por la cola: obtener textos,
+  // escribir guiones, emparejar los vídeos de una tanda, mirar la mano. Se
+  // agrupa en un "trabajo" por día.
+  { value: "web", label: "Desde la web" },
 ];
 
 const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
@@ -43,6 +47,7 @@ const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
   ],
   tiktok_shop: [{ value: "tiktok_shop", label: "TikTok Shop" }],
   editor_auto: [{ value: "editor_auto", label: "Editor Auto" }],
+  web: [{ value: "web", label: "Desde la web" }],
 };
 
 // Operadores Creator Reward (los que pueden encolar jobs). Si en el futuro
