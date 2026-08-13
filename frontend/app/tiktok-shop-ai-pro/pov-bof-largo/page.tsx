@@ -8,7 +8,6 @@ import {
   ClipboardCopy,
   Download,
   HardDrive,
-  LayoutGrid,
   Loader2,
   Mic,
   RefreshCw,
@@ -96,7 +95,6 @@ export default function PovBofLargoPage() {
   const [source, setSource] = useEstadoRecordado("povbof-largo:fuente", "");
   const activaSource = source || sources.data?.[0]?.slug || "";
 
-  const [showAll, setShowAll] = useState(false);
   const [showFotos, setShowFotos] = useState(false);
   const [picked, setPicked] = useEstadoRecordado<string | null>("povbof-largo:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
@@ -437,18 +435,6 @@ export default function PovBofLargoPage() {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${folders.isFetching ? "animate-spin" : ""}`} />
             </button>
-            <button
-              type="button"
-              onClick={() => setShowAll((v) => !v)}
-              className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] transition sm:text-xs ${
-                showAll
-                  ? "border-violet-500 text-violet-500"
-                  : "border-border/60 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Ver todas
-            </button>
           </div>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -457,6 +443,30 @@ export default function PovBofLargoPage() {
             style={{ width: `${pct}%` }}
           />
         </div>
+        {/* Todas las carpetas a la vista, como en Creativos Pro: se ve de un
+            vistazo cuáles están hechas y se salta a cualquiera sin desplegar
+            nada. Antes iban escondidas tras "Ver todas" y en una rejilla de
+            números, donde no se leía de qué carpeta era cada una. */}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(data?.items ?? []).map((f) => (
+            <button
+              key={f.id || f.name}
+              type="button"
+              onClick={() => setPicked(f.name)}
+              className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+                folder === f.name
+                  ? "border-violet-500 bg-violet-500/15 text-violet-500"
+                  : f.completed
+                    ? "border-emerald-500/40 text-emerald-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {f.completed && "✓ "}
+              {f.name}
+            </button>
+          ))}
+        </div>
+
 
         <button
           type="button"
@@ -587,31 +597,6 @@ export default function PovBofLargoPage() {
         </p>
       )}
 
-      {showAll && data && (
-        <section className="rounded-xl border border-border/60 bg-card p-3">
-          <div className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:grid-cols-8">
-            {data.items.map((f, i) => {
-              const isSel = f.name === folder;
-              return (
-                <button
-                  key={f.id || f.name}
-                  type="button"
-                  onClick={() => setPicked(f.name)}
-                  title={f.name}
-                  className={`flex aspect-square flex-col items-center justify-center rounded-lg border p-0.5 text-xs transition ${
-                    f.completed
-                      ? "border-violet-500/50 bg-violet-500/15 text-violet-500"
-                      : "border-border/60 text-muted-foreground hover:border-foreground/30"
-                  } ${isSel ? "ring-2 ring-violet-500" : ""}`}
-                >
-                  <span className="font-semibold">{i + 1}</span>
-                  {f.completed && <Check className="h-3 w-3" />}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       {data && !folder && (
         <p className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-4 text-center text-sm text-violet-500">

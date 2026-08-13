@@ -8,7 +8,6 @@ import {
   ClipboardCopy,
   Download,
   HardDrive,
-  LayoutGrid,
   Link2 as LinkIcon,
   Loader2,
   Eye,
@@ -91,7 +90,6 @@ const CAR_POR_SEG = 18.2;
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
-  const [showAll, setShowAll] = useState(false);
   // Las fotos en crudo van colapsadas: ocupaban toda la pantalla.
   const [showFotos, setShowFotos] = useState(false);
   // Carpeta elegida a mano. Si es null se usa la "current" del backend
@@ -427,18 +425,6 @@ export default function NichoPovBofPage() {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${folders.isFetching ? "animate-spin" : ""}`} />
             </button>
-            <button
-              type="button"
-              onClick={() => setShowAll((v) => !v)}
-              className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] transition sm:text-xs ${
-                showAll
-                  ? "border-emerald-500 text-emerald-500"
-                  : "border-border/60 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Ver todas
-            </button>
           </div>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -447,6 +433,30 @@ export default function NichoPovBofPage() {
             style={{ width: `${pct}%` }}
           />
         </div>
+        {/* Todas las carpetas a la vista, como en Creativos Pro: se ve de un
+            vistazo cuáles están hechas y se salta a cualquiera sin desplegar
+            nada. Antes iban escondidas tras "Ver todas" y en una rejilla de
+            números, donde no se leía de qué carpeta era cada una. */}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(data?.items ?? []).map((f) => (
+            <button
+              key={f.id || f.name}
+              type="button"
+              onClick={() => setPicked(f.name)}
+              className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+                folder === f.name
+                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                  : f.completed
+                    ? "border-emerald-500/40 text-emerald-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {f.completed && "✓ "}
+              {f.name}
+            </button>
+          ))}
+        </div>
+
 
         {/* Lo que ya vendió es lo que dice qué buscar, así que va ARRIBA y a
             un toque. Antes vivía al final de la página, detrás de todo. */}
@@ -588,32 +598,6 @@ export default function NichoPovBofPage() {
         </p>
       )}
 
-      {/* Rejilla compacta de todas las carpetas (estilo calendario) */}
-      {showAll && data && (
-        <section className="rounded-xl border border-border/60 bg-card p-3">
-          <div className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:grid-cols-8">
-            {data.items.map((f, i) => {
-              const isSel = f.name === folder;
-              return (
-                <button
-                  key={f.id || f.name}
-                  type="button"
-                  onClick={() => setPicked(f.name)}
-                  title={f.name}
-                  className={`flex aspect-square flex-col items-center justify-center rounded-lg border p-0.5 text-xs transition ${
-                    f.completed
-                      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-500"
-                      : "border-border/60 text-muted-foreground hover:border-foreground/30"
-                  } ${isSel ? "ring-2 ring-emerald-500" : ""}`}
-                >
-                  <span className="font-semibold">{i + 1}</span>
-                  {f.completed && <Check className="h-3 w-3" />}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       {/* Carpeta actual */}
       {data && !folder && (
