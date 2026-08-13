@@ -31,6 +31,7 @@ Documentación obligatoria para AÑADIR un nuevo modo o API:
 
 from __future__ import annotations
 
+import threading
 import time
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
@@ -183,11 +184,68 @@ def set_meta(key: str, value: Any) -> None:
     job.meta[key] = value
 
 
+# Un cerrojo para el "trabajo del día" de abajo: la API atiende varias
+# peticiones a la vez y todas escriben en el MISMO documento, así que sin esto
+# dos llamadas simultáneas se pisan y una de las dos se pierde.
+_CERROJO_SUELTO = threading.Lock()
+
+
+def _apuntar_suelto(line: CostLine) -> None:
+    """Guarda un coste que no nace de un trabajo de la cola.
+
+    Todo lo que se lanza desde la web —obtener textos, escribir guiones,
+    emparejar los vídeos, mirar la mano— pasa por un endpoint y no por la cola,
+    así que no tenía tracker y su coste se PERDÍA: el panel marcaba 6 llamadas
+    a Gemini en un mes en el que se hicieron cientos.
+
+    Se acumulan en un trabajo sintético por día (`web-<fecha>`), que es lo que
+    el panel ya sabe leer. Agrupar por día y no por llamada evita convertir el
+    índice del mes en miles de entradas.
+    """
+    redis = _redis()
+    if redis is None:
+        return
+    fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    mes = fecha[:7]
+    jid = f"web-{fecha}"
+    try:
+        with _CERROJO_SUELTO:
+            doc = redis.get_json(f"cost:job:{jid}") or {}
+            nuevo = not doc
+            if nuevo:
+                doc = {
+                    "job_id": jid, "program": "web", "mode": "web",
+                    "user": None, "product_id": None,
+                    "started_at": time.time(), "finished_at": None,
+                    "lines": [], "title": f"Llamadas desde la web · {fecha}",
+                    "meta": {},
+                }
+            doc["lines"].append(asdict(line))
+            doc["finished_at"] = time.time()
+            doc["total_usd"] = round(
+                sum(float(l.get("cost_usd") or 0) for l in doc["lines"]), 6,
+            )
+            redis.set_json(f"cost:job:{jid}", doc)
+            if nuevo:
+                # Solo la primera vez del día. Y se comprueba que no esté YA en
+                # el índice: si alguien borra el documento del día a mano, el id
+                # se queda en la lista y volver a añadirlo haría que el panel
+                # leyera dos veces el mismo día y lo contara doble.
+                for idx in (f"cost:index:web:{mes}", f"cost:index:all:{mes}"):
+                    if jid not in (redis.lrange(idx, 0, 400) or []):
+                        redis.lpush(idx, jid)
+    except Exception:  # noqa: BLE001
+        # El coste es contabilidad, no funcionalidad: si Redis falla, que no se
+        # caiga la petición que el operador está esperando.
+        return
+
+
 def _add_line(line: CostLine) -> None:
     job = _active_tracker.get()
     if job is None:
-        # Sin tracker activo (modo dev / test / call directa fuera de un job).
-        # Nos callamos para no romper el flow — solo se pierde el dato.
+        # Fuera de un trabajo de la cola (llamadas desde la web). Se apuntan
+        # aparte en vez de tirarlas, que es lo que se hacía antes.
+        _apuntar_suelto(line)
         return
     job.lines.append(line)
 
