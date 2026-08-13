@@ -220,6 +220,7 @@ def _listar(
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
     from src.nicho_pov_bof.services import audience, drive_client, photo_pairing
     from src.nicho_pov_bof.services import emojis as emojis_svc
+    from src.nicho_pov_bof.services import top_vendidos
 
     try:
         fotos = [
@@ -237,6 +238,8 @@ def _listar(
     # Escaparate GLOBAL por (tienda|nombre): un producto marcado en cualquier
     # carpeta sale marcado en todas las que sean el mismo producto.
     esc_index = product_repo.escaparate_index(usuario)
+    # Solo devuelve algo en "Top vendidos"; en las demás fuentes es {}.
+    ventas = top_vendidos.ventas_por_producto(source)
 
     items: list[ProductoLargo] = []
     for par in pares:
@@ -267,6 +270,8 @@ def _listar(
             product_url=str(textos.get("product_url") or ""),
             url_match_name=str(textos.get("url_match_name") or ""),
             url_match_score=float(textos.get("url_match_score") or 0.0),
+            ventas=int((ventas.get(f"{folder}|{pid}") or {}).get("ventas") or 0),
+            vendido_at=float((ventas.get(f"{folder}|{pid}") or {}).get("vendido_at") or 0),
             precio=_precio(textos),
             precio_lista=_precio(textos, "precio_lista"),
             modo_plazos=_es_plazos(textos),

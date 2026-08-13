@@ -26,6 +26,11 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  esVentaNueva,
+  FUENTE_TOP_VENDIDOS,
+  verTopVendidos,
+} from "@/lib/topVendidos";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -130,6 +135,19 @@ export default function PovBofLargoPage() {
   const totalProductos = items.length;
   const conVideo = items.filter((p) => p.video_path).length;
   const conFoto = items.filter((p) => p.clean_photo_id).length;
+  const esTopVendidos = activaSource === FUENTE_TOP_VENDIDOS;
+  const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
+    "largo:topventas:sinsubir", false,
+  );
+  const itemsVisibles = useMemo(
+    () =>
+      verTopVendidos(items, {
+        activo: esTopVendidos,
+        soloSinSubir,
+        yaSubido: (p) => p.uploaded,
+      }),
+    [items, esTopVendidos, soloSinSubir],
+  );
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
   const conPlazos = items.filter((p) => p.clean_photo_id && p.modo_plazos).length;
   const conViejo = items.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
@@ -913,14 +931,32 @@ export default function PovBofLargoPage() {
             </p>
           )}
 
-          {items.length > 0 && (
+          {/* Solo en Top vendidos: ahí importa el orden (lo que más vende) y
+              lo que se busca es lo que aún no has probado. */}
+          {esTopVendidos && items.length > 0 && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-violet-500"
+                checked={soloSinSubir}
+                onChange={(e) => setSoloSinSubir(e.target.checked)}
+              />
+              Solo los que no he subido
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {itemsVisibles.length}/{items.length}
+              </span>
+            </label>
+          )}
+
+          {itemsVisibles.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {items.map((p) => (
+              {itemsVisibles.map((p) => (
                 <ProductoCard
                   key={p.producto}
                   source={activaSource}
                   folder={folder}
                   producto={p}
+                  esTopVendidos={esTopVendidos}
                 />
               ))}
             </div>
@@ -1314,10 +1350,13 @@ function ProductoCard({
   source,
   folder,
   producto: p,
+  esTopVendidos = false,
 }: {
   source: string;
   folder: string;
   producto: ProductoLargo;
+  /** En "Top vendidos" se enseña cuántas veces vendió y si es reciente. */
+  esTopVendidos?: boolean;
 }) {
   const qc = useQueryClient();
   const guion = useEscribirGuion();
@@ -1452,6 +1491,18 @@ function ProductoCard({
           </p>
           {p.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">{p.titulo_tiktok_completo}</p>
+          )}
+          {esTopVendidos && p.ventas > 0 && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">
+                🔥 {p.ventas} {p.ventas === 1 ? "venta" : "ventas"}
+              </span>
+              {esVentaNueva(p.vendido_at) && (
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-500">
+                  nuevo
+                </span>
+              )}
+            </p>
           )}
           {/* El precio decide QUÉ guion escribe la IA: por encima del umbral
               lleva la frase de financiación. Los dos clips van igual. */}

@@ -27,6 +27,11 @@ import { ApiError } from "@/lib/api";
 import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
+  esVentaNueva,
+  FUENTE_TOP_VENDIDOS,
+  verTopVendidos,
+} from "@/lib/topVendidos";
+import {
   useCrearMiProducto,
   nichoPovBofKeys,
   buildCleanPhotoDownloadUrl,
@@ -136,19 +141,21 @@ export default function NichoPovBofPage() {
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
   const productos = useProductos(source, folder);
-  const esTopVendidos = source === "top_vendidos";
-  const [soloSinSubir, setSoloSinSubir] = useState(false);
-  /** En Top vendidos manda lo que vende, no el número de producto: el orden
-   *  del fichero es el de ENTRADA (que no se toca nunca para no perder el
-   *  progreso), así que ordenar aquí es lo único que queda. */
-  const productosVisibles = useMemo(() => {
-    const items = productos.data ?? [];
-    if (!esTopVendidos) return items;
-    return items
-      .filter((p) => !soloSinSubir || !p.uploaded)
-      .slice()
-      .sort((a, b) => b.ventas - a.ventas || b.vendido_at - a.vendido_at);
-  }, [productos.data, esTopVendidos, soloSinSubir]);
+  const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
+  // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima
+  // vez que entres quieres lo mismo.
+  const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
+    "povbof:topventas:sinsubir", false,
+  );
+  const productosVisibles = useMemo(
+    () =>
+      verTopVendidos(productos.data ?? [], {
+        activo: esTopVendidos,
+        soloSinSubir,
+        yaSubido: (p) => p.uploaded,
+      }),
+    [productos.data, esTopVendidos, soloSinSubir],
+  );
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   // SIN fuente: el ranking es global y el listado que se abre también, así
@@ -1619,7 +1626,7 @@ function ProductoCard({
               </span>
               {/* "Nuevo" = entró en el ranking esta semana. Es lo que buscas al
                   abrir la pantalla: qué ha empezado a vender. */}
-              {Date.now() / 1000 - producto.vendido_at < 7 * 24 * 3600 && (
+              {esVentaNueva(producto.vendido_at) && (
                 <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-500">
                   nuevo
                 </span>

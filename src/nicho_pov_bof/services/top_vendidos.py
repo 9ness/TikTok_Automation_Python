@@ -80,6 +80,34 @@ def origen_de(carpeta: str, producto: str) -> dict | None:
     return None
 
 
+def ventas_por_producto(source: str) -> dict[str, dict]:
+    """`{"<carpeta>|<producto>": {ventas, vendido_at}}` de esta fuente.
+
+    Las ventas viven en el ranking, bajo la carpeta de ORIGEN, así que hay que
+    cruzarlas por el manifiesto. Se hace una vez por listado (dos lecturas de
+    Redis) y lo usan los tres nichos, que enseñan lo mismo.
+
+    Fuera de "Top vendidos" devuelve `{}`: en las demás fuentes no hay nada que
+    cruzar y así el caller puede llamarlo siempre sin preguntar.
+    """
+    if source != SOURCE:
+        return {}
+    from src.nicho_pov_bof.repos import product_repo
+
+    ranking = {
+        f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}": v
+        for v in product_repo.ranking_vendidos()
+    }
+    salida: dict[str, dict] = {}
+    for ref, sitio in manifiesto().items():
+        v = ranking.get(ref) or {}
+        salida[f"{sitio.get('carpeta')}|{sitio.get('producto')}"] = {
+            "ventas": int(v.get("unidades") or 0),
+            "vendido_at": float(v.get("vendido_at") or 0),
+        }
+    return salida
+
+
 # ---------------------------------------------------------------------------
 # Carpetas en disco (mismo shape que `drive_client`)
 # ---------------------------------------------------------------------------

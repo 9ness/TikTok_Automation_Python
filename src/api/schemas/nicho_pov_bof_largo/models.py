@@ -37,6 +37,9 @@ class ProductoLargo(BaseModel):
     product_url: str = ""
     url_match_name: str = ""
     url_match_score: float = 0.0
+    # Solo en "Top vendidos": ventas del producto de origen y cuándo entró.
+    ventas: int = 0
+    vendido_at: float = 0
     # Precio y modo de guion — el dato lo extrae el POV BOF, aquí se lee.
     precio: float = 0
     precio_lista: float = 0

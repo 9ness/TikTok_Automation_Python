@@ -84,31 +84,6 @@ def _bad_request(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
 
-def _ventas_top(source: str) -> dict[str, dict]:
-    """`{"<carpeta>|<producto>": {ventas, vendido_at}}` para "Top vendidos".
-
-    El dato vive en el ranking (bajo la carpeta de ORIGEN), no en el producto
-    copiado, así que hay que cruzarlo por el manifiesto. Se hace una vez por
-    listado y no por producto: son dos lecturas de Redis en total.
-    """
-    if source != top_vendidos.SOURCE:
-        return {}
-    from src.nicho_pov_bof.repos import product_repo
-
-    ranking = {
-        f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}": v
-        for v in product_repo.ranking_vendidos()
-    }
-    salida: dict[str, dict] = {}
-    for ref, sitio in top_vendidos.manifiesto().items():
-        v = ranking.get(ref) or {}
-        salida[f"{sitio.get('carpeta')}|{sitio.get('producto')}"] = {
-            "ventas": int(v.get("unidades") or 0),
-            "vendido_at": float(v.get("vendido_at") or 0),
-        }
-    return salida
-
-
 def _precio_y_modo(prod: dict) -> tuple[float, bool]:
     """Precio del producto y si le toca el guion de plazos.
 
@@ -363,7 +338,7 @@ def _list_productos(
     montandose = _productos_montandose(queue, source, folder)
     # Una sola lectura del índice para toda la carpeta, no una por producto.
     escaparate = product_repo.escaparate_index(usuario)
-    ventas = _ventas_top(source)
+    ventas = top_vendidos.ventas_por_producto(source)
 
     items: list[ProductoInfo] = []
     for pair in pairs:

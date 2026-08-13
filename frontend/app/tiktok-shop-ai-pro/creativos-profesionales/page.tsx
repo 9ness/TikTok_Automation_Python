@@ -9,12 +9,17 @@ import {
   Store,
   ShoppingBag,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  esVentaNueva,
+  FUENTE_TOP_VENDIDOS,
+  verTopVendidos,
+} from "@/lib/topVendidos";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -67,6 +72,21 @@ export default function CreativosProPage() {
   const items = productos.data ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
   const subidosCarpeta = items.filter((p) => horasSubida[p.producto]).length;
+  const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
+  const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
+    "creativos:topventas:sinsubir", false,
+  );
+  // "Subido" aquí es el CREATIVO, no el vídeo: un producto puede tener el
+  // vídeo publicado y el creativo aún no.
+  const itemsVisibles = useMemo(
+    () =>
+      verTopVendidos(items, {
+        activo: esTopVendidos,
+        soloSinSubir,
+        yaSubido: (p) => Boolean(horasSubida[p.producto]),
+      }),
+    [items, esTopVendidos, soloSinSubir, horasSubida],
+  );
   const enEscaparate = items.filter((p) => p.en_escaparate).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
 
@@ -296,13 +316,29 @@ export default function CreativosProPage() {
           />
         )}
 
+        {esTopVendidos && items.length > 0 && (
+          <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-fuchsia-500"
+              checked={soloSinSubir}
+              onChange={(e) => setSoloSinSubir(e.target.checked)}
+            />
+            Solo los que no he subido
+            <span className="ml-auto text-[10px] text-muted-foreground">
+              {itemsVisibles.length}/{items.length}
+            </span>
+          </label>
+        )}
+
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {items.map((p) => (
+          {itemsVisibles.map((p) => (
             <CreativoCard
               key={`${source}-${folder}-${p.producto}`}
               source={source}
               folder={folder!}
               producto={p}
+              esTopVendidos={esTopVendidos}
               subido={Boolean(horasSubida[p.producto])}
               subidoAt={horasSubida[p.producto] ?? 0}
               onSubido={(v) =>
@@ -347,6 +383,7 @@ function CreativoCard({
   source,
   folder,
   producto: p,
+  esTopVendidos = false,
   subido,
   subidoAt,
   onSubido,
@@ -354,6 +391,8 @@ function CreativoCard({
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** En "Top vendidos" se enseña cuántas veces vendió y si es reciente. */
+  esTopVendidos?: boolean;
   /** Si el CREATIVO de este producto ya se publicó. Es propio de este nicho:
    *  "subido" en el POV BOF es el vídeo, y son dos publicaciones distintas. */
   subido: boolean;
@@ -430,6 +469,18 @@ function CreativoCard({
           </p>
           {p.tienda && (
             <p className="truncate text-[10px] text-muted-foreground">{p.tienda}</p>
+          )}
+          {esTopVendidos && p.ventas > 0 && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">
+                🔥 {p.ventas} {p.ventas === 1 ? "venta" : "ventas"}
+              </span>
+              {esVentaNueva(p.vendido_at) && (
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-500">
+                  nuevo
+                </span>
+              )}
+            </p>
           )}
         </div>
       </div>
