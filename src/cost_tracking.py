@@ -184,6 +184,44 @@ def set_meta(key: str, value: Any) -> None:
     job.meta[key] = value
 
 
+# De qué programa es la petición que se está atendiendo. Lo pone el middleware
+# de `api/main.py` a partir de la URL: las llamadas desde la web no tienen job,
+# así que sin esto no habría forma de saber a qué programa cargarles el coste y
+# acababan todas en un cajón común.
+programa_web: ContextVar[str] = ContextVar("cost_programa_web", default="web")
+
+# Qué prefijo de URL es de qué programa. Los nombres son los mismos que usan
+# los trabajos de la cola (`_MODE_TO_PROGRAM`), para que en el panel el gasto
+# de un programa salga junto y no partido en dos.
+PROGRAMA_POR_RUTA: tuple[tuple[str, str], ...] = (
+    ("/api/v1/nicho-pov-bof", "viralizacion"),
+    ("/api/v1/nicho-pov-bof-largo", "viralizacion"),
+    ("/api/v1/nicho-creativos", "viralizacion"),
+    ("/api/v1/nicho-ropa", "viralizacion"),
+    ("/api/v1/nicho-ropa-personas", "viralizacion"),
+    ("/api/v1/nicho-bof-cine", "viralizacion"),
+    ("/api/v1/nicho-gorras", "viralizacion"),
+    ("/api/v1/cuenta-piloto", "viralizacion"),
+    ("/api/v1/viralizacion", "viralizacion"),
+    ("/api/v1/tiktok-shop", "tiktok_shop"),
+    ("/api/v1/editor-auto", "editor_auto"),
+    ("/api/v1/creator-reward", "creator_reward"),
+    ("/api/v1/pronosticos", "creator_reward"),
+    ("/api/v1/presidents", "creator_reward"),
+)
+
+
+def programa_de_ruta(ruta: str) -> str:
+    """Programa al que cargarle el coste de una petición. `web` si no cuadra."""
+    mejor = "web"
+    for prefijo, programa in PROGRAMA_POR_RUTA:
+        # El prefijo más largo gana: `/nicho-pov-bof-largo` antes que
+        # `/nicho-pov-bof`, aunque hoy los dos vayan al mismo programa.
+        if ruta.startswith(prefijo) and (mejor == "web" or len(prefijo) > len(mejor)):
+            mejor = programa
+    return mejor
+
+
 # Un cerrojo para el "trabajo del día" de abajo: la API atiende varias
 # peticiones a la vez y todas escriben en el MISMO documento, así que sin esto
 # dos llamadas simultáneas se pisan y una de las dos se pierde.
@@ -207,14 +245,15 @@ def _apuntar_suelto(line: CostLine) -> None:
         return
     fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     mes = fecha[:7]
-    jid = f"web-{fecha}"
+    programa = programa_web.get()
+    jid = f"web-{programa}-{fecha}"
     try:
         with _CERROJO_SUELTO:
             doc = redis.get_json(f"cost:job:{jid}") or {}
             nuevo = not doc
             if nuevo:
                 doc = {
-                    "job_id": jid, "program": "web", "mode": "web",
+                    "job_id": jid, "program": programa, "mode": "web",
                     "user": None, "product_id": None,
                     "started_at": time.time(), "finished_at": None,
                     "lines": [], "title": f"Llamadas desde la web · {fecha}",
@@ -231,7 +270,7 @@ def _apuntar_suelto(line: CostLine) -> None:
                 # el índice: si alguien borra el documento del día a mano, el id
                 # se queda en la lista y volver a añadirlo haría que el panel
                 # leyera dos veces el mismo día y lo contara doble.
-                for idx in (f"cost:index:web:{mes}", f"cost:index:all:{mes}"):
+                for idx in (f"cost:index:{programa}:{mes}", f"cost:index:all:{mes}"):
                     if jid not in (redis.lrange(idx, 0, 400) or []):
                         redis.lpush(idx, jid)
     except Exception:  # noqa: BLE001

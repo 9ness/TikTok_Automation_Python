@@ -342,6 +342,26 @@ _PREFIJOS_PRO = (
 
 
 @app.middleware("http")
+async def _programa_de_la_peticion(request, call_next):
+    """Marca a qué programa cargarle lo que gaste esta petición.
+
+    Las llamadas a las IA que se hacen desde la web (obtener textos, escribir
+    guiones, emparejar los vídeos de una tanda) no pasan por la cola, así que
+    no tienen `job` del que sacar el programa. Sin esto, su coste acababa en un
+    cajón común y el panel no podía decir qué nicho lo gastó.
+    """
+    from src import cost_tracking
+
+    testigo = cost_tracking.programa_web.set(
+        cost_tracking.programa_de_ruta(request.url.path)
+    )
+    try:
+        return await call_next(request)
+    finally:
+        cost_tracking.programa_web.reset(testigo)
+
+
+@app.middleware("http")
 async def _sin_cache_en_json(request, call_next):
     """Que ninguna respuesta de datos se quede pegada en la caché del cliente.
 

@@ -23,17 +23,18 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-type Program = "all" | "creator_reward" | "tiktok_shop" | "editor_auto" | "web";
+type Program = "all" | "creator_reward" | "tiktok_shop" | "editor_auto" | "viralizacion" | "web";
 
 const PROGRAMS: { value: Program; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "creator_reward", label: "Creator Reward" },
   { value: "tiktok_shop", label: "TikTok Shop" },
   { value: "editor_auto", label: "Editor Auto" },
-  // Lo que se lanza desde la web y no pasa por la cola: obtener textos,
-  // escribir guiones, emparejar los vídeos de una tanda, mirar la mano. Se
-  // agrupa en un "trabajo" por día.
-  { value: "web", label: "Desde la web" },
+  // Programa 4. Por dentro se llama "viralizacion" desde que era solo ese
+  // nicho, y ahí van todos los demás (POV BOF, Largo, Creativos, Piloto…).
+  { value: "viralizacion", label: "Tiktok Shop AI Pro" },
+  // Lo que no cae en ningún programa (cuotas, diagnóstico…).
+  { value: "web", label: "Otras (desde la web)" },
 ];
 
 const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
@@ -47,6 +48,14 @@ const MODES_BY_PROGRAM: Record<Program, { value: string; label: string }[]> = {
   ],
   tiktok_shop: [{ value: "tiktok_shop", label: "TikTok Shop" }],
   editor_auto: [{ value: "editor_auto", label: "Editor Auto" }],
+  viralizacion: [
+    { value: "viralizacion_batch", label: "Viralización 1K" },
+    { value: "nicho_pov_bof_video", label: "POV BOF" },
+    { value: "nicho_pov_bof_plazos_video", label: "POV BOF · plazos" },
+    { value: "nicho_pov_bof_largo_video", label: "POV BOF Largo" },
+    { value: "cuenta_piloto_video", label: "Cuenta Piloto" },
+    { value: "web", label: "Desde la web (textos, guiones, emparejar)" },
+  ],
   web: [{ value: "web", label: "Desde la web" }],
 };
 
