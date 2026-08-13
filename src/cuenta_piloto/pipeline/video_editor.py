@@ -29,6 +29,9 @@ def montar(
     raw_video: Path,
     textos: dict,
     sexo: str,
+    # Quién monta y con qué guion: deciden de qué banco sale la voz.
+    usuario: str = "",
+    tipo_guion: str = "normal",
     output_path: Path,
     work_dir: Path,
     semilla: str = "",
@@ -46,7 +49,18 @@ def montar(
     banco para el sexo elegido y se le recortan los silencios.
     """
     if audio_path is None:
-        crudo = audio_bank.pick_random(sexo)
+        # Primero la voz del PROPIO operador: es la gracia de este nicho, que
+        # cada cuenta suene a su persona. El banco compartido del curso queda
+        # de red de seguridad para quien aún no se haya grabado nada.
+        from src.cuenta_piloto.services import audios as mis_audios
+
+        crudo = mis_audios.elegir(usuario, sexo, tipo_guion, semilla=semilla) if usuario else None
+        if crudo is None:
+            crudo = audio_bank.pick_random(sexo)
+            on_log(
+                f"[cuenta_piloto] sin audios propios de {sexo} ({tipo_guion}); "
+                "tiro del banco compartido. Grábalos en 'Mis audios'."
+            )
         audio_path = audio_bank.prepare(crudo, on_log=on_log)
         on_log(f"[cuenta_piloto] voz: {crudo.name} → {Path(audio_path).name}")
 

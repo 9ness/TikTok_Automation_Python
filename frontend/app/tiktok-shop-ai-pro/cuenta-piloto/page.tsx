@@ -18,6 +18,7 @@ import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
+import { MisAudiosPiloto } from "@/components/tiktok-shop-ai-pro/MisAudiosPiloto";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   fotoPilotoUrl,
@@ -61,6 +62,9 @@ export default function CuentaPilotoPage() {
       </header>
 
       <AltaProducto />
+
+      <MisAudiosPiloto />
+
 
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
         <div className="flex items-center gap-2">
@@ -309,6 +313,9 @@ function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
   const subir = useSubirVideoPiloto();
   // Progreso de la tanda que se está mandando (null = no hay ninguna).
   const [enviando, setEnviando] = useState<{ hechos: number; total: number } | null>(null);
+  // Qué audio locuta el vídeo. Aquí no hay precio que lo decida (los productos
+  // los sube el operador), así que lo elige él.
+  const [tipoGuion, setTipoGuion] = useState<"normal" | "plazos">("normal");
   const borrar = useBorrarProductoPiloto();
   const extraer = useExtraerTextosPiloto();
   const refVideo = useRef<HTMLInputElement>(null);
@@ -343,6 +350,7 @@ function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
           conTitulo: titulo,
           conCta: cta,
           conFlecha: flecha,
+          tipoGuion: tipoGuion,
           // Solo el primero abre el contador de la tanda.
           lote: i === 0 ? files.length : 0,
         });
@@ -471,6 +479,23 @@ function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
             }`}
           >
             {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5">
+        {(["normal", "plazos"] as const).map((tg) => (
+          <button
+            key={tg}
+            type="button"
+            onClick={() => setTipoGuion(tg)}
+            className={`rounded-md border px-2 py-1 text-[10px] transition ${
+              tipoGuion === tg
+                ? "border-sky-500 bg-sky-500/10 font-semibold text-sky-500"
+                : "border-border/60 text-muted-foreground"
+            }`}
+          >
+            {tg === "normal" ? "Guion normal" : "💳 Guion de plazos"}
           </button>
         ))}
       </div>

@@ -2218,6 +2218,8 @@ def run_cuenta_piloto_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             raw_video=raw_path,
             textos=textos,
             sexo=sexo,
+            usuario=operator,
+            tipo_guion=str(p.get("tipo_guion") or "normal"),
             output_path=salida,
             work_dir=work,
             semilla=f"{operator}/{producto}/v{n}",

@@ -126,6 +126,8 @@ export function useSubirVideoPiloto() {
       conFlecha: boolean;
       /** Tamaño de la tanda. Solo lo manda el primero de la serie. */
       lote?: number;
+      /** Con qué guion se locuta: el de siempre o el de plazos. */
+      tipoGuion?: string;
     }
   >({
     mutationFn: async (v) => {
@@ -138,6 +140,7 @@ export function useSubirVideoPiloto() {
       fd.append("con_cta", String(v.conCta));
       fd.append("con_flecha", String(v.conFlecha));
       if (v.lote && v.lote > 1) fd.append("lote", String(v.lote));
+      if (v.tipoGuion) fd.append("tipo_guion", v.tipoGuion);
       return api.post<{ job_id: string; message: string }>(`${ROOT}/video/upload`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: pilotoKeys.productos() }),
@@ -169,4 +172,73 @@ export function videoPilotoUrl(
   return `${base()}${ROOT}/video?producto=${encodeURIComponent(
     producto,
   )}&n=${n}&descargar=${descargar}${keyQs()}`;
+}
+
+// --- Mis audios -------------------------------------------------------------
+
+export interface GuionAudio {
+  tipo: "normal" | "plazos";
+  n: number;
+  texto: string;
+  grabado: boolean;
+  grabado_at: number;
+  segundos: number;
+}
+
+const audiosKey = (sexo: string) => [...pilotoKeys.all, "audios", sexo] as const;
+
+/** Los diez guiones a grabar con el texto para leer y cuáles ya están. */
+export function useAudiosPiloto(sexo: string) {
+  return useQuery<GuionAudio[]>({
+    queryKey: audiosKey(sexo),
+    queryFn: async () =>
+      (await api.get<{ items: GuionAudio[] }>(`${ROOT}/audios?sexo=${sexo}`)).items ?? [],
+  });
+}
+
+/** Guarda la grabación de un guion. Sirve tanto para lo grabado en la propia
+ *  pantalla como para un fichero de la grabadora del móvil. */
+export function useSubirAudioPiloto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: GuionAudio[] },
+    Error,
+    { sexo: string; tipo: string; n: number; blob: Blob; nombre?: string }
+  >({
+    mutationFn: (v) => {
+      const fd = new FormData();
+      fd.append("file", v.blob, v.nombre ?? `${v.tipo}${v.n}.webm`);
+      fd.append("sexo", v.sexo);
+      fd.append("tipo", v.tipo);
+      fd.append("n", String(v.n));
+      return api.post<{ items: GuionAudio[] }>(`${ROOT}/audios`, fd);
+    },
+    onSuccess: (r, v) => qc.setQueryData(audiosKey(v.sexo), r.items),
+  });
+}
+
+export function useBorrarAudioPiloto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: GuionAudio[] },
+    Error,
+    { sexo: string; tipo: string; n: number }
+  >({
+    mutationFn: (v) =>
+      api.del<{ items: GuionAudio[] }>(
+        `${ROOT}/audios?sexo=${v.sexo}&tipo=${v.tipo}&n=${v.n}`,
+      ),
+    onSuccess: (r, v) => qc.setQueryData(audiosKey(v.sexo), r.items),
+  });
+}
+
+/** URL para escuchar lo grabado. Lleva `t` para saltarse la caché al regrabar:
+ *  el fichero se llama igual y si no sonaría el anterior. */
+export function audioPilotoUrl(
+  sexo: string, tipo: string, n: number, version = 0,
+): string {
+  const k = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  return `${base()}/api/v1/cuenta-piloto/audios/file?sexo=${sexo}&tipo=${tipo}&n=${n}&t=${version}${
+    k ? `&api_key=${encodeURIComponent(k)}` : ""
+  }`;
 }

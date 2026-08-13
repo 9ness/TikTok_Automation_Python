@@ -359,6 +359,103 @@ def get_foto(
     )
 
 
+# ---------------------------------------------------------------------------
+# Mis audios: los diez guiones con la voz del propio operador
+# ---------------------------------------------------------------------------
+@router.get("/audios")
+def list_audios(
+    sexo: Annotated[str, Query()] = "mujer",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Los diez guiones a grabar y cuáles ya están.
+
+    Devuelve también el TEXTO: la pantalla es para leerlo mientras se graba.
+    """
+    from src.cuenta_piloto.services import audios
+
+    try:
+        return {"sexo": sexo, "items": audios.listar(usuario, sexo)}
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+
+
+@router.post("/audios")
+async def upload_audio(
+    file: Annotated[UploadFile, File()],
+    sexo: Annotated[str, Form()],
+    tipo: Annotated[str, Form()],
+    n: Annotated[int, Form()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Guarda la grabación de UN guion (pisa la anterior de ese sitio).
+
+    Acepta lo que grabe el navegador (webm/ogg) y lo que salga de la grabadora
+    del móvil (m4a/mp3/wav): todo se convierte a mp3 aquí, así el montaje no
+    tiene que saber de formatos.
+    """
+    from src.api.temp_storage import upload_subdir
+    from src.cuenta_piloto.services import audios
+
+    crudo = upload_subdir("cuenta_piloto") / f"voz_{int(time.time())}.bin"
+    try:
+        with crudo.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+    except Exception as e:
+        raise APIError(f"No se pudo guardar el audio: {e}", status_code=500) from e
+    finally:
+        await file.close()
+
+    try:
+        audios.guardar(usuario, sexo, tipo, int(n), crudo)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=422) from e
+    finally:
+        crudo.unlink(missing_ok=True)
+
+    return {"sexo": sexo, "items": audios.listar(usuario, sexo)}
+
+
+@router.get("/audios/file")
+def get_audio(
+    sexo: Annotated[str, Query()],
+    tipo: Annotated[str, Query()],
+    n: Annotated[int, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """Sirve la grabación para escucharla.
+
+    Sin caché: al regrabar, el fichero se llama igual y el navegador seguiría
+    dando la anterior — parecería que la grabación nueva no ha entrado.
+    """
+    from src.cuenta_piloto.services import audios
+
+    try:
+        f = audios.ruta(usuario, sexo, tipo, int(n))
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    if not f.is_file():
+        raise APIError("Ese guion todavía no está grabado.", status_code=404)
+    return FileResponse(f, media_type="audio/mpeg", headers={"Cache-Control": "no-cache"})
+
+
+@router.delete("/audios")
+def delete_audio(
+    sexo: Annotated[str, Query()],
+    tipo: Annotated[str, Query()],
+    n: Annotated[int, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    from src.cuenta_piloto.services import audios
+
+    try:
+        audios.borrar(usuario, sexo, tipo, int(n))
+        return {"sexo": sexo, "items": audios.listar(usuario, sexo)}
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+
+
 @router.post("/video/upload", response_model=VideoPilotoUploadResponse)
 async def upload_video(
     queue: Annotated[JobQueue, Depends(get_queue)],
@@ -373,6 +470,9 @@ async def upload_video(
     # manda el primero: sirve para que la ficha sepa decir "listos 4 de 9" y no
     # tener que adivinarlo contando vídeos.
     lote: Annotated[int, Form()] = 0,
+    # Con qué guion se locuta: el de siempre o el de plazos. Aquí no hay precio
+    # que lo decida (los productos los sube el operador), así que lo elige él.
+    tipo_guion: Annotated[str, Form()] = "normal",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> VideoPilotoUploadResponse:
     """Sube UN vídeo orgánico y encola su montaje.
@@ -434,6 +534,7 @@ async def upload_video(
             "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta),
             "con_flecha": bool(con_flecha),
+            "tipo_guion": (tipo_guion or "normal").strip().lower(),
         },
         enqueued_by=usuario or None,
     )
