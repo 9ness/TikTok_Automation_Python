@@ -285,21 +285,27 @@ export default function PovBofLargoPage() {
   /** Escribe el guion de TODOS los productos de la carpeta que ya tienen
    *  textos y aún no lo tienen. Uno detrás de otro (cada uno gasta una llamada
    *  a Gemini), igual que "Textos" pero por guion. */
-  /** `conTextoAhora` sirve para encadenarlo justo después de extraer: en ese
-   *  momento `items` es todavía el de antes (sin títulos) y filtrar por él no
-   *  daría ni un producto pendiente.
+  /** `reciEn` es lo que acaba de devolver la extracción de textos, para
+   *  encadenar las dos cosas.
    *
-   *  Se pasan solo los NÚMEROS de producto que acaban de recibir textos, no la
-   *  lista entera: lo que devuelve la extracción son los productos del POV BOF
-   *  y el estado del guion es de este nicho, así que mezclarlas daría por
-   *  escrito lo que no lo está. */
-  async function generarTodosGuiones(conTextoAhora?: Set<string>) {
+   *  Hace falta porque en ese momento `items` es todavía el de ANTES, y ahí no
+   *  están ni los títulos ni —esto es lo que se escapó— el PRECIO. Un producto
+   *  que estrena precio pasa a ser de plazos justo ahora: mirando la lista
+   *  vieja seguía figurando como normal, su guion "cuadraba" y se saltaba, así
+   *  que se quedaba con un guion sin la frase de financiación.
+   *
+   *  De la lista nueva solo se cogen el título y el precio, que son datos del
+   *  producto (los extrae el POV BOF). El estado del guion es de este nicho y
+   *  se sigue leyendo de `items`. */
+  async function generarTodosGuiones(reciEn?: ProductoItem[]) {
     if (!folder) return;
-    const pend = items.filter(
-      (p) =>
-        (conTextoAhora?.has(p.producto) || Boolean(p.titulo)) &&
-        (!p.guion || p.modo_plazos !== p.guion_plazos),
-    );
+    const frescos = new Map((reciEn ?? []).map((x) => [x.producto, x]));
+    const pend = items.filter((p) => {
+      const nuevo = frescos.get(p.producto);
+      const tieneTexto = Boolean(nuevo?.titulo || p.titulo);
+      const esPlazos = nuevo?.modo_plazos ?? p.modo_plazos;
+      return tieneTexto && (!p.guion || esPlazos !== p.guion_plazos);
+    });
     if (!pend.length) {
       toast.error("Todos los productos con textos ya tienen guion");
       return;
@@ -348,9 +354,7 @@ export default function PovBofLargoPage() {
         onSuccess: async (nuevos) => {
           toast.success("Textos extraídos · escribiendo guiones…");
           invalidarProductos();
-          await generarTodosGuiones(
-            new Set(nuevos.filter((x) => x.titulo).map((x) => x.producto)),
-          );
+          await generarTodosGuiones(nuevos);
         },
         onError: (e) => toast.error(err(e)),
       },
