@@ -516,8 +516,12 @@ async def upload_clip(
     if slot not in (1, 2):
         raise _bad(f"slot debe ser 1 o 2, recibido: {slot}")
     sexo_norm = (sexo or "").strip().lower()
-    if sexo_norm not in config.SEXOS:
-        raise _bad(f"sexo debe ser {' o '.join(config.SEXOS)}, recibido: {sexo!r}")
+    # "auto" no está en `config.SEXOS` (eso son las voces de Fish): lo resuelve
+    # el montaje mirando la mano del clip 1.
+    if sexo_norm != "auto" and sexo_norm not in config.SEXOS:
+        raise _bad(
+            f"sexo debe ser {' o '.join(config.SEXOS)} o 'auto', recibido: {sexo!r}"
+        )
 
     guardado = product_repo.get_product(source, folder, producto, usuario)
     if not guardado.get("guion"):

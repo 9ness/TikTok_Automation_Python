@@ -1926,7 +1926,17 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     for c in clips:
         if not c.is_file():
             raise FileNotFoundError(f"No está el clip subido: {c}")
-    sexo = (p.get("sexo") or "hombre").strip().lower()
+    sexo = (p.get("sexo") or "mujer").strip().lower()
+    # "auto": la mano del clip 1 decide la voz (mismo criterio que el POV BOF —
+    # mujer salvo que se vea reloj o vello). Se mira el primer clip porque los
+    # dos son del mismo producto y la misma persona.
+    deteccion = {}
+    if sexo == "auto":
+        from src.nicho_pov_bof.services import mano
+
+        on_progress(0.02, "🖐️ Mirando la mano del vídeo…")
+        deteccion = mano.detectar(clips[0], on_log=on_log)
+        sexo = deteccion.get("sexo") or "mujer"
 
     on_progress(0.03, "📝 Leyendo textos del producto…")
     textos = product_repo.textos_producto(source, folder, producto, operator)

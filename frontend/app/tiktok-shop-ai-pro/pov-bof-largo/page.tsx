@@ -1405,9 +1405,9 @@ function ProductoCard({
     1: null,
     2: null,
   });
-  const [sexo, setSexo] = useState<"hombre" | "mujer">(
-    p.sexo_sugerido === "mujer" ? "mujer" : "hombre",
-  );
+  // Auto por defecto: el montaje mira la mano del clip 1 y elige la voz
+  // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
+  const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
   const [tools, setTools] = useState<Record<ToolKey, boolean>>({
     gancho: true, titulo: true, cta: true, flecha: true,
   });
@@ -1721,17 +1721,22 @@ function ProductoCard({
 
       {/* Voz */}
       <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-        {(["hombre", "mujer"] as const).map((s) => (
+        {(["auto", "hombre", "mujer"] as const).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSexo(s)}
+            title={
+              s === "auto"
+                ? "Mira la mano del clip 1: mujer salvo que se vea reloj o vello"
+                : undefined
+            }
             className={`flex-1 rounded px-1.5 py-1 transition ${
               sexo === s ? "bg-violet-500 font-semibold text-white" : "text-muted-foreground"
             }`}
           >
-            {s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
-            {p.sexo_sugerido === s && " ★"}
+            {s === "auto" ? "🖐️ Auto" : s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
+            {s !== "auto" && p.sexo_sugerido === s && " ★"}
           </button>
         ))}
       </div>

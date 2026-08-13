@@ -48,6 +48,9 @@ ANCHO = 540
 # no están, mientras que distinguir una mano de mujer de una lampiña de hombre
 # falla hasta a ojo.
 MIN_SENALES = 2
+# Cuántos se miran en el segundo intento, cuando en el primero no salió ninguna
+# mano. Más y repartidos distinto: la mano entra y sale de plano.
+FOTOGRAMAS_REINTENTO = 9
 
 _PROMPT = """Fotogramas de un vídeo vertical de TikTok donde una persona muestra
 un producto con la mano.
@@ -64,9 +67,13 @@ NO cuentan como señal: que no se le vean las uñas pintadas, que la mano esté
 algo sombreada, o que sostenga un producto "de hombre". Ante la duda, NO es
 señal: se dará por mujer.
 
+Marca `fuerte` cuando la señal sea de las que no admiten discusión —vello
+visible o un reloj/pulsera de hombre—, y déjalo en false cuando sea solo de
+proporciones (mano ancha, dedos gruesos), que es opinable.
+
 Responde SOLO un JSON con una entrada por fotograma, en orden:
-{"fotogramas": [{"hombre": true|false, "senal": "3-6 palabras o vacío",
-                 "hay_mano": true|false}, ...]}
+{"fotogramas": [{"hombre": true|false, "fuerte": true|false,
+                 "senal": "3-6 palabras o vacío", "hay_mano": true|false}, ...]}
 
 `hay_mano` en false si en ese fotograma no se ve mano ni brazo."""
 
@@ -107,8 +114,13 @@ def _sacar_fotogramas(video: Path, destino: Path, n: int = FOTOGRAMAS) -> list[s
 def detectar(video: Path, *, on_log: OnLog = _noop) -> dict:
     """`{sexo, votos, total, pistas}`. `sexo` vacío si no se ve ninguna mano.
 
+    Si en los cinco primeros fotogramas no sale ninguna mano se reintenta con
+    más, repartidos por otros sitios: la mano entra y sale de plano, y quedarse
+    sin verla manda el vídeo a la voz por defecto sin haberlo mirado bien. Pasó
+    en 1 de 17 vídeos con mano de hombre.
+
     No lanza nunca: si falla ffmpeg o Gemini se devuelve vacío y quien llama
-    decide (en el montaje, seguir con lo que eligió el operador).
+    decide (en el montaje, la voz de mujer, que es la de por defecto).
     """
     from src.tiktok_shop.api.gemini import generate_json
 
@@ -122,12 +134,28 @@ def detectar(video: Path, *, on_log: OnLog = _noop) -> dict:
         datos = generate_json(_PROMPT, "", images=fotos)
         lecturas = [x for x in ((datos or {}).get("fotogramas") or []) if x.get("hay_mano")]
         if not lecturas:
-            on_log("[mano] no se ve ninguna mano en los fotogramas")
+            on_log(f"[mano] ninguna mano en {len(fotos)} fotogramas; miro más")
+            fotos = _sacar_fotogramas(Path(video), trabajo, n=FOTOGRAMAS_REINTENTO)
+            datos = generate_json(_PROMPT, "", images=fotos) if fotos else {}
+            lecturas = [
+                x for x in ((datos or {}).get("fotogramas") or []) if x.get("hay_mano")
+            ]
+        if not lecturas:
+            on_log("[mano] no se ve ninguna mano en el vídeo")
             return vacio
         con_senal = [x for x in lecturas if x.get("hombre")]
-        # Dos fotogramas con la misma señal, no uno: con uno bastaba una sombra
-        # o el puño de una camisa para dar hombre por error.
-        sexo = "hombre" if len(con_senal) >= MIN_SENALES else "mujer"
+        fuertes = [x for x in con_senal if x.get("fuerte")]
+        # Dos fotogramas con señal, o UNO si es de las que no admiten discusión
+        # (vello o reloj de hombre). El equilibrio no es simétrico a propósito:
+        # colar voz de mujer en un vídeo con mano de hombre es el fallo que de
+        # verdad se nota, así que ante una señal clara se va a hombre aunque
+        # aparezca en un único fotograma; en cambio "mano ancha" —que es
+        # opinable— necesita repetirse.
+        sexo = (
+            "hombre"
+            if len(con_senal) >= MIN_SENALES or fuertes
+            else "mujer"
+        )
         pistas = "; ".join(
             str(x.get("senal") or "") for x in con_senal[:2] if x.get("senal")
         )
