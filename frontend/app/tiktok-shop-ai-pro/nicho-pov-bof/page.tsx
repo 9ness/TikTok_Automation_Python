@@ -467,8 +467,14 @@ export default function NichoPovBofPage() {
               type="button"
               onClick={() => setPicked(f.name)}
               className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+                // La carpeta ABIERTA se pinta según esté hecha o no: en verde
+                // si ya se completó y en azul si aún no. Antes la abierta y las
+                // completadas eran del mismo color y no se sabía si la que
+                // tenías delante estaba lista o te faltaba terminarla.
                 folder === f.name
-                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                  ? f.completed
+                    ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                    : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
                   : f.completed
                     ? "border-emerald-500/40 text-emerald-500"
                     : "border-border/60 text-muted-foreground hover:border-foreground/30"

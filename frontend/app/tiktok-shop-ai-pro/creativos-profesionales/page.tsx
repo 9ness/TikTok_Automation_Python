@@ -184,8 +184,13 @@ export default function CreativosProPage() {
               type="button"
               onClick={() => setPicked(f.name)}
               className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+                // Verde si la carpeta abierta está hecha, azul si no (igual
+                // que en POV BOF): con un solo color no se sabía si la que
+                // tienes delante está terminada.
                 folder === f.name
-                  ? "border-cyan-500 bg-cyan-500/15 text-cyan-500"
+                  ? f.completed
+                    ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                    : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
                   : f.completed
                     ? "border-emerald-500/40 text-emerald-500"
                     : "border-border/60 text-muted-foreground"
