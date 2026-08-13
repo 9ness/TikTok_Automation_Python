@@ -514,7 +514,9 @@ export interface LoteResponse {
 
 /** Sube varios vídeos de golpe y devuelve de qué producto cree que es cada uno.
  *  NO encola nada: el operador repasa y confirma después. */
-export function useSubirLote() {
+/** `root` decide el nicho: el POV BOF y el Largo tienen sus propios endpoints
+ *  (allí cada producto lleva DOS clips), pero la pantalla es la misma. */
+export function useSubirLote(root: string = ROOT) {
   return useMutation<
     LoteResponse,
     Error,
@@ -526,12 +528,12 @@ export function useSubirLote() {
       fd.append("source", v.source);
       fd.append("folder", v.folder);
       fd.append("productos", v.productos.join(","));
-      return api.post<LoteResponse>(`${ROOT}/video/lote`, fd);
+      return api.post<LoteResponse>(`${root}/video/lote`, fd);
     },
   });
 }
 
-export function useConfirmarLote() {
+export function useConfirmarLote(root: string = ROOT) {
   const qc = useQueryClient();
   return useMutation<
     { encolados: number; pendientes: number; mensajes: string[] },
@@ -549,10 +551,11 @@ export function useConfirmarLote() {
   >({
     mutationFn: (body) =>
       api.post<{ encolados: number; pendientes: number; mensajes: string[] }>(
-        `${ROOT}/video/lote/confirmar`,
+        `${root}/video/lote/confirmar`,
         body,
       ),
-    onSuccess: (_r, v) =>
-      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.productos(v.source, v.folder) }),
+    // Se invalida TODO el nicho, no solo esta carpeta: la pantalla la usan los
+    // dos y cada uno guarda su progreso en su sitio.
+    onSuccess: () => void qc.invalidateQueries(),
   });
 }

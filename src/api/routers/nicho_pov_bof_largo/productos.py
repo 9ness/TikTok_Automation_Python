@@ -31,6 +31,10 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_pov_bof_largo import (
+    LoteLargoConfirmarRequest,
+    LoteLargoConfirmarResponse,
+    LoteLargoItem,
+    LoteLargoResponse,
     ClipLargoUploadResponse,
     FolderLargo,
     FoldersLargoResponse,
@@ -482,6 +486,126 @@ def _uno(body: GuionLargoRequest, queue, usuario: str) -> GuionLargoResponse:
     raise APIError(f"No existe el producto {body.producto}.", status_code=404)
 
 
+# ---------------------------------------------------------------------------
+# Subida en tanda: los clips de toda la carpeta de golpe
+# ---------------------------------------------------------------------------
+_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _ruta_de_token(token: str) -> Path:
+    """Resuelve un bruto ya subido, sin dejar que se escape de su carpeta."""
+    from src.api.temp_storage import upload_subdir
+
+    if not _TOKEN_RE.match(token or ""):
+        raise _bad(f"identificador de vídeo inválido: {token!r}")
+    base = upload_subdir("nicho_pov_bof_largo").resolve()
+    ruta = (base / token).resolve()
+    if base not in ruta.parents or not ruta.is_file():
+        raise _bad("ese vídeo ya no está (se purgan a las 24h). Vuelve a subirlo.")
+    return ruta
+
+
+@router.post("/video/lote", response_model=LoteLargoResponse)
+async def subir_lote(
+    files: Annotated[list[UploadFile], File()],
+    source: Annotated[str, Form()],
+    folder: Annotated[str, Form()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> LoteLargoResponse:
+    """Sube los clips de la carpeta de golpe y dice de qué producto es cada uno.
+
+    Aquí TODOS los productos llevan dos clips, así que cada uno puede llevarse
+    dos vídeos de la tanda. No encola nada: el operador repasa y confirma.
+    """
+    from src.api.temp_storage import upload_subdir
+    from src.nicho_pov_bof.services import emparejador
+
+    dest = upload_subdir("nicho_pov_bof_largo")
+    guardados: list[tuple[str, str]] = []
+    for f in files:
+        nombre = (f.filename or "").lower()
+        ext = next((e for e in _EXTS_VIDEO if nombre.endswith(e)), "")
+        if not ext:
+            raise _bad(
+                f"Formato de vídeo no soportado: {f.filename!r}. "
+                f"Acepta: {', '.join(sorted(_EXTS_VIDEO))}."
+            )
+        stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}")
+        token = f"lote_{stub}_{int(time.time() * 1000)}_{len(guardados)}{ext}"
+        try:
+            with (dest / token).open("wb") as out:
+                shutil.copyfileobj(f.file, out)
+        except Exception as e:
+            raise APIError(f"No se pudo guardar {f.filename!r}: {e}", status_code=500) from e
+        finally:
+            await f.close()
+        guardados.append((token, f.filename or token))
+
+    fichas = _listar(source, folder, queue, usuario).items
+    candidatos = [p.producto for p in fichas if p.clean_photo_id]
+    reparto = emparejador.emparejar(
+        source, folder, [dest / t for t, _ in guardados], candidatos,
+        dobles=set(candidatos),
+    )
+    items = [
+        LoteLargoItem(
+            token=token, archivo=nombre,
+            producto=str(r.get("producto") or ""), por_que=str(r.get("por_que") or ""),
+        )
+        for (token, nombre), r in zip(guardados, reparto)
+    ]
+    return LoteLargoResponse(
+        source=source, folder=folder, items=items,
+        reconocidos=sum(1 for i in items if i.producto),
+    )
+
+
+@router.post("/video/lote/confirmar", response_model=LoteLargoConfirmarResponse)
+def confirmar_lote(
+    body: LoteLargoConfirmarRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> LoteLargoConfirmarResponse:
+    """Guarda cada clip en su sitio y encola los productos que ya tengan los dos.
+
+    El orden de la tanda manda: el primer vídeo de un producto es su clip 1 y
+    el segundo el clip 2. Un producto con un solo vídeo se queda esperando al
+    otro, que es lo mismo que pasa subiéndolos a mano.
+    """
+    encolados, pendientes, mensajes = 0, 0, []
+    vistos: dict[str, int] = {}
+    for item in body.items:
+        if not item.producto:
+            continue
+        vistos[item.producto] = vistos.get(item.producto, 0) + 1
+        ruta = _ruta_de_token(item.token)
+        prod = product_repo.get_product(body.source, body.folder, item.producto, usuario)
+        if not prod.get("guion"):
+            pendientes += 1
+            mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
+            continue
+        montado_at = float(prod.get("video_listo_at") or 0)
+        if vistos[item.producto] >= 2:
+            slot = 2
+        else:
+            slot = 1 if not _clip_puesto(prod.get("clip1_path"), montado_at) else 2
+        r = _encolar_clip(
+            queue, body.source, body.folder, item.producto, slot, ruta,
+            body.sexo, usuario,
+            con_gancho=body.con_gancho, con_titulo=body.con_titulo,
+            con_cta=body.con_cta, con_flecha=body.con_flecha,
+        )
+        if r.encolado:
+            encolados += 1
+        else:
+            pendientes += 1
+            mensajes.append(f"Producto {item.producto}: {r.message}")
+    return LoteLargoConfirmarResponse(
+        encolados=encolados, pendientes=pendientes, mensajes=mensajes[:6],
+    )
+
+
 @router.post("/clip/upload", response_model=ClipLargoUploadResponse)
 async def upload_clip(
     queue: Annotated[JobQueue, Depends(get_queue)],
@@ -549,6 +673,34 @@ async def upload_clip(
     finally:
         await file.close()
 
+    return _encolar_clip(
+        queue, source, folder, producto, slot, destino, sexo_norm, usuario,
+        con_gancho=con_gancho, con_titulo=con_titulo,
+        con_cta=con_cta, con_flecha=con_flecha,
+    )
+
+
+def _encolar_clip(
+    queue: JobQueue,
+    source: str,
+    folder: str,
+    producto: str,
+    slot: int,
+    destino: Path,
+    sexo: str,
+    usuario: str,
+    *,
+    con_gancho: bool = True,
+    con_titulo: bool = True,
+    con_cta: bool = True,
+    con_flecha: bool = True,
+) -> ClipLargoUploadResponse:
+    """Guarda el clip en su hueco y encola el montaje si ya están los dos.
+
+    Sale aparte de `upload_clip` porque lo usan los DOS caminos: subir un clip
+    suelto y la subida en tanda. Duplicarlo habría acabado en dos versiones de
+    la regla de "no montar hasta tener los dos".
+    """
     try:
         prod = product_repo.update_product(
             source, folder, producto, usuario=usuario,
@@ -581,7 +733,7 @@ async def upload_clip(
         params={
             "source": source, "folder": folder, "producto": producto,
             "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
-            "sexo": sexo_norm, "operator": usuario,
+            "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
         },

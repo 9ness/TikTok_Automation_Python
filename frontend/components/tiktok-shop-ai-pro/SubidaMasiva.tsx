@@ -29,36 +29,32 @@ export function SubidaMasiva({
   source,
   folder,
   productos,
+  root = "/api/v1/nicho-pov-bof",
 }: {
   source: string;
   folder: string;
-  productos: ProductoItem[];
+  /** Solo se usan el número, el título y si tiene foto: sirve igual la ficha
+   *  del POV BOF que la del Largo. */
+  productos: Pick<ProductoItem, "producto" | "titulo" | "clean_photo_id">[];
+  /** Raíz de la API del nicho. En el Largo cada producto lleva dos clips y de
+   *  eso se encarga su endpoint, no esta pantalla. */
+  root?: string;
 }) {
-  const subir = useSubirLote();
-  const confirmar = useConfirmarLote();
+  const subir = useSubirLote(root);
+  const confirmar = useConfirmarLote(root);
   const [abierto, setAbierto] = useState(false);
-  const [elegidos, setElegidos] = useState<Set<string>>(new Set());
   const [reparto, setReparto] = useState<LoteItem[] | null>(null);
   const [sexo, setSexo] = useState<"auto" | "hombre" | "mujer">("auto");
 
   const conFoto = productos.filter((p) => p.clean_photo_id);
-  const candidatos = elegidos.size
-    ? conFoto.filter((p) => elegidos.has(p.producto))
-    : conFoto;
-
-  function alternar(pid: string) {
-    setElegidos((prev) => {
-      const s = new Set(prev);
-      if (s.has(pid)) s.delete(pid);
-      else s.add(pid);
-      return s;
-    });
-  }
 
   function enviar(files: File[]) {
     if (!files.length) return;
     subir.mutate(
-      { source, folder, productos: candidatos.map((p) => p.producto), files },
+      // Sin lista: se compara contra toda la carpeta. Marcar antes a qué
+      // productos ibas era un paso más para ahorrar poco, y si te dejabas uno
+      // su vídeo se quedaba sin sitio.
+      { source, folder, productos: [], files },
       {
         onSuccess: (r) => {
           setReparto(r.items);
@@ -89,26 +85,10 @@ export function SubidaMasiva({
       {abierto && (
         <div className="space-y-2">
           <p className="text-[10px] leading-relaxed text-muted-foreground">
-            Marca a qué productos vas a subir (o déjalo sin marcar para toda la
-            carpeta), suelta los vídeos y se reparten solos. Repasas y confirmas.
+            Suelta los vídeos de la carpeta y se reparten solos. No hace falta
+            que estén todos: los productos sin vídeo se quedan como están, y si
+            alguno no se reconoce lo asignas tú. Repasas y confirmas.
           </p>
-
-          <div className="flex flex-wrap gap-1">
-            {conFoto.map((p) => (
-              <button
-                key={p.producto}
-                type="button"
-                onClick={() => alternar(p.producto)}
-                className={`rounded border px-2 py-1 text-[10px] transition ${
-                  elegidos.has(p.producto)
-                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-                    : "border-border/60 text-muted-foreground"
-                }`}
-              >
-                {p.producto}
-              </button>
-            ))}
-          </div>
 
           <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600">
             {subir.isPending ? (
@@ -118,8 +98,7 @@ export function SubidaMasiva({
               </>
             ) : (
               <>
-                <Upload className="h-3.5 w-3.5" /> Elegir vídeos ({candidatos.length}{" "}
-                productos)
+                <Upload className="h-3.5 w-3.5" /> Elegir vídeos
               </>
             )}
             <input

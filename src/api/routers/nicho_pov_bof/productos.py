@@ -599,8 +599,12 @@ async def subir_lote(
             if p.clean_photo_id
         ]
 
+    # Los de plazos llevan DOS clips, así que pueden llevarse dos vídeos de la
+    # tanda; el resto, uno.
+    fichas = {p.producto: p for p in _list_productos(source, folder, None, usuario).items}
+    dobles = {pid for pid in candidatos if getattr(fichas.get(pid), "modo_plazos", False)}
     reparto = emparejador.emparejar(
-        source, folder, [dest / t for t, _ in guardados], candidatos,
+        source, folder, [dest / t for t, _ in guardados], candidatos, dobles=dobles,
     )
     items = [
         VideoLoteItem(
@@ -630,9 +634,14 @@ def confirmar_lote(
     from src.nicho_pov_bof.repos import product_repo
 
     encolados, pendientes, mensajes = 0, 0, []
+    # Cuántos vídeos van ya de cada producto en ESTA tanda: el segundo de un
+    # producto de plazos es su clip 2, y sin llevar la cuenta los dos se
+    # guardaban en el mismo hueco y el montaje nunca arrancaba.
+    vistos: dict[str, int] = {}
     for item in body.items:
         if not item.producto:
             continue
+        vistos[item.producto] = vistos.get(item.producto, 0) + 1
         ruta = _ruta_de_token(item.token)
         prod = product_repo.get_product(body.source, body.folder, item.producto, usuario)
         flags = {
@@ -641,7 +650,13 @@ def confirmar_lote(
         }
         if _precio_y_modo(prod)[1]:
             montado_at = float(prod.get("video_listo_at") or 0)
-            slot = 1 if not _clip_vigente(prod.get("clip1_path"), montado_at) else 2
+            # El orden de la tanda manda: el primer vídeo de este producto es
+            # el clip 1 y el segundo el clip 2. Solo si ya tenía uno subido de
+            # antes se respeta el hueco que quede libre.
+            if vistos[item.producto] >= 2:
+                slot = 2
+            else:
+                slot = 1 if not _clip_vigente(prod.get("clip1_path"), montado_at) else 2
             r = _plazos_clip(
                 queue, body.source, body.folder, item.producto, slot, ruta,
                 body.sexo, usuario, **flags,

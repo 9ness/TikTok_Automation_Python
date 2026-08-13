@@ -127,6 +127,39 @@ class GuionLargoResponse(BaseModel):
     producto: ProductoLargo
 
 
+class LoteLargoItem(BaseModel):
+    token: str
+    archivo: str = ""
+    producto: str = ""
+    por_que: str = ""
+
+
+class LoteLargoResponse(BaseModel):
+    source: str
+    folder: str
+    items: list[LoteLargoItem] = Field(default_factory=list)
+    reconocidos: int = 0
+
+
+class LoteLargoConfirmarRequest(BaseModel):
+    """Lo que confirma el operador tras repasar el reparto de la tanda."""
+
+    source: str
+    folder: str
+    items: list[LoteLargoItem] = Field(default_factory=list)
+    sexo: str = "auto"
+    con_gancho: bool = True
+    con_titulo: bool = True
+    con_cta: bool = True
+    con_flecha: bool = True
+
+
+class LoteLargoConfirmarResponse(BaseModel):
+    encolados: int = 0
+    pendientes: int = 0
+    mensajes: list[str] = Field(default_factory=list)
+
+
 class ClipLargoUploadResponse(BaseModel):
     job_id: str = ""
     encolado: bool = False

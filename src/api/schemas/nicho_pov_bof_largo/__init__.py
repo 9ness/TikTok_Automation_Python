@@ -1,4 +1,8 @@
 from .models import (
+    LoteLargoItem,
+    LoteLargoResponse,
+    LoteLargoConfirmarRequest,
+    LoteLargoConfirmarResponse,
     ClipLargoUploadResponse,
     FolderLargo,
     FoldersLargoResponse,
@@ -14,6 +18,10 @@ from .models import (
 )
 
 __all__ = [
+    "LoteLargoItem",
+    "LoteLargoResponse",
+    "LoteLargoConfirmarRequest",
+    "LoteLargoConfirmarResponse",
     "ClipLargoUploadResponse",
     "FolderLargo",
     "FoldersLargoResponse",

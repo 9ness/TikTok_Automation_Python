@@ -32,6 +32,7 @@ import {
 } from "@/lib/topVendidos";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -958,6 +959,17 @@ export default function PovBofLargoPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
               {(productosQ.error as Error)?.message ?? "No se pudieron cargar los productos."}
             </p>
+          )}
+
+          {/* Subir los clips de la carpeta de golpe. Aquí cada producto lleva
+              DOS, y de repartirlos se encarga el endpoint del nicho. */}
+          {folder && items.length > 0 && (
+            <SubidaMasiva
+              source={activaSource}
+              folder={folder}
+              productos={items}
+              root="/api/v1/nicho-pov-bof-largo"
+            />
           )}
 
           {/* Solo en Top vendidos: ahí importa el orden (lo que más vende) y

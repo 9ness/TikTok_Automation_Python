@@ -63,14 +63,20 @@ def _fotogramas(video: Path, destino: Path, etiqueta: str) -> list[str]:
     return salidas
 
 
-def _prompt(n_videos: int, fotos_por_video: list[int], productos: list[str]) -> str:
+def _prompt(
+    n_videos: int, fotos_por_video: list[int], productos: list[str],
+    dobles: set[str] | None = None,
+) -> str:
     bloques = []
     i = 1
     for v, cuantos in enumerate(fotos_por_video, start=1):
         bloques.append(f"- Vídeo {v}: imágenes {i} a {i + cuantos - 1}")
         i += cuantos
+    dobles = dobles or set()
     catalogo = "\n".join(
-        f"- Producto {p}: imagen {i + n}" for n, p in enumerate(productos)
+        f"- Producto {p}: imagen {i + n}"
+        + (" (DE DOS CLIPS: puede salir en dos vídeos)" if p in dobles else "")
+        for n, p in enumerate(productos)
     )
     return (
         f"Te paso {i - 1 + len(productos)} imágenes en orden.\n\n"
@@ -79,8 +85,13 @@ def _prompt(n_videos: int, fotos_por_video: list[int], productos: list[str]) -> 
         "Cada vídeo se generó a partir de la foto de UNO de esos productos. "
         "Dime de cuál es cada vídeo.\n\n"
         "Reglas:\n"
-        "- Un producto no puede repetirse en dos vídeos: reparte.\n"
-        "- Puede haber productos parecidos (varios carritos, varios colchones). "
+        + (
+            "- Cada producto sale en UN solo vídeo, salvo los marcados como DE "
+            "DOS CLIPS, que salen en DOS (son dos planos del mismo producto).\n"
+            if dobles else
+            "- Un producto no puede repetirse en dos vídeos: reparte.\n"
+        )
+        + "- Puede haber productos parecidos (varios carritos, varios colchones). "
         "Fíjate en la forma exacta, el color, el material, las ruedas, el "
         "número de plazas y los detalles, no en el tipo genérico.\n"
         "- MUY IMPORTANTE: puede que el producto del vídeo NO esté en el "
@@ -122,11 +133,15 @@ def emparejar(
     videos: list[Path],
     productos: list[str],
     *,
+    dobles: set[str] | None = None,
     on_log: OnLog = _noop,
 ) -> list[dict]:
     """`[{video: <índice 0..n>, producto, por_que}]`, uno por vídeo.
 
-    `productos` son los candidatos (los que marcó el operador). Si algo falla
+    `dobles` son los productos que llevan DOS clips (los de plazos, y todos en
+    el POV BOF Largo): esos pueden llevarse dos vídeos y el resto solo uno.
+
+    `productos` son los candidatos. Si algo falla
     se devuelve la lista con `producto` vacío: la ficha la enseñará sin asignar
     y él la rellena, que es mejor que no poder subir nada.
     """
@@ -172,11 +187,15 @@ def emparejar(
             on_log("[emparejador] ninguno de los productos elegidos tiene foto limpia")
             return vacio
 
+        dobles = {str(d) for d in (dobles or set())} & set(ids)
         datos = generate_json(
-            _prompt(len(videos), por_video, ids), "", images=imagenes + catalogo,
+            _prompt(len(videos), por_video, ids, dobles), "",
+            images=imagenes + catalogo,
         )
         salida = {i: {"video": i, "producto": "", "por_que": ""} for i in range(len(videos))}
-        usados: set[str] = set()
+        # Cuántos vídeos admite cada producto: dos si lleva dos clips, uno el
+        # resto. Sin este tope, un producto se quedaba con media carpeta.
+        cupo = {pid: (2 if pid in dobles else 1) for pid in ids}
         for fila in (datos or {}).get("videos") or []:
             try:
                 idx = int(fila.get("video", 0)) - 1
@@ -186,9 +205,9 @@ def emparejar(
             # Se ignora lo que no cuadre: un id inventado, uno fuera de los
             # elegidos o un producto repetido. Vale más dejarlo sin asignar que
             # meter el vídeo del colchón en el sofá.
-            if idx not in salida or pid not in ids or pid in usados:
+            if idx not in salida or pid not in ids or cupo.get(pid, 0) <= 0:
                 continue
-            usados.add(pid)
+            cupo[pid] -= 1
             salida[idx] = {
                 "video": idx, "producto": pid,
                 "por_que": str(fila.get("por_que") or "")[:80],
