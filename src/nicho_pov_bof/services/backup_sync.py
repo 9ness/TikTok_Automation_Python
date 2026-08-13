@@ -41,8 +41,19 @@ SRC_REMOTE = "gdrive,shared_with_me=true:"
 SRC_PATH = f"{SRC_REMOTE}{config.SHARED_ROOT}"
 
 # Destino: hermano de TIKTOK_SHOP_AI_PRO bajo la raíz del proyecto en Drive.
+#
+# Todas las copias cuelgan de UNA carpeta (`BACKUP_DIR`) en vez de quedarse
+# sueltas en la raíz. Se hace una copia casi cada día y en un mes la raíz del
+# proyecto eran quince carpetas de backup y tres de trabajo: encontrar
+# `TIKTOK_SHOP_AI_PRO` en el móvil obligaba a bajar media pantalla.
 BACKUP_PARENT = "NEBULABS_AUTOMATED_TIKTOK"
+BACKUP_DIR = "BACKUPS_Productos_Espana"
 BACKUP_PREFIX = "BACKUP_Productos_Espana"
+
+
+def _destino(nombre: str) -> str:
+    """Ruta rclone de una copia, ya dentro de la carpeta de backups."""
+    return f"gdrive:{BACKUP_PARENT}/{BACKUP_DIR}/{nombre}"
 
 # Si cambia más de esta fracción del archivo, sale más a cuenta una copia
 # completa nueva que un delta gigante.
@@ -272,11 +283,11 @@ def run_sync(
         }
 
     if full:
-        dest = f"gdrive:{BACKUP_PARENT}/{BACKUP_PREFIX}_{fecha}"
+        dest = _destino(f"{BACKUP_PREFIX}_{fecha}")
         ids = sorted(new_snap)
         on_log(f"[backup] copia COMPLETA ({reason}) → {dest}")
     else:
-        dest = f"gdrive:{BACKUP_PARENT}/{BACKUP_PREFIX}_delta_{fecha}"
+        dest = _destino(f"{BACKUP_PREFIX}_delta_{fecha}")
         ids = d["added"] + d["modified"]
         on_log(f"[backup] copia DELTA ({reason}, {len(ids)} ficheros) → {dest}")
 
