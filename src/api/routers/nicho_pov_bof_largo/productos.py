@@ -541,6 +541,23 @@ async def subir_uno_del_lote(
     return {"token": token, "archivo": file.filename or token}
 
 
+@router.get("/video/lote/archivo")
+def ver_video_del_lote(
+    token: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """Sirve un bruto ya subido para poder verlo antes de asignarlo.
+
+    Cuando el reparto no reconoce un vídeo, con el nombre del fichero no hay
+    forma de saber cuál es: hay que verlo. Auth por `?api_key=` porque va en un
+    `<video src>`, que no manda cabeceras.
+    """
+    ruta = _ruta_de_token(token)
+    return FileResponse(
+        ruta, media_type="video/mp4", headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.post("/video/lote/repartir", response_model=LoteLargoResponse)
 def repartir_lote(
     body: dict,

@@ -595,3 +595,16 @@ export function useConfirmarLote(root: string = ROOT) {
     onSuccess: () => void qc.invalidateQueries(),
   });
 }
+
+/** URL para ver un bruto de la tanda que aún no se ha asignado.
+ *
+ *  Lleva la api_key en la URL porque va en un `<video src>` y ahí no se pueden
+ *  poner cabeceras. */
+export function archivoLoteUrl(root: string, token: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const k = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  return (
+    `${base}${root}/video/lote/archivo?token=${encodeURIComponent(token)}` +
+    (k ? `&api_key=${encodeURIComponent(k)}` : "")
+  );
+}

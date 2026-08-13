@@ -236,6 +236,44 @@ def emparejar(
                 "video": idx, "producto": pid,
                 "por_que": str(fila.get("por_que") or "")[:80],
             }
+        # Segunda pasada para los que se hayan quedado sueltos. El modelo no
+        # es determinista: con los MISMOS vídeos a veces reconoce los tres y a
+        # veces dos. Aquí se le vuelve a preguntar solo por los que faltan y
+        # solo contra los productos que aún admiten otro vídeo, que es un
+        # problema mucho más pequeño que el original.
+        sueltos = [i for i, x in salida.items() if not x["producto"]]
+        quedan = [pid for pid in ids if cupo.get(pid, 0) > 0]
+        if sueltos and quedan and len(quedan) < len(ids):
+            on_log(f"[emparejador] segunda pasada para {len(sueltos)} vídeo(s)")
+            sub_imgs, sub_por_video = [], []
+            for i in sueltos:
+                desde = sum(por_video[:i])
+                sub_imgs += imagenes[desde:desde + por_video[i]]
+                sub_por_video.append(por_video[i])
+            sub_cat = [catalogo[ids.index(pid)] for pid in quedan]
+            sub_letra = _letras(quedan)
+            sub_por_letra = {v: k for k, v in sub_letra.items()}
+            datos2 = generate_json(
+                _prompt(len(sueltos), sub_por_video, quedan, dobles & set(quedan)),
+                "", images=sub_imgs + sub_cat,
+            )
+            for fila in (datos2 or {}).get("videos") or []:
+                try:
+                    n = int(fila.get("video", 0)) - 1
+                except (TypeError, ValueError):
+                    continue
+                if not 0 <= n < len(sueltos):
+                    continue
+                bruto = str(fila.get("producto") or "").strip()
+                pid = sub_por_letra.get(bruto.upper(), "") or _id_de(bruto, quedan)
+                if not pid or cupo.get(pid, 0) <= 0:
+                    continue
+                cupo[pid] -= 1
+                salida[sueltos[n]] = {
+                    "video": sueltos[n], "producto": pid,
+                    "por_que": str(fila.get("por_que") or "")[:80],
+                }
+
         hechos = sum(1 for x in salida.values() if x["producto"])
         on_log(f"[emparejador] {hechos}/{len(videos)} vídeos reconocidos")
         return [salida[i] for i in range(len(videos))]

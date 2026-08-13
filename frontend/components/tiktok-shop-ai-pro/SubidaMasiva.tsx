@@ -6,11 +6,13 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import {
+  archivoLoteUrl,
   subirUno,
   useConfirmarLote,
   useRepartirLote,
   type LoteItem,
 } from "@/lib/queries/nichoPovBof";
+import { buildPhotoUrl } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 /** Subir los vídeos de una carpeta de golpe y que cada uno vaya a su producto.
@@ -46,6 +48,9 @@ export function SubidaMasiva({
   // Por dónde va la subida: qué fichero y su porcentaje.
   const [progreso, setProgreso] = useState<{ n: number; total: number; pct: number } | null>(null);
   const [reconociendo, setReconociendo] = useState(false);
+  // Las fotos de producto salen del nicho del POV BOF también en el Largo:
+  // las carpetas son las mismas.
+  const fotoUrl = (s: string, f: string, id: string) => buildPhotoUrl(s, f, id, 160);
   const [abierto, setAbierto] = useState(false);
   const [reparto, setReparto] = useState<LoteItem[] | null>(null);
   const [sexo, setSexo] = useState<"auto" | "hombre" | "mujer">("auto");
@@ -74,7 +79,10 @@ export function SubidaMasiva({
         // aquí y es lo que hay que enseñar al repasar.
         nombres.set(tok, file.name);
       }
-      setProgreso({ n: files.length, total: files.length, pct: 100 });
+      // Se limpia el progreso ANTES de reconocer: si no, el botón se quedaba
+      // clavado en "Vídeo 3 de 3 · 100%" mientras la IA pensaba, que es la
+      // parte que más tarda.
+      setProgreso(null);
       setReconociendo(true);
       const r = await repartir.mutateAsync({ source, folder, tokens });
       setReparto(r.items.map((x) => ({ ...x, archivo: nombres.get(x.token) ?? x.archivo })));
@@ -90,6 +98,10 @@ export function SubidaMasiva({
   }
 
   const listos = (reparto ?? []).filter((i) => i.producto).length;
+
+  function cambiar(i: number, producto: string) {
+    setReparto((prev) => (prev ?? []).map((x, n) => (n === i ? { ...x, producto } : x)));
+  }
 
   return (
     <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
@@ -144,47 +156,102 @@ export function SubidaMasiva({
 
           {reparto && (
             <div className="space-y-1.5">
-              {reparto.map((it, i) => (
-                <div
-                  key={it.token}
-                  className={`space-y-1 rounded-lg border p-2 ${
-                    it.producto ? "border-border/60" : "border-amber-500/50 bg-amber-500/5"
-                  }`}
-                >
-                  <p className="truncate text-[10px] text-muted-foreground">
-                    {it.archivo}
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={it.producto}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setReparto((prev) =>
-                          (prev ?? []).map((x, n) =>
-                            n === i ? { ...x, producto: v } : x,
-                          ),
-                        );
-                      }}
-                      className="flex-1 rounded-md border border-border/60 bg-background px-2 py-1 text-xs"
-                    >
-                      <option value="">— sin asignar —</option>
+              {reparto.map((it, i) => {
+                const asignado = conFoto.find((p) => p.producto === it.producto);
+                return (
+                  <div
+                    key={it.token}
+                    className={`space-y-1.5 rounded-lg border p-2 ${
+                      it.producto ? "border-border/60" : "border-amber-500/50 bg-amber-500/5"
+                    }`}
+                  >
+                    <div className="flex gap-2">
+                      {/* El vídeo, para poder verlo: cuando no lo reconoce, el
+                          nombre del fichero no dice absolutamente nada. */}
+                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                      <video
+                        src={archivoLoteUrl(root, it.token)}
+                        controls
+                        preload="metadata"
+                        playsInline
+                        className="h-24 w-16 shrink-0 rounded border border-border/60 bg-black object-cover"
+                      />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {it.archivo}
+                        </p>
+                        {asignado ? (
+                          <div className="flex items-center gap-1.5">
+                            {asignado.clean_photo_id && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={fotoUrl(source, folder, asignado.clean_photo_id)}
+                                alt={asignado.producto}
+                                className="h-10 w-10 rounded border border-emerald-500/60 object-cover"
+                              />
+                            )}
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">
+                              {asignado.producto} · {asignado.titulo || "sin título"}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-amber-500">
+                            No lo ha reconocido: elígelo abajo o déjalo fuera.
+                          </p>
+                        )}
+                        {it.por_que && (
+                          <p className="text-[10px] text-muted-foreground">{it.por_que}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Las fotos de los productos, para elegir mirando y no
+                        leyendo. La asignada va marcada. */}
+                    <div className="flex gap-1 overflow-x-auto pb-1">
+                      <button
+                        type="button"
+                        onClick={() => cambiar(i, "")}
+                        className={`shrink-0 rounded border px-2 py-1 text-[10px] ${
+                          it.producto
+                            ? "border-border/60 text-muted-foreground"
+                            : "border-amber-500 text-amber-500"
+                        }`}
+                      >
+                        fuera
+                      </button>
                       {conFoto.map((p) => (
-                        <option key={p.producto} value={p.producto}>
-                          {p.producto} · {(p.titulo || "sin título").slice(0, 34)}
-                        </option>
+                        <button
+                          key={p.producto}
+                          type="button"
+                          onClick={() => cambiar(i, p.producto)}
+                          title={`${p.producto} · ${p.titulo ?? ""}`}
+                          className={`relative shrink-0 rounded border ${
+                            it.producto === p.producto
+                              ? "border-emerald-500 ring-1 ring-emerald-500"
+                              : "border-border/60"
+                          }`}
+                        >
+                          {p.clean_photo_id ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={fotoUrl(source, folder, p.clean_photo_id)}
+                              alt={p.producto}
+                              className="h-12 w-12 rounded object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-12 w-12 items-center justify-center text-[10px]">
+                              {p.producto}
+                            </span>
+                          )}
+                          <span className="absolute bottom-0 left-0 rounded-br rounded-tl bg-black/70 px-1 text-[9px] text-white">
+                            {p.producto}
+                          </span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
-                  {it.por_que && (
-                    <p className="text-[10px] text-muted-foreground">{it.por_que}</p>
-                  )}
-                  {!it.producto && (
-                    <p className="text-[10px] text-amber-500">
-                      No lo ha reconocido: elígelo tú o déjalo fuera.
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
                 {(["auto", "hombre", "mujer"] as const).map((s) => (
