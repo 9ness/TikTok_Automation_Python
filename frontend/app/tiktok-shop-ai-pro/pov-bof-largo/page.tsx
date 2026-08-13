@@ -116,7 +116,9 @@ export default function PovBofLargoPage() {
   const guionBatch = useEscribirGuion();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
-  const totalVendidos = (vendidos.data ?? []).reduce((n, v) => n + (v.unidades || 1), 0);
+  // Productos, no unidades: el botón habla de productos (ver POV BOF).
+  const totalVendidos = (vendidos.data ?? []).length;
+  const unidadesVendidas = (vendidos.data ?? []).reduce((n, v) => n + (v.unidades || 1), 0);
 
   const [backup, setBackup] = useState<BackupCheckResponse | null>(null);
   const backupCheck = useBackupCheck();
@@ -478,6 +480,11 @@ export default function PovBofLargoPage() {
           {totalVendidos > 0 && (
             <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-black">
               {totalVendidos}
+            </span>
+          )}
+          {unidadesVendidas > totalVendidos && (
+            <span className="text-[10px] font-normal opacity-70">
+              · {unidadesVendidas} uds
             </span>
           )}
         </button>

@@ -163,7 +163,11 @@ export default function NichoPovBofPage() {
   // que el número del botón tiene que contar lo mismo. Con `source` decía 2
   // (solo la fuente abierta) y al abrirlo salían 43.
   const vendidos = useVendidos("");
-  const totalVendidos = (vendidos.data ?? []).reduce(
+  // El botón dice "productos", así que enseña PRODUCTOS. Antes sumaba las
+  // unidades y salía un número mayor (48 con 30 productos), que no cuadraba
+  // con las carpetas de Top vendidos y parecía que faltaban por copiar.
+  const totalVendidos = (vendidos.data ?? []).length;
+  const unidadesVendidas = (vendidos.data ?? []).reduce(
     (n, v) => n + (v.unidades || 1), 0,
   );
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
@@ -470,6 +474,11 @@ export default function NichoPovBofPage() {
           {totalVendidos > 0 && (
             <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-black">
               {totalVendidos}
+            </span>
+          )}
+          {unidadesVendidas > totalVendidos && (
+            <span className="text-[10px] font-normal opacity-70">
+              · {unidadesVendidas} uds
             </span>
           )}
         </button>
