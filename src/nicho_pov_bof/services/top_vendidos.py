@@ -108,6 +108,23 @@ def ventas_por_producto(source: str) -> dict[str, dict]:
     return salida
 
 
+def pendientes() -> int:
+    """Cuántos productos del ranking aún no están en la carpeta.
+
+    Es una resta de dos lecturas de Redis, sin tocar Drive: se pide en cada
+    carga de la pantalla para poder avisar de que hay algo que traer, y si
+    costara un listado del Drive no se podría.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    doc = manifiesto()
+    return sum(
+        1 for v in product_repo.ranking_vendidos()
+        if f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}" not in doc
+        and v.get("source") != SOURCE
+    )
+
+
 # ---------------------------------------------------------------------------
 # Carpetas en disco (mismo shape que `drive_client`)
 # ---------------------------------------------------------------------------

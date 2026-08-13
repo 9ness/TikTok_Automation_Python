@@ -3,6 +3,8 @@
 export interface SourceInfo {
   slug: string;
   label: string;
+  /** Solo en "Top vendidos": vendidos que faltan por copiar a la carpeta. */
+  pendientes: number;
 }
 
 export interface SourcesListResponse {

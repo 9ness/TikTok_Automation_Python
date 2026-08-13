@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 class SourceInfo(BaseModel):
     slug: str
     label: str
+    # Solo en "Top vendidos": productos del ranking que aún no se han copiado a
+    # la carpeta. Va aquí para poder avisar sin entrar a la fuente.
+    pendientes: int = 0
 
 
 class SourcesListResponse(BaseModel):

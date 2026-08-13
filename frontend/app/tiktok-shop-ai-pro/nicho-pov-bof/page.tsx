@@ -56,6 +56,7 @@ import {
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
   useSetEstado,
+  useBorrarMiProducto,
   useSincronizarTopVendidos,
   useSortearGuionPlazos,
   useSources,
@@ -383,6 +384,13 @@ export default function NichoPovBofPage() {
               }`}
             >
               {s.label}
+              {/* Vendidos que aún no están copiados en la carpeta. Sin esto no
+                  hay forma de enterarse sin entrar a mirar. */}
+              {s.pendientes > 0 && (
+                <span className="ml-1 rounded bg-amber-500/20 px-1 py-0.5 text-[9px] font-bold text-amber-500">
+                  +{s.pendientes}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -986,12 +994,17 @@ export default function NichoPovBofPage() {
  *  entrar: si acabas de marcar una venta, esto la baja a su carpeta. */
 function SincronizarTopVendidos() {
   const sincronizar = useSincronizarTopVendidos();
+  // Cuántos hay esperando, para decirlo en el propio botón en vez de tener que
+  // pulsarlo para averiguarlo.
+  const faltan =
+    useSources().data?.items.find((s) => s.slug === FUENTE_TOP_VENDIDOS)?.pendientes ?? 0;
   return (
     <div className="space-y-1 rounded-lg border border-border/60 p-2">
       <p className="text-[10px] leading-relaxed text-muted-foreground">
         Trae aquí los productos que ya vendieron, de diez en diez, con sus
         textos ya extraídos. Cada uno se queda siempre en su carpeta aunque
-        luego venda más — moverlo perdería lo que ya llevas marcado.
+        luego venda más — moverlo perdería lo que ya llevas marcado. Las
+        ventas sí se actualizan solas, sin pulsar nada.
       </p>
       <button
         type="button"
@@ -1013,7 +1026,10 @@ function SincronizarTopVendidos() {
           </>
         ) : (
           <>
-            <RefreshCw className="h-3.5 w-3.5" /> Buscar productos vendidos nuevos
+            <RefreshCw className="h-3.5 w-3.5" />
+            {faltan > 0
+              ? `Traer ${faltan} producto${faltan > 1 ? "s" : ""} nuevo${faltan > 1 ? "s" : ""}`
+              : "Buscar productos vendidos nuevos"}
           </>
         )}
       </button>
@@ -1476,6 +1492,7 @@ function ProductoCard({
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
   const sortear = useSortearGuionPlazos();
+  const borrar = useBorrarMiProducto();
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2047,6 +2064,40 @@ function ProductoCard({
           </>
         )}
       </button>
+      )}
+
+      {/* Solo en "Mis productos": son los que sube el operador, así que
+          también los puede quitar. Las del curso son de solo lectura. */}
+      {source === "mis_productos" && (
+        <button
+          type="button"
+          disabled={borrar.isPending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                `¿Quitar el producto ${producto.producto}? Se borran sus dos fotos.`,
+              )
+            )
+              return;
+            borrar.mutate(
+              { carpeta: folder, producto: producto.producto },
+              {
+                onSuccess: () => toast.success(`Producto ${producto.producto} borrado`),
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            );
+          }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-50"
+        >
+          {borrar.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Borrando…
+            </>
+          ) : (
+            <>🗑️ Quitar este producto</>
+          )}
+        </button>
       )}
 
       <div className="flex gap-1.5">

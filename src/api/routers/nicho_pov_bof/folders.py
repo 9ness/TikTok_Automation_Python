@@ -51,10 +51,23 @@ def _bad_request(msg: str) -> APIError:
 @router.get("/sources", response_model=SourcesListResponse)
 def list_sources() -> SourcesListResponse:
     from src.nicho_pov_bof import config
+    from src.nicho_pov_bof.services import top_vendidos
+
+    # Cuántos vendidos quedan por traer. Es una resta de dos lecturas de Redis
+    # (no toca Drive), así que se puede pedir en cada carga de la pantalla; si
+    # falla, se enseña 0 antes que tumbar el selector de fuentes.
+    try:
+        faltan = top_vendidos.pendientes()
+    except Exception:
+        faltan = 0
 
     return SourcesListResponse(
         items=[
-            SourceInfo(slug=slug, label=meta["label"])
+            SourceInfo(
+                slug=slug,
+                label=meta["label"],
+                pendientes=faltan if slug == top_vendidos.SOURCE else 0,
+            )
             for slug, meta in config.SOURCES.items()
         ]
     )
