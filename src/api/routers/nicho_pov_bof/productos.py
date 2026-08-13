@@ -265,11 +265,8 @@ def _producto_info(
         # producto está repetido en varias carpetas y se graba con varios
         # nichos, pero al Marketplace se sube UNA vez. El flag viejo por
         # producto se sigue mirando para no perder lo ya marcado.
-        en_escaparate=(
-            product_repo.en_escaparate(
-                prod.get("tienda", ""), prod.get("titulo", ""), usuario,
-            )
-            or bool(prod.get("en_escaparate"))
+        en_escaparate=product_repo.marcado_en_escaparate(
+            prod, product_repo.escaparate_index(usuario),
         ),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
@@ -391,12 +388,7 @@ def _list_productos(
                 clip2=_clip_vigente(
                     guardado.get("clip2_path"), float(guardado.get("video_listo_at") or 0),
                 ),
-                en_escaparate=(
-                    product_repo.clave_escaparate(
-                        guardado.get("tienda", ""), guardado.get("titulo", ""),
-                    ) in escaparate
-                    or bool(guardado.get("en_escaparate"))
-                ),
+                en_escaparate=product_repo.marcado_en_escaparate(guardado, escaparate),
                 uploaded=bool(guardado.get("uploaded")),
                 uploaded_at=float(guardado.get("uploaded_at") or 0),
                 sold=bool(guardado.get("sold")),

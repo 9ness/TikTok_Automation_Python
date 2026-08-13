@@ -536,6 +536,28 @@ def save_hashtags(tags: list[str]) -> list[str]:
 _ESCAPARATE_INDEX = "escaparate:index"
 
 
+def marcado_en_escaparate(prod: dict, indice: set[str]) -> bool:
+    """¿Este producto está en el escaparate? ÚNICO criterio para todos los nichos.
+
+    Manda el índice compartido, pero se acepta también la marca antigua que
+    vive dentro del producto (`en_escaparate`), de cuando el escaparate era de
+    cada carpeta. Hacía falta unificarlo: el POV BOF miraba las dos cosas y el
+    Largo solo el índice, así que la misma carpeta salía llena en uno y a cero
+    en el otro.
+
+    Los dos datos se separan cuando se re-extraen los textos: la clave del
+    índice es `tienda|titulo` y al cambiar el título la marca vieja queda
+    huérfana. Por eso no basta con el índice, y por eso existe
+    `scripts/migrar_escaparate.py`, que reengancha las huérfanas.
+    """
+    if bool(prod.get("en_escaparate")):
+        return True
+    titulo = prod.get("titulo", "")
+    if not titulo:
+        return False
+    return clave_escaparate(prod.get("tienda", ""), titulo) in indice
+
+
 def clave_escaparate(tienda: str, titulo: str) -> str:
     """`tienda|nombre` normalizados. Vacía si no hay nombre — sin textos
     extraídos todavía no se puede saber si dos productos son el mismo."""

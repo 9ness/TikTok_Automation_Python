@@ -284,12 +284,11 @@ def _listar(
             clip2=_clip_puesto(mio.get("clip2_path"), float(mio.get("video_listo_at") or 0)),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
-            en_escaparate=(
-                product_repo.clave_escaparate(
-                    textos.get("tienda", ""), textos.get("titulo", "")
-                ) in esc_index
-                if textos.get("titulo")
-                else bool(mio.get("en_escaparate"))
+            # Mismo criterio que el POV BOF y Creativos (índice compartido o
+            # marca antigua). Antes aquí solo se miraba el índice y la misma
+            # carpeta salía llena en un nicho y a cero en este.
+            en_escaparate=product_repo.marcado_en_escaparate(
+                {**textos, "en_escaparate": mio.get("en_escaparate")}, esc_index
             ),
             uploaded=bool(mio.get("uploaded")),
             uploaded_at=float(mio.get("uploaded_at") or 0),

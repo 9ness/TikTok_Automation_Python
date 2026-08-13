@@ -130,6 +130,11 @@ def textos_producto(source: str, folder: str, producto: str, usuario: str = "") 
 from src.nicho_pov_bof.repos import product_repo as _pov  # noqa: E402
 
 clave_escaparate = _pov.clave_escaparate
+# El criterio de "está en el escaparate" es UNO para todos los nichos: se
+# reenvía el del POV BOF en vez de escribirlo aquí. Tenerlo duplicado fue el
+# error que hizo que la misma carpeta saliera llena en un nicho y a cero en
+# este.
+marcado_en_escaparate = _pov.marcado_en_escaparate
 
 
 def _legacy_index(usuario: str) -> set[str]:
