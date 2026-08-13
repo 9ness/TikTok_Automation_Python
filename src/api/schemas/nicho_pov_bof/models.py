@@ -134,6 +134,10 @@ class ProductoInfo(BaseModel):
     # Precio leído de la ficha. Decide el guion: por encima de
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.
+    # Solo en "Top vendidos": cuántas veces vendió el producto de origen y
+    # cuándo entró en el ranking. Sirven para ordenar y para marcar los nuevos.
+    ventas: int = 0
+    vendido_at: float = 0
     precio: float = 0
     # El precio de antes del descuento, solo para verlo. La decisión la manda
     # `precio` (lo que se paga hoy): con cupones por debajo de 30 € Klarna no

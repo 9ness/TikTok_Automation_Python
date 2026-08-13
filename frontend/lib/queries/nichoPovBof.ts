@@ -272,6 +272,28 @@ export function useSetEstado() {
   });
 }
 
+/** Copia a "Top vendidos" los productos del ranking que aún no estén.
+ *
+ *  No gasta Gemini (los textos se copian de la carpeta de origen) y solo
+ *  añade: un producto ya copiado no se mueve de sitio aunque venda más. */
+export function useSincronizarTopVendidos() {
+  const qc = useQueryClient();
+  return useMutation<
+    { añadidos: number; total: number; carpetas: number },
+    Error,
+    void
+  >({
+    mutationFn: () =>
+      api.post<{ añadidos: number; total: number; carpetas: number }>(
+        `${ROOT}/top-vendidos/sincronizar`,
+        {},
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+    },
+  });
+}
+
 /** Sortea el guion de plazos del producto (o pide otro distinto).
  *
  *  No gasta ninguna llamada de API: son cinco textos fijos del curso. Sirve

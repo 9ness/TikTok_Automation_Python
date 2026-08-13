@@ -51,6 +51,7 @@ import {
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
   useSetEstado,
+  useSincronizarTopVendidos,
   useSortearGuionPlazos,
   useSources,
   useVendidos,
@@ -135,6 +136,19 @@ export default function NichoPovBofPage() {
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
   const productos = useProductos(source, folder);
+  const esTopVendidos = source === "top_vendidos";
+  const [soloSinSubir, setSoloSinSubir] = useState(false);
+  /** En Top vendidos manda lo que vende, no el número de producto: el orden
+   *  del fichero es el de ENTRADA (que no se toca nunca para no perder el
+   *  progreso), así que ordenar aquí es lo único que queda. */
+  const productosVisibles = useMemo(() => {
+    const items = productos.data ?? [];
+    if (!esTopVendidos) return items;
+    return items
+      .filter((p) => !soloSinSubir || !p.uploaded)
+      .slice()
+      .sort((a, b) => b.ventas - a.ventas || b.vendido_at - a.vendido_at);
+  }, [productos.data, esTopVendidos, soloSinSubir]);
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   // SIN fuente: el ranking es global y el listado que se abre también, así
@@ -346,9 +360,9 @@ export default function NichoPovBofPage() {
           y el hueco entre ambas costaban ~60px de scroll en móvil para dos
           líneas de contenido. */}
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        {/* Las tres fuentes en una sola fila: son tres y caben, y así no se
-            come una línea entera de pantalla en el móvil. */}
-        <div className="grid grid-cols-3 gap-1.5">
+        {/* Dos por línea en móvil desde que son cuatro: en una sola fila los
+            nombres quedaban recortados a tres letras. */}
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {(sources.data?.items ?? []).map((s) => (
             <button
               key={s.slug}
@@ -367,6 +381,7 @@ export default function NichoPovBofPage() {
 
         {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
         {source === "mis_productos" && <AltaMiProducto />}
+        {source === "top_vendidos" && <SincronizarTopVendidos />}
 
 
         <div className="mb-2 flex items-center justify-between text-xs sm:text-sm">
@@ -889,15 +904,33 @@ export default function NichoPovBofPage() {
             </p>
           )}
 
-          {productos.data && productos.data.length > 0 && (
+          {/* Solo en Top vendidos: ahí el orden importa (los que más venden
+              primero) y lo que se busca es lo que aún no has probado. */}
+          {esTopVendidos && productos.data && productos.data.length > 0 && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-500"
+                checked={soloSinSubir}
+                onChange={(e) => setSoloSinSubir(e.target.checked)}
+              />
+              Solo los que no he subido
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {productosVisibles.length}/{productos.data.length}
+              </span>
+            </label>
+          )}
+
+          {productosVisibles.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {productos.data.map((p) => (
+              {productosVisibles.map((p) => (
                 <ProductoCard
                   key={p.producto}
                   source={source}
                   folder={folder}
                   producto={p}
                   carpetaHecha={Boolean(productos.data?.some((x) => x.titulo))}
+                  esTopVendidos={esTopVendidos}
                 />
               ))}
             </div>
@@ -926,6 +959,48 @@ export default function NichoPovBofPage() {
  *  partir de ahí el producto se comporta igual que cualquier otro: textos,
  *  caption, gancho, CTA, escaparate, vendidos y montaje del vídeo.
  */
+/** Trae al "Top vendidos" los productos del ranking que aún no estén.
+ *
+ *  Va aquí, junto al selector de fuente, porque es lo primero que se hace al
+ *  entrar: si acabas de marcar una venta, esto la baja a su carpeta. */
+function SincronizarTopVendidos() {
+  const sincronizar = useSincronizarTopVendidos();
+  return (
+    <div className="space-y-1 rounded-lg border border-border/60 p-2">
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Trae aquí los productos que ya vendieron, de diez en diez, con sus
+        textos ya extraídos. Cada uno se queda siempre en su carpeta aunque
+        luego venda más — moverlo perdería lo que ya llevas marcado.
+      </p>
+      <button
+        type="button"
+        disabled={sincronizar.isPending}
+        onClick={() =>
+          sincronizar.mutate(undefined, {
+            onSuccess: (r) =>
+              r.añadidos
+                ? toast.success(`${r.añadidos} producto(s) nuevos · ${r.total} en total`)
+                : toast.info("Ya estaban todos los que han vendido"),
+            onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+          })
+        }
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-3 py-1.5 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/10 disabled:opacity-50"
+      >
+        {sincronizar.isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Copiando fotos…
+          </>
+        ) : (
+          <>
+            <RefreshCw className="h-3.5 w-3.5" /> Buscar productos vendidos nuevos
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+
 function AltaMiProducto() {
   const crear = useCrearMiProducto();
   const [limpia, setLimpia] = useState<File | null>(null);
@@ -1331,10 +1406,13 @@ function ProductoCard({
   folder,
   producto,
   carpetaHecha = false,
+  esTopVendidos = false,
 }: {
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** En "Top vendidos" se enseña cuántas veces vendió y si es reciente. */
+  esTopVendidos?: boolean;
   /** La carpeta ya tiene textos en OTROS productos. Sirve para marcar al que
    *  se quedó sin ellos: es un producto que apareció tarde (antes se perdían
    *  los de fotos sin extensión y los fundidos bajo un mismo número), y sin
@@ -1534,6 +1612,20 @@ function ProductoCard({
               el guion de plazos), así que se ve pegado al producto. Cuando la
               carpeta tiene textos pero no se pudo leer el precio se dice: en
               silencio parecería barato y se iría al guion de siempre. */}
+          {esTopVendidos && producto.ventas > 0 && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">
+                🔥 {producto.ventas} {producto.ventas === 1 ? "venta" : "ventas"}
+              </span>
+              {/* "Nuevo" = entró en el ranking esta semana. Es lo que buscas al
+                  abrir la pantalla: qué ha empezado a vender. */}
+              {Date.now() / 1000 - producto.vendido_at < 7 * 24 * 3600 && (
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-500">
+                  nuevo
+                </span>
+              )}
+            </p>
+          )}
           {producto.titulo && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               {producto.precio > 0 ? (

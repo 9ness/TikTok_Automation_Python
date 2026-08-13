@@ -60,6 +60,14 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "mis_productos",
         "propia": "1",
     },
+    # Los que YA vendieron, copiados aquí desde su carpeta de origen para
+    # volver a grabarlos. También es "propia" (vive en el Drive montado) y usa
+    # el mismo convenio de nombres, así que no necesita nada especial.
+    "top_vendidos": {
+        "label": "Top vendidos",
+        "folder": "top_vendidos",
+        "propia": "1",
+    },
 }
 
 # Cuántos productos entran en cada carpeta de "Mis productos". Diez, como las
@@ -67,6 +75,12 @@ SOURCES: dict[str, dict[str, str]] = {
 # de 200 imposible de mirar.
 MIS_PRODUCTOS_POR_CARPETA = 10
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
+
+# "Top vendidos" — mismas reglas (diez por carpeta) y raíz propia. NO lleva
+# subcarpeta por usuario porque el ranking de vendidos tampoco: es único y
+# global, y el progreso ya se separa por usuario dentro de Redis.
+TOP_VENDIDOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Top_Vendidos"
+TOP_VENDIDOS_PREFIJO = "Top"
 
 
 def es_fuente_propia(source: str) -> bool:
@@ -103,6 +117,31 @@ def mis_productos_dir() -> Path:
     )
     destino.mkdir(parents=True, exist_ok=True)
     _MIS_PRODUCTOS_DIR = destino
+    return destino
+
+
+_TOP_VENDIDOS_DIR: Path | None = None
+
+
+def top_vendidos_dir() -> Path:
+    """Raíz de "Top vendidos" en el Drive MONTADO.
+
+    Se recuerda por lo mismo que `mis_productos_dir`: resolver una ruta honda
+    del mount en frío cuesta decenas de segundos.
+    """
+    global _TOP_VENDIDOS_DIR
+    if _TOP_VENDIDOS_DIR is not None:
+        return _TOP_VENDIDOS_DIR
+
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / TOP_VENDIDOS_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "top_vendidos"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    _TOP_VENDIDOS_DIR = destino
     return destino
 
 

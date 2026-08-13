@@ -99,6 +99,9 @@ export interface ProductoItem {
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;
+  /** Solo en "Top vendidos": ventas del producto de origen y cuándo entró. */
+  ventas: number;
+  vendido_at: number;
   /** Precio leído de la ficha (0 = no se pudo leer). */
   precio: number;
   /** Precio de antes del descuento (0 si no hay). Solo informativo. */

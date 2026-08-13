@@ -189,6 +189,18 @@ def _lsjson(path: str, *, dirs_only: bool = False, files_only: bool = False) -> 
     return json.loads(out or "[]")
 
 
+def _servicio_propio(source: str):
+    """Qué módulo lleva las carpetas de una fuente que vive en NUESTRO Drive.
+
+    Hay dos y las dos hablan el mismo idioma que este cliente
+    (`listar_carpetas_como_drive` / `listar_fotos_como_drive`): los productos
+    que sube el operador y los que ya vendieron.
+    """
+    from src.nicho_pov_bof.services import mis_productos, top_vendidos
+
+    return top_vendidos if source == top_vendidos.SOURCE else mis_productos
+
+
 def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
     """Carpetas de producto de una fuente, en orden natural (1, 2, 10...).
 
@@ -197,9 +209,7 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
     # Fuente propia: las carpetas son del Drive MONTADO, no del compartido, y
     # se leen del disco. Sin caché: son cuatro entradas y cambian al subir.
     if config.es_fuente_propia(source):
-        from src.nicho_pov_bof.services import mis_productos
-
-        return mis_productos.listar_carpetas_como_drive()
+        return _servicio_propio(source).listar_carpetas_como_drive()
 
     base = config.source_path(source)  # valida el slug
 
@@ -233,9 +243,7 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     canónico (hay nombres duplicados).
     """
     if config.es_fuente_propia(source):
-        from src.nicho_pov_bof.services import mis_productos
-
-        return mis_productos.listar_fotos_como_drive(folder)
+        return _servicio_propio(source).listar_fotos_como_drive(folder)
 
     base = config.source_path(source)
     _assert_known_folder(source, folder)

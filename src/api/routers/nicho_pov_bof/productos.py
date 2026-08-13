@@ -61,6 +61,7 @@ import shutil
 
 from src.nicho_pov_bof import config as nicho_config
 from src.nicho_pov_bof.services import audience
+from src.nicho_pov_bof.services import top_vendidos
 from src.nicho_pov_bof.services import emojis as emojis_svc
 from src.nicho_pov_bof.pipeline.video_editor import (
     caption_arriesgado,
@@ -81,6 +82,31 @@ _ALLOWED_SEXOS = ("hombre", "mujer")
 
 def _bad_request(msg: str) -> APIError:
     return APIError(msg, status_code=400)
+
+
+def _ventas_top(source: str) -> dict[str, dict]:
+    """`{"<carpeta>|<producto>": {ventas, vendido_at}}` para "Top vendidos".
+
+    El dato vive en el ranking (bajo la carpeta de ORIGEN), no en el producto
+    copiado, así que hay que cruzarlo por el manifiesto. Se hace una vez por
+    listado y no por producto: son dos lecturas de Redis en total.
+    """
+    if source != top_vendidos.SOURCE:
+        return {}
+    from src.nicho_pov_bof.repos import product_repo
+
+    ranking = {
+        f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}": v
+        for v in product_repo.ranking_vendidos()
+    }
+    salida: dict[str, dict] = {}
+    for ref, sitio in top_vendidos.manifiesto().items():
+        v = ranking.get(ref) or {}
+        salida[f"{sitio.get('carpeta')}|{sitio.get('producto')}"] = {
+            "ventas": int(v.get("unidades") or 0),
+            "vendido_at": float(v.get("vendido_at") or 0),
+        }
+    return salida
 
 
 def _precio_y_modo(prod: dict) -> tuple[float, bool]:
@@ -337,10 +363,12 @@ def _list_productos(
     montandose = _productos_montandose(queue, source, folder)
     # Una sola lectura del índice para toda la carpeta, no una por producto.
     escaparate = product_repo.escaparate_index(usuario)
+    ventas = _ventas_top(source)
 
     items: list[ProductoInfo] = []
     for pair in pairs:
         producto = pair["producto"]
+        venta = ventas.get(f"{folder}|{producto}") or {}
         guardado = guardados.get(producto, {})
         clean = pair.get("clean") or {}
         titled = pair.get("titled") or {}
@@ -372,6 +400,8 @@ def _list_productos(
                     guardado.get("titulo", ""),
                     guardado.get("titulo_tiktok_completo", ""),
                 ),
+                ventas=int(venta.get("ventas") or 0),
+                vendido_at=float(venta.get("vendido_at") or 0),
                 precio=_precio_y_modo(guardado)[0],
                 precio_lista=nicho_config.precio_num(guardado.get("precio_lista")),
                 modo_plazos=_precio_y_modo(guardado)[1],
@@ -754,6 +784,27 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.post("/top-vendidos/sincronizar")
+def sincronizar_top_vendidos(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Copia a "Top vendidos" los productos del ranking que aún no estén.
+
+    Solo añade, nunca reordena: el sitio de un producto es fijo porque el
+    progreso (subido, clips, guion) se guarda por carpeta y moverlo lo
+    perdería. El orden por ventas se hace al pintar.
+
+    No gasta Gemini: los textos se copian de la carpeta de origen, donde ya se
+    extrajeron.
+    """
+    try:
+        return top_vendidos.sincronizar(usuario=usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    except Exception as e:
+        raise APIError(f"No se pudo sincronizar: {e}", status_code=500) from e
+
+
 @router.post("/producto/guion-plazos", response_model=ProductoInfo)
 def sortear_guion_plazos(
     body: GuionPlazosRequest,
@@ -858,17 +909,26 @@ def set_producto_estado(
     # hace falta para pintarlo (foto incluida). Se escribe AQUÍ, en el único
     # sitio donde se marca la venta, y no recorriendo las 31 carpetas después.
     if body.sold is not None:
+        # En "Top vendidos" el producto es una COPIA de uno del curso: la venta
+        # se le apunta al original, que es quien está en el ranking. Si se
+        # apuntara aquí, el mismo producto contaría dos veces y además se
+        # duplicaría en la lista.
+        destino = (body.source, body.folder, body.producto)
+        if body.source == top_vendidos.SOURCE:
+            origen = top_vendidos.origen_de(body.folder, body.producto)
+            if origen:
+                destino = (origen["source"], origen["folder"], origen["producto"])
         try:
             if body.sold:
                 product_repo.marcar_vendido(
-                    body.source, body.folder, body.producto,
+                    *destino,
                     titulo=info.titulo or "", tienda=info.tienda or "",
                     clean_photo_id=info.clean_photo_id or "",
                     product_url=info.product_url or "",
                     nicho=(body.nicho or "").strip(),
                 )
             else:
-                product_repo.desmarcar_vendido(body.source, body.folder, body.producto)
+                product_repo.desmarcar_vendido(*destino)
         except Exception:
             # Que no se caiga el marcado por un fallo del ranking: el dato
             # bueno (`sold`) ya está guardado en el producto.

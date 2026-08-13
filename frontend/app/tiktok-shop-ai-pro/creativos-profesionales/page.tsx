@@ -115,7 +115,8 @@ export default function CreativosProPage() {
       </header>
 
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-        <div className="grid grid-cols-3 gap-1.5">
+        {/* Dos por línea en móvil desde que son cuatro fuentes. */}
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {(sources.data?.items ?? []).map((s) => (
             <button
               key={s.slug}
