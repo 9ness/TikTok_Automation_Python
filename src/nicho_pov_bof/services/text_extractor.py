@@ -127,13 +127,20 @@ def _sellar_id(path, producto: str):
     Si algo falla (PIL, disco), se devuelve la foto original: mejor arriesgarse
     al desajuste que quedarse sin textos.
     """
+    import tempfile
     from pathlib import Path as _Path
 
     try:
         from PIL import Image, ImageDraw, ImageFont
 
         origen = _Path(str(path))
-        destino = origen.with_name(f"{origen.stem}__id{producto}.jpg")
+        # A un temporal, NUNCA al lado del original. En las fuentes del curso da
+        # igual (la foto ya es una copia temporal descargada del Drive), pero en
+        # las nuestras —"Mis productos" y "Top vendidos"— el identificador de la
+        # foto ES su ruta en el Drive montado, así que la copia sellada se
+        # quedaba dentro de la carpeta del operador: basura acumulándose en su
+        # Drive y una tercera foto por producto que el emparejado no espera.
+        destino = _Path(tempfile.gettempdir()) / f"sello_{origen.stem}__id{producto}.jpg"
         if destino.is_file():
             return destino
         with Image.open(origen) as im:

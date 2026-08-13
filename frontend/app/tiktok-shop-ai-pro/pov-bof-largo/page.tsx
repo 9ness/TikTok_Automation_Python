@@ -377,7 +377,7 @@ export default function PovBofLargoPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-3 p-3 sm:space-y-4 sm:p-6 md:p-10">
+    <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
       <header className="rounded-xl border border-border/60 bg-card p-3">
         <div className="flex items-center gap-2">
           <Mic className="h-5 w-5 shrink-0 text-violet-500" />

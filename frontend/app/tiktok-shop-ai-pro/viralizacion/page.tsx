@@ -655,7 +655,7 @@ export default function ViralizacionPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-10">
+    <div className="mx-auto w-full max-w-4xl space-y-4 p-3 pb-24 sm:space-y-6">
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
           <Rocket className="h-5 w-5 text-amber-500 sm:h-6 sm:w-6" />

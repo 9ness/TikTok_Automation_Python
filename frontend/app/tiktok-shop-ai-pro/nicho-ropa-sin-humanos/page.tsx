@@ -74,7 +74,7 @@ export default function NichoRopaPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-3 p-3 sm:space-y-4 sm:p-6 md:p-10">
+    <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={portadaDe("nicho-ropa-sin-humanos")}

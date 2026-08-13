@@ -355,7 +355,7 @@ export default function NichoPovBofPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-3 p-3 sm:space-y-4 sm:p-6 md:p-10">
+    <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
       {/* Portada del módulo 6 del curso — la misma que abre los demás nichos,
           para que todos los submenús se reconozcan de un vistazo. Hace también
           de título: por eso no hay un <h1> debajo comiéndose otra fila. */}
