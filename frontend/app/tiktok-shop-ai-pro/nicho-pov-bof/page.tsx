@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Link2 as LinkIcon,
   Loader2,
+  Eye,
   RefreshCw,
   Search,
   ShoppingBag,
@@ -1971,7 +1972,11 @@ function ProductoCard({
             }
             className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-1.5 text-xs font-medium text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${sortear.isPending ? "animate-spin" : ""}`} />
+            {sortear.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
             Ver el guion de plazos
           </button>
         )
