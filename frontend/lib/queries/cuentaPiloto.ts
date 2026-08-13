@@ -23,8 +23,15 @@ export function useProductosPiloto() {
       (await api.get<ProductosPilotoResponse>(`${ROOT}/productos`)).items ?? [],
     // Mientras haya un montaje en curso se refresca solo, para que el vídeo
     // nuevo aparezca en la lista sin recargar la página.
+    // También mientras quede una tanda a medias: si los nueve montajes están
+    // en cola sin arrancar todavía, `montando` puede ser falso y el contador
+    // se quedaría congelado en 0/9.
     refetchInterval: (q) =>
-      (q.state.data ?? []).some((p) => p.montando) ? 5000 : false,
+      (q.state.data ?? []).some(
+        (p) => p.montando || (p.lote_total > 1 && p.lote_listos < p.lote_total),
+      )
+        ? 5000
+        : false,
   });
 }
 
@@ -117,6 +124,8 @@ export function useSubirVideoPiloto() {
       conTitulo: boolean;
       conCta: boolean;
       conFlecha: boolean;
+      /** Tamaño de la tanda. Solo lo manda el primero de la serie. */
+      lote?: number;
     }
   >({
     mutationFn: async (v) => {
@@ -128,6 +137,7 @@ export function useSubirVideoPiloto() {
       fd.append("con_titulo", String(v.conTitulo));
       fd.append("con_cta", String(v.conCta));
       fd.append("con_flecha", String(v.conFlecha));
+      if (v.lote && v.lote > 1) fd.append("lote", String(v.lote));
       return api.post<{ job_id: string; message: string }>(`${ROOT}/video/upload`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: pilotoKeys.productos() }),

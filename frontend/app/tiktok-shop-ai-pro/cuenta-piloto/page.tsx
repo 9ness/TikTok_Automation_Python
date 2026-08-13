@@ -307,6 +307,8 @@ function FotoInput({
 function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
   const [verFoto, setVerFoto] = useState(false);
   const subir = useSubirVideoPiloto();
+  // Progreso de la tanda que se está mandando (null = no hay ninguna).
+  const [enviando, setEnviando] = useState<{ hechos: number; total: number } | null>(null);
   const borrar = useBorrarProductoPiloto();
   const extraer = useExtraerTextosPiloto();
   const refVideo = useRef<HTMLInputElement>(null);
@@ -317,25 +319,45 @@ function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
   const [cta, setCta] = useState(true);
   const [flecha, setFlecha] = useState(true);
 
-  function subirVideo(file: File) {
-    subir.mutate(
-      {
-        producto: p.id,
-        file,
-        sexo,
-        conGancho: gancho,
-        conTitulo: titulo,
-        conCta: cta,
-        conFlecha: flecha,
-      },
-      {
-        onSuccess: (r) => toast.success(r.message),
-        onError: (e) => toast.error(error(e)),
-        onSettled: () => {
-          if (refVideo.current) refVideo.current.value = "";
-        },
-      },
-    );
+  /** Manda a editar TODOS los vídeos elegidos, uno detrás de otro.
+   *
+   *  De uno en uno a propósito: son ficheros grandes y subir nueve a la vez
+   *  desde el móvil satura la conexión y hace que fallen a medias. La cola ya
+   *  se encarga de que los montajes vayan seguidos.
+   *
+   *  Cada vídeo sale con distinto rótulo, emoji y color sin hacer nada: el
+   *  montaje los sortea a partir del número de vídeo dentro del producto.
+   */
+  async function subirTanda(files: File[]) {
+    if (!files.length) return;
+    setEnviando({ hechos: 0, total: files.length });
+    let ok = 0;
+    for (const [i, file] of files.entries()) {
+      setEnviando({ hechos: i, total: files.length });
+      try {
+        await subir.mutateAsync({
+          producto: p.id,
+          file,
+          sexo,
+          conGancho: gancho,
+          conTitulo: titulo,
+          conCta: cta,
+          conFlecha: flecha,
+          // Solo el primero abre el contador de la tanda.
+          lote: i === 0 ? files.length : 0,
+        });
+        ok++;
+      } catch (e) {
+        toast.error(`Vídeo ${i + 1}: ${error(e)}`);
+      }
+    }
+    setEnviando(null);
+    if (refVideo.current) refVideo.current.value = "";
+    if (ok) {
+      toast.success(
+        ok === 1 ? "En la cola, editando…" : `${ok} vídeos en la cola, editando…`,
+      );
+    }
   }
 
   return (
@@ -453,31 +475,56 @@ function ProductoCard({ producto: p }: { producto: ProductoPiloto }) {
         ))}
       </div>
 
+      {/* Se eligen VARIOS de la galería y se mandan todos a editar de una
+          vez: en el Piloto lo normal es probar el mismo producto muchas veces
+          y hacerlo de uno en uno eran nueve viajes. */}
       <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-md bg-sky-500 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-sky-600">
-        {subir.isPending ? (
+        {enviando ? (
           <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mandando a editar{" "}
+            {enviando.hechos + 1}/{enviando.total}…
           </>
         ) : (
           <>
             <Upload className="h-3.5 w-3.5" />
-            {p.videos.length > 0 ? "Subir OTRO vídeo" : "Subir vídeo"}
+            {p.videos.length > 0 ? "Mandar más vídeos a editar" : "Mandar vídeos a editar"}
           </>
         )}
         <input
           ref={refVideo}
           type="file"
           accept="video/*"
-          disabled={subir.isPending}
+          multiple
+          disabled={Boolean(enviando)}
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) subirVideo(f);
+            const elegidos = Array.from(e.target.files ?? []);
+            if (elegidos.length) void subirTanda(elegidos);
           }}
           className="hidden"
         />
       </label>
 
-      {p.montando && (
+      {/* De la ÚLTIMA tanda, no del total histórico del producto: mandas nueve
+          y lo que quieres saber es cuántos de esos nueve están. */}
+      {p.lote_total > 1 && (
+        <p
+          className={`flex items-center gap-1.5 rounded border px-2 py-1 text-[10px] ${
+            p.lote_listos >= p.lote_total
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+              : "border-sky-500/40 bg-sky-500/10 text-sky-500"
+          }`}
+        >
+          {p.lote_listos >= p.lote_total ? (
+            <>✅ Listos {p.lote_listos}/{p.lote_total} vídeos — ya se pueden descargar</>
+          ) : (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Editando {p.lote_listos}/
+              {p.lote_total} vídeos…
+            </>
+          )}
+        </p>
+      )}
+      {p.montando && p.lote_total <= 1 && (
         <p className="flex items-center gap-1.5 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-500">
           <Loader2 className="h-3 w-3 animate-spin" /> Montando un vídeo…
         </p>

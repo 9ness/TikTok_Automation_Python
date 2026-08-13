@@ -29,6 +29,11 @@ class ProductoPiloto(BaseModel):
     en_escaparate: bool = False
     tiene_ficha: bool = False
     videos: list[VideoPiloto] = Field(default_factory=list)
+    # Última tanda enviada a editar: cuántos vídeos eran y cuántos van ya. El
+    # operador manda 9 de golpe y lo que quiere ver es "7 de 9", no la lista
+    # entera de vídeos que lleva el producto desde siempre.
+    lote_total: int = 0
+    lote_listos: int = 0
     creado_at: float = 0
     textos_at: str = ""
     montando: bool = False

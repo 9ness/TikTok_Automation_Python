@@ -97,6 +97,16 @@ def _a_schema(
     # enseñar exactamente lo que se va a quemar.
     fijos = textos_fijos(f"cuenta_piloto {pid}")
     videos = [v for v in (prod.get("videos") or []) if isinstance(v, dict)]
+    # Lo listo de la ÚLTIMA tanda: los vídeos montados desde que se envió. Se
+    # cuenta por fecha y no con un contador aparte para que no se descuadre si
+    # un montaje falla o el operador sube otro suelto por en medio.
+    lote = prod.get("lote") or {}
+    lote_total = int(lote.get("total") or 0)
+    iniciado = float(lote.get("iniciado") or 0)
+    lote_listos = (
+        min(lote_total, sum(1 for v in videos if float(v.get("at") or 0) >= iniciado))
+        if lote_total > 1 else 0
+    )
     return ProductoPiloto(
         id=pid,
         titulo=prod.get("titulo", ""),
@@ -119,6 +129,8 @@ def _a_schema(
             in escaparate
         ),
         tiene_ficha=bool(prod.get("foto_ficha")),
+        lote_total=lote_total if lote_total > 1 else 0,
+        lote_listos=lote_listos,
         videos=[
             VideoPiloto(
                 n=i + 1,
@@ -357,6 +369,10 @@ async def upload_video(
     con_titulo: Annotated[bool, Form()] = True,
     con_cta: Annotated[bool, Form()] = True,
     con_flecha: Annotated[bool, Form()] = True,
+    # Tamaño de la TANDA que se está subiendo (1 = un vídeo suelto). Solo lo
+    # manda el primero: sirve para que la ficha sepa decir "listos 4 de 9" y no
+    # tener que adivinarlo contando vídeos.
+    lote: Annotated[int, Form()] = 0,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> VideoPilotoUploadResponse:
     """Sube UN vídeo orgánico y encola su montaje.
@@ -392,6 +408,19 @@ async def upload_video(
         raise APIError(f"No se pudo guardar el vídeo: {e}", status_code=500) from e
     finally:
         await file.close()
+
+    # El primero de la tanda abre el contador. Se guarda ANTES de encolar: si
+    # se guardara después, un montaje rápido podría terminar antes y contarse
+    # como si fuera de la tanda anterior.
+    if lote > 1:
+        try:
+            product_repo.update_product(
+                usuario, producto,
+                lote={"total": int(lote), "iniciado": time.time()},
+            )
+        except RuntimeError:
+            # El contador es una comodidad; si Redis falla, el montaje sigue.
+            pass
 
     job = queue.enqueue(
         JobMode.CUENTA_PILOTO_VIDEO,

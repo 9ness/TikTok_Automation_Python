@@ -24,6 +24,9 @@ export interface ProductoPiloto {
   en_escaparate: boolean;
   tiene_ficha: boolean;
   videos: VideoPiloto[];
+  /** Última tanda mandada a editar: cuántos eran y cuántos llevan montados. */
+  lote_total: number;
+  lote_listos: number;
   creado_at: number;
   textos_at: string;
   montando: boolean;
