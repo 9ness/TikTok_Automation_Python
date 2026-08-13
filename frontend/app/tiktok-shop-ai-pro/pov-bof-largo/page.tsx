@@ -285,9 +285,21 @@ export default function PovBofLargoPage() {
   /** Escribe el guion de TODOS los productos de la carpeta que ya tienen
    *  textos y aún no lo tienen. Uno detrás de otro (cada uno gasta una llamada
    *  a Gemini), igual que "Textos" pero por guion. */
-  async function generarTodosGuiones() {
+  /** `conTextoAhora` sirve para encadenarlo justo después de extraer: en ese
+   *  momento `items` es todavía el de antes (sin títulos) y filtrar por él no
+   *  daría ni un producto pendiente.
+   *
+   *  Se pasan solo los NÚMEROS de producto que acaban de recibir textos, no la
+   *  lista entera: lo que devuelve la extracción son los productos del POV BOF
+   *  y el estado del guion es de este nicho, así que mezclarlas daría por
+   *  escrito lo que no lo está. */
+  async function generarTodosGuiones(conTextoAhora?: Set<string>) {
     if (!folder) return;
-    const pend = items.filter(pendienteGuion);
+    const pend = items.filter(
+      (p) =>
+        (conTextoAhora?.has(p.producto) || Boolean(p.titulo)) &&
+        (!p.guion || p.modo_plazos !== p.guion_plazos),
+    );
     if (!pend.length) {
       toast.error("Todos los productos con textos ya tienen guion");
       return;
@@ -317,14 +329,28 @@ export default function PovBofLargoPage() {
     }
   }
 
+  /** Extrae los textos de la carpeta y, seguido, escribe los guiones que
+   *  falten.
+   *
+   *  Van juntos porque en este nicho no sirve de nada lo uno sin lo otro: sin
+   *  guion no se pueden subir los clips, y el guion se escribe a partir de los
+   *  textos. Hacerlo en dos botones significaba pulsar el segundo diez veces,
+   *  una por producto.
+   *
+   *  Si la extracción falla no se escribe ningún guion: saldrían todos
+   *  genéricos, y encima gastando una llamada a Gemini por producto.
+   */
   function runExtraerTextos() {
     if (!folder) return;
     extraerTextos.mutate(
       { source: activaSource, folder },
       {
-        onSuccess: () => {
-          toast.success("Textos extraídos");
+        onSuccess: async (nuevos) => {
+          toast.success("Textos extraídos · escribiendo guiones…");
           invalidarProductos();
+          await generarTodosGuiones(
+            new Set(nuevos.filter((x) => x.titulo).map((x) => x.producto)),
+          );
         },
         onError: (e) => toast.error(err(e)),
       },
@@ -745,12 +771,14 @@ export default function PovBofLargoPage() {
                 {extraerTextos.isPending ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    <span className="truncate">Extrayendo…</span>
+                    <span className="truncate">Extrayendo textos…</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Textos ({conTexto}/{totalProductos})</span>
+                    <span className="truncate">
+                      Textos + guiones ({conTexto}/{totalProductos})
+                    </span>
                   </>
                 )}
               </button>

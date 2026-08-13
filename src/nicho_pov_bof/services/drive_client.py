@@ -307,7 +307,10 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     if str(file_id).startswith("/"):
         # Ya está en disco: se sirve tal cual. Copiarla a la caché no ahorraba
         # nada y añadía una copia que se podía quedar vieja.
-        ruta = Path(file_id)
+        #
+        # El id trae `#<mtime>` pegado (ver `mis_productos.listar_fotos_como_drive`):
+        # es lo que hace que la URL cambie al cambiar la foto. Aquí se quita.
+        ruta = Path(str(file_id).split("#", 1)[0])
         if not ruta.is_file():
             raise ValueError(f"no está la foto: {file_id}")
         return ruta

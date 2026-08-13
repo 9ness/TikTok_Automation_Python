@@ -176,20 +176,18 @@ def get_photo(
         if encogida != path:
             path, media_type = encogida, "image/jpeg"
 
-    from src.nicho_pov_bof import config as pov_config
-
-    # Un file ID de Drive es inmutable → se puede cachear un día entero. Pero
-    # en "Mis productos" el identificador es la RUTA, y esa se REUTILIZA: al
-    # borrar un producto y subir otro, `Mis Productos 1/1.jpg` pasa a ser una
-    # foto distinta con la misma URL. Cacheando agresivo, el navegador seguía
-    # enseñando la anterior durante 24h — que es exactamente lo que pasó.
-    propia = pov_config.es_fuente_propia(source)
+    # Un día entero de caché para todas. Los ids del curso son de Google y no
+    # cambian nunca; los de las carpetas propias son la RUTA + la fecha del
+    # fichero (`/…/1.jpg#1786…`), así que al sustituir una foto cambia la URL y
+    # el navegador se la pide otra vez.
+    #
+    # Antes las propias iban con `no-cache` justo por eso —la ruta se reutiliza
+    # al borrar un producto y subir otro—, y el precio era que el móvil se las
+    # volvía a bajar en cada scroll: cargaban lentas y a veces ni salían.
     return FileResponse(
         path,
         media_type=media_type,
-        headers={
-            "Cache-Control": "no-cache" if propia else "public, max-age=86400",
-        },
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

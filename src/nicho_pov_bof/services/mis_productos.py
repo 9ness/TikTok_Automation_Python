@@ -189,7 +189,12 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
             return []
         fotos = [
             {
-                "id": str(f),
+                # El id lleva pegada la fecha del fichero: es lo que permite
+                # cachear la foto un día entero en el móvil sin arriesgarse a
+                # ver una vieja. Al sustituirla cambia el mtime, con él la URL,
+                # y el navegador la vuelve a pedir. Sin esto había que servirlas
+                # con `no-cache` y se rebajaban en cada scroll.
+                "id": f"{f}#{int(f.stat().st_mtime)}",
                 "name": f.name,
                 "size": f.stat().st_size,
                 "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",

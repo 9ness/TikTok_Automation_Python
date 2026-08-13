@@ -157,7 +157,13 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
         return []
     fotos = [
         {
-            "id": str(f),
+            # El id lleva pegada la fecha del fichero. Es lo que permite
+            # cachear la foto un día entero en el móvil sin arriesgarse a ver
+            # una vieja: al regrabar o sustituir la foto cambia el mtime, con
+            # él cambia la URL, y el navegador la pide de nuevo. Sin esto había
+            # que servirlas con `no-cache` y se volvían a bajar en cada scroll
+            # (las del curso vuelan porque su id de Google no cambia nunca).
+            "id": f"{f}#{int(f.stat().st_mtime)}",
             "name": f.name,
             "size": f.stat().st_size,
             "mime": f"image/{f.suffix.lstrip('.').replace('jpg', 'jpeg')}",
