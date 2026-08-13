@@ -211,7 +211,7 @@ function Historial() {
             <div
               key={d.fecha}
               title={`${d.fecha}: 🎬 ${d.videos} vídeos · 📸 ${d.carruseles} carruseles`}
-              className={`rounded border p-0.5 leading-tight ${
+              className={`rounded border px-0.5 py-1 leading-tight ${
                 esHoy
                   ? "border-foreground/60"
                   : algo
@@ -222,13 +222,17 @@ function Historial() {
               <div className={`text-[9px] ${esHoy ? "font-bold" : "text-muted-foreground"}`}>
                 {Number(d.fecha.slice(8))}
               </div>
+              {/* Los dos números en la MISMA línea: uno debajo del otro, cada
+                  casilla medía tres renglones y el calendario ocupaba media
+                  pantalla. */}
               {algo ? (
-                <>
-                  <div className="text-[9px] font-semibold text-emerald-500">{d.videos}</div>
-                  <div className="text-[9px] font-semibold text-sky-500">{d.carruseles}</div>
-                </>
+                <div className="flex items-center justify-center gap-1 text-[9px] font-semibold leading-none">
+                  <span className="text-emerald-500">{d.videos}</span>
+                  <span className="text-muted-foreground/50">/</span>
+                  <span className="text-sky-500">{d.carruseles}</span>
+                </div>
               ) : (
-                <div className="text-[9px] text-muted-foreground/40">·</div>
+                <div className="text-[9px] leading-none text-muted-foreground/40">·</div>
               )}
             </div>
           );
