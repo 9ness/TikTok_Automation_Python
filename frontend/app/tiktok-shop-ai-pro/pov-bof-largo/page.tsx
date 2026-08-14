@@ -170,8 +170,10 @@ export default function PovBofLargoPage() {
   // ordenar dentro de una no da el ranking.
   // Encendido por DEFECTO: en esta fuente lo que se quiere ver es el ranking,
   // igual que en "Productos que vendieron". Quitarlo devuelve la vista carpeta
-  // a carpeta.
-  const [verTodas, setVerTodas] = useEstadoRecordado("largo:topventas:todas", true);
+  // a carpeta. La clave lleva `ranking` y no `todas` porque la primera versión
+  // salió apagada y quedó guardada así en los navegadores que la vieron: con
+  // la misma clave, el defecto nuevo no habría llegado a nadie.
+  const [verTodas, setVerTodas] = useEstadoRecordado("largo:topventas:ranking", true);
   const todos = useProductosTodosLargo(activaSource, esTopVendidos && verTodas);
   const lista = esTopVendidos && verTodas ? todos.data?.items ?? [] : items;
 
