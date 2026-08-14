@@ -39,6 +39,7 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
+import { useMe } from "@/lib/queries/auth";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
@@ -107,6 +108,10 @@ const MOSTRAR_ECHOTIK = false;
 
 export default function PovBofLargoPage() {
   const qc = useQueryClient();
+  // Solo el admin ve el space de "foto con IA": Ana y Mauro trabajan con la
+  // foto limpia del Drive.
+  const esAdmin = useMe().data?.rol === "admin";
+
   const sources = useSourcesLargo();
   const [source, setSource] = useEstadoRecordado("povbof-largo:fuente", "");
   const activaSource = source || sources.data?.[0]?.slug || "";
@@ -922,9 +927,12 @@ export default function PovBofLargoPage() {
             </div>
 
             {/* Aquí SIEMPRE son dos clips por foto (normal o plazos da igual),
-                así que solo hace falta el space de plazos. Magnific o los
-                prompts: son alternativas. */}
-            <MagnificSpaces spaces={["foto_limpia_plazos"]} />
+                así que del de foto limpia solo hace falta el de plazos. El de
+                "foto con IA" es para cuando ya tienes la imagen generada, y
+                solo lo usa el admin. Magnific o los prompts: son alternativas. */}
+            <MagnificSpaces
+              spaces={["foto_limpia_plazos", ...(esAdmin ? (["foto_ia"] as const) : [])]}
+            />
             <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
 
             <div className="grid grid-cols-2 gap-2">
