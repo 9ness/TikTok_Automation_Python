@@ -52,6 +52,10 @@ export interface ProductoLargo {
   guion_caracteres: number;
   clip1: boolean;
   clip2: boolean;
+  /** Tercer clip: solo cuando el guion no cabe en dos. */
+  clip3?: boolean;
+  /** Cuántos clips pide este guion (2, o 3 si la voz no cabe en dos). */
+  clips_necesarios?: number;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.

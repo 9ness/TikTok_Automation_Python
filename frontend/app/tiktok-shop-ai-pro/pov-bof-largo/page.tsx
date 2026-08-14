@@ -1556,7 +1556,11 @@ function ProductoCard({
   const setEstado = useSetEstadoLargo();
   const buscarUrl = useBuscarProductoUrl();
   const hashtags = useHashtags().data ?? [];
-  const refs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
+  const refs = {
+    1: useRef<HTMLInputElement>(null),
+    2: useRef<HTMLInputElement>(null),
+    3: useRef<HTMLInputElement>(null),
+  };
 
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
@@ -1565,14 +1569,18 @@ function ProductoCard({
   // plazos). No es un error: pasa con todo lo escrito antes de que existieran
   // los plazos y cada vez que se corrige un precio.
   const guionDesfasado = Boolean(p.guion) && p.modo_plazos !== p.guion_plazos;
+  // Cuántos clips pide ESTE guion. Lo calcula el backend con los caracteres
+  // (la voz aún no existe cuando hay que decidirlo).
+  const necesarios = p.clips_necesarios || 2;
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
   // las demás (subir clips de varios productos a la vez).
-  const [pcts, setPcts] = useState<{ 1: number | null; 2: number | null }>({
-    1: null,
-    2: null,
-  });
+  const [pcts, setPcts] = useState<{
+    1: number | null;
+    2: number | null;
+    3: number | null;
+  }>({ 1: null, 2: null, 3: null });
   // Auto por defecto: el montaje mira la mano del clip 1 y elige la voz
   // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
   const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
@@ -1604,7 +1612,7 @@ function ProductoCard({
 
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
   // Cada slot va por su cuenta: no se bloquea el otro clip ni las demás fichas.
-  function subirClip(slot: 1 | 2, file: File) {
+  function subirClip(slot: 1 | 2 | 3, file: File) {
     setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
     fd.append("file", file);
@@ -1956,10 +1964,12 @@ function ProductoCard({
         )}
       </div>
 
-      {/* Los DOS clips. No se encola hasta tener los dos y el guion. */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {([1, 2] as const).map((slot) => {
-          const puesto = slot === 1 ? p.clip1 : p.clip2;
+      {/* Los clips. No se encola hasta tenerlos todos y el guion. Son DOS,
+          salvo que la voz no quepa en veinte segundos: entonces hace falta un
+          tercero (si no, el montaje estira los dos y el gesto se deforma). */}
+      <div className={`grid gap-1.5 ${necesarios > 2 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {(necesarios > 2 ? ([1, 2, 3] as const) : ([1, 2] as const)).map((slot) => {
+          const puesto = slot === 1 ? p.clip1 : slot === 2 ? p.clip2 : p.clip3;
           const pctSlot = pcts[slot];
           const subiendoEste = pctSlot !== null;
           return (
@@ -2006,11 +2016,16 @@ function ProductoCard({
           );
         })}
       </div>
-      {!p.guion && (
+      {!p.guion ? (
         <p className="text-[10px] text-muted-foreground">
           Escribe el guion antes de subir los clips: la voz decide la duración.
         </p>
-      )}
+      ) : necesarios > 2 ? (
+        <p className="text-[10px] text-amber-500">
+          Este guion no cabe en dos clips ({p.guion_caracteres} car. · ~
+          {Math.round(p.guion_caracteres / 18.2)}s): hacen falta {necesarios}.
+        </p>
+      ) : null}
 
       {p.montando && (
         <p className="flex items-center gap-1.5 rounded border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-[10px] text-violet-500">

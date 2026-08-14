@@ -33,10 +33,16 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 # Clips
 # ---------------------------------------------------------------------------
-# Dos clips de ~10s. Hasta que no están los dos subidos no se encola nada: con
-# uno solo no hay vídeo que montar (mismo criterio que el BOF Cinematográfico).
+# Dos clips de ~10s. Hasta que no están todos los que hacen falta no se encola
+# nada: con uno solo no hay vídeo que montar (mismo criterio que el BOF
+# Cinematográfico).
 CLIPS_POR_VIDEO = 2
 CLIP_TARGET_S = 10.0
+# Cuando el guion se alarga, dos clips se quedan cortos: uno de 519 caracteres
+# son ~29s y en 20s de vídeo no cabe, así que el montaje estiraba los dos clips
+# hasta deformar el gesto. Por encima de lo que cabe en dos, se pide un
+# TERCERO. Más de tres no: el vídeo dejaría de parecer una toma continua.
+CLIPS_MAXIMOS = 3
 
 # ---------------------------------------------------------------------------
 # Guion
@@ -49,6 +55,22 @@ CLIP_TARGET_S = 10.0
 # ¿Residuo blanco?"). Así que el tope real es el que cabe en los dos clips.
 CARACTERES_POR_SEGUNDO = 18.2      # medido con voces reales de Fish
 GUION_MAX_CARACTERES = int(CLIPS_POR_VIDEO * CLIP_TARGET_S * CARACTERES_POR_SEGUNDO)  # 364
+
+
+def clips_necesarios(guion: str) -> int:
+    """Cuántos clips hacen falta para que quepa ese guion.
+
+    La voz manda: si dura más de lo que dan los clips, el montaje tiene que
+    estirarlos y el gesto de la mano se deforma. Se calcula por caracteres
+    (18,2 car/s medidos con las voces de Fish) porque hay que saberlo ANTES de
+    locutar, cuando aún no hay audio que medir.
+    """
+    n = len((guion or "").strip())
+    if not n:
+        return CLIPS_POR_VIDEO
+    segundos = n / CARACTERES_POR_SEGUNDO
+    hacen_falta = -(-int(segundos * 100) // int(CLIP_TARGET_S * 100))  # techo
+    return max(CLIPS_POR_VIDEO, min(CLIPS_MAXIMOS, hacen_falta))
 
 
 def prompts_dir() -> Path:

@@ -58,6 +58,10 @@ class ProductoLargo(BaseModel):
     guion_caracteres: int = 0
     clip1: bool = False
     clip2: bool = False
+    # Tercer clip: solo cuando el guion no cabe en dos (ver
+    # `config.clips_necesarios`).
+    clip3: bool = False
+    clips_necesarios: int = 2
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False

@@ -295,6 +295,10 @@ def _listar(
             guion_caracteres=len(guion),
             clip1=_clip_puesto(mio.get("clip1_path"), float(mio.get("video_listo_at") or 0)),
             clip2=_clip_puesto(mio.get("clip2_path"), float(mio.get("video_listo_at") or 0)),
+            clip3=_clip_puesto(mio.get("clip3_path"), float(mio.get("video_listo_at") or 0)),
+            # Con guiones largos dos clips se quedan cortos y el montaje tendría
+            # que estirarlos hasta deformar el gesto: ahí se pide un tercero.
+            clips_necesarios=config.clips_necesarios(guion),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             # Mismo criterio que el POV BOF y Creativos (índice compartido o
@@ -716,8 +720,8 @@ async def upload_clip(
     """
     from src.api.temp_storage import upload_subdir
 
-    if slot not in (1, 2):
-        raise _bad(f"slot debe ser 1 o 2, recibido: {slot}")
+    if slot not in (1, 2, 3):
+        raise _bad(f"slot debe ser 1, 2 o 3, recibido: {slot}")
     sexo_norm = (sexo or "").strip().lower()
     # "auto" no está en `config.SEXOS` (eso son las voces de Fish): lo resuelve
     # el montaje mirando la mano del clip 1.
@@ -790,13 +794,25 @@ def _encolar_clip(
         raise APIError(str(e), status_code=503) from e
 
     montado_at = float(prod.get("video_listo_at") or 0)
-    if not (
-        _clip_puesto(prod.get("clip1_path"), montado_at)
-        and _clip_puesto(prod.get("clip2_path"), montado_at)
-    ):
-        falta = 2 if slot == 1 else 1
+    # Cuántos clips pide ESTE guion (dos, o tres si la voz no cabe en dos).
+    hacen_falta = config.clips_necesarios(str(prod.get("guion") or ""))
+    rutas = [
+        prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
+    ]
+    puestos = [r for r in rutas if _clip_puesto(r, montado_at)]
+    if len(puestos) < hacen_falta:
+        faltan = [
+            n for n in range(1, hacen_falta + 1)
+            if not _clip_puesto(prod.get(f"clip{n}_path"), montado_at)
+        ]
         return ClipLargoUploadResponse(
-            encolado=False, message=f"Clip {slot} guardado. Falta el clip {falta}.",
+            encolado=False,
+            message=(
+                f"Clip {slot} guardado. Falta el clip "
+                + " y el ".join(str(n) for n in faltan)
+                + (f" (este guion necesita {hacen_falta})" if hacen_falta > 2 else "")
+                + "."
+            ),
         )
 
     # Red de seguridad para la carrera de los dos clips subidos a la vez: si el
@@ -813,6 +829,8 @@ def _encolar_clip(
         params={
             "source": source, "folder": folder, "producto": producto,
             "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
+            # Solo cuando el guion no cabe en dos.
+            **({"clip3_path": prod.get("clip3_path") or ""} if hacen_falta > 2 else {}),
             "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
@@ -826,7 +844,7 @@ def _encolar_clip(
     try:
         product_repo.update_product(
             source, folder, producto, usuario=usuario,
-            clip1_path="", clip2_path="",
+            clip1_path="", clip2_path="", clip3_path="",
         )
     except RuntimeError:
         # El montaje ya está encolado; que no falle la respuesta por esto.
