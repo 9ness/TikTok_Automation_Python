@@ -123,6 +123,25 @@ def fuente_canonica(source: str) -> str:
     return destino or source
 
 
+def fuente_copia_de(source: str) -> str:
+    """La fuente "🗄️ Copia" que corresponde a una del curso (o vacío)."""
+    for slug, meta in SOURCES.items():
+        if meta.get("backup") and meta.get("canonica") == source:
+            return slug
+    return ""
+
+
+def fuentes_a_barrer() -> list[str]:
+    """Fuentes que valen para BARRIDOS (buscador, recuperados, resúmenes).
+
+    Deja fuera las de la copia de seguridad: son las mismas carpetas del curso
+    —así que saldrían duplicadas— y listarlas cuesta varias llamadas a rclone
+    (mira todas las copias), que en un buscador que se dispara al teclear se
+    notaba en forma de "no encuentra nada".
+    """
+    return [s for s in SOURCES if not es_fuente_backup(s)]
+
+
 def es_fuente_backup(source: str) -> bool:
     """True si la fuente es la copia de seguridad del Drive del curso.
 

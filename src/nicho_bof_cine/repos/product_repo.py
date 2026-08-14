@@ -251,7 +251,7 @@ def buscar_productos(
         return [], 0
 
     entradas: list[tuple[str, str]] = []
-    for src in ([source] if source else list(config.SOURCES)):
+    for src in ([source] if source else config.fuentes_a_barrer()):
         try:
             entradas += [(src, c["name"]) for c in drive_client.list_product_folders(src)]
         except Exception:
@@ -345,7 +345,7 @@ def productos_recuperados(usuario: str = "") -> list[dict]:
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
     out: list[dict] = []
-    for src in config.SOURCES:
+    for src in config.fuentes_a_barrer():
         try:
             carpetas = drive_client.list_product_folders(src)
         except Exception:
@@ -390,7 +390,7 @@ def sold_products(source: str | None = None) -> list[dict]:
     from src.nicho_pov_bof.services import drive_client
 
     out: list[dict] = []
-    fuentes = [source] if source else list(config.SOURCES)
+    fuentes = [source] if source else config.fuentes_a_barrer()
     for src in fuentes:
         try:
             carpetas = drive_client.list_product_folders(src)

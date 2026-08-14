@@ -31,7 +31,11 @@ REDIS_PREFIX = os.getenv("NICHO_BOF_CINE_REDIS_PREFIX", "nicho_bof_cine:")
 
 # Las MISMAS fuentes del Nicho POV BOF: mismo Drive, mismas carpetas, mismas
 # fotos. Se importan para que añadir una fuente valga para los dos.
-from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
+from src.nicho_pov_bof.config import (  # noqa: E402,F401
+    SOURCES,
+    fuentes_a_barrer,
+    source_path,
+)
 
 
 def prompts_dir() -> Path:

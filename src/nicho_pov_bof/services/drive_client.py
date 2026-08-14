@@ -120,6 +120,35 @@ def _refrescar_en_segundo_plano(key: str, cargar: Callable[[], Any]) -> None:
     threading.Thread(target=_tarea, daemon=True, name=f"drive-refresh-{key}").start()
 
 
+def _cacheado_sin_esperar(key: str, cargar: Callable[[], Any], sino: Any) -> Any:
+    """Como `_listar_cacheado` pero NUNCA bloquea: si no hay nada guardado,
+    devuelve `sino` y lo calcula en segundo plano.
+
+    Para datos que solo ENRIQUECEN una respuesta y no pueden retrasarla. El
+    caso real: saber qué carpetas ha borrado el curso cuesta ~17s de rclone
+    (hay que recorrer todas las copias) y se necesita en cada listado de
+    carpetas; pagarlo dejaba la pantalla y el buscador colgados. Aparecerán en
+    cuanto termine el cálculo de fondo, unos segundos después.
+    """
+    en_memoria = _cache_get(key)
+    if en_memoria is not None:
+        return en_memoria
+    en_redis = _redis_cache_get(key)
+    if en_redis is not None:
+        payload, edad = en_redis
+        _cache_put(key, payload)
+        if edad > _TTL_COPIA_S:
+            _refrescar_en_segundo_plano(key, cargar)
+        return payload
+    _refrescar_en_segundo_plano(key, cargar)
+    return sino
+
+
+# Las carpetas que el curso ha borrado cambian de mes en mes, no de minuto en
+# minuto: no merece la pena recalcularlo con el ritmo de los listados normales.
+_TTL_COPIA_S = 6 * 3600
+
+
 def _listar_cacheado(key: str, cargar: Callable[[], Any], *, refresh: bool) -> Any:
     """Memoria → Redis (sirviendo stale) → rclone."""
     if refresh:
@@ -228,11 +257,14 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
         from src.nicho_pov_bof.services import backup_sync
 
         fuente = config.SOURCES[source]["folder"]
-        return _listar_cacheado(
+        # Misma clave que usa el listado normal para saber qué se borró: así se
+        # calcula UNA vez y sirve a los dos.
+        nombres = _listar_cacheado(
             f"backup-folders:{source}",
-            lambda: [{"name": c, "id": c} for c in backup_sync.carpetas_de(fuente)],
+            lambda: backup_sync.carpetas_de(fuente),
             refresh=refresh,
         )
+        return [{"name": c, "id": c} for c in nombres]
 
     base = config.source_path(source)  # valida el slug
 
@@ -260,17 +292,25 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
 
 
 def _carpetas_solo_en_copia(source: str, ya_estan: set[str]) -> list[str]:
-    """Las carpetas que están en el backup y ya no en el Drive del curso."""
-    try:
+    """Las carpetas que están en el backup y ya no en el Drive del curso.
+
+    Va por la fuente "🗄️ Copia" y NO por `backup_sync` directamente para
+    aprovechar su caché: reconstruir el archivo son varias llamadas a rclone
+    (mira todas las copias) y esto se ejecuta en cada listado de carpetas —
+    pagarlo cada vez dejaba el buscador sin responder.
+    """
+    copia = config.fuente_copia_de(source)
+    if not copia:
+        return []
+
+    def cargar() -> list[str]:
         from src.nicho_pov_bof.services import backup_sync
 
         fuente = config.SOURCES.get(source, {}).get("folder") or ""
-        if not fuente:
-            return []
-        return [c for c in backup_sync.carpetas_de(fuente) if c not in ya_estan]
-    except Exception:  # noqa: BLE001
-        # Que un problema con la copia no deje sin listado la fuente entera.
-        return []
+        return backup_sync.carpetas_de(fuente) if fuente else []
+
+    todas = _cacheado_sin_esperar(f"backup-folders:{copia}", cargar, [])
+    return [c for c in todas if c not in ya_estan]
 
 
 def _assert_known_folder(source: str, folder: str) -> None:
