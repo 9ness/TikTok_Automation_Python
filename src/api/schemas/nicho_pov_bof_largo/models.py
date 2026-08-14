@@ -20,6 +20,9 @@ class VocesLargoResponse(BaseModel):
 
 class ProductoLargo(BaseModel):
     producto: str
+    # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
+    # (Top vendidos ordenado por ventas): ahí cada producto viene de una.
+    folder: str = ""
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
     foto_aviso: str = ""

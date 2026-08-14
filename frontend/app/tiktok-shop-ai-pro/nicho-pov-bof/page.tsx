@@ -45,6 +45,7 @@ import {
   usePhotos,
   usePrompts,
   useProductos,
+  useProductosTodos,
   useBuscarProductoUrl,
   useHashtags,
   useGuardarHashtags,
@@ -178,14 +179,23 @@ export default function NichoPovBofPage() {
     }
   }
 
+  // Ver el ranking entero, no solo la carpeta abierta. Se recuerda igual que
+  // el filtro de arriba: quien lo enciende lo quiere siempre.
+  const [verTodas, setVerTodas] = useEstadoRecordado("povbof:topventas:todas", false);
+  const todos = useProductosTodos(source, esTopVendidos && verTodas);
+  const listaProductos = useMemo(
+    () => (esTopVendidos && verTodas ? todos.data ?? [] : productos.data ?? []),
+    [esTopVendidos, productos.data, todos.data, verTodas],
+  );
+
   const productosVisibles = useMemo(
     () =>
-      verTopVendidos(productos.data ?? [], {
+      verTopVendidos(listaProductos, {
         activo: esTopVendidos,
         soloSinSubir,
         yaSubido: (p) => p.uploaded,
       }),
-    [productos.data, esTopVendidos, soloSinSubir],
+    [listaProductos, esTopVendidos, soloSinSubir],
   );
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
@@ -989,8 +999,25 @@ export default function NichoPovBofPage() {
               />
               Solo los que no he subido
               <span className="ml-auto text-[10px] text-muted-foreground">
-                {productosVisibles.length}/{productos.data.length}
+                {productosVisibles.length}/{listaProductos.length}
               </span>
+            </label>
+          )}
+
+          {/* El ranking de verdad: los productos entran en carpetas de diez y
+              ahí se quedan de por vida (moverlos perdería el progreso), así
+              que ordenar dentro de una carpeta NO da el ranking. Con esto se
+              juntan todas y se ordenan por ventas. */}
+          {esTopVendidos && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-500"
+                checked={verTodas}
+                onChange={(e) => setVerTodas(e.target.checked)}
+              />
+              Todas las carpetas juntas, por ventas
+              {todos.isFetching && <Loader2 className="h-3 w-3 animate-spin" />}
             </label>
           )}
 
@@ -998,11 +1025,12 @@ export default function NichoPovBofPage() {
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {productosVisibles.map((p) => (
                 <ProductoCard
-                  key={p.producto}
+                  key={`${p.folder || folder}-${p.producto}`}
                   source={source}
-                  folder={folder}
+                  // En la vista global cada tarjeta es de SU carpeta.
+                  folder={p.folder || folder}
                   producto={p}
-                  carpetaHecha={Boolean(productos.data?.some((x) => x.titulo))}
+                  carpetaHecha={Boolean(listaProductos.some((x) => x.titulo))}
                   esTopVendidos={esTopVendidos}
                 />
               ))}

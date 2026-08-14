@@ -81,6 +81,9 @@ export interface PromptsResponse {
 
 export interface ProductoItem {
   producto: string;
+  /** De qué carpeta es. Solo viene relleno en el listado de TODAS las carpetas
+   *  (Top vendidos ordenado por ventas); en el normal se sabe por la pantalla. */
+  folder?: string;
   clean_photo_id: string | null;
   titled_photo_id: string | null;
   titulo: string | null;

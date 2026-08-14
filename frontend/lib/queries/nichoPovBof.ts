@@ -241,6 +241,25 @@ export function useProductos(source: string, folder: string | null) {
   });
 }
 
+/** TODOS los productos de la fuente, de más a menos ventas.
+ *
+ *  Solo tiene sentido en "Top vendidos": ahí cada producto se queda de por
+ *  vida en la carpeta de diez donde entró, así que ordenar dentro de una
+ *  carpeta no da el ranking. Cada item trae su `folder`.
+ */
+export function useProductosTodos(source: string, activo: boolean) {
+  return useQuery<ProductoItem[]>({
+    queryKey: [...nichoPovBofKeys.productos(source, "*todos*")],
+    queryFn: async () =>
+      (await api.get<{ items: ProductoItem[] }>(
+        `${ROOT}/productos-todos?source=${encodeURIComponent(source)}`,
+      )).items ?? [],
+    enabled: Boolean(source && activo),
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((p) => p.montando) ? 5000 : false,
+  });
+}
+
 /** Tarda ~1 min (lee las capturas con Gemini) — el caller muestra spinner. */
 export function useExtraerTextos() {
   const qc = useQueryClient();

@@ -70,6 +70,7 @@ import {
   useFoldersLargo,
   useMarkCompletedLargo,
   useProductosLargo,
+  useProductosTodosLargo,
   useSetEstadoLargo,
   useSourcesLargo,
   useSumarUnidadesLargo,
@@ -164,14 +165,21 @@ export default function PovBofLargoPage() {
     }
   }
 
+  // Ver el ranking entero y no solo la carpeta abierta: en Top vendidos cada
+  // producto se queda de por vida en la carpeta de diez donde entró, así que
+  // ordenar dentro de una no da el ranking.
+  const [verTodas, setVerTodas] = useEstadoRecordado("largo:topventas:todas", false);
+  const todos = useProductosTodosLargo(activaSource, esTopVendidos && verTodas);
+  const lista = esTopVendidos && verTodas ? todos.data?.items ?? [] : items;
+
   const itemsVisibles = useMemo(
     () =>
-      verTopVendidos(items, {
+      verTopVendidos(lista, {
         activo: esTopVendidos,
         soloSinSubir,
         yaSubido: (p) => p.uploaded,
       }),
-    [items, esTopVendidos, soloSinSubir],
+    [lista, esTopVendidos, soloSinSubir],
   );
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
   const conPlazos = items.filter((p) => p.clean_photo_id && p.modo_plazos).length;
@@ -1018,8 +1026,23 @@ export default function PovBofLargoPage() {
               />
               Solo los que no he subido
               <span className="ml-auto text-[10px] text-muted-foreground">
-                {itemsVisibles.length}/{items.length}
+                {itemsVisibles.length}/{lista.length}
               </span>
+            </label>
+          )}
+
+          {/* El ranking de verdad: junta las carpetas de diez y ordena por
+              ventas (el sitio de cada producto es fijo, ver arriba). */}
+          {esTopVendidos && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-violet-500"
+                checked={verTodas}
+                onChange={(e) => setVerTodas(e.target.checked)}
+              />
+              Todas las carpetas juntas, por ventas
+              {todos.isFetching && <Loader2 className="h-3 w-3 animate-spin" />}
             </label>
           )}
 
@@ -1027,9 +1050,10 @@ export default function PovBofLargoPage() {
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {itemsVisibles.map((p) => (
                 <ProductoCard
-                  key={p.producto}
+                  key={`${p.folder || folder}-${p.producto}`}
                   source={activaSource}
-                  folder={folder}
+                  // En la vista global cada tarjeta es de SU carpeta.
+                  folder={p.folder || folder}
                   producto={p}
                   esTopVendidos={esTopVendidos}
                 />

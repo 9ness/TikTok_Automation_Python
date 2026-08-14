@@ -76,6 +76,21 @@ export function useMarkCompletedLargo(source: string) {
   });
 }
 
+/** TODOS los productos de la fuente, de más a menos ventas (solo Top
+ *  vendidos: ahí el sitio de cada producto es fijo y el ranking solo se ve
+ *  juntando las carpetas). Cada item trae su `folder`. */
+export function useProductosTodosLargo(source: string, activo: boolean) {
+  return useQuery<ProductosLargoResponse>({
+    queryKey: [...largoKeys.productos(source, "*todos*")],
+    queryFn: () =>
+      api.get<ProductosLargoResponse>(
+        `${ROOT}/productos-todos?source=${encodeURIComponent(source)}`,
+      ),
+    enabled: Boolean(source && activo),
+    refetchInterval: (q) => (q.state.data?.montando ? 5000 : false),
+  });
+}
+
 export function useProductosLargo(source: string, folder: string) {
   return useQuery<ProductosLargoResponse>({
     queryKey: largoKeys.productos(source, folder),

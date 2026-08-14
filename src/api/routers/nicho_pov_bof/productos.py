@@ -427,6 +427,44 @@ def list_productos(
     return _list_productos(source, folder, queue, usuario)
 
 
+@router.get("/productos-todos", response_model=ProductosListResponse)
+def list_productos_todos(
+    source: Annotated[str, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductosListResponse:
+    """Todos los productos de la fuente, de MÁS a MENOS ventas.
+
+    Existe por "Top vendidos": ahí los productos entran en carpetas de diez y
+    el sitio de cada uno es fijo de por vida (moverlo perdería el progreso),
+    así que ordenar dentro de una carpeta no da el ranking — un producto de
+    tres ventas puede estar en la carpeta 3 mientras miras la 1. Esto las junta
+    todas y las ordena de verdad.
+
+    Solo para `top_vendidos`: en las fuentes del curso son 30+ carpetas de
+    Drive remoto y listarlas todas costaría minutos.
+    """
+    if source != top_vendidos.SOURCE:
+        raise _bad_request(
+            "El listado global solo existe en Top vendidos: en las demás "
+            "fuentes hay demasiadas carpetas que leer."
+        )
+    items: list[ProductoInfo] = []
+    for carpeta in top_vendidos.carpetas():
+        try:
+            parcial = _list_productos(source, carpeta, queue, usuario)
+        except Exception:  # noqa: BLE001
+            # Una carpeta ilegible no puede dejar sin lista a las demás.
+            continue
+        items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
+    items.sort(key=lambda p: (p.ventas, p.vendido_at), reverse=True)
+    return ProductosListResponse(
+        source=source, folder="", items=items,
+        textos_extraidos=True,
+        montando=any(p.montando for p in items),
+    )
+
+
 @router.post("/extraer-textos", response_model=ProductosListResponse)
 def extraer_textos(
     body: ExtraerTextosRequest,

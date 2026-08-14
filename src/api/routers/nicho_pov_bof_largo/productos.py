@@ -317,6 +317,40 @@ def list_productos(
     return _listar(source, folder, queue, usuario)
 
 
+@router.get("/productos-todos", response_model=ProductosLargoResponse)
+def list_productos_todos(
+    source: Annotated[str, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductosLargoResponse:
+    """Todos los productos de la fuente, de MÁS a MENOS ventas.
+
+    Mismo motivo que en el POV BOF: en Top vendidos el sitio de cada producto
+    es fijo (moverlo perdería el progreso), así que el ranking solo se ve
+    juntando las carpetas. Solo vale para esa fuente.
+    """
+    from src.nicho_pov_bof.services import top_vendidos
+
+    if source != top_vendidos.SOURCE:
+        raise APIError(
+            "El listado global solo existe en Top vendidos: en las demás "
+            "fuentes hay demasiadas carpetas que leer.",
+            status_code=400,
+        )
+    items: list[ProductoLargo] = []
+    montando = False
+    for carpeta in top_vendidos.carpetas():
+        try:
+            parcial = _listar(source, carpeta, queue, usuario)
+        except Exception:  # noqa: BLE001
+            # Una carpeta ilegible no deja sin lista a las demás.
+            continue
+        montando = montando or parcial.montando
+        items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
+    items.sort(key=lambda p: (p.ventas, p.vendido_at), reverse=True)
+    return ProductosLargoResponse(source=source, folder="", items=items, montando=montando)
+
+
 @router.post("/producto/estado", response_model=ProductoLargo)
 def set_producto_estado(
     body: ProductoEstadoLargoRequest,

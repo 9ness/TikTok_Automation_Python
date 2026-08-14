@@ -102,6 +102,10 @@ class ProductoInfo(BaseModel):
     """Un producto de una carpeta: emparejado de fotos + textos + estado."""
 
     producto: str
+    # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
+    # (Top vendidos ordenado por ventas), donde cada producto es de una y la
+    # pantalla necesita saberlo para actuar sobre él.
+    folder: str = ""
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
     # Aviso cuando el emparejado limpia/captura NO es fiable (vacío si lo es).
