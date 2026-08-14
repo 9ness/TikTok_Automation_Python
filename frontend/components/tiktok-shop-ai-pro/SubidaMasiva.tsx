@@ -1,19 +1,36 @@
 "use client";
 
-import { Loader2, Sparkles, Upload } from "lucide-react";
-import { useState } from "react";
+import { Loader2, RotateCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { escucharAvisos, lanzarEnSegundoPlano, soportaBgFetch, tandaEnMarcha } from "@/lib/bgFetch";
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  actualizarLote,
+  borrarLote,
+  crearLote,
+  ficherosDe,
+  guardarReparto,
+  idDeLote,
+  leerLote,
+  marcarToken,
+} from "@/lib/loteIdb";
 import {
   archivoLoteUrl,
+  baseApi,
+  claveApi,
   subirUno,
+  urlSubidaLote,
   useConfirmarLote,
   useRepartirLote,
   type LoteItem,
 } from "@/lib/queries/nichoPovBof";
 import { buildPhotoUrl } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
+
+type Sexo = "auto" | "hombre" | "mujer";
 
 /** Subir los vídeos de una carpeta de golpe y que cada uno vaya a su producto.
  *
@@ -24,9 +41,14 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
  *
  *  Lo importante del repaso: la IA acierta de sobra con productos distintos,
  *  pero con colchones o sofás gemelos se equivoca, y cuando se equivoca lo hace
- *  con total seguridad. Por eso esto PROPONE y no monta nada hasta que se
- *  confirma — y cuando no lo tiene claro deja el vídeo sin asignar en vez de
- *  colocarlo en cualquier sitio.
+ *  con total seguridad. Por eso el repaso existe — pero es OPCIONAL: con el
+ *  check quitado se reparte y se encola sin preguntar, que es lo que se quiere
+ *  en carpetas de productos claramente distintos.
+ *
+ *  La tanda NO vive solo en esta pantalla: los ficheros y los tokens se guardan
+ *  en IndexedDB (`lib/loteIdb.ts`) y, donde se puede, la subida corre en
+ *  segundo plano (`lib/bgFetch.ts`). Cerrar la app o que Android la mate ya no
+ *  obliga a volver a subir 30 MB por vídeo.
  */
 export function SubidaMasiva({
   source,
@@ -53,54 +75,268 @@ export function SubidaMasiva({
   const fotoUrl = (s: string, f: string, id: string) => buildPhotoUrl(s, f, id, 160);
   const [abierto, setAbierto] = useState(false);
   const [reparto, setReparto] = useState<LoteItem[] | null>(null);
-  const [sexo, setSexo] = useState<"auto" | "hombre" | "mujer">("auto");
+  const [sexo, setSexo] = useEstadoRecordado<Sexo>("lote:sexo", "auto");
+  /** Marcado = repasar antes de editar (lo de siempre). Sin marcar = directo. */
+  const [confirmarAntes, setConfirmarAntes] = useEstadoRecordado("lote:confirmar", true);
+  /** Tanda a medias encontrada al abrir la pantalla. */
+  const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
+  /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
+  const [enSegundoPlano, setEnSegundoPlano] = useState(false);
+
+  const loteId = idDeLote(root, source, folder);
+  const cancelar = useRef<AbortController | null>(null);
 
   const conFoto = productos.filter((p) => p.clean_photo_id);
+  const subiendo = Boolean(progreso) || reconociendo || enSegundoPlano;
 
-  /** Sube la tanda con progreso de verdad y luego pide el reparto.
+  /** Manda a editar sin repaso. Los que no reconoció se quedan fuera y se
+   *  avisa: es preferible dejar un vídeo sin montar que montarlo en el
+   *  producto equivocado. */
+  const encolarDirecto = useCallback(
+    async (items: LoteItem[], vozElegida: Sexo) => {
+      const listos = items.filter((i) => i.producto);
+      const fuera = items.length - listos.length;
+      if (!listos.length) {
+        toast.warning("No reconoció ningún vídeo: repásalos a mano.");
+        return false;
+      }
+      const r = await confirmar.mutateAsync({
+        source,
+        folder,
+        items: listos.map((i) => ({ token: i.token, producto: i.producto })),
+        sexo: vozElegida,
+        con_gancho: true,
+        con_titulo: true,
+        con_cta: true,
+        con_flecha: true,
+      });
+      toast.success(`${r.encolados} vídeo(s) en la cola, editando…`);
+      for (const m of r.mensajes) toast.info(m);
+      if (fuera) toast.warning(`${fuera} vídeo(s) sin reconocer: quedaron fuera.`);
+      return true;
+    },
+    [confirmar, folder, source],
+  );
+
+  /** Pide el reparto con los tokens ya subidos y decide si repasar o encolar. */
+  const repartirYSeguir = useCallback(
+    async (tokens: string[], nombres: Map<string, string>, auto: boolean, vozElegida: Sexo) => {
+      setReconociendo(true);
+      try {
+        const r = await repartir.mutateAsync({ source, folder, tokens });
+        const items = r.items.map((x) => ({
+          ...x,
+          archivo: nombres.get(x.token) ?? x.archivo,
+        }));
+        if (auto) {
+          const ok = await encolarDirecto(items, vozElegida);
+          if (ok) {
+            await borrarLote(loteId);
+            setReparto(null);
+            setPendiente(null);
+            return;
+          }
+        }
+        // O se pidió repaso, o el automático no pudo encolar nada.
+        setReparto(items);
+        await guardarReparto(loteId, items);
+        toast.success(`${r.reconocidos}/${items.length} vídeos reconocidos. Repasa y confirma.`);
+      } finally {
+        setReconociendo(false);
+      }
+    },
+    [encolarDirecto, folder, loteId, repartir, source],
+  );
+
+  /** Sube lo que falte de la tanda guardada y sigue con el reparto.
    *
-   *  Antes iba todo en una petición y el botón decía "subiendo y reconociendo"
-   *  durante minutos, sin saber si quedaba mucho. Ahora se ve por dónde va:
-   *  "vídeo 2 de 3 · 47%".
+   *  Vale tanto para empezar como para retomar: lee de IndexedDB los ficheros
+   *  sin token, así que un vídeo ya subido no vuelve a viajar.
    */
-  async function enviar(files: File[]) {
-    if (!files.length) return;
+  const procesarPendientes = useCallback(async () => {
+    const meta = await leerLote(loteId);
+    if (!meta) return;
+    const ficheros = await ficherosDe(loteId);
+    if (!ficheros.length) return;
+
+    const ctrl = new AbortController();
+    cancelar.current = ctrl;
+    const nombres = new Map<string, string>();
+    for (const f of ficheros) if (f.token) nombres.set(f.token, f.nombre);
+
     try {
-      const tokens: string[] = [];
-      const nombres = new Map<string, string>();
-      for (const [i, file] of files.entries()) {
-        setProgreso({ n: i + 1, total: files.length, pct: 0 });
+      const faltan = ficheros.filter((f) => !f.token);
+      for (const [i, f] of faltan.entries()) {
+        setProgreso({ n: ficheros.length - faltan.length + i + 1, total: ficheros.length, pct: 0 });
         const tok = await subirUno({
-          source, folder, file, root,
-          onProgreso: (pct) => setProgreso({ n: i + 1, total: files.length, pct }),
+          source,
+          folder,
+          file: f.blob,
+          nombre: f.nombre,
+          root,
+          senal: ctrl.signal,
+          onProgreso: (pct) =>
+            setProgreso({ n: ficheros.length - faltan.length + i + 1, total: ficheros.length, pct }),
         });
-        tokens.push(tok);
-        // El servidor solo conoce el token; el nombre de verdad lo tenemos
-        // aquí y es lo que hay que enseñar al repasar.
-        nombres.set(tok, file.name);
+        await marcarToken(loteId, f.idx, tok);
+        nombres.set(tok, f.nombre);
       }
       // Se limpia el progreso ANTES de reconocer: si no, el botón se quedaba
       // clavado en "Vídeo 3 de 3 · 100%" mientras la IA pensaba, que es la
       // parte que más tarda.
       setProgreso(null);
-      setReconociendo(true);
-      const r = await repartir.mutateAsync({ source, folder, tokens });
-      setReparto(r.items.map((x) => ({ ...x, archivo: nombres.get(x.token) ?? x.archivo })));
-      toast.success(
-        `${r.reconocidos}/${r.items.length} vídeos reconocidos. Repasa y confirma.`,
-      );
+      setPendiente(null);
+      const tokens = (await ficherosDe(loteId)).map((f) => f.token).filter(Boolean) as string[];
+      await repartirYSeguir(tokens, nombres, meta.auto, meta.sexo);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : String(e));
+      const msg = e instanceof ApiError ? e.message : String(e);
+      // Cortar al salir de la pantalla no es un error que enseñar.
+      if (!ctrl.signal.aborted) toast.error(msg);
+      const quedan = await ficherosDe(loteId);
+      const subidos = quedan.filter((f) => f.token).length;
+      if (quedan.length) setPendiente({ subidos, total: quedan.length });
     } finally {
       setProgreso(null);
       setReconociendo(false);
+      cancelar.current = null;
     }
+  }, [folder, loteId, repartirYSeguir, root, source]);
+
+  async function enviar(files: File[]) {
+    if (!files.length) return;
+    const auto = !confirmarAntes;
+    setReparto(null);
+    await crearLote(
+      {
+        id: loteId,
+        source,
+        folder,
+        root,
+        modo: soportaBgFetch() ? "bg" : "xhr",
+        auto,
+        sexo,
+        base: baseApi(),
+        apiKey: claveApi(),
+      },
+      files,
+    );
+
+    // Camino bueno: el sistema se encarga y la app puede cerrarse.
+    if (soportaBgFetch()) {
+      const reg = await lanzarEnSegundoPlano({
+        loteId,
+        url: urlSubidaLote(root),
+        apiKey: claveApi(),
+        source,
+        folder,
+        files,
+      });
+      if (reg) {
+        setEnSegundoPlano(true);
+        setPendiente({ subidos: 0, total: files.length });
+        toast.success("Subiendo en segundo plano: ya puedes cerrar la app.");
+        return;
+      }
+      await actualizarLote(loteId, { modo: "xhr" });
+    }
+
+    await procesarPendientes();
   }
+
+  // Al abrir la pantalla: ¿había una tanda a medias?
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const meta = await leerLote(loteId);
+      if (!vivo || !meta) return;
+      if (meta.reparto?.length) {
+        setReparto(meta.reparto as LoteItem[]);
+        setAbierto(true);
+        return;
+      }
+      const ficheros = await ficherosDe(loteId);
+      if (!vivo || !ficheros.length) return;
+      const enMarcha = await tandaEnMarcha(loteId);
+      if (!vivo) return;
+      setPendiente({ subidos: ficheros.filter((f) => f.token).length, total: ficheros.length });
+      setAbierto(true);
+      if (enMarcha) setEnSegundoPlano(true);
+    })();
+    return () => {
+      vivo = false;
+      cancelar.current?.abort();
+    };
+  }, [loteId]);
+
+  // Lo que cuenta el Service Worker cuando termina con la app cerrada.
+  useEffect(() => {
+    return escucharAvisos((a) => {
+      if (a.loteId !== loteId) return;
+      setEnSegundoPlano(false);
+      if (a.tipo === "lote-encolado") {
+        toast.success(`${a.encolados} vídeo(s) ya en la cola.`);
+        setPendiente(null);
+        setReparto(null);
+        return;
+      }
+      if (a.tipo === "lote-cancelado") {
+        toast.warning("Subida cancelada.");
+      }
+      if (a.tipo === "lote-fallo") {
+        toast.error("No se pudo subir ningún vídeo.");
+      }
+      // Quedan tokens o ficheros: que la pantalla los recoja.
+      void (async () => {
+        const meta = await leerLote(loteId);
+        if (meta?.reparto?.length) {
+          setReparto(meta.reparto as LoteItem[]);
+          setPendiente(null);
+          return;
+        }
+        const ficheros = await ficherosDe(loteId);
+        if (!ficheros.length) {
+          setPendiente(null);
+          return;
+        }
+        const subidos = ficheros.filter((f) => f.token).length;
+        setPendiente({ subidos, total: ficheros.length });
+        // Todo subido y sin repaso: solo falta reconocer, y eso se hace ya.
+        if (subidos === ficheros.length) void procesarPendientes();
+      })();
+    });
+  }, [loteId, procesarPendientes]);
+
+  // Aviso al cerrar mientras sube desde la pantalla. En el móvil no llega
+  // (por eso existe todo lo de arriba), pero en escritorio evita el susto.
+  useEffect(() => {
+    if (!progreso && !reconociendo) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [progreso, reconociendo]);
 
   const listos = (reparto ?? []).filter((i) => i.producto).length;
 
   function cambiar(i: number, producto: string) {
-    setReparto((prev) => (prev ?? []).map((x, n) => (n === i ? { ...x, producto } : x)));
+    setReparto((prev) => {
+      const nuevo = (prev ?? []).map((x, n) => (n === i ? { ...x, producto } : x));
+      void guardarReparto(loteId, nuevo);
+      return nuevo;
+    });
+  }
+
+  async function descartarPendiente() {
+    cancelar.current?.abort();
+    const enMarcha = await tandaEnMarcha(loteId);
+    await enMarcha?.abort().catch(() => false);
+    await borrarLote(loteId);
+    setPendiente(null);
+    setEnSegundoPlano(false);
+    setReparto(null);
+    toast.info("Tanda descartada.");
   }
 
   return (
@@ -121,8 +357,83 @@ export function SubidaMasiva({
           <p className="text-[10px] leading-relaxed text-muted-foreground">
             Suelta los vídeos de la carpeta y se reparten solos. No hace falta
             que estén todos: los productos sin vídeo se quedan como están, y si
-            alguno no se reconoce lo asignas tú. Repasas y confirmas.
+            alguno no se reconoce lo asignas tú.
           </p>
+
+          {/* Con el check quitado no hay repaso, así que la voz hay que
+              elegirla ANTES de soltar los vídeos. */}
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/60 p-2">
+            <input
+              type="checkbox"
+              checked={confirmarAntes}
+              onChange={(e) => setConfirmarAntes(e.target.checked)}
+              disabled={subiendo}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-emerald-500"
+            />
+            <span className="min-w-0">
+              <span className="block text-[11px] font-semibold">Confirmar antes de editar</span>
+              <span className="block text-[10px] text-muted-foreground">
+                {confirmarAntes
+                  ? "Verás qué vídeo ha puesto en cada producto y confirmas tú."
+                  : "Va directo: reparte y manda a editar sin preguntar."}
+              </span>
+            </span>
+          </label>
+
+          <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
+            {(["auto", "hombre", "mujer"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setSexo(s);
+                  void actualizarLote(loteId, { sexo: s });
+                }}
+                className={`flex-1 rounded px-1.5 py-1 transition ${
+                  sexo === s ? "bg-emerald-500 font-semibold text-white" : "text-muted-foreground"
+                }`}
+              >
+                {s === "auto" ? "🖐️ Auto" : s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
+              </button>
+            ))}
+          </div>
+
+          {/* Tanda a medias: o se retoma (sin volver a subir lo que ya está) o
+              se tira. Es lo que salva la subida cuando Android mata la app. */}
+          {pendiente && !progreso && !reconociendo && (
+            <div className="space-y-1.5 rounded-lg border border-amber-500/50 bg-amber-500/5 p-2">
+              <p className="text-[11px] font-semibold text-amber-500">
+                {enSegundoPlano
+                  ? `Subiendo en segundo plano · ${pendiente.total} vídeo(s)`
+                  : `Tanda a medias: ${pendiente.subidos}/${pendiente.total} subidos`}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {enSegundoPlano
+                  ? "Puedes cerrar la app: el móvil sigue subiendo y al volver estará listo."
+                  : "Se retoma donde iba: lo ya subido no vuelve a viajar."}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {!enSegundoPlano && (
+                  <button
+                    type="button"
+                    onClick={() => void procesarPendientes()}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-amber-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-amber-600"
+                  >
+                    <RotateCw className="h-3 w-3" /> Retomar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void descartarPendiente()}
+                  className={`flex items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground ${
+                    enSegundoPlano ? "col-span-2" : ""
+                  }`}
+                >
+                  <Trash2 className="h-3 w-3" /> Descartar
+                </button>
+              </div>
+            </div>
+          )}
 
           <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600">
             {progreso ? (
@@ -135,6 +446,10 @@ export function SubidaMasiva({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reconociendo los
                 productos…
               </>
+            ) : enSegundoPlano ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo en segundo plano…
+              </>
             ) : (
               <>
                 <Upload className="h-3.5 w-3.5" /> Elegir vídeos
@@ -144,12 +459,12 @@ export function SubidaMasiva({
               type="file"
               accept="video/*"
               multiple
-              disabled={Boolean(progreso) || reconociendo}
+              disabled={subiendo}
               className="hidden"
               onChange={(e) => {
                 const f = Array.from(e.target.files ?? []);
                 e.target.value = "";
-                enviar(f);
+                void enviar(f);
               }}
             />
           </label>
@@ -253,23 +568,6 @@ export function SubidaMasiva({
                 );
               })}
 
-              <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
-                {(["auto", "hombre", "mujer"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSexo(s)}
-                    className={`flex-1 rounded px-1.5 py-1 transition ${
-                      sexo === s
-                        ? "bg-emerald-500 font-semibold text-white"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {s === "auto" ? "🖐️ Auto" : s === "hombre" ? "👨 Hombre" : "👩 Mujer"}
-                  </button>
-                ))}
-              </div>
-
               <button
                 type="button"
                 disabled={confirmar.isPending || !listos}
@@ -292,6 +590,7 @@ export function SubidaMasiva({
                         toast.success(`${r.encolados} vídeo(s) en la cola, editando…`);
                         for (const m of r.mensajes) toast.info(m);
                         setReparto(null);
+                        void borrarLote(loteId);
                       },
                       onError: (e) =>
                         toast.error(e instanceof ApiError ? e.message : String(e)),

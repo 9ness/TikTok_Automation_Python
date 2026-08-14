@@ -520,17 +520,36 @@ export interface LoteResponse {
  *  10-30 MB y sin progreso el botón se queda minutos sin decir nada. Van de
  *  uno en uno a propósito — varios a la vez desde el móvil se atragantan.
  */
+export function baseApi(): string {
+  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+}
+
+export function claveApi(): string {
+  return process.env.NEXT_PUBLIC_API_KEY ?? "";
+}
+
+/** Endpoint de subida de un vídeo del lote. Lo necesita también la subida en
+ *  segundo plano, que arma las peticiones a mano. */
+export function urlSubidaLote(root: string): string {
+  return `${baseApi()}${root}/video/lote/subir`;
+}
+
 export function subirUno(v: {
   source: string;
   folder: string;
-  file: File;
+  /** El fichero, o el blob recuperado de IndexedDB al retomar una tanda. */
+  file: File | Blob;
+  nombre?: string;
   root: string;
   onProgreso?: (pct: number) => void;
+  /** Para poder cortar la subida al desmontar la pantalla. */
+  senal?: AbortSignal;
 }): Promise<string> {
-  const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
-  const key = process.env.NEXT_PUBLIC_API_KEY ?? "";
+  const base = baseApi();
+  const key = claveApi();
+  const nombre = v.nombre ?? (v.file instanceof File ? v.file.name : "video.mp4");
   const fd = new FormData();
-  fd.append("file", v.file);
+  fd.append("file", v.file, nombre);
   fd.append("source", v.source);
   fd.append("folder", v.folder);
   return new Promise((resolve, reject) => {
@@ -538,6 +557,13 @@ export function subirUno(v: {
     xhr.open("POST", `${base}${v.root}/video/lote/subir`);
     if (key) xhr.setRequestHeader("X-API-Key", key);
     xhr.withCredentials = true;
+    if (v.senal) {
+      if (v.senal.aborted) {
+        reject(new Error("Subida cancelada"));
+        return;
+      }
+      v.senal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) v.onProgreso?.(Math.round((e.loaded / e.total) * 100));
     };
@@ -545,15 +571,16 @@ export function subirUno(v: {
       try {
         const d = JSON.parse(xhr.responseText) as { token?: string; error?: string };
         if (xhr.status >= 400 || !d.token) {
-          reject(new Error(d.error || `No se pudo subir ${v.file.name}`));
+          reject(new Error(d.error || `No se pudo subir ${nombre}`));
           return;
         }
         resolve(d.token);
       } catch {
-        reject(new Error(`Respuesta inválida al subir ${v.file.name}`));
+        reject(new Error(`Respuesta inválida al subir ${nombre}`));
       }
     };
-    xhr.onerror = () => reject(new Error(`Error de red subiendo ${v.file.name}`));
+    xhr.onabort = () => reject(new Error("Subida cancelada"));
+    xhr.onerror = () => reject(new Error(`Error de red subiendo ${nombre}`));
     xhr.send(fd);
   });
 }
