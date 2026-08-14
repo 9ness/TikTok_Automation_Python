@@ -153,9 +153,6 @@ export default function PovBofLargoPage() {
   const [generandoGuiones, setGenerandoGuiones] = useState(false);
   const [guionProgress, setGuionProgress] = useState("");
 
-  const totalProductos = items.length;
-  const conVideo = items.filter((p) => p.video_path).length;
-  const conFoto = items.filter((p) => p.clean_photo_id).length;
   const esTopVendidos = activaSource === FUENTE_TOP_VENDIDOS;
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "largo:topventas:sinsubir", false,
@@ -197,14 +194,23 @@ export default function PovBofLargoPage() {
     [lista, esTopVendidos, soloSinSubir],
   );
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
-  const conPlazos = items.filter((p) => p.clean_photo_id && p.modo_plazos).length;
-  const conViejo = items.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
-  const videosPlazos = items.filter((p) => p.video_path && p.modo_plazos).length;
-  const videosViejo = items.filter((p) => p.video_path && !p.modo_plazos).length;
+  // Sobre lo que se ESTÁ VIENDO: con el ranking completo abierto, "Fotos
+  // 10/10" mientras hay cuarenta productos en pantalla no decía nada de lo que
+  // se iba a bajar. Los de textos y guiones NO, que son acciones de carpeta.
+  const totalProductos = itemsVisibles.length;
+  const conVideo = itemsVisibles.filter((p) => p.video_path).length;
+  const conFoto = itemsVisibles.filter((p) => p.clean_photo_id).length;
+  const conPlazos = itemsVisibles.filter((p) => p.clean_photo_id && p.modo_plazos).length;
+  const conViejo = itemsVisibles.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
+  const videosPlazos = itemsVisibles.filter((p) => p.video_path && p.modo_plazos).length;
+  const videosViejo = itemsVisibles.filter((p) => p.video_path && !p.modo_plazos).length;
+  // "Textos + guiones" actúa sobre la CARPETA abierta, así que su total es el
+  // de la carpeta y no el de lo que se ve.
+  const totalCarpeta = items.length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
-  const subidos = items.filter((p) => p.uploaded).length;
-  const enEscaparate = items.filter((p) => p.en_escaparate).length;
+  const subidos = itemsVisibles.filter((p) => p.uploaded).length;
+  const enEscaparate = itemsVisibles.filter((p) => p.en_escaparate).length;
   /** Le falta el guion o el que tiene es del otro modo (escrito antes de que
    *  existieran los plazos, o antes de corregir el precio). Los desfasados
    *  cuentan como pendientes: si no, el botón dice "guiones al día" mientras
@@ -257,7 +263,10 @@ export default function PovBofLargoPage() {
 
   async function downloadVideos(filtro: Filtro = "todas") {
     if (!folder) return;
-    const conV = items.filter((p) => p.video_path && cuadra(p, filtro));
+    // En el ORDEN QUE SE VE: en Top vendidos la lista va por ventas y las
+    // descargas salían por número de producto, en otro orden del que se
+    // acababa de mirar.
+    const conV = itemsVisibles.filter((p) => p.video_path && cuadra(p, filtro));
     if (!conV.length) {
       toast.error(
         filtro === "todas"
@@ -271,9 +280,14 @@ export default function PovBofLargoPage() {
       for (const [i, p] of conV.entries()) {
         setVideoProgress(`${i + 1}/${conV.length}`);
         const a = document.createElement("a");
-        a.href = videoLargoUrl(activaSource, folder, p.producto, p.video_listo_at ?? 0, true);
+        // Cada producto es de SU carpeta cuando se ven todas juntas.
+        const suya = p.folder || folder;
+        a.href = videoLargoUrl(activaSource, suya, p.producto, p.video_listo_at ?? 0, true);
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
-        a.download = `${folder}_${p.producto}${sufijo}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        // El número de delante es lo que hace que la galería los enseñe en el
+        // mismo orden que la pantalla.
+        a.download = `${String(i + 1).padStart(2, "0")}_${suya}_${p.producto}${sufijo}.mp4`
+          .replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -291,7 +305,7 @@ export default function PovBofLargoPage() {
    *  generarlos por tandas y no ir mirando el precio producto a producto. */
   async function downloadCleanPhotos(filtro: Filtro = "todas") {
     if (!folder) return;
-    const conF = items.filter((p) => p.clean_photo_id && cuadra(p, filtro));
+    const conF = itemsVisibles.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!conF.length) {
       toast.error(
         filtro === "todas"
@@ -305,9 +319,11 @@ export default function PovBofLargoPage() {
       for (const [i, p] of conF.entries()) {
         setDownloadProgress(`${i + 1}/${conF.length}`);
         const a = document.createElement("a");
-        a.href = buildCleanPhotoDownloadUrl(activaSource, folder, p.producto);
+        const suya = p.folder || folder;
+        a.href = buildCleanPhotoDownloadUrl(activaSource, suya, p.producto);
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
-        a.download = `${folder}_${p.producto}${sufijo}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        a.download = `${String(i + 1).padStart(2, "0")}_${suya}_${p.producto}${sufijo}`
+          .replace(/[^a-zA-Z0-9_.-]+/g, "_");
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -839,7 +855,7 @@ export default function PovBofLargoPage() {
                   <>
                     <Sparkles className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">
-                      Textos + guiones ({conTexto}/{totalProductos})
+                      Textos + guiones ({conTexto}/{totalCarpeta})
                     </span>
                   </>
                 )}

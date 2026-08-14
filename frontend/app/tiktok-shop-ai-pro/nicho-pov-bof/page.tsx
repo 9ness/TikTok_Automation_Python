@@ -228,32 +228,38 @@ export default function NichoPovBofPage() {
   const [downloadProgress, setDownloadProgress] = useState("");
   const [downloadingVideos, setDownloadingVideos] = useState(false);
   const [videoProgress, setVideoProgress] = useState("");
-  const totalProductos = productos.data?.length ?? 0;
-  const conVideo = (productos.data ?? []).filter((p) => p.video_path).length;
-  const conFoto = (productos.data ?? []).filter((p) => p.clean_photo_id).length;
+  // Los recuentos van sobre lo que se ESTÁ VIENDO: con el ranking completo
+  // abierto, "Fotos 10/10" mientras hay cuarenta productos en pantalla no
+  // decía nada de lo que se iba a bajar.
+  const totalProductos = productosVisibles.length;
+  const conVideo = productosVisibles.filter((p) => p.video_path).length;
+  const conFoto = productosVisibles.filter((p) => p.clean_photo_id).length;
   // Los dos flujos de generación de la carpeta, contados sobre los que tienen
   // foto (que son los que se pueden bajar).
-  const conPlazos = (productos.data ?? []).filter(
+  const conPlazos = productosVisibles.filter(
     (p) => p.clean_photo_id && p.modo_plazos,
   ).length;
-  const conViejo = (productos.data ?? []).filter(
+  const conViejo = productosVisibles.filter(
     (p) => p.clean_photo_id && !p.modo_plazos,
   ).length;
   // Lo mismo para los vídeos ya montados: bajar 20 para quedarse con 3 es lo
   // que se quería evitar.
-  const videosPlazos = (productos.data ?? []).filter(
+  const videosPlazos = productosVisibles.filter(
     (p) => p.video_path && p.modo_plazos,
   ).length;
-  const videosViejo = (productos.data ?? []).filter(
+  const videosViejo = productosVisibles.filter(
     (p) => p.video_path && !p.modo_plazos,
   ).length;
+  // "Textos" es una acción de CARPETA (extrae la carpeta abierta), así que su
+  // contador va sobre la carpeta y no sobre lo que se ve.
+  const totalCarpeta = productos.data?.length ?? 0;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
-  const subidos = (productos.data ?? []).filter((p) => p.uploaded).length;
-  const enEscaparate = (productos.data ?? []).filter((p) => p.en_escaparate).length;
+  const subidos = productosVisibles.filter((p) => p.uploaded).length;
+  const enEscaparate = productosVisibles.filter((p) => p.en_escaparate).length;
   // Meter el producto en el escaparate es el paso más lento del día y no se
   // puede automatizar (ver EscaparateModal), así que el pendiente se enseña
   // arriba, en el botón, sin tener que abrir nada.
-  const pendientesEscaparate = (productos.data ?? []).filter(
+  const pendientesEscaparate = productosVisibles.filter(
     (p) => !p.en_escaparate,
   ).length;
 
@@ -268,8 +274,9 @@ export default function NichoPovBofPage() {
    *  Igual que las fotos: el navegador móvil cancela las descargas
    *  simultáneas, así que van en fila con un retardo entre medias. */
   async function downloadVideos(filtro: Filtro = "todas") {
-    if (!folder || !productos.data?.length) return;
-    const items = productos.data.filter((p) => p.video_path && cuadra(p, filtro));
+    if (!folder || !productosVisibles.length) return;
+    // En el orden que se ve (ver `downloadCleanPhotos`).
+    const items = productosVisibles.filter((p) => p.video_path && cuadra(p, filtro));
     if (!items.length) {
       toast.error(
         filtro === "todas"
@@ -283,9 +290,13 @@ export default function NichoPovBofPage() {
       for (const [i, p] of items.entries()) {
         setVideoProgress(`${i + 1}/${items.length}`);
         const a = document.createElement("a");
-        a.href = buildVideoUrl(source, folder, p.producto, p.video_listo_at ?? 0, true);
+        const suya = p.folder || folder;
+        a.href = buildVideoUrl(source, suya, p.producto, p.video_listo_at ?? 0, true);
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
-        a.download = `${folder}_${p.producto}${sufijo}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        const orden = String(i + 1).padStart(2, "0");
+        a.download = `${orden}_${suya}_${p.producto}${sufijo}.mp4`.replace(
+          /[^a-zA-Z0-9_.-]+/g, "_",
+        );
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -302,8 +313,11 @@ export default function NichoPovBofPage() {
    *  necesitan DOS clips y los de siempre uno solo, así que bajar la carpeta
    *  entera obligaba a ir mirando el precio producto a producto. */
   async function downloadCleanPhotos(filtro: Filtro = "todas") {
-    if (!folder || !productos.data?.length) return;
-    const items = productos.data.filter((p) => p.clean_photo_id && cuadra(p, filtro));
+    if (!folder || !productosVisibles.length) return;
+    // En el ORDEN QUE SE VE, no en el de la carpeta: en Top vendidos la lista
+    // va por ventas y las fotos se bajaban por número de producto, así que en
+    // la galería aparecían en otro orden del que se acababa de mirar.
+    const items = productosVisibles.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!items.length) {
       toast.error(
         filtro === "todas"
@@ -321,10 +335,17 @@ export default function NichoPovBofPage() {
       for (const [i, p] of items.entries()) {
         setDownloadProgress(`${i + 1}/${items.length}`);
         const a = document.createElement("a");
-        a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto);
-        // El sufijo evita mezclar los dos flujos en la carpeta de Descargas.
+        // Cada producto es de SU carpeta cuando se ven todas juntas.
+        const suya = p.folder || folder;
+        a.href = buildCleanPhotoDownloadUrl(source, suya, p.producto);
+        // El sufijo evita mezclar los dos flujos en la carpeta de Descargas, y
+        // el número de delante es lo que hace que la galería los enseñe en el
+        // mismo orden que la pantalla.
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
-        a.download = `${folder}_${p.producto}${sufijo}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        const orden = String(i + 1).padStart(2, "0");
+        a.download = `${orden}_${suya}_${p.producto}${sufijo}`.replace(
+          /[^a-zA-Z0-9_.-]+/g, "_",
+        );
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -862,7 +883,7 @@ export default function NichoPovBofPage() {
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">Textos ({conTexto}/{totalProductos})</span>
+                  <span className="truncate">Textos ({conTexto}/{totalCarpeta})</span>
                 </>
               )}
             </button>
