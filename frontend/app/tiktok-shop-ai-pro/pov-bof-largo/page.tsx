@@ -1472,6 +1472,18 @@ function ProductoCard({
 }) {
   const qc = useQueryClient();
   const guion = useEscribirGuion();
+
+  /** Escribe el guion del producto. La usan el botón grande y el intento de
+   *  subir un clip sin guion (que es cuando de verdad se echa en falta). */
+  function escribirGuion() {
+    guion.mutate(
+      { source, folder, producto: p.producto },
+      {
+        onSuccess: () => toast.success("Guion escrito"),
+        onError: (e) => toast.error(err(e)),
+      },
+    );
+  }
   const setEstado = useSetEstadoLargo();
   const buscarUrl = useBuscarProductoUrl();
   const hashtags = useHashtags().data ?? [];
@@ -1795,15 +1807,7 @@ function ProductoCard({
         <button
           type="button"
           disabled={guion.isPending || !p.titulo}
-          onClick={() =>
-            guion.mutate(
-              { source, folder, producto: p.producto },
-              {
-                onSuccess: () => toast.success("Guion escrito"),
-                onError: (e) => toast.error(err(e)),
-              },
-            )
-          }
+          onClick={escribirGuion}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
         >
           {guion.isPending ? (
@@ -1892,11 +1896,20 @@ function ProductoCard({
           return (
             <label
               key={slot}
+              // Sin guion NO se puede subir (la voz manda la duración), pero
+              // antes el botón quedaba muerto: se pulsaba y no pasaba nada, y
+              // parecía roto. Ahora dice por qué y lo escribe de un toque.
+              onClick={(e) => {
+                if (p.guion || subiendoEste) return;
+                e.preventDefault();
+                toast.info("Primero escribe el guion: es lo que marca la duración.");
+                if (!guion.isPending) escribirGuion();
+              }}
               className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-[11px] font-medium transition ${
                 puesto
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-border/60 hover:border-violet-500/60"
-              } ${!p.guion || subiendoEste ? "pointer-events-none opacity-60" : ""}`}
+              } ${!p.guion || subiendoEste ? "opacity-60" : ""}`}
             >
               {subiendoEste ? (
                 <>
