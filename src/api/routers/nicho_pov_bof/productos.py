@@ -336,6 +336,11 @@ def _list_productos(
     except RuntimeError as e:
         raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
 
+    # Si el Drive del curso vació la carpeta, las fotos salen de nuestra copia.
+    # La pantalla lo dice: el operador tiene que saber que eso ya no está en el
+    # origen (y que si aún no ha grabado el producto, corre prisa).
+    desde_copia = drive_client.desde_la_copia(photos)
+
     # Las dimensiones son la señal principal para distinguir foto limpia de
     # captura con título; `probe_dimensions` descarga (cacheado) si hace falta.
     photos = [drive_client.probe_dimensions(p) for p in photos]
@@ -359,6 +364,7 @@ def _list_productos(
         items.append(
             ProductoInfo(
                 producto=producto,
+                desde_copia=desde_copia,
                 clean_photo_id=clean.get("id"),
                 titled_photo_id=titled.get("id"),
                 foto_aviso=_aviso_foto(pair),

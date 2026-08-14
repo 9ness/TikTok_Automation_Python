@@ -106,6 +106,9 @@ class ProductoInfo(BaseModel):
     # (Top vendidos ordenado por ventas), donde cada producto es de una y la
     # pantalla necesita saberlo para actuar sobre él.
     folder: str = ""
+    # Sus fotos salen de NUESTRA COPIA porque el Drive del curso ya no las
+    # tiene. El producto sigue siendo grabable; la pantalla solo lo avisa.
+    desde_copia: bool = False
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
     # Aviso cuando el emparejado limpia/captura NO es fiable (vacío si lo es).

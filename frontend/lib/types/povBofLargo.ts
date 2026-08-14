@@ -18,6 +18,8 @@ export interface ProductoLargo {
   /** De qué carpeta es. Solo en el listado de TODAS las carpetas (Top
    *  vendidos por ventas). */
   folder?: string;
+  /** Sus fotos salen de NUESTRA copia: el Drive del curso ya no las tiene. */
+  desde_copia?: boolean;
   clean_photo_id: string | null;
   titled_photo_id: string | null;
   foto_aviso: string;

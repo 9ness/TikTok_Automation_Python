@@ -175,9 +175,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     calentador_stop = asyncio.Event()
     calentador_task = asyncio.create_task(bucle_precalentado(calentador_stop))
 
+    # Nicho POV BOF · copia diaria del Drive del curso. El admin de aquel Drive
+    # borra carpetas sin avisar y hasta ahora la copia dependía de que alguien
+    # pulsara el botón: se perdieron ocho productos de "10 Agosto 2026" por dos
+    # días de diferencia. Encola un job al día (la marca vive en Redis, así que
+    # los reinicios del deploy no la disparan de más).
+    from src.nicho_pov_bof.services.backup_diario import bucle as backup_diario_bucle
+
+    backup_stop = asyncio.Event()
+    backup_task = asyncio.create_task(backup_diario_bucle(backup_stop))
+
     try:
         yield
     finally:
+        backup_stop.set()
+        try:
+            await asyncio.wait_for(backup_task, timeout=5)
+        except asyncio.TimeoutError:
+            backup_task.cancel()
         calentador_stop.set()
         try:
             await asyncio.wait_for(calentador_task, timeout=5)

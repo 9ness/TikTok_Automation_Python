@@ -316,9 +316,41 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
             and config.is_image(it["Name"], it.get("MimeType", ""))
         ]
         photos.sort(key=lambda p: config.natural_sort_key(p["name"]))
-        return photos
+        if photos:
+            return photos
+        # Carpeta VACÍA en el Drive del curso. El admin de aquel Drive borra
+        # cada cierto tiempo, y entonces desaparecían productos con los que ya
+        # se estaba trabajando ("10 Agosto 2026" perdió ocho de golpe). Si la
+        # copia los tiene, se sirven de ahí: misma fuente y misma carpeta, así
+        # que el progreso guardado (subido, clips, escaparate) sigue valiendo.
+        return _de_la_copia(source, folder)
 
     return _listar_cacheado(f"photos:{source}:{folder}", cargar, refresh=refresh)
+
+
+def _de_la_copia(source: str, folder: str) -> list[dict]:
+    """Las fotos de esa carpeta en el backup, marcadas como tales. `[]` si no hay.
+
+    Cada foto lleva `desde_copia`, que es lo que la pantalla usa para avisar de
+    que eso ya no está en el Drive del curso.
+    """
+    try:
+        from src.nicho_pov_bof.services import backup_sync
+
+        fuente = config.SOURCES.get(source, {}).get("folder") or ""
+        if not fuente:
+            return []
+        fotos = backup_sync.fotos_de(fuente, folder)
+    except Exception:  # noqa: BLE001
+        return []
+    for f in fotos:
+        f["desde_copia"] = True
+    return fotos
+
+
+def desde_la_copia(fotos: list[dict]) -> bool:
+    """¿Lo que se está enseñando sale del backup y no del Drive del curso?"""
+    return any(f.get("desde_copia") for f in fotos)
 
 
 def probe_dimensions(photo: dict) -> dict:

@@ -1726,6 +1726,17 @@ function ProductoCard({
                   producto={producto.producto}
                 />
               )}
+              {producto.desde_copia && (
+                /* El Drive del curso ya no tiene estas fotos: se están
+                   sirviendo de nuestra copia. Se avisa porque significa que el
+                   producto puede desaparecer de un momento a otro del origen. */
+                <span
+                  title="El Drive del curso ya no las tiene: salen de la copia de seguridad"
+                  className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-500"
+                >
+                  🗄️ desde la copia
+                </span>
+              )}
               {producto.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
                   💳 Plazos · 2 clips

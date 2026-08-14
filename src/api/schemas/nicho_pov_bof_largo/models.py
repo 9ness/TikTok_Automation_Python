@@ -23,6 +23,8 @@ class ProductoLargo(BaseModel):
     # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
     # (Top vendidos ordenado por ventas): ahí cada producto viene de una.
     folder: str = ""
+    # Sus fotos salen de NUESTRA COPIA: el Drive del curso ya no las tiene.
+    desde_copia: bool = False
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
     foto_aviso: str = ""

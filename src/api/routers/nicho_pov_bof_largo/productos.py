@@ -241,6 +241,8 @@ def _listar(
     except RuntimeError as e:
         raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
 
+    # Si el Drive del curso vació la carpeta, las fotos vienen de nuestra copia.
+    desde_copia = drive_client.desde_la_copia(fotos)
     pares = photo_pairing.pair_folder(fotos)
     propio = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
     activos = _montandose(queue, source, folder)
@@ -260,6 +262,7 @@ def _listar(
         guion = str(mio.get("guion") or "")
         items.append(ProductoLargo(
             producto=pid,
+            desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
             # Textos y enlaces: compartidos con el POV BOF (los extrae/busca él).
