@@ -322,16 +322,23 @@ export function useSetEstado() {
         nichoPovBofKeys.productos(vars.source, vars.folder),
         (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
       );
+      // La lista global (ranking de Top vendidos) es otra query: sin esto, lo
+      // que se acaba de marcar no se veía con el ranking abierto.
+      void qc.invalidateQueries({
+        queryKey: nichoPovBofKeys.productos(vars.source, "*todos*"),
+      });
       // Puede haber entrado o salido de "vendidos".
       void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
       // Y si lo que cambió fue "Subido", el tope diario ya no es el mismo.
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
       }
-      // El precio decide si el vídeo va con guion de plazos (dos clips): al
-      // tocarlo hay que releer la carpeta, no solo esta tarjeta.
+      // El precio decide si el vídeo va con guion de plazos (dos clips) y lo
+      // lee también el POV BOF Largo, que es otro nicho con sus propias
+      // queries: se invalida TODO, que es lo único que garantiza que el
+      // cambio se vea donde se está mirando.
       if (vars.precio !== undefined) {
-        void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+        void qc.invalidateQueries();
       }
     },
   });

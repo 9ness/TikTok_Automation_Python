@@ -108,6 +108,17 @@ export function useProductosTodosLargo(source: string, activo: boolean) {
   });
 }
 
+/** Invalida la carpeta Y la lista global.
+ *
+ *  En Top vendidos la pantalla pinta el ranking completo, que es OTRA query
+ *  (`*todos*`): invalidando solo la carpeta, el guion recién escrito o el
+ *  precio recién puesto no se veían y parecía que no se habían guardado.
+ */
+function invalidarProductos(qc: ReturnType<typeof useQueryClient>, source: string, folder: string) {
+  void qc.invalidateQueries({ queryKey: largoKeys.productos(source, folder) });
+  void qc.invalidateQueries({ queryKey: largoKeys.productos(source, "*todos*") });
+}
+
 export function useProductosLargo(source: string, folder: string) {
   return useQuery<ProductosLargoResponse>({
     queryKey: largoKeys.productos(source, folder),
@@ -131,8 +142,7 @@ export function useEscribirGuion() {
   >({
     mutationFn: async (body) =>
       (await api.post<{ producto: ProductoLargo }>(`${ROOT}/guion`, body)).producto,
-    onSuccess: (_p, v) =>
-      void qc.invalidateQueries({ queryKey: largoKeys.productos(v.source, v.folder) }),
+    onSuccess: (_p, v) => invalidarProductos(qc, v.source, v.folder),
   });
 }
 
@@ -154,6 +164,9 @@ export function useSetEstadoLargo() {
               }
             : old,
       );
+      // La lista global (ranking) es otra query: sin esto, lo que se acaba de
+      // marcar no se veía al tener abierto Top vendidos.
+      void qc.invalidateQueries({ queryKey: largoKeys.productos(vars.source, "*todos*") });
       // Puede haber entrado o salido del ranking de vendidos.
       void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) });
       if (vars.uploaded !== undefined) {
@@ -222,8 +235,7 @@ export function useSubirClipLargo() {
       fd.append("con_flecha", String(v.conFlecha));
       return api.post<ClipLargoUploadResponse>(`${ROOT}/clip/upload`, fd);
     },
-    onSuccess: (_r, v) =>
-      void qc.invalidateQueries({ queryKey: largoKeys.productos(v.source, v.folder) }),
+    onSuccess: (_r, v) => invalidarProductos(qc, v.source, v.folder),
   });
 }
 
