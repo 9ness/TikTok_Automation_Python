@@ -1927,15 +1927,16 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         if not c.is_file():
             raise FileNotFoundError(f"No está el clip subido: {c}")
     sexo = (p.get("sexo") or "mujer").strip().lower()
-    # "auto": la mano del clip 1 decide la voz (mismo criterio que el POV BOF —
-    # mujer salvo que se vea reloj o vello). Se mira el primer clip porque los
-    # dos son del mismo producto y la misma persona.
+    # "auto": la mano decide la voz (mismo criterio que el POV BOF — mujer
+    # salvo que se vea reloj o vello). Se miran los DOS clips: son del mismo
+    # producto, pero la mano no sale igual de cerca en los dos y mirar solo el
+    # primero deja fuera la mitad del material.
     deteccion = {}
     if sexo == "auto":
         from src.nicho_pov_bof.services import mano
 
         on_progress(0.02, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(clips[0], on_log=on_log)
+        deteccion = mano.detectar(clips, on_log=on_log)
         sexo = deteccion.get("sexo") or "mujer"
 
     on_progress(0.03, "📝 Leyendo textos del producto…")
@@ -2108,7 +2109,7 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
         from src.nicho_pov_bof.services import mano
 
         on_progress(0.05, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(clips[0], on_log=on_log)
+        deteccion = mano.detectar(clips, on_log=on_log)
         sexo = deteccion.get("sexo") or rng.choice(["hombre", "mujer"])
         if not deteccion.get("sexo"):
             on_log(f"[pov_bof_plazos] no se ve mano; voz sorteada: {sexo}")

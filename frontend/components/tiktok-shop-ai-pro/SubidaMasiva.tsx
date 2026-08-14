@@ -82,6 +82,9 @@ export function SubidaMasiva({
   const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
   /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
   const [enSegundoPlano, setEnSegundoPlano] = useState(false);
+  /** Lo que quedó sin encolar y por qué. En pantalla hasta que se cierre: en
+   *  un toast se pierde y luego no cuadra la cuenta de la cola. */
+  const [avisos, setAvisos] = useState<string[]>([]);
 
   const loteId = idDeLote(root, source, folder);
   const cancelar = useRef<AbortController | null>(null);
@@ -89,16 +92,20 @@ export function SubidaMasiva({
   const conFoto = productos.filter((p) => p.clean_photo_id);
   const subiendo = Boolean(progreso) || reconociendo || enSegundoPlano;
 
-  /** Manda a editar sin repaso. Los que no reconoció se quedan fuera y se
-   *  avisa: es preferible dejar un vídeo sin montar que montarlo en el
-   *  producto equivocado. */
+  /** Manda a editar sin repaso y devuelve lo que NO se encoló.
+   *
+   *  Los que no reconoció no se tiran: se devuelven para que el operador los
+   *  asigne. Montar un vídeo en el producto equivocado es peor que dejarlo
+   *  esperando, pero descartarlo en silencio es lo peor de todo — pasó con una
+   *  tanda de 5 en la que solo se editaron 4.
+   */
   const encolarDirecto = useCallback(
     async (items: LoteItem[], vozElegida: Sexo) => {
       const listos = items.filter((i) => i.producto);
-      const fuera = items.length - listos.length;
+      const sinAsignar = items.filter((i) => !i.producto);
       if (!listos.length) {
-        toast.warning("No reconoció ningún vídeo: repásalos a mano.");
-        return false;
+        toast.warning("No reconoció ningún vídeo: asígnalos tú.");
+        return { encolados: 0, sinAsignar, avisos: [] as string[] };
       }
       const r = await confirmar.mutateAsync({
         source,
@@ -111,9 +118,20 @@ export function SubidaMasiva({
         con_flecha: true,
       });
       toast.success(`${r.encolados} vídeo(s) en la cola, editando…`);
-      for (const m of r.mensajes) toast.info(m);
-      if (fuera) toast.warning(`${fuera} vídeo(s) sin reconocer: quedaron fuera.`);
-      return true;
+      // Lo que el backend NO encoló (productos de plazos a los que les falta
+      // el otro clip, sobre todo) se queda escrito en pantalla: en un toast se
+      // pierde y la cuenta de la cola no cuadra sin saber por qué.
+      const avisos = [...r.mensajes];
+      if (r.encolados < listos.length) {
+        avisos.push(
+          `${listos.length - r.encolados} vídeo(s) reconocidos NO se encolaron ` +
+            "(en productos de plazos hacen falta los dos clips).",
+        );
+      }
+      if (sinAsignar.length) {
+        avisos.push(`${sinAsignar.length} vídeo(s) sin reconocer: asígnalos abajo.`);
+      }
+      return { encolados: r.encolados, sinAsignar, avisos };
     },
     [confirmar, folder, source],
   );
@@ -129,15 +147,20 @@ export function SubidaMasiva({
           archivo: nombres.get(x.token) ?? x.archivo,
         }));
         if (auto) {
-          const ok = await encolarDirecto(items, vozElegida);
-          if (ok) {
+          const res = await encolarDirecto(items, vozElegida);
+          setAvisos(res.avisos);
+          if (!res.sinAsignar.length) {
             await borrarLote(loteId);
             setReparto(null);
             setPendiente(null);
             return;
           }
+          // Quedan sin reconocer: se dejan EN PANTALLA para asignarlos, no se
+          // descartan. Los ya encolados no vuelven a salir.
+          setReparto(res.sinAsignar);
+          await guardarReparto(loteId, res.sinAsignar);
+          return;
         }
-        // O se pidió repaso, o el automático no pudo encolar nada.
         setReparto(items);
         await guardarReparto(loteId, items);
         toast.success(`${r.reconocidos}/${items.length} vídeos reconocidos. Repasa y confirma.`);
@@ -206,6 +229,7 @@ export function SubidaMasiva({
     if (!files.length) return;
     const auto = !confirmarAntes;
     setReparto(null);
+    setAvisos([]);
     await crearLote(
       {
         id: loteId,
@@ -398,6 +422,28 @@ export function SubidaMasiva({
             ))}
           </div>
 
+          {/* Qué NO se encoló y por qué. Se queda hasta que se cierre: la
+              queja fue "subí 5 y solo se editan 4" sin saber cuál faltaba. */}
+          {avisos.length > 0 && (
+            <div className="space-y-1 rounded-lg border border-amber-500/50 bg-amber-500/5 p-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] font-semibold text-amber-500">Revisa esto</p>
+                <button
+                  type="button"
+                  onClick={() => setAvisos([])}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  cerrar
+                </button>
+              </div>
+              {avisos.map((a) => (
+                <p key={a} className="text-[10px] leading-relaxed text-muted-foreground">
+                  · {a}
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* Tanda a medias: o se retoma (sin volver a subir lo que ya está) o
               se tira. Es lo que salva la subida cuando Android mata la app. */}
           {pendiente && !progreso && !reconociendo && (
@@ -588,7 +634,14 @@ export function SubidaMasiva({
                     {
                       onSuccess: (r) => {
                         toast.success(`${r.encolados} vídeo(s) en la cola, editando…`);
-                        for (const m of r.mensajes) toast.info(m);
+                        const avisosDelServidor = [...r.mensajes];
+                        if (r.encolados < listos) {
+                          avisosDelServidor.push(
+                            `${listos - r.encolados} vídeo(s) NO se encolaron ` +
+                              "(en productos de plazos hacen falta los dos clips).",
+                          );
+                        }
+                        setAvisos(avisosDelServidor);
                         setReparto(null);
                         void borrarLote(loteId);
                       },

@@ -690,6 +690,17 @@ def confirmar_lote(
                 mensajes.append(f"Producto {item.producto}: {r.message}")
             continue
 
+        # Producto normal = UN vídeo. Si la tanda trae dos para el mismo, el
+        # segundo montaje sobrescribiría al primero y el operador vería un
+        # producto sin vídeo sin saber por qué: se ignora y se dice.
+        if vistos[item.producto] >= 2:
+            pendientes += 1
+            mensajes.append(
+                f"Producto {item.producto}: llegaron {vistos[item.producto]} vídeos y "
+                "solo lleva uno; el de más se ha ignorado (¿es de otro producto?)."
+            )
+            continue
+
         job = queue.enqueue(
             JobMode.NICHO_POV_BOF_VIDEO,
             title=f"🎬 Nicho POV BOF: producto {item.producto} · {body.folder}",
