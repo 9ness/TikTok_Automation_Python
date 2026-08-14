@@ -276,18 +276,20 @@ export function useSetEstado() {
  *
  *  No gasta Gemini (los textos se copian de la carpeta de origen) y solo
  *  añade: un producto ya copiado no se mueve de sitio aunque venda más. */
+export interface SincronizarTopResponse {
+  añadidos: number;
+  total: number;
+  carpetas: number;
+  /** Vendidos que NO se pudieron copiar (y por qué). Sin esto, el botón
+   *  seguía diciendo "traer 1 producto nuevo" para siempre. */
+  omitidos?: { producto: string; motivo: string }[];
+}
+
 export function useSincronizarTopVendidos() {
   const qc = useQueryClient();
-  return useMutation<
-    { añadidos: number; total: number; carpetas: number },
-    Error,
-    void
-  >({
+  return useMutation<SincronizarTopResponse, Error, void>({
     mutationFn: () =>
-      api.post<{ añadidos: number; total: number; carpetas: number }>(
-        `${ROOT}/top-vendidos/sincronizar`,
-        {},
-      ),
+      api.post<SincronizarTopResponse>(`${ROOT}/top-vendidos/sincronizar`, {}),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
     },

@@ -228,7 +228,14 @@ def sincronizar(*, usuario: str = "", on_log: OnLog = _noop) -> dict:
         and v.get("source") != SOURCE
     ]
     if not pendientes:
-        return {"añadidos": 0, "total": len(doc), "carpetas": len(carpetas())}
+        return {
+            "añadidos": 0, "total": len(doc), "carpetas": len(carpetas()), "omitidos": [],
+        }
+
+    # Los que no se pueden copiar se DEVUELVEN, no solo se loguean: si no, el
+    # botón sigue diciendo "traer 1 producto nuevo" para siempre y el producto
+    # no aparece nunca en la lista sin que nadie sepa por qué.
+    omitidos: list[dict] = []
 
     # Emparejar cuesta un listado por carpeta de origen; se hace UNA vez por
     # carpeta aunque tenga varios productos vendidos.
@@ -260,6 +267,10 @@ def sincronizar(*, usuario: str = "", on_log: OnLog = _noop) -> dict:
         ficha = (par.get("titled") or {}).get("id") or ""
         if not limpia:
             on_log(f"[top_vendidos] {ref}: sin foto limpia, lo dejo fuera")
+            omitidos.append({
+                "producto": v.get("titulo") or ref,
+                "motivo": "no encuentro su foto limpia en la carpeta de origen",
+            })
             continue
 
         carpeta, numero = _siguiente_hueco()
@@ -274,6 +285,10 @@ def sincronizar(*, usuario: str = "", on_log: OnLog = _noop) -> dict:
                 shutil.copy2(local, destino / f"{numero}{sufijo}{ext}")
         except Exception as e:
             on_log(f"[top_vendidos] {ref}: no pude copiar las fotos ({e})")
+            omitidos.append({
+                "producto": v.get("titulo") or ref,
+                "motivo": f"no pude copiar sus fotos ({e})",
+            })
             continue
 
         # Los textos ya extraídos viajan con el producto: nada de volver a
@@ -296,7 +311,10 @@ def sincronizar(*, usuario: str = "", on_log: OnLog = _noop) -> dict:
         on_log(f"[top_vendidos] {ref} → {carpeta} #{numero}")
 
     _invalidar()
-    return {"añadidos": añadidos, "total": len(doc), "carpetas": len(carpetas())}
+    return {
+        "añadidos": añadidos, "total": len(doc), "carpetas": len(carpetas()),
+        "omitidos": omitidos[:10],
+    }
 
 
 def _invalidar() -> None:

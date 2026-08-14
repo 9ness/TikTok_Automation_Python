@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ import { FUENTE_TOP_VENDIDOS } from "@/lib/topVendidos";
 export function SincronizarTopVendidos() {
   const qc = useQueryClient();
   const sincronizar = useSincronizarTopVendidos();
+  const [omitidos, setOmitidos] = useState<{ producto: string; motivo: string }[]>([]);
   // Cuántos hay esperando, para decirlo en el propio botón en vez de tener que
   // pulsarlo para averiguarlo.
   const faltan =
@@ -39,9 +41,14 @@ export function SincronizarTopVendidos() {
               // El ranking lo leen todos los nichos: se refresca todo, no solo
               // la pantalla desde la que se pulsó.
               void qc.invalidateQueries();
+              setOmitidos(r.omitidos ?? []);
               return r.añadidos
                 ? toast.success(`${r.añadidos} producto(s) nuevos · ${r.total} en total`)
-                : toast.info("Ya estaban todos los que han vendido");
+                : toast.info(
+                    r.omitidos?.length
+                      ? "No pude traer ninguno; mira el aviso de abajo"
+                      : "Ya estaban todos los que han vendido",
+                  );
             },
             onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
           })
@@ -61,6 +68,22 @@ export function SincronizarTopVendidos() {
           </>
         )}
       </button>
+
+      {/* Los que se quedan fuera. Antes solo iban al log del servidor: el
+          producto no aparecía nunca en la lista y el botón seguía diciendo que
+          quedaba uno por traer. */}
+      {omitidos.length > 0 && (
+        <div className="space-y-0.5 rounded-md border border-amber-500/50 bg-amber-500/5 p-2">
+          <p className="text-[10px] font-semibold text-amber-500">
+            {omitidos.length} vendido(s) no se pudieron traer
+          </p>
+          {omitidos.map((o) => (
+            <p key={o.producto} className="text-[10px] text-muted-foreground">
+              · {o.producto}: {o.motivo}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
