@@ -168,7 +168,10 @@ export default function PovBofLargoPage() {
   // Ver el ranking entero y no solo la carpeta abierta: en Top vendidos cada
   // producto se queda de por vida en la carpeta de diez donde entró, así que
   // ordenar dentro de una no da el ranking.
-  const [verTodas, setVerTodas] = useEstadoRecordado("largo:topventas:todas", false);
+  // Encendido por DEFECTO: en esta fuente lo que se quiere ver es el ranking,
+  // igual que en "Productos que vendieron". Quitarlo devuelve la vista carpeta
+  // a carpeta.
+  const [verTodas, setVerTodas] = useEstadoRecordado("largo:topventas:todas", true);
   const todos = useProductosTodosLargo(activaSource, esTopVendidos && verTodas);
   const lista = esTopVendidos && verTodas ? todos.data?.items ?? [] : items;
 

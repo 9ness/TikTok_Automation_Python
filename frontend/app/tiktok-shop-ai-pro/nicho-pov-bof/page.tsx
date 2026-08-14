@@ -181,7 +181,10 @@ export default function NichoPovBofPage() {
 
   // Ver el ranking entero, no solo la carpeta abierta. Se recuerda igual que
   // el filtro de arriba: quien lo enciende lo quiere siempre.
-  const [verTodas, setVerTodas] = useEstadoRecordado("povbof:topventas:todas", false);
+  // Encendido por DEFECTO: en esta fuente lo que se quiere ver es el ranking,
+  // igual que en "Productos que vendieron". Quitarlo devuelve la vista carpeta
+  // a carpeta.
+  const [verTodas, setVerTodas] = useEstadoRecordado("povbof:topventas:todas", true);
   const todos = useProductosTodos(source, esTopVendidos && verTodas);
   const listaProductos = useMemo(
     () => (esTopVendidos && verTodas ? todos.data ?? [] : productos.data ?? []),
