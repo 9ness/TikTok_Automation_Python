@@ -2098,8 +2098,20 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
     guardado = product_repo.get_product(source, folder, producto, quien)
     guion = str(guardado.get("guion_plazos") or "").strip() or rng.choice(guiones)
     sexo = (p.get("sexo") or "").strip().lower()
+    # "auto" mira la MANO del clip 1, igual que el POV BOF y el Largo. Antes
+    # aquí se sorteaba siempre (el guion de plazos no dice quién lo cuenta) y
+    # el resultado fue voz de mujer sobre una mano con vello, que es
+    # exactamente el fallo que se nota. El sorteo se queda solo para cuando no
+    # se ve ninguna mano: ahí no hay nada que contradecir y da variedad.
+    deteccion: dict = {}
     if sexo not in ("hombre", "mujer"):
-        sexo = rng.choice(["hombre", "mujer"])
+        from src.nicho_pov_bof.services import mano
+
+        on_progress(0.05, "🖐️ Mirando la mano del vídeo…")
+        deteccion = mano.detectar(clips[0], on_log=on_log)
+        sexo = deteccion.get("sexo") or rng.choice(["hombre", "mujer"])
+        if not deteccion.get("sexo"):
+            on_log(f"[pov_bof_plazos] no se ve mano; voz sorteada: {sexo}")
     on_log(f"[pov_bof_plazos] guion ({len(guion)} car., voz {sexo}): {guion}")
 
     on_progress(0.10, f"🔊 Locutando el guion de plazos ({sexo})…")
@@ -2170,6 +2182,10 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
         source, folder, producto, usuario=quien,
         video_path=str(dest_path), video_listo_at=int(time.time()),
         guion_plazos=guion, voz_label=info.get("voz_label", ""), voz_sexo=sexo,
+        # Igual que en el POV BOF: guardar qué mano se vio permite comparar
+        # después con lo que elige el operador a mano.
+        mano_detectada=deteccion.get("sexo", ""),
+        mano_votos=f"{deteccion.get('votos', 0)}/{deteccion.get('total', 0)}",
     )
     on_progress(1.0, "✅ Listo")
     return str(dest_path)
