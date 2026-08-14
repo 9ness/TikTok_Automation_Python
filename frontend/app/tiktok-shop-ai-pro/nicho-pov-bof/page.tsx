@@ -46,6 +46,7 @@ import {
   usePrompts,
   useProductos,
   useProductosTodos,
+  refrescarDesdeDrive,
   useBuscarProductoUrl,
   useHashtags,
   useGuardarHashtags,
@@ -173,6 +174,9 @@ export default function NichoPovBofPage() {
   async function actualizarTodo() {
     setRefrescando(true);
     try {
+      // Primero se le dice al servidor que relea el Drive (tiene su propia
+      // caché de listados); invalidar solo la del navegador devolvía lo mismo.
+      await refrescarDesdeDrive(source, folder).catch(() => {});
       await qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
     } finally {
       setRefrescando(false);

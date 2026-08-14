@@ -76,6 +76,23 @@ export function useMarkCompletedLargo(source: string) {
   });
 }
 
+/** Relee del Drive saltándose la caché de listados del servidor.
+ *
+ *  El backend cachea qué fotos tiene cada carpeta: una carpeta que se listó
+ *  vacía (Drive lento, o las fotos todavía sin subir) seguía saliendo vacía por
+ *  mucho que se recargara la app. Es lo que hace el botón "Actualizar".
+ */
+export async function refrescarDesdeDriveLargo(source: string, folder: string | null) {
+  await api.get(`${ROOT}/folders?source=${encodeURIComponent(source)}&refresh=true`);
+  if (folder) {
+    await api.get(
+      `${ROOT}/productos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+        folder,
+      )}&refresh=true`,
+    );
+  }
+}
+
 /** TODOS los productos de la fuente, de más a menos ventas (solo Top
  *  vendidos: ahí el sitio de cada producto es fijo y el ranking solo se ve
  *  juntando las carpetas). Cada item trae su `folder`. */

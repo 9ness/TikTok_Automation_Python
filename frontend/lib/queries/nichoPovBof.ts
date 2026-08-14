@@ -241,6 +241,24 @@ export function useProductos(source: string, folder: string | null) {
   });
 }
 
+/** Relee del Drive saltándose la caché de listados del servidor.
+ *
+ *  El backend cachea qué fotos tiene cada carpeta, así que una carpeta que se
+ *  listó vacía (Drive lento, o las fotos aún sin subir) seguía saliendo vacía
+ *  aunque se recargara la app. Esto es lo que hace de verdad el botón
+ *  "Actualizar productos y ventas".
+ */
+export async function refrescarDesdeDrive(source: string, folder: string | null) {
+  await api.get(`${ROOT}/folders?source=${encodeURIComponent(source)}&refresh=true`);
+  if (folder) {
+    await api.get(
+      `${ROOT}/productos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+        folder,
+      )}&refresh=true`,
+    );
+  }
+}
+
 /** TODOS los productos de la fuente, de más a menos ventas.
  *
  *  Solo tiene sentido en "Top vendidos": ahí cada producto se queda de por

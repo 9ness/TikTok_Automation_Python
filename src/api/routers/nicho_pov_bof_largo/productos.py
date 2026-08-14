@@ -221,6 +221,7 @@ def _montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
 
 def _listar(
     source: str, folder: str, queue: JobQueue | None, usuario: str,
+    refresh: bool = False,
 ) -> ProductosLargoResponse:
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
     from src.nicho_pov_bof.services import audience, drive_client, photo_pairing
@@ -228,9 +229,12 @@ def _listar(
     from src.nicho_pov_bof.services import top_vendidos
 
     try:
+        # `refresh` salta la caché de listados: una carpeta que se listó vacía
+        # (Drive lento, fotos aún sin subir) se quedaba vacía en pantalla hasta
+        # que caducara, sin forma de forzarlo desde la app.
         fotos = [
             drive_client.probe_dimensions(f)
-            for f in drive_client.list_photos(source, folder)
+            for f in drive_client.list_photos(source, folder, refresh=refresh)
         ]
     except ValueError as e:
         raise _bad(str(e)) from e
@@ -313,8 +317,9 @@ def list_productos(
     folder: Annotated[str, Query()],
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
+    refresh: Annotated[bool, Query()] = False,
 ) -> ProductosLargoResponse:
-    return _listar(source, folder, queue, usuario)
+    return _listar(source, folder, queue, usuario, refresh=refresh)
 
 
 @router.get("/productos-todos", response_model=ProductosLargoResponse)

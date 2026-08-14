@@ -317,6 +317,7 @@ def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> s
 
 def _list_productos(
     source: str, folder: str, queue: JobQueue | None = None, usuario: str = "",
+    refresh: bool = False,
 ) -> ProductosListResponse:
     """Compone el emparejado de fotos (`photo_pairing`) con el estado
     guardado en Redis (`product_repo`). Reusada por `/productos` y
@@ -325,7 +326,11 @@ def _list_productos(
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
     try:
-        photos = drive_client.list_photos(source, folder)
+        # `refresh` se salta la caché de listados. Hace falta porque una
+        # carpeta que se listó vacía (Drive lento, fotos aún sin subir) se
+        # quedaba vacía en pantalla hasta que caducara el listado, sin manera
+        # de forzarlo desde la app.
+        photos = drive_client.list_photos(source, folder, refresh=refresh)
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except RuntimeError as e:
@@ -423,8 +428,9 @@ def list_productos(
     folder: Annotated[str, Query()],
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
+    refresh: Annotated[bool, Query()] = False,
 ) -> ProductosListResponse:
-    return _list_productos(source, folder, queue, usuario)
+    return _list_productos(source, folder, queue, usuario, refresh=refresh)
 
 
 @router.get("/productos-todos", response_model=ProductosListResponse)

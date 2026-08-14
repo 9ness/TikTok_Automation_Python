@@ -71,6 +71,7 @@ import {
   useMarkCompletedLargo,
   useProductosLargo,
   useProductosTodosLargo,
+  refrescarDesdeDriveLargo,
   useSetEstadoLargo,
   useSourcesLargo,
   useSumarUnidadesLargo,
@@ -159,6 +160,9 @@ export default function PovBofLargoPage() {
   async function actualizarTodo() {
     setRefrescando(true);
     try {
+      // El servidor cachea los listados del Drive: sin esto, invalidar la
+      // caché del navegador devolvía exactamente lo mismo.
+      await refrescarDesdeDriveLargo(activaSource, folder).catch(() => {});
       await qc.invalidateQueries({ queryKey: largoKeys.all });
     } finally {
       setRefrescando(false);
