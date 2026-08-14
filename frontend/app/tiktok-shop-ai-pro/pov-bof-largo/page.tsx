@@ -37,6 +37,7 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import {
@@ -874,6 +875,13 @@ export default function PovBofLargoPage() {
               <p className="text-[11px] font-semibold">Generar fuera</p>
               <p className="truncate text-[10px] text-muted-foreground">copia el prompt y las fotos</p>
             </div>
+
+            {/* Aquí SIEMPRE son dos clips por foto (normal o plazos da igual),
+                así que solo hace falta el space de plazos. Magnific o los
+                prompts: son alternativas. */}
+            <MagnificSpaces spaces={["foto_limpia_plazos"]} />
+            <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"

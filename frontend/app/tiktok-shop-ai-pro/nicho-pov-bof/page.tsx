@@ -73,6 +73,8 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { useMe } from "@/lib/queries/auth";
 import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
@@ -109,6 +111,10 @@ export default function NichoPovBofPage() {
   const [picked, setPicked] = useEstadoRecordado<string | null>("povbof:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
+
+  // Solo el admin ve el space de "foto con IA": Ana y Mauro trabajan con la
+  // foto limpia del Drive.
+  const esAdmin = useMe().data?.rol === "admin";
 
   const sources = useSources();
   const folders = useFolders(source);
@@ -764,12 +770,17 @@ export default function NichoPovBofPage() {
               <p className="text-[11px] font-semibold">Preparar</p>
               <p className="truncate text-[10px] text-muted-foreground">textos y ficha del producto</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Textos, subidos y escaparate EN LA MISMA LÍNEA: se leen juntos,
+                que de eso se trata — comparar lo que está en el escaparate con
+                lo que ya se publicó. Que la carpeta esté "completada" no
+                significa que estén todos subidos: puede haber productos sin
+                stock. */}
+            <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={runExtraerTextos}
               disabled={extraerTextos.isPending}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-purple-600 disabled:opacity-50"
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-purple-600 disabled:opacity-50"
             >
               {extraerTextos.isPending ? (
                 <>
@@ -783,21 +794,15 @@ export default function NichoPovBofPage() {
                 </>
               )}
             </button>
-            </div>
 
-            {/* Subidos y escaparate EN LA MISMA LÍNEA: se leen juntos, que de
-                eso se trata — comparar lo que está en el escaparate con lo que
-                ya se publicó. Que la carpeta esté "completada" no significa que
-                estén todos subidos: puede haber productos sin stock. */}
-            <div className="grid grid-cols-2 gap-1.5">
             <div
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
+              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-2 text-[11px] font-semibold ${
                 subidos === totalProductos && totalProductos > 0
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-border/60 text-muted-foreground"
               }`}
             >
-              📤 Subidos {subidos}/{totalProductos}
+              <span className="truncate">📤 Subidos {subidos}/{totalProductos}</span>
             </div>
 
             {/* Junto a "Subidos" para poder comparar de un vistazo: cuántos
@@ -805,13 +810,13 @@ export default function NichoPovBofPage() {
             <button
               type="button"
               onClick={() => setVerEscaparate(true)}
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-2 text-[11px] font-semibold transition ${
                 enEscaparate === totalProductos && totalProductos > 0
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
               }`}
             >
-              🏪 Escaparate {enEscaparate}/{totalProductos}
+              <span className="truncate">🏪 Escaparate {enEscaparate}/{totalProductos}</span>
             </button>
 
             {MOSTRAR_ECHOTIK && (<button
@@ -847,6 +852,19 @@ export default function NichoPovBofPage() {
               <p className="text-[11px] font-semibold">Generar fuera</p>
               <p className="truncate text-[10px] text-muted-foreground">copia el prompt y las fotos</p>
             </div>
+
+            {/* Magnific O los prompts: son dos caminos para lo mismo. El space
+                de "foto con IA" solo lo usa el admin — Ana y Mauro de momento
+                no trabajan con fotos generadas. */}
+            <MagnificSpaces
+              spaces={[
+                "foto_limpia_normal",
+                "foto_limpia_plazos",
+                ...(esAdmin ? (["foto_ia"] as const) : []),
+              ]}
+            />
+            <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
+
             <div className="grid grid-cols-2 gap-2">
             <button
               type="button"

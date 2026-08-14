@@ -24,6 +24,7 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import {
   useCompletarCarpetaCreativos,
   useFoldersCreativos,
@@ -230,6 +231,11 @@ export default function CreativosProPage() {
       {/* Un solo prompt, y el formato pegado a él: copiarlo y generar en
           cuadrado es el error fácil de este nicho. */}
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+        {/* El space de carruseles parte de UNA foto, igual que este nicho.
+            Magnific o el prompt: son alternativas. */}
+        <MagnificSpaces spaces={["carrusel"]} />
+        <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
+
         <button
           type="button"
           disabled={!prompt.data}
