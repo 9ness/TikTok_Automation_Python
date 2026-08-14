@@ -202,6 +202,11 @@ export default function NichoPovBofPage() {
     [esTopVendidos, productos.data, todos.data, verTodas],
   );
 
+  // El ranking completo son 40 productos y de un tirón no se repasa: se ve de
+  // diez en diez, como las carpetas, pero SIN romper el orden por ventas.
+  const [pagina, setPagina] = useState(0);
+  const POR_PAGINA = 10;
+
   const productosVisibles = useMemo(
     () =>
       verTopVendidos(listaProductos, {
@@ -211,6 +216,21 @@ export default function NichoPovBofPage() {
       }),
     [listaProductos, esTopVendidos, soloSinSubir],
   );
+  const paginado = esTopVendidos && verTodas;
+  const paginas = paginado ? Math.max(1, Math.ceil(productosVisibles.length / POR_PAGINA)) : 1;
+  // Lo que se ve AHORA: es lo que se baja y lo que cuentan los botones.
+  const enPantalla = useMemo(
+    () =>
+      paginado
+        ? productosVisibles.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
+        : productosVisibles,
+    [paginado, productosVisibles, pagina],
+  );
+  // Cambiar de fuente, de carpeta o de filtro deja la página fuera de rango.
+  useEffect(() => {
+    setPagina(0);
+  }, [source, folder, verTodas, soloSinSubir]);
+
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   // SIN fuente: el ranking es global y el listado que se abre también, así
@@ -231,35 +251,35 @@ export default function NichoPovBofPage() {
   // Los recuentos van sobre lo que se ESTÁ VIENDO: con el ranking completo
   // abierto, "Fotos 10/10" mientras hay cuarenta productos en pantalla no
   // decía nada de lo que se iba a bajar.
-  const totalProductos = productosVisibles.length;
-  const conVideo = productosVisibles.filter((p) => p.video_path).length;
-  const conFoto = productosVisibles.filter((p) => p.clean_photo_id).length;
+  const totalProductos = enPantalla.length;
+  const conVideo = enPantalla.filter((p) => p.video_path).length;
+  const conFoto = enPantalla.filter((p) => p.clean_photo_id).length;
   // Los dos flujos de generación de la carpeta, contados sobre los que tienen
   // foto (que son los que se pueden bajar).
-  const conPlazos = productosVisibles.filter(
+  const conPlazos = enPantalla.filter(
     (p) => p.clean_photo_id && p.modo_plazos,
   ).length;
-  const conViejo = productosVisibles.filter(
+  const conViejo = enPantalla.filter(
     (p) => p.clean_photo_id && !p.modo_plazos,
   ).length;
   // Lo mismo para los vídeos ya montados: bajar 20 para quedarse con 3 es lo
   // que se quería evitar.
-  const videosPlazos = productosVisibles.filter(
+  const videosPlazos = enPantalla.filter(
     (p) => p.video_path && p.modo_plazos,
   ).length;
-  const videosViejo = productosVisibles.filter(
+  const videosViejo = enPantalla.filter(
     (p) => p.video_path && !p.modo_plazos,
   ).length;
   // "Textos" es una acción de CARPETA (extrae la carpeta abierta), así que su
   // contador va sobre la carpeta y no sobre lo que se ve.
   const totalCarpeta = productos.data?.length ?? 0;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
-  const subidos = productosVisibles.filter((p) => p.uploaded).length;
-  const enEscaparate = productosVisibles.filter((p) => p.en_escaparate).length;
+  const subidos = enPantalla.filter((p) => p.uploaded).length;
+  const enEscaparate = enPantalla.filter((p) => p.en_escaparate).length;
   // Meter el producto en el escaparate es el paso más lento del día y no se
   // puede automatizar (ver EscaparateModal), así que el pendiente se enseña
   // arriba, en el botón, sin tener que abrir nada.
-  const pendientesEscaparate = productosVisibles.filter(
+  const pendientesEscaparate = enPantalla.filter(
     (p) => !p.en_escaparate,
   ).length;
 
@@ -274,9 +294,9 @@ export default function NichoPovBofPage() {
    *  Igual que las fotos: el navegador móvil cancela las descargas
    *  simultáneas, así que van en fila con un retardo entre medias. */
   async function downloadVideos(filtro: Filtro = "todas") {
-    if (!folder || !productosVisibles.length) return;
+    if (!folder || !enPantalla.length) return;
     // En el orden que se ve (ver `downloadCleanPhotos`).
-    const items = productosVisibles.filter((p) => p.video_path && cuadra(p, filtro));
+    const items = enPantalla.filter((p) => p.video_path && cuadra(p, filtro));
     if (!items.length) {
       toast.error(
         filtro === "todas"
@@ -313,11 +333,11 @@ export default function NichoPovBofPage() {
    *  necesitan DOS clips y los de siempre uno solo, así que bajar la carpeta
    *  entera obligaba a ir mirando el precio producto a producto. */
   async function downloadCleanPhotos(filtro: Filtro = "todas") {
-    if (!folder || !productosVisibles.length) return;
+    if (!folder || !enPantalla.length) return;
     // En el ORDEN QUE SE VE, no en el de la carpeta: en Top vendidos la lista
     // va por ventas y las fotos se bajaban por número de producto, así que en
     // la galería aparecían en otro orden del que se acababa de mirar.
-    const items = productosVisibles.filter((p) => p.clean_photo_id && cuadra(p, filtro));
+    const items = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!items.length) {
       toast.error(
         filtro === "todas"
@@ -1087,9 +1107,38 @@ export default function NichoPovBofPage() {
             </label>
           )}
 
-          {productosVisibles.length > 0 && (
+          {/* El ranking se recorre de diez en diez, como las carpetas, pero sin
+              romper el orden por ventas: la página 2 son los diez siguientes
+              del ranking, no la carpeta 2. */}
+          {paginado && paginas > 1 && (
+            <div className="flex items-center justify-between rounded-lg border border-border/60 p-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setPagina((n) => Math.max(0, n - 1))}
+                disabled={pagina === 0}
+                className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+              >
+                ‹ anteriores
+              </button>
+              <span className="font-semibold">
+                {pagina * POR_PAGINA + 1}-
+                {Math.min((pagina + 1) * POR_PAGINA, productosVisibles.length)} de{" "}
+                {productosVisibles.length} por ventas
+              </span>
+              <button
+                type="button"
+                onClick={() => setPagina((n) => Math.min(paginas - 1, n + 1))}
+                disabled={pagina >= paginas - 1}
+                className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+              >
+                siguientes ›
+              </button>
+            </div>
+          )}
+
+          {enPantalla.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {productosVisibles.map((p) => (
+              {enPantalla.map((p) => (
                 <ProductoCard
                   key={`${p.folder || folder}-${p.producto}`}
                   source={source}

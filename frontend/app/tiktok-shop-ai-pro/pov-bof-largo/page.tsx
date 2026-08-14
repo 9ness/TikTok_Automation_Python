@@ -184,6 +184,11 @@ export default function PovBofLargoPage() {
   const todos = useProductosTodosLargo(activaSource, esTopVendidos && verTodas);
   const lista = esTopVendidos && verTodas ? todos.data?.items ?? [] : items;
 
+  // El ranking completo no se repasa de un tirón: se ve de diez en diez, como
+  // las carpetas, pero sin romper el orden por ventas.
+  const [pagina, setPagina] = useState(0);
+  const POR_PAGINA = 10;
+
   const itemsVisibles = useMemo(
     () =>
       verTopVendidos(lista, {
@@ -194,23 +199,35 @@ export default function PovBofLargoPage() {
     [lista, esTopVendidos, soloSinSubir],
   );
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
+  // Cambiar de fuente, de carpeta o de filtro deja la página fuera de rango.
+  useEffect(() => {
+    setPagina(0);
+  }, [activaSource, folder, verTodas, soloSinSubir]);
+
+  const paginado = esTopVendidos && verTodas;
+  const paginas = paginado ? Math.max(1, Math.ceil(itemsVisibles.length / POR_PAGINA)) : 1;
+  // Lo que se ve AHORA: es lo que se baja y lo que cuentan los botones.
+  const enPantalla = paginado
+    ? itemsVisibles.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
+    : itemsVisibles;
+
   // Sobre lo que se ESTÁ VIENDO: con el ranking completo abierto, "Fotos
   // 10/10" mientras hay cuarenta productos en pantalla no decía nada de lo que
   // se iba a bajar. Los de textos y guiones NO, que son acciones de carpeta.
-  const totalProductos = itemsVisibles.length;
-  const conVideo = itemsVisibles.filter((p) => p.video_path).length;
-  const conFoto = itemsVisibles.filter((p) => p.clean_photo_id).length;
-  const conPlazos = itemsVisibles.filter((p) => p.clean_photo_id && p.modo_plazos).length;
-  const conViejo = itemsVisibles.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
-  const videosPlazos = itemsVisibles.filter((p) => p.video_path && p.modo_plazos).length;
-  const videosViejo = itemsVisibles.filter((p) => p.video_path && !p.modo_plazos).length;
+  const totalProductos = enPantalla.length;
+  const conVideo = enPantalla.filter((p) => p.video_path).length;
+  const conFoto = enPantalla.filter((p) => p.clean_photo_id).length;
+  const conPlazos = enPantalla.filter((p) => p.clean_photo_id && p.modo_plazos).length;
+  const conViejo = enPantalla.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
+  const videosPlazos = enPantalla.filter((p) => p.video_path && p.modo_plazos).length;
+  const videosViejo = enPantalla.filter((p) => p.video_path && !p.modo_plazos).length;
   // "Textos + guiones" actúa sobre la CARPETA abierta, así que su total es el
   // de la carpeta y no el de lo que se ve.
   const totalCarpeta = items.length;
   const conTexto = items.filter((p) => p.titulo).length;
   const conGuion = items.filter((p) => p.guion).length;
-  const subidos = itemsVisibles.filter((p) => p.uploaded).length;
-  const enEscaparate = itemsVisibles.filter((p) => p.en_escaparate).length;
+  const subidos = enPantalla.filter((p) => p.uploaded).length;
+  const enEscaparate = enPantalla.filter((p) => p.en_escaparate).length;
   /** Le falta el guion o el que tiene es del otro modo (escrito antes de que
    *  existieran los plazos, o antes de corregir el precio). Los desfasados
    *  cuentan como pendientes: si no, el botón dice "guiones al día" mientras
@@ -266,7 +283,7 @@ export default function PovBofLargoPage() {
     // En el ORDEN QUE SE VE: en Top vendidos la lista va por ventas y las
     // descargas salían por número de producto, en otro orden del que se
     // acababa de mirar.
-    const conV = itemsVisibles.filter((p) => p.video_path && cuadra(p, filtro));
+    const conV = enPantalla.filter((p) => p.video_path && cuadra(p, filtro));
     if (!conV.length) {
       toast.error(
         filtro === "todas"
@@ -305,7 +322,7 @@ export default function PovBofLargoPage() {
    *  generarlos por tandas y no ir mirando el precio producto a producto. */
   async function downloadCleanPhotos(filtro: Filtro = "todas") {
     if (!folder) return;
-    const conF = itemsVisibles.filter((p) => p.clean_photo_id && cuadra(p, filtro));
+    const conF = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, filtro));
     if (!conF.length) {
       toast.error(
         filtro === "todas"
@@ -1083,9 +1100,37 @@ export default function PovBofLargoPage() {
             </label>
           )}
 
-          {itemsVisibles.length > 0 && (
+          {/* De diez en diez, sin romper el orden por ventas: la página 2 son
+              los diez siguientes del ranking, no la carpeta 2. */}
+          {paginado && paginas > 1 && (
+            <div className="flex items-center justify-between rounded-lg border border-border/60 p-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setPagina((n) => Math.max(0, n - 1))}
+                disabled={pagina === 0}
+                className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+              >
+                ‹ anteriores
+              </button>
+              <span className="font-semibold">
+                {pagina * POR_PAGINA + 1}-
+                {Math.min((pagina + 1) * POR_PAGINA, itemsVisibles.length)} de{" "}
+                {itemsVisibles.length} por ventas
+              </span>
+              <button
+                type="button"
+                onClick={() => setPagina((n) => Math.min(paginas - 1, n + 1))}
+                disabled={pagina >= paginas - 1}
+                className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
+              >
+                siguientes ›
+              </button>
+            </div>
+          )}
+
+          {enPantalla.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {itemsVisibles.map((p) => (
+              {enPantalla.map((p) => (
                 <ProductoCard
                   key={`${p.folder || folder}-${p.producto}`}
                   source={activaSource}
