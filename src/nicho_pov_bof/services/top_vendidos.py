@@ -101,9 +101,17 @@ def ventas_por_producto(source: str) -> dict[str, dict]:
     salida: dict[str, dict] = {}
     for ref, sitio in manifiesto().items():
         v = ranking.get(ref) or {}
-        salida[f"{sitio.get('carpeta')}|{sitio.get('producto')}"] = {
-            "ventas": int(v.get("unidades") or 0),
-            "vendido_at": float(v.get("vendido_at") or 0),
+        clave = f"{sitio.get('carpeta')}|{sitio.get('producto')}"
+        # Ventas apuntadas AQUÍ y no al original. No debería pasar (ver
+        # `product_repo._ref_vendido`), pero las que se marcaron antes de
+        # arreglarlo existen y se perderían: se suman, que cada una es una
+        # venta de verdad.
+        propia = ranking.get(f"{SOURCE}|{clave}") or {}
+        salida[clave] = {
+            "ventas": int(v.get("unidades") or 0) + int(propia.get("unidades") or 0),
+            "vendido_at": max(
+                float(v.get("vendido_at") or 0), float(propia.get("vendido_at") or 0),
+            ),
         }
     return salida
 

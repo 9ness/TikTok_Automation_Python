@@ -38,6 +38,7 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import {
@@ -151,6 +152,18 @@ export default function PovBofLargoPage() {
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "largo:topventas:sinsubir", false,
   );
+  // Un solo botón para "tráete lo de verdad": carpetas, productos y las ventas
+  // del ranking (que se cruzan al listar, no se guardan en el producto).
+  const [refrescando, setRefrescando] = useState(false);
+  async function actualizarTodo() {
+    setRefrescando(true);
+    try {
+      await qc.invalidateQueries({ queryKey: largoKeys.all });
+    } finally {
+      setRefrescando(false);
+    }
+  }
+
   const itemsVisibles = useMemo(
     () =>
       verTopVendidos(items, {
@@ -469,18 +482,29 @@ export default function PovBofLargoPage() {
           <AltaMiProducto onCreado={() => void folders.refetch()} />
         )}
 
+        {/* La carpeta de Top vendidos es la misma para todos los nichos, así
+            que traerse los que han vendido se puede hacer también desde aquí
+            (antes solo estaba en el POV BOF). */}
+        {esTopVendidos && <SincronizarTopVendidos />}
+
         <div className="mb-2 flex items-center justify-between text-xs sm:text-sm">
           <span className="font-medium">
             {done} / {total} completadas
           </span>
           <div className="flex items-center gap-2">
+            {/* Antes solo recargaba las CARPETAS, así que pulsarlo no cambiaba
+                nada de lo que se estaba mirando (ni los productos, ni las
+                ventas del ranking, que es para lo que se pulsaba). Ahora tira
+                de todo lo del nicho y lo dice. */}
             <button
               type="button"
-              onClick={() => void folders.refetch()}
-              className="rounded-md border border-border/60 p-1.5 text-muted-foreground transition hover:text-foreground"
-              title="Recargar desde Drive"
+              onClick={() => void actualizarTodo()}
+              disabled={refrescando}
+              className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+              title="Recarga carpetas, productos y ventas"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${folders.isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? "animate-spin" : ""}`} />
+              {refrescando ? "Actualizando…" : "Actualizar productos y ventas"}
             </button>
           </div>
         </div>

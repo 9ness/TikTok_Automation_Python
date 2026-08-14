@@ -1078,15 +1078,10 @@ def set_producto_estado(
     # hace falta para pintarlo (foto incluida). Se escribe AQUÍ, en el único
     # sitio donde se marca la venta, y no recorriendo las 31 carpetas después.
     if body.sold is not None:
-        # En "Top vendidos" el producto es una COPIA de uno del curso: la venta
-        # se le apunta al original, que es quien está en el ranking. Si se
-        # apuntara aquí, el mismo producto contaría dos veces y además se
-        # duplicaría en la lista.
+        # En "Top vendidos" la venta se le apunta al producto de ORIGEN, no a
+        # la copia. Eso lo resuelve ya el repo (`_ref_vendido`) para todos los
+        # nichos por igual — aquí se manda tal cual llegó.
         destino = (body.source, body.folder, body.producto)
-        if body.source == top_vendidos.SOURCE:
-            origen = top_vendidos.origen_de(body.folder, body.producto)
-            if origen:
-                destino = (origen["source"], origen["folder"], origen["producto"])
         try:
             if body.sold:
                 product_repo.marcar_vendido(

@@ -57,7 +57,6 @@ import {
   useBorrarCuentaEchoTik,
   useSetEstado,
   useBorrarMiProducto,
-  useSincronizarTopVendidos,
   useSortearGuionPlazos,
   useSources,
   useVendidos,
@@ -74,6 +73,7 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { useMe } from "@/lib/queries/auth";
 import { VideoModal } from "@/components/ui/video-modal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
@@ -166,6 +166,18 @@ export default function NichoPovBofPage() {
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "povbof:topventas:sinsubir", false,
   );
+  // Un solo botón para "tráete lo de verdad": carpetas, productos y las ventas
+  // del ranking (que se cruzan al listar, no se guardan en el producto).
+  const [refrescando, setRefrescando] = useState(false);
+  async function actualizarTodo() {
+    setRefrescando(true);
+    try {
+      await qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+    } finally {
+      setRefrescando(false);
+    }
+  }
+
   const productosVisibles = useMemo(
     () =>
       verTopVendidos(productos.data ?? [], {
@@ -447,13 +459,18 @@ export default function NichoPovBofPage() {
             {done} / {total} completadas
           </span>
           <div className="flex items-center gap-2">
+            {/* Recargaba SOLO las carpetas: pulsarlo no cambiaba ni los
+                productos ni las ventas del ranking, que es justo para lo que
+                se pulsa. Ahora refresca todo el nicho. */}
             <button
               type="button"
-              onClick={() => void folders.refetch()}
-              className="rounded-md border border-border/60 p-1.5 text-muted-foreground transition hover:text-foreground"
-              title="Recargar desde Drive"
+              onClick={() => void actualizarTodo()}
+              disabled={refrescando}
+              className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+              title="Recarga carpetas, productos y ventas"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${folders.isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? "animate-spin" : ""}`} />
+              {refrescando ? "Actualizando…" : "Actualizar productos y ventas"}
             </button>
           </div>
         </div>
@@ -1019,52 +1036,6 @@ export default function NichoPovBofPage() {
  *
  *  Va aquí, junto al selector de fuente, porque es lo primero que se hace al
  *  entrar: si acabas de marcar una venta, esto la baja a su carpeta. */
-function SincronizarTopVendidos() {
-  const sincronizar = useSincronizarTopVendidos();
-  // Cuántos hay esperando, para decirlo en el propio botón en vez de tener que
-  // pulsarlo para averiguarlo.
-  const faltan =
-    useSources().data?.items.find((s) => s.slug === FUENTE_TOP_VENDIDOS)?.pendientes ?? 0;
-  return (
-    <div className="space-y-1 rounded-lg border border-border/60 p-2">
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Trae aquí los productos que ya vendieron, de diez en diez, con sus
-        textos ya extraídos. Cada uno se queda siempre en su carpeta aunque
-        luego venda más — moverlo perdería lo que ya llevas marcado. Las
-        ventas sí se actualizan solas, sin pulsar nada.
-      </p>
-      <button
-        type="button"
-        disabled={sincronizar.isPending}
-        onClick={() =>
-          sincronizar.mutate(undefined, {
-            onSuccess: (r) =>
-              r.añadidos
-                ? toast.success(`${r.añadidos} producto(s) nuevos · ${r.total} en total`)
-                : toast.info("Ya estaban todos los que han vendido"),
-            onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
-          })
-        }
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-3 py-1.5 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/10 disabled:opacity-50"
-      >
-        {sincronizar.isPending ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Copiando fotos…
-          </>
-        ) : (
-          <>
-            <RefreshCw className="h-3.5 w-3.5" />
-            {faltan > 0
-              ? `Traer ${faltan} producto${faltan > 1 ? "s" : ""} nuevo${faltan > 1 ? "s" : ""}`
-              : "Buscar productos vendidos nuevos"}
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
-
 function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) {
   const crear = useCrearMiProducto();
   const [limpia, setLimpia] = useState<File | null>(null);

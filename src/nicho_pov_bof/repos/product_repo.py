@@ -634,6 +634,32 @@ NICHOS_VENTA: dict[str, str] = {
 
 
 def _ref_vendido(source: str, folder: str, producto: str) -> str:
+    """La referencia con la que vive un producto en el ranking.
+
+    En "Top vendidos" el producto es una COPIA de uno del curso, así que la
+    venta se le apunta al ORIGINAL: es quien está en el ranking y con quien se
+    cruzan las ventas al listar. Apuntarla aquí dejaba dos entradas del mismo
+    producto y, peor, el listado de Top vendidos no veía esas ventas —seguía
+    diciendo 0 y el orden por ventas no cambiaba— porque solo cruza por la
+    referencia de origen.
+
+    La traducción se hace AQUÍ y no en cada endpoint: el POV BOF la hacía y el
+    Largo no, así que marcar la venta desde una pantalla u otra daba resultados
+    distintos.
+    """
+    if source == "top_vendidos":
+        try:
+            from src.nicho_pov_bof.services import top_vendidos
+
+            origen = top_vendidos.origen_de(folder, producto)
+            if origen:
+                return (
+                    f"{origen['source']}|{origen['folder']}|{origen['producto']}"
+                )
+        except Exception:  # noqa: BLE001
+            # Sin manifiesto (Redis caído) se apunta donde estaba: perder la
+            # venta sería peor que apuntarla en el sitio raro.
+            pass
     return f"{source}|{folder}|{producto}"
 
 
