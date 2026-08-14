@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, RotateCw, Sparkles, Trash2, Upload } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
@@ -32,6 +32,76 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 type Sexo = "auto" | "hombre" | "mujer";
 
+type FichaMinima = Pick<
+  ProductoItem, "producto" | "titulo" | "clean_photo_id" | "modo_plazos" | "clip1" | "clip2"
+>;
+
+/** Una fila del repaso, ya colocada: qué vídeo es, de qué producto y si es el
+ *  clip 1 o el 2. `idx` es la posición REAL en el reparto — el orden de la
+ *  pantalla cambia, el del estado no. */
+interface Fila {
+  it: LoteItem;
+  idx: number;
+  ficha?: FichaMinima;
+  doble: boolean;
+  /** 1 o 2 en los productos de dos clips; 0 en los normales. */
+  clip: number;
+  /** Producto de dos clips al que le falta el otro: así NO se encola. */
+  falta: boolean;
+  /** Primero de su grupo: solo ahí se pinta la cabecera del producto. */
+  abreGrupo: boolean;
+}
+
+/** Ordena el repaso por producto para poder repasarlo de un tirón.
+ *
+ *  Los dos vídeos de un mismo producto salían separados y había que ir y venir
+ *  para comprobar que la pareja estaba bien. Aquí van juntos y numerados, y lo
+ *  que no reconoció queda al final, que es lo único que hay que tocar a mano.
+ */
+function ordenarPorProducto(
+  reparto: LoteItem[], productos: FichaMinima[], todosDobles: boolean,
+): Fila[] {
+  const ficha = new Map(productos.map((p) => [p.producto, p]));
+  const esDoble = (p?: FichaMinima) => Boolean(p && (todosDobles || p.modo_plazos));
+
+  const grupos = new Map<string, { it: LoteItem; idx: number }[]>();
+  reparto.forEach((it, idx) => {
+    const clave = it.producto || "";
+    const lista = grupos.get(clave) ?? [];
+    lista.push({ it, idx });
+    grupos.set(clave, lista);
+  });
+
+  const claves = [...grupos.keys()]
+    .filter((k) => k)
+    .sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      return Number.isNaN(na) || Number.isNaN(nb) ? a.localeCompare(b) : na - nb;
+    });
+  // Los sin asignar, al final: son los que piden trabajo.
+  if (grupos.has("")) claves.push("");
+
+  const filas: Fila[] = [];
+  for (const clave of claves) {
+    const grupo = grupos.get(clave) ?? [];
+    const p = ficha.get(clave);
+    const doble = Boolean(clave) && esDoble(p);
+    grupo.forEach(({ it, idx }, n) => {
+      // Con dos vídeos en la tanda son el clip 1 y el 2. Con uno solo, es el
+      // clip 2 si el producto ya tenía guardado el 1 (mismo criterio que el
+      // backend al repartir los huecos).
+      const clip = !doble ? 0 : grupo.length >= 2 ? n + 1 : p?.clip1 && !p?.clip2 ? 2 : 1;
+      filas.push({
+        it, idx, ficha: p, doble, clip,
+        falta: doble && grupo.length < 2 && !(p?.clip1 || p?.clip2),
+        abreGrupo: n === 0,
+      });
+    });
+  }
+  return filas;
+}
+
 /** Subir los vídeos de una carpeta de golpe y que cada uno vaya a su producto.
  *
  *  El vídeo se genera fuera (Magnific, Veo3, Kling) y vuelve con un nombre que
@@ -55,15 +125,21 @@ export function SubidaMasiva({
   folder,
   productos,
   root = "/api/v1/nicho-pov-bof",
+  todosDobles = false,
 }: {
   source: string;
   folder: string;
-  /** Solo se usan el número, el título y si tiene foto: sirve igual la ficha
-   *  del POV BOF que la del Largo. */
-  productos: Pick<ProductoItem, "producto" | "titulo" | "clean_photo_id">[];
+  /** Sirve igual la ficha del POV BOF que la del Largo: se usan el número, el
+   *  título, la foto y si el producto va de plazos (dos clips). */
+  productos: Pick<
+    ProductoItem, "producto" | "titulo" | "clean_photo_id" | "modo_plazos" | "clip1" | "clip2"
+  >[];
   /** Raíz de la API del nicho. En el Largo cada producto lleva dos clips y de
    *  eso se encarga su endpoint, no esta pantalla. */
   root?: string;
+  /** En el POV BOF Largo TODOS los productos van en dos clips, no solo los de
+   *  plazos. Cambia lo que se enseña al repasar (Clip 1 / Clip 2). */
+  todosDobles?: boolean;
 }) {
   const repartir = useRepartirLote(root);
   const confirmar = useConfirmarLote(root);
@@ -343,6 +419,11 @@ export function SubidaMasiva({
   }, [progreso, reconociendo]);
 
   const listos = (reparto ?? []).filter((i) => i.producto).length;
+  // El repaso, agrupado por producto y con los clips numerados.
+  const filas = useMemo(
+    () => ordenarPorProducto(reparto ?? [], productos, todosDobles),
+    [productos, reparto, todosDobles],
+  );
 
   function cambiar(i: number, producto: string) {
     setReparto((prev) => {
@@ -517,15 +598,38 @@ export function SubidaMasiva({
 
           {reparto && (
             <div className="space-y-1.5">
-              {reparto.map((it, i) => {
+              {filas.map(({ it, idx: i, ficha, doble, clip, falta, abreGrupo }) => {
                 const asignado = conFoto.find((p) => p.producto === it.producto);
                 return (
                   <div
                     key={it.token}
                     className={`space-y-1.5 rounded-lg border p-2 ${
                       it.producto ? "border-border/60" : "border-amber-500/50 bg-amber-500/5"
-                    }`}
+                    } ${!abreGrupo ? "-mt-1 border-t-0" : ""}`}
                   >
+                    {/* De un vistazo: si el producto va de plazos y cuál de sus
+                        dos clips es este. Sin esto había que abrir la ficha
+                        para saber por qué un producto llevaba dos vídeos. */}
+                    {(doble || falta) && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {ficha?.modo_plazos && (
+                          <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-400">
+                            💳 Plazos
+                          </span>
+                        )}
+                        {clip > 0 && (
+                          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-400">
+                            Clip {clip} de 2
+                          </span>
+                        )}
+                        {falta && (
+                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500">
+                            falta el otro clip · no se editará
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex gap-2">
                       {/* El vídeo, para poder verlo: cuando no lo reconoce, el
                           nombre del fichero no dice absolutamente nada. */}

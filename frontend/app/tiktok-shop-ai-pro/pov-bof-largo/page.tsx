@@ -977,6 +977,8 @@ export default function PovBofLargoPage() {
               folder={folder}
               productos={items}
               root="/api/v1/nicho-pov-bof-largo"
+              // Aquí no hay productos de un solo clip: todos van en dos.
+              todosDobles
             />
           )}
 
