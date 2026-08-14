@@ -36,6 +36,12 @@ _noop: OnLog = lambda _m: None
 # rato y cada uno que se añade encarece la llamada.
 FOTOGRAMAS = 3
 ANCHO = 540
+# Dónde se cogen, en fracción del vídeo. El primero va casi al principio a
+# propósito: estos vídeos ARRANCAN de la foto limpia del producto, así que ahí
+# se ve entero y sin mano delante — que es exactamente lo que hay que comparar
+# con el catálogo. Repartidos por igual (1/4, 2/4, 3/4) los tres salían ya con
+# la mano metida en cuadro, y una tumbona quedó sin reconocer por eso.
+INSTANTES = (0.06, 0.3, 0.6)
 
 
 def _fotogramas(video: Path, destino: Path, etiqueta: str) -> list[str]:
@@ -48,10 +54,9 @@ def _fotogramas(video: Path, destino: Path, etiqueta: str) -> list[str]:
     except Exception:
         dur = 10.0
     salidas = []
-    for i in range(FOTOGRAMAS):
-        # Ni el primer instante ni el último: ahí la mano entra o sale y el
-        # producto se ve a medias.
-        t = dur * (i + 1) / (FOTOGRAMAS + 1)
+    for i, frac in enumerate(INSTANTES[:FOTOGRAMAS]):
+        # El final NO se mira: ahí la mano ya tapa medio producto.
+        t = dur * frac
         f = destino / f"{etiqueta}_{i}.jpg"
         subprocess.run(
             ["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video),
