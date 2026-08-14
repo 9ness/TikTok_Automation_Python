@@ -15,6 +15,8 @@ export interface ProductFolder {
   name: string;
   id: string;
   completed: boolean;
+  /** El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. */
+  desde_copia?: boolean;
 }
 
 export interface FoldersListResponse {

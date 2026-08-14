@@ -422,6 +422,43 @@ def run_sync(
     }
 
 
+_ULTIMA = "backup:ultima"
+
+
+def guardar_ultima(result: dict) -> None:
+    """Deja constancia de la última copia para poder enseñarla.
+
+    Interesa sobre todo `n_deleted`: es la única señal de que el admin del
+    Drive del curso ha borrado cosas, y hasta ahora solo se veía en el log del
+    job (que nadie mira). Nunca lanza: es informativo.
+    """
+    try:
+        from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
+        import time as _time
+
+        get_nicho_pov_bof_redis().set_json(_ULTIMA, {
+            "ts": _time.time(),
+            "mode": result.get("mode", ""),
+            "n_added": int(result.get("n_added") or 0),
+            "n_modified": int(result.get("n_modified") or 0),
+            "n_deleted": int(result.get("n_deleted") or 0),
+            "copied": int(result.get("copied") or 0),
+            "failed": int(result.get("failed") or 0),
+        })
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def ultima() -> dict:
+    """Lo que hizo la última copia. `{}` si no hay ninguna registrada."""
+    try:
+        from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
+
+        return get_nicho_pov_bof_redis().get_json(_ULTIMA) or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _counts(d: dict) -> dict:
     return {
         "n_added": d["n_added"],

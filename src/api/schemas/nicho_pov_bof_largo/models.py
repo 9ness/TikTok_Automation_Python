@@ -92,6 +92,8 @@ class ProductoEstadoLargoRequest(BaseModel):
 
 
 class FolderLargo(BaseModel):
+    # El Drive del curso ya no tiene esta carpeta: sale de nuestra copia.
+    desde_copia: bool = False
     name: str
     id: str = ""
     completed: bool = False

@@ -557,6 +557,9 @@ export default function PovBofLargoPage() {
               }`}
             >
               {f.completed && "✓ "}
+              {/* El curso borró esta carpeta entera: se sigue trabajando
+                  desde nuestra copia, con el progreso de siempre. */}
+              {f.desde_copia && "🗄️ "}
               {f.name}
             </button>
           ))}

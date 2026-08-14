@@ -246,10 +246,31 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
             for it in items
             if it.get("Name")
         ]
+        # Carpetas que el curso BORRÓ ENTERAS y nosotros sí tenemos. Sin esto
+        # desaparecían del navegador y con ellas el trabajo a medias: el
+        # progreso sigue en Redis, pero sin carpeta que abrir no hay forma de
+        # llegar a él. Se marcan para que se vea de dónde salen.
+        vistas = {f["name"] for f in folders}
+        for nombre in _carpetas_solo_en_copia(source, vistas):
+            folders.append({"name": nombre, "id": nombre, "desde_copia": True})
         folders.sort(key=lambda f: config.natural_sort_key(f["name"]))
         return folders
 
     return _listar_cacheado(f"folders:{source}", cargar, refresh=refresh)
+
+
+def _carpetas_solo_en_copia(source: str, ya_estan: set[str]) -> list[str]:
+    """Las carpetas que están en el backup y ya no en el Drive del curso."""
+    try:
+        from src.nicho_pov_bof.services import backup_sync
+
+        fuente = config.SOURCES.get(source, {}).get("folder") or ""
+        if not fuente:
+            return []
+        return [c for c in backup_sync.carpetas_de(fuente) if c not in ya_estan]
+    except Exception:  # noqa: BLE001
+        # Que un problema con la copia no deje sin listado la fuente entera.
+        return []
 
 
 def _assert_known_folder(source: str, folder: str) -> None:

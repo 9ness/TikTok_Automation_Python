@@ -2287,6 +2287,11 @@ def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -
         on_progress=on_progress,
     )
 
+    # Se guarda para poder enseñarlo en la pantalla: lo que de verdad importa
+    # es cuántos ficheros DESAPARECIERON del origen, y eso solo estaba en este
+    # log.
+    backup_sync.guardar_ultima(result)
+
     on_log(
         f"[backup] modo={result['mode']} ({result['reason']}) · "
         f"+{result['n_added']} nuevos · ~{result['n_modified']} modificados · "

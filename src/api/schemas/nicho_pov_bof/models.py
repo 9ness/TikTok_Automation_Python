@@ -24,6 +24,9 @@ class ProductFolder(BaseModel):
     name: str
     id: str
     completed: bool
+    # El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. Se
+    # marca para que se vea de dónde viene lo que se está trabajando.
+    desde_copia: bool = False
 
 
 class FoldersListResponse(BaseModel):

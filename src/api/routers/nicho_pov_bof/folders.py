@@ -91,7 +91,10 @@ def list_folders(
 
     completed = progress_repo.get_completed(source, usuario)
     items = [
-        ProductFolder(name=f["name"], id=f["id"], completed=f["name"] in completed)
+        ProductFolder(
+            name=f["name"], id=f["id"], completed=f["name"] in completed,
+            desde_copia=bool(f.get("desde_copia")),
+        )
         for f in folders
     ]
     current = next((i.name for i in items if not i.completed), None)
@@ -204,6 +207,18 @@ def backup_check() -> BackupCheckResponse:
         return BackupCheckResponse(**backup_sync.check_only())
     except RuntimeError as e:
         raise APIError(f"No se pudo comparar con el origen: {e}", status_code=502) from e
+
+
+@router.get("/backup/ultima")
+def backup_ultima() -> dict:
+    """Qué hizo la última copia (y cuántos ficheros borró el curso).
+
+    Es una lectura de Redis, no toca Drive: se pide al abrir la pantalla para
+    poder avisar de los borrados el mismo día en que pasan.
+    """
+    from src.nicho_pov_bof.services import backup_sync
+
+    return backup_sync.ultima()
 
 
 @router.post(

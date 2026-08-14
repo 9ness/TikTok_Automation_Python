@@ -38,6 +38,7 @@ import {
   buildVideoUrl,
   buildPhotoUrl,
   useBackupCheck,
+  useUltimaCopia,
   useBackupSync,
   useExtraerTextos,
   useFolders,
@@ -125,6 +126,9 @@ export default function NichoPovBofPage() {
 
   const [backup, setBackup] = useState<BackupCheckResponse | null>(null);
   const backupCheck = useBackupCheck();
+  // Qué hizo la última copia (la diaria incluida): sirve para avisar de los
+  // borrados del origen el mismo día.
+  const ultimaCopia = useUltimaCopia();
   const backupSync = useBackupSync();
   const openQueue = useDrawerStore((s) => s.openQueue);
 
@@ -525,6 +529,9 @@ export default function NichoPovBofPage() {
               }`}
             >
               {f.completed && "✓ "}
+              {/* El curso borró esta carpeta entera: se sigue trabajando
+                  desde nuestra copia, con el progreso de siempre. */}
+              {f.desde_copia && "🗄️ "}
               {f.name}
             </button>
           ))}
@@ -592,6 +599,34 @@ export default function NichoPovBofPage() {
               El Drive de origen es de un tercero y se borra sin aviso. Comprueba si
               han añadido o cambiado algo y guarda solo la diferencia.
             </p>
+
+            {/* Lo que hizo la copia AUTOMÁTICA (una al día). Lo que importa
+                aquí es `n_deleted`: es la única forma de enterarse de que el
+                curso ha borrado cosas sin abrir el log del job. */}
+            {ultimaCopia.data?.ts ? (
+              <div className="space-y-0.5 rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px]">
+                <p className="text-muted-foreground">
+                  Copia automática:{" "}
+                  <span className="font-medium text-foreground">
+                    {/* Con el día, no solo la hora: es una copia diaria y lo
+                        que se quiere saber es si la de hoy ya pasó. */}
+                    {new Date(ultimaCopia.data.ts * 1000).toLocaleString("es-ES", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>{" "}
+                  · {ultimaCopia.data.copied ?? 0} fichero(s) guardados
+                </p>
+                {(ultimaCopia.data.n_deleted ?? 0) > 0 && (
+                  <p className="font-semibold text-amber-500">
+                    ⚠️ el curso borró {ultimaCopia.data.n_deleted} fichero(s) del
+                    origen — los tuyos siguen en la copia
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {backup && (
               <div className="space-y-1 rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px]">

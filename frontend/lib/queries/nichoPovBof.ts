@@ -122,6 +122,29 @@ export function useMarkCompleted(source: string) {
   });
 }
 
+export interface UltimaCopia {
+  ts?: number;
+  mode?: string;
+  n_added?: number;
+  n_modified?: number;
+  n_deleted?: number;
+  copied?: number;
+  failed?: number;
+}
+
+/** Qué hizo la última copia (la diaria incluida).
+ *
+ *  Es una lectura de Redis, no toca Drive, así que se pide al abrir la
+ *  pantalla: lo que interesa es enterarse el mismo día de que el curso ha
+ *  BORRADO ficheros, y eso antes solo salía en el log del job. */
+export function useUltimaCopia() {
+  return useQuery<UltimaCopia>({
+    queryKey: [...nichoPovBofKeys.all, "backup-ultima"],
+    queryFn: () => api.get<UltimaCopia>(`${ROOT}/backup/ultima`),
+    staleTime: 60_000,
+  });
+}
+
 /** Comprobar cambios en el Drive de origen. Bajo demanda: el listado
  *  recursivo tarda ~1 min, así que no se dispara solo al abrir la página. */
 export function useBackupCheck() {

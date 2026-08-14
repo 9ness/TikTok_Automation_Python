@@ -148,6 +148,7 @@ def list_folders(
         FolderLargo(
             name=c.get("name"), id=c.get("id", ""),
             completed=c.get("name") in completed,
+            desde_copia=bool(c.get("desde_copia")),
         )
         for c in carpetas
     ]
