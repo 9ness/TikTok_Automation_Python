@@ -35,7 +35,11 @@ def _slug_usuario(usuario: str) -> str:
 
 
 def _key(source: str, folder: str, usuario: str) -> str:
-    return f"folder:{source}:{folder}:u:{_slug_usuario(usuario)}"
+    # La fuente se canoniza: leer una carpeta desde la copia de seguridad es
+    # leer la MISMA carpeta del curso, con el mismo progreso.
+    from src.nicho_pov_bof import config as pov_config
+
+    return f"folder:{pov_config.fuente_canonica(source)}:{folder}:u:{_slug_usuario(usuario)}"
 
 
 def _lock(source: str, folder: str, usuario: str) -> str:

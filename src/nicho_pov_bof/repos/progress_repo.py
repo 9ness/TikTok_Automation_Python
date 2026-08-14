@@ -8,6 +8,7 @@ Key: `nicho_pov_bof:completed:<source>` → SET de nombres de carpeta.
 
 from __future__ import annotations
 
+from src.nicho_pov_bof import config
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 
@@ -17,6 +18,9 @@ def _key(source: str, usuario: str = "") -> str:
     El histórico (sin usuario) se conserva como clave de `ness`, que es quien
     lo generó — así no pierde por dónde iba al separar las cuentas.
     """
+    # La copia de seguridad comparte progreso con la fuente del curso: son las
+    # mismas carpetas, solo cambia de dónde se leen las fotos.
+    source = config.fuente_canonica(source)
     if not usuario or usuario == "ness":
         return f"completed:{source}"
     return f"completed:{source}:{usuario}"

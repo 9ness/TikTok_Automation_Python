@@ -19,6 +19,7 @@ import time
 import unicodedata
 from contextlib import contextmanager
 
+from src.nicho_pov_bof import config
 from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
 
 
@@ -41,8 +42,12 @@ CAMPOS_PRIVADOS = frozenset({
 
 
 def _key(source: str, folder: str) -> str:
-    """Documento COMPARTIDO de la carpeta (textos y enlaces)."""
-    return f"folder:{source}:{folder}"
+    """Documento COMPARTIDO de la carpeta (textos y enlaces).
+
+    La fuente se canoniza: leer una carpeta desde la copia de seguridad es leer
+    LA MISMA carpeta del curso, así que textos y progreso son los mismos.
+    """
+    return f"folder:{config.fuente_canonica(source)}:{folder}"
 
 
 def _key_privado(source: str, folder: str, usuario: str) -> str:
@@ -51,7 +56,7 @@ def _key_privado(source: str, folder: str, usuario: str) -> str:
     `ness` se queda en el documento compartido: es donde está su histórico y
     moverlo sería reescribir meses de trabajo sin ganar nada.
     """
-    return f"folder:{source}:{folder}:u:{usuario}"
+    return f"folder:{config.fuente_canonica(source)}:{folder}:u:{usuario}"
 
 
 def _now() -> str:

@@ -71,17 +71,21 @@ SOURCES: dict[str, dict[str, str]] = {
     # La COPIA de seguridad del Drive del curso, de solo lectura. El admin de
     # aquel Drive borra carpetas cada cierto tiempo y entonces sus productos
     # desaparecen de la pantalla aunque estén guardados en nuestro Drive: estas
-    # dos fuentes los vuelven a hacer accesibles. Apuntan a la última copia
-    # COMPLETA (ver `backup_sync`), que es la que tiene el archivo entero.
+    # dos fuentes los vuelven a hacer accesibles: leen la última copia completa
+    # MÁS los deltas posteriores (ver `backup_sync._copias_utiles`), porque una
+    # carpeta que se subió y se borró después solo está en un delta.
     "backup_1": {
         "label": "🗄️ Copia · 1 Prod Aleatorios",
         "folder": "1 Prod Aleatorios",
         "backup": "1",
+        # El progreso NO es de esta fuente: es la misma carpeta del curso.
+        "canonica": "aleatorios_1",
     },
     "backup_2": {
         "label": "🗄️ Copia · 2 Prod Aleatorios 2",
         "folder": "2 Prod Aleatorios 2",
         "backup": "1",
+        "canonica": "aleatorios_2",
     },
 }
 
@@ -101,6 +105,22 @@ TOP_VENDIDOS_PREFIJO = "Top"
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""
     return bool((SOURCES.get(source) or {}).get("propia"))
+
+
+def fuente_canonica(source: str) -> str:
+    """La fuente con la que se guarda el progreso de un producto.
+
+    Las fuentes "🗄️ Copia" NO son otro catálogo: son las MISMAS carpetas del
+    curso leídas de nuestro backup. Si guardaran su progreso aparte, una
+    carpeta ya trabajada aparecería sin empezar al abrirla desde la copia, y lo
+    que se marcara ahí no contaría en la original. Se apunta todo en la fuente
+    de verdad.
+    """
+    meta = SOURCES.get(source) or {}
+    if not meta.get("backup"):
+        return source
+    destino = meta.get("canonica") or ""
+    return destino or source
 
 
 def es_fuente_backup(source: str) -> bool:
