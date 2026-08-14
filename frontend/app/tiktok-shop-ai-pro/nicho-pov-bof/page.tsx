@@ -75,6 +75,7 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { useMe } from "@/lib/queries/auth";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -1715,7 +1716,15 @@ function ProductoCard({
                   </span>
                 </>
               ) : (
-                <span className="text-muted-foreground">precio sin detectar</span>
+                /* Sin precio el producto NUNCA pasa a plazos, así que una
+                   silla de 150 € se montaría con el guion de una de 15. Pasa
+                   cuando falta la captura de la ficha o no se deja leer: se
+                   escribe a mano y ya decide bien. */
+                <PrecioAMano
+                  source={source}
+                  folder={folder}
+                  producto={producto.producto}
+                />
               )}
               {producto.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">

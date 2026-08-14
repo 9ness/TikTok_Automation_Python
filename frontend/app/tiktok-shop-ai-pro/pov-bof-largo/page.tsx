@@ -38,6 +38,7 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
@@ -1628,7 +1629,9 @@ function ProductoCard({
                   </span>
                 </>
               ) : (
-                <span className="text-muted-foreground">precio sin detectar</span>
+                /* El precio lo guarda el POV BOF (es del producto, no del
+                   nicho) y aquí se lee: sin él no hay guion de plazos. */
+                <PrecioAMano source={source} folder={folder} producto={p.producto} />
               )}
               {p.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">

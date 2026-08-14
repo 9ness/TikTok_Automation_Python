@@ -267,6 +267,11 @@ class ProductoEstadoRequest(BaseModel):
     # A qué nicho se le apunta la venta. Lo elige el operador: el mismo
     # producto se graba con varios nichos y solo él sabe con cuál vendió.
     nicho: str = ""
+    # Precio escrito A MANO. Hace falta cuando la captura de la ficha no está
+    # o no se lee (queda "precio sin detectar"): sin precio el producto nunca
+    # pasa a plazos, así que una silla de 150 € se montaría con el guion corto
+    # de un producto barato. `0` lo deja como estaba; para borrarlo, -1.
+    precio: float | None = None
 
 
 class ProductoBuscado(BaseModel):

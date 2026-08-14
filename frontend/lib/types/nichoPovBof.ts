@@ -239,6 +239,9 @@ export interface EstadoRequest {
   sold?: boolean;
   /** A qué nicho se le apunta la venta. Solo se manda al marcar "vendió". */
   nicho?: string;
+  /** Precio escrito a mano cuando la ficha no se deja leer. Sin precio el
+   *  producto nunca pasa a plazos. -1 lo borra. */
+  precio?: number;
 }
 
 export interface VideoUploadResponse {

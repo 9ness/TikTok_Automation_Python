@@ -1090,6 +1090,16 @@ def set_producto_estado(
             "se puede saber si ya está en el escaparate. Pásale 'Textos' antes."
         )
 
+    # El precio va al documento COMPARTIDO (es un dato del producto, no del
+    # operador) y decide si el vídeo lleva guion de plazos. Se escribe a mano
+    # cuando la captura de la ficha falta o no se deja leer: sin él, un
+    # producto de 150 € se montaría como uno de 15.
+    if body.precio is not None:
+        nuevo = 0.0 if body.precio < 0 else float(body.precio)
+        product_repo.save_extracted_texts(
+            body.source, body.folder, {body.producto: {"precio": nuevo}},
+        )
+
     try:
         prod = product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,

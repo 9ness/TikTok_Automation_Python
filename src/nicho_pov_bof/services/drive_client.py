@@ -146,9 +146,16 @@ def _listar_cacheado(key: str, cargar: Callable[[], Any], *, refresh: bool) -> A
     return payload
 
 
-def _run_rclone(args: list[str], *, on_log: Callable[[str], None] = _noop) -> str:
-    """Ejecuta rclone y devuelve stdout. Lanza RuntimeError si falla."""
-    cmd = ["rclone", *args, config.SHARED_WITH_ME_FLAG]
+def _run_rclone(
+    args: list[str], *, on_log: Callable[[str], None] = _noop, shared: bool = True,
+) -> str:
+    """Ejecuta rclone y devuelve stdout. Lanza RuntimeError si falla.
+
+    `shared=False` quita `--drive-shared-with-me`: hace falta para la copia de
+    seguridad, que vive en NUESTRO Drive ("Mi unidad"). Con el flag puesto, esa
+    carpeta sencillamente no existe para rclone.
+    """
+    cmd = ["rclone", *args] + ([config.SHARED_WITH_ME_FLAG] if shared else [])
     conf = config.rclone_config_path()
     if conf:
         cmd += ["--config", conf]
@@ -179,13 +186,16 @@ def _run_rclone(args: list[str], *, on_log: Callable[[str], None] = _noop) -> st
     return proc.stdout
 
 
-def _lsjson(path: str, *, dirs_only: bool = False, files_only: bool = False) -> list[dict]:
+def _lsjson(
+    path: str, *, dirs_only: bool = False, files_only: bool = False,
+    shared: bool = True,
+) -> list[dict]:
     args = ["lsjson", path]
     if dirs_only:
         args.append("--dirs-only")
     if files_only:
         args.append("--files-only")
-    out = _run_rclone(args)
+    out = _run_rclone(args, shared=shared)
     return json.loads(out or "[]")
 
 
@@ -211,10 +221,26 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
     if config.es_fuente_propia(source):
         return _servicio_propio(source).listar_carpetas_como_drive()
 
+    # La COPIA de seguridad: no es una carpeta del Drive del curso sino la
+    # unión de todas las copias guardadas (ver `backup_sync.carpetas_de`), así
+    # que la resuelve ese módulo y no un `lsjson` a secas.
+    if config.es_fuente_backup(source):
+        from src.nicho_pov_bof.services import backup_sync
+
+        fuente = config.SOURCES[source]["folder"]
+        return _listar_cacheado(
+            f"backup-folders:{source}",
+            lambda: [{"name": c, "id": c} for c in backup_sync.carpetas_de(fuente)],
+            refresh=refresh,
+        )
+
     base = config.source_path(source)  # valida el slug
 
+    # La copia de seguridad está en "Mi unidad", no en "Compartido conmigo".
+    compartido = not config.es_fuente_backup(source)
+
     def cargar() -> list[dict]:
-        items = _lsjson(base, dirs_only=True)
+        items = _lsjson(base, dirs_only=True, shared=compartido)
         folders = [
             {"name": it["Name"], "id": it.get("ID", "")}
             for it in items
@@ -245,15 +271,38 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     if config.es_fuente_propia(source):
         return _servicio_propio(source).listar_fotos_como_drive(folder)
 
+    if config.es_fuente_backup(source):
+        from src.nicho_pov_bof.services import backup_sync
+
+        fuente = config.SOURCES[source]["folder"]
+        _assert_known_folder(source, folder)
+        return _listar_cacheado(
+            f"backup-photos:{source}:{folder}",
+            lambda: backup_sync.fotos_de(fuente, folder),
+            refresh=refresh,
+        )
+
     base = config.source_path(source)
     _assert_known_folder(source, folder)
 
+    compartido = not config.es_fuente_backup(source)
+
+    def limpiar(nombre: str) -> str:
+        """En la copia, los nombres duplicados llevan pegado el file ID.
+
+        El backup no puede guardar dos `2.PNG` en la misma carpeta, así que al
+        copiarlos les añade `__<8 primeros del ID>` (ver `backup_sync`). Ese
+        sufijo rompería el emparejado, que va por el número del nombre — se
+        quita al listar; el identificador real sigue siendo el file ID.
+        """
+        return re.sub(r"__[0-9A-Za-z_-]{8}(\.[^.]+)$", r"\1", nombre) if not compartido else nombre
+
     def cargar() -> list[dict]:
-        items = _lsjson(f"{base}/{folder}", files_only=True)
+        items = _lsjson(f"{base}/{folder}", files_only=True, shared=compartido)
         photos = [
             {
                 "id": it.get("ID", ""),
-                "name": it["Name"],
+                "name": limpiar(it["Name"]),
                 "size": int(it.get("Size") or 0),
                 "mime": it.get("MimeType", ""),
                 # Cuándo se subió. Es lo único que separa dos productos cuyas
@@ -327,7 +376,15 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     # `copyid` es la única forma de resolver la ambigüedad de nombres
     # duplicados: baja el fichero por su ID, no por su path.
     tmp = dest.with_suffix(dest.suffix + ".part")
-    _run_rclone(["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)])
+    try:
+        _run_rclone(["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)])
+    except RuntimeError:
+        # Las fotos de la COPIA de seguridad están en nuestro Drive, y ahí el
+        # flag `--drive-shared-with-me` estorba. Como aquí solo llega el ID (no
+        # de qué fuente venía), se reintenta sin él antes de rendirse.
+        _run_rclone(
+            ["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)], shared=False,
+        )
     if not tmp.is_file() or tmp.stat().st_size == 0:
         tmp.unlink(missing_ok=True)
         raise RuntimeError(f"rclone no devolvió contenido para el ID {file_id}")

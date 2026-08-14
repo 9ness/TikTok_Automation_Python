@@ -68,6 +68,21 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "top_vendidos",
         "propia": "1",
     },
+    # La COPIA de seguridad del Drive del curso, de solo lectura. El admin de
+    # aquel Drive borra carpetas cada cierto tiempo y entonces sus productos
+    # desaparecen de la pantalla aunque estén guardados en nuestro Drive: estas
+    # dos fuentes los vuelven a hacer accesibles. Apuntan a la última copia
+    # COMPLETA (ver `backup_sync`), que es la que tiene el archivo entero.
+    "backup_1": {
+        "label": "🗄️ Copia · 1 Prod Aleatorios",
+        "folder": "1 Prod Aleatorios",
+        "backup": "1",
+    },
+    "backup_2": {
+        "label": "🗄️ Copia · 2 Prod Aleatorios 2",
+        "folder": "2 Prod Aleatorios 2",
+        "backup": "1",
+    },
 }
 
 # Cuántos productos entran en cada carpeta de "Mis productos". Diez, como las
@@ -86,6 +101,16 @@ TOP_VENDIDOS_PREFIJO = "Top"
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""
     return bool((SOURCES.get(source) or {}).get("propia"))
+
+
+def es_fuente_backup(source: str) -> bool:
+    """True si la fuente es la copia de seguridad del Drive del curso.
+
+    Importa para leerla: la copia vive en NUESTRO Drive ("Mi unidad"), no en
+    "Compartido conmigo", así que rclone NO puede llevar el flag
+    `--drive-shared-with-me` o no la encuentra.
+    """
+    return bool((SOURCES.get(source) or {}).get("backup"))
 
 
 # Ruta ya resuelta y creada. Se recuerda porque el `mkdir` de abajo va contra
@@ -152,6 +177,17 @@ def source_path(source: str) -> str:
         raise ValueError(
             f"Fuente desconocida: {source!r}. Válidas: {sorted(SOURCES)}"
         )
+    if meta.get("backup"):
+        # Import perezoso: `backup_sync` importa este módulo.
+        from src.nicho_pov_bof.services import backup_sync
+
+        copia = backup_sync.ultima_completa()
+        if not copia:
+            raise ValueError(
+                "Todavía no hay ninguna copia completa del Drive del curso. "
+                "Pulsa 'Forzar copia completa nueva' en la copia de seguridad."
+            )
+        return f"{DRIVE_REMOTE}{backup_sync.BACKUP_ROOT}/{copia}/{meta['folder']}"
     return f"{DRIVE_REMOTE}{SHARED_ROOT}/{meta['folder']}"
 
 

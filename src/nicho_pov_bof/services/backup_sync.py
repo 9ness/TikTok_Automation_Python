@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,9 +52,114 @@ BACKUP_DIR = "BACKUPS_Productos_Espana"
 BACKUP_PREFIX = "BACKUP_Productos_Espana"
 
 
+# Ruta (sin remote) de la carpeta que guarda todas las copias. La usa también
+# la fuente "🗄️ Copia" para poder LEER de ahí cuando el Drive del curso borra
+# una carpeta.
+BACKUP_ROOT = f"{BACKUP_PARENT}/{BACKUP_DIR}"
+
+
 def _destino(nombre: str) -> str:
     """Ruta rclone de una copia, ya dentro de la carpeta de backups."""
-    return f"gdrive:{BACKUP_PARENT}/{BACKUP_DIR}/{nombre}"
+    return f"gdrive:{BACKUP_ROOT}/{nombre}"
+
+
+def copias() -> list[str]:
+    """Nombres de las copias guardadas, de la más nueva a la más vieja.
+
+    Van en NUESTRO Drive, así que se listan SIN `--drive-shared-with-me`: con
+    el flag puesto, "Mi unidad" no existe para rclone.
+    """
+    try:
+        out = _rclone(["lsjson", _destino("").rstrip("/"), "--dirs-only"], timeout=120)
+        return sorted(
+            (d.get("Name", "") for d in json.loads(out or "[]") if d.get("Name")),
+            reverse=True,
+        )
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def ultima_completa() -> str:
+    """La copia COMPLETA más reciente (las `_delta_` solo traen lo que cambió)."""
+    return next(
+        (c for c in copias() if c.startswith(BACKUP_PREFIX) and "_delta_" not in c),
+        "",
+    )
+
+
+def _copias_utiles() -> list[str]:
+    """Las copias que hay que mirar para reconstruir el archivo, de nueva a vieja.
+
+    La completa NO basta: una carpeta que el curso subió y borró después solo
+    está en el delta de aquel día (pasó con "10 Agosto 2026", que se copió el
+    12 de agosto y ya no existe en el origen). Y los deltas tampoco bastan,
+    porque solo traen lo que cambió. Así que se miran todas, de la más reciente
+    a la más antigua, y gana la primera versión que aparece.
+    """
+    todas = copias()
+    completa = ultima_completa()
+    if not completa:
+        return todas
+    # De la completa hacia atrás no hace falta nada: ya lo contiene todo.
+    return todas[: todas.index(completa) + 1]
+
+
+def _limpiar_nombre(nombre: str) -> str:
+    """Quita el `__<id>` que el backup añade a los nombres duplicados."""
+    return re.sub(r"__[0-9A-Za-z_-]{8}(\.[^.]*)?$", lambda m: m.group(1) or "", nombre)
+
+
+def carpetas_de(fuente: str) -> list[str]:
+    """Carpetas de producto que hay en la copia, de una fuente del curso."""
+    vistas: dict[str, None] = {}
+    for copia in _copias_utiles():
+        try:
+            out = _rclone(
+                ["lsjson", f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}", "--dirs-only"],
+                timeout=120,
+            )
+        except Exception:  # noqa: BLE001
+            continue  # esa copia no llegó a tener esta fuente
+        for d in json.loads(out or "[]"):
+            if d.get("Name"):
+                vistas.setdefault(d["Name"], None)
+    return sorted(vistas)
+
+
+def fotos_de(fuente: str, carpeta: str) -> list[dict]:
+    """Fotos de una carpeta en la copia, con el shape de `drive_client`.
+
+    Gana la copia más reciente: si un fichero se modificó, la versión buena es
+    la última que se guardó.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    salida: dict[str, dict] = {}
+    for copia in _copias_utiles():
+        try:
+            out = _rclone(
+                ["lsjson", f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}/{carpeta}", "--files-only"],
+                timeout=120,
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        for it in json.loads(out or "[]"):
+            nombre, fid = it.get("Name") or "", it.get("ID") or ""
+            if not nombre or not fid or nombre in salida:
+                continue
+            limpio = _limpiar_nombre(nombre)
+            if not pov_config.is_image(limpio, it.get("MimeType", "")):
+                continue
+            salida[nombre] = {
+                "id": fid,
+                "name": limpio,
+                "size": int(it.get("Size") or 0),
+                "mime": it.get("MimeType", ""),
+                "mtime": it.get("ModTime", ""),
+            }
+    fotos = list(salida.values())
+    fotos.sort(key=lambda p: pov_config.natural_sort_key(p["name"]))
+    return fotos
 
 # Si cambia más de esta fracción del archivo, sale más a cuenta una copia
 # completa nueva que un delta gigante.

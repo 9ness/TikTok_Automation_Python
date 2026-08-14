@@ -305,6 +305,11 @@ export function useSetEstado() {
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
       }
+      // El precio decide si el vídeo va con guion de plazos (dos clips): al
+      // tocarlo hay que releer la carpeta, no solo esta tarjeta.
+      if (vars.precio !== undefined) {
+        void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+      }
     },
   });
 }
