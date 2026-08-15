@@ -116,6 +116,36 @@ def ventas_por_producto(source: str) -> dict[str, dict]:
     return salida
 
 
+def recopiar_textos(carpeta: str, *, on_log: OnLog = _noop) -> dict[str, dict]:
+    """Vuelve a traer los textos del producto de ORIGEN de cada copia.
+
+    Los productos de aquí ya pasaron por Gemini en su carpeta del curso, así
+    que volver a leer sus capturas no solo es pagar dos veces: es arriesgarse a
+    que el modelo cruce los textos entre imágenes de una tanda y la carpeta
+    entera quede desplazada (pasó: un producto con el título de otro). Con el
+    manifiesto sabemos de dónde vino cada uno y basta con copiar.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    campos = (
+        "titulo", "titulo_tiktok_completo", "tienda", "caption",
+        "emojis", "precio", "precio_lista", "product_url",
+    )
+    salida: dict[str, dict] = {}
+    for ref, sitio in manifiesto().items():
+        if sitio.get("carpeta") != carpeta:
+            continue
+        partes = ref.split("|")
+        if len(partes) != 3:
+            continue
+        origen = product_repo.get_product(partes[0], partes[1], partes[2])
+        textos = {k: origen.get(k, "") for k in campos if origen.get(k)}
+        if textos:
+            salida[str(sitio.get("producto"))] = textos
+    on_log(f"[top_vendidos] textos recopiados del origen: {len(salida)} producto(s)")
+    return salida
+
+
 def pendientes() -> int:
     """Cuántos productos del ranking aún no están en la carpeta.
 

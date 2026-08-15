@@ -489,10 +489,18 @@ def extraer_textos(
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import text_extractor
 
-    try:
-        textos = text_extractor.extract_folder_texts(body.source, body.folder)
-    except ValueError as e:
-        raise _bad_request(str(e)) from e
+    # En "Top vendidos" los textos NO se extraen: los productos son copias de
+    # otros que ya pasaron por Gemini, así que se traen del original. Leer sus
+    # capturas otra vez costaba una llamada de más y, sobre todo, el modelo
+    # llegó a cruzar los textos entre las imágenes de una tanda y dejó media
+    # carpeta con el título del producto de al lado.
+    if body.source == top_vendidos.SOURCE:
+        textos = top_vendidos.recopiar_textos(body.folder)
+    else:
+        try:
+            textos = text_extractor.extract_folder_texts(body.source, body.folder)
+        except ValueError as e:
+            raise _bad_request(str(e)) from e
 
     if textos:
         try:

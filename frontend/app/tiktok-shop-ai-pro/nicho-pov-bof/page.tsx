@@ -746,7 +746,7 @@ export default function NichoPovBofPage() {
             n={1}
             color="violeta"
             titulo="Preparar los textos"
-            hint="Lee la ficha de cada producto con IA (título, tienda, caption, precio). Se hace una vez por carpeta."
+            hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Lee la ficha de cada producto con IA (título, tienda, caption, precio). Se hace una vez por carpeta."}
             extra={`${conTexto}/${totalCarpeta}`}
           >
             <button

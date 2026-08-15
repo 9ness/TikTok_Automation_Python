@@ -753,7 +753,7 @@ export default function PovBofLargoPage() {
             n={1}
             color="violeta"
             titulo="Preparar textos y guion"
-            hint="Los textos salen de la ficha; el guion lo escribe la IA para ese producto y es lo que marca cuántos clips harán falta."
+            hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Los textos salen de la ficha; el guion lo escribe la IA para ese producto y es lo que marca cuántos clips harán falta."}
             extra={`${conGuion}/${totalProductos} con guion`}
           >
             <button
