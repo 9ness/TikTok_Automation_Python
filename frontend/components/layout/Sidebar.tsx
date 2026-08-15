@@ -127,6 +127,10 @@ const NAV: NavGroup[] = [
         label: m.label,
         icon: m.icon,
       })),
+      // Al FINAL y fuera de los nichos: son ajustes comunes (hashtags, copia
+      // de seguridad) que antes vivían plegados dentro de cada pantalla de
+      // trabajo, donde solo estorbaban.
+      { href: "/tiktok-shop-ai-pro/configuracion", label: "Configuración", icon: Settings },
     ],
   },
   {

@@ -25,6 +25,7 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { OSepara, Paso } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   useCompletarCarpetaCreativos,
   useFoldersCreativos,
@@ -228,32 +229,25 @@ export default function CreativosProPage() {
         </button>
       )}
 
-      {/* Un solo prompt, y el formato pegado a él: copiarlo y generar en
-          cuadrado es el error fácil de este nicho. */}
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        {/* El space de carruseles parte de UNA foto, igual que este nicho.
-            Magnific o el prompt: son alternativas. */}
-        <MagnificSpaces spaces={["carrusel"]} />
-        <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
+      {/* Los mismos pasos y colores que el POV BOF, aunque aquí sean tres: el
+          creativo es una IMAGEN, no hay vídeo que traer ni que montar. Quien
+          aprende un nicho sabe usar los otros. */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <Sparkles className="h-4 w-4 shrink-0 text-fuchsia-500" />
+          <p className="text-sm font-semibold">Cómo se hace un creativo</p>
+          {folder ? (
+            <span className="ml-auto text-[10px] text-muted-foreground">{folder}</span>
+          ) : null}
+        </div>
 
-        <button
-          type="button"
-          disabled={!prompt.data}
-          onClick={() => {
-            navigator.clipboard.writeText(prompt.data?.imagen ?? "");
-            toast.success("Prompt copiado");
-          }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+        <Paso
+          n={1}
+          color="violeta"
+          titulo="Preparar los textos"
+          hint="Lee la ficha de cada producto con IA. El creativo saca de ahí los beneficios que se escriben encima."
+          extra={`${conTexto}/${items.length}`}
         >
-          <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
-        </button>
-        <p className="text-center text-[11px] font-semibold text-cyan-500">
-          Genera en formato {prompt.data?.formato ?? "3:4"}
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             disabled={extraer.isPending || !folder}
@@ -266,89 +260,115 @@ export default function CreativosProPage() {
                 },
               )
             }
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
           >
             {extraer.isPending ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extrayendo…
+                <Loader2 className="h-4 w-4 animate-spin" /> Extrayendo textos…
               </>
             ) : (
               <>
-                <Sparkles className="h-3.5 w-3.5" /> Textos ({conTexto}/{items.length})
+                <Sparkles className="h-4 w-4" /> Obtener textos ({conTexto}/{items.length})
               </>
             )}
           </button>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <div
+              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
+                subidosCarpeta === items.length && items.length > 0
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-border/60 text-muted-foreground"
+              }`}
+            >
+              <span className="truncate">📤 Subidos {subidosCarpeta}/{items.length}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVerEscaparate(true)}
+              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
+                enEscaparate === items.length && items.length > 0
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
+              }`}
+            >
+              <span className="truncate">🏪 Escaparate {enEscaparate}/{items.length}</span>
+            </button>
+          </div>
+        </Paso>
+
+        <Paso
+          n={2}
+          color="fucsia"
+          titulo="Generar el creativo fuera"
+          hint={`Baja la foto de la ficha y genera la imagen en formato ${prompt.data?.formato ?? "3:4"} — en cuadrado es el error fácil de este nicho.`}
+        >
           <button
             type="button"
             disabled={Boolean(bajando) || !items.length}
             onClick={descargarFotos}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
             {bajando
               ? `Bajando ${bajando}`
-              : `Fotos ficha (${items.filter((p) => p.titled_photo_id).length})`}
+              : `Fotos de la ficha (${items.filter((p) => p.titled_photo_id).length})`}
           </button>
-        </div>
 
-        {/* Los dos EN LA MISMA LÍNEA: se leen juntos, que de eso se trata —
-            comparar lo que está en el escaparate con lo que ya se publicó.
-            Que la carpeta esté completada no significa que todo esté subido:
-            puede haber productos sin stock o descartados. */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <div
-            className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
-              subidosCarpeta === items.length && items.length > 0
-                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                : "border-border/60 text-muted-foreground"
-            }`}
-          >
-            📤 Subidos {subidosCarpeta}/{items.length}
-          </div>
+          <MagnificSpaces spaces={["carrusel"]} />
+          <OSepara />
           <button
             type="button"
-            onClick={() => setVerEscaparate(true)}
-            className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold transition ${
-              enEscaparate === items.length && items.length > 0
-                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
-            }`}
+            disabled={!prompt.data}
+            onClick={() => {
+              navigator.clipboard.writeText(prompt.data?.imagen ?? "");
+              toast.success("Prompt copiado");
+            }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
           >
-            🏪 Escaparate {enEscaparate}/{items.length}
+            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
           </button>
-        </div>
+          <p className="text-center text-[11px] font-semibold text-cyan-500">
+            Genera en formato {prompt.data?.formato ?? "3:4"}
+          </p>
+        </Paso>
 
+        <Paso
+          n={3}
+          color="azul"
+          titulo="Publicar"
+          hint="El creativo se sube tal cual desde tu galería: aquí no se monta nada. Marca cada uno cuando lo publiques."
+        >
+          <button
+            type="button"
+            onClick={() => setVerVendidos(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+          >
+            <ShoppingBag className="h-3.5 w-3.5" />
+            Ver qué productos vendieron
+          </button>
+        </Paso>
+      </section>
+
+      {verVendidos && <VendidosModal onClose={() => setVerVendidos(false)} />}
+
+      {/* El escaparate es el mismo para todos los nichos: si el producto ya se
+          metió desde el POV BOF (o desde otra carpeta), aquí sale hecho. */}
+      {verEscaparate && folder && (
+        <EscaparateModal
+          source={source}
+          folder={folder}
+          productos={items}
+          onClose={() => setVerEscaparate(false)}
+        />
+      )}
+
+      {/* Los productos de la carpeta, ya fuera de los pasos. */}
+      <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
         {productos.isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
           </div>
-        )}
-
-        {/* El ranking de vendidos es ÚNICO y global: dice qué tipo de producto
-            buscar, así que se abre desde cualquier nicho. */}
-        <button
-          type="button"
-          onClick={() => setVerVendidos(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
-        >
-          <ShoppingBag className="h-3.5 w-3.5" />
-          Productos que vendieron
-        </button>
-
-        {verVendidos && (
-          <VendidosModal onClose={() => setVerVendidos(false)} />
-        )}
-
-        {/* El escaparate es el mismo para todos los nichos: si el producto ya
-            se metió desde el POV BOF (o desde otra carpeta), aquí sale hecho. */}
-
-        {verEscaparate && folder && (
-          <EscaparateModal
-            source={source}
-            folder={folder}
-            productos={items}
-            onClose={() => setVerEscaparate(false)}
-          />
         )}
 
         {esTopVendidos && items.length > 0 && (

@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ClipboardCopy,
   Download,
-  HardDrive,
   Loader2,
   Mic,
   RefreshCw,
@@ -30,9 +29,9 @@ import {
   FUENTE_TOP_VENDIDOS,
   verTopVendidos,
 } from "@/lib/topVendidos";
-import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
+import { OSepara, Paso } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -46,11 +45,10 @@ import { useDrawerStore } from "@/lib/stores/drawerStore";
 import {
   buildCleanPhotoDownloadUrl,
   useActivarCuentaEchoTik,
-  useBackupCheck,
-  useBackupSync,
   useBorrarCuentaEchoTik,
   useBuscarProductos,
   useBuscarProductoUrl,
+  useHashtags,
   useBuscarUrlsCarpeta,
   useCrearMiProducto,
   useEchoTikCuentas,
@@ -58,8 +56,6 @@ import {
   useExtraerTextos,
   useGuardarCuentaEchoTik,
   useGuardarEchoTik,
-  useGuardarHashtags,
-  useHashtags,
   usePhotos,
   usePrompts,
 } from "@/lib/queries/nichoPovBof";
@@ -82,7 +78,6 @@ import {
   videoLargoUrl,
 } from "@/lib/queries/povBofLargo";
 import type {
-  BackupCheckResponse,
   ProductoBuscado,
   ProductoItem,
 } from "@/lib/types/nichoPovBof";
@@ -141,9 +136,6 @@ export default function PovBofLargoPage() {
   const totalVendidos = (vendidos.data ?? []).length;
   const unidadesVendidas = (vendidos.data ?? []).reduce((n, v) => n + (v.unidades || 1), 0);
 
-  const [backup, setBackup] = useState<BackupCheckResponse | null>(null);
-  const backupCheck = useBackupCheck();
-  const backupSync = useBackupSync();
   const openQueue = useDrawerStore((s) => s.openQueue);
 
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
@@ -254,32 +246,6 @@ export default function PovBofLargoPage() {
     toast.success(`${label} copiado`);
   }
 
-  function checkBackup() {
-    backupCheck.mutate(undefined, {
-      onSuccess: (res) => {
-        setBackup(res);
-        toast.success(
-          res.has_changes
-            ? `${res.n_added} nuevos · ${res.n_modified} modificados · ${res.n_deleted} borrados en origen`
-            : "Sin cambios desde la última copia",
-        );
-      },
-      onError: (e) => toast.error(err(e)),
-    });
-  }
-
-  function syncBackup(forceFull: boolean) {
-    backupSync.mutate(
-      { force_full: forceFull },
-      {
-        onSuccess: () => {
-          toast.success("Backup encolado");
-          openQueue();
-        },
-        onError: (e) => toast.error(err(e)),
-      },
-    );
-  }
 
   async function downloadVideos(filtro: Filtro = "todas") {
     if (!folder) return;
@@ -643,92 +609,6 @@ export default function PovBofLargoPage() {
         />
       )}
 
-      <CollapsibleCard
-        title="⚙️ Configuración"
-        subtitle="EchoTik · hashtags · copia de seguridad — el Drive de origen es de solo lectura"
-      >
-        <div className="space-y-3">
-          <EchoTikPanel />
-          <HashtagsPanel />
-
-          <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-            <div className="flex items-center gap-2">
-              <HardDrive className="h-4 w-4 shrink-0 text-sky-500" />
-              <p className="text-sm font-semibold">Copia de seguridad</p>
-            </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              El Drive de origen es de un tercero y se borra sin aviso. Comprueba si
-              han añadido o cambiado algo y guarda solo la diferencia.
-            </p>
-
-            {backup && (
-              <div className="space-y-1 rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px]">
-                <p className="text-muted-foreground">
-                  Última copia:{" "}
-                  <span className="font-medium text-foreground">
-                    {backup.last_snapshot ?? "ninguna"}
-                  </span>
-                </p>
-                {backup.has_changes ? (
-                  <>
-                    <p>
-                      <span className="font-semibold text-emerald-500">+{backup.n_added}</span> nuevos ·{" "}
-                      <span className="font-semibold text-amber-500">~{backup.n_modified}</span> modificados ·{" "}
-                      <span className="font-semibold text-red-500">-{backup.n_deleted}</span> borrados
-                    </p>
-                    <p className="text-muted-foreground">
-                      {Math.round(backup.change_ratio * 100)}% del archivo ({backup.n_total_source} ficheros).{" "}
-                      {backup.would_be_full ? "Se hará copia COMPLETA nueva." : "Se copiará solo la diferencia."}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-emerald-500">Sin cambios — no hay nada que copiar.</p>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={checkBackup}
-                disabled={backupCheck.isPending}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                {backupCheck.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Comprobar cambios
-              </button>
-              <button
-                type="button"
-                onClick={() => syncBackup(false)}
-                disabled={backupSync.isPending}
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50"
-              >
-                {backupSync.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <HardDrive className="h-3.5 w-3.5" />
-                )}
-                Sincronizar
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => syncBackup(true)}
-              disabled={backupSync.isPending}
-              className="w-full rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-            >
-              Forzar copia completa nueva
-            </button>
-            <p className="text-[10px] text-muted-foreground">
-              También corre solo cada día a las 06:00.
-            </p>
-          </section>
-        </div>
-      </CollapsibleCard>
 
       {folders.isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -840,84 +720,99 @@ export default function PovBofLargoPage() {
         </section>
       )}
 
-      {/* Automatización de vídeos por producto */}
+      {/* El trabajo del día en el ORDEN en que se hace, con los mismos cuatro
+          pasos y los mismos colores que el POV BOF: quien aprende uno sabe
+          usar el otro. Aquí el paso 1 escribe además el guion, que es lo que
+          decide la duración del vídeo. */}
       {data && folder && (
-        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-          <div className="flex items-center gap-2">
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
             <Sparkles className="h-4 w-4 shrink-0 text-violet-500" />
-            <p className="text-sm font-semibold">Automatización de vídeos</p>
-            <span className="ml-auto text-[11px] text-muted-foreground">
-              {conGuion}/{totalProductos} con guion
-            </span>
+            <p className="text-sm font-semibold">Cómo se hace un vídeo</p>
+            <span className="ml-auto text-[10px] text-muted-foreground">{folder}</span>
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                1
-              </span>
-              <p className="text-[11px] font-semibold">Preparar</p>
-              <p className="truncate text-[10px] text-muted-foreground">textos y ficha del producto</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={runExtraerTextos}
-                disabled={extraerTextos.isPending}
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
-              >
-                {extraerTextos.isPending ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    <span className="truncate">Extrayendo textos…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      Textos + guiones ({conTexto}/{totalCarpeta})
-                    </span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Subidos y escaparate en la misma línea (ver POV BOF). */}
-            <div className="grid grid-cols-2 gap-1.5">
-            <div
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${
-                subidos === totalProductos && totalProductos > 0
-                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                  : "border-border/60 text-muted-foreground"
-              }`}
+          <Paso
+            n={1}
+            color="violeta"
+            titulo="Preparar textos y guion"
+            hint="Los textos salen de la ficha; el guion lo escribe la IA para ese producto y es lo que marca cuántos clips harán falta."
+            extra={`${conGuion}/${totalProductos} con guion`}
+          >
+            <button
+              type="button"
+              onClick={runExtraerTextos}
+              disabled={extraerTextos.isPending}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
             >
-              📤 Subidos {subidos}/{totalProductos}
-            </div>
+              {extraerTextos.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> Extrayendo textos…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                  Obtener textos ({conTexto}/{totalCarpeta})
+                </>
+              )}
+            </button>
 
-              {/* Junto a "Subidos" para comparar de un vistazo. */}
+            {/* Guion para toda la carpeta a la vez, en vez de tarjeta a
+                tarjeta. Necesitan tener textos primero. */}
+            <button
+              type="button"
+              onClick={() => void generarTodosGuiones()}
+              disabled={generandoGuiones || !sinGuion}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/60 bg-card px-3 py-2 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/10 disabled:opacity-50"
+            >
+              {generandoGuiones ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  Escribiendo guiones {guionProgress}…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  {sinGuion
+                    ? `Escribir todos los guiones (${sinGuion})`
+                    : `Guiones al día (${conGuion}/${totalProductos})`}
+                </>
+              )}
+            </button>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <div
+                className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
+                  subidos === totalProductos && totalProductos > 0
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                    : "border-border/60 text-muted-foreground"
+                }`}
+              >
+                <span className="truncate">📤 Subidos {subidos}/{totalProductos}</span>
+              </div>
               <button
                 type="button"
                 onClick={() => setVerEscaparate(true)}
-                className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
                   enEscaparate === totalProductos && totalProductos > 0
                     ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                     : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
                 }`}
               >
-                🏪 Escaparate {enEscaparate}/{totalProductos}
+                <span className="truncate">🏪 Escaparate {enEscaparate}/{totalProductos}</span>
               </button>
+            </div>
 
-              {MOSTRAR_ECHOTIK && (
+            {MOSTRAR_ECHOTIK && (
               <button
                 type="button"
                 onClick={runBuscarUrls}
                 disabled={buscarUrls.isPending || !pendientesUrl}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/10 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/10 disabled:opacity-50"
               >
                 {buscarUrls.isPending ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    <span className="truncate">Buscando…</span>
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> Buscando…
                   </>
                 ) : (
                   <span className="truncate">
@@ -925,82 +820,19 @@ export default function PovBofLargoPage() {
                   </span>
                 )}
               </button>
-              )}
-            </div>
-            {/* Guion para todos los productos de la carpeta a la vez, en vez de
-                pulsarlo en cada tarjeta. Necesitan tener textos primero. */}
-            <button
-              type="button"
-              onClick={() => void generarTodosGuiones()}
-              disabled={generandoGuiones || !sinGuion}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/60 px-3 py-2 text-xs font-semibold text-violet-500 transition hover:bg-violet-500/10 disabled:opacity-50"
-            >
-              {generandoGuiones ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                  <span className="truncate">Escribiendo guiones {guionProgress}…</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {sinGuion
-                      ? `Escribir todos los guiones (${sinGuion})`
-                      : `Guiones al día (${conGuion}/${totalProductos})`}
-                  </span>
-                </>
-              )}
-            </button>
-          </div>
+            )}
+          </Paso>
 
-          <div className="space-y-1.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                2
-              </span>
-              <p className="text-[11px] font-semibold">Generar fuera</p>
-              <p className="truncate text-[10px] text-muted-foreground">copia el prompt y las fotos</p>
-            </div>
-
-            {/* Aquí SIEMPRE son dos clips por foto (normal o plazos da igual),
-                así que del de foto limpia solo hace falta el de plazos. El de
-                "foto con IA" es para cuando ya tienes la imagen generada, y
-                solo lo usa el admin. Magnific o los prompts: son alternativas. */}
-            <MagnificSpaces
-              spaces={["foto_limpia_plazos", ...(esAdmin ? (["foto_ia"] as const) : [])]}
-            />
-            <p className="text-center text-[10px] font-semibold text-muted-foreground">o</p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => copyText("Prompt imagen", prompts.data?.imagen)}
-                disabled={!prompts.data?.imagen}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
-              </button>
-              <button
-                type="button"
-                onClick={() => copyText("Prompt vídeo", prompts.data?.video)}
-                disabled={!prompts.data?.video}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                <Clapperboard className="h-3.5 w-3.5" /> Prompt vídeo
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                3
-              </span>
-              <p className="text-[11px] font-semibold">Descargar</p>
-              <p className="truncate text-[10px] text-muted-foreground">fotos para generar · vídeos ya montados</p>
-            </div>
-            {/* Una fila por cosa: el total y los dos flujos al lado (ver
-                POV BOF), para bajar solo lo que toca. */}
+          <Paso
+            n={2}
+            color="fucsia"
+            titulo="Generar los clips fuera"
+            hint="Baja las fotos y crea los clips en Magnific. Aquí cada vídeo lleva dos clips (tres si el guion pasa de 25s)."
+            extra={`${conFoto} foto(s)`}
+          >
+            <p className="text-[10px] font-semibold text-muted-foreground">
+              Primero, baja las fotos
+            </p>
             <div className="grid grid-cols-3 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadCleanPhotos()}
@@ -1023,6 +855,61 @@ export default function PovBofLargoPage() {
                 acento
               />
             </div>
+
+            <p className="pt-1 text-[10px] font-semibold text-muted-foreground">
+              Y luego, créalos
+            </p>
+            {/* Del de foto limpia solo hace falta el de plazos: aquí todos los
+                vídeos llevan dos clips. El de "foto con IA" solo el admin. */}
+            <MagnificSpaces
+              spaces={["foto_limpia_plazos", ...(esAdmin ? (["foto_ia"] as const) : [])]}
+            />
+            <OSepara />
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => copyText("Prompt imagen", prompts.data?.imagen)}
+                disabled={!prompts.data?.imagen}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
+              </button>
+              <button
+                type="button"
+                onClick={() => copyText("Prompt vídeo", prompts.data?.video)}
+                disabled={!prompts.data?.video}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+              >
+                <Clapperboard className="h-3.5 w-3.5" /> Prompt vídeo
+              </button>
+            </div>
+          </Paso>
+
+          {folder && items.length > 0 && (
+            <Paso
+              n={3}
+              color="esmeralda"
+              titulo="Traer los clips generados"
+              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1, 2 y 3)."
+            >
+              <SubidaMasiva
+                source={activaSource}
+                folder={folder}
+                productos={items}
+                root="/api/v1/nicho-pov-bof-largo"
+                todosDobles
+                sinMarco
+              />
+            </Paso>
+          )}
+
+          <Paso
+            n={4}
+            color="azul"
+            titulo="Descargar lo ya montado"
+            hint="Los vídeos con la voz puesta, listos para subir a TikTok."
+            extra={`${conVideo}/${totalProductos}`}
+          >
             <div className="grid grid-cols-3 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadVideos()}
@@ -1045,8 +932,13 @@ export default function PovBofLargoPage() {
                 acento
               />
             </div>
-          </div>
+          </Paso>
+        </section>
+      )}
 
+      {/* Los productos de la carpeta, ya fuera de los pasos. */}
+      {data && folder && (
+        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
           {productosQ.isLoading && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
@@ -1056,19 +948,6 @@ export default function PovBofLargoPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
               {(productosQ.error as Error)?.message ?? "No se pudieron cargar los productos."}
             </p>
-          )}
-
-          {/* Subir los clips de la carpeta de golpe. Aquí cada producto lleva
-              DOS, y de repartirlos se encarga el endpoint del nicho. */}
-          {folder && items.length > 0 && (
-            <SubidaMasiva
-              source={activaSource}
-              folder={folder}
-              productos={items}
-              root="/api/v1/nicho-pov-bof-largo"
-              // Aquí no hay productos de un solo clip: todos van en dos.
-              todosDobles
-            />
           )}
 
           {/* Solo en Top vendidos: ahí importa el orden (lo que más vende) y
@@ -1241,275 +1120,6 @@ function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
 
 
 
-function HashtagsPanel() {
-  const tagsQuery = useHashtags();
-  const guardar = useGuardarHashtags();
-  const [nuevo, setNuevo] = useState("");
-  const tags = tagsQuery.data ?? [];
-
-  function aplicar(siguientes: string[]) {
-    guardar.mutate(siguientes, { onError: (e) => toast.error(err(e)) });
-  }
-
-  return (
-    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-      <p className="text-xs font-semibold">🏷️ Hashtags del caption</p>
-      <p className="text-[11px] text-muted-foreground">
-        Se pegan al final de TODOS los captions al copiarlos. Cámbialos según la campaña.
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((t) => (
-          <span
-            key={t}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px]"
-          >
-            {t}
-            <button
-              type="button"
-              aria-label={`Quitar ${t}`}
-              onClick={() => aplicar(tags.filter((x) => x !== t))}
-              className="text-muted-foreground transition hover:text-destructive"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        {tags.length === 0 && !tagsQuery.isLoading && (
-          <span className="text-[11px] text-muted-foreground">Ninguno.</span>
-        )}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const t = nuevo.trim();
-          if (!t) return;
-          aplicar([...tags, t]);
-          setNuevo("");
-        }}
-        className="flex gap-1.5"
-      >
-        <input
-          value={nuevo}
-          onChange={(e) => setNuevo(e.target.value)}
-          placeholder="#rebajasdeverano"
-          className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs"
-        />
-        <button
-          type="submit"
-          disabled={guardar.isPending || !nuevo.trim()}
-          className="rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition hover:border-foreground/30 disabled:opacity-50"
-        >
-          Añadir
-        </button>
-      </form>
-    </section>
-  );
-}
-
-function diaCorto(ts: number | null | undefined): string {
-  if (!ts) return "";
-  return new Date(ts * 1000).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-}
-
-function EchoTikPanel() {
-  const estado = useEchoTikEstado();
-  const guardar = useGuardarEchoTik();
-  const cuentas = useEchoTikCuentas();
-  const guardarCuenta = useGuardarCuentaEchoTik();
-  const activarCuenta = useActivarCuentaEchoTik();
-  const borrarCuenta = useBorrarCuentaEchoTik();
-  const [abierto, setAbierto] = useState(false);
-  const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
-
-  const puedeGuardar = usuario.trim().length >= 4 && password.trim().length >= 8;
-  const listaCuentas = cuentas.data ?? [];
-  const libres = listaCuentas.filter((c) => c.disponible).length;
-  const d = estado.data;
-
-  return (
-    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 text-left"
-      >
-        <span className="text-sm font-semibold">🔑 API de EchoTik (enlaces)</span>
-        <span className="text-[11px] text-muted-foreground">
-          {d
-            ? d.configurado
-              ? `${d.usuario_mascara} · ${d.origen === "guardadas" ? "guardadas aquí" : "del .env"}`
-              : "sin configurar"
-            : "…"}
-        </span>
-      </button>
-
-      {d?.mensaje && !guardar.isPending && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-500">
-          {d.mensaje}
-        </p>
-      )}
-
-      {abierto && (
-        <div className="space-y-2">
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Se aplican al instante, sin desplegar nada. Al guardar se gasta UNA llamada
-            comprobando que funcionan; si no funcionan, no se guardan.
-          </p>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={usuario}
-            onChange={(e) => setUsuario(e.target.value)}
-            placeholder="usuario (el número largo)"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="contraseña"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-          />
-          <button
-            type="button"
-            disabled={guardar.isPending || !puedeGuardar}
-            onClick={() =>
-              guardar.mutate(
-                { usuario: usuario.trim(), password: password.trim(), probar: true },
-                {
-                  onSuccess: (r) => {
-                    if (r.ok) {
-                      toast.success(r.mensaje);
-                      setUsuario("");
-                      setPassword("");
-                      setAbierto(false);
-                    } else {
-                      toast.error(r.mensaje);
-                    }
-                  },
-                  onError: (e) => toast.error(err(e)),
-                },
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
-          >
-            {guardar.isPending ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Comprobando…
-              </>
-            ) : (
-              "Usar ahora (gasta 1 llamada)"
-            )}
-          </button>
-          <button
-            type="button"
-            disabled={guardarCuenta.isPending || !puedeGuardar}
-            onClick={() =>
-              guardarCuenta.mutate(
-                { usuario: usuario.trim(), password: password.trim(), nota: "" },
-                {
-                  onSuccess: (r) => {
-                    toast.success(r.mensaje || "Cuenta guardada");
-                    setUsuario("");
-                    setPassword("");
-                  },
-                  onError: (e) => toast.error(err(e)),
-                },
-              )
-            }
-            className="w-full rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-          >
-            Guardar de respaldo (sin usarla, 0 llamadas)
-          </button>
-        </div>
-      )}
-
-      {listaCuentas.length > 0 && (
-        <div className="space-y-1.5 border-t border-border/60 pt-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">
-              Cuentas guardadas · {libres} con llamadas libres
-            </p>
-            {!abierto && (
-              <button
-                type="button"
-                onClick={() => setAbierto(true)}
-                className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[11px] transition hover:border-emerald-500 hover:text-emerald-500"
-              >
-                + Añadir cuenta
-              </button>
-            )}
-          </div>
-          {listaCuentas.map((c) => {
-            const renueva = diaCorto(c.renueva_at);
-            return (
-              <div
-                key={c.usuario}
-                className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
-                  c.activa ? "border-emerald-500/60 bg-emerald-500/10" : "border-border/60"
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
-                    c.disponible ? "bg-emerald-500" : "bg-amber-500"
-                  }`}
-                  title={c.disponible ? "Con llamadas" : "Agotada este ciclo"}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">
-                    {c.usuario_mascara}
-                    {c.activa && (
-                      <span className="ml-1 text-[10px] font-normal text-emerald-500">en uso</span>
-                    )}
-                  </p>
-                  <p className="truncate text-[10px] text-muted-foreground">
-                    {c.primer_uso_at
-                      ? `${c.llamadas}/100 · ${
-                          c.disponible ? `renueva ~${renueva}` : `libre ~${renueva}`
-                        }`
-                      : "sin estrenar"}
-                  </p>
-                </div>
-                {!c.activa && (
-                  <button
-                    type="button"
-                    disabled={activarCuenta.isPending}
-                    onClick={() =>
-                      activarCuenta.mutate(c.usuario, {
-                        onSuccess: (r) => toast.success(r.mensaje || "Activada"),
-                        onError: (e) => toast.error(err(e)),
-                      })
-                    }
-                    className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[11px] transition hover:border-emerald-500 hover:text-emerald-500 disabled:opacity-50"
-                  >
-                    Usar
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={borrarCuenta.isPending}
-                  onClick={() =>
-                    borrarCuenta.mutate(c.usuario, {
-                      onSuccess: () => toast.success("Cuenta borrada"),
-                      onError: (e) => toast.error(err(e)),
-                    })
-                  }
-                  className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:text-destructive disabled:opacity-50"
-                  aria-label={`Borrar ${c.usuario_mascara}`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** El escaparate del Largo escribe en SU progreso (endpoint propio). */
 function EscaparateModalLargo({
   source,
   folder,

@@ -135,6 +135,7 @@ export function SubidaMasiva({
   productos,
   root = "/api/v1/nicho-pov-bof",
   todosDobles = false,
+  sinMarco = false,
 }: {
   source: string;
   folder: string;
@@ -149,6 +150,8 @@ export function SubidaMasiva({
   /** En el POV BOF Largo TODOS los productos van en dos clips, no solo los de
    *  plazos. Cambia lo que se enseña al repasar (Clip 1 / Clip 2). */
   todosDobles?: boolean;
+  /** Sin su propio recuadro: cuando va DENTRO de un paso, que ya lo tiene. */
+  sinMarco?: boolean;
 }) {
   const repartir = useRepartirLote(root);
   const confirmar = useConfirmarLote(root);
@@ -454,16 +457,27 @@ export function SubidaMasiva({
   }
 
   return (
-    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+    <section
+      className={
+        sinMarco ? "space-y-2" : "space-y-2 rounded-xl border border-border/60 bg-card p-3"
+      }
+    >
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
+        className={
+          sinMarco
+            ? "flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
+            : "flex w-full items-center justify-between text-left"
+        }
       >
         <span className="flex items-center gap-1.5 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-emerald-500" /> Subir todos los vídeos
+          <Sparkles className={`h-4 w-4 ${sinMarco ? "" : "text-emerald-500"}`} />
+          Subir todos los vídeos
         </span>
-        <span className="text-[11px] text-muted-foreground">{abierto ? "▾" : "▸"}</span>
+        <span className={`text-[11px] ${sinMarco ? "" : "text-muted-foreground"}`}>
+          {abierto ? "▾" : "▸"}
+        </span>
       </button>
 
       {abierto && (
