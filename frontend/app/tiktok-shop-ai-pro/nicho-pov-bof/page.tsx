@@ -1238,7 +1238,18 @@ function ProductoCard({
   }) => {
     setEstado.mutate(
       { source, folder, producto: producto.producto, ...patch },
-      { onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)) },
+      {
+        onError: (e) => {
+          // DESHACER lo que se pintó al pulsar. Sin esto el botón se quedaba
+          // marcado y se desmarcaba solo un rato después (cuando llegaba el
+          // listado del servidor), que es lo que se ve como "no me deja
+          // marcar" sin saber por qué.
+          if (patch.en_escaparate !== undefined) setEnEscaparate(!patch.en_escaparate);
+          if (patch.uploaded !== undefined) setUploaded(!patch.uploaded);
+          if (patch.sold !== undefined) setSold(!patch.sold);
+          toast.error(e instanceof ApiError ? e.message : String(e));
+        },
+      },
     );
   };
 
