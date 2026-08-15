@@ -203,8 +203,9 @@ export default function NichoPovBofPage() {
   );
 
   // El ranking completo son 40 productos y de un tirón no se repasa: se ve de
-  // diez en diez, como las carpetas, pero SIN romper el orden por ventas.
-  const [pagina, setPagina] = useState(0);
+  // diez en diez. La página NO es un estado aparte: es la CARPETA abierta, así
+  // que "Top 2" enseña del 11 al 20 del ranking. Tenerlos separados hacía que
+  // cambiar de carpeta dejara delante los mismos diez primeros.
   const POR_PAGINA = 10;
 
   const productosVisibles = useMemo(
@@ -218,6 +219,14 @@ export default function NichoPovBofPage() {
   );
   const paginado = esTopVendidos && verTodas;
   const paginas = paginado ? Math.max(1, Math.ceil(productosVisibles.length / POR_PAGINA)) : 1;
+  const carpetas = data?.items ?? [];
+  const iCarpeta = Math.max(0, carpetas.findIndex((f) => f.name === folder));
+  const pagina = paginado ? Math.min(iCarpeta, paginas - 1) : 0;
+  /** Pasar de página = abrir la carpeta correspondiente. */
+  const irAPagina = (n: number) => {
+    const destino = carpetas[Math.max(0, Math.min(paginas - 1, n))];
+    if (destino) setPicked(destino.name);
+  };
   // Lo que se ve AHORA: es lo que se baja y lo que cuentan los botones.
   const enPantalla = useMemo(
     () =>
@@ -226,11 +235,6 @@ export default function NichoPovBofPage() {
         : productosVisibles,
     [paginado, productosVisibles, pagina],
   );
-  // Cambiar de fuente, de carpeta o de filtro deja la página fuera de rango.
-  useEffect(() => {
-    setPagina(0);
-  }, [source, folder, verTodas, soloSinSubir]);
-
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
   // SIN fuente: el ranking es global y el listado que se abre también, así
@@ -1114,7 +1118,7 @@ export default function NichoPovBofPage() {
             <div className="flex items-center justify-between rounded-lg border border-border/60 p-1.5 text-[11px]">
               <button
                 type="button"
-                onClick={() => setPagina((n) => Math.max(0, n - 1))}
+                onClick={() => irAPagina(pagina - 1)}
                 disabled={pagina === 0}
                 className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
               >
@@ -1127,7 +1131,7 @@ export default function NichoPovBofPage() {
               </span>
               <button
                 type="button"
-                onClick={() => setPagina((n) => Math.min(paginas - 1, n + 1))}
+                onClick={() => irAPagina(pagina + 1)}
                 disabled={pagina >= paginas - 1}
                 className="rounded px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-30"
               >
