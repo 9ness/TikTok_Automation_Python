@@ -34,7 +34,11 @@ type Sexo = "auto" | "hombre" | "mujer";
 
 type FichaMinima = Pick<
   ProductoItem, "producto" | "titulo" | "clean_photo_id" | "modo_plazos" | "clip1" | "clip2"
->;
+> & {
+  /** Solo el POV BOF Largo: los guiones que pasan de 25s piden TRES clips. */
+  clips_necesarios?: number;
+  clip3?: boolean;
+};
 
 /** Una fila del repaso, ya colocada: qué vídeo es, de qué producto y si es el
  *  clip 1 o el 2. `idx` es la posición REAL en el reparto — el orden de la
@@ -44,8 +48,10 @@ interface Fila {
   idx: number;
   ficha?: FichaMinima;
   doble: boolean;
-  /** 1 o 2 en los productos de dos clips; 0 en los normales. */
+  /** 1..N en los productos de varios clips; 0 en los de uno solo. */
   clip: number;
+  /** Cuántos pide ese producto (2 normalmente, 3 con guion largo). */
+  cuantos: number;
   /** Producto de dos clips al que le falta el otro: así NO se encola. */
   falta: boolean;
   /** Primero de su grupo: solo ahí se pinta la cabecera del producto. */
@@ -63,6 +69,8 @@ function ordenarPorProducto(
 ): Fila[] {
   const ficha = new Map(productos.map((p) => [p.producto, p]));
   const esDoble = (p?: FichaMinima) => Boolean(p && (todosDobles || p.modo_plazos));
+  // Cuántos clips pide el producto: los guiones largos del Largo piden tres.
+  const cuantosDe = (p?: FichaMinima) => Math.max(2, Number(p?.clips_necesarios) || 2);
 
   const grupos = new Map<string, { it: LoteItem; idx: number }[]>();
   reparto.forEach((it, idx) => {
@@ -87,14 +95,15 @@ function ordenarPorProducto(
     const grupo = grupos.get(clave) ?? [];
     const p = ficha.get(clave);
     const doble = Boolean(clave) && esDoble(p);
+    const cuantos = doble ? cuantosDe(p) : 0;
+    const yaPuestos = [p?.clip1, p?.clip2, p?.clip3].filter(Boolean).length;
     grupo.forEach(({ it, idx }, n) => {
-      // Con dos vídeos en la tanda son el clip 1 y el 2. Con uno solo, es el
-      // clip 2 si el producto ya tenía guardado el 1 (mismo criterio que el
-      // backend al repartir los huecos).
-      const clip = !doble ? 0 : grupo.length >= 2 ? n + 1 : p?.clip1 && !p?.clip2 ? 2 : 1;
+      // Con varios vídeos en la tanda, el enésimo es su clip n. Con uno solo,
+      // va al primer hueco libre (mismo criterio que el backend).
+      const clip = !doble ? 0 : grupo.length >= 2 ? n + 1 : yaPuestos + 1;
       filas.push({
-        it, idx, ficha: p, doble, clip,
-        falta: doble && grupo.length < 2 && !(p?.clip1 || p?.clip2),
+        it, idx, ficha: p, doble, clip, cuantos,
+        falta: doble && grupo.length + yaPuestos < cuantos,
         abreGrupo: n === 0,
       });
     });
@@ -598,7 +607,7 @@ export function SubidaMasiva({
 
           {reparto && (
             <div className="space-y-1.5">
-              {filas.map(({ it, idx: i, ficha, doble, clip, falta, abreGrupo }) => {
+              {filas.map(({ it, idx: i, ficha, doble, clip, cuantos, falta, abreGrupo }) => {
                 const asignado = conFoto.find((p) => p.producto === it.producto);
                 return (
                   <div
@@ -619,12 +628,14 @@ export function SubidaMasiva({
                         )}
                         {clip > 0 && (
                           <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-400">
-                            Clip {clip} de 2
+                            Clip {clip} de {cuantos}
                           </span>
                         )}
                         {falta && (
                           <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500">
-                            falta el otro clip · no se editará
+                            {cuantos > 2
+                              ? `este guion pide ${cuantos} clips · no se editará`
+                              : "falta el otro clip · no se editará"}
                           </span>
                         )}
                       </div>

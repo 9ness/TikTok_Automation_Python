@@ -82,7 +82,7 @@ def _letras(productos: list[str]) -> dict[str, str]:
 
 def _prompt(
     n_videos: int, fotos_por_video: list[int], productos: list[str],
-    dobles: set[str] | None = None,
+    dobles: set[str] | None = None, cupos: dict[str, int] | None = None,
 ) -> str:
     bloques = []
     i = 1
@@ -90,10 +90,18 @@ def _prompt(
         bloques.append(f"- Vídeo {v}: las siguientes {cuantos} imágenes")
         i += cuantos
     dobles = dobles or set()
+    cupos = cupos or {}
     letra = _letras(productos)
+
+    def _cuantos(p: str) -> int:
+        return int(cupos.get(p) or (2 if p in dobles else 1))
+
     catalogo = "\n".join(
         f"- Producto {letra[p]}"
-        + (" (DE DOS CLIPS: puede salir en dos vídeos)" if p in dobles else "")
+        + (
+            f" (DE {_cuantos(p)} CLIPS: sale en {_cuantos(p)} vídeos)"
+            if _cuantos(p) > 1 else ""
+        )
         for p in productos
     )
     return (
@@ -105,9 +113,9 @@ def _prompt(
         "Dime de cuál es cada vídeo.\n\n"
         "Reglas:\n"
         + (
-            "- Cada producto sale en UN solo vídeo, salvo los marcados como DE "
-            "DOS CLIPS, que salen en DOS.\n"
-            "- Esos dos clips son DOS PLANOS DEL MISMO PRODUCTO y pueden verse "
+            "- Cada producto sale en UN solo vídeo, salvo los marcados con un "
+            "número de clips, que salen en tantos vídeos como diga.\n"
+            "- Esos clips son PLANOS DEL MISMO PRODUCTO y pueden verse "
             "muy distintos entre sí: otro ángulo, más cerca, otra luz, otra "
             "habitación, la mano tapando una parte. Que no se parezcan ENTRE "
             "ELLOS no significa que sean productos distintos; compara cada uno "
@@ -158,12 +166,15 @@ def emparejar(
     productos: list[str],
     *,
     dobles: set[str] | None = None,
+    cupos: dict[str, int] | None = None,
     on_log: OnLog = _noop,
 ) -> list[dict]:
     """`[{video: <índice 0..n>, producto, por_que}]`, uno por vídeo.
 
     `dobles` son los productos que llevan DOS clips (los de plazos, y todos en
     el POV BOF Largo): esos pueden llevarse dos vídeos y el resto solo uno.
+    `cupos` lo afina cuando alguno lleva TRES (guion largo del POV BOF Largo):
+    manda sobre `dobles` para los productos que aparezcan en él.
 
     `productos` son los candidatos. Si algo falla
     se devuelve la lista con `producto` vacío: la ficha la enseñará sin asignar
@@ -212,16 +223,19 @@ def emparejar(
             return vacio
 
         dobles = {str(d) for d in (dobles or set())} & set(ids)
+        cupos = {str(k): int(v) for k, v in (cupos or {}).items() if str(k) in ids}
         letra = _letras(ids)
         por_letra = {v: k for k, v in letra.items()}
         datos = generate_json(
-            _prompt(len(videos), por_video, ids, dobles), "",
+            _prompt(len(videos), por_video, ids, dobles, cupos), "",
             images=imagenes + catalogo,
         )
         salida = {i: {"video": i, "producto": "", "por_que": ""} for i in range(len(videos))}
         # Cuántos vídeos admite cada producto: dos si lleva dos clips, uno el
         # resto. Sin este tope, un producto se quedaba con media carpeta.
-        cupo = {pid: (2 if pid in dobles else 1) for pid in ids}
+        cupo = {
+            pid: int(cupos.get(pid) or (2 if pid in dobles else 1)) for pid in ids
+        }
         for fila in (datos or {}).get("videos") or []:
             try:
                 idx = int(fila.get("video", 0)) - 1
@@ -259,7 +273,10 @@ def emparejar(
             sub_letra = _letras(quedan)
             sub_por_letra = {v: k for k, v in sub_letra.items()}
             datos2 = generate_json(
-                _prompt(len(sueltos), sub_por_video, quedan, dobles & set(quedan)),
+                _prompt(
+                    len(sueltos), sub_por_video, quedan, dobles & set(quedan),
+                    {k: v for k, v in cupos.items() if k in quedan},
+                ),
                 "", images=sub_imgs + sub_cat,
             )
             for fila in (datos2 or {}).get("videos") or []:

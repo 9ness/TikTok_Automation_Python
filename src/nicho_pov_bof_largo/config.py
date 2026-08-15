@@ -39,10 +39,14 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 CLIPS_POR_VIDEO = 2
 CLIP_TARGET_S = 10.0
 # Cuando el guion se alarga, dos clips se quedan cortos: uno de 519 caracteres
-# son ~29s y en 20s de vídeo no cabe, así que el montaje estiraba los dos clips
-# hasta deformar el gesto. Por encima de lo que cabe en dos, se pide un
-# TERCERO. Más de tres no: el vídeo dejaría de parecer una toma continua.
+# son ~29s y estirar dos clips de diez hasta ahí deforma el gesto. Por encima
+# de lo que aguantan dos se pide un TERCERO; más de tres no, que el vídeo
+# dejaría de parecer una toma continua.
 CLIPS_MAXIMOS = 3
+# Hasta dónde se puede estirar un clip sin que se note. El montaje ya alarga un
+# poco cada uno para cuadrar con la voz (`match_video_to_audio`), así que dos
+# clips cubren 25s de guion; solo a partir de ahí hace falta el tercero.
+CLIP_MAX_S = 12.5
 
 # ---------------------------------------------------------------------------
 # Guion
@@ -69,7 +73,9 @@ def clips_necesarios(guion: str) -> int:
     if not n:
         return CLIPS_POR_VIDEO
     segundos = n / CARACTERES_POR_SEGUNDO
-    hacen_falta = -(-int(segundos * 100) // int(CLIP_TARGET_S * 100))  # techo
+    # Contra `CLIP_MAX_S` y no contra los 10s nominales: estirar un poco cada
+    # clip es lo que ya hace el montaje y no se nota.
+    hacen_falta = -(-int(segundos * 100) // int(CLIP_MAX_S * 100))  # techo
     return max(CLIPS_POR_VIDEO, min(CLIPS_MAXIMOS, hacen_falta))
 
 

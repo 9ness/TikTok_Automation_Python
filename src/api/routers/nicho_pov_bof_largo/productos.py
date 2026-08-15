@@ -627,10 +627,16 @@ def repartir_lote(
 
     fichas = _listar(source, folder, queue, usuario).items
     candidatos = [p.producto for p in fichas if p.clean_photo_id]
-    # Aquí TODOS llevan dos clips.
+    # Aquí TODOS llevan al menos dos clips, y los de guion largo TRES: sin
+    # decírselo, el reparto dejaba el tercer vídeo sin asignar (creía que ese
+    # producto ya estaba servido).
     dobles = set(candidatos)
+    cupos = {
+        p.producto: int(p.clips_necesarios or 2)
+        for p in fichas if p.clean_photo_id
+    }
     reparto = emparejador.emparejar(
-        source, folder, rutas, candidatos, dobles=dobles,
+        source, folder, rutas, candidatos, dobles=dobles, cupos=cupos,
     )
     items = [
         LoteLargoItem(
@@ -651,11 +657,11 @@ def confirmar_lote(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> LoteLargoConfirmarResponse:
-    """Guarda cada clip en su sitio y encola los productos que ya tengan los dos.
+    """Guarda cada clip en su sitio y encola los que ya tengan todos los suyos.
 
-    El orden de la tanda manda: el primer vídeo de un producto es su clip 1 y
-    el segundo el clip 2. Un producto con un solo vídeo se queda esperando al
-    otro, que es lo mismo que pasa subiéndolos a mano.
+    El orden de la tanda manda: el primer vídeo de un producto es su clip 1, el
+    segundo el 2 y el tercero el 3 (los guiones largos piden tres). Un producto
+    al que le falte alguno se queda esperando, igual que subiéndolos a mano.
     """
     encolados, pendientes, mensajes = 0, 0, []
     vistos: dict[str, int] = {}
@@ -670,10 +676,20 @@ def confirmar_lote(
             mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
             continue
         montado_at = float(prod.get("video_listo_at") or 0)
+        hacen_falta = config.clips_necesarios(str(prod.get("guion") or ""))
         if vistos[item.producto] >= 2:
-            slot = 2
+            # El enésimo vídeo de este producto en ESTA tanda va al hueco n.
+            slot = min(vistos[item.producto], hacen_falta)
         else:
-            slot = 1 if not _clip_puesto(prod.get("clip1_path"), montado_at) else 2
+            # El primero va al primer hueco libre: puede que ya hubiera clips
+            # subidos a mano antes de la tanda.
+            slot = next(
+                (
+                    n for n in range(1, hacen_falta + 1)
+                    if not _clip_puesto(prod.get(f"clip{n}_path"), montado_at)
+                ),
+                1,
+            )
         r = _encolar_clip(
             queue, body.source, body.folder, item.producto, slot, ruta,
             body.sexo, usuario,

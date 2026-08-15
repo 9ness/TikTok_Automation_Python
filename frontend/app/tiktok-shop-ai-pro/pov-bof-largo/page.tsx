@@ -2022,8 +2022,8 @@ function ProductoCard({
         </p>
       ) : necesarios > 2 ? (
         <p className="text-[10px] text-amber-500">
-          Este guion no cabe en dos clips ({p.guion_caracteres} car. · ~
-          {Math.round(p.guion_caracteres / 18.2)}s): hacen falta {necesarios}.
+          Este guion pasa de 25s ({p.guion_caracteres} car. · ~
+          {Math.round(p.guion_caracteres / 18.2)}s): hacen falta {necesarios} clips.
         </p>
       ) : null}
 
