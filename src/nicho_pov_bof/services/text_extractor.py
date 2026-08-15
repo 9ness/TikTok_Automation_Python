@@ -275,6 +275,39 @@ def extract_from_pairs(
         paths_faltan = [image_paths[ids.index(i)] for i in faltan]
         result.update(_pedir(faltan, paths_faltan))
 
+    # Títulos REPETIDOS = el modelo cruzó dos imágenes de la tanda: le dio a dos
+    # productos el mismo texto. Pasó de verdad (una colchoneta hinchable con el
+    # nombre de una silla gaming, y el error viajó a Top vendidos al copiarlo).
+    # Se reintentan de UNO EN UNO, que es donde no hay orden que perder; si aun
+    # así repiten, se quedan fuera antes que dar por bueno un texto que es de
+    # otro producto.
+    por_titulo: dict[str, list[str]] = {}
+    for pid, doc in result.items():
+        por_titulo.setdefault((doc.get("titulo") or "").strip().lower(), []).append(pid)
+    repetidos = [pids for t, pids in por_titulo.items() if t and len(pids) > 1]
+    if repetidos:
+        sospechosos = sorted({pid for grupo in repetidos for pid in grupo})
+        on_log(
+            f"[text_extractor] mismo título en {sospechosos} — el modelo cruzó "
+            "las imágenes; los repito de uno en uno"
+        )
+        for pid in sospechosos:
+            solo = _pedir([pid], [image_paths[ids.index(pid)]])
+            if pid in solo:
+                result[pid] = solo[pid]
+        # Segunda comprobación: lo que siga repetido no vale.
+        por_titulo = {}
+        for pid, doc in result.items():
+            por_titulo.setdefault((doc.get("titulo") or "").strip().lower(), []).append(pid)
+        for t, pids in por_titulo.items():
+            if t and len(pids) > 1:
+                on_log(
+                    f"[text_extractor] {pids} siguen con el mismo título: los dejo "
+                    "sin texto para que se vea que hay que mirarlos"
+                )
+                for pid in pids:
+                    result.pop(pid, None)
+
     for pid in ids:
         if pid not in result:
             on_log(f"[text_extractor] sin texto utilizable para producto {pid}")

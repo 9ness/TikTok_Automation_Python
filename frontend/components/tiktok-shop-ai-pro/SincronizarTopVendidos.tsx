@@ -2,6 +2,17 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +36,7 @@ export function SincronizarTopVendidos({ folder }: { folder?: string | null }) {
   const sincronizar = useSincronizarTopVendidos();
   const reparar = useRepararTopVendidos();
   const [omitidos, setOmitidos] = useState<{ producto: string; motivo: string }[]>([]);
+  const [confirmar, setConfirmar] = useState(false);
   // Cuántos hay esperando, para decirlo en el propio botón en vez de tener que
   // pulsarlo para averiguarlo.
   const faltan =
@@ -79,40 +91,68 @@ export function SincronizarTopVendidos({ folder }: { folder?: string | null }) {
           rehacen las dos cosas desde el original, que es la única fuente
           fiable. Va debajo y en gris porque es un remedio, no rutina. */}
       {folder ? (
-        <button
-          type="button"
-          disabled={reparar.isPending}
-          onClick={() => {
-            if (
-              !window.confirm(
-                `Volver a copiar fotos y textos de "${folder}" desde el producto original. ` +
-                  "Lo que hayas marcado (subido, escaparate, vídeos) NO se toca. ¿Sigo?",
-              )
-            )
-              return;
-            reparar.mutate(
-              { folder },
-              {
-                onSuccess: (r) => {
-                  toast.success(
-                    `${r.fotos} foto(s) y ${r.textos} texto(s) traídos del original`,
-                  );
-                  for (const a of r.avisos ?? []) toast.warning(a);
-                },
-                onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
-              },
-            );
-          }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-        >
-          {reparar.isPending ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" /> Reparando…
-            </>
-          ) : (
-            <>🛠️ Reparar “{folder}” desde el original</>
-          )}
-        </button>
+        <>
+          <button
+            type="button"
+            disabled={reparar.isPending}
+            onClick={() => setConfirmar(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+          >
+            {reparar.isPending ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" /> Reparando…
+              </>
+            ) : (
+              <>🛠️ Reparar “{folder}” desde el original</>
+            )}
+          </button>
+
+          {/* Diálogo propio y no el `confirm` del navegador: aquel sale con el
+              dominio de la app arriba y dos botones del sistema, que en el
+              móvil parece un aviso de la web y no de la aplicación. */}
+          <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
+            <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-base">
+                  🛠️ Reparar “{folder}”
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2 text-left text-xs">
+                  <span className="block">
+                    Se vuelven a copiar las fotos y los textos desde el producto
+                    original de cada uno.
+                  </span>
+                  <span className="block text-muted-foreground">
+                    Lo que hayas marcado —subido, escaparate, vídeos ya montados—
+                    no se toca.
+                  </span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="text-xs">Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="text-xs"
+                  onClick={() =>
+                    reparar.mutate(
+                      { folder },
+                      {
+                        onSuccess: (r) => {
+                          toast.success(
+                            `${r.fotos} foto(s) y ${r.textos} texto(s) traídos del original`,
+                          );
+                          for (const a of r.avisos ?? []) toast.warning(a);
+                        },
+                        onError: (e) =>
+                          toast.error(e instanceof ApiError ? e.message : String(e)),
+                      },
+                    )
+                  }
+                >
+                  Reparar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       ) : null}
 
       {/* Los que se quedan fuera. Antes solo iban al log del servidor: el
