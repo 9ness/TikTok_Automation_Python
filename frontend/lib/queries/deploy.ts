@@ -51,8 +51,11 @@ export function useDeployStatus(opts?: { enabled?: boolean; live?: boolean }) {
     queryKey: deployKeys.status(),
     queryFn: () => api.get<DeployStatus>(`${ROOT}/status`),
     enabled: opts?.enabled ?? true,
-    // Live polling rápido si hay deploy en curso, lento si no.
-    refetchInterval: opts?.live ? 3_000 : 20_000,
+    // Rápido MIENTRAS hay un deploy en curso y lento el resto del tiempo. Se
+    // decide con el propio dato: con `live` fijo, la Cola abierta preguntaba
+    // cada 3s aunque no hubiera nada desplegándose.
+    refetchInterval: (q) =>
+      q.state.data?.deploy_in_progress ? 3_000 : opts?.live ? 20_000 : 30_000,
   });
 }
 

@@ -19,6 +19,7 @@ import {
 } from "@/lib/queue-meta";
 import type { ActiveJob, JobMode } from "@/lib/types/queue";
 import { cn } from "@/lib/utils";
+import { AvisoDespliegue } from "./AvisoDespliegue";
 import { JobCard } from "./JobCard";
 
 type ProgramFilter = "all" | Program;
@@ -111,6 +112,11 @@ export function QueueDrawer() {
             <X className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Qué pasa con el despliegue. Va aquí porque la duda ("¿ya está
+            subido lo nuevo?", "¿puedo mandar un vídeo o se corta?") siempre se
+            tiene mirando la cola. */}
+        <AvisoDespliegue enCurso={active.length} />
 
         {/* Multiusuario: cada uno ve LO SUYO. El admin puede mirar la de otro
             y se le avisa, en pequeño, de quién tiene algo en marcha — pediste
