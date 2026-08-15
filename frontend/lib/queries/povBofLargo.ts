@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { toast } from "sonner";
+
 import { api } from "@/lib/api";
 import { ANCHO_CHIP, ANCHO_MINIATURA, ANCHO_VISOR } from "@/lib/queries/nichoPovBof";
 
@@ -114,6 +116,33 @@ export function useProductosTodosLargo(source: string, activo: boolean) {
  *  (`*todos*`): invalidando solo la carpeta, el guion recién escrito o el
  *  precio recién puesto no se veían y parecía que no se habían guardado.
  */
+/** Mete el producto devuelto por el servidor en las dos listas (la de la
+ *  carpeta y la global del ranking) sin pedir nada más. */
+function parchearProducto(
+  qc: ReturnType<typeof useQueryClient>,
+  source: string,
+  folder: string,
+  updated: ProductoLargo,
+) {
+  const mete = (p: ProductoLargo) =>
+    p.producto === updated.producto ? { ...updated, folder: p.folder } : p;
+  qc.setQueryData<ProductosLargoResponse>(largoKeys.productos(source, folder), (old) =>
+    old ? { ...old, items: old.items.map(mete) } : old,
+  );
+  qc.setQueryData<ProductosLargoResponse>(largoKeys.productos(source, "*todos*"), (old) =>
+    old
+      ? {
+          ...old,
+          items: old.items.map((p) =>
+            p.producto === updated.producto && (p.folder ?? "") === folder
+              ? { ...updated, folder: p.folder }
+              : p,
+          ),
+        }
+      : old,
+  );
+}
+
 function invalidarProductos(qc: ReturnType<typeof useQueryClient>, source: string, folder: string) {
   void qc.invalidateQueries({ queryKey: largoKeys.productos(source, folder) });
   void qc.invalidateQueries({ queryKey: largoKeys.productos(source, "*todos*") });
@@ -142,7 +171,25 @@ export function useEscribirGuion() {
   >({
     mutationFn: async (body) =>
       (await api.post<{ producto: ProductoLargo }>(`${ROOT}/guion`, body)).producto,
-    onSuccess: (_p, v) => invalidarProductos(qc, v.source, v.folder),
+    onSuccess: (updated, v) => {
+      // Se pinta con lo que ACABA de devolver el servidor, sin esperar a
+      // ningún listado: invalidando y ya está, el guion recién escrito podía
+      // tardar en aparecer (el ranking relista cuatro carpetas) o no aparecer
+      // si el refetch se quedaba servido de caché. El toast decía "guion
+      // escrito" y la ficha seguía pidiéndolo.
+      parchearProducto(qc, v.source, v.folder, updated);
+      // Y de fondo, que el listado se ponga al día sin bloquear nada.
+      invalidarProductos(qc, v.source, v.folder);
+      // Si el servidor dice que lo ha escrito pero devuelve el producto SIN
+      // guion, es que se guardó en un sitio y se lee de otro. Antes eso se
+      // veía como "pone que está escrito y la ficha sigue igual", sin más
+      // pista; ahora lo dice.
+      if (!updated.guion) {
+        toast.warning(
+          `El guion del producto ${updated.producto} se ha escrito pero el servidor no lo devuelve. Recarga y avisa si sigue.`,
+        );
+      }
+    },
   });
 }
 
