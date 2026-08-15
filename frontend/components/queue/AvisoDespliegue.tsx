@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Rocket } from "lucide-react";
+import { Check, Loader2, Rocket } from "lucide-react";
 
 import { useDeployStatus } from "@/lib/queries/deploy";
 
@@ -28,7 +28,31 @@ export function AvisoDespliegue({ enCurso }: { enCurso: number }) {
 
   const desplegando = Boolean(d.deploy_in_progress);
   const pendientes = d.commits_behind ?? 0;
-  if (!desplegando && pendientes === 0) return null;
+
+  // Todo al día: se dice CUÁNDO entró lo último, con hora y segundos. Sin
+  // esto, "no sale nada" podía ser tanto "ya está subido" como "el aviso no
+  // funciona", y había que preguntar para salir de dudas.
+  if (!desplegando && pendientes === 0) {
+    const cuando = d.last_deploy?.finished_at ?? d.last_deploy?.started_at ?? 0;
+    if (!cuando) return null;
+    return (
+      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-1.5 text-[11px] text-muted-foreground">
+        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+        <p className="truncate">
+          Al día · último despliegue{" "}
+          <span className="font-medium text-foreground">
+            {new Date(cuando * 1000).toLocaleString("es-ES", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </span>
+        </p>
+      </div>
+    );
+  }
 
   if (desplegando) {
     return (
