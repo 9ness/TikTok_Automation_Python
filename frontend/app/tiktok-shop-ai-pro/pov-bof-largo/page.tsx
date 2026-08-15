@@ -1156,6 +1156,7 @@ function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
   const [ficha, setFicha] = useState<File | null>(null);
   const refLimpia = useRef<HTMLInputElement>(null);
   const refFicha = useRef<HTMLInputElement>(null);
+  const [abierto, setAbierto] = useState(false);
 
   function enviar() {
     if (!limpia) {
@@ -1201,7 +1202,18 @@ function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
 
   return (
     <section className="space-y-2 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
-      <p className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</p>
+      {/* Plegado por defecto (ver POV BOF): dar de alta un producto es cosa de
+          una vez al día y desplegado empujaba la lista media pantalla abajo. */}
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</span>
+        <span className="text-[11px] text-muted-foreground">{abierto ? "▾" : "▸"}</span>
+      </button>
+      {!abierto ? null : (
+      <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
         {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
@@ -1218,6 +1230,8 @@ function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
         Las carpetas se llenan de 10 en 10. Es el mismo catálogo que el POV BOF:
         el producto vale para los dos nichos.
       </p>
+      </>
+      )}
     </section>
   );
 }

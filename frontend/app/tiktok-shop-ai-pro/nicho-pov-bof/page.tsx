@@ -1185,6 +1185,7 @@ function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) 
   const [ficha, setFicha] = useState<File | null>(null);
   const refLimpia = useRef<HTMLInputElement>(null);
   const refFicha = useRef<HTMLInputElement>(null);
+  const [abierto, setAbierto] = useState(false);
 
   function enviar() {
     if (!limpia) {
@@ -1235,7 +1236,19 @@ function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) 
 
   return (
     <section className="space-y-2 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3">
-      <p className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</p>
+      {/* Plegado por defecto: dar de alta un producto es cosa de una vez al
+          día, y desplegado empujaba la lista de carpetas media pantalla abajo
+          cada vez que se abría el nicho. */}
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</span>
+        <span className="text-[11px] text-muted-foreground">{abierto ? "▾" : "▸"}</span>
+      </button>
+      {!abierto ? null : (
+      <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
         {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
@@ -1253,6 +1266,8 @@ function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) 
         sola. Después se usa igual que un producto del curso — textos, caption,
         voz y vídeo.
       </p>
+      </>
+      )}
     </section>
   );
 }
