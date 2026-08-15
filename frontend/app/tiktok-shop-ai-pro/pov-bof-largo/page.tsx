@@ -528,7 +528,7 @@ export default function PovBofLargoPage() {
         {/* La carpeta de Top vendidos es la misma para todos los nichos, así
             que traerse los que han vendido se puede hacer también desde aquí
             (antes solo estaba en el POV BOF). */}
-        {esTopVendidos && <SincronizarTopVendidos />}
+        {esTopVendidos && <SincronizarTopVendidos folder={folder} />}
 
         <Sub>Carpetas</Sub>
         <div className="flex items-center justify-between text-xs sm:text-sm">

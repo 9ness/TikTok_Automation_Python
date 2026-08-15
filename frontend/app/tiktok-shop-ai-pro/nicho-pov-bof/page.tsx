@@ -498,7 +498,7 @@ export default function NichoPovBofPage() {
             }}
           />
         )}
-        {source === "top_vendidos" && <SincronizarTopVendidos />}
+        {source === "top_vendidos" && <SincronizarTopVendidos folder={folder} />}
 
         <Sub>Carpetas</Sub>
         <div className="flex items-center justify-between text-xs sm:text-sm">

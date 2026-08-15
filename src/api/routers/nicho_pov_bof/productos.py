@@ -1011,6 +1011,28 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.post("/top-vendidos/reparar")
+def reparar_top_vendidos(
+    folder: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Rehace fotos y textos de una carpeta de Top vendidos desde el original.
+
+    Existe porque una copia puede quedarse torcida (foto de un producto con el
+    texto de otro) y desde la pantalla no había forma de arreglarlo: extraer
+    los textos otra vez no toca las fotos, y las fotos no se pueden reemparejar
+    a mano. El original es la única fuente fiable.
+    """
+    from src.nicho_pov_bof.services import top_vendidos as tv
+
+    try:
+        return tv.reparar_carpeta(folder)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+
 @router.post("/top-vendidos/sincronizar")
 def sincronizar_top_vendidos(
     usuario: Annotated[str, Depends(get_web_user)] = "",

@@ -379,6 +379,24 @@ export interface SincronizarTopResponse {
   omitidos?: { producto: string; motivo: string }[];
 }
 
+/** Rehace fotos y textos de una carpeta de Top vendidos desde el original. */
+export function useRepararTopVendidos() {
+  const qc = useQueryClient();
+  return useMutation<
+    { fotos: number; textos: number; avisos: string[] },
+    Error,
+    { folder: string }
+  >({
+    mutationFn: ({ folder }) =>
+      api.post<{ fotos: number; textos: number; avisos: string[] }>(
+        `${ROOT}/top-vendidos/reparar?folder=${encodeURIComponent(folder)}`,
+        {},
+      ),
+    // Cambian fotos Y textos de toda la carpeta, y los leen todos los nichos.
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useSincronizarTopVendidos() {
   const qc = useQueryClient();
   return useMutation<SincronizarTopResponse, Error, void>({

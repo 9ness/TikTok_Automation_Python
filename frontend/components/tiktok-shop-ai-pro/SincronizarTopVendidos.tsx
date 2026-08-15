@@ -6,7 +6,11 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useSincronizarTopVendidos, useSources } from "@/lib/queries/nichoPovBof";
+import {
+  useRepararTopVendidos,
+  useSincronizarTopVendidos,
+  useSources,
+} from "@/lib/queries/nichoPovBof";
 import { FUENTE_TOP_VENDIDOS } from "@/lib/topVendidos";
 
 /** Trae al Top vendidos los productos del ranking que aún no estén.
@@ -16,9 +20,10 @@ import { FUENTE_TOP_VENDIDOS } from "@/lib/topVendidos";
  *  Largo y los demás. Estaba solo en el POV BOF y desde el Largo no había
  *  manera de traerse un producto nuevo ni de refrescar el ranking.
  */
-export function SincronizarTopVendidos() {
+export function SincronizarTopVendidos({ folder }: { folder?: string | null }) {
   const qc = useQueryClient();
   const sincronizar = useSincronizarTopVendidos();
+  const reparar = useRepararTopVendidos();
   const [omitidos, setOmitidos] = useState<{ producto: string; motivo: string }[]>([]);
   // Cuántos hay esperando, para decirlo en el propio botón en vez de tener que
   // pulsarlo para averiguarlo.
@@ -68,6 +73,47 @@ export function SincronizarTopVendidos() {
           </>
         )}
       </button>
+
+      {/* Una copia puede quedarse torcida: la foto de un producto con el texto
+          de otro. Extraer los textos no arregla la foto, así que aquí se
+          rehacen las dos cosas desde el original, que es la única fuente
+          fiable. Va debajo y en gris porque es un remedio, no rutina. */}
+      {folder ? (
+        <button
+          type="button"
+          disabled={reparar.isPending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                `Volver a copiar fotos y textos de "${folder}" desde el producto original. ` +
+                  "Lo que hayas marcado (subido, escaparate, vídeos) NO se toca. ¿Sigo?",
+              )
+            )
+              return;
+            reparar.mutate(
+              { folder },
+              {
+                onSuccess: (r) => {
+                  toast.success(
+                    `${r.fotos} foto(s) y ${r.textos} texto(s) traídos del original`,
+                  );
+                  for (const a of r.avisos ?? []) toast.warning(a);
+                },
+                onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            );
+          }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        >
+          {reparar.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Reparando…
+            </>
+          ) : (
+            <>🛠️ Reparar “{folder}” desde el original</>
+          )}
+        </button>
+      ) : null}
 
       {/* Los que se quedan fuera. Antes solo iban al log del servidor: el
           producto no aparecía nunca en la lista y el botón seguía diciendo que

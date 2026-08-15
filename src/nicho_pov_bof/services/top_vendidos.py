@@ -146,6 +146,103 @@ def recopiar_textos(carpeta: str, *, on_log: OnLog = _noop) -> dict[str, dict]:
     return salida
 
 
+def reparar_carpeta(carpeta: str, *, on_log: OnLog = _noop) -> dict:
+    """Vuelve a copiar FOTOS y textos del original en toda una carpeta.
+
+    `recopiar_textos` arregla los textos, pero si lo que se copió mal fue la
+    foto no hay texto que valga: se veía una tumbona con el nombre de una silla
+    gaming. Esto rehace las dos cosas desde el producto de origen, que es la
+    única fuente fiable, y de paso dice qué productos de la carpeta no constan
+    en el manifiesto (esos no se pueden reparar solos).
+    """
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    destino = config.top_vendidos_dir() / carpeta
+    if not destino.is_dir():
+        raise ValueError(f"No existe la carpeta {carpeta!r} en Top vendidos.")
+
+    doc = manifiesto()
+    mios = {
+        str(sitio.get("producto")): ref
+        for ref, sitio in doc.items() if sitio.get("carpeta") == carpeta
+    }
+    fotos_ok = textos_ok = 0
+    fallos: list[str] = []
+
+    for numero, ref in sorted(mios.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0):
+        partes = ref.split("|")
+        if len(partes) != 3:
+            continue
+        source, folder, producto = partes
+        try:
+            pares = photo_pairing.pair_folder([
+                drive_client.probe_dimensions(f)
+                for f in drive_client.list_photos(source, folder)
+            ])
+            par = next((x for x in pares if str(x.get("producto")) == producto), None)
+            limpia = (par or {}).get("clean") or {}
+            ficha = (par or {}).get("titled") or {}
+            if not limpia.get("id"):
+                fallos.append(f"{numero}: el original ya no tiene foto limpia")
+            else:
+                # Se borra lo que hubiera con ese número antes de copiar: si la
+                # extensión cambia (.png → .jpg) quedarían las dos y el
+                # emparejado volvería a elegir mal.
+                for viejo in destino.glob(f"{numero}.*"):
+                    viejo.unlink(missing_ok=True)
+                for viejo in destino.glob(f"{numero}(1).*"):
+                    viejo.unlink(missing_ok=True)
+                for foto_id, sufijo in ((limpia.get("id"), ""), (ficha.get("id"), "(1)")):
+                    if not foto_id:
+                        continue
+                    local = drive_client.fetch_photo(foto_id, suffix=".jpg")
+                    ext = Path(str(local)).suffix.lower()
+                    ext = ext if ext in _EXTS else ".jpg"
+                    shutil.copy2(local, destino / f"{numero}{sufijo}{ext}")
+                fotos_ok += 1
+        except Exception as e:  # noqa: BLE001
+            fallos.append(f"{numero}: no pude copiar sus fotos ({e})")
+
+        origen = product_repo.get_product(source, folder, producto)
+        textos = {
+            k: origen.get(k, "")
+            for k in (
+                "titulo", "titulo_tiktok_completo", "tienda", "caption",
+                "emojis", "precio", "precio_lista", "product_url",
+            )
+            if origen.get(k)
+        }
+        if textos:
+            product_repo.save_extracted_texts(SOURCE, carpeta, {numero: textos})
+            textos_ok += 1
+
+    # Productos que están en la carpeta pero no en el manifiesto: se copiaron
+    # antes de que existiera o se metieron a mano, y no hay original al que
+    # mirar. Se avisa en vez de dejarlos torcidos en silencio.
+    en_disco = {
+        m.group(1)
+        for f in destino.iterdir()
+        if f.is_file() and (m := re.match(r"(\d+)", f.name))
+    }
+    huerfanos = sorted(en_disco - set(mios), key=lambda x: int(x))
+    if huerfanos:
+        fallos.append(
+            "sin original conocido (no se pueden reparar): " + ", ".join(huerfanos)
+        )
+
+    on_log(
+        f"[top_vendidos] reparada {carpeta}: {fotos_ok} fotos y {textos_ok} textos "
+        f"del original · {len(fallos)} aviso(s)"
+    )
+    _invalidar()
+    try:
+        drive_client.list_photos(SOURCE, carpeta, refresh=True)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"fotos": fotos_ok, "textos": textos_ok, "avisos": fallos[:10]}
+
+
 def pendientes() -> int:
     """Cuántos productos del ranking aún no están en la carpeta.
 
