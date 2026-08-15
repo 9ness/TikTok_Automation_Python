@@ -76,7 +76,6 @@ import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { useMe } from "@/lib/queries/auth";
 import { VideoModal } from "@/components/ui/video-modal";
-import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
   ProductoBuscado,
@@ -427,15 +426,26 @@ export default function NichoPovBofPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
-      {/* Portada del módulo 6 del curso — la misma que abre los demás nichos,
-          para que todos los submenús se reconozcan de un vistazo. Hace también
-          de título: por eso no hay un <h1> debajo comiéndose otra fila. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={portadaDe("nicho-pov-bof")}
-        alt="Creación de Nicho POV BOF"
-        className="h-auto w-full rounded-xl border border-border/60"
-      />
+      {/* Cabecera de texto, como en el Largo y en Creativos Pro: la portada
+          del curso ocupaba media pantalla en el móvil y decía menos que dos
+          líneas. Lo primero que hay que ver es dónde trabajas. */}
+      <header className="rounded-xl border border-border/60 bg-card p-3">
+        <div className="flex items-center gap-2">
+          <ShoppingBag className="h-5 w-5 shrink-0 text-emerald-500" />
+          <div className="min-w-0">
+            <h1 className="text-base font-bold sm:text-lg">Nicho POV BOF</h1>
+            <p className="text-[11px] text-muted-foreground">
+              Un vídeo por producto: la mano enseña el producto y la voz sale
+              del banco de audios · UN clip de 10s
+            </p>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+          Los productos salen del Drive del curso (solo lectura) y lo que
+          marques aquí —textos, escaparate, subido— es de este nicho. Los que
+          pasan de 40 € llevan guion de plazos y van con dos clips.
+        </p>
+      </header>
 
       {/* Dónde trabajas: de qué catálogo salen los productos y en qué carpeta
           estás. En una caja con rótulos porque antes eran bloques sueltos sin
