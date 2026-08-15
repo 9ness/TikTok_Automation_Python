@@ -344,10 +344,19 @@ export default function PovBofLargoPage() {
       const nuevo = frescos.get(p.producto);
       const tieneTexto = Boolean(nuevo?.titulo || p.titulo);
       const esPlazos = nuevo?.modo_plazos ?? p.modo_plazos;
-      return tieneTexto && (!p.guion || esPlazos !== p.guion_plazos);
+      // Si el TÍTULO ha cambiado, el guion viejo habla de otro producto y hay
+      // que rehacerlo. Pasa al corregir una carpeta descuadrada: los textos se
+      // arreglan y, sin esto, cada vídeo se locutaba con el guion del producto
+      // de al lado (que era justo el error que se venía a arreglar).
+      const otroProducto = Boolean(
+        nuevo?.titulo && p.titulo && nuevo.titulo !== p.titulo,
+      );
+      return tieneTexto && (!p.guion || esPlazos !== p.guion_plazos || otroProducto);
     });
     if (!pend.length) {
-      toast.error("Todos los productos con textos ya tienen guion");
+      // No es un error: es que no había nada que reescribir. Con el toast en
+      // rojo parecía que la actualización de textos había fallado.
+      toast.info("Textos al día · los guiones ya estaban escritos");
       return;
     }
     setGenerandoGuiones(true);
