@@ -414,24 +414,84 @@ def desde_la_copia(fotos: list[dict]) -> bool:
     return any(f.get("desde_copia") for f in fotos)
 
 
+# Dimensiones ya medidas, guardadas en disco. La clave es el id de la foto (que
+# en las fuentes propias lleva pegado el mtime) más su tamaño, así que una foto
+# sustituida no reutiliza las medidas de la anterior.
+_DIMS: dict[str, list[int]] | None = None
+_DIMS_SUCIO = False
+_DIMS_LOCK = threading.Lock()
+
+
+def _dims_fichero() -> Path:
+    return Path(config.photo_cache_dir()) / "dimensiones.json"
+
+
+def _dims_cargar() -> dict[str, list[int]]:
+    global _DIMS
+    if _DIMS is None:
+        try:
+            _DIMS = json.loads(_dims_fichero().read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            _DIMS = {}
+    return _DIMS
+
+
+def _dims_guardar() -> None:
+    """Vuelca a disco. Por fichero temporal: con varios workers escribiendo, un
+    guardado a medias dejaría el JSON roto y se perderían TODAS las medidas."""
+    global _DIMS_SUCIO
+    with _DIMS_LOCK:
+        if not _DIMS_SUCIO or _DIMS is None:
+            return
+        try:
+            destino = _dims_fichero()
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            tmp = destino.with_suffix(".tmp")
+            tmp.write_text(json.dumps(_DIMS), encoding="utf-8")
+            tmp.replace(destino)
+            _DIMS_SUCIO = False
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def probe_dimensions(photo: dict) -> dict:
     """Añade `width`/`height` a una foto, descargándola si hace falta.
 
     Las dimensiones son la señal que distingue la foto de producto (cuadrada)
     de la captura con título (pantallazo alto o tira ancha), y `rclone lsjson`
-    no las trae. La descarga se cachea, así que solo se paga una vez.
+    no las trae.
+
+    Se guardan en disco porque medirlas es lo que hacía LENTO el listado: abrir
+    con Pillow las veinte fotos de una carpeta desde el Drive montado costaba
+    ~55s, y el ranking (cuatro carpetas) casi dos minutos — la pantalla se
+    quedaba enseñando lo de la vez anterior mientras tanto, que parecía que no
+    se había actualizado nada. Medidas ya, el listado va con lo que hay en
+    disco.
     """
     import os
 
     from PIL import Image
 
+    global _DIMS_SUCIO
+
     if photo.get("width") and photo.get("height"):
         return photo
+
+    clave = f"{photo.get('id', '')}|{photo.get('size', 0)}"
+    guardado = _dims_cargar().get(clave)
+    if guardado:
+        photo["width"], photo["height"] = guardado[0], guardado[1]
+        return photo
+
     try:
         suffix = os.path.splitext(photo.get("name", ""))[1].lower() or ".jpg"
         path = fetch_photo(photo["id"], suffix=suffix)
         with Image.open(path) as im:
             photo["width"], photo["height"] = im.size
+        with _DIMS_LOCK:
+            _dims_cargar()[clave] = [photo["width"], photo["height"]]
+            _DIMS_SUCIO = True
+        _dims_guardar()
     except Exception as e:  # una foto ilegible no puede tumbar la carpeta
         photo["width"] = photo["height"] = 0
         photo["probe_error"] = str(e)
