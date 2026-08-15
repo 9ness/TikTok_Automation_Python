@@ -1132,7 +1132,12 @@ def set_producto_estado(
             body.uploaded, usuario,
         )
 
-    info = _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
+    # SIN `source`/`folder`: rellenarlos hace que se emparejen las fotos de la
+    # carpeta (leerlas del Drive montado y desempatar por contenido), y eso son
+    # 10-15 segundos por toque en la acción que más se repite del día. Marcar
+    # un booleano no necesita mirar ninguna foto; la pantalla ya conserva las
+    # suyas porque solo copia los campos de estado de esta respuesta.
+    info = _producto_info(body.producto, prod, queue=queue, usuario=usuario)
 
     # El ranking de vendidos lleva su propio índice con una copia de lo que
     # hace falta para pintarlo (foto incluida). Se escribe AQUÍ, en el único

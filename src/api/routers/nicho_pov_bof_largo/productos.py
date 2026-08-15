@@ -422,6 +422,28 @@ def set_producto_estado(
         except Exception:
             pass
 
+    # Marcar Escaparate o Subido NO necesita releer nada del Drive: se responde
+    # con lo guardado. Antes se relistaba la carpeta ENTERA (emparejar las
+    # fotos de sus diez productos, leyéndolas del Drive montado) y el botón
+    # tardaba 10-15 segundos en la acción que más se repite del día. Solo se
+    # paga ese listado al marcar "Vendió", que sí necesita título, tienda y
+    # foto para escribirlos en el ranking.
+    if body.sold is None:
+        mio = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+        return ProductoLargo(
+            producto=body.producto,
+            titulo=textos.get("titulo", ""),
+            tienda=textos.get("tienda", ""),
+            en_escaparate=(
+                body.en_escaparate
+                if body.en_escaparate is not None
+                else bool(mio.get("en_escaparate"))
+            ),
+            uploaded=bool(mio.get("uploaded")),
+            uploaded_at=float(mio.get("uploaded_at") or 0),
+            sold=bool(mio.get("sold")),
+        )
+
     listado = _listar(body.source, body.folder, queue, usuario)
     item = next((x for x in listado.items if x.producto == body.producto), None)
     if item is None:

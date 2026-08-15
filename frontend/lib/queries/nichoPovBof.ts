@@ -318,9 +318,19 @@ export function useSetEstado() {
   return useMutation<ProductoItem, Error, EstadoRequest>({
     mutationFn: (body) => api.post<ProductoItem>(`${ROOT}/producto/estado`, body),
     onSuccess: (updated, vars) => {
+      // Solo los campos de ESTADO, no el producto entero: la respuesta viene
+      // sin fotos (rellenarlas costaba 10-15s por toque) y sustituyendo la
+      // ficha completa desaparecía la miniatura hasta recargar.
+      const soloEstado = (p: ProductoItem): ProductoItem => ({
+        ...p,
+        en_escaparate: updated.en_escaparate,
+        uploaded: updated.uploaded,
+        uploaded_at: updated.uploaded_at,
+        sold: updated.sold,
+      });
       qc.setQueryData<ProductoItem[]>(
         nichoPovBofKeys.productos(vars.source, vars.folder),
-        (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
+        (old) => old?.map((p) => (p.producto === updated.producto ? soloEstado(p) : p)),
       );
       // La lista global (ranking de Top vendidos) es otra query. Se PARCHEA
       // en sitio, no se invalida: invalidándola, cada toque a Escaparate o
@@ -331,7 +341,7 @@ export function useSetEstado() {
         (old) =>
           old?.map((p) =>
             p.producto === updated.producto && (p.folder ?? "") === vars.folder
-              ? { ...updated, folder: p.folder }
+              ? soloEstado(p)
               : p,
           ),
       );

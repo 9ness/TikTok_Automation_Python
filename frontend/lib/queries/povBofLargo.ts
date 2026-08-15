@@ -199,6 +199,17 @@ export function useSetEstadoLargo() {
   return useMutation<ProductoLargo, Error, EstadoLargoRequest>({
     mutationFn: (body) => api.post<ProductoLargo>(`${ROOT}/producto/estado`, body),
     onSuccess: (updated, vars) => {
+      // Solo los campos de ESTADO: la respuesta ya no trae la ficha completa
+      // (recomponerla obligaba a releer las fotos de la carpeta del Drive, con
+      // 10-15s de espera por toque) y sustituir el producto entero borraría la
+      // miniatura, el guion y los clips de la pantalla.
+      const soloEstado = (p: ProductoLargo): ProductoLargo => ({
+        ...p,
+        en_escaparate: updated.en_escaparate,
+        uploaded: updated.uploaded,
+        uploaded_at: updated.uploaded_at,
+        sold: updated.sold,
+      });
       qc.setQueryData<ProductosLargoResponse>(
         largoKeys.productos(vars.source, vars.folder),
         (old) =>
@@ -206,7 +217,7 @@ export function useSetEstadoLargo() {
             ? {
                 ...old,
                 items: old.items.map((p) =>
-                  p.producto === updated.producto ? updated : p,
+                  p.producto === updated.producto ? soloEstado(p) : p,
                 ),
               }
             : old,
@@ -222,7 +233,7 @@ export function useSetEstadoLargo() {
                 ...old,
                 items: old.items.map((p) =>
                   p.producto === updated.producto && (p.folder ?? "") === vars.folder
-                    ? { ...updated, folder: p.folder }
+                    ? soloEstado(p)
                     : p,
                 ),
               }
