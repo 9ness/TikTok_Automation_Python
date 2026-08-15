@@ -66,7 +66,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
-import { OSepara, Paso } from "@/components/tiktok-shop-ai-pro/Paso";
+import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -437,10 +437,16 @@ export default function NichoPovBofPage() {
         className="h-auto w-full rounded-xl border border-border/60"
       />
 
-      {/* Fuente + progreso en UNA tarjeta. Iban en dos y el borde, el padding
-          y el hueco entre ambas costaban ~60px de scroll en móvil para dos
-          líneas de contenido. */}
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      {/* Dónde trabajas: de qué catálogo salen los productos y en qué carpeta
+          estás. En una caja con rótulos porque antes eran bloques sueltos sin
+          título y había que deducir qué era cada uno por sus botones. */}
+      <Caja
+        icono="📁"
+        titulo="Dónde trabajas"
+        hint="Elige el catálogo y la carpeta. El progreso es de este nicho."
+        extra={`${done}/${total} hechas`}
+      >
+        <Sub>Catálogo</Sub>
         {/* Dos por línea en móvil desde que son cuatro: en una sola fila los
             nombres quedaban recortados a tres letras. */}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -484,8 +490,8 @@ export default function NichoPovBofPage() {
         )}
         {source === "top_vendidos" && <SincronizarTopVendidos />}
 
-
-        <div className="mb-2 flex items-center justify-between text-xs sm:text-sm">
+        <Sub>Carpetas</Sub>
+        <div className="flex items-center justify-between text-xs sm:text-sm">
           <span className="font-medium">
             {done} / {total} completadas
           </span>
@@ -545,31 +551,27 @@ export default function NichoPovBofPage() {
         </div>
 
 
-        {/* Lo que ya vendió es lo que dice qué buscar, así que va ARRIBA y a
-            un toque. Antes vivía al final de la página, detrás de todo. */}
-        <button
-          type="button"
-          onClick={() => setVerVendidos(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
-        >
-          <ShoppingBag className="h-3.5 w-3.5" />
-          Productos que vendieron
-          {totalVendidos > 0 && (
-            <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-black">
-              {totalVendidos}
-            </span>
-          )}
-          {unidadesVendidas > totalVendidos && (
-            <span className="text-[10px] font-normal opacity-70">
-              · {unidadesVendidas} uds
-            </span>
-          )}
-        </button>
-        {/* El escaparate es el cuello de botella real del día: no se puede
-            automatizar (EchoTik da con la ficha 1 de cada 4 veces y su cuota
-            gratis no llega), así que al menos se abre de un toque desde
-            arriba, igual que los vendidos. */}
-      </section>
+      </Caja>
+
+      {/* Lo que ya vendió dice qué buscar, y el índice es GLOBAL (el mismo para
+          todos los nichos): por eso va fuera de la caja de la carpeta y a un
+          toque, no enterrado al final de la página. */}
+      <button
+        type="button"
+        onClick={() => setVerVendidos(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+      >
+        <ShoppingBag className="h-4 w-4" />
+        Productos que vendieron
+        {totalVendidos > 0 && (
+          <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-black">
+            {totalVendidos}
+          </span>
+        )}
+        {unidadesVendidas > totalVendidos && (
+          <span className="text-[10px] font-normal opacity-70">· {unidadesVendidas} uds</span>
+        )}
+      </button>
 
       {verVendidos && (
         <VendidosModal onClose={() => setVerVendidos(false)} />
@@ -608,8 +610,15 @@ export default function NichoPovBofPage() {
         </p>
       )}
 
+      {/* La carpeta abierta: se navega, se ven sus fotos en crudo y se marca
+          hecha. Caja propia para que no se confunda con los pasos del trabajo,
+          que vienen justo debajo. */}
       {data && folder && (
-        <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+        <Caja
+          icono="📂"
+          titulo={folder}
+          hint={`Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`}
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -620,12 +629,9 @@ export default function NichoPovBofPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <div className="min-w-0 flex-1 text-center">
-              <p className="truncate text-sm font-semibold sm:text-base">{folder}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {idx + 1} de {total}
-                {currentItem?.completed && " · ✅ completada"}
-              </p>
+            <div className="min-w-0 flex-1 text-center text-[11px] text-muted-foreground">
+              {/* El nombre y el "N de M" ya están en la cabecera de la caja. */}
+              cambiar de carpeta
             </div>
             <button
               type="button"
@@ -707,7 +713,7 @@ export default function NichoPovBofPage() {
             )}
             {currentItem?.completed ? "Desmarcar completada" : "Completada · siguiente"}
           </button>
-        </section>
+        </Caja>
       )}
 
 

@@ -94,3 +94,54 @@ export function OSepara() {
     </div>
   );
 }
+
+/** Caja con cabecera, para lo que NO es un paso del flujo: elegir dónde
+ *  trabajas, la carpeta abierta, el ranking de ventas…
+ *
+ *  Comparte lenguaje con `Paso` (mismo radio, misma cabecera, mismos tamaños)
+ *  pero en gris, para que se lea a la primera qué es contexto y qué es trabajo
+ *  por hacer. Antes todo eran recuadros iguales, sin título, y había que
+ *  deducir de qué iba cada uno por los botones que tenía dentro.
+ */
+export function Caja({
+  icono,
+  titulo,
+  hint,
+  extra,
+  children,
+}: {
+  icono: ReactNode;
+  titulo: string;
+  hint?: string;
+  extra?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      <div className="flex items-start gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[12px]">
+          {icono}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold sm:text-sm">{titulo}</p>
+          {hint ? (
+            <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+              {hint}
+            </p>
+          ) : null}
+        </div>
+        {extra ? <div className="shrink-0 text-[10px] text-muted-foreground">{extra}</div> : null}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
+  );
+}
+
+/** Rotulillo para separar bloques dentro de una caja ("Fuente", "Carpetas"). */
+export function Sub({ children }: { children: ReactNode }) {
+  return (
+    <p className="pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </p>
+  );
+}

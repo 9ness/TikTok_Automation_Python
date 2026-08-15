@@ -25,7 +25,7 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
-import { OSepara, Paso } from "@/components/tiktok-shop-ai-pro/Paso";
+import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   useCompletarCarpetaCreativos,
   useFoldersCreativos,
@@ -136,7 +136,14 @@ export default function CreativosProPage() {
         </div>
       </header>
 
-      <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+      {/* Dónde trabajas, con rótulos: mismo lenguaje que los otros nichos. */}
+      <Caja
+        icono="📁"
+        titulo="Dónde trabajas"
+        hint="Elige el catálogo y la carpeta. El progreso es de Creativos Pro, aparte del vídeo."
+        extra={folders.data ? `${folders.data.done}/${folders.data.total} hechas` : undefined}
+      >
+        <Sub>Catálogo</Sub>
         {/* Dos por línea en móvil desde que son cuatro fuentes. */}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {(sources.data?.items ?? []).map((s) => (
@@ -158,6 +165,7 @@ export default function CreativosProPage() {
           ))}
         </div>
 
+        <Sub>Carpetas</Sub>
         {/* Progreso: es SUYO. Haber hecho una carpeta en POV BOF no la deja
             hecha aquí — un creativo no es un vídeo. */}
         {folders.data && (
@@ -203,12 +211,10 @@ export default function CreativosProPage() {
             </button>
           ))}
         </div>
-      </section>
 
-      {/* Cerrar la carpeta va ARRIBA, no al final de la lista: con diez
-          productos había que recorrerlos todos para llegar al botón, y es lo
-          que se pulsa nada más terminar. */}
-      {folder && (
+        {/* Cerrar la carpeta, dentro de su caja: es lo que se pulsa nada más
+            terminar y antes quedaba suelto entre dos bloques. */}
+        {folder && (
         <button
           type="button"
           disabled={completar.isPending}
@@ -227,7 +233,8 @@ export default function CreativosProPage() {
           <Check className="h-3.5 w-3.5" />
           {hecha ? "Desmarcar carpeta" : "Carpeta completada"}
         </button>
-      )}
+        )}
+      </Caja>
 
       {/* Los mismos pasos y colores que el POV BOF, aunque aquí sean tres: el
           creativo es una IMAGEN, no hay vídeo que traer ni que montar. Quien
