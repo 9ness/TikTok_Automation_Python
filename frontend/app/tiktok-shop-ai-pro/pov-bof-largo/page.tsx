@@ -1310,7 +1310,17 @@ function ProductoCard({
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+    /* Borde con el color del nicho (violeta) y según el estado: gris sin
+       guion, violeta con guion escrito, verde cuando el vídeo ya está. */
+    <div
+      className={`space-y-2 rounded-xl border bg-card p-3 transition ${
+        p.video_path
+          ? "border-emerald-500/50"
+          : p.guion
+            ? "border-violet-500/40"
+            : "border-border/60 hover:border-violet-500/30"
+      }`}
+    >
       <div className="flex gap-2">
         {limpia ? (
           <button type="button" onClick={() => setVerFoto(true)} title="Ver la foto en grande" className="shrink-0">
@@ -1711,8 +1721,9 @@ function ProductoCard({
         }
       />
 
-      {/* Estado individual */}
-      <div className="flex gap-1.5">
+      {/* Estado individual. Separado con una línea: no es trabajo por hacer,
+          es marcar en qué punto está el producto (igual que en el POV BOF). */}
+      <div className="flex gap-1.5 border-t border-border/60 pt-2">
         <button
           type="button"
           onClick={() => push({ en_escaparate: !p.en_escaparate })}

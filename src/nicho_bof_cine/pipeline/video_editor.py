@@ -46,6 +46,21 @@ def _run(cmd: list[str], on_log: OnLog) -> None:
         raise RuntimeError(f"ffmpeg falló: {proc.stderr[-500:]}")
 
 
+def _medidas(video: Path) -> tuple[int, int]:
+    """`(ancho, alto)` del vídeo. `(1080, 1920)` si no se puede leer."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height",
+             "-of", "csv=s=x:p=0", str(video)],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        w, h = (int(x) for x in out.split("x")[:2])
+        return (w, h) if w > 0 and h > 0 else (1080, 1920)
+    except Exception:  # noqa: BLE001
+        return 1080, 1920
+
+
 def concatenar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     """Pega los clips uno detrás de otro, re-codificando.
 
@@ -53,10 +68,24 @@ def concatenar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     generaciones distintas y pueden traer fps o codificación distintos; con
     `-c copy` eso da saltos en el audio/vídeo o directamente un fichero roto.
     """
+    # Se igualan tamaño y relación de píxel antes de pegar: `concat` exige que
+    # todas las entradas midan lo mismo y si no falla con "Invalid argument
+    # (-22)". Pasó de verdad en el POV BOF Largo con un clip venido de otra
+    # generación (720x1280 contra 1080x1920).
+    ancho, alto = _medidas(clips[0])
     entradas: list[str] = []
     for c in clips:
         entradas += ["-i", str(c)]
-    filtro = "".join(f"[{i}:v:0]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=1:a=0[v]"
+    cadenas = "".join(
+        f"[{i}:v:0]scale={ancho}:{alto}:force_original_aspect_ratio=decrease,"
+        f"pad={ancho}:{alto}:(ow-iw)/2:(oh-ih)/2,setsar=1[v{i}];"
+        for i in range(len(clips))
+    )
+    filtro = (
+        cadenas
+        + "".join(f"[v{i}]" for i in range(len(clips)))
+        + f"concat=n={len(clips)}:v=1:a=0[v]"
+    )
     _run([
         "ffmpeg", "-y", "-v", "error", *entradas,
         "-filter_complex", filtro, "-map", "[v]",

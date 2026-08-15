@@ -1327,7 +1327,17 @@ function ProductoCard({
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+    /* El borde lleva el color del nicho (verde) y cambia con el estado: gris
+       mientras no hay nada, verde en cuanto el vídeo está montado. Con todas
+       las tarjetas iguales había que leerlas una a una para saber por dónde
+       ibas. */
+    <div
+      className={`space-y-2 rounded-xl border bg-card p-3 transition ${
+        producto.video_path
+          ? "border-emerald-500/50"
+          : "border-border/60 hover:border-emerald-500/30"
+      }`}
+    >
       <div className="flex gap-2">
         {producto.clean_photo_id ? (
           <button
@@ -1854,7 +1864,10 @@ function ProductoCard({
         </button>
       )}
 
-      <div className="flex gap-1.5">
+      {/* Lo de abajo NO es trabajo: es marcar en qué punto está el producto.
+          Separado con una línea para que no se confunda con los botones de
+          arriba, que sí hacen cosas. */}
+      <div className="flex gap-1.5 border-t border-border/60 pt-2">
         {/* Va PRIMERO porque es lo primero que pasa de verdad: el producto
             entra en el escaparate antes de que se publique nada. */}
         <button
