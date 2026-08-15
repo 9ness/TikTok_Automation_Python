@@ -322,13 +322,25 @@ export function useSetEstado() {
         nichoPovBofKeys.productos(vars.source, vars.folder),
         (old) => old?.map((p) => (p.producto === updated.producto ? updated : p)),
       );
-      // La lista global (ranking de Top vendidos) es otra query: sin esto, lo
-      // que se acaba de marcar no se veía con el ranking abierto.
-      void qc.invalidateQueries({
-        queryKey: nichoPovBofKeys.productos(vars.source, "*todos*"),
-      });
-      // Puede haber entrado o salido de "vendidos".
-      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
+      // La lista global (ranking de Top vendidos) es otra query. Se PARCHEA
+      // en sitio, no se invalida: invalidándola, cada toque a Escaparate o
+      // Subido volvía a listar las cuatro carpetas enteras del ranking y el
+      // botón tardaba segundos en responder.
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(vars.source, "*todos*"),
+        (old) =>
+          old?.map((p) =>
+            p.producto === updated.producto && (p.folder ?? "") === vars.folder
+              ? { ...updated, folder: p.folder }
+              : p,
+          ),
+      );
+      // El ranking de vendidos solo cambia si se tocó "Vendió": recargarlo al
+      // marcar Escaparate o Subido era trabajo de más en la acción que más se
+      // repite del día.
+      if (vars.sold !== undefined) {
+        void qc.invalidateQueries({ queryKey: nichoPovBofKeys.vendidos(vars.source) });
+      }
       // Y si lo que cambió fue "Subido", el tope diario ya no es el mismo.
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });

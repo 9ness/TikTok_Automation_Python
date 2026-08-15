@@ -164,11 +164,27 @@ export function useSetEstadoLargo() {
               }
             : old,
       );
-      // La lista global (ranking) es otra query: sin esto, lo que se acaba de
-      // marcar no se veía al tener abierto Top vendidos.
-      void qc.invalidateQueries({ queryKey: largoKeys.productos(vars.source, "*todos*") });
-      // Puede haber entrado o salido del ranking de vendidos.
-      void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) });
+      // La lista global (ranking) se PARCHEA en sitio: invalidándola, cada
+      // toque volvía a listar las cuatro carpetas del ranking y el botón
+      // tardaba segundos.
+      qc.setQueryData<ProductosLargoResponse>(
+        largoKeys.productos(vars.source, "*todos*"),
+        (old) =>
+          old
+            ? {
+                ...old,
+                items: old.items.map((p) =>
+                  p.producto === updated.producto && (p.folder ?? "") === vars.folder
+                    ? { ...updated, folder: p.folder }
+                    : p,
+                ),
+              }
+            : old,
+      );
+      // Solo si se tocó "Vendió": el ranking no cambia al marcar Escaparate.
+      if (vars.sold !== undefined) {
+        void qc.invalidateQueries({ queryKey: largoKeys.vendidos(vars.source) });
+      }
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
       }
