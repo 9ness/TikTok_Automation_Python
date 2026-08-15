@@ -461,14 +461,25 @@ def list_productos_todos(
             "El listado global solo existe en Top vendidos: en las demás "
             "fuentes hay demasiadas carpetas que leer."
         )
-    items: list[ProductoInfo] = []
-    for carpeta in top_vendidos.carpetas():
+    # A la vez, no en fila: cada carpeta es independiente y en serie sumaban
+    # sus segundos (ver el mismo cambio en el POV BOF Largo).
+    from concurrent.futures import ThreadPoolExecutor
+
+    carpetas = top_vendidos.carpetas()
+
+    def _una(carpeta: str):
         try:
-            parcial = _list_productos(source, carpeta, queue, usuario)
+            return carpeta, _list_productos(source, carpeta, queue, usuario)
         except Exception:  # noqa: BLE001
             # Una carpeta ilegible no puede dejar sin lista a las demás.
-            continue
-        items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
+            return carpeta, None
+
+    items: list[ProductoInfo] = []
+    with ThreadPoolExecutor(max_workers=min(4, len(carpetas) or 1)) as pool:
+        for carpeta, parcial in pool.map(_una, carpetas):
+            if parcial is None:
+                continue
+            items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
     items.sort(key=lambda p: (p.ventas, p.vendido_at), reverse=True)
     return ProductosListResponse(
         source=source, folder="", items=items,

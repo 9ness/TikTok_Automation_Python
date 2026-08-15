@@ -246,6 +246,15 @@ def _listar(
     desde_copia = drive_client.desde_la_copia(fotos)
     pares = photo_pairing.pair_folder(fotos)
     propio = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
+    # Los textos del POV BOF, de UNA lectura para toda la carpeta. Pedirlos
+    # producto a producto eran diez viajes a Redis por carpeta —cuarenta en el
+    # ranking completo— y ahí se iban los segundos que hacían que la pantalla
+    # siguiera enseñando lo de la vez anterior.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    textos_carpeta = (
+        pov_repo.load_folder_para(source, folder, usuario).get("productos") or {}
+    )
     activos = _montandose(queue, source, folder)
     # Escaparate GLOBAL por (tienda|nombre): un producto marcado en cualquier
     # carpeta sale marcado en todas las que sean el mismo producto.
@@ -257,7 +266,7 @@ def _listar(
     for par in pares:
         pid = str(par["producto"])
         # Los textos del producto son del POV BOF; lo de este nicho es `mio`.
-        textos = product_repo.textos_producto(source, folder, pid, usuario)
+        textos = textos_carpeta.get(pid) or {}
         mio = propio.get(pid) or {}
         fijos = textos_fijos(f"{pid} {folder}")
         guion = str(mio.get("guion") or "")
@@ -350,16 +359,28 @@ def list_productos_todos(
             "fuentes hay demasiadas carpetas que leer.",
             status_code=400,
         )
-    items: list[ProductoLargo] = []
-    montando = False
-    for carpeta in top_vendidos.carpetas():
+    # Las carpetas se listan A LA VEZ: son cuatro y en fila iban sumando sus
+    # segundos, que es lo que hacía que el ranking tardara en aparecer. Cada
+    # una es independiente (su Drive, su documento de Redis).
+    from concurrent.futures import ThreadPoolExecutor
+
+    carpetas = top_vendidos.carpetas()
+
+    def _una(carpeta: str):
         try:
-            parcial = _listar(source, carpeta, queue, usuario)
+            return carpeta, _listar(source, carpeta, queue, usuario)
         except Exception:  # noqa: BLE001
             # Una carpeta ilegible no deja sin lista a las demás.
-            continue
-        montando = montando or parcial.montando
-        items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
+            return carpeta, None
+
+    items: list[ProductoLargo] = []
+    montando = False
+    with ThreadPoolExecutor(max_workers=min(4, len(carpetas) or 1)) as pool:
+        for carpeta, parcial in pool.map(_una, carpetas):
+            if parcial is None:
+                continue
+            montando = montando or parcial.montando
+            items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
     items.sort(key=lambda p: (p.ventas, p.vendido_at), reverse=True)
     return ProductosLargoResponse(source=source, folder="", items=items, montando=montando)
 
