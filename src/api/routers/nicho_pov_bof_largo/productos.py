@@ -451,15 +451,23 @@ def set_producto_estado(
     # foto para escribirlos en el ranking.
     if body.sold is None:
         mio = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+        # El escaparate NO se guarda en el producto: vive en el índice global
+        # por (tienda|nombre), porque el mismo producto se graba con varios
+        # nichos y al Marketplace se sube una sola vez. Leyéndolo del producto
+        # salía siempre `false`, así que marcar "Subido" apagaba el botón de
+        # escaparate en la pantalla.
+        en_escaparate = (
+            body.en_escaparate
+            if body.en_escaparate is not None
+            else product_repo.marcado_en_escaparate(
+                {**textos, **mio}, product_repo.escaparate_index(usuario),
+            )
+        )
         return ProductoLargo(
             producto=body.producto,
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
-            en_escaparate=(
-                body.en_escaparate
-                if body.en_escaparate is not None
-                else bool(mio.get("en_escaparate"))
-            ),
+            en_escaparate=bool(en_escaparate),
             uploaded=bool(mio.get("uploaded")),
             uploaded_at=float(mio.get("uploaded_at") or 0),
             sold=bool(mio.get("sold")),
@@ -747,6 +755,48 @@ def confirmar_lote(
     return LoteLargoConfirmarResponse(
         encolados=encolados, pendientes=pendientes, mensajes=mensajes[:6],
     )
+
+
+@router.post("/clip/quitar", response_model=ProductoLargo)
+def quitar_clip(
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    slot: Annotated[int, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductoLargo:
+    """Quita un clip subido por error, para poder poner otro.
+
+    Hasta ahora un clip mal subido se quedaba puesto: la única salida era
+    subir encima el bueno, y si el vídeo era de dos clips y el error estaba en
+    el segundo, el montaje arrancaba con el equivocado.
+
+    Solo borra el hueco. No toca el vídeo ya montado ni el guion.
+    """
+    if slot not in (1, 2, 3):
+        raise _bad(f"slot debe ser 1, 2 o 3, recibido: {slot}")
+    prod = product_repo.get_product(source, folder, producto, usuario)
+    ruta = str(prod.get(f"clip{slot}_path") or "")
+    try:
+        product_repo.update_product(
+            source, folder, producto, usuario=usuario, **{f"clip{slot}_path": ""},
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    # El bruto vive en `api_uploads/`, que se purga solo a las 24h; se borra ya
+    # para no dejar ficheros de vídeo ocupando sitio sin motivo.
+    if ruta:
+        try:
+            Path(ruta).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    listado = _listar(source, folder, queue, usuario)
+    item = next((x for x in listado.items if x.producto == producto), None)
+    if item is None:
+        raise APIError(f"No existe el producto {producto}.", status_code=404)
+    return item
 
 
 @router.post("/clip/upload", response_model=ClipLargoUploadResponse)

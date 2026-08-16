@@ -313,6 +313,41 @@ export function useExtraerTextos() {
   });
 }
 
+/** Quita un clip subido por error (productos de plazos, que llevan dos). */
+export function useQuitarClip() {
+  const qc = useQueryClient();
+  return useMutation<
+    ProductoItem,
+    Error,
+    { source: string; folder: string; producto: string; slot: 1 | 2 }
+  >({
+    mutationFn: ({ source, folder, producto, slot }) =>
+      api.post<ProductoItem>(
+        `${ROOT}/clip/quitar?source=${encodeURIComponent(source)}` +
+          `&folder=${encodeURIComponent(folder)}` +
+          `&producto=${encodeURIComponent(producto)}&slot=${slot}`,
+        {},
+      ),
+    onSuccess: (updated, v) => {
+      const mete = (p: ProductoItem) =>
+        p.producto === updated.producto
+          ? { ...p, clip1: updated.clip1, clip2: updated.clip2 }
+          : p;
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(v.source, v.folder),
+        (old) => old?.map(mete),
+      );
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(v.source, "*todos*"),
+        (old) =>
+          old?.map((p) =>
+            p.producto === updated.producto && (p.folder ?? "") === v.folder ? mete(p) : p,
+          ),
+      );
+    },
+  });
+}
+
 export function useSetEstado() {
   const qc = useQueryClient();
   return useMutation<ProductoItem, Error, EstadoRequest>({

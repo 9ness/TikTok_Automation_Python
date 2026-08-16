@@ -786,6 +786,43 @@ def confirmar_lote(
     )
 
 
+@router.post("/clip/quitar", response_model=ProductoInfo)
+def quitar_clip(
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    slot: Annotated[int, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> ProductoInfo:
+    """Quita un clip subido por error (solo productos de plazos, que llevan dos).
+
+    Sin esto, un clip mal subido se quedaba puesto y el montaje arrancaba con
+    él en cuanto entraba el otro. Solo se borra el hueco: ni el vídeo montado
+    ni el guion se tocan.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    if slot not in (1, 2):
+        raise _bad_request(f"slot debe ser 1 o 2, recibido: {slot}")
+    prod = product_repo.get_product(source, folder, producto, usuario)
+    ruta = str(prod.get(f"clip{slot}_path") or "")
+    try:
+        prod = product_repo.update_product(
+            source, folder, producto, usuario=usuario, **{f"clip{slot}_path": ""},
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    if ruta:
+        # Vive en `api_uploads/` (se purga a las 24h); se borra ya para no
+        # dejar vídeos ocupando sitio.
+        try:
+            Path(ruta).unlink(missing_ok=True)
+        except OSError:
+            pass
+    return _producto_info(producto, prod, queue=queue, usuario=usuario)
+
+
 @router.post("/video/upload")
 async def upload_video(
     queue: Annotated[JobQueue, Depends(get_queue)],

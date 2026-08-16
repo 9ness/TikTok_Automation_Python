@@ -55,6 +55,7 @@ import {
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
   useSetEstado,
+  useQuitarClip,
   useBorrarMiProducto,
   useSortearGuionPlazos,
   useSources,
@@ -1185,6 +1186,7 @@ function ProductoCard({
   carpetaHecha?: boolean;
 }) {
   const setEstado = useSetEstado();
+  const quitarClip = useQuitarClip();
   const buscarUrl = useBuscarProductoUrl();
   // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
   // indexa el producto). Sin distinguirlo, el botón se quedaba igual que
@@ -1778,6 +1780,34 @@ function ProductoCard({
                   <>
                     <Upload className="h-3.5 w-3.5 shrink-0" />
                     {puesto ? `Clip ${slot} ✓` : `Clip ${slot}`}
+                    {/* Quitar un clip subido por error. Corta el evento: el
+                        botón es un <label> con el input dentro y si no se
+                        abriría el selector de ficheros. */}
+                    {puesto && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Quitar el clip ${slot}`}
+                        title="Quitar este clip"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          quitarClip.mutate(
+                            { source, folder, producto: producto.producto, slot },
+                            {
+                              onSuccess: () => toast.success(`Clip ${slot} quitado`),
+                              onError: (e2) =>
+                                toast.error(
+                                  e2 instanceof ApiError ? e2.message : String(e2),
+                                ),
+                            },
+                          );
+                        }}
+                        className="ml-0.5 rounded px-1 text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                      >
+                        ✕
+                      </span>
+                    )}
                   </>
                 )}
                 <input

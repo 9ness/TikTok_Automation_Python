@@ -71,6 +71,7 @@ import {
   useProductosTodosLargo,
   refrescarDesdeDriveLargo,
   useSetEstadoLargo,
+  useQuitarClipLargo,
   useSourcesLargo,
   useSumarUnidadesLargo,
   useVendidosLargo,
@@ -1207,6 +1208,7 @@ function ProductoCard({
     );
   }
   const setEstado = useSetEstadoLargo();
+  const quitarClip = useQuitarClipLargo();
   const buscarUrl = useBuscarProductoUrl();
   const hashtags = useHashtags().data ?? [];
   const refs = {
@@ -1662,6 +1664,31 @@ function ProductoCard({
                 <>
                   <Upload className="h-3.5 w-3.5 shrink-0" />
                   {puesto ? `Clip ${slot} ✓` : `Clip ${slot}`}
+                  {/* Quitar el clip subido por error. Va DENTRO del botón (que
+                      es un <label> con el input dentro), así que hay que
+                      cortar el evento o se abriría el selector de ficheros. */}
+                  {puesto && !subiendoEste && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Quitar el clip ${slot}`}
+                      title="Quitar este clip"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        quitarClip.mutate(
+                          { source, folder, producto: p.producto, slot },
+                          {
+                            onSuccess: () => toast.success(`Clip ${slot} quitado`),
+                            onError: (e2: unknown) => toast.error(err(e2)),
+                          },
+                        );
+                      }}
+                      className="ml-0.5 rounded px-1 text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      ✕
+                    </span>
+                  )}
                 </>
               )}
               <input

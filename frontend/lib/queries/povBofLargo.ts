@@ -161,6 +161,25 @@ export function useProductosLargo(source: string, folder: string) {
   });
 }
 
+/** Quita un clip subido por error para poder poner otro. */
+export function useQuitarClipLargo() {
+  const qc = useQueryClient();
+  return useMutation<
+    ProductoLargo,
+    Error,
+    { source: string; folder: string; producto: string; slot: 1 | 2 | 3 }
+  >({
+    mutationFn: ({ source, folder, producto, slot }) =>
+      api.post<ProductoLargo>(
+        `${ROOT}/clip/quitar?source=${encodeURIComponent(source)}` +
+          `&folder=${encodeURIComponent(folder)}` +
+          `&producto=${encodeURIComponent(producto)}&slot=${slot}`,
+        {},
+      ),
+    onSuccess: (updated, v) => parchearProducto(qc, v.source, v.folder, updated),
+  });
+}
+
 /** Escribe el guion locutado del producto. Gasta UNA llamada a Gemini. */
 export function useEscribirGuion() {
   const qc = useQueryClient();
