@@ -1223,7 +1223,8 @@ function TandaEscenario({
             subirRef.mutate(
               { tipo: "chica", escenario: escenario.clave, file },
               {
-                onSuccess: () => toast.success(`Referencia de ${escenario.label}`),
+                onSuccess: () =>
+                  toast.success(`Referencia de ${escenario.label} guardada`),
                 onError: (e2) => toast.error(err(e2)),
               },
             );
@@ -1323,6 +1324,26 @@ function TandaEscenario({
       ) : null}
 
       <div className="flex items-center gap-2">
+        {/* Subir la foto de referencia de ESTE escenario. Va como botón con
+            texto y no solo en la miniatura: en móvil el toque en 44 px se
+            pierde, y sin referencia la tanda no sirve. */}
+        <button
+          type="button"
+          disabled={subirRef.isPending}
+          onClick={() => refFoto.current?.click()}
+          className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold transition disabled:opacity-50 ${
+            suya?.propia
+              ? "border-border/60 text-muted-foreground hover:border-foreground/30"
+              : "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-400"
+          }`}
+        >
+          {subirRef.isPending
+            ? "Subiendo…"
+            : suya?.propia
+              ? "Cambiar referencia"
+              : "Subir referencia"}
+        </button>
+
         {/* De una foto a la ficha de ESTE escenario: los rasgos de esa chica
             entran en el JSON de aquí abajo y ya se genera clavada. */}
         <input
