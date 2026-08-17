@@ -212,6 +212,24 @@ export function useEscribirGuion() {
   });
 }
 
+/** Los guiones de TODA la carpeta, por la cola.
+ *
+ *  Antes se escribían de uno en uno desde el navegador: diez llamadas a Gemini
+ *  seguidas con la pantalla abierta y el operador esperando. `productos` son
+ *  los que hay que REHACER sí o sí (el título cambió al corregir los textos,
+ *  así que el guion viejo habla de otro producto). */
+export function useGuionesLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; position_in_queue: number },
+    Error,
+    { source: string; folder: string; productos?: string[]; rehacer?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/guiones/lote`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
+  });
+}
+
 /** Escaparate / Subido / Vendió — progreso INDIVIDUAL del Largo. */
 export function useSetEstadoLargo() {
   const qc = useQueryClient();

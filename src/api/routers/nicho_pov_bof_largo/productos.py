@@ -40,6 +40,7 @@ from src.api.schemas.nicho_pov_bof_largo import (
     FolderLargo,
     FoldersLargoResponse,
     GuionLargoRequest,
+    GuionesLoteRequest,
     GuionLargoResponse,
     MarkCompletedLargoRequest,
     MarkCompletedLargoResponse,
@@ -575,6 +576,45 @@ def escribir_guion(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return _uno(body, queue, usuario)
+
+
+@router.post("/guiones/lote", status_code=201)
+def guiones_lote(
+    body: GuionesLoteRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Encola los guiones de TODA la carpeta.
+
+    Es lo único de este nicho que no se puede compartir: el guion habla de ESE
+    producto, así que son diez llamadas a Gemini. De una en una desde la
+    pantalla son diez esperas seguidas; por la cola se lanza y se sigue.
+    """
+    from src.queue.models import JobMode, JobStatus
+
+    title = f"✍️ Guiones · {body.folder}" + (" (rehacer)" if body.rehacer else "")
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_LARGO_GUIONES,
+        title=title,
+        params={
+            "source": body.source,
+            "folder": body.folder,
+            "usuario": usuario,
+            "rehacer": bool(body.rehacer),
+            "productos": [str(x) for x in (body.productos or [])],
+        },
+    )
+    pendientes = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    return {
+        "job_id": job.id,
+        "title": title,
+        "position_in_queue": next(
+            (i for i, j in enumerate(pendientes) if j.id == job.id), 0
+        ),
+    }
 
 
 def _uno(body: GuionLargoRequest, queue, usuario: str) -> GuionLargoResponse:

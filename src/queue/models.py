@@ -43,6 +43,8 @@ class JobMode(str, Enum):
     CUENTA_PILOTO_VIDEO = "cuenta_piloto_video"
     # POV BOF Largo: DOS clips de 10s + guion locutado por IA (Fish).
     NICHO_POV_BOF_LARGO_VIDEO = "nicho_pov_bof_largo_video"
+    # POV BOF Largo: los guiones de TODA una carpeta, de una tacada.
+    NICHO_POV_BOF_LARGO_GUIONES = "nicho_pov_bof_largo_guiones"
     # POV BOF con el guion de plazos (Klarna): voz de Fish y DOS clips.
     NICHO_POV_BOF_PLAZOS_VIDEO = "nicho_pov_bof_plazos_video"
 
@@ -77,6 +79,7 @@ MODE_LABELS = {
     JobMode.NICHO_BOF_CINE_VIDEO: "🎬 Vídeo BOF Cinematográfico",
     JobMode.CUENTA_PILOTO_VIDEO: "🧪 Vídeo Cuenta Piloto",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "🎙️ Vídeo POV BOF Largo",
+    JobMode.NICHO_POV_BOF_LARGO_GUIONES: "✍️ Guiones POV BOF Largo",
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "💳 Vídeo POV BOF (plazos)",
 }
 

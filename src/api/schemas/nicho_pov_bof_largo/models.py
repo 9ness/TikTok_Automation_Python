@@ -134,6 +134,20 @@ class GuionLargoRequest(BaseModel):
     rehacer: bool = False
 
 
+class GuionesLoteRequest(BaseModel):
+    """Los guiones de TODA una carpeta, por la cola."""
+
+    source: str
+    folder: str
+    # Reescribir también los que ya tienen guion (cuesta una llamada por
+    # producto para rehacer lo mismo, así que no es el caso normal).
+    rehacer: bool = False
+    # Productos que hay que reescribir SÍ O SÍ aunque ya tengan guion. Se usa
+    # al corregir textos cruzados: si el título ha cambiado, el guion viejo
+    # habla de otro producto.
+    productos: list[str] = []
+
+
 class GuionLargoResponse(BaseModel):
     producto: ProductoLargo
 

@@ -2392,6 +2392,120 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     return resumen
 
 
+
+def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Escribe los guiones de TODA una carpeta del POV BOF Largo.
+
+    Es lo único de este nicho que no se puede compartir con los demás: el guion
+    habla de ESE producto, así que son diez llamadas a Gemini por carpeta. De
+    uno en uno desde la pantalla eso son diez esperas seguidas con el operador
+    delante; aquí se lanza y se mira la cola.
+
+    Como en la pantalla, un guion ya escrito se respeta salvo que sea del OTRO
+    modo (uno de plazos escrito sin la frase de financiación no vale) o que se
+    pida rehacer. Un producto que falle no para los demás.
+
+    Params: source, folder, usuario, rehacer.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof_largo.repos import product_repo
+    from src.nicho_pov_bof_largo.services import guionista
+
+    p = job.params or {}
+    source, folder = str(p.get("source") or ""), str(p.get("folder") or "")
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+    rehacer = bool(p.get("rehacer"))
+    # Los que hay que reescribir sí o sí: al corregir textos cruzados, el guion
+    # viejo habla del producto de al lado y "ya tiene guion" no vale.
+    forzados = {str(x) for x in (p.get("productos") or [])}
+    if not source or not folder:
+        raise RuntimeError("Falta la carpeta de la que escribir los guiones.")
+
+    # Los textos son del catálogo compartido del POV BOF: aquí solo se leen.
+    textos = (pov_repo.load_folder_para(source, folder, usuario).get("productos") or {})
+    mios = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
+    if not textos:
+        raise RuntimeError(
+            "Esta carpeta no tiene textos extraídos todavía: sácalos primero "
+            "(Configuración → Textos de todo un catálogo)."
+        )
+
+    pendientes: list[tuple[str, dict, bool]] = []
+    for pid in sorted(textos, key=lambda x: (len(x), x)):
+        t = textos[pid]
+        if not str(t.get("titulo") or "").strip():
+            continue
+        # El umbral y el parseo del precio son los del POV BOF: mismo producto y
+        # misma cuenta, no puede haber dos criterios según el nicho.
+        plazos = pov_config.precio_num(t.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+        guardado = mios.get(pid) or {}
+        ya = bool(guardado.get("guion")) and bool(guardado.get("guion_plazos")) == plazos
+        if rehacer or pid in forzados or not ya:
+            pendientes.append((pid, t, plazos))
+
+    if not pendientes:
+        on_log("[guiones] todos los productos de la carpeta ya tienen guion")
+        return "sin-cambios"
+
+    on_log(f"[guiones] {len(pendientes)} producto(s) por escribir en {folder}")
+    hechos, fallidos = 0, []
+    for i, (pid, t, plazos) in enumerate(pendientes):
+        on_progress(int(i * 100 / len(pendientes)))
+        on_log(f"[guiones] {i + 1}/{len(pendientes)} · producto {pid}")
+        try:
+            escrito = guionista.escribir(
+                titulo=t.get("titulo", ""),
+                tienda=t.get("tienda", ""),
+                caption=t.get("caption", ""),
+                foto=_foto_limpia(source, folder, pid),
+                plazos=plazos,
+            )
+        except Exception as e:  # noqa: BLE001 — uno malo no para la carpeta
+            on_log(f"[guiones] producto {pid} falló: {e}")
+            fallidos.append(pid)
+            continue
+        product_repo.update_product(
+            source, folder, pid, usuario=usuario,
+            guion=escrito["guion"], subliminal=escrito["subliminal"],
+            nombre_guion=escrito["nombre"], guion_plazos=plazos,
+        )
+        hechos += 1
+
+    on_progress(100)
+    resumen = f"{hechos}/{len(pendientes)} guiones"
+    if fallidos:
+        on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
+        resumen += f" · fallaron {len(fallidos)}"
+    on_log(f"[guiones] {resumen}")
+    return resumen
+
+
+def _foto_limpia(source: str, folder: str, producto: str):
+    """La foto limpia del producto, para que el guion hable de lo que se ve.
+
+    Opcional a propósito: sin ella el guion se escribe igual con el título y el
+    caption, y quedarse sin guion por un fallo de Drive sería peor.
+    """
+    try:
+        from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        par = next(
+            (x for x in photo_pairing.pair_folder(fotos)
+             if str(x.get("producto")) == str(producto)), None,
+        )
+        limpia = (par or {}).get("clean") or {}
+        if limpia.get("id"):
+            return drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
 # ============================================================
 # RUNNER: NICHO POV BOF — MONTAJE DE VÍDEO POR PRODUCTO
 # ============================================================
@@ -2934,6 +3048,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_BOF_CINE_VIDEO: run_nicho_bof_cine_video,
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
+    JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: run_nicho_pov_bof_plazos_video,
 }
 
@@ -2961,6 +3076,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_BOF_CINE_VIDEO: "viralizacion",
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
+    JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "viralizacion",
 }
 

@@ -65,6 +65,7 @@ import {
   fotoLargoUrl,
   largoKeys,
   useEscribirGuion,
+  useGuionesLote,
   useFoldersLargo,
   useMarkCompletedLargo,
   useProductosLargo,
@@ -130,7 +131,7 @@ export default function PovBofLargoPage() {
   const items = productosQ.data?.items ?? [];
   const extraerTextos = useExtraerTextos();
   const buscarUrls = useBuscarUrlsCarpeta();
-  const guionBatch = useEscribirGuion();
+  const guionesLote = useGuionesLote();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
   // Productos, no unidades: el botón habla de productos (ver POV BOF).
@@ -143,8 +144,6 @@ export default function PovBofLargoPage() {
   const [downloadProgress, setDownloadProgress] = useState("");
   const [downloadingVideos, setDownloadingVideos] = useState(false);
   const [videoProgress, setVideoProgress] = useState("");
-  const [generandoGuiones, setGenerandoGuiones] = useState(false);
-  const [guionProgress, setGuionProgress] = useState("");
 
   const esTopVendidos = activaSource === FUENTE_TOP_VENDIDOS;
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
@@ -360,29 +359,24 @@ export default function PovBofLargoPage() {
       toast.info("Textos al día · los guiones ya estaban escritos");
       return;
     }
-    setGenerandoGuiones(true);
-    try {
-      let ok = 0;
-      for (const [i, p] of pend.entries()) {
-        setGuionProgress(`${i + 1}/${pend.length}`);
-        try {
-          await guionBatch.mutateAsync({
-            source: activaSource, folder, producto: p.producto,
-            // Sin esto el endpoint reaprovecharía el guion desfasado y el
-            // lote no arreglaría nada.
-            rehacer: Boolean(p.guion),
-          });
-          ok++;
-        } catch (e) {
-          toast.error(`Producto ${p.producto}: ${err(e)}`);
-        }
-      }
-      toast.success(`${ok}/${pend.length} guiones escritos`);
-      invalidarProductos();
-    } finally {
-      setGenerandoGuiones(false);
-      setGuionProgress("");
-    }
+    // Por la COLA, no en el navegador: son diez llamadas a Gemini seguidas y
+    // antes había que quedarse en la pantalla esperando a que acabaran.
+    // Los que YA tienen guion van en la lista de forzados: el trabajo sabe
+    // solo cuáles no lo tienen, pero no que a estos les cambió el título.
+    guionesLote.mutate(
+      {
+        source: activaSource,
+        folder,
+        productos: pend.filter((p) => p.guion).map((p) => p.producto),
+      },
+      {
+        onSuccess: () => {
+          toast.success(`${pend.length} guion(es) en la cola`);
+          openQueue();
+        },
+        onError: (e: unknown) => toast.error(err(e)),
+      },
+    );
   }
 
   /** Extrae los textos de la carpeta y, seguido, escribe los guiones que
@@ -402,7 +396,7 @@ export default function PovBofLargoPage() {
       { source: activaSource, folder },
       {
         onSuccess: async (nuevos) => {
-          toast.success("Textos extraídos · escribiendo guiones…");
+          toast.success("Textos extraídos · los guiones van a la cola");
           invalidarProductos();
           await generarTodosGuiones(nuevos);
         },
@@ -789,13 +783,13 @@ export default function PovBofLargoPage() {
             <button
               type="button"
               onClick={() => void generarTodosGuiones()}
-              disabled={generandoGuiones || !sinGuion}
+              disabled={guionesLote.isPending || !sinGuion}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/60 bg-card px-3 py-2 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/10 disabled:opacity-50"
             >
-              {generandoGuiones ? (
+              {guionesLote.isPending ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                  Escribiendo guiones {guionProgress}…
+                  Encolando…
                 </>
               ) : (
                 <>
