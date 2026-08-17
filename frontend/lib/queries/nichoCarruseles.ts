@@ -746,20 +746,25 @@ export function useBorrarReferencia() {
   });
 }
 
+/** URL de la foto de referencia. Con `ancho` la pide encogida: los sellos de
+ *  44 px de los escenarios se bajaban enteros (medio mega por carga). Al
+ *  descargarla nunca se encoge — esa es la que se sube a Flow. */
 export function buildReferenciaUrl(
   tipo: "chica" | "producto",
   version: string,
   descargar = false,
   escenario = "",
+  ancho = 0,
 ): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const dl = descargar ? "&descargar=1" : "";
   const esc = escenario ? `&escenario=${encodeURIComponent(escenario)}` : "";
+  const w = ancho && !descargar ? `&w=${ancho}` : "";
   return `${base}${ROOT}/referencia?tipo=${tipo}&v=${encodeURIComponent(
     version,
-  )}${esc}${dl}${qs}`;
+  )}${esc}${dl}${w}${qs}`;
 }
 
 /** URL de una foto del banco. Lleva el `mtime` (`v`) para que el móvil pueda
@@ -771,14 +776,16 @@ export function buildFotoCarruselUrl(
   tipo: keyof FotosCarrusel,
   version: string,
   descargar = false,
+  ancho = 0,
 ): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const dl = descargar ? "&descargar=1" : "";
+  const w = ancho && !descargar ? `&w=${ancho}` : "";
   return `${base}${ROOT}/foto?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
   )}&producto=${encodeURIComponent(producto)}&tipo=${tipo}&v=${encodeURIComponent(
     version,
-  )}${dl}${qs}`;
+  )}${dl}${w}${qs}`;
 }

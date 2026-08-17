@@ -994,7 +994,7 @@ function Referencia({
   const borrar = useBorrarReferencia();
   const ref = useRef<HTMLInputElement>(null);
   const estado = referencias.data?.[tipo];
-  const url = estado?.hay ? buildReferenciaUrl(tipo, estado.version) : null;
+  const url = estado?.hay ? buildReferenciaUrl(tipo, estado.version, false, "", 160) : null;
 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
@@ -1251,7 +1251,7 @@ function TandaEscenario({
           {suya?.hay ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={buildReferenciaUrl("chica", suya.version, false, escenario.clave)}
+              src={buildReferenciaUrl("chica", suya.version, false, escenario.clave, 160)}
               alt={escenario.label}
               loading="lazy"
               className={`h-full w-full object-cover ${suya.propia ? "" : "opacity-50"}`}
@@ -1727,10 +1727,14 @@ function FotoCarrusel({
       </div>
     );
   }
-  const url = buildFotoCarruselUrl(source, folder, producto, tipo, version);
+  const url = buildFotoCarruselUrl(source, folder, producto, tipo, version, false, 540);
   return (
     <div className="relative">
-      <a href={url} target="_blank" rel="noopener noreferrer">
+      <a
+        href={buildFotoCarruselUrl(source, folder, producto, tipo, version)}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}

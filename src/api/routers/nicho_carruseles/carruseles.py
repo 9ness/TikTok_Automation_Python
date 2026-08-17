@@ -581,11 +581,14 @@ def ver_referencia(
     tipo: Annotated[str, Query()] = "chica",
     escenario: Annotated[str, Query()] = "",
     descargar: Annotated[bool, Query()] = False,
+    w: Annotated[int | None, Query(ge=32, le=4000)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
     """Sirve la foto de referencia. Auth por `?api_key=` (va en un `<img src>`).
 
     Con `escenario` devuelve la de ese escenario si la hay; si no, la general.
+    Con `w` sale encogida a ese ancho: la pantalla pinta once referencias en
+    sellos de 44 px y bajarlas enteras era medio mega por carga.
     """
     from src.nicho_carruseles.services import referencia
 
@@ -597,10 +600,19 @@ def ver_referencia(
         raise APIError(
             "No hay foto de referencia. Sube una desde la pantalla.", status_code=404,
         )
-    headers = {"Cache-Control": "no-cache"}
+    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
+    # Al bajarla va SIEMPRE entera: es la que se sube a Flow.
+    if w and not descargar:
+        from src.nicho_pov_bof.services import thumbs
+
+        encogida = thumbs.miniatura(ruta, w)
+        if encogida != ruta:
+            ruta, media = encogida, "image/jpeg"
+    # La URL lleva el `v=<mtime>` de la referencia, así que al cambiarla cambia
+    # la dirección y el móvil se la vuelve a pedir: se puede cachear un día.
+    headers = {"Cache-Control": "public, max-age=86400"}
     if descargar:
         headers["Content-Disposition"] = f'attachment; filename="referencia_{tipo}.jpg"'
-    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
     return FileResponse(ruta, media_type=media, headers=headers)
 
 
@@ -1289,6 +1301,7 @@ def ver_foto(
     producto: Annotated[str, Query()],
     tipo: Annotated[str, Query()] = "chica",
     descargar: Annotated[bool, Query()] = False,
+    w: Annotated[int | None, Query(ge=32, le=4000)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
     """Sirve una foto del banco. Auth por `?api_key=` (va en un `<img src>`).
@@ -1296,6 +1309,8 @@ def ver_foto(
     Con `descargar=1` fuerza la descarga: el atributo `download` de un `<a>` se
     ignora entre orígenes distintos —y la API es otro origen—, así que lo único
     que la baja en el móvil es el `Content-Disposition` de aquí.
+
+    Con `w` sale encogida: las tarjetas la pintan pequeña y son cientos.
     """
     if tipo not in config.SUBCARPETAS:
         raise _bad_request(f"Tipo de foto desconocido: {tipo!r}.")
@@ -1303,12 +1318,21 @@ def ver_foto(
     if not ruta:
         raise APIError("Esa foto todavía no está subida.", status_code=404)
 
-    headers = {"Cache-Control": "no-cache"}
+    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
+    # Al bajarla va SIEMPRE entera: es la que se publica en TikTok.
+    if w and not descargar:
+        from src.nicho_pov_bof.services import thumbs
+
+        encogida = thumbs.miniatura(ruta, w)
+        if encogida != ruta:
+            ruta, media = encogida, "image/jpeg"
+    # La URL lleva el `v=<mtime>` de la foto: al sustituirla cambia la
+    # dirección, así que se puede cachear un día sin quedarse con la vieja.
+    headers = {"Cache-Control": "public, max-age=86400"}
     if descargar:
         pos = 1 if tipo.startswith("chica") else 2
         nombre = fotos_svc.nombre_descarga(source, folder, producto, pos)
         headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
-    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
     return FileResponse(ruta, media_type=media, headers=headers)
 
 
