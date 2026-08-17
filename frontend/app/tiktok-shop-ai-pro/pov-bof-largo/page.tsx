@@ -778,8 +778,10 @@ export default function PovBofLargoPage() {
               )}
             </button>
 
-            {/* Guion para toda la carpeta a la vez, en vez de tarjeta a
-                tarjeta. Necesitan tener textos primero. */}
+            {/* Guion para toda LA CARPETA, en vez de tarjeta a tarjeta.
+                Necesitan tener textos primero. Lo de todo el catálogo vive en
+                Configuración, igual que la extracción de textos: aquí solo
+                está lo de la carpeta que tienes abierta. */}
             <button
               type="button"
               onClick={() => void generarTodosGuiones()}
@@ -799,31 +801,6 @@ export default function PovBofLargoPage() {
                     : `Guiones al día (${conGuion}/${totalProductos})`}
                 </>
               )}
-            </button>
-
-            {/* Y el catálogo entero: los textos ya se sacan de todas las
-                carpetas de una vez (Configuración), así que los guiones tenían
-                que poder hacer lo mismo — si no, hay que entrar a las 35
-                carpetas a pulsar el botón de arriba. */}
-            <button
-              type="button"
-              disabled={guionesLote.isPending}
-              onClick={() =>
-                guionesLote.mutate(
-                  { source: activaSource },
-                  {
-                    onSuccess: () => {
-                      toast.success("Guiones de todo el catálogo en la cola");
-                      openQueue();
-                    },
-                    onError: (e: unknown) => toast.error(err(e)),
-                  },
-                )
-              }
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
-            >
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              Escribir los guiones de TODAS las carpetas
             </button>
 
             <div className="grid grid-cols-2 gap-1.5">
