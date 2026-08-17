@@ -886,11 +886,17 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
         for i, folder in enumerate(nombres):
             prods = ((mios[i] if i < len(mios) else None) or {}).get("productos") or {}
             suyos = ((textos[i] if i < len(textos) else None) or {}).get("productos") or {}
+            # Productos que EXISTEN hoy en el Drive. Los textos guardados se
+            # quedan aunque el curso borre una foto o cambie el emparejado, y
+            # esos fantasmas salían en la lista y daban 404 al bajar su foto.
+            reales = _productos_reales(source, folder)
             # Se recorren los que tienen TEXTOS, no los clasificados: si no, el
             # resumen diría "12/12 pasan" contando solo lo ya mirado.
             for pid in sorted(suyos, key=lambda p: (len(p), p)):
                 texto = suyos[pid] or {}
                 if not str(texto.get("titulo") or "").strip():
+                    continue
+                if reales is not None and pid not in reales:
                     continue
                 prod = prods.get(pid) or {}
                 apto = carrusel_repo.es_apto(prod)
@@ -912,6 +918,26 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
                     ),
                 })
     return salida
+
+
+def _productos_reales(source: str, folder: str) -> set[str] | None:
+    """Ids de producto que hoy salen de emparejar las fotos de la carpeta.
+
+    `None` si no se pudo leer el Drive — entonces no se filtra nada, que es
+    preferible a esconder productos buenos por un fallo de red.
+
+    No se miden las fotos a propósito: agrupar solo mira los NOMBRES, y medir
+    obliga a descargarlas (esto se llama por cada una de las ~65 carpetas).
+    """
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    try:
+        fotos = drive_client.list_photos(source, folder)
+    except Exception:  # noqa: BLE001
+        return None
+    if not fotos:
+        return None
+    return {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)}
 
 
 class PrepararRequest(BaseModel):
