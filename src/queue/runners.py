@@ -2405,10 +2405,15 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     modo (uno de plazos escrito sin la frase de financiación no vale) o que se
     pida rehacer. Un producto que falle no para los demás.
 
-    Params: source, folder, usuario, rehacer.
+    Sin `folder` va TODO el catálogo, carpeta por carpeta: es como se usa de
+    verdad —primero los textos de todas y luego los guiones de todas— en vez de
+    entrar a las 35 carpetas a pulsar el botón.
+
+    Params: source, folder (vacío = todas), usuario, rehacer, productos.
     """
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof.services import drive_client
     from src.nicho_pov_bof_largo.repos import product_repo
     from src.nicho_pov_bof_largo.services import guionista
 
@@ -2417,56 +2422,87 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     usuario = str(p.get("usuario") or job.enqueued_by or "")
     rehacer = bool(p.get("rehacer"))
     # Los que hay que reescribir sí o sí: al corregir textos cruzados, el guion
-    # viejo habla del producto de al lado y "ya tiene guion" no vale.
+    # viejo habla del producto de al lado y "ya tiene guion" no vale. Solo tiene
+    # sentido con UNA carpeta, que es de donde los manda la pantalla.
     forzados = {str(x) for x in (p.get("productos") or [])}
-    if not source or not folder:
-        raise RuntimeError("Falta la carpeta de la que escribir los guiones.")
+    if not source:
+        raise RuntimeError("Falta el catálogo del que escribir los guiones.")
 
-    # Los textos son del catálogo compartido del POV BOF: aquí solo se leen.
-    textos = (pov_repo.load_folder_para(source, folder, usuario).get("productos") or {})
-    mios = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
-    if not textos:
-        raise RuntimeError(
-            "Esta carpeta no tiene textos extraídos todavía: sácalos primero "
-            "(Configuración → Textos de todo un catálogo)."
+    carpetas = (
+        [folder] if folder
+        else [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    )
+    if not carpetas:
+        raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
+
+    # Se calcula TODO el trabajo antes de empezar: así la barra de progreso va
+    # sobre el total real y no se reinicia en cada carpeta.
+    pendientes: list[tuple[str, str, dict, bool]] = []
+    sin_textos: list[str] = []
+    for carpeta in carpetas:
+        textos = (
+            pov_repo.load_folder_para(source, carpeta, usuario).get("productos") or {}
         )
-
-    pendientes: list[tuple[str, dict, bool]] = []
-    for pid in sorted(textos, key=lambda x: (len(x), x)):
-        t = textos[pid]
-        if not str(t.get("titulo") or "").strip():
+        if not textos:
+            sin_textos.append(carpeta)
             continue
-        # El umbral y el parseo del precio son los del POV BOF: mismo producto y
-        # misma cuenta, no puede haber dos criterios según el nicho.
-        plazos = pov_config.precio_num(t.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
-        guardado = mios.get(pid) or {}
-        ya = bool(guardado.get("guion")) and bool(guardado.get("guion_plazos")) == plazos
-        if rehacer or pid in forzados or not ya:
-            pendientes.append((pid, t, plazos))
+        mios = (
+            product_repo.load_folder(source, carpeta, usuario).get("productos") or {}
+        )
+        for pid in sorted(textos, key=lambda x: (len(x), x)):
+            t = textos[pid]
+            if not str(t.get("titulo") or "").strip():
+                continue
+            # El umbral y el parseo del precio son los del POV BOF: mismo
+            # producto y misma cuenta, no puede haber dos criterios según el
+            # nicho desde el que se grabe.
+            plazos = (
+                pov_config.precio_num(t.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+            )
+            guardado = mios.get(pid) or {}
+            ya = (
+                bool(guardado.get("guion"))
+                and bool(guardado.get("guion_plazos")) == plazos
+            )
+            if rehacer or (folder and pid in forzados) or not ya:
+                pendientes.append((carpeta, pid, t, plazos))
 
+    if sin_textos:
+        on_log(
+            f"[guiones] sin textos (se saltan): {', '.join(sin_textos)} — "
+            "sácalos en Configuración › Textos de todo un catálogo"
+        )
     if not pendientes:
-        on_log("[guiones] todos los productos de la carpeta ya tienen guion")
+        if sin_textos and len(sin_textos) == len(carpetas):
+            raise RuntimeError(
+                "Ninguna carpeta tiene textos extraídos todavía: sácalos "
+                "primero (Configuración › Textos de todo un catálogo)."
+            )
+        on_log("[guiones] todo lo que tiene textos ya tiene guion")
         return "sin-cambios"
 
-    on_log(f"[guiones] {len(pendientes)} producto(s) por escribir en {folder}")
+    on_log(
+        f"[guiones] {len(pendientes)} guion(es) por escribir en "
+        f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
+    )
     hechos, fallidos = 0, []
-    for i, (pid, t, plazos) in enumerate(pendientes):
+    for i, (carpeta, pid, t, plazos) in enumerate(pendientes):
         on_progress(int(i * 100 / len(pendientes)))
-        on_log(f"[guiones] {i + 1}/{len(pendientes)} · producto {pid}")
+        on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),
                 tienda=t.get("tienda", ""),
                 caption=t.get("caption", ""),
-                foto=_foto_limpia(source, folder, pid),
+                foto=_foto_limpia(source, carpeta, pid),
                 plazos=plazos,
             )
-        except Exception as e:  # noqa: BLE001 — uno malo no para la carpeta
-            on_log(f"[guiones] producto {pid} falló: {e}")
-            fallidos.append(pid)
+        except Exception as e:  # noqa: BLE001 — uno malo no para el resto
+            on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
+            fallidos.append(f"{carpeta}/{pid}")
             continue
         product_repo.update_product(
-            source, folder, pid, usuario=usuario,
+            source, carpeta, pid, usuario=usuario,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
         )

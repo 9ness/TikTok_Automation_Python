@@ -584,15 +584,20 @@ def guiones_lote(
     queue: Annotated[JobQueue, Depends(get_queue)],
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Encola los guiones de TODA la carpeta.
+    """Encola los guiones de una carpeta o de TODO el catálogo (sin `folder`).
 
     Es lo único de este nicho que no se puede compartir: el guion habla de ESE
-    producto, así que son diez llamadas a Gemini. De una en una desde la
-    pantalla son diez esperas seguidas; por la cola se lanza y se sigue.
+    producto, así que son diez llamadas a Gemini por carpeta. De una en una
+    desde la pantalla son diez esperas seguidas; por la cola se lanza y se
+    sigue trabajando.
     """
+    from src.nicho_pov_bof import config as pov_config
     from src.queue.models import JobMode, JobStatus
 
-    title = f"✍️ Guiones · {body.folder}" + (" (rehacer)" if body.rehacer else "")
+    alcance = body.folder or (
+        pov_config.SOURCES.get(body.source, {}).get("label") or body.source
+    ) + " · todas"
+    title = f"✍️ Guiones · {alcance}" + (" (rehacer)" if body.rehacer else "")
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_LARGO_GUIONES,
         title=title,

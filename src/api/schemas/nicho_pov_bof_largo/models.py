@@ -135,10 +135,12 @@ class GuionLargoRequest(BaseModel):
 
 
 class GuionesLoteRequest(BaseModel):
-    """Los guiones de TODA una carpeta, por la cola."""
+    """Los guiones por la cola: de una carpeta o de todo el catálogo."""
 
     source: str
-    folder: str
+    # Vacío = TODAS las carpetas del catálogo, que es como se usa de verdad:
+    # primero los textos de todas y luego los guiones de todas.
+    folder: str = ""
     # Reescribir también los que ya tienen guion (cuesta una llamada por
     # producto para rehacer lo mismo, así que no es el caso normal).
     rehacer: bool = False

@@ -223,7 +223,8 @@ export function useGuionesLote() {
   return useMutation<
     { job_id: string; title: string; position_in_queue: number },
     Error,
-    { source: string; folder: string; productos?: string[]; rehacer?: boolean }
+    // `folder` vacío = TODAS las carpetas del catálogo.
+    { source: string; folder?: string; productos?: string[]; rehacer?: boolean }
   >({
     mutationFn: (body) => api.post(`${ROOT}/guiones/lote`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
