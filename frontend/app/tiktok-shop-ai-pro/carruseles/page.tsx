@@ -619,9 +619,9 @@ export default function CarruselesPage() {
           titulo="La foto del producto (foto 2)"
           hint="Esta sí es de cada producto: en Flow subes su foto limpia y el prompt la recrea en el sitio donde se usa. No hace falta foto de referencia."
         >
-          {/* Con el prompt de abajo NO hace falta composición de referencia: se
-              sube la foto limpia del producto y se le dice el sitio. Se deja
-              por si algún día se quiere clavar un estilo concreto. */}
+          {/* La mano la decide el PRODUCTO, no el operador: lo que cabe en la
+              mano se coge (crema, vitaminas) y lo que no se enseña en su sitio.
+              Este check es solo para forzarla en los grandes. */}
           <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
             <input
               type="checkbox"
@@ -629,7 +629,7 @@ export default function CarruselesPage() {
               checked={conMano}
               onChange={(e) => setConMano(e.target.checked)}
             />
-            Con mano señalando el producto (estilo POV)
+            Forzar la mano también en los productos grandes (señalando)
           </label>
           {/* La SEGUNDA imagen de Flow: la foto limpia del Drive. Por
               CATEGORÍA y de todos los catálogos, porque en Flow se trabaja por

@@ -195,23 +195,47 @@ LUGAR_POR_ESCENARIO: dict[str, str] = {
     "playa": "la playa o el borde de una piscina",
 }
 
-# La mano en primera persona, como en el POV BOF. Se añade o no según lo que
-# quiera el operador: en un carrusel a veces estorba y a veces es justo lo que
-# hace que la foto parezca de alguien y no de catálogo.
-LINEA_MANO = (
-    "Aparece la mano de una persona, ultra realista, en modo POV señalando el "
-    "producto, visto desde la altura de los ojos de una persona."
+# La mano en primera persona, como en el POV BOF. Hay dos, y cuál toca no lo
+# decide el operador sino el PRODUCTO: lo que cabe en la mano se coge (una
+# crema, un bote de vitaminas), y lo que no —un colchón, un sofá— se enseña en
+# su sitio y como mucho se señala. Una mano "sujetando" un tendedero es la clase
+# de imagen que delata que la foto es de IA.
+LINEA_MANO_SUJETA = (
+    "Aparece la mano de una persona, ultra realista, SUJETANDO el producto en "
+    "modo POV, vista desde la altura de los ojos."
+)
+LINEA_MANO_SENALA = (
+    "Aparece la mano de una persona, ultra realista, en modo POV SEÑALANDO el "
+    "producto, vista desde la altura de los ojos."
 )
 
+# En qué escenarios el producto se coge con la mano. Son los de producto
+# pequeño: belleza, suplementos, tecnología y fitness van todos al genérico.
+ESCENARIOS_DE_MANO = frozenset({"generico", "bano", "coche"})
 
-def prompt_producto(escenario: str = "", con_mano: bool = False) -> str:
-    """El prompt de la foto 2, con el sitio del escenario ya puesto."""
+
+def prompt_producto(escenario: str = "", con_mano: bool | None = None) -> str:
+    """El prompt de la foto 2, con el sitio y la mano que le tocan.
+
+    `con_mano=None` (lo normal) decide solo: se coge si el producto cabe en la
+    mano. `True` fuerza la mano señalando —para cuando el producto es grande
+    pero se quiere el punto de vista de alguien— y `False` la quita.
+    """
     lugar = LUGAR_POR_ESCENARIO.get(escenario) or LUGAR_POR_ESCENARIO["generico"]
     texto = leer_prompt("foto_producto").replace("{lugar}", lugar)
-    if con_mano:
+
+    de_mano = (escenario or "generico") in ESCENARIOS_DE_MANO
+    if con_mano is False:
+        linea = ""
+    elif con_mano is True and not de_mano:
+        linea = LINEA_MANO_SENALA
+    else:
+        linea = LINEA_MANO_SUJETA if de_mano else ""
+
+    if linea:
         # Detrás del primer párrafo, que es el que describe la escena.
         partes = texto.split("\n\n", 1)
-        texto = f"{partes[0]} {LINEA_MANO}" + (f"\n\n{partes[1]}" if len(partes) > 1 else "")
+        texto = f"{partes[0]} {linea}" + (f"\n\n{partes[1]}" if len(partes) > 1 else "")
     return texto
 
 
