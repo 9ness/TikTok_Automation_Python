@@ -16,6 +16,7 @@ segundo. Encolarlo solo añadiría la espera de un worker (ver
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
@@ -107,6 +108,8 @@ class QuemarRequest(BaseModel):
     # Sin producto = toda la carpeta (así se queman de golpe las chicas, que es
     # el caso normal: mismo gesto para las diez).
     producto: str | None = None
+    # "chica", "producto" o "ambas" — que es el botón de "mandar a editar" de
+    # la carpeta entera, cuando ya están las dos fotos de cada producto.
     tipo: str = "chica"
 
 
@@ -662,6 +665,215 @@ async def subir_chicas(
     }
 
 
+@router.get("/aptos")
+def list_aptos(
+    categoria: Annotated[str, Query()] = "",
+    sin_foto2: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Todos los productos aptos, de TODOS los catálogos, con su categoría.
+
+    Es lo que deja bajar las fotos limpias EN LOTE por categoría: se generan en
+    Flow todas las de dormitorio de una sentada, luego todas las de belleza…
+    Trabajar carpeta a carpeta con dos productos por carpeta era el cuello de
+    botella de este nicho.
+    """
+    items = _barrer_aptos(usuario)
+    if categoria:
+        items = [i for i in items if i["categoria"] == categoria]
+    if sin_foto2:
+        items = [i for i in items if not i["tiene_foto2"]]
+    return {
+        "items": items,
+        "por_categoria": {
+            cat: sum(1 for i in _barrer_aptos(usuario) if i["categoria"] == cat)
+            for cat in config.CATEGORIAS_APTAS
+        },
+    }
+
+
+def _barrer_aptos(usuario: str) -> list[dict]:
+    """Los productos aptos de todos los catálogos, en orden de trabajo.
+
+    Cruza tres cosas: lo que sabe este nicho (categoría, mensajes), los textos
+    del POV BOF (título, para reconocerlos) y qué fotos hay ya en el Drive.
+    """
+    from src.nicho_carruseles.repos.redis_base import get_nicho_carruseles_redis
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    r = get_nicho_carruseles_redis()
+    if not r.is_available():
+        return []
+
+    salida: list[dict] = []
+    for source in config.fuentes_a_barrer():
+        try:
+            nombres = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+        except Exception:  # noqa: BLE001
+            continue
+        canon = config.fuente_canonica(source)
+        mios = r.mget_json([f"folder:{canon}:{n}" for n in nombres])
+        # Los textos viven en el documento del POV BOF: otro `mget`, no 35
+        # lecturas sueltas.
+        textos = product_repo.load_folders([(source, n) for n in nombres])
+        for i, folder in enumerate(nombres):
+            prods = ((mios[i] if i < len(mios) else None) or {}).get("productos") or {}
+            suyos = ((textos[i] if i < len(textos) else None) or {}).get("productos") or {}
+            for pid in sorted(prods, key=lambda p: (len(p), p)):
+                prod = prods[pid]
+                if not carrusel_repo.es_apto(prod):
+                    continue
+                texto = suyos.get(pid) or {}
+                salida.append({
+                    "source": source,
+                    "folder": folder,
+                    "producto": pid,
+                    "ref": f"{source}|{folder}|{pid}",
+                    "titulo": texto.get("titulo") or "",
+                    "tienda": texto.get("tienda") or "",
+                    "categoria": prod.get("categoria") or "",
+                    "escenario": carrusel_repo.escenario_de(prod),
+                    "tiene_foto2": fotos_svc.tiene(
+                        "producto", usuario, source, folder, pid,
+                    ),
+                })
+    return salida
+
+
+@router.post("/fotos2")
+async def subir_fotos2(
+    archivos: Annotated[list[UploadFile], File()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Sube la tanda de fotos de PRODUCTO y las reparte solas.
+
+    Aquí no vale repartir por orden como con las chicas: cada foto es de UN
+    producto concreto. Se reconoce con IA (`services/reparto_fotos.py`) contra
+    los productos que esperan foto, de todos los catálogos.
+
+    Lo que no se reconoce NO se tira: se guarda en "sin asignar" y la pantalla
+    lo enseña para colocarlo a mano.
+    """
+    from src.nicho_carruseles.services import reparto_fotos
+
+    if not archivos:
+        raise _bad_request("No has adjuntado ninguna foto.")
+
+    candidatos = [i for i in _barrer_aptos(usuario) if not i["tiene_foto2"]]
+    if not candidatos:
+        raise _bad_request("Ningún producto apto está esperando foto de producto.")
+
+    import tempfile
+
+    trabajo = Path(tempfile.mkdtemp(prefix="carruseles_fotos2_"))
+    try:
+        rutas: list[Path] = []
+        nombres: list[str] = []
+        for i, archivo in enumerate(
+            sorted(archivos, key=lambda a: (a.filename or "").lower())
+        ):
+            datos = await _leer_foto(archivo)
+            nombre = archivo.filename or f"foto_{i + 1}.jpg"
+            destino = trabajo / f"{i:03d}_{Path(nombre).name}"
+            destino.write_bytes(datos)
+            rutas.append(destino)
+            nombres.append(nombre)
+
+        reparto = reparto_fotos.repartir(rutas, candidatos)
+        por_ref = {c["ref"]: c for c in candidatos}
+        asignadas, sueltas = [], []
+        for fila in reparto:
+            i = fila["foto"]
+            destino = por_ref.get(fila["ref"])
+            if not destino:
+                fotos_svc.guardar_sin_asignar(
+                    usuario, rutas[i].read_bytes(), filename=nombres[i],
+                )
+                sueltas.append(nombres[i])
+                continue
+            fotos_svc.guardar(
+                "producto", usuario, destino["source"], destino["folder"],
+                destino["producto"], rutas[i].read_bytes(), filename=nombres[i],
+            )
+            fotos_svc.borrar(
+                "producto_txt", usuario, destino["source"], destino["folder"],
+                destino["producto"],
+            )
+            asignadas.append({
+                "archivo": nombres[i],
+                "source": destino["source"],
+                "folder": destino["folder"],
+                "producto": destino["producto"],
+                "titulo": destino["titulo"],
+                "por_que": fila["por_que"],
+            })
+    finally:
+        import shutil
+
+        shutil.rmtree(trabajo, ignore_errors=True)
+
+    return {
+        "asignadas": len(asignadas),
+        "items": asignadas,
+        "sin_asignar": sueltas,
+        "faltan": max(0, len(candidatos) - len(asignadas)),
+    }
+
+
+@router.get("/sin-asignar")
+def list_sin_asignar(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Fotos de producto que la IA no supo colocar."""
+    return {"items": fotos_svc.listar_sin_asignar(usuario)}
+
+
+@router.get("/sin-asignar/foto")
+def ver_sin_asignar(
+    archivo: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    ruta = fotos_svc.ruta_sin_asignar(usuario, archivo)
+    if not ruta:
+        raise APIError("Esa foto ya no está.", status_code=404)
+    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(ruta, media_type=media, headers={"Cache-Control": "no-cache"})
+
+
+class AsignarRequest(BaseModel):
+    archivo: str
+    source: str
+    folder: str
+    producto: str
+
+
+@router.post("/sin-asignar/asignar")
+def asignar_suelta(
+    body: AsignarRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Coloca a mano una de las fotos sueltas en su producto."""
+    try:
+        fotos_svc.asignar_sin_asignar(
+            usuario, body.archivo, body.source, body.folder, body.producto,
+        )
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except OSError as e:
+        raise APIError(f"No se pudo guardar la foto: {e}", status_code=500) from e
+    return {"items": fotos_svc.listar_sin_asignar(usuario)}
+
+
+@router.delete("/sin-asignar")
+def borrar_suelta(
+    archivo: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    ruta = fotos_svc.ruta_sin_asignar(usuario, archivo)
+    if ruta:
+        ruta.unlink(missing_ok=True)
+    return {"items": fotos_svc.listar_sin_asignar(usuario)}
+
+
 @router.post("/foto")
 async def subir_foto(
     source: Annotated[str, Form()],
@@ -720,9 +932,9 @@ def quemar(
     chicas: mismo gesto para las diez. Un producto sin foto o sin mensaje no
     tumba la tanda — se cuenta como saltado y se sigue.
     """
-    if body.tipo not in ("chica", "producto"):
-        raise _bad_request("Solo se puede quemar texto sobre 'chica' o 'producto'.")
-    campo = "mensaje1" if body.tipo == "chica" else "mensaje2"
+    if body.tipo not in ("chica", "producto", "ambas"):
+        raise _bad_request("Solo se puede quemar 'chica', 'producto' o 'ambas'.")
+    tipos = ("chica", "producto") if body.tipo == "ambas" else (body.tipo,)
 
     guardados = carrusel_repo.productos(body.source, body.folder)
     if body.producto:
@@ -734,19 +946,22 @@ def quemar(
 
     hechas, saltados = 0, []
     for pid, prod in sorted(objetivos.items(), key=lambda kv: (len(kv[0]), kv[0])):
-        texto = str(prod.get(campo) or "").strip()
-        if not texto:
-            saltados.append(f"{pid} (sin mensaje)")
-            continue
-        try:
-            fotos_svc.quemar_texto(
-                body.tipo, usuario, body.source, body.folder, pid, texto,
-            )
-            hechas += 1
-        except ValueError:
-            saltados.append(f"{pid} (sin foto)")
-        except OSError as e:
-            saltados.append(f"{pid} ({e})")
+        for tipo in tipos:
+            campo = "mensaje1" if tipo == "chica" else "mensaje2"
+            etiqueta = f"{pid}·{'1' if tipo == 'chica' else '2'}"
+            texto = str(prod.get(campo) or "").strip()
+            if not texto:
+                saltados.append(f"{etiqueta} (sin mensaje)")
+                continue
+            try:
+                fotos_svc.quemar_texto(
+                    tipo, usuario, body.source, body.folder, pid, texto,
+                )
+                hechas += 1
+            except ValueError:
+                saltados.append(f"{etiqueta} (sin foto)")
+            except OSError as e:
+                saltados.append(f"{etiqueta} ({e})")
 
     if not hechas and saltados:
         raise _bad_request(f"No se pudo quemar ninguna: {', '.join(saltados)}.")

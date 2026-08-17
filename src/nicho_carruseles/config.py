@@ -114,6 +114,11 @@ SUBCARPETAS = {
     "producto_txt": "productos_con_texto",
 }
 
+# Las fotos de producto que sube en tanda y la IA no reconoce. NO se tiran: son
+# generaciones de Flow que han costado su rato, así que se guardan aquí y la
+# pantalla las enseña para asignarlas a mano.
+SIN_ASIGNAR = "productos_sin_asignar"
+
 # Cuántas chicas se piden de una tacada como máximo. No es un límite técnico:
 # es el aviso de que una tanda mayor no cabe en una sesión de Flow.
 CHICAS_POR_TANDA = 40
@@ -165,6 +170,12 @@ def carruseles_dir() -> Path:
     )
     destino.mkdir(parents=True, exist_ok=True)
     _RAIZ = destino
+    return destino
+
+
+def carpeta_sin_asignar(usuario: str = "") -> Path:
+    destino = carruseles_dir() / (usuario or "ness") / SIN_ASIGNAR
+    destino.mkdir(parents=True, exist_ok=True)
     return destino
 
 

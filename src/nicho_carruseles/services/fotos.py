@@ -197,6 +197,64 @@ def limpiar_texto(usuario: str, source: str, folder: str, producto: str) -> None
         borrar(tipo, usuario, source, folder, producto)
 
 
+# ---------------------------------------------------------------------------
+# Fotos de producto que la IA no supo colocar
+# ---------------------------------------------------------------------------
+# No se tiran: son generaciones de Flow que han costado su rato. Se guardan
+# aparte y la pantalla las enseña para asignarlas a mano.
+def guardar_sin_asignar(usuario: str, datos: bytes, *, filename: str = "") -> Path:
+    base = config.carpeta_sin_asignar(usuario)
+    limpio = _slug(Path(filename or "foto").stem) or "foto"
+    ext = _extension(filename)
+    destino = base / f"{limpio}{ext}"
+    # Dos tandas seguidas de Flow traen ficheros con el mismo nombre
+    # (`imagen_1.png`): sin esto la segunda pisaría a la primera.
+    n = 2
+    while destino.is_file():
+        destino = base / f"{limpio}_{n}{ext}"
+        n += 1
+    destino.write_bytes(datos)
+    return destino
+
+
+def listar_sin_asignar(usuario: str) -> list[dict]:
+    base = config.carpeta_sin_asignar(usuario)
+    fotos = [
+        {"archivo": f.name, "version": str(int(f.stat().st_mtime))}
+        for f in base.iterdir()
+        if f.is_file() and f.suffix.lower() in _EXTS
+    ]
+    fotos.sort(key=lambda d: d["archivo"])
+    return fotos
+
+
+def ruta_sin_asignar(usuario: str, archivo: str) -> Path | None:
+    """La foto por su nombre. `None` si no está o si el nombre es una trampa
+    (`../`): lo manda el cliente y nunca se concatena a ciegas."""
+    nombre = Path(str(archivo or "")).name
+    if not nombre:
+        return None
+    p = config.carpeta_sin_asignar(usuario) / nombre
+    return p if p.is_file() else None
+
+
+def asignar_sin_asignar(
+    usuario: str, archivo: str, source: str, folder: str, producto: str,
+) -> Path:
+    """Coloca una foto suelta en su producto."""
+    origen = ruta_sin_asignar(usuario, archivo)
+    if not origen:
+        raise ValueError("esa foto ya no está")
+    destino = guardar(
+        "producto", usuario, source, folder, producto, origen.read_bytes(),
+        filename=origen.name,
+    )
+    origen.unlink(missing_ok=True)
+    # La versión con texto era de la foto que hubiera antes.
+    borrar("producto_txt", usuario, source, folder, producto)
+    return destino
+
+
 def nombre_descarga(source: str, folder: str, producto: str, pos: int) -> str:
     """Cómo se llama la foto al bajarla: `<carpeta>_<producto>_1.jpg`.
 

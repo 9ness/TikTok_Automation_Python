@@ -22,7 +22,34 @@ export const carruselesKeys = {
   /** Las chicas que faltan son de TODOS los catálogos, no de uno. */
   pendientes: () => [...carruselesKeys.all, "pendientes"] as const,
   referencias: () => [...carruselesKeys.all, "referencias"] as const,
+  aptos: () => [...carruselesKeys.all, "aptos"] as const,
+  sinAsignar: () => [...carruselesKeys.all, "sin-asignar"] as const,
 };
+
+/** Un producto apto, mirando TODOS los catálogos a la vez. Es lo que deja
+ *  bajar las fotos limpias en lote por categoría y generar la foto 2 de
+ *  cincuenta productos en una sesión de Flow. */
+export interface AptoCarrusel {
+  source: string;
+  folder: string;
+  producto: string;
+  ref: string;
+  titulo: string;
+  tienda: string;
+  categoria: string;
+  escenario: string;
+  tiene_foto2: boolean;
+}
+
+export interface AptosCarrusel {
+  items: AptoCarrusel[];
+  por_categoria: Record<string, number>;
+}
+
+export interface FotoSuelta {
+  archivo: string;
+  version: string;
+}
 
 /** Las fotos que hay que ADJUNTAR en Flow: los dos prompts del curso son de
  *  imagen-a-imagen, sin referencia no generan nada. */
@@ -323,7 +350,7 @@ export function useQuemarTexto(source: string, folder: string | null) {
   return useMutation<
     Quemado,
     Error,
-    { producto?: string; tipo: "chica" | "producto" }
+    { producto?: string; tipo: "chica" | "producto" | "ambas" }
   >({
     mutationFn: (body) =>
       api.post<Quemado>(`${ROOT}/quemar`, { source, folder: folder ?? "", ...body }),
@@ -364,6 +391,85 @@ export function useMarcarSubidoCarrusel(source: string, folder: string | null) {
       void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
     },
   });
+}
+
+/** Todos los aptos de todos los catálogos, con su categoría. */
+export function useAptos() {
+  return useQuery<AptosCarrusel>({
+    queryKey: carruselesKeys.aptos(),
+    queryFn: () => api.get<AptosCarrusel>(`${ROOT}/aptos`),
+  });
+}
+
+export interface RepartoFotos2 {
+  asignadas: number;
+  items: {
+    archivo: string;
+    source: string;
+    folder: string;
+    producto: string;
+    titulo: string;
+    por_que: string;
+  }[];
+  sin_asignar: string[];
+  faltan: number;
+}
+
+/** Sube la tanda de fotos de PRODUCTO: la IA reconoce de cuál es cada una.
+ *
+ *  Aquí no vale repartir por orden como con las chicas — cada foto es de un
+ *  producto concreto. Lo que no reconoce se queda "sin asignar". */
+export function useSubirFotos2() {
+  const qc = useQueryClient();
+  return useMutation<RepartoFotos2, Error, File[]>({
+    mutationFn: (files) => {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("archivos", f));
+      return api.post<RepartoFotos2>(`${ROOT}/fotos2`, fd);
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
+  });
+}
+
+export function useSinAsignar() {
+  return useQuery<FotoSuelta[]>({
+    queryKey: carruselesKeys.sinAsignar(),
+    queryFn: async () =>
+      (await api.get<{ items: FotoSuelta[] }>(`${ROOT}/sin-asignar`)).items,
+  });
+}
+
+export function useAsignarSuelta() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: FotoSuelta[] },
+    Error,
+    { archivo: string; source: string; folder: string; producto: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/sin-asignar/asignar`, body),
+    onSuccess: (res) => {
+      qc.setQueryData(carruselesKeys.sinAsignar(), res.items);
+      void qc.invalidateQueries({ queryKey: carruselesKeys.all });
+    },
+  });
+}
+
+export function useBorrarSuelta() {
+  const qc = useQueryClient();
+  return useMutation<{ items: FotoSuelta[] }, Error, string>({
+    mutationFn: (archivo) =>
+      api.del(`${ROOT}/sin-asignar?archivo=${encodeURIComponent(archivo)}`),
+    onSuccess: (res) => qc.setQueryData(carruselesKeys.sinAsignar(), res.items),
+  });
+}
+
+export function buildSueltaUrl(archivo: string, version: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  return `${base}${ROOT}/sin-asignar/foto?archivo=${encodeURIComponent(
+    archivo,
+  )}&v=${encodeURIComponent(version)}${qs}`;
 }
 
 export function useReferencias() {

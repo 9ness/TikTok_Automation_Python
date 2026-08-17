@@ -104,6 +104,22 @@ def load_folder(source: str, folder: str) -> dict:
     return r.get_json(_key(source, folder)) or {}
 
 
+def load_folders(entradas: list[tuple[str, str]]) -> list[dict]:
+    """Varias carpetas de una tacada, en el mismo orden que `entradas`.
+
+    Con Upstash REST, N lecturas sueltas son N latencias seguidas: barrer las
+    35 carpetas de una fuente para cruzar sus textos costaba segundos. Esto lo
+    deja en una llamada (mismo criterio que `buscar_productos`).
+    """
+    if not entradas:
+        return []
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return [{} for _ in entradas]
+    docs = r.mget_json([_key(s, f) for s, f in entradas])
+    return [doc if isinstance(doc, dict) else {} for doc in docs]
+
+
 def save_folder(source: str, folder: str, data: dict) -> None:
     data["updated_at"] = _now()
     _require_redis().set_json(_key(source, folder), data)

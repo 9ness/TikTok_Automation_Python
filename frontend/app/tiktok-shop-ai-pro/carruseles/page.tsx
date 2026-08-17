@@ -25,7 +25,11 @@ import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   buildFotoCarruselUrl,
   buildReferenciaUrl,
+  buildSueltaUrl,
+  useAptos,
+  useAsignarSuelta,
   useBorrarFotoCarrusel,
+  useBorrarSuelta,
   useBorrarReferencia,
   useCambiarEscenario,
   useChicasPendientes,
@@ -40,10 +44,13 @@ import {
   usePromptsCarruseles,
   useQuemarTexto,
   useReferencias,
+  useSinAsignar,
   useSubidosCarruseles,
   useSubirReferencia,
   useSubirChicas,
   useSubirFotoCarrusel,
+  useSubirFotos2,
+  type AptoCarrusel,
   type EscenarioPrompt,
   type FotosCarrusel,
   type ProductoCarrusel,
@@ -107,12 +114,28 @@ export default function CarruselesPage() {
   const quemar = useQuemarTexto(source, folder);
   const subidos = useSubidosCarruseles(source, folder);
   const marcarSubido = useMarcarSubidoCarrusel(source, folder);
+  // Los aptos de TODOS los catálogos: es lo que deja trabajar por ambientes en
+  // Flow (bajar todas las de dormitorio de una vez) en lugar de carpeta a
+  // carpeta con dos productos en cada una.
+  const todosAptos = useAptos();
+  const subirFotos2 = useSubirFotos2();
+  const aptosGlobales = todosAptos.data?.items ?? [];
+  const porCategoriaPendiente = aptosGlobales.reduce<Record<string, number>>(
+    (acc, a) => {
+      if (a.tiene_foto2 || !a.categoria) return acc;
+      acc[a.categoria] = (acc[a.categoria] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
 
   const [verTodos, setVerTodos] = useEstadoRecordado("carruseles:vertodos", false);
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const [bajando, setBajando] = useState("");
   const [bajandoLimpias, setBajandoLimpias] = useState("");
+  const [bajandoCarpeta, setBajandoCarpeta] = useState("");
+  const fotos2Ref = useRef<HTMLInputElement>(null);
   // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
   // pintarían las cuatro girando a la vez.
   const [tandaEnCurso, setTandaEnCurso] = useState("");
@@ -131,33 +154,82 @@ export default function CarruselesPage() {
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
   const clasificada = estado.data?.clasificada ?? false;
 
-  /** Baja las fotos limpias de los productos aptos, para llevarlas a Flow.
+  /** Baja las fotos limpias que se llevan a Flow para hacer la foto 2.
    *
-   *  Solo los APTOS: bajar los diez de la carpeta para usar dos es justo lo que
-   *  este nicho intenta evitar. Van numeradas para que en la galería del móvil
-   *  salgan en el mismo orden que en pantalla, y de una en una — varias
-   *  descargas a la vez se cancelan solas en el navegador del móvil.
+   *  `modo` es "carpeta" (los aptos de la que tienes abierta) o una CATEGORÍA
+   *  (los de esa categoría en todos los catálogos, y solo los que aún no tienen
+   *  foto 2). Lo segundo es lo que permite generar en Flow por ambientes en vez
+   *  de ir carpeta a carpeta con dos productos en cada una.
+   *
+   *  Van numeradas para que en la galería salgan en el mismo orden, y de una en
+   *  una — varias descargas a la vez se cancelan solas en el móvil.
    */
-  async function descargarLimpias() {
-    if (!folder) return;
-    const conFoto = aptos.filter((p) => p.clean_photo_id);
-    if (!conFoto.length) {
-      toast.error("Ningún producto apto de esta carpeta tiene foto limpia");
+  async function descargarLimpias(modo: string) {
+    const lista =
+      modo === "carpeta"
+        ? aptos
+            .filter((p) => p.clean_photo_id)
+            .map((p) => ({
+              source,
+              folder: p.folder || folder || "",
+              producto: p.producto,
+            }))
+        : (aptosGlobales ?? [])
+            .filter((a) => a.categoria === modo && !a.tiene_foto2)
+            .map((a) => ({ source: a.source, folder: a.folder, producto: a.producto }));
+    if (!lista.length) {
+      toast.error("No hay fotos que bajar ahí");
       return;
     }
-    for (const [i, p] of conFoto.entries()) {
-      setBajandoLimpias(`${i + 1}/${conFoto.length}`);
+    for (const [i, p] of lista.entries()) {
+      setBajandoLimpias(`${i + 1}/${lista.length}`);
       const a = document.createElement("a");
-      a.href = buildCleanPhotoDownloadUrl(source, p.folder || folder, p.producto);
+      a.href = buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto);
       const orden = String(i + 1).padStart(2, "0");
-      a.download = `${orden}_${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      a.download = `${orden}_${p.folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
       document.body.appendChild(a);
       a.click();
       a.remove();
-      if (i < conFoto.length - 1) await new Promise((r) => setTimeout(r, 600));
+      if (i < lista.length - 1) await new Promise((r) => setTimeout(r, 600));
     }
     setBajandoLimpias("");
-    toast.success(`${conFoto.length} foto(s) descargadas`);
+    toast.success(`${lista.length} foto(s) descargadas`);
+  }
+
+  /** Baja las dos fotos YA EDITADAS de toda la carpeta, en orden: 1 y 2 del
+   *  primer producto, 1 y 2 del segundo… Así se suben al carrusel sin pararse a
+   *  mirar cuál va antes. */
+  async function descargarCarpetaEditada() {
+    if (!folder) return;
+    const cola: { producto: string; tipo: keyof FotosCarrusel; version: string }[] = [];
+    for (const p of aptos) {
+      const f = porProducto[p.producto]?.fotos;
+      if (f?.chica_txt)
+        cola.push({ producto: p.producto, tipo: "chica_txt", version: f.chica_txt });
+      if (f?.producto_txt)
+        cola.push({ producto: p.producto, tipo: "producto_txt", version: f.producto_txt });
+    }
+    if (!cola.length) {
+      toast.error("Esta carpeta no tiene ninguna foto editada todavía");
+      return;
+    }
+    for (const [i, item] of cola.entries()) {
+      setBajandoCarpeta(`${i + 1}/${cola.length}`);
+      const a = document.createElement("a");
+      a.href = buildFotoCarruselUrl(
+        source, folder, item.producto, item.tipo, item.version, true,
+      );
+      const orden = String(i + 1).padStart(2, "0");
+      a.download = `${orden}_${folder}_${item.producto}_${
+        item.tipo === "chica_txt" ? 1 : 2
+      }`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < cola.length - 1) await new Promise((r) => setTimeout(r, 600));
+    }
+    setBajandoCarpeta("");
+    toast.success(`${cola.length} foto(s) descargadas`);
   }
 
   /** Baja las dos fotos de un producto, en orden (1 chica, 2 producto). */
@@ -489,29 +561,149 @@ export default function CarruselesPage() {
           >
             <ClipboardCopy className="h-3.5 w-3.5" /> Prompt producto (Flow)
           </button>
-          {/* La SEGUNDA imagen de Flow: la foto limpia que ya está en el Drive.
-              De golpe y solo de los aptos, como en POV BOF. */}
+          {/* La SEGUNDA imagen de Flow: la foto limpia del Drive. Por
+              CATEGORÍA y de todos los catálogos, porque en Flow se trabaja por
+              ambientes: todas las de dormitorio de una sentada, luego las de
+              belleza… Carpeta a carpeta, con dos productos por carpeta, era el
+              cuello de botella de este nicho. */}
+          <Sub>Bajar fotos limpias para Flow</Sub>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              disabled={Boolean(bajandoLimpias) || !aptos.length}
+              onClick={() => descargarLimpias("carpeta")}
+              className="flex items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                Esta carpeta ({aptos.filter((p) => p.clean_photo_id).length})
+              </span>
+            </button>
+            {Object.entries(porCategoriaPendiente).map(([cat, n]) => (
+              <button
+                key={cat}
+                type="button"
+                disabled={Boolean(bajandoLimpias) || !n}
+                onClick={() => descargarLimpias(cat)}
+                className="flex items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {CATEGORIA_LABEL[cat] ?? cat} ({n})
+                </span>
+              </button>
+            ))}
+          </div>
+          {bajandoLimpias ? (
+            <p className="text-center text-[10px] text-muted-foreground">
+              Bajando {bajandoLimpias}…
+            </p>
+          ) : (
+            <p className="text-center text-[10px] text-muted-foreground">
+              Las de categoría son de TODOS los catálogos y solo de los que aún no
+              tienen foto 2.
+            </p>
+          )}
+
+          {/* La vuelta: se sueltan todas las generadas y la IA las coloca. */}
+          <input
+            ref={fotos2Ref}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              if (!files.length) return;
+              subirFotos2.mutate(files, {
+                onSuccess: (r) =>
+                  toast.success(
+                    `${r.asignadas} fotos repartidas` +
+                      (r.sin_asignar.length
+                        ? ` · ${r.sin_asignar.length} sin reconocer`
+                        : ""),
+                  ),
+                onError: (e2) => toast.error(err(e2)),
+              });
+            }}
+          />
           <button
             type="button"
-            disabled={Boolean(bajandoLimpias) || !aptos.length}
-            onClick={descargarLimpias}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            disabled={subirFotos2.isPending}
+            onClick={() => fotos2Ref.current?.click()}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
           >
-            <Download className="h-3.5 w-3.5" />
-            {bajandoLimpias
-              ? `Bajando ${bajandoLimpias}`
-              : `Fotos limpias de los aptos (${
-                  aptos.filter((p) => p.clean_photo_id).length
-                })`}
+            {subirFotos2.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Reconociendo y repartiendo…
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" /> Traer las fotos generadas
+              </>
+            )}
           </button>
+          <p className="text-center text-[10px] text-muted-foreground">
+            Suéltalas todas de golpe: la IA reconoce de qué producto es cada una y la
+            coloca en su ficha.
+          </p>
+
+          <SinAsignar folder={folder} source={source} aptos={aptosGlobales} />
         </Paso>
 
         <Paso
           n={4}
           color="azul"
-          titulo="Publicar"
-          hint="Baja las dos fotos en orden, súbelas como carrusel y pega el caption. Marca cada uno al publicarlo."
+          titulo="Editar y publicar la carpeta"
+          hint="Con las dos fotos de cada producto ya puestas: se les escribe el texto de golpe y se bajan en orden (1 y 2 de cada uno)."
+          extra={`${listos}/${aptos.length} listos`}
         >
+          <button
+            type="button"
+            disabled={quemar.isPending || !folder || !conMensaje}
+            onClick={() =>
+              quemar.mutate(
+                { tipo: "ambas" },
+                {
+                  onSuccess: (r) =>
+                    toast.success(
+                      `${r.quemadas} fotos con texto` +
+                        (r.saltados.length ? ` · saltadas: ${r.saltados.join(", ")}` : ""),
+                    ),
+                  onError: (e) => toast.error(err(e)),
+                },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50"
+          >
+            {quemar.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Escribiendo…
+              </>
+            ) : (
+              <>
+                <Flame className="h-4 w-4" /> Mandar a editar las fotos de la carpeta
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            disabled={Boolean(bajandoCarpeta) || !listos}
+            onClick={descargarCarpetaEditada}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20 disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {bajandoCarpeta
+              ? `Bajando ${bajandoCarpeta}`
+              : "Bajar las fotos editadas en orden"}
+          </button>
+          <p className="text-center text-[10px] text-muted-foreground">
+            Salen numeradas 01, 02, 03… — foto 1 y 2 del primer producto, luego las del
+            segundo, y así.
+          </p>
+
           <button
             type="button"
             onClick={() => setVerVendidos(true)}
@@ -685,6 +877,92 @@ function Referencia({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Las fotos de producto que la IA no supo colocar.
+ *
+ *  No se tiran —son generaciones de Flow que han costado su rato—: se enseñan
+ *  aquí con un desplegable para ponerlas en su producto a mano. */
+function SinAsignar({
+  source,
+  folder,
+  aptos,
+}: {
+  source: string;
+  folder: string | null;
+  aptos: AptoCarrusel[];
+}) {
+  const sueltas = useSinAsignar();
+  const asignar = useAsignarSuelta();
+  const borrar = useBorrarSuelta();
+  const items = sueltas.data ?? [];
+  if (!items.length) return null;
+
+  // Primero los de la carpeta abierta: casi siempre es de ahí lo que falla.
+  const candidatos = [...aptos].sort((a, b) => {
+    const suyo = (x: AptoCarrusel) => (x.folder === folder && x.source === source ? 0 : 1);
+    return suyo(a) - suyo(b);
+  });
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2">
+      <p className="text-[11px] font-semibold text-amber-500">
+        Sin reconocer ({items.length})
+      </p>
+      <p className="text-[10px] text-muted-foreground">
+        No se han tirado. Dile a cuál es cada una y se coloca.
+      </p>
+      {items.map((f) => (
+        <div key={f.archivo} className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={buildSueltaUrl(f.archivo, f.version)}
+            alt={f.archivo}
+            loading="lazy"
+            className="h-12 w-12 shrink-0 rounded-md object-cover"
+          />
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const destino = candidatos.find((c) => c.ref === e.target.value);
+              if (!destino) return;
+              asignar.mutate(
+                {
+                  archivo: f.archivo,
+                  source: destino.source,
+                  folder: destino.folder,
+                  producto: destino.producto,
+                },
+                {
+                  onSuccess: () => toast.success("Colocada"),
+                  onError: (e2) => toast.error(err(e2)),
+                },
+              );
+            }}
+            className="min-w-0 flex-1 truncate rounded border border-border/60 bg-background px-1.5 py-1 text-[10px]"
+          >
+            <option value="">¿De qué producto es?</option>
+            {candidatos.map((c) => (
+              <option key={c.ref} value={c.ref}>
+                {c.folder} · {c.producto} · {c.titulo || "sin título"}
+                {c.tiene_foto2 ? " (ya tiene)" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            title="Tirar esta foto"
+            onClick={() =>
+              borrar.mutate(f.archivo, { onError: (e) => toast.error(err(e)) })
+            }
+            className="shrink-0 rounded border border-border/60 p-1 text-muted-foreground transition hover:border-red-500 hover:text-red-500"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

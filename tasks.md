@@ -27,6 +27,9 @@ la carpeta → foto 2 por producto → bajar las dos y publicar. Falta rodarlo:
       Flow con la misma foto de referencia, o si cada uno necesita la suya.
 - [ ] Ver el texto quemado en el móvil: si tapa la cara, se mueve con
       `TEXTO_Y` en `src/nicho_carruseles/config.py` (hoy 0.28).
+- [ ] Medir qué tal reparte la IA las fotos 2 de una tanda grande (dos pasos:
+      describir + repartir por título). Si se le escapan muchas, subir el
+      número de fotos por lote o pasar a comparar imagen contra imagen.
 - [ ] La foto 2 es de CADA producto (sale el producto): la genera el operador
       —en Flow o como quiera— y la sube en la tarjeta. Confirmado 2026-08-17.
 
