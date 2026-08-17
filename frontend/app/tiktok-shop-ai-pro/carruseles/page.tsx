@@ -93,7 +93,7 @@ const VACIO: ProductoCarrusel = {
 const ESCENARIO_POR_CATEGORIA: Record<string, string> = {
   belleza: "generico",
   suplementos: "generico",
-  hogar: "generico",
+  hogar: "casa",
   tecnologia: "generico",
   fitness: "generico",
   descanso: "cama",

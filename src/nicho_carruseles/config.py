@@ -74,23 +74,29 @@ CATEGORIAS = (
 ESCENARIOS: dict[str, dict[str, str]] = {
     "generico": {
         "label": "En la calle, de noche",
-        "para": "Belleza, suplementos y cualquier producto pequeño",
+        "para": "Belleza, suplementos, tecnología y fitness · chica de 19-23",
+    },
+    # Los productos de casa no los anuncia una de 20 en la calle: el tendedero
+    # o el robot aspirador se los cree quien lleva una casa.
+    "casa": {
+        "label": "En casa",
+        "para": "Limpieza, orden y decoración · mujer de 28-38",
     },
     "cama": {
         "label": "En la cama",
-        "para": "Colchones, almohadas, ropa de cama, dormitorio",
+        "para": "Colchones, almohadas, ropa de cama · mujer de 25-35",
     },
     "sofa": {
         "label": "En el sofá",
-        "para": "Sofás, mantas, cojines, salón",
+        "para": "Sofás, mantas, cojines · mujer de 25-35",
     },
     "exterior": {
         "label": "Al aire libre",
-        "para": "Camping, jardín, terraza, muebles de exterior",
+        "para": "Camping, jardín, terraza · mujer de 28-38",
     },
     "cocina": {
         "label": "En la cocina",
-        "para": "Freidoras, cafeteras, menaje, organizadores de cocina",
+        "para": "Freidoras, cafeteras, menaje · mujer de 28-38",
     },
     "bano": {
         "label": "En el baño",
@@ -115,9 +121,7 @@ ESCENARIOS: dict[str, dict[str, str]] = {
 ESCENARIO_POR_CATEGORIA: dict[str, str] = {
     "belleza": "generico",
     "suplementos": "generico",
-    # Limpieza, orden y decoración pequeña: le vale la chica "en casa", que ya
-    # sale en cocina, salón o pasillo. No necesita prompt propio.
-    "hogar": "generico",
+    "hogar": "casa",
     "descanso": "cama",
     "salon": "sofa",
     "exterior": "exterior",
@@ -185,6 +189,7 @@ TEXTO_BORDE = 0.11  # grosor del contorno, sobre el tamaño de letra
 # imagen del POV BOF).
 LUGAR_POR_ESCENARIO: dict[str, str] = {
     "generico": "el sitio de la casa donde se use de verdad",
+    "casa": "el sitio de la casa donde se use de verdad",
     "cama": "un dormitorio, sobre la cama o en la mesilla",
     "sofa": "un salón, sobre el sofá o la mesa de centro",
     "exterior": "un jardín o una terraza",
@@ -212,6 +217,8 @@ LINEA_MANO_SENALA = (
 # En qué escenarios el producto se coge con la mano. Son los de producto
 # pequeño: belleza, suplementos, tecnología y fitness van todos al genérico.
 ESCENARIOS_DE_MANO = frozenset({"generico", "bano", "coche"})
+# "casa" queda fuera: lo que se anuncia ahí (mopas, tendederos, robots)
+# no se sostiene con una mano.
 
 
 def prompt_producto(escenario: str = "", con_mano: bool | None = None) -> str:
