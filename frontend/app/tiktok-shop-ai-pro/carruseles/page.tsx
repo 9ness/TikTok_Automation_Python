@@ -1328,6 +1328,35 @@ function TandaEscenario({
           </button>
         ) : null}
       </div>
+
+      {/* Repetir la tanda desde cero. Hace falta porque una subida que entra a
+          medias no deja saber cuáles llegaron, y volver a subirlas todas
+          colocaría las repetidas en productos que no tocan. */}
+      {total - faltan > 0 ? (
+        <button
+          type="button"
+          disabled={borrarChicas.isPending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                `¿Borrar las ${total - faltan} fotos de chica de "${escenario.label}"? ` +
+                  "Tendrás que volver a subirlas todas.",
+              )
+            )
+              return;
+            borrarChicas.mutate(escenario.clave, {
+              onSuccess: (r) => toast.success(`${r.borradas} fotos borradas`),
+              onError: (e) => toast.error(err(e)),
+            });
+          }}
+          className="w-full text-[10px] text-muted-foreground underline-offset-2 transition hover:text-red-400 hover:underline disabled:opacity-50"
+        >
+          {borrarChicas.isPending
+            ? "Borrando…"
+            : `Borrar las ${total - faltan} fotos ya subidas`}
+        </button>
+      ) : null}
+
       {subiendo && progreso ? <Barra pct={progreso.pct} /> : null}
     </div>
   );
