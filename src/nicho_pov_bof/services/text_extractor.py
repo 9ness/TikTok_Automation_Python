@@ -92,7 +92,9 @@ def _is_valid_entry(entry: object) -> bool:
     return True
 
 
-def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> dict[str, dict]:
+def extract_folder_texts(
+    source: str, folder: str, *, lote: int = 0, on_log: OnLog = _noop,
+) -> dict[str, dict]:
     """Extrae los textos de TODOS los productos de una carpeta en UNA llamada.
 
     Devuelve `{producto: {titulo, titulo_tiktok_completo, tienda, caption}}`
@@ -116,6 +118,7 @@ def extract_folder_texts(source: str, folder: str, *, on_log: OnLog = _noop) -> 
         pairs,
         system_prompt=_load_system_prompt(),
         fetch=drive_client.fetch_photo,
+        lote=lote,
         on_log=on_log,
     )
 
@@ -173,6 +176,7 @@ def extract_from_pairs(
     *,
     system_prompt: str,
     fetch,
+    lote: int = 0,
     on_log: OnLog = _noop,
 ) -> dict[str, dict]:
     """El motor de la extracción, sin saber de dónde salen las fotos.
@@ -273,9 +277,15 @@ def extract_from_pairs(
     # ningún título, así que el detector de duplicados no lo veía. Con cuatro
     # por llamada el modelo no tiene tanto de donde confundirse; son tres
     # llamadas en vez de una y siguen siendo céntimos.
+    #
+    # `lote=1` es la opción a prueba de bombas: una captura por llamada, así no
+    # hay ninguna otra con la que confundirse. Cuesta una llamada por producto
+    # en vez de una por cada cuatro, y se usa cuando se quiere repasar todo el
+    # catálogo y quedarse tranquilo.
+    tam = lote if lote > 0 else LOTE_MAX
     result: dict[str, dict] = {}
-    for i in range(0, len(ids), LOTE_MAX):
-        result.update(_pedir(ids[i:i + LOTE_MAX], image_paths[i:i + LOTE_MAX]))
+    for i in range(0, len(ids), tam):
+        result.update(_pedir(ids[i:i + tam], image_paths[i:i + tam]))
 
     # Reintento de los que se hayan quedado fuera. En un lote de 10 imágenes
     # el modelo se deja alguna suelta (pasó con una captura muy alta,

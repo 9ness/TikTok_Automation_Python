@@ -2339,6 +2339,9 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     p = job.params or {}
     source = str(p.get("source") or "")
     rehacer = bool(p.get("rehacer"))
+    # De una en una: más lento, pero imposible que el modelo cruce los textos
+    # entre productos de la misma carpeta.
+    lote = 1 if p.get("uno_a_uno") else 0
     if not source:
         raise RuntimeError("Falta el catálogo del que sacar los textos.")
 
@@ -2396,7 +2399,7 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
                 textos = top_vendidos.recopiar_textos(carpeta)
             else:
                 textos = text_extractor.extract_folder_texts(
-                    source, carpeta, on_log=on_log,
+                    source, carpeta, lote=lote, on_log=on_log,
                 )
         except Exception as e:  # noqa: BLE001 — una carpeta rota no para el resto
             on_log(f"[textos] {carpeta} falló: {e}")

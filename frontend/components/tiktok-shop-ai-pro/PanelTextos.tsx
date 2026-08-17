@@ -25,10 +25,11 @@ export function PanelTextos() {
   const openQueue = useDrawerStore((s) => s.openQueue);
   const [source, setSource] = useState("aleatorios_1");
   const [rehacer, setRehacer] = useState(false);
+  const [unoAUno, setUnoAUno] = useState(false);
 
   function lanzar() {
     lote.mutate(
-      { source, rehacer },
+      { source, rehacer, unoAUno },
       {
         onSuccess: (r) => {
           toast.success(`${r.title} en la cola`);
@@ -79,6 +80,19 @@ export function PanelTextos() {
           onChange={(e) => setRehacer(e.target.checked)}
         />
         Rehacer también las carpetas que ya tienen textos
+      </label>
+
+      {/* Una captura por llamada: es la única forma de que el modelo no pueda
+          cruzar los títulos entre productos de la misma carpeta. Tarda más y
+          cuesta una llamada por producto, pero deja el catálogo fiable. */}
+      <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-violet-500"
+          checked={unoAUno}
+          onChange={(e) => setUnoAUno(e.target.checked)}
+        />
+        Leer las capturas de una en una (más lento, imposible que se crucen)
       </label>
 
       <button

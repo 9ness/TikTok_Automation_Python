@@ -250,6 +250,7 @@ def textos_lote_enqueue(
     queue: Annotated[JobQueue, Depends(get_queue)],
     source: Annotated[str, Query()],
     rehacer: Annotated[bool, Query()] = False,
+    uno_a_uno: Annotated[bool, Query()] = False,
 ) -> dict:
     """Encola la extracción de textos de TODAS las carpetas de un catálogo.
 
@@ -266,11 +267,19 @@ def textos_lote_enqueue(
         raise _bad_request(f"Catálogo desconocido: {source!r}")
 
     etiqueta = (pov_config.SOURCES[source].get("label") or source)
-    title = f"🔤 Textos · {etiqueta}" + (" (rehacer)" if rehacer else "")
+    title = (
+        f"🔤 Textos · {etiqueta}"
+        + (" (rehacer)" if rehacer else "")
+        + (" · una a una" if uno_a_uno else "")
+    )
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_TEXTOS,
         title=title,
-        params={"source": source, "rehacer": bool(rehacer)},
+        params={
+            "source": source,
+            "rehacer": bool(rehacer),
+            "uno_a_uno": bool(uno_a_uno),
+        },
     )
     pending = [
         j for j in queue.get_all()

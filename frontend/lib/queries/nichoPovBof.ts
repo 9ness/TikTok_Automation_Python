@@ -169,12 +169,13 @@ export function useTextosLote() {
   return useMutation<
     { job_id: string; title: string; position_in_queue: number },
     Error,
-    { source: string; rehacer?: boolean }
+    { source: string; rehacer?: boolean; unoAUno?: boolean }
   >({
-    mutationFn: ({ source, rehacer }) =>
+    mutationFn: ({ source, rehacer, unoAUno }) =>
       api.post(
         `${ROOT}/textos/lote?source=${encodeURIComponent(source)}` +
-          (rehacer ? "&rehacer=1" : ""),
+          (rehacer ? "&rehacer=1" : "") +
+          (unoAUno ? "&uno_a_uno=1" : ""),
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
   });
