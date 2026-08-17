@@ -328,6 +328,7 @@ def clasificar_carpeta(
         carrusel_repo.guardar_categorias(body.source, body.folder, cats)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+    _invalidar_barrido()
     return _estado_carpeta(body.source, body.folder, usuario)
 
 
@@ -651,40 +652,22 @@ def _pendientes_de_chica(usuario: str, escenario: str = "") -> list[dict]:
     que la tanda de Flow se hace una vez para todo el trabajo pendiente y no
     catálogo a catálogo (lo pidió así el operador).
 
-    En ORDEN de trabajo (catálogo, carpeta y número): es el mismo orden en el
-    que se reparte la tanda que sube.
+    Sale del MISMO barrido que el contador (`_barrer`), que está cacheado: antes
+    eran dos recorridos completos de los cuatro catálogos cada vez que se abría
+    la pantalla, y se notaba.
     """
-    from src.nicho_carruseles.repos.redis_base import get_nicho_carruseles_redis
-    from src.nicho_pov_bof.services import drive_client
-
-    r = get_nicho_carruseles_redis()
-    if not r.is_available():
-        return []
-
     pendientes: list[dict] = []
-    for source in config.fuentes_a_barrer():
-        try:
-            nombres = [c.get("name", "") for c in drive_client.list_product_folders(source)]
-        except Exception:  # noqa: BLE001 — un catálogo ilegible no tumba el resto
+    for item in _barrer(usuario):
+        if not item["apto"]:
             continue
-        docs = r.mget_json(
-            [f"folder:{config.fuente_canonica(source)}:{n}" for n in nombres]
-        )
-        for i, folder in enumerate(nombres):
-            prods = ((docs[i] if i < len(docs) else None) or {}).get("productos") or {}
-            for pid in sorted(prods, key=lambda p: (len(p), p)):
-                prod = prods[pid]
-                if not carrusel_repo.es_apto(prod):
-                    continue
-                suyo = carrusel_repo.escenario_de(prod)
-                if escenario and suyo != escenario:
-                    continue
-                if fotos_svc.tiene("chica", usuario, source, folder, pid):
-                    continue
-                pendientes.append({
-                    "source": source, "folder": folder, "producto": pid,
-                    "escenario": suyo,
-                })
+        if escenario and item["escenario"] != escenario:
+            continue
+        if item["tiene_chica"]:
+            continue
+        pendientes.append({
+            "source": item["source"], "folder": item["folder"],
+            "producto": item["producto"], "escenario": item["escenario"],
+        })
     return pendientes
 
 
@@ -822,7 +805,32 @@ def _barrer_aptos(usuario: str) -> list[dict]:
     return [i for i in _barrer(usuario) if i["apto"]]
 
 
+_BARRIDO_TTL_S = 60.0
+_BARRIDO: dict[str, tuple[float, list[dict]]] = {}
+
+
 def _barrer(usuario: str) -> list[dict]:
+    """Como `_barrer_sin_cache`, pero guardado un minuto.
+
+    La pantalla llama a `/aptos` y a `/chicas/pendientes` a la vez y los dos
+    hacen el mismo recorrido; sin esto se paga dos veces cada vez que se abre.
+    """
+    import time as _time
+
+    hit = _BARRIDO.get(usuario)
+    if hit and _time.monotonic() < hit[0]:
+        return hit[1]
+    datos = _barrer_sin_cache(usuario)
+    _BARRIDO[usuario] = (_time.monotonic() + _BARRIDO_TTL_S, datos)
+    return datos
+
+
+def _invalidar_barrido() -> None:
+    """Tras tocar fotos o clasificación: el contador tiene que reflejarlo ya."""
+    _BARRIDO.clear()
+
+
+def _barrer_sin_cache(usuario: str) -> list[dict]:
     """TODOS los productos con textos, de todos los catálogos, en orden.
 
     Cruza tres cosas: lo que sabe este nicho (categoría, mensajes), los textos
@@ -870,6 +878,9 @@ def _barrer(usuario: str) -> list[dict]:
                     "escenario": carrusel_repo.escenario_de(prod) if apto else "",
                     "tiene_foto2": apto and fotos_svc.tiene(
                         "producto", usuario, source, folder, pid,
+                    ),
+                    "tiene_chica": apto and fotos_svc.tiene(
+                        "chica", usuario, source, folder, pid,
                     ),
                 })
     return salida
@@ -1052,6 +1063,7 @@ async def subir_foto(
             tipo, usuario, source, folder, producto, datos,
             filename=archivo.filename or "",
         )
+        _invalidar_barrido()
         # La versión con texto era de la foto vieja: se tira para que no quede
         # un carrusel con la foto nueva y el quemado de la anterior.
         fotos_svc.borrar(f"{tipo}_txt", usuario, source, folder, producto)

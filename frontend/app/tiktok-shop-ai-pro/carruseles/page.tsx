@@ -150,6 +150,8 @@ export default function CarruselesPage() {
   // Flow (bajar todas las de dormitorio de una vez) en lugar de carpeta a
   // carpeta con dos productos en cada una.
   const todosAptos = useAptos();
+  const referenciasGlobal = useReferencias();
+  const referenciasCargando = referenciasGlobal.isLoading;
   const subirFotos2 = useSubirFotos2();
   const aptosGlobales = todosAptos.data?.items ?? [];
   const porCategoriaPendiente = aptosGlobales.reduce<Record<string, number>>(
@@ -556,6 +558,7 @@ export default function CarruselesPage() {
               key={esc.clave}
               escenario={esc}
               faltan={pendientes.data?.por_escenario?.[esc.clave] ?? 0}
+              cargando={pendientes.isLoading || referenciasCargando}
               subiendo={subirChicas.isPending && tandaEnCurso === esc.clave}
               progreso={tandaEnCurso === esc.clave ? progresoTanda : null}
               onSubir={(files) => {
@@ -1098,12 +1101,15 @@ function Barra({ pct }: { pct: number }) {
 function TandaEscenario({
   escenario,
   faltan,
+  cargando,
   subiendo,
   progreso,
   onSubir,
 }: {
   escenario: EscenarioPrompt;
   faltan: number;
+  /** Aún no han llegado los datos: no es que no haya nada. */
+  cargando: boolean;
   subiendo: boolean;
   /** Progreso de la subida de ESTE escenario (null si no es el suyo). */
   progreso: ProgresoTanda | null;
@@ -1174,7 +1180,11 @@ function TandaEscenario({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold">{escenario.label}</p>
           <p className="truncate text-[10px] text-muted-foreground">
-            {suya?.propia ? "referencia propia · " : "⚠️ sin referencia propia · "}
+            {cargando
+              ? "cargando… · "
+              : suya?.propia
+                ? "referencia propia · "
+                : "⚠️ sin referencia propia · "}
             {escenario.para}
           </p>
         </div>
@@ -1183,7 +1193,7 @@ function TandaEscenario({
             faltan ? "bg-fuchsia-500/20 text-fuchsia-400" : "text-muted-foreground"
           }`}
         >
-          {faltan}
+          {cargando ? "…" : faltan}
         </span>
       </div>
 
@@ -1212,7 +1222,7 @@ function TandaEscenario({
         </button>
         <button
           type="button"
-          disabled={subiendo || !faltan}
+          disabled={subiendo || cargando || !faltan}
           onClick={() => ref.current?.click()}
           className="flex items-center justify-center gap-1 rounded-md bg-fuchsia-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-40"
         >

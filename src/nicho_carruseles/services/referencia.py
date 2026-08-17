@@ -147,26 +147,44 @@ def estado(usuario: str = "") -> dict[str, dict]:
 
     `propia` distingue la que ha puesto el operador de la del curso: es lo que
     dice si el botón de "volver a la del curso" tiene sentido.
+
+    Se lista la carpeta UNA vez en vez de preguntar fichero a fichero: son 11
+    referencias × 4 extensiones = 44 comprobaciones contra el Drive montado, y
+    esta pantalla ya va justa de espera.
     """
+    base = config.carruseles_dir() / (usuario or "ness")
+    try:
+        ficheros = {
+            f.stem: f for f in base.iterdir()
+            if f.is_file() and f.suffix.lower() in _EXTS
+        }
+    except OSError:
+        ficheros = {}
+
+    def _mtime(f: Path) -> str:
+        try:
+            return f"{int(f.stat().st_mtime)}"
+        except OSError:
+            return ""
+
     salida: dict[str, dict] = {}
     for tipo in TIPOS:
-        propia = _propia(tipo, usuario)
+        propia = ficheros.get(f"referencia_{tipo}")
+        # Del curso solo hay la de la chica, y resolverla cuesta una llamada a
+        # rclone: solo se pregunta si no hay propia.
         ruta = propia or (_del_curso() if tipo == "chica" else None)
         salida[tipo] = {
             "hay": bool(ruta),
             "propia": bool(propia),
-            "version": f"{int(ruta.stat().st_mtime)}" if ruta else "",
+            "version": _mtime(ruta) if ruta else "",
         }
     # Y la de cada escenario, para saber cuáles tienen la suya y cuáles tiran
     # de la general.
     for escenario in config.ESCENARIOS:
-        suya = _propia("chica", usuario, escenario)
+        suya = ficheros.get(f"referencia_chica_{escenario}")
         salida[f"chica_{escenario}"] = {
             "hay": bool(suya or salida["chica"]["hay"]),
             "propia": bool(suya),
-            "version": (
-                f"{int(suya.stat().st_mtime)}" if suya
-                else salida["chica"]["version"]
-            ),
+            "version": _mtime(suya) if suya else salida["chica"]["version"],
         }
     return salida
