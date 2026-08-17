@@ -1225,20 +1225,36 @@ function TandaEscenario({
             : "Subir tanda"}
         </button>
       </div>
-      {suya?.propia ? (
+      {/* Crear la referencia desde CERO, sin adjuntar foto: con una imagen de
+          referencia el modelo copia la cara —y con ella la edad—, así que es la
+          única forma de tener una chica más joven. Se genera, se sube aquí como
+          referencia del escenario y ya todas las tandas salen así. */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() =>
-            borrarRef.mutate(
-              { tipo: "chica", escenario: escenario.clave },
-              { onError: (e) => toast.error(err(e)) },
-            )
-          }
-          className="w-full text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+          onClick={() => {
+            navigator.clipboard.writeText(escenario.prompt_referencia);
+            toast.success("Prompt para crear la referencia (sin foto)");
+          }}
+          className="flex-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
         >
-          Volver a la referencia general
+          Prompt para crear esta referencia
         </button>
-      ) : null}
+        {suya?.propia ? (
+          <button
+            type="button"
+            onClick={() =>
+              borrarRef.mutate(
+                { tipo: "chica", escenario: escenario.clave },
+                { onError: (e) => toast.error(err(e)) },
+              )
+            }
+            className="shrink-0 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Quitar
+          </button>
+        ) : null}
+      </div>
       {subiendo && progreso ? <Barra pct={progreso.pct} /> : null}
     </div>
   );

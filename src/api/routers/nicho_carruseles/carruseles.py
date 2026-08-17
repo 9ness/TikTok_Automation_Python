@@ -56,6 +56,10 @@ class EscenarioPrompt(BaseModel):
     # cocina o en el dormitorio según dónde se use.
     prompt_producto: str
     prompt_producto_mano: str
+    # Para CREAR la foto de referencia de este escenario desde cero, sin
+    # adjuntar ninguna imagen: es la única forma de fijar la edad (con una foto
+    # de referencia el modelo copia la cara, y con ella los años).
+    prompt_referencia: str
 
 
 class PromptsResponse(BaseModel):
@@ -145,6 +149,7 @@ def get_prompts() -> PromptsResponse:
                     prompt=config.leer_prompt(f"foto_chica_{clave}"),
                     prompt_producto=config.prompt_producto(clave),
                     prompt_producto_mano=config.prompt_producto(clave, con_mano=True),
+                    prompt_referencia=config.leer_prompt(f"referencia_chica_{clave}"),
                 )
                 for clave, meta in config.ESCENARIOS.items()
             ],

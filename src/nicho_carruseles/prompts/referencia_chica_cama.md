@@ -1,0 +1,3 @@
+Foto vertical 9:16 de una chica de 26 años, muy guapa, con cara de sorpresa total: ojos muy abiertos y boca abierta, como quien acaba de enterarse de algo increíble. Se está haciendo un selfie con el móvil sujeto con la mano, a la altura de los ojos. Está sentada en la cama de un dormitorio real y acogedor; se ven el cabecero, las almohadas y la ropa de cama.
+
+Ultra realista, como una foto sacada con un iPhone 16 sin filtros: luz natural, sin efecto cinematográfico, sin retoque de piel, sin fondo desenfocado artificial. Que parezca una foto de verdad de una persona normal, no una modelo de catálogo ni una imagen de IA. Sin texto, sin logotipos y sin marcas de agua.

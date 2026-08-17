@@ -84,6 +84,9 @@ export interface EscenarioPrompt {
    *  composición: basta con la foto limpia del producto. */
   prompt_producto: string;
   prompt_producto_mano: string;
+  /** Para CREAR la referencia de este escenario desde cero, sin adjuntar
+   *  ninguna foto: es lo único que fija la edad. */
+  prompt_referencia: string;
 }
 
 export interface PromptsCarruseles {
