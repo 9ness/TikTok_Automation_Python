@@ -17,7 +17,10 @@ import {
   Mic,
   HardDrive,
   HardHat,
+  GalleryHorizontalEnd,
   Package,
+  PenLine,
+  Puzzle,
   Radar,
   Rocket,
   Scissors,
@@ -25,6 +28,7 @@ import {
   Shirt,
   ShoppingBag,
   Trophy,
+  Type,
   Video,
 } from "lucide-react";
 
@@ -54,6 +58,11 @@ export const MODE_TO_PROGRAM: Record<JobMode, Program> = {
   nicho_bof_cine_video: "viralizacion",
   cuenta_piloto_video: "viralizacion",
   nicho_pov_bof_largo_video: "viralizacion",
+  nicho_pov_bof_plazos_video: "viralizacion",
+  nicho_pov_bof_textos: "viralizacion",
+  nicho_pov_bof_largo_guiones: "viralizacion",
+  nicho_carruseles_preparar: "viralizacion",
+  nicho_carruseles_reparto: "viralizacion",
 };
 
 export const PROGRAM_LABEL: Record<Program, string> = {
@@ -92,6 +101,11 @@ export const SUBMODULE_LABEL: Record<JobMode, string> = {
   nicho_bof_cine_video: "Nicho BOF Cinematográfico",
   cuenta_piloto_video: "Cuenta Piloto",
   nicho_pov_bof_largo_video: "POV BOF Largo",
+  nicho_pov_bof_plazos_video: "POV BOF (plazos)",
+  nicho_pov_bof_textos: "Textos del catálogo",
+  nicho_pov_bof_largo_guiones: "Guiones POV BOF Largo",
+  nicho_carruseles_preparar: "Carruseles",
+  nicho_carruseles_reparto: "Fotos de carrusel",
 };
 
 export const MODE_ICON: Record<JobMode, LucideIcon> = {
@@ -116,6 +130,11 @@ export const MODE_ICON: Record<JobMode, LucideIcon> = {
   nicho_bof_cine_video: Film,
   cuenta_piloto_video: FlaskConical,
   nicho_pov_bof_largo_video: Mic,
+  nicho_pov_bof_plazos_video: Mic,
+  nicho_pov_bof_textos: Type,
+  nicho_pov_bof_largo_guiones: PenLine,
+  nicho_carruseles_preparar: GalleryHorizontalEnd,
+  nicho_carruseles_reparto: Puzzle,
 };
 
 /**
@@ -201,6 +220,18 @@ export function describeJobParams(
       break;
     case "nicho_pov_bof_backup":
       out.push(params.force_full ? "copia completa" : "incremental");
+      break;
+    case "nicho_pov_bof_textos":
+      if (params.source) out.push(String(params.source));
+      if (params.rehacer) out.push("rehaciendo los que ya estaban");
+      break;
+    case "nicho_pov_bof_largo_guiones":
+      out.push(params.folder ? String(params.folder) : "todas las carpetas");
+      if (params.rehacer) out.push("rehaciendo");
+      break;
+    case "nicho_carruseles_preparar":
+      if (params.source) out.push(String(params.source));
+      out.push(params.solo_filtrar ? "solo filtrar" : "filtrar + mensajes");
       break;
     case "nicho_ropa_video":
       if (params.producto) out.push(`prenda ${String(params.producto)}`);
