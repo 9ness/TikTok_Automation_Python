@@ -1,5 +1,0 @@
-Foto vertical 9:16, SELFIE hecho con la cámara frontal del móvil, con el brazo estirado y la cámara a la altura de los ojos. El móvil NO aparece en la imagen y ella NO lo está mirando: mira a cámara. Sale una chica ESPAÑOLA (rasgos mediterráneos, pelo castaño claro o rubio oscuro) de 32 años, MUY GUAPA y atractiva —de las que paran el scroll—, con la piel limpia y sana, con cara de sorpresa total: ojos muy abiertos y boca abierta, como quien acaba de enterarse de algo increíble. Está de pie en la cocina de una casa real, junto a la encimera.
-
-Estilo de selfie REAL de móvil, no de fotógrafo: flash del propio móvil, algo de grano, ligero movimiento, pelo despeinado, ropa de diario (camiseta, top o sudadera) y maquillaje natural muy ligero. La piel, limpia: sin acné, sin manchas y sin marcas, pero con textura de piel real (nada de retoque de estudio ni efecto plástico). Nada de pose de modelo, nada de estudio, sin fondo desenfocado artificial y sin efecto cinematográfico. Que parezca sacada con un iPhone en ese momento.
-
-Sin texto, sin logotipos y sin marcas de agua.

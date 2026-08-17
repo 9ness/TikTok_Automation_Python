@@ -105,16 +105,19 @@ def borrar(usuario: str) -> None:
 
 
 def prompt_referencia(usuario: str, escenario: str) -> str:
-    """El prompt para crear la referencia de un escenario.
+    """El JSON con el que se crea la foto de referencia de un escenario.
 
-    Con ficha guardada se manda el JSON con ESA chica; sin ella, el párrafo de
-    siempre (`prompts/referencia_chica_<escenario>.md`).
+    Siempre JSON, con ficha o sin ella: es lo que mejor respeta el modelo (la
+    plantilla del curso del Nicho Ropa va igual) y evita que la edad o el estilo
+    se pierdan en un párrafo. Con ficha guardada sale la chica del operador; sin
+    ella, la de la plantilla.
+
+    Se genera SIN adjuntar ninguna imagen: es la única forma de fijar la edad,
+    porque con una foto delante el modelo copia la cara y con ella los años.
     """
-    texto_base = config.leer_prompt(f"referencia_chica_{escenario}")
     doc = leer(usuario)
-    ficha = doc.get("ficha") if isinstance(doc, dict) else None
-    if not isinstance(ficha, dict) or not ficha:
-        return texto_base
+    guardada = doc.get("ficha") if isinstance(doc, dict) else None
+    ficha = guardada if isinstance(guardada, dict) and guardada else plantilla()
 
     escena = config.ESCENA_EN.get(escenario) or config.ESCENA_EN["generico"]
     ficha = json.loads(json.dumps(ficha).replace("{escena}", f"She is {escena}"))
