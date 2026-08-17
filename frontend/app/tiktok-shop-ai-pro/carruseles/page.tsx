@@ -366,7 +366,7 @@ export default function CarruselesPage() {
           n={1}
           color="violeta"
           titulo="Preparar la carpeta"
-          hint="Lee las fichas con IA y decide qué productos valen: los que la chica puede estar usando en el sitio del producto."
+          hint="En este orden: los textos primero (el filtro los lee), luego cuáles valen y por último sus dos mensajes."
           extra={`${aptos.length} aptos`}
         >
           <button
@@ -389,7 +389,7 @@ export default function CarruselesPage() {
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" /> Obtener textos ({conTexto}/{items.length})
+                <Sparkles className="h-4 w-4" /> 1º Obtener textos ({conTexto}/{items.length})
               </>
             )}
           </button>
@@ -415,7 +415,7 @@ export default function CarruselesPage() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mirando la carpeta…
               </>
             ) : (
-              <>🔎 {clasificada ? "Volver a filtrar" : "Filtrar los que valen para carrusel"}</>
+              <>🔎 2º {clasificada ? "Volver a filtrar" : "Filtrar los que valen para carrusel"}</>
             )}
           </button>
 
@@ -435,7 +435,7 @@ export default function CarruselesPage() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Escribiendo mensajes…
               </>
             ) : (
-              <>✍️ Escribir los dos mensajes ({conMensaje}/{aptos.length})</>
+              <>✍️ 3º Escribir los dos mensajes ({conMensaje}/{aptos.length})</>
             )}
           </button>
 
