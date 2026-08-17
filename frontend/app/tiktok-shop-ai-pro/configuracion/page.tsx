@@ -4,6 +4,7 @@ import { Settings } from "lucide-react";
 
 import { EchoTikPanel, HashtagsPanel } from "@/components/tiktok-shop-ai-pro/PanelesConfig";
 import { PanelBackup } from "@/components/tiktok-shop-ai-pro/PanelBackup";
+import { PanelCarruseles } from "@/components/tiktok-shop-ai-pro/PanelCarruseles";
 import { PanelGuiones } from "@/components/tiktok-shop-ai-pro/PanelGuiones";
 import { PanelTextos } from "@/components/tiktok-shop-ai-pro/PanelTextos";
 
@@ -36,6 +37,7 @@ export default function ConfiguracionAiProPage() {
       <HashtagsPanel />
       <PanelTextos />
       <PanelGuiones />
+      <PanelCarruseles />
       <PanelBackup />
       {MOSTRAR_ECHOTIK && <EchoTikPanel />}
     </div>

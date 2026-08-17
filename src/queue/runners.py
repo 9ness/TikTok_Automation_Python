@@ -2545,6 +2545,175 @@ def _foto_limpia(source: str, folder: str, producto: str):
     return None
 
 
+
+def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Filtra y escribe los mensajes de TODO un catálogo, carpeta por carpeta.
+
+    Los dos pasos que hay que dar antes de poder trabajar en Carruseles y que
+    de uno en uno son 35 carpetas × 2 botones. Ambos son llamadas de TEXTO a
+    Gemini (leen los títulos ya extraídos, sin imágenes), así que salen baratas
+    y caben de sobra en un solo trabajo.
+
+    Por carpeta:
+      1. clasificar — qué productos valen y en qué escenario va su chica,
+      2. mensajes — el de la foto 1 y el de la foto 2 de los que valen.
+
+    Se salta lo ya hecho: una carpeta ya clasificada no se vuelve a mirar y un
+    producto con mensajes no se reescribe. Una carpeta que falle no para las
+    demás.
+
+    Params: source, rehacer (rehace clasificación y mensajes), solo_filtrar.
+    """
+    from src.nicho_carruseles.repos import carrusel_repo
+    from src.nicho_carruseles.services import clasificador, mensajes as mensajes_svc
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    p = job.params or {}
+    source = str(p.get("source") or "")
+    rehacer = bool(p.get("rehacer"))
+    solo_filtrar = bool(p.get("solo_filtrar"))
+    if not source:
+        raise RuntimeError("Falta el catálogo que preparar.")
+
+    carpetas = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    if not carpetas:
+        raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
+
+    textos_por_carpeta = pov_repo.load_folders([(source, c) for c in carpetas])
+    clasificadas, con_mensajes, sin_textos, fallidas = 0, 0, [], []
+    # Los mensajes 1 ya usados en el catálogo, para que no se repitan de una
+    # carpeta a otra: el modelo no los ve de ninguna otra forma.
+    usados: list[str] = []
+    for doc in (carrusel_repo.load_folder(source, c) for c in carpetas):
+        for prod in (doc.get("productos") or {}).values():
+            if prod.get("mensaje1"):
+                usados.append(str(prod["mensaje1"]))
+
+    for i, carpeta in enumerate(carpetas):
+        on_progress(i / len(carpetas), f"🖼️ {i + 1}/{len(carpetas)} · {carpeta}")
+        textos = ((textos_por_carpeta[i] or {}).get("productos")) or {}
+        if not any(str(x.get("titulo") or "").strip() for x in textos.values()):
+            sin_textos.append(carpeta)
+            continue
+
+        doc = carrusel_repo.load_folder(source, carpeta)
+        mios = doc.get("productos") or {}
+        try:
+            if rehacer or not doc.get("clasificada"):
+                cats = clasificador.clasificar(textos, on_log=on_log)
+                if cats:
+                    mios = carrusel_repo.guardar_categorias(source, carpeta, cats)
+                    clasificadas += 1
+                else:
+                    fallidas.append(carpeta)
+                    continue
+
+            if solo_filtrar:
+                continue
+
+            aptos = {
+                pid: textos[pid] for pid, prod in mios.items()
+                if carrusel_repo.es_apto(prod) and pid in textos
+                and (rehacer or not prod.get("mensaje1"))
+            }
+            if not aptos:
+                continue
+            escritos = mensajes_svc.escribir(aptos, evitar=usados, on_log=on_log)
+            if escritos:
+                carrusel_repo.guardar_mensajes(source, carpeta, escritos)
+                con_mensajes += len(escritos)
+                usados += [d["mensaje1"] for d in escritos.values()]
+        except Exception as e:  # noqa: BLE001 — una carpeta rota no para el resto
+            on_log(f"[carruseles] {carpeta} falló: {e}")
+            fallidas.append(carpeta)
+
+    on_progress(1.0, "🖼️ Catálogo preparado")
+    if sin_textos:
+        on_log(
+            f"[carruseles] sin textos (se saltan): {', '.join(sin_textos)} — "
+            "sácalos en Configuración › Textos de todo un catálogo"
+        )
+    resumen = f"{clasificadas} carpetas filtradas · {con_mensajes} productos con mensajes"
+    if fallidas:
+        on_log(f"[carruseles] fallaron: {', '.join(fallidas)}")
+        resumen += f" · {len(fallidas)} con fallo"
+    on_log(f"[carruseles] {resumen}")
+    return resumen
+
+
+
+def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Reconoce de qué producto es cada foto 2 suelta y la coloca en su ficha.
+
+    Las fotos ya están subidas (el endpoint las deja en "sin asignar", así que
+    no se pierde nada si esto falla): aquí solo se mira qué hay en cada una y se
+    reparte. Va por la cola porque es una llamada de visión por cada 12 fotos y
+    una tanda de 40 se plantaba minuto y medio con el navegador esperando.
+
+    Params: usuario.
+    """
+    from src.nicho_carruseles.services import fotos as fotos_svc, reparto_fotos
+
+    p = job.params or {}
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+
+    sueltas = fotos_svc.listar_sin_asignar(usuario)
+    if not sueltas:
+        on_log("[carruseles] no hay fotos sueltas que repartir")
+        return "sin-cambios"
+
+    on_progress(0.05, f"🧩 {len(sueltas)} foto(s) por reconocer")
+    candidatos = _candidatos_carrusel(usuario)
+    if not candidatos:
+        raise RuntimeError(
+            "Ningún producto apto está esperando foto de producto. Filtra "
+            "alguna carpeta primero."
+        )
+
+    rutas, nombres = [], []
+    for f in sueltas:
+        ruta = fotos_svc.ruta_sin_asignar(usuario, f["archivo"])
+        if ruta:
+            rutas.append(ruta)
+            nombres.append(f["archivo"])
+
+    reparto = reparto_fotos.repartir(rutas, candidatos, on_log=on_log)
+    por_ref = {c["ref"]: c for c in candidatos}
+    colocadas = 0
+    for fila in reparto:
+        destino = por_ref.get(fila["ref"])
+        if not destino:
+            continue
+        try:
+            fotos_svc.asignar_sin_asignar(
+                usuario, nombres[fila["foto"]], destino["source"],
+                destino["folder"], destino["producto"],
+            )
+            colocadas += 1
+        except (ValueError, OSError) as e:
+            on_log(f"[carruseles] {nombres[fila['foto']]} no se pudo colocar: {e}")
+
+    on_progress(1.0, "🧩 Fotos repartidas")
+    sueltas_final = len(fotos_svc.listar_sin_asignar(usuario))
+    resumen = f"{colocadas}/{len(rutas)} fotos colocadas"
+    if sueltas_final:
+        resumen += f" · {sueltas_final} sin reconocer"
+        on_log(
+            "[carruseles] las que no se han reconocido siguen en «Sin "
+            "reconocer»: se colocan a mano desde la pantalla"
+        )
+    on_log(f"[carruseles] {resumen}")
+    return resumen
+
+
+def _candidatos_carrusel(usuario: str) -> list[dict]:
+    """Productos aptos que esperan foto de producto, de todos los catálogos."""
+    from src.api.routers.nicho_carruseles.carruseles import _barrer_aptos
+
+    return [i for i in _barrer_aptos(usuario) if not i["tiene_foto2"]]
+
+
 # ============================================================
 # RUNNER: NICHO POV BOF — MONTAJE DE VÍDEO POR PRODUCTO
 # ============================================================
@@ -3088,6 +3257,8 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
+    JobMode.NICHO_CARRUSELES_PREPARAR: run_nicho_carruseles_preparar,
+    JobMode.NICHO_CARRUSELES_REPARTO: run_nicho_carruseles_reparto,
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: run_nicho_pov_bof_plazos_video,
 }
 
@@ -3116,6 +3287,8 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
+    JobMode.NICHO_CARRUSELES_PREPARAR: "viralizacion",
+    JobMode.NICHO_CARRUSELES_REPARTO: "viralizacion",
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "viralizacion",
 }
 

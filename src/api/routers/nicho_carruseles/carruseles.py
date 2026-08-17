@@ -23,11 +23,12 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.api.dependencies import get_current_user, get_web_user
+from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.nicho_carruseles import config
 from src.nicho_carruseles.repos import carrusel_repo
 from src.nicho_carruseles.services import fotos as fotos_svc
+from src.queue.manager import JobQueue
 
 router = APIRouter(
     prefix="/api/v1/nicho-carruseles",
@@ -766,84 +767,91 @@ def _barrer(usuario: str) -> list[dict]:
     return salida
 
 
-@router.post("/fotos2")
+class PrepararRequest(BaseModel):
+    """Filtrar (y escribir mensajes de) TODO un catálogo, por la cola."""
+
+    source: str
+    rehacer: bool = False
+    # Solo el filtro, sin escribir mensajes: para mirar primero cuántos pasan.
+    solo_filtrar: bool = False
+
+
+@router.post("/preparar", status_code=201)
+def preparar_catalogo(
+    body: PrepararRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> dict:
+    """Encola el filtro + los mensajes de todas las carpetas del catálogo.
+
+    Los dos pasos de la pantalla, pero para las 35 carpetas: de una en una son
+    70 botones. Las dos llamadas son de TEXTO (leen los títulos ya extraídos),
+    así que salen baratas.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.queue.models import JobMode, JobStatus
+
+    if body.source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {body.source!r}")
+
+    etiqueta = pov_config.SOURCES[body.source].get("label") or body.source
+    title = f"🖼️ Carruseles · {etiqueta}" + (" (solo filtro)" if body.solo_filtrar else "")
+    job = queue.enqueue(
+        JobMode.NICHO_CARRUSELES_PREPARAR,
+        title=title,
+        params={
+            "source": body.source,
+            "rehacer": bool(body.rehacer),
+            "solo_filtrar": bool(body.solo_filtrar),
+        },
+    )
+    pendientes = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    return {
+        "job_id": job.id,
+        "title": title,
+        "position_in_queue": next(
+            (i for i, j in enumerate(pendientes) if j.id == job.id), 0
+        ),
+    }
+
+
+@router.post("/fotos2", status_code=201)
 async def subir_fotos2(
     archivos: Annotated[list[UploadFile], File()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Sube la tanda de fotos de PRODUCTO y las reparte solas.
+    """Sube la tanda de fotos de PRODUCTO y encola el reparto.
 
     Aquí no vale repartir por orden como con las chicas: cada foto es de UN
-    producto concreto. Se reconoce con IA (`services/reparto_fotos.py`) contra
-    los productos que esperan foto, de todos los catálogos.
-
-    Lo que no se reconoce NO se tira: se guarda en "sin asignar" y la pantalla
-    lo enseña para colocarlo a mano.
+    producto concreto y hay que mirarla. Eso es una llamada de visión por cada
+    12 fotos, así que las fotos se guardan primero —en "sin asignar", donde no
+    se pierden pase lo que pase— y el reconocimiento va por la cola.
     """
-    from src.nicho_carruseles.services import reparto_fotos
+    from src.queue.models import JobMode
 
     if not archivos:
         raise _bad_request("No has adjuntado ninguna foto.")
 
-    candidatos = [i for i in _barrer_aptos(usuario) if not i["tiene_foto2"]]
-    if not candidatos:
-        raise _bad_request("Ningún producto apto está esperando foto de producto.")
-
-    import tempfile
-
-    trabajo = Path(tempfile.mkdtemp(prefix="carruseles_fotos2_"))
-    try:
-        rutas: list[Path] = []
-        nombres: list[str] = []
-        for i, archivo in enumerate(
-            sorted(archivos, key=lambda a: (a.filename or "").lower())
-        ):
-            datos = await _leer_foto(archivo)
-            nombre = archivo.filename or f"foto_{i + 1}.jpg"
-            destino = trabajo / f"{i:03d}_{Path(nombre).name}"
-            destino.write_bytes(datos)
-            rutas.append(destino)
-            nombres.append(nombre)
-
-        reparto = reparto_fotos.repartir(rutas, candidatos)
-        por_ref = {c["ref"]: c for c in candidatos}
-        asignadas, sueltas = [], []
-        for fila in reparto:
-            i = fila["foto"]
-            destino = por_ref.get(fila["ref"])
-            if not destino:
-                fotos_svc.guardar_sin_asignar(
-                    usuario, rutas[i].read_bytes(), filename=nombres[i],
-                )
-                sueltas.append(nombres[i])
-                continue
-            fotos_svc.guardar(
-                "producto", usuario, destino["source"], destino["folder"],
-                destino["producto"], rutas[i].read_bytes(), filename=nombres[i],
+    guardadas = 0
+    for archivo in sorted(archivos, key=lambda a: (a.filename or "").lower()):
+        datos = await _leer_foto(archivo)
+        try:
+            fotos_svc.guardar_sin_asignar(
+                usuario, datos, filename=archivo.filename or "",
             )
-            fotos_svc.borrar(
-                "producto_txt", usuario, destino["source"], destino["folder"],
-                destino["producto"],
-            )
-            asignadas.append({
-                "archivo": nombres[i],
-                "source": destino["source"],
-                "folder": destino["folder"],
-                "producto": destino["producto"],
-                "titulo": destino["titulo"],
-                "por_que": fila["por_que"],
-            })
-    finally:
-        import shutil
+            guardadas += 1
+        except OSError as e:
+            raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
-        shutil.rmtree(trabajo, ignore_errors=True)
-
-    return {
-        "asignadas": len(asignadas),
-        "items": asignadas,
-        "sin_asignar": sueltas,
-        "faltan": max(0, len(candidatos) - len(asignadas)),
-    }
+    job = queue.enqueue(
+        JobMode.NICHO_CARRUSELES_REPARTO,
+        title=f"🧩 Repartir {guardadas} foto(s) de carrusel",
+        params={"usuario": usuario},
+    )
+    return {"recibidas": guardadas, "job_id": job.id}
 
 
 @router.get("/sin-asignar")

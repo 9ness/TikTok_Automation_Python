@@ -410,23 +410,16 @@ export function useAptos() {
 }
 
 export interface RepartoFotos2 {
-  asignadas: number;
-  items: {
-    archivo: string;
-    source: string;
-    folder: string;
-    producto: string;
-    titulo: string;
-    por_que: string;
-  }[];
-  sin_asignar: string[];
-  faltan: number;
+  recibidas: number;
+  job_id: string;
 }
 
-/** Sube la tanda de fotos de PRODUCTO: la IA reconoce de cuál es cada una.
+/** Sube la tanda de fotos de PRODUCTO. El reconocimiento va por la COLA: es
+ *  una llamada de visión por cada 12 fotos y una tanda de 40 dejaba el
+ *  navegador esperando minuto y medio.
  *
- *  Aquí no vale repartir por orden como con las chicas — cada foto es de un
- *  producto concreto. Lo que no reconoce se queda "sin asignar". */
+ *  Las fotos se guardan antes de encolar, así que aunque el reparto falle no se
+ *  pierde ninguna: aparecen en "Sin reconocer" y se colocan a mano. */
 export function useSubirFotos2() {
   const qc = useQueryClient();
   return useMutation<RepartoFotos2, Error, File[]>({
@@ -435,7 +428,23 @@ export function useSubirFotos2() {
       files.forEach((f) => fd.append("archivos", f));
       return api.post<RepartoFotos2>(`${ROOT}/fotos2`, fd);
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: carruselesKeys.all });
+      void qc.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+}
+
+/** Filtrar (y escribir los mensajes de) TODO un catálogo, por la cola. */
+export function usePrepararCatalogo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; position_in_queue: number },
+    Error,
+    { source: string; rehacer?: boolean; solo_filtrar?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/preparar`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
   });
 }
 
@@ -444,6 +453,9 @@ export function useSinAsignar() {
     queryKey: carruselesKeys.sinAsignar(),
     queryFn: async () =>
       (await api.get<{ items: FotoSuelta[] }>(`${ROOT}/sin-asignar`)).items,
+    // El reparto corre en la cola: mientras queden fotas sueltas se vuelve a
+    // mirar, y así la lista se vacía sola según las va colocando.
+    refetchInterval: (q) => ((q.state.data?.length ?? 0) > 0 ? 15000 : false),
   });
 }
 

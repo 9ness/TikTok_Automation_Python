@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -142,6 +143,7 @@ export default function CarruselesPage() {
   const [verTodos, setVerTodos] = useEstadoRecordado("carruseles:vertodos", false);
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
+  const abrirCola = useDrawerStore((s) => s.openQueue);
   const [bajando, setBajando] = useState("");
   const [bajandoLimpias, setBajandoLimpias] = useState("");
   const [bajandoCarpeta, setBajandoCarpeta] = useState("");
@@ -282,7 +284,7 @@ export default function CarruselesPage() {
       <Caja
         icono="📁"
         titulo="Dónde trabajas"
-        hint="Solo los productos donde la chica puede estar EN el sitio: belleza, suplementos, dormitorio, salón y exterior."
+        hint="Solo los productos donde la chica puede estar EN el sitio. Para filtrar el catálogo entero de una vez, ve a Configuración."
         extra={
           folders.data
             ? `${folders.data.done}/${folders.data.total} hechas · ${folders.data.aptos} aptos`
@@ -646,13 +648,10 @@ export default function CarruselesPage() {
               e.target.value = "";
               if (!files.length) return;
               subirFotos2.mutate(files, {
-                onSuccess: (r) =>
-                  toast.success(
-                    `${r.asignadas} fotos repartidas` +
-                      (r.sin_asignar.length
-                        ? ` · ${r.sin_asignar.length} sin reconocer`
-                        : ""),
-                  ),
+                onSuccess: (r) => {
+                  toast.success(`${r.recibidas} foto(s) subidas · repartiendo en la cola`);
+                  abrirCola();
+                },
                 onError: (e2) => toast.error(err(e2)),
               });
             }}
@@ -665,7 +664,7 @@ export default function CarruselesPage() {
           >
             {subirFotos2.isPending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Reconociendo y repartiendo…
+                <Loader2 className="h-4 w-4 animate-spin" /> Subiendo…
               </>
             ) : (
               <>
@@ -674,8 +673,8 @@ export default function CarruselesPage() {
             )}
           </button>
           <p className="text-center text-[10px] text-muted-foreground">
-            Suéltalas todas de golpe: la IA reconoce de qué producto es cada una y la
-            coloca en su ficha.
+            Suéltalas todas de golpe: se suben y la IA va reconociendo en la cola de
+            qué producto es cada una. Las que no reconozca salen abajo.
           </p>
 
           <SinAsignar folder={folder} source={source} aptos={aptosGlobales} />
