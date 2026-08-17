@@ -16,6 +16,11 @@ Dos referencias:
 Cualquiera de las dos se puede sustituir por una propia, que vive en SU Drive y
 gana siempre: cuando una referencia deja de funcionar, cambiarla no puede
 depender de que alguien toque el Drive del curso.
+
+La de la chica admite además una POR ESCENARIO. Es lo que de verdad decide cómo
+sale la foto: la del curso es una mujer de unos 35 en una cocina, y con ella
+salían así también las del sofá o las de la playa, donde el público es otro.
+Orden: la del escenario → la general → la del curso.
 """
 
 from __future__ import annotations
@@ -37,11 +42,19 @@ _ID_CURSO: tuple[float, str, str] | None = None
 _TTL_S = 3600.0
 
 
-def _propia(tipo: str, usuario: str) -> Path | None:
-    """La referencia que haya subido el operador, si la hay."""
+def _propia(tipo: str, usuario: str, escenario: str = "") -> Path | None:
+    """La referencia que haya subido el operador, si la hay.
+
+    Con `escenario` se busca la de ESE escenario (`referencia_chica_sofa.jpg`).
+    Existe porque la referencia es lo que de verdad manda en la foto: la del
+    curso es una mujer de unos 35 en una cocina, y de ahí salían todas —también
+    las del sofá o la playa, donde el público es otro. Poniendo una por
+    escenario, cada tanda sale como tiene que salir.
+    """
     base = config.carruseles_dir() / (usuario or "ness")
+    nombre = f"referencia_{tipo}" + (f"_{escenario}" if escenario else "")
     for ext in _EXTS:
-        p = base / f"referencia_{tipo}{ext}"
+        p = base / f"{nombre}{ext}"
         if p.is_file():
             return p
     return None
@@ -85,10 +98,15 @@ def _del_curso() -> Path | None:
         return None
 
 
-def obtener(tipo: str, usuario: str = "") -> Path | None:
-    """La referencia que toca usar: la propia si existe, si no la del curso."""
+def obtener(tipo: str, usuario: str = "", escenario: str = "") -> Path | None:
+    """La referencia que toca: la del escenario, si no la general, si no la del
+    curso."""
     if tipo not in TIPOS:
         raise ValueError(f"referencia desconocida: {tipo!r}")
+    if escenario:
+        suya = _propia(tipo, usuario, escenario)
+        if suya:
+            return suya
     propia = _propia(tipo, usuario)
     if propia:
         return propia
@@ -96,23 +114,28 @@ def obtener(tipo: str, usuario: str = "") -> Path | None:
     return _del_curso() if tipo == "chica" else None
 
 
-def guardar(tipo: str, usuario: str, datos: bytes, *, filename: str = "") -> Path:
-    """Sustituye la referencia por una propia."""
+def guardar(
+    tipo: str, usuario: str, datos: bytes, *, filename: str = "", escenario: str = "",
+) -> Path:
+    """Sustituye la referencia por una propia (general o de un escenario)."""
     if tipo not in TIPOS:
         raise ValueError(f"referencia desconocida: {tipo!r}")
+    if escenario and escenario not in config.ESCENARIOS:
+        raise ValueError(f"escenario desconocido: {escenario!r}")
     base = config.carruseles_dir() / (usuario or "ness")
     base.mkdir(parents=True, exist_ok=True)
+    nombre = f"referencia_{tipo}" + (f"_{escenario}" if escenario else "")
     for ext in _EXTS:
-        (base / f"referencia_{tipo}{ext}").unlink(missing_ok=True)
+        (base / f"{nombre}{ext}").unlink(missing_ok=True)
     ext = Path(filename or "").suffix.lower()
-    destino = base / f"referencia_{tipo}{ext if ext in _EXTS else '.jpg'}"
+    destino = base / f"{nombre}{ext if ext in _EXTS else '.jpg'}"
     destino.write_bytes(datos)
     return destino
 
 
-def borrar(tipo: str, usuario: str) -> bool:
-    """Quita la propia y vuelve a la del curso (si la hay)."""
-    p = _propia(tipo, usuario)
+def borrar(tipo: str, usuario: str, escenario: str = "") -> bool:
+    """Quita la propia y vuelve a la de arriba (la general o la del curso)."""
+    p = _propia(tipo, usuario, escenario)
     if not p:
         return False
     p.unlink(missing_ok=True)
@@ -133,5 +156,17 @@ def estado(usuario: str = "") -> dict[str, dict]:
             "hay": bool(ruta),
             "propia": bool(propia),
             "version": f"{int(ruta.stat().st_mtime)}" if ruta else "",
+        }
+    # Y la de cada escenario, para saber cuáles tienen la suya y cuáles tiran
+    # de la general.
+    for escenario in config.ESCENARIOS:
+        suya = _propia("chica", usuario, escenario)
+        salida[f"chica_{escenario}"] = {
+            "hay": bool(suya or salida["chica"]["hay"]),
+            "propia": bool(suya),
+            "version": (
+                f"{int(suya.stat().st_mtime)}" if suya
+                else salida["chica"]["version"]
+            ),
         }
     return salida

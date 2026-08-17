@@ -915,7 +915,7 @@ function Referencia({
             <button
               type="button"
               onClick={() =>
-                borrar.mutate(tipo, { onError: (e) => toast.error(err(e)) })
+                borrar.mutate({ tipo }, { onError: (e) => toast.error(err(e)) })
               }
               className="rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
             >
@@ -1046,6 +1046,15 @@ function TandaEscenario({
   onSubir: (files: File[]) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const refFoto = useRef<HTMLInputElement>(null);
+  const referencias = useReferencias();
+  const subirRef = useSubirReferencia();
+  const borrarRef = useBorrarReferencia();
+  // La referencia de ESTE escenario. Es lo que de verdad decide cómo sale la
+  // chica: con la del curso (una mujer de unos 35 en una cocina) salían así
+  // todas, también las de la playa.
+  const suya = referencias.data?.[`chica_${escenario.clave}`];
+
   return (
     <div
       className={`space-y-1.5 rounded-lg border p-2 ${
@@ -1053,9 +1062,56 @@ function TandaEscenario({
       }`}
     >
       <div className="flex items-center gap-2">
+        {/* Su foto de referencia: se toca para cambiarla solo en este
+            escenario. Sin ella se usa la general. */}
+        <input
+          ref={refFoto}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            subirRef.mutate(
+              { tipo: "chica", escenario: escenario.clave, file },
+              {
+                onSuccess: () => toast.success(`Referencia de ${escenario.label}`),
+                onError: (e2) => toast.error(err(e2)),
+              },
+            );
+          }}
+        />
+        <button
+          type="button"
+          title={
+            suya?.propia
+              ? "Referencia propia de este escenario (toca para cambiarla)"
+              : "Usa la referencia general — toca para poner una de este escenario"
+          }
+          onClick={() => refFoto.current?.click()}
+          className={`h-11 w-11 shrink-0 overflow-hidden rounded-md border transition ${
+            suya?.propia ? "border-fuchsia-500" : "border-dashed border-border/60"
+          }`}
+        >
+          {suya?.hay ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={buildReferenciaUrl("chica", suya.version, false, escenario.clave)}
+              alt={escenario.label}
+              loading="lazy"
+              className={`h-full w-full object-cover ${suya.propia ? "" : "opacity-50"}`}
+            />
+          ) : (
+            <span className="text-[9px] text-muted-foreground">ref</span>
+          )}
+        </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold">{escenario.label}</p>
-          <p className="truncate text-[10px] text-muted-foreground">{escenario.para}</p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            {suya?.propia ? "referencia propia · " : ""}
+            {escenario.para}
+          </p>
         </div>
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${
@@ -1105,6 +1161,20 @@ function TandaEscenario({
             : "Subir tanda"}
         </button>
       </div>
+      {suya?.propia ? (
+        <button
+          type="button"
+          onClick={() =>
+            borrarRef.mutate(
+              { tipo: "chica", escenario: escenario.clave },
+              { onError: (e) => toast.error(err(e)) },
+            )
+          }
+          className="w-full text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Volver a la referencia general
+        </button>
+      ) : null}
       {subiendo && progreso ? <Barra pct={progreso.pct} /> : null}
     </div>
   );

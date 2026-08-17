@@ -68,7 +68,9 @@ export interface ReferenciaEstado {
   version: string;
 }
 
-export type Referencias = Record<"chica" | "producto", ReferenciaEstado>;
+/** `chica`, `producto` y una por escenario (`chica_sofa`, `chica_playa`…). La
+ *  del escenario es la que manda al generar esa tanda. */
+export type Referencias = Record<string, ReferenciaEstado>;
 
 /** Dónde está la chica de la foto 1. Cada escenario tiene su prompt de Flow:
  *  la chica tiene que estar DONDE se usa el producto (en la cama si es un
@@ -593,11 +595,12 @@ export function useSubirReferencia() {
   return useMutation<
     { items: Referencias },
     Error,
-    { tipo: "chica" | "producto"; file: File }
+    { tipo: "chica" | "producto"; file: File; escenario?: string }
   >({
-    mutationFn: ({ tipo, file }) => {
+    mutationFn: ({ tipo, file, escenario }) => {
       const fd = new FormData();
       fd.append("tipo", tipo);
+      if (escenario) fd.append("escenario", escenario);
       fd.append("archivo", file);
       return api.post<{ items: Referencias }>(`${ROOT}/referencia`, fd);
     },
@@ -608,9 +611,16 @@ export function useSubirReferencia() {
 /** Quita la propia y vuelve a la del curso. */
 export function useBorrarReferencia() {
   const qc = useQueryClient();
-  return useMutation<{ items: Referencias }, Error, "chica" | "producto">({
-    mutationFn: (tipo) =>
-      api.del<{ items: Referencias }>(`${ROOT}/referencia?tipo=${tipo}`),
+  return useMutation<
+    { items: Referencias },
+    Error,
+    { tipo: "chica" | "producto"; escenario?: string }
+  >({
+    mutationFn: ({ tipo, escenario }) =>
+      api.del<{ items: Referencias }>(
+        `${ROOT}/referencia?tipo=${tipo}` +
+          (escenario ? `&escenario=${encodeURIComponent(escenario)}` : ""),
+      ),
     onSuccess: (res) => qc.setQueryData(carruselesKeys.referencias(), res.items),
   });
 }
@@ -619,12 +629,16 @@ export function buildReferenciaUrl(
   tipo: "chica" | "producto",
   version: string,
   descargar = false,
+  escenario = "",
 ): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const dl = descargar ? "&descargar=1" : "";
-  return `${base}${ROOT}/referencia?tipo=${tipo}&v=${encodeURIComponent(version)}${dl}${qs}`;
+  const esc = escenario ? `&escenario=${encodeURIComponent(escenario)}` : "";
+  return `${base}${ROOT}/referencia?tipo=${tipo}&v=${encodeURIComponent(
+    version,
+  )}${esc}${dl}${qs}`;
 }
 
 /** URL de una foto del banco. Lleva el `mtime` (`v`) para que el móvil pueda

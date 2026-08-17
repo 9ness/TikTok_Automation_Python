@@ -478,14 +478,18 @@ def estado_referencias(
 @router.get("/referencia")
 def ver_referencia(
     tipo: Annotated[str, Query()] = "chica",
+    escenario: Annotated[str, Query()] = "",
     descargar: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
-    """Sirve la foto de referencia. Auth por `?api_key=` (va en un `<img src>`)."""
+    """Sirve la foto de referencia. Auth por `?api_key=` (va en un `<img src>`).
+
+    Con `escenario` devuelve la de ese escenario si la hay; si no, la general.
+    """
     from src.nicho_carruseles.services import referencia
 
     try:
-        ruta = referencia.obtener(tipo, usuario)
+        ruta = referencia.obtener(tipo, usuario, escenario)
     except ValueError as e:
         raise _bad_request(str(e)) from e
     if not ruta:
@@ -503,14 +507,22 @@ def ver_referencia(
 async def subir_referencia(
     archivo: Annotated[UploadFile, File()],
     tipo: Annotated[str, Form()] = "chica",
+    escenario: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Pone una referencia propia (gana sobre la del curso)."""
+    """Pone una referencia propia (gana sobre la general y sobre la del curso).
+
+    Con `escenario` es solo para ese escenario: es lo que deja tener una chica
+    joven para la playa y otra para la cocina.
+    """
     from src.nicho_carruseles.services import referencia
 
     datos = await _leer_foto(archivo, "La foto de referencia")
     try:
-        referencia.guardar(tipo, usuario, datos, filename=archivo.filename or "")
+        referencia.guardar(
+            tipo, usuario, datos, filename=archivo.filename or "",
+            escenario=escenario,
+        )
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except OSError as e:
@@ -521,13 +533,14 @@ async def subir_referencia(
 @router.delete("/referencia")
 def borrar_referencia(
     tipo: Annotated[str, Query()] = "chica",
+    escenario: Annotated[str, Query()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Quita la propia y vuelve a la del curso."""
+    """Quita la propia y vuelve a la de arriba (la general o la del curso)."""
     from src.nicho_carruseles.services import referencia
 
     try:
-        referencia.borrar(tipo, usuario)
+        referencia.borrar(tipo, usuario, escenario)
     except ValueError as e:
         raise _bad_request(str(e)) from e
     return {"items": referencia.estado(usuario)}
