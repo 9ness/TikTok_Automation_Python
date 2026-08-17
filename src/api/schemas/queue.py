@@ -8,10 +8,11 @@ from pydantic import BaseModel, Field
 
 
 JobStatusValue = Literal["pending", "running", "completed", "failed", "cancelled"]
-JobModeValue = Literal[
-    "presidents", "pronosticos", "subs_auto", "copyright", "tiktok_shop",
-    "editor_auto",
-]
+# Cualquier `JobMode.value`. Era una lista escrita a mano con seis modos, y como
+# esto valida la SALIDA, un job de un modo que no estuviera en la lista tumbaba
+# la cola entera con un 500 — no solo ese job. Con veintitantos modos y uno
+# nuevo por nicho, la lista siempre iba a quedarse corta.
+JobModeValue = str
 
 
 class ActiveJobResponse(BaseModel):
