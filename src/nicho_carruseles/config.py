@@ -73,7 +73,7 @@ CATEGORIAS = (
 # (`prompts/foto_chica_<clave>.md`).
 ESCENARIOS: dict[str, dict[str, str]] = {
     "generico": {
-        "label": "En casa (genérico)",
+        "label": "En la calle, de noche",
         "para": "Belleza, suplementos y cualquier producto pequeño",
     },
     "cama": {

@@ -1,3 +1,5 @@
-Foto vertical 9:16 de una chica de 25 años, muy guapa, con cara de sorpresa total: ojos muy abiertos y boca abierta, como quien acaba de enterarse de algo increíble. Se está haciendo un selfie con el móvil sujeto con la mano, a la altura de los ojos. Está sentada en el asiento del conductor de un coche parado, con el cinturón puesto; se ven el volante y el salpicadero.
+Foto vertical 9:16, selfie con el móvil sujeto con la mano a la altura de los ojos, de una chica de 20 años con cara de sorpresa total: ojos muy abiertos y boca abierta, como quien acaba de enterarse de algo increíble. Está sentada en el asiento del conductor de un coche parado por la noche; se ven el volante y las luces de la calle por la ventanilla.
 
-Ultra realista, como una foto sacada con un iPhone 16 sin filtros: luz natural, sin efecto cinematográfico, sin retoque de piel, sin fondo desenfocado artificial. Que parezca una foto de verdad de una persona normal, no una modelo de catálogo ni una imagen de IA. Sin texto, sin logotipos y sin marcas de agua.
+Estilo de selfie REAL de móvil, no de fotógrafo: flash del propio móvil, algo de grano, ligero movimiento, pelo despeinado, ropa de diario (camiseta, top o sudadera) y cara sin maquillar ni retocar —piel real, con sus imperfecciones—. Nada de pose de modelo, nada de estudio, sin fondo desenfocado artificial y sin efecto cinematográfico. Que parezca sacada con un iPhone en ese momento.
+
+Sin texto, sin logotipos y sin marcas de agua.
