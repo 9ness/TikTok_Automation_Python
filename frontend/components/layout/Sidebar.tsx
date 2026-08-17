@@ -171,9 +171,11 @@ const BASE_AI_PRO = "/tiktok-shop-ai-pro";
 /** Lo que se usa a diario va primero; el resto sigue debajo en su orden. */
 const ORDEN_AI_PRO = [
   `${BASE_AI_PRO}/viralizacion`,
+  // Los cuatro que comparten catálogo, en el orden en que se trabajan.
   `${BASE_AI_PRO}/nicho-pov-bof`,
-  `${BASE_AI_PRO}/creativos-profesionales`,
   `${BASE_AI_PRO}/pov-bof-largo`,
+  `${BASE_AI_PRO}/creativos-profesionales`,
+  `${BASE_AI_PRO}/carruseles`,
 ];
 
 /** Lo único que necesitan hoy Ana y Mauro. Es solo el MENÚ: las demás

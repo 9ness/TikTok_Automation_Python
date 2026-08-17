@@ -366,7 +366,7 @@ export default function CarruselesPage() {
           n={1}
           color="violeta"
           titulo="Preparar la carpeta"
-          hint="Lee las fichas con IA y decide qué productos valen: solo belleza y suplementación."
+          hint="Lee las fichas con IA y decide qué productos valen: los que la chica puede estar usando en el sitio del producto."
           extra={`${aptos.length} aptos`}
         >
           <button
@@ -415,7 +415,7 @@ export default function CarruselesPage() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mirando la carpeta…
               </>
             ) : (
-              <>🔎 {clasificada ? "Volver a filtrar" : "Filtrar belleza y suplementos"}</>
+              <>🔎 {clasificada ? "Volver a filtrar" : "Filtrar los que valen para carrusel"}</>
             )}
           </button>
 
@@ -750,7 +750,7 @@ export default function CarruselesPage() {
         {!visibles.length && !productos.isLoading && (
           <p className="py-4 text-center text-[11px] text-muted-foreground">
             {clasificada
-              ? "En esta carpeta no hay nada de belleza ni suplementos."
+              ? "En esta carpeta no hay ningún producto que encaje en un carrusel."
               : "Pulsa «Filtrar belleza y suplementos» para saber cuáles valen."}
           </p>
         )}
