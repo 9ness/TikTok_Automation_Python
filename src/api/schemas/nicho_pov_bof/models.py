@@ -119,6 +119,10 @@ class ProductoInfo(BaseModel):
     # la foto dudosa sin marca — llegó a colarse la captura de la descripción
     # como si fuera la del producto.
     foto_aviso: str = ""
+    # Cuándo se subió la foto al Drive del curso (ISO de rclone, vacío si no se
+    # sabe). Es lo único que dice si un producto es NUEVO en una carpeta que ya
+    # se había trabajado — pasa a menudo: el curso va añadiendo durante el día.
+    subida_at: str = ""
     titulo: str = ""
     titulo_tiktok_completo: str = ""
     tienda: str = ""

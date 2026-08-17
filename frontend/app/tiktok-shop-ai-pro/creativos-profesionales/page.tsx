@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { horaCorta } from "@/lib/hora";
+import { fechaCorta, horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
@@ -24,6 +24,7 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
@@ -513,23 +514,17 @@ function CreativoCard({
   return (
     <div className="space-y-2 rounded-lg border border-border/60 p-2">
       <div className="flex items-start gap-2">
-        {limpia ? (
-          <button
-            type="button"
-            onClick={() => setVerFoto(true)}
-            className="shrink-0 rounded-md transition hover:ring-2 hover:ring-cyan-500"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={limpia}
-              alt={p.titulo ?? p.producto}
-              loading="lazy"
-              className="h-16 w-16 rounded-md object-cover"
-            />
-          </button>
-        ) : (
-          <div className="h-16 w-16 shrink-0 rounded-md bg-muted" />
-        )}
+        <button
+          type="button"
+          onClick={() => setVerFoto(true)}
+          className="shrink-0 rounded-md transition hover:ring-2 hover:ring-cyan-500"
+        >
+          <FotoProducto
+            src={limpia}
+            alt={p.titulo ?? p.producto}
+            className="h-16 w-16 rounded-md object-cover"
+          />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline gap-1.5 text-xs font-semibold">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -540,6 +535,11 @@ function CreativoCard({
           {p.tienda && (
             <p className="truncate text-[10px] text-muted-foreground">{p.tienda}</p>
           )}
+          {p.subida_at ? (
+            <p className="truncate text-[10px] text-muted-foreground">
+              subido al Drive el {fechaCorta(p.subida_at)}
+            </p>
+          ) : null}
           {esTopVendidos && p.ventas > 0 && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">

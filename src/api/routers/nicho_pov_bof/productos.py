@@ -191,8 +191,8 @@ def _aviso_foto(pair: dict) -> str:
 
 def _fotos_del_producto(
     source: str, folder: str, producto: str,
-) -> tuple[str | None, str | None, str]:
-    """(id foto limpia, id captura con título, aviso) de un producto.
+) -> tuple[str | None, str | None, str, str]:
+    """(id foto limpia, id captura, aviso, fecha de subida) de un producto.
 
     El listado está cacheado, así que esto no vuelve a pegarle al Drive.
     """
@@ -212,11 +212,26 @@ def _fotos_del_producto(
                     (pair.get("clean") or {}).get("id"),
                     (pair.get("titled") or {}).get("id"),
                     _aviso_foto(pair),
+                    _subida_de(pair),
                 )
     except (ValueError, RuntimeError):
         # Sin fotos se devuelve el resto del producto igualmente.
         pass
-    return None, None, ""
+    return None, None, "", ""
+
+
+def _subida_de(pair: dict) -> str:
+    """Cuándo entró el producto en el Drive: la fecha de su foto más ANTIGUA.
+
+    Sirve para lo de siempre: una carpeta ya trabajada a la que el curso le
+    añade dos productos más por la tarde. Sin esta fecha no hay forma de saber
+    cuáles son los nuevos.
+    """
+    fechas = [
+        str((pair.get(k) or {}).get("mtime") or "")
+        for k in ("clean", "titled")
+    ]
+    return min((f for f in fechas if f), default="")
 
 
 def _producto_info(
@@ -233,15 +248,16 @@ def _producto_info(
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    clean, titled, aviso = (
+    clean, titled, aviso, subida = (
         _fotos_del_producto(source, folder, producto) if source and folder
-        else (None, None, "")
+        else (None, None, "", "")
     )
     return ProductoInfo(
         producto=producto,
         clean_photo_id=clean,
         titled_photo_id=titled,
         foto_aviso=aviso,
+        subida_at=subida,
         titulo=prod.get("titulo", ""),
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
@@ -368,6 +384,7 @@ def _list_productos(
                 clean_photo_id=clean.get("id"),
                 titled_photo_id=titled.get("id"),
                 foto_aviso=_aviso_foto(pair),
+                subida_at=_subida_de(pair),
                 titulo=guardado.get("titulo", ""),
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),

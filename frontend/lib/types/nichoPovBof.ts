@@ -133,6 +133,9 @@ export interface ProductoItem {
   sexo_sugerido?: "hombre" | "mujer";
   /** Aviso si no se pudo confirmar cuál de las fotos es la del producto. */
   foto_aviso?: string;
+  /** Cuándo se subió al Drive del curso (ISO). Dice si el producto es NUEVO en
+   *  una carpeta que ya se había trabajado. */
+  subida_at?: string;
   con_textos?: boolean;
   /** Ficha en TikTok Shop. Vacío = aún no se ha buscado o no se encontró
    *  nada con parecido suficiente (averiguarla gasta cuota de EchoTik). */

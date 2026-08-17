@@ -20,6 +20,7 @@ import { horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -1251,17 +1252,11 @@ function CarruselCard({
       }`}
     >
       <div className="flex items-start gap-2">
-        {limpia ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={limpia}
-            alt={p.titulo ?? p.producto}
-            loading="lazy"
-            className="h-16 w-16 shrink-0 rounded-md object-cover"
-          />
-        ) : (
-          <div className="h-16 w-16 shrink-0 rounded-md bg-muted" />
-        )}
+        <FotoProducto
+          src={limpia}
+          alt={p.titulo ?? p.producto}
+          className="h-16 w-16 shrink-0 rounded-md object-cover"
+        />
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline gap-1.5 text-xs font-semibold">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
