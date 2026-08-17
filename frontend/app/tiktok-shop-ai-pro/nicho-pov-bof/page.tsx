@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { horaCorta } from "@/lib/hora";
+import { fechaCorta, horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
@@ -1454,6 +1454,17 @@ function ProductoCard({
               {producto.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
                   💳 Plazos · 2 clips
+                </span>
+              )}
+              {/* Cuándo entró en el Drive del curso. Las carpetas no son
+                  cerradas: van añadiendo productos durante el día, y sin la
+                  fecha no hay forma de saber cuáles son nuevos. */}
+              {producto.subida_at && (
+                <span
+                  title="Cuándo se subió al Drive del curso"
+                  className="text-muted-foreground"
+                >
+                  📅 {fechaCorta(producto.subida_at)}
                 </span>
               )}
             </p>

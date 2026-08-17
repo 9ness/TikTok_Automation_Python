@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { horaCorta } from "@/lib/hora";
+import { horaCorta, fechaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
@@ -1415,6 +1415,14 @@ function ProductoCard({
             sitio (el que va a TikTok es el completo). */}
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
+        {p.subida_at ? (
+          <span
+            title="Cuándo se subió al Drive del curso"
+            className="self-center text-[10px] text-muted-foreground"
+          >
+            📅 {fechaCorta(p.subida_at)}
+          </span>
+        ) : null}
         <CopyChip
           label="✍️ Caption"
           text={

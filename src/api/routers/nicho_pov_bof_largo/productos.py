@@ -276,6 +276,14 @@ def _listar(
             desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
+            subida_at=min(
+                (
+                    str((par.get(k) or {}).get("mtime") or "")
+                    for k in ("clean", "titled")
+                    if str((par.get(k) or {}).get("mtime") or "")
+                ),
+                default="",
+            ),
             # Textos y enlaces: compartidos con el POV BOF (los extrae/busca él).
             titulo=textos.get("titulo", ""),
             titulo_tiktok_completo=textos.get("titulo_tiktok_completo", ""),

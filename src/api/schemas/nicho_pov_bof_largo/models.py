@@ -28,6 +28,9 @@ class ProductoLargo(BaseModel):
     clean_photo_id: str | None = None
     titled_photo_id: str | None = None
     foto_aviso: str = ""
+    # Cuándo se subió al Drive del curso (ISO). Las carpetas no son cerradas:
+    # van añadiendo productos durante el día.
+    subida_at: str = ""
     # Textos y enlaces del producto — vienen del Nicho POV BOF (dato objetivo
     # del producto, compartido), no se extraen ni se buscan aquí.
     titulo: str = ""

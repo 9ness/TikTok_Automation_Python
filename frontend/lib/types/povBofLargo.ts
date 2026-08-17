@@ -23,6 +23,8 @@ export interface ProductoLargo {
   clean_photo_id: string | null;
   titled_photo_id: string | null;
   foto_aviso: string;
+  /** Cuándo se subió al Drive del curso (ISO). */
+  subida_at?: string;
   // Textos y enlaces — compartidos con el POV BOF (los extrae/busca él).
   titulo: string;
   titulo_tiktok_completo: string;

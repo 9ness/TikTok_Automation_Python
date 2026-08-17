@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { horaCorta } from "@/lib/hora";
+import { fechaCorta, horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -1457,6 +1457,13 @@ function CarruselCard({
             </span>
             <span className="truncate">{p.titulo ?? "sin título"}</span>
           </p>
+          {/* Cuándo lo subió al Drive quien comparte los productos: es lo que
+              distingue un producto NUEVO de uno que se quedó sin hacer. */}
+          {p.subida_at ? (
+            <p className="truncate text-[10px] text-muted-foreground">
+              subido al Drive el {fechaCorta(p.subida_at)}
+            </p>
+          ) : null}
           {datos.categoria ? (
             <p className="mt-0.5 text-[10px] text-muted-foreground">
               {CATEGORIA_LABEL[datos.categoria] ?? "— no encaja en carrusel"}
