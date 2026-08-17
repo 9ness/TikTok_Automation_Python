@@ -173,6 +173,9 @@ export default function CarruselesPage() {
   const [bajando, setBajando] = useState("");
   const [bajandoLimpias, setBajandoLimpias] = useState("");
   const [bajandoCarpeta, setBajandoCarpeta] = useState("");
+  // De qué categoría son las fotos que se están subiendo: el reconocimiento se
+  // acota a sus productos.
+  const [categoriaSubiendo, setCategoriaSubiendo] = useState("");
   const [conMano, setConMano] = useEstadoRecordado("carruseles:conmano", false);
   const fotos2Ref = useRef<HTMLInputElement>(null);
   // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
@@ -721,6 +724,25 @@ export default function CarruselesPage() {
                 >
                   <ClipboardCopy className="h-3.5 w-3.5" />
                 </button>
+                {/* Y subir las generadas DE ESA categoría: el reconocimiento
+                    solo mira esos productos, así que acierta más y va más
+                    rápido que comparando contra los 185. */}
+                <button
+                  type="button"
+                  title="Subir las fotos generadas de esta categoría"
+                  disabled={subirFotos2.isPending}
+                  onClick={() => {
+                    setCategoriaSubiendo(cat);
+                    fotos2Ref.current?.click();
+                  }}
+                  className="shrink-0 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-2 text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                >
+                  {subirFotos2.isPending && categoriaSubiendo === cat ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
             ))}
           </div>
@@ -748,7 +770,11 @@ export default function CarruselesPage() {
               if (!files.length) return;
               setProgresoFotos2({ pct: 0, hechos: 0, total: files.length });
               subirFotos2.mutate(
-                { files, onProgreso: (p) => setProgresoFotos2(p) },
+                {
+                  files,
+                  categoria: categoriaSubiendo,
+                  onProgreso: (p) => setProgresoFotos2(p),
+                },
                 {
                   onSuccess: (r) => {
                     toast.success(
@@ -757,7 +783,10 @@ export default function CarruselesPage() {
                     abrirCola();
                   },
                   onError: (e2) => toast.error(err(e2)),
-                  onSettled: () => setProgresoFotos2(null),
+                  onSettled: () => {
+                    setProgresoFotos2(null);
+                    setCategoriaSubiendo("");
+                  },
                 },
               );
             }}
@@ -765,7 +794,10 @@ export default function CarruselesPage() {
           <button
             type="button"
             disabled={subirFotos2.isPending}
-            onClick={() => fotos2Ref.current?.click()}
+            onClick={() => {
+              setCategoriaSubiendo("");
+              fotos2Ref.current?.click();
+            }}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
           >
             {subirFotos2.isPending ? (

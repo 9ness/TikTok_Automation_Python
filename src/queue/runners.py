@@ -2698,6 +2698,10 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
 
     p = job.params or {}
     usuario = str(p.get("usuario") or job.enqueued_by or "")
+    # Si el operador sube las fotos de UNA categoría (que es como las genera en
+    # Flow), los candidatos son solo esos: acierta más y va más rápido que
+    # comparando contra los 185 del catálogo.
+    categoria = str(p.get("categoria") or "")
 
     sueltas = fotos_svc.listar_sin_asignar(usuario)
     if not sueltas:
@@ -2705,12 +2709,15 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
         return "sin-cambios"
 
     on_progress(0.05, f"🧩 {len(sueltas)} foto(s) por reconocer")
-    candidatos = _candidatos_carrusel(usuario)
+    candidatos = _candidatos_carrusel(usuario, categoria)
     if not candidatos:
         raise RuntimeError(
-            "Ningún producto apto está esperando foto de producto. Filtra "
-            "alguna carpeta primero."
+            "Ningún producto"
+            + (f" de {categoria}" if categoria else " apto")
+            + " está esperando foto de producto."
         )
+    if categoria:
+        on_log(f"[carruseles] solo entre los {len(candidatos)} de {categoria}")
 
     rutas, nombres = [], []
     for f in sueltas:
@@ -2748,11 +2755,19 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
     return resumen
 
 
-def _candidatos_carrusel(usuario: str) -> list[dict]:
-    """Productos aptos que esperan foto de producto, de todos los catálogos."""
+def _candidatos_carrusel(usuario: str, categoria: str = "") -> list[dict]:
+    """Productos aptos que esperan foto de producto, de todos los catálogos.
+
+    Con `categoria` se acota a esa: es como se generan las fotos en Flow (una
+    tanda por categoría) y comparar contra 54 cremas en vez de contra 185
+    productos acierta más.
+    """
     from src.api.routers.nicho_carruseles.carruseles import _barrer_aptos
 
-    return [i for i in _barrer_aptos(usuario) if not i["tiene_foto2"]]
+    return [
+        i for i in _barrer_aptos(usuario)
+        if not i["tiene_foto2"] and (not categoria or i["categoria"] == categoria)
+    ]
 
 
 

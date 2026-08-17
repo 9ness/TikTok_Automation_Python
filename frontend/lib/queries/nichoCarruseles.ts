@@ -564,13 +564,17 @@ export function useSubirFotos2() {
   return useMutation<
     RepartoFotos2,
     Error,
-    { files: File[]; onProgreso?: (p: ProgresoTanda) => void }
+    { files: File[]; categoria?: string; onProgreso?: (p: ProgresoTanda) => void }
   >({
-    mutationFn: async ({ files, onProgreso }) => {
+    mutationFn: async ({ files, categoria, onProgreso }) => {
       await subirTanda(`${ROOT}/fotos2`, files, {}, onProgreso);
       // Con todo subido, un solo trabajo para reconocerlas: encolar uno por
-      // trozo dejaría ocho jobs peleándose por los mismos productos.
-      return api.post<RepartoFotos2>(`${ROOT}/fotos2/repartir`);
+      // trozo dejaría ocho jobs peleándose por los mismos productos. Con
+      // `categoria`, el reconocimiento solo mira los productos de esa.
+      return api.post<RepartoFotos2>(
+        `${ROOT}/fotos2/repartir` +
+          (categoria ? `?categoria=${encodeURIComponent(categoria)}` : ""),
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: carruselesKeys.all });

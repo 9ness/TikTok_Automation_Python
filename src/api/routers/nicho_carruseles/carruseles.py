@@ -990,6 +990,7 @@ async def subir_fotos2(
 @router.post("/fotos2/repartir", status_code=201)
 def repartir_fotos2(
     queue: Annotated[JobQueue, Depends(get_queue)],
+    categoria: Annotated[str, Query()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola el reconocimiento de las fotos que estén sin asignar.
@@ -1002,10 +1003,15 @@ def repartir_fotos2(
     sueltas = fotos_svc.listar_sin_asignar(usuario)
     if not sueltas:
         raise _bad_request("No hay fotos pendientes de repartir.")
+    if categoria and categoria not in config.CATEGORIAS_APTAS:
+        raise _bad_request(f"Categoría desconocida: {categoria!r}.")
     job = queue.enqueue(
         JobMode.NICHO_CARRUSELES_REPARTO,
-        title=f"🧩 Repartir {len(sueltas)} foto(s) de carrusel",
-        params={"usuario": usuario},
+        title=(
+            f"🧩 Repartir {len(sueltas)} foto(s)"
+            + (f" · {categoria}" if categoria else " de carrusel")
+        ),
+        params={"usuario": usuario, "categoria": categoria},
     )
     return {"pendientes": len(sueltas), "job_id": job.id}
 
