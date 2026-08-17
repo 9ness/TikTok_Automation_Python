@@ -39,8 +39,12 @@ _noop: OnLog = lambda _: None
 BLOQUES_INTOCABLES = ("expression", "framing", "photography", "clothing", "output")
 
 
-def _key(usuario: str) -> str:
-    return f"chica:{usuario or 'ness'}"
+def _key(usuario: str, escenario: str = "") -> str:
+    """La ficha es POR ESCENARIO: cada nicho tiene su chica (una de 20 en la
+    calle, una de 32 en la cocina). Sin escenario es la general, que se usa de
+    respaldo cuando ese escenario no tiene la suya."""
+    base = f"chica:{usuario or 'ness'}"
+    return f"{base}:{escenario}" if escenario else base
 
 
 def plantilla() -> dict:
@@ -80,28 +84,33 @@ def crear_desde_foto(foto: Path | bytes, *, on_log: OnLog = _noop) -> dict:
     return ficha
 
 
-def guardar(usuario: str, ficha: dict) -> dict:
+def guardar(usuario: str, ficha: dict, escenario: str = "") -> dict:
     r = get_nicho_carruseles_redis()
     if not r.is_available():
         raise RuntimeError(
             "Redis (Upstash) no está configurado — no se puede guardar la chica."
         )
-    doc = {"ficha": ficha, "creada_at": time.time()}
-    r.set_json(_key(usuario), doc)
+    doc = {"ficha": ficha, "creada_at": time.time(), "escenario": escenario}
+    r.set_json(_key(usuario, escenario), doc)
     return doc
 
 
-def leer(usuario: str) -> dict:
+def leer(usuario: str, escenario: str = "") -> dict:
+    """La ficha de ese escenario; si no tiene, la general."""
     r = get_nicho_carruseles_redis()
     if not r.is_available():
         return {}
+    if escenario:
+        suya = r.get_json(_key(usuario, escenario))
+        if isinstance(suya, dict) and suya.get("ficha"):
+            return suya
     return r.get_json(_key(usuario)) or {}
 
 
-def borrar(usuario: str) -> None:
+def borrar(usuario: str, escenario: str = "") -> None:
     r = get_nicho_carruseles_redis()
     if r.is_available():
-        r.delete(_key(usuario))
+        r.delete(_key(usuario, escenario))
 
 
 def prompt_referencia(usuario: str, escenario: str) -> str:
@@ -115,7 +124,7 @@ def prompt_referencia(usuario: str, escenario: str) -> str:
     Se genera SIN adjuntar ninguna imagen: es la única forma de fijar la edad,
     porque con una foto delante el modelo copia la cara y con ella los años.
     """
-    doc = leer(usuario)
+    doc = leer(usuario, escenario)
     guardada = doc.get("ficha") if isinstance(doc, dict) else None
     ficha = guardada if isinstance(guardada, dict) and guardada else plantilla()
 

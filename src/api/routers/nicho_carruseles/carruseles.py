@@ -487,15 +487,19 @@ def editar_mensaje(
 # La chica de la casa
 # ---------------------------------------------------------------------------
 @router.get("/chica")
-def ver_chica(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
-    """La ficha de la chica del operador, si tiene."""
+def ver_chica(
+    escenario: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """La ficha de la chica de ese escenario (o la general)."""
     from src.nicho_carruseles.services import chica_ficha
 
-    doc = chica_ficha.leer(usuario)
+    doc = chica_ficha.leer(usuario, escenario)
     ficha = doc.get("ficha") if isinstance(doc, dict) else None
     return {
         "hay": bool(ficha),
         "creada_at": (doc or {}).get("creada_at", 0),
+        "propia": bool(escenario) and (doc or {}).get("escenario") == escenario,
         "resumen": _resumen_chica(ficha) if ficha else "",
     }
 
@@ -514,6 +518,7 @@ def _resumen_chica(ficha: dict) -> str:
 @router.post("/chica")
 async def crear_chica(
     archivo: Annotated[UploadFile, File()],
+    escenario: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Convierte la foto de una chica en la ficha con la que se crean las
@@ -524,10 +529,12 @@ async def crear_chica(
     """
     from src.nicho_carruseles.services import chica_ficha
 
+    if escenario and escenario not in config.ESCENARIOS:
+        raise _bad_request(f"Escenario desconocido: {escenario!r}.")
     datos = await _leer_foto(archivo, "La foto de la chica")
     try:
         ficha = chica_ficha.crear_desde_foto(datos)
-        chica_ficha.guardar(usuario, ficha)
+        chica_ficha.guardar(usuario, ficha, escenario)
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except RuntimeError as e:
@@ -538,11 +545,14 @@ async def crear_chica(
 
 
 @router.delete("/chica")
-def borrar_chica(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
-    """Vuelve a los prompts genéricos."""
+def borrar_chica(
+    escenario: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Vuelve a la ficha general (o a la plantilla, si era la general)."""
     from src.nicho_carruseles.services import chica_ficha
 
-    chica_ficha.borrar(usuario)
+    chica_ficha.borrar(usuario, escenario)
     return {"hay": False, "resumen": ""}
 
 

@@ -599,25 +599,33 @@ export interface ChicaFicha {
   hay: boolean;
   resumen: string;
   creada_at?: number;
+  /** true si es la ficha de ESE escenario; false = se está usando la general. */
+  propia?: boolean;
 }
 
-export function useChicaCarrusel() {
+/** `escenario` vacío = la ficha general (la que vale para los que no tengan
+ *  la suya). */
+export function useChicaCarrusel(escenario = "") {
   return useQuery<ChicaFicha>({
-    queryKey: [...carruselesKeys.all, "chica"],
-    queryFn: () => api.get<ChicaFicha>(`${ROOT}/chica`),
+    queryKey: [...carruselesKeys.all, "chica", escenario],
+    queryFn: () =>
+      api.get<ChicaFicha>(
+        `${ROOT}/chica` + (escenario ? `?escenario=${encodeURIComponent(escenario)}` : ""),
+      ),
   });
 }
 
 export function useCrearChicaCarrusel() {
   const qc = useQueryClient();
-  return useMutation<ChicaFicha, Error, File>({
-    mutationFn: (file) => {
+  return useMutation<ChicaFicha, Error, { file: File; escenario?: string }>({
+    mutationFn: ({ file, escenario }) => {
       const fd = new FormData();
+      if (escenario) fd.append("escenario", escenario);
       fd.append("archivo", file);
       return api.post<ChicaFicha>(`${ROOT}/chica`, fd);
     },
-    onSuccess: (res) => {
-      qc.setQueryData([...carruselesKeys.all, "chica"], res);
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...carruselesKeys.all, "chica"] });
       // Los prompts de referencia cambian: ahora llevan su ficha dentro.
       void qc.invalidateQueries({ queryKey: carruselesKeys.prompts() });
     },
@@ -626,10 +634,13 @@ export function useCrearChicaCarrusel() {
 
 export function useBorrarChicaCarrusel() {
   const qc = useQueryClient();
-  return useMutation<ChicaFicha, Error, void>({
-    mutationFn: () => api.del<ChicaFicha>(`${ROOT}/chica`),
-    onSuccess: (res) => {
-      qc.setQueryData([...carruselesKeys.all, "chica"], res);
+  return useMutation<ChicaFicha, Error, string | void>({
+    mutationFn: (escenario) =>
+      api.del<ChicaFicha>(
+        `${ROOT}/chica` + (escenario ? `?escenario=${encodeURIComponent(escenario)}` : ""),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...carruselesKeys.all, "chica"] });
       void qc.invalidateQueries({ queryKey: carruselesKeys.prompts() });
     },
   });

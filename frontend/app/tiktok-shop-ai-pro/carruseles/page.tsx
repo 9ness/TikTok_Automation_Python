@@ -922,7 +922,7 @@ function ChicaDeLaCasa() {
         {hay ? (
           <button
             type="button"
-            onClick={() => borrar.mutate(undefined, { onError: (e: unknown) => toast.error(err(e)) })}
+            onClick={() => borrar.mutate(undefined, { onError: (e) => toast.error(err(e)) })}
             className="shrink-0 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
           >
             Quitar
@@ -943,10 +943,13 @@ function ChicaDeLaCasa() {
           const file = e.target.files?.[0];
           e.target.value = "";
           if (!file) return;
-          crear.mutate(file, {
-            onSuccess: (r) => toast.success(`Ficha creada · ${r.resumen}`),
-            onError: (e2) => toast.error(err(e2)),
-          });
+          crear.mutate(
+            { file },
+            {
+              onSuccess: (r) => toast.success(`Ficha creada · ${r.resumen}`),
+              onError: (e2) => toast.error(err(e2)),
+            },
+          );
         }}
       />
       <button
@@ -1188,6 +1191,9 @@ function TandaEscenario({
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const refFoto = useRef<HTMLInputElement>(null);
+  const fichaFoto = useRef<HTMLInputElement>(null);
+  const crearFicha = useCrearChicaCarrusel();
+  const ficha = useChicaCarrusel(escenario.clave);
   const referencias = useReferencias();
   const subirRef = useSubirReferencia();
   const borrarRef = useBorrarReferencia();
@@ -1317,15 +1323,47 @@ function TandaEscenario({
       ) : null}
 
       <div className="flex items-center gap-2">
+        {/* De una foto a la ficha de ESTE escenario: los rasgos de esa chica
+            entran en el JSON de aquí abajo y ya se genera clavada. */}
+        <input
+          ref={fichaFoto}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            crearFicha.mutate(
+              { file, escenario: escenario.clave },
+              {
+                onSuccess: (r) => toast.success(`Ficha de ${escenario.label} · ${r.resumen}`),
+                onError: (e2) => toast.error(err(e2)),
+              },
+            );
+          }}
+        />
+        <button
+          type="button"
+          disabled={crearFicha.isPending}
+          onClick={() => fichaFoto.current?.click()}
+          className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
+        >
+          {crearFicha.isPending ? "…" : ficha.data?.propia ? "Cambiar chica" : "Foto → ficha"}
+        </button>
         <button
           type="button"
           onClick={() => {
             navigator.clipboard.writeText(escenario.prompt_referencia);
-            toast.success("Prompt para crear la referencia (sin foto)");
+            toast.success(
+              ficha.data?.hay
+                ? "JSON con tu chica copiado"
+                : "JSON para crear la referencia copiado",
+            );
           }}
           className="flex-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
         >
-          Prompt para crear esta referencia
+          JSON para crear esta referencia
         </button>
         {suya?.propia ? (
           <button
