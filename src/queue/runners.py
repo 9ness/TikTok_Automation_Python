@@ -2332,7 +2332,9 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     las demás; al final se dice cuáles fueron.
     """
     from src.nicho_pov_bof.repos import product_repo
-    from src.nicho_pov_bof.services import drive_client, text_extractor, top_vendidos
+    from src.nicho_pov_bof.services import (
+        drive_client, photo_pairing, text_extractor, top_vendidos,
+    )
 
     p = job.params or {}
     source = str(p.get("source") or "")
@@ -2344,14 +2346,38 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     if not carpetas:
         raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
 
-    # Qué carpetas van: las que no tienen NINGÚN texto (o todas si se pide
-    # rehacer). Se mira de una tacada, no carpeta a carpeta contra Upstash.
+    # Qué carpetas van: las que tienen ALGÚN producto sin texto (o todas si se
+    # pide rehacer). Los documentos se leen de una tacada, no carpeta a carpeta
+    # contra Upstash.
+    #
+    # Ojo con el criterio: antes bastaba con que la carpeta tuviera UN producto
+    # con texto para darla por hecha, y las carpetas a medias —que las hay, de
+    # cuando se extraían a mano— no se completaban nunca. Por eso se compara
+    # contra los productos REALES de la carpeta (el emparejado de sus fotos),
+    # no contra los que ya están guardados.
     docs = product_repo.load_folders([(source, c) for c in carpetas])
     pendientes = []
     for carpeta, doc in zip(carpetas, docs):
         productos = (doc or {}).get("productos") or {}
-        con_texto = sum(1 for x in productos.values() if x.get("titulo"))
+        con_texto = {p for p, x in productos.items() if x.get("titulo")}
         if rehacer or not con_texto:
+            pendientes.append(carpeta)
+            continue
+        try:
+            fotos = [
+                drive_client.probe_dimensions(f)
+                for f in drive_client.list_photos(source, carpeta)
+            ]
+            reales = {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)}
+        except Exception as e:  # noqa: BLE001 — sin listado, se deja como está
+            on_log(f"[textos] no se pudo mirar {carpeta}: {e}")
+            continue
+        faltan = reales - con_texto
+        if faltan:
+            on_log(
+                f"[textos] {carpeta}: {len(con_texto)}/{len(reales)} con texto "
+                f"— faltan {sorted(faltan)}"
+            )
             pendientes.append(carpeta)
     if not pendientes:
         on_log("[textos] todas las carpetas tienen textos ya")
