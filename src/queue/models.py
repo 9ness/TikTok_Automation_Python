@@ -49,6 +49,8 @@ class JobMode(str, Enum):
     NICHO_CARRUSELES_PREPARAR = "nicho_carruseles_preparar"
     # Carruseles: reconocer con IA de qué producto es cada foto 2 de la tanda.
     NICHO_CARRUSELES_REPARTO = "nicho_carruseles_reparto"
+    # Carruseles: quemar los mensajes en las fotos de todo un catálogo.
+    NICHO_CARRUSELES_QUEMAR = "nicho_carruseles_quemar"
     # POV BOF con el guion de plazos (Klarna): voz de Fish y DOS clips.
     NICHO_POV_BOF_PLAZOS_VIDEO = "nicho_pov_bof_plazos_video"
 
@@ -86,6 +88,7 @@ MODE_LABELS = {
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "✍️ Guiones POV BOF Largo",
     JobMode.NICHO_CARRUSELES_PREPARAR: "🖼️ Preparar carruseles",
     JobMode.NICHO_CARRUSELES_REPARTO: "🧩 Repartir fotos de carrusel",
+    JobMode.NICHO_CARRUSELES_QUEMAR: "🔥 Escribir los textos del carrusel",
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "💳 Vídeo POV BOF (plazos)",
 }
 

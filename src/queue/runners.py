@@ -2740,6 +2740,84 @@ def _candidatos_carrusel(usuario: str) -> list[dict]:
     return [i for i in _barrer_aptos(usuario) if not i["tiene_foto2"]]
 
 
+
+def run_nicho_carruseles_quemar(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Escribe los mensajes sobre las fotos de TODO un catálogo.
+
+    El botón de la pantalla quema una carpeta; con 190 productos repartidos en
+    treinta carpetas eso son treinta idas y venidas. Aquí va todo de una tacada.
+
+    Cada foto es PIL sobre un JPEG (décimas de segundo), pero son cientos y
+    viven en el Drive montado, así que el rato se nota: por eso va por la cola.
+    Lo ya quemado se salta salvo que se pida rehacer.
+
+    Params: usuario, tipo ("chica" | "producto" | "ambas"), rehacer.
+    """
+    from src.api.routers.nicho_carruseles.carruseles import _barrer_aptos
+    from src.nicho_carruseles.repos import carrusel_repo
+    from src.nicho_carruseles.services import fotos as fotos_svc
+
+    p = job.params or {}
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+    tipo = str(p.get("tipo") or "ambas")
+    rehacer = bool(p.get("rehacer"))
+    tipos = ("chica", "producto") if tipo == "ambas" else (tipo,)
+
+    aptos = _barrer_aptos(usuario)
+    if not aptos:
+        raise RuntimeError("No hay productos aptos: filtra algún catálogo primero.")
+
+    # Se calcula el trabajo antes de empezar para que la barra vaya sobre el
+    # total real y no salte al terminar cada carpeta.
+    tareas: list[tuple[dict, str, str]] = []
+    for item in aptos:
+        guardado = carrusel_repo.productos(item["source"], item["folder"]).get(
+            item["producto"], {}
+        )
+        for t_foto in tipos:
+            campo = "mensaje1" if t_foto == "chica" else "mensaje2"
+            texto = str(guardado.get(campo) or "").strip()
+            if not texto:
+                continue
+            if not fotos_svc.tiene(
+                t_foto, usuario, item["source"], item["folder"], item["producto"]
+            ):
+                continue
+            if not rehacer and fotos_svc.tiene(
+                f"{t_foto}_txt", usuario, item["source"], item["folder"], item["producto"]
+            ):
+                continue
+            tareas.append((item, t_foto, texto))
+
+    if not tareas:
+        on_log("[carruseles] no hay nada que escribir (o ya está todo hecho)")
+        return "sin-cambios"
+
+    on_log(f"[carruseles] {len(tareas)} foto(s) por escribir")
+    hechas, fallidas = 0, []
+    for i, (item, t_foto, texto) in enumerate(tareas):
+        on_progress(
+            i / len(tareas),
+            f"🔥 {i + 1}/{len(tareas)} · {item['folder']} · {item['producto']}",
+        )
+        try:
+            fotos_svc.quemar_texto(
+                t_foto, usuario, item["source"], item["folder"], item["producto"], texto,
+            )
+            hechas += 1
+        except Exception as e:  # noqa: BLE001 — una foto rota no para el resto
+            fallidas.append(f"{item['folder']}/{item['producto']}")
+            on_log(f"[carruseles] {item['folder']}/{item['producto']} falló: {e}")
+
+    on_progress(1.0, "🔥 Textos escritos")
+    resumen = f"{hechas}/{len(tareas)} fotos con texto"
+    if fallidas:
+        resumen += f" · {len(fallidas)} con fallo"
+        on_log(f"[carruseles] sin texto: {', '.join(fallidas[:20])}")
+    on_log(f"[carruseles] {resumen}")
+    return resumen
+
+
 # ============================================================
 # RUNNER: NICHO POV BOF — MONTAJE DE VÍDEO POR PRODUCTO
 # ============================================================
@@ -3285,6 +3363,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
     JobMode.NICHO_CARRUSELES_PREPARAR: run_nicho_carruseles_preparar,
     JobMode.NICHO_CARRUSELES_REPARTO: run_nicho_carruseles_reparto,
+    JobMode.NICHO_CARRUSELES_QUEMAR: run_nicho_carruseles_quemar,
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: run_nicho_pov_bof_plazos_video,
 }
 
@@ -3315,6 +3394,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
     JobMode.NICHO_CARRUSELES_PREPARAR: "viralizacion",
     JobMode.NICHO_CARRUSELES_REPARTO: "viralizacion",
+    JobMode.NICHO_CARRUSELES_QUEMAR: "viralizacion",
     JobMode.NICHO_POV_BOF_PLAZOS_VIDEO: "viralizacion",
 }
 

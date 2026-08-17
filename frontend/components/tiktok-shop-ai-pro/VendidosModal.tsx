@@ -125,7 +125,28 @@ export function VendidosModal({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando…
               </div>
             )}
-            {!resultados.isLoading && !resultados.data?.items.length && (
+            {/* El error se DICE. Antes salía el mismo "nada con X" tanto si no
+                había resultados como si la petición se había caído (pasó: la
+                API estaba ocupada subiendo una tanda y el buscador parecía
+                roto). */}
+            {resultados.isError && (
+              <div className="space-y-1.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2">
+                <p className="text-[11px] text-red-400">
+                  No se pudo buscar:{" "}
+                  {resultados.error instanceof Error
+                    ? resultados.error.message
+                    : String(resultados.error)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void resultados.refetch()}
+                  className="rounded-md border border-red-500/40 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/10"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+            {!resultados.isLoading && !resultados.isError && !resultados.data?.items.length && (
               <p className="py-6 text-center text-xs text-muted-foreground">
                 Nada con “{busca}”. Prueba con una palabra del título o con la tienda.
               </p>

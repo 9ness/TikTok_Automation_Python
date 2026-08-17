@@ -492,6 +492,19 @@ export function useQuemarTexto(source: string, folder: string | null) {
   });
 }
 
+/** Quema los mensajes de TODO el catálogo, por la cola. */
+export function useQuemarTodo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string },
+    Error,
+    { tipo: "chica" | "producto" | "ambas"; rehacer?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/quemar/todo`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
+  });
+}
+
 export function useSubidosCarruseles(source: string, folder: string | null) {
   return useQuery<Record<string, number>>({
     queryKey: [...carruselesKeys.all, "subidos", source, folder ?? ""],

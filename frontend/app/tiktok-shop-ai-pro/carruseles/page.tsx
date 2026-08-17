@@ -46,6 +46,7 @@ import {
   useMarcarSubidoCarrusel,
   usePromptsCarruseles,
   useQuemarTexto,
+  useQuemarTodo,
   useReferencias,
   useSinAsignar,
   useSubidosCarruseles,
@@ -145,6 +146,7 @@ export default function CarruselesPage() {
   const completar = useCompletarCarpetaCarrusel();
   const subirChicas = useSubirChicas();
   const quemar = useQuemarTexto(source, folder);
+  const quemarTodo = useQuemarTodo();
   const subidos = useSubidosCarruseles(source, folder);
   const marcarSubido = useMarcarSubidoCarrusel(source, folder);
   // Los aptos de TODOS los catálogos: es lo que deja trabajar por ambientes en
@@ -593,6 +595,36 @@ export default function CarruselesPage() {
               }}
             />
           ))}
+
+          {/* Y el catálogo entero, que es como se usa de verdad: 190 fotos
+              repartidas en treinta carpetas. Va por la cola. */}
+          <button
+            type="button"
+            disabled={quemarTodo.isPending}
+            onClick={() =>
+              quemarTodo.mutate(
+                { tipo: "chica" },
+                {
+                  onSuccess: () => {
+                    toast.success("Textos de todo el catálogo en la cola");
+                    abrirCola();
+                  },
+                  onError: (e) => toast.error(err(e)),
+                },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-fuchsia-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-50"
+          >
+            {quemarTodo.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Encolando…
+              </>
+            ) : (
+              <>
+                <Flame className="h-4 w-4" /> Poner el mensaje 1 a TODO el catálogo
+              </>
+            )}
+          </button>
 
           {/* El quemado de la foto 1 es masivo por carpeta: mismo gesto para
               las diez, que es justo lo que hace que esto salga a cuenta. */}
@@ -1390,6 +1422,7 @@ function CarruselCard({
   const cambiarEscenario = useCambiarEscenario(source, folder);
   const subirFoto = useSubirFotoCarrusel(source, folder);
   const quemar = useQuemarTexto(source, folder);
+  const quemarTodo = useQuemarTodo();
   const editar = useEditarMensaje(source, folder);
   const fotoRef = useRef<HTMLInputElement>(null);
   const [mensaje2, setMensaje2] = useState(datos.mensaje2);

@@ -1194,6 +1194,37 @@ def quemar(
     }
 
 
+class QuemarTodoRequest(BaseModel):
+    """Escribir los textos de TODO el catálogo, por la cola."""
+
+    # "chica", "producto" o "ambas".
+    tipo: str = "ambas"
+    rehacer: bool = False
+
+
+@router.post("/quemar/todo", status_code=201)
+def quemar_todo(
+    body: QuemarTodoRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Encola el quemado de todas las fotos que tengan mensaje y foto.
+
+    El botón de la pantalla hace UNA carpeta; con 190 productos en treinta
+    carpetas eso son treinta idas y venidas.
+    """
+    from src.queue.models import JobMode
+
+    if body.tipo not in ("chica", "producto", "ambas"):
+        raise _bad_request("Solo se puede quemar 'chica', 'producto' o 'ambas'.")
+    job = queue.enqueue(
+        JobMode.NICHO_CARRUSELES_QUEMAR,
+        title="🔥 Textos del carrusel" + (" (rehacer)" if body.rehacer else ""),
+        params={"usuario": usuario, "tipo": body.tipo, "rehacer": bool(body.rehacer)},
+    )
+    return {"job_id": job.id}
+
+
 @router.get("/foto")
 def ver_foto(
     source: Annotated[str, Query()],
