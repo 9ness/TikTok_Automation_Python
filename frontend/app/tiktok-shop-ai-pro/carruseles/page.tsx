@@ -53,6 +53,7 @@ import {
   useSubirFotos2,
   type AptoCarrusel,
   type EscenarioPrompt,
+  type ProgresoTanda,
   type FotosCarrusel,
   type ProductoCarrusel,
 } from "@/lib/queries/nichoCarruseles";
@@ -151,6 +152,8 @@ export default function CarruselesPage() {
   // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
   // pintarían las cuatro girando a la vez.
   const [tandaEnCurso, setTandaEnCurso] = useState("");
+  const [progresoTanda, setProgresoTanda] = useState<ProgresoTanda | null>(null);
+  const [progresoFotos2, setProgresoFotos2] = useState<ProgresoTanda | null>(null);
 
   const items = productos.data ?? [];
   const porProducto = estado.data?.productos ?? {};
@@ -519,19 +522,24 @@ export default function CarruselesPage() {
               escenario={esc}
               faltan={pendientes.data?.por_escenario?.[esc.clave] ?? 0}
               subiendo={subirChicas.isPending && tandaEnCurso === esc.clave}
+              progreso={tandaEnCurso === esc.clave ? progresoTanda : null}
               onSubir={(files) => {
                 setTandaEnCurso(esc.clave);
+                setProgresoTanda({ pct: 0, hechos: 0, total: files.length });
                 subirChicas.mutate(
-                  { escenario: esc.clave, files },
                   {
-                    onSuccess: (r) =>
-                      toast.success(
-                        `${r.asignadas} chicas repartidas` +
-                          (r.sobran_fotos ? ` · sobran ${r.sobran_fotos}` : "") +
-                          (r.faltan ? ` · siguen faltando ${r.faltan}` : ""),
-                      ),
+                    escenario: esc.clave,
+                    files,
+                    onProgreso: (p) => setProgresoTanda(p),
+                  },
+                  {
+                    onSuccess: () =>
+                      toast.success(`${files.length} chica(s) subidas y repartidas`),
                     onError: (e2) => toast.error(err(e2)),
-                    onSettled: () => setTandaEnCurso(""),
+                    onSettled: () => {
+                      setTandaEnCurso("");
+                      setProgresoTanda(null);
+                    },
                   },
                 );
               }}
@@ -647,13 +655,20 @@ export default function CarruselesPage() {
               const files = Array.from(e.target.files ?? []);
               e.target.value = "";
               if (!files.length) return;
-              subirFotos2.mutate(files, {
-                onSuccess: (r) => {
-                  toast.success(`${r.recibidas} foto(s) subidas · repartiendo en la cola`);
-                  abrirCola();
+              setProgresoFotos2({ pct: 0, hechos: 0, total: files.length });
+              subirFotos2.mutate(
+                { files, onProgreso: (p) => setProgresoFotos2(p) },
+                {
+                  onSuccess: (r) => {
+                    toast.success(
+                      `${files.length} foto(s) subidas · repartiendo ${r.pendientes} en la cola`,
+                    );
+                    abrirCola();
+                  },
+                  onError: (e2) => toast.error(err(e2)),
+                  onSettled: () => setProgresoFotos2(null),
                 },
-                onError: (e2) => toast.error(err(e2)),
-              });
+              );
             }}
           />
           <button
@@ -664,7 +679,10 @@ export default function CarruselesPage() {
           >
             {subirFotos2.isPending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Subiendo…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {progresoFotos2
+                  ? `Subiendo ${progresoFotos2.hechos}/${progresoFotos2.total} · ${progresoFotos2.pct}%`
+                  : "Subiendo…"}
               </>
             ) : (
               <>
@@ -672,6 +690,7 @@ export default function CarruselesPage() {
               </>
             )}
           </button>
+          {progresoFotos2 ? <Barra pct={progresoFotos2.pct} /> : null}
           <p className="text-center text-[10px] text-muted-foreground">
             Suéltalas todas de golpe: se suben y la IA va reconociendo en la cola de
             qué producto es cada una. Las que no reconozca salen abajo.
@@ -995,6 +1014,19 @@ function SinAsignar({
   );
 }
 
+/** Barra de subida. Lo que se ve mientras el navegador manda los ficheros: sin
+ *  ella, una tanda de 78 fotos parece colgada tres minutos. */
+function Barra({ pct }: { pct: number }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-full bg-fuchsia-500 transition-all"
+        style={{ width: `${Math.max(2, pct)}%` }}
+      />
+    </div>
+  );
+}
+
 /** Un escenario de chica: cuántas faltan, su prompt de Flow y su tanda.
  *
  *  Van por separado porque una chica del sofá no vale para un producto de
@@ -1003,11 +1035,14 @@ function TandaEscenario({
   escenario,
   faltan,
   subiendo,
+  progreso,
   onSubir,
 }: {
   escenario: EscenarioPrompt;
   faltan: number;
   subiendo: boolean;
+  /** Progreso de la subida de ESTE escenario (null si no es el suyo). */
+  progreso: ProgresoTanda | null;
   onSubir: (files: File[]) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -1065,9 +1100,12 @@ function TandaEscenario({
           ) : (
             <Upload className="h-3.5 w-3.5" />
           )}
-          Subir tanda
+          {subiendo && progreso
+            ? `${progreso.hechos}/${progreso.total} · ${progreso.pct}%`
+            : "Subir tanda"}
         </button>
       </div>
+      {subiendo && progreso ? <Barra pct={progreso.pct} /> : null}
     </div>
   );
 }

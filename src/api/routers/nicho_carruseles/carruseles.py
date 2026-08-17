@@ -820,18 +820,15 @@ def preparar_catalogo(
 @router.post("/fotos2", status_code=201)
 async def subir_fotos2(
     archivos: Annotated[list[UploadFile], File()],
-    queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Sube la tanda de fotos de PRODUCTO y encola el reparto.
+    """Guarda un trozo de la tanda de fotos de PRODUCTO. NO reparte todavía.
 
-    Aquí no vale repartir por orden como con las chicas: cada foto es de UN
-    producto concreto y hay que mirarla. Eso es una llamada de visión por cada
-    12 fotos, así que las fotos se guardan primero —en "sin asignar", donde no
-    se pierden pase lo que pase— y el reconocimiento va por la cola.
+    La pantalla las sube de ocho en ocho (para poder enseñar el porcentaje y no
+    mandar 150 MB de una vez) y al terminar llama a `/fotos2/repartir`. Hasta
+    entonces viven en "sin asignar", que es donde no se pierden pase lo que
+    pase.
     """
-    from src.queue.models import JobMode
-
     if not archivos:
         raise _bad_request("No has adjuntado ninguna foto.")
 
@@ -845,13 +842,30 @@ async def subir_fotos2(
             guardadas += 1
         except OSError as e:
             raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
+    return {"recibidas": guardadas}
 
+
+@router.post("/fotos2/repartir", status_code=201)
+def repartir_fotos2(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Encola el reconocimiento de las fotos que estén sin asignar.
+
+    Va por la cola porque es una llamada de visión por cada 12 fotos: con una
+    tanda de 40 el navegador se quedaba minuto y medio esperando.
+    """
+    from src.queue.models import JobMode
+
+    sueltas = fotos_svc.listar_sin_asignar(usuario)
+    if not sueltas:
+        raise _bad_request("No hay fotos pendientes de repartir.")
     job = queue.enqueue(
         JobMode.NICHO_CARRUSELES_REPARTO,
-        title=f"🧩 Repartir {guardadas} foto(s) de carrusel",
+        title=f"🧩 Repartir {len(sueltas)} foto(s) de carrusel",
         params={"usuario": usuario},
     )
-    return {"recibidas": guardadas, "job_id": job.id}
+    return {"pendientes": len(sueltas), "job_id": job.id}
 
 
 @router.get("/sin-asignar")

@@ -151,6 +151,89 @@ export interface ChicasPendientes {
   items: PendienteChica[];
 }
 
+
+// ---------------------------------------------------------------------------
+// Subida de tandas con porcentaje
+// ---------------------------------------------------------------------------
+// `fetch` no sabe decir cuánto lleva subido, así que las tandas van por
+// XMLHttpRequest — igual que la subida de vídeos del POV BOF. Y en TROZOS de
+// ocho ficheros: una tanda de 78 fotos son ~150 MB y mandarlos en una sola
+// petición es pedir un timeout; así además el porcentaje avanza de verdad y no
+// se queda clavado al 0 mientras sube todo.
+const POR_TROZO = 8;
+
+export interface ProgresoTanda {
+  /** 0-100 del total de bytes de la tanda. */
+  pct: number;
+  hechos: number;
+  total: number;
+}
+
+function subirTrozo(
+  path: string,
+  files: File[],
+  extra: Record<string, string>,
+  onBytes: (subidos: number) => void,
+): Promise<unknown> {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const fd = new FormData();
+  Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
+  files.forEach((f) => fd.append("archivos", f));
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${base}${path}`);
+    if (key) xhr.setRequestHeader("X-API-Key", key);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onBytes(e.loaded);
+    };
+    xhr.onload = () => {
+      let d: { detail?: string; error?: string } = {};
+      try {
+        d = JSON.parse(xhr.responseText || "{}");
+      } catch {
+        d = {};
+      }
+      if (xhr.status >= 400) {
+        reject(new Error(d.detail || d.error || `Error ${xhr.status} subiendo`));
+        return;
+      }
+      resolve(d);
+    };
+    xhr.onerror = () => reject(new Error("Error de red subiendo la tanda"));
+    xhr.send(fd);
+  });
+}
+
+/** Sube todos los ficheros en trozos, avisando del porcentaje del TOTAL. */
+async function subirTanda(
+  path: string,
+  files: File[],
+  extra: Record<string, string>,
+  onProgreso?: (p: ProgresoTanda) => void,
+): Promise<void> {
+  const bytesTotal = files.reduce((n, f) => n + f.size, 0) || 1;
+  let yaSubidos = 0;
+  for (let i = 0; i < files.length; i += POR_TROZO) {
+    const trozo = files.slice(i, i + POR_TROZO);
+    const bytesTrozo = trozo.reduce((n, f) => n + f.size, 0);
+    await subirTrozo(path, trozo, extra, (subidos) => {
+      onProgreso?.({
+        pct: Math.min(100, Math.round(((yaSubidos + subidos) / bytesTotal) * 100)),
+        hechos: i,
+        total: files.length,
+      });
+    });
+    yaSubidos += bytesTrozo;
+    onProgreso?.({
+      pct: Math.min(100, Math.round((yaSubidos / bytesTotal) * 100)),
+      hechos: Math.min(files.length, i + trozo.length),
+      total: files.length,
+    });
+  }
+}
+
 export function usePromptsCarruseles() {
   return useQuery<PromptsCarruseles>({
     queryKey: carruselesKeys.prompts(),
@@ -282,13 +365,13 @@ export interface RepartoChicas {
  *  productos de ESE escenario que no tienen, de todos los catálogos. */
 export function useSubirChicas() {
   const qc = useQueryClient();
-  return useMutation<RepartoChicas, Error, { escenario: string; files: File[] }>({
-    mutationFn: ({ escenario, files }) => {
-      const fd = new FormData();
-      fd.append("escenario", escenario);
-      files.forEach((f) => fd.append("archivos", f));
-      return api.post<RepartoChicas>(`${ROOT}/chicas`, fd);
-    },
+  return useMutation<
+    void,
+    Error,
+    { escenario: string; files: File[]; onProgreso?: (p: ProgresoTanda) => void }
+  >({
+    mutationFn: ({ escenario, files, onProgreso }) =>
+      subirTanda(`${ROOT}/chicas`, files, { escenario }, onProgreso),
     onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
   });
 }
@@ -410,7 +493,7 @@ export function useAptos() {
 }
 
 export interface RepartoFotos2 {
-  recibidas: number;
+  pendientes: number;
   job_id: string;
 }
 
@@ -422,11 +505,16 @@ export interface RepartoFotos2 {
  *  pierde ninguna: aparecen en "Sin reconocer" y se colocan a mano. */
 export function useSubirFotos2() {
   const qc = useQueryClient();
-  return useMutation<RepartoFotos2, Error, File[]>({
-    mutationFn: (files) => {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("archivos", f));
-      return api.post<RepartoFotos2>(`${ROOT}/fotos2`, fd);
+  return useMutation<
+    RepartoFotos2,
+    Error,
+    { files: File[]; onProgreso?: (p: ProgresoTanda) => void }
+  >({
+    mutationFn: async ({ files, onProgreso }) => {
+      await subirTanda(`${ROOT}/fotos2`, files, {}, onProgreso);
+      // Con todo subido, un solo trabajo para reconocerlas: encolar uno por
+      // trozo dejaría ocho jobs peleándose por los mismos productos.
+      return api.post<RepartoFotos2>(`${ROOT}/fotos2/repartir`);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: carruselesKeys.all });
