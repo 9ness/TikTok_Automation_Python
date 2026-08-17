@@ -171,16 +171,20 @@ CHICAS_POR_TANDA = 40
 # Blanco, negrita, con borde negro y sombra: es lo que hace TikTok nativo y lo
 # que llevan las cuentas de referencia del curso. Sin píldora — la caja negra
 # canta a "editado fuera".
+#
+# Los números están medidos contra una publicación real de esas cuentas: letra
+# algo mayor de lo que parece y borde grueso, que es lo que la hace legible
+# sobre una calle de noche llena de luces.
 FUENTE_TEXTO = "Montserrat-ExtraBold.ttf"
 # Proporción del ANCHO de la foto. Así el mismo estilo vale para una foto de
 # Flow (1536 px) y para una captura de móvil, sin recalcular tamaños a mano.
-TEXTO_TAM = 0.062
-TEXTO_ANCHO_MAX = 0.86
+TEXTO_TAM = 0.066
+TEXTO_ANCHO_MAX = 0.84
 # Altura donde se centra el bloque de texto (0 = arriba, 1 = abajo). En el
 # tercio de arriba: probado sobre la foto de referencia, a 0.40 el texto caía
 # encima de los ojos de la chica y ahí lo que tiene que verse es la cara.
 TEXTO_Y = 0.28
-TEXTO_BORDE = 0.11  # grosor del contorno, sobre el tamaño de letra
+TEXTO_BORDE = 0.13  # grosor del contorno, sobre el tamaño de letra
 
 
 # Dónde se recrea el producto de la foto 2, según el escenario que le tocó. El
