@@ -187,23 +187,6 @@ TEXTO_Y = 0.28
 TEXTO_BORDE = 0.13  # grosor del contorno, sobre el tamaño de letra
 
 
-# Dónde se recrea el producto de la foto 2, según el escenario que le tocó. El
-# prompt de la foto 2 NO necesita una composición de referencia: basta con la
-# foto limpia del producto y decirle el sitio (mismo enfoque que el prompt de
-# imagen del POV BOF).
-LUGAR_POR_ESCENARIO: dict[str, str] = {
-    "generico": "una casa real, en el sitio donde se usaría de verdad",
-    "casa": "una casa real, en el sitio donde se usaría de verdad",
-    "cama": "un dormitorio real, donde iría de verdad (sobre la cama, en la mesilla o en el suelo)",
-    "sofa": "un salón real, donde iría de verdad (sobre el sofá, en la mesa de centro o en el suelo)",
-    "exterior": "un jardín o una terraza, donde iría de verdad",
-    "cocina": "una cocina real, donde iría de verdad (en la encimera si es pequeño, en el suelo o dentro de un mueble si no)",
-    "bano": "un cuarto de baño real, donde iría de verdad",
-    "coche": "el interior de un coche, donde iría de verdad",
-    "escritorio": "un rincón de trabajo de casa, donde iría de verdad (encima de la mesa o en el suelo si es un mueble)",
-    "playa": "la playa o el borde de una piscina",
-}
-
 # La mano en primera persona, como en el POV BOF. Hay dos, y cuál toca no lo
 # decide el operador sino el PRODUCTO: lo que cabe en la mano se coge (una
 # crema, un bote de vitaminas), y lo que no —un colchón, un sofá— se enseña en
@@ -226,14 +209,17 @@ ESCENARIOS_DE_MANO = frozenset({"generico", "bano", "coche"})
 
 
 def prompt_producto(escenario: str = "", con_mano: bool | None = None) -> str:
-    """El prompt de la foto 2, con el sitio y la mano que le tocan.
+    """El prompt de la foto 2: ubicación ideal y la mano que le toque.
+
+    El SITIO no se dicta. Se probó a decírselo por escenario ("la encimera de
+    una cocina") y el modelo obedecía al pie de la letra: salió un cubo de
+    basura encima de la encimera. Sabe de sobra dónde va cada cosa.
 
     `con_mano=None` (lo normal) decide solo: se coge si el producto cabe en la
     mano. `True` fuerza la mano señalando —para cuando el producto es grande
     pero se quiere el punto de vista de alguien— y `False` la quita.
     """
-    lugar = LUGAR_POR_ESCENARIO.get(escenario) or LUGAR_POR_ESCENARIO["generico"]
-    texto = leer_prompt("foto_producto").replace("{lugar}", lugar)
+    texto = leer_prompt("foto_producto")
 
     de_mano = (escenario or "generico") in ESCENARIOS_DE_MANO
     if con_mano is False:
