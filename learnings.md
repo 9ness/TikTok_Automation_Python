@@ -609,3 +609,4 @@
 - La cola devolvía 500 entera si había un job de un modo que no estuviera en el Literal `JobModeValue` (lista a mano de 6 modos); ahora es `str` — validar la SALIDA con una lista cerrada tumba todo, no solo ese job.
 - El clasificador de Carruseles no es determinista: con el MISMO título un producto dudoso (silla de coche) puede pasar de "coche" a "otro" al rehacer — por eso existe el interruptor manual; y una petición lanzada mientras se despliega entra en la versión VIEJA (ignoró el filtro de carpetas y rehízo el catálogo entero).
 - Carruseles: las miniaturas (referencia de escenario, fotos del producto) se servían enteras y con `no-cache`; ahora `?w=` + caché de un día (la URL ya lleva `v=<mtime>`), y al DESCARGAR siempre va la original.
+- Carruseles: el índice de fotos del Drive montado se corrige entrada a entrada al guardar/borrar/quemar en vez de tirarlo entero; listar las cuatro carpetas en frío eran decenas de segundos y se pagaban tras CADA foto.

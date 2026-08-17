@@ -35,10 +35,12 @@ _EXTS = (".jpg", ".jpeg", ".png", ".webp")
 # chicas faltan en una fuente entera pasaba de mil.
 #
 # Se lista cada carpeta UNA vez (`iterdir`) y se resuelve todo contra ese
-# diccionario. El TTL es corto porque aquí escribe la propia app: cualquier
-# escritura invalida (`_invalidar`) y el TTL solo cubre el caso de tocar el
-# Drive a mano. Mismo patrón que `nicho_pov_bof.services.mis_productos`.
-_TTL_S = 120.0
+# diccionario. Escribir NO tira el índice: se corrige la entrada que cambia
+# (`_apuntar` / `_olvidar`), porque volver a listar las cuatro carpetas del
+# Drive montado son decenas de segundos y se pagaban después de CADA foto
+# subida o quemada. El TTL solo cubre el caso de tocar el Drive a mano.
+# Mismo patrón que `nicho_pov_bof.services.mis_productos`.
+_TTL_S = 600.0
 _INDICES: dict[tuple[str, str], tuple[float, dict[str, Path]]] = {}
 
 
@@ -71,6 +73,20 @@ def _invalidar(tipo: str = "", usuario: str = "") -> None:
         _INDICES.clear()
         return
     _INDICES.pop((tipo, usuario or "ness"), None)
+
+
+def _apuntar(tipo: str, usuario: str, nombre: str, ruta: Path) -> None:
+    """Mete una foto recién guardada en el índice que ya está en memoria."""
+    hit = _INDICES.get((tipo, usuario or "ness"))
+    if hit:
+        hit[1][nombre] = ruta
+
+
+def _olvidar(tipo: str, usuario: str, nombre: str) -> None:
+    """Quita del índice una foto recién borrada."""
+    hit = _INDICES.get((tipo, usuario or "ness"))
+    if hit:
+        hit[1].pop(nombre, None)
 
 
 def _slug(texto: str) -> str:
@@ -115,7 +131,7 @@ def guardar(
         (base / f"{nombre}{ext}").unlink(missing_ok=True)
     destino = base / f"{nombre}{_extension(filename)}"
     destino.write_bytes(datos)
-    _invalidar(tipo, usuario)
+    _apuntar(tipo, usuario, nombre, destino)
     return destino
 
 
@@ -125,7 +141,7 @@ def borrar(tipo: str, usuario: str, source: str, folder: str, producto: str) -> 
     if not p:
         return False
     p.unlink(missing_ok=True)
-    _invalidar(tipo, usuario)
+    _olvidar(tipo, usuario, ref(source, folder, producto))
     return True
 
 
@@ -204,7 +220,7 @@ def quemar_texto(
     for ext in _EXTS:
         (destino.parent / f"{ref(source, folder, producto)}{ext}").unlink(missing_ok=True)
     salida = texto_foto.quemar(origen, texto, destino)
-    _invalidar(f"{tipo}_txt", usuario)
+    _apuntar(f"{tipo}_txt", usuario, ref(source, folder, producto), salida)
     return salida
 
 
