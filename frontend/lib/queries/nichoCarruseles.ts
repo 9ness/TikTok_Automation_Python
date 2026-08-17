@@ -1,0 +1,350 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { api } from "@/lib/api";
+
+/** Nicho Carruseles (módulo 14).
+ *
+ *  El CATÁLOGO no está aquí: productos, fotos del Drive, textos, hashtags,
+ *  escaparate y vendidos son los del Nicho POV BOF y se piden con sus hooks
+ *  (`nichoPovBof.ts`), igual que hace Creativos Pro. Aquí solo vive lo del
+ *  carrusel: si el producto vale, sus dos mensajes y sus dos fotos.
+ */
+const ROOT = "/api/v1/nicho-carruseles";
+
+export const carruselesKeys = {
+  all: ["nicho-carruseles"] as const,
+  prompts: () => [...carruselesKeys.all, "prompts"] as const,
+  folders: (source: string) => [...carruselesKeys.all, "folders", source] as const,
+  estado: (source: string, folder: string) =>
+    [...carruselesKeys.all, "estado", source, folder] as const,
+  pendientes: (source: string) =>
+    [...carruselesKeys.all, "pendientes", source] as const,
+};
+
+export interface PromptsCarruseles {
+  chica: string;
+  producto: string;
+  formato: string;
+  referencia_drive: string;
+}
+
+export interface CarpetaCarruseles {
+  name: string;
+  completed: boolean;
+  /** Cuántos productos de la carpeta valen para carrusel. */
+  aptos: number;
+  clasificada: boolean;
+}
+
+export interface FoldersCarruseles {
+  source: string;
+  items: CarpetaCarruseles[];
+  current: string | null;
+  done: number;
+  total: number;
+  aptos: number;
+}
+
+/** Qué fotos tiene el producto. El valor es el `mtime` (o "" si no está): se
+ *  mete en la URL para poder cachear la imagen y aun así ver la nueva al
+ *  sustituirla. */
+export interface FotosCarrusel {
+  chica: string;
+  chica_txt: string;
+  producto: string;
+  producto_txt: string;
+}
+
+export interface ProductoCarrusel {
+  categoria: string;
+  apto: boolean;
+  /** `true`/`false` si el operador lo forzó a mano; `null` = manda la IA. */
+  apto_manual: boolean | null;
+  mensaje1: string;
+  mensaje2: string;
+  fotos: FotosCarrusel;
+  subido_at: number;
+}
+
+export interface EstadoCarruseles {
+  source: string;
+  folder: string;
+  clasificada: boolean;
+  productos: Record<string, ProductoCarrusel>;
+}
+
+export interface PendienteChica {
+  source: string;
+  folder: string;
+  producto: string;
+}
+
+export interface ChicasPendientes {
+  source: string;
+  faltan: number;
+  por_tanda: number;
+  items: PendienteChica[];
+}
+
+export function usePromptsCarruseles() {
+  return useQuery<PromptsCarruseles>({
+    queryKey: carruselesKeys.prompts(),
+    queryFn: () => api.get<PromptsCarruseles>(`${ROOT}/prompts`),
+    staleTime: Infinity,
+  });
+}
+
+export function useFoldersCarruseles(source: string) {
+  return useQuery<FoldersCarruseles>({
+    queryKey: carruselesKeys.folders(source),
+    queryFn: () =>
+      api.get<FoldersCarruseles>(`${ROOT}/folders?source=${encodeURIComponent(source)}`),
+    enabled: Boolean(source),
+  });
+}
+
+export function useEstadoCarruseles(source: string, folder: string | null) {
+  return useQuery<EstadoCarruseles>({
+    queryKey: carruselesKeys.estado(source, folder ?? ""),
+    queryFn: () =>
+      api.get<EstadoCarruseles>(
+        `${ROOT}/estado?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+          folder ?? "",
+        )}`,
+      ),
+    enabled: Boolean(source && folder),
+  });
+}
+
+export function useCompletarCarpetaCarrusel() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean },
+    Error,
+    { source: string; folder: string; completed: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/complete`, body),
+    onSuccess: (_r, v) =>
+      void qc.invalidateQueries({ queryKey: carruselesKeys.folders(v.source) }),
+  });
+}
+
+/** Guarda el estado que devuelven casi todos los endpoints de escritura: así
+ *  la pantalla se actualiza sin una segunda vuelta a la API. */
+function useGuardarEstado(source: string, folder: string | null) {
+  const qc = useQueryClient();
+  return (estado: EstadoCarruseles) => {
+    qc.setQueryData(carruselesKeys.estado(source, folder ?? ""), estado);
+    void qc.invalidateQueries({ queryKey: carruselesKeys.folders(source) });
+    void qc.invalidateQueries({ queryKey: carruselesKeys.pendientes(source) });
+  };
+}
+
+export function useClasificarCarpeta(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<EstadoCarruseles, Error, void>({
+    mutationFn: () =>
+      api.post<EstadoCarruseles>(`${ROOT}/clasificar`, { source, folder: folder ?? "" }),
+    onSuccess: guardar,
+  });
+}
+
+export function useMarcarApto(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<
+    EstadoCarruseles,
+    Error,
+    { producto: string; apto: boolean | null }
+  >({
+    mutationFn: (body) =>
+      api.post<EstadoCarruseles>(`${ROOT}/apto`, {
+        source,
+        folder: folder ?? "",
+        ...body,
+      }),
+    onSuccess: guardar,
+  });
+}
+
+export function useEscribirMensajes(source: string, folder: string | null) {
+  const qc = useQueryClient();
+  return useMutation<{ escritos: number }, Error, void>({
+    mutationFn: () =>
+      api.post<{ escritos: number }>(`${ROOT}/mensajes`, {
+        source,
+        folder: folder ?? "",
+      }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: carruselesKeys.estado(source, folder ?? "") }),
+  });
+}
+
+export function useEditarMensaje(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<
+    EstadoCarruseles,
+    Error,
+    { producto: string; mensaje1?: string; mensaje2?: string }
+  >({
+    mutationFn: (body) =>
+      api.post<EstadoCarruseles>(`${ROOT}/mensaje`, {
+        source,
+        folder: folder ?? "",
+        ...body,
+      }),
+    onSuccess: guardar,
+  });
+}
+
+/** Cuántas fotos de chica hay que generar en Flow para toda la fuente. */
+export function useChicasPendientes(source: string) {
+  return useQuery<ChicasPendientes>({
+    queryKey: carruselesKeys.pendientes(source),
+    queryFn: () =>
+      api.get<ChicasPendientes>(
+        `${ROOT}/chicas/pendientes?source=${encodeURIComponent(source)}`,
+      ),
+    enabled: Boolean(source),
+  });
+}
+
+export interface RepartoChicas {
+  asignadas: number;
+  items: (PendienteChica & { archivo: string; mtime: number })[];
+  sobran_fotos: number;
+  faltan: number;
+}
+
+/** Sube la tanda entera de chicas: se reparten solas entre los productos que
+ *  no tienen (la foto 1 no depende del producto). */
+export function useSubirChicas(source: string) {
+  const qc = useQueryClient();
+  return useMutation<RepartoChicas, Error, File[]>({
+    mutationFn: (files) => {
+      const fd = new FormData();
+      fd.append("source", source);
+      files.forEach((f) => fd.append("archivos", f));
+      return api.post<RepartoChicas>(`${ROOT}/chicas`, fd);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: carruselesKeys.pendientes(source) });
+      void qc.invalidateQueries({ queryKey: carruselesKeys.all });
+    },
+  });
+}
+
+export function useSubirFotoCarrusel(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<
+    EstadoCarruseles,
+    Error,
+    { producto: string; tipo: "chica" | "producto"; file: File }
+  >({
+    mutationFn: ({ producto, tipo, file }) => {
+      const fd = new FormData();
+      fd.append("source", source);
+      fd.append("folder", folder ?? "");
+      fd.append("producto", producto);
+      fd.append("tipo", tipo);
+      fd.append("archivo", file);
+      return api.post<EstadoCarruseles>(`${ROOT}/foto`, fd);
+    },
+    onSuccess: guardar,
+  });
+}
+
+export function useBorrarFotoCarrusel(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<
+    EstadoCarruseles,
+    Error,
+    { producto: string; tipo: "chica" | "producto" }
+  >({
+    mutationFn: ({ producto, tipo }) =>
+      api.del<EstadoCarruseles>(
+        `${ROOT}/foto?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+          folder ?? "",
+        )}&producto=${encodeURIComponent(producto)}&tipo=${tipo}`,
+      ),
+    onSuccess: guardar,
+  });
+}
+
+export interface Quemado {
+  quemadas: number;
+  saltados: string[];
+  estado: EstadoCarruseles;
+}
+
+/** Quema el mensaje sobre la foto. Sin `producto` va toda la carpeta — que es
+ *  como se usa con las chicas. */
+export function useQuemarTexto(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<
+    Quemado,
+    Error,
+    { producto?: string; tipo: "chica" | "producto" }
+  >({
+    mutationFn: (body) =>
+      api.post<Quemado>(`${ROOT}/quemar`, { source, folder: folder ?? "", ...body }),
+    onSuccess: (res) => guardar(res.estado),
+  });
+}
+
+export function useSubidosCarruseles(source: string, folder: string | null) {
+  return useQuery<Record<string, number>>({
+    queryKey: [...carruselesKeys.all, "subidos", source, folder ?? ""],
+    queryFn: async () =>
+      (
+        await api.get<{ items: string[]; horas: Record<string, number> }>(
+          `${ROOT}/subidos?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+            folder ?? "",
+          )}`,
+        )
+      ).horas ?? {},
+    enabled: Boolean(source && folder),
+  });
+}
+
+export function useMarcarSubidoCarrusel(source: string, folder: string | null) {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: string[]; horas: Record<string, number> },
+    Error,
+    { producto: string; uploaded: boolean }
+  >({
+    mutationFn: (body) =>
+      api.post<{ items: string[]; horas: Record<string, number> }>(`${ROOT}/subido`, {
+        source,
+        folder: folder ?? "",
+        ...body,
+      }),
+    onSuccess: (res) => {
+      qc.setQueryData([...carruselesKeys.all, "subidos", source, folder ?? ""], res.horas ?? {});
+      void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
+    },
+  });
+}
+
+/** URL de una foto del banco. Lleva el `mtime` (`v`) para que el móvil pueda
+ *  cachearla y aun así ver la nueva cuando se sustituye. */
+export function buildFotoCarruselUrl(
+  source: string,
+  folder: string,
+  producto: string,
+  tipo: keyof FotosCarrusel,
+  version: string,
+  descargar = false,
+): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  const dl = descargar ? "&descargar=1" : "";
+  return `${base}${ROOT}/foto?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
+    folder,
+  )}&producto=${encodeURIComponent(producto)}&tipo=${tipo}&v=${encodeURIComponent(
+    version,
+  )}${dl}${qs}`;
+}

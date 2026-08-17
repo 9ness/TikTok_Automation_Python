@@ -126,6 +126,7 @@ export const MODULOS: ModuloNicho[] = [
     titulo: "Creación de Carruseles",
     icon: GalleryHorizontalEnd,
     drive: "Nicho Carruseles",
+    listo: true,
     resumen: "Carruseles que informan, enganchan y venden 24/7.",
   },
 ];

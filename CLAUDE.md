@@ -44,6 +44,7 @@ nichos.
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🎨 Creativos Pro | (sin modo — no edita vídeo) | Módulo 13: un creativo publicitario por producto. Mismo catálogo que POV BOF (fuentes, fotos, textos, hashtags, escaparate, vendidos); solo cambia el prompt y el formato 3:4 |
+| 🖼️ Carruseles | (sin modo — no edita vídeo) | Módulo 14: carrusel de DOS fotos (chica sorprendida + producto) con el texto quemado. Solo belleza y suplementos |
 | 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
 | 🎬 Nicho BOF Cinematográfico | `NICHO_BOF_CINE_VIDEO` | Módulo 10: como POV BOF pero sin mano — DOS clips de 5s con paneo, pegados y cuadrados por velocidad |
 | 👗 Nicho Ropa Con Personas | `NICHO_ROPA_PERSONAS_VIDEO` | Módulo 7: SOLO ropa de mujer, puesta por una modelo creada con IA (ficha JSON por usuario) |
@@ -387,6 +388,32 @@ Cosas que ya costaron una vez:
   BOF, no se re-extraen: costarían las llamadas de Gemini dos veces.
 - La cadena de nivelado del POV BOF (`TP=-1.5`) NO vale para Fish: daba +0,20
   dBTP. Aquí es `TP=-2.0` con limitador 0.89.
+
+### Nicho Carruseles (mismo programa, módulo 14)
+
+Módulos en [`src/nicho_carruseles/`](src/nicho_carruseles/) (prefijo Redis
+`nicho_carruseles:`). API: `/api/v1/nicho-carruseles/*`. **No edita vídeo**:
+publica un carrusel de DOS fotos con el texto quemado encima (PIL, sin cola —
+es un PNG sobre un JPEG).
+
+Lo que no tiene ningún otro nicho:
+- **Solo belleza y suplementación.** El resto de productos no funciona en este
+  formato, así que hay un paso de clasificación con Gemini (texto suelto sobre
+  los títulos YA extraídos, sin imágenes) + interruptor manual por producto. Al
+  filtrar, una carpeta de diez se queda en dos o tres: el listado de carpetas
+  enseña cuántos aptos tiene cada una para no abrirlas en balde.
+- **La foto 1 NO depende del producto** (una chica sorprendida, generada en
+  Google Flow con el prompt del curso). Se suben en TANDA para toda la fuente y
+  se reparten por orden entre los productos que no tienen; la foto 2 —el
+  producto— sí es de cada uno y se sube en su tarjeta.
+- Las fotos viven en el Drive montado
+  (`TIKTOK_SHOP_AI_PRO/Nicho_Carruseles/<usuario>/`), y el original y la
+  versión con texto van en carpetas distintas: quemar sobre lo quemado deja el
+  texto doble. El vínculo foto↔producto es el NOMBRE del fichero
+  (`<fuente>__<carpeta>__<producto>.jpg`), no un índice en Redis.
+
+Comparte con el POV BOF catálogo, textos, hashtags, escaparate y vendidos
+(igual que Creativos Pro). Progreso y "subido" son propios.
 
 ### Cuenta Piloto (mismo programa, no es un módulo del curso)
 

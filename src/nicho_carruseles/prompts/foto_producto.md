@@ -1,0 +1,3 @@
+Cambia el producto de la primera imagen por el producto de la segunda imagen. Modifica también el ambiente de fondo y la habitación, manteniendo la misma idea y estilo general de la imagen original, pero con una ambientación diferente y renovada. Elimina cualquier texto, logotipo, etiqueta o elemento gráfico presente en la imagen.
+
+Es fundamental que el producto de la segunda imagen se respete con total precisión, manteniendo exactamente su diseño, forma, proporciones, colores, materiales, acabados, detalles, accesorios y todas sus características visuales. No alteres ni reinterpretes ningún elemento del producto. El producto debe verse idéntico al de la imagen de referencia. Ultra realista.

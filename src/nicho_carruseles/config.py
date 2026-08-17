@@ -1,0 +1,143 @@
+"""Nicho Carruseles (Programa 4 — módulo 14 del curso).
+
+No monta vídeo: publica un CARRUSEL de DOS fotos.
+
+  - Foto 1 — una chica sorprendida, GENÉRICA: no tiene nada que ver con el
+    producto. Se generan de golpe en Google Flow (de cuatro en cuatro) a partir
+    de una foto de referencia y el prompt del curso, y se suben aquí en lote.
+    Encima lleva quemado un mensaje corto que da curiosidad ("no me esperaba
+    que fuera TAN bueno 😳"), tampoco atado al producto.
+  - Foto 2 — el producto: ella sosteniéndolo, o el producto solo si es grande.
+    Esta SÍ es de cada producto, se sube una a una y lleva quemado el mensaje
+    del curso ("Han ajustado el precio de X…").
+
+Como la foto 1 no depende del producto, el trabajo se reparte al revés que en
+los demás nichos: primero una tanda enorme de chicas para toda la fuente y
+después, producto a producto, solo la foto 2.
+
+Del catálogo NO se toca nada: fuentes, carpetas, fotos, textos, hashtags,
+escaparate y vendidos son los del Nicho POV BOF (ver `nicho_creativos`, que hace
+lo mismo). Lo propio de aquí es:
+
+  - qué productos VALEN para carrusel (belleza y suplementación; el resto no
+    funciona en este formato) — `services/clasificador.py`,
+  - los dos mensajes, escritos con los prompts del curso,
+  - el banco de chicas y las fotos de producto, que viven en NUESTRO Drive,
+  - quemar el texto sobre la foto (`services/texto_foto.py`),
+  - y el progreso por carpeta, que es SUYO.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+REDIS_PREFIX = os.getenv("NICHO_CARRUSELES_REDIS_PREFIX", "nicho_carruseles:")
+
+# Las MISMAS fuentes del Nicho POV BOF: mismo Drive, mismas carpetas, mismas
+# fotos. Se importan para que añadir una fuente allí valga aquí sin tocar nada.
+from src.nicho_pov_bof.config import (  # noqa: E402,F401
+    SOURCES,
+    es_fuente_propia,
+    fuente_canonica,
+    fuentes_a_barrer,
+)
+
+# Las fotos salen de Flow en vertical, como el vídeo. Se enseña al lado del
+# prompt porque el generador no lo deduce del texto.
+FORMATO = "9:16"
+
+# ---------------------------------------------------------------------------
+# Qué productos valen
+# ---------------------------------------------------------------------------
+# El carrusel es una chica sorprendida hablando de "lo que le contaron": eso
+# cuela en cosmética y en suplementos, y no cuela con un taladro. En vez de
+# adivinarlo con palabras clave, lo clasifica Gemini leyendo los títulos que ya
+# están extraídos (texto, sin imágenes: la llamada más barata que hay aquí).
+CATEGORIAS = ("belleza", "suplementos", "otro")
+CATEGORIAS_APTAS = ("belleza", "suplementos")
+
+# ---------------------------------------------------------------------------
+# Dónde viven las fotos
+# ---------------------------------------------------------------------------
+# En NUESTRO Drive montado, no en el compartido del curso (que es solo lectura)
+# y NUNCA en `api_uploads/` — eso se purga a las 24h y aquí una tanda de chicas
+# tarda días en gastarse. Mismo criterio que Cuenta Piloto.
+CARRUSELES_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Carruseles"
+
+# Subcarpetas por tipo de foto. Las `_txt` guardan la versión con el texto ya
+# quemado: se conservan las dos para poder volver a quemar con otro mensaje sin
+# haber perdido el original (quemar sobre lo quemado deja el texto doble).
+SUBCARPETAS = {
+    "chica": "chicas",
+    "chica_txt": "chicas_con_texto",
+    "producto": "productos",
+    "producto_txt": "productos_con_texto",
+}
+
+# Cuántas chicas se piden de una tacada como máximo. No es un límite técnico:
+# es el aviso de que una tanda mayor no cabe en una sesión de Flow.
+CHICAS_POR_TANDA = 40
+
+# ---------------------------------------------------------------------------
+# Estilo del texto quemado
+# ---------------------------------------------------------------------------
+# Blanco, negrita, con borde negro y sombra: es lo que hace TikTok nativo y lo
+# que llevan las cuentas de referencia del curso. Sin píldora — la caja negra
+# canta a "editado fuera".
+FUENTE_TEXTO = "Montserrat-ExtraBold.ttf"
+# Proporción del ANCHO de la foto. Así el mismo estilo vale para una foto de
+# Flow (1536 px) y para una captura de móvil, sin recalcular tamaños a mano.
+TEXTO_TAM = 0.062
+TEXTO_ANCHO_MAX = 0.86
+# Altura donde se centra el bloque de texto (0 = arriba, 1 = abajo). En el
+# tercio de arriba: probado sobre la foto de referencia, a 0.40 el texto caía
+# encima de los ojos de la chica y ahí lo que tiene que verse es la cara.
+TEXTO_Y = 0.28
+TEXTO_BORDE = 0.11  # grosor del contorno, sobre el tamaño de letra
+
+
+def prompts_dir() -> Path:
+    return Path(__file__).resolve().parent / "prompts"
+
+
+def leer_prompt(nombre: str) -> str:
+    return (prompts_dir() / f"{nombre}.md").read_text(encoding="utf-8").strip()
+
+
+# Ruta ya resuelta y creada. Se recuerda por lo mismo que en el POV BOF: el
+# `mkdir` va contra el Drive MONTADO y en frío cuesta decenas de segundos,
+# porque rclone tiene que resolver los cuatro niveles contra Google.
+_RAIZ: Path | None = None
+
+
+def carruseles_dir() -> Path:
+    """Raíz del nicho en el Drive MONTADO (no el compartido del curso)."""
+    global _RAIZ
+    if _RAIZ is not None:
+        return _RAIZ
+
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / CARRUSELES_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_carruseles"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    _RAIZ = destino
+    return destino
+
+
+def carpeta_de(tipo: str, usuario: str = "") -> Path:
+    """Carpeta de un tipo de foto para ese usuario.
+
+    Es POR USUARIO porque la cuenta de TikTok lo es: la chica que sale en los
+    carruseles de Ana no puede salir en los de Mauro el mismo día.
+    """
+    sub = SUBCARPETAS.get(tipo)
+    if not sub:
+        raise ValueError(f"tipo de foto desconocido: {tipo}")
+    destino = carruseles_dir() / (usuario or "ness") / sub
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino

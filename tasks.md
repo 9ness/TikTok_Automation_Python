@@ -12,6 +12,21 @@
 - [ ] Tras push → SSH al VPS y disparar `deploy_safe.sh` para aplicar
 - [ ] Probar el flujo end-to-end del refactor TikTok Shop: crear producto desde URL → fotos → análisis → presets → /generate con bulk + smart variants
 
+## 🖼️ Nicho Carruseles (módulo 14) — pendiente de estrenar
+
+Ya está la pantalla (`/tiktok-shop-ai-pro/carruseles`) con el flujo entero:
+filtrar belleza/suplementos con IA → escribir los dos mensajes → tanda de
+chicas de Flow → quemar el mensaje 1 a toda la carpeta → foto 2 por producto →
+bajar las dos y publicar. Falta rodarlo:
+
+- [ ] Primera carpeta de verdad: comprobar que el filtro de belleza/suplementos
+      acierta y ajustar el prompt (`src/nicho_carruseles/prompts/clasificar.md`)
+      si deja fuera cosas que sí valen.
+- [ ] Ver el texto quemado en el móvil: si tapa la cara, se mueve con
+      `TEXTO_Y` en `src/nicho_carruseles/config.py` (hoy 0.28).
+- [ ] Decidir si la foto 2 se genera en Flow con el prompt de "cambiar
+      producto" o basta con la foto limpia del Drive tal cual.
+
 ## 🗂️ Drive "Productos España" — mapa de carpetas por nicho (2026-08-03)
 
 Explorado entero. Tenía 16 subcarpetas, no las 2 que conocíamos. La carpeta que
