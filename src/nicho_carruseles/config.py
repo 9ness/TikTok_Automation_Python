@@ -62,7 +62,11 @@ FORMATO = "9:16"
 #
 # Lo clasifica Gemini leyendo los títulos YA extraídos (texto, sin imágenes: la
 # llamada más barata que hay aquí).
-CATEGORIAS = ("belleza", "suplementos", "descanso", "salon", "exterior", "otro")
+CATEGORIAS = (
+    "belleza", "suplementos", "descanso", "salon", "exterior",
+    "cocina", "bano", "hogar", "coche", "tecnologia", "oficina", "fitness",
+    "otro",
+)
 
 # Escenarios de la foto 1. La clave viaja por la API y da nombre al prompt
 # (`prompts/foto_chica_<clave>.md`).
@@ -83,6 +87,22 @@ ESCENARIOS: dict[str, dict[str, str]] = {
         "label": "Al aire libre",
         "para": "Camping, jardín, terraza, muebles de exterior",
     },
+    "cocina": {
+        "label": "En la cocina",
+        "para": "Freidoras, cafeteras, menaje, organizadores de cocina",
+    },
+    "bano": {
+        "label": "En el baño",
+        "para": "Toallas, ducha, espejos, organizadores de baño",
+    },
+    "coche": {
+        "label": "En el coche",
+        "para": "Organizadores, soportes, aspirador de coche",
+    },
+    "escritorio": {
+        "label": "En el escritorio",
+        "para": "Sillas, lámparas de mesa, monitores, orden de oficina",
+    },
 }
 
 # Qué escenario le toca a cada categoría. Un producto es apto si su categoría
@@ -90,9 +110,21 @@ ESCENARIOS: dict[str, dict[str, str]] = {
 ESCENARIO_POR_CATEGORIA: dict[str, str] = {
     "belleza": "generico",
     "suplementos": "generico",
+    # Limpieza, orden y decoración pequeña: le vale la chica "en casa", que ya
+    # sale en cocina, salón o pasillo. No necesita prompt propio.
+    "hogar": "generico",
     "descanso": "cama",
     "salon": "sofa",
     "exterior": "exterior",
+    "cocina": "cocina",
+    "bano": "bano",
+    "coche": "coche",
+    "oficina": "escritorio",
+    # Estas dos van con la chica "en casa" y no piden prompt propio: lo que se
+    # ve es ella, no el sitio (unos auriculares o una banda elástica se usan en
+    # cualquier habitación).
+    "tecnologia": "generico",
+    "fitness": "generico",
 }
 CATEGORIAS_APTAS = tuple(ESCENARIO_POR_CATEGORIA)
 

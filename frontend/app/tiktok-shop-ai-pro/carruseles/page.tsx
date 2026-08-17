@@ -84,14 +84,24 @@ const VACIO: ProductoCarrusel = {
   subido_at: 0,
 };
 
-/** Cómo se lee cada categoría en la tarjeta. Las tres últimas son productos
- *  grandes: valen para carrusel, pero con la chica EN el sitio del producto. */
+/** Cómo se lee cada categoría en la tarjeta.
+ *
+ *  Todas valen para carrusel; lo que cambia es DÓNDE tiene que estar la chica
+ *  (ver `ESCENARIO_POR_CATEGORIA` en el backend). Lo que no está aquí es
+ *  `otro`, que es lo que se queda fuera. */
 const CATEGORIA_LABEL: Record<string, string> = {
   belleza: "💄 belleza",
   suplementos: "💊 suplementos",
   descanso: "🛏️ dormitorio",
   salon: "🛋️ salón",
   exterior: "🌳 exterior",
+  cocina: "🍳 cocina",
+  bano: "🚿 baño",
+  hogar: "🧽 hogar",
+  coche: "🚗 coche",
+  tecnologia: "🎧 tecnología",
+  oficina: "🖥️ escritorio",
+  fitness: "🏋️ fitness",
 };
 
 export default function CarruselesPage() {

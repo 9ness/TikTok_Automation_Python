@@ -404,8 +404,8 @@ Lo que no tiene ningún otro nicho:
   aptos tiene cada una para no abrirlas en balde.
 - **La foto 1 NO depende del producto, solo del SITIO.** Es una chica
   sorprendida generada en Google Flow, y lo único que tiene que encajar es
-  dónde está: `generico` (belleza, suplementos), `cama` (descanso), `sofa`
-  (salón) y `exterior` (jardín/camping) — un prompt por escenario
+  dónde está: `generico`, `cama`, `sofa`, `exterior`, `cocina`, `bano`,
+  `coche` y `escritorio` — un prompt por escenario
   (`prompts/foto_chica_<escenario>.md`), y la categoría decide cuál le toca.
   Las tandas se suben POR ESCENARIO y para TODOS los catálogos a la vez, y se
   reparten por orden entre los productos que no tienen. La foto 2 —el
