@@ -30,6 +30,7 @@ import {
   buildSueltaUrl,
   useAptos,
   useAsignarSuelta,
+  useBorrarChicas,
   useBorrarFotoCarrusel,
   useBorrarSuelta,
   useBorrarReferencia,
@@ -558,6 +559,7 @@ export default function CarruselesPage() {
               key={esc.clave}
               escenario={esc}
               faltan={pendientes.data?.por_escenario?.[esc.clave] ?? 0}
+              total={pendientes.data?.total_por_escenario?.[esc.clave] ?? 0}
               cargando={pendientes.isLoading || referenciasCargando}
               subiendo={subirChicas.isPending && tandaEnCurso === esc.clave}
               progreso={tandaEnCurso === esc.clave ? progresoTanda : null}
@@ -571,8 +573,16 @@ export default function CarruselesPage() {
                     onProgreso: (p) => setProgresoTanda(p),
                   },
                   {
-                    onSuccess: () =>
-                      toast.success(`${files.length} chica(s) subidas y repartidas`),
+                    onSuccess: (r) => {
+                      if (r.fallidas) {
+                        toast.error(
+                          `${r.subidas}/${r.total} subidas · ${r.fallidas} fallaron` +
+                            (r.error ? `: ${r.error}` : ""),
+                        );
+                      } else {
+                        toast.success(`${r.subidas} chica(s) subidas y repartidas`);
+                      }
+                    },
                     onError: (e2) => toast.error(err(e2)),
                     onSettled: () => {
                       setTandaEnCurso("");
@@ -1101,6 +1111,7 @@ function Barra({ pct }: { pct: number }) {
 function TandaEscenario({
   escenario,
   faltan,
+  total,
   cargando,
   subiendo,
   progreso,
@@ -1108,6 +1119,8 @@ function TandaEscenario({
 }: {
   escenario: EscenarioPrompt;
   faltan: number;
+  /** Productos de este escenario en total (los hechos son total - faltan). */
+  total: number;
   /** Aún no han llegado los datos: no es que no haya nada. */
   cargando: boolean;
   subiendo: boolean;
@@ -1120,6 +1133,7 @@ function TandaEscenario({
   const referencias = useReferencias();
   const subirRef = useSubirReferencia();
   const borrarRef = useBorrarReferencia();
+  const borrarChicas = useBorrarChicas();
   // La referencia de ESTE escenario. Es lo que de verdad decide cómo sale la
   // chica: con la del curso (una mujer de unos 35 en una cocina) salían así
   // todas, también las de la playa.
@@ -1188,12 +1202,19 @@ function TandaEscenario({
             {escenario.para}
           </p>
         </div>
+        {/* Hechas/total, no solo lo que falta: así se ve que una tanda entró a
+            medias (8/20) y, cuando el catálogo crezca, que hay más por hacer
+            (20/34). */}
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${
-            faltan ? "bg-fuchsia-500/20 text-fuchsia-400" : "text-muted-foreground"
+            !faltan && total
+              ? "bg-emerald-500/20 text-emerald-500"
+              : faltan
+                ? "bg-fuchsia-500/20 text-fuchsia-400"
+                : "text-muted-foreground"
           }`}
         >
-          {cargando ? "…" : faltan}
+          {cargando ? "…" : `${total - faltan}/${total}`}
         </span>
       </div>
 
@@ -1233,7 +1254,9 @@ function TandaEscenario({
           )}
           {subiendo && progreso
             ? `${progreso.hechos}/${progreso.total} · ${progreso.pct}%`
-            : "Subir tanda"}
+            : faltan
+              ? `Subir tanda (${faltan})`
+              : "Hechas"}
         </button>
       </div>
       {/* Crear la referencia desde CERO, sin adjuntar foto: con una imagen de

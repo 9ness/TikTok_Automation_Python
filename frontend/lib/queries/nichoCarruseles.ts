@@ -156,8 +156,11 @@ export interface PendienteChica {
 
 export interface ChicasPendientes {
   faltan: number;
+  total: number;
   /** Cuántas faltan de cada escenario: es la cuenta que se lleva a Flow. */
   por_escenario: Record<string, number>;
+  /** Y cuántas hay en total, para poder decir "8/20". */
+  total_por_escenario: Record<string, number>;
   por_tanda: number;
   items: PendienteChica[];
 }
@@ -217,25 +220,44 @@ function subirTrozo(
   });
 }
 
-/** Sube todos los ficheros en trozos, avisando del porcentaje del TOTAL. */
+export interface ResultadoTanda {
+  subidas: number;
+  fallidas: number;
+  total: number;
+  /** El primer error, para poder enseñarlo. */
+  error?: string;
+}
+
+/** Sube todos los ficheros en trozos, avisando del porcentaje del TOTAL.
+ *
+ *  Un trozo que falla NO aborta la tanda: se cuenta y se sigue con el resto.
+ *  Antes, si se caía el segundo trozo de veinte fotos, entraban ocho y no había
+ *  forma de saber cuáles — y volver a subirlas todas las duplicaba a medias. */
 async function subirTanda(
   path: string,
   files: File[],
   extra: Record<string, string>,
   onProgreso?: (p: ProgresoTanda) => void,
-): Promise<void> {
+): Promise<ResultadoTanda> {
   const bytesTotal = files.reduce((n, f) => n + f.size, 0) || 1;
   let yaSubidos = 0;
+  let subidas = 0;
+  let error = "";
   for (let i = 0; i < files.length; i += POR_TROZO) {
     const trozo = files.slice(i, i + POR_TROZO);
     const bytesTrozo = trozo.reduce((n, f) => n + f.size, 0);
-    await subirTrozo(path, trozo, extra, (subidos) => {
-      onProgreso?.({
-        pct: Math.min(100, Math.round(((yaSubidos + subidos) / bytesTotal) * 100)),
-        hechos: i,
-        total: files.length,
+    try {
+      await subirTrozo(path, trozo, extra, (bytes) => {
+        onProgreso?.({
+          pct: Math.min(100, Math.round(((yaSubidos + bytes) / bytesTotal) * 100)),
+          hechos: i,
+          total: files.length,
+        });
       });
-    });
+      subidas += trozo.length;
+    } catch (e) {
+      if (!error) error = e instanceof Error ? e.message : String(e);
+    }
     yaSubidos += bytesTrozo;
     onProgreso?.({
       pct: Math.min(100, Math.round((yaSubidos / bytesTotal) * 100)),
@@ -243,6 +265,7 @@ async function subirTanda(
       total: files.length,
     });
   }
+  return { subidas, fallidas: files.length - subidas, total: files.length, error };
 }
 
 export function usePromptsCarruseles() {
@@ -376,7 +399,7 @@ export interface RepartoChicas {
 export function useSubirChicas() {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    ResultadoTanda,
     Error,
     { escenario: string; files: File[]; onProgreso?: (p: ProgresoTanda) => void }
   >({
@@ -398,6 +421,16 @@ export function useCambiarEscenario(source: string, folder: string | null) {
         ...body,
       }),
     onSuccess: guardar,
+  });
+}
+
+/** Borra las fotos de chica de un escenario entero, para repetir la tanda. */
+export function useBorrarChicas() {
+  const qc = useQueryClient();
+  return useMutation<{ borradas: number }, Error, string>({
+    mutationFn: (escenario) =>
+      api.del(`${ROOT}/chicas?escenario=${encodeURIComponent(escenario)}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
   });
 }
 

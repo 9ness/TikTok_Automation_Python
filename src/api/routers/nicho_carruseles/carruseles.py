@@ -682,13 +682,22 @@ def chicas_pendientes(
     tanda, porque una chica del sofá no vale para un producto de jardín.
     """
     pendientes = _pendientes_de_chica(usuario)
+    aptos = [i for i in _barrer(usuario) if i["apto"]]
+    # Lo hecho y el total, no solo lo que falta: "8/20" dice de un vistazo que
+    # la tanda entró a medias, y "20/34" que el catálogo ha crecido.
     por_escenario = {
         clave: sum(1 for p in pendientes if p["escenario"] == clave)
         for clave in config.ESCENARIOS
     }
+    total_por_escenario = {
+        clave: sum(1 for i in aptos if i["escenario"] == clave)
+        for clave in config.ESCENARIOS
+    }
     return {
         "faltan": len(pendientes),
+        "total": len(aptos),
         "por_escenario": por_escenario,
+        "total_por_escenario": total_por_escenario,
         "por_tanda": config.CHICAS_POR_TANDA,
         "items": pendientes[: config.CHICAS_POR_TANDA * 4],
     }
@@ -1038,6 +1047,36 @@ def borrar_suelta(
     if ruta:
         ruta.unlink(missing_ok=True)
     return {"items": fotos_svc.listar_sin_asignar(usuario)}
+
+
+@router.delete("/chicas")
+def borrar_chicas(
+    escenario: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Borra las fotos de chica de TODOS los productos de un escenario.
+
+    Existe para poder repetir una tanda desde cero: si una subida entra a
+    medias no hay forma de saber cuáles de las 20 llegaron, y volver a
+    subirlas todas dejaría la mitad sin sitio.
+    """
+    if escenario not in config.ESCENARIOS:
+        raise _bad_request(f"Escenario desconocido: {escenario!r}.")
+
+    borradas = 0
+    for item in _barrer(usuario):
+        if not item["apto"] or item["escenario"] != escenario:
+            continue
+        if fotos_svc.borrar(
+            "chica", usuario, item["source"], item["folder"], item["producto"],
+        ):
+            borradas += 1
+        # La versión con el texto quemado era de esa foto: se va con ella.
+        fotos_svc.borrar(
+            "chica_txt", usuario, item["source"], item["folder"], item["producto"],
+        )
+    _invalidar_barrido()
+    return {"borradas": borradas, "escenario": escenario}
 
 
 @router.post("/foto")
