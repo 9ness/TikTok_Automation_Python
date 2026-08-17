@@ -192,15 +192,15 @@ TEXTO_BORDE = 0.13  # grosor del contorno, sobre el tamaño de letra
 # foto limpia del producto y decirle el sitio (mismo enfoque que el prompt de
 # imagen del POV BOF).
 LUGAR_POR_ESCENARIO: dict[str, str] = {
-    "generico": "el sitio de la casa donde se use de verdad",
-    "casa": "el sitio de la casa donde se use de verdad",
-    "cama": "un dormitorio, sobre la cama o en la mesilla",
-    "sofa": "un salón, sobre el sofá o la mesa de centro",
-    "exterior": "un jardín o una terraza",
-    "cocina": "la encimera de una cocina",
-    "bano": "un cuarto de baño",
-    "coche": "el interior de un coche",
-    "escritorio": "un escritorio de casa",
+    "generico": "una casa real, en el sitio donde se usaría de verdad",
+    "casa": "una casa real, en el sitio donde se usaría de verdad",
+    "cama": "un dormitorio real, donde iría de verdad (sobre la cama, en la mesilla o en el suelo)",
+    "sofa": "un salón real, donde iría de verdad (sobre el sofá, en la mesa de centro o en el suelo)",
+    "exterior": "un jardín o una terraza, donde iría de verdad",
+    "cocina": "una cocina real, donde iría de verdad (en la encimera si es pequeño, en el suelo o dentro de un mueble si no)",
+    "bano": "un cuarto de baño real, donde iría de verdad",
+    "coche": "el interior de un coche, donde iría de verdad",
+    "escritorio": "un rincón de trabajo de casa, donde iría de verdad (encima de la mesa o en el suelo si es un mueble)",
     "playa": "la playa o el borde de una piscina",
 }
 

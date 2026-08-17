@@ -1,5 +1,7 @@
 Este producto en una ubicación ideal adaptada a un entorno donde pueda estar ubicado de manera real: {lugar}. Debe ser una ubicación DIFERENTE a la de la foto de referencia.
 
+Colócalo donde se pondría de verdad según lo que es: los muebles y los aparatos grandes van en el SUELO, y solo lo pequeño va encima de una superficie. Un cubo de basura no se pone en la encimera.
+
 Respeta a la perfección las propiedades y características del producto: diseño, forma, proporciones, colores, materiales, acabados y detalles. No alteres ni reinterpretes ningún elemento.
 
 El producto debe verse con textura y colores ultra realistas, no sintéticos. La imagen tiene que parecer una foto de la vida real sacada con un iPhone 17: sin efecto cinematográfico, iluminación y sombras realistas, completamente enfocada.
