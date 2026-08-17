@@ -741,6 +741,12 @@ async def subir_chicas(
     if escenario not in config.ESCENARIOS:
         raise _bad_request(f"Escenario desconocido: {escenario!r}.")
 
+    # La pantalla sube la tanda en TROZOS, y cada trozo es una petición: si los
+    # pendientes salieran de la caché, el trozo 2 se colocaría encima de los
+    # mismos productos que el 1 (pasó: de 20 fotos entraban 8, las mismas tres
+    # veces). Antes de repartir, la lista se recalcula desde el disco.
+    fotos_svc.invalidar("chica", usuario)
+    _invalidar_barrido()
     pendientes = _pendientes_de_chica(usuario, escenario)
     if not pendientes:
         raise _bad_request(
@@ -756,6 +762,8 @@ async def subir_chicas(
         asignados = fotos_svc.repartir_chicas(usuario, pendientes, leidos)
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
+    # Y al terminar, para que el trozo siguiente vea lo que acaba de entrar.
+    _invalidar_barrido()
 
     return {
         "escenario": escenario,

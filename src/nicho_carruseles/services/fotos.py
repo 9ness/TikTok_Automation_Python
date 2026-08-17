@@ -58,6 +58,13 @@ def _indice(tipo: str, usuario: str) -> dict[str, Path]:
     return mapa
 
 
+def invalidar(tipo: str = "", usuario: str = "") -> None:
+    """Tira el índice a mano. Lo usa el reparto de tandas antes de decidir a
+    quién le toca cada foto: la lista tiene que salir del disco, no de hace un
+    minuto."""
+    _invalidar(tipo, usuario)
+
+
 def _invalidar(tipo: str = "", usuario: str = "") -> None:
     """Tras escribir. Sin argumentos tira el índice entero."""
     if not tipo:
@@ -156,7 +163,17 @@ def repartir_chicas(
     lista más corta y el resto se informa.
     """
     asignados: list[dict] = []
-    for destino, (filename, datos) in zip(pendientes, archivos):
+    fotos = list(archivos)
+    for destino in pendientes:
+        if not fotos:
+            break
+        # Cierre de seguridad: si el que llama trae una lista de pendientes
+        # vieja —pasó con la tanda en trozos, donde el trozo 2 recibía los
+        # mismos productos que el 1—, la foto se pondría ENCIMA de otra y de 20
+        # fotos entrarían 8. Aquí se comprueba contra el disco.
+        if tiene("chica", usuario, destino["source"], destino["folder"], destino["producto"]):
+            continue
+        filename, datos = fotos.pop(0)
         ruta = guardar(
             "chica", usuario, destino["source"], destino["folder"],
             destino["producto"], datos, filename=filename,
