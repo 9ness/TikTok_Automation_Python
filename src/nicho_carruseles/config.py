@@ -179,6 +179,42 @@ TEXTO_Y = 0.28
 TEXTO_BORDE = 0.11  # grosor del contorno, sobre el tamaño de letra
 
 
+# Dónde se recrea el producto de la foto 2, según el escenario que le tocó. El
+# prompt de la foto 2 NO necesita una composición de referencia: basta con la
+# foto limpia del producto y decirle el sitio (mismo enfoque que el prompt de
+# imagen del POV BOF).
+LUGAR_POR_ESCENARIO: dict[str, str] = {
+    "generico": "el sitio de la casa donde se use de verdad",
+    "cama": "un dormitorio, sobre la cama o en la mesilla",
+    "sofa": "un salón, sobre el sofá o la mesa de centro",
+    "exterior": "un jardín o una terraza",
+    "cocina": "la encimera de una cocina",
+    "bano": "un cuarto de baño",
+    "coche": "el interior de un coche",
+    "escritorio": "un escritorio de casa",
+    "playa": "la playa o el borde de una piscina",
+}
+
+# La mano en primera persona, como en el POV BOF. Se añade o no según lo que
+# quiera el operador: en un carrusel a veces estorba y a veces es justo lo que
+# hace que la foto parezca de alguien y no de catálogo.
+LINEA_MANO = (
+    "Aparece la mano de una persona, ultra realista, en modo POV señalando el "
+    "producto, visto desde la altura de los ojos de una persona."
+)
+
+
+def prompt_producto(escenario: str = "", con_mano: bool = False) -> str:
+    """El prompt de la foto 2, con el sitio del escenario ya puesto."""
+    lugar = LUGAR_POR_ESCENARIO.get(escenario) or LUGAR_POR_ESCENARIO["generico"]
+    texto = leer_prompt("foto_producto").replace("{lugar}", lugar)
+    if con_mano:
+        # Detrás del primer párrafo, que es el que describe la escena.
+        partes = texto.split("\n\n", 1)
+        texto = f"{partes[0]} {LINEA_MANO}" + (f"\n\n{partes[1]}" if len(partes) > 1 else "")
+    return texto
+
+
 def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 

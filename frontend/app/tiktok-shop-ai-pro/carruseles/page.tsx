@@ -87,6 +87,25 @@ const VACIO: ProductoCarrusel = {
   subido_at: 0,
 };
 
+/** En qué sitio se recrea el producto de cada categoría. Es el MISMO mapa que
+ *  `ESCENARIO_POR_CATEGORIA` del backend: aquí solo hace falta para saber qué
+ *  prompt copiar al bajar un grupo de fotos. */
+const ESCENARIO_POR_CATEGORIA: Record<string, string> = {
+  belleza: "generico",
+  suplementos: "generico",
+  hogar: "generico",
+  tecnologia: "generico",
+  fitness: "generico",
+  descanso: "cama",
+  salon: "sofa",
+  exterior: "exterior",
+  cocina: "cocina",
+  bano: "bano",
+  coche: "coche",
+  oficina: "escritorio",
+  playa: "playa",
+};
+
 /** Cómo se lee cada categoría en la tarjeta.
  *
  *  Todas valen para carrusel; lo que cambia es DÓNDE tiene que estar la chica
@@ -149,6 +168,7 @@ export default function CarruselesPage() {
   const [bajando, setBajando] = useState("");
   const [bajandoLimpias, setBajandoLimpias] = useState("");
   const [bajandoCarpeta, setBajandoCarpeta] = useState("");
+  const [conMano, setConMano] = useEstadoRecordado("carruseles:conmano", false);
   const fotos2Ref = useRef<HTMLInputElement>(null);
   // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
   // pintarían las cuatro girando a la vez.
@@ -169,6 +189,20 @@ export default function CarruselesPage() {
   }).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
   const clasificada = estado.data?.clasificada ?? false;
+
+  /** El prompt de la foto 2 de esa categoría, al portapapeles.
+   *
+   *  Cada categoría recrea el producto en SU sitio (la cocina, el dormitorio,
+   *  el coche…), así que el prompt no es uno solo: se copia el del grupo que se
+   *  acaba de bajar. */
+  function copiarPromptProducto(categoria: string) {
+    const escenario = ESCENARIO_POR_CATEGORIA[categoria] ?? "generico";
+    const esc = prompts.data?.escenarios.find((e) => e.clave === escenario);
+    const texto = conMano ? esc?.prompt_producto_mano : esc?.prompt_producto;
+    if (!texto) return;
+    navigator.clipboard.writeText(texto);
+    toast.success(`Prompt de ${CATEGORIA_LABEL[categoria] ?? categoria}`);
+  }
 
   /** Baja las fotos limpias que se llevan a Flow para hacer la foto 2.
    *
@@ -583,30 +617,26 @@ export default function CarruselesPage() {
           n={3}
           color="esmeralda"
           titulo="La foto del producto (foto 2)"
-          hint="Esta sí es de cada producto. En Flow van DOS imágenes: la de referencia (la composición) y la foto limpia del producto."
+          hint="Esta sí es de cada producto: en Flow subes su foto limpia y el prompt la recrea en el sitio donde se usa. No hace falta foto de referencia."
         >
-          <Referencia
-            tipo="producto"
-            titulo="Foto de referencia (composición)"
-            hint="La PRIMERA imagen de Flow: un producto colocado en un sitio bonito. El curso no da ninguna, elige tú una que te guste."
-          />
-          <button
-            type="button"
-            disabled={!prompts.data}
-            onClick={() => {
-              navigator.clipboard.writeText(prompts.data?.producto ?? "");
-              toast.success("Prompt copiado");
-            }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-          >
-            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt producto (Flow)
-          </button>
+          {/* Con el prompt de abajo NO hace falta composición de referencia: se
+              sube la foto limpia del producto y se le dice el sitio. Se deja
+              por si algún día se quiere clavar un estilo concreto. */}
+          <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-emerald-500"
+              checked={conMano}
+              onChange={(e) => setConMano(e.target.checked)}
+            />
+            Con mano señalando el producto (estilo POV)
+          </label>
           {/* La SEGUNDA imagen de Flow: la foto limpia del Drive. Por
               CATEGORÍA y de todos los catálogos, porque en Flow se trabaja por
               ambientes: todas las de dormitorio de una sentada, luego las de
               belleza… Carpeta a carpeta, con dos productos por carpeta, era el
               cuello de botella de este nicho. */}
-          <Sub>Bajar fotos limpias para Flow</Sub>
+          <Sub>Bajar fotos limpias + su prompt</Sub>
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
@@ -620,18 +650,30 @@ export default function CarruselesPage() {
               </span>
             </button>
             {Object.entries(porCategoriaPendiente).map(([cat, n]) => (
-              <button
-                key={cat}
-                type="button"
-                disabled={Boolean(bajandoLimpias) || !n}
-                onClick={() => descargarLimpias(cat)}
-                className="flex items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
-              >
-                <Download className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {CATEGORIA_LABEL[cat] ?? cat} ({n})
-                </span>
-              </button>
+              <div key={cat} className="flex items-stretch gap-1">
+                <button
+                  type="button"
+                  disabled={Boolean(bajandoLimpias) || !n}
+                  onClick={() => descargarLimpias(cat)}
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {CATEGORIA_LABEL[cat] ?? cat} ({n})
+                  </span>
+                </button>
+                {/* Su prompt: el producto se recrea en el sitio donde se usa
+                    (cocina, dormitorio…), que es lo que hace que la foto 2
+                    pegue con la foto 1. */}
+                <button
+                  type="button"
+                  title="Copiar el prompt de esta categoría"
+                  onClick={() => copiarPromptProducto(cat)}
+                  className="shrink-0 rounded-lg border border-border/60 bg-card px-2 transition hover:border-foreground/30"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
           </div>
           {bajandoLimpias ? (

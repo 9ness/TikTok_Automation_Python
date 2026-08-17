@@ -52,6 +52,10 @@ class EscenarioPrompt(BaseModel):
     label: str
     para: str
     prompt: str
+    # El de la foto 2 para ese escenario: el mismo producto se recrea en la
+    # cocina o en el dormitorio según dónde se use.
+    prompt_producto: str
+    prompt_producto_mano: str
 
 
 class PromptsResponse(BaseModel):
@@ -139,10 +143,12 @@ def get_prompts() -> PromptsResponse:
                     label=meta["label"],
                     para=meta["para"],
                     prompt=config.leer_prompt(f"foto_chica_{clave}"),
+                    prompt_producto=config.prompt_producto(clave),
+                    prompt_producto_mano=config.prompt_producto(clave, con_mano=True),
                 )
                 for clave, meta in config.ESCENARIOS.items()
             ],
-            producto=config.leer_prompt("foto_producto"),
+            producto=config.prompt_producto(),
             formato=config.FORMATO,
             referencia_drive=(
                 "Productos España › Carruseles › Pronts Carruseles "

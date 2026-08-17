@@ -1,3 +1,7 @@
-Cambia el producto de la primera imagen por el producto de la segunda imagen. Modifica también el ambiente de fondo y la habitación, manteniendo la misma idea y estilo general de la imagen original, pero con una ambientación diferente y renovada. Elimina cualquier texto, logotipo, etiqueta o elemento gráfico presente en la imagen.
+Este producto en una ubicación ideal adaptada a un entorno donde pueda estar ubicado de manera real: {lugar}. Debe ser una ubicación DIFERENTE a la de la foto de referencia.
 
-Es fundamental que el producto de la segunda imagen se respete con total precisión, manteniendo exactamente su diseño, forma, proporciones, colores, materiales, acabados, detalles, accesorios y todas sus características visuales. No alteres ni reinterpretes ningún elemento del producto. El producto debe verse idéntico al de la imagen de referencia. Ultra realista.
+Respeta a la perfección las propiedades y características del producto: diseño, forma, proporciones, colores, materiales, acabados y detalles. No alteres ni reinterpretes ningún elemento.
+
+El producto debe verse con textura y colores ultra realistas, no sintéticos. La imagen tiene que parecer una foto de la vida real sacada con un iPhone 17: sin efecto cinematográfico, iluminación y sombras realistas, completamente enfocada.
+
+No muestres precios ni etiquetas. No lo pongas en una tienda ni en un expositor. Elimina cualquier texto, logotipo o marca de agua que traiga la foto de referencia.

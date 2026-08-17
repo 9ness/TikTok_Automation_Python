@@ -80,6 +80,10 @@ export interface EscenarioPrompt {
   label: string;
   para: string;
   prompt: string;
+  /** El de la foto 2 en ESE sitio (cocina, dormitorio…). No necesita foto de
+   *  composición: basta con la foto limpia del producto. */
+  prompt_producto: string;
+  prompt_producto_mano: string;
 }
 
 export interface PromptsCarruseles {
