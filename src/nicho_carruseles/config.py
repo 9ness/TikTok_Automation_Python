@@ -264,13 +264,15 @@ ESCENA_EN: dict[str, str] = {
 
 # La edad que le toca a la referencia de cada escenario. Misma tabla que la de
 # los prompts de texto: a una de 20 anunciando un tendedero no se la cree nadie.
+# El "looks young for her age" no es un capricho: sin él, pedir 28 devuelve una
+# mujer de 40 largos (probado con las referencias de cama y de casa).
 EDAD_REFERENCIA: dict[str, str] = {
     "generico": "20 years old",
-    "casa": "32 years old",
-    "cama": "28 years old",
-    "sofa": "28 years old",
-    "exterior": "32 years old",
-    "cocina": "32 years old",
+    "casa": "32 years old, looks young for her age",
+    "cama": "28 years old, looks young for her age",
+    "sofa": "28 years old, looks young for her age",
+    "exterior": "32 years old, looks young for her age",
+    "cocina": "32 years old, looks young for her age",
     "bano": "21 years old",
     "coche": "21 years old",
     "escritorio": "23 years old",
