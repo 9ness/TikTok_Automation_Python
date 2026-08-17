@@ -246,6 +246,38 @@ def prompt_producto(escenario: str = "", con_mano: bool | None = None) -> str:
     return texto
 
 
+# El sitio de cada escenario, en INGLÉS: es lo que se mete en la ficha JSON de
+# la chica (`services/chica_ficha.py`), que va en inglés como la del curso.
+ESCENA_EN: dict[str, str] = {
+    "generico": "on a city street at night, with city lights, cars and people blurred behind her",
+    "casa": "at home, in the living room or hallway, with the real house behind her",
+    "cama": "sitting on the bed of a real bedroom, with the headboard and pillows behind her",
+    "sofa": "sitting on the sofa of a real living room, with cushions and a blanket",
+    "exterior": "outdoors, in the garden or terrace of a house, in daylight",
+    "cocina": "standing in the kitchen of a real home, next to the worktop",
+    "bano": "in the bathroom of a real home, next to the sink and mirror",
+    "coche": "sitting in the driver seat of a parked car at night, steering wheel and street lights visible through the window",
+    "escritorio": "sitting at the desk of a home work corner",
+    "playa": "at the beach or by a swimming pool, with the water behind her in daylight",
+}
+
+
+# La edad que le toca a la referencia de cada escenario. Misma tabla que la de
+# los prompts de texto: a una de 20 anunciando un tendedero no se la cree nadie.
+EDAD_REFERENCIA: dict[str, str] = {
+    "generico": "20 years old",
+    "casa": "32 years old",
+    "cama": "28 years old",
+    "sofa": "28 years old",
+    "exterior": "32 years old",
+    "cocina": "32 years old",
+    "bano": "21 years old",
+    "coche": "21 years old",
+    "escritorio": "23 years old",
+    "playa": "20 years old",
+}
+
+
 def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 

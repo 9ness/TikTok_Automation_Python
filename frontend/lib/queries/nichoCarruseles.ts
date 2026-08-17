@@ -247,7 +247,6 @@ export function usePromptsCarruseles() {
   return useQuery<PromptsCarruseles>({
     queryKey: carruselesKeys.prompts(),
     queryFn: () => api.get<PromptsCarruseles>(`${ROOT}/prompts`),
-    staleTime: Infinity,
   });
 }
 
@@ -587,6 +586,51 @@ export function buildSueltaUrl(archivo: string, version: string): string {
   return `${base}${ROOT}/sin-asignar/foto?archivo=${encodeURIComponent(
     archivo,
   )}&v=${encodeURIComponent(version)}${qs}`;
+}
+
+/** La chica de la casa: una ficha JSON con su cara, sacada de una foto.
+ *
+ *  Sirve para CREAR las referencias de cada escenario: un párrafo no clava a
+ *  una persona y la referencia es lo que manda en la foto final. Mismo paso que
+ *  "crear la chica" del Nicho Ropa Con Personas. */
+export interface ChicaFicha {
+  hay: boolean;
+  resumen: string;
+  creada_at?: number;
+}
+
+export function useChicaCarrusel() {
+  return useQuery<ChicaFicha>({
+    queryKey: [...carruselesKeys.all, "chica"],
+    queryFn: () => api.get<ChicaFicha>(`${ROOT}/chica`),
+  });
+}
+
+export function useCrearChicaCarrusel() {
+  const qc = useQueryClient();
+  return useMutation<ChicaFicha, Error, File>({
+    mutationFn: (file) => {
+      const fd = new FormData();
+      fd.append("archivo", file);
+      return api.post<ChicaFicha>(`${ROOT}/chica`, fd);
+    },
+    onSuccess: (res) => {
+      qc.setQueryData([...carruselesKeys.all, "chica"], res);
+      // Los prompts de referencia cambian: ahora llevan su ficha dentro.
+      void qc.invalidateQueries({ queryKey: carruselesKeys.prompts() });
+    },
+  });
+}
+
+export function useBorrarChicaCarrusel() {
+  const qc = useQueryClient();
+  return useMutation<ChicaFicha, Error, void>({
+    mutationFn: () => api.del<ChicaFicha>(`${ROOT}/chica`),
+    onSuccess: (res) => {
+      qc.setQueryData([...carruselesKeys.all, "chica"], res);
+      void qc.invalidateQueries({ queryKey: carruselesKeys.prompts() });
+    },
+  });
 }
 
 export function useReferencias() {

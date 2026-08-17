@@ -11,6 +11,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -30,11 +31,14 @@ import {
   buildSueltaUrl,
   useAptos,
   useAsignarSuelta,
+  useBorrarChicaCarrusel,
   useBorrarFotoCarrusel,
   useBorrarSuelta,
   useBorrarReferencia,
   useCambiarEscenario,
+  useChicaCarrusel,
   useChicasPendientes,
+  useCrearChicaCarrusel,
   useClasificarCarpeta,
   useCompletarCarpetaCarrusel,
   useEditarMensaje,
@@ -544,6 +548,8 @@ export default function CarruselesPage() {
             de jardín.
           </p>
 
+          <ChicaDeLaCasa />
+
           <Referencia
             tipo="chica"
             titulo="Foto de referencia (chica)"
@@ -888,6 +894,77 @@ export default function CarruselesPage() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+/** La chica de la casa: una foto suya → una ficha con sus rasgos.
+ *
+ *  Con la ficha puesta, el botón "Prompt para crear esta referencia" de cada
+ *  escenario devuelve un JSON con ELLA dentro en vez de un párrafo genérico. Es
+ *  lo que hace que las referencias de los diez escenarios sean la misma chica,
+ *  y con ellas las tandas. Mismo paso que "crear la chica" del Nicho Ropa Con
+ *  Personas, de donde viene la idea. */
+function ChicaDeLaCasa() {
+  const chica = useChicaCarrusel();
+  const crear = useCrearChicaCarrusel();
+  const borrar = useBorrarChicaCarrusel();
+  const ref = useRef<HTMLInputElement>(null);
+  const hay = chica.data?.hay;
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-border/60 p-2">
+      <div className="flex items-center gap-2">
+        <UserRound className="h-3.5 w-3.5 shrink-0 text-fuchsia-400" />
+        <p className="min-w-0 flex-1 truncate text-[11px] font-semibold">
+          {hay ? "Tu chica" : "La chica de la casa (opcional)"}
+        </p>
+        {hay ? (
+          <button
+            type="button"
+            onClick={() => borrar.mutate(undefined, { onError: (e: unknown) => toast.error(err(e)) })}
+            className="shrink-0 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Quitar
+          </button>
+        ) : null}
+      </div>
+      <p className="text-[10px] leading-snug text-muted-foreground">
+        {hay
+          ? `${chica.data?.resumen} — los prompts de referencia salen con ella.`
+          : "Sube la foto de una chica que te guste (de internet vale) y la IA saca sus rasgos. A partir de ahí, las referencias de los diez escenarios son ella."}
+      </p>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          crear.mutate(file, {
+            onSuccess: (r) => toast.success(`Ficha creada · ${r.resumen}`),
+            onError: (e2) => toast.error(err(e2)),
+          });
+        }}
+      />
+      <button
+        type="button"
+        disabled={crear.isPending}
+        onClick={() => ref.current?.click()}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+      >
+        {crear.isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sacando sus rasgos…
+          </>
+        ) : (
+          <>
+            <Upload className="h-3.5 w-3.5" /> {hay ? "Cambiar de chica" : "Subir foto de la chica"}
+          </>
+        )}
+      </button>
     </div>
   );
 }

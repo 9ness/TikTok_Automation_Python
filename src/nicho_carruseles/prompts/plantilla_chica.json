@@ -1,0 +1,33 @@
+{
+  "subject": {
+    "description": "Very attractive young Spanish woman taking a front-camera selfie with her arm extended, camera at eye level. The phone is NOT visible in the frame and she is looking straight at the camera, not at the screen.",
+    "age": "20 years old",
+    "nationality": "Spanish, Mediterranean features",
+    "hair_color": "light brown",
+    "hair_style": "long, slightly messy, natural texture",
+    "skin": "clean and healthy skin, no acne, no blemishes, but with real skin texture (no studio retouching, no plastic look)",
+    "makeup": "very light natural makeup"
+  },
+  "expression": {
+    "face": "total shock: eyes wide open, mouth open, eyebrows raised",
+    "feeling": "she has just found out something unbelievable"
+  },
+  "framing": {
+    "shot": "vertical 9:16 selfie, head and shoulders, face taking most of the frame",
+    "angle": "eye level, arm extended"
+  },
+  "background": {
+    "scene": "{escena}"
+  },
+  "photography": {
+    "camera": "iPhone front camera, handheld",
+    "look": "real phone selfie, not a photographer's shot: phone flash, slight grain, slight motion blur",
+    "avoid": "no studio lighting, no artificial background blur, no cinematic look, no model posing, no beauty filter"
+  },
+  "clothing": {
+    "style": "everyday clothes: t-shirt, top, sweatshirt or hoodie"
+  },
+  "output": {
+    "no_text": "no text, no logos, no watermarks"
+  }
+}

@@ -402,6 +402,11 @@ Lo que no tiene ningún otro nicho:
   extraídos, sin imágenes) + interruptor manual por producto. Al filtrar, una
   carpeta de diez se queda en dos o tres: el listado de carpetas enseña cuántos
   aptos tiene cada una para no abrirlas en balde.
+- **La chica de la casa**: se sube la foto de una chica y Gemini saca su ficha
+  JSON (`services/chica_ficha.py`, idea del Nicho Ropa Con Personas). Con ella,
+  el prompt para crear la referencia de cada escenario lleva a ESA chica dentro
+  — un párrafo no clava a una persona y la referencia es lo que manda en
+  imagen-a-imagen.
 - **La foto 1 NO depende del producto, solo del SITIO.** Es una chica
   sorprendida generada en Google Flow, y lo único que tiene que encajar es
   dónde está: `generico`, `cama`, `sofa`, `exterior`, `cocina`, `bano`,

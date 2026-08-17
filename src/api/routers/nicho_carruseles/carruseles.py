@@ -133,12 +133,19 @@ class SubidoRequest(BaseModel):
 # Prompts y carpetas
 # ---------------------------------------------------------------------------
 @router.get("/prompts", response_model=PromptsResponse)
-def get_prompts() -> PromptsResponse:
+def get_prompts(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> PromptsResponse:
     """Los dos prompts de Flow y el formato en el que hay que generar.
 
     El formato viaja con el prompt por lo mismo que en Creativos Pro: el
     generador no lo deduce del texto y salir en cuadrado es el error fácil.
+
+    Si el operador tiene ficha de chica, los prompts de referencia salen con
+    ELLA dentro (JSON) en vez del párrafo genérico.
     """
+    from src.nicho_carruseles.services import chica_ficha
+
     try:
         return PromptsResponse(
             escenarios=[
@@ -149,7 +156,7 @@ def get_prompts() -> PromptsResponse:
                     prompt=config.leer_prompt(f"foto_chica_{clave}"),
                     prompt_producto=config.prompt_producto(clave),
                     prompt_producto_mano=config.prompt_producto(clave, con_mano=True),
-                    prompt_referencia=config.leer_prompt(f"referencia_chica_{clave}"),
+                    prompt_referencia=chica_ficha.prompt_referencia(usuario, clave),
                 )
                 for clave, meta in config.ESCENARIOS.items()
             ],
@@ -470,6 +477,69 @@ def editar_mensaje(
     if "mensaje2" in campos:
         fotos_svc.borrar("producto_txt", usuario, body.source, body.folder, body.producto)
     return _estado_carpeta(body.source, body.folder, usuario)
+
+
+# ---------------------------------------------------------------------------
+# La chica de la casa
+# ---------------------------------------------------------------------------
+@router.get("/chica")
+def ver_chica(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """La ficha de la chica del operador, si tiene."""
+    from src.nicho_carruseles.services import chica_ficha
+
+    doc = chica_ficha.leer(usuario)
+    ficha = doc.get("ficha") if isinstance(doc, dict) else None
+    return {
+        "hay": bool(ficha),
+        "creada_at": (doc or {}).get("creada_at", 0),
+        "resumen": _resumen_chica(ficha) if ficha else "",
+    }
+
+
+def _resumen_chica(ficha: dict) -> str:
+    """Una línea para la pantalla: pelo, edad y rasgos."""
+    s = ficha.get("subject") or {}
+    partes = [
+        str(s.get("age") or ""),
+        str(s.get("hair_color") or ""),
+        str(s.get("nationality") or ""),
+    ]
+    return " · ".join(p for p in partes if p)
+
+
+@router.post("/chica")
+async def crear_chica(
+    archivo: Annotated[UploadFile, File()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Convierte la foto de una chica en la ficha con la que se crean las
+    referencias de todos los escenarios.
+
+    Es el paso del Nicho Ropa Con Personas traído aquí: un párrafo no clava a
+    una persona y la referencia es lo que manda en la foto final.
+    """
+    from src.nicho_carruseles.services import chica_ficha
+
+    datos = await _leer_foto(archivo, "La foto de la chica")
+    try:
+        ficha = chica_ficha.crear_desde_foto(datos)
+        chica_ficha.guardar(usuario, ficha)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    except Exception as e:  # noqa: BLE001 — Gemini caído o sin cuota
+        raise APIError(f"No se pudo crear la ficha: {e}", status_code=502) from e
+    return {"hay": True, "resumen": _resumen_chica(ficha)}
+
+
+@router.delete("/chica")
+def borrar_chica(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Vuelve a los prompts genéricos."""
+    from src.nicho_carruseles.services import chica_ficha
+
+    chica_ficha.borrar(usuario)
+    return {"hay": False, "resumen": ""}
 
 
 # ---------------------------------------------------------------------------
