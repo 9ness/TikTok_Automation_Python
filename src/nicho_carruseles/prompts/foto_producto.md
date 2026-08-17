@@ -1,4 +1,6 @@
-Este producto en una ubicación ideal, la que le corresponda de verdad: un entorno real donde ese producto estaría de manera natural, colocado donde se pondría (en el suelo, sobre la superficie que le toque o donde se use). Debe ser una ubicación DIFERENTE a la de la foto de referencia.
+Este producto en una ubicación ideal, la que le corresponda de verdad: un entorno real, limpio y ordenado donde ese producto estaría de manera natural. Debe ser una ubicación DIFERENTE a la de la foto de referencia.
+
+El producto tiene que verse LIMPIO y NUEVO, como recién comprado: vacío, sin contenido dentro, sin usar, sin suciedad y sin desgaste. Nada de bolsas, basura, restos ni objetos metidos en él.
 
 Respeta a la perfección las propiedades y características del producto: diseño, forma, proporciones, colores, materiales, acabados y detalles. No alteres ni reinterpretes ningún elemento.
 
