@@ -46,6 +46,10 @@ REQUIRED_FIELDS = (
 # respaldo por palabras clave en `services/emojis.py`.
 OPTIONAL_FIELDS = ("emojis", "tienda", "precio", "precio_lista")
 
+# Cuántas capturas se mandan por llamada. Ver el comentario de
+# `extract_from_pairs`: con la carpeta entera el modelo cruza los textos.
+LOTE_MAX = 4
+
 
 def _load_system_prompt() -> str:
     return _PROMPT_PATH.read_text(encoding="utf-8")
@@ -262,7 +266,16 @@ def extract_from_pairs(
                 salida[pid] = doc
         return salida
 
-    result = _pedir(ids, image_paths)
+    # En LOTES PEQUEÑOS, no las diez de golpe. Con diez imágenes el modelo
+    # cruza títulos entre productos aunque cada una lleve su `#id` sellado
+    # encima: pasó en "1 Pront Flow", donde seis de diez salieron con el nombre
+    # de otro (una bici eléctrica titulada "conjunto de jardín") y sin repetir
+    # ningún título, así que el detector de duplicados no lo veía. Con cuatro
+    # por llamada el modelo no tiene tanto de donde confundirse; son tres
+    # llamadas en vez de una y siguen siendo céntimos.
+    result: dict[str, dict] = {}
+    for i in range(0, len(ids), LOTE_MAX):
+        result.update(_pedir(ids[i:i + LOTE_MAX], image_paths[i:i + LOTE_MAX]))
 
     # Reintento de los que se hayan quedado fuera. En un lote de 10 imágenes
     # el modelo se deja alguna suelta (pasó con una captura muy alta,
