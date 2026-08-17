@@ -417,8 +417,9 @@ export default function CreativosProPage() {
             conserva, así que se dice dónde mirar en vez de dejar el hueco. */}
         {!productos.isFetching && !productos.isError && !items.length && folder && (
           <p className="py-4 text-center text-[11px] text-muted-foreground">
-            Esta carpeta no tiene fotos en el Drive del curso. Si antes las tenía, es
-            que las han borrado: ábrela desde el catálogo «🗄️ Copia».
+            Esta carpeta está vacía en el Drive del curso: o todavía no han subido nada
+            (las de los días siguientes se crean por adelantado) o han borrado sus fotos
+            — en ese caso, ábrela desde el catálogo «🗄️ Copia».
           </p>
         )}
 
