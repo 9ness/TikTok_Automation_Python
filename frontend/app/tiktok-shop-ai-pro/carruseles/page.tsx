@@ -11,7 +11,6 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -31,14 +30,11 @@ import {
   buildSueltaUrl,
   useAptos,
   useAsignarSuelta,
-  useBorrarChicaCarrusel,
   useBorrarFotoCarrusel,
   useBorrarSuelta,
   useBorrarReferencia,
   useCambiarEscenario,
-  useChicaCarrusel,
   useChicasPendientes,
-  useCrearChicaCarrusel,
   useClasificarCarpeta,
   useCompletarCarpetaCarrusel,
   useEditarMensaje,
@@ -548,8 +544,6 @@ export default function CarruselesPage() {
             de jardín.
           </p>
 
-          <ChicaDeLaCasa />
-
           <Referencia
             tipo="chica"
             titulo="Foto de referencia (chica)"
@@ -898,80 +892,6 @@ export default function CarruselesPage() {
   );
 }
 
-/** La chica de la casa: una foto suya → una ficha con sus rasgos.
- *
- *  Con la ficha puesta, el botón "Prompt para crear esta referencia" de cada
- *  escenario devuelve un JSON con ELLA dentro en vez de un párrafo genérico. Es
- *  lo que hace que las referencias de los diez escenarios sean la misma chica,
- *  y con ellas las tandas. Mismo paso que "crear la chica" del Nicho Ropa Con
- *  Personas, de donde viene la idea. */
-function ChicaDeLaCasa() {
-  const chica = useChicaCarrusel();
-  const crear = useCrearChicaCarrusel();
-  const borrar = useBorrarChicaCarrusel();
-  const ref = useRef<HTMLInputElement>(null);
-  const hay = chica.data?.hay;
-
-  return (
-    <div className="space-y-1.5 rounded-lg border border-border/60 p-2">
-      <div className="flex items-center gap-2">
-        <UserRound className="h-3.5 w-3.5 shrink-0 text-fuchsia-400" />
-        <p className="min-w-0 flex-1 truncate text-[11px] font-semibold">
-          {hay ? "Tu chica" : "La chica de la casa (opcional)"}
-        </p>
-        {hay ? (
-          <button
-            type="button"
-            onClick={() => borrar.mutate(undefined, { onError: (e) => toast.error(err(e)) })}
-            className="shrink-0 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
-          >
-            Quitar
-          </button>
-        ) : null}
-      </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        {hay
-          ? `${chica.data?.resumen} — los prompts de referencia salen con ella.`
-          : "Sube la foto de una chica que te guste (de internet vale) y la IA saca sus rasgos. A partir de ahí, las referencias de los diez escenarios son ella."}
-      </p>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          crear.mutate(
-            { file },
-            {
-              onSuccess: (r) => toast.success(`Ficha creada · ${r.resumen}`),
-              onError: (e2) => toast.error(err(e2)),
-            },
-          );
-        }}
-      />
-      <button
-        type="button"
-        disabled={crear.isPending}
-        onClick={() => ref.current?.click()}
-        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
-      >
-        {crear.isPending ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sacando sus rasgos…
-          </>
-        ) : (
-          <>
-            <Upload className="h-3.5 w-3.5" /> {hay ? "Cambiar de chica" : "Subir foto de la chica"}
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
 /** La foto que hay que ADJUNTAR en Flow junto al prompt.
  *
  *  Los dos prompts del curso son de imagen-a-imagen ("genera una imagen
@@ -1191,9 +1111,6 @@ function TandaEscenario({
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const refFoto = useRef<HTMLInputElement>(null);
-  const fichaFoto = useRef<HTMLInputElement>(null);
-  const crearFicha = useCrearChicaCarrusel();
-  const ficha = useChicaCarrusel(escenario.clave);
   const referencias = useReferencias();
   const subirRef = useSubirReferencia();
   const borrarRef = useBorrarReferencia();
@@ -1344,43 +1261,20 @@ function TandaEscenario({
               : "Subir referencia"}
         </button>
 
-        {/* De una foto a la ficha de ESTE escenario: los rasgos de esa chica
-            entran en el JSON de aquí abajo y ya se genera clavada. */}
-        <input
-          ref={fichaFoto}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            crearFicha.mutate(
-              { file, escenario: escenario.clave },
-              {
-                onSuccess: (r) => toast.success(`Ficha de ${escenario.label} · ${r.resumen}`),
-                onError: (e2) => toast.error(err(e2)),
-              },
-            );
-          }}
-        />
-        <button
-          type="button"
-          disabled={crearFicha.isPending}
-          onClick={() => fichaFoto.current?.click()}
-          className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
-        >
-          {crearFicha.isPending ? "…" : ficha.data?.propia ? "Cambiar chica" : "Foto → ficha"}
-        </button>
+        {suya?.hay ? (
+          <a
+            href={buildReferenciaUrl("chica", suya.version, true, escenario.clave)}
+            title="Bajar la referencia (tamaño original)"
+            className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
+          >
+            <Download className="h-3 w-3" /> Bajar
+          </a>
+        ) : null}
         <button
           type="button"
           onClick={() => {
             navigator.clipboard.writeText(escenario.prompt_referencia);
-            toast.success(
-              ficha.data?.hay
-                ? "JSON con tu chica copiado"
-                : "JSON para crear la referencia copiado",
-            );
+            toast.success("JSON para crear la referencia copiado");
           }}
           className="flex-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
         >
