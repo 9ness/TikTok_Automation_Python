@@ -859,7 +859,7 @@ export default function NichoPovBofPage() {
               spaces={[
                 "foto_limpia_normal",
                 "foto_limpia_plazos",
-                ...(esAdmin ? (["foto_ia"] as const) : []),
+                ...(esAdmin ? (["foto_ia", "foto_ia_2"] as const) : []),
               ]}
             />
             <OSepara />

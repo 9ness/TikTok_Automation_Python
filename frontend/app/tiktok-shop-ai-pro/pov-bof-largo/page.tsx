@@ -889,7 +889,10 @@ export default function PovBofLargoPage() {
             {/* Del de foto limpia solo hace falta el de plazos: aquí todos los
                 vídeos llevan dos clips. El de "foto con IA" solo el admin. */}
             <MagnificSpaces
-              spaces={["foto_limpia_plazos", ...(esAdmin ? (["foto_ia"] as const) : [])]}
+              spaces={[
+                "foto_limpia_plazos",
+                ...(esAdmin ? (["foto_ia", "foto_ia_2"] as const) : []),
+              ]}
             />
             <OSepara />
             <div className="grid grid-cols-2 gap-1.5">

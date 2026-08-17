@@ -16,9 +16,15 @@ export type MagnificSpaceId =
   | "foto_limpia_normal"
   | "foto_limpia_plazos"
   | "foto_ia"
+  | "foto_ia_2"
   | "carrusel";
 
-const SPACES: Record<MagnificSpaceId, { label: string; hint: string; url: string }> = {
+/** `fila`: los spaces que la comparten se pintan en la misma línea (los de foto
+ *  con IA son dos para repartir las fotos y que no se sature un space). */
+const SPACES: Record<
+  MagnificSpaceId,
+  { label: string; hint: string; url: string; fila?: string }
+> = {
   foto_limpia_normal: {
     label: "Foto limpia → vídeo (pago normal)",
     hint: "1 clip por foto",
@@ -33,6 +39,13 @@ const SPACES: Record<MagnificSpaceId, { label: string; hint: string; url: string
     label: "Foto con IA → vídeo",
     hint: "cuando ya tienes la foto generada con IA, no la limpia",
     url: "https://www.magnific.com/app/spaces/a271e815-cff4-46b6-8597-16153024b453",
+    fila: "foto_ia",
+  },
+  foto_ia_2: {
+    label: "Foto con IA → vídeo (2)",
+    hint: "mismo flow, otro space para repartir las fotos",
+    url: "https://www.magnific.com/app/spaces/a285a2e7-03d4-426c-9053-4ef927673519?page=1",
+    fila: "foto_ia",
   },
   carrusel: {
     label: "Crear carrusel de 1 foto",
@@ -44,6 +57,17 @@ const SPACES: Record<MagnificSpaceId, { label: string; hint: string; url: string
 export function MagnificSpaces({ spaces }: { spaces: MagnificSpaceId[] }) {
   const [abierto, setAbierto] = useState(false);
   if (!spaces.length) return null;
+
+  // Agrupa en filas: los que comparten `fila` van juntos, el resto va solo.
+  const filas: MagnificSpaceId[][] = [];
+  for (const id of spaces) {
+    const fila = SPACES[id].fila;
+    const ultima = filas[filas.length - 1];
+    const primeroDeUltima = ultima?.[0];
+    if (fila && ultima && primeroDeUltima && SPACES[primeroDeUltima].fila === fila)
+      ultima.push(id);
+    else filas.push([id]);
+  }
 
   return (
     <div className="space-y-1.5">
@@ -61,26 +85,33 @@ export function MagnificSpaces({ spaces }: { spaces: MagnificSpaceId[] }) {
 
       {abierto && (
         <div className="space-y-1.5 rounded-lg border border-border/60 p-1.5">
-          {spaces.map((id) => {
-            const s = SPACES[id];
-            return (
-              <a
-                key={id}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md border border-border/60 px-2.5 py-2 transition hover:border-fuchsia-500/50 hover:bg-fuchsia-500/5"
-              >
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fuchsia-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] font-semibold">{s.label}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">
-                    {s.hint}
-                  </span>
-                </span>
-              </a>
-            );
-          })}
+          {filas.map((fila) => (
+            <div
+              key={fila.join("+")}
+              className={fila.length > 1 ? "grid grid-cols-2 gap-1.5" : undefined}
+            >
+              {fila.map((id) => {
+                const s = SPACES[id];
+                return (
+                  <a
+                    key={id}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-border/60 px-2.5 py-2 transition hover:border-fuchsia-500/50 hover:bg-fuchsia-500/5"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fuchsia-400" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-semibold">{s.label}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {s.hint}
+                      </span>
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
