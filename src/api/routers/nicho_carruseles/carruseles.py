@@ -353,6 +353,9 @@ def marcar_apto(
             )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+    # El "2/3" de la pantalla sale del barrido cacheado: sin esto, forzar un
+    # producto a apto no se notaría en el recuento hasta cinco minutos después.
+    _invalidar_barrido()
     return _estado_carpeta(body.source, body.folder, usuario)
 
 
@@ -379,6 +382,7 @@ def cambiar_escenario(
         carrusel_repo.save_folder(body.source, body.folder, data)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+    _invalidar_barrido()
     return _estado_carpeta(body.source, body.folder, usuario)
 
 
