@@ -803,13 +803,21 @@ def list_aptos(
         items = [i for i in items if not i["tiene_foto2"]]
 
     por_categoria: dict[str, int] = {}
+    con_foto2: dict[str, int] = {}
     for i in aptos:
-        if i["categoria"]:
-            por_categoria[i["categoria"]] = por_categoria.get(i["categoria"], 0) + 1
+        cat = i["categoria"]
+        if not cat:
+            continue
+        por_categoria[cat] = por_categoria.get(cat, 0) + 1
+        if i["tiene_foto2"]:
+            con_foto2[cat] = con_foto2.get(cat, 0) + 1
 
     return {
         "items": items,
         "por_categoria": por_categoria,
+        # Cuántos de cada categoría ya tienen su foto 2: la pantalla enseña
+        # "2/2" y, cuando el curso añada productos, "2/3".
+        "con_foto2_por_categoria": con_foto2,
         "resumen": {
             # Productos con textos extraídos: los que se han podido mirar.
             "total": len(todos),
@@ -825,7 +833,7 @@ def _barrer_aptos(usuario: str) -> list[dict]:
     return [i for i in _barrer(usuario) if i["apto"]]
 
 
-_BARRIDO_TTL_S = 60.0
+_BARRIDO_TTL_S = 300.0
 _BARRIDO: dict[str, tuple[float, list[dict]]] = {}
 
 

@@ -44,6 +44,8 @@ export interface AptoCarrusel {
 export interface AptosCarrusel {
   items: AptoCarrusel[];
   por_categoria: Record<string, number>;
+  /** Cuántos de cada categoría ya tienen foto 2 (para el "2/3"). */
+  con_foto2_por_categoria: Record<string, number>;
   /** Cuántos productos del catálogo pasan el filtro. `total` son los que
    *  tienen textos extraídos: sin título no hay nada que clasificar. */
   resumen: {
@@ -383,6 +385,7 @@ export function useChicasPendientes() {
   return useQuery<ChicasPendientes>({
     queryKey: carruselesKeys.pendientes(),
     queryFn: () => api.get<ChicasPendientes>(`${ROOT}/chicas/pendientes`),
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -545,6 +548,9 @@ export function useAptos() {
   return useQuery<AptosCarrusel>({
     queryKey: carruselesKeys.aptos(),
     queryFn: () => api.get<AptosCarrusel>(`${ROOT}/aptos`),
+    // El barrido de los cuatro catálogos es lo más caro de esta pantalla y solo
+    // cambia cuando el propio operador sube o clasifica algo (que ya invalida).
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -701,6 +707,7 @@ export function useReferencias() {
     queryKey: carruselesKeys.referencias(),
     queryFn: async () =>
       (await api.get<{ items: Referencias }>(`${ROOT}/referencias`)).items,
+    staleTime: 5 * 60_000,
   });
 }
 

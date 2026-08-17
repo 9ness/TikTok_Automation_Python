@@ -157,14 +157,9 @@ export default function CarruselesPage() {
   const referenciasCargando = referenciasGlobal.isLoading;
   const subirFotos2 = useSubirFotos2();
   const aptosGlobales = todosAptos.data?.items ?? [];
-  const porCategoriaPendiente = aptosGlobales.reduce<Record<string, number>>(
-    (acc, a) => {
-      if (a.tiene_foto2 || !a.categoria) return acc;
-      acc[a.categoria] = (acc[a.categoria] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+  // TODAS las categorías con productos, tengan o no fotos pendientes: así se
+  // ve "2/2" cuando está terminada y "2/3" cuando el curso añade una nueva.
+  const totalPorCategoria = todosAptos.data?.por_categoria ?? {};
 
   const [verTodos, setVerTodos] = useEstadoRecordado("carruseles:vertodos", false);
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -688,29 +683,35 @@ export default function CarruselesPage() {
               belleza… Carpeta a carpeta, con dos productos por carpeta, era el
               cuello de botella de este nicho. */}
           <Sub>Bajar fotos limpias + su prompt</Sub>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="space-y-1.5">
             <button
               type="button"
               disabled={Boolean(bajandoLimpias) || !aptos.length}
               onClick={() => descargarLimpias("carpeta")}
-              className="flex items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-1 rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">
-                Esta carpeta ({aptos.filter((p) => p.clean_photo_id).length})
-              </span>
+              Esta carpeta ({aptos.filter((p) => p.clean_photo_id).length})
             </button>
-            {Object.entries(porCategoriaPendiente).map(([cat, n]) => (
+            {Object.entries(totalPorCategoria).map(([cat, total]) => {
+              const hechas = todosAptos.data?.con_foto2_por_categoria?.[cat] ?? 0;
+              const n = total - hechas;
+              return (
               <div key={cat} className="flex items-stretch gap-1">
                 <button
                   type="button"
                   disabled={Boolean(bajandoLimpias) || !n}
                   onClick={() => descargarLimpias(cat)}
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-lg border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
+                  className="flex min-w-0 flex-1 items-center gap-1 rounded-lg border border-border/60 bg-card px-2 py-1.5 text-left text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {CATEGORIA_LABEL[cat] ?? cat} ({n})
+                  <span className="min-w-0 flex-1">{CATEGORIA_LABEL[cat] ?? cat}</span>
+                  <span
+                    className={`shrink-0 font-semibold ${
+                      n ? "text-foreground" : "text-emerald-500"
+                    }`}
+                  >
+                    {hechas}/{total}
                   </span>
                 </button>
                 {/* Su prompt: el producto se recrea en el sitio donde se usa
@@ -744,7 +745,8 @@ export default function CarruselesPage() {
                   )}
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
           {bajandoLimpias ? (
             <p className="text-center text-[10px] text-muted-foreground">
