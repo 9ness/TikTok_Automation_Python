@@ -146,6 +146,19 @@ def repartir(
             "foto": n, "ref": ref, "por_que": str(fila.get("por_que") or "")[:80],
         }
 
+    # Por descarte: si al final queda UNA foto suelta y UN solo producto sin
+    # foto, no hay nada que elegir —es esa—. Pasa cuando la tanda es de una
+    # categoría y el modelo no supo leer el título (un cubo de basura genérico
+    # contra "cubo 3 compartimentos"). Solo con uno y uno: con dos de cada ya
+    # habría que adivinar cuál va con cuál, y eso no se hace a ciegas.
+    sueltas = [i for i, x in salida.items() if not x["ref"]]
+    libres = [c["ref"] for c in candidatos if c["ref"] not in usados]
+    if len(sueltas) == 1 and len(libres) == 1:
+        salida[sueltas[0]] = {
+            "foto": sueltas[0], "ref": libres[0], "por_que": "por descarte",
+        }
+        on_log("[carruseles] la última foto se coloca por descarte")
+
     hechas = sum(1 for x in salida.values() if x["ref"])
     on_log(f"[carruseles] {hechas}/{len(fotos)} fotos repartidas")
     return [salida[i] for i in range(len(fotos))]

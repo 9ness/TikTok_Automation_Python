@@ -2742,6 +2742,13 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
         except (ValueError, OSError) as e:
             on_log(f"[carruseles] {nombres[fila['foto']]} no se pudo colocar: {e}")
 
+    # El recuento "2/3" de la pantalla sale del barrido cacheado: sin esto,
+    # las fotos recién colocadas tardarían cinco minutos en contar.
+    if colocadas:
+        from src.api.routers.nicho_carruseles.carruseles import _invalidar_barrido
+
+        _invalidar_barrido()
+
     on_progress(1.0, "🧩 Fotos repartidas")
     sueltas_final = len(fotos_svc.listar_sin_asignar(usuario))
     resumen = f"{colocadas}/{len(rutas)} fotos colocadas"
