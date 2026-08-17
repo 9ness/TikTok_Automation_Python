@@ -35,6 +35,16 @@ TALL_MIN = 1.80
 # separa.
 SIZE_RATIO_CONFIDENT = 1.25
 
+# Fotos con el nombre que les pone el móvil (`IMG_0245.jpg`). Ahí no hay número
+# de producto que agrupe: cada fichero se tomaba como un producto suyo, así que
+# la carpeta salía con el doble de productos y la mitad eran la CAPTURA de la
+# ficha haciéndose pasar por foto de producto.
+CAMARA_RE = re.compile(r"^(?:img|image|photo|foto|pxl|dsc)[ _-]?(\d+)$")
+# Las dos fotos de un producto se hacen seguidas, así que sus números van
+# pegados (0245/0246, y como mucho 0309/0311 si el operador borró alguna). De
+# un producto al siguiente el salto es de decenas.
+CAMARA_SALTO_MAX = 5
+
 
 def _stem_key(name: str) -> str:
     """Clave de emparejado: el número del fichero, ignorando extensión y caja.
@@ -81,6 +91,8 @@ def group_by_product(photos: Iterable[dict]) -> dict[str, list[dict]]:
     for p in photos:
         por_numero.setdefault(_stem_key(p["name"]), []).append(p)
 
+    _juntar_de_camara(por_numero)
+
     groups: dict[str, list[dict]] = {}
     for numero, fotos in por_numero.items():
         bloques: dict[str, list[dict]] = {}
@@ -106,6 +118,42 @@ def group_by_product(photos: Iterable[dict]) -> dict[str, list[dict]]:
             sufijo = "" if i == 0 else chr(ord("a") + i)  # 2, 2b, 2c…
             groups[f"{numero}{sufijo}"] = bloque
     return groups
+
+
+def _juntar_de_camara(por_numero: dict[str, list[dict]]) -> None:
+    """Junta las fotos con nombre de móvil que van de dos en dos.
+
+    En algunas carpetas el curso no renumera y sube los ficheros tal cual salen
+    del carrete: `IMG_0245.jpg` (el producto) e `IMG_0246.PNG` (la captura de
+    la ficha). Como el nombre no empieza por número, cada uno se tomaba como un
+    producto distinto: la carpeta salía con el doble de productos y en la mitad
+    la "foto limpia" era en realidad el pantallazo con el precio encima.
+
+    Se agrupan por CERCANÍA de número, que es lo que las relaciona: las dos se
+    hacen seguidas y entre un producto y el siguiente pasan decenas de fotos.
+    Solo se juntan si la pareja queda exacta —dos ficheros, uno de cada— porque
+    juntar de más cruzaría dos productos, que es peor que dejarlos sueltos.
+
+    Modifica el dict en sitio. La clave del par es la del PRIMERO: es la que ya
+    tiene el progreso guardado en Redis.
+    """
+    sueltas = sorted(
+        (int(m.group(1)), clave)
+        for clave, fotos in por_numero.items()
+        if len(fotos) == 1 and (m := CAMARA_RE.match(clave))
+    )
+    if len(sueltas) < 2:
+        return
+
+    grupo: list[tuple[int, str]] = []
+    for actual in sueltas + [(10**9, "")]:
+        if grupo and actual[0] - grupo[-1][0] > CAMARA_SALTO_MAX:
+            if len(grupo) == 2:
+                primera, segunda = grupo[0][1], grupo[1][1]
+                por_numero[primera] = por_numero[primera] + por_numero.pop(segunda)
+            grupo = []
+        if actual[1]:
+            grupo.append(actual)
 
 
 def _bloques_por_fecha(fotos: list[dict]) -> list[list[dict]] | None:
