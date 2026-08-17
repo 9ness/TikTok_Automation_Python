@@ -919,6 +919,7 @@ class PrepararRequest(BaseModel):
 def preparar_catalogo(
     body: PrepararRequest,
     queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola el filtro + los mensajes de todas las carpetas del catálogo.
 
@@ -939,6 +940,7 @@ def preparar_catalogo(
         title=title,
         params={
             "source": body.source,
+            "usuario": usuario,
             "rehacer": bool(body.rehacer),
             "solo_filtrar": bool(body.solo_filtrar),
         },

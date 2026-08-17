@@ -23,10 +23,11 @@ export function PanelCarruseles() {
   const openQueue = useDrawerStore((s) => s.openQueue);
   const [source, setSource] = useState("aleatorios_1");
   const [soloFiltrar, setSoloFiltrar] = useState(false);
+  const [rehacer, setRehacer] = useState(false);
 
   function lanzar() {
     preparar.mutate(
-      { source, solo_filtrar: soloFiltrar },
+      { source, solo_filtrar: soloFiltrar, rehacer },
       {
         onSuccess: (r) => {
           toast.success(`${r.title} en la cola`);
@@ -79,6 +80,19 @@ export function PanelCarruseles() {
           onChange={(e) => setSoloFiltrar(e.target.checked)}
         />
         Solo filtrar (sin escribir los mensajes todavía)
+      </label>
+
+      {/* Hace falta cuando los TEXTOS cambian: la categoría y los mensajes se
+          calcularon con los títulos de antes y hay que rehacerlos. Sin esto,
+          el trabajo se salta todo lo que ya estuviera hecho. */}
+      <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-cyan-500"
+          checked={rehacer}
+          onChange={(e) => setRehacer(e.target.checked)}
+        />
+        Rehacer lo que ya estaba (hazlo si has vuelto a sacar los textos)
       </label>
 
       <button

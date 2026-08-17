@@ -2600,6 +2600,7 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
 
     p = job.params or {}
     source = str(p.get("source") or "")
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
     rehacer = bool(p.get("rehacer"))
     solo_filtrar = bool(p.get("solo_filtrar"))
     if not source:
@@ -2650,6 +2651,17 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
                 continue
             escritos = mensajes_svc.escribir(aptos, evitar=usados, on_log=on_log)
             if escritos:
+                # Si un mensaje CAMBIA, la foto que ya estaba quemada lleva el
+                # texto viejo: se tira para que el quemado la rehaga. Pasa justo
+                # al rehacer los textos de un catálogo ya trabajado.
+                from src.nicho_carruseles.services import fotos as fotos_svc
+
+                for pid, nuevo in escritos.items():
+                    viejo = mios.get(pid) or {}
+                    if viejo.get("mensaje1") and viejo["mensaje1"] != nuevo["mensaje1"]:
+                        fotos_svc.borrar("chica_txt", usuario, source, carpeta, pid)
+                    if viejo.get("mensaje2") and viejo["mensaje2"] != nuevo["mensaje2"]:
+                        fotos_svc.borrar("producto_txt", usuario, source, carpeta, pid)
                 carrusel_repo.guardar_mensajes(source, carpeta, escritos)
                 con_mensajes += len(escritos)
                 usados += [d["mensaje1"] for d in escritos.values()]
