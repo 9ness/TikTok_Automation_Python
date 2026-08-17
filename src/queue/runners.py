@@ -2360,7 +2360,7 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     on_log(f"[textos] {len(pendientes)}/{len(carpetas)} carpetas por hacer")
     hechas, fallidas, total_productos = 0, [], 0
     for i, carpeta in enumerate(pendientes):
-        on_progress(int(i * 100 / len(pendientes)))
+        on_progress(i / len(pendientes), f"🔤 {i + 1}/{len(pendientes)} · {carpeta}")
         on_log(f"[textos] {i + 1}/{len(pendientes)} · {carpeta}")
         try:
             if source == top_vendidos.SOURCE:
@@ -2383,7 +2383,7 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
         hechas += 1
         total_productos += len(textos)
 
-    on_progress(100)
+    on_progress(1.0, "🔤 Textos listos")
     resumen = f"{hechas}/{len(pendientes)} carpetas · {total_productos} productos"
     if fallidas:
         on_log(f"[textos] sin textos: {', '.join(fallidas)}")
@@ -2487,7 +2487,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     )
     hechos, fallidos = 0, []
     for i, (carpeta, pid, t, plazos) in enumerate(pendientes):
-        on_progress(int(i * 100 / len(pendientes)))
+        on_progress(
+            i / len(pendientes),
+            f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
+        )
         on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
         try:
             escrito = guionista.escribir(
@@ -2508,7 +2511,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         )
         hechos += 1
 
-    on_progress(100)
+    on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
     if fallidos:
         on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
