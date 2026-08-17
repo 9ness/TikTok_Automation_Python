@@ -397,14 +397,18 @@ publica un carrusel de DOS fotos con el texto quemado encima (PIL, sin cola —
 es un PNG sobre un JPEG).
 
 Lo que no tiene ningún otro nicho:
-- **Solo belleza y suplementación.** El resto de productos no funciona en este
-  formato, así que hay un paso de clasificación con Gemini (texto suelto sobre
-  los títulos YA extraídos, sin imágenes) + interruptor manual por producto. Al
-  filtrar, una carpeta de diez se queda en dos o tres: el listado de carpetas
-  enseña cuántos aptos tiene cada una para no abrirlas en balde.
-- **La foto 1 NO depende del producto** (una chica sorprendida, generada en
-  Google Flow con el prompt del curso). Se suben en TANDA para toda la fuente y
-  se reparten por orden entre los productos que no tienen; la foto 2 —el
+- **Filtro de categoría.** No todo producto funciona en este formato: hay un
+  paso de clasificación con Gemini (texto suelto sobre los títulos YA
+  extraídos, sin imágenes) + interruptor manual por producto. Al filtrar, una
+  carpeta de diez se queda en dos o tres: el listado de carpetas enseña cuántos
+  aptos tiene cada una para no abrirlas en balde.
+- **La foto 1 NO depende del producto, solo del SITIO.** Es una chica
+  sorprendida generada en Google Flow, y lo único que tiene que encajar es
+  dónde está: `generico` (belleza, suplementos), `cama` (descanso), `sofa`
+  (salón) y `exterior` (jardín/camping) — un prompt por escenario
+  (`prompts/foto_chica_<escenario>.md`), y la categoría decide cuál le toca.
+  Las tandas se suben POR ESCENARIO y para TODOS los catálogos a la vez, y se
+  reparten por orden entre los productos que no tienen. La foto 2 —el
   producto— sí es de cada uno y se sube en su tarjeta.
 - Las fotos viven en el Drive montado
   (`TIKTOK_SHOP_AI_PRO/Nicho_Carruseles/<usuario>/`), y el original y la

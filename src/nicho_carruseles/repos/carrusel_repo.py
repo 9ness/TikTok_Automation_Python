@@ -112,3 +112,17 @@ def es_apto(prod: dict) -> bool:
     if isinstance(manual, bool):
         return manual
     return str(prod.get("categoria") or "") in config.CATEGORIAS_APTAS
+
+
+def escenario_de(prod: dict) -> str:
+    """Dónde tiene que estar la chica de la foto 1 de este producto.
+
+    Sale de la categoría (un colchón pide cama, un sofá pide sofá), y el
+    operador puede forzarlo a mano. Un producto que él marcó apto pero que la IA
+    dejó en `otro` se lleva el escenario genérico: es el que vale para todo.
+    """
+    manual = str(prod.get("escenario") or "")
+    if manual in config.ESCENARIOS:
+        return manual
+    categoria = str(prod.get("categoria") or "")
+    return config.ESCENARIO_POR_CATEGORIA.get(categoria, "generico")

@@ -45,8 +45,22 @@ def _bad_request(msg: str) -> APIError:
 # ---------------------------------------------------------------------------
 # Modelos
 # ---------------------------------------------------------------------------
+class EscenarioPrompt(BaseModel):
+    clave: str
+    label: str
+    para: str
+    prompt: str
+
+
 class PromptsResponse(BaseModel):
-    chica: str
+    """Los prompts de Flow: uno por escenario de chica, más el del producto.
+
+    Los escenarios existen porque la chica tiene que estar DONDE se usa el
+    producto: en la cama si es un colchón, en el sofá si es un sofá. Es el mismo
+    prompt del curso cambiando una frase.
+    """
+
+    escenarios: list[EscenarioPrompt]
     producto: str
     formato: str
     referencia_drive: str
@@ -69,6 +83,14 @@ class AptoRequest(BaseModel):
     producto: str
     # `None` = quitar el interruptor manual y volver a hacer caso a la IA.
     apto: bool | None = None
+
+
+class EscenarioRequest(BaseModel):
+    source: str
+    folder: str
+    producto: str
+    # `""` = volver al que le toca por su categoría.
+    escenario: str = ""
 
 
 class MensajeRequest(BaseModel):
@@ -107,7 +129,15 @@ def get_prompts() -> PromptsResponse:
     """
     try:
         return PromptsResponse(
-            chica=config.leer_prompt("foto_chica"),
+            escenarios=[
+                EscenarioPrompt(
+                    clave=clave,
+                    label=meta["label"],
+                    para=meta["para"],
+                    prompt=config.leer_prompt(f"foto_chica_{clave}"),
+                )
+                for clave, meta in config.ESCENARIOS.items()
+            ],
             producto=config.leer_prompt("foto_producto"),
             formato=config.FORMATO,
             referencia_drive=(
@@ -212,6 +242,8 @@ def _estado_carpeta(source: str, folder: str, usuario: str) -> dict:
             "categoria": prod.get("categoria") or "",
             "apto": carrusel_repo.es_apto(prod),
             "apto_manual": prod.get("apto"),
+            "escenario": carrusel_repo.escenario_de(prod),
+            "escenario_manual": prod.get("escenario") or "",
             "mensaje1": prod.get("mensaje1") or "",
             "mensaje2": prod.get("mensaje2") or "",
             "fotos": fotos_svc.estado(usuario, source, folder, pid),
@@ -291,6 +323,32 @@ def marcar_apto(
             carrusel_repo.update_product(
                 body.source, body.folder, body.producto, apto=body.apto,
             )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return _estado_carpeta(body.source, body.folder, usuario)
+
+
+@router.post("/escenario")
+def cambiar_escenario(
+    body: EscenarioRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Cambia dónde tiene que estar la chica de ese producto.
+
+    Se usa cuando la categoría se queda corta: un difusor de aroma es belleza,
+    pero la foto queda mejor con la chica en el sofá. Tirar la chica que ya
+    tuviera sería peor que dejarla: si molesta, se borra desde su tarjeta.
+    """
+    if body.escenario and body.escenario not in config.ESCENARIOS:
+        raise _bad_request(f"Escenario desconocido: {body.escenario!r}.")
+    try:
+        data = carrusel_repo.load_folder(body.source, body.folder)
+        prod = (data.setdefault("productos", {})).setdefault(body.producto, {})
+        if body.escenario:
+            prod["escenario"] = body.escenario
+        else:
+            prod.pop("escenario", None)
+        carrusel_repo.save_folder(body.source, body.folder, data)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return _estado_carpeta(body.source, body.folder, usuario)
@@ -402,11 +460,15 @@ def editar_mensaje(
 # ---------------------------------------------------------------------------
 # Fotos
 # ---------------------------------------------------------------------------
-def _pendientes_de_chica(source: str, usuario: str) -> list[dict]:
-    """Productos aptos de la fuente que aún no tienen foto de chica.
+def _pendientes_de_chica(usuario: str, escenario: str = "") -> list[dict]:
+    """Productos aptos SIN foto de chica, de TODOS los catálogos.
 
-    En ORDEN de trabajo (carpeta y número): es el mismo orden en el que se
-    reparte la tanda que sube el operador.
+    Global a propósito: la foto 1 no depende del producto ni del catálogo, así
+    que la tanda de Flow se hace una vez para todo el trabajo pendiente y no
+    catálogo a catálogo (lo pidió así el operador).
+
+    En ORDEN de trabajo (catálogo, carpeta y número): es el mismo orden en el
+    que se reparte la tanda que sube.
     """
     from src.nicho_carruseles.repos.redis_base import get_nicho_carruseles_redis
     from src.nicho_pov_bof.services import drive_client
@@ -414,38 +476,52 @@ def _pendientes_de_chica(source: str, usuario: str) -> list[dict]:
     r = get_nicho_carruseles_redis()
     if not r.is_available():
         return []
-    try:
-        nombres = [c.get("name", "") for c in drive_client.list_product_folders(source)]
-    except Exception as e:  # noqa: BLE001
-        raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
 
-    docs = r.mget_json([f"folder:{config.fuente_canonica(source)}:{n}" for n in nombres])
     pendientes: list[dict] = []
-    for i, folder in enumerate(nombres):
-        prods = ((docs[i] if i < len(docs) else None) or {}).get("productos") or {}
-        for pid in sorted(prods, key=lambda p: (len(p), p)):
-            if not carrusel_repo.es_apto(prods[pid]):
-                continue
-            if fotos_svc.tiene("chica", usuario, source, folder, pid):
-                continue
-            pendientes.append({"source": source, "folder": folder, "producto": pid})
+    for source in config.fuentes_a_barrer():
+        try:
+            nombres = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+        except Exception:  # noqa: BLE001 — un catálogo ilegible no tumba el resto
+            continue
+        docs = r.mget_json(
+            [f"folder:{config.fuente_canonica(source)}:{n}" for n in nombres]
+        )
+        for i, folder in enumerate(nombres):
+            prods = ((docs[i] if i < len(docs) else None) or {}).get("productos") or {}
+            for pid in sorted(prods, key=lambda p: (len(p), p)):
+                prod = prods[pid]
+                if not carrusel_repo.es_apto(prod):
+                    continue
+                suyo = carrusel_repo.escenario_de(prod)
+                if escenario and suyo != escenario:
+                    continue
+                if fotos_svc.tiene("chica", usuario, source, folder, pid):
+                    continue
+                pendientes.append({
+                    "source": source, "folder": folder, "producto": pid,
+                    "escenario": suyo,
+                })
     return pendientes
 
 
 @router.get("/chicas/pendientes")
 def chicas_pendientes(
-    source: Annotated[str, Query()],
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Cuántas fotos de chica hacen falta en esta fuente, y para quién.
+    """Cuántas fotos de chica hacen falta EN TOTAL, repartidas por escenario.
 
-    Es el número que el operador se lleva a Flow: genera esa cantidad de cuatro
-    en cuatro y las sube todas juntas.
+    Es lo que el operador se lleva a Flow: tantas en casa, tantas en la cama,
+    tantas en el sofá… Cada escenario tiene su prompt (`GET /prompts`) y su
+    tanda, porque una chica del sofá no vale para un producto de jardín.
     """
-    pendientes = _pendientes_de_chica(source, usuario)
+    pendientes = _pendientes_de_chica(usuario)
+    por_escenario = {
+        clave: sum(1 for p in pendientes if p["escenario"] == clave)
+        for clave in config.ESCENARIOS
+    }
     return {
-        "source": source,
         "faltan": len(pendientes),
+        "por_escenario": por_escenario,
         "por_tanda": config.CHICAS_POR_TANDA,
         "items": pendientes[: config.CHICAS_POR_TANDA * 4],
     }
@@ -470,26 +546,30 @@ async def _leer_foto(archivo: UploadFile, que: str = "La foto") -> bytes:
 
 @router.post("/chicas")
 async def subir_chicas(
-    source: Annotated[str, Form()],
     archivos: Annotated[list[UploadFile], File()],
+    escenario: Annotated[str, Form()] = "generico",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Sube la tanda de chicas y la reparte entre los productos que no tienen.
+    """Sube la tanda de chicas de un escenario y la reparte.
 
-    Se asignan POR ORDEN (carpeta y número). La foto 1 no depende del producto,
-    así que da igual cuál caiga dónde — lo que importa es que cada producto
-    acabe con una y que no se repita ninguna.
+    Se asignan POR ORDEN (catálogo, carpeta y número) entre los productos de ESE
+    escenario que aún no tienen. Dentro de un escenario la foto 1 no depende del
+    producto, así que da igual cuál caiga dónde — lo que importa es que cada
+    producto acabe con una y que no se repita ninguna.
 
     Se ordenan por nombre de fichero antes de repartir: Flow los baja numerados
     y así el reparto es reproducible si hay que repetirlo.
     """
     if not archivos:
         raise _bad_request("No has adjuntado ninguna foto.")
+    if escenario not in config.ESCENARIOS:
+        raise _bad_request(f"Escenario desconocido: {escenario!r}.")
 
-    pendientes = _pendientes_de_chica(source, usuario)
+    pendientes = _pendientes_de_chica(usuario, escenario)
     if not pendientes:
         raise _bad_request(
-            "Ningún producto apto está esperando foto de chica en esta fuente."
+            "Ningún producto está esperando foto de chica "
+            f"«{config.ESCENARIOS[escenario]['label']}»."
         )
 
     leidos: list[tuple[str, bytes]] = []
@@ -502,6 +582,7 @@ async def subir_chicas(
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
     return {
+        "escenario": escenario,
         "asignadas": len(asignados),
         "items": asignados,
         "sobran_fotos": max(0, len(leidos) - len(pendientes)),

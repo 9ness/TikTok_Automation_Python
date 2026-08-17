@@ -21,10 +21,11 @@ import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
-import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
+import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   buildFotoCarruselUrl,
   useBorrarFotoCarrusel,
+  useCambiarEscenario,
   useChicasPendientes,
   useClasificarCarpeta,
   useCompletarCarpetaCarrusel,
@@ -39,6 +40,7 @@ import {
   useSubidosCarruseles,
   useSubirChicas,
   useSubirFotoCarrusel,
+  type EscenarioPrompt,
   type FotosCarrusel,
   type ProductoCarrusel,
 } from "@/lib/queries/nichoCarruseles";
@@ -62,10 +64,22 @@ const VACIO: ProductoCarrusel = {
   categoria: "",
   apto: false,
   apto_manual: null,
+  escenario: "generico",
+  escenario_manual: "",
   mensaje1: "",
   mensaje2: "",
   fotos: { chica: "", chica_txt: "", producto: "", producto_txt: "" },
   subido_at: 0,
+};
+
+/** Cómo se lee cada categoría en la tarjeta. Las tres últimas son productos
+ *  grandes: valen para carrusel, pero con la chica EN el sitio del producto. */
+const CATEGORIA_LABEL: Record<string, string> = {
+  belleza: "💄 belleza",
+  suplementos: "💊 suplementos",
+  descanso: "🛏️ dormitorio",
+  salon: "🛋️ salón",
+  exterior: "🌳 exterior",
 };
 
 export default function CarruselesPage() {
@@ -78,13 +92,13 @@ export default function CarruselesPage() {
   const productos = useProductos(source, folder);
   const estado = useEstadoCarruseles(source, folder);
   const prompts = usePromptsCarruseles();
-  const pendientes = useChicasPendientes(source);
+  const pendientes = useChicasPendientes();
 
   const extraer = useExtraerTextos();
   const clasificar = useClasificarCarpeta(source, folder);
   const escribir = useEscribirMensajes(source, folder);
   const completar = useCompletarCarpetaCarrusel();
-  const subirChicas = useSubirChicas(source);
+  const subirChicas = useSubirChicas();
   const quemar = useQuemarTexto(source, folder);
   const subidos = useSubidosCarruseles(source, folder);
   const marcarSubido = useMarcarSubidoCarrusel(source, folder);
@@ -93,7 +107,9 @@ export default function CarruselesPage() {
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const [bajando, setBajando] = useState("");
-  const tandaRef = useRef<HTMLInputElement>(null);
+  // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
+  // pintarían las cuatro girando a la vez.
+  const [tandaEnCurso, setTandaEnCurso] = useState("");
 
   const items = productos.data ?? [];
   const porProducto = estado.data?.productos ?? {};
@@ -340,77 +356,44 @@ export default function CarruselesPage() {
           n={2}
           color="fucsia"
           titulo="La tanda de chicas (foto 1)"
-          hint="La foto 1 no depende del producto: se generan todas de golpe en Flow y se reparten solas."
+          hint="La foto 1 no depende del producto, solo del SITIO: en casa, en la cama, en el sofá o fuera. Se generan de golpe en Flow para todos los catálogos."
           extra={pendientes.data ? `faltan ${pendientes.data.faltan}` : undefined}
         >
-          <div className="rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/5 p-2 text-center">
-            <p className="text-[11px] text-muted-foreground">
-              Fotos de chica que faltan en este catálogo
-            </p>
-            <p className="text-2xl font-bold text-fuchsia-400">
-              {pendientes.isLoading ? "…" : (pendientes.data?.faltan ?? 0)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              Genéralas en Flow de cuatro en cuatro con la foto de referencia
-              {prompts.data ? ` (${prompts.data.referencia_drive})` : ""} y súbelas todas
-              juntas.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={!prompts.data}
-            onClick={() => {
-              navigator.clipboard.writeText(prompts.data?.chica ?? "");
-              toast.success("Prompt copiado");
-            }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
-          >
-            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt chica (Flow)
-          </button>
-          <p className="text-center text-[11px] font-semibold text-cyan-500">
-            Genera en formato {prompts.data?.formato ?? "9:16"}
+          <p className="text-center text-[10px] text-muted-foreground">
+            Genéralas en Flow de cuatro en cuatro con la foto de referencia
+            {prompts.data ? ` (${prompts.data.referencia_drive})` : ""}, en formato{" "}
+            <span className="font-semibold text-cyan-500">
+              {prompts.data?.formato ?? "9:16"}
+            </span>
+            . Cada escenario va por su lado: una chica del sofá no vale para un producto
+            de jardín.
           </p>
 
-          <OSepara />
-
-          <input
-            ref={tandaRef}
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              e.target.value = "";
-              if (!files.length) return;
-              subirChicas.mutate(files, {
-                onSuccess: (r) =>
-                  toast.success(
-                    `${r.asignadas} chicas repartidas` +
-                      (r.sobran_fotos ? ` · sobran ${r.sobran_fotos}` : "") +
-                      (r.faltan ? ` · siguen faltando ${r.faltan}` : ""),
-                  ),
-                onError: (e2) => toast.error(err(e2)),
-              });
-            }}
-          />
-          <button
-            type="button"
-            disabled={subirChicas.isPending}
-            onClick={() => tandaRef.current?.click()}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-fuchsia-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-50"
-          >
-            {subirChicas.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Repartiendo la tanda…
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4" /> Subir tanda de chicas
-              </>
-            )}
-          </button>
+          {/* Una tarjeta por escenario: su cuenta, su prompt y su tanda. */}
+          {(prompts.data?.escenarios ?? []).map((esc) => (
+            <TandaEscenario
+              key={esc.clave}
+              escenario={esc}
+              faltan={pendientes.data?.por_escenario?.[esc.clave] ?? 0}
+              subiendo={subirChicas.isPending && tandaEnCurso === esc.clave}
+              onSubir={(files) => {
+                setTandaEnCurso(esc.clave);
+                subirChicas.mutate(
+                  { escenario: esc.clave, files },
+                  {
+                    onSuccess: (r) =>
+                      toast.success(
+                        `${r.asignadas} chicas repartidas` +
+                          (r.sobran_fotos ? ` · sobran ${r.sobran_fotos}` : "") +
+                          (r.faltan ? ` · siguen faltando ${r.faltan}` : ""),
+                      ),
+                    onError: (e2) => toast.error(err(e2)),
+                    onSettled: () => setTandaEnCurso(""),
+                  },
+                );
+              }}
+            />
+          ))}
 
           {/* El quemado de la foto 1 es masivo por carpeta: mismo gesto para
               las diez, que es justo lo que hace que esto salga a cuenta. */}
@@ -546,6 +529,83 @@ export default function CarruselesPage() {
   );
 }
 
+/** Un escenario de chica: cuántas faltan, su prompt de Flow y su tanda.
+ *
+ *  Van por separado porque una chica del sofá no vale para un producto de
+ *  jardín: el reparto es dentro del escenario. */
+function TandaEscenario({
+  escenario,
+  faltan,
+  subiendo,
+  onSubir,
+}: {
+  escenario: EscenarioPrompt;
+  faltan: number;
+  subiendo: boolean;
+  onSubir: (files: File[]) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      className={`space-y-1.5 rounded-lg border p-2 ${
+        faltan ? "border-fuchsia-500/40 bg-fuchsia-500/5" : "border-border/60 opacity-70"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold">{escenario.label}</p>
+          <p className="truncate text-[10px] text-muted-foreground">{escenario.para}</p>
+        </div>
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${
+            faltan ? "bg-fuchsia-500/20 text-fuchsia-400" : "text-muted-foreground"
+          }`}
+        >
+          {faltan}
+        </span>
+      </div>
+
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length) onSubir(files);
+        }}
+      />
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText(escenario.prompt);
+            toast.success("Prompt copiado");
+          }}
+          className="flex items-center justify-center gap-1 rounded-md border border-border/60 bg-card px-2 py-1.5 text-[11px] transition hover:border-foreground/30"
+        >
+          <ClipboardCopy className="h-3.5 w-3.5" /> Prompt
+        </button>
+        <button
+          type="button"
+          disabled={subiendo || !faltan}
+          onClick={() => ref.current?.click()}
+          className="flex items-center justify-center gap-1 rounded-md bg-fuchsia-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-40"
+        >
+          {subiendo ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5" />
+          )}
+          Subir tanda
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Un producto: sus dos mensajes, sus dos fotos y el botón de bajarlas. */
 function CarruselCard({
   source,
@@ -569,7 +629,9 @@ function CarruselCard({
   onSubido: (v: boolean) => void;
 }) {
   const hashtags = useHashtags();
+  const prompts = usePromptsCarruseles();
   const marcarApto = useMarcarApto(source, folder);
+  const cambiarEscenario = useCambiarEscenario(source, folder);
   const subirFoto = useSubirFotoCarrusel(source, folder);
   const quemar = useQuemarTexto(source, folder);
   const editar = useEditarMensaje(source, folder);
@@ -614,11 +676,7 @@ function CarruselCard({
           </p>
           {datos.categoria ? (
             <p className="mt-0.5 text-[10px] text-muted-foreground">
-              {datos.categoria === "belleza"
-                ? "💄 belleza"
-                : datos.categoria === "suplementos"
-                  ? "💊 suplementos"
-                  : "— no encaja en carrusel"}
+              {CATEGORIA_LABEL[datos.categoria] ?? "— no encaja en carrusel"}
               {datos.apto_manual !== null ? " · a mano" : ""}
             </p>
           ) : null}
@@ -662,6 +720,31 @@ function CarruselCard({
           conTexto={Boolean(datos.fotos.producto_txt)}
         />
       </div>
+
+      {/* Dónde va la chica. Sale de la categoría, pero se puede cambiar: un
+          difusor de aroma es belleza y queda mejor con la chica en el sofá. */}
+      {datos.apto ? (
+        <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          Chica en
+          <select
+            value={datos.escenario}
+            onChange={(e) =>
+              cambiarEscenario.mutate(
+                { producto: p.producto, escenario: e.target.value },
+                { onError: (e2) => toast.error(err(e2)) },
+              )
+            }
+            className="min-w-0 flex-1 truncate rounded border border-border/60 bg-background px-1.5 py-1 text-[10px]"
+          >
+            {(prompts.data?.escenarios ?? []).map((esc) => (
+              <option key={esc.clave} value={esc.clave}>
+                {esc.label}
+              </option>
+            ))}
+          </select>
+          {datos.escenario_manual ? <span title="cambiado a mano">✎</span> : null}
+        </label>
+      ) : null}
 
       {datos.mensaje1 ? (
         <p className="rounded border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">

@@ -48,14 +48,53 @@ from src.nicho_pov_bof.config import (  # noqa: E402,F401
 FORMATO = "9:16"
 
 # ---------------------------------------------------------------------------
-# Qué productos valen
+# Qué productos valen y DÓNDE está la chica
 # ---------------------------------------------------------------------------
-# El carrusel es una chica sorprendida hablando de "lo que le contaron": eso
-# cuela en cosmética y en suplementos, y no cuela con un taladro. En vez de
-# adivinarlo con palabras clave, lo clasifica Gemini leyendo los títulos que ya
-# están extraídos (texto, sin imágenes: la llamada más barata que hay aquí).
-CATEGORIAS = ("belleza", "suplementos", "otro")
-CATEGORIAS_APTAS = ("belleza", "suplementos")
+# El carrusel es una chica sorprendida hablando de "lo que le contaron". Eso
+# cuela en cosmética y en suplementos… y también en un colchón o un sofá, con
+# una condición: que la chica esté EN EL SITIO del producto. Una chica en la
+# cocina anunciando un colchón no pega; la misma chica sentada en la cama, sí.
+#
+# Por eso la clasificación devuelve dos cosas: la categoría (qué es) y el
+# ESCENARIO (dónde tiene que estar la chica de su foto 1). El escenario es lo
+# que decide con qué prompt se genera en Flow, y el banco de chicas se lleva
+# por escenario — no vale una del sofá para un producto de jardín.
+#
+# Lo clasifica Gemini leyendo los títulos YA extraídos (texto, sin imágenes: la
+# llamada más barata que hay aquí).
+CATEGORIAS = ("belleza", "suplementos", "descanso", "salon", "exterior", "otro")
+
+# Escenarios de la foto 1. La clave viaja por la API y da nombre al prompt
+# (`prompts/foto_chica_<clave>.md`).
+ESCENARIOS: dict[str, dict[str, str]] = {
+    "generico": {
+        "label": "En casa (genérico)",
+        "para": "Belleza, suplementos y cualquier producto pequeño",
+    },
+    "cama": {
+        "label": "En la cama",
+        "para": "Colchones, almohadas, ropa de cama, dormitorio",
+    },
+    "sofa": {
+        "label": "En el sofá",
+        "para": "Sofás, mantas, cojines, salón",
+    },
+    "exterior": {
+        "label": "Al aire libre",
+        "para": "Camping, jardín, terraza, muebles de exterior",
+    },
+}
+
+# Qué escenario le toca a cada categoría. Un producto es apto si su categoría
+# tiene escenario; `otro` no lo tiene y por eso se queda fuera.
+ESCENARIO_POR_CATEGORIA: dict[str, str] = {
+    "belleza": "generico",
+    "suplementos": "generico",
+    "descanso": "cama",
+    "salon": "sofa",
+    "exterior": "exterior",
+}
+CATEGORIAS_APTAS = tuple(ESCENARIO_POR_CATEGORIA)
 
 # ---------------------------------------------------------------------------
 # Dónde viven las fotos

@@ -19,12 +19,22 @@ export const carruselesKeys = {
   folders: (source: string) => [...carruselesKeys.all, "folders", source] as const,
   estado: (source: string, folder: string) =>
     [...carruselesKeys.all, "estado", source, folder] as const,
-  pendientes: (source: string) =>
-    [...carruselesKeys.all, "pendientes", source] as const,
+  /** Las chicas que faltan son de TODOS los catálogos, no de uno. */
+  pendientes: () => [...carruselesKeys.all, "pendientes"] as const,
 };
 
+/** Dónde está la chica de la foto 1. Cada escenario tiene su prompt de Flow:
+ *  la chica tiene que estar DONDE se usa el producto (en la cama si es un
+ *  colchón, en el sofá si es un sofá). */
+export interface EscenarioPrompt {
+  clave: string;
+  label: string;
+  para: string;
+  prompt: string;
+}
+
 export interface PromptsCarruseles {
-  chica: string;
+  escenarios: EscenarioPrompt[];
   producto: string;
   formato: string;
   referencia_drive: string;
@@ -62,6 +72,10 @@ export interface ProductoCarrusel {
   apto: boolean;
   /** `true`/`false` si el operador lo forzó a mano; `null` = manda la IA. */
   apto_manual: boolean | null;
+  /** Dónde va la chica de este producto (sale de su categoría). */
+  escenario: string;
+  /** No vacío si el operador lo cambió a mano. */
+  escenario_manual: string;
   mensaje1: string;
   mensaje2: string;
   fotos: FotosCarrusel;
@@ -79,11 +93,13 @@ export interface PendienteChica {
   source: string;
   folder: string;
   producto: string;
+  escenario: string;
 }
 
 export interface ChicasPendientes {
-  source: string;
   faltan: number;
+  /** Cuántas faltan de cada escenario: es la cuenta que se lleva a Flow. */
+  por_escenario: Record<string, number>;
   por_tanda: number;
   items: PendienteChica[];
 }
@@ -138,7 +154,7 @@ function useGuardarEstado(source: string, folder: string | null) {
   return (estado: EstadoCarruseles) => {
     qc.setQueryData(carruselesKeys.estado(source, folder ?? ""), estado);
     void qc.invalidateQueries({ queryKey: carruselesKeys.folders(source) });
-    void qc.invalidateQueries({ queryKey: carruselesKeys.pendientes(source) });
+    void qc.invalidateQueries({ queryKey: carruselesKeys.pendientes() });
   };
 }
 
@@ -198,40 +214,50 @@ export function useEditarMensaje(source: string, folder: string | null) {
   });
 }
 
-/** Cuántas fotos de chica hay que generar en Flow para toda la fuente. */
-export function useChicasPendientes(source: string) {
+/** Cuántas fotos de chica hay que generar en Flow, de TODOS los catálogos y
+ *  repartidas por escenario. */
+export function useChicasPendientes() {
   return useQuery<ChicasPendientes>({
-    queryKey: carruselesKeys.pendientes(source),
-    queryFn: () =>
-      api.get<ChicasPendientes>(
-        `${ROOT}/chicas/pendientes?source=${encodeURIComponent(source)}`,
-      ),
-    enabled: Boolean(source),
+    queryKey: carruselesKeys.pendientes(),
+    queryFn: () => api.get<ChicasPendientes>(`${ROOT}/chicas/pendientes`),
   });
 }
 
 export interface RepartoChicas {
+  escenario: string;
   asignadas: number;
   items: (PendienteChica & { archivo: string; mtime: number })[];
   sobran_fotos: number;
   faltan: number;
 }
 
-/** Sube la tanda entera de chicas: se reparten solas entre los productos que
- *  no tienen (la foto 1 no depende del producto). */
-export function useSubirChicas(source: string) {
+/** Sube la tanda entera de chicas de un escenario: se reparten solas entre los
+ *  productos de ESE escenario que no tienen, de todos los catálogos. */
+export function useSubirChicas() {
   const qc = useQueryClient();
-  return useMutation<RepartoChicas, Error, File[]>({
-    mutationFn: (files) => {
+  return useMutation<RepartoChicas, Error, { escenario: string; files: File[] }>({
+    mutationFn: ({ escenario, files }) => {
       const fd = new FormData();
-      fd.append("source", source);
+      fd.append("escenario", escenario);
       files.forEach((f) => fd.append("archivos", f));
       return api.post<RepartoChicas>(`${ROOT}/chicas`, fd);
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: carruselesKeys.pendientes(source) });
-      void qc.invalidateQueries({ queryKey: carruselesKeys.all });
-    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
+  });
+}
+
+/** Cambia dónde va la chica de un producto (cuando la categoría se queda
+ *  corta). Vacío = el que le toca por su categoría. */
+export function useCambiarEscenario(source: string, folder: string | null) {
+  const guardar = useGuardarEstado(source, folder);
+  return useMutation<EstadoCarruseles, Error, { producto: string; escenario: string }>({
+    mutationFn: (body) =>
+      api.post<EstadoCarruseles>(`${ROOT}/escenario`, {
+        source,
+        folder: folder ?? "",
+        ...body,
+      }),
+    onSuccess: guardar,
   });
 }
 

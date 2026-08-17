@@ -15,17 +15,20 @@
 ## 🖼️ Nicho Carruseles (módulo 14) — pendiente de estrenar
 
 Ya está la pantalla (`/tiktok-shop-ai-pro/carruseles`) con el flujo entero:
-filtrar belleza/suplementos con IA → escribir los dos mensajes → tanda de
-chicas de Flow → quemar el mensaje 1 a toda la carpeta → foto 2 por producto →
-bajar las dos y publicar. Falta rodarlo:
+filtrar con IA (5 categorías) → escribir los dos mensajes → tandas de chicas de
+Flow por escenario (casa / cama / sofá / exterior) → quemar el mensaje 1 a toda
+la carpeta → foto 2 por producto → bajar las dos y publicar. Falta rodarlo:
 
-- [ ] Primera carpeta de verdad: comprobar que el filtro de belleza/suplementos
-      acierta y ajustar el prompt (`src/nicho_carruseles/prompts/clasificar.md`)
-      si deja fuera cosas que sí valen.
+- [ ] Primera carpeta de verdad: comprobar que el filtro acierta con las cinco
+      categorías (belleza, suplementos, descanso, salón, exterior) y ajustar el
+      prompt (`src/nicho_carruseles/prompts/clasificar.md`) si deja fuera cosas
+      que sí valen.
+- [ ] Ver si los tres escenarios nuevos (cama, sofá, exterior) salen bien en
+      Flow con la misma foto de referencia, o si cada uno necesita la suya.
 - [ ] Ver el texto quemado en el móvil: si tapa la cara, se mueve con
       `TEXTO_Y` en `src/nicho_carruseles/config.py` (hoy 0.28).
-- [ ] Decidir si la foto 2 se genera en Flow con el prompt de "cambiar
-      producto" o basta con la foto limpia del Drive tal cual.
+- [ ] La foto 2 es de CADA producto (sale el producto): la genera el operador
+      —en Flow o como quiera— y la sube en la tarjeta. Confirmado 2026-08-17.
 
 ## 🗂️ Drive "Productos España" — mapa de carpetas por nicho (2026-08-03)
 
