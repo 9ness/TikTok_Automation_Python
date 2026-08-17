@@ -921,6 +921,10 @@ class PrepararRequest(BaseModel):
     rehacer: bool = False
     # Solo el filtro, sin escribir mensajes: para mirar primero cuántos pasan.
     solo_filtrar: bool = False
+    # Solo estas carpetas. Sin nada, todas las del catálogo. Sirve para rehacer
+    # las que cambian de productos sin volver a tocar las que ya están
+    # trabajadas (una categoría distinta dejaría a su chica en otro sitio).
+    carpetas: list[str] = []
 
 
 @router.post("/preparar", status_code=201)
@@ -942,7 +946,12 @@ def preparar_catalogo(
         raise _bad_request(f"Catálogo desconocido: {body.source!r}")
 
     etiqueta = pov_config.SOURCES[body.source].get("label") or body.source
-    title = f"🖼️ Carruseles · {etiqueta}" + (" (solo filtro)" if body.solo_filtrar else "")
+    solo = [c for c in body.carpetas if c.strip()]
+    title = (
+        f"🖼️ Carruseles · {etiqueta}"
+        + (f" · {len(solo)} carpeta(s)" if solo else "")
+        + (" (solo filtro)" if body.solo_filtrar else "")
+    )
     job = queue.enqueue(
         JobMode.NICHO_CARRUSELES_PREPARAR,
         title=title,
@@ -951,6 +960,7 @@ def preparar_catalogo(
             "usuario": usuario,
             "rehacer": bool(body.rehacer),
             "solo_filtrar": bool(body.solo_filtrar),
+            "carpetas": solo,
         },
     )
     pendientes = [
