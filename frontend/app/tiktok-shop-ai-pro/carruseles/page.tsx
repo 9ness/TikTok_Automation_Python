@@ -603,7 +603,10 @@ export default function CarruselesPage() {
             disabled={quemarTodo.isPending}
             onClick={() =>
               quemarTodo.mutate(
-                { tipo: "chica" },
+                // Los DOS mensajes: el trabajo se salta lo que no tenga foto o
+                // mensaje, así que el mismo botón vale antes y después de tener
+                // las fotos de producto.
+                { tipo: "ambas" },
                 {
                   onSuccess: () => {
                     toast.success("Textos de todo el catálogo en la cola");
@@ -621,7 +624,7 @@ export default function CarruselesPage() {
               </>
             ) : (
               <>
-                <Flame className="h-4 w-4" /> Poner el mensaje 1 a TODO el catálogo
+                <Flame className="h-4 w-4" /> Poner los textos a TODO el catálogo
               </>
             )}
           </button>
