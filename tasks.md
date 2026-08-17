@@ -1,3 +1,17 @@
+## 🎠 Carruseles — dónde se quedó (18 ago 2026, madrugada)
+
+Catálogo `2 Prod Aleatorios 2`: **152 productos aptos**, todos con su foto de
+chica y su texto quemado. Faltan **141 fotos de producto** (playa 8/9, cocina
+2/2, silla de coche 1/1 ya hechas): bajar por categoría → generar en Flow →
+subir con el ⬆ de esa fila → quemar textos.
+
+- Queda **1 foto suelta** en "Sin reconocer": es una segunda toma de la silla de
+  coche (ya tiene la suya asignada). Borrarla o cambiarla.
+- La silla de coche está forzada a apta a mano (`8 Agosto 2026 · 6`): el
+  clasificador la mandó a "otro" al rehacer, con el mismo título.
+- `1 Prod Aleatorios` sigue SIN textos ni filtro (31 carpetas): es la vía para
+  ampliar catálogo cuando haga falta.
+
 ## 👤 Tareas Humanas
 
 - [ ] **Probar en el MÓVIL la subida en segundo plano** (Background Fetch): soltar 2-3 vídeos en "Subir todos los vídeos", bloquear el móvil / cerrar la APK y comprobar que (a) la notificación de Chrome sigue subiendo, (b) al volver los vídeos están repartidos —o ya encolados si el check "Confirmar antes de editar" está quitado—, y (c) si Android corta, el banner ámbar "Tanda a medias" retoma sin volver a subir lo ya subido. Solo se puede probar en Chrome Android con HTTPS (no en local ni en iOS: ahí cae al modo normal, que también retoma).
