@@ -773,9 +773,30 @@ export default function CarruselesPage() {
       )}
 
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-        {(productos.isLoading || estado.isLoading) && (
+        {(productos.isFetching || estado.isFetching) && !items.length && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
+          </div>
+        )}
+
+        {/* Igual que en Creativos Pro: si el listado falla hay que DECIRLO, o
+            la carpeta parece vacía. */}
+        {(productos.isError || estado.isError) && (
+          <div className="space-y-1.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2">
+            <p className="text-[11px] text-red-400">
+              No se pudieron cargar los productos:{" "}
+              {err(productos.error ?? estado.error)}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void productos.refetch();
+                void estado.refetch();
+              }}
+              className="rounded-md border border-red-500/40 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/10"
+            >
+              Reintentar
+            </button>
           </div>
         )}
 

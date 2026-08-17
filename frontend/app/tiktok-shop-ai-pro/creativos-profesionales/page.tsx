@@ -372,9 +372,27 @@ export default function CreativosProPage() {
 
       {/* Los productos de la carpeta, ya fuera de los pasos. */}
       <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
-        {productos.isLoading && (
+        {productos.isFetching && !items.length && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando productos…
+          </div>
+        )}
+
+        {/* Sin esto la pantalla se quedaba MUDA cuando el listado fallaba: ni
+            productos, ni spinner, ni motivo. Y el fallo pasa —el Drive tarda o
+            devuelve 502 mientras hay un trabajo pesado en la cola. */}
+        {productos.isError && (
+          <div className="space-y-1.5 rounded-lg border border-red-500/40 bg-red-500/10 p-2">
+            <p className="text-[11px] text-red-400">
+              No se pudieron cargar los productos: {err(productos.error)}
+            </p>
+            <button
+              type="button"
+              onClick={() => void productos.refetch()}
+              className="rounded-md border border-red-500/40 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/10"
+            >
+              Reintentar
+            </button>
           </div>
         )}
 
@@ -391,6 +409,16 @@ export default function CreativosProPage() {
               {itemsVisibles.length}/{items.length}
             </span>
           </label>
+        )}
+
+        {/* Carpeta vacía: casi siempre es que el curso ha borrado sus fotos
+            del Drive de origen (pasa cada pocas semanas). Nuestra copia las
+            conserva, así que se dice dónde mirar en vez de dejar el hueco. */}
+        {!productos.isFetching && !productos.isError && !items.length && folder && (
+          <p className="py-4 text-center text-[11px] text-muted-foreground">
+            Esta carpeta no tiene fotos en el Drive del curso. Si antes las tenía, es
+            que las han borrado: ábrela desde el catálogo «🗄️ Copia».
+          </p>
         )}
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
