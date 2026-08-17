@@ -458,6 +458,78 @@ def editar_mensaje(
 
 
 # ---------------------------------------------------------------------------
+# Fotos de referencia (las que se adjuntan en Flow)
+# ---------------------------------------------------------------------------
+@router.get("/referencias")
+def estado_referencias(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Qué referencias hay: la de la chica (del curso o propia) y la de la
+    foto 2 (siempre propia — el curso no da ninguna)."""
+    from src.nicho_carruseles.services import referencia
+
+    return {"items": referencia.estado(usuario)}
+
+
+@router.get("/referencia")
+def ver_referencia(
+    tipo: Annotated[str, Query()] = "chica",
+    descargar: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """Sirve la foto de referencia. Auth por `?api_key=` (va en un `<img src>`)."""
+    from src.nicho_carruseles.services import referencia
+
+    try:
+        ruta = referencia.obtener(tipo, usuario)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    if not ruta:
+        raise APIError(
+            "No hay foto de referencia. Sube una desde la pantalla.", status_code=404,
+        )
+    headers = {"Cache-Control": "no-cache"}
+    if descargar:
+        headers["Content-Disposition"] = f'attachment; filename="referencia_{tipo}.jpg"'
+    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(ruta, media_type=media, headers=headers)
+
+
+@router.post("/referencia")
+async def subir_referencia(
+    archivo: Annotated[UploadFile, File()],
+    tipo: Annotated[str, Form()] = "chica",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Pone una referencia propia (gana sobre la del curso)."""
+    from src.nicho_carruseles.services import referencia
+
+    datos = await _leer_foto(archivo, "La foto de referencia")
+    try:
+        referencia.guardar(tipo, usuario, datos, filename=archivo.filename or "")
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except OSError as e:
+        raise APIError(f"No se pudo guardar la referencia: {e}", status_code=500) from e
+    return {"items": referencia.estado(usuario)}
+
+
+@router.delete("/referencia")
+def borrar_referencia(
+    tipo: Annotated[str, Query()] = "chica",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Quita la propia y vuelve a la del curso."""
+    from src.nicho_carruseles.services import referencia
+
+    try:
+        referencia.borrar(tipo, usuario)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    return {"items": referencia.estado(usuario)}
+
+
+# ---------------------------------------------------------------------------
 # Fotos
 # ---------------------------------------------------------------------------
 def _pendientes_de_chica(usuario: str, escenario: str = "") -> list[dict]:

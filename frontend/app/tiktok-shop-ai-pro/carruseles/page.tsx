@@ -24,7 +24,9 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   buildFotoCarruselUrl,
+  buildReferenciaUrl,
   useBorrarFotoCarrusel,
+  useBorrarReferencia,
   useCambiarEscenario,
   useChicasPendientes,
   useClasificarCarpeta,
@@ -37,7 +39,9 @@ import {
   useMarcarSubidoCarrusel,
   usePromptsCarruseles,
   useQuemarTexto,
+  useReferencias,
   useSubidosCarruseles,
+  useSubirReferencia,
   useSubirChicas,
   useSubirFotoCarrusel,
   type EscenarioPrompt,
@@ -48,6 +52,7 @@ import {
 // fuentes, carpetas, fotos, textos, hashtags y escaparate. Duplicarlo habría
 // significado volver a pagar la extracción de textos con Gemini.
 import {
+  buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useExtraerTextos,
   useHashtags,
@@ -156,7 +161,7 @@ export default function CarruselesPage() {
           <div className="min-w-0">
             <h1 className="text-base font-bold sm:text-lg">Carruseles</h1>
             <p className="text-[11px] text-muted-foreground">
-              Dos fotos: chica sorprendida + producto · solo belleza y suplementos
+              Dos fotos: chica sorprendida + producto, con el texto quemado
             </p>
           </div>
         </div>
@@ -165,7 +170,7 @@ export default function CarruselesPage() {
       <Caja
         icono="📁"
         titulo="Dónde trabajas"
-        hint="Solo se trabajan los productos de belleza o suplementación: el resto no funciona en carrusel."
+        hint="Solo los productos donde la chica puede estar EN el sitio: belleza, suplementos, dormitorio, salón y exterior."
         extra={
           folders.data
             ? `${folders.data.done}/${folders.data.total} hechas · ${folders.data.aptos} aptos`
@@ -360,14 +365,19 @@ export default function CarruselesPage() {
           extra={pendientes.data ? `faltan ${pendientes.data.faltan}` : undefined}
         >
           <p className="text-center text-[10px] text-muted-foreground">
-            Genéralas en Flow de cuatro en cuatro con la foto de referencia
-            {prompts.data ? ` (${prompts.data.referencia_drive})` : ""}, en formato{" "}
+            En Flow: adjunta la foto de referencia + el prompt del escenario, en formato{" "}
             <span className="font-semibold text-cyan-500">
               {prompts.data?.formato ?? "9:16"}
             </span>
             . Cada escenario va por su lado: una chica del sofá no vale para un producto
             de jardín.
           </p>
+
+          <Referencia
+            tipo="chica"
+            titulo="Foto de referencia (chica)"
+            hint="Se adjunta SIEMPRE en Flow junto al prompt. Es la del curso; puedes poner otra."
+          />
 
           {/* Una tarjeta por escenario: su cuenta, su prompt y su tanda. */}
           {(prompts.data?.escenarios ?? []).map((esc) => (
@@ -431,8 +441,13 @@ export default function CarruselesPage() {
           n={3}
           color="esmeralda"
           titulo="La foto del producto (foto 2)"
-          hint="Esta sí es de cada producto: se genera en Flow con su foto y se sube abajo, en su tarjeta."
+          hint="Esta sí es de cada producto. En Flow van DOS imágenes: la de referencia (la composición) y la foto limpia del producto."
         >
+          <Referencia
+            tipo="producto"
+            titulo="Foto de referencia (composición)"
+            hint="La PRIMERA imagen de Flow: un producto colocado en un sitio bonito. El curso no da ninguna, elige tú una que te guste."
+          />
           <button
             type="button"
             disabled={!prompts.data}
@@ -444,6 +459,10 @@ export default function CarruselesPage() {
           >
             <ClipboardCopy className="h-3.5 w-3.5" /> Prompt producto (Flow)
           </button>
+          <p className="text-center text-[10px] text-muted-foreground">
+            La SEGUNDA imagen es la foto limpia de cada producto: se baja desde su
+            tarjeta, abajo.
+          </p>
         </Paso>
 
         <Paso
@@ -525,6 +544,106 @@ export default function CarruselesPage() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+/** La foto que hay que ADJUNTAR en Flow junto al prompt.
+ *
+ *  Los dos prompts del curso son de imagen-a-imagen ("genera una imagen
+ *  similar", "cambia el producto de la primera imagen por el de la segunda"),
+ *  así que sin referencia no hay nada que generar. La de la chica sale del
+ *  Drive del curso; la del producto la pone el operador. */
+function Referencia({
+  tipo,
+  titulo,
+  hint,
+}: {
+  tipo: "chica" | "producto";
+  titulo: string;
+  hint: string;
+}) {
+  const referencias = useReferencias();
+  const subir = useSubirReferencia();
+  const borrar = useBorrarReferencia();
+  const ref = useRef<HTMLInputElement>(null);
+  const estado = referencias.data?.[tipo];
+  const url = estado?.hay ? buildReferenciaUrl(tipo, estado.version) : null;
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt={titulo}
+            loading="lazy"
+            className="h-14 w-14 rounded-md object-cover"
+          />
+        </a>
+      ) : (
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-border/60 text-[9px] text-muted-foreground">
+          sin foto
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="truncate text-[11px] font-semibold">{titulo}</p>
+        <p className="text-[10px] leading-snug text-muted-foreground">{hint}</p>
+        <input
+          ref={ref}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            subir.mutate(
+              { tipo, file },
+              {
+                onSuccess: () => toast.success("Referencia cambiada"),
+                onError: (e2) => toast.error(err(e2)),
+              },
+            );
+          }}
+        />
+        <div className="flex flex-wrap gap-1">
+          {estado?.hay && (
+            <a
+              href={buildReferenciaUrl(tipo, estado.version, true)}
+              className="flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] transition hover:border-foreground/30"
+            >
+              <Download className="h-3 w-3" /> Bajar
+            </a>
+          )}
+          <button
+            type="button"
+            disabled={subir.isPending}
+            onClick={() => ref.current?.click()}
+            className="flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] transition hover:border-foreground/30 disabled:opacity-50"
+          >
+            {subir.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Upload className="h-3 w-3" />
+            )}
+            {estado?.hay ? "Cambiar" : "Subir"}
+          </button>
+          {estado?.propia && tipo === "chica" && (
+            <button
+              type="button"
+              onClick={() =>
+                borrar.mutate(tipo, { onError: (e) => toast.error(err(e)) })
+              }
+              className="rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
+            >
+              Volver a la del curso
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -787,6 +906,16 @@ function CarruselCard({
           );
         }}
       />
+
+      {/* La foto limpia del producto es la SEGUNDA imagen que pide Flow para
+          generar la foto 2. Por el endpoint de descarga, no por el de ver: el
+          `download` de un <a> se ignora entre orígenes distintos. */}
+      <a
+        href={buildCleanPhotoDownloadUrl(source, folder, p.producto, "limpia")}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30"
+      >
+        <Download className="h-3.5 w-3.5" /> Bajar foto del producto (para Flow)
+      </a>
 
       <div className="grid grid-cols-2 gap-1.5">
         <button

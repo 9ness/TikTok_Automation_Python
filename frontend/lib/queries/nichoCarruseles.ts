@@ -21,7 +21,19 @@ export const carruselesKeys = {
     [...carruselesKeys.all, "estado", source, folder] as const,
   /** Las chicas que faltan son de TODOS los catálogos, no de uno. */
   pendientes: () => [...carruselesKeys.all, "pendientes"] as const,
+  referencias: () => [...carruselesKeys.all, "referencias"] as const,
 };
+
+/** Las fotos que hay que ADJUNTAR en Flow: los dos prompts del curso son de
+ *  imagen-a-imagen, sin referencia no generan nada. */
+export interface ReferenciaEstado {
+  hay: boolean;
+  /** true si la puso el operador; false = la del Drive del curso. */
+  propia: boolean;
+  version: string;
+}
+
+export type Referencias = Record<"chica" | "producto", ReferenciaEstado>;
 
 /** Dónde está la chica de la foto 1. Cada escenario tiene su prompt de Flow:
  *  la chica tiene que estar DONDE se usa el producto (en la cama si es un
@@ -352,6 +364,53 @@ export function useMarcarSubidoCarrusel(source: string, folder: string | null) {
       void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
     },
   });
+}
+
+export function useReferencias() {
+  return useQuery<Referencias>({
+    queryKey: carruselesKeys.referencias(),
+    queryFn: async () =>
+      (await api.get<{ items: Referencias }>(`${ROOT}/referencias`)).items,
+  });
+}
+
+export function useSubirReferencia() {
+  const qc = useQueryClient();
+  return useMutation<
+    { items: Referencias },
+    Error,
+    { tipo: "chica" | "producto"; file: File }
+  >({
+    mutationFn: ({ tipo, file }) => {
+      const fd = new FormData();
+      fd.append("tipo", tipo);
+      fd.append("archivo", file);
+      return api.post<{ items: Referencias }>(`${ROOT}/referencia`, fd);
+    },
+    onSuccess: (res) => qc.setQueryData(carruselesKeys.referencias(), res.items),
+  });
+}
+
+/** Quita la propia y vuelve a la del curso. */
+export function useBorrarReferencia() {
+  const qc = useQueryClient();
+  return useMutation<{ items: Referencias }, Error, "chica" | "producto">({
+    mutationFn: (tipo) =>
+      api.del<{ items: Referencias }>(`${ROOT}/referencia?tipo=${tipo}`),
+    onSuccess: (res) => qc.setQueryData(carruselesKeys.referencias(), res.items),
+  });
+}
+
+export function buildReferenciaUrl(
+  tipo: "chica" | "producto",
+  version: string,
+  descargar = false,
+): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  const dl = descargar ? "&descargar=1" : "";
+  return `${base}${ROOT}/referencia?tipo=${tipo}&v=${encodeURIComponent(version)}${dl}${qs}`;
 }
 
 /** URL de una foto del banco. Lleva el `mtime` (`v`) para que el móvil pueda
