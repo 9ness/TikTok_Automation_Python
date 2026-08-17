@@ -1250,7 +1250,7 @@ function TandaEscenario({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold">{escenario.label}</p>
           <p className="truncate text-[10px] text-muted-foreground">
-            {suya?.propia ? "referencia propia · " : ""}
+            {suya?.propia ? "referencia propia · " : "⚠️ sin referencia propia · "}
             {escenario.para}
           </p>
         </div>
@@ -1306,6 +1306,16 @@ function TandaEscenario({
           referencia el modelo copia la cara —y con ella la edad—, así que es la
           única forma de tener una chica más joven. Se genera, se sube aquí como
           referencia del escenario y ya todas las tandas salen así. */}
+      {/* Qué chica va en este escenario. La referencia es lo que manda en la
+          tanda —la cara, la edad y el estilo salen de ella—, así que elegirla
+          es la mitad del trabajo. */}
+      {!suya?.propia ? (
+        <p className="rounded border border-border/60 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
+          <span className="font-semibold text-foreground">Busca o crea:</span>{" "}
+          {escenario.busqueda}
+        </p>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <button
           type="button"

@@ -60,6 +60,9 @@ class EscenarioPrompt(BaseModel):
     # adjuntar ninguna imagen: es la única forma de fijar la edad (con una foto
     # de referencia el modelo copia la cara, y con ella los años).
     prompt_referencia: str
+    # Qué chica buscar (o pedirle a la IA) para este escenario: la referencia es
+    # lo que manda en la tanda, así que elegirla bien es la mitad del trabajo.
+    busqueda: str
 
 
 class PromptsResponse(BaseModel):
@@ -157,6 +160,7 @@ def get_prompts(
                     prompt_producto=config.prompt_producto(clave),
                     prompt_producto_mano=config.prompt_producto(clave, con_mano=True),
                     prompt_referencia=chica_ficha.prompt_referencia(usuario, clave),
+                    busqueda=config.BUSQUEDA_CHICA.get(clave, ""),
                 )
                 for clave, meta in config.ESCENARIOS.items()
             ],

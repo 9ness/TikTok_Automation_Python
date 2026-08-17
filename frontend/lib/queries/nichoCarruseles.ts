@@ -87,6 +87,8 @@ export interface EscenarioPrompt {
   /** Para CREAR la referencia de este escenario desde cero, sin adjuntar
    *  ninguna foto: es lo único que fija la edad. */
   prompt_referencia: string;
+  /** Qué chica buscar (o pedirle a la IA) para este escenario. */
+  busqueda: string;
 }
 
 export interface PromptsCarruseles {
