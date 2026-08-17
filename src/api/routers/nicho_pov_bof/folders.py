@@ -245,6 +245,41 @@ def backup_sync_enqueue(
     return BackupSyncResponse(job_id=job.id, title=title, position_in_queue=position)
 
 
+@router.post("/textos/lote", status_code=status.HTTP_201_CREATED)
+def textos_lote_enqueue(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    source: Annotated[str, Query()],
+    rehacer: Annotated[bool, Query()] = False,
+) -> dict:
+    """Encola la extracción de textos de TODAS las carpetas de un catálogo.
+
+    Es del POV BOF porque los textos son del catálogo COMPARTIDO: valen igual
+    para POV BOF Largo, Creativos Pro y Carruseles, que leen el mismo
+    documento. Por la cola porque son ~1 min de Gemini por carpeta.
+
+    Por defecto solo las que no tienen textos; con `rehacer` se repasan todas
+    (cuesta una llamada de Gemini por carpeta, así que no es el caso normal).
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+
+    etiqueta = (pov_config.SOURCES[source].get("label") or source)
+    title = f"🔤 Textos · {etiqueta}" + (" (rehacer)" if rehacer else "")
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_TEXTOS,
+        title=title,
+        params={"source": source, "rehacer": bool(rehacer)},
+    )
+    pending = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    position = next((i for i, j in enumerate(pending) if j.id == job.id), 0)
+    return {"job_id": job.id, "title": title, "position_in_queue": position}
+
+
 @router.post("/complete", response_model=MarkCompletedResponse)
 def mark_completed(
     body: MarkCompletedRequest,

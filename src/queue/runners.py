@@ -2314,6 +2314,84 @@ def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -
     return result.get("dest") or "sin-cambios"
 
 
+
+def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Extrae los textos de TODAS las carpetas de un catálogo, una tras otra.
+
+    El botón de cada nicho extrae UNA carpeta (~1 min de Gemini) y hasta ahora
+    había que ir carpeta a carpeta. En Carruseles se nota más que en ninguno:
+    el filtro de categoría LEE los títulos, así que sin textos no se puede
+    saber qué productos valen — y hay 35 carpetas por fuente.
+
+    Los textos son del catálogo compartido, así que esto vale igual para POV
+    BOF, POV BOF Largo, Creativos Pro y Carruseles: se guardan en el mismo
+    documento que ya leen todos.
+
+    Por defecto SOLO las que no tienen textos: repetir las hechas costaría
+    llamadas de Gemini para reescribir lo mismo. Una carpeta que falle no para
+    las demás; al final se dice cuáles fueron.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client, text_extractor, top_vendidos
+
+    p = job.params or {}
+    source = str(p.get("source") or "")
+    rehacer = bool(p.get("rehacer"))
+    if not source:
+        raise RuntimeError("Falta el catálogo del que sacar los textos.")
+
+    carpetas = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    if not carpetas:
+        raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
+
+    # Qué carpetas van: las que no tienen NINGÚN texto (o todas si se pide
+    # rehacer). Se mira de una tacada, no carpeta a carpeta contra Upstash.
+    docs = product_repo.load_folders([(source, c) for c in carpetas])
+    pendientes = []
+    for carpeta, doc in zip(carpetas, docs):
+        productos = (doc or {}).get("productos") or {}
+        con_texto = sum(1 for x in productos.values() if x.get("titulo"))
+        if rehacer or not con_texto:
+            pendientes.append(carpeta)
+    if not pendientes:
+        on_log("[textos] todas las carpetas tienen textos ya")
+        return "sin-cambios"
+
+    on_log(f"[textos] {len(pendientes)}/{len(carpetas)} carpetas por hacer")
+    hechas, fallidas, total_productos = 0, [], 0
+    for i, carpeta in enumerate(pendientes):
+        on_progress(int(i * 100 / len(pendientes)))
+        on_log(f"[textos] {i + 1}/{len(pendientes)} · {carpeta}")
+        try:
+            if source == top_vendidos.SOURCE:
+                # Aquí los productos son copias: sus textos se traen del
+                # original en vez de volver a pagar a Gemini (y de arriesgarse
+                # a que cruce las imágenes de la tanda).
+                textos = top_vendidos.recopiar_textos(carpeta)
+            else:
+                textos = text_extractor.extract_folder_texts(
+                    source, carpeta, on_log=on_log,
+                )
+        except Exception as e:  # noqa: BLE001 — una carpeta rota no para el resto
+            on_log(f"[textos] {carpeta} falló: {e}")
+            fallidas.append(carpeta)
+            continue
+        if not textos:
+            fallidas.append(carpeta)
+            continue
+        product_repo.save_extracted_texts(source, carpeta, textos)
+        hechas += 1
+        total_productos += len(textos)
+
+    on_progress(100)
+    resumen = f"{hechas}/{len(pendientes)} carpetas · {total_productos} productos"
+    if fallidas:
+        on_log(f"[textos] sin textos: {', '.join(fallidas)}")
+        resumen += f" · fallaron {len(fallidas)}"
+    on_log(f"[textos] {resumen}")
+    return resumen
+
+
 # ============================================================
 # RUNNER: NICHO POV BOF — MONTAJE DE VÍDEO POR PRODUCTO
 # ============================================================
@@ -2849,6 +2927,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
     JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
+    JobMode.NICHO_POV_BOF_TEXTOS: run_nicho_pov_bof_textos,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
@@ -2875,6 +2954,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.VIRALIZACION_BATCH: "viralizacion",
     JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
+    JobMode.NICHO_POV_BOF_TEXTOS: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",

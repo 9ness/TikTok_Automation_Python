@@ -4,6 +4,7 @@ import { Settings } from "lucide-react";
 
 import { EchoTikPanel, HashtagsPanel } from "@/components/tiktok-shop-ai-pro/PanelesConfig";
 import { PanelBackup } from "@/components/tiktok-shop-ai-pro/PanelBackup";
+import { PanelTextos } from "@/components/tiktok-shop-ai-pro/PanelTextos";
 
 /** EchoTik apagado a petición del operador (su cuota gratis no da para el
  *  volumen diario). Poniéndolo a `true` vuelve el panel de credenciales. */
@@ -25,12 +26,14 @@ export default function ConfiguracionAiProPage() {
           <Settings className="h-5 w-5 text-muted-foreground" /> Configuración
         </h1>
         <p className="text-[11px] text-muted-foreground sm:text-xs">
-          Hashtags del caption y copia de seguridad del Drive del curso. Valen
-          para todos los nichos: no hay que repetirlo en cada uno.
+          Hashtags del caption, textos del catálogo y copia de seguridad del
+          Drive del curso. Valen para todos los nichos: no hay que repetirlo en
+          cada uno.
         </p>
       </header>
 
       <HashtagsPanel />
+      <PanelTextos />
       <PanelBackup />
       {MOSTRAR_ECHOTIK && <EchoTikPanel />}
     </div>

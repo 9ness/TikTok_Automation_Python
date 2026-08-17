@@ -159,6 +159,27 @@ export function useBackupSync() {
   });
 }
 
+/** Textos de TODAS las carpetas de un catálogo, de una tacada.
+ *
+ *  Vive aquí y no en cada nicho porque los textos son del catálogo COMPARTIDO:
+ *  extraerlos vale igual para POV BOF, POV BOF Largo, Creativos Pro y
+ *  Carruseles. Va por la cola — son ~1 min de Gemini por carpeta y hay 35. */
+export function useTextosLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; position_in_queue: number },
+    Error,
+    { source: string; rehacer?: boolean }
+  >({
+    mutationFn: ({ source, rehacer }) =>
+      api.post(
+        `${ROOT}/textos/lote?source=${encodeURIComponent(source)}` +
+          (rehacer ? "&rehacer=1" : ""),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
+  });
+}
+
 /** URL de la foto (api_key por query — un <img> no manda headers). */
 /** Alta de un producto PROPIO: se suben las dos fotos y el backend las guarda
  *  con el convenio de nombres del Drive del curso, así que a partir de ahí es

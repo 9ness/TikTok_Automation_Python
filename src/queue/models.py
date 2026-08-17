@@ -30,6 +30,9 @@ class JobMode(str, Enum):
     VIRALIZACION_BATCH = "viralizacion_batch"
     VIRALIZACION_CLIPS = "viralizacion_clips"  # trocear audio largo en clips
     NICHO_POV_BOF_BACKUP = "nicho_pov_bof_backup"  # copia/diff del Drive compartido
+    # Textos de TODAS las carpetas de un catálogo, de una tacada. Va por la
+    # cola porque son ~1 min de Gemini por carpeta y hay 35 por fuente.
+    NICHO_POV_BOF_TEXTOS = "nicho_pov_bof_textos"
     NICHO_POV_BOF_VIDEO = "nicho_pov_bof_video"  # montaje final por producto
     NICHO_ROPA_VIDEO = "nicho_ropa_video"  # ropa sin personas: encuadre + mudo
     # Ropa CON personas: título centrado sobre la prenda + flecha + voz de mujer.
@@ -67,6 +70,7 @@ MODE_LABELS = {
     JobMode.VIRALIZACION_BATCH: "🚀 Viralización 1K",
     JobMode.VIRALIZACION_CLIPS: "✂️ Cortar audio largo",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",
+    JobMode.NICHO_POV_BOF_TEXTOS: "🔤 Textos de todo el catálogo",
     JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
     JobMode.NICHO_ROPA_VIDEO: "👕 Vídeo Nicho Ropa",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "👗 Vídeo Ropa Con Personas",
