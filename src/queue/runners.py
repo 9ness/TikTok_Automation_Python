@@ -2349,6 +2349,15 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
     if not carpetas:
         raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
 
+    # Solo unas carpetas concretas: para cuando cambia el emparejado de las
+    # fotos y hay que rehacer ESAS y no las treinta del catálogo.
+    solo = [str(c) for c in (p.get("carpetas") or []) if str(c)]
+    if solo:
+        desconocidas = [c for c in solo if c not in carpetas]
+        if desconocidas:
+            raise RuntimeError(f"Carpetas que no existen: {', '.join(desconocidas)}")
+        carpetas = solo
+
     # Qué carpetas van: las que tienen ALGÚN producto sin texto (o todas si se
     # pide rehacer). Los documentos se leen de una tacada, no carpeta a carpeta
     # contra Upstash.
@@ -2609,6 +2618,15 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
     carpetas = [c.get("name", "") for c in drive_client.list_product_folders(source)]
     if not carpetas:
         raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
+
+    # Solo unas carpetas concretas: para cuando cambia el emparejado de las
+    # fotos y hay que rehacer ESAS y no las treinta del catálogo.
+    solo = [str(c) for c in (p.get("carpetas") or []) if str(c)]
+    if solo:
+        desconocidas = [c for c in solo if c not in carpetas]
+        if desconocidas:
+            raise RuntimeError(f"Carpetas que no existen: {', '.join(desconocidas)}")
+        carpetas = solo
 
     textos_por_carpeta = pov_repo.load_folders([(source, c) for c in carpetas])
     clasificadas, con_mensajes, sin_textos, fallidas = 0, 0, [], []

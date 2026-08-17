@@ -251,6 +251,7 @@ def textos_lote_enqueue(
     source: Annotated[str, Query()],
     rehacer: Annotated[bool, Query()] = False,
     uno_a_uno: Annotated[bool, Query()] = False,
+    carpetas: Annotated[list[str] | None, Query()] = None,
 ) -> dict:
     """Encola la extracción de textos de TODAS las carpetas de un catálogo.
 
@@ -267,8 +268,10 @@ def textos_lote_enqueue(
         raise _bad_request(f"Catálogo desconocido: {source!r}")
 
     etiqueta = (pov_config.SOURCES[source].get("label") or source)
+    solo = [c for c in (carpetas or []) if c.strip()]
     title = (
         f"🔤 Textos · {etiqueta}"
+        + (f" · {len(solo)} carpeta(s)" if solo else "")
         + (" (rehacer)" if rehacer else "")
         + (" · una a una" if uno_a_uno else "")
     )
@@ -279,6 +282,7 @@ def textos_lote_enqueue(
             "source": source,
             "rehacer": bool(rehacer),
             "uno_a_uno": bool(uno_a_uno),
+            "carpetas": solo,
         },
     )
     pending = [
