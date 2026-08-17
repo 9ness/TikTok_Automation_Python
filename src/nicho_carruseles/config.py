@@ -270,11 +270,11 @@ ESCENA_EN: dict[str, str] = {
 # age" ayuda pero no basta.
 EDAD_REFERENCIA: dict[str, str] = {
     "generico": "19 years old",
-    "casa": "27 years old, looks young for her age",
+    "casa": "26 years old, looks young for her age",
     "cama": "24 years old, looks young for her age",
     "sofa": "24 years old, looks young for her age",
-    "exterior": "27 years old, looks young for her age",
-    "cocina": "27 years old, looks young for her age",
+    "exterior": "26 years old, looks young for her age",
+    "cocina": "26 years old, looks young for her age",
     "bano": "19 years old",
     "coche": "19 years old",
     "escritorio": "21 years old",
@@ -319,8 +319,8 @@ RASGOS_POR_ESCENARIO: dict[str, dict[str, str]] = {
         "hair_style": "very long and straight, middle parting, no frizz",
     },
     "casa": {
-        "face": "round friendly face, dark brown eyes, warm natural look, youthful "
-                "face with smooth skin, pretty",
+        "face": "round friendly face, dark brown eyes, full lips, youthful face "
+                "with smooth skin, no wrinkles, very pretty",
         "hair_color": "dark brown, almost black",
         "hair_style": "shoulder length, tied back in a low ponytail with a few loose "
                       "strands, no frizz",
@@ -339,13 +339,13 @@ RASGOS_POR_ESCENARIO: dict[str, dict[str, str]] = {
     },
     "exterior": {
         "face": "long face, dark brown eyes, defined cheekbones, sun-kissed look, "
-                "youthful face with smooth skin, pretty",
+                "youthful face with smooth skin, no wrinkles, very pretty",
         "hair_color": "very dark brown",
         "hair_style": "very long and straight, middle parting, no frizz",
     },
     "cocina": {
-        "face": "round face, light brown eyes, warm smile lines only when smiling, "
-                "youthful face with smooth skin, pretty",
+        "face": "round face, light brown eyes, full lips, youthful face with smooth "
+                "skin, no wrinkles, very pretty",
         "hair_color": "chestnut brown",
         "hair_style": "medium length with a straight fringe, no frizz",
     },
@@ -363,7 +363,7 @@ RASGOS_POR_ESCENARIO: dict[str, dict[str, str]] = {
     },
     "escritorio": {
         "face": "oval face with light freckles, brown eyes, wears thin-framed "
-                "glasses, youthful face with smooth skin, pretty",
+                "glasses, youthful face with smooth skin, very pretty",
         "hair_color": "light brown",
         "hair_style": "long, tied in a high ponytail, no frizz",
     },
