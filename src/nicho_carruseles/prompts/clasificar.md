@@ -8,13 +8,14 @@ Categorías:
 - `suplementos` — vitaminas, colágeno, proteína, gomitas, adelgazantes, energéticos, sueño, digestión.
 - `descanso` — dormitorio: colchones, topper, almohadas, edredones, sábanas, mantas eléctricas, antifaces.
 - `salon` — salón y estar: sofás, sillones, pufs, cojines, mantas, alfombras, mesas de centro.
-- `exterior` — jardín, terraza y camping: muebles de exterior, sombrillas, tumbonas, hamacas, barbacoas, tiendas, neveras portátiles, piscinas.
+- `exterior` — jardín, terraza y camping: muebles de exterior, sombrillas, tumbonas, hamacas, barbacoas, tiendas de campaña, neveras portátiles.
+- `playa` — playa, piscina y agua: colchonetas y flotadores hinchables, tablas de paddle surf, toallas de playa, gafas de buceo, piscinas desmontables.
 - `cocina` — cocina y menaje: freidoras de aire, cafeteras, batidoras, sartenes, vajilla, tuppers, organizadores de cocina, pequeños electrodomésticos.
 - `bano` — cuarto de baño: toallas, alcachofas de ducha, mamparas, espejos, alfombrillas, organizadores de baño.
 - `hogar` — limpieza, orden y decoración pequeña del resto de la casa: mopas, robots aspiradores, quitapelusas, organizadores, perchas, cajas, velas, difusores, iluminación.
 - `coche` — accesorios de coche: organizadores, soportes de móvil, aspiradores de coche, fundas, ambientadores.
 - `tecnologia` — electrónica pequeña de uso diario: auriculares, cargadores, power banks, smartwatch, altavoces, luces LED, soportes de móvil. NO la electrónica cara ni compleja (portátiles, televisores, drones, consolas): esa es `otro`.
-- `oficina` — el rincón de trabajo de casa: sillas de escritorio, lámparas de mesa, reposapiés, alfombrillas, soportes de monitor, organizadores de escritorio.
+- `oficina` — el rincón de trabajo de casa: sillas de escritorio y sillas gaming, lámparas de mesa, reposapiés, alfombrillas, soportes de monitor, organizadores de escritorio.
 - `fitness` — deporte en casa, cosas pequeñas: esterillas, bandas elásticas, mancuernas, rodillos, cuerdas, botellas. NO máquinas grandes.
 - `otro` — TODO lo demás: electrónica cara, herramientas y bricolaje, juguetes, bebés, mascotas, ropa, calzado, bolsos y accesorios.
 
@@ -29,6 +30,6 @@ Reglas:
 Responde SOLO con un objeto JSON, sin explicaciones ni ```:
 
 {
-  "<identificador>": {"categoria": "belleza|suplementos|descanso|salon|exterior|cocina|bano|hogar|coche|tecnologia|oficina|fitness|otro"},
+  "<identificador>": {"categoria": "belleza|suplementos|descanso|salon|exterior|cocina|bano|hogar|coche|tecnologia|oficina|fitness|playa|otro"},
   ...
 }

@@ -44,6 +44,14 @@ export interface AptoCarrusel {
 export interface AptosCarrusel {
   items: AptoCarrusel[];
   por_categoria: Record<string, number>;
+  /** Cuántos productos del catálogo pasan el filtro. `total` son los que
+   *  tienen textos extraídos: sin título no hay nada que clasificar. */
+  resumen: {
+    total: number;
+    clasificados: number;
+    aptos: number;
+    filtros: number;
+  };
 }
 
 export interface FotoSuelta {

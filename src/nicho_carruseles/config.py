@@ -65,6 +65,7 @@ FORMATO = "9:16"
 CATEGORIAS = (
     "belleza", "suplementos", "descanso", "salon", "exterior",
     "cocina", "bano", "hogar", "coche", "tecnologia", "oficina", "fitness",
+    "playa",
     "otro",
 )
 
@@ -101,7 +102,11 @@ ESCENARIOS: dict[str, dict[str, str]] = {
     },
     "escritorio": {
         "label": "En el escritorio",
-        "para": "Sillas, lámparas de mesa, monitores, orden de oficina",
+        "para": "Sillas de escritorio y gaming, lámparas, orden de oficina",
+    },
+    "playa": {
+        "label": "En la playa o la piscina",
+        "para": "Colchonetas, flotadores, paddle surf, toallas de playa",
     },
 }
 
@@ -125,6 +130,7 @@ ESCENARIO_POR_CATEGORIA: dict[str, str] = {
     # cualquier habitación).
     "tecnologia": "generico",
     "fitness": "generico",
+    "playa": "playa",
 }
 CATEGORIAS_APTAS = tuple(ESCENARIO_POR_CATEGORIA)
 

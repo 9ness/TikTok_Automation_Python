@@ -677,26 +677,49 @@ def list_aptos(
     Flow todas las de dormitorio de una sentada, luego todas las de belleza…
     Trabajar carpeta a carpeta con dos productos por carpeta era el cuello de
     botella de este nicho.
+
+    Devuelve también el resumen del filtro ("248/290 pasan"), que es lo que
+    dice de un vistazo si merece la pena seguir clasificando.
     """
-    items = _barrer_aptos(usuario)
+    todos = _barrer(usuario)
+    aptos = [i for i in todos if i["apto"]]
+
+    items = aptos
     if categoria:
         items = [i for i in items if i["categoria"] == categoria]
     if sin_foto2:
         items = [i for i in items if not i["tiene_foto2"]]
+
+    por_categoria: dict[str, int] = {}
+    for i in aptos:
+        if i["categoria"]:
+            por_categoria[i["categoria"]] = por_categoria.get(i["categoria"], 0) + 1
+
     return {
         "items": items,
-        "por_categoria": {
-            cat: sum(1 for i in _barrer_aptos(usuario) if i["categoria"] == cat)
-            for cat in config.CATEGORIAS_APTAS
+        "por_categoria": por_categoria,
+        "resumen": {
+            # Productos con textos extraídos: los que se han podido mirar.
+            "total": len(todos),
+            "clasificados": sum(1 for i in todos if i["categoria"]),
+            "aptos": len(aptos),
+            "filtros": len(config.CATEGORIAS_APTAS),
         },
     }
 
 
 def _barrer_aptos(usuario: str) -> list[dict]:
-    """Los productos aptos de todos los catálogos, en orden de trabajo.
+    """Solo los que valen para carrusel."""
+    return [i for i in _barrer(usuario) if i["apto"]]
+
+
+def _barrer(usuario: str) -> list[dict]:
+    """TODOS los productos con textos, de todos los catálogos, en orden.
 
     Cruza tres cosas: lo que sabe este nicho (categoría, mensajes), los textos
     del POV BOF (título, para reconocerlos) y qué fotos hay ya en el Drive.
+    Todo con dos `mget` por catálogo — leer carpeta a carpeta eran 35 latencias
+    de Upstash por cada una de las dos fuentes.
     """
     from src.nicho_carruseles.repos.redis_base import get_nicho_carruseles_redis
     from src.nicho_pov_bof.repos import product_repo
@@ -714,17 +737,18 @@ def _barrer_aptos(usuario: str) -> list[dict]:
             continue
         canon = config.fuente_canonica(source)
         mios = r.mget_json([f"folder:{canon}:{n}" for n in nombres])
-        # Los textos viven en el documento del POV BOF: otro `mget`, no 35
-        # lecturas sueltas.
         textos = product_repo.load_folders([(source, n) for n in nombres])
         for i, folder in enumerate(nombres):
             prods = ((mios[i] if i < len(mios) else None) or {}).get("productos") or {}
             suyos = ((textos[i] if i < len(textos) else None) or {}).get("productos") or {}
-            for pid in sorted(prods, key=lambda p: (len(p), p)):
-                prod = prods[pid]
-                if not carrusel_repo.es_apto(prod):
+            # Se recorren los que tienen TEXTOS, no los clasificados: si no, el
+            # resumen diría "12/12 pasan" contando solo lo ya mirado.
+            for pid in sorted(suyos, key=lambda p: (len(p), p)):
+                texto = suyos[pid] or {}
+                if not str(texto.get("titulo") or "").strip():
                     continue
-                texto = suyos.get(pid) or {}
+                prod = prods.get(pid) or {}
+                apto = carrusel_repo.es_apto(prod)
                 salida.append({
                     "source": source,
                     "folder": folder,
@@ -733,8 +757,9 @@ def _barrer_aptos(usuario: str) -> list[dict]:
                     "titulo": texto.get("titulo") or "",
                     "tienda": texto.get("tienda") or "",
                     "categoria": prod.get("categoria") or "",
-                    "escenario": carrusel_repo.escenario_de(prod),
-                    "tiene_foto2": fotos_svc.tiene(
+                    "apto": apto,
+                    "escenario": carrusel_repo.escenario_de(prod) if apto else "",
+                    "tiene_foto2": apto and fotos_svc.tiene(
                         "producto", usuario, source, folder, pid,
                     ),
                 })

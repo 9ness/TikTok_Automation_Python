@@ -310,6 +310,25 @@ export default function CarruselesPage() {
           ))}
         </div>
 
+        {/* Cuánto del catálogo entero entra en este nicho. Es el número que
+            dice si merece la pena seguir clasificando carpetas. */}
+        {todosAptos.data ? (
+          <p className="rounded-lg border border-border/60 px-2 py-1.5 text-center text-[11px]">
+            <span className="font-semibold text-cyan-500">
+              {todosAptos.data.resumen.aptos}/{todosAptos.data.resumen.clasificados}
+            </span>{" "}
+            productos pasan los {todosAptos.data.resumen.filtros} filtros
+            {todosAptos.data.resumen.total > todosAptos.data.resumen.clasificados ? (
+              <span className="text-muted-foreground">
+                {" "}
+                · quedan{" "}
+                {todosAptos.data.resumen.total - todosAptos.data.resumen.clasificados} sin
+                mirar
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+
         <Sub>Carpetas</Sub>
         {/* Cada carpeta enseña CUÁNTOS aptos tiene. Filtrando a belleza y
             suplementos la mayoría se queda en dos o tres productos y algunas en
