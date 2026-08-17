@@ -16,6 +16,7 @@ segundo. Encolarlo solo añadiría la espera de un worker (ver
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Annotated
 
@@ -615,9 +616,9 @@ async def subir_referencia(
 
     datos = await _leer_foto(archivo, "La foto de referencia")
     try:
-        referencia.guardar(
-            tipo, usuario, datos, filename=archivo.filename or "",
-            escenario=escenario,
+        await asyncio.to_thread(
+            referencia.guardar, tipo, usuario, datos,
+            filename=archivo.filename or "", escenario=escenario,
         )
     except ValueError as e:
         raise _bad_request(str(e)) from e
@@ -759,7 +760,9 @@ async def subir_chicas(
         leidos.append((archivo.filename or "", await _leer_foto(archivo)))
 
     try:
-        asignados = fotos_svc.repartir_chicas(usuario, pendientes, leidos)
+        asignados = await asyncio.to_thread(
+            fotos_svc.repartir_chicas, usuario, pendientes, leidos,
+        )
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
     # Y al terminar, para que el trozo siguiente vea lo que acaba de entrar.
@@ -972,7 +975,8 @@ async def subir_fotos2(
     for archivo in sorted(archivos, key=lambda a: (a.filename or "").lower()):
         datos = await _leer_foto(archivo)
         try:
-            fotos_svc.guardar_sin_asignar(
+            await asyncio.to_thread(
+                fotos_svc.guardar_sin_asignar,
                 usuario, datos, filename=archivo.filename or "",
             )
             guardadas += 1
@@ -1105,15 +1109,19 @@ async def subir_foto(
     if tipo not in ("chica", "producto"):
         raise _bad_request("El tipo de foto tiene que ser 'chica' o 'producto'.")
     datos = await _leer_foto(archivo)
-    try:
+
+    def _guardar() -> None:
         fotos_svc.guardar(
             tipo, usuario, source, folder, producto, datos,
             filename=archivo.filename or "",
         )
-        _invalidar_barrido()
         # La versión con texto era de la foto vieja: se tira para que no quede
         # un carrusel con la foto nueva y el quemado de la anterior.
         fotos_svc.borrar(f"{tipo}_txt", usuario, source, folder, producto)
+
+    try:
+        await asyncio.to_thread(_guardar)
+        _invalidar_barrido()
     except OSError as e:
         raise APIError(f"No se pudo guardar la foto: {e}", status_code=500) from e
     return _estado_carpeta(source, folder, usuario)
