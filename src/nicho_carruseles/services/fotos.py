@@ -122,6 +122,15 @@ def precalentar(usuario: str = "ness") -> int:
         referencia.estado(usuario, refrescar=True)
     except Exception:  # noqa: BLE001 — es un adelanto, no un requisito
         pass
+
+    # Y el barrido del catálogo, que es lo más caro de la pantalla. Se importa
+    # aquí dentro para no atar este servicio a la capa de API.
+    try:
+        from src.api.routers.nicho_carruseles.carruseles import precalentar_barrido
+
+        precalentar_barrido(usuario)
+    except Exception:  # noqa: BLE001
+        pass
     return total
 
 

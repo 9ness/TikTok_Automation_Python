@@ -849,7 +849,9 @@ def _barrer_aptos(usuario: str) -> list[dict]:
     return [i for i in _barrer(usuario) if i["apto"]]
 
 
-_BARRIDO_TTL_S = 300.0
+# Se refresca solo cada 5 min desde el precalentado (`precalentar_barrido`), así
+# que el TTL solo cubre el caso de que ese bucle se pare: por eso es largo.
+_BARRIDO_TTL_S = 900.0
 _BARRIDO: dict[str, tuple[float, list[dict]]] = {}
 
 
@@ -870,8 +872,27 @@ def _barrer(usuario: str) -> list[dict]:
 
 
 def _invalidar_barrido() -> None:
-    """Tras tocar fotos o clasificación: el contador tiene que reflejarlo ya."""
+    """Tras tocar fotos o clasificación: el contador tiene que reflejarlo ya.
+
+    Se tira de verdad (no se sirve lo viejo) porque el reparto de fotos decide
+    con esto a quién le falta la suya: con datos de hace un rato podría dar por
+    libre un producto que ya tiene foto y escribirle encima.
+    """
     _BARRIDO.clear()
+
+
+def precalentar_barrido(usuario: str = "ness") -> int:
+    """Rehace el barrido en segundo plano. Devuelve cuántos productos hay.
+
+    Es lo más caro de la pantalla (60 documentos de Redis y el emparejado de
+    todas las carpetas). Hacerlo desde el bucle de precalentado deja la carga
+    de la pantalla en instantánea salvo justo después de tocar algo.
+    """
+    import time as _time
+
+    datos = _barrer_sin_cache(usuario)
+    _BARRIDO[usuario or "ness"] = (_time.monotonic() + _BARRIDO_TTL_S, datos)
+    return len(datos)
 
 
 def _barrer_sin_cache(usuario: str) -> list[dict]:
