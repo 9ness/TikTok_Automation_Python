@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Rocket } from "lucide-react";
+import { Check, Hourglass, Loader2, Rocket } from "lucide-react";
 
 import { useDeployStatus } from "@/lib/queries/deploy";
 
@@ -54,15 +54,31 @@ export function AvisoDespliegue({ enCurso }: { enCurso: number }) {
     );
   }
 
+  // Dos estados MUY distintos que antes se pintaban igual (azul): uno es
+  // "estoy reiniciando ya" y el otro "no he empezado, estoy esperando a que
+  // acaben tus trabajos". Con el mismo color parecía que el despliegue iba a
+  // cortar el trabajo en curso.
+  if (desplegando && enCurso > 0) {
+    return (
+      <div className="flex items-start gap-2 border-b border-violet-500/30 bg-violet-500/10 px-4 py-2 text-[11px] text-violet-400">
+        <Hourglass className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <p className="leading-relaxed">
+          <span className="font-semibold">
+            Despliegue en espera: {enCurso} trabajo(s) en curso.
+          </span>{" "}
+          No se cortan — la versión nueva entra en cuanto terminen.
+        </p>
+      </div>
+    );
+  }
+
   if (desplegando) {
     return (
       <div className="flex items-start gap-2 border-b border-sky-500/30 bg-sky-500/10 px-4 py-2 text-[11px] text-sky-400">
         <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
         <p className="leading-relaxed">
           <span className="font-semibold">Desplegando la versión nueva…</span>{" "}
-          {enCurso > 0
-            ? `Espera a que terminen los ${enCurso} trabajo(s) en curso: no se cortan.`
-            : "Lo que mandes ahora se queda en la cola y arranca al terminar."}
+          Lo que mandes ahora se queda en la cola y arranca al terminar.
         </p>
       </div>
     );
