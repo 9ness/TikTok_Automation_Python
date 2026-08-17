@@ -936,6 +936,13 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
     return salida
 
 
+# Qué productos tiene hoy cada carpeta. Cambia cuando el curso sube o quita
+# fotos (una vez al día), y en cambio se pregunta por las ~65 carpetas en cada
+# barrido: sin guardarlo eran ~10 s de idas y venidas a Redis por carga.
+_REALES_TTL_S = 900.0
+_REALES: dict[tuple[str, str], tuple[float, set[str] | None]] = {}
+
+
 def _productos_reales(source: str, folder: str) -> set[str] | None:
     """Ids de producto que hoy salen de emparejar las fotos de la carpeta.
 
@@ -945,15 +952,24 @@ def _productos_reales(source: str, folder: str) -> set[str] | None:
     No se miden las fotos a propósito: agrupar solo mira los NOMBRES, y medir
     obliga a descargarlas (esto se llama por cada una de las ~65 carpetas).
     """
+    import time as _time
+
     from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    clave = (source, folder)
+    hit = _REALES.get(clave)
+    if hit and _time.monotonic() < hit[0]:
+        return hit[1]
 
     try:
         fotos = drive_client.list_photos(source, folder)
     except Exception:  # noqa: BLE001
         return None
-    if not fotos:
-        return None
-    return {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)}
+    reales = (
+        {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)} if fotos else None
+    )
+    _REALES[clave] = (_time.monotonic() + _REALES_TTL_S, reales)
+    return reales
 
 
 class PrepararRequest(BaseModel):

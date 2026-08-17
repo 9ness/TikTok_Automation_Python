@@ -130,6 +130,7 @@ def guardar(
     ext = Path(filename or "").suffix.lower()
     destino = base / f"{nombre}{ext if ext in _EXTS else '.jpg'}"
     destino.write_bytes(datos)
+    invalidar(usuario)
     return destino
 
 
@@ -139,10 +140,27 @@ def borrar(tipo: str, usuario: str, escenario: str = "") -> bool:
     if not p:
         return False
     p.unlink(missing_ok=True)
+    invalidar(usuario)
     return True
 
 
-def estado(usuario: str = "") -> dict[str, dict]:
+# El listado + los `stat()` de las once referencias se pagan contra el Drive
+# montado: en frío eran cuarenta segundos, y esto se pide en CADA carga de la
+# pantalla. Se guarda el resultado; subir o quitar una referencia lo tira, y el
+# precalentado de `fotos.py` lo rehace cada pocos minutos.
+_TTL_S = 600.0
+_ESTADOS: dict[str, tuple[float, dict[str, dict]]] = {}
+
+
+def invalidar(usuario: str = "") -> None:
+    """Tras cambiar una referencia. Sin usuario, tira todo."""
+    if usuario:
+        _ESTADOS.pop(usuario or "ness", None)
+    else:
+        _ESTADOS.clear()
+
+
+def estado(usuario: str = "", *, refrescar: bool = False) -> dict[str, dict]:
     """Qué referencias hay, para pintar el menú.
 
     `propia` distingue la que ha puesto el operador de la del curso: es lo que
@@ -152,6 +170,14 @@ def estado(usuario: str = "") -> dict[str, dict]:
     referencias × 4 extensiones = 44 comprobaciones contra el Drive montado, y
     esta pantalla ya va justa de espera.
     """
+    import time as _time
+
+    clave = usuario or "ness"
+    if not refrescar:
+        hit = _ESTADOS.get(clave)
+        if hit and _time.monotonic() < hit[0]:
+            return hit[1]
+
     base = config.carruseles_dir() / (usuario or "ness")
     try:
         ficheros = {
@@ -187,4 +213,5 @@ def estado(usuario: str = "") -> dict[str, dict]:
             "propia": bool(suya),
             "version": _mtime(suya) if suya else salida["chica"]["version"],
         }
+    _ESTADOS[clave] = (_time.monotonic() + _TTL_S, salida)
     return salida

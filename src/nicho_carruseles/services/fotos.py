@@ -113,6 +113,15 @@ def precalentar(usuario: str = "ness") -> int:
         mapa = _listar(tipo, usuario)
         _INDICES[(tipo, usuario or "ness")] = (time.monotonic() + _TTL_S, mapa)
         total += len(mapa)
+
+    # Las referencias viven en la carpeta de al lado y las pide la misma
+    # pantalla: en frío son otros cuarenta segundos.
+    from src.nicho_carruseles.services import referencia
+
+    try:
+        referencia.estado(usuario, refrescar=True)
+    except Exception:  # noqa: BLE001 — es un adelanto, no un requisito
+        pass
     return total
 
 
