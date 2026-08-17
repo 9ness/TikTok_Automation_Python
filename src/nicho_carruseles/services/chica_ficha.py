@@ -122,16 +122,21 @@ def prompt_referencia(usuario: str, escenario: str) -> str:
     ella, la de la plantilla.
 
     Se genera SIN adjuntar ninguna imagen: es la única forma de fijar la edad,
-    porque con una foto delante el modelo copia la cara y con ella los años.
+    porque con una foto delante el modelo copia la cara y con ella los años. Y
+    sale con FONDO NEUTRO: la referencia es la cara, no el decorado.
     """
     doc = leer(usuario, escenario)
     guardada = doc.get("ficha") if isinstance(doc, dict) else None
     ficha = guardada if isinstance(guardada, dict) and guardada else plantilla()
 
-    escena = config.ESCENA_EN.get(escenario) or config.ESCENA_EN["generico"]
-    ficha = json.loads(json.dumps(ficha).replace("{escena}", f"She is {escena}"))
-    # La edad la manda el escenario, no la foto que subió: una de 20 no vale
-    # para anunciar un colchón (ver `foto_chica_<escenario>.md`).
+    ficha = json.loads(json.dumps(ficha))
+    # El fondo va NEUTRO, no el del escenario: la referencia solo tiene que
+    # fijar la cara. Si trae decorado, el modelo lo arrastra a toda la tanda —
+    # que es lo que pasaba con la cocina de la foto del curso. El sitio lo pone
+    # el prompt de la tanda (`foto_chica_<escenario>.md`).
+    ficha["background"] = plantilla().get("background", {})
+    # La edad sí la manda el escenario, no la foto que subió: una de 20 no vale
+    # para anunciar un colchón.
     if isinstance(ficha.get("subject"), dict):
         ficha["subject"]["age"] = config.EDAD_REFERENCIA.get(escenario, "20 years old")
     return json.dumps(ficha, ensure_ascii=False, indent=2)

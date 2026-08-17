@@ -17,7 +17,7 @@
     "angle": "eye level, arm extended"
   },
   "background": {
-    "scene": "{escena}"
+    "scene": "plain neutral wall, nothing else behind her: no furniture, no street, no people, no objects. The background must be as empty as possible so it does not carry over to other images."
   },
   "photography": {
     "camera": "iPhone front camera, handheld",

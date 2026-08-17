@@ -278,53 +278,25 @@ EDAD_REFERENCIA: dict[str, str] = {
 }
 
 
-# Qué chica buscar para cada escenario. Es lo que se escribe en el buscador (o
-# lo que se le pide a la IA si se genera): la foto de referencia es lo que
-# manda en la tanda, así que elegirla bien es la mitad del trabajo.
+# Qué chica buscar para cada escenario. Solo la PERSONA: la referencia se hace
+# con fondo neutro y el sitio lo pone el prompt de la tanda. Si la referencia
+# trae escenario, el modelo lo arrastra a todas las fotos (pasó con la cocina de
+# la foto del curso).
 #
 # Mejor una chica GENERADA que la foto de una persona real: la referencia se
 # reutiliza en cientos de carruseles comerciales, y la cara de alguien de
 # internet no es tuya para eso.
 BUSQUEDA_CHICA: dict[str, str] = {
-    "generico": (
-        "chica española de 20 años, guapa, pelo castaño claro o rubio oscuro, "
-        "selfie de noche en la calle con luces de ciudad detrás"
-    ),
-    "casa": (
-        "mujer española de 32 años, guapa y arreglada sin exagerar, selfie en el "
-        "salón o el pasillo de su casa"
-    ),
-    "cama": (
-        "chica española de 28 años, guapa, selfie sentada en la cama de su "
-        "dormitorio, ropa cómoda"
-    ),
-    "sofa": (
-        "chica española de 28 años, guapa, selfie sentada en el sofá del salón "
-        "con una manta"
-    ),
-    "exterior": (
-        "mujer española de 32 años, guapa, selfie en el jardín o la terraza de "
-        "una casa, de día"
-    ),
-    "cocina": (
-        "mujer española de 32 años, guapa, selfie en la cocina de su casa junto "
-        "a la encimera"
-    ),
-    "bano": (
-        "chica española de 21 años, guapa, selfie en el baño de casa delante del "
-        "espejo"
-    ),
-    "coche": (
-        "chica española de 21 años, guapa, selfie dentro del coche por la noche, "
-        "con las luces de la calle detrás"
-    ),
-    "escritorio": (
-        "chica española de 23 años, guapa, selfie sentada en su escritorio en casa"
-    ),
-    "playa": (
-        "chica española de 20 años, guapa, selfie en la playa o al borde de una "
-        "piscina, de día"
-    ),
+    "generico": "chica española de 20 años, guapa, pelo castaño claro o rubio oscuro",
+    "casa": "mujer española de 32 años, guapa y natural",
+    "cama": "chica española de 28 años, guapa",
+    "sofa": "chica española de 28 años, guapa",
+    "exterior": "mujer española de 32 años, guapa y natural",
+    "cocina": "mujer española de 32 años, guapa y natural",
+    "bano": "chica española de 21 años, guapa",
+    "coche": "chica española de 21 años, guapa",
+    "escritorio": "chica española de 23 años, guapa",
+    "playa": "chica española de 20 años, guapa, con algo de moreno",
 }
 
 
