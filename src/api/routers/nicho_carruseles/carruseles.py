@@ -1033,30 +1033,37 @@ async def subir_fotos2(
     if not archivos:
         raise _bad_request("No has adjuntado ninguna foto.")
 
-    guardadas = 0
+    guardadas: list[str] = []
     for archivo in sorted(archivos, key=lambda a: (a.filename or "").lower()):
         datos = await _leer_foto(archivo)
         try:
-            await asyncio.to_thread(
+            ruta = await asyncio.to_thread(
                 fotos_svc.guardar_sin_asignar,
                 usuario, datos, filename=archivo.filename or "",
             )
-            guardadas += 1
+            guardadas.append(ruta.name)
         except OSError as e:
             raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
-    return {"recibidas": guardadas}
+    # Se devuelven los nombres para que el reparto sepa QUÉ fotos son de esta
+    # tanda: en "sin asignar" puede haber restos de otra que no se reconoció.
+    return {"recibidas": len(guardadas), "archivos": guardadas}
 
 
 @router.post("/fotos2/repartir", status_code=201)
 def repartir_fotos2(
     queue: Annotated[JobQueue, Depends(get_queue)],
     categoria: Annotated[str, Query()] = "",
+    archivos: Annotated[list[str] | None, Query()] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola el reconocimiento de las fotos que estén sin asignar.
 
     Va por la cola porque es una llamada de visión por cada 12 fotos: con una
     tanda de 40 el navegador se quedaba minuto y medio esperando.
+
+    Con `archivos` se reparte SOLO la tanda que se acaba de subir. Importa: en
+    "sin asignar" pueden quedar fotos viejas que no se reconocieron, y si se
+    mezclan con las nuevas la regla del descarte podría colocar una donde no va.
     """
     from src.queue.models import JobMode
 
@@ -1065,15 +1072,17 @@ def repartir_fotos2(
         raise _bad_request("No hay fotos pendientes de repartir.")
     if categoria and categoria not in config.CATEGORIAS_APTAS:
         raise _bad_request(f"Categoría desconocida: {categoria!r}.")
+    solo = [a for a in (archivos or []) if a.strip()]
+    cuantas = len([s for s in sueltas if s["archivo"] in solo]) if solo else len(sueltas)
     job = queue.enqueue(
         JobMode.NICHO_CARRUSELES_REPARTO,
         title=(
-            f"🧩 Repartir {len(sueltas)} foto(s)"
+            f"🧩 Repartir {cuantas} foto(s)"
             + (f" · {categoria}" if categoria else " de carrusel")
         ),
-        params={"usuario": usuario, "categoria": categoria},
+        params={"usuario": usuario, "categoria": categoria, "archivos": solo},
     )
-    return {"pendientes": len(sueltas), "job_id": job.id}
+    return {"pendientes": cuantas, "job_id": job.id}
 
 
 @router.get("/sin-asignar")

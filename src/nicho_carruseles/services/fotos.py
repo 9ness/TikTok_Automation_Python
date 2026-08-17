@@ -44,18 +44,23 @@ _TTL_S = 600.0
 _INDICES: dict[tuple[str, str], tuple[float, dict[str, Path]]] = {}
 
 
+def _listar(tipo: str, usuario: str) -> dict[str, Path]:
+    """Lee la carpeta del Drive. Es LA operación cara de este módulo."""
+    base = config.carpeta_de(tipo, usuario)
+    return {
+        f.stem: f
+        for f in base.iterdir()
+        if f.is_file() and f.suffix.lower() in _EXTS
+    }
+
+
 def _indice(tipo: str, usuario: str) -> dict[str, Path]:
     """`{nombre_sin_extension: ruta}` de todas las fotos de ese tipo."""
     clave = (tipo, usuario or "ness")
     hit = _INDICES.get(clave)
     if hit and time.monotonic() < hit[0]:
         return hit[1]
-    base = config.carpeta_de(tipo, usuario)
-    mapa = {
-        f.stem: f
-        for f in base.iterdir()
-        if f.is_file() and f.suffix.lower() in _EXTS
-    }
+    mapa = _listar(tipo, usuario)
     _INDICES[clave] = (time.monotonic() + _TTL_S, mapa)
     return mapa
 
@@ -87,6 +92,51 @@ def _olvidar(tipo: str, usuario: str, nombre: str) -> None:
     hit = _INDICES.get((tipo, usuario or "ness"))
     if hit:
         hit[1].pop(nombre, None)
+
+
+# Cada cuánto se repasa el Drive para tener el índice listo antes de que lo
+# pidan. Menos que `_TTL_S` a propósito: así nunca se encuentra vencido.
+_REFRESCO_S = 300.0
+
+
+def precalentar(usuario: str = "ness") -> int:
+    """Rehace los cuatro índices de ese usuario. Devuelve cuántas fotos hay.
+
+    Listar las carpetas del Drive montado en frío cuesta un minuto largo, y
+    hasta ahora lo pagaba quien abriera la pantalla justo después de un
+    despliegue. Se llama al arrancar y cada pocos minutos.
+    """
+    total = 0
+    for tipo in config.SUBCARPETAS:
+        # Se lista ANTES de tocar el índice vivo: si se tirara primero, quien
+        # entrase durante el minuto que tarda se pondría a listar también.
+        mapa = _listar(tipo, usuario)
+        _INDICES[(tipo, usuario or "ness")] = (time.monotonic() + _TTL_S, mapa)
+        total += len(mapa)
+    return total
+
+
+async def bucle_precalentado(stop) -> None:
+    """Mantiene calientes los índices mientras la API viva.
+
+    El `to_thread` no es decorativo: `iterdir()` sobre el mount bloquea
+    decenas de segundos y en el loop de asyncio se llevaría por delante a
+    todas las peticiones en curso (mismo motivo que en "Mis productos").
+    """
+    import asyncio
+    import logging
+
+    log = logging.getLogger("api")
+    while not stop.is_set():
+        try:
+            n = await asyncio.to_thread(precalentar)
+            log.debug("carruseles precalentado: %d fotos", n)
+        except Exception as e:  # Drive caído, permisos… no es motivo de caída
+            log.warning("precalentado de carruseles falló: %s", e)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=_REFRESCO_S)
+        except asyncio.TimeoutError:
+            pass
 
 
 def _slug(texto: str) -> str:

@@ -2721,7 +2721,14 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
     # comparando contra los 185 del catálogo.
     categoria = str(p.get("categoria") or "")
 
-    sueltas = fotos_svc.listar_sin_asignar(usuario)
+    # Las fotos de ESTA tanda. Sin la lista se reparten todas las sueltas, que
+    # es lo que hacía antes: si quedaba una vieja sin reconocer se colaba en la
+    # siguiente tanda y podía acabar colocada por descarte donde no iba.
+    solo = {str(a) for a in (p.get("archivos") or []) if str(a)}
+    sueltas = [
+        f for f in fotos_svc.listar_sin_asignar(usuario)
+        if not solo or f["archivo"] in solo
+    ]
     if not sueltas:
         on_log("[carruseles] no hay fotos sueltas que repartir")
         return "sin-cambios"
@@ -2768,7 +2775,11 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
         _invalidar_barrido()
 
     on_progress(1.0, "🧩 Fotos repartidas")
-    sueltas_final = len(fotos_svc.listar_sin_asignar(usuario))
+    # Las que quedan DE ESTA tanda; las viejas de otra no son cosa de este job.
+    sueltas_final = len([
+        f for f in fotos_svc.listar_sin_asignar(usuario)
+        if not solo or f["archivo"] in solo
+    ])
     resumen = f"{colocadas}/{len(rutas)} fotos colocadas"
     if sueltas_final:
         resumen += f" · {sueltas_final} sin reconocer"

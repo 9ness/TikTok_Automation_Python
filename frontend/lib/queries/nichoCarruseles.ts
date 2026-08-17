@@ -228,6 +228,9 @@ export interface ResultadoTanda {
   total: number;
   /** El primer error, para poder enseñarlo. */
   error?: string;
+  /** Cómo se ha guardado cada foto en el servidor (solo fotos de producto).
+   *  Es lo que deja repartir SOLO esta tanda y no las sueltas de antes. */
+  archivos: string[];
 }
 
 /** Sube todos los ficheros en trozos, avisando del porcentaje del TOTAL.
@@ -245,17 +248,20 @@ async function subirTanda(
   let yaSubidos = 0;
   let subidas = 0;
   let error = "";
+  const archivos: string[] = [];
   for (let i = 0; i < files.length; i += POR_TROZO) {
     const trozo = files.slice(i, i + POR_TROZO);
     const bytesTrozo = trozo.reduce((n, f) => n + f.size, 0);
     try {
-      await subirTrozo(path, trozo, extra, (bytes) => {
+      const res = await subirTrozo(path, trozo, extra, (bytes) => {
         onProgreso?.({
           pct: Math.min(100, Math.round(((yaSubidos + bytes) / bytesTotal) * 100)),
           hechos: i,
           total: files.length,
         });
       });
+      const nombres = (res as { archivos?: string[] })?.archivos;
+      if (Array.isArray(nombres)) archivos.push(...nombres);
       subidas += trozo.length;
     } catch (e) {
       if (!error) error = e instanceof Error ? e.message : String(e);
@@ -267,7 +273,9 @@ async function subirTanda(
       total: files.length,
     });
   }
-  return { subidas, fallidas: files.length - subidas, total: files.length, error };
+  return {
+    subidas, fallidas: files.length - subidas, total: files.length, error, archivos,
+  };
 }
 
 export function usePromptsCarruseles() {
@@ -573,14 +581,16 @@ export function useSubirFotos2() {
     { files: File[]; categoria?: string; onProgreso?: (p: ProgresoTanda) => void }
   >({
     mutationFn: async ({ files, categoria, onProgreso }) => {
-      await subirTanda(`${ROOT}/fotos2`, files, {}, onProgreso);
+      const subida = await subirTanda(`${ROOT}/fotos2`, files, {}, onProgreso);
       // Con todo subido, un solo trabajo para reconocerlas: encolar uno por
       // trozo dejaría ocho jobs peleándose por los mismos productos. Con
-      // `categoria`, el reconocimiento solo mira los productos de esa.
-      return api.post<RepartoFotos2>(
-        `${ROOT}/fotos2/repartir` +
-          (categoria ? `?categoria=${encodeURIComponent(categoria)}` : ""),
-      );
+      // `categoria`, el reconocimiento solo mira los productos de esa; y con
+      // los nombres, SOLO estas fotos —si quedaban sueltas de otra tanda que
+      // no se reconoció, no se mezclan con las nuevas.
+      const qs = new URLSearchParams();
+      if (categoria) qs.set("categoria", categoria);
+      subida.archivos.forEach((a) => qs.append("archivos", a));
+      return api.post<RepartoFotos2>(`${ROOT}/fotos2/repartir?${qs.toString()}`);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: carruselesKeys.all });

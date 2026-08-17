@@ -176,6 +176,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     calentador_stop = asyncio.Event()
     calentador_task = asyncio.create_task(bucle_precalentado(calentador_stop))
 
+    # Nicho Carruseles · sus cuatro carpetas de fotos viven en el mismo mount y
+    # listarlas en frío es lo que hacía que la pantalla tardara un minuto largo
+    # justo después de un deploy. Mismo precalentado que "Mis productos".
+    from src.nicho_carruseles.services.fotos import (
+        bucle_precalentado as carruseles_precalentado,
+    )
+
+    carruseles_stop = asyncio.Event()
+    carruseles_task = asyncio.create_task(carruseles_precalentado(carruseles_stop))
+
     # Nicho POV BOF · copia diaria del Drive del curso. El admin de aquel Drive
     # borra carpetas sin avisar y hasta ahora la copia dependía de que alguien
     # pulsara el botón: se perdieron ocho productos de "10 Agosto 2026" por dos
@@ -194,6 +204,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(backup_task, timeout=5)
         except asyncio.TimeoutError:
             backup_task.cancel()
+        carruseles_stop.set()
+        try:
+            await asyncio.wait_for(carruseles_task, timeout=5)
+        except asyncio.TimeoutError:
+            carruseles_task.cancel()
         calentador_stop.set()
         try:
             await asyncio.wait_for(calentador_task, timeout=5)
