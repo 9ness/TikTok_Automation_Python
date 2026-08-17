@@ -95,13 +95,31 @@ def _copias_utiles() -> list[str]:
     12 de agosto y ya no existe en el origen). Y los deltas tampoco bastan,
     porque solo traen lo que cambió. Así que se miran todas, de la más reciente
     a la más antigua, y gana la primera versión que aparece.
+
+    Se corta en la última COMPLETA porque esa ya lo contenía todo *ese día*.
+    Ojo: lo que el curso borró ANTES de esa copia no está en ninguna de las de
+    aquí — para eso está `_copias_antiguas()`, que se mira solo cuando hace
+    falta (listar carpetas y rescatar una que no aparezca).
     """
     todas = copias()
     completa = ultima_completa()
     if not completa:
         return todas
-    # De la completa hacia atrás no hace falta nada: ya lo contiene todo.
     return todas[: todas.index(completa) + 1]
+
+
+def _copias_antiguas() -> list[str]:
+    """Las anteriores a la última completa, de nueva a vieja.
+
+    Guardan lo que el curso ya había borrado cuando se hizo esa copia completa:
+    carpetas enteras que si no, desaparecían del navegador aunque siguieran
+    guardadas en nuestro Drive.
+    """
+    todas = copias()
+    completa = ultima_completa()
+    if not completa or completa not in todas:
+        return []
+    return todas[todas.index(completa) + 1:]
 
 
 def _limpiar_nombre(nombre: str) -> str:
@@ -110,9 +128,21 @@ def _limpiar_nombre(nombre: str) -> str:
 
 
 def carpetas_de(fuente: str) -> list[str]:
-    """Carpetas de producto que hay en la copia, de una fuente del curso."""
+    """Carpetas de producto que hay en la copia, de una fuente del curso.
+
+    Se miran TODAS las copias, también las anteriores a la última completa: una
+    carpeta que el curso borró antes de aquel día no está en ninguna copia
+    posterior, y aun así la tenemos guardada. Mirando solo desde la completa
+    hacia acá, esas carpetas no salían en el navegador y parecía que la copia
+    tenía menos cosas que el original.
+
+    En orden NATURAL (1, 2, 10…), no alfabético: ordenando como texto, "10
+    Agosto" se colaba entre "1 Pront Flow" y "2 Pront Flow".
+    """
+    from src.nicho_pov_bof import config as pov_config
+
     vistas: dict[str, None] = {}
-    for copia in _copias_utiles():
+    for copia in _copias_utiles() + _copias_antiguas():
         try:
             out = _rclone(
                 ["lsjson", f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}", "--dirs-only"],
@@ -123,7 +153,7 @@ def carpetas_de(fuente: str) -> list[str]:
         for d in json.loads(out or "[]"):
             if d.get("Name"):
                 vistas.setdefault(d["Name"], None)
-    return sorted(vistas)
+    return sorted(vistas, key=pov_config.natural_sort_key)
 
 
 def fotos_de(fuente: str, carpeta: str) -> list[dict]:
@@ -135,28 +165,43 @@ def fotos_de(fuente: str, carpeta: str) -> list[dict]:
     from src.nicho_pov_bof import config as pov_config
 
     salida: dict[str, dict] = {}
-    for copia in _copias_utiles():
-        try:
-            out = _rclone(
-                ["lsjson", f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}/{carpeta}", "--files-only"],
-                timeout=120,
-            )
-        except Exception:  # noqa: BLE001
-            continue
-        for it in json.loads(out or "[]"):
-            nombre, fid = it.get("Name") or "", it.get("ID") or ""
-            if not nombre or not fid or nombre in salida:
+
+    def _mirar(copias_a_mirar: list[str]) -> None:
+        for copia in copias_a_mirar:
+            try:
+                out = _rclone(
+                    [
+                        "lsjson",
+                        f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}/{carpeta}",
+                        "--files-only",
+                    ],
+                    timeout=120,
+                )
+            except Exception:  # noqa: BLE001
                 continue
-            limpio = _limpiar_nombre(nombre)
-            if not pov_config.is_image(limpio, it.get("MimeType", "")):
-                continue
-            salida[nombre] = {
-                "id": fid,
-                "name": limpio,
-                "size": int(it.get("Size") or 0),
-                "mime": it.get("MimeType", ""),
-                "mtime": it.get("ModTime", ""),
-            }
+            for it in json.loads(out or "[]"):
+                nombre, fid = it.get("Name") or "", it.get("ID") or ""
+                if not nombre or not fid or nombre in salida:
+                    continue
+                limpio = _limpiar_nombre(nombre)
+                if not pov_config.is_image(limpio, it.get("MimeType", "")):
+                    continue
+                salida[nombre] = {
+                    "id": fid,
+                    "name": limpio,
+                    "size": int(it.get("Size") or 0),
+                    "mime": it.get("MimeType", ""),
+                    "mtime": it.get("ModTime", ""),
+                }
+
+    _mirar(_copias_utiles())
+    # Solo si la carpeta no aparecía en las copias recientes: entonces es de
+    # las que el curso borró ANTES de la última completa y hay que ir a buscarla
+    # más atrás. Mirar siempre en todas serían decenas de llamadas a rclone cada
+    # vez que se abre una carpeta.
+    if not salida:
+        _mirar(_copias_antiguas())
+
     fotos = list(salida.values())
     fotos.sort(key=lambda p: pov_config.natural_sort_key(p["name"]))
     return fotos

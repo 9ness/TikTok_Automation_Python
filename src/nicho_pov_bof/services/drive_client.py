@@ -264,7 +264,13 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
             lambda: backup_sync.carpetas_de(fuente),
             refresh=refresh,
         )
-        return [{"name": c, "id": c} for c in nombres]
+        # En orden natural, como las del curso. Se reordena también aquí porque
+        # en la caché puede haber listados guardados con el orden alfabético de
+        # antes, y "10 Agosto" se colaba entre "1 Pront Flow" y "2 Pront Flow".
+        return [
+            {"name": c, "id": c}
+            for c in sorted(nombres, key=config.natural_sort_key)
+        ]
 
     base = config.source_path(source)  # valida el slug
 
