@@ -304,6 +304,78 @@ BUSQUEDA_CHICA: dict[str, str] = {
 }
 
 
+# Cómo es la chica de cada escenario. Sin esto los diez salían clavados —misma
+# melena castaña, misma cara— porque la plantilla es una sola y el modelo tira
+# siempre a su "española por defecto". Con rasgos distintos, la cuenta no parece
+# la misma persona disfrazada en diez sitios.
+#
+# Solo se cambian los campos de aspecto: expresión, encuadre y estilo de foto
+# son los mismos en todos, que es lo que da coherencia al carrusel.
+RASGOS_POR_ESCENARIO: dict[str, dict[str, str]] = {
+    "generico": {
+        "face": "oval face, light freckles across the nose, green eyes, full lips, "
+                "youthful face with smooth skin, very pretty",
+        "hair_color": "dark blonde",
+        "hair_style": "very long and straight, middle parting, no frizz",
+    },
+    "casa": {
+        "face": "round friendly face, dark brown eyes, warm natural look, youthful "
+                "face with smooth skin, pretty",
+        "hair_color": "dark brown, almost black",
+        "hair_style": "shoulder length, tied back in a low ponytail with a few loose "
+                      "strands, no frizz",
+    },
+    "cama": {
+        "face": "heart-shaped face, hazel eyes, freckles, youthful face with smooth "
+                "skin, very pretty",
+        "hair_color": "auburn (reddish brown)",
+        "hair_style": "wavy, shoulder length, middle parting, no frizz",
+    },
+    "sofa": {
+        "face": "soft oval face, blue eyes, full lips, youthful face with smooth "
+                "skin, very pretty",
+        "hair_color": "light blonde",
+        "hair_style": "straight, just below the shoulders, side parting, no frizz",
+    },
+    "exterior": {
+        "face": "long face, dark brown eyes, defined cheekbones, sun-kissed look, "
+                "youthful face with smooth skin, pretty",
+        "hair_color": "very dark brown",
+        "hair_style": "very long and straight, middle parting, no frizz",
+    },
+    "cocina": {
+        "face": "round face, light brown eyes, warm smile lines only when smiling, "
+                "youthful face with smooth skin, pretty",
+        "hair_color": "chestnut brown",
+        "hair_style": "medium length with a straight fringe, no frizz",
+    },
+    "bano": {
+        "face": "oval face, very dark eyes, thick eyebrows, porcelain skin, youthful "
+                "face with smooth skin, very pretty",
+        "hair_color": "black",
+        "hair_style": "very long and sleek, middle parting, no frizz",
+    },
+    "coche": {
+        "face": "small round face, light grey-blue eyes, small nose, youthful face "
+                "with smooth skin, very pretty",
+        "hair_color": "golden blonde",
+        "hair_style": "long with loose waves, messy bun on top sometimes, no frizz",
+    },
+    "escritorio": {
+        "face": "oval face with light freckles, brown eyes, wears thin-framed "
+                "glasses, youthful face with smooth skin, pretty",
+        "hair_color": "light brown",
+        "hair_style": "long, tied in a high ponytail, no frizz",
+    },
+    "playa": {
+        "face": "oval face, green-blue eyes, freckles, tanned skin, youthful face "
+                "with smooth skin, very pretty",
+        "hair_color": "sun-bleached blonde",
+        "hair_style": "long, beach waves, slightly wind-blown, no frizz",
+    },
+}
+
+
 def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 

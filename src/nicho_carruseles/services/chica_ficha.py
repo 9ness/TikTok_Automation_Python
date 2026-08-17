@@ -139,4 +139,8 @@ def prompt_referencia(usuario: str, escenario: str) -> str:
     # para anunciar un colchón.
     if isinstance(ficha.get("subject"), dict):
         ficha["subject"]["age"] = config.EDAD_REFERENCIA.get(escenario, "20 years old")
+        # Y los rasgos, si no hay ficha propia: sin esto los diez escenarios
+        # salen con la misma chica castaña, que es justo lo que no se quiere.
+        if not guardada:
+            ficha["subject"].update(config.RASGOS_POR_ESCENARIO.get(escenario, {}))
     return json.dumps(ficha, ensure_ascii=False, indent=2)
