@@ -112,6 +112,7 @@ export default function CarruselesPage() {
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const [bajando, setBajando] = useState("");
+  const [bajandoLimpias, setBajandoLimpias] = useState("");
   // Qué escenario se está subiendo: hay una tanda por escenario y sin esto se
   // pintarían las cuatro girando a la vez.
   const [tandaEnCurso, setTandaEnCurso] = useState("");
@@ -129,6 +130,35 @@ export default function CarruselesPage() {
   }).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
   const clasificada = estado.data?.clasificada ?? false;
+
+  /** Baja las fotos limpias de los productos aptos, para llevarlas a Flow.
+   *
+   *  Solo los APTOS: bajar los diez de la carpeta para usar dos es justo lo que
+   *  este nicho intenta evitar. Van numeradas para que en la galería del móvil
+   *  salgan en el mismo orden que en pantalla, y de una en una — varias
+   *  descargas a la vez se cancelan solas en el navegador del móvil.
+   */
+  async function descargarLimpias() {
+    if (!folder) return;
+    const conFoto = aptos.filter((p) => p.clean_photo_id);
+    if (!conFoto.length) {
+      toast.error("Ningún producto apto de esta carpeta tiene foto limpia");
+      return;
+    }
+    for (const [i, p] of conFoto.entries()) {
+      setBajandoLimpias(`${i + 1}/${conFoto.length}`);
+      const a = document.createElement("a");
+      a.href = buildCleanPhotoDownloadUrl(source, p.folder || folder, p.producto);
+      const orden = String(i + 1).padStart(2, "0");
+      a.download = `${orden}_${folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < conFoto.length - 1) await new Promise((r) => setTimeout(r, 600));
+    }
+    setBajandoLimpias("");
+    toast.success(`${conFoto.length} foto(s) descargadas`);
+  }
 
   /** Baja las dos fotos de un producto, en orden (1 chica, 2 producto). */
   async function descargarPar(producto: string, fotos: FotosCarrusel) {
@@ -459,10 +489,21 @@ export default function CarruselesPage() {
           >
             <ClipboardCopy className="h-3.5 w-3.5" /> Prompt producto (Flow)
           </button>
-          <p className="text-center text-[10px] text-muted-foreground">
-            La SEGUNDA imagen es la foto limpia de cada producto: se baja desde su
-            tarjeta, abajo.
-          </p>
+          {/* La SEGUNDA imagen de Flow: la foto limpia que ya está en el Drive.
+              De golpe y solo de los aptos, como en POV BOF. */}
+          <button
+            type="button"
+            disabled={Boolean(bajandoLimpias) || !aptos.length}
+            onClick={descargarLimpias}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {bajandoLimpias
+              ? `Bajando ${bajandoLimpias}`
+              : `Fotos limpias de los aptos (${
+                  aptos.filter((p) => p.clean_photo_id).length
+                })`}
+          </button>
         </Paso>
 
         <Paso
