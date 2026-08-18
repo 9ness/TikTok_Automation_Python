@@ -239,7 +239,12 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
         }
     except Exception as e:  # noqa: BLE001
         on_log(f"[mano] no se pudo detectar ({e}); sigo con lo que eligió el operador")
-        return vacio
+        # Se distingue de "no se ve mano": ahí la voz por defecto es una
+        # decisión; aquí es que la IA no ha contestado, y quien llama tiene que
+        # poder pararse en vez de sortear el sexo de la voz a ciegas. Un día
+        # entero de vídeos con voz de mujer y mano de hombre salió justo de
+        # esto (Gemini sin cuota y OpenAI sin crédito).
+        return {**vacio, "error": str(e)[:200]}
     finally:
         import shutil
 

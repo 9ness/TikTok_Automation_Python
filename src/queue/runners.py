@@ -1941,6 +1941,12 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
         on_progress(0.02, "🖐️ Mirando la mano del vídeo…")
         deteccion = mano.detectar(clips, on_log=on_log)
+        if deteccion.get("error"):
+            raise RuntimeError(
+                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
+                "a mano en la ficha y vuelve a montarlo."
+            )
         sexo = deteccion.get("sexo") or "mujer"
 
     on_progress(0.03, "📝 Leyendo textos del producto…")
@@ -2114,6 +2120,12 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
 
         on_progress(0.05, "🖐️ Mirando la mano del vídeo…")
         deteccion = mano.detectar(clips, on_log=on_log)
+        if deteccion.get("error"):
+            raise RuntimeError(
+                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
+                "a mano en la ficha y vuelve a montarlo."
+            )
         sexo = deteccion.get("sexo") or rng.choice(["hombre", "mujer"])
         if not deteccion.get("sexo"):
             on_log(f"[pov_bof_plazos] no se ve mano; voz sorteada: {sexo}")
@@ -3020,6 +3032,12 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
 
         on_progress(0.04, "🖐️ Mirando la mano del vídeo…")
         deteccion = mano.detectar(raw_path, on_log=on_log)
+        if deteccion.get("error"):
+            raise RuntimeError(
+                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
+                "a mano en la ficha y vuelve a montarlo."
+            )
         sexo = deteccion.get("sexo") or "mujer"
         if not deteccion.get("sexo"):
             on_log("[nicho_pov_bof] no se ve mano; voz de mujer (la de por defecto)")
