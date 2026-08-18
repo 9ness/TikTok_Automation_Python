@@ -141,6 +141,7 @@ def precalentar(usuario: str = "ness") -> int:
 
     try:
         repuesto(usuario, refrescar=True)
+        listar_sin_asignar(usuario, refrescar=True)
         referencia.estado(usuario, refrescar=True)
     except Exception:  # noqa: BLE001 — es un adelanto, no un requisito
         pass
@@ -418,14 +419,41 @@ def guardar_sin_asignar(usuario: str, datos: bytes, *, filename: str = "") -> Pa
     return destino
 
 
-def listar_sin_asignar(usuario: str) -> list[dict]:
+# Las sueltas se piden en CADA carga de la pantalla y viven en el mount: con un
+# `stat()` por foto eran 14 segundos. Se listan con `scandir` (la fecha viene en
+# la misma pasada) y se guardan; cualquier escritura tira la caché.
+_SUELTAS: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _invalidar_sueltas(usuario: str = "") -> None:
+    if usuario:
+        _SUELTAS.pop(usuario or "ness", None)
+    else:
+        _SUELTAS.clear()
+
+
+def listar_sin_asignar(usuario: str, *, refrescar: bool = False) -> list[dict]:
+    import os
+
+    clave = usuario or "ness"
+    hit = _SUELTAS.get(clave)
+    if hit and not refrescar and time.monotonic() < hit[0]:
+        return hit[1]
+
     base = config.carpeta_sin_asignar(usuario)
-    fotos = [
-        {"archivo": f.name, "version": str(int(f.stat().st_mtime))}
-        for f in base.iterdir()
-        if f.is_file() and f.suffix.lower() in _EXTS
-    ]
+    fotos: list[dict] = []
+    with os.scandir(base) as entradas:
+        for e in entradas:
+            if Path(e.name).suffix.lower() not in _EXTS:
+                continue
+            try:
+                if not e.is_file():
+                    continue
+                fotos.append({"archivo": e.name, "version": str(int(e.stat().st_mtime))})
+            except OSError:
+                continue
     fotos.sort(key=lambda d: d["archivo"])
+    _SUELTAS[clave] = (time.monotonic() + _TTL_S, fotos)
     return fotos
 
 
@@ -451,6 +479,7 @@ def asignar_sin_asignar(
         filename=origen.name,
     )
     origen.unlink(missing_ok=True)
+    _invalidar_sueltas(usuario)
     # La versión con texto era de la foto que hubiera antes.
     borrar("producto_txt", usuario, source, folder, producto)
     return destino

@@ -1454,7 +1454,7 @@ def asignar_suelta(
     except OSError as e:
         raise APIError(f"No se pudo guardar la foto: {e}", status_code=500) from e
     _invalidar_barrido()
-    return {"items": fotos_svc.listar_sin_asignar(usuario)}
+    return {"items": fotos_svc.listar_sin_asignar(usuario, refrescar=True)}
 
 
 @router.delete("/sin-asignar")
@@ -1465,7 +1465,7 @@ def borrar_suelta(
     ruta = fotos_svc.ruta_sin_asignar(usuario, archivo)
     if ruta:
         ruta.unlink(missing_ok=True)
-    return {"items": fotos_svc.listar_sin_asignar(usuario)}
+    return {"items": fotos_svc.listar_sin_asignar(usuario, refrescar=True)}
 
 
 @router.delete("/chicas")
