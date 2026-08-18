@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import {
+  buildCleanPhotoDownloadUrl,
   useGuardarUrlProducto,
   useSources,
   useUrlsCatalogo,
@@ -95,6 +97,9 @@ export function PanelUrls() {
                   <FilaUrl
                     key={p.clave}
                     titulo={p.titulo}
+                    tituloTikTok={p.titulo_tiktok_completo}
+                    tienda={p.tienda}
+                    foto={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "limpia", 120)}
                     carpetas={p.carpetas.length}
                     url={p.url}
                     guardando={guardar.isPending}
@@ -127,12 +132,19 @@ export function PanelUrls() {
 /** Una línea: el producto, su enlace y el botón de guardar. */
 function FilaUrl({
   titulo,
+  tituloTikTok,
+  tienda,
+  foto,
   carpetas,
   url,
   guardando,
   onGuardar,
 }: {
   titulo: string;
+  /** El literal de la ficha: es lo que se busca en la app de TikTok. */
+  tituloTikTok: string;
+  tienda: string;
+  foto: string;
   /** En cuántas carpetas sale el mismo producto (la ficha vale para todas). */
   carpetas: number;
   url: string;
@@ -145,12 +157,30 @@ function FilaUrl({
 
   return (
     <div className="space-y-1 rounded-md border border-border/60 p-1.5">
-      <p className="line-clamp-2 text-[10px] leading-tight">
-        {titulo.split("\n").join(" ")}
-        {carpetas > 1 && (
-          <span className="ml-1 text-muted-foreground">· en {carpetas} carpetas</span>
-        )}
-      </p>
+      <div className="flex gap-1.5">
+        {/* La foto limpia: es lo que deja reconocer el producto de un vistazo
+            cuando la tienda tiene quince sérums que se llaman casi igual. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={foto}
+          alt={titulo}
+          loading="lazy"
+          className="h-12 w-12 shrink-0 rounded object-cover"
+        />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="line-clamp-2 text-[10px] leading-tight">
+            {titulo.split("\n").join(" ")}
+            {carpetas > 1 && (
+              <span className="ml-1 text-muted-foreground">· en {carpetas} carpetas</span>
+            )}
+          </p>
+          {/* Para buscarlo en la app: el título literal y la tienda. */}
+          <div className="flex flex-wrap gap-1">
+            <CopyChip label="🔎 Título" text={tituloTikTok} siempre />
+            <CopyChip label="🏪 Tienda" text={tienda} siempre />
+          </div>
+        </div>
+      </div>
       <div className="flex gap-1">
         <input
           value={valor}

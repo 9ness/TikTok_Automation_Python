@@ -702,13 +702,17 @@ export function useGuardarUrlProducto() {
 export function buildCleanPhotoDownloadUrl(
   source: string, folder: string, producto: string,
   variante: "limpia" | "ficha" = "limpia",
+  /** Con ancho sale encogida y se PINTA (no se descarga): para miniaturas
+   *  donde solo hace falta reconocer el producto. */
+  ancho = 0,
 ): string {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
+  const w = ancho ? `&w=${ancho}` : "";
   return `${base}${ROOT}/foto-limpia?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
     folder,
-  )}&producto=${encodeURIComponent(producto)}&variante=${variante}${qs}`;
+  )}&producto=${encodeURIComponent(producto)}&variante=${variante}${w}${qs}`;
 }
 
 // --- Subida en tanda -------------------------------------------------------

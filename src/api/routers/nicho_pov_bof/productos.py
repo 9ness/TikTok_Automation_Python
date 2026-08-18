@@ -568,6 +568,7 @@ def download_clean_photo(
     folder: Annotated[str, Query()],
     producto: Annotated[str, Query()],
     variante: Annotated[Literal["limpia", "ficha"], Query()] = "limpia",
+    w: Annotated[int | None, Query(ge=32, le=4000)] = None,
 ) -> FileResponse:
     """Descarga una de las dos fotos del producto, con un nombre que agrupa por
     carpeta al ordenar en la galería del móvil.
@@ -624,6 +625,20 @@ def download_clean_photo(
     folder_slug = re.sub(r"\s+", "_", folder.strip())
     marca = "" if variante == "limpia" else "_ficha"
     filename = f"{folder_slug}_{producto.zfill(2)}{marca}{suffix}"
+
+    # Con `w` sale encogida y SIN forzar la descarga: así el mismo endpoint
+    # sirve de miniatura donde solo hace falta reconocer el producto (la
+    # pantalla de las fichas de TikTok), sin tener que resolver el file ID
+    # fuera. Sin `w` se comporta como siempre: original y `attachment`.
+    if w:
+        from src.nicho_pov_bof.services import thumbs
+
+        encogida = thumbs.miniatura(path, w)
+        return FileResponse(
+            encogida,
+            media_type="image/jpeg" if encogida != path else (clean.get("mime") or "image/jpeg"),
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     return FileResponse(
         path,
