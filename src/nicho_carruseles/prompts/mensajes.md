@@ -17,16 +17,26 @@ PROHIBIDO prometer un resultado o hablar de salud, aunque el título del product
 - Como mucho un emoji, y solo si aporta.
 - **Cada producto lleva un mensaje 1 DISTINTO.** No repitas ninguno dentro de la misma lista, ni cambiando dos palabras: cambia la idea (agradecer a quien te lo contó, no creértelo, arrepentirte de no haberlo comprado antes, avisar de que se va a agotar, quedarte en shock…).
 
-**Mensaje 2 (foto del producto).** Va QUEMADO sobre la foto y tiene que leerse de un vistazo, así que es CORTO: **máximo 14 palabras**, con esta estructura:
+**Mensaje 2 (foto del producto).** UNA sola frase corta sobre el producto, del documento del curso ("20 variantes adaptadas al producto"). Va quemada sobre la foto, así que tiene que leerse de un vistazo: **máximo 12 palabras**.
 
-"Han ajustado el precio del [NOMBRE DEL PRODUCTO] 😮 mira tus cupones en el carrito naranja"
+El ángulo es el PRECIO o la oportunidad, sin prometer nada. Así son las del curso, adaptadas a un autobronceador:
 
-- **El nombre del producto, corto**: dos o tres palabras, lo justo para reconocerlo (fuera marca larga, medidas, unidades, materiales y coletillas). "Colchón de muelles", "cama con LED", "aspirador de tapicerías".
-- Un emoji, y solo uno.
-- No inventes descuentos, porcentajes ni precios concretos, y no afirmes que exista un cupón: se invita a mirarlo.
-- Nada de prometer resultados ni hablar de salud, igual que en el mensaje 1.
+  - "Este autobronceador está a un precio increíble hoy."
+  - "Han mejorado el precio de este autobronceador recientemente."
+  - "Este producto está más accesible que nunca."
+  - "No puedo creer el precio que tiene ahora mismo."
+  - "Este autobronceador está arrasando y no me extraña."
+  - "Han ajustado el precio y merece mucho la pena."
+  - "Este es el mejor momento para probarlo."
+  - "Este producto se está haciendo viral por una razón."
 
-La versión larga de antes ("Entra al carrito naranja, aplica tus cupones de descuento y llévatelo aún más barato, con envío gratis") ocupaba media foto quemada y tapaba el producto.
+Reglas:
+
+- Al producto se le llama por lo que ES, en dos o tres palabras y en genérico: "este colchón", "esta cama con LED", "este aspirador". Nada de marca, medidas, unidades ni materiales.
+- Ni cupones, ni carrito naranja, ni envío gratis, ni porcentajes: eso alargaba la frase hasta tapar media foto y no es lo que hace el curso.
+- No inventes precios ni descuentos concretos, y no prometas resultados ni hables de salud (igual que en el mensaje 1).
+- Como mucho un emoji, y solo si aporta.
+- **Varía la frase entre productos**: hay veinte formas de decirlo en la lista de arriba, no uses la misma dos veces seguidas.
 
 Responde SOLO con un objeto JSON, sin explicaciones ni ```:
 
