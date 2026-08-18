@@ -17,12 +17,16 @@ PROHIBIDO prometer un resultado o hablar de salud, aunque el título del product
 - Como mucho un emoji, y solo si aporta.
 - **Cada producto lleva un mensaje 1 DISTINTO.** No repitas ninguno dentro de la misma lista, ni cambiando dos palabras: cambia la idea (agradecer a quien te lo contó, no creértelo, arrepentirte de no haberlo comprado antes, avisar de que se va a agotar, quedarte en shock…).
 
-**Mensaje 2 (foto del producto).** Adáptalo al producto usando esta estructura, cambiando únicamente el nombre:
+**Mensaje 2 (foto del producto).** Va QUEMADO sobre la foto y tiene que leerse de un vistazo, así que es CORTO: **máximo 14 palabras**, con esta estructura:
 
-"Han ajustado el precio de [NOMBRE DEL PRODUCTO]. Entra al carrito naranja, aplica tus cupones de descuento y llévatelo aún más barato, con envío gratis."
+"Han ajustado el precio del [NOMBRE DEL PRODUCTO] 😮 mira tus cupones en el carrito naranja"
 
-- Si el nombre del producto es muy largo, acórtalo de forma natural para que la frase fluya (quita marca, medidas, número de unidades y palabras de relleno).
-- No inventes descuentos, porcentajes ni precios concretos, y no afirmes que existe un cupón: se invita a comprobarlo.
+- **El nombre del producto, corto**: dos o tres palabras, lo justo para reconocerlo (fuera marca larga, medidas, unidades, materiales y coletillas). "Colchón de muelles", "cama con LED", "aspirador de tapicerías".
+- Un emoji, y solo uno.
+- No inventes descuentos, porcentajes ni precios concretos, y no afirmes que exista un cupón: se invita a mirarlo.
+- Nada de prometer resultados ni hablar de salud, igual que en el mensaje 1.
+
+La versión larga de antes ("Entra al carrito naranja, aplica tus cupones de descuento y llévatelo aún más barato, con envío gratis") ocupaba media foto quemada y tapaba el producto.
 
 Responde SOLO con un objeto JSON, sin explicaciones ni ```:
 
