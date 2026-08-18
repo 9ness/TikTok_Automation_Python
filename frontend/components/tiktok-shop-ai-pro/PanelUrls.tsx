@@ -42,7 +42,9 @@ export function PanelUrls() {
         )}
       </div>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Pega aquí el enlace de cada producto en la app de TikTok Shop. Después,
+        Cada tienda va ordenada de más caro a más barato (los que no tienen
+        precio leído, al final). Pega aquí el enlace de cada producto en la app
+        de TikTok Shop. Después,
         en cada nicho, el botón 🔗 abre la ficha directamente — que es lo único
         que hace falta para meterlo en el escaparate. Se guarda por producto, así
         que sirve para todas sus carpetas y para las cuentas de Mauro y Ana.
@@ -99,6 +101,7 @@ export function PanelUrls() {
                     titulo={p.titulo}
                     tituloTikTok={p.titulo_tiktok_completo}
                     tienda={p.tienda}
+                    precio={p.precio}
                     foto={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "limpia", 120)}
                     carpetas={p.carpetas.length}
                     url={p.url}
@@ -134,6 +137,7 @@ function FilaUrl({
   titulo,
   tituloTikTok,
   tienda,
+  precio,
   foto,
   carpetas,
   url,
@@ -144,6 +148,8 @@ function FilaUrl({
   /** El literal de la ficha: es lo que se busca en la app de TikTok. */
   tituloTikTok: string;
   tienda: string;
+  /** Precio de la ficha; 0 si no se pudo leer. */
+  precio: number;
   foto: string;
   /** En cuántas carpetas sale el mismo producto (la ficha vale para todas). */
   carpetas: number;
@@ -169,6 +175,11 @@ function FilaUrl({
         />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="line-clamp-2 text-[10px] leading-tight">
+            {precio > 0 && (
+              <span className="mr-1 font-semibold">
+                {precio.toFixed(2).replace(".", ",")} €
+              </span>
+            )}
             {titulo.split("\n").join(" ")}
             {carpetas > 1 && (
               <span className="ml-1 text-muted-foreground">· en {carpetas} carpetas</span>

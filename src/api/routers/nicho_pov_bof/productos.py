@@ -1352,6 +1352,14 @@ def buscar_producto_url(
     return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
+def _a_precio(valor) -> float:
+    """El precio como número (0 si no se pudo leer de la ficha)."""
+    try:
+        return float(str(valor).replace(",", ".").strip() or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _productos_de_la_carpeta(source: str, folder: str) -> set[str] | None:
     """Ids de producto que salen hoy de emparejar las fotos. `None` si falla.
 
@@ -1419,6 +1427,7 @@ def urls_catalogo(
                 "titulo": prod.get("titulo") or "",
                 "titulo_tiktok_completo": prod.get("titulo_tiktok_completo") or "",
                 "tienda": prod.get("tienda") or "sin tienda",
+                "precio": _a_precio(prod.get("precio")),
                 "url": product_repo.url_de(prod, indice),
                 "carpetas": [],
             })
@@ -1427,8 +1436,11 @@ def urls_catalogo(
     tiendas: dict[str, list[dict]] = {}
     for item in por_clave.values():
         tiendas.setdefault(item["tienda"], []).append(item)
+    # De más caro a más barato: el producto caro es el que deja comisión, así
+    # que es por el que se empieza a pegar fichas. Los que no tienen precio
+    # leído se van al final, que si no se colarían arriba como si fueran 0 €.
     for lista in tiendas.values():
-        lista.sort(key=lambda x: x["titulo"].lower())
+        lista.sort(key=lambda x: (-(x["precio"] or 0), x["titulo"].lower()))
 
     return {
         "source": source,
