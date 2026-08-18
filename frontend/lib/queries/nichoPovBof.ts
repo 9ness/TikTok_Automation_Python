@@ -665,6 +665,8 @@ export interface ProductoConUrl {
   tienda: string;
   /** Precio de la ficha (0 si no se pudo leer): ordena la lista de la tienda. */
   precio: number;
+  /** El de antes del descuento, para enseñarlo tachado. */
+  precio_lista: number;
   url: string;
   /** En qué carpetas sale el mismo producto (la ficha vale para todas). */
   carpetas: string[];

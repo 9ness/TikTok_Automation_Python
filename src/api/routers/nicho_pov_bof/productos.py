@@ -1428,6 +1428,9 @@ def urls_catalogo(
                 "titulo_tiktok_completo": prod.get("titulo_tiktok_completo") or "",
                 "tienda": prod.get("tienda") or "sin tienda",
                 "precio": _a_precio(prod.get("precio")),
+                # El de antes del descuento: se enseña tachado, como en las
+                # fichas de los nichos.
+                "precio_lista": _a_precio(prod.get("precio_lista")),
                 "url": product_repo.url_de(prod, indice),
                 "carpetas": [],
             })

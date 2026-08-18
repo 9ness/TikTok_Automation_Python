@@ -102,6 +102,7 @@ export function PanelUrls() {
                     tituloTikTok={p.titulo_tiktok_completo}
                     tienda={p.tienda}
                     precio={p.precio}
+                    precioLista={p.precio_lista}
                     foto={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "limpia", 120)}
                     carpetas={p.carpetas.length}
                     url={p.url}
@@ -138,6 +139,7 @@ function FilaUrl({
   tituloTikTok,
   tienda,
   precio,
+  precioLista,
   foto,
   carpetas,
   url,
@@ -150,6 +152,8 @@ function FilaUrl({
   tienda: string;
   /** Precio de la ficha; 0 si no se pudo leer. */
   precio: number;
+  /** El de antes del descuento (0 si no lo hay): se enseña tachado. */
+  precioLista: number;
   foto: string;
   /** En cuántas carpetas sale el mismo producto (la ficha vale para todas). */
   carpetas: number;
@@ -175,8 +179,15 @@ function FilaUrl({
         />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="line-clamp-2 text-[10px] leading-tight">
+            {/* Los dos precios, como en las fichas de los nichos: el de antes
+                tachado y el que se paga en negrita. */}
+            {precioLista > precio && (
+              <span className="mr-1 font-mono text-muted-foreground line-through">
+                {precioLista.toFixed(2).replace(".", ",")} €
+              </span>
+            )}
             {precio > 0 && (
-              <span className="mr-1 font-semibold">
+              <span className="mr-1 font-mono font-semibold">
                 {precio.toFixed(2).replace(".", ",")} €
               </span>
             )}
