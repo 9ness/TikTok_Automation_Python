@@ -144,8 +144,10 @@ def get_prompts() -> PromptsResponse:
     hardcoded en el código (convención del proyecto)."""
     d = _prompts_dir()
     try:
-        imagen = (d / "prompt_imagen.md").read_text(encoding="utf-8").strip()
-        video = (d / "prompt_video.md").read_text(encoding="utf-8").strip()
+        from src.nicho_pov_bof.config import limpiar_prompt
+
+        imagen = limpiar_prompt((d / "prompt_imagen.md").read_text(encoding="utf-8"))
+        video = limpiar_prompt((d / "prompt_video.md").read_text(encoding="utf-8"))
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
     return PromptsResponse(imagen=imagen, video=video)

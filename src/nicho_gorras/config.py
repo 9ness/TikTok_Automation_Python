@@ -77,10 +77,9 @@ def prompts_dir() -> Path:
 
 
 def prompt(slug: str) -> str:
-    texto = (prompts_dir() / f"{slug}.md").read_text(encoding="utf-8")
-    if "-->" in texto:
-        texto = texto.split("-->", 1)[1]
-    return texto.strip()
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt((prompts_dir() / f"{slug}.md").read_text(encoding="utf-8"))
 
 
 def rclone_config_path() -> str:

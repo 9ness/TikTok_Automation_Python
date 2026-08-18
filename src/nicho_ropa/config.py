@@ -83,6 +83,13 @@ def redis_prefix() -> str:
 # ---------------------------------------------------------------------------
 # Prompts
 # ---------------------------------------------------------------------------
+def _limpio(fichero: str) -> str:
+    """El `.md` sin sus notas `<!-- ... -->`, listo para pegar."""
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt((prompts_dir() / fichero).read_text(encoding="utf-8"))
+
+
 def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 
@@ -94,7 +101,7 @@ LINEA_MANOS = "Una mano aparece en escena y acaricia la ropa."
 
 
 def prompt_video(con_manos: bool) -> str:
-    texto = (prompts_dir() / "prompt_video.md").read_text(encoding="utf-8").strip()
+    texto = _limpio("prompt_video.md")
     if con_manos:
         return texto
     return " ".join(texto.replace(LINEA_MANOS, "").split())
@@ -111,11 +118,11 @@ def prompt_video_percha() -> str:
     Va aparte y no como variante del de alfombra porque no comparte texto: es
     otro escenario entero, no la misma toma con o sin manos.
     """
-    return (prompts_dir() / "prompt_video_percha.md").read_text(encoding="utf-8").strip()
+    return _limpio("prompt_video_percha.md")
 
 
 def prompt_imagen() -> str:
-    return (prompts_dir() / "prompt_imagen.md").read_text(encoding="utf-8").strip()
+    return _limpio("prompt_imagen.md")
 
 
 # ---------------------------------------------------------------------------

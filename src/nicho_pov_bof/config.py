@@ -476,6 +476,18 @@ def precio_num(valor) -> float:
         return 0.0
 
 
+def limpiar_prompt(texto: str) -> str:
+    """Quita las notas `<!-- ... -->` del `.md` y deja el prompt listo para pegar.
+
+    Las notas explican el prompt a quien abre el archivo y NO deben acabar en
+    el portapapeles del operador. Se quitan TODAS, estén donde estén: antes se
+    partía por el primer `-->` y se tiraba lo de delante, así que una nota en
+    mitad del archivo se llevaba por delante el prompt del curso.
+    """
+    limpio = re.sub(r"<!--.*?-->", "", texto, flags=re.DOTALL)
+    return re.sub(r"\n{3,}", "\n\n", limpio).strip()
+
+
 def guiones_plazos() -> list[str]:
     """Los guiones del documento del curso, uno por línea. Se sortea uno."""
     ruta = Path(__file__).resolve().parent / "prompts" / "guiones_plazos.md"

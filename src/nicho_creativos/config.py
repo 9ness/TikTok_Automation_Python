@@ -42,4 +42,6 @@ def prompts_dir() -> Path:
 
 
 def prompt_imagen() -> str:
-    return (prompts_dir() / "prompt_imagen.md").read_text(encoding="utf-8").strip()
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt((prompts_dir() / "prompt_imagen.md").read_text(encoding="utf-8"))

@@ -43,11 +43,11 @@ def prompts_dir() -> Path:
 
 
 def _sin_comentario(texto: str) -> str:
-    """Quita la nota `<!-- ... -->` de cabecera: explica el prompt a quien lea
-    el archivo, pero no debe acabar en el portapapeles del operador."""
-    if "-->" in texto:
-        texto = texto.split("-->", 1)[1]
-    return texto.strip()
+    """Quita las notas `<!-- ... -->`: explican el prompt a quien lea el
+    archivo, pero no deben acabar en el portapapeles del operador."""
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt(texto)
 
 
 def prompt_imagen() -> str:

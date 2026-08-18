@@ -377,7 +377,9 @@ def prompts_dir() -> Path:
 
 
 def leer_prompt(nombre: str) -> str:
-    return (prompts_dir() / f"{nombre}.md").read_text(encoding="utf-8").strip()
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt((prompts_dir() / f"{nombre}.md").read_text(encoding="utf-8"))
 
 
 # Ruta ya resuelta y creada. Se recuerda por lo mismo que en el POV BOF: el
