@@ -81,6 +81,22 @@ def describir(fotos: list[Path], *, on_log: OnLog = _noop) -> list[str]:
     return salida
 
 
+def _encaje(descripcion: str, candidato: dict) -> float:
+    """Cuánto del título del producto aparece en lo que se ve en la foto."""
+    import re
+    import unicodedata
+
+    def _tokens(x: str) -> set[str]:
+        plano = unicodedata.normalize("NFKD", str(x or "").lower())
+        plano = "".join(c for c in plano if not unicodedata.combining(c))
+        return {p for p in re.split(r"[^a-z0-9]+", plano) if len(p) > 2}
+
+    titulo = _tokens(f"{candidato.get('tienda') or ''} {candidato.get('titulo') or ''}")
+    if not titulo:
+        return 0.0
+    return len(titulo & _tokens(descripcion)) / len(titulo)
+
+
 def repartir(
     fotos: list[Path], candidatos: list[dict], *,
     cupos: dict[str, int] | None = None, on_log: OnLog = _noop,
@@ -151,6 +167,28 @@ def repartir(
         salida[n] = {
             "foto": n, "ref": ref, "por_que": str(fila.get("por_que") or "")[:80],
         }
+
+    # Segunda pasada, sin IA: los productos del curso se repiten con el título
+    # casi igual ("cama doble LED" y "cama doble con iluminación LED" son el
+    # mismo colchón en dos carpetas), y ahí el modelo manda varias fotos al
+    # mismo id y las de más se quedaban fuera. Se colocan comparando la
+    # descripción de la foto con el título, que para ESTE caso basta.
+    for i in [j for j, x in salida.items() if not x["ref"]]:
+        if not descripciones[i]:
+            continue
+        puntuados = sorted(
+            (
+                (_encaje(descripciones[i], c), c["ref"])
+                for c in candidatos
+                if libres.get(c["ref"], 0) > 0
+            ),
+            reverse=True,
+        )
+        if puntuados and puntuados[0][0] >= 0.6:
+            punt, ref = puntuados[0]
+            libres[ref] -= 1
+            salida[i] = {"foto": i, "ref": ref, "por_que": f"por parecido ({punt:.0%})"}
+            on_log(f"[carruseles] foto {i + 1} colocada por parecido con el título")
 
     # Por descarte: si al final queda UNA foto suelta y UN solo producto sin
     # foto, no hay nada que elegir —es esa—. Pasa cuando la tanda es de una
