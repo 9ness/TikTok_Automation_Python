@@ -197,7 +197,7 @@ def mover_productos(
     except Exception as e:  # noqa: BLE001
         log.warning("reanclaje: ventas no se pudieron mover (%s)", e)
 
-    _mover_fotos(source, folder, mapa)
+    mover_fotos(source, folder, mapa)
 
 
 def _slug(texto: str) -> str:
@@ -206,7 +206,7 @@ def _slug(texto: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", plano).strip("_")
 
 
-def _mover_fotos(source: str, folder: str, mapa: dict[str, str]) -> None:
+def mover_fotos(source: str, folder: str, mapa: dict[str, str]) -> None:
     """Renombra las fotos de Carruseles: el número va en el nombre del fichero.
 
     Son las generadas en Flow y las que ya llevan el texto quemado — lo que más

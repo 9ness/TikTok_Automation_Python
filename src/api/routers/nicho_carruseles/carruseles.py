@@ -1137,6 +1137,37 @@ def repartir_fotos2(
     return {"pendientes": cuantas, "job_id": job.id}
 
 
+class MoverFotosRequest(BaseModel):
+    """Cambiar de número las fotos ya generadas de unos productos."""
+
+    source: str
+    folder: str
+    # `{"img_0245": "6"}` — el número viejo y el que le toca ahora.
+    mapa: dict[str, str]
+
+
+@router.post("/mover-fotos")
+def mover_fotos(
+    body: MoverFotosRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Renombra las fotos de esos productos (chica y producto, con y sin texto).
+
+    Para cuando el curso renumera una carpeta y hay que reenganchar a mano lo ya
+    generado. Lo automático es `services/reanclaje.py`, que lo hace por el file
+    ID de las fotos; esto es la puerta de atrás para lo que se renumeró antes de
+    que existiera aquello.
+    """
+    from src.nicho_pov_bof.services import reanclaje
+
+    mapa = {str(k): str(v) for k, v in (body.mapa or {}).items() if k and v}
+    if not mapa:
+        raise _bad_request("No has dicho qué producto va a qué número.")
+    reanclaje.mover_fotos(body.source, body.folder, mapa)
+    _invalidar_barrido()
+    return {"movidos": len(mapa), "estado": _estado_carpeta(body.source, body.folder, usuario)}
+
+
 @router.get("/sin-asignar")
 def list_sin_asignar(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
     """Fotos de producto que la IA no supo colocar."""
