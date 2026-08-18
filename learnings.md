@@ -618,3 +618,4 @@
 - La búsqueda de productos (para marcar vendidos) daba 500: `_fotos_del_producto` pasó a devolver 4 valores al añadir la fecha de subida y ahí se seguía desempaquetando en 3.
 - Carruseles/foto 2: decir "elimina cualquier texto o logotipo de la referencia" hacía que el modelo borrase LA ETIQUETA del producto (botes en blanco); ahora se conserva la etiqueta y solo se quitan los añadidos de la captura. Y el tamaño manda sobre la mano: un espejo de tocador es "belleza" pero no cabe en la mano.
 - Mis productos: al borrar se cierra el hueco de numeración y se arrastra lo guardado de cada producto (textos, guion, clips, subidos, ventas); las entradas de números sin foto se tiran o chocarían con el que ocupa su sitio.
+- Carruseles: el filtro de "productos que existen hoy" tiraba los `3b` (dos productos con el mismo número en una carpeta) porque el emparejado sin medir las fotos no los separa; se acepta también por el número pelado.

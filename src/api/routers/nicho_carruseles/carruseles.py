@@ -933,7 +933,7 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
                 texto = suyos[pid] or {}
                 if not str(texto.get("titulo") or "").strip():
                     continue
-                if reales is not None and pid not in reales:
+                if reales is not None and not _existe_hoy(pid, reales):
                     continue
                 prod = prods.get(pid) or {}
                 apto = carrusel_repo.es_apto(prod)
@@ -962,6 +962,21 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
 # barrido: sin guardarlo eran ~10 s de idas y venidas a Redis por carga.
 _REALES_TTL_S = 900.0
 _REALES: dict[tuple[str, str], tuple[float, set[str] | None]] = {}
+
+
+def _existe_hoy(pid: str, reales: set[str]) -> bool:
+    """¿Ese producto sigue teniendo fotos en el Drive?
+
+    Se acepta también por el número pelado: cuando en una carpeta hay DOS
+    productos con el mismo número, el emparejado los separa en `3` y `3b`, pero
+    solo si puede MEDIR las fotos — y aquí no se miden a propósito (obligaría a
+    descargarlas en cada barrido). Sin medir sale un único `3`, así que el `3b`
+    se daba por desaparecido y diez productos buenos se caían de la lista.
+    """
+    if pid in reales:
+        return True
+    base = pid.rstrip("abcdefghijklmnopqrstuvwxyz")
+    return bool(base) and base != pid and base in reales
 
 
 def _productos_reales(source: str, folder: str) -> set[str] | None:
