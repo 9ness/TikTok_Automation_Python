@@ -795,6 +795,28 @@ def marcar_vendido(
     return doc
 
 
+def mover_venta(source: str, folder: str, viejo: str, nuevo: str) -> None:
+    """Cambia de número la venta de un producto (o la borra si no hay nuevo).
+
+    Hace falta al renumerar "Mis productos": la venta vive en un documento por
+    referencia `fuente|carpeta|producto`, así que cerrar un hueco sin mover
+    esto dejaría el ranking apuntando a un producto que ya no existe.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    ref_v = _ref_vendido(source, folder, viejo)
+    doc = r.get_json(_key_vendido(ref_v))
+    r.delete(_key_vendido(ref_v))
+    r.srem(_VENDIDOS_INDEX, ref_v)
+    if not doc or not nuevo:
+        return
+    doc["producto"] = nuevo
+    ref_n = _ref_vendido(source, folder, nuevo)
+    r.set_json(_key_vendido(ref_n), doc)
+    r.sadd(_VENDIDOS_INDEX, ref_n)
+
+
 def desmarcar_vendido(source: str, folder: str, producto: str) -> None:
     r = _require_redis()
     ref = _ref_vendido(source, folder, producto)

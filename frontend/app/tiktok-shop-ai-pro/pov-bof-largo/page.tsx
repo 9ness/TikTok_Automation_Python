@@ -46,6 +46,7 @@ import {
   buildCleanPhotoDownloadUrl,
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
+  useBorrarMiProducto,
   useBuscarProductos,
   useBuscarProductoUrl,
   useHashtags,
@@ -1207,6 +1208,7 @@ function ProductoCard({
     );
   }
   const setEstado = useSetEstadoLargo();
+  const borrarMio = useBorrarMiProducto();
   const quitarClip = useQuitarClipLargo();
   const buscarUrl = useBuscarProductoUrl();
   const hashtags = useHashtags().data ?? [];
@@ -1806,6 +1808,45 @@ function ProductoCard({
           💰 Vendió
         </button>
       </div>
+
+      {/* Solo en "Mis productos": son los que sube el operador, así que también
+          los puede quitar (los del curso son de solo lectura). Al borrar se
+          cierra el hueco de la numeración, así que la carpeta no se queda en
+          5, 7, 8. */}
+      {source === "mis_productos" && (
+        <button
+          type="button"
+          disabled={borrarMio.isPending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                `¿Quitar el producto ${p.producto}? Se borran sus dos fotos y ` +
+                  "los siguientes se renumeran.",
+              )
+            )
+              return;
+            borrarMio.mutate(
+              { carpeta: folder, producto: p.producto },
+              {
+                onSuccess: () => {
+                  toast.success(`Producto ${p.producto} borrado`);
+                  void qc.invalidateQueries({ queryKey: largoKeys.all });
+                },
+                onError: (e) => toast.error(err(e)),
+              },
+            );
+          }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-50"
+        >
+          {borrarMio.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Borrando…
+            </>
+          ) : (
+            <>🗑️ Quitar este producto</>
+          )}
+        </button>
+      )}
     </div>
   );
 }

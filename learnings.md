@@ -616,3 +616,5 @@
 - `text_extractor` leía las fichas con la temperatura por defecto de `generate_json` (0.7): la misma captura daba un título distinto en cada pasada. Ahora 0.15 — leer no es escribir.
 - Escaparate: la clave pasa a ser `tienda|titulo_tiktok_completo` (el título LITERAL de la ficha, que no lo reescribe la IA). Al leer se miran las dos claves (nueva y vieja) y el flag, así que nada se pierde; al desmarcar se quitan las dos o seguiría saliendo marcado.
 - La búsqueda de productos (para marcar vendidos) daba 500: `_fotos_del_producto` pasó a devolver 4 valores al añadir la fecha de subida y ahí se seguía desempaquetando en 3.
+- Carruseles/foto 2: decir "elimina cualquier texto o logotipo de la referencia" hacía que el modelo borrase LA ETIQUETA del producto (botes en blanco); ahora se conserva la etiqueta y solo se quitan los añadidos de la captura. Y el tamaño manda sobre la mano: un espejo de tocador es "belleza" pero no cabe en la mano.
+- Mis productos: al borrar se cierra el hueco de numeración y se arrastra lo guardado de cada producto (textos, guion, clips, subidos, ventas); las entradas de números sin foto se tiran o chocarían con el que ocupa su sitio.

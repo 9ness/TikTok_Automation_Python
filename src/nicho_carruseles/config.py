@@ -193,16 +193,22 @@ TEXTO_BORDE = 0.13  # grosor del contorno, sobre el tamaño de letra
 # su sitio y como mucho se señala. Una mano "sujetando" un tendedero es la clase
 # de imagen que delata que la foto es de IA.
 LINEA_MANO_SUJETA = (
-    "Aparece la mano de una persona, ultra realista, SUJETANDO el producto en "
-    "modo POV, vista desde la altura de los ojos."
+    "Aparece la mano de una persona, ultra realista, en modo POV, vista desde "
+    "la altura de los ojos: sujeta el producto SI cabe de verdad en una mano; "
+    "si es grande (un mueble, un espejo de tocador, un electrodoméstico), NO "
+    "lo sujeta — el producto sale a su tamaño real, apoyado donde le toca, y "
+    "la mano solo lo señala."
 )
 LINEA_MANO_SENALA = (
     "Aparece la mano de una persona, ultra realista, en modo POV SEÑALANDO el "
     "producto, vista desde la altura de los ojos."
 )
 
-# En qué escenarios el producto se coge con la mano. Son los de producto
-# pequeño: belleza, suplementos, tecnología y fitness van todos al genérico.
+# En qué escenarios se enseña la mano. Son los de producto pequeño (belleza,
+# suplementos, tecnología y fitness van todos al genérico), pero dentro de esos
+# hay cosas grandes —un espejo de tocador es "belleza"—, así que el prompt
+# manda coger el producto SOLO si cabe en la mano: el modelo encogía el mueble
+# para que cupiera.
 ESCENARIOS_DE_MANO = frozenset({"generico", "bano", "coche"})
 # "casa" queda fuera: lo que se anuncia ahí (mopas, tendederos, robots)
 # no se sostiene con una mano.

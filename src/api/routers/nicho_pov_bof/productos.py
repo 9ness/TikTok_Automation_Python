@@ -1076,6 +1076,20 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.post("/mis-productos/renumerar")
+def renumerar_mis_productos(carpeta: Annotated[str, Query()]) -> dict:
+    """Cierra los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
+
+    Al borrar ya se cierran solos; esto es para los huecos que dejaron los
+    borrados de antes. Arrastra lo guardado de cada producto (textos, guion,
+    clips, vídeo, subidos, ventas) a su número nuevo.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    mapa = mis_productos.renumerar_carpeta(carpeta)
+    return {"movidos": mapa, "total": len(mapa)}
+
+
 @router.post("/top-vendidos/reparar")
 def reparar_top_vendidos(
     folder: Annotated[str, Query()],

@@ -155,8 +155,16 @@ def guardar_producto(
     return {"carpeta": carpeta, "producto": producto}
 
 
-def borrar_producto(carpeta: str, producto: str) -> bool:
-    """Quita las fotos de un producto. La carpeta se queda (con sus huecos)."""
+def borrar_producto(carpeta: str, producto: str, *, renumerar: bool = True) -> bool:
+    """Quita las fotos de un producto y CIERRA EL HUECO que deja.
+
+    Sin renumerar, borrar el 6 dejaba la carpeta en 5, 7, 8… y el operador se
+    encuentra con una numeración con agujeros que no cuadra con nada. Al cerrar
+    el hueco hay que arrastrar lo que cada nicho guarda de esos productos
+    (textos, guion, clips, vídeo, subidos, ventas): el número ES la identidad
+    del producto, así que renombrar solo los ficheros le pondría a uno los
+    textos del siguiente. Ver `_renumerar`.
+    """
     d = config.mis_productos_dir() / carpeta
     if not d.is_dir():
         return False
@@ -165,9 +173,138 @@ def borrar_producto(carpeta: str, producto: str) -> bool:
         if f.is_file() and re.match(rf"^{re.escape(producto)}(\(\d+\))?$", f.stem):
             f.unlink(missing_ok=True)
             borradas += 1
-    if borradas:
-        _invalidar()
-    return borradas > 0
+    if not borradas:
+        return False
+    if renumerar:
+        renumerar_carpeta(carpeta)
+    _invalidar()
+    return True
+
+
+def _numeros(carpeta: str) -> list[int]:
+    """Los números de producto que hay HOY en la carpeta, ordenados."""
+    d = config.mis_productos_dir() / carpeta
+    if not d.is_dir():
+        return []
+    vistos = set()
+    for f in d.iterdir():
+        if not f.is_file() or not config.is_image(f.name):
+            continue
+        m = re.match(r"^(\d+)", f.stem)
+        if m:
+            vistos.add(int(m.group(1)))
+    return sorted(vistos)
+
+
+def renumerar_carpeta(carpeta: str) -> dict[str, str]:
+    """Cierra los huecos: 5, 7, 8 → 5, 6, 7. Devuelve el mapa viejo→nuevo.
+
+    Se llama al borrar, y también a mano desde la pantalla para arreglar los
+    huecos que dejaron los borrados de antes de que esto existiera.
+
+    Renombra las fotos y mueve TODO lo que está guardado con ese número. Se va
+    de menor a mayor y el nuevo número siempre es menor que el viejo, así que
+    ningún renombrado pisa a otro.
+    """
+    numeros = _numeros(carpeta)
+    mapa = {
+        str(viejo): str(nuevo)
+        for nuevo, viejo in enumerate(numeros, start=1)
+        if str(nuevo) != str(viejo)
+    }
+    if not mapa:
+        return {}
+    # Los que HOY tienen fotos. Lo guardado de cualquier otro número es de un
+    # producto que ya no está: se tira. Si no, al cerrar el hueco del 6 el
+    # texto viejo del 6 chocaría con el 7 que pasa a ser 6.
+    validos = {str(n) for n in numeros}
+
+    d = config.mis_productos_dir() / carpeta
+    for viejo, nuevo in mapa.items():
+        for f in sorted(d.iterdir()):
+            if not f.is_file():
+                continue
+            m = re.match(rf"^{re.escape(viejo)}(\(\d+\))?$", f.stem)
+            if m:
+                f.rename(d / f"{nuevo}{m.group(1) or ''}{f.suffix}")
+    _mover_datos(carpeta, mapa, validos)
+    return mapa
+
+
+def _mover_datos(carpeta: str, mapa: dict[str, str], validos: set[str]) -> None:
+    """Arrastra a su número nuevo lo que cada nicho guarda de esos productos.
+
+    Todo lo de aquí es "si falla, que no impida borrar": las fotos ya están
+    renombradas y dejar un texto viejo es menos grave que reventar la pantalla.
+    """
+    from src.api import users as _users
+
+    fuente = "mis_productos"
+    usuarios = list(_users.USUARIOS) + [""]
+
+    def _rehacer(productos: dict) -> dict:
+        """Aplica el mapa a un `{producto: datos}` y tira lo que ya no existe."""
+        salida = {}
+        for pid, valor in productos.items():
+            if str(pid) not in validos:
+                continue
+            salida[mapa.get(str(pid), str(pid))] = valor
+        return salida
+
+    # 1) Documentos con `productos` dentro: textos del POV BOF (compartido y
+    #    privado) y lo del POV BOF Largo (guion, clips, vídeo).
+    from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
+    from src.nicho_pov_bof_largo.repos.redis_base import get_nicho_pov_bof_largo_redis
+
+    # OJO con los repetidos: aplicar el mapa dos veces al mismo documento
+    # volvería a correr los números (el 7 pasa a 6 y luego el 6 a 5). Por eso
+    # se juntan por (nicho, clave) antes de tocar nada.
+    docs: dict[tuple[str, str], Any] = {}
+    docs[("pov", f"folder:{fuente}:{carpeta}")] = get_nicho_pov_bof_redis()
+    for u in usuarios:
+        if u:
+            docs[("pov", f"folder:{fuente}:{carpeta}:u:{u}")] = get_nicho_pov_bof_redis()
+        docs[("largo", f"folder:{fuente}:{carpeta}:u:{u or 'ness'}")] = (
+            get_nicho_pov_bof_largo_redis()
+        )
+    for (_nicho, clave), r in docs.items():
+        try:
+            if not r.is_available():
+                continue
+            doc = r.get_json(clave)
+            if not doc or not doc.get("productos"):
+                continue
+            doc["productos"] = _rehacer(doc["productos"])
+            r.set_json(clave, doc)
+        except Exception:  # noqa: BLE001
+            continue
+
+    # 2) Creativos Pro: `{producto: hora}` de los ya publicados.
+    try:
+        from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
+
+        rc = get_nicho_creativos_redis()
+        if rc.is_available():
+            claves = {
+                f"subidos:{fuente}:{carpeta}" + (f":{u}" if u and u != "ness" else "")
+                for u in usuarios
+            }
+            for clave in claves:
+                doc = rc.get_json(clave)
+                if doc:
+                    rc.set_json(clave, _rehacer(doc))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 3) Ventas: viven en un documento por referencia `fuente|carpeta|numero`,
+    #    así que se mueven de número para no dejar el ranking colgando.
+    try:
+        from src.nicho_pov_bof.repos import product_repo as pov
+
+        for viejo, nuevo in mapa.items():
+            pov.mover_venta(fuente, carpeta, viejo, nuevo)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def listar_carpetas_como_drive() -> list[dict]:
