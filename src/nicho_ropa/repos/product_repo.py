@@ -74,14 +74,25 @@ def save_extracted_texts(carpeta: str, textos: dict[str, dict]) -> dict:
         r = _require_redis()
         doc = r.get_json(_key(carpeta)) or {}
         productos = doc.setdefault("productos", {})
+        # La marca del escaparate se guarda por `tienda|titulo`: si el título
+        # cambia al releer la ficha, hay que mudarla o el producto vuelve a
+        # salir sin marcar (pasó con cientos a la vez).
+        mudanzas: list[tuple[str, str, str, str]] = []
         for pid, campos in textos.items():
             prod = productos.setdefault(str(pid), {})
+            antes = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
             prod.update(campos)
             prod["textos_at"] = _now()
+            despues = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
+            if antes != despues and antes[1]:
+                mudanzas.append((*antes, *despues))
         doc["textos_extraidos"] = True
         doc["updated_at"] = _now()
         r.set_json(_key(carpeta), doc)
-        return doc
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    pov_repo.mudar_escaparate(mudanzas)
+    return doc
 
 
 def update_product(carpeta: str, producto: str, **campos) -> dict:

@@ -196,11 +196,21 @@ def save_extracted_texts(usuario: str, textos: dict[str, dict]) -> dict:
         r = _require_redis()
         doc = r.get_json(_key(usuario)) or {}
         productos = doc.setdefault("productos", {})
+        # La marca del escaparate va por `tienda|titulo`: al cambiar el título
+        # hay que mudarla o el producto vuelve a salir sin marcar.
+        mudanzas: list[tuple[str, str, str, str]] = []
         for pid, campos in textos.items():
             prod = productos.setdefault(str(pid), {"id": str(pid), "videos": []})
+            antes = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
             prod.update(campos)
             prod["textos_at"] = _now()
             prod["updated_at"] = _now()
+            despues = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
+            if antes != despues and antes[1]:
+                mudanzas.append((*antes, *despues))
         doc["updated_at"] = _now()
         r.set_json(_key(usuario), doc)
-        return doc
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    pov_repo.mudar_escaparate(mudanzas, usuario=usuario)
+    return doc

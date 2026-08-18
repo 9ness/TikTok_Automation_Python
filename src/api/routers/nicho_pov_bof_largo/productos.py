@@ -426,6 +426,11 @@ def set_producto_estado(
             # Vender implica haberlo subido — mismo criterio que el POV BOF.
             if body.sold:
                 campos["uploaded"] = True
+        if body.en_escaparate is not None:
+            # Se guarda TAMBIÉN en el documento de este nicho (que es lo que
+            # lee el listado): la clave del índice es `tienda|titulo`, así que
+            # al re-extraer los textos la marca se quedaría huérfana.
+            campos["en_escaparate"] = body.en_escaparate
         if campos:
             product_repo.update_product(
                 body.source, body.folder, body.producto, usuario=usuario, **campos,

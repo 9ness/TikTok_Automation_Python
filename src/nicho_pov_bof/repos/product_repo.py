@@ -229,15 +229,56 @@ def save_extracted_texts(source: str, folder: str, textos: dict[str, dict]) -> N
 
     No pisa `uploaded`/`sold`: el operador puede re-extraer textos sin perder
     el progreso de subida.
+
+    Y ARRASTRA la marca del escaparate. La clave del índice es `tienda|titulo`,
+    así que al releer la ficha con otras palabras la marca se quedaba huérfana
+    y el producto volvía a salir sin marcar: se perdieron cientos de una tacada
+    al repasar el catálogo. Aquí se mueve la marca del título viejo al nuevo.
     """
     data = load_folder(source, folder)
     productos = data.setdefault("productos", {})
+    mudanzas: list[tuple[str, str, str, str]] = []
     for prod_id, campos in textos.items():
         prod = productos.setdefault(prod_id, {})
+        antes = (prod.get("tienda", ""), prod.get("titulo", ""))
         prod.update(campos)
         prod["textos_at"] = _now()
+        despues = (prod.get("tienda", ""), prod.get("titulo", ""))
+        if antes != despues and clave_escaparate(*antes):
+            mudanzas.append((*antes, *despues))
     data["textos_extraidos"] = True
     save_folder(source, folder, data)
+    mudar_escaparate(mudanzas)
+
+
+def mudar_escaparate(
+    mudanzas: list[tuple[str, str, str, str]], *, usuario: str | None = None,
+) -> None:
+    """Pasa la marca del escaparate del título viejo al nuevo.
+
+    Sin `usuario` se repasa el de cada uno (el índice es de cada persona: Ana y
+    Mauro tienen su propia cuenta de TikTok).
+
+    No borra la vieja: si dos productos distintos acaban compartiendo título no
+    se pierde nada, y una clave huérfana en el índice no molesta a nadie.
+    """
+    if not mudanzas:
+        return
+    quienes = (usuario,) if usuario is not None else ("", "ana", "mauro")
+    for usuario in quienes:
+        try:
+            indice = escaparate_index(usuario)
+        except Exception:  # noqa: BLE001 — Redis caído: se sigue sin tocar nada
+            continue
+        for tienda_v, titulo_v, tienda_n, titulo_n in mudanzas:
+            if clave_escaparate(tienda_v, titulo_v) not in indice:
+                continue
+            if not clave_escaparate(tienda_n, titulo_n):
+                continue
+            try:
+                set_escaparate(tienda_n, titulo_n, True, usuario)
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def folder_summary(source: str, folder: str) -> dict:

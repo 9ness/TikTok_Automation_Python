@@ -196,14 +196,24 @@ def save_extracted_texts(source: str, folder: str, textos: dict[str, dict]) -> N
     No pisa `uploaded`/`sold`: el operador puede re-extraer textos sin perder
     el progreso de subida.
     """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
     data = load_folder(source, folder)
     productos = data.setdefault("productos", {})
+    # Si el título cambia, la marca del escaparate (que va por `tienda|titulo`)
+    # se muda al nuevo; si no, el producto vuelve a salir sin marcar.
+    mudanzas: list[tuple[str, str, str, str]] = []
     for prod_id, campos in textos.items():
         prod = productos.setdefault(prod_id, {})
+        antes = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
         prod.update(campos)
         prod["textos_at"] = _now()
+        despues = (prod.get("tienda", "") or "", prod.get("titulo", "") or "")
+        if antes != despues and antes[1]:
+            mudanzas.append((*antes, *despues))
     data["textos_extraidos"] = True
     save_folder(source, folder, data)
+    pov_repo.mudar_escaparate(mudanzas)
 
 
 def folder_summary(source: str, folder: str) -> dict:
