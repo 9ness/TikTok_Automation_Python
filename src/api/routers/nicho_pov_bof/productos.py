@@ -1678,7 +1678,9 @@ def buscar_productos(
     escaparate = product_repo.escaparate_index(usuario)
     items: list[ProductoBuscado] = []
     for d in encontrados:
-        clean, _titled, _aviso = _fotos_del_producto(
+        # Cuatro valores: al añadir la fecha de subida se quedó aquí un
+        # desempaquetado de tres y la búsqueda entera devolvía un 500.
+        clean, _titled, _aviso, _subida = _fotos_del_producto(
             d["source"], d["folder"], d["producto"],
         )
         items.append(
