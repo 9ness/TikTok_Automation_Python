@@ -1,6 +1,8 @@
 Este producto en una ubicación ideal, la que le corresponda de verdad: un entorno real, limpio y ordenado donde ese producto estaría de manera natural. Debe ser una ubicación DIFERENTE a la de la foto de referencia.
 
-El producto tiene que verse LIMPIO y NUEVO, como recién comprado: vacío, sin contenido dentro, sin usar, sin suciedad y sin desgaste. Nada de bolsas, basura, restos ni objetos metidos en él.
+El producto tiene que verse LIMPIO y NUEVO, como recién comprado: sin usar, sin suciedad, sin desgaste y sin basura ni restos dentro (un cubo de basura sale vacío y limpio, nunca con bolsas ni desperdicios).
+
+Ahora bien, **lo que el producto lleva encima en la foto de referencia se mantiene**: si el carro de jardín viene con sus plantas y sus herramientas, o el organizador con sus toallas dobladas, así es como se vende y así tiene que salir. Eso no es suciedad, es el producto puesto en uso. Vaciarlo lo deja pobre y no se parece a la ficha.
 
 Respeta a la perfección las propiedades y características del producto: diseño, forma, proporciones, colores, materiales, acabados y detalles. No alteres ni reinterpretes ningún elemento.
 
