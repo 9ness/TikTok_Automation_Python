@@ -1,6 +1,9 @@
 "use client";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 
 /** Un paso del flujo de trabajo, con su número y su color.
  *
@@ -49,6 +52,8 @@ export function Paso({
   hint,
   color,
   extra,
+  plegable,
+  abiertoPorDefecto = true,
   children,
 }: {
   /** El número que se ve. Es el orden en que se hacen las cosas. */
@@ -59,26 +64,50 @@ export function Paso({
   color: ColorPaso;
   /** Contador o estado a la derecha del título (p. ej. "9/10"). */
   extra?: ReactNode;
+  /** Se pliega tocando la cabecera, y plegado NO se monta el contenido: los
+   *  pasos de generar fotos traen decenas de miniaturas y, una vez hecho ese
+   *  trabajo, solo sirven para que la pantalla tarde en abrir. */
+  plegable?: boolean;
+  abiertoPorDefecto?: boolean;
   children: ReactNode;
 }) {
   const c = COLORES[color];
+  // Se recuerda: quien lo pliega no quiere volver a plegarlo cada vez.
+  const [abierto, setAbierto] = useEstadoRecordado(
+    `paso-abierto:${n}:${titulo}`,
+    abiertoPorDefecto,
+  );
+  const desplegado = !plegable || abierto;
   return (
     <section className={`space-y-2 rounded-xl border ${c.borde} ${c.fondo} p-3`}>
-      <div className="flex items-start gap-2">
+      <div
+        className={`flex items-start gap-2 ${plegable ? "cursor-pointer" : ""}`}
+        onClick={plegable ? () => setAbierto(!abierto) : undefined}
+      >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${c.num}`}
         >
           {n}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={`text-xs font-semibold sm:text-sm ${c.texto}`}>{titulo}</p>
-          <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
-            {hint}
+          <p className={`flex items-center gap-1 text-xs font-semibold sm:text-sm ${c.texto}`}>
+            {plegable &&
+              (desplegado ? (
+                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              ))}
+            {titulo}
           </p>
+          {desplegado && (
+            <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+              {hint}
+            </p>
+          )}
         </div>
         {extra ? <div className="shrink-0 text-[10px] text-muted-foreground">{extra}</div> : null}
       </div>
-      <div className="space-y-1.5">{children}</div>
+      {desplegado && <div className="space-y-1.5">{children}</div>}
     </section>
   );
 }

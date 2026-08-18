@@ -560,6 +560,8 @@ export default function CarruselesPage() {
         <Paso
           n={2}
           color="fucsia"
+          plegable
+          abiertoPorDefecto={false}
           titulo="La tanda de chicas (foto 1)"
           hint="La foto 1 no depende del producto, solo del SITIO: en casa, en la cama, en el sofá o fuera. Se generan de golpe en Flow para todos los catálogos."
           extra={pendientes.data ? `faltan ${pendientes.data.faltan}` : undefined}
@@ -689,6 +691,8 @@ export default function CarruselesPage() {
         <Paso
           n={3}
           color="esmeralda"
+          plegable
+          abiertoPorDefecto={false}
           titulo="La foto del producto (foto 2)"
           hint="Esta sí es de cada producto: en Flow subes su foto limpia y el prompt la recrea en el sitio donde se usa. No hace falta foto de referencia."
         >
