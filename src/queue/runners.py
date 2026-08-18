@@ -2697,13 +2697,16 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
 
                 for pid, nuevo in escritos.items():
                     viejo = mios.get(pid) or {}
-                    if viejo.get("mensaje1") and viejo["mensaje1"] != nuevo["mensaje1"]:
-                        fotos_svc.borrar("chica_txt", usuario, source, carpeta, pid)
-                    if viejo.get("mensaje2") and viejo["mensaje2"] != nuevo["mensaje2"]:
-                        fotos_svc.borrar("producto_txt", usuario, source, carpeta, pid)
+                    for campo, foto in (("mensaje1", "chica_txt"), ("mensaje2", "producto_txt")):
+                        # `nuevo` puede traer solo uno de los dos (el mensaje 1
+                        # se descarta si repite; el 2 se guarda igual).
+                        if campo not in nuevo:
+                            continue
+                        if viejo.get(campo) and viejo[campo] != nuevo[campo]:
+                            fotos_svc.borrar(foto, usuario, source, carpeta, pid)
                 carrusel_repo.guardar_mensajes(source, carpeta, escritos)
                 con_mensajes += len(escritos)
-                usados += [d["mensaje1"] for d in escritos.values()]
+                usados += [d["mensaje1"] for d in escritos.values() if d.get("mensaje1")]
         except Exception as e:  # noqa: BLE001 — una carpeta rota no para el resto
             on_log(f"[carruseles] {carpeta} falló: {e}")
             fallidas.append(carpeta)

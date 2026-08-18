@@ -126,18 +126,19 @@ def escribir(
         m2 = str(entrada.get("mensaje2") or "").strip()
         if not m1 or not m2:
             continue
-        # Repetido dentro del mismo lote (o con otra carpeta): se deja fuera. Es
-        # mejor quedarse sin mensaje —y que se note— que publicar dos carruseles
-        # con la misma frase, que es lo que TikTok lee como contenido duplicado.
+        # El mensaje 1 se cae si repite (TikTok lo lee como contenido duplicado)
+        # o si promete algo. Pero el 2 es de ESE producto y no tiene la culpa:
+        # antes se descartaba la pareja entera y el producto se quedaba con los
+        # dos mensajes viejos — así se quedaron once con el párrafo largo del
+        # carrito naranja después de acortarlos todos.
+        motivo = ""
         if m1.lower() in vistos:
-            on_log(f"[carruseles] el mensaje 1 del producto {pid} estaba repetido, se descarta")
-            continue
-        promesa = promete_algo(m1)
-        if promesa:
-            on_log(
-                f"[carruseles] el mensaje 1 del producto {pid} promete algo "
-                f"(«{promesa}»), se descarta: {m1[:50]}"
-            )
+            motivo = "estaba repetido"
+        elif promete_algo(m1):
+            motivo = f"promete algo («{promete_algo(m1)}»)"
+        if motivo:
+            on_log(f"[carruseles] el mensaje 1 del producto {pid} {motivo}, se queda el de antes")
+            salida[pid] = {"mensaje2": m2}
             continue
         vistos.add(m1.lower())
         salida[pid] = {"mensaje1": m1, "mensaje2": m2}
