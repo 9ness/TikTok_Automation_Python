@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { bajarEnOrden } from "@/lib/descargas";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
@@ -295,23 +296,19 @@ export default function CarruselesPage() {
       toast.error("Esta carpeta no tiene ninguna foto editada todavía");
       return;
     }
-    for (const [i, item] of cola.entries()) {
-      setBajandoCarpeta(`${i + 1}/${cola.length}`);
-      const a = document.createElement("a");
-      a.href = buildFotoCarruselUrl(
-        source, folder, item.producto, item.tipo, item.version, true,
-      );
-      const orden = String(i + 1).padStart(2, "0");
-      a.download = `${orden}_${folder}_${item.producto}_${
+    const archivos = cola.map((item, i) => ({
+      href: buildFotoCarruselUrl(source, folder, item.producto, item.tipo, item.version, true),
+      nombre: `${String(i + 1).padStart(2, "0")}_${folder}_${item.producto}_${
         item.tipo === "chica_txt" ? 1 : 2
-      }`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      if (i < cola.length - 1) await new Promise((r) => setTimeout(r, 600));
-    }
+      }`.replace(/[^a-zA-Z0-9_.-]+/g, "_"),
+    }));
+    const r = await bajarEnOrden(archivos, (hechos, total) =>
+      setBajandoCarpeta(`${hechos}/${total}`),
+    );
     setBajandoCarpeta("");
-    toast.success(`${cola.length} foto(s) descargadas`);
+    toast.success(
+      `${r.bajadas} foto(s) descargadas` + (r.fallidas ? ` · ${r.fallidas} fallaron` : ""),
+    );
   }
 
   /** Baja las dos fotos de un producto, en orden (1 chica, 2 producto). */
@@ -322,18 +319,14 @@ export default function CarruselesPage() {
       ["producto_txt", fotos.producto_txt],
     ];
     setBajando(producto);
-    for (const [i, [tipo, version]] of cola.entries()) {
-      if (!version) continue;
-      const a = document.createElement("a");
-      a.href = buildFotoCarruselUrl(source, folder, producto, tipo, version, true);
-      a.download = `${folder}_${producto}_${i + 1}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Un respiro entre las dos: varias descargas a la vez se cancelan solas
-      // en el navegador del móvil (mismo motivo que en Creativos Pro).
-      if (i === 0) await new Promise((r) => setTimeout(r, 600));
-    }
+    await bajarEnOrden(
+      cola
+        .filter(([, version]) => version)
+        .map(([tipo, version], i) => ({
+          href: buildFotoCarruselUrl(source, folder, producto, tipo, version, true),
+          nombre: `${folder}_${producto}_${i + 1}`.replace(/[^a-zA-Z0-9_.-]+/g, "_"),
+        })),
+    );
     setBajando("");
   }
 
@@ -1144,27 +1137,27 @@ function PorNicho() {
   /** Todas las parejas del nicho, en orden y numeradas: 01, 02, 03… */
   async function bajarTodo() {
     const pendientes = items.filter((p) => !p.subido_at);
+    const archivos: { href: string; nombre: string }[] = [];
     for (const [n, p] of pendientes.entries()) {
-      setBajando(`${n + 1}/${pendientes.length}`);
-      const cola: [keyof FotosCarrusel, string][] = [
-        ["chica_txt", p.fotos.chica_txt],
-        ["producto_txt", p.fotos.producto_txt],
-      ];
-      for (const [i, [tipo, version]] of cola.entries()) {
+      const orden = String(n + 1).padStart(2, "0");
+      for (const [i, tipo] of (["chica_txt", "producto_txt"] as const).entries()) {
+        const version = p.fotos[tipo];
         if (!version) continue;
-        const a = document.createElement("a");
-        a.href = buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true);
-        const orden = String(n + 1).padStart(2, "0");
-        a.download = `${orden}_${p.folder}_${p.producto}_${i + 1}`.replace(
-          /[^a-zA-Z0-9_.-]+/g, "_",
-        );
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        await new Promise((r) => setTimeout(r, 600));
+        archivos.push({
+          href: buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true),
+          nombre: `${orden}_${p.folder}_${p.producto}_${i + 1}`.replace(
+            /[^a-zA-Z0-9_.-]+/g, "_",
+          ),
+        });
       }
     }
+    const r = await bajarEnOrden(archivos, (hechos, total) =>
+      setBajando(`${hechos}/${total}`),
+    );
     setBajando("");
+    toast.success(
+      `${r.bajadas} foto(s) descargadas` + (r.fallidas ? ` · ${r.fallidas} fallaron` : ""),
+    );
   }
 
   return (
