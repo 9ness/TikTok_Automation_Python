@@ -151,8 +151,14 @@ def get_prompts(
     """
     from src.nicho_carruseles.services import chica_ficha
 
+    import time as _time
+
+    hit = _PROMPTS.get(usuario or "ness")
+    if hit and _time.monotonic() < hit[0]:
+        return hit[1]
+
     try:
-        return PromptsResponse(
+        respuesta = PromptsResponse(
             escenarios=[
                 EscenarioPrompt(
                     clave=clave,
@@ -173,6 +179,8 @@ def get_prompts(
                 "(la foto de la chica de referencia)"
             ),
         )
+        _PROMPTS[usuario or "ness"] = (_time.monotonic() + _PROMPTS_TTL_S, respuesta)
+        return respuesta
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
 
@@ -545,6 +553,7 @@ async def crear_chica(
     try:
         ficha = chica_ficha.crear_desde_foto(datos)
         chica_ficha.guardar(usuario, ficha, escenario)
+        _invalidar_prompts()
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except RuntimeError as e:
@@ -640,6 +649,8 @@ async def subir_referencia(
             referencia.guardar, tipo, usuario, datos,
             filename=archivo.filename or "", escenario=escenario,
         )
+        # La referencia viaja dentro de los prompts (la ficha de la chica).
+        _invalidar_prompts()
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except OSError as e:
@@ -658,6 +669,7 @@ def borrar_referencia(
 
     try:
         referencia.borrar(tipo, usuario, escenario)
+        _invalidar_prompts()
     except ValueError as e:
         raise _bad_request(str(e)) from e
     return {"items": referencia.estado(usuario)}
@@ -854,6 +866,26 @@ def list_aptos(
             "filtros": len(config.CATEGORIAS_APTAS),
         },
     }
+
+
+# Los prompts son 92 KB (diez escenarios con su prompt de chica, los dos de
+# producto y la ficha JSON de la chica) y se rehacían en CADA carga: 4,3 s. Solo
+# cambian al tocar una referencia o al desplegar.
+_PROMPTS_TTL_S = 900.0
+_PROMPTS: dict[str, tuple[float, "PromptsResponse"]] = {}
+
+
+def _invalidar_prompts() -> None:
+    _PROMPTS.clear()
+
+
+def precalentar_prompts(usuario: str = "ness") -> None:
+    """Deja los prompts hechos antes de que los pida la pantalla."""
+    _invalidar_prompts()
+    try:
+        get_prompts(usuario)  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _barrer_aptos(usuario: str) -> list[dict]:

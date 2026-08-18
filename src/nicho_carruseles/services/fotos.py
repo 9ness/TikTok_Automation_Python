@@ -41,21 +41,39 @@ _EXTS = (".jpg", ".jpeg", ".png", ".webp")
 # subida o quemada. El TTL solo cubre el caso de tocar el Drive a mano.
 # Mismo patrón que `nicho_pov_bof.services.mis_productos`.
 _TTL_S = 600.0
-_INDICES: dict[tuple[str, str], tuple[float, dict[str, Path]]] = {}
+# `{nombre_sin_extension: (ruta, mtime)}`. El mtime va DENTRO del índice: la
+# tarjeta lo necesita para poder cachear la foto en el móvil, y pedirlo con un
+# `stat()` por foto eran cuatro llamadas al mount por producto — 23 segundos en
+# abrir una carpeta de diez.
+_INDICES: dict[tuple[str, str], tuple[float, dict[str, tuple[Path, int]]]] = {}
 
 
-def _listar(tipo: str, usuario: str) -> dict[str, Path]:
-    """Lee la carpeta del Drive. Es LA operación cara de este módulo."""
+def _listar(tipo: str, usuario: str) -> dict[str, tuple[Path, int]]:
+    """Lee la carpeta del Drive. Es LA operación cara de este módulo.
+
+    Con `os.scandir` en vez de `iterdir`: trae el tipo y la fecha de cada
+    entrada en la misma pasada, así que la fecha sale gratis.
+    """
+    import os
+
     base = config.carpeta_de(tipo, usuario)
-    return {
-        f.stem: f
-        for f in base.iterdir()
-        if f.is_file() and f.suffix.lower() in _EXTS
-    }
+    salida: dict[str, tuple[Path, int]] = {}
+    with os.scandir(base) as entradas:
+        for e in entradas:
+            nombre = Path(e.name)
+            if nombre.suffix.lower() not in _EXTS:
+                continue
+            try:
+                if not e.is_file():
+                    continue
+                salida[nombre.stem] = (Path(e.path), int(e.stat().st_mtime))
+            except OSError:
+                continue
+    return salida
 
 
-def _indice(tipo: str, usuario: str) -> dict[str, Path]:
-    """`{nombre_sin_extension: ruta}` de todas las fotos de ese tipo."""
+def _indice(tipo: str, usuario: str) -> dict[str, tuple[Path, int]]:
+    """`{nombre_sin_extension: (ruta, mtime)}` de las fotos de ese tipo."""
     clave = (tipo, usuario or "ness")
     hit = _INDICES.get(clave)
     if hit and time.monotonic() < hit[0]:
@@ -84,7 +102,10 @@ def _apuntar(tipo: str, usuario: str, nombre: str, ruta: Path) -> None:
     """Mete una foto recién guardada en el índice que ya está en memoria."""
     hit = _INDICES.get((tipo, usuario or "ness"))
     if hit:
-        hit[1][nombre] = ruta
+        try:
+            hit[1][nombre] = (ruta, int(ruta.stat().st_mtime))
+        except OSError:
+            hit[1][nombre] = (ruta, 0)
 
 
 def _olvidar(tipo: str, usuario: str, nombre: str) -> None:
@@ -119,6 +140,7 @@ def precalentar(usuario: str = "ness") -> int:
     from src.nicho_carruseles.services import referencia
 
     try:
+        repuesto(usuario, refrescar=True)
         referencia.estado(usuario, refrescar=True)
     except Exception:  # noqa: BLE001 — es un adelanto, no un requisito
         pass
@@ -127,7 +149,7 @@ def precalentar(usuario: str = "ness") -> int:
     # aquí dentro para no atar este servicio a la capa de API.
     try:
         from src.api.routers.nicho_carruseles.carruseles import (
-            colocar_repuestos, precalentar_barrido,
+            colocar_repuestos, precalentar_barrido, precalentar_prompts,
         )
 
         # Primero se colocan las chicas de repuesto que le toquen a los
@@ -135,6 +157,7 @@ def precalentar(usuario: str = "ness") -> int:
         # sale con ellas puestas.
         colocar_repuestos(usuario)
         precalentar_barrido(usuario)
+        precalentar_prompts(usuario)
     except Exception:  # noqa: BLE001
         pass
     return total
@@ -182,7 +205,8 @@ def ref(source: str, folder: str, producto: str) -> str:
 
 def buscar(tipo: str, usuario: str, source: str, folder: str, producto: str) -> Path | None:
     """La foto de ese producto, sea cual sea su extensión. `None` si no está."""
-    return _indice(tipo, usuario).get(ref(source, folder, producto))
+    hit = _indice(tipo, usuario).get(ref(source, folder, producto))
+    return hit[0] if hit else None
 
 
 def _extension(filename: str) -> str:
@@ -228,8 +252,8 @@ def estado(usuario: str, source: str, folder: str, producto: str) -> dict:
     nombre = ref(source, folder, producto)
     out: dict[str, str] = {}
     for tipo in config.SUBCARPETAS:
-        p = _indice(tipo, usuario).get(nombre)
-        out[tipo] = f"{int(p.stat().st_mtime)}" if p else ""
+        hit = _indice(tipo, usuario).get(nombre)
+        out[tipo] = str(hit[1]) if hit else ""
     return out
 
 
@@ -292,17 +316,34 @@ def guardar_repuesto(
     )
     destino = base / f"{n}{_extension(filename)}"
     destino.write_bytes(datos)
+    _invalidar_repuesto(usuario)
     return destino
 
 
-def repuesto(usuario: str = "") -> dict[str, int]:
-    """`{escenario: cuántas hay}`. Vacío si aún no se ha subido ninguna."""
+_REPUESTO: dict[str, tuple[float, dict[str, int]]] = {}
+
+
+def _invalidar_repuesto(usuario: str = "") -> None:
+    _REPUESTO.pop(usuario or "ness", None)
+
+
+def repuesto(usuario: str = "", *, refrescar: bool = False) -> dict[str, int]:
+    """`{escenario: cuántas hay}`. Vacío si aún no se ha subido ninguna.
+
+    Guardado: son diez carpetas del Drive montado y esto se pide en cada carga
+    de la pantalla — sin caché eran 16 segundos de espera para un contador.
+    """
+    clave = usuario or "ness"
+    hit = _REPUESTO.get(clave)
+    if hit and not refrescar and time.monotonic() < hit[0]:
+        return hit[1]
     salida: dict[str, int] = {}
     for escenario in config.ESCENARIOS:
         base = config.carpeta_repuesto(escenario, usuario)
         n = sum(1 for f in base.iterdir() if f.is_file() and f.suffix.lower() in _EXTS)
         if n:
             salida[escenario] = n
+    _REPUESTO[clave] = (time.monotonic() + _TTL_S, salida)
     return salida
 
 
@@ -321,6 +362,7 @@ def colocar_repuesto(
     guardar("chica", usuario, source, folder, producto, foto.read_bytes(),
             filename=foto.name)
     foto.unlink(missing_ok=True)
+    _invalidar_repuesto(usuario)
     return True
 
 
