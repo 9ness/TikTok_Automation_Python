@@ -6,7 +6,7 @@ El producto está colocado sobre su caja oficial premium que debe tener exactame
 <!-- Añadido nuestro (no está en el prompt del curso). Ver
      `src/nicho_carruseles/prompts/foto_producto.md`. -->
 
-**El producto conserva SU etiqueta, su envase y su marca exactamente como se ven en la foto de referencia**: el mismo texto, el mismo logotipo, los mismos colores y la misma tipografía, en el mismo sitio y con el mismo tamaño. No lo dejes en blanco, no lo sustituyas por un envase genérico y no te inventes otra etiqueta. Lo único que se quita es lo que añadió la captura por encima: precios, insignias de descuento, iconos de la aplicación y marcas de agua.
+**El producto conserva SU etiqueta, su envase y su marca exactamente como se ven en la foto de referencia**: el mismo texto, el mismo logotipo, los mismos colores y la misma tipografía, en el mismo sitio y con el mismo tamaño. No lo dejes en blanco, no lo sustituyas por un envase genérico y no te inventes otra etiqueta. **Los rótulos que la tienda pegó ENCIMA de la foto se van todos**: capacidades y medidas tipo «900LBS», flechas, sellos, banderines de oferta, precios, iconos de la aplicación y marcas de agua. La regla es dónde está el texto: si está IMPRESO en el producto o en su envase, se queda igual; si está puesto encima de la imagen como publicidad, fuera.
 
 **Si la foto de referencia trae varias unidades, salen TODAS.** Muchos productos se venden en pack (dos botes, un set de tres, la crema y su sérum): la foto tiene que enseñar el pack entero, con las mismas unidades y en la misma disposición, no una sola pieza.
 
