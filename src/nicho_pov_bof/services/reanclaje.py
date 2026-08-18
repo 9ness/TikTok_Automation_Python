@@ -95,16 +95,23 @@ def _sincronizar(source: str, folder: str, pares: list[dict]) -> dict[str, str]:
     if mapa:
         log.info("reanclaje %s/%s: %s", source, folder, mapa)
         mover_productos(source, folder, mapa)
+        doc = pov.load_folder(source, folder)  # lo movido cambia el documento
 
-    _guardar_ids(source, folder, actuales)
+    _guardar_ids(source, folder, actuales, doc)
     return mapa
 
 
-def _guardar_ids(source: str, folder: str, actuales: dict[str, set[str]]) -> None:
-    """Apunta en cada producto los ids de sus fotos (solo si han cambiado)."""
+def _guardar_ids(
+    source: str, folder: str, actuales: dict[str, set[str]], doc: dict | None = None,
+) -> None:
+    """Apunta en cada producto los ids de sus fotos (solo si han cambiado).
+
+    Se reutiliza el documento que ya tiene quien llama: esto corre en CADA
+    listado de carpeta y volver a leerlo era otra ida y vuelta a Redis.
+    """
     from src.nicho_pov_bof.repos import product_repo as pov
 
-    doc = pov.load_folder(source, folder)
+    doc = doc if doc is not None else pov.load_folder(source, folder)
     productos = doc.get("productos") or {}
     if not productos:
         return
