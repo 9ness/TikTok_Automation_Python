@@ -1415,14 +1415,6 @@ function ProductoCard({
             sitio (el que va a TikTok es el completo). */}
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
-        {p.subida_at ? (
-          <span
-            title="Cuándo se subió al Drive del curso"
-            className="self-center text-[10px] text-muted-foreground"
-          >
-            📅 {fechaCorta(p.subida_at)}
-          </span>
-        ) : null}
         <CopyChip
           label="✍️ Caption"
           text={
@@ -1442,6 +1434,16 @@ function ProductoCard({
             <Download className="h-3 w-3" /> Foto
           </a>
         )}
+        {/* La fecha va al final: los botones que se PULSAN mandan, y esto
+            solo se mira (para saber qué productos añadió hoy el curso). */}
+        {p.subida_at ? (
+          <span
+            title="Cuándo se subió al Drive del curso"
+            className="self-center text-[10px] text-muted-foreground"
+          >
+            📅 {fechaCorta(p.subida_at)}
+          </span>
+        ) : null}
       </div>
 
       <FotoModal
