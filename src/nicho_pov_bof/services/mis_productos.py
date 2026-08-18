@@ -228,6 +228,9 @@ def renumerar_carpeta(carpeta: str) -> dict[str, str]:
             if m:
                 f.rename(d / f"{nuevo}{m.group(1) or ''}{f.suffix}")
     _mover_datos(carpeta, mapa, validos)
+    # Sin esto el listado sigue sirviendo los números viejos y se cruzan con
+    # los textos ya movidos: cada producto sale con el nombre del siguiente.
+    _invalidar()
     return mapa
 
 
