@@ -15,9 +15,10 @@ Estrategia de uso:
   - Si la llamada falla con `429 RESOURCE_EXHAUSTED` (cuota free agotada),
     cambia a PAID **inmediatamente** y reintenta UNA vez.
   - Si solo una de las dos está definida, usa esa sin fallback.
-  - Si ninguna está definida, cae al legacy `GOOGLE_AI_API_KEY` /
-    `GOOGLE_GEMINI_KEY` para compatibilidad (NO recomendado para producción
-    — Creator Reward también las puede usar).
+  - La legacy `GOOGLE_AI_API_KEY` / `GOOGLE_GEMINI_KEY` queda SIEMPRE la
+    última de la cola (la comparte Creator Reward): es el paracaídas para
+    cuando el proyecto de pago se pasa del tope mensual y el free ya gastó su
+    cuota, que si no deja el módulo entero sin IA sin decir nada.
 
 En la última key disponible, si vuelve a fallar con 429, se aplica retry
 exponencial con el `retry_delay` exacto que devuelve el servidor.
@@ -50,8 +51,9 @@ def _get_gemini_keys() -> list[tuple[str, str]]:
     Orden:
       1. `GOOGLE_GEMINI_KEY_FREE` → label "free"
       2. `GOOGLE_GEMINI_KEY_PAID` → label "paid"
-      3. (Compat) `GOOGLE_AI_API_KEY` o `GOOGLE_GEMINI_KEY` → label "legacy"
-         — solo se usa si NINGUNA de las dos anteriores está definida.
+      3. `GOOGLE_AI_API_KEY` o `GOOGLE_GEMINI_KEY` → label "legacy", siempre
+         la última: es la de Creator Reward y solo se usa si las otras dos
+         están agotadas (o no existen).
 
     El operador puede definir solo `_FREE`, solo `_PAID`, o ambas. Si ambas
     están vacías, intenta legacy. Si todo vacío, lista vacía.
@@ -63,10 +65,13 @@ def _get_gemini_keys() -> list[tuple[str, str]]:
         out.append(("free", free))
     if paid:
         out.append(("paid", paid))
-    if not out:
-        legacy = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GOOGLE_GEMINI_KEY")
-        if legacy:
-            out.append(("legacy", legacy))
+    # La legacy va SIEMPRE al final de la cola, no solo cuando no hay otras: el
+    # día que el proyecto de pago se pasó del tope mensual y el free agotó su
+    # cuota, todo lo que usa Gemini (textos, filtro, mensajes, emparejado de
+    # fotos) dejó de funcionar en silencio teniendo una key buena en el .env.
+    legacy = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GOOGLE_GEMINI_KEY")
+    if legacy and legacy not in {k for _, k in out}:
+        out.append(("legacy", legacy))
     return out
 
 

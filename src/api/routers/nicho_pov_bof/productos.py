@@ -540,6 +540,15 @@ def extraer_textos(
         except ValueError as e:
             raise _bad_request(str(e)) from e
 
+    if not textos:
+        # Antes se devolvía la lista igual y la pantalla decía "textos
+        # extraídos" sin haber extraído nada: el operador vuelve a pulsar sin
+        # saber que la cuota de Gemini está agotada.
+        raise APIError(
+            "Gemini no ha devuelto ningún texto. Suele ser la cuota agotada "
+            "(revisa el tope del proyecto de pago) o una captura ilegible.",
+            status_code=502,
+        )
     if textos:
         try:
             product_repo.save_extracted_texts(body.source, body.folder, textos)
