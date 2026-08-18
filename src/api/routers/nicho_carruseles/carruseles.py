@@ -984,6 +984,9 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
                     # `product_repo.claves_escaparate`).
                     "titulo_tiktok_completo": texto.get("titulo_tiktok_completo") or "",
                     "tienda": texto.get("tienda") or "",
+                    # Para copiar el pie del post sin salir de la pantalla.
+                    "caption": texto.get("caption") or "",
+                    "emojis": texto.get("emojis") or "",
                     "categoria": prod.get("categoria") or "",
                     "apto": apto,
                     "escenario": carrusel_repo.escenario_de(prod) if apto else "",
@@ -1226,6 +1229,10 @@ def list_listos(
             "folder": item["folder"],
             "producto": item["producto"],
             "titulo": item["titulo"],
+            "titulo_tiktok_completo": item.get("titulo_tiktok_completo") or "",
+            "tienda": item.get("tienda") or "",
+            "caption": item.get("caption") or "",
+            "emojis": item.get("emojis") or "",
             "categoria": item["categoria"],
             "fotos": fotos,
             "subido_at": float(subidos_por_carpeta[clave].get(item["producto"]) or 0),

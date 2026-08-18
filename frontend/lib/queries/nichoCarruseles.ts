@@ -626,6 +626,11 @@ export interface CarruselListo {
   folder: string;
   producto: string;
   titulo: string;
+  /** El literal de la ficha: es el que se pega en el Centro de Afiliados. */
+  titulo_tiktok_completo: string;
+  tienda: string;
+  caption: string;
+  emojis: string;
   categoria: string;
   fotos: FotosCarrusel;
   subido_at: number;

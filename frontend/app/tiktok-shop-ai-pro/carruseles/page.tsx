@@ -1096,6 +1096,7 @@ function FraseDeReferencia() {
 function PorNicho() {
   const [categoria, setCategoria] = useState("");
   const listos = useListos(categoria);
+  const hashtags = useHashtags().data ?? [];
   const marcar = useMarcarSubidoSuelto();
   const escaparate = useEscaparateCarrusel();
   const [bajando, setBajando] = useState("");
@@ -1234,6 +1235,21 @@ function PorNicho() {
                   {p.folder} · {p.producto}
                 </p>
                 <p className="line-clamp-2 text-[10px] leading-tight">{p.titulo}</p>
+                {/* Lo que hay que pegar en TikTok al publicar: el caption es el
+                    que más se usa, y ya va con emojis y hashtags puestos. */}
+                <div className="flex flex-wrap gap-1">
+                  {/* Mismo orden y mismos botones que en Creativos Pro, que es
+                      donde el operador ya tiene la mano hecha. */}
+                  <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo} siempre />
+                  <CopyChip label="🏪 Tienda" text={p.tienda} siempre />
+                  <CopyChip
+                    label="✍️ Caption"
+                    siempre
+                    text={
+                      [p.caption, p.emojis, hashtags.join(" ")].filter(Boolean).join(" ")
+                    }
+                  />
+                </div>
                 <div className="flex gap-1">
                   <button
                     type="button"
