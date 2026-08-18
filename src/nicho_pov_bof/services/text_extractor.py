@@ -236,7 +236,14 @@ def extract_from_pairs(
             f"{json.dumps(lote_ids, ensure_ascii=False)}"
         )
         try:
-            raw = generate_json(system_prompt, user_prompt, images=lote_paths)
+            # Temperatura baja: esto es LEER una captura, no escribir. Con la
+            # de por defecto (0.7) la misma ficha salía con un título distinto
+            # cada vez, y como la marca del escaparate se guarda por
+            # `tienda|titulo`, re-extraer los textos dejaba las marcas
+            # huérfanas a cientos.
+            raw = generate_json(
+                system_prompt, user_prompt, images=lote_paths, temperature=0.15,
+            )
         except Exception as e:
             # Gemini caído / cuota agotada / JSON inválido: sin textos esta
             # vez, pero la carpeta sigue navegable — se puede reintentar el

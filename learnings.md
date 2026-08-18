@@ -613,3 +613,4 @@
 - Carruseles: el reparto de fotos 2 va con los NOMBRES de la tanda recién subida; si se repartían todas las sueltas, una vieja sin reconocer podía colarse en la siguiente tanda y colocarse por descarte donde no iba.
 - Carruseles: los índices de fotos se precalientan al arrancar y cada 5 min (como "Mis productos"): listar el mount en frío era el minuto largo que tardaba la pantalla tras cada deploy.
 - Escaparate: la clave del índice es `tienda|titulo`, así que re-extraer los textos dejaba huérfanas las marcas (439 de 555 tras repasar el catálogo). Ahora `save_extracted_texts` de CADA nicho muda la marca al título nuevo (`pov.mudar_escaparate`) y el POV BOF Largo guarda además su respaldo en su documento; `scripts/reenganchar_escaparate.py` recupera las viejas por parecido.
+- `text_extractor` leía las fichas con la temperatura por defecto de `generate_json` (0.7): la misma captura daba un título distinto en cada pasada. Ahora 0.15 — leer no es escribir.
