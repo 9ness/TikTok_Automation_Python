@@ -1174,6 +1174,58 @@ def repartir_fotos2(
     return {"pendientes": cuantas, "job_id": job.id}
 
 
+@router.get("/listos")
+def list_listos(
+    categoria: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Carruseles TERMINADOS (las dos fotos con su texto), de TODAS las carpetas.
+
+    Publicar iba carpeta por carpeta, y el trabajo no avanza así: las fotos se
+    generan por nicho —una tanda de suplementos, otra de belleza— y hasta que
+    no estaba la carpeta entera no se podía subir nada. Aquí salen juntos todos
+    los del mismo nicho, aunque estén repartidos en veinte carpetas, y marcar
+    "subido" se apunta en la carpeta que le toca.
+
+    Sin `categoria` devuelve solo el recuento por nicho, que es lo que pinta los
+    botones: la lista entera son cientos de `stat()` contra el Drive montado.
+    """
+    from src.nicho_carruseles.repos import subidos_repo
+
+    aptos = [i for i in _barrer(usuario) if i["apto"]]
+    if categoria:
+        aptos = [i for i in aptos if i["categoria"] == categoria]
+
+    # Terminado = tiene las dos fotos con el texto quemado.
+    listos: list[dict] = []
+    por_categoria: dict[str, int] = {}
+    subidos_por_carpeta: dict[tuple[str, str], dict] = {}
+    for item in aptos:
+        fotos = fotos_svc.estado(
+            usuario, item["source"], item["folder"], item["producto"],
+        )
+        if not (fotos.get("chica_txt") and fotos.get("producto_txt")):
+            continue
+        por_categoria[item["categoria"]] = por_categoria.get(item["categoria"], 0) + 1
+        if not categoria:
+            continue
+        clave = (item["source"], item["folder"])
+        if clave not in subidos_por_carpeta:
+            subidos_por_carpeta[clave] = subidos_repo.subidos(*clave, usuario)
+        listos.append({
+            "source": item["source"],
+            "folder": item["folder"],
+            "producto": item["producto"],
+            "titulo": item["titulo"],
+            "categoria": item["categoria"],
+            "fotos": fotos,
+            "subido_at": float(subidos_por_carpeta[clave].get(item["producto"]) or 0),
+        })
+
+    listos.sort(key=lambda x: (x["folder"], len(x["producto"]), x["producto"]))
+    return {"items": listos, "por_categoria": por_categoria, "total": len(listos)}
+
+
 class MoverFotosRequest(BaseModel):
     """Cambiar de número las fotos ya generadas de unos productos."""
 

@@ -45,7 +45,10 @@ import {
   useEstadoCarruseles,
   useFoldersCarruseles,
   useMarcarApto,
+  useListos,
+  type CarruselListo,
   useMarcarSubidoCarrusel,
+  useMarcarSubidoSuelto,
   usePromptsCarruseles,
   useQuemarTexto,
   useQuemarTodo,
@@ -896,6 +899,11 @@ export default function CarruselesPage() {
         </Paso>
       </section>
 
+      {/* Publicar por NICHO, no por carpeta: las fotos se generan por nicho, así
+          que los carruseles terminados de suplementos están repartidos por
+          veinte carpetas y antes había que esperar a tenerlas todas. */}
+      <PorNicho />
+
       {verVendidos && <VendidosModal onClose={() => setVerVendidos(false)} />}
       {verEscaparate && folder && (
         <EscaparateModal
@@ -980,6 +988,149 @@ export default function CarruselesPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** Los carruseles ya terminados de un nicho, vengan de la carpeta que vengan.
+ *
+ *  Es lo que permite empezar a publicar sin tener el catálogo entero hecho:
+ *  se genera la tanda de un nicho, se quema el texto y ya se puede subir, con
+ *  el "subido" apuntado en la carpeta de cada producto. */
+function PorNicho() {
+  const [categoria, setCategoria] = useState("");
+  const listos = useListos(categoria);
+  const marcar = useMarcarSubidoSuelto();
+  const [bajando, setBajando] = useState("");
+  const cuentas = listos.data?.por_categoria ?? {};
+  const items = categoria ? (listos.data?.items ?? []) : [];
+
+  async function bajarPar(p: CarruselListo) {
+    const cola: [keyof FotosCarrusel, string][] = [
+      ["chica_txt", p.fotos.chica_txt],
+      ["producto_txt", p.fotos.producto_txt],
+    ];
+    setBajando(`${p.folder}|${p.producto}`);
+    for (const [i, [tipo, version]] of cola.entries()) {
+      if (!version) continue;
+      const a = document.createElement("a");
+      a.href = buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true);
+      a.download = `${p.folder}_${p.producto}_${i + 1}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Un respiro entre las dos: el móvil cancela las descargas simultáneas.
+      if (i === 0) await new Promise((r) => setTimeout(r, 600));
+    }
+    setBajando("");
+  }
+
+  return (
+    <Paso
+      n={5}
+      color="esmeralda"
+      titulo="Publicar por nicho"
+      hint="Los carruseles ya terminados, junten la carpeta que junten. Marca «subido» y se apunta en su carpeta."
+      extra={
+        listos.data
+          ? `${Object.values(cuentas).reduce((a, b) => a + b, 0)} listos`
+          : undefined
+      }
+    >
+      <div className="space-y-1.5">
+        {Object.entries(cuentas)
+          .sort((a, b) => b[1] - a[1])
+          .map(([cat, n]) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategoria(categoria === cat ? "" : cat)}
+              className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-[11px] transition ${
+                categoria === cat
+                  ? "border-sky-500 bg-sky-500/15 text-sky-400"
+                  : "border-border/60 hover:border-foreground/30"
+              }`}
+            >
+              <span className="min-w-0 flex-1">{CATEGORIA_LABEL[cat] ?? cat}</span>
+              <span className="shrink-0 font-semibold">{n}</span>
+            </button>
+          ))}
+        {!Object.keys(cuentas).length && !listos.isLoading && (
+          <p className="py-2 text-center text-[11px] text-muted-foreground">
+            Todavía no hay ningún carrusel con sus dos fotos escritas.
+          </p>
+        )}
+        {listos.isLoading && (
+          <p className="flex items-center justify-center gap-2 py-2 text-[11px] text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mirando qué está listo…
+          </p>
+        )}
+      </div>
+
+      {categoria && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {items.map((p) => {
+            const clave = `${p.folder}|${p.producto}`;
+            const subido = p.subido_at > 0;
+            return (
+              <div
+                key={clave}
+                className={`space-y-1 rounded-lg border p-1.5 ${
+                  subido ? "border-emerald-500/50 bg-emerald-500/5" : "border-border/60"
+                }`}
+              >
+                <div className="grid grid-cols-2 gap-1">
+                  {(["chica_txt", "producto_txt"] as const).map((tipo) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={tipo}
+                      src={buildFotoCarruselUrl(
+                        p.source, p.folder, p.producto, tipo, p.fotos[tipo], false, 260,
+                      )}
+                      alt={tipo}
+                      loading="lazy"
+                      className="aspect-[9/16] w-full rounded object-cover"
+                    />
+                  ))}
+                </div>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {p.folder} · {p.producto}
+                </p>
+                <p className="line-clamp-2 text-[10px] leading-tight">{p.titulo}</p>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={bajando === clave}
+                    onClick={() => bajarPar(p)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded border border-border/60 px-1.5 py-1 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
+                  >
+                    <Download className="h-3 w-3" /> Bajar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      marcar.mutate(
+                        {
+                          source: p.source, folder: p.folder,
+                          producto: p.producto, uploaded: !subido,
+                        },
+                        { onError: (e) => toast.error(err(e)) },
+                      )
+                    }
+                    className={`flex-1 rounded border px-1.5 py-1 text-[10px] font-semibold transition ${
+                      subido
+                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                        : "border-border/60 hover:border-foreground/40"
+                    }`}
+                  >
+                    {subido ? "✓ subido" : "📤 subido"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Paso>
   );
 }
 

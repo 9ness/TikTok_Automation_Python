@@ -621,6 +621,51 @@ export function usePrepararCatalogo() {
   });
 }
 
+export interface CarruselListo {
+  source: string;
+  folder: string;
+  producto: string;
+  titulo: string;
+  categoria: string;
+  fotos: FotosCarrusel;
+  subido_at: number;
+}
+
+export interface Listos {
+  items: CarruselListo[];
+  /** Cuántos hay terminados de cada nicho (para los botones). */
+  por_categoria: Record<string, number>;
+  total: number;
+}
+
+/** Los carruseles YA terminados, juntando todas las carpetas.
+ *
+ *  Sin categoría solo trae el recuento: la lista entera son cientos de fotos
+ *  que mirar en el Drive. */
+export function useListos(categoria: string) {
+  return useQuery<Listos>({
+    queryKey: [...carruselesKeys.all, "listos", categoria],
+    queryFn: () =>
+      api.get<Listos>(
+        `${ROOT}/listos` + (categoria ? `?categoria=${encodeURIComponent(categoria)}` : ""),
+      ),
+    staleTime: 60_000,
+  });
+}
+
+/** Marcar "subido" desde la vista por nicho: cada producto va a SU carpeta. */
+export function useMarcarSubidoSuelto() {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { source: string; folder: string; producto: string; uploaded: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/subido`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
+  });
+}
+
 export function useSinAsignar() {
   return useQuery<FotoSuelta[]>({
     queryKey: carruselesKeys.sinAsignar(),

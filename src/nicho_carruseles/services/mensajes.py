@@ -26,22 +26,43 @@ _noop: OnLog = lambda _: None
 # modelo ve el título del producto y le tira escribir sobre él. Con suplementos
 # y cosmética eso es lo que tumba una cuenta, así que se comprueba también aquí:
 # el mensaje 1 va sobre la foto de una chica, donde no se ve ningún producto.
-_PROMESAS = (
-    "articulacion", "inmune", "defensas", "energia", "digestion", "digestiv",
-    "dolor", "duermo", "dormir", "descanso", "descansar", "sueno", "piel",
-    "arruga", "mancha", "adelgaz", "peso", "grasa", "curar", "cura", "alivia",
-    "sana", "sano", "salud", "cabello", "pelo", "unas", "colageno", "vitamina",
-    "musculo", "recupera", "estres", "ansiedad", "memoria", "concentracion",
+# Estas se buscan por el PRINCIPIO de la palabra, para cazar sus variantes
+# ("articulacion" → articulaciones).
+_PROMESAS_RAIZ = (
+    "articulacion", "inmun", "defensa", "energia", "digest", "dolor", "duerm",
+    "dormir", "descans", "arruga", "mancha", "adelgaz", "recupera", "colagen",
+    "vitamin", "musculo", "estres", "ansiedad", "memoria", "concentracion",
+    "alivi", "cicatriz", "inflama",
 )
+# Y estas SOLO como palabra entera: por raíz se comían frases inocentes
+# ("locura" no promete nada, y "pelotas" tampoco).
+_PROMESAS_EXACTAS = (
+    "cura", "curar", "curo", "curan", "sana", "sano", "salud", "piel", "peso",
+    "grasa", "pelo", "cabello", "sueno", "suenos",
+)
+# "uñas" se mira CON tilde: sin ella es "unas", que es un artículo y se llevaba
+# por delante frases inocentes ("me han regalado unas...").
+_CON_TILDE = ("uñas",)
 
 
 def promete_algo(mensaje: str) -> str:
     """La palabra que convierte el mensaje en una promesa, o "" si está limpio."""
+    import re
     import unicodedata
 
-    plano = unicodedata.normalize("NFKD", str(mensaje or "").lower())
+    original = str(mensaje or "").lower()
+    for palabra in _CON_TILDE:
+        if re.search(rf"\b{palabra}\b", original):
+            return palabra
+    plano = unicodedata.normalize("NFKD", original)
     plano = "".join(c for c in plano if not unicodedata.combining(c))
-    return next((p for p in _PROMESAS if p in plano), "")
+    for raiz in _PROMESAS_RAIZ:
+        if re.search(rf"\b{raiz}", plano):
+            return raiz
+    for palabra in _PROMESAS_EXACTAS:
+        if re.search(rf"\b{palabra}\b", plano):
+            return palabra
+    return ""
 
 
 def escribir(
