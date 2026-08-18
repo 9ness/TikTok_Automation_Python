@@ -45,6 +45,7 @@ import {
   useEstadoCarruseles,
   useFoldersCarruseles,
   useMarcarApto,
+  useEscaparateCarrusel,
   useListos,
   type CarruselListo,
   useMarcarSubidoCarrusel,
@@ -1000,6 +1001,7 @@ function PorNicho() {
   const [categoria, setCategoria] = useState("");
   const listos = useListos(categoria);
   const marcar = useMarcarSubidoSuelto();
+  const escaparate = useEscaparateCarrusel();
   const [bajando, setBajando] = useState("");
   const cuentas = listos.data?.por_categoria ?? {};
   const items = categoria ? (listos.data?.items ?? []) : [];
@@ -1020,6 +1022,32 @@ function PorNicho() {
       a.remove();
       // Un respiro entre las dos: el móvil cancela las descargas simultáneas.
       if (i === 0) await new Promise((r) => setTimeout(r, 600));
+    }
+    setBajando("");
+  }
+
+  /** Todas las parejas del nicho, en orden y numeradas: 01, 02, 03… */
+  async function bajarTodo() {
+    const pendientes = items.filter((p) => !p.subido_at);
+    for (const [n, p] of pendientes.entries()) {
+      setBajando(`${n + 1}/${pendientes.length}`);
+      const cola: [keyof FotosCarrusel, string][] = [
+        ["chica_txt", p.fotos.chica_txt],
+        ["producto_txt", p.fotos.producto_txt],
+      ];
+      for (const [i, [tipo, version]] of cola.entries()) {
+        if (!version) continue;
+        const a = document.createElement("a");
+        a.href = buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true);
+        const orden = String(n + 1).padStart(2, "0");
+        a.download = `${orden}_${p.folder}_${p.producto}_${i + 1}`.replace(
+          /[^a-zA-Z0-9_.-]+/g, "_",
+        );
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        await new Promise((r) => setTimeout(r, 600));
+      }
     }
     setBajando("");
   }
@@ -1065,6 +1093,20 @@ function PorNicho() {
           </p>
         )}
       </div>
+
+      {categoria && items.length > 1 && (
+        <button
+          type="button"
+          disabled={Boolean(bajando)}
+          onClick={bajarTodo}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {bajando.includes("/")
+            ? `Bajando ${bajando}`
+            : `Bajar los ${items.filter((p) => !p.subido_at).length} sin subir, en orden`}
+        </button>
+      )}
 
       {categoria && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1125,6 +1167,27 @@ function PorNicho() {
                     {subido ? "✓ subido" : "📤 subido"}
                   </button>
                 </div>
+                {/* El escaparate es del PRODUCTO, no del nicho: marcarlo aquí
+                    se ve marcado en POV BOF, Largo y los demás. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    escaparate.mutate(
+                      {
+                        source: p.source, folder: p.folder,
+                        producto: p.producto, en_escaparate: !p.en_escaparate,
+                      },
+                      { onError: (e) => toast.error(err(e)) },
+                    )
+                  }
+                  className={`w-full rounded border px-1.5 py-1 text-[10px] font-semibold transition ${
+                    p.en_escaparate
+                      ? "border-sky-500 bg-sky-500/15 text-sky-400"
+                      : "border-border/60 text-muted-foreground hover:border-foreground/40"
+                  }`}
+                >
+                  🏪 escaparate
+                </button>
               </div>
             );
           })}

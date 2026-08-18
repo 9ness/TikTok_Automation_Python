@@ -976,6 +976,9 @@ def _barrer_sin_cache(usuario: str) -> list[dict]:
                     "producto": pid,
                     "ref": f"{source}|{folder}|{pid}",
                     "titulo": texto.get("titulo") or "",
+                    # El literal es la clave del escaparate (ver
+                    # `product_repo.claves_escaparate`).
+                    "titulo_tiktok_completo": texto.get("titulo_tiktok_completo") or "",
                     "tienda": texto.get("tienda") or "",
                     "categoria": prod.get("categoria") or "",
                     "apto": apto,
@@ -1191,8 +1194,10 @@ def list_listos(
     botones: la lista entera son cientos de `stat()` contra el Drive montado.
     """
     from src.nicho_carruseles.repos import subidos_repo
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
 
     aptos = [i for i in _barrer(usuario) if i["apto"]]
+    escaparate = pov_repo.escaparate_index(usuario) if categoria else set()
     if categoria:
         aptos = [i for i in aptos if i["categoria"] == categoria]
 
@@ -1220,10 +1225,45 @@ def list_listos(
             "categoria": item["categoria"],
             "fotos": fotos,
             "subido_at": float(subidos_por_carpeta[clave].get(item["producto"]) or 0),
+            # El escaparate es ÚNICO por producto y compartido con los demás
+            # nichos: marcarlo aquí se ve marcado en el POV BOF y al revés.
+            "en_escaparate": pov_repo.marcado_en_escaparate(item, escaparate),
         })
 
     listos.sort(key=lambda x: (x["folder"], len(x["producto"]), x["producto"]))
     return {"items": listos, "por_categoria": por_categoria, "total": len(listos)}
+
+
+class EscaparateRequest(BaseModel):
+    source: str
+    folder: str
+    producto: str
+    en_escaparate: bool
+
+
+@router.post("/escaparate")
+def marcar_escaparate(
+    body: EscaparateRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Mete o saca el producto del escaparate del Marketplace.
+
+    El índice es el del POV BOF —uno solo por producto y por usuario—, así que
+    lo que se marque aquí sale marcado en todos los nichos. Se hace desde
+    Carruseles porque publicar el carrusel y meterlo en el escaparate es el
+    mismo gesto.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    textos = pov_repo.get_product(body.source, body.folder, body.producto, usuario)
+    if not (textos.get("titulo") or textos.get("titulo_tiktok_completo")):
+        raise _bad_request(
+            "Este producto no tiene textos: sin el nombre no se puede saber si "
+            "ya está en el escaparate."
+        )
+    pov_repo.marcar_escaparate_producto(textos, body.en_escaparate, usuario)
+    _invalidar_barrido()
+    return {"en_escaparate": body.en_escaparate}
 
 
 class MoverFotosRequest(BaseModel):

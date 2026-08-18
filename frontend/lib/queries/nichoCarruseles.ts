@@ -629,6 +629,8 @@ export interface CarruselListo {
   categoria: string;
   fotos: FotosCarrusel;
   subido_at: number;
+  /** El escaparate es único por producto y compartido con los demás nichos. */
+  en_escaparate: boolean;
 }
 
 export interface Listos {
@@ -650,6 +652,20 @@ export function useListos(categoria: string) {
         `${ROOT}/listos` + (categoria ? `?categoria=${encodeURIComponent(categoria)}` : ""),
       ),
     staleTime: 60_000,
+  });
+}
+
+/** Meter o sacar del escaparate desde la vista por nicho. El índice es el
+ *  mismo del POV BOF, así que se ve marcado en todos los nichos. */
+export function useEscaparateCarrusel() {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { source: string; folder: string; producto: string; en_escaparate: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/escaparate`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: carruselesKeys.all }),
   });
 }
 
