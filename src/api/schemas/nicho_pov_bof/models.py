@@ -211,6 +211,15 @@ class ProductosListResponse(BaseModel):
     montando: bool = False
 
 
+class GuardarUrlRequest(BaseModel):
+    """Pegar a mano la ficha de TikTok Shop de un producto (vacía = quitarla)."""
+
+    source: str
+    folder: str
+    producto: str
+    url: str = ""
+
+
 class ExtraerTextosRequest(BaseModel):
     source: str = Field(..., min_length=1)
     folder: str = Field(..., min_length=1)

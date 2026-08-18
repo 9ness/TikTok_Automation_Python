@@ -655,6 +655,50 @@ export function buildVideoUrl(
  *  `variante`: "limpia" (default, la que anima el POV BOF) o "ficha" (la
  *  captura con la descripción, que es la que pide Creativos Pro).
  */
+export interface ProductoConUrl {
+  clave: string;
+  source: string;
+  folder: string;
+  producto: string;
+  titulo: string;
+  titulo_tiktok_completo: string;
+  tienda: string;
+  url: string;
+  /** En qué carpetas sale el mismo producto (la ficha vale para todas). */
+  carpetas: string[];
+}
+
+export interface UrlsCatalogo {
+  source: string;
+  tiendas: { tienda: string; items: ProductoConUrl[]; con_url: number; total: number }[];
+  con_url: number;
+  total: number;
+}
+
+/** Los productos de un catálogo agrupados por tienda, con su ficha de TikTok. */
+export function useUrlsCatalogo(source: string) {
+  return useQuery<UrlsCatalogo>({
+    queryKey: [...nichoPovBofKeys.all, "urls", source],
+    queryFn: () =>
+      api.get<UrlsCatalogo>(`${ROOT}/urls-catalogo?source=${encodeURIComponent(source)}`),
+    enabled: Boolean(source),
+    staleTime: 60_000,
+  });
+}
+
+/** Pegar (o quitar) la ficha de un producto. Vale para todas sus carpetas. */
+export function useGuardarUrlProducto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { url: string },
+    Error,
+    { source: string; folder: string; producto: string; url: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/url-producto`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 export function buildCleanPhotoDownloadUrl(
   source: string, folder: string, producto: string,
   variante: "limpia" | "ficha" = "limpia",

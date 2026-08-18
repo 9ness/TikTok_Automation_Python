@@ -631,6 +631,8 @@ export interface CarruselListo {
   tienda: string;
   caption: string;
   emojis: string;
+  /** La ficha del producto en TikTok Shop, si está pegada. */
+  product_url: string;
   categoria: string;
   fotos: FotosCarrusel;
   subido_at: number;

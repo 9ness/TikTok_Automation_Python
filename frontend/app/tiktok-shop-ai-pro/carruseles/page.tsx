@@ -21,6 +21,7 @@ import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -1256,6 +1257,7 @@ function PorNicho() {
                       [p.caption, p.emojis, hashtags.join(" ")].filter(Boolean).join(" ")
                     }
                   />
+                  <BotonUrl url={p.product_url} />
                 </div>
                 <div className="flex gap-1">
                   <button

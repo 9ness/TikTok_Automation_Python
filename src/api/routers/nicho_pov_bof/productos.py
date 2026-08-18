@@ -33,6 +33,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
+    GuardarUrlRequest,
     GuionPlazosRequest,
     VideoLoteConfirmarRequest,
     VideoLoteConfirmarResponse,
@@ -296,7 +297,7 @@ def _producto_info(
         video_path=prod.get("video_path"),
         video_listo_at=int(prod.get("video_listo_at") or 0),
         product_id=prod.get("product_id", ""),
-        product_url=prod.get("product_url", ""),
+        product_url=product_repo.url_de(prod),
         url_match_name=prod.get("url_match_name", ""),
         url_match_score=float(prod.get("url_match_score") or 0.0),
         url_ventas_30d=int(prod.get("url_ventas_30d") or 0),
@@ -378,6 +379,9 @@ def _list_productos(
     montandose = _productos_montandose(queue, source, folder)
     # Una sola lectura del índice para toda la carpeta, no una por producto.
     escaparate = product_repo.escaparate_index(usuario)
+    # La ficha de TikTok es del producto y la comparten los tres usuarios: se
+    # lee el índice entero una vez, no producto a producto.
+    urls = product_repo.urls_index()
     ventas = top_vendidos.ventas_por_producto(source)
 
     items: list[ProductoInfo] = []
@@ -437,7 +441,7 @@ def _list_productos(
                 video_path=guardado.get("video_path"),
                 video_listo_at=int(guardado.get("video_listo_at") or 0),
                 product_id=guardado.get("product_id", ""),
-                product_url=guardado.get("product_url", ""),
+                product_url=product_repo.url_de(guardado, urls),
                 url_match_name=guardado.get("url_match_name", ""),
                 url_match_score=float(guardado.get("url_match_score") or 0.0),
                 url_ventas_30d=int(guardado.get("url_ventas_30d") or 0),
@@ -1333,6 +1337,102 @@ def buscar_producto_url(
     return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
+@router.get("/urls-catalogo")
+def urls_catalogo(
+    source: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Todos los productos de un catálogo, agrupados por TIENDA, con su ficha.
+
+    Es la pantalla desde la que se pegan las URLs de TikTok Shop una detrás de
+    otra. Por tienda porque así se trabajan: se abre la tienda en la app y se
+    van copiando sus productos seguidos.
+
+    Un producto sale UNA vez aunque esté repetido en cinco carpetas: la ficha
+    es del producto, no de la carpeta, y pegarla una vez vale para todas.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+
+    try:
+        carpetas = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    except (ValueError, RuntimeError) as e:
+        raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
+
+    docs = product_repo.load_folders([(source, c) for c in carpetas])
+    indice = product_repo.urls_index()
+    por_clave: dict[str, dict] = {}
+    for carpeta, doc in zip(carpetas, docs):
+        for pid, prod in ((doc or {}).get("productos") or {}).items():
+            if not str(prod.get("titulo") or "").strip():
+                continue
+            claves = product_repo.claves_escaparate(prod)
+            if not claves:
+                continue
+            item = por_clave.setdefault(claves[0], {
+                "clave": claves[0],
+                "source": source,
+                "folder": carpeta,
+                "producto": pid,
+                "titulo": prod.get("titulo") or "",
+                "titulo_tiktok_completo": prod.get("titulo_tiktok_completo") or "",
+                "tienda": prod.get("tienda") or "sin tienda",
+                "url": product_repo.url_de(prod, indice),
+                "carpetas": [],
+            })
+            item["carpetas"].append(carpeta)
+
+    tiendas: dict[str, list[dict]] = {}
+    for item in por_clave.values():
+        tiendas.setdefault(item["tienda"], []).append(item)
+    for lista in tiendas.values():
+        lista.sort(key=lambda x: x["titulo"].lower())
+
+    return {
+        "source": source,
+        "tiendas": [
+            {
+                "tienda": tienda,
+                "items": lista,
+                "con_url": sum(1 for x in lista if x["url"]),
+                "total": len(lista),
+            }
+            for tienda, lista in sorted(
+                tiendas.items(), key=lambda kv: (-len(kv[1]), kv[0].lower())
+            )
+        ],
+        "con_url": sum(1 for x in por_clave.values() if x["url"]),
+        "total": len(por_clave),
+    }
+
+
+@router.post("/url-producto")
+def guardar_url_producto(
+    body: GuardarUrlRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Guarda a mano la ficha de TikTok Shop de un producto (vacía = quitarla).
+
+    Se guarda por producto (tienda + título literal), así que vale para todas
+    sus carpetas y para todos los usuarios: la ficha de TikTok es la misma,
+    cada uno la añade a SU escaparate.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    prod = product_repo.get_product(body.source, body.folder, body.producto, usuario)
+    if not prod:
+        raise _bad_request(f"Producto {body.producto!r} no encontrado en {body.folder!r}.")
+    try:
+        url = product_repo.guardar_url(prod, body.url)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"url": url}
+
+
 @router.post("/productos/urls", response_model=ProductosUrlsResponse)
 def buscar_urls_carpeta(
     body: ProductosUrlsRequest,
@@ -1723,7 +1823,7 @@ def buscar_productos(
                 titulo_tiktok_completo=d.get("titulo_tiktok_completo") or "",
                 tienda=d.get("tienda") or "",
                 clean_photo_id=clean or "",
-                product_url=d.get("product_url") or "",
+                product_url=product_repo.url_de(d),
                 en_escaparate=product_repo.marcado_en_escaparate(d, escaparate),
                 uploaded=bool(d.get("uploaded")),
                 sold=bool(d.get("sold")),

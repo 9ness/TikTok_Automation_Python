@@ -1205,6 +1205,7 @@ def list_listos(
 
     aptos = [i for i in _barrer(usuario) if i["apto"]]
     escaparate = pov_repo.escaparate_index(usuario) if categoria else set()
+    urls = pov_repo.urls_index() if categoria else {}
     if categoria:
         aptos = [i for i in aptos if i["categoria"] == categoria]
 
@@ -1233,6 +1234,7 @@ def list_listos(
             "tienda": item.get("tienda") or "",
             "caption": item.get("caption") or "",
             "emojis": item.get("emojis") or "",
+            "product_url": pov_repo.url_de(item, urls),
             "categoria": item["categoria"],
             "fotos": fotos,
             "subido_at": float(subidos_por_carpeta[clave].get(item["producto"]) or 0),

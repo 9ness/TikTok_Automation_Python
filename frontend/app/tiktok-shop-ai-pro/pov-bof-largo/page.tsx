@@ -37,6 +37,7 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro, useMe } from "@/lib/queries/auth";
@@ -1435,7 +1436,7 @@ function ProductoCard({
             se ha bajado DENTRO del guion plegado: ahí siguen a mano (el
             subliminal no lo pone el vídeo, solo se copia) sin ocupar sitio en
             la ficha. */}
-        {p.product_url && <CopyChip label="🔗 Enlace" text={p.product_url} />}
+        <BotonUrl url={p.product_url} />
         {p.clean_photo_id && (
           <a
             href={buildCleanPhotoDownloadUrl(source, folder, p.producto)}

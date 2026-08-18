@@ -664,6 +664,54 @@ def clave_escaparate(tienda: str, titulo: str) -> str:
     return f"{' '.join(_normaliza(tienda).split())}|{nombre}"
 
 
+# ---------------------------------------------------------------------------
+# La ficha del producto en TikTok Shop (su URL)
+# ---------------------------------------------------------------------------
+# La URL es del PRODUCTO, no de la carpeta: el mismo producto sale en varias
+# carpetas y catálogos, y pegarla una vez tiene que valer para todas. Por eso
+# va en un índice con la misma clave que el escaparate (tienda + título
+# literal) y NO por usuario: la ficha de TikTok es la misma para ness, Mauro y
+# Ana — lo que cambia es la cuenta desde la que cada uno la añade al suyo.
+_URLS_INDEX = "urls:index"
+
+
+def urls_index() -> dict[str, str]:
+    """`{clave: url}` de todos los productos con ficha guardada."""
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return {}
+    return r.get_json(_URLS_INDEX) or {}
+
+
+def url_de(prod: dict, indice: dict[str, str] | None = None) -> str:
+    """La ficha de ese producto: la del índice o la que guardó EchoTik."""
+    if indice is None:
+        indice = urls_index()
+    for clave in claves_escaparate(prod):
+        if indice.get(clave):
+            return str(indice[clave])
+    return str(prod.get("product_url") or "")
+
+
+def guardar_url(prod: dict, url: str) -> str:
+    """Guarda (o borra, con url vacía) la ficha de un producto. Devuelve la url."""
+    claves = claves_escaparate(prod)
+    if not claves:
+        raise RuntimeError(
+            "Sin título no se puede guardar la ficha: extrae antes los textos."
+        )
+    r = _require_redis()
+    indice = r.get_json(_URLS_INDEX) or {}
+    limpia = url.strip()
+    if limpia:
+        indice[claves[0]] = limpia
+    else:
+        for clave in claves:
+            indice.pop(clave, None)
+    r.set_json(_URLS_INDEX, indice)
+    return limpia
+
+
 def _key_escaparate(usuario: str = "") -> str:
     if _es_compartido(usuario):
         return _ESCAPARATE_INDEX

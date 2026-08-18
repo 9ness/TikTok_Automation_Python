@@ -1,0 +1,174 @@
+"use client";
+
+import { Check, Link2, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { ApiError } from "@/lib/api";
+import {
+  useGuardarUrlProducto,
+  useSources,
+  useUrlsCatalogo,
+} from "@/lib/queries/nichoPovBof";
+
+/** Pegar las fichas de TikTok Shop de un catálogo entero, tienda por tienda.
+ *
+ *  Meter un producto en el escaparate es entrar en su ficha de la app, y
+ *  buscarla a mano cada vez es lo que hace lento el trabajo — más aún con tres
+ *  cuentas. Aquí se pegan todas una vez: la ficha es del PRODUCTO, así que vale
+ *  para todas sus carpetas, para todos los nichos y para los tres usuarios.
+ *
+ *  Por tienda porque así se trabaja: se abre la tienda en la app y se van
+ *  copiando sus productos seguidos.
+ */
+export function PanelUrls() {
+  const sources = useSources();
+  const [source, setSource] = useState("aleatorios_2");
+  const [abierta, setAbierta] = useState("");
+  const datos = useUrlsCatalogo(source);
+  const guardar = useGuardarUrlProducto();
+
+  return (
+    <section className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+      <div className="flex items-center gap-2">
+        <Link2 className="h-4 w-4 shrink-0 text-emerald-500" />
+        <p className="text-sm font-semibold">Fichas de TikTok Shop</p>
+        {datos.data && (
+          <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            {datos.data.con_url}/{datos.data.total} con ficha
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Pega aquí el enlace de cada producto en la app de TikTok Shop. Después,
+        en cada nicho, el botón 🔗 abre la ficha directamente — que es lo único
+        que hace falta para meterlo en el escaparate. Se guarda por producto, así
+        que sirve para todas sus carpetas y para las cuentas de Mauro y Ana.
+      </p>
+
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {(sources.data?.items ?? []).map((s) => (
+          <button
+            key={s.slug}
+            type="button"
+            onClick={() => {
+              setSource(s.slug);
+              setAbierta("");
+            }}
+            className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+              source === s.slug
+                ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                : "border-border/60 text-muted-foreground hover:border-foreground/40"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {datos.isLoading && (
+        <p className="flex items-center justify-center gap-2 py-3 text-[11px] text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Leyendo el catálogo…
+        </p>
+      )}
+
+      <div className="space-y-1.5">
+        {(datos.data?.tiendas ?? []).map((t) => (
+          <div key={t.tienda} className="rounded-lg border border-border/60">
+            <button
+              type="button"
+              onClick={() => setAbierta(abierta === t.tienda ? "" : t.tienda)}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px]"
+            >
+              <span className="min-w-0 flex-1 truncate font-medium">{t.tienda}</span>
+              <span
+                className={`shrink-0 font-semibold ${
+                  t.con_url === t.total ? "text-emerald-500" : "text-muted-foreground"
+                }`}
+              >
+                {t.con_url}/{t.total}
+              </span>
+            </button>
+            {abierta === t.tienda && (
+              <div className="space-y-1.5 border-t border-border/60 p-2">
+                {t.items.map((p) => (
+                  <FilaUrl
+                    key={p.clave}
+                    titulo={p.titulo}
+                    carpetas={p.carpetas.length}
+                    url={p.url}
+                    guardando={guardar.isPending}
+                    onGuardar={(url) =>
+                      guardar.mutate(
+                        {
+                          source: p.source,
+                          folder: p.folder,
+                          producto: p.producto,
+                          url,
+                        },
+                        {
+                          onSuccess: () => toast.success(url ? "Ficha guardada" : "Ficha quitada"),
+                          onError: (e) =>
+                            toast.error(e instanceof ApiError ? e.message : String(e)),
+                        },
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Una línea: el producto, su enlace y el botón de guardar. */
+function FilaUrl({
+  titulo,
+  carpetas,
+  url,
+  guardando,
+  onGuardar,
+}: {
+  titulo: string;
+  /** En cuántas carpetas sale el mismo producto (la ficha vale para todas). */
+  carpetas: number;
+  url: string;
+  guardando: boolean;
+  onGuardar: (url: string) => void;
+}) {
+  const [valor, setValor] = useState(url);
+  useEffect(() => setValor(url), [url]);
+  const cambiado = valor.trim() !== url;
+
+  return (
+    <div className="space-y-1 rounded-md border border-border/60 p-1.5">
+      <p className="line-clamp-2 text-[10px] leading-tight">
+        {titulo.split("\n").join(" ")}
+        {carpetas > 1 && (
+          <span className="ml-1 text-muted-foreground">· en {carpetas} carpetas</span>
+        )}
+      </p>
+      <div className="flex gap-1">
+        <input
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          placeholder="https://www.tiktok.com/view/product/…"
+          className={`min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-[10px] ${
+            url ? "border-emerald-500/50" : "border-border/60"
+          }`}
+        />
+        <button
+          type="button"
+          disabled={guardando || !cambiado}
+          onClick={() => onGuardar(valor.trim())}
+          className="shrink-0 rounded border border-border/60 px-2 text-[10px] font-semibold transition hover:border-foreground/40 disabled:opacity-40"
+        >
+          {url && !cambiado ? <Check className="h-3 w-3 text-emerald-500" /> : "Guardar"}
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -260,6 +260,10 @@ def _listar(
     # Escaparate GLOBAL por (tienda|nombre): un producto marcado en cualquier
     # carpeta sale marcado en todas las que sean el mismo producto.
     esc_index = product_repo.escaparate_index(usuario)
+    # La ficha de TikTok Shop es del producto y es común a los tres usuarios.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    urls = pov_repo.urls_index()
     # Solo devuelve algo en "Top vendidos"; en las demás fuentes es {}.
     ventas = top_vendidos.ventas_por_producto(source)
 
@@ -298,7 +302,7 @@ def _listar(
             sexo_sugerido=audience.sexo_sugerido(
                 textos.get("titulo", ""), textos.get("titulo_tiktok_completo", ""),
             ),
-            product_url=str(textos.get("product_url") or ""),
+            product_url=pov_repo.url_de(textos, urls),
             url_match_name=str(textos.get("url_match_name") or ""),
             url_match_score=float(textos.get("url_match_score") or 0.0),
             ventas=int((ventas.get(f"{folder}|{pid}") or {}).get("ventas") or 0),

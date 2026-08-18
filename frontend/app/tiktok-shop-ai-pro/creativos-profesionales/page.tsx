@@ -22,6 +22,7 @@ import {
 } from "@/lib/topVendidos";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -569,6 +570,7 @@ function CreativoCard({
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} siempre />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
         <CopyChip label="✍️ Caption" text={caption} siempre />
+        <BotonUrl url={p.product_url} />
       </div>
 
       {p.caption_riesgo && (

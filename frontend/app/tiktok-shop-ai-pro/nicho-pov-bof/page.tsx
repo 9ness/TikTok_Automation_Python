@@ -68,6 +68,7 @@ import {
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -1499,7 +1500,7 @@ function ProductoCard({
         />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
-        {producto.product_url && <CopyChip label="🔗 Enlace" text={producto.product_url} />}
+        <BotonUrl url={producto.product_url} />
         {producto.clean_photo_id && (
           <>
             {/* Sin botón "Ver foto": la miniatura de arriba ya abre el visor
