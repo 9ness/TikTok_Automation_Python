@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   buildCleanPhotoDownloadUrl,
   useGuardarUrlProducto,
@@ -104,6 +105,8 @@ export function PanelUrls() {
                     precio={p.precio}
                     precioLista={p.precio_lista}
                     foto={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "limpia", 120)}
+                    fotoGrande={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "limpia", 900)}
+                    fotoFicha={buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto, "ficha", 900)}
                     carpetas={p.carpetas.length}
                     url={p.url}
                     guardando={guardar.isPending}
@@ -141,6 +144,8 @@ function FilaUrl({
   precio,
   precioLista,
   foto,
+  fotoGrande,
+  fotoFicha,
   carpetas,
   url,
   guardando,
@@ -155,6 +160,9 @@ function FilaUrl({
   /** El de antes del descuento (0 si no lo hay): se enseña tachado. */
   precioLista: number;
   foto: string;
+  /** La misma foto en grande y la captura de la ficha, para el visor. */
+  fotoGrande: string;
+  fotoFicha: string;
   /** En cuántas carpetas sale el mismo producto (la ficha vale para todas). */
   carpetas: number;
   url: string;
@@ -162,6 +170,7 @@ function FilaUrl({
   onGuardar: (url: string) => void;
 }) {
   const [valor, setValor] = useState(url);
+  const [verFoto, setVerFoto] = useState(false);
   useEffect(() => setValor(url), [url]);
   const cambiado = valor.trim() !== url;
 
@@ -170,13 +179,17 @@ function FilaUrl({
       <div className="flex gap-1.5">
         {/* La foto limpia: es lo que deja reconocer el producto de un vistazo
             cuando la tienda tiene quince sérums que se llaman casi igual. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={foto}
-          alt={titulo}
-          loading="lazy"
-          className="h-12 w-12 shrink-0 rounded object-cover"
-        />
+        {/* Se toca y se ve en grande, como en las fichas de los nichos: en un
+            sello de 48 px no se distingue un sérum de otro. */}
+        <button type="button" onClick={() => setVerFoto(true)} className="shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={foto}
+            alt={titulo}
+            loading="lazy"
+            className="h-12 w-12 rounded object-cover"
+          />
+        </button>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="line-clamp-2 text-[10px] leading-tight">
             {/* Los dos precios, como en las fichas de los nichos: el de antes
@@ -221,6 +234,14 @@ function FilaUrl({
           {url && !cambiado ? <Check className="h-3 w-3 text-emerald-500" /> : "Guardar"}
         </button>
       </div>
+
+      <FotoModal
+        open={verFoto}
+        onOpenChange={setVerFoto}
+        titulo={titulo.split("\n").join(" ")}
+        urlLimpia={fotoGrande}
+        urlTitulo={fotoFicha}
+      />
     </div>
   );
 }
