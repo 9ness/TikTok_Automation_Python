@@ -2751,13 +2751,33 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
             rutas.append(ruta)
             nombres.append(f["archivo"])
 
-    reparto = reparto_fotos.repartir(rutas, candidatos, on_log=on_log)
-    por_ref = {c["ref"]: c for c in candidatos}
+    # El MISMO producto sale en varias carpetas del curso (el colchón DEWINNER
+    # está en cinco), y hay que hacerle una foto a cada copia. Al modelo se le
+    # enseña UNA sola vez —con cinco títulos idénticos no sabría a cuál va, y
+    # además acierta más con menos candidatos— y las copias se reparten aquí.
+    grupos: dict[str, list[dict]] = {}
+    for c in candidatos:
+        grupos.setdefault(_clave_titulo(c), []).append(c)
+    representantes = [g[0] for g in grupos.values()]
+    cupos = {g[0]["ref"]: len(g) for g in grupos.values()}
+    if len(representantes) < len(candidatos):
+        on_log(
+            f"[carruseles] {len(candidatos)} productos son "
+            f"{len(representantes)} distintos (el resto son repetidos del curso)"
+        )
+
+    reparto = reparto_fotos.repartir(
+        rutas, representantes, cupos=cupos, on_log=on_log,
+    )
+    por_ref = {g[0]["ref"]: list(g) for g in grupos.values()}
     colocadas = 0
     for fila in reparto:
-        destino = por_ref.get(fila["ref"])
-        if not destino:
+        copias = por_ref.get(fila["ref"])
+        if not copias:
             continue
+        # A la primera copia libre: entre dos carpetas con el mismo producto da
+        # igual cuál se lleve cuál foto, lo que importa es que ninguna repita.
+        destino = copias.pop(0)
         try:
             fotos_svc.asignar_sin_asignar(
                 usuario, nombres[fila["foto"]], destino["source"],
@@ -2789,6 +2809,19 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
         )
     on_log(f"[carruseles] {resumen}")
     return resumen
+
+
+def _clave_titulo(candidato: dict) -> str:
+    """Qué productos son EL MISMO a efectos de la foto: tienda + título."""
+    import unicodedata
+
+    def _norm(x: str) -> str:
+        plano = unicodedata.normalize("NFKD", str(x or "").lower())
+        return " ".join(
+            "".join(c for c in plano if not unicodedata.combining(c)).split()
+        )
+
+    return f"{_norm(candidato.get('tienda'))}|{_norm(candidato.get('titulo'))}"
 
 
 def _candidatos_carrusel(usuario: str, categoria: str = "") -> list[dict]:

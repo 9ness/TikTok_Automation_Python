@@ -82,7 +82,8 @@ def describir(fotos: list[Path], *, on_log: OnLog = _noop) -> list[str]:
 
 
 def repartir(
-    fotos: list[Path], candidatos: list[dict], *, on_log: OnLog = _noop,
+    fotos: list[Path], candidatos: list[dict], *,
+    cupos: dict[str, int] | None = None, on_log: OnLog = _noop,
 ) -> list[dict]:
     """`[{foto: <índice>, ref, por_que}]`, uno por foto subida.
 
@@ -90,6 +91,11 @@ def repartir(
     esperan foto; `ref` es lo que devuelve la asignación (y lo que identifica al
     producto: fuente + carpeta + número). Los que no se reconocen vuelven con
     `ref` vacío.
+
+    `cupos` dice cuántas fotos admite cada `ref` (una por defecto). Sirve para
+    los productos REPETIDOS: el mismo colchón sale en cinco carpetas del curso y
+    hay que hacerle una foto a cada copia, así que las cinco fotos van al mismo
+    candidato y quien llama las reparte entre sus copias.
     """
     vacio = [{"foto": i, "ref": "", "por_que": ""} for i in range(len(fotos))]
     if not fotos or not candidatos:
@@ -128,7 +134,7 @@ def repartir(
         return vacio
 
     validos = {c["ref"] for c in candidatos}
-    usados: set[str] = set()
+    libres = {ref: max(1, int((cupos or {}).get(ref, 1))) for ref in validos}
     salida = {i: {"foto": i, "ref": "", "por_que": ""} for i in range(len(fotos))}
     for fila in (raw or {}).get("fotos") or []:
         try:
@@ -137,11 +143,11 @@ def repartir(
             continue
         ref = str(fila.get("id") or "").strip()
         # Se ignora lo que no cuadre: una referencia inventada o un producto
-        # que ya se llevó otra foto. Vale más dejarla sin asignar que meterle
-        # a un producto la foto de otro.
-        if n not in salida or ref not in validos or ref in usados:
+        # que ya se llevó todas las fotos que admite. Vale más dejarla sin
+        # asignar que meterle a un producto la foto de otro.
+        if n not in salida or ref not in validos or libres.get(ref, 0) <= 0:
             continue
-        usados.add(ref)
+        libres[ref] -= 1
         salida[n] = {
             "foto": n, "ref": ref, "por_que": str(fila.get("por_que") or "")[:80],
         }
@@ -152,10 +158,10 @@ def repartir(
     # contra "cubo 3 compartimentos"). Solo con uno y uno: con dos de cada ya
     # habría que adivinar cuál va con cuál, y eso no se hace a ciegas.
     sueltas = [i for i, x in salida.items() if not x["ref"]]
-    libres = [c["ref"] for c in candidatos if c["ref"] not in usados]
-    if len(sueltas) == 1 and len(libres) == 1:
+    quedan = [ref for ref, n in libres.items() if n > 0]
+    if len(sueltas) == 1 and len(quedan) == 1:
         salida[sueltas[0]] = {
-            "foto": sueltas[0], "ref": libres[0], "por_que": "por descarte",
+            "foto": sueltas[0], "ref": quedan[0], "por_que": "por descarte",
         }
         on_log("[carruseles] la última foto se coloca por descarte")
 
