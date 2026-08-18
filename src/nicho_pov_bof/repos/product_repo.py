@@ -607,17 +607,52 @@ def marcado_en_escaparate(prod: dict, indice: set[str]) -> bool:
     Largo solo el índice, así que la misma carpeta salía llena en uno y a cero
     en el otro.
 
-    Los dos datos se separan cuando se re-extraen los textos: la clave del
-    índice es `tienda|titulo` y al cambiar el título la marca vieja queda
-    huérfana. Por eso no basta con el índice, y por eso existe
-    `scripts/migrar_escaparate.py`, que reengancha las huérfanas.
+    Se miran las DOS claves posibles (ver `claves_escaparate`): la nueva, con
+    el título literal de la ficha, y la vieja, con el título reescrito. Así las
+    marcas de antes de la migración siguen valiendo.
     """
     if bool(prod.get("en_escaparate")):
         return True
-    titulo = prod.get("titulo", "")
-    if not titulo:
-        return False
-    return clave_escaparate(prod.get("tienda", ""), titulo) in indice
+    return any(c in indice for c in claves_escaparate(prod))
+
+
+def claves_escaparate(prod: dict) -> list[str]:
+    """Las claves con las que este producto puede estar en el índice.
+
+    La primera es la BUENA: el título LITERAL de la ficha
+    (`titulo_tiktok_completo`), que se copia letra a letra y no cambia aunque
+    se vuelvan a leer los textos. La segunda es la vieja, con el `titulo`
+    reescrito por la IA — se resumía y se traducía, así que cada relectura lo
+    dejaba distinto y la marca se quedaba huérfana. Se sigue mirando para no
+    perder lo marcado antes de la migración.
+    """
+    tienda = prod.get("tienda", "") or ""
+    claves = []
+    for nombre in (prod.get("titulo_tiktok_completo"), prod.get("titulo")):
+        clave = clave_escaparate(tienda, str(nombre or ""))
+        if clave and clave not in claves:
+            claves.append(clave)
+    return claves
+
+
+def marcar_escaparate_producto(prod: dict, on: bool, usuario: str = "") -> None:
+    """Mete o saca del escaparate un producto entero (con sus dos claves).
+
+    Al marcar se escribe SOLO la clave buena (la del título literal). Al
+    desmarcar se quitan las dos, porque si no la vieja seguiría diciendo que
+    está dentro.
+    """
+    claves = claves_escaparate(prod)
+    if not claves:
+        return
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    if on:
+        r.sadd(_key_escaparate(usuario), claves[0])
+        return
+    for clave in claves:
+        r.srem(_key_escaparate(usuario), clave)
 
 
 def clave_escaparate(tienda: str, titulo: str) -> str:

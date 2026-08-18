@@ -1211,9 +1211,8 @@ def set_producto_estado(
         # varias carpetas y se graba con varios nichos, pero al Marketplace se
         # sube una sola vez. Así queda marcado en todos los sitios a la vez.
         if body.en_escaparate is not None:
-            product_repo.set_escaparate(
-                textos.get("tienda", ""), textos.get("titulo", ""),
-                body.en_escaparate, usuario,
+            product_repo.marcar_escaparate_producto(
+                textos, body.en_escaparate, usuario,
             )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
@@ -1690,12 +1689,7 @@ def buscar_productos(
                 tienda=d.get("tienda") or "",
                 clean_photo_id=clean or "",
                 product_url=d.get("product_url") or "",
-                en_escaparate=(
-                    product_repo.clave_escaparate(
-                        d.get("tienda") or "", d.get("titulo") or "",
-                    ) in escaparate
-                    or bool(d.get("en_escaparate"))
-                ),
+                en_escaparate=product_repo.marcado_en_escaparate(d, escaparate),
                 uploaded=bool(d.get("uploaded")),
                 sold=bool(d.get("sold")),
                 unidades=int(d.get("unidades") or 0),

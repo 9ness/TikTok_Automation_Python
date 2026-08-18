@@ -147,10 +147,7 @@ def list_prendas(
                 pid, prod.get("titulo", ""), prod.get("caption", ""),
             ),
             caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
-            en_escaparate=(
-                pov_repo.clave_escaparate(prod.get("tienda", ""), prod.get("titulo", ""))
-                in escaparate
-            ),
+            en_escaparate=pov_repo.marcado_en_escaparate(prod, escaparate),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -189,10 +186,7 @@ def set_producto_estado(
             "se puede saber si ya está en el escaparate.",
             status_code=400,
         )
-    pov_repo.set_escaparate(
-        guardado.get("tienda", ""), guardado.get("titulo", ""),
-        body.en_escaparate, usuario,
-    )
+    pov_repo.marcar_escaparate_producto(guardado, body.en_escaparate, usuario)
 
     listado = list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
     for item in listado.items:

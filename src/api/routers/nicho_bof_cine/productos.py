@@ -216,10 +216,7 @@ def _listar(
             # puede montar o falta material.
             clip1=bool(g.get("clip1_path")),
             clip2=bool(g.get("clip2_path")),
-            en_escaparate=(
-                pov_repo.clave_escaparate(g.get("tienda", ""), g.get("titulo", ""))
-                in escaparate
-            ),
+            en_escaparate=pov_repo.marcado_en_escaparate(g, escaparate),
             uploaded=bool(g.get("uploaded")),
             video_path=g.get("video_path"),
             video_listo_at=int(g.get("video_listo_at") or 0),
@@ -256,10 +253,7 @@ def set_producto_estado(
             "se puede saber si ya está en el escaparate.",
             status_code=400,
         )
-    pov_repo.set_escaparate(
-        guardado.get("tienda", ""), guardado.get("titulo", ""),
-        body.en_escaparate, usuario,
-    )
+    pov_repo.marcar_escaparate_producto(guardado, body.en_escaparate, usuario)
 
     listado = _listar(body.source, body.folder, queue, usuario)
     for item in listado.items:

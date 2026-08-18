@@ -436,9 +436,8 @@ def set_producto_estado(
                 body.source, body.folder, body.producto, usuario=usuario, **campos,
             )
         if body.en_escaparate is not None:
-            product_repo.set_escaparate(
-                textos.get("tienda", ""), textos.get("titulo", ""),
-                body.en_escaparate, usuario,
+            product_repo.marcar_escaparate_producto(
+                textos, body.en_escaparate, usuario,
             )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

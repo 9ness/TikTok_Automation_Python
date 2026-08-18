@@ -96,10 +96,7 @@ def _listar(carpeta: str, usuario: str = "") -> GorrasListResponse:
                 pid, g.get("titulo", ""), g.get("caption", ""),
             ),
             caption_riesgo=caption_arriesgado(g.get("caption", "")) or "",
-            en_escaparate=(
-                pov_repo.clave_escaparate(g.get("tienda", ""), g.get("titulo", ""))
-                in escaparate
-            ),
+            en_escaparate=pov_repo.marcado_en_escaparate(g, escaparate),
         ))
     return GorrasListResponse(
         carpeta=carpeta, items=items,
@@ -142,10 +139,7 @@ def set_producto_estado(
             "se puede saber si ya está en el escaparate.",
             status_code=400,
         )
-    pov_repo.set_escaparate(
-        guardado.get("tienda", ""), guardado.get("titulo", ""),
-        body.en_escaparate, usuario,
-    )
+    pov_repo.marcar_escaparate_producto(guardado, body.en_escaparate, usuario)
 
     for item in _listar(carpeta, usuario).items:
         if item.producto == body.producto:

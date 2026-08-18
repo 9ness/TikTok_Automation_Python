@@ -156,11 +156,24 @@ def escaparate_index(usuario: str = "") -> set[str]:
 
 def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> None:
     _pov.set_escaparate(tienda, titulo, on, usuario)
-    # Al desmarcar hay que quitarlo TAMBIÉN del índice viejo; si no, seguiría
-    # apareciendo marcado por la unión de arriba.
     if not on:
-        clave = clave_escaparate(tienda, titulo)
-        r = get_nicho_pov_bof_largo_redis()
-        if clave and r.is_available():
-            k = "escaparate" if _slug_usuario(usuario) == "ness" else f"escaparate:{usuario}"
+        _limpiar_legacy([clave_escaparate(tienda, titulo)], usuario)
+
+
+def marcar_escaparate_producto(prod: dict, on: bool, usuario: str = "") -> None:
+    """Como el del POV BOF, pero limpiando también el índice viejo de aquí."""
+    _pov.marcar_escaparate_producto(prod, on, usuario)
+    if not on:
+        _limpiar_legacy(_pov.claves_escaparate(prod), usuario)
+
+
+def _limpiar_legacy(claves: list[str], usuario: str) -> None:
+    """Al desmarcar hay que quitarlo TAMBIÉN del índice viejo; si no, seguiría
+    apareciendo marcado por la unión de `escaparate_index`."""
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available():
+        return
+    k = "escaparate" if _slug_usuario(usuario) == "ness" else f"escaparate:{usuario}"
+    for clave in claves:
+        if clave:
             r.srem(k, clave)

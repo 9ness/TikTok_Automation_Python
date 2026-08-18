@@ -123,10 +123,7 @@ def _a_schema(
         # los demás nichos: el mismo producto se sube al Marketplace una vez.
         en_escaparate=bool(
             escaparate is not None
-            and pov_repo.clave_escaparate(
-                prod.get("tienda", ""), prod.get("titulo", ""),
-            )
-            in escaparate
+            and pov_repo.marcado_en_escaparate(prod, escaparate)
         ),
         tiene_ficha=bool(prod.get("foto_ficha")),
         lote_total=lote_total if lote_total > 1 else 0,
@@ -313,10 +310,7 @@ def set_producto_estado(
             "se puede saber si ya está en el escaparate.",
             status_code=400,
         )
-    pov_repo.set_escaparate(
-        prod.get("tienda", ""), prod.get("titulo", ""),
-        body.en_escaparate, usuario,
-    )
+    pov_repo.marcar_escaparate_producto(prod, body.en_escaparate, usuario)
     return ProductoPilotoResponse(
         producto=_a_schema(prod, escaparate=_escaparate(usuario)),
     )
