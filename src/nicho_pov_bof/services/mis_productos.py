@@ -237,77 +237,12 @@ def renumerar_carpeta(carpeta: str) -> dict[str, str]:
 def _mover_datos(carpeta: str, mapa: dict[str, str], validos: set[str]) -> None:
     """Arrastra a su número nuevo lo que cada nicho guarda de esos productos.
 
-    Todo lo de aquí es "si falla, que no impida borrar": las fotos ya están
-    renombradas y dejar un texto viejo es menos grave que reventar la pantalla.
+    Es lo mismo que hace el reanclaje cuando el curso renumera una carpeta, así
+    que se reutiliza en vez de tener dos copias de la lista de nichos.
     """
-    from src.api import users as _users
+    from src.nicho_pov_bof.services import reanclaje
 
-    fuente = "mis_productos"
-    usuarios = list(_users.USUARIOS) + [""]
-
-    def _rehacer(productos: dict) -> dict:
-        """Aplica el mapa a un `{producto: datos}` y tira lo que ya no existe."""
-        salida = {}
-        for pid, valor in productos.items():
-            if str(pid) not in validos:
-                continue
-            salida[mapa.get(str(pid), str(pid))] = valor
-        return salida
-
-    # 1) Documentos con `productos` dentro: textos del POV BOF (compartido y
-    #    privado) y lo del POV BOF Largo (guion, clips, vídeo).
-    from src.nicho_pov_bof.repos.redis_base import get_nicho_pov_bof_redis
-    from src.nicho_pov_bof_largo.repos.redis_base import get_nicho_pov_bof_largo_redis
-
-    # OJO con los repetidos: aplicar el mapa dos veces al mismo documento
-    # volvería a correr los números (el 7 pasa a 6 y luego el 6 a 5). Por eso
-    # se juntan por (nicho, clave) antes de tocar nada.
-    docs: dict[tuple[str, str], Any] = {}
-    docs[("pov", f"folder:{fuente}:{carpeta}")] = get_nicho_pov_bof_redis()
-    for u in usuarios:
-        if u:
-            docs[("pov", f"folder:{fuente}:{carpeta}:u:{u}")] = get_nicho_pov_bof_redis()
-        docs[("largo", f"folder:{fuente}:{carpeta}:u:{u or 'ness'}")] = (
-            get_nicho_pov_bof_largo_redis()
-        )
-    for (_nicho, clave), r in docs.items():
-        try:
-            if not r.is_available():
-                continue
-            doc = r.get_json(clave)
-            if not doc or not doc.get("productos"):
-                continue
-            doc["productos"] = _rehacer(doc["productos"])
-            r.set_json(clave, doc)
-        except Exception:  # noqa: BLE001
-            continue
-
-    # 2) Creativos Pro: `{producto: hora}` de los ya publicados.
-    try:
-        from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
-
-        rc = get_nicho_creativos_redis()
-        if rc.is_available():
-            claves = {
-                f"subidos:{fuente}:{carpeta}" + (f":{u}" if u and u != "ness" else "")
-                for u in usuarios
-            }
-            for clave in claves:
-                doc = rc.get_json(clave)
-                if doc:
-                    rc.set_json(clave, _rehacer(doc))
-    except Exception:  # noqa: BLE001
-        pass
-
-    # 3) Ventas: viven en un documento por referencia `fuente|carpeta|numero`,
-    #    así que se mueven de número para no dejar el ranking colgando.
-    try:
-        from src.nicho_pov_bof.repos import product_repo as pov
-
-        for viejo, nuevo in mapa.items():
-            pov.mover_venta(fuente, carpeta, viejo, nuevo)
-    except Exception:  # noqa: BLE001
-        pass
+    reanclaje.mover_productos("mis_productos", carpeta, mapa, validos=validos)
 
 
 def listar_carpetas_como_drive() -> list[dict]:

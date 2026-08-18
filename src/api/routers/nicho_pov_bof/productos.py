@@ -364,6 +364,14 @@ def _list_productos(
     photos = [drive_client.probe_dimensions(p) for p in photos]
     pairs = photo_pairing.pair_folder(photos)
 
+    # El curso renumera carpetas de vez en cuando (lo que era `IMG_0245.jpg`
+    # pasa a `4.png`) y con el número cambia la identidad del producto. Aquí se
+    # reengancha por el file ID de las fotos, que Google no toca al renombrar:
+    # si no ha cambiado nada, no hace nada.
+    from src.nicho_pov_bof.services import reanclaje
+
+    reanclaje.sincronizar(source, folder, pairs)
+
     # Vista del usuario: textos y enlaces compartidos, su progreso privado.
     folder_state = product_repo.load_folder_para(source, folder, usuario)
     guardados = folder_state.get("productos") or {}

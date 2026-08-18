@@ -44,6 +44,23 @@ def subidos(source: str, folder: str, usuario: str = "") -> dict[str, float]:
     return {str(k): float(v or 0) for k, v in doc.items()}
 
 
+def mover(source: str, folder: str, mapa: dict[str, str]) -> None:
+    """Cambia de número lo marcado como subido (el curso renumeró la carpeta).
+
+    Ver `nicho_pov_bof/services/reanclaje.py`: el número de producto sale del
+    nombre de sus fotos, así que un renombrado en el Drive del curso lo cambia.
+    """
+    r = get_nicho_carruseles_redis()
+    if not mapa or not r.is_available():
+        return
+    for usuario in ("", "ana", "mauro"):
+        clave = _key(source, folder, usuario)
+        doc = r.get_json(clave)
+        if not doc:
+            continue
+        r.set_json(clave, {mapa.get(str(k), str(k)): v for k, v in doc.items()})
+
+
 def marcar(
     source: str, folder: str, producto: str, subido: bool, usuario: str = "",
 ) -> None:
