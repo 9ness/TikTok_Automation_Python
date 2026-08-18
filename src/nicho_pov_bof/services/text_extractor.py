@@ -147,7 +147,19 @@ def _sellar_id(path, producto: str):
         # foto ES su ruta en el Drive montado, así que la copia sellada se
         # quedaba dentro de la carpeta del operador: basura acumulándose en su
         # Drive y una tercera foto por producto que el emparejado no espera.
-        destino = _Path(tempfile.gettempdir()) / f"sello_{origen.stem}__id{producto}.jpg"
+        # El nombre del temporal lleva la RUTA y la fecha de la foto, no solo su
+        # nombre: "6(1).jpg" existe en todas las carpetas de "Mis productos", y
+        # con el nombre a secas la carpeta 2 reutilizaba el sello de la 1 —le
+        # enseñaba a Gemini la ficha de otro producto—. Y al sustituir una foto
+        # (o renumerar la carpeta) el sello viejo se quedaba pegado.
+        import hashlib
+
+        try:
+            firma = f"{origen}|{int(origen.stat().st_mtime)}"
+        except OSError:
+            firma = str(origen)
+        clave = hashlib.sha1(firma.encode()).hexdigest()[:10]
+        destino = _Path(tempfile.gettempdir()) / f"sello_{clave}__id{producto}.jpg"
         if destino.is_file():
             return destino
         with Image.open(origen) as im:
