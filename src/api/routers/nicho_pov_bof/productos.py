@@ -1352,6 +1352,23 @@ def buscar_producto_url(
     return _producto_info(body.producto, prod, body.source, body.folder, queue, usuario)
 
 
+def _productos_de_la_carpeta(source: str, folder: str) -> set[str] | None:
+    """Ids de producto que salen hoy de emparejar las fotos. `None` si falla.
+
+    No se miden las fotos: agrupar va por el NOMBRE, y medir obligaría a
+    descargarlas todas para pintar una lista.
+    """
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    try:
+        fotos = drive_client.list_photos(source, folder)
+    except Exception:  # noqa: BLE001
+        return None
+    if not fotos:
+        return None
+    return {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)}
+
+
 @router.get("/urls-catalogo")
 def urls_catalogo(
     source: Annotated[str, Query()],
@@ -1382,8 +1399,14 @@ def urls_catalogo(
     indice = product_repo.urls_index()
     por_clave: dict[str, dict] = {}
     for carpeta, doc in zip(carpetas, docs):
+        # Solo los que HOY tienen fotos: en Redis se quedan los textos de
+        # productos que el curso borró o renumeró, y si uno de esos acaba
+        # siendo el representante, su miniatura da 404.
+        reales = _productos_de_la_carpeta(source, carpeta)
         for pid, prod in ((doc or {}).get("productos") or {}).items():
             if not str(prod.get("titulo") or "").strip():
+                continue
+            if reales is not None and pid not in reales:
                 continue
             claves = product_repo.claves_escaparate(prod)
             if not claves:
