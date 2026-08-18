@@ -46,6 +46,9 @@ import {
   useFoldersCarruseles,
   useMarcarApto,
   useEscaparateCarrusel,
+  useFraseDesdeImagen,
+  useFraseReferencia,
+  useGuardarFrase,
   useListos,
   type CarruselListo,
   useMarcarSubidoCarrusel,
@@ -900,6 +903,8 @@ export default function CarruselesPage() {
         </Paso>
       </section>
 
+      <FraseDeReferencia />
+
       {/* Publicar por NICHO, no por carpeta: las fotos se generan por nicho, así
           que los carruseles terminados de suplementos están repartidos por
           veinte carpetas y antes había que esperar a tenerlas todas. */}
@@ -989,6 +994,97 @@ export default function CarruselesPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** La frase de la que salen los mensajes de la foto 2.
+ *
+ *  El método del curso no es inventarse los textos: se coge un carrusel de
+ *  otra cuenta que YA está funcionando, se traduce su frase y se piden
+ *  variantes adaptadas a cada producto. Aquí se guarda esa frase (a mano o
+ *  leyéndola de una captura) y la usan todos los mensajes que se escriban
+ *  después. */
+function FraseDeReferencia() {
+  const frase = useFraseReferencia();
+  const guardar = useGuardarFrase();
+  const desdeImagen = useFraseDesdeImagen();
+  const [texto, setTexto] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => setTexto(frase.data?.texto ?? ""), [frase.data?.texto]);
+
+  return (
+    <Paso
+      n={6}
+      color="violeta"
+      titulo="La frase de la que salen los mensajes"
+      hint="Coge un carrusel de otra cuenta que esté funcionando: su frase, traducida. Los mensajes de la foto 2 serán variantes de esa, adaptadas a cada producto."
+      extra={frase.data?.texto ? "puesta" : "sin poner"}
+    >
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        rows={2}
+        placeholder="Las brumas corporales Cozy están prácticamente gratis hoy"
+        className="w-full rounded-lg border border-border/60 bg-background p-2 text-[11px]"
+      />
+      {frase.data?.origen && (
+        <p className="truncate text-[10px] text-muted-foreground">
+          original: {frase.data.origen}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          disabled={guardar.isPending || texto === (frase.data?.texto ?? "")}
+          onClick={() =>
+            guardar.mutate(
+              { texto },
+              {
+                onSuccess: () => toast.success(texto ? "Frase guardada" : "Frase quitada"),
+                onError: (e) => toast.error(err(e)),
+              },
+            )
+          }
+          className="rounded-lg bg-violet-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+        >
+          {guardar.isPending ? "Guardando…" : "Guardar la frase"}
+        </button>
+        <button
+          type="button"
+          disabled={desdeImagen.isPending}
+          onClick={() => ref.current?.click()}
+          className="flex items-center justify-center gap-1 rounded-lg border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-50"
+        >
+          {desdeImagen.isPending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Leyendo…
+            </>
+          ) : (
+            <>📸 Sacarla de una captura</>
+          )}
+        </button>
+      </div>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          desdeImagen.mutate(f, {
+            onSuccess: (d) => toast.success(`Frase: ${d.texto.slice(0, 40)}…`),
+            onError: (x) => toast.error(err(x)),
+          });
+        }}
+      />
+      <p className="text-[10px] text-muted-foreground">
+        Al cambiarla, vuelve a escribir los mensajes desde Configuración («solo
+        reescribir los mensajes») para que todo el catálogo hable igual.
+      </p>
+    </Paso>
   );
 }
 

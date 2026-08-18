@@ -682,6 +682,42 @@ export function useMarcarSubidoSuelto() {
   });
 }
 
+export interface FraseReferencia {
+  texto: string;
+  origen?: string;
+  guardada_at?: string;
+}
+
+/** La frase de un carrusel que ya funciona: de ella salen los mensajes 2. */
+export function useFraseReferencia() {
+  return useQuery<FraseReferencia>({
+    queryKey: [...carruselesKeys.all, "frase"],
+    queryFn: () => api.get<FraseReferencia>(`${ROOT}/frase-referencia`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useGuardarFrase() {
+  const qc = useQueryClient();
+  return useMutation<FraseReferencia, Error, { texto: string; origen?: string }>({
+    mutationFn: (body) => api.post(`${ROOT}/frase-referencia`, body),
+    onSuccess: (d) => qc.setQueryData([...carruselesKeys.all, "frase"], d),
+  });
+}
+
+/** Sacar la frase de la captura de un carrusel ajeno (la lee y la traduce). */
+export function useFraseDesdeImagen() {
+  const qc = useQueryClient();
+  return useMutation<FraseReferencia, Error, File>({
+    mutationFn: async (file) => {
+      const fd = new FormData();
+      fd.append("archivo", file);
+      return api.post<FraseReferencia>(`${ROOT}/frase-referencia/imagen`, fd);
+    },
+    onSuccess: (d) => qc.setQueryData([...carruselesKeys.all, "frase"], d),
+  });
+}
+
 export function useSinAsignar() {
   return useQuery<FotoSuelta[]>({
     queryKey: carruselesKeys.sinAsignar(),

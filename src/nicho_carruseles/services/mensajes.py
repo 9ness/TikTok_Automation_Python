@@ -66,7 +66,8 @@ def promete_algo(mensaje: str) -> str:
 
 
 def escribir(
-    productos: dict[str, dict], *, evitar: list[str] | None = None, on_log: OnLog = _noop,
+    productos: dict[str, dict], *, evitar: list[str] | None = None,
+    frase: str = "", on_log: OnLog = _noop,
 ) -> dict[str, dict]:
     """`{producto: {titulo}}` → `{producto: {mensaje1, mensaje2}}`.
 
@@ -90,6 +91,10 @@ def escribir(
         for pid, prod in sorted(con_titulo.items(), key=lambda kv: kv[0])
     ]
     peticion = {"productos": lista}
+    if frase:
+        # La frase de un carrusel que YA funciona: los mensajes 2 son variantes
+        # suyas adaptadas a cada producto. Es el método del curso.
+        peticion["frase_referencia"] = frase
     if evitar:
         # Solo los últimos: la lista entera crecería sin fin y se comería el
         # prompt según se van haciendo carpetas.

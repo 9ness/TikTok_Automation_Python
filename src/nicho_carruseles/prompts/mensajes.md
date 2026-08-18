@@ -19,7 +19,9 @@ PROHIBIDO prometer un resultado o hablar de salud, aunque el título del product
 
 **Mensaje 2 (foto del producto).** UNA sola frase corta sobre el producto, del documento del curso ("20 variantes adaptadas al producto"). Va quemada sobre la foto, así que tiene que leerse de un vistazo: **máximo 12 palabras**.
 
-El ángulo es el PRECIO o la oportunidad, sin prometer nada. Así son las del curso, adaptadas a un autobronceador:
+**Si en la petición viene `frase_referencia`, ESA manda.** Es la frase de un carrusel que ya está funcionando (traducida del original), y cada mensaje 2 tiene que ser una VARIANTE suya adaptada al producto: mismo registro, misma longitud, mismo tipo de gancho, cambiando el producto y girando un poco la forma de decirlo para que no salgan veinte iguales. Ejemplo real del curso: de "Las brumas corporales Cozy están prácticamente gratis hoy" salieron "Este autobronceador está a un precio increíble hoy", "Han mejorado el precio de este autobronceador recientemente", "Este producto está más accesible que nunca"…
+
+Sin `frase_referencia`, el ángulo es el PRECIO o la oportunidad, sin prometer nada. Así son las del curso, adaptadas a un autobronceador:
 
   - "Este autobronceador está a un precio increíble hoy."
   - "Han mejorado el precio de este autobronceador recientemente."

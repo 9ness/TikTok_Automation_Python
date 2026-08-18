@@ -101,6 +101,37 @@ def guardar_mensajes(source: str, folder: str, mensajes: dict[str, dict]) -> dic
     return prods
 
 
+# ---------------------------------------------------------------------------
+# La frase de la que salen los mensajes
+# ---------------------------------------------------------------------------
+# El método del curso no es inventarse los textos: se coge un carrusel que YA
+# está funcionando (de otra cuenta), se traduce su frase y se piden variantes
+# adaptadas al producto. Aquí se guarda esa frase para que los mensajes de todo
+# el catálogo salgan de ella, y se pueda cambiar cuando cambie lo que funciona.
+def _key_frase(usuario: str = "") -> str:
+    return "frase_referencia" + (f":{usuario}" if usuario and usuario != "ness" else "")
+
+
+def frase_referencia(usuario: str = "") -> dict:
+    """`{texto, origen, guardada_at}`. Vacío si el operador no ha puesto ninguna."""
+    r = get_nicho_carruseles_redis()
+    if not r.is_available():
+        return {}
+    return r.get_json(_key_frase(usuario)) or {}
+
+
+def guardar_frase(texto: str, *, origen: str = "", usuario: str = "") -> dict:
+    """Guarda (o borra, con texto vacío) la frase de referencia."""
+    r = _require_redis()
+    clave = _key_frase(usuario)
+    if not texto.strip():
+        r.delete(clave)
+        return {}
+    doc = {"texto": texto.strip()[:300], "origen": origen.strip()[:200], "guardada_at": _now()}
+    r.set_json(clave, doc)
+    return doc
+
+
 def es_apto(prod: dict) -> bool:
     """¿Este producto vale para carrusel?
 

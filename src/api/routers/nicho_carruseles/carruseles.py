@@ -17,6 +17,7 @@ segundo. Encolarlo solo añadiría la espera de un worker (ver
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -422,7 +423,10 @@ def escribir_mensajes(
     if not pendientes:
         raise _bad_request("Todos los productos aptos de esta carpeta ya tienen mensajes.")
 
-    escritos = mensajes_svc.escribir(pendientes, evitar=_mensajes_usados(body.source))
+    escritos = mensajes_svc.escribir(
+        pendientes, evitar=_mensajes_usados(body.source),
+        frase=str(carrusel_repo.frase_referencia(usuario).get("texto") or ""),
+    )
     if not escritos:
         raise APIError(
             "No se pudieron escribir los mensajes (Gemini falló). Vuelve a "
@@ -1232,6 +1236,78 @@ def list_listos(
 
     listos.sort(key=lambda x: (x["folder"], len(x["producto"]), x["producto"]))
     return {"items": listos, "por_categoria": por_categoria, "total": len(listos)}
+
+
+class FraseRequest(BaseModel):
+    """La frase de un carrusel que ya funciona, de la que salen los mensajes."""
+
+    texto: str = ""
+    # De dónde se sacó (la cuenta o el producto), solo para acordarse.
+    origen: str = ""
+
+
+@router.get("/frase-referencia")
+def ver_frase(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    return carrusel_repo.frase_referencia(usuario) or {"texto": "", "origen": ""}
+
+
+@router.post("/frase-referencia")
+def guardar_frase(
+    body: FraseRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Guarda la frase de la que se copian los mensajes (vacía = quitarla).
+
+    El curso no inventa los textos: coge un carrusel que YA está funcionando,
+    traduce su frase y pide variantes adaptadas al producto. Aquí se guarda esa
+    frase una vez y la usan todos los mensajes que se escriban después.
+    """
+    try:
+        return carrusel_repo.guardar_frase(
+            body.texto, origen=body.origen, usuario=usuario,
+        ) or {"texto": "", "origen": ""}
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+
+@router.post("/frase-referencia/imagen")
+async def frase_desde_imagen(
+    archivo: Annotated[UploadFile, File()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Saca la frase de la CAPTURA de un carrusel ajeno y la traduce.
+
+    Es el primer paso del método: se ve un carrusel que funciona (casi siempre
+    en inglés), se le hace una captura y de ahí sale la frase. Hacerlo a mano
+    era copiar, traducir y pegar.
+    """
+    from src.tiktok_shop.api.gemini import generate_json
+
+    datos = await _leer_foto(archivo, "La captura")
+    ruta = config.carpeta_sin_asignar(usuario) / f"_frase_{int(time.time())}.jpg"
+    try:
+        await asyncio.to_thread(ruta.write_bytes, datos)
+        raw = await asyncio.to_thread(
+            generate_json,
+            "Te doy la captura de un carrusel de TikTok Shop. Devuelve SOLO "
+            '{"texto": "...", "traduccion": "..."} con el texto que está '
+            "escrito ENCIMA de la foto (el gancho, no la interfaz de TikTok) y "
+            "su traducción al español de España, natural y corta.",
+            "",
+            images=[str(ruta)],
+            temperature=0.1,
+        )
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"No se pudo leer la captura: {e}", status_code=502) from e
+    finally:
+        ruta.unlink(missing_ok=True)
+
+    frase = str((raw or {}).get("traduccion") or (raw or {}).get("texto") or "").strip()
+    if not frase:
+        raise APIError("No se ve ningún texto en esa captura.", status_code=400)
+    return carrusel_repo.guardar_frase(
+        frase, origen=str((raw or {}).get("texto") or "")[:200], usuario=usuario,
+    )
 
 
 class EscaparateRequest(BaseModel):

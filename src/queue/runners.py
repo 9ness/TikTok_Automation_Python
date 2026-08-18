@@ -2684,7 +2684,11 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
             }
             if not aptos:
                 continue
-            escritos = mensajes_svc.escribir(aptos, evitar=usados, on_log=on_log)
+            escritos = mensajes_svc.escribir(
+                aptos, evitar=usados,
+                frase=str(carrusel_repo.frase_referencia(usuario).get("texto") or ""),
+                on_log=on_log,
+            )
             if escritos:
                 # Si un mensaje CAMBIA, la foto que ya estaba quemada lleva el
                 # texto viejo: se tira para que el quemado la rehaga. Pasa justo
