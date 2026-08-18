@@ -715,6 +715,9 @@ def chicas_pendientes(
         "total": len(aptos),
         "por_escenario": por_escenario,
         "total_por_escenario": total_por_escenario,
+        # Las de sobra que esperan por escenario: se colocan solas en cuanto
+        # aparece un producto de ese sitio.
+        "repuesto_por_escenario": fotos_svc.repuesto(usuario),
         "por_tanda": config.CHICAS_POR_TANDA,
         "items": pendientes[: config.CHICAS_POR_TANDA * 4],
     }
@@ -765,20 +768,24 @@ async def subir_chicas(
     fotos_svc.invalidar("chica", usuario)
     _invalidar_barrido()
     pendientes = _pendientes_de_chica(usuario, escenario)
-    if not pendientes:
-        raise _bad_request(
-            "Ningún producto está esperando foto de chica "
-            f"«{config.ESCENARIOS[escenario]['label']}»."
-        )
 
     leidos: list[tuple[str, bytes]] = []
     for archivo in sorted(archivos, key=lambda a: (a.filename or "").lower()):
         leidos.append((archivo.filename or "", await _leer_foto(archivo)))
 
+    def _guardar() -> tuple[list[dict], int]:
+        colocadas = fotos_svc.repartir_chicas(usuario, pendientes, leidos)
+        # Lo que sobra NO se tira: espera en el banco de repuesto de ese
+        # escenario y se coloca solo cuando el curso añade un producto de ahí.
+        # Generar una tanda en Flow cuesta una sesión; guardar de más, nada.
+        guardadas = 0
+        for filename, datos in leidos[len(colocadas):]:
+            fotos_svc.guardar_repuesto(usuario, escenario, datos, filename=filename)
+            guardadas += 1
+        return colocadas, guardadas
+
     try:
-        asignados = await asyncio.to_thread(
-            fotos_svc.repartir_chicas, usuario, pendientes, leidos,
-        )
+        asignados, al_repuesto = await asyncio.to_thread(_guardar)
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
     # Y al terminar, para que el trozo siguiente vea lo que acaba de entrar.
@@ -788,7 +795,8 @@ async def subir_chicas(
         "escenario": escenario,
         "asignadas": len(asignados),
         "items": asignados,
-        "sobran_fotos": max(0, len(leidos) - len(pendientes)),
+        "al_repuesto": al_repuesto,
+        "sobran_fotos": 0,
         "faltan": max(0, len(pendientes) - len(leidos)),
     }
 
@@ -879,6 +887,31 @@ def _invalidar_barrido() -> None:
     libre un producto que ya tiene foto y escribirle encima.
     """
     _BARRIDO.clear()
+
+
+def colocar_repuestos(usuario: str = "ness") -> int:
+    """Le pone su chica a los productos nuevos tirando del banco de repuesto.
+
+    El curso añade productos cada pocos días y volver a Flow por dos fotos no
+    compensa; por eso el operador sube unas cuantas de más. Esto las coloca
+    solo, sin que tenga que acordarse.
+    """
+    disponibles = fotos_svc.repuesto(usuario)
+    if not disponibles:
+        return 0
+    puestas = 0
+    for item in _barrer(usuario):
+        escenario = item["escenario"]
+        if not item["apto"] or item["tiene_chica"] or not disponibles.get(escenario):
+            continue
+        if fotos_svc.colocar_repuesto(
+            usuario, escenario, item["source"], item["folder"], item["producto"],
+        ):
+            disponibles[escenario] -= 1
+            puestas += 1
+    if puestas:
+        _invalidar_barrido()
+    return puestas
 
 
 def precalentar_barrido(usuario: str = "ness") -> int:

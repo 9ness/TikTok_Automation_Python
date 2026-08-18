@@ -560,6 +560,7 @@ export default function CarruselesPage() {
               escenario={esc}
               faltan={pendientes.data?.por_escenario?.[esc.clave] ?? 0}
               total={pendientes.data?.total_por_escenario?.[esc.clave] ?? 0}
+              repuesto={pendientes.data?.repuesto_por_escenario?.[esc.clave] ?? 0}
               cargando={pendientes.isLoading || referenciasCargando}
               subiendo={subirChicas.isPending && tandaEnCurso === esc.clave}
               progreso={tandaEnCurso === esc.clave ? progresoTanda : null}
@@ -1181,6 +1182,7 @@ function TandaEscenario({
   escenario,
   faltan,
   total,
+  repuesto,
   cargando,
   subiendo,
   progreso,
@@ -1190,6 +1192,8 @@ function TandaEscenario({
   faltan: number;
   /** Productos de este escenario en total (los hechos son total - faltan). */
   total: number;
+  /** Chicas de sobra guardadas para este escenario. */
+  repuesto: number;
   /** Aún no han llegado los datos: no es que no haya nada. */
   cargando: boolean;
   subiendo: boolean;
@@ -1284,6 +1288,14 @@ function TandaEscenario({
           }`}
         >
           {cargando ? "…" : `${total - faltan}/${total}`}
+          {!cargando && repuesto ? (
+            <span
+              title={`${repuesto} de sobra esperando: se colocan solas cuando el curso añada productos de este sitio`}
+              className="ml-1 font-normal opacity-80"
+            >
+              +{repuesto}
+            </span>
+          ) : null}
         </span>
       </div>
 
@@ -1310,11 +1322,18 @@ function TandaEscenario({
         >
           <ClipboardCopy className="h-3.5 w-3.5" /> Prompt
         </button>
+        {/* Se puede subir aunque no falte ninguna: lo que sobre se guarda de
+            repuesto y se coloca solo cuando el curso añada productos de este
+            sitio. Volver a Flow por dos fotos no compensa. */}
         <button
           type="button"
-          disabled={subiendo || cargando || !faltan}
+          disabled={subiendo || cargando}
           onClick={() => ref.current?.click()}
-          className="flex items-center justify-center gap-1 rounded-md bg-fuchsia-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-fuchsia-600 disabled:opacity-40"
+          className={`flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition disabled:opacity-40 ${
+            faltan
+              ? "bg-fuchsia-500 text-white hover:bg-fuchsia-600"
+              : "border border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
         >
           {subiendo ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1325,7 +1344,7 @@ function TandaEscenario({
             ? `${progreso.hechos}/${progreso.total} · ${progreso.pct}%`
             : faltan
               ? `Subir tanda (${faltan})`
-              : "Hechas"}
+              : "Subir de repuesto"}
         </button>
       </div>
       {/* Crear la referencia desde CERO, sin adjuntar foto: con una imagen de

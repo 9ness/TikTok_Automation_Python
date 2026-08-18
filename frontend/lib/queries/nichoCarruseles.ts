@@ -163,6 +163,9 @@ export interface ChicasPendientes {
   por_escenario: Record<string, number>;
   /** Y cuántas hay en total, para poder decir "8/20". */
   total_por_escenario: Record<string, number>;
+  /** Chicas de sobra esperando por escenario: se colocan solas en cuanto el
+   *  curso añade un producto de ese sitio. */
+  repuesto_por_escenario: Record<string, number>;
   por_tanda: number;
   items: PendienteChica[];
 }

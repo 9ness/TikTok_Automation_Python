@@ -126,8 +126,14 @@ def precalentar(usuario: str = "ness") -> int:
     # Y el barrido del catálogo, que es lo más caro de la pantalla. Se importa
     # aquí dentro para no atar este servicio a la capa de API.
     try:
-        from src.api.routers.nicho_carruseles.carruseles import precalentar_barrido
+        from src.api.routers.nicho_carruseles.carruseles import (
+            colocar_repuestos, precalentar_barrido,
+        )
 
+        # Primero se colocan las chicas de repuesto que le toquen a los
+        # productos nuevos, y luego se rehace el barrido: así el contador ya
+        # sale con ellas puestas.
+        colocar_repuestos(usuario)
         precalentar_barrido(usuario)
     except Exception:  # noqa: BLE001
         pass
@@ -264,6 +270,58 @@ def repartir_chicas(
         )
         asignados.append({**destino, "archivo": ruta.name, "mtime": int(ruta.stat().st_mtime)})
     return asignados
+
+
+# ---------------------------------------------------------------------------
+# Chicas de repuesto
+# ---------------------------------------------------------------------------
+# Lo que sobra de una tanda no se tira: espera aquí por escenario y se coloca
+# solo cuando el curso añade un producto de ese sitio. Así no hay que volver a
+# Flow cada vez que aparecen dos productos nuevos.
+
+
+def guardar_repuesto(
+    usuario: str, escenario: str, datos: bytes, *, filename: str = "",
+) -> Path:
+    """Guarda una chica de sobra. El nombre no importa: la carpeta ya dice el
+    escenario, y dentro se cogen por orden."""
+    base = config.carpeta_repuesto(escenario, usuario)
+    n = 1 + max(
+        (int(f.stem) for f in base.iterdir() if f.is_file() and f.stem.isdigit()),
+        default=0,
+    )
+    destino = base / f"{n}{_extension(filename)}"
+    destino.write_bytes(datos)
+    return destino
+
+
+def repuesto(usuario: str = "") -> dict[str, int]:
+    """`{escenario: cuántas hay}`. Vacío si aún no se ha subido ninguna."""
+    salida: dict[str, int] = {}
+    for escenario in config.ESCENARIOS:
+        base = config.carpeta_repuesto(escenario, usuario)
+        n = sum(1 for f in base.iterdir() if f.is_file() and f.suffix.lower() in _EXTS)
+        if n:
+            salida[escenario] = n
+    return salida
+
+
+def colocar_repuesto(
+    usuario: str, escenario: str, source: str, folder: str, producto: str,
+) -> bool:
+    """Le pone a un producto la primera chica de repuesto de su escenario."""
+    base = config.carpeta_repuesto(escenario, usuario)
+    disponibles = sorted(
+        (f for f in base.iterdir() if f.is_file() and f.suffix.lower() in _EXTS),
+        key=lambda f: (len(f.stem), f.stem),
+    )
+    if not disponibles:
+        return False
+    foto = disponibles[0]
+    guardar("chica", usuario, source, folder, producto, foto.read_bytes(),
+            filename=foto.name)
+    foto.unlink(missing_ok=True)
+    return True
 
 
 def quemar_texto(

@@ -161,6 +161,13 @@ SUBCARPETAS = {
 # pantalla las enseña para asignarlas a mano.
 SIN_ASIGNAR = "productos_sin_asignar"
 
+# Chicas de más. Generar una tanda cuesta una sesión de Flow, y el curso añade
+# productos cada pocos días: subir 9 de sobra ahora evita volver a sentarse a
+# generar por dos productos nuevos. Se guardan por escenario, que es de lo
+# único que depende la foto 1, y se colocan solas cuando aparece un producto
+# de ese sitio que no tiene la suya.
+REPUESTO = "chicas_repuesto"
+
 # Cuántas chicas se piden de una tacada como máximo. No es un límite técnico:
 # es el aviso de que una tanda mayor no cabe en una sesión de Flow.
 CHICAS_POR_TANDA = 40
@@ -408,6 +415,13 @@ def carruseles_dir() -> Path:
 
 def carpeta_sin_asignar(usuario: str = "") -> Path:
     destino = carruseles_dir() / (usuario or "ness") / SIN_ASIGNAR
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino
+
+
+def carpeta_repuesto(escenario: str, usuario: str = "") -> Path:
+    """Donde esperan las chicas de sobra de un escenario."""
+    destino = carruseles_dir() / (usuario or "ness") / REPUESTO / (escenario or "generico")
     destino.mkdir(parents=True, exist_ok=True)
     return destino
 

@@ -620,3 +620,4 @@
 - Mis productos: al borrar se cierra el hueco de numeración y se arrastra lo guardado de cada producto (textos, guion, clips, subidos, ventas); las entradas de números sin foto se tiran o chocarían con el que ocupa su sitio.
 - Carruseles: el filtro de "productos que existen hoy" tiraba los `3b` (dos productos con el mismo número en una carpeta) porque el emparejado sin medir las fotos no los separa; se acepta también por el número pelado.
 - El curso renumera carpetas (IMG_0245.jpg → 4.png) y con el número cambia la identidad del producto: se guardan los file ID de sus fotos (`foto_ids`, que Google no toca al renombrar) y `services/reanclaje.py` mueve textos, guion, clips, categoría, mensajes, subidos, ventas y las fotos de Carruseles al número nuevo.
+- Carruseles: las chicas que sobran de una tanda van a un banco de repuesto por escenario (`chicas_repuesto/<escenario>/`) y el precalentado se las coloca solas a los productos nuevos; la tarjeta enseña "7/7 +9".
