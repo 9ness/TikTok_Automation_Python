@@ -213,7 +213,14 @@ export default function CarruselesPage() {
     const escenario = ESCENARIO_POR_CATEGORIA[categoria] ?? "generico";
     const esc = prompts.data?.escenarios.find((e) => e.clave === escenario);
     const texto = conMano ? esc?.prompt_producto_mano : esc?.prompt_producto;
-    if (!texto) return;
+    // Sin esto se copiaba el vacío en silencio cuando los prompts aún no
+    // habían cargado (o su petición había fallado): el operador pegaba en Flow
+    // y no salía nada, sin saber por qué.
+    if (!texto) {
+      toast.error("Los prompts aún no han cargado, vuelve a intentarlo");
+      void prompts.refetch();
+      return;
+    }
     navigator.clipboard.writeText(texto);
     toast.success(`Prompt de ${CATEGORIA_LABEL[categoria] ?? categoria}`);
   }
