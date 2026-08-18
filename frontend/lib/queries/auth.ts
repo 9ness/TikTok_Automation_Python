@@ -30,6 +30,18 @@ export function useMe() {
   });
 }
 
+/** ¿Quien mira es un `pro` (Ana, Mauro) y no el administrador?
+ *
+ *  Sirve para esconder acciones que gastan cuota de IA y cuyo resultado es
+ *  COMPARTIDO (los textos del producto): que las lance uno solo. No es
+ *  seguridad — el backend corta por su cuenta (`_PREFIJOS_PRO`).
+ *
+ *  Mientras `useMe` carga devuelve `false`: enseñar el botón medio segundo y
+ *  quitarlo es menos malo que esconderle el suyo al administrador. */
+export function useEsPro(): boolean {
+  return useMe().data?.rol === "pro";
+}
+
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation<

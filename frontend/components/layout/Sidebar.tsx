@@ -178,9 +178,22 @@ const ORDEN_AI_PRO = [
   `${BASE_AI_PRO}/carruseles`,
 ];
 
-/** Lo único que necesitan hoy Ana y Mauro. Es solo el MENÚ: las demás
- *  pantallas siguen existiendo si se escribe la URL. */
-const ITEMS_PRO = [`${BASE_AI_PRO}/cuenta-piloto`];
+/** Lo único que necesitan hoy Ana y Mauro: los cuatro nichos que comparten
+ *  catálogo del Drive del curso, en el orden en que se trabajan.
+ *
+ *  Fuera quedan Cuenta Piloto (es una prueba de `ness`) y Configuración: lo de
+ *  allí —hashtags, textos y guiones de un catálogo entero, copia de seguridad—
+ *  se lanza una vez y el resultado ya lo comparten todos, así que a ellos solo
+ *  les daría botones para gastar cuota repitiendo lo hecho.
+ *
+ *  Es solo el MENÚ: las demás pantallas siguen existiendo si se escribe la URL
+ *  (el backend corta aparte lo que no les toca, ver `_PREFIJOS_PRO`). */
+const ITEMS_PRO = [
+  `${BASE_AI_PRO}/nicho-pov-bof`,
+  `${BASE_AI_PRO}/pov-bof-largo`,
+  `${BASE_AI_PRO}/creativos-profesionales`,
+  `${BASE_AI_PRO}/carruseles`,
+];
 
 function esAiPro(n: NavGroup): boolean {
   return n.kind === "group" && n.basePath === BASE_AI_PRO;
@@ -209,7 +222,13 @@ function navPara(rol: string | null | undefined): NavGroup[] {
     return BASES_PRO.some((b) => base === b || base.startsWith(`${b}/`));
   }).map((n) =>
     esAiPro(n) && n.kind === "group"
-      ? { ...n, items: n.items.filter((i) => ITEMS_PRO.includes(i.href)) }
+      ? {
+          ...n,
+          items: ordenar(
+            n.items.filter((i) => ITEMS_PRO.includes(i.href)),
+            ITEMS_PRO,
+          ),
+        }
       : n,
   );
 }

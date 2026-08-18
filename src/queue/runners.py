@@ -2612,6 +2612,11 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
     usuario = str(p.get("usuario") or job.enqueued_by or "")
     rehacer = bool(p.get("rehacer"))
     solo_filtrar = bool(p.get("solo_filtrar"))
+    # Reescribir los mensajes SIN volver a clasificar. Se necesita cuando cambia
+    # el prompt de los mensajes (p. ej. para quitar promesas de salud): rehacer
+    # entero volvería a pasar el filtro y algún producto dudoso cambia de
+    # categoría, y con ella el escenario de su chica ya generada.
+    solo_mensajes = bool(p.get("solo_mensajes"))
     if not source:
         raise RuntimeError("Falta el catálogo que preparar.")
 
@@ -2648,7 +2653,7 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
         doc = carrusel_repo.load_folder(source, carpeta)
         mios = doc.get("productos") or {}
         try:
-            if rehacer or not doc.get("clasificada"):
+            if not solo_mensajes and (rehacer or not doc.get("clasificada")):
                 cats = clasificador.clasificar(textos, on_log=on_log)
                 if cats:
                     mios = carrusel_repo.guardar_categorias(source, carpeta, cats)
@@ -2663,7 +2668,7 @@ def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgre
             aptos = {
                 pid: textos[pid] for pid, prod in mios.items()
                 if carrusel_repo.es_apto(prod) and pid in textos
-                and (rehacer or not prod.get("mensaje1"))
+                and (rehacer or solo_mensajes or not prod.get("mensaje1"))
             }
             if not aptos:
                 continue

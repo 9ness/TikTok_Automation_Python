@@ -20,6 +20,8 @@ import {
   FUENTE_TOP_VENDIDOS,
   verTopVendidos,
 } from "@/lib/topVendidos";
+import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
+import { useEsPro } from "@/lib/queries/auth";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -62,6 +64,8 @@ export default function CreativosProPage() {
   const productos = useProductos(source, folder);
   const prompt = usePromptCreativos();
   const extraer = useExtraerTextos();
+  // Los textos son del producto y se comparten: los extrae solo el admin.
+  const esPro = useEsPro();
   const completar = useCompletarCarpetaCreativos();
   // Qué creativos ya se publicaron: propio de este nicho, se marca a mano.
   const subidos = useSubidosCreativos(source, folder);
@@ -256,30 +260,34 @@ export default function CreativosProPage() {
           hint="Lee la ficha de cada producto con IA. El creativo saca de ahí los beneficios que se escriben encima."
           extra={`${conTexto}/${items.length}`}
         >
-          <button
-            type="button"
-            disabled={extraer.isPending || !folder}
-            onClick={() =>
-              extraer.mutate(
-                { source, folder: folder! },
-                {
-                  onSuccess: () => toast.success("Textos extraídos"),
-                  onError: (e) => toast.error(err(e)),
-                },
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
-          >
-            {extraer.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Extrayendo textos…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" /> Obtener textos ({conTexto}/{items.length})
-              </>
-            )}
-          </button>
+          {esPro ? (
+            <TextosDelAdmin hechos={conTexto} total={items.length} />
+          ) : (
+            <button
+              type="button"
+              disabled={extraer.isPending || !folder}
+              onClick={() =>
+                extraer.mutate(
+                  { source, folder: folder! },
+                  {
+                    onSuccess: () => toast.success("Textos extraídos"),
+                    onError: (e) => toast.error(err(e)),
+                  },
+                )
+              }
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+            >
+              {extraer.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Extrayendo textos…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" /> Obtener textos ({conTexto}/{items.length})
+                </>
+              )}
+            </button>
+          )}
 
           <div className="grid grid-cols-2 gap-1.5">
             <div

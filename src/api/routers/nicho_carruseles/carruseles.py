@@ -1048,6 +1048,8 @@ class PrepararRequest(BaseModel):
     rehacer: bool = False
     # Solo el filtro, sin escribir mensajes: para mirar primero cuántos pasan.
     solo_filtrar: bool = False
+    # Al revés: reescribir los mensajes sin volver a pasar el filtro.
+    solo_mensajes: bool = False
     # Solo estas carpetas. Sin nada, todas las del catálogo. Sirve para rehacer
     # las que cambian de productos sin volver a tocar las que ya están
     # trabajadas (una categoría distinta dejaría a su chica en otro sitio).
@@ -1078,6 +1080,7 @@ def preparar_catalogo(
         f"🖼️ Carruseles · {etiqueta}"
         + (f" · {len(solo)} carpeta(s)" if solo else "")
         + (" (solo filtro)" if body.solo_filtrar else "")
+        + (" (solo mensajes)" if body.solo_mensajes else "")
     )
     job = queue.enqueue(
         JobMode.NICHO_CARRUSELES_PREPARAR,
@@ -1087,6 +1090,7 @@ def preparar_catalogo(
             "usuario": usuario,
             "rehacer": bool(body.rehacer),
             "solo_filtrar": bool(body.solo_filtrar),
+            "solo_mensajes": bool(body.solo_mensajes),
             "carpetas": solo,
         },
     )

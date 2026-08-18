@@ -21,6 +21,28 @@ from src.tiktok_shop.api.gemini import generate_json
 OnLog = Callable[[str], None]
 _noop: OnLog = lambda _: None
 
+# Palabras que convierten el mensaje 1 en una promesa de salud. El prompt ya lo
+# prohíbe, pero se coló ("Mis articulaciones nunca estuvieron mejor") porque el
+# modelo ve el título del producto y le tira escribir sobre él. Con suplementos
+# y cosmética eso es lo que tumba una cuenta, así que se comprueba también aquí:
+# el mensaje 1 va sobre la foto de una chica, donde no se ve ningún producto.
+_PROMESAS = (
+    "articulacion", "inmune", "defensas", "energia", "digestion", "digestiv",
+    "dolor", "duermo", "dormir", "descanso", "descansar", "sueno", "piel",
+    "arruga", "mancha", "adelgaz", "peso", "grasa", "curar", "cura", "alivia",
+    "sana", "sano", "salud", "cabello", "pelo", "unas", "colageno", "vitamina",
+    "musculo", "recupera", "estres", "ansiedad", "memoria", "concentracion",
+)
+
+
+def promete_algo(mensaje: str) -> str:
+    """La palabra que convierte el mensaje en una promesa, o "" si está limpio."""
+    import unicodedata
+
+    plano = unicodedata.normalize("NFKD", str(mensaje or "").lower())
+    plano = "".join(c for c in plano if not unicodedata.combining(c))
+    return next((p for p in _PROMESAS if p in plano), "")
+
 
 def escribir(
     productos: dict[str, dict], *, evitar: list[str] | None = None, on_log: OnLog = _noop,
@@ -83,6 +105,13 @@ def escribir(
         # con la misma frase, que es lo que TikTok lee como contenido duplicado.
         if m1.lower() in vistos:
             on_log(f"[carruseles] el mensaje 1 del producto {pid} estaba repetido, se descarta")
+            continue
+        promesa = promete_algo(m1)
+        if promesa:
+            on_log(
+                f"[carruseles] el mensaje 1 del producto {pid} promete algo "
+                f"(«{promesa}»), se descarta: {m1[:50]}"
+            )
             continue
         vistos.add(m1.lower())
         salida[pid] = {"mensaje1": m1, "mensaje2": m2}

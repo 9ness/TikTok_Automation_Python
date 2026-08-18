@@ -608,7 +608,13 @@ export function usePrepararCatalogo() {
   return useMutation<
     { job_id: string; title: string; position_in_queue: number },
     Error,
-    { source: string; rehacer?: boolean; solo_filtrar?: boolean }
+    {
+      source: string;
+      rehacer?: boolean;
+      solo_filtrar?: boolean;
+      solo_mensajes?: boolean;
+      carpetas?: string[];
+    }
   >({
     mutationFn: (body) => api.post(`${ROOT}/preparar`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),

@@ -23,11 +23,12 @@ export function PanelCarruseles() {
   const openQueue = useDrawerStore((s) => s.openQueue);
   const [source, setSource] = useState("aleatorios_1");
   const [soloFiltrar, setSoloFiltrar] = useState(false);
+  const [soloMensajes, setSoloMensajes] = useState(false);
   const [rehacer, setRehacer] = useState(false);
 
   function lanzar() {
     preparar.mutate(
-      { source, solo_filtrar: soloFiltrar, rehacer },
+      { source, solo_filtrar: soloFiltrar, solo_mensajes: soloMensajes, rehacer },
       {
         onSuccess: (r) => {
           toast.success(`${r.title} en la cola`);
@@ -82,6 +83,20 @@ export function PanelCarruseles() {
         Solo filtrar (sin escribir los mensajes todavía)
       </label>
 
+      {/* Para cuando cambia el prompt de los mensajes (por ejemplo, al quitar
+          las promesas de salud): reescribe los dos mensajes de todos los aptos
+          sin volver a pasar el filtro, que podría cambiarle la categoría a un
+          producto dudoso y dejar su chica en otro sitio. */}
+      <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-cyan-500"
+          checked={soloMensajes}
+          onChange={(e) => setSoloMensajes(e.target.checked)}
+        />
+        Solo reescribir los mensajes (sin volver a filtrar)
+      </label>
+
       {/* Hace falta cuando los TEXTOS cambian: la categoría y los mensajes se
           calcularon con los títulos de antes y hay que rehacerlos. Sin esto,
           el trabajo se salta todo lo que ya estuviera hecho. */}
@@ -108,7 +123,11 @@ export function PanelCarruseles() {
         ) : (
           <>
             <GalleryHorizontalEnd className="h-4 w-4" />
-            {soloFiltrar ? "Filtrar todo el catálogo" : "Filtrar y escribir los mensajes"}
+            {soloFiltrar
+              ? "Filtrar todo el catálogo"
+              : soloMensajes
+                ? "Reescribir los mensajes"
+                : "Filtrar y escribir los mensajes"}
           </>
         )}
       </button>

@@ -75,7 +75,8 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
-import { useMe } from "@/lib/queries/auth";
+import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
+import { useEsPro, useMe } from "@/lib/queries/auth";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type {
@@ -198,6 +199,8 @@ export default function NichoPovBofPage() {
     [paginado, productosVisibles, pagina],
   );
   const extraerTextos = useExtraerTextos();
+  // Los textos son del producto y se comparten: los extrae solo el admin.
+  const esPro = useEsPro();
   const buscarUrls = useBuscarUrlsCarpeta();
   // SIN fuente: el ranking es global y el listado que se abre también, así
   // que el número del botón tiene que contar lo mismo. Con `source` decía 2
@@ -750,26 +753,30 @@ export default function NichoPovBofPage() {
             hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Lee la ficha de cada producto con IA (título, tienda, caption, precio). Se hace una vez por carpeta."}
             extra={`${conTexto}/${totalCarpeta}`}
           >
-            <button
-              type="button"
-              onClick={runExtraerTextos}
-              disabled={extraerTextos.isPending}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
-            >
-              {extraerTextos.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                  Extrayendo textos…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 shrink-0" />
-                  {conTexto >= totalCarpeta && totalCarpeta > 0
-                    ? "Textos al día · volver a extraer"
-                    : `Obtener textos (${conTexto}/${totalCarpeta})`}
-                </>
-              )}
-            </button>
+            {esPro ? (
+              <TextosDelAdmin hechos={conTexto} total={totalCarpeta} />
+            ) : (
+              <button
+                type="button"
+                onClick={runExtraerTextos}
+                disabled={extraerTextos.isPending}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+              >
+                {extraerTextos.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    Extrayendo textos…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 shrink-0" />
+                    {conTexto >= totalCarpeta && totalCarpeta > 0
+                      ? "Textos al día · volver a extraer"
+                      : `Obtener textos (${conTexto}/${totalCarpeta})`}
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Estado de la carpeta, para comparar de un vistazo lo que está
                 en el escaparate con lo que ya se publicó. */}

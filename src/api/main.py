@@ -366,6 +366,11 @@ _PREFIJOS_PRO = (
     "/api/v1/cuenta-piloto",
     "/api/v1/nicho-pov-bof-largo",
     "/api/v1/nicho-creativos",
+    # Carruseles y el contador de publicaciones del día faltaban: sin ellos,
+    # a un `pro` la pantalla de Carruseles y la barra de cuota le respondían
+    # 403 y parecían rotas.
+    "/api/v1/nicho-carruseles",
+    "/api/v1/cuotas",
     "/api/v1/queue",
     "/api/v1/auth",
     "/api/v1/health",

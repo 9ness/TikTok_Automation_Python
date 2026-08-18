@@ -38,7 +38,8 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
-import { useMe } from "@/lib/queries/auth";
+import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
+import { useEsPro, useMe } from "@/lib/queries/auth";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
@@ -131,6 +132,9 @@ export default function PovBofLargoPage() {
   const productosQ = useProductosLargo(activaSource, folder ?? "");
   const items = productosQ.data?.items ?? [];
   const extraerTextos = useExtraerTextos();
+  // Los textos son del producto y se comparten: los extrae solo el admin.
+  // El GUION no: es de cada uno, así que ese botón se queda.
+  const esPro = useEsPro();
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
@@ -761,23 +765,27 @@ export default function PovBofLargoPage() {
             hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Los textos salen de la ficha; el guion lo escribe la IA para ese producto y es lo que marca cuántos clips harán falta."}
             extra={`${conGuion}/${totalProductos} con guion`}
           >
-            <button
-              type="button"
-              onClick={runExtraerTextos}
-              disabled={extraerTextos.isPending}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
-            >
-              {extraerTextos.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> Extrayendo textos…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 shrink-0" />
-                  Obtener textos ({conTexto}/{totalCarpeta})
-                </>
-              )}
-            </button>
+            {esPro ? (
+              <TextosDelAdmin hechos={conTexto} total={totalCarpeta} />
+            ) : (
+              <button
+                type="button"
+                onClick={runExtraerTextos}
+                disabled={extraerTextos.isPending}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+              >
+                {extraerTextos.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> Extrayendo textos…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 shrink-0" />
+                    Obtener textos ({conTexto}/{totalCarpeta})
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Guion para toda LA CARPETA, en vez de tarjeta a tarjeta.
                 Necesitan tener textos primero. Lo de todo el catálogo vive en
