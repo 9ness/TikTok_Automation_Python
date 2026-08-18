@@ -81,6 +81,67 @@ def describir(fotos: list[Path], *, on_log: OnLog = _noop) -> list[str]:
     return salida
 
 
+# Cuántas fotos de catálogo caben en una comparación visual. Con más, el modelo
+# empieza a confundir los números de las imágenes.
+POR_COMPARACION = 10
+
+
+def emparejar_visual(
+    fotos: list[Path], candidatos: list[dict], *, on_log: OnLog = _noop,
+) -> dict[int, str]:
+    """Compara cada foto generada con las fotos de CATÁLOGO de los candidatos.
+
+    Es el último recurso, y el único que funciona con los productos que se
+    parecen entre sí: cinco colchones distintos se describen igual ("colchón
+    blanco de muelles"), así que emparejar por texto no puede acertar — pero
+    puestas una al lado de otra se distinguen por el borde, el acolchado o la
+    altura.
+
+    `candidatos` tienen que traer `foto` (la ruta de su foto limpia ya
+    descargada). Devuelve `{índice de foto: ref}` solo de lo que se reconoce
+    con seguridad.
+    """
+    salida: dict[int, str] = {}
+    utiles = [c for c in candidatos if c.get("foto")]
+    if not fotos or not utiles:
+        return salida
+
+    prompt = config.leer_prompt("emparejar_visual")
+    for i, foto in fotos:
+        libres = [c for c in utiles if c["ref"] not in salida.values()]
+        if not libres:
+            break
+        elegido = ""
+        for inicio in range(0, len(libres), POR_COMPARACION):
+            lote = libres[inicio:inicio + POR_COMPARACION]
+            imagenes = [_miniatura(foto)] + [_miniatura(Path(c["foto"])) for c in lote]
+            try:
+                raw = generate_json(
+                    prompt,
+                    "La primera imagen es la generada. Las otras "
+                    f"{len(lote)} son el catálogo, numeradas de 1 a {len(lote)}.",
+                    images=imagenes,
+                    temperature=0.1,
+                )
+            except Exception as e:  # noqa: BLE001
+                on_log(f"[carruseles] comparación visual fallida: {e}")
+                continue
+            try:
+                n = int((raw or {}).get("n") or 0)
+            except (TypeError, ValueError):
+                n = 0
+            if n and (raw or {}).get("seguro") and 1 <= n <= len(lote):
+                elegido = lote[n - 1]["ref"]
+                on_log(
+                    f"[carruseles] foto {i + 1} reconocida mirándola: "
+                    f"{str((raw or {}).get('por_que') or '')[:60]}"
+                )
+                break
+        if elegido:
+            salida[i] = elegido
+    return salida
+
+
 def _encaje(descripcion: str, candidato: dict) -> float:
     """Cuánto del título del producto aparece en lo que se ve en la foto."""
     import re

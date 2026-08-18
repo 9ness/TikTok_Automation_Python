@@ -2771,6 +2771,7 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
     )
     por_ref = {g[0]["ref"]: list(g) for g in grupos.values()}
     colocadas = 0
+    hechas: set[int] = set()
     for fila in reparto:
         copias = por_ref.get(fila["ref"])
         if not copias:
@@ -2783,9 +2784,38 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
                 usuario, nombres[fila["foto"]], destino["source"],
                 destino["folder"], destino["producto"],
             )
+            hechas.add(int(fila["foto"]))
             colocadas += 1
         except (ValueError, OSError) as e:
             on_log(f"[carruseles] {nombres[fila['foto']]} no se pudo colocar: {e}")
+
+    # Lo que no se ha reconocido por texto, MIRÁNDOLO: se compara la foto
+    # generada con la foto de catálogo de los productos que siguen libres. Es
+    # lo único que separa cinco colchones que se describen igual. Cuesta una
+    # llamada por foto, así que va solo con las que quedan.
+    sueltas_ahora = [(i, r) for i, r in enumerate(rutas) if i not in hechas]
+    libres = [c for copias in por_ref.values() for c in copias]
+    if sueltas_ahora and libres:
+        on_log(
+            f"[carruseles] quedan {len(sueltas_ahora)}: se comparan con la foto "
+            f"de catálogo de los {len(libres)} productos libres"
+        )
+        for c in libres:
+            c["foto"] = _foto_catalogo(c)
+        visual = reparto_fotos.emparejar_visual(sueltas_ahora, libres, on_log=on_log)
+        for idx, ref in visual.items():
+            destino = next((c for c in libres if c["ref"] == ref), None)
+            if not destino:
+                continue
+            try:
+                fotos_svc.asignar_sin_asignar(
+                    usuario, nombres[idx], destino["source"],
+                    destino["folder"], destino["producto"],
+                )
+                libres.remove(destino)
+                colocadas += 1
+            except (ValueError, OSError) as e:
+                on_log(f"[carruseles] {nombres[idx]} no se pudo colocar: {e}")
 
     # El recuento "2/3" de la pantalla sale del barrido cacheado: sin esto,
     # las fotos recién colocadas tardarían cinco minutos en contar.
@@ -2809,6 +2839,31 @@ def run_nicho_carruseles_reparto(job: Job, on_log: OnLog, on_progress: OnProgres
         )
     on_log(f"[carruseles] {resumen}")
     return resumen
+
+
+def _foto_catalogo(candidato: dict) -> str:
+    """Ruta local de la foto LIMPIA del producto (la del Drive del curso)."""
+    import os
+
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    try:
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(candidato["source"], candidato["folder"])
+        ]
+        for par in photo_pairing.pair_folder(fotos):
+            if str(par["producto"]) != str(candidato["producto"]):
+                continue
+            par = photo_pairing.desempatar_por_contenido(par, drive_client.fetch_photo)
+            limpia = par.get("clean") or {}
+            if not limpia.get("id"):
+                return ""
+            sufijo = os.path.splitext(limpia.get("name") or "")[1].lower() or ".jpg"
+            return str(drive_client.fetch_photo(limpia["id"], suffix=sufijo))
+    except Exception:  # noqa: BLE001 — sin foto, ese candidato no se compara
+        return ""
+    return ""
 
 
 def _clave_titulo(candidato: dict) -> str:
