@@ -69,6 +69,7 @@ import {
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
@@ -884,8 +885,8 @@ export default function NichoPovBofPage() {
           <Paso
             n={2}
             color="fucsia"
-            titulo="Generar los vídeos fuera"
-            hint="Baja las fotos, crea los vídeos en Magnific (o con el prompt en otra herramienta) y vuelve aquí."
+            titulo="Generar los clips fuera"
+            hint="Baja las fotos y crea los clips en Magnific (o con el prompt en otra herramienta). Los que piden más de un clip van marcados con una franja de color."
             extra={`${conFoto} foto(s)`}
           >
             <p className="text-[10px] font-semibold text-muted-foreground">
@@ -970,8 +971,8 @@ export default function NichoPovBofPage() {
             <Paso
               n={3}
               color="esmeralda"
-              titulo="Traer los vídeos generados"
-              hint="Suéltalos todos de golpe: la IA los reparte a su producto y tú solo repasas."
+              titulo="Traer los clips generados"
+              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1 y 2)."
             >
               <SubidaMasiva
                 source={source}
@@ -986,7 +987,7 @@ export default function NichoPovBofPage() {
             n={4}
             color="azul"
             titulo="Descargar lo ya montado"
-            hint="Los vídeos editados, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
+            hint="Los vídeos con la voz puesta, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
             extra={`${conVideo}/${totalProductos}`}
           >
             <div className="grid grid-cols-2 gap-1.5">
@@ -1047,20 +1048,12 @@ export default function NichoPovBofPage() {
             </p>
           )}
 
-          {listaProductos.length > 0 && (
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-emerald-500"
-                checked={soloConUrl}
-                onChange={(e) => setSoloConUrl(e.target.checked)}
-              />
-              Solo los que tienen URL
-              <span className="ml-auto text-[10px] text-muted-foreground">
-                {conUrlEnCarpeta}/{listaProductos.length}
-              </span>
-            </label>
-          )}
+          <FiltroSoloUrl
+            activo={soloConUrl}
+            onChange={setSoloConUrl}
+            conUrl={conUrlEnCarpeta}
+            total={listaProductos.length}
+          />
 
           {/* Solo en Top vendidos: ahí el orden importa (los que más venden
               primero) y lo que se busca es lo que aún no has probado. */}
@@ -1963,13 +1956,13 @@ function ProductoCard({
           })}
         </div>
       ) : null}
-      {producto.montando && producto.modo_plazos ? (
+      {producto.montando && clipsDe(producto) === 2 ? (
         <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locutando y montando…
         </p>
       ) : null}
 
-      {!producto.modo_plazos && (
+      {clipsDe(producto) === 1 && (
       <input
         ref={fileInputRef}
         type="file"
@@ -1982,7 +1975,7 @@ function ProductoCard({
         }}
       />
       )}
-      {!producto.modo_plazos && (
+      {clipsDe(producto) === 1 && (
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
@@ -2001,7 +1994,7 @@ function ProductoCard({
           </>
         ) : (
           <>
-            <Upload className="h-3.5 w-3.5" /> Subir vídeo
+            <Upload className="h-3.5 w-3.5" /> Subir clip
           </>
         )}
       </button>

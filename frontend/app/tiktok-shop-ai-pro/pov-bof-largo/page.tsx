@@ -33,6 +33,7 @@ import {
   verTopVendidos,
 } from "@/lib/topVendidos";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -1003,7 +1004,7 @@ export default function PovBofLargoPage() {
               n={3}
               color="esmeralda"
               titulo="Traer los clips generados"
-              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1, 2 y 3)."
+              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1, 2, 3 y 4)."
             >
               <SubidaMasiva
                 source={activaSource}
@@ -1020,7 +1021,7 @@ export default function PovBofLargoPage() {
             n={4}
             color="azul"
             titulo="Descargar lo ya montado"
-            hint="Los vídeos con la voz puesta, listos para subir a TikTok."
+            hint="Los vídeos con la voz puesta, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
             extra={`${conVideo}/${totalProductos}`}
           >
             <div className="grid grid-cols-2 gap-1.5">
@@ -1080,20 +1081,12 @@ export default function PovBofLargoPage() {
             </p>
           )}
 
-          {lista.length > 0 && (
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-emerald-500"
-                checked={soloConUrl}
-                onChange={(e) => setSoloConUrl(e.target.checked)}
-              />
-              Solo los que tienen URL
-              <span className="ml-auto text-[10px] text-muted-foreground">
-                {conUrlEnCarpeta}/{lista.length}
-              </span>
-            </label>
-          )}
+          <FiltroSoloUrl
+            activo={soloConUrl}
+            onChange={setSoloConUrl}
+            conUrl={conUrlEnCarpeta}
+            total={lista.length}
+          />
 
           {/* Solo en Top vendidos: ahí importa el orden (lo que más vende) y
               lo que se busca es lo que aún no has probado. */}
@@ -1773,7 +1766,11 @@ function ProductoCard({
       {/* Los clips. No se encola hasta tenerlos todos y el guion. Son DOS,
           salvo que la voz no quepa en veinte segundos: entonces hace falta un
           tercero (si no, el montaje estira los dos y el gesto se deforma). */}
-      <div className={`grid gap-1.5 ${necesarios === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      {/* SIEMPRE dos columnas. Con tres clips se ponían tres en fila, y en un
+          móvil estrecho salen tres botones apretados; encima con cuatro ya eran
+          dos filas de dos, así que la pantalla cambiaba de forma según el
+          producto. Dos columnas es igual en todos los casos (2, 2+1, 2+2). */}
+      <div className="grid grid-cols-2 gap-1.5">
         {(
           [1, 2, 3, 4].slice(0, necesarios) as (1 | 2 | 3 | 4)[]
         ).map((slot) => {
