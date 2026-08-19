@@ -99,11 +99,56 @@ const CAR_POR_SEG = 18.2;
 
 /** Los dos flujos de la carpeta: el guion lleva la frase de plazos o no, según
  *  el precio. Se bajan por separado porque no se generan igual. */
-type Filtro = "todas" | "plazos" | "viejo";
+/** Qué subconjunto se baja.
+ *
+ *  Aquí NO se reparte por normal/plazos como en el POV BOF: en este nicho todos
+ *  los vídeos llevan varios clips y el flujo de plazos no cambia lo que hay que
+ *  bajar, así que esos dos botones no servían para nada.
+ *
+ *  Lo que sí importa es (1) si el producto tiene ya enlazada su ficha de TikTok
+ *  Shop —es con los que se trabaja— y (2) cuántos clips pide su guion, porque
+ *  eso decide cuántos hay que generar en Magnific. Los de 3 y 4 se cuentan
+ *  SOBRE los que tienen URL, que es el conjunto de trabajo.
+ */
+type Filtro = "todas" | "url" | "clips3" | "clips4";
 
-function cuadra(p: { modo_plazos: boolean }, filtro: Filtro): boolean {
+interface ParaFiltrar {
+  product_url?: string;
+  clips_necesarios?: number;
+}
+
+// Cuántos clips pide un guion es lo que más trabajo cambia (hay que generar uno
+// más en Magnific por cada uno), así que se ve de un vistazo: una franja en el
+// lado de la tarjeta y un distintivo junto al precio, del MISMO color que su
+// botón de descarga. Dos clips es lo normal y no se marca.
+const BORDE_CLIPS: Record<number, string> = {
+  3: "border-l-4 border-l-amber-500",
+  4: "border-l-4 border-l-rose-500",
+};
+
+const CHIP_CLIPS: Record<number, string> = {
+  3: "bg-amber-500/15 text-amber-500",
+  4: "bg-rose-500/15 text-rose-500",
+};
+
+/** Cómo se nombra cada subconjunto cuando no hay nada que bajar. */
+function textoFiltro(filtro: Filtro): string {
+  if (filtro === "url") return "con la ficha enlazada";
+  if (filtro === "clips3") return "de 3 clips con la ficha enlazada";
+  if (filtro === "clips4") return "de 4 clips con la ficha enlazada";
+  return "";
+}
+
+/** Clips que pide el guion de este producto (2 si aún no hay guion). */
+function clipsDe(p: ParaFiltrar): number {
+  return Math.min(4, p.clips_necesarios || 2);
+}
+
+function cuadra(p: ParaFiltrar, filtro: Filtro): boolean {
   if (filtro === "todas") return true;
-  return filtro === "plazos" ? p.modo_plazos : !p.modo_plazos;
+  const conUrl = Boolean(p.product_url);
+  if (filtro === "url") return conUrl;
+  return conUrl && clipsDe(p) === (filtro === "clips3" ? 3 : 4);
 }
 
 /** EchoTik apagado (ver la misma bandera en el Nicho POV BOF). */
@@ -221,10 +266,14 @@ export default function PovBofLargoPage() {
   const totalProductos = enPantalla.length;
   const conVideo = enPantalla.filter((p) => p.video_path).length;
   const conFoto = enPantalla.filter((p) => p.clean_photo_id).length;
-  const conPlazos = enPantalla.filter((p) => p.clean_photo_id && p.modo_plazos).length;
-  const conViejo = enPantalla.filter((p) => p.clean_photo_id && !p.modo_plazos).length;
-  const videosPlazos = enPantalla.filter((p) => p.video_path && p.modo_plazos).length;
-  const videosViejo = enPantalla.filter((p) => p.video_path && !p.modo_plazos).length;
+  // Los conjuntos que de verdad se bajan aquí: los que tienen la ficha
+  // enlazada, y dentro de esos, los que piden 3 y 4 clips.
+  const fotoConUrl = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "url")).length;
+  const foto3 = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "clips3")).length;
+  const foto4 = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "clips4")).length;
+  const videoConUrl = enPantalla.filter((p) => p.video_path && cuadra(p, "url")).length;
+  const video3 = enPantalla.filter((p) => p.video_path && cuadra(p, "clips3")).length;
+  const video4 = enPantalla.filter((p) => p.video_path && cuadra(p, "clips4")).length;
   // "Textos + guiones" actúa sobre la CARPETA abierta, así que su total es el
   // de la carpeta y no el de lo que se ve.
   const totalCarpeta = items.length;
@@ -266,7 +315,7 @@ export default function PovBofLargoPage() {
       toast.error(
         filtro === "todas"
           ? "Ningún producto tiene vídeo montado todavía"
-          : `Ningún vídeo ${filtro === "plazos" ? "de plazos" : "de guion normal"} montado`,
+          : `Ningún vídeo montado ${textoFiltro(filtro)}`,
       );
       return;
     }
@@ -305,7 +354,7 @@ export default function PovBofLargoPage() {
       toast.error(
         filtro === "todas"
           ? "No hay fotos limpias en esta carpeta"
-          : `No hay productos ${filtro === "plazos" ? "de plazos" : "con guion viejo"} con foto`,
+          : `No hay productos con foto ${textoFiltro(filtro)}`,
       );
       return;
     }
@@ -863,13 +912,13 @@ export default function PovBofLargoPage() {
             n={2}
             color="fucsia"
             titulo="Generar los clips fuera"
-            hint="Baja las fotos y crea los clips en Magnific. Aquí cada vídeo lleva dos clips (tres si el guion pasa de 25s)."
+            hint="Baja las fotos y crea los clips en Magnific. Cada vídeo lleva dos clips, o tres o cuatro si el guion es largo: los que piden más van marcados con una franja de color."
             extra={`${conFoto} foto(s)`}
           >
             <p className="text-[10px] font-semibold text-muted-foreground">
               Primero, baja las fotos
             </p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadCleanPhotos()}
                 cargando={downloadingPhotos}
@@ -878,19 +927,40 @@ export default function PovBofLargoPage() {
                 etiqueta={`Fotos ${conFoto}/${totalProductos}`}
               />
               <BotonDescarga
-                onClick={() => void downloadCleanPhotos("viejo")}
+                onClick={() => void downloadCleanPhotos("url")}
                 cargando={false}
-                disabled={downloadingPhotos || !conViejo}
-                etiqueta={`Normal (${conViejo})`}
-              />
-              <BotonDescarga
-                onClick={() => void downloadCleanPhotos("plazos")}
-                cargando={false}
-                disabled={downloadingPhotos || !conPlazos}
-                etiqueta={`💳 Plazos (${conPlazos})`}
-                acento
+                disabled={downloadingPhotos || !fotoConUrl}
+                etiqueta={`🔗 Con URL (${fotoConUrl})`}
+                tono="url"
               />
             </div>
+            {/* Los que piden 3 y 4 clips, por separado: es lo que decide
+                cuántos hay que generar en Magnific, así que se hace por tandas.
+                Solo salen si hay alguno — en una carpeta donde todos van con
+                dos clips, estos botones serían dos huecos apagados. */}
+            {(foto3 > 0 || foto4 > 0) && (
+              <>
+                <p className="pt-0.5 text-[10px] text-muted-foreground">
+                  De los que tienen URL, por clips:
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadCleanPhotos("clips3")}
+                    cargando={false}
+                    disabled={downloadingPhotos || !foto3}
+                    etiqueta={`3 clips (${foto3})`}
+                    tono="clips3"
+                  />
+                  <BotonDescarga
+                    onClick={() => void downloadCleanPhotos("clips4")}
+                    cargando={false}
+                    disabled={downloadingPhotos || !foto4}
+                    etiqueta={`4 clips (${foto4})`}
+                    tono="clips4"
+                  />
+                </div>
+              </>
+            )}
 
             <p className="pt-1 text-[10px] font-semibold text-muted-foreground">
               Y luego, créalos
@@ -949,7 +1019,7 @@ export default function PovBofLargoPage() {
             hint="Los vídeos con la voz puesta, listos para subir a TikTok."
             extra={`${conVideo}/${totalProductos}`}
           >
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadVideos()}
                 cargando={downloadingVideos}
@@ -958,19 +1028,36 @@ export default function PovBofLargoPage() {
                 etiqueta={`Vídeos ${conVideo}/${totalProductos}`}
               />
               <BotonDescarga
-                onClick={() => void downloadVideos("viejo")}
+                onClick={() => void downloadVideos("url")}
                 cargando={false}
-                disabled={downloadingVideos || !videosViejo}
-                etiqueta={`Normal (${videosViejo})`}
-              />
-              <BotonDescarga
-                onClick={() => void downloadVideos("plazos")}
-                cargando={false}
-                disabled={downloadingVideos || !videosPlazos}
-                etiqueta={`💳 Plazos (${videosPlazos})`}
-                acento
+                disabled={downloadingVideos || !videoConUrl}
+                etiqueta={`🔗 Con URL (${videoConUrl})`}
+                tono="url"
               />
             </div>
+            {(video3 > 0 || video4 > 0) && (
+              <>
+                <p className="pt-0.5 text-[10px] text-muted-foreground">
+                  De los que tienen URL, por clips:
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadVideos("clips3")}
+                    cargando={false}
+                    disabled={downloadingVideos || !video3}
+                    etiqueta={`3 clips (${video3})`}
+                    tono="clips3"
+                  />
+                  <BotonDescarga
+                    onClick={() => void downloadVideos("clips4")}
+                    cargando={false}
+                    disabled={downloadingVideos || !video4}
+                    etiqueta={`4 clips (${video4})`}
+                    tono="clips4"
+                  />
+                </div>
+              </>
+            )}
           </Paso>
         </section>
       )}
@@ -1345,7 +1432,7 @@ function ProductoCard({
           : p.guion
             ? "border-violet-500/40"
             : "border-border/60 hover:border-violet-500/30"
-      }`}
+      } ${BORDE_CLIPS[necesarios] ?? ""}`}
     >
       <div className="flex gap-2">
         {limpia ? (
@@ -1419,6 +1506,16 @@ function ProductoCard({
               {p.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
                   💳 Guion con plazos
+                </span>
+              )}
+              {/* Cuántos clips pide, cuando son más de los dos de siempre.
+                  Va arriba, junto al precio, y no solo en el aviso del final de
+                  la tarjeta: es lo que hay que saber ANTES de ponerse a
+                  generarlos, y desplazándose se ve por la franja del lado sin
+                  tener que abrir nada. */}
+              {necesarios > 2 && (
+                <span className={`rounded px-1.5 py-0.5 font-semibold ${CHIP_CLIPS[necesarios]}`}>
+                  🎞️ {necesarios} clips
                 </span>
               )}
             </p>

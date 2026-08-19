@@ -857,7 +857,7 @@ export default function NichoPovBofPage() {
                 cargando={false}
                 disabled={downloadingPhotos || !conPlazos}
                 etiqueta={`💳 Plazos (${conPlazos})`}
-                acento
+                tono="plazos"
               />
             </div>
 
@@ -938,7 +938,7 @@ export default function NichoPovBofPage() {
                 cargando={false}
                 disabled={downloadingVideos || !videosPlazos}
                 etiqueta={`💳 Plazos (${videosPlazos})`}
-                acento
+                tono="plazos"
               />
             </div>
           </Paso>
