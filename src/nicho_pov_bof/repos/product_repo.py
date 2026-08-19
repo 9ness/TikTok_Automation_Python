@@ -598,6 +598,50 @@ def save_hashtags(tags: list[str]) -> list[str]:
 _ESCAPARATE_INDEX = "escaparate:index"
 
 
+# Longitud mínima del trozo común para dar por bueno un título cortado. Con
+# menos no se distingue un producto de su hermano ("DEWINNER cama..." hay
+# cinco), así que se prefiere no emparejar.
+_MIN_TROZO = 40
+
+
+def _sin_puntos(clave: str) -> str:
+    """El trozo útil de una clave cortada, o vacío si no está cortada."""
+    limpia = clave.rstrip()
+    if not limpia.endswith("..."):
+        return ""
+    trozo = limpia[:-3].rstrip()
+    return trozo if len(trozo) >= _MIN_TROZO else ""
+
+
+def casa_clave(clave: str, candidatas) -> str:
+    """La clave equivalente dentro de `candidatas`, aunque una venga CORTADA.
+
+    El título literal se lee de la CAPTURA de la ficha y TikTok corta los
+    largos con puntos suspensivos: la misma cama es "…reposabrazos" en una
+    captura y "…reposabra..." en otra. Sin esto, la URL pegada con la captura
+    corta se quedaba huérfana en cuanto se releían los textos y salía el
+    título entero — 61 de las 169 fichas guardadas estaban así.
+
+    Solo empareja si NO hay duda: si el trozo cuadra con dos productos
+    distintos devuelve vacío, que es mejor que enseñar la ficha equivocada.
+    """
+    if not clave:
+        return ""
+    candidatas = list(candidatas)
+    if clave in candidatas:
+        return clave
+    trozo = _sin_puntos(clave)
+    casan = set()
+    for otra in candidatas:
+        if trozo and otra.startswith(trozo):
+            casan.add(otra)
+            continue
+        trozo_otra = _sin_puntos(otra)
+        if trozo_otra and clave.startswith(trozo_otra):
+            casan.add(otra)
+    return casan.pop() if len(casan) == 1 else ""
+
+
 def marcado_en_escaparate(prod: dict, indice: set[str]) -> bool:
     """¿Este producto está en el escaparate? ÚNICO criterio para todos los nichos.
 
@@ -613,7 +657,12 @@ def marcado_en_escaparate(prod: dict, indice: set[str]) -> bool:
     """
     if bool(prod.get("en_escaparate")):
         return True
-    return any(c in indice for c in claves_escaparate(prod))
+    claves = claves_escaparate(prod)
+    if any(c in indice for c in claves):
+        return True
+    # Y las cortadas: el título literal depende de cuánto se vea en la captura
+    # de la ficha (ver `casa_clave`).
+    return any(casa_clave(c, indice) for c in claves)
 
 
 def claves_escaparate(prod: dict) -> list[str]:
@@ -687,9 +736,14 @@ def url_de(prod: dict, indice: dict[str, str] | None = None) -> str:
     """La ficha de ese producto: la del índice o la que guardó EchoTik."""
     if indice is None:
         indice = urls_index()
-    for clave in claves_escaparate(prod):
+    claves = claves_escaparate(prod)
+    for clave in claves:
         if indice.get(clave):
             return str(indice[clave])
+    for clave in claves:
+        equivalente = casa_clave(clave, indice)
+        if equivalente and indice.get(equivalente):
+            return str(indice[equivalente])
     return str(prod.get("product_url") or "")
 
 
@@ -702,12 +756,14 @@ def guardar_url(prod: dict, url: str) -> str:
         )
     r = _require_redis()
     indice = r.get_json(_URLS_INDEX) or {}
+    # Las equivalentes cortadas salen del índice: si no, el mismo producto
+    # acabaría con dos entradas y la vieja seguiría contestando.
+    viejas = {c for clave in claves if (c := casa_clave(clave, indice))}
     limpia = url.strip()
+    for clave in viejas | set(claves):
+        indice.pop(clave, None)
     if limpia:
         indice[claves[0]] = limpia
-    else:
-        for clave in claves:
-            indice.pop(clave, None)
     r.set_json(_URLS_INDEX, indice)
     return limpia
 
