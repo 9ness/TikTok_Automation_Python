@@ -293,6 +293,41 @@ def textos_lote_enqueue(
     return {"job_id": job.id, "title": title, "position_in_queue": position}
 
 
+@router.post("/textos/revisar", status_code=status.HTTP_201_CREATED)
+def revisar_textos_enqueue(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    source: Annotated[str, Query()],
+    arreglar: Annotated[bool, Query()] = False,
+    carpetas: Annotated[list[str] | None, Query()] = None,
+) -> dict:
+    """Encola la revisión de que cada texto es el de SU producto.
+
+    Le enseña a Gemini la captura de la ficha y el título guardado y pregunta
+    si son el mismo producto. Es una llamada por producto (céntimos) y sirve
+    para cazar los cruces que dejó la extracción por lotes — un producto con el
+    nombre de otro se publica con el texto equivocado y no se nota hasta que
+    alguien mira la foto.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+
+    etiqueta = pov_config.SOURCES[source].get("label") or source
+    solo = [c for c in (carpetas or []) if c.strip()]
+    title = (
+        f"🔍 Revisar textos · {etiqueta}"
+        + (f" · {len(solo)} carpeta(s)" if solo else "")
+        + (" (y arreglar)" if arreglar else "")
+    )
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_REVISAR,
+        title=title,
+        params={"source": source, "arreglar": bool(arreglar), "carpetas": solo},
+    )
+    return {"job_id": job.id, "title": title}
+
+
 @router.post("/complete", response_model=MarkCompletedResponse)
 def mark_completed(
     body: MarkCompletedRequest,

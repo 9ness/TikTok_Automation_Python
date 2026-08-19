@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useSources, useTextosLote } from "@/lib/queries/nichoPovBof";
+import { useRevisarTextos, useSources, useTextosLote } from "@/lib/queries/nichoPovBof";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 
 /** Extraer los textos de TODAS las carpetas de un catálogo de una tacada.
@@ -22,6 +22,7 @@ import { useDrawerStore } from "@/lib/stores/drawerStore";
 export function PanelTextos() {
   const sources = useSources();
   const lote = useTextosLote();
+  const revisar = useRevisarTextos();
   const openQueue = useDrawerStore((s) => s.openQueue);
   const [source, setSource] = useState("aleatorios_1");
   const [rehacer, setRehacer] = useState(false);
@@ -94,6 +95,29 @@ export function PanelTextos() {
         />
         Leer las capturas de una en una (más lento, imposible que se crucen)
       </label>
+
+      {/* Cazar los cruces: la extracción por lotes le daba a un producto el
+          nombre de otro (una escalera publicada como probióticos). Le enseña a
+          Gemini la ficha y el título guardado, producto a producto. */}
+      <button
+        type="button"
+        disabled={revisar.isPending}
+        onClick={() =>
+          revisar.mutate(
+            { source, arreglar: true },
+            {
+              onSuccess: (r) => {
+                toast.success(`${r.title} en la cola`);
+                openQueue();
+              },
+              onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+            },
+          )
+        }
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-[11px] font-semibold text-violet-400 transition hover:bg-violet-500/10 disabled:opacity-50"
+      >
+        🔍 Revisar que cada texto es de su producto (y arreglarlo)
+      </button>
 
       <button
         type="button"

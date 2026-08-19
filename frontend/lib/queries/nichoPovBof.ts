@@ -703,6 +703,24 @@ export function useGuardarUrlProducto() {
   });
 }
 
+/** Revisar que el texto de cada producto es el de SU ficha (por la cola). */
+export function useRevisarTextos() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string },
+    Error,
+    { source: string; arreglar?: boolean }
+  >({
+    mutationFn: ({ source, arreglar }) =>
+      api.post(
+        `${ROOT}/textos/revisar?source=${encodeURIComponent(source)}` +
+          (arreglar ? "&arreglar=true" : ""),
+        {},
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
+  });
+}
+
 export function buildCleanPhotoDownloadUrl(
   source: string, folder: string, producto: string,
   variante: "limpia" | "ficha" = "limpia",

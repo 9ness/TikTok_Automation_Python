@@ -28,6 +28,7 @@ export type JobMode =
   | "nicho_pov_bof_largo_video"
   | "nicho_pov_bof_plazos_video"
   | "nicho_pov_bof_textos"
+  | "nicho_pov_bof_revisar"
   | "nicho_pov_bof_largo_guiones"
   | "nicho_carruseles_preparar"
   | "nicho_carruseles_reparto";

@@ -2458,6 +2458,115 @@ def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -
 
 
 
+def run_nicho_pov_bof_revisar(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Comprueba que el texto guardado de cada producto es el de SU ficha.
+
+    La extracción por lotes cruzaba imágenes y algún producto se quedaba con el
+    nombre de otro: pasó con una escalera de aluminio publicada como si fuera un
+    bote de probióticos. Mirarlo a ojo son 200 fichas; aquí se le enseña a
+    Gemini la captura y el título guardado y se le pregunta si son el mismo
+    producto — una llamada por producto, barata, y queda apuntada en costes.
+
+    Con `arreglar` se vuelven a sacar los textos de las carpetas donde algo no
+    cuadre, de UNA EN UNA (que es donde no se puede cruzar nada).
+
+    Params: source, carpetas (opcional), arreglar.
+    """
+    import os
+
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client, photo_pairing, text_extractor
+    from src.tiktok_shop.api.gemini import generate_json
+
+    p = job.params or {}
+    source = str(p.get("source") or "")
+    arreglar = bool(p.get("arreglar"))
+    if source not in pov_config.SOURCES:
+        raise RuntimeError(f"Catálogo desconocido: {source!r}")
+
+    carpetas = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    solo = [str(c) for c in (p.get("carpetas") or []) if str(c)]
+    if solo:
+        carpetas = [c for c in carpetas if c in solo]
+    docs = product_repo.load_folders([(source, c) for c in carpetas])
+
+    prompt = (
+        "Te doy la CAPTURA de la ficha de un producto de TikTok Shop y un "
+        "título. Dime si ese título es el del producto de la captura. Devuelve "
+        'SOLO {"coincide": true|false, "titulo_real": "el de la captura, corto"}. '
+        "Coincide si es el MISMO producto aunque las palabras cambien; no "
+        "coincide solo si es otro producto distinto."
+    )
+
+    revisados, cruzados, fallos = 0, [], 0
+    for i, (carpeta, doc) in enumerate(zip(carpetas, docs)):
+        on_progress(i / max(1, len(carpetas)), f"🔍 {i + 1}/{len(carpetas)} · {carpeta}")
+        guardados = (doc or {}).get("productos") or {}
+        if not guardados:
+            continue
+        try:
+            fotos = [
+                drive_client.probe_dimensions(f)
+                for f in drive_client.list_photos(source, carpeta)
+            ]
+            pares = {str(x["producto"]): x for x in photo_pairing.pair_folder(fotos)}
+        except Exception as e:  # noqa: BLE001
+            on_log(f"[revisar] {carpeta}: no se pudo leer el Drive ({e})")
+            continue
+
+        for pid, prod in guardados.items():
+            titulo = " ".join(str(prod.get("titulo") or "").split())
+            par = pares.get(pid)
+            ficha = (par or {}).get("titled") or {}
+            if not titulo or not ficha.get("id"):
+                continue
+            try:
+                sufijo = os.path.splitext(ficha.get("name") or "")[1].lower() or ".jpg"
+                ruta = drive_client.fetch_photo(ficha["id"], suffix=sufijo)
+                raw = generate_json(
+                    prompt, f"Título guardado: {titulo}",
+                    images=[str(ruta)], temperature=0.1,
+                )
+            except Exception as e:  # noqa: BLE001
+                fallos += 1
+                on_log(f"[revisar] {carpeta}/{pid}: no se pudo mirar ({e})")
+                continue
+            revisados += 1
+            if not (raw or {}).get("coincide", True):
+                real = str((raw or {}).get("titulo_real") or "")[:40]
+                cruzados.append((carpeta, pid, titulo[:40], real))
+                on_log(f"[revisar] ✗ {carpeta}/{pid}: guardado «{titulo[:34]}» · ficha «{real}»")
+
+    if not cruzados:
+        on_progress(1.0, "🔍 Todo cuadra")
+        return f"{revisados} productos revisados · ninguno cruzado"
+
+    resumen = f"{len(cruzados)}/{revisados} cruzados"
+    if arreglar:
+        afectadas = sorted({c for c, _, _, _ in cruzados})
+        on_log(f"[revisar] rehaciendo los textos de: {', '.join(afectadas)}")
+        for j, carpeta in enumerate(afectadas):
+            on_progress(0.6 + 0.4 * j / len(afectadas), f"🔤 {carpeta}")
+            try:
+                textos = text_extractor.extract_folder_texts(
+                    source, carpeta, lote=1, on_log=on_log,
+                )
+                if textos:
+                    product_repo.save_extracted_texts(source, carpeta, textos)
+            except Exception as e:  # noqa: BLE001
+                on_log(f"[revisar] {carpeta} no se pudo rehacer: {e}")
+        resumen += f" · rehechas {len(afectadas)} carpeta(s)"
+        on_log(
+            "[revisar] los productos que cambian de nombre necesitan también "
+            "categoría y mensajes nuevos (Configuración › Carruseles)"
+        )
+    if fallos:
+        resumen += f" · {fallos} sin mirar"
+    on_progress(1.0, "🔍 Revisado")
+    return resumen
+
+
 def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Escribe los guiones de TODA una carpeta del POV BOF Largo.
 
@@ -3553,6 +3662,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_TEXTOS: run_nicho_pov_bof_textos,
+    JobMode.NICHO_POV_BOF_REVISAR: run_nicho_pov_bof_revisar,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: run_nicho_ropa_personas_video,
@@ -3584,6 +3694,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_TEXTOS: "viralizacion",
+    JobMode.NICHO_POV_BOF_REVISAR: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_PERSONAS_VIDEO: "viralizacion",
