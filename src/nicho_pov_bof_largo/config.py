@@ -3,14 +3,15 @@
 Es el Nicho POV BOF con UNA diferencia de fondo: la voz no sale de un banco de
 frases grabadas, sino de un **guion escrito para ESE producto** por la IA y
 locutado con Fish Audio. Como el guion habla del producto concreto, dura más
-que las frases genéricas (~20s en vez de ~11), y por eso el vídeo son **dos
-clips de 10s** pegados en vez de uno.
+que las frases genéricas (~20s en vez de ~11), y por eso el vídeo son **varios
+clips pegados** en vez de uno: con los clips de 8s de la plataforma nueva, un
+guion de veinte segundos son tres (ver `clips_necesarios`).
 
 Todo lo demás es idéntico y se reutiliza tal cual: mismas carpetas de Drive,
 mismas fotos, mismos textos extraídos, mismo bloque de gancho/título/CTA, misma
 flecha y el mismo montador.
 
-**La duración la manda el audio.** Se pegan los dos clips (~20s) y se recorta a
+**La duración la manda el audio.** Se pegan los clips y se recorta a
 la duración exacta de la voz con `match_video_to_audio`, que ya hace las dos
 cosas: si sobra vídeo lo corta y si falta lo alarga rebobinando. O sea que un
 guion de 18s deja un vídeo de 18s, sin tocar la velocidad.
@@ -36,17 +37,19 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 # Dos clips de ~10s. Hasta que no están todos los que hacen falta no se encola
 # nada: con uno solo no hay vídeo que montar (mismo criterio que el BOF
 # Cinematográfico).
-CLIPS_POR_VIDEO = 2
-CLIP_TARGET_S = 10.0
-# Cuando el guion se alarga, dos clips se quedan cortos: uno de 519 caracteres
-# son ~29s y estirar dos clips de diez hasta ahí deforma el gesto. Por encima
-# de lo que aguantan dos se pide un TERCERO; más de tres no, que el vídeo
-# dejaría de parecer una toma continua.
-CLIPS_MAXIMOS = 3
-# Hasta dónde se puede estirar un clip sin que se note. El montaje ya alarga un
-# poco cada uno para cuadrar con la voz (`match_video_to_audio`), así que dos
-# clips cubren 25s de guion; solo a partir de ahí hace falta el tercero.
-CLIP_MAX_S = 12.5
+CLIPS_POR_VIDEO = 1
+# Cuánto dura un clip generado. La plataforma de vídeo los da de OCHO segundos
+# (antes eran de diez); si algún día vuelven a ser de diez, se cambia aquí y
+# todo lo demás —cuántos clips pedir y cuánto guion cabe— sale solo.
+CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "8"))
+# Más de cuatro deja de parecer una toma continua.
+CLIPS_MAXIMOS = 4
+# Hasta dónde se puede estirar un clip sin que se note: el montaje ya alarga un
+# poco cada uno para cuadrar con la voz (`match_video_to_audio`). Un 20% sobre
+# los 8s son 9,6s, que es justo el margen que pidió el operador ("uno o dos
+# segundos"). De ahí salen los cortes: 1 clip hasta ~9,5s, 2 hasta ~19s, 3
+# hasta ~28,5s y 4 hasta ~38s.
+CLIP_MAX_S = round(CLIP_TARGET_S * 1.2, 1)
 
 # ---------------------------------------------------------------------------
 # Guion
@@ -56,25 +59,61 @@ CLIP_MAX_S = 12.5
 # OJO con el tope de caracteres: el documento original pide 260 "para un vídeo
 # de 15 segundos", pero su PROPIO ejemplo tiene 357 y a 18 car/s eso son 20s,
 # no 15. Forzar los 260 con reintentos deja el guion telegráfico ("¿Piel grasa?
-# ¿Residuo blanco?"). Así que el tope real es el que cabe en los dos clips.
-CARACTERES_POR_SEGUNDO = 18.2      # medido con voces reales de Fish
-GUION_MAX_CARACTERES = int(CLIPS_POR_VIDEO * CLIP_TARGET_S * CARACTERES_POR_SEGUNDO)  # 364
+# ¿Residuo blanco?"). Así que el tope es la DURACIÓN que se quiere, no lo que
+# quepa en los clips.
+# Velocidad de locución, MEDIDA sobre vídeos ya montados (guion / duración del
+# audio de Fish). No es un detalle: con el mismo guion, "audio hombre vendedor"
+# corre a 23,6 car/s y "influencer" a 15,4 — 20s con una son 30s con la otra, y
+# de eso depende cuántos clips hay que generar.
+CARACTERES_POR_SEGUNDO = 17.8      # media de los 20 vídeos medidos
+# Para decidir CUÁNTOS CLIPS se usa la voz LENTA, no la media: la voz se sortea
+# después de escribir el guion, así que hay que ponerse en lo peor. Quedarse
+# corto obliga a estirar el vídeo y deforma el gesto de la mano; sobrar medio
+# clip no se nota, porque el montaje recorta a la duración de la voz.
+CARACTERES_POR_SEGUNDO_LENTA = 15.4
+# Lo que tiene que DURAR el guion, que es una decisión del formato y no del
+# tamaño de los clips: el del curso cuenta el producto en unos veinte segundos.
+# Antes se calculaba como "lo que quepa en los clips" y al pasar a clips de 8s
+# habría dado 683 caracteres — guiones del doble de largos sin que nadie lo
+# pidiera. Los clips se adaptan al guion, no al revés.
+GUION_OBJETIVO_S = 20.0
+GUION_MAX_CARACTERES = int(GUION_OBJETIVO_S * CARACTERES_POR_SEGUNDO)  # ~356
 
 
-def clips_necesarios(guion: str) -> int:
+def segundos_de(guion: str, voz: str = "") -> float:
+    """Cuánto va a durar ese guion locutado, en segundos.
+
+    Con `voz` (el `reference_id` o su etiqueta) se usa SU velocidad medida; sin
+    ella, la media. Las medidas se van afinando solas con cada vídeo que se
+    monta (ver `services/velocidad_voz.py`).
+    """
+    n = len((guion or "").strip())
+    if not n:
+        return 0.0
+    from src.nicho_pov_bof_largo.services import velocidad_voz
+
+    return n / velocidad_voz.caracteres_por_segundo(voz)
+
+
+def clips_necesarios(guion: str, voz: str = "") -> int:
     """Cuántos clips hacen falta para que quepa ese guion.
 
     La voz manda: si dura más de lo que dan los clips, el montaje tiene que
     estirarlos y el gesto de la mano se deforma. Se calcula por caracteres
-    (18,2 car/s medidos con las voces de Fish) porque hay que saberlo ANTES de
-    locutar, cuando aún no hay audio que medir.
+    porque hay que saberlo ANTES de locutar, cuando aún no hay audio que medir.
+
+    Sin voz elegida se cuenta con la más lenta del banco: es lo que evita
+    quedarse corto justo cuando toca la que más se alarga.
     """
     n = len((guion or "").strip())
     if not n:
         return CLIPS_POR_VIDEO
-    segundos = n / CARACTERES_POR_SEGUNDO
-    # Contra `CLIP_MAX_S` y no contra los 10s nominales: estirar un poco cada
-    # clip es lo que ya hace el montaje y no se nota.
+    if voz:
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        segundos = n / velocidad_voz.caracteres_por_segundo(voz)
+    else:
+        segundos = n / CARACTERES_POR_SEGUNDO_LENTA
     hacen_falta = -(-int(segundos * 100) // int(CLIP_MAX_S * 100))  # techo
     return max(CLIPS_POR_VIDEO, min(CLIPS_MAXIMOS, hacen_falta))
 

@@ -1904,11 +1904,12 @@ def _es_plazos(textos: dict) -> bool:
 
 def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UN producto: guion escrito por IA, locutado y sobre
-    DOS clips de 10s pegados.
+    los clips que haga falta pegados (8s cada uno).
 
     Es el Nicho POV BOF con la voz cambiada: en vez de una frase genérica del
-    banco, un guion que habla de ESE producto. Como dura más (~20s), hacen
-    falta dos clips; y como la voz manda, el vídeo se recorta a su duración.
+    banco, un guion que habla de ESE producto. Como dura más (~20s) hacen falta
+    varios clips —tres con los de 8s—, y como la voz manda, el vídeo se recorta
+    a su duración.
 
     Params: source, folder, producto, clip1_path, clip2_path, sexo, operator,
     con_gancho/titulo/cta/flecha.
@@ -2010,6 +2011,14 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         audio = work / "voz.mp3"
         info = voz_svc.sintetizar(
             escrito["guion"], audio, sexo=sexo, on_log=on_log,
+        )
+        # Cada vídeo afina la velocidad de SU voz: es lo que hace que la
+        # próxima estimación de cuántos clips hacen falta sea mejor.
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        velocidad_voz.apuntar(
+            str(info.get("voz_id") or ""), len(escrito["guion"]),
+            float(info.get("duracion") or 0),
         )
 
         salida = Path(largo_config.video_dir()) / source / folder / f"{producto}.mp4"
@@ -2141,6 +2150,12 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
         on_log(
             f"[pov_bof_plazos] voz: {info.get('voz_label')} · "
             f"{info.get('duracion', 0):.1f}s"
+        )
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        velocidad_voz.apuntar(
+            str(info.get("voz_id") or ""), len(guion),
+            float(info.get("duracion") or 0),
         )
 
         def _progreso(pct: float, label: str) -> None:
