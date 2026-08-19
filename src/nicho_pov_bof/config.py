@@ -388,13 +388,19 @@ TARGET_W, TARGET_H, TARGET_FPS = 1080, 1920, 30
 # Ampliación anti-marca-de-agua. Las plataformas de generación (GenAI Pro con
 # Veo, desde 2026-08) devuelven el clip con una marca pequeña en una esquina.
 # No se tapa con un parche —un rectángulo encima canta más que la marca—: se
-# AMPLÍA el vídeo un poco y el recorte se lleva la esquina entera.
-ZOOM_MARCA_AGUA = float(os.getenv("ZOOM_MARCA_AGUA", "1.05"))
-# En qué esquina cae la marca. El sobrante del recorte se concentra AHÍ en vez
-# de repartirse por igual entre los cuatro lados: con la misma ampliación se
-# quita el doble donde hace falta y el encuadre solo se desplaza un 2,5%.
-# "centro" reparte como se hacía antes.
-ESQUINA_MARCA_AGUA = os.getenv("ESQUINA_MARCA_AGUA", "abajo-derecha")
+# AMPLÍA el vídeo un poco y el recorte simétrico se la lleva.
+#
+# El 7% no es un número al azar: medida la marca en un vídeo real, su borde
+# más alto queda a 48 px del fondo, y repartiendo el recorte por igual entre
+# los cuatro lados el 5% solo se come 45,7 px — asomaba una tira de 2 px.
+# Con el 7% se quitan 62,8 px por arriba y por abajo (35,3 a cada lado), o
+# sea 15 px de margen. La salida sigue siendo 1080x1920 exactos.
+ZOOM_MARCA_AGUA = float(os.getenv("ZOOM_MARCA_AGUA", "1.07"))
+# El recorte se reparte por IGUAL entre los cuatro lados ("centro"): el
+# producto tiene que quedarse donde estaba, que es lo que importa del plano.
+# Se puede concentrar en una esquina ("abajo-derecha"…) si algún generador
+# empieza a poner la marca más adentro y no llega con un recorte simétrico.
+ESQUINA_MARCA_AGUA = os.getenv("ESQUINA_MARCA_AGUA", "centro")
 
 
 def _par(n: float) -> int:
