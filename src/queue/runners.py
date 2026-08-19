@@ -3166,27 +3166,42 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     """Monta el vídeo final de UN producto (Fase 2 del Nicho POV BOF) y lo
     publica en Drive.
 
+    El vídeo son DOS clips pegados, con el mismo montaje del POV BOF Largo: la
+    voz manda la duración y el salto del clip 1 al 2 cae en una pausa del habla.
+    Antes era UN clip y no daba: los audios del banco duran entre 9,7s y 13,9s
+    y un clip son 8s (9,6s estirado), así que casi siempre faltaba trozo y lo
+    rellenaba `_build_pingpong` repitiendo el final hacia atrás y hacia delante
+    — en un vídeo de 12s, un tercio era ese rebote.
+
     Params esperados en job.params:
       - source, folder, producto: identifican el producto (carpeta del Drive
         compartido "Productos España" + número de producto dentro de ella).
-      - raw_path: vídeo bruto subido por el operador (Veo3/Kling), en
-        API_TEMP_ROOT.
-      - sexo: "hombre" | "mujer" — el operador solo elige esto, la frase/voz
-        salen sorteadas del banco de audios.
-      - origen: "veo3" | "kling" — determina si hay que quitar marca de agua.
+      - clip1_path, clip2_path: los dos clips subidos por el operador.
+      - raw_path: UN clip. Solo lo mandan los trabajos encolados antes de este
+        cambio; se sigue aceptando para no tirar lo que hubiera en la cola.
+      - sexo: "hombre" | "mujer" | "auto" — el operador solo elige esto, la
+        frase/voz salen sorteadas del banco de audios.
+      - origen: histórico, ya no se usa (`build_video` lo ignora).
     """
     from src.nicho_pov_bof import config
-    from src.nicho_pov_bof.pipeline import video_editor
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import audio_bank
+    from src.nicho_pov_bof_largo.pipeline import video_editor
 
     p = job.params
     source = p["source"]
     folder = p["folder"]
     producto = p["producto"]
-    raw_path = Path(p["raw_path"])
     sexo = p["sexo"]
-    origen = p.get("origen", "")
+
+    clips = [Path(c) for c in (p.get("clip1_path"), p.get("clip2_path")) if c]
+    if not clips:
+        # Trabajo de antes del cambio a dos clips.
+        clips = [Path(p["raw_path"])]
+    for c in clips:
+        if not c.is_file():
+            raise FileNotFoundError(f"No está el clip subido: {c}")
+    raw_path = clips[0]
 
     # "auto": la mano del vídeo decide la voz. Se hace AQUÍ y no al subir
     # porque el bruto ya está en disco local (sacar cinco fotogramas es
@@ -3201,7 +3216,7 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         from src.nicho_pov_bof.services import mano
 
         on_progress(0.04, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(raw_path, on_log=on_log)
+        deteccion = mano.detectar(clips, on_log=on_log)
         if deteccion.get("error"):
             raise RuntimeError(
                 "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
@@ -3234,14 +3249,16 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         # Drive; el 84% restante es lo que reporta `video_editor.build_video`.
         on_progress(0.08 + pct * 0.84, label)
 
-    video_editor.build_video(
-        raw_video=raw_path,
+    # `montar` cuadra cada clip con SU parte de la voz y busca la pausa donde
+    # saltar del uno al otro; por dentro llama al MISMO `build_video` de
+    # siempre, así que el acabado no cambia.
+    video_editor.montar(
+        clips=clips,
         audio_path=audio_ready,
         textos=textos,
-        origen=origen,
         output_path=output_local,
         work_dir=work_dir,
-        layout=video_editor.layout_for_producto(producto, textos.get("cta", "")),
+        producto=producto,
         con_gancho=bool(p.get("con_gancho", p.get("con_textos", True))),
         con_titulo=bool(p.get("con_titulo", p.get("con_textos", True))),
         con_cta=bool(p.get("con_cta", p.get("con_textos", True))),

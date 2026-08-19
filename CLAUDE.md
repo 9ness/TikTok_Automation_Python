@@ -298,12 +298,18 @@ fotos se guardan con el MISMO convenio de nombres del Drive compartido
 (`3.png` / `3(1).png`) para que emparejado, textos, ficha y montaje funcionen
 sin código especial (`services/mis_productos.py`).
 
-Los productos CAROS van por otro camino: al extraer textos se lee también el
-**precio** y, por encima de `PRECIO_MIN_PLAZOS` (40 €), el vídeo lleva uno de
-los guiones de Klarna del curso (`prompts/guiones_plazos.md`, sorteado y
-locutado con Fish en voz de hombre o mujer al azar) y se monta con **DOS clips**
-usando el editor del POV BOF Largo — `JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`. Por
-debajo del umbral, todo sigue igual: un clip y el audio del banco.
+**TODOS los vídeos son de DOS clips**, montados con el editor del POV BOF Largo
+(`montar`: cuadra cada clip con su parte de la voz y salta del uno al otro en
+una pausa del habla). Sale de medir el banco: los audios duran 9,7-13,9s
+(mediana 12) y un clip da 8s, o 9,6 estirado un 20%; con uno solo faltaba trozo
+en todos y el hueco lo rellenaba el rebobinado (`_build_pingpong`) — en un vídeo
+de 12s, un tercio era ese rebote.
+
+Lo que cambia según el precio es la VOZ, no el número de clips: por encima de
+`PRECIO_MIN_PLAZOS` (40 €) el vídeo lleva uno de los guiones de Klarna del curso
+(`prompts/guiones_plazos.md`, sorteado y locutado con Fish) —
+`JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`—, y por debajo, un audio del banco —
+`JobMode.NICHO_POV_BOF_VIDEO`.
 
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
 Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.

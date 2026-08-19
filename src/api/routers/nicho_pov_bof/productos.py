@@ -794,48 +794,26 @@ def confirmar_lote(
             "con_gancho": bool(body.con_gancho), "con_titulo": bool(body.con_titulo),
             "con_cta": bool(body.con_cta), "con_flecha": bool(body.con_flecha),
         }
-        if _precio_y_modo(prod)[1]:
-            montado_at = float(prod.get("video_listo_at") or 0)
-            # El orden de la tanda manda: el primer vídeo de este producto es
-            # el clip 1 y el segundo el clip 2. Solo si ya tenía uno subido de
-            # antes se respeta el hueco que quede libre.
-            if vistos[item.producto] >= 2:
-                slot = 2
-            else:
-                slot = 1 if not _clip_vigente(prod.get("clip1_path"), montado_at) else 2
-            r = _plazos_clip(
-                queue, body.source, body.folder, item.producto, slot, ruta,
-                body.sexo, usuario, **flags,
-            )
-            if r.job_id:
-                encolados += 1
-            else:
-                pendientes += 1
-                mensajes.append(f"Producto {item.producto}: {r.message}")
-            continue
-
-        # Producto normal = UN vídeo. Si la tanda trae dos para el mismo, el
-        # segundo montaje sobrescribiría al primero y el operador vería un
-        # producto sin vídeo sin saber por qué: se ignora y se dice.
+        # Todos los productos llevan DOS clips (ver `_guardar_clip`), así que
+        # la tanda ya no reparte por precio, sino por hueco libre.
+        montado_at = float(prod.get("video_listo_at") or 0)
+        # El orden de la tanda manda: el primer vídeo de este producto es el
+        # clip 1 y el segundo el clip 2. Solo si ya tenía uno subido de antes se
+        # respeta el hueco que quede libre.
         if vistos[item.producto] >= 2:
-            pendientes += 1
-            mensajes.append(
-                f"Producto {item.producto}: llegaron {vistos[item.producto]} vídeos y "
-                "solo lleva uno; el de más se ha ignorado (¿es de otro producto?)."
-            )
-            continue
-
-        job = queue.enqueue(
-            JobMode.NICHO_POV_BOF_VIDEO,
-            title=f"🎬 Nicho POV BOF: producto {item.producto} · {body.folder}",
-            params={
-                "source": body.source, "folder": body.folder,
-                "producto": item.producto, "raw_path": str(ruta),
-                "sexo": body.sexo, "origen": "", **flags,
-            },
-            enqueued_by=usuario or None,
+            slot = 2
+        else:
+            slot = 1 if not _clip_vigente(prod.get("clip1_path"), montado_at) else 2
+        r = _guardar_clip(
+            queue, body.source, body.folder, item.producto, slot, ruta,
+            body.sexo, usuario, **flags,
         )
-        encolados += 1 if job else 0
+        if r.job_id:
+            encolados += 1
+        else:
+            pendientes += 1
+            mensajes.append(f"Producto {item.producto}: {r.message}")
+
     return VideoLoteConfirmarResponse(
         encolados=encolados, pendientes=pendientes, mensajes=mensajes[:6],
     )
@@ -947,7 +925,7 @@ async def upload_video(
         await file.close()
 
     if slot:
-        return _plazos_clip(
+        return _guardar_clip(
             queue, source, folder, producto, slot, raw_path, sexo_norm, operator,
             con_gancho=bool(con_gancho) and bool(con_textos),
             con_titulo=bool(con_titulo) and bool(con_textos),
@@ -976,7 +954,7 @@ async def upload_video(
     return VideoUploadResponse(ok=True, job_id=job.id, message="En la cola, procesando…")
 
 
-def _plazos_clip(
+def _guardar_clip(
     queue: JobQueue,
     source: str,
     folder: str,
@@ -987,10 +965,20 @@ def _plazos_clip(
     operator: str,
     **flags: bool,
 ) -> VideoUploadResponse:
-    """Guarda uno de los dos clips del vídeo de plazos y encola cuando están los dos.
+    """Guarda uno de los dos clips y encola el montaje cuando están los dos.
 
-    El guion de Klarna dura ~15s y un clip son 10s: con uno solo faltaría un
-    tercio del vídeo, así que no hay nada que montar hasta tener los dos.
+    TODOS los productos van con dos clips, no solo los de plazos. El motivo es
+    medido: los audios del banco duran entre 9,7s y 13,9s (mediana 12s) y un
+    clip da 8s, o 9,6s estirado un 20%, que es el margen aceptado. Con uno solo
+    faltaba casi siempre, y ese hueco lo rellenaba `_build_pingpong` repitiendo
+    el final del clip hacia atrás y hacia delante: en un vídeo de 12s, un
+    tercio era ese rebote. Con dos clips (16s de material) no hace falta
+    ninguno. Es además la MISMA regla del POV BOF Largo —`techo(segundos/9,6)`—
+    aplicada a este banco de audios.
+
+    Lo que cambia entre uno y otro es de dónde sale la VOZ, no el número de
+    clips: los caros llevan el guion de Klarna locutado con Fish y el resto un
+    audio del banco.
 
     Cada montaje empieza de cero — al encolar se olvidan los dos paths, igual
     que en el POV BOF Largo, para que resubir un producto ya montado vuelva a
@@ -1025,9 +1013,14 @@ def _plazos_clip(
             message=f"Clip {slot} guardado. Ya hay un montaje en marcha para este producto.",
         )
 
+    # De dónde sale la voz: guion de Klarna locutado (caros) o banco de audios.
+    es_plazos = bool(_precio_y_modo(prod)[1])
     job = queue.enqueue(
-        JobMode.NICHO_POV_BOF_PLAZOS_VIDEO,
-        title=f"💳 POV BOF plazos: producto {producto} · {folder}",
+        JobMode.NICHO_POV_BOF_PLAZOS_VIDEO if es_plazos else JobMode.NICHO_POV_BOF_VIDEO,
+        title=(
+            f"💳 POV BOF plazos: producto {producto} · {folder}" if es_plazos
+            else f"🎬 Nicho POV BOF: producto {producto} · {folder}"
+        ),
         params={
             "source": source, "folder": folder, "producto": producto,
             "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
@@ -1046,7 +1039,10 @@ def _plazos_clip(
         pass
     return VideoUploadResponse(
         ok=True, job_id=job.id,
-        message="Los dos clips están: locutando el guion de plazos y montando.",
+        message=(
+            "Los dos clips están: locutando el guion de plazos y montando."
+            if es_plazos else "Los dos clips están: montando el vídeo."
+        ),
     )
 
 

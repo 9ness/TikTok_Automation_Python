@@ -100,15 +100,21 @@ const CAR_POR_SEG = 18.2;
 /** Los dos flujos de la carpeta. Un producto lleva guion de plazos o el de
  *  siempre según su precio, y cada uno se genera distinto (dos clips o uno),
  *  así que se bajan por separado. `todas` es la carpeta entera. */
-/** Cuántos clips pide este producto.
+/** Cuántos clips pide este producto: DOS, siempre.
  *
- *  HOY: los de plazos llevan dos (su guion dura ~15s) y el resto uno. Si mañana
- *  los normales pasan a dos, se cambia AQUÍ y lo siguen solos la tarjeta, los
- *  recuentos y los botones de descarga — por eso no se pregunta por
- *  `modo_plazos` en cada sitio.
+ *  Sale de medir el banco: los audios duran entre 9,7s y 13,9s (mediana 12s) y
+ *  un clip da 8s, o 9,6s estirado un 20%. Con uno solo faltaba trozo en todos,
+ *  y ese hueco se rellenaba repitiendo el final del clip hacia atrás y hacia
+ *  delante — en un vídeo de 12s, un tercio era ese rebote. Es además la misma
+ *  regla del POV BOF Largo, `techo(segundos / 9,6)`, aplicada a este banco: da
+ *  dos hasta para el audio más corto.
+ *
+ *  Sigue siendo una función y no un `2` suelto porque es el sitio donde mirar
+ *  si los clips dejan de durar 8s: lo siguen la tarjeta, los recuentos, los
+ *  botones de descarga y cuántos huecos de subida se pintan.
  */
-function clipsDe(p: { modo_plazos: boolean }): number {
-  return p.modo_plazos ? 2 : 1;
+function clipsDe(_p: { modo_plazos: boolean }): number {
+  return 2;
 }
 
 /** Qué subconjunto se baja. Mismo planteamiento que el POV BOF Largo, para que
@@ -286,6 +292,12 @@ export default function NichoPovBofPage() {
   const foto2 = enPantalla.filter(
     (p) => p.clean_photo_id && cuadra(p, "clips2"),
   ).length;
+  // Si TODOS piden los mismos clips (hoy, dos), separarlos no separa nada:
+  // ni los botones ni las marcas de la tarjeta aportan. En cuanto vuelva a
+  // haber mezcla, reaparecen solos — por eso se mira el dato y no se comenta
+  // el código.
+  const hayMezclaDeClips =
+    new Set(enPantalla.map((p) => clipsDe(p))).size > 1;
   // Lo mismo para los vídeos ya montados: bajar 20 para quedarse con 3 es lo
   // que se quería evitar.
   const videoConUrl = enPantalla.filter(
@@ -908,7 +920,7 @@ export default function NichoPovBofPage() {
                 tono="url"
               />
             </div>
-            {(foto1 > 0 || foto2 > 0) && (
+            {hayMezclaDeClips && (
               <>
                 <p className="pt-0.5 text-[10px] text-muted-foreground">
                   De los que tienen URL, por clips:
@@ -1006,7 +1018,7 @@ export default function NichoPovBofPage() {
                 tono="url"
               />
             </div>
-            {(video1 > 0 || video2 > 0) && (
+            {hayMezclaDeClips && (
               <>
                 <p className="pt-0.5 text-[10px] text-muted-foreground">
                   De los que tienen URL, por clips:
@@ -1129,6 +1141,7 @@ export default function NichoPovBofPage() {
                   producto={p}
                   carpetaHecha={Boolean(listaProductos.some((x) => x.titulo))}
                   esTopVendidos={esTopVendidos}
+                  marcarClips={hayMezclaDeClips}
                 />
               ))}
             </div>
@@ -1279,10 +1292,14 @@ function ProductoCard({
   producto,
   carpetaHecha = false,
   esTopVendidos = false,
+  marcarClips = false,
 }: {
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** ¿Hay productos de distinto nº de clips en pantalla? Solo entonces vale la
+   *  pena marcar cuántos pide cada uno. */
+  marcarClips?: boolean;
   /** En "Top vendidos" se enseña cuántas veces vendió y si es reciente. */
   esTopVendidos?: boolean;
   /** La carpeta ya tiene textos en OTROS productos. Sirve para marcar al que
@@ -1455,7 +1472,7 @@ function ProductoCard({
         producto.video_path
           ? "border-emerald-500/50"
           : "border-border/60 hover:border-emerald-500/30"
-      } ${BORDE_CLIPS[clipsDe(producto)] ?? ""}`}
+      } ${marcarClips ? BORDE_CLIPS[clipsDe(producto)] ?? "" : ""}`}
     >
       <div className="flex gap-2">
         {producto.clean_photo_id ? (
@@ -1562,18 +1579,18 @@ function ProductoCard({
                   💳 Plazos
                 </span>
               )}
-              {/* Cuántos clips pide, siempre: aquí uno y dos son los dos casos
-                  normales, así que hay que poder distinguirlos de un vistazo.
-                  El número ya no cuelga del distintivo de plazos — si mañana
-                  los normales pasan a dos clips, esto sigue diciendo la
-                  verdad (ver `clipsDe`). */}
-              <span
-                className={`rounded px-1.5 py-0.5 font-semibold ${
-                  CHIP_CLIPS[clipsDe(producto)]
-                }`}
-              >
-                🎞️ {clipsDe(producto)} clip{clipsDe(producto) > 1 ? "s" : ""}
-              </span>
+              {/* Cuántos clips pide, SOLO si en la carpeta hay de varios
+                  tipos. Con todos iguales (hoy, dos) el distintivo lo llevaría
+                  cada tarjeta y no distinguiría nada. */}
+              {marcarClips && (
+                <span
+                  className={`rounded px-1.5 py-0.5 font-semibold ${
+                    CHIP_CLIPS[clipsDe(producto)]
+                  }`}
+                >
+                  🎞️ {clipsDe(producto)} clip{clipsDe(producto) > 1 ? "s" : ""}
+                </span>
+              )}
               {/* Cuándo entró en el Drive del curso. Las carpetas no son
                   cerradas: van añadiendo productos durante el día, y sin la
                   fecha no hay forma de saber cuáles son nuevos. */}
