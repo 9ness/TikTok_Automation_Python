@@ -209,7 +209,11 @@ export function QueueDrawer() {
           </div>
         )}
 
-        {disconnected && (
+        {/* Solo cuando está CAÍDO de verdad. Cambiar de cola pasa por
+            "conectando" un instante, y avisar ahí de que se ha perdido la
+            conexión es mentira y encima asusta. El puntito de la cabecera ya
+            distingue los tres estados. */}
+        {connection === "disconnected" && (
           <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
             Desconectado del servidor — reintentando…
           </div>

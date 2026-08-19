@@ -112,7 +112,12 @@ export const useQueueStore = create<QueueState>((set) => ({
   setOtros: (otros: Record<string, ActivosDeOtro>) => set(() => ({ otros })),
   setViendo: (viendo: string, esAdmin: boolean) =>
     set(() => ({ viendo, esAdmin })),
-  setVerDe: (verDe: string) => set(() => ({ verDe })),
+  // Al cambiar de cola se VACÍA lo que hay. El socket se reconecta con el
+  // filtro nuevo y hasta que llegue su snapshot lo que quedaría en pantalla es
+  // la lista de la persona anterior — y como el cambio tarda un instante, se
+  // lee como "he pulsado Ana y me sale la mía".
+  setVerDe: (verDe: string) =>
+    set(() => ({ verDe, active: {}, recent: [], connection: "connecting" })),
   setConnection: (connection, error = null) =>
     set(() => ({ connection, lastError: error })),
 

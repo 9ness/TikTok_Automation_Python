@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import { api } from "@/lib/api";
 import { useQueueStore } from "@/lib/stores/queueStore";
@@ -32,7 +32,17 @@ function buildWsUrl(de: string): string {
  *   se reescribe completo, no quedan jobs huérfanos.
  *
  * Diseñado para invocarse UNA VEZ desde un provider de raíz. Múltiples
- * llamadas crean conexiones extra; usa `QueueWebSocketProvider`.
+ * llamadas crean conexiones extra; usa `QueueWebSocketBridge`.
+ *
+ * TODO el estado del socket vive DENTRO del efecto, no en `useRef`. Con refs
+ * compartidas entre ejecuciones pasaba esto al cambiar de cola con el selector
+ * "Viendo": el cierre del socket viejo es asíncrono y llegaba cuando el nuevo
+ * ya estaba abierto, así que su `onclose` ponía a `null` la referencia del
+ * NUEVO y programaba una reconexión con el filtro ANTERIOR (el que tenía
+ * atrapado en su clausura). Acababas con dos sockets vivos mandando snapshots
+ * contradictorios: se veía un par de recargas y ganaba el que contestara el
+ * último, casi siempre el viejo. Con variables locales, cada ejecución del
+ * efecto tiene lo suyo y la anterior no puede tocar nada.
  */
 export function useQueueWebSocket(): void {
   // De quién ver la cola. Solo lo respeta el backend si eres admin; al
@@ -46,54 +56,58 @@ export function useQueueWebSocket(): void {
   const setViendo = useQueueStore((s) => s.setViendo);
   const setOtros = useQueueStore((s) => s.setOtros);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attemptRef = useRef(0);
-  const stoppedRef = useRef(false);
-
   useEffect(() => {
-    stoppedRef.current = false;
+    /** ¿Sigue mandando esta ejecución del efecto? Al cambiar `verDe` (o al
+     *  desmontar) pasa a `false` y todo lo que quede en vuelo se ignora. */
+    let vivo = true;
+    /** Soltado a propósito por tener la app de fondo (no es un corte). */
+    let dormido = false;
+    let socket: WebSocket | null = null;
+    let pingTimer: ReturnType<typeof setInterval> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let dormirTimer: ReturnType<typeof setTimeout> | null = null;
+    let intentos = 0;
 
-    function clearTimers() {
-      if (pingTimerRef.current) {
-        clearInterval(pingTimerRef.current);
-        pingTimerRef.current = null;
+    function pararTimers() {
+      if (pingTimer) {
+        clearInterval(pingTimer);
+        pingTimer = null;
       }
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
     }
 
-    function scheduleReconnect() {
-      if (stoppedRef.current) return;
-      const delay = Math.min(
-        RECONNECT_BASE_MS * 2 ** attemptRef.current,
-        RECONNECT_MAX_MS,
-      );
-      attemptRef.current += 1;
-      reconnectTimerRef.current = setTimeout(connect, delay);
+    function reconectarLuego() {
+      if (!vivo || dormido) return;
+      const espera = Math.min(RECONNECT_BASE_MS * 2 ** intentos, RECONNECT_MAX_MS);
+      intentos += 1;
+      reconnectTimer = setTimeout(conectar, espera);
     }
 
-    function connect() {
-      if (stoppedRef.current) return;
+    function conectar() {
+      if (!vivo || dormido) return;
       setConnection("connecting");
       let ws: WebSocket;
       try {
         ws = new WebSocket(buildWsUrl(verDe));
       } catch (e) {
         setConnection("disconnected", e instanceof Error ? e.message : "WS error");
-        scheduleReconnect();
+        reconectarLuego();
         return;
       }
-      wsRef.current = ws;
+      socket = ws;
+
+      /** ¿Este socket sigue siendo el bueno? Un socket viejo puede seguir
+       *  emitiendo eventos un rato después de haberlo sustituido. */
+      const actual = () => vivo && socket === ws;
 
       ws.onopen = () => {
-        attemptRef.current = 0;
+        if (!actual()) return;
+        intentos = 0;
         setConnection("connected");
-        // Iniciar pings periódicos
-        pingTimerRef.current = setInterval(() => {
+        pingTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "ping" }));
           }
@@ -101,6 +115,7 @@ export function useQueueWebSocket(): void {
       };
 
       ws.onmessage = (ev) => {
+        if (!actual()) return;
         let payload: WsEvent;
         try {
           payload = JSON.parse(ev.data);
@@ -132,23 +147,27 @@ export function useQueueWebSocket(): void {
       };
 
       ws.onerror = () => {
+        if (!actual()) return;
         setConnection("disconnected", "ws_error");
       };
 
       ws.onclose = () => {
-        if (pingTimerRef.current) {
-          clearInterval(pingTimerRef.current);
-          pingTimerRef.current = null;
+        // Si este socket ya no es el vigente, no se toca NADA: ni la conexión
+        // que se ve, ni la reconexión. Es el socket de la cola anterior
+        // despidiéndose.
+        if (!actual()) return;
+        if (pingTimer) {
+          clearInterval(pingTimer);
+          pingTimer = null;
         }
-        wsRef.current = null;
-        if (!stoppedRef.current) {
-          setConnection("disconnected");
-          scheduleReconnect();
-        }
+        socket = null;
+        if (dormido) return;
+        setConnection("disconnected");
+        reconectarLuego();
       };
     }
 
-    connect();
+    conectar();
 
     // Con la app de fondo no hay nadie mirando la cola, pero el socket seguía
     // abierto haciendo ping cada pocos segundos: gasta batería y mantiene
@@ -156,50 +175,41 @@ export function useQueueWebSocket(): void {
     // matarlo (es lo que dice el chivato que pasa). Se suelta al minuto de
     // esconderse y se vuelve a conectar al volver — el servidor manda un
     // `snapshot` al reconectar, así que no se pierde ningún job.
-    let dormir: ReturnType<typeof setTimeout> | null = null;
-
     function alCambiarVisibilidad() {
       if (document.visibilityState === "hidden") {
-        dormir = setTimeout(() => {
-          stoppedRef.current = true;
-          clearTimers();
-          const ws = wsRef.current;
+        dormirTimer = setTimeout(() => {
+          dormido = true;
+          pararTimers();
+          const ws = socket;
+          socket = null;
           if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
-          wsRef.current = null;
           setConnection("disconnected");
         }, HIDDEN_CLOSE_MS);
         return;
       }
-      if (dormir) {
-        clearTimeout(dormir);
-        dormir = null;
+      if (dormirTimer) {
+        clearTimeout(dormirTimer);
+        dormirTimer = null;
       }
       // Al volver: si se había soltado, reconectar de inmediato.
-      if (!wsRef.current) {
-        stoppedRef.current = false;
-        attemptRef.current = 0;
-        connect();
+      if (!socket) {
+        dormido = false;
+        intentos = 0;
+        conectar();
       }
     }
 
     document.addEventListener("visibilitychange", alCambiarVisibilidad);
 
     return () => {
-      stoppedRef.current = true;
-      if (dormir) clearTimeout(dormir);
+      vivo = false;
+      if (dormirTimer) clearTimeout(dormirTimer);
       document.removeEventListener("visibilitychange", alCambiarVisibilidad);
-      clearTimers();
-      const ws = wsRef.current;
-      if (ws && ws.readyState !== WebSocket.CLOSED) {
-        ws.close();
-      }
-      wsRef.current = null;
+      pararTimers();
+      const ws = socket;
+      socket = null;
+      if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
     };
-    // `verDe` TIENE que estar aquí: es lo que va en la URL del socket. Sin él,
-    // pulsar "Todas" cambiaba el estado pero el socket seguía conectado con el
-    // filtro viejo, así que se veía exactamente lo mismo que en "La mía" — que
-    // es justo el fallo que se notó. Los setters de zustand son estables, así
-    // que añadirlos no provoca reconexiones de más.
   }, [
     verDe,
     setSnapshot,
