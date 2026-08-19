@@ -73,8 +73,14 @@ export function Paso({
 }) {
   const c = COLORES[color];
   // Se recuerda: quien lo pliega no quiere volver a plegarlo cada vez.
+  //
+  // El defecto va DENTRO de la clave a propósito: `useEstadoRecordado` guarda
+  // en localStorage nada más montarse, así que a quien ya abrió la pantalla
+  // con el defecto viejo no le llegaba el nuevo — se plegaron los pasos 5 y 6
+  // y seguían saliendo abiertos. Metiéndolo en la clave, cambiar el defecto
+  // empieza de cero para todos y quien lo despliegue lo conserva.
   const [abierto, setAbierto] = useEstadoRecordado(
-    `paso-abierto:${n}:${titulo}`,
+    `paso-abierto:${n}:${titulo}:${abiertoPorDefecto ? "a" : "c"}`,
     abiertoPorDefecto,
   );
   const desplegado = !plegable || abierto;

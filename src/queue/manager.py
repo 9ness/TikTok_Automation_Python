@@ -57,6 +57,25 @@ def _is_client_edit_job(job: Job) -> bool:
 
 _PERSIST_FILENAME = "queue_state.json"
 
+# Cuántos trabajos YA TERMINADOS se conservan. Los pendientes y los que corren
+# no se tocan nunca, pasen los que pasen.
+#
+# Por qué hay tope: el estado no se limpiaba solo. Cada trabajo acabado se
+# quedaba en la lista para siempre, y esa lista se serializa ENTERA en cada
+# cambio de estado (`_save_state_locked` reescribe el JSON completo) y se
+# recorre entera cada segundo por cada pestaña abierta para calcular el diff
+# del WebSocket. Con 36 trabajos son 157 KB; a los pocos meses de uso son
+# megas escritos por cada job que arranca o acaba, en el mismo disco donde se
+# está montando vídeo.
+#
+# 100 va sobradísimo para lo que se enseña: el endpoint de la cola sirve como
+# mucho 100 terminados (`finished_limit`) y la interfaz se queda con 10. El
+# botón de limpiar historial sigue estando para vaciarlo a mano.
+try:
+    HISTORIAL_MAX = max(10, int(os.environ.get("QUEUE_HISTORY_MAX", "100")))
+except ValueError:
+    HISTORIAL_MAX = 100
+
 
 def leer_jobs(persist_dir: str | Path) -> list[dict]:
     """Lee los trabajos del fichero de estado SIN construir una `JobQueue`.
@@ -486,8 +505,29 @@ class JobQueue:
     # ----------------------------------------------------------
     # Persistencia
     # ----------------------------------------------------------
+    def _podar_historial_locked(self) -> None:
+        """Deja como mucho `HISTORIAL_MAX` trabajos terminados, tirando los más
+        viejos. ASUME lock adquirido.
+
+        Va colgado de `_save_state_locked` a propósito: es el único sitio por el
+        que pasan TODOS los cambios de la cola, así que el tope se mantiene solo
+        sin tener que acordarse de llamarlo en cada mutación.
+        """
+        terminados = [
+            (i, j) for i, j in enumerate(self._jobs)
+            if j.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
+        ]
+        sobran = len(terminados) - HISTORIAL_MAX
+        if sobran <= 0:
+            return
+        # Los más antiguos por fecha de fin; los que no la tengan, primeros.
+        terminados.sort(key=lambda par: (par[1].finished_at or 0, par[0]))
+        fuera = {id(j) for _i, j in terminados[:sobran]}
+        self._jobs = [j for j in self._jobs if id(j) not in fuera]
+
     def _save_state_locked(self) -> None:
         """Escribe el estado actual. ASUME que el lock ya está adquirido."""
+        self._podar_historial_locked()
         try:
             data = {"jobs": [j.to_dict() for j in self._jobs]}
             tmp = self._persist_path.with_suffix(".tmp")

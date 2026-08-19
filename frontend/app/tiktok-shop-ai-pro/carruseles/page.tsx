@@ -466,6 +466,10 @@ export default function CarruselesPage() {
           color="violeta"
           titulo="Preparar la carpeta"
           hint="En este orden: los textos primero (el filtro los lee), luego cuáles valen y por último sus dos mensajes."
+          // Plegado: preparar una carpeta se hace UNA vez y luego estorba —
+          // el contador de aptos se sigue viendo con el paso cerrado.
+          plegable
+          abiertoPorDefecto={false}
           extra={`${aptos.length} aptos`}
         >
           {esPro ? (

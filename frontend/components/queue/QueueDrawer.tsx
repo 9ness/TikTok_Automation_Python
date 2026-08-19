@@ -96,6 +96,18 @@ export function QueueDrawer() {
     return { ts, cr, ea, vi: resto };
   }, [filtered]);
 
+  // Trabajos en marcha CONTANDO los de los demás. El despliegue espera a que
+  // no quede ninguno en toda la máquina, no solo los míos: contando solo los
+  // propios, el aviso decía "entrará en cuanto se lance" mientras Ana estaba
+  // renderizando y el despliegue en realidad iba a quedarse esperando.
+  // Con "Todas" ya vienen todos en `active`; sumar `otros` los contaría dos
+  // veces.
+  const enCursoTotal =
+    verDe === "todos"
+      ? active.length
+      : active.length +
+        Object.values(otros).reduce((n, d) => n + (d?.total ?? 0), 0);
+
   if (!open) return null;
   const disconnected = connection !== "connected";
 
@@ -134,7 +146,7 @@ export function QueueDrawer() {
         {/* Qué pasa con el despliegue. Va aquí porque la duda ("¿ya está
             subido lo nuevo?", "¿puedo mandar un vídeo o se corta?") siempre se
             tiene mirando la cola. */}
-        <AvisoDespliegue enCurso={active.length} />
+        <AvisoDespliegue enCurso={enCursoTotal} />
 
         {/* Multiusuario: cada uno ve LO SUYO. El admin puede mirar la de otro
             y se le avisa, en pequeño, de quién tiene algo en marcha — pediste
