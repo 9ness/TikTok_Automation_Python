@@ -63,6 +63,19 @@ class FakeJobQueue:
     def get_all(self):
         return list(self._jobs)
 
+    def posiciones_pendientes(self):
+        """Mismo cálculo que la cola de verdad: `{job_id: puesto}` de los
+        pendientes, con las ediciones de cliente al final."""
+        from src.queue.manager import _is_client_edit_job
+        from src.queue.models import JobStatus
+
+        pendientes = [
+            (i, j) for i, j in enumerate(self._jobs)
+            if j.status == JobStatus.PENDING
+        ]
+        pendientes.sort(key=lambda par: (_is_client_edit_job(par[1]), par[0]))
+        return {j.id: puesto for puesto, (_i, j) in enumerate(pendientes, start=1)}
+
     def remove(self, job_id):
         from src.queue.models import JobStatus
         finals = (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)

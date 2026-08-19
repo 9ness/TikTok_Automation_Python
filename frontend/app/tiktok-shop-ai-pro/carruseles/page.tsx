@@ -1865,12 +1865,22 @@ function CarruselCard({
       }`}
     >
       <div className="flex items-start gap-2">
-        <FotoProducto
-          src={limpia}
-          alt={p.titulo ?? p.producto}
-          onClick={limpiaVisor || fichaVisor ? () => setVerFoto(true) : undefined}
-          className="h-16 w-16 shrink-0 cursor-zoom-in rounded-md object-cover"
-        />
+        {/* La miniatura va dentro de un BOTÓN, como en POV BOF y el Largo: con
+            el `onClick` pegado a la <img> el toque en el móvil no siempre
+            entraba, y esto además le da su etiqueta y su zona de toque. */}
+        <button
+          type="button"
+          onClick={() => setVerFoto(true)}
+          title="Ver la foto en grande (limpia y ficha)"
+          aria-label="Ver la foto en grande"
+          className="shrink-0"
+        >
+          <FotoProducto
+            src={limpia}
+            alt={p.titulo ?? p.producto}
+            className="h-16 w-16 shrink-0 cursor-zoom-in rounded-md border border-border/60 object-cover transition hover:border-foreground/40"
+          />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline gap-1.5 text-xs font-semibold">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -2059,7 +2069,12 @@ function CarruselCard({
 
       <div className="flex flex-wrap gap-1">
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} siempre />
+        <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
         <CopyChip label="✍️ Caption" text={caption} siempre />
+        {/* La ficha de TikTok Shop, igual que en POV BOF, Largo y Creativos:
+            el índice de URLs es del PRODUCTO, así que la misma pegada una vez
+            vale aquí sin hacer nada más. */}
+        <BotonUrl url={p.product_url} />
       </div>
 
       <div className="flex gap-1">
