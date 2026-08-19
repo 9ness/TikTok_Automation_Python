@@ -1614,10 +1614,10 @@ def descargar_video(
     """Sirve el vídeo YA montado del producto.
 
     Se lee del `video_path` guardado, que apunta al fichero publicado en Drive
-    (el mount). Al remontar un producto se sobrescribe con el mismo nombre, así
-    que esto devuelve SIEMPRE la última versión; el frontend añade
-    `video_listo_at` a la URL para que el navegador no sirva la anterior de su
-    caché.
+    (el mount). Cada montaje escribe un fichero nuevo (el nombre lleva la hora)
+    y `video_path` apunta al último, así que esto devuelve SIEMPRE la última
+    versión; el frontend añade `video_listo_at` a la URL para que el navegador
+    no sirva la anterior de su caché.
     """
     from src.nicho_pov_bof.repos import product_repo
 
@@ -1649,7 +1649,7 @@ def descargar_video(
         )
     return FileResponse(
         str(p), media_type="video/mp4",
-        filename=p.name if descargar else None,
+        filename=(Path(ruta).name or p.name) if descargar else None,
     )
 
 

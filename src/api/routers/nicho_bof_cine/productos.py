@@ -406,5 +406,5 @@ def get_video(
         raise APIError(f"El producto {producto} no tiene vídeo montado.", status_code=404)
     return FileResponse(
         ruta, media_type="video/mp4",
-        filename=f"cine_{producto}.mp4" if descargar else None,
+        filename=Path(ruta).name if descargar else None,
     )

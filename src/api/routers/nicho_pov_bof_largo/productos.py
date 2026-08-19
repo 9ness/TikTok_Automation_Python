@@ -1042,5 +1042,5 @@ def get_video(
         )
     return FileResponse(
         ruta, media_type="video/mp4",
-        filename=f"povlargo_{producto}_{folder}.mp4" if descargar else None,
+        filename=Path(ruta).name if descargar else None,
     )

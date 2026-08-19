@@ -402,6 +402,40 @@ def _par(n: float) -> int:
     return int(round(n / 2)) * 2
 
 
+def _trozo_titulo(titulo: str, tope: int = 42) -> str:
+    """Trozo del título que cabe en un nombre de fichero, sin cortar palabras."""
+    limpio = re.sub(r'[\\/:*?"<>|]+', " ", str(titulo or ""))
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    if len(limpio) <= tope:
+        return limpio
+    corte = limpio[:tope].rsplit(" ", 1)[0]
+    return (corte or limpio[:tope]).strip()
+
+
+def nombre_video(
+    producto: str | int, titulo: str = "", *, folder: str = "", hora: bool = True,
+) -> str:
+    """Nombre del MP4 montado: número de producto + título + hora.
+
+    Antes era el número a secas (`9.mp4`) y en el buscador de Drive salían
+    veinte iguales sin poder distinguirlos, ni al descargarlos al móvil. El
+    número va DELANTE para que la carpeta siga ordenándose por producto; la
+    carpeta solo se usa de recambio cuando el producto aún no tiene título
+    extraído (así el nombre nunca se queda en un número suelto).
+    """
+    from datetime import datetime
+
+    partes = [str(producto).strip()]
+    trozo = _trozo_titulo(titulo)
+    if trozo:
+        partes.append(trozo)
+    elif folder:
+        partes.append(_trozo_titulo(folder))
+    if hora:
+        partes.append(datetime.now().strftime("%H%M"))
+    return " ".join(x for x in partes if x) + ".mp4"
+
+
 def filtro_encuadre(
     w: int = TARGET_W, h: int = TARGET_H, fps: int = TARGET_FPS,
     *, zoom: float | None = None, esquina: str = "",

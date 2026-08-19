@@ -1722,6 +1722,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
 
     Params: producto, raw_path, y opcionalmente sexo ("hombre"|"mujer").
     """
+    from src.nicho_pov_bof import config as pov_config
     from src.nicho_ropa import config as ropa_config
     from src.nicho_ropa.pipeline import video_editor
     from src.nicho_ropa.repos import product_repo
@@ -1750,7 +1751,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             on_log(f"[nicho_ropa] no se pudo preparar la voz: {e} — sale mudo")
 
     on_progress(0.4, "🎬 Encuadrando a 9:16…")
-    salida = Path(ropa_config.video_dir()) / carpeta / f"{producto}.mp4"
+    titulo = str((product_repo.get_product(carpeta, producto) or {}).get("titulo") or "")
+    salida = Path(ropa_config.video_dir()) / carpeta / pov_config.nombre_video(
+        producto, titulo, folder=carpeta,
+    )
     video_editor.montar(raw_path, salida, voz=voz, on_log=on_log)
 
     on_progress(0.95, "💾 Guardando estado…")
@@ -1774,6 +1778,7 @@ def run_nicho_ropa_personas_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
     Params: producto, carpeta, raw_path.
     """
+    from src.nicho_pov_bof import config as pov_config
     from src.nicho_ropa_personas import config as rp_config
     from src.nicho_ropa_personas.pipeline import video_editor
     from src.nicho_ropa_personas.repos import product_repo
@@ -1795,7 +1800,9 @@ def run_nicho_ropa_personas_video(job: Job, on_log: OnLog, on_progress: OnProgre
             "saldrá SIN texto. Pulsa 'Obtener textos' y vuelve a montarlo."
         )
 
-    salida = Path(rp_config.video_dir()) / carpeta / f"{producto}.mp4"
+    salida = Path(rp_config.video_dir()) / carpeta / pov_config.nombre_video(
+        producto, titulo, folder=carpeta,
+    )
     salida.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f"ropa_personas_{producto}_"))
     try:
@@ -1835,6 +1842,7 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
     Params: source, folder, producto, clip1_path, clip2_path, sexo.
     """
     from src.nicho_bof_cine import config as cine_config
+    from src.nicho_pov_bof import config as pov_config
     from src.nicho_bof_cine.pipeline import video_editor
     from src.nicho_bof_cine.repos import product_repo
     from src.nicho_pov_bof.pipeline.video_editor import layout_for_producto
@@ -1860,7 +1868,9 @@ def run_nicho_bof_cine_video(job: Job, on_log: OnLog, on_progress: OnProgress) -
         "cta": guardado.get("cta", ""),
     }
 
-    salida = Path(cine_config.video_dir()) / source / folder / f"{producto}.mp4"
+    salida = Path(cine_config.video_dir()) / source / folder / pov_config.nombre_video(
+        producto, textos.get("titulo", ""), folder=folder,
+    )
     salida.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f"cine_{producto}_"))
     try:
@@ -1914,6 +1924,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     Params: source, folder, producto, clip1_path, clip2_path, sexo, operator,
     con_gancho/titulo/cta/flecha.
     """
+    from src.nicho_pov_bof import config
     from src.nicho_pov_bof_largo import config as largo_config
     from src.nicho_pov_bof_largo.pipeline import video_editor
     from src.nicho_pov_bof_largo.repos import product_repo
@@ -2021,7 +2032,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             float(info.get("duracion") or 0),
         )
 
-        salida = Path(largo_config.video_dir()) / source / folder / f"{producto}.mp4"
+        salida = Path(largo_config.video_dir()) / source / folder / config.nombre_video(
+            producto, textos.get("titulo", ""), folder=folder,
+        )
         salida.parent.mkdir(parents=True, exist_ok=True)
 
         def _progreso(pct: float, label: str) -> None:
@@ -2189,7 +2202,9 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
             dest_dir = dest_dir / quien
         dest_dir = dest_dir / folder
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = dest_dir / f"{producto} {folder}.mp4"
+        dest_path = dest_dir / config.nombre_video(
+            producto, textos.get("titulo", ""), folder=folder,
+        )
         tmp_dest = dest_path.with_name(dest_path.name + ".part")
         shutil.copy2(output_local, tmp_dest)
         tmp_dest.replace(dest_path)
@@ -2236,6 +2251,7 @@ def run_cuenta_piloto_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     Params: producto, raw_path, sexo, operator, con_gancho/titulo/cta/flecha.
     """
     from src.cuenta_piloto import config as cp_config
+    from src.nicho_pov_bof import config as pov_config
     from src.cuenta_piloto.pipeline import video_editor
     from src.cuenta_piloto.repos import product_repo
 
@@ -2265,10 +2281,15 @@ def run_cuenta_piloto_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # en disco aunque Redis guardase los dos.
     carpeta = cp_config.videos_dir(operator, producto)
     n = 1 + len([v for v in (guardado.get("videos") or []) if isinstance(v, dict)])
-    salida = carpeta / f"{producto}_v{n}.mp4"
+    def _nombre(i: int) -> str:
+        return pov_config.nombre_video(
+            f"{producto}_v{i}", textos.get("titulo", ""), hora=False,
+        )
+
+    salida = carpeta / _nombre(n)
     while salida.exists():
         n += 1
-        salida = carpeta / f"{producto}_v{n}.mp4"
+        salida = carpeta / _nombre(n)
 
     work = Path(tempfile.mkdtemp(prefix=f"cuenta_piloto_{producto}_"))
     try:
@@ -3232,7 +3253,9 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         dest_dir = dest_dir / quien
     dest_dir = dest_dir / folder
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest_path = dest_dir / f"{producto} {folder}.mp4"
+    dest_path = dest_dir / config.nombre_video(
+        producto, textos.get("titulo", ""), folder=folder,
+    )
     tmp_dest = dest_path.with_name(dest_path.name + ".part")
     shutil.copy2(output_local, tmp_dest)
     tmp_dest.replace(dest_path)
