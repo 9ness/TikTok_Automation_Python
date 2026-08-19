@@ -18,8 +18,16 @@ import type { QueryClient } from "@tanstack/react-query";
  *    algo de ayer.
  *  - Se ignoran las respuestas gordas (`MAX_BYTES`): `localStorage` tiene ~5 MB
  *    y llenarlo rompería también el resto (progreso de carpeta, sesión…).
+ *  - Es de UNA persona (`asegurarDueno`). Lo que guarda son listados del
+ *    nicho, y esos son distintos para cada usuario: carpetas hechas, productos
+ *    subidos, escaparate, vendidos. Sin dueño, al entrar el admin en la cuenta
+ *    de Ana la pantalla se pintaba con el progreso de él —seis carpetas en
+ *    verde que Ana no había hecho— hasta que el Drive terminaba de responder,
+ *    que son varios segundos.
  */
 const PREFIJO = "qcache:";
+/** De quién es lo que hay guardado ahora mismo. */
+const CLAVE_DUENO = `${PREFIJO}dueño`;
 const FRESCURA_MS = 6 * 60 * 60 * 1000;
 const MAX_BYTES = 150_000;
 const MAX_ENTRADAS = 40;
@@ -53,6 +61,43 @@ function claveDe(key: readonly unknown[]): string {
   return PREFIJO + JSON.stringify(key);
 }
 
+/** ¿Esta query es de las que se guardan? Son las que llevan el progreso de
+ *  una persona, así que también son las que hay que tirar al cambiar de
+ *  cuenta. */
+export function esDeNicho(key: readonly unknown[]): boolean {
+  return interesa(key);
+}
+
+/** Borra TODO lo guardado (incluido de quién era). */
+export function olvidar(): void {
+  try {
+    const claves: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const clave = localStorage.key(i);
+      if (clave?.startsWith(PREFIJO)) claves.push(clave);
+    }
+    for (const clave of claves) localStorage.removeItem(clave);
+  } catch {
+    /* localStorage bloqueado (modo privado): no hay nada que limpiar */
+  }
+}
+
+/** Deja la caché a nombre de `usuario`, tirándola entera si era de otro.
+ *
+ *  Devuelve `true` si ha tirado algo — el caller aprovecha para vaciar
+ *  también lo que ya estuviera en memoria.
+ */
+export function asegurarDueno(usuario: string): boolean {
+  try {
+    if (localStorage.getItem(CLAVE_DUENO) === usuario) return false;
+    olvidar();
+    localStorage.setItem(CLAVE_DUENO, usuario);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Vuelca lo guardado a la caché. Se llama UNA vez, antes del primer render de
  *  las pantallas, para que la primera pintura ya lleve datos. */
 export function hidratar(qc: QueryClient): void {
@@ -60,6 +105,9 @@ export function hidratar(qc: QueryClient): void {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const clave = localStorage.key(i);
+      // La marca de dueño vive bajo el mismo prefijo pero NO es una entrada:
+      // es texto plano y al intentar parsearla se borraría sola.
+      if (clave === CLAVE_DUENO) continue;
       if (clave?.startsWith(PREFIJO)) entradas.push({ clave, ts: 0 });
     }
   } catch {
@@ -127,7 +175,7 @@ function podar(agresivo = false): void {
     const entradas: { clave: string; ts: number }[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const clave = localStorage.key(i);
-      if (!clave?.startsWith(PREFIJO)) continue;
+      if (!clave?.startsWith(PREFIJO) || clave === CLAVE_DUENO) continue;
       let ts = 0;
       try {
         ts = (JSON.parse(localStorage.getItem(clave) || "{}") as { ts?: number }).ts ?? 0;

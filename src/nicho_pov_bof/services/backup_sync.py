@@ -598,9 +598,14 @@ def construir_paquete(
 # para dárselo a UNA persona. Se llama a la API de Drive con el mismo token
 # que ya usa el backup (`rclone config dump`), que tiene scope `drive`.
 def _token_drive() -> str:
-    salida = subprocess.run(
-        ["rclone", "config", "dump"], capture_output=True, text=True, timeout=60,
-    )
+    # Con `--config`: dentro del contenedor la configuración de rclone está
+    # montada en `/app/secrets/`, no en el HOME, y sin decírselo `config dump`
+    # devuelve `{}` y esto fallaba con "no hay token".
+    cmd = ["rclone", "config", "dump"]
+    conf = config.rclone_config_path()
+    if conf:
+        cmd += ["--config", conf]
+    salida = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if salida.returncode != 0:
         raise RuntimeError("No se pudo leer la configuración de rclone.")
     cfg = json.loads(salida.stdout or "{}").get("gdrive") or {}
