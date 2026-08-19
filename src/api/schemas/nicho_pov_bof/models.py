@@ -27,6 +27,9 @@ class ProductFolder(BaseModel):
     # El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. Se
     # marca para que se vea de dónde viene lo que se está trabajando.
     desde_copia: bool = False
+    # Cuántos de sus productos tienen ya enlazada la ficha de TikTok Shop. Es
+    # lo que dice, desde el listado, en qué carpeta hay trabajo — sin abrirla.
+    con_url: int = 0
 
 
 class FoldersListResponse(BaseModel):

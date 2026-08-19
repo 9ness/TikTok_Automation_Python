@@ -105,6 +105,9 @@ class FolderLargo(BaseModel):
     name: str
     id: str = ""
     completed: bool = False
+    # Cuántos de sus productos tienen ya enlazada la ficha de TikTok Shop. Es
+    # lo que dice, desde el listado, en qué carpeta hay trabajo — sin abrirla.
+    con_url: int = 0
 
 
 class FoldersLargoResponse(BaseModel):

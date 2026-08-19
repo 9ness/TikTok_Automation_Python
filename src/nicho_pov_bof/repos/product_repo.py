@@ -732,6 +732,32 @@ def urls_index() -> dict[str, str]:
     return r.get_json(_URLS_INDEX) or {}
 
 
+def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
+    """`{carpeta: cuántos de sus productos tienen ficha enlazada}`.
+
+    Sirve para saber desde el listado en qué carpetas hay trabajo de verdad sin
+    entrar en cada una. Los textos (título y tienda) son del producto y viven en
+    el documento COMPARTIDO, así que vale con leer ese: la ficha enlazada
+    tampoco es de nadie en particular.
+
+    Se leen TODAS las carpetas de un tirón (`mget`) y el índice de fichas UNA
+    vez. Carpeta a carpeta serían 30 idas y vueltas a Upstash cada vez que se
+    abre la pantalla, que es justo lo que hizo lenta la de Carruseles.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available() or not folders:
+        return {}
+    indice = urls_index()
+    if not indice:
+        return {n: 0 for n in folders}
+    docs = r.mget_json([_key(source, n) for n in folders])
+    salida: dict[str, int] = {}
+    for nombre, doc in zip(folders, docs):
+        productos = ((doc or {}).get("productos") or {}).values()
+        salida[nombre] = sum(1 for prod in productos if url_de(prod, indice))
+    return salida
+
+
 def url_de(prod: dict, indice: dict[str, str] | None = None) -> str:
     """La ficha de ese producto: la del índice o la que guardó EchoTik."""
     if indice is None:

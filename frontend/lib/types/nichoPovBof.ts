@@ -17,6 +17,8 @@ export interface ProductFolder {
   completed: boolean;
   /** El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. */
   desde_copia?: boolean;
+  /** Cuántos de sus productos ya tienen enlazada la ficha de TikTok Shop. */
+  con_url?: number;
 }
 
 export interface FoldersListResponse {

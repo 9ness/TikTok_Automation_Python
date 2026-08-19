@@ -82,7 +82,7 @@ def list_folders(
     refresh: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FoldersListResponse:
-    from src.nicho_pov_bof.repos import progress_repo
+    from src.nicho_pov_bof.repos import product_repo, progress_repo
     from src.nicho_pov_bof.services import drive_client
 
     try:
@@ -93,10 +93,20 @@ def list_folders(
         raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
 
     completed = progress_repo.get_completed(source, usuario)
+    # Cuántos productos de cada carpeta tienen ya la ficha enlazada: es lo que
+    # dice desde el listado dónde hay trabajo, sin entrar a mirar.
+    try:
+        con_url = product_repo.con_url_por_carpeta(
+            source, [f["name"] for f in folders],
+        )
+    except Exception:  # noqa: BLE001
+        # Un fallo contando no puede dejar sin listado de carpetas.
+        con_url = {}
     items = [
         ProductFolder(
             name=f["name"], id=f["id"], completed=f["name"] in completed,
             desde_copia=bool(f.get("desde_copia")),
+            con_url=int(con_url.get(f["name"], 0)),
         )
         for f in folders
     ]

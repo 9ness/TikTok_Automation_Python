@@ -146,11 +146,23 @@ def list_folders(
         raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
 
     completed = progress_repo.get_completed(source, usuario)
+    # Igual que en el POV BOF: cuántos de cada carpeta tienen la ficha
+    # enlazada. Los textos y el enlace son del producto y se comparten entre
+    # los dos nichos, así que se lee el mismo índice.
+    try:
+        from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+        con_url = pov_repo.con_url_por_carpeta(
+            source, [c.get("name", "") for c in carpetas],
+        )
+    except Exception:  # noqa: BLE001
+        con_url = {}
     items = [
         FolderLargo(
             name=c.get("name"), id=c.get("id", ""),
             completed=c.get("name") in completed,
             desde_copia=bool(c.get("desde_copia")),
+            con_url=int(con_url.get(c.get("name", ""), 0)),
         )
         for c in carpetas
     ]
