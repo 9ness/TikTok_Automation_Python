@@ -1175,6 +1175,11 @@ function PorNicho() {
       color="esmeralda"
       titulo="Publicar por nicho"
       hint="Los carruseles ya terminados, junten la carpeta que junten. Marca «subido» y se apunta en su carpeta."
+      // Plegado de salida: publicar es lo ÚLTIMO y el listado de nichos es
+      // largo; abierto empujaba las carpetas —lo del día a día— fuera de la
+      // pantalla. El contador de listos se sigue viendo con el paso cerrado.
+      plegable
+      abiertoPorDefecto={false}
       extra={
         listos.data
           ? `${Object.values(cuentas).reduce((a, b) => a + b, 0)} listos`
