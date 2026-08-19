@@ -25,7 +25,7 @@ from src.viralizacion.pipeline.ffmpeg_utils import (
     run,
     trailing_silence,
 )
-from src.viralizacion.pipeline.styles import StylePreset
+from src.viralizacion.pipeline.styles import StylePreset, jitter_style
 from src.viralizacion.pipeline.transcriber import group_into_phrases
 
 OnLog = Callable[[str], None]
@@ -503,6 +503,41 @@ def _ken_burns_vf(spec: ClipSpec, delta: float) -> str:
     )
 
 
+def _hook_fx() -> str:
+    """Retoque aleatorio del GANCHO, en filtros ffmpeg listos para encadenar.
+
+    El gancho es el trozo con más riesgo de huella: siempre la misma cara, del
+    mismo vídeo fuente, recortada casi igual en todos los vídeos de un ponente.
+    El b-roll varía solo (otro clip, otra ventana, otro zoom); esto le da al
+    gancho la misma variedad sin tocar el encuadre —que está calculado sobre la
+    cara detectada y no se puede mover sin descabezarla—: se mueve el COLOR y
+    la TEXTURA.
+
+    Devuelve cadena vacía o filtros con coma final, para concatenar.
+    """
+    partes = [
+        "eq="
+        f"brightness={random.uniform(*config.HOOK_FX_BRIGHT_RANGE):.4f}:"
+        f"saturation={random.uniform(*config.HOOK_FX_SAT_RANGE):.4f}:"
+        f"contrast={random.uniform(*config.HOOK_FX_CONTRAST_RANGE):.4f}",
+        f"hue=h={random.uniform(*config.HOOK_FX_HUE_RANGE):.2f}",
+    ]
+    if random.random() < config.HOOK_FX_TEXTURA_PROB:
+        # Micro-nitidez o micro-suavizado: cambia el detalle fino (y con él el
+        # hash perceptual) sin que se vea a ojo.
+        if random.random() < 0.5:
+            partes.append("unsharp=5:5:0.45:5:5:0.0")
+        else:
+            partes.append("gblur=sigma=0.35")
+    if random.random() < config.HOOK_FX_DESTELLO_PROB:
+        # Destello blanco de arranque. `fade` con `color=white` empieza en
+        # blanco y descubre la imagen — a esta duración se lee como un flash
+        # de edición, no como un fallo.
+        dur = random.uniform(*config.HOOK_FX_DESTELLO_DUR)
+        partes.append(f"fade=t=in:st=0:d={dur:.3f}:color=white")
+    return "".join(f"{f}," for f in partes)
+
+
 def _clip_vf(spec: ClipSpec, ken_burns: float = 0.0) -> str:
     # El Ken Burns solo va en los PAISAJES (`cx_frac is None`). En el gancho
     # el encuadre está calculado sobre la cara detectada; moverlo la
@@ -520,10 +555,14 @@ def _clip_vf(spec: ClipSpec, ken_burns: float = 0.0) -> str:
     else:
         x_expr = f"(in_w-{config.TARGET_W})/2"
     y_expr = f"(in_h-{config.TARGET_H})/2"
+    # El retoque anti-huella es SOLO del gancho: los paisajes ya varían por su
+    # cuenta (otro clip, otra ventana, otro zoom) y el grade del estilo se
+    # aplica igual a todo el montaje después.
+    fx = _hook_fx() if spec.cx_frac is not None else ""
     return (
         f"scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase,"
         f"crop={config.TARGET_W}:{config.TARGET_H}:x='{x_expr}':y='{y_expr}',"
-        f"hflip,fps={config.TARGET_FPS},format=yuv420p,setsar=1"
+        f"{fx}hflip,fps={config.TARGET_FPS},format=yuv420p,setsar=1"
     )
 
 
@@ -932,6 +971,11 @@ def render_video(
 ) -> Path:
     tmp_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Copia del estilo con el rótulo movido/escalado un pelín (anti-huella).
+    # Se hace UNA vez aquí y se usa en todo el render: el .ass y el finalize
+    # tienen que ver el mismo estilo, y el registro no se toca.
+    style = jitter_style(style)
 
     full_audio_dur = ffprobe_duration(audio_path)
     if target_duration is None:

@@ -103,6 +103,13 @@ candidatos NO SOLAPADOS de 4.5s, saltando los primeros/últimos 60s (intro/
 outro/CTAs). Cacheado en `paisajes/paisaje_candidates.json`, COMPARTIDO entre
 ponentes (misma fuente).
 
+**Clips vetados** (`services/clip_library.CLIPS_VETADOS`): lista negra por país
+que se filtra al leer el manifiesto. Hoy los clips **221 y 222 de España** — un
+encierro/capea con TOROS que costó el BANEO de una cuenta (TikTok lo trata como
+maltrato animal). Los ficheros están en `paisajes_clips_descartados/` y fuera
+del manifiesto, pero el veto vive además en código para que no vuelvan si se
+regenera el manifiesto con `scripts/viralizacion_trocear_paisajes.py`.
+
 **Tracking de uso** (`repos/usage_repo.py`, Redis Upstash, prefijo
 `viralizacion:`):
 - `hook_used:<ponente>` → SET de índices de `hook_candidates` ya usados por
@@ -124,7 +131,7 @@ se puede mantener sin persistencia.
 
 ---
 
-## 6 estilos de subtítulo/filtro (rotan por ronda)
+## 11 estilos de subtítulo/filtro (rotan por ronda)
 
 `pipeline/styles.py:STYLE_PRESETS` — registro extensible (`StylePreset`
 dataclass: `build_ass(lines, preset)` + overrides de filtro de vídeo). Añadir
@@ -159,6 +166,27 @@ película vieja se retiró el 11 ago 2026 con sus tres estilos (ver más abajo).
   El resplandor son DOS capas ASS: el halo difuminado en `layer=0` y la letra
   nítida en `layer=1`. Con una sola capa (borde grueso + `\blur` sobre el propio
   texto) el difuminado se come el filo de la letra.
+
+- **G-K "Bloque"** (`build_ass_reflexion` también): más variantes del formato
+  de TRES PALABRAS —el que funciona— para poder escalar a varias cuentas sin
+  que los vídeos se parezcan entre sí. Todas en letra BLANCA con BORDE NEGRO
+  (legibles sobre cualquier paisaje); lo que cambia es la tipografía, si van en
+  MAYÚSCULAS y cómo se despega la letra del fondo:
+  - **G** Montserrat Black MAYÚS · borde duro (`_BORDE_DURO`).
+  - **H** Anton MAYÚS · borde duro + sombra negra grande (`_BORDE_SOMBRA`).
+  - **I** Rubik minúsculas · borde duro + brillo BLANCO por fuera
+    (`_BORDE_BRILLO`) — el brillo va DEBAJO del borde negro; encima, derrite
+    el filo de la letra.
+  - **J** Fredoka SemiBold (redonda) minúsculas · borde duro.
+  - **K** Playfair Display Black MAYÚS · borde duro + sombra grande.
+
+  `build_ass_reflexion` es el molde común de D-K: agrupa de tres en tres,
+  centra y pinta hasta TRES capas (brillo exterior → borde → letra nítida).
+  Una variante nueva es una entrada en `STYLE_PRESETS`, no una función nueva.
+  `halo_blur` alto = resplandor difuso (D/E/F); bajo = borde recortado (G-K).
+  El cuerpo (`sub_scale`) no es el mismo en todas: una sans muy negra en
+  MAYÚSCULAS ocupa bastante más que la serif en minúsculas y con 1.9 se partían
+  casi todas las frases en dos.
 
 **Estilos retirados** — el 6 ago 2026 cayeron D "Serif apilado", E "Cascada" y
 los cuadrados G "Película" y H "Resaltado"; el 11 ago 2026, los tres "sucios"
@@ -202,6 +230,20 @@ rangos, configurables en `config.py`:
   fija en 0.35s — validada explícitamente por el operador.
 - **EQ del vídeo** (contrast/saturation/brightness): ±5% por vídeo (no por
   clip) sobre los valores base aprobados.
+- **Rótulo** (`styles.jitter_style`, por vídeo): cuerpo de letra ×`[0.94, 1.06]`
+  y bloque desplazado `[-16,16]`px en X y `[-70,70]`px en Y. El subtítulo era lo
+  MÁS repetido de la plantilla: mismo tamaño y mismo centro EXACTO en todos los
+  vídeos de un estilo. El desplazamiento se aplica con `\an5\pos(...)` porque
+  con `Alignment=5` libass IGNORA `MarginV` —no hay forma de bajarlo desde el
+  estilo—, y con desplazamiento 0 el resultado es idéntico al de antes.
+- **Gancho** (`renderer._hook_fx`, por vídeo): es el trozo con más riesgo de
+  huella —siempre la misma cara, del mismo fuente, con el encuadre atado a la
+  cara detectada y por tanto no movible—, así que se le mueve el COLOR y la
+  TEXTURA: micro-grade (tono ±5°, brillo ±0,035, saturación `[0.93,1.09]`,
+  contraste `[0.96,1.05]`), a veces un micro-enfoque o micro-desenfoque (cambia
+  el hash perceptual sin verse) y en ~1 de cada 3 vídeos un destello blanco de
+  0,14-0,28s al arrancar. El destello NO va siempre a propósito: si saliera en
+  todos, el destello sería la huella.
 
 ---
 

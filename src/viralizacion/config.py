@@ -508,6 +508,36 @@ TRANSITION_LANDSCAPE_JITTER_RANGE = (0.7, 1.1)
 # valor pelado idéntico en cada render.
 EQ_JITTER_FRAC = 0.05
 
+# --- Jitter del RÓTULO (por vídeo) -----------------------------------------
+# El subtítulo es lo más repetido de la plantilla: mismo cuerpo de letra y
+# mismo centro exacto en todos los vídeos de un estilo. Movido unos píxeles y
+# escalado un pelín, el espectador no nota nada pero dos vídeos ya no coinciden
+# píxel a píxel. Rangos deliberadamente cortos: pasado de ahí el texto empieza
+# a rozar la botonera de TikTok (abajo) o el nombre de la cuenta (arriba).
+SUB_SIZE_JITTER_RANGE = (0.94, 1.06)
+SUB_POS_JITTER_X_PX = (-16, 16)
+SUB_POS_JITTER_Y_PX = (-70, 70)
+
+# --- Retoque del GANCHO (por vídeo) ----------------------------------------
+# El b-roll de paisaje ya varía solo (clip distinto, ventana distinta, zoom
+# distinto), pero el gancho es SIEMPRE la misma cara del mismo vídeo fuente,
+# recortada casi igual. Es el trozo por el que más fácil se relacionan dos
+# cuentas. Estos retoques son de grado, no de encuadre: no tocan la cara ni el
+# ritmo, solo mueven el color/la textura lo justo para que el fotograma no sea
+# el mismo dato.
+HOOK_FX_HUE_RANGE = (-5.0, 5.0)          # grados de tono
+HOOK_FX_BRIGHT_RANGE = (-0.035, 0.035)
+HOOK_FX_SAT_RANGE = (0.93, 1.09)
+HOOK_FX_CONTRAST_RANGE = (0.96, 1.05)
+# Destello blanco corto al arrancar el vídeo. No en todos: si saliera siempre,
+# el propio destello sería la huella. Con ~1 de cada 3 basta para romper el
+# patrón y encima lee como recurso de edición.
+HOOK_FX_DESTELLO_PROB = 0.35
+HOOK_FX_DESTELLO_DUR = (0.14, 0.28)
+# Micro-nitidez/suavizado alternos: cambian la textura (y con ella el hash
+# perceptual) sin que se note a ojo.
+HOOK_FX_TEXTURA_PROB = 0.5
+
 # Estilo G "Cuadrado": lado del recuadro y radio de las esquinas, sobre el
 # lienzo 1080x1920. 940 deja margen negro a los lados y bastante arriba y
 # abajo, que es la proporción de los vídeos de referencia.

@@ -30,6 +30,15 @@ from src.viralizacion import config
 
 MANIFEST_NAME = "clips_manifest.json"
 
+# Clips VETADOS por país: material que NO puede volver al banco ni aunque se
+# regenere el manifiesto (`viralizacion_trocear_paisajes.py`). Es una lista
+# negra en código, no solo un fichero movido de carpeta, porque el motivo no
+# es estético: los clips 221 y 222 de España son un encierro/capea con toros
+# y costaron el BANEO de una cuenta — TikTok lo trata como maltrato animal.
+CLIPS_VETADOS: dict[str, set[int]] = {
+    "es": {221, 222},
+}
+
 
 def clips_folder(pais: str = "es") -> Path:
     """Carpeta de la biblioteca, UNA POR PAÍS.
@@ -66,7 +75,11 @@ def _load_manifest(pais: str = "es") -> tuple[dict, ...]:
         mtime = path.stat().st_mtime
     except OSError:
         return ()
-    return _load_manifest_cached(str(path), mtime)
+    clips = _load_manifest_cached(str(path), mtime)
+    vetados = CLIPS_VETADOS.get(pais)
+    if vetados:
+        clips = tuple(c for c in clips if c.get("index") not in vetados)
+    return clips
 
 
 def is_available(pais: str = "es") -> bool:

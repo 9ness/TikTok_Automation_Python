@@ -28,7 +28,7 @@ Añadir un estilo nuevo: define un `StylePreset` en `STYLE_PRESETS` con su
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 from src.viralizacion import config
@@ -85,6 +85,31 @@ def _inicio_siguiente_bloque(
     return None
 
 
+def _cuerpo(preset: "StylePreset", multiplicador: float) -> int:
+    """Tamaño de letra del estilo, con el jitter anti-huella ya aplicado.
+
+    El multiplicador es el de SIEMPRE de cada estilo (1.9 en B, 1.0 en A…);
+    `size_jitter` lo mueve un pelín por vídeo — ver `jitter_style`.
+    """
+    return max(12, int(round(config.SUB_FONTSIZE * multiplicador * preset.size_jitter)))
+
+
+def _pos(preset: "StylePreset") -> str:
+    r"""Etiqueta `\pos` con el desplazamiento anti-huella, o cadena vacía.
+
+    Todos los estilos rotulan centrados (`Alignment=5`), y con esa alineación
+    libass IGNORA `MarginV`: no hay forma de bajar el bloque unos píxeles
+    tocando el estilo. Con `\an5\pos(x,y)` sí, y con desplazamiento 0 el
+    resultado es idéntico al de antes (mismo centro exacto), así que se puede
+    anteponer a cualquier evento sin cambiar el aspecto.
+    """
+    if not preset.pos_dx and not preset.pos_dy:
+        return ""
+    x = config.TARGET_W // 2 + int(preset.pos_dx)
+    y = config.TARGET_H // 2 + int(preset.pos_dy)
+    return f"{{\\an5\\pos({x},{y})}}"
+
+
 def _dialogue(start: float, end: float, text: str, layer: int = 0) -> str:
     """`layer` decide quién tapa a quién cuando dos eventos coinciden en el
     tiempo: ASS pinta primero las capas bajas. Con todo en 0 mandaba el orden
@@ -97,12 +122,13 @@ def _dialogue(start: float, end: float, text: str, layer: int = 0) -> str:
 # ---------------------------------------------------------------------------
 def build_ass_classic(lines: list[dict], preset: "StylePreset") -> str:
     style_line = (
-        f"Style: Default,{config.SUB_FONT},{config.SUB_FONTSIZE},"
+        f"Style: Default,{config.SUB_FONT},{_cuerpo(preset, 1.0)},"
         f"&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,2,0,5,"
         f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
     )
     header = _ass_header(style_line)
-    events = [_dialogue(ln["start"], ln["end"], ln["text"]) for ln in lines]
+    pos = _pos(preset)
+    events = [_dialogue(ln["start"], ln["end"], pos + ln["text"]) for ln in lines]
     return header + "\n".join(events) + "\n"
 
 
@@ -131,7 +157,7 @@ def build_ass_frases(lines: list[dict], preset: "StylePreset") -> str:
     # Grande: en la referencia tres palabras ocupan ~la mitad del ancho. Con el
     # cuerpo base se quedaba en un tercio y parecía un subtítulo de película,
     # no el rótulo protagonista que es en este estilo.
-    size = int(config.SUB_FONTSIZE * 1.9)
+    size = _cuerpo(preset, 1.9)
     style_line = (
         f"Style: Default,{font},{size},"
         # blanco, sin secundario; contorno y sombra en negro translúcido
@@ -158,27 +184,34 @@ def build_ass_frases(lines: list[dict], preset: "StylePreset") -> str:
             continue
         # `\blur` difumina contorno y sombra: es lo que da el halo suave de la
         # referencia en vez de un borde recortado.
-        events.append(_dialogue(start, end, f"{{\\blur1.4}}{texto}"))
+        events.append(_dialogue(start, end, f"{_pos(preset)}{{\\blur1.4}}{texto}"))
 
     return header + "\n".join(events) + "\n"
 
 
 def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
-    """Frases cortas en minúsculas, partidas en dos líneas, con resplandor.
+    """Bloques de hasta 3 palabras, blancos, con borde/resplandor configurable.
 
-    Es el estilo B con la referencia que pasó el operador delante: minúsculas
-    (el bloque en mayúsculas grita y aquí se busca lo contrario), la frase
-    partida en dos renglones —tres palabras en una sola línea ocupan casi todo
-    el ancho y obligan a encoger la letra— y un RESPLANDOR difuminado en lugar
-    del contorno duro, que le daba aire de subtítulo de karaoke.
+    Es el molde del que salen TODOS los estilos de tres palabras que no son el
+    B: la estructura (agrupar de tres en tres, centrado, sin invadir el bloque
+    siguiente) es siempre la misma y lo que cambia es la TIPOGRAFÍA y cómo se
+    despega la letra del fondo. Añadir una variante nueva es una entrada más
+    en `STYLE_PRESETS`, sin tocar esta función.
 
-    El resplandor son dos capas: el halo difuminado debajo y la letra nítida
-    encima. Con una sola capa (borde grueso y difuminado sobre el propio texto)
-    el difuminado se come el filo de la letra y sobre paisaje claro se vuelve
-    ilegible — probado.
+    Se pintan hasta TRES capas, de atrás a delante:
+      0. `brillo_*` — resplandor exterior opcional (blanco tenue, o negro muy
+         difuso a modo de sombra grande). Es lo que da el "brillo" sin lavar
+         la letra.
+      1. `halo_*`   — el borde propiamente dicho. Con `halo_blur` alto sale un
+         resplandor difuso; con `halo_blur` bajo, un borde negro DURO.
+      2. la letra nítida encima.
+
+    Lo de las capas no es capricho: con una sola (borde grueso y `\blur` sobre
+    el propio texto) el difuminado se come el filo de la letra y sobre paisaje
+    claro se vuelve ilegible — probado.
     """
     font = preset.font_name or config.SUB_FONT
-    size = int(config.SUB_FONTSIZE * preset.sub_scale)
+    size = _cuerpo(preset, preset.sub_scale)
     margen = preset.sub_margin_lr or config.SUB_MARGIN_LR
     style_line = (
         f"Style: Default,{font},{size},"
@@ -188,6 +221,7 @@ def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
         f"{margen},{margen},0,1"
     )
     header = _ass_header(style_line)
+    pos = _pos(preset)
 
     todas = [w for ln in lines for w in (ln.get("words") or [])]
     events: list[str] = []
@@ -200,25 +234,40 @@ def build_ass_reflexion(lines: list[dict], preset: "StylePreset") -> str:
             end = min(end, float(todas[siguiente]["start"]))
         if end - start < 0.20:
             end = start + 0.20
-        palabras = [w["word"].strip().lower() for w in grupo if w["word"].strip()]
-        if not palabras:
+        crudas = [w["word"].strip() for w in grupo if w["word"].strip()]
+        if not crudas:
             continue
+        palabras = [
+            p.upper() if preset.texto_mayusculas else p.lower() for p in crudas
+        ]
         # UNA línea. Partirla siempre en dos (que es como nació este estilo)
         # hacía la letra enorme y todas las frases iguales; el estilo B, que es
         # el que funciona, cabe casi siempre en un renglón y solo baja cuando no
         # cabe. De eso se encarga libass con `WrapStyle: 0` y el margen.
         texto = " ".join(palabras)
+
+        capa = 0
+        if preset.brillo_bord > 0:
+            brillo = (
+                f"{{\\bord{preset.brillo_bord}\\blur{preset.brillo_blur}"
+                f"\\3c{preset.brillo_color}\\3a{preset.brillo_alpha}\\shad0}}"
+            )
+            events.append(_dialogue(start, end, pos + brillo + texto, layer=capa))
+            capa += 1
+
         halo = (
             f"{{\\bord{preset.halo_bord}\\blur{preset.halo_blur}"
             f"\\3c{preset.halo_color}\\3a{preset.halo_alpha}\\shad0}}"
         )
+        events.append(_dialogue(start, end, pos + halo + texto, layer=capa))
+        capa += 1
+
         letra = (
             f"{{\\bord0\\shad{preset.halo_sombra}"
             + (r"\4c&H00000000&\4a&H80&" if preset.halo_sombra else "")
             + r"\blur0.4}"
         )
-        events.append(_dialogue(start, end, halo + texto, layer=0))
-        events.append(_dialogue(start, end, letra + texto, layer=1))
+        events.append(_dialogue(start, end, pos + letra + texto, layer=capa))
 
     return header + "\n".join(events) + "\n"
 
@@ -305,11 +354,12 @@ def build_ass_cinematic(lines: list[dict], preset: "StylePreset") -> str:
     # fondos oscuros). PrimaryColour por defecto negro — se sobreescribe
     # inline con \1c en cada palabra de cada evento.
     style_line = (
-        f"Style: Default,{config.SUB_FONT},{config.SUB_FONTSIZE},"
+        f"Style: Default,{config.SUB_FONT},{_cuerpo(preset, 1.0)},"
         f"&H00000000&,&H000000FF&,&H00FFFFFF&,&H00000000&,-1,0,0,0,100,100,0,0,1,2,0,5,"
         f"{config.SUB_MARGIN_LR},{config.SUB_MARGIN_LR},0,1"
     )
     header = _ass_header(style_line)
+    pos = _pos(preset)
     events: list[str] = []
 
     for ln in lines:
@@ -319,14 +369,14 @@ def build_ass_cinematic(lines: list[dict], preset: "StylePreset") -> str:
         # pre-roll: antes de la 1ª palabra, todo en negro (ninguna activa)
         if words[0]["start"] > ln["start"] + 0.01:
             text = _karaoke_text(words, active_idx=-1)
-            events.append(_dialogue(ln["start"], words[0]["start"], text))
+            events.append(_dialogue(ln["start"], words[0]["start"], pos + text))
         for i, w in enumerate(words):
             ev_start = w["start"]
             ev_end = words[i + 1]["start"] if i + 1 < len(words) else ln["end"]
             if ev_end <= ev_start:
                 ev_end = ev_start + 0.05
             text = _karaoke_text(words, active_idx=i)
-            events.append(_dialogue(ev_start, ev_end, text))
+            events.append(_dialogue(ev_start, ev_end, pos + text))
 
     return header + "\n".join(events) + "\n"
 
@@ -810,6 +860,25 @@ class StylePreset:
     # Sombra bajo la letra. Solo hace falta con halo BLANCO: sobre paisaje claro
     # el blanco sobre blanco se deshace y hay que despegarlo del fondo.
     halo_sombra: float = 0.0
+    # Segundo resplandor, POR DETRÁS del halo (capa 0). Con `brillo_bord=0` no
+    # se pinta. Sirve para las dos cosas que pidió el operador sin cambiar de
+    # builder: un brillo blanco tenue que separa la letra del paisaje, o un
+    # negro muy difuso que actúa de sombra grande.
+    brillo_color: str = "&HFFFFFF&"
+    brillo_bord: float = 0.0
+    brillo_blur: float = 14.0
+    brillo_alpha: str = "&HA0&"
+    # MAYÚSCULAS en vez de minúsculas. Es el cambio que más distingue dos
+    # variantes con la misma estructura de tres palabras.
+    texto_mayusculas: bool = False
+    # --- Jitter anti-huella del rótulo (lo pone `jitter_style` por vídeo) ---
+    # Multiplicador del cuerpo de letra y desplazamiento en píxeles del bloque
+    # respecto al centro. En el preset del registro valen 1.0/0/0: el sorteo
+    # vive en la COPIA que hace el renderer, para que el registro siga siendo
+    # la definición estable del estilo.
+    size_jitter: float = 1.0
+    pos_dx: int = 0
+    pos_dy: int = 0
     # Margen lateral propio. El de `config` (145 px, 13,4%) está pensado para
     # frases de una línea con el cuerpo de B; estos van algo más anchos para que
     # tres palabras quepan en UN renglón sin encoger la letra. No se baja más:
@@ -876,6 +945,38 @@ _HALO_NEGRO = dict(
     halo_sombra=0.0,
 )
 
+# --- Variantes de BORDE NEGRO DURO (G-K) -----------------------------------
+# Lo que pidió el operador para escalar a varias cuentas: más versiones del
+# formato de TRES PALABRAS que ya funciona, todas en letra BLANCA con borde
+# NEGRO —o sea, legibles sobre cualquier paisaje— pero que no se parezcan
+# entre sí. Lo que cambia de una a otra: la tipografía, si va en mayúsculas, y
+# cómo se despega la letra del fondo (borde duro / sombra grande / brillo).
+#
+# `halo_blur` bajo = borde RECORTADO (el que se lee de lejos). Los tres de
+# reflexión (D/E/F) usan lo contrario, difuminado, así que no se confunden con
+# estos aunque compartan builder.
+_BORDE_DURO = dict(
+    halo_color="&H000000&", halo_bord=5.0, halo_blur=0.8, halo_alpha="&H00&",
+    halo_sombra=0.0,
+)
+# Borde duro + una sombra negra GRANDE por detrás: sobre paisajes muy movidos
+# (olas, hojas, gente) el borde solo no basta y el texto "vibra".
+_BORDE_SOMBRA = dict(
+    halo_color="&H000000&", halo_bord=4.5, halo_blur=0.8, halo_alpha="&H00&",
+    halo_sombra=0.0,
+    brillo_color="&H000000&", brillo_bord=13.0, brillo_blur=18.0,
+    brillo_alpha="&H70&",
+)
+# Borde duro + brillo BLANCO tenue por fuera: es el "que brille algo" sin que
+# la letra se derrita — el brillo va por DETRÁS del borde negro, así que el
+# filo de la letra sigue nítido.
+_BORDE_BRILLO = dict(
+    halo_color="&H000000&", halo_bord=4.5, halo_blur=0.9, halo_alpha="&H00&",
+    halo_sombra=0.0,
+    brillo_color="&HFFFFFF&", brillo_bord=11.0, brillo_blur=16.0,
+    brillo_alpha="&H85&",
+)
+
 STYLE_PRESETS: dict[str, StylePreset] = {
     # --- Los tres de siempre (antes A2/B2/C2) ---
     "classic_claro": StylePreset(
@@ -910,6 +1011,46 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         font_name="PT Serif", fonts_dir=bundled_fonts_dir(),
         sub_scale=1.75, sub_margin_lr=125, **_HALO_NEGRO, **_LIMPIO,
     ),
+    # --- Cinco variantes más del formato de tres palabras, con borde negro ---
+    "bloque_montserrat": StylePreset(
+        key="bloque_montserrat", label="G · Bloque · Montserrat MAYÚS",
+        build_ass=build_ass_reflexion,
+        font_name="Montserrat Black", fonts_dir=bundled_fonts_dir(),
+        # Una sans muy negra en mayúsculas ocupa mucho más que la serif en
+        # minúsculas: con 1.9 se partían casi todas las frases en dos.
+        sub_scale=1.55, sub_margin_lr=120, texto_mayusculas=True,
+        **_BORDE_DURO, **_LIMPIO,
+    ),
+    "bloque_anton": StylePreset(
+        key="bloque_anton", label="H · Bloque · Anton MAYÚS + sombra",
+        build_ass=build_ass_reflexion,
+        # Anton es condensada: cabe más letra por renglón, así que aguanta un
+        # cuerpo mayor que Montserrat sin partir la frase.
+        font_name="Anton", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.95, sub_margin_lr=115, texto_mayusculas=True,
+        **_BORDE_SOMBRA, **_LIMPIO,
+    ),
+    "bloque_rubik": StylePreset(
+        key="bloque_rubik", label="I · Bloque · Rubik + brillo",
+        build_ass=build_ass_reflexion,
+        font_name="Rubik", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.70, sub_margin_lr=120,
+        **_BORDE_BRILLO, **_LIMPIO,
+    ),
+    "bloque_fredoka": StylePreset(
+        key="bloque_fredoka", label="J · Bloque · Fredoka redonda",
+        build_ass=build_ass_reflexion,
+        font_name="Fredoka SemiBold", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.75, sub_margin_lr=120,
+        **_BORDE_DURO, **_LIMPIO,
+    ),
+    "bloque_playfair_mayus": StylePreset(
+        key="bloque_playfair_mayus", label="K · Bloque · Playfair MAYÚS + sombra",
+        build_ass=build_ass_reflexion,
+        font_name="Playfair Display Black", fonts_dir=bundled_fonts_dir(),
+        sub_scale=1.60, sub_margin_lr=120, texto_mayusculas=True,
+        **_BORDE_SOMBRA, **_LIMPIO,
+    ),
 }
 
 
@@ -917,7 +1058,30 @@ STYLE_PRESETS: dict[str, StylePreset] = {
 STYLE_ORDER = [
     "classic_claro", "reveal_claro", "cinematic_claro",
     "reflexion_luz", "reflexion_sombra", "reflexion_serif",
+    "bloque_montserrat", "bloque_anton", "bloque_rubik",
+    "bloque_fredoka", "bloque_playfair_mayus",
 ]
+
+
+def jitter_style(style: StylePreset) -> StylePreset:
+    """Copia del estilo con el rótulo movido y escalado un poco, al azar.
+
+    Por qué: el estilo es lo MÁS repetido de la plantilla. Dos vídeos del mismo
+    estilo comparten tipografía, cuerpo de letra exacto y posición exacta del
+    bloque en pantalla — es una firma perfecta para relacionar cuentas entre sí.
+    Aquí el bloque se mueve unos píxeles y la letra cambia un pelín de tamaño
+    en CADA vídeo: el espectador no lo nota (los rangos son minúsculos) pero ya
+    no hay dos rótulos que caigan en el mismo píxel.
+
+    Devuelve una COPIA (`replace`): los presets del registro son la definición
+    estable del estilo y no se tocan.
+    """
+    return replace(
+        style,
+        size_jitter=random.uniform(*config.SUB_SIZE_JITTER_RANGE),
+        pos_dx=random.randint(*config.SUB_POS_JITTER_X_PX),
+        pos_dy=random.randint(*config.SUB_POS_JITTER_Y_PX),
+    )
 
 
 def get_style_for_round(round_idx: int) -> StylePreset:
