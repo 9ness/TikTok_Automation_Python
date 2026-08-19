@@ -375,10 +375,15 @@ y los demás nichos las reusan (no dupliques índices por nicho):
   sale repetido en varias carpetas del Drive y se graba con varios nichos:
   marcado en uno, aparece marcado en todos. Sin textos extraídos la clave es
   vacía y no deduplica.
-- **Vendidos** — `vendidos:index`, ranking único y global; **no** se clasifica
-  por nicho (`NICHOS_VENTA` queda solo por compatibilidad del dato antiguo).
+- **Vendidos** — `vendidos:index[:usuario]` + `vendido:[u:<usuario>:]<ref>`,
+  un ranking por persona; **no** se clasifica por nicho (`NICHOS_VENTA` queda
+  solo por compatibilidad del dato antiguo). La carpeta "Top vendidos" del
+  Drive sí es común: es un catálogo, no un progreso.
 
-Ambos son **por usuario**: Ana y Mauro son otras personas con su propia cuenta.
+Ambos son **por usuario**: Ana y Mauro son otras personas con su propia cuenta,
+y una venta o un escaparate es el resultado de SU cuenta. El histórico va en la
+clave sin sufijo, que es la de `ness` (mismo criterio que el progreso de
+carpetas).
 
 Cosas que ya costaron una vez:
 - El documento del curso pide 260 caracteres "para 15 segundos", pero su propio

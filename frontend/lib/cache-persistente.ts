@@ -18,16 +18,24 @@ import type { QueryClient } from "@tanstack/react-query";
  *    algo de ayer.
  *  - Se ignoran las respuestas gordas (`MAX_BYTES`): `localStorage` tiene ~5 MB
  *    y llenarlo rompería también el resto (progreso de carpeta, sesión…).
- *  - Es de UNA persona (`asegurarDueno`). Lo que guarda son listados del
- *    nicho, y esos son distintos para cada usuario: carpetas hechas, productos
- *    subidos, escaparate, vendidos. Sin dueño, al entrar el admin en la cuenta
- *    de Ana la pantalla se pintaba con el progreso de él —seis carpetas en
- *    verde que Ana no había hecho— hasta que el Drive terminaba de responder,
- *    que son varios segundos.
+ *  - Cada persona tiene su cajón (`qcache:u:<usuario>:…`). Lo que se guarda
+ *    son listados del nicho, y llevan dentro el progreso de quien los pidió:
+ *    carpetas hechas, subidos, escaparate, vendidos. Con un cajón único, al
+ *    entrar el admin en la cuenta de Ana la pantalla salía con el progreso de
+ *    él —seis carpetas en verde que Ana no había hecho— hasta que respondía el
+ *    Drive, que son segundos.
+ *
+ *    Separado por persona NO se pierde velocidad: se pinta igual de rápido,
+ *    solo que del cajón que toca. Para saber cuál toca ANTES de que responda
+ *    `/me` se guarda quién entró el último (`CLAVE_ULTIMO`); quien cambia de
+ *    cuenta lo deja escrito antes de recargar (`useCambiarUsuario`), así que
+ *    en la primera pintura ya se acierta. `/me` solo hace de red de seguridad
+ *    para los casos que no pasan por ahí (sesión caducada, otro dispositivo).
  */
 const PREFIJO = "qcache:";
-/** De quién es lo que hay guardado ahora mismo. */
-const CLAVE_DUENO = `${PREFIJO}dueño`;
+/** Quién entró el último. Sirve para elegir cajón en la primera pintura, antes
+ *  de que `/me` haya contestado. */
+const CLAVE_ULTIMO = `${PREFIJO}ultimo`;
 const FRESCURA_MS = 6 * 60 * 60 * 1000;
 const MAX_BYTES = 150_000;
 const MAX_ENTRADAS = 40;
@@ -57,8 +65,33 @@ function interesa(key: readonly unknown[]): boolean {
   return typeof key[0] === "string" && PREFIJOS.includes(key[0]);
 }
 
-function claveDe(key: readonly unknown[]): string {
-  return PREFIJO + JSON.stringify(key);
+/** Cajón de una persona. Sin usuario cae en uno propio ("anónimo") en vez de
+ *  mezclarse con el de nadie. */
+function cajon(usuario: string): string {
+  return `${PREFIJO}u:${usuario || "?"}:`;
+}
+
+function claveDe(usuario: string, key: readonly unknown[]): string {
+  return cajon(usuario) + JSON.stringify(key);
+}
+
+/** Quién entró el último, o "" si no consta. */
+export function ultimoUsuario(): string {
+  try {
+    return localStorage.getItem(CLAVE_ULTIMO) || "";
+  } catch {
+    return "";
+  }
+}
+
+/** Deja apuntado quién manda ahora. Lo llama quien cambia de cuenta ANTES de
+ *  recargar, para que la pintura de después ya salga del cajón correcto. */
+export function fijarUsuario(usuario: string): void {
+  try {
+    localStorage.setItem(CLAVE_ULTIMO, usuario);
+  } catch {
+    /* localStorage bloqueado: se tirará de `/me` y ya está */
+  }
 }
 
 /** ¿Esta query es de las que se guardan? Son las que llevan el progreso de
@@ -68,13 +101,14 @@ export function esDeNicho(key: readonly unknown[]): boolean {
   return interesa(key);
 }
 
-/** Borra TODO lo guardado (incluido de quién era). */
-export function olvidar(): void {
+/** Borra lo guardado: el cajón de `usuario`, o TODO si no se pasa ninguno. */
+export function olvidar(usuario?: string): void {
+  const desde = usuario === undefined ? PREFIJO : cajon(usuario);
   try {
     const claves: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const clave = localStorage.key(i);
-      if (clave?.startsWith(PREFIJO)) claves.push(clave);
+      if (clave?.startsWith(desde)) claves.push(clave);
     }
     for (const clave of claves) localStorage.removeItem(clave);
   } catch {
@@ -82,33 +116,17 @@ export function olvidar(): void {
   }
 }
 
-/** Deja la caché a nombre de `usuario`, tirándola entera si era de otro.
- *
- *  Devuelve `true` si ha tirado algo — el caller aprovecha para vaciar
- *  también lo que ya estuviera en memoria.
- */
-export function asegurarDueno(usuario: string): boolean {
-  try {
-    if (localStorage.getItem(CLAVE_DUENO) === usuario) return false;
-    olvidar();
-    localStorage.setItem(CLAVE_DUENO, usuario);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Vuelca lo guardado a la caché. Se llama UNA vez, antes del primer render de
  *  las pantallas, para que la primera pintura ya lleve datos. */
-export function hidratar(qc: QueryClient): void {
-  let entradas: { clave: string; ts: number }[] = [];
+export function hidratar(qc: QueryClient, usuario: string): void {
+  const mio = cajon(usuario);
+  const entradas: { clave: string; ts: number }[] = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const clave = localStorage.key(i);
-      // La marca de dueño vive bajo el mismo prefijo pero NO es una entrada:
-      // es texto plano y al intentar parsearla se borraría sola.
-      if (clave === CLAVE_DUENO) continue;
-      if (clave?.startsWith(PREFIJO)) entradas.push({ clave, ts: 0 });
+      // Solo el cajón de esta persona: el de al lado tiene el progreso de
+      // otra, que es justo lo que no puede pintarse aquí.
+      if (clave?.startsWith(mio)) entradas.push({ clave, ts: 0 });
     }
   } catch {
     return;
@@ -144,7 +162,7 @@ export function hidratar(qc: QueryClient): void {
 }
 
 /** Empieza a guardar cada listado que llega. Devuelve cómo dejar de hacerlo. */
-export function vigilar(qc: QueryClient): () => void {
+export function vigilar(qc: QueryClient, usuario: string): () => void {
   return qc.getQueryCache().subscribe((evento) => {
     const query = evento.query;
     if (!query || query.state.status !== "success") return;
@@ -160,22 +178,25 @@ export function vigilar(qc: QueryClient): () => void {
         ts: Date.now(),
       });
       if (cuerpo.length > MAX_BYTES) return;
-      localStorage.setItem(claveDe(key), cuerpo);
-      podar();
+      localStorage.setItem(claveDe(usuario, key), cuerpo);
+      podar(usuario);
     } catch {
       // Cuota llena: se tira lo viejo y se deja estar. No merece más.
-      podar(true);
+      podar(usuario, true);
     }
   });
 }
 
-/** Deja como mucho `MAX_ENTRADAS`, tirando las más viejas. */
-function podar(agresivo = false): void {
+/** Deja como mucho `MAX_ENTRADAS` en el cajón de esa persona, tirando las más
+ *  viejas. El tope es por cajón: son tres personas y `localStorage` da de
+ *  sobra para eso. */
+function podar(usuario: string, agresivo = false): void {
+  const mio = cajon(usuario);
   try {
     const entradas: { clave: string; ts: number }[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const clave = localStorage.key(i);
-      if (!clave?.startsWith(PREFIJO) || clave === CLAVE_DUENO) continue;
+      if (!clave?.startsWith(mio)) continue;
       let ts = 0;
       try {
         ts = (JSON.parse(localStorage.getItem(clave) || "{}") as { ts?: number }).ts ?? 0;

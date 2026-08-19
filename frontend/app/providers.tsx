@@ -6,38 +6,53 @@ import { Toaster } from "sonner";
 
 import { QueueDrawer } from "@/components/queue/QueueDrawer";
 import { QueueWebSocketBridge } from "@/components/queue/QueueWebSocketBridge";
-import { asegurarDueno, esDeNicho, hidratar, vigilar } from "@/lib/cache-persistente";
+import {
+  esDeNicho,
+  fijarUsuario,
+  hidratar,
+  ultimoUsuario,
+  vigilar,
+} from "@/lib/cache-persistente";
 import { useMe } from "@/lib/queries/auth";
 import { ThemeProvider } from "@/lib/theme";
 
-/** Rellena la caché con lo último que se vio, PERO solo cuando ya se sabe de
- *  quién es la sesión.
+/** Rellena la caché con lo último que vio ESTA persona.
  *
  *  Al reabrir la app (Android la mata al rato de dejarla de fondo) la caché
  *  arranca vacía y toca esperar otra vez al Drive, que son segundos. Se pinta
  *  lo guardado y React Query refresca por detrás.
  *
- *  Lo de esperar a `/me` no es un detalle: los listados guardados llevan el
- *  progreso de una PERSONA (carpetas hechas, subidos, escaparate). Hidratando
- *  a ciegas, el admin entraba en la cuenta de Ana y veía pintado su propio
- *  progreso hasta que respondía el Drive. `/me` es una llamada local de unos
- *  milisegundos; el listado del Drive tarda segundos, así que lo que se gana
- *  en pintura rápida sigue estando.
+ *  Se hidrata YA, sin esperar a `/me`, con quien entró el último
+ *  (`ultimoUsuario`): así no se pierde nada de velocidad. Y como cada persona
+ *  tiene su propio cajón, lo que se pinta es lo suyo — antes, con un cajón
+ *  único, el admin entraba en la cuenta de Ana y veía su propio progreso hasta
+ *  que respondía el Drive.
+ *
+ *  Cuando `/me` contesta se comprueba: si resulta ser otra persona (sesión
+ *  caducada, cambio desde otro sitio), se tira lo pintado y se hidrata del
+ *  cajón bueno. Por el camino normal no pasa: quien cambia de cuenta deja
+ *  escrito quién entra antes de recargar.
  */
 function CachePersistente() {
   const qc = useQueryClient();
-  const usuario = useMe().data?.username ?? null;
+  const real = useMe().data?.username ?? null;
+  // El de la primera pintura. `useState` con inicializador: se calcula una
+  // sola vez y ANTES del primer efecto.
+  const [ultimo] = useState(() =>
+    typeof window === "undefined" ? "" : ultimoUsuario(),
+  );
+  const usuario = real ?? ultimo;
 
   useEffect(() => {
     if (!usuario) return;
-    if (asegurarDueno(usuario)) {
-      // Era de otra persona: fuera también lo que ya hubiera en memoria (al
-      // cambiar de cuenta sin recargar, o si la sesión cambia por su cuenta).
+    if (real && real !== ultimo) {
+      // Lo hidratado era de otra persona: fuera de memoria antes de nada.
       qc.removeQueries({ predicate: (q) => esDeNicho(q.queryKey) });
+      fijarUsuario(real);
     }
-    hidratar(qc);
-    return vigilar(qc);
-  }, [qc, usuario]);
+    hidratar(qc, usuario);
+    return vigilar(qc, usuario);
+  }, [qc, usuario, real, ultimo]);
 
   return null;
 }

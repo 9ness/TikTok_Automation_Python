@@ -80,7 +80,7 @@ def origen_de(carpeta: str, producto: str) -> dict | None:
     return None
 
 
-def ventas_por_producto(source: str) -> dict[str, dict]:
+def ventas_por_producto(source: str, usuario: str = "") -> dict[str, dict]:
     """`{"<carpeta>|<producto>": {ventas, vendido_at}}` de esta fuente.
 
     Las ventas viven en el ranking, bajo la carpeta de ORIGEN, así que hay que
@@ -96,7 +96,7 @@ def ventas_por_producto(source: str) -> dict[str, dict]:
 
     ranking = {
         f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}": v
-        for v in product_repo.ranking_vendidos()
+        for v in product_repo.ranking_vendidos(usuario=usuario)
     }
     salida: dict[str, dict] = {}
     for ref, sitio in manifiesto().items():
@@ -243,7 +243,7 @@ def reparar_carpeta(carpeta: str, *, on_log: OnLog = _noop) -> dict:
     return {"fotos": fotos_ok, "textos": textos_ok, "avisos": fallos[:10]}
 
 
-def pendientes() -> int:
+def pendientes(usuario: str = "") -> int:
     """Cuántos productos del ranking aún no están en la carpeta.
 
     Es una resta de dos lecturas de Redis, sin tocar Drive: se pide en cada
@@ -254,7 +254,7 @@ def pendientes() -> int:
 
     doc = manifiesto()
     return sum(
-        1 for v in product_repo.ranking_vendidos()
+        1 for v in product_repo.ranking_vendidos(usuario=usuario)
         if f"{v.get('source')}|{v.get('folder')}|{v.get('producto')}" not in doc
         and v.get("source") != SOURCE
     )
@@ -345,7 +345,10 @@ def sincronizar(*, usuario: str = "", on_log: OnLog = _noop) -> dict:
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
-    ranking = product_repo.ranking_vendidos()
+    # El ranking es de QUIEN sincroniza: las ventas son suyas (ver
+    # `product_repo._key_vendidos_index`). La carpeta de Top vendidos en Drive
+    # sí es común — es un catálogo, no un progreso.
+    ranking = product_repo.ranking_vendidos(usuario=usuario)
     doc = manifiesto()
     # De más vendido a menos, para que los primeros en entrar sean los mejores
     # (el orden de entrada es lo único que fija el sitio).

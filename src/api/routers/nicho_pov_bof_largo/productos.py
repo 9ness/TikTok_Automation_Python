@@ -13,8 +13,9 @@
 Las fotos y los TEXTOS del producto salen del Nicho POV BOF: aquí no se extrae
 nada, solo se consulta (mismo Drive, mismas carpetas). Lo PROPIO —guion, clips,
 vídeo montado y el progreso (carpeta hecha, escaparate, subido, vendió)— es
-INDIVIDUAL de este nicho y va por usuario. El ranking de vendidos es el único
-dato transversal: se apunta en el índice compartido con `nicho="pov_bof_largo"`.
+INDIVIDUAL de este nicho y va por usuario. El ranking de vendidos es transversal
+a los NICHOS —se apunta con `nicho="pov_bof_largo"` en el índice que comparten
+todos— pero es de cada PERSONA: una venta es de la cuenta de quien la hizo.
 """
 
 from __future__ import annotations
@@ -265,7 +266,7 @@ def _listar(
 
     urls = pov_repo.urls_index()
     # Solo devuelve algo en "Top vendidos"; en las demás fuentes es {}.
-    ventas = top_vendidos.ventas_por_producto(source)
+    ventas = top_vendidos.ventas_por_producto(source, usuario)
 
     items: list[ProductoLargo] = []
     for par in pares:
@@ -496,7 +497,8 @@ def set_producto_estado(
     if item is None:
         raise APIError(f"No existe el producto {body.producto}.", status_code=404)
 
-    # Ranking de vendidos: índice único y GLOBAL, sin clasificar por nicho.
+    # Ranking de vendidos: es POR USUARIO (una venta es de la cuenta de quien
+    # la hizo), pero NO se clasifica por nicho — se comparte entre todos.
     if body.sold is not None:
         from src.nicho_pov_bof.repos import product_repo as pov_repo
 
@@ -507,9 +509,12 @@ def set_producto_estado(
                     titulo=item.titulo or "", tienda=item.tienda or "",
                     clean_photo_id=item.clean_photo_id or "",
                     product_url=item.product_url or "",
+                    usuario=usuario,
                 )
             else:
-                pov_repo.desmarcar_vendido(body.source, body.folder, body.producto)
+                pov_repo.desmarcar_vendido(
+                    body.source, body.folder, body.producto, usuario,
+                )
         except Exception:
             # El dato bueno (`sold`) ya está guardado; que no se caiga por el
             # ranking.

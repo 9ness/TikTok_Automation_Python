@@ -371,7 +371,7 @@ def _list_productos(
     # si no ha cambiado nada, no hace nada.
     from src.nicho_pov_bof.services import reanclaje
 
-    reanclaje.sincronizar(source, folder, pairs)
+    reanclaje.sincronizar(source, folder, pairs, usuario)
 
     # Vista del usuario: textos y enlaces compartidos, su progreso privado.
     folder_state = product_repo.load_folder_para(source, folder, usuario)
@@ -382,7 +382,7 @@ def _list_productos(
     # La ficha de TikTok es del producto y la comparten los tres usuarios: se
     # lee el índice entero una vez, no producto a producto.
     urls = product_repo.urls_index()
-    ventas = top_vendidos.ventas_por_producto(source)
+    ventas = top_vendidos.ventas_por_producto(source, usuario)
 
     items: list[ProductoInfo] = []
     for pair in pairs:
@@ -1301,9 +1301,10 @@ def set_producto_estado(
                     clean_photo_id=info.clean_photo_id or "",
                     product_url=info.product_url or "",
                     nicho=(body.nicho or "").strip(),
+                    usuario=usuario,
                 )
             else:
-                product_repo.desmarcar_vendido(*destino)
+                product_repo.desmarcar_vendido(*destino, usuario=usuario)
         except Exception:
             # Que no se caiga el marcado por un fallo del ranking: el dato
             # bueno (`sold`) ya está guardado en el producto.
@@ -1937,6 +1938,7 @@ def list_nichos_venta() -> dict:
 def list_sold(
     source: Annotated[str | None, Query()] = None,
     nicho: Annotated[str | None, Query()] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> SoldProductsResponse:
     """Ranking de vendidos, del que más unidades al que menos.
 
@@ -1947,14 +1949,17 @@ def list_sold(
     from src.nicho_pov_bof.repos import product_repo
 
     # Sin `nicho` salen TODOS mezclados, que es la vista por defecto.
-    items = product_repo.ranking_vendidos(nicho or "")
+    items = product_repo.ranking_vendidos(nicho or "", usuario)
     if source:
         items = [i for i in items if i.get("source") == source]
     return SoldProductsResponse(items=items)
 
 
 @router.post("/vendidos/unidades", response_model=SoldProductsResponse)
-def sumar_unidades_vendidas(body: UnidadesRequest) -> SoldProductsResponse:
+def sumar_unidades_vendidas(
+    body: UnidadesRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> SoldProductsResponse:
     """Suma (o resta) unidades a un producto ya vendido.
 
     Un producto que REPITE venta es la señal más valiosa que hay aquí, y no
@@ -1963,9 +1968,11 @@ def sumar_unidades_vendidas(body: UnidadesRequest) -> SoldProductsResponse:
     from src.nicho_pov_bof.repos import product_repo
 
     try:
-        product_repo.sumar_unidades(body.source, body.folder, body.producto, body.delta)
+        product_repo.sumar_unidades(
+            body.source, body.folder, body.producto, body.delta, usuario,
+        )
     except ValueError as e:
         raise APIError(str(e), status_code=404) from e
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return SoldProductsResponse(items=product_repo.ranking_vendidos())
+    return SoldProductsResponse(items=product_repo.ranking_vendidos(usuario=usuario))

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import { fijarUsuario } from "@/lib/cache-persistente";
 
 export interface UsuarioFicha {
   username: string;
@@ -94,7 +95,11 @@ export function useSuplantando(): string | null {
  *  Tras el cambio se RECARGA la página entera a propósito. Todo lo que hay en
  *  caché (productos, progreso, cola, cuota) es de la persona anterior, y la
  *  mitad de las pantallas ni siquiera son visibles para el rol nuevo — vaciar
- *  query por query sería más frágil que empezar de cero. */
+ *  query por query sería más frágil que empezar de cero.
+ *
+ *  Antes de recargar se deja apuntado quién entra: así la pintura de después
+ *  sale YA del cajón de esa persona, sin esperar a `/me` y sin enseñar ni un
+ *  fotograma del progreso de la anterior. */
 export function useCambiarUsuario() {
   return useMutation<
     { username: string; nombre: string; rol: string; admin_real: string | null },
@@ -103,7 +108,8 @@ export function useCambiarUsuario() {
   >({
     mutationFn: (body) =>
       api.post(`/api/v1/auth/cambiar-usuario`, body),
-    onSuccess: () => {
+    onSuccess: (datos) => {
+      fijarUsuario(datos.username);
       window.location.assign("/");
     },
   });
@@ -114,6 +120,10 @@ export function useLogout() {
   return useMutation<void, Error, void>({
     mutationFn: () => api.post<void>(`/api/v1/auth/logout`),
     onSuccess: () => {
+      // Sin dueño apuntado, el siguiente que entre no hidrata nada hasta que
+      // `/me` diga quién es. El cajón NO se borra: si vuelve el mismo, su
+      // pantalla sigue saliendo pintada al momento.
+      fijarUsuario("");
       qc.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });

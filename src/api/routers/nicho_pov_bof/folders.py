@@ -50,7 +50,9 @@ def _bad_request(msg: str) -> APIError:
 
 
 @router.get("/sources", response_model=SourcesListResponse)
-def list_sources() -> SourcesListResponse:
+def list_sources(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> SourcesListResponse:
     from src.nicho_pov_bof import config
     from src.nicho_pov_bof.services import top_vendidos
 
@@ -58,7 +60,7 @@ def list_sources() -> SourcesListResponse:
     # (no toca Drive), así que se puede pedir en cada carga de la pantalla; si
     # falla, se enseña 0 antes que tumbar el selector de fuentes.
     try:
-        faltan = top_vendidos.pendientes()
+        faltan = top_vendidos.pendientes(usuario)
     except Exception:
         faltan = 0
 

@@ -820,6 +820,19 @@ def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> Non
 # vendió.
 _VENDIDOS_INDEX = "vendidos:index"
 
+
+def _key_vendidos_index(usuario: str = "") -> str:
+    """Índice del ranking. Es POR USUARIO, igual que el escaparate: haber
+    vendido un producto es el resultado de la cuenta de UNA persona, no un dato
+    del catálogo. Ana no vende porque venda yo.
+
+    `ness` se queda en la clave sin sufijo (su histórico), que es el criterio
+    que ya usan el progreso de carpetas y el escaparate.
+    """
+    if _es_compartido(usuario):
+        return _VENDIDOS_INDEX
+    return f"{_VENDIDOS_INDEX}:{usuario}"
+
 # Nichos que pueden atribuirse una venta. La clave es lo que se guarda; la
 # etiqueta, lo que se enseña.
 NICHOS_VENTA: dict[str, str] = {
@@ -864,14 +877,17 @@ def _ref_vendido(source: str, folder: str, producto: str) -> str:
     return f"{source}|{folder}|{producto}"
 
 
-def _key_vendido(ref: str) -> str:
-    return f"vendido:{ref}"
+def _key_vendido(ref: str, usuario: str = "") -> str:
+    if _es_compartido(usuario):
+        return f"vendido:{ref}"
+    return f"vendido:u:{usuario}:{ref}"
 
 
 def marcar_vendido(
     source: str, folder: str, producto: str,
     *, titulo: str = "", tienda: str = "", clean_photo_id: str = "",
     product_url: str = "", unidades: int = 1, nicho: str = "",
+    usuario: str = "",
 ) -> dict:
     """Entra (o actualiza) en el ranking de vendidos.
 
@@ -882,7 +898,7 @@ def marcar_vendido(
     """
     r = _require_redis()
     ref = _ref_vendido(source, folder, producto)
-    doc = r.get_json(_key_vendido(ref)) or {}
+    doc = r.get_json(_key_vendido(ref, usuario)) or {}
     doc.update({
         "source": source, "folder": folder, "producto": producto,
         "titulo": titulo or doc.get("titulo", ""),
@@ -894,12 +910,14 @@ def marcar_vendido(
         "vendido_at": doc.get("vendido_at") or time.time(),
         "updated_at": time.time(),
     })
-    r.set_json(_key_vendido(ref), doc)
-    r.sadd(_VENDIDOS_INDEX, ref)
+    r.set_json(_key_vendido(ref, usuario), doc)
+    r.sadd(_key_vendidos_index(usuario), ref)
     return doc
 
 
-def mover_venta(source: str, folder: str, viejo: str, nuevo: str) -> None:
+def mover_venta(
+    source: str, folder: str, viejo: str, nuevo: str, usuario: str = "",
+) -> None:
     """Cambia de número la venta de un producto (o la borra si no hay nuevo).
 
     Hace falta al renumerar "Mis productos": la venta vive en un documento por
@@ -910,25 +928,29 @@ def mover_venta(source: str, folder: str, viejo: str, nuevo: str) -> None:
     if not r.is_available():
         return
     ref_v = _ref_vendido(source, folder, viejo)
-    doc = r.get_json(_key_vendido(ref_v))
-    r.delete(_key_vendido(ref_v))
-    r.srem(_VENDIDOS_INDEX, ref_v)
+    doc = r.get_json(_key_vendido(ref_v, usuario))
+    r.delete(_key_vendido(ref_v, usuario))
+    r.srem(_key_vendidos_index(usuario), ref_v)
     if not doc or not nuevo:
         return
     doc["producto"] = nuevo
     ref_n = _ref_vendido(source, folder, nuevo)
-    r.set_json(_key_vendido(ref_n), doc)
-    r.sadd(_VENDIDOS_INDEX, ref_n)
+    r.set_json(_key_vendido(ref_n, usuario), doc)
+    r.sadd(_key_vendidos_index(usuario), ref_n)
 
 
-def desmarcar_vendido(source: str, folder: str, producto: str) -> None:
+def desmarcar_vendido(
+    source: str, folder: str, producto: str, usuario: str = "",
+) -> None:
     r = _require_redis()
     ref = _ref_vendido(source, folder, producto)
-    r.delete(_key_vendido(ref))
-    r.srem(_VENDIDOS_INDEX, ref)
+    r.delete(_key_vendido(ref, usuario))
+    r.srem(_key_vendidos_index(usuario), ref)
 
 
-def sumar_unidades(source: str, folder: str, producto: str, delta: int) -> dict:
+def sumar_unidades(
+    source: str, folder: str, producto: str, delta: int, usuario: str = "",
+) -> dict:
     """Suma (o resta) unidades vendidas. Nunca baja de 1.
 
     Existe porque un producto que repite venta es la señal más valiosa que hay
@@ -937,16 +959,16 @@ def sumar_unidades(source: str, folder: str, producto: str, delta: int) -> dict:
     """
     r = _require_redis()
     ref = _ref_vendido(source, folder, producto)
-    doc = r.get_json(_key_vendido(ref))
+    doc = r.get_json(_key_vendido(ref, usuario))
     if not doc:
         raise ValueError("Ese producto no está marcado como vendido.")
     doc["unidades"] = max(1, int(doc.get("unidades") or 1) + int(delta))
     doc["updated_at"] = time.time()
-    r.set_json(_key_vendido(ref), doc)
+    r.set_json(_key_vendido(ref, usuario), doc)
     return doc
 
 
-def ranking_vendidos(nicho: str = "") -> list[dict]:
+def ranking_vendidos(nicho: str = "", usuario: str = "") -> list[dict]:
     """Vendidos de más a menos unidades. Dos llamadas a Redis.
 
     `nicho` vacío = TODOS mezclados, que es la vista por defecto. Con nicho se
@@ -955,10 +977,10 @@ def ranking_vendidos(nicho: str = "") -> list[dict]:
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return []
-    refs = [str(x) for x in r.smembers(_VENDIDOS_INDEX) if x]
+    refs = [str(x) for x in r.smembers(_key_vendidos_index(usuario)) if x]
     if not refs:
         return []
-    docs = r.mget_json([_key_vendido(ref) for ref in refs])
+    docs = r.mget_json([_key_vendido(ref, usuario) for ref in refs])
     salida = [d for d in docs if isinstance(d, dict)]
     if nicho:
         salida = [d for d in salida if (d.get("nicho") or "") == nicho]

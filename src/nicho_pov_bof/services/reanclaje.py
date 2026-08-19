@@ -51,7 +51,9 @@ def ids_de(par: dict) -> set[str]:
     return out
 
 
-def sincronizar(source: str, folder: str, pares: Iterable[dict]) -> dict[str, str]:
+def sincronizar(
+    source: str, folder: str, pares: Iterable[dict], usuario: str = "",
+) -> dict[str, str]:
     """Reengancha lo guardado si el curso ha renumerado la carpeta.
 
     Devuelve el mapa viejo→nuevo de lo que se ha movido (vacío si no había
@@ -59,13 +61,15 @@ def sincronizar(source: str, folder: str, pares: Iterable[dict]) -> dict[str, st
     dejar al operador sin pantalla.
     """
     try:
-        return _sincronizar(source, folder, list(pares))
+        return _sincronizar(source, folder, list(pares), usuario)
     except Exception as e:  # noqa: BLE001
         log.warning("reanclaje de %s/%s falló: %s", source, folder, e)
         return {}
 
 
-def _sincronizar(source: str, folder: str, pares: list[dict]) -> dict[str, str]:
+def _sincronizar(
+    source: str, folder: str, pares: list[dict], usuario: str = "",
+) -> dict[str, str]:
     from src.nicho_pov_bof.repos import product_repo as pov
 
     doc = pov.load_folder(source, folder)
@@ -200,7 +204,7 @@ def mover_productos(
         from src.nicho_pov_bof.repos import product_repo as pov
 
         for viejo, nuevo in mapa.items():
-            pov.mover_venta(source, folder, viejo, nuevo)
+            pov.mover_venta(source, folder, viejo, nuevo, usuario)
     except Exception as e:  # noqa: BLE001
         log.warning("reanclaje: ventas no se pudieron mover (%s)", e)
 
