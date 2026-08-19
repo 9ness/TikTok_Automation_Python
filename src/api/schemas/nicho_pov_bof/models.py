@@ -82,6 +82,17 @@ class BackupSyncResponse(BaseModel):
     position_in_queue: int
 
 
+class PaqueteRequest(BaseModel):
+    """Monta UNA carpeta con todo el material, para poder devolvérselo a
+    quien comparte el Drive si lo pierde."""
+
+
+class CompartirPaqueteRequest(BaseModel):
+    correo: str
+    # Por defecto solo lectura: es un respaldo, no una carpeta de trabajo.
+    rol: str = "reader"
+
+
 class MarkCompletedResponse(BaseModel):
     source: str
     folder: str

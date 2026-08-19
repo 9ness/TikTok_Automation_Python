@@ -1,11 +1,18 @@
 "use client";
 
-import { HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { HardDrive, Loader2, Package, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useBackupCheck, useBackupSync, useUltimaCopia } from "@/lib/queries/nichoPovBof";
+import {
+  useBackupCheck,
+  useBackupSync,
+  useCompartirPaquete,
+  useMontarPaquete,
+  usePaquete,
+  useUltimaCopia,
+} from "@/lib/queries/nichoPovBof";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import type { BackupCheckResponse } from "@/lib/types/nichoPovBof";
 
@@ -21,6 +28,10 @@ export function PanelBackup() {
   const backupCheck = useBackupCheck();
   const backupSync = useBackupSync();
   const ultimaCopia = useUltimaCopia();
+  const paquete = usePaquete();
+  const montarPaquete = useMontarPaquete();
+  const compartir = useCompartirPaquete();
+  const [correo, setCorreo] = useState("");
   const openQueue = useDrawerStore((s) => s.openQueue);
 
   function checkBackup() {
@@ -152,6 +163,91 @@ export function PanelBackup() {
       >
         Forzar copia completa nueva
       </button>
+
+      {/* El paquete: lo que se le DEVUELVE al dueño del Drive si lo pierde.
+          Nuestro archivo son la copia completa más un delta por día, y eso no
+          se le puede pasar a nadie: hay que juntarlo en una sola carpeta con
+          el árbol tal y como estaba. */}
+      <div className="space-y-2 rounded-lg border border-border/60 p-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-semibold">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" /> Paquete para
+              devolver
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Una sola carpeta con TODO el material y su estructura original.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              montarPaquete.mutate(undefined, {
+                onSuccess: () => {
+                  toast.success("Montando el paquete — va por la cola");
+                  openQueue();
+                },
+                onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+              })
+            }
+            disabled={montarPaquete.isPending}
+            className="shrink-0 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] font-semibold transition hover:border-foreground/30 disabled:opacity-50"
+          >
+            {montarPaquete.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              "Montar"
+            )}
+          </button>
+        </div>
+
+        {paquete.data?.carpeta ? (
+          <p className="break-words text-[11px] text-emerald-500">
+            📦 {paquete.data.carpeta.split("/").pop()} ·{" "}
+            {paquete.data.ficheros?.toLocaleString("es-ES")} ficheros ·{" "}
+            {((paquete.data.bytes ?? 0) / 2 ** 30).toFixed(2)} GB
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            Todavía no hay paquete montado.
+          </p>
+        )}
+
+        <div className="flex gap-1.5">
+          <input
+            type="email"
+            inputMode="email"
+            value={correo}
+            onChange={(e) => setCorreo(e.target.value)}
+            placeholder="correo@gmail.com"
+            className="min-w-0 flex-1 rounded-lg border border-border/60 bg-background px-2 py-1.5 text-xs"
+          />
+          <button
+            type="button"
+            onClick={() =>
+              compartir.mutate(
+                { correo, rol: "reader" },
+                {
+                  onSuccess: (r) => {
+                    toast.success(`Compartido con ${r.correo}`);
+                    setCorreo("");
+                  },
+                  onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+                },
+              )
+            }
+            disabled={compartir.isPending || !correo.includes("@") || !paquete.data?.carpeta}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {compartir.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            Compartir
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

@@ -159,6 +159,40 @@ export function useBackupSync() {
   });
 }
 
+/** El paquete: UNA carpeta con todo el material, con el árbol original.
+ *
+ *  El archivo de copias (completa + un delta por día) sirve para trabajar,
+ *  pero para DEVOLVERLE el material a quien comparte el Drive —le hackearon
+ *  el correo y se quedó sin acceso— hace falta una sola carpeta. */
+export type PaqueteEstado = { carpeta?: string; ficheros?: number; bytes?: number };
+
+export function usePaquete() {
+  return useQuery<PaqueteEstado>({
+    queryKey: [...nichoPovBofKeys.all, "backup-paquete"],
+    queryFn: () => api.get<PaqueteEstado>(`${ROOT}/backup/paquete`),
+    staleTime: 60_000,
+  });
+}
+
+export function useMontarPaquete() {
+  const qc = useQueryClient();
+  return useMutation<BackupSyncResponse, Error, void>({
+    mutationFn: () => api.post<BackupSyncResponse>(`${ROOT}/backup/paquete`, {}),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "backup-paquete"] }),
+  });
+}
+
+export function useCompartirPaquete() {
+  return useMutation<
+    { carpeta: string; correo: string; rol: string; enlace: string },
+    Error,
+    { correo: string; rol?: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/backup/paquete/compartir`, body),
+  });
+}
+
 /** Textos de TODAS las carpetas de un catálogo, de una tacada.
  *
  *  Vive aquí y no en cada nicho porque los textos son del catálogo COMPARTIDO:

@@ -2338,6 +2338,19 @@ def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -
     from src.nicho_pov_bof.services import backup_sync
 
     p = job.params or {}
+
+    # Modo "paquete": no mira el origen, junta lo que YA tenemos en una sola
+    # carpeta con el árbol original. Es lo que se le devuelve al dueño del
+    # Drive si pierde el suyo, y lo que vale como respaldo enseñable.
+    if p.get("paquete"):
+        on_progress(0.02, "📦 Juntando todas las copias…")
+        hecho = backup_sync.construir_paquete(on_log=on_log, on_progress=on_progress)
+        on_progress(1.0, "✅ Paquete listo")
+        return (
+            f"{hecho['carpeta']} · {hecho['ficheros']} ficheros · "
+            f"{hecho['bytes'] / 2**30:.2f} GiB"
+        )
+
     result = backup_sync.run_sync(
         force_full=bool(p.get("force_full")),
         on_log=on_log,

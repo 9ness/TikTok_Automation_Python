@@ -25,6 +25,7 @@ from src.api.schemas.nicho_pov_bof import (
     BackupCheckResponse,
     BackupSyncRequest,
     BackupSyncResponse,
+    CompartirPaqueteRequest,
     FoldersListResponse,
     MarkCompletedRequest,
     MarkCompletedResponse,
@@ -192,6 +193,54 @@ def get_photo(
         media_type=media_type,
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@router.get("/backup/paquete")
+def backup_paquete_estado() -> dict:
+    """El último paquete montado (la carpeta única con TODO el material).
+
+    Nuestro archivo son una copia completa + un delta por día: vale para
+    trabajar, pero para DEVOLVERLE el material a quien comparte el Drive hace
+    falta una sola carpeta con el árbol original.
+    """
+    from src.nicho_pov_bof.services import backup_sync
+
+    return backup_sync.paquete_actual()
+
+
+@router.post(
+    "/backup/paquete",
+    response_model=BackupSyncResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def backup_paquete_enqueue(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+) -> BackupSyncResponse:
+    """Encola el montaje del paquete (vuelca todas las copias en una)."""
+    title = "📦 Paquete completo Productos España"
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_BACKUP, title=title, params={"paquete": True},
+    )
+    pending = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    position = next((i for i, j in enumerate(pending) if j.id == job.id), 0)
+    return BackupSyncResponse(job_id=job.id, title=title, position_in_queue=position)
+
+
+@router.post("/backup/paquete/compartir")
+def backup_paquete_compartir(body: CompartirPaqueteRequest) -> dict:
+    """Da acceso al paquete a un correo (le llega el aviso de Google)."""
+    from src.nicho_pov_bof.services import backup_sync
+
+    actual = backup_sync.paquete_actual()
+    if not actual.get("carpeta"):
+        raise _bad_request("Todavía no hay paquete montado: púlsalo antes.")
+    try:
+        return backup_sync.compartir(actual["carpeta"], body.correo, rol=body.rol)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=502) from e
 
 
 @router.get("/backup/check", response_model=BackupCheckResponse)

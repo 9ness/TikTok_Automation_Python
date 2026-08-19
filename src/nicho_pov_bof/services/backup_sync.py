@@ -514,6 +514,150 @@ def _counts(d: dict) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Paquete para DEVOLVER el material
+# ---------------------------------------------------------------------------
+# Nuestro archivo son una copia completa + los deltas de cada día: sirve para
+# trabajar, pero no para DAR. Si el dueño del Drive de origen lo pierde (pasó
+# el 19-08-2026: le entraron en el correo y se quedó sin acceso), lo que hay
+# que poder pasarle es UNA carpeta con la estructura tal y como estaba.
+#
+# Se vuelca de la copia más VIEJA a la más nueva para que, cuando un fichero
+# esté en varias, gane la última versión.
+PAQUETE_PREFIX = "PAQUETE_Productos_Espana"
+
+
+def _paquete_root(tag: str = "") -> str:
+    nombre = f"{PAQUETE_PREFIX}_{tag}" if tag else PAQUETE_PREFIX
+    return f"{BACKUP_PARENT}/{nombre}"
+
+
+def paquetes() -> list[str]:
+    """Paquetes ya montados, del más nuevo al más viejo."""
+    try:
+        out = _rclone(["lsjson", f"gdrive:{BACKUP_PARENT}", "--dirs-only"], timeout=120)
+        return sorted(
+            (str(d["Name"]) for d in json.loads(out or "[]")
+             if str(d.get("Name", "")).startswith(PAQUETE_PREFIX)),
+            reverse=True,
+        )
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def paquete_actual() -> dict:
+    """El último paquete montado: `{carpeta, ficheros, bytes}`. Vacío si no hay."""
+    todos = paquetes()
+    if not todos:
+        return {}
+    ruta = f"{BACKUP_PARENT}/{todos[0]}"
+    try:
+        datos = json.loads(_rclone(["size", f"gdrive:{ruta}", "--json"], timeout=600) or "{}")
+    except Exception:  # noqa: BLE001
+        datos = {}
+    return {
+        "carpeta": ruta,
+        "ficheros": int(datos.get("count") or 0),
+        "bytes": int(datos.get("bytes") or 0),
+    }
+
+
+def construir_paquete(
+    *, on_log: OnLog = _noop, on_progress: Callable[[float, str], None] | None = None,
+) -> dict:
+    """Junta todas las copias en UNA carpeta con el árbol original."""
+    prog = on_progress or (lambda *_: None)
+    tag = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    destino = f"gdrive:{_paquete_root(tag)}"
+    todas = sorted(copias())
+    if not todas:
+        raise RuntimeError("No hay ninguna copia guardada todavía.")
+    for i, copia in enumerate(todas, 1):
+        on_log(f"[paquete] volcando {copia} ({i}/{len(todas)})…")
+        prog(i / (len(todas) + 1), f"volcando {copia}")
+        _rclone(
+            ["copy", f"gdrive:{BACKUP_ROOT}/{copia}", destino,
+             "--transfers", "8", "--checkers", "8"],
+            timeout=7200, on_log=_noop,
+        )
+    prog(0.98, "contando lo copiado")
+    datos = json.loads(_rclone(["size", destino, "--json"], timeout=600) or "{}")
+    on_log(
+        f"[paquete] listo: {datos.get('count', 0)} ficheros, "
+        f"{(datos.get('bytes') or 0) / 2**30:.2f} GiB en {destino}"
+    )
+    return {
+        "carpeta": _paquete_root(tag),
+        "ficheros": int(datos.get("count") or 0),
+        "bytes": int(datos.get("bytes") or 0),
+        "copias_volcadas": len(todas),
+    }
+
+
+# rclone solo sabe hacer enlaces públicos, y esto no es para publicarlo: es
+# para dárselo a UNA persona. Se llama a la API de Drive con el mismo token
+# que ya usa el backup (`rclone config dump`), que tiene scope `drive`.
+def _token_drive() -> str:
+    salida = subprocess.run(
+        ["rclone", "config", "dump"], capture_output=True, text=True, timeout=60,
+    )
+    if salida.returncode != 0:
+        raise RuntimeError("No se pudo leer la configuración de rclone.")
+    cfg = json.loads(salida.stdout or "{}").get("gdrive") or {}
+    tok = json.loads(cfg.get("token") or "{}")
+    if not tok.get("access_token"):
+        raise RuntimeError("La cuenta de Drive no tiene token; reconecta rclone.")
+    return str(tok["access_token"])
+
+
+def id_de_carpeta(ruta: str) -> str:
+    """ID de una carpeta de NUESTRO Drive (`lsjson --stat` no lo trae)."""
+    padre, _, nombre = ruta.rpartition("/")
+    out = _rclone(["lsjson", f"gdrive:{padre}", "--dirs-only"], timeout=300)
+    for d in json.loads(out or "[]"):
+        if d.get("Name") == nombre:
+            return str(d.get("ID") or "")
+    return ""
+
+
+def compartir(ruta: str, correo: str, *, rol: str = "reader") -> dict:
+    """Da acceso a un correo a una carpeta nuestra. Devuelve el enlace."""
+    import urllib.error
+    import urllib.request
+
+    correo = (correo or "").strip()
+    if "@" not in correo:
+        raise RuntimeError(f"Eso no es un correo: {correo!r}")
+    if rol not in ("reader", "writer"):
+        rol = "reader"
+    fid = id_de_carpeta(ruta)
+    if not fid:
+        raise RuntimeError(f"No encuentro la carpeta {ruta!r} en el Drive.")
+    req = urllib.request.Request(
+        f"https://www.googleapis.com/drive/v3/files/{fid}/permissions"
+        "?sendNotificationEmail=true&supportsAllDrives=true",
+        data=json.dumps({"role": rol, "type": "user", "emailAddress": correo}).encode(),
+        headers={
+            "Authorization": f"Bearer {_token_drive()}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(
+            f"Drive no dejó compartir ({e.code}): {e.read().decode()[:200]}"
+        ) from e
+    return {
+        "carpeta": ruta,
+        "correo": correo,
+        "rol": rol,
+        "enlace": f"https://drive.google.com/drive/folders/{fid}",
+    }
+
+
 def check_only(*, on_log: OnLog = _noop) -> dict:
     """Diff sin copiar nada (para el botón "comprobar cambios")."""
     new_snap = take_snapshot(on_log=on_log)
