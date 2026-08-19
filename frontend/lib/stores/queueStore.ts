@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-import type { ActiveJob, JobStatus } from "@/lib/types/queue";
+import type { ActiveJob, ActivosDeOtro, JobStatus } from "@/lib/types/queue";
 
 const FINAL_STATUSES: JobStatus[] = ["completed", "failed", "cancelled"];
 const RECENT_LIMIT = 10;
@@ -19,7 +19,7 @@ export interface QueueState {
   /** Multiusuario: de quién es la cola que se ve y qué tienen los demás. */
   viendo: string;
   esAdmin: boolean;
-  otros: Record<string, number>;
+  otros: Record<string, ActivosDeOtro>;
   /** Cola de quién quiere ver el admin ("" = la suya, "todos" = mezcladas). */
   verDe: string;
   lastError: string | null;
@@ -34,7 +34,7 @@ export interface QueueState {
   /** Quita un job individual del listado de "Recientes". */
   dismissRecent: (id: string) => void;
   setConnection: (state: ConnectionState, error?: string | null) => void;
-  setOtros: (otros: Record<string, number>) => void;
+  setOtros: (otros: Record<string, ActivosDeOtro>) => void;
   setViendo: (viendo: string, esAdmin: boolean) => void;
   setVerDe: (verDe: string) => void;
   reset: () => void;
@@ -109,7 +109,7 @@ export const useQueueStore = create<QueueState>((set) => ({
   dismissRecent: (id) =>
     set((state) => ({ recent: state.recent.filter((j) => j.job_id !== id) })),
 
-  setOtros: (otros: Record<string, number>) => set(() => ({ otros })),
+  setOtros: (otros: Record<string, ActivosDeOtro>) => set(() => ({ otros })),
   setViendo: (viendo: string, esAdmin: boolean) =>
     set(() => ({ viendo, esAdmin })),
   setVerDe: (verDe: string) => set(() => ({ verDe })),

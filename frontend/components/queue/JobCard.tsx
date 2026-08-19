@@ -25,6 +25,7 @@ import {
   useReorderJob,
   useRescheduleJob,
 } from "@/lib/queries/queue";
+import { useMe } from "@/lib/queries/auth";
 import { useQueueStore } from "@/lib/stores/queueStore";
 import { JobDetailDialog } from "./JobDetailDialog";
 import { JobVideoDialog } from "./JobVideoDialog";
@@ -40,6 +41,7 @@ import {
   type Program,
 } from "@/lib/queue-meta";
 import type { ActiveJob, JobStatus } from "@/lib/types/queue";
+import { colorDeUsuario, nombreDueno } from "@/lib/usuarios-color";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -83,8 +85,16 @@ function statusBadge(job: ActiveJob): {
         Icon: Timer,
       };
     }
+    // El puesto lo calcula el servidor sobre la cola ENTERA. Contarlo aquí
+    // mentiría: cada uno solo ve lo suyo, así que Ana se vería siempre la
+    // primera aunque tuviera veinte por delante.
+    const puesto = job.queue_position;
     return {
-      label: "En cola",
+      label: puesto
+        ? `En cola · nº ${puesto}${
+            job.queue_pending_total ? ` de ${job.queue_pending_total}` : ""
+          }`
+        : "En cola",
       cls: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300",
       Icon: Clock,
     };
@@ -147,6 +157,12 @@ export function JobCard({ job }: { job: ActiveJob }) {
   const reorder = useReorderJob();
   const reschedule = useRescheduleJob();
   const dismissRecentLocal = useQueueStore((s) => s.dismissRecent);
+  // Quién mira. Sale de la sesión, no de `viendo` del store: `viendo` es el
+  // FILTRO ("todos" cuando se mira la cola entera), no la persona. Mientras no
+  // se sepa se deja vacío: `nombreDueno` daría "ness" por defecto y a Ana le
+  // saldría medio segundo la etiqueta en sus propios trabajos.
+  const sesion = useMe().data?.username;
+  const yo = sesion ? nombreDueno(sesion) : "";
   const [videoOpen, setVideoOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -184,6 +200,10 @@ export function JobCard({ job }: { job: ActiveJob }) {
   // Fallback defensivo: un `mode` que el frontend aún no conozca (p.ej. uno
   // nuevo del backend) NO debe tumbar todo el drawer con un icono undefined.
   const program: Program = MODE_TO_PROGRAM[job.mode] ?? "tiktok_shop";
+  // Dueño del trabajo: solo se enseña si NO es de quien está mirando.
+  const duenoNombre = nombreDueno(job.enqueued_by);
+  const colorDueno = colorDeUsuario(duenoNombre);
+  const esDeOtro = Boolean(yo) && duenoNombre !== yo;
   const isRunning = job.status === "running";
   const isFailed = job.status === "failed";
   const isCompleted = job.status === "completed";
@@ -270,6 +290,22 @@ export function JobCard({ job }: { job: ActiveJob }) {
               <ProgramIcon className="h-3 w-3" strokeWidth={1.75} />
               {PROGRAM_LABEL[program]}
             </Badge>
+            {/* De quién es. Solo cuando NO es de quien mira: en la cola propia
+                sobra, y con "Todas" es lo primero que hace falta saber. Cada
+                persona con su color, el mismo de los circulitos de la
+                cabecera. */}
+            {esDeOtro && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold",
+                  colorDueno.pildora,
+                )}
+                title={`Encolado por ${duenoNombre}`}
+              >
+                <span className={cn("h-1.5 w-1.5 rounded-full", colorDueno.punto)} />
+                {duenoNombre}
+              </span>
+            )}
             {showSubmodule && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 <SubmoduleIcon className="h-3 w-3" strokeWidth={1.75} />

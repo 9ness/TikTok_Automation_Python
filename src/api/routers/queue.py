@@ -33,7 +33,9 @@ router = APIRouter(
 _FINAL_STATUSES = (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
 
 
-def _to_response(job: Job) -> ActiveJobResponse:
+def _to_response(
+    job: Job, posiciones: dict[str, int] | None = None,
+) -> ActiveJobResponse:
     return ActiveJobResponse(
         job_id=job.id,
         mode=job.mode.value,
@@ -52,6 +54,8 @@ def _to_response(job: Job) -> ActiveJobResponse:
         params=_safe_params(job.params),
         scheduled_for=getattr(job, "scheduled_for", None),
         duration_seconds=job.duration_seconds,
+        queue_position=(posiciones or {}).get(job.id),
+        queue_pending_total=len(posiciones) if posiciones is not None else 0,
     )
 
 
@@ -134,15 +138,23 @@ def get_queue_state(
                 if _duenio(j) == objetivo or (es_admin_objetivo and not _duenio(j))
             ]
 
-    # Aviso para el admin: cuántos trabajos hay de los DEMÁS ahora mismo.
-    otros: dict[str, int] = {}
+    # Aviso para el admin: qué tienen los DEMÁS ahora mismo, con el desglose
+    # de cuántos están esperando y cuántos corriendo.
+    otros: dict[str, dict[str, int]] = {}
     if admin:
         for j in queue.get_all():
             duenio = _duenio(j)
-            if duenio and duenio != usuario and j.status in (
-                JobStatus.PENDING, JobStatus.RUNNING
-            ):
-                otros[duenio] = otros.get(duenio, 0) + 1
+            if not duenio or duenio == usuario:
+                continue
+            if j.status not in (JobStatus.PENDING, JobStatus.RUNNING):
+                continue
+            d = otros.setdefault(duenio, {"total": 0, "ejecutando": 0})
+            d["total"] += 1
+            if j.status == JobStatus.RUNNING:
+                d["ejecutando"] += 1
+    # Las posiciones salen de la cola ENTERA, no de `all_jobs` (que ya viene
+    # filtrado por usuario): el puesto tiene que ser el real.
+    posiciones = queue.posiciones_pendientes()
     active = [
         j for j in all_jobs
         if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
@@ -150,10 +162,10 @@ def get_queue_state(
     finished = [j for j in all_jobs if j.status in _FINAL_STATUSES]
     finished.sort(key=lambda j: j.finished_at or 0, reverse=True)
     return QueueStateResponse(
-        active_jobs=[_to_response(j) for j in active],
+        active_jobs=[_to_response(j, posiciones) for j in active],
         pending_count=sum(1 for j in active if j.status == JobStatus.PENDING),
         running_count=sum(1 for j in active if j.status == JobStatus.RUNNING),
-        recent_completed=[_to_response(j) for j in finished[:finished_limit]],
+        recent_completed=[_to_response(j, posiciones) for j in finished[:finished_limit]],
         viendo=quiere or usuario or "",
         es_admin=admin,
         activos_de_otros=otros,
@@ -168,9 +180,10 @@ def get_job(
     job_id: str,
     queue: Annotated[JobQueue, Depends(get_queue)],
 ) -> ActiveJobResponse:
+    posiciones = queue.posiciones_pendientes()
     for j in queue.get_all():
         if j.id == job_id:
-            return _to_response(j)
+            return _to_response(j, posiciones)
     raise JobNotFoundError(
         f"Job '{job_id}' no encontrado.",
         details={"job_id": job_id},

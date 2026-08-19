@@ -287,12 +287,19 @@ export function buildPhotoUrl(
 
 // --- Fase 2: automatización de vídeos ----------------------------------
 
-/** Prompts fijos (imagen/vídeo) — no dependen de carpeta ni fuente. */
+/** Prompts (imagen/vídeo) — no dependen de carpeta ni fuente.
+ *
+ *  `staleTime` finito A PROPÓSITO: con `Infinity` el prompt se quedaba
+ *  congelado para siempre en el móvil —la clave empieza por `nicho-pov-bof`,
+ *  así que `cache-persistente` lo guarda en localStorage y al arrancar se
+ *  rehidrataba el viejo sin volver a pedirlo—. Se cambió el prompt de vídeo
+ *  al inglés, se desplegó, y el botón de copiar seguía dando el de antes.
+ *  Son dos ficheros pequeños: pedirlos cada minuto no cuesta nada. */
 export function usePrompts() {
   return useQuery<PromptsResponse>({
     queryKey: nichoPovBofKeys.prompts(),
     queryFn: () => api.get<PromptsResponse>(`${ROOT}/prompts`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 }
 

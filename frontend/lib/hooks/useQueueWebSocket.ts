@@ -195,5 +195,19 @@ export function useQueueWebSocket(): void {
       }
       wsRef.current = null;
     };
-  }, [setSnapshot, upsertJobs, applyProgress, removeJobs, setConnection]);
+    // `verDe` TIENE que estar aquí: es lo que va en la URL del socket. Sin él,
+    // pulsar "Todas" cambiaba el estado pero el socket seguía conectado con el
+    // filtro viejo, así que se veía exactamente lo mismo que en "La mía" — que
+    // es justo el fallo que se notó. Los setters de zustand son estables, así
+    // que añadirlos no provoca reconexiones de más.
+  }, [
+    verDe,
+    setSnapshot,
+    upsertJobs,
+    applyProgress,
+    removeJobs,
+    setConnection,
+    setViendo,
+    setOtros,
+  ]);
 }

@@ -35,6 +35,11 @@ class ActiveJobResponse(BaseModel):
     # el worker no lo coge hasta esa hora. None = ejecutar inmediato.
     scheduled_for: float | None = None
     duration_seconds: float | None = None
+    # Puesto en la cola COMPARTIDA (1 = el siguiente en entrar). `None` si no
+    # está pendiente. Se calcula sobre la cola entera, no sobre lo que ve quien
+    # pregunta: si no, cada uno se vería siempre el primero.
+    queue_position: int | None = None
+    queue_pending_total: int = 0
 
 
 class QueueStateResponse(BaseModel):
@@ -43,7 +48,9 @@ class QueueStateResponse(BaseModel):
     # aviso discreto del admin).
     viendo: str = ""
     es_admin: bool = False
-    activos_de_otros: dict[str, int] = Field(default_factory=dict)
+    # `{usuario: {"total": n, "ejecutando": n}}` — hace falta el desglose para
+    # distinguir "Ana tiene tres esperando" de "Ana está renderizando".
+    activos_de_otros: dict[str, dict[str, int]] = Field(default_factory=dict)
     active_jobs: list[ActiveJobResponse]  # pending + running, en orden de cola
     pending_count: int
     running_count: int

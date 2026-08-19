@@ -59,17 +59,31 @@ def _visible_para(job: Job, usuario: str, admin: bool) -> bool:
     return admin and not duenio
 
 
-def _activos_de_otros(queue: JobQueue, usuario: str) -> dict[str, int]:
-    """Cuántos trabajos activos tiene cada uno de los DEMÁS."""
-    fuera: dict[str, int] = {}
+def _activos_de_otros(queue: JobQueue, usuario: str) -> dict[str, dict]:
+    """Qué tiene cada uno de los DEMÁS ahora mismo.
+
+    `{usuario: {"total": n, "ejecutando": n}}`. Antes era solo el total, y con
+    eso no se distingue "Ana tiene tres esperando" de "Ana está renderizando" —
+    que es lo que de verdad interesa mirar desde fuera.
+    """
+    fuera: dict[str, dict] = {}
     for j in queue.get_all():
         duenio = _duenio(j)
-        if duenio and duenio != usuario and j.status.value in ("pending", "running"):
-            fuera[duenio] = fuera.get(duenio, 0) + 1
+        if not duenio or duenio == usuario:
+            continue
+        estado = j.status.value
+        if estado not in ("pending", "running"):
+            continue
+        d = fuera.setdefault(duenio, {"total": 0, "ejecutando": 0})
+        d["total"] += 1
+        if estado == "running":
+            d["ejecutando"] += 1
     return fuera
 
 
-def _job_payload(job: Job) -> dict[str, Any]:
+def _job_payload(
+    job: Job, posiciones: dict[str, int] | None = None,
+) -> dict[str, Any]:
     """Snapshot mínimo de un job para el WebSocket (subset de fields
     relevantes para la UI). Excluye `logs` por tamaño."""
     # ETA inteligente: blend self-based + histórico (samples Redis). Cae
@@ -95,6 +109,10 @@ def _job_payload(job: Job) -> dict[str, Any]:
         "error": job.error,
         "result_path": job.result_path,
         "duration_seconds": job.duration_seconds,
+        # Puesto REAL en la cola compartida (1 = el siguiente). `None` si no
+        # está pendiente. El total va aparte para poder decir "3 de 9".
+        "queue_position": (posiciones or {}).get(job.id),
+        "queue_pending_total": len(posiciones) if posiciones is not None else 0,
     }
 
 
@@ -123,6 +141,11 @@ def _diff_jobs(
             prev["progress_percent"] != payload["progress_percent"]
             or prev["current_step"] != payload["current_step"]
             or prev["error"] != payload["error"]
+            # El puesto en la cola cambia sin que el job se mueva (adelanta
+            # porque el de delante ha terminado). Sin esto, un pendiente se
+            # quedaba con el número del momento en que se encoló.
+            or prev.get("queue_position") != payload.get("queue_position")
+            or prev.get("queue_pending_total") != payload.get("queue_pending_total")
         ):
             progress.append(payload)
     removed = [jid for jid in old if jid not in new]
@@ -172,8 +195,11 @@ class ConnectionManager:
         efectivo = "" if mirado == "todos" else (mirado or usuario)
 
         # 1. Snapshot inicial
+        # Las posiciones se calculan sobre la cola ENTERA (no sobre lo que se
+        # ve): el puesto tiene que ser el de verdad, no el del subconjunto.
+        posiciones = queue.posiciones_pendientes()
         snapshot = {
-            j.id: _job_payload(j) for j in queue.get_all()
+            j.id: _job_payload(j, posiciones) for j in queue.get_all()
             if _visible_para(j, efectivo, admin and not mirado)
         }
         await self._send_json(websocket, {
@@ -230,12 +256,13 @@ class ConnectionManager:
         admin: bool = False,
         avisar_de_otros: str = "",
     ) -> None:
-        otros_previo: dict[str, int] = {}
+        otros_previo: dict[str, dict] = {}
         try:
             while True:
                 await asyncio.sleep(self.poll_interval_s)
+                posiciones = queue.posiciones_pendientes()
                 current = {
-                    j.id: _job_payload(j) for j in queue.get_all()
+                    j.id: _job_payload(j, posiciones) for j in queue.get_all()
                     if _visible_para(j, usuario, admin)
                 }
                 # Aviso al admin de que otro tiene trabajos en marcha. Solo se

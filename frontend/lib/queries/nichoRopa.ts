@@ -20,12 +20,14 @@ export const nichoRopaKeys = {
   prompts: () => [...nichoRopaKeys.all, "prompts"] as const,
 };
 
-/** Los prompts no cambian entre sesiones: se cachean para siempre. */
+/** Los prompts SÍ cambian (se afinan cada pocas semanas), así que no se
+ *  cachean para siempre: con `Infinity` el móvil se quedaba con el viejo
+ *  aunque estuviera desplegado el nuevo (ver `usePrompts` del POV BOF). */
 export function usePromptsRopa() {
   return useQuery<PromptsRopaResponse>({
     queryKey: nichoRopaKeys.prompts(),
     queryFn: () => api.get<PromptsRopaResponse>(`${ROOT}/prompts`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 }
 

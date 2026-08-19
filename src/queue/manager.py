@@ -326,6 +326,30 @@ class JobQueue:
         with self._lock:
             return list(self._jobs)
 
+    def posiciones_pendientes(self) -> dict[str, int]:
+        """`{job_id: puesto}` (1-based) de los PENDIENTES, en el orden REAL en
+        que los va a coger un worker. Y el total, en `len()`.
+
+        Por qué en el manager y no en la interfaz: la cola es ÚNICA y compartida
+        y cada uno solo ve la suya, así que contar posiciones sobre lo que se
+        pinta mentiría — Ana vería su vídeo "el primero" teniendo veinte
+        delante. El puesto se calcula aquí, sobre la lista entera, y luego se
+        reparte a cada quien con su job.
+
+        El orden replica el de `_worker_loop`: primero los que no son ediciones
+        de cliente (van con prioridad), y dentro de cada grupo el de la lista
+        (FIFO + los reordenados a mano). Es una ESTIMACIÓN en un caso: si un
+        modo exclusivo ya está corriendo, el suyo se salta y el de detrás
+        adelanta — dura lo que dure ese job y no compensa complicar el número.
+        """
+        with self._lock:
+            pendientes = [
+                (i, j) for i, j in enumerate(self._jobs)
+                if j.status == JobStatus.PENDING
+            ]
+        pendientes.sort(key=lambda par: (_is_client_edit_job(par[1]), par[0]))
+        return {j.id: puesto for puesto, (_i, j) in enumerate(pendientes, start=1)}
+
     def get_running(self) -> Job | None:
         with self._lock:
             for j in self._jobs:

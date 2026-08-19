@@ -33,11 +33,13 @@ export interface FoldersCreativos {
   total: number;
 }
 
+// Sin `Infinity`: un prompt retocado tiene que llegar al móvil (ver
+// `usePrompts` del POV BOF, donde esto congeló el prompt viejo).
 export function usePromptCreativos() {
   return useQuery<PromptCreativos>({
     queryKey: creativosKeys.prompt(),
     queryFn: () => api.get<PromptCreativos>(`${ROOT}/prompt`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 }
 

@@ -27,11 +27,13 @@ export const cineKeys = {
     [...cineKeys.all, "productos", source, folder] as const,
 };
 
+// Los prompts se retocan de vez en cuando y con `staleTime: Infinity` el móvil
+// se quedaba con el viejo para siempre (ver `usePrompts` del POV BOF).
 export function useCinePrompts() {
   return useQuery<CinePrompts>({
     queryKey: cineKeys.prompts(),
     queryFn: () => api.get<CinePrompts>(`${ROOT}/prompts`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 }
 

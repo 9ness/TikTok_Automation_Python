@@ -18,6 +18,8 @@ import {
   type Program,
 } from "@/lib/queue-meta";
 import type { ActiveJob, JobMode } from "@/lib/types/queue";
+import { useEsPro, useMe } from "@/lib/queries/auth";
+import { colorDeUsuario, nombreDueno } from "@/lib/usuarios-color";
 import { cn } from "@/lib/utils";
 import { AvisoDespliegue } from "./AvisoDespliegue";
 import { JobCard } from "./JobCard";
@@ -38,6 +40,8 @@ export function QueueDrawer() {
   const recent = useQueueStore((s) => s.recent);
   const connection = useQueueStore((s) => s.connection);
 
+  const esPro = useEsPro();
+  const me = useMe();
   const [programFilter, setProgramFilter] = useState<ProgramFilter>("all");
   const [crSubFilter, setCrSubFilter] = useState<SubmoduleFilter>("all");
   const [recentOpen, setRecentOpen] = useState(true);
@@ -56,7 +60,21 @@ export function QueueDrawer() {
   }
 
   const active = useMemo(
-    () => Object.values(activeMap).sort((a, b) => a.created_at - b.created_at),
+    () =>
+      Object.values(activeMap).sort((a, b) => {
+        // Lo que está corriendo, arriba. Y los pendientes por su PUESTO real
+        // en la cola, no por hora de creación: con el reordenado a mano (subir
+        // a lo alto) y la prioridad de los trabajos de admin, el orden por
+        // fecha ya no era el orden en que se van a ejecutar — la lista decía
+        // una cosa y la etiqueta "nº 3 de 9" otra.
+        const corriendoA = a.status === "running" ? 0 : 1;
+        const corriendoB = b.status === "running" ? 0 : 1;
+        if (corriendoA !== corriendoB) return corriendoA - corriendoB;
+        const posA = a.queue_position ?? Number.MAX_SAFE_INTEGER;
+        const posB = b.queue_position ?? Number.MAX_SAFE_INTEGER;
+        if (posA !== posB) return posA - posB;
+        return a.created_at - b.created_at;
+      }),
     [activeMap],
   );
 
@@ -124,29 +142,56 @@ export function QueueDrawer() {
         {esAdmin && (
           <div className="flex flex-wrap items-center gap-1.5 border-b px-4 pb-2 text-[11px]">
             <span className="text-muted-foreground">Viendo:</span>
-            {[{ v: "", n: "La mía" }, { v: "todos", n: "Todas" }].concat(
-              Object.keys(otros).map((u) => ({ v: u, n: u })),
-            ).map((o) => (
-              <button
-                key={o.v || "mia"}
-                type="button"
-                onClick={() => setVerDe(o.v)}
-                className={cn(
-                  "rounded border px-1.5 py-0.5 transition",
-                  verDe === o.v
-                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-                    : "border-border/60 text-muted-foreground hover:border-foreground/40",
-                )}
-              >
-                {o.n}
-              </button>
-            ))}
+            {[{ v: "", n: "La mía" }, { v: "todos", n: "Todas" }]
+              // TODOS los usuarios, no solo los que tienen algo encolado: con
+              // `Object.keys(otros)` no podías mirar la cola de Ana si estaba
+              // vacía, que es justo cuando quieres comprobar que está vacía.
+              .concat(
+                (me.data?.usuarios ?? [])
+                  .filter((u) => u.username !== me.data?.username)
+                  .map((u) => ({ v: u.username, n: u.nombre })),
+              )
+              .map((o) => (
+                <button
+                  key={o.v || "mia"}
+                  type="button"
+                  onClick={() => setVerDe(o.v)}
+                  className={cn(
+                    "rounded border px-1.5 py-0.5 transition",
+                    verDe === o.v
+                      ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                      : "border-border/60 text-muted-foreground hover:border-foreground/40",
+                  )}
+                >
+                  {o.n}
+                </button>
+              ))}
             {Object.entries(otros).length > 0 && verDe === "" && (
-              <span className="text-amber-500">
-                ·{" "}
-                {Object.entries(otros)
-                  .map(([u, n]) => `${u}: ${n}`)
-                  .join(" · ")}
+              <span className="flex flex-wrap items-center gap-1.5">
+                {Object.entries(otros).map(([u, d]) => {
+                  const color = colorDeUsuario(u);
+                  return (
+                    <span
+                      key={u}
+                      className={cn("inline-flex items-center gap-1", color.texto)}
+                      title={
+                        d.ejecutando > 0
+                          ? `${d.ejecutando} en marcha de ${d.total}`
+                          : `${d.total} esperando`
+                      }
+                    >
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          color.punto,
+                          d.ejecutando > 0 && "animate-pulse",
+                        )}
+                      />
+                      {nombreDueno(u)}: {d.total}
+                      {d.ejecutando > 0 ? ` (${d.ejecutando} ▶)` : ""}
+                    </span>
+                  );
+                })}
               </span>
             )}
           </div>
@@ -158,7 +203,11 @@ export function QueueDrawer() {
           </div>
         )}
 
-        {/* Filtros principales */}
+        {/* Filtros por programa. A un `pro` (Ana, Mauro) NO se le enseñan: su
+            menú es solo Tiktok Shop AI Pro, así que filtrar por Creator Reward
+            o TikTok Shop le ofrece cosas que no puede tener — botones que
+            siempre devuelven una lista vacía. */}
+        {!esPro && (
         <div className="space-y-2 border-b px-4 py-3">
           <div className="flex flex-wrap gap-1">
             {(
@@ -204,6 +253,7 @@ export function QueueDrawer() {
             </div>
           )}
         </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4">
           <Section title={`Activos (${filtered.length})`}>

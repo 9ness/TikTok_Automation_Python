@@ -33,6 +33,12 @@ export type JobMode =
   | "nicho_carruseles_preparar"
   | "nicho_carruseles_reparto";
 
+/** Qué tiene otra persona en la cola ahora mismo. */
+export interface ActivosDeOtro {
+  total: number;
+  ejecutando: number;
+}
+
 export interface ActiveJob {
   job_id: string;
   mode: JobMode;
@@ -46,6 +52,11 @@ export interface ActiveJob {
   started_at: number | null;
   finished_at: number | null;
   enqueued_by: string | null;
+  /** Puesto en la cola COMPARTIDA (1 = el siguiente). `null` si no espera.
+   *  Se calcula en el servidor sobre la cola entera: contarlo aquí sobre lo
+   *  que se ve mentiría, porque cada uno solo ve lo suyo. */
+  queue_position?: number | null;
+  queue_pending_total?: number;
   error: string | null;
   result_path?: string | null;
   duration_seconds?: number | null;
@@ -76,14 +87,14 @@ export interface WsSnapshotEvent {
     viendo?: string;
     es_admin?: boolean;
     /** Trabajos activos de CADA UNO de los demás. Solo llega al admin. */
-    otros?: Record<string, number>;
+    otros?: Record<string, ActivosDeOtro>;
   };
 }
 
 /** Cambió el número de trabajos activos de los demás (solo admin). */
 export interface WsOtrosEvent {
   type: "otros";
-  data: { otros: Record<string, number> };
+  data: { otros: Record<string, ActivosDeOtro> };
 }
 export interface WsUpdateEvent {
   type: "update";

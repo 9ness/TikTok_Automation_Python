@@ -9,15 +9,28 @@ import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { useQueueStore } from "@/lib/stores/queueStore";
 import { MODE_TO_PROGRAM, SUBMODULE_LABEL } from "@/lib/queue-meta";
 import type { JobMode } from "@/lib/types/queue";
+import { colorDeUsuario, nombreDueno } from "@/lib/usuarios-color";
 import { cn } from "@/lib/utils";
 
 export function QueueBadge() {
   const activeMap = useQueueStore((s) => s.active);
   const connection = useQueueStore((s) => s.connection);
+  const otros = useQueueStore((s) => s.otros);
+  const esAdmin = useQueueStore((s) => s.esAdmin);
   const toggle = useDrawerStore((s) => s.toggleQueue);
 
   const summary = useMemo(() => buildSummary(activeMap), [activeMap]);
   const disconnected = connection !== "connected";
+  // Lo de los DEMÁS. Solo lo manda el servidor si quien mira es admin, así que
+  // a Ana y Mauro esto les llega vacío y no ven nada — es lo suyo: no tienen
+  // por qué saber en qué anda el otro.
+  const deOtros = useMemo(
+    () =>
+      Object.entries(otros)
+        .filter(([, v]) => (v?.total ?? 0) > 0)
+        .sort(([a], [b]) => a.localeCompare(b)),
+    [otros],
+  );
 
   return (
     <Button
@@ -48,6 +61,32 @@ export function QueueBadge() {
           {summary.total}
         </Badge>
       )}
+      {/* Un circulito por cada OTRA persona con algo en la cola, de su color.
+          Late si lo está ejecutando ahora y se queda quieto si solo espera:
+          así se sabe de un vistazo si Ana está renderizando o solo ha dejado
+          cosas puestas, sin abrir el cajón. */}
+      {esAdmin &&
+        deOtros.map(([quien, datos]) => {
+          const color = colorDeUsuario(quien);
+          const nombre = nombreDueno(quien);
+          return (
+            <span
+              key={quien}
+              title={
+                datos.ejecutando > 0
+                  ? `${nombre}: ${datos.ejecutando} en marcha de ${datos.total}`
+                  : `${nombre}: ${datos.total} esperando`
+              }
+              className={cn(
+                "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white",
+                color.punto,
+                datos.ejecutando > 0 && "animate-pulse",
+              )}
+            >
+              {datos.total}
+            </span>
+          );
+        })}
     </Button>
   );
 }
