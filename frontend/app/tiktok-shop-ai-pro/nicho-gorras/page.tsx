@@ -13,7 +13,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -34,7 +34,7 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 export default function NichoGorrasPage() {
   const carpetas = useGorrasCarpetas();
-  const [carpeta, setCarpeta] = useEstadoRecordado("gorras:carpeta", "");
+  const [carpeta, setCarpeta] = useEstadoDeUsuario("gorras:carpeta", "");
   const activa = carpeta || carpetas.data?.[0]?.slug || "";
   const gorras = useGorras(activa);
   const extraer = useExtraerTextosGorras();

@@ -23,7 +23,10 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { horaCorta, fechaCorta } from "@/lib/hora";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  useEstadoDeUsuario,
+  useEstadoRecordado,
+} from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
   FUENTE_TOP_VENDIDOS,
@@ -113,11 +116,11 @@ export default function PovBofLargoPage() {
   const esAdmin = useMe().data?.rol === "admin";
 
   const sources = useSourcesLargo();
-  const [source, setSource] = useEstadoRecordado("povbof-largo:fuente", "");
+  const [source, setSource] = useEstadoDeUsuario("povbof-largo:fuente", "");
   const activaSource = source || sources.data?.[0]?.slug || "";
 
   const [showFotos, setShowFotos] = useState(false);
-  const [picked, setPicked] = useEstadoRecordado<string | null>("povbof-largo:carpeta", null);
+  const [picked, setPicked] = useEstadoDeUsuario<string | null>("povbof-largo:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
 

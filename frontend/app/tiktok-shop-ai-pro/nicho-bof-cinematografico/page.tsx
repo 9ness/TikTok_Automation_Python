@@ -16,7 +16,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -47,8 +47,8 @@ function copiar(label: string, texto: string) {
 
 export default function NichoBofCinePage() {
   const sources = useCineSources();
-  const [source, setSource] = useEstadoRecordado("cine:fuente", "aleatorios_1");
-  const [picked, setPicked] = useEstadoRecordado<string | null>("cine:carpeta", null);
+  const [source, setSource] = useEstadoDeUsuario("cine:fuente", "aleatorios_1");
+  const [picked, setPicked] = useEstadoDeUsuario<string | null>("cine:carpeta", null);
   const folders = useCineFolders(source);
   const folder = picked ?? folders.data?.current ?? null;
   const productos = useCineProductos(source, folder);

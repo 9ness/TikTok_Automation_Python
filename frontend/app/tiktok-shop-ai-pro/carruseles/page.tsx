@@ -17,7 +17,10 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  useEstadoDeUsuario,
+  useEstadoRecordado,
+} from "@/lib/hooks/useEstadoRecordado";
 import { bajarEnOrden } from "@/lib/descargas";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
@@ -143,9 +146,9 @@ const CATEGORIA_LABEL: Record<string, string> = {
 
 export default function CarruselesPage() {
   const sources = useSources();
-  const [source, setSource] = useEstadoRecordado("carruseles:fuente", "aleatorios_1");
+  const [source, setSource] = useEstadoDeUsuario("carruseles:fuente", "aleatorios_1");
   const folders = useFoldersCarruseles(source);
-  const [picked, setPicked] = useEstadoRecordado<string | null>("carruseles:carpeta", null);
+  const [picked, setPicked] = useEstadoDeUsuario<string | null>("carruseles:carpeta", null);
   const folder = picked ?? folders.data?.current ?? null;
 
   const productos = useProductos(source, folder);

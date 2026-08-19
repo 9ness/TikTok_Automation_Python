@@ -625,6 +625,69 @@ def id_de_carpeta(ruta: str) -> str:
     return ""
 
 
+def id_de_enlace(enlace: str) -> str:
+    """El identificador de carpeta que lleva dentro un enlace de Drive.
+
+    Se acepta el enlace entero porque es lo que se copia del navegador; si ya
+    viene el identificador suelto, se devuelve tal cual.
+    """
+    texto = (enlace or "").strip()
+    m = re.search(r"/folders/([A-Za-z0-9_-]{10,})", texto)
+    if m:
+        return m.group(1)
+    m = re.search(r"[?&]id=([A-Za-z0-9_-]{10,})", texto)
+    if m:
+        return m.group(1)
+    return texto if re.fullmatch(r"[A-Za-z0-9_-]{10,}", texto) else ""
+
+
+def volcar_paquete(
+    enlace: str, *, on_log: OnLog = _noop,
+    on_progress: Callable[[float, str], None] | None = None,
+) -> dict:
+    """Copia el paquete DENTRO de una carpeta que nos hayan compartido.
+
+    Es la forma sencilla de devolverle el material a alguien sin que tenga que
+    autorizar nada raro: crea una carpeta vacía en SU Drive, nos la comparte
+    como editor y pega aquí el enlace. Lo que se copia nace siendo suyo, no es
+    un acceso compartido que pueda perder.
+    """
+    prog = on_progress or (lambda *_: None)
+    fid = id_de_enlace(enlace)
+    if not fid:
+        raise RuntimeError(f"De ahí no sale ningún enlace de carpeta: {enlace!r}")
+    actual = paquete_actual()
+    if not actual.get("carpeta"):
+        raise RuntimeError("No hay paquete montado todavía.")
+
+    prog(0.05, "comprobando la carpeta de destino")
+    try:
+        _rclone(["lsf", f"gdrive,root_folder_id={fid}:", "--max-depth", "1"], timeout=300)
+    except RuntimeError as e:
+        raise RuntimeError(
+            "No puedo abrir esa carpeta. Que la compartan con esta cuenta "
+            f"como EDITOR y vuelve a intentarlo. ({e})"
+        ) from e
+
+    on_log(f"[paquete] volcando {actual['carpeta']} en la carpeta {fid}…")
+    prog(0.1, "copiando (servidor a servidor)")
+    _rclone(
+        ["copy", f"gdrive:{actual['carpeta']}", f"gdrive,root_folder_id={fid}:",
+         "--drive-server-side-across-configs", "--transfers", "8", "--checkers", "8"],
+        timeout=14400, on_log=_noop,
+    )
+    datos = json.loads(
+        _rclone(["size", f"gdrive,root_folder_id={fid}:", "--json"], timeout=600) or "{}"
+    )
+    on_log(f"[paquete] en destino hay ya {datos.get('count', 0)} ficheros")
+    return {
+        "destino": fid,
+        "ficheros": int(datos.get("count") or 0),
+        "bytes": int(datos.get("bytes") or 0),
+        "enlace": f"https://drive.google.com/drive/folders/{fid}",
+    }
+
+
 def compartir(ruta: str, correo: str, *, rol: str = "reader") -> dict:
     """Da acceso a un correo a una carpeta nuestra. Devuelve el enlace."""
     import urllib.error

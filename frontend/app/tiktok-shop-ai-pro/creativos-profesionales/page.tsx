@@ -14,7 +14,10 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  useEstadoDeUsuario,
+  useEstadoRecordado,
+} from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
   FUENTE_TOP_VENDIDOS,
@@ -58,9 +61,9 @@ function err(e: unknown): string {
 
 export default function CreativosProPage() {
   const sources = useSources();
-  const [source, setSource] = useEstadoRecordado("creativos:fuente", "aleatorios_1");
+  const [source, setSource] = useEstadoDeUsuario("creativos:fuente", "aleatorios_1");
   const folders = useFoldersCreativos(source);
-  const [picked, setPicked] = useEstadoRecordado<string | null>("creativos:carpeta", null);
+  const [picked, setPicked] = useEstadoDeUsuario<string | null>("creativos:carpeta", null);
   const folder = picked ?? folders.data?.current ?? null;
   const productos = useProductos(source, folder);
   const prompt = usePromptCreativos();

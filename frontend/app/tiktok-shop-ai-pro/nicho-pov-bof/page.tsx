@@ -24,7 +24,10 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import {
+  useEstadoDeUsuario,
+  useEstadoRecordado,
+} from "@/lib/hooks/useEstadoRecordado";
 import {
   esVentaNueva,
   FUENTE_TOP_VENDIDOS,
@@ -104,12 +107,12 @@ function cuadra(p: { modo_plazos: boolean }, filtro: Filtro): boolean {
 }
 
 export default function NichoPovBofPage() {
-  const [source, setSource] = useEstadoRecordado("povbof:fuente", "aleatorios_1");
+  const [source, setSource] = useEstadoDeUsuario("povbof:fuente", "aleatorios_1");
   // Las fotos en crudo van colapsadas: ocupaban toda la pantalla.
   const [showFotos, setShowFotos] = useState(false);
   // Carpeta elegida a mano. Si es null se usa la "current" del backend
   // (la primera sin completar).
-  const [picked, setPicked] = useEstadoRecordado<string | null>("povbof:carpeta", null);
+  const [picked, setPicked] = useEstadoDeUsuario<string | null>("povbof:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
 

@@ -14,7 +14,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
   buildFotoLimpiaRopaUrl,
   buildFotoRopaUrl,
@@ -38,7 +38,7 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
 export default function NichoRopaPage() {
   // Las carpetas de mujer son las del nicho CON personas, pero la misma prenda
   // vale aquí colgada en percha: lo que cambia es el prompt, no la foto.
-  const [carpeta, setCarpeta] = useEstadoRecordado("ropa:carpeta", "camisetas");
+  const [carpeta, setCarpeta] = useEstadoDeUsuario("ropa:carpeta", "camisetas");
   const carpetas = useCarpetasRopa();
   const prendas = usePrendas(carpeta);
   const prompts = usePromptsRopa();
