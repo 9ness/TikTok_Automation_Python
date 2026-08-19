@@ -732,6 +732,31 @@ def urls_index() -> dict[str, str]:
     return r.get_json(_URLS_INDEX) or {}
 
 
+def guardar_ids_vigentes(source: str, folder: str, ids: list[str]) -> None:
+    """Apunta qué productos tiene HOY la carpeta.
+
+    Hace falta porque el documento acumula huérfanos: cuando el curso cambia
+    las fotos de una carpeta, lo guardado del producto viejo se reengancha por
+    file ID (`reanclaje`) y lo que no encuentra dueño se queda ahí para siempre.
+    Una carpeta de diez llegó a tener veinticuatro entradas, y contarlas todas
+    decía "19 productos con ficha" en una carpeta de 10.
+
+    Se escribe al listar la carpeta, que es cuando se sabe de verdad — sacarlo
+    en el listado de carpetas costaría un listado de Drive por carpeta (medido:
+    ~0,2s cada una, 6,5s por pantalla).
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    clave = _key(source, folder)
+    doc = r.get_json(clave) or {}
+    nuevos = [str(x) for x in ids if str(x)]
+    if doc.get("ids_vigentes") == nuevos:
+        return
+    doc["ids_vigentes"] = nuevos
+    r.set_json(clave, doc)
+
+
 def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     """`{carpeta: cuántos de sus productos tienen ficha enlazada}`.
 
@@ -753,7 +778,15 @@ def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     docs = r.mget_json([_key(source, n) for n in folders])
     salida: dict[str, int] = {}
     for nombre, doc in zip(folders, docs):
-        productos = ((doc or {}).get("productos") or {}).values()
+        todos = ((doc or {}).get("productos") or {})
+        # Solo los que la carpeta tiene HOY. Sin esa lista (carpeta que nadie
+        # ha abierto todavía) se cuentan todos: es lo que había, y se corrige
+        # sola en cuanto se abra.
+        vigentes = (doc or {}).get("ids_vigentes")
+        if isinstance(vigentes, list):
+            productos = [todos[str(i)] for i in vigentes if str(i) in todos]
+        else:
+            productos = list(todos.values())
         salida[nombre] = sum(1 for prod in productos if url_de(prod, indice))
     return salida
 

@@ -373,6 +373,16 @@ def _list_productos(
 
     reanclaje.sincronizar(source, folder, pairs, usuario)
 
+    # Qué productos tiene HOY la carpeta. Se apunta aquí, que es donde se sabe,
+    # para que el listado de carpetas pueda decir cuántos llevan ficha sin
+    # tener que listar el Drive de cada una (ver `guardar_ids_vigentes`).
+    try:
+        product_repo.guardar_ids_vigentes(
+            source, folder, [str(par["producto"]) for par in pairs],
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
     # Vista del usuario: textos y enlaces compartidos, su progreso privado.
     folder_state = product_repo.load_folder_para(source, folder, usuario)
     guardados = folder_state.get("productos") or {}
