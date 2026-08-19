@@ -38,6 +38,7 @@ type FichaMinima = Pick<
   /** Solo el POV BOF Largo: los guiones que pasan de 25s piden TRES clips. */
   clips_necesarios?: number;
   clip3?: boolean;
+  clip4?: boolean;
 };
 
 /** Una fila del repaso, ya colocada: qué vídeo es, de qué producto y si es el
@@ -70,7 +71,11 @@ function ordenarPorProducto(
   const ficha = new Map(productos.map((p) => [p.producto, p]));
   const esDoble = (p?: FichaMinima) => Boolean(p && (todosDobles || p.modo_plazos));
   // Cuántos clips pide el producto: los guiones largos del Largo piden tres.
-  const cuantosDe = (p?: FichaMinima) => Math.max(2, Number(p?.clips_necesarios) || 2);
+  // Entre dos y cuatro: es lo que puede pedir `config.clips_necesarios` con
+  // los clips de 8s, y más huecos de los que hay en la ficha dejarían al
+  // producto esperando un clip que no se puede subir.
+  const cuantosDe = (p?: FichaMinima) =>
+    Math.min(4, Math.max(2, Number(p?.clips_necesarios) || 2));
 
   const grupos = new Map<string, { it: LoteItem; idx: number }[]>();
   reparto.forEach((it, idx) => {
@@ -96,7 +101,7 @@ function ordenarPorProducto(
     const p = ficha.get(clave);
     const doble = Boolean(clave) && esDoble(p);
     const cuantos = doble ? cuantosDe(p) : 0;
-    const yaPuestos = [p?.clip1, p?.clip2, p?.clip3].filter(Boolean).length;
+    const yaPuestos = [p?.clip1, p?.clip2, p?.clip3, p?.clip4].filter(Boolean).length;
     grupo.forEach(({ it, idx }, n) => {
       // Con varios vídeos en la tanda, el enésimo es su clip n. Con uno solo,
       // va al primer hueco libre (mismo criterio que el backend).

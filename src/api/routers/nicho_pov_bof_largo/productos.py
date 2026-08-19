@@ -318,8 +318,9 @@ def _listar(
             clip1=_clip_puesto(mio.get("clip1_path"), float(mio.get("video_listo_at") or 0)),
             clip2=_clip_puesto(mio.get("clip2_path"), float(mio.get("video_listo_at") or 0)),
             clip3=_clip_puesto(mio.get("clip3_path"), float(mio.get("video_listo_at") or 0)),
+            clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
-            # que estirarlos hasta deformar el gesto: ahí se pide un tercero.
+            # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=config.clips_necesarios(guion),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
@@ -835,8 +836,10 @@ def quitar_clip(
 
     Solo borra el hueco. No toca el vídeo ya montado ni el guion.
     """
-    if slot not in (1, 2, 3):
-        raise _bad(f"slot debe ser 1, 2 o 3, recibido: {slot}")
+    if not 1 <= slot <= config.CLIPS_MAXIMOS:
+        raise _bad(
+            f"slot debe estar entre 1 y {config.CLIPS_MAXIMOS}, recibido: {slot}"
+        )
     prod = product_repo.get_product(source, folder, producto, usuario)
     ruta = str(prod.get(f"clip{slot}_path") or "")
     try:
@@ -890,8 +893,10 @@ async def upload_clip(
     """
     from src.api.temp_storage import upload_subdir
 
-    if slot not in (1, 2, 3):
-        raise _bad(f"slot debe ser 1, 2 o 3, recibido: {slot}")
+    if not 1 <= slot <= config.CLIPS_MAXIMOS:
+        raise _bad(
+            f"slot debe estar entre 1 y {config.CLIPS_MAXIMOS}, recibido: {slot}"
+        )
     sexo_norm = (sexo or "").strip().lower()
     # "auto" no está en `config.SEXOS` (eso son las voces de Fish): lo resuelve
     # el montaje mirando la mano del clip 1.
@@ -998,9 +1003,13 @@ def _encolar_clip(
         title=f"🎙️ POV BOF Largo: producto {producto} · {folder}",
         params={
             "source": source, "folder": folder, "producto": producto,
-            "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
-            # Solo cuando el guion no cabe en dos.
-            **({"clip3_path": prod.get("clip3_path") or ""} if hacen_falta > 2 else {}),
+            # Todos los que pida el guion, no solo dos: con los clips de 8s un
+            # guion largo se va a cuatro y el que faltara se quedaba fuera del
+            # montaje (o peor, el producto no llegaba a encolarse nunca).
+            **{
+                f"clip{n}_path": prod.get(f"clip{n}_path") or ""
+                for n in range(1, hacen_falta + 1)
+            },
             "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
@@ -1014,7 +1023,7 @@ def _encolar_clip(
     try:
         product_repo.update_product(
             source, folder, producto, usuario=usuario,
-            clip1_path="", clip2_path="", clip3_path="",
+            **{f"clip{n}_path": "" for n in range(1, config.CLIPS_MAXIMOS + 1)},
         )
     except RuntimeError:
         # El montaje ya está encolado; que no falle la respuesta por esto.

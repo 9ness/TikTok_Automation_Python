@@ -1934,11 +1934,16 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     source, folder = str(p["source"]), str(p["folder"])
     producto = str(p["producto"])
     operator = str(p.get("operator") or job.enqueued_by or "")
-    # Dos clips, o TRES cuando el guion no cabe en dos: la voz manda la
-    # duración y estirar dos clips 29 segundos deforma el gesto de la mano.
-    clips = [Path(p["clip1_path"]), Path(p["clip2_path"])]
-    if p.get("clip3_path"):
-        clips.append(Path(p["clip3_path"]))
+    # Los que haya: dos de base y hasta `CLIPS_MAXIMOS` cuando el guion no
+    # cabe en menos. La voz manda la duración y estirar dos clips 29 segundos
+    # deforma el gesto de la mano.
+    clips = [
+        Path(p[f"clip{n}_path"])
+        for n in range(1, largo_config.CLIPS_MAXIMOS + 1)
+        if p.get(f"clip{n}_path")
+    ]
+    if len(clips) < 2:
+        raise ValueError(f"Hacen falta al menos dos clips, llegaron {len(clips)}.")
     for c in clips:
         if not c.is_file():
             raise FileNotFoundError(f"No está el clip subido: {c}")

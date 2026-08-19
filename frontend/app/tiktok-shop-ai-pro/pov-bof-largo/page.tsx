@@ -1225,6 +1225,7 @@ function ProductoCard({
     1: useRef<HTMLInputElement>(null),
     2: useRef<HTMLInputElement>(null),
     3: useRef<HTMLInputElement>(null),
+    4: useRef<HTMLInputElement>(null),
   };
 
   const [verFoto, setVerFoto] = useState(false);
@@ -1236,7 +1237,7 @@ function ProductoCard({
   const guionDesfasado = Boolean(p.guion) && p.modo_plazos !== p.guion_plazos;
   // Cuántos clips pide ESTE guion. Lo calcula el backend con los caracteres
   // (la voz aún no existe cuando hay que decidirlo).
-  const necesarios = p.clips_necesarios || 2;
+  const necesarios = Math.min(4, p.clips_necesarios || 2);
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1245,7 +1246,8 @@ function ProductoCard({
     1: number | null;
     2: number | null;
     3: number | null;
-  }>({ 1: null, 2: null, 3: null });
+    4: number | null;
+  }>({ 1: null, 2: null, 3: null, 4: null });
   // Auto por defecto: el montaje mira la mano del clip 1 y elige la voz
   // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
   const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
@@ -1277,7 +1279,7 @@ function ProductoCard({
 
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
   // Cada slot va por su cuenta: no se bloquea el otro clip ni las demás fichas.
-  function subirClip(slot: 1 | 2 | 3, file: File) {
+  function subirClip(slot: 1 | 2 | 3 | 4, file: File) {
     setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
     fd.append("file", file);
@@ -1652,9 +1654,11 @@ function ProductoCard({
       {/* Los clips. No se encola hasta tenerlos todos y el guion. Son DOS,
           salvo que la voz no quepa en veinte segundos: entonces hace falta un
           tercero (si no, el montaje estira los dos y el gesto se deforma). */}
-      <div className={`grid gap-1.5 ${necesarios > 2 ? "grid-cols-3" : "grid-cols-2"}`}>
-        {(necesarios > 2 ? ([1, 2, 3] as const) : ([1, 2] as const)).map((slot) => {
-          const puesto = slot === 1 ? p.clip1 : slot === 2 ? p.clip2 : p.clip3;
+      <div className={`grid gap-1.5 ${necesarios === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {(
+          [1, 2, 3, 4].slice(0, necesarios) as (1 | 2 | 3 | 4)[]
+        ).map((slot) => {
+          const puesto = [p.clip1, p.clip2, p.clip3, p.clip4][slot - 1];
           const pctSlot = pcts[slot];
           const subiendoEste = pctSlot !== null;
           return (

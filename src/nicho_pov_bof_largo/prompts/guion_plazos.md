@@ -33,6 +33,7 @@ Ejemplos del tono exacto que se busca para esa frase:
   superiores a 30 euros`
 
 La frase de plazos ocupa unos 70 caracteres, así que el guion ENTERO no debe
-pasar de 360: es lo que cabe en los dos clips de 10 segundos. Lo que NO vale es
+pasar de 360: por encima de ahí la voz se alarga y el vídeo necesita un clip
+más de los que hacen falta normalmente. Lo que NO vale es
 quitarle el punto de dolor o el beneficio para que quepa — eso es lo que hace
 que el vídeo funcione; lo que se recorta es la descripción del producto.
