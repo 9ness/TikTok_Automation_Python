@@ -24,6 +24,7 @@ import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
@@ -75,6 +76,7 @@ import {
 // fuentes, carpetas, fotos, textos, hashtags y escaparate. Duplicarlo habría
 // significado volver a pagar la extracción de textos con Gemini.
 import {
+  ANCHO_VISOR,
   buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useExtraerTextos,
@@ -1839,6 +1841,15 @@ function CarruselCard({
   useEffect(() => setMensaje2(datos.mensaje2), [datos.mensaje2]);
 
   const limpia = p.clean_photo_id ? buildPhotoUrl(source, folder, p.clean_photo_id) : null;
+  // Las dos del catálogo en grande, igual que en el POV BOF y en Configuración:
+  // la limpia para ver el producto y la de la ficha para leer la descripción.
+  const [verFoto, setVerFoto] = useState(false);
+  const limpiaVisor = p.clean_photo_id
+    ? buildPhotoUrl(source, folder, p.clean_photo_id, ANCHO_VISOR)
+    : null;
+  const fichaVisor = p.titled_photo_id
+    ? buildPhotoUrl(source, folder, p.titled_photo_id, ANCHO_VISOR)
+    : null;
   const caption = [p.caption, p.emojis, (hashtags.data ?? []).join(" ")]
     .filter(Boolean)
     .join(" ");
@@ -1854,7 +1865,8 @@ function CarruselCard({
         <FotoProducto
           src={limpia}
           alt={p.titulo ?? p.producto}
-          className="h-16 w-16 shrink-0 rounded-md object-cover"
+          onClick={limpiaVisor || fichaVisor ? () => setVerFoto(true) : undefined}
+          className="h-16 w-16 shrink-0 cursor-zoom-in rounded-md object-cover"
         />
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline gap-1.5 text-xs font-semibold">
@@ -1894,6 +1906,17 @@ function CarruselCard({
           {datos.apto ? "Apto" : "No apto"}
         </button>
       </div>
+
+      <FotoModal
+        open={verFoto}
+        onOpenChange={setVerFoto}
+        titulo={`Producto ${p.producto}`}
+        urlLimpia={limpiaVisor}
+        urlTitulo={fichaVisor}
+        urlDescarga={
+          p.clean_photo_id ? buildCleanPhotoDownloadUrl(source, folder, p.producto) : null
+        }
+      />
 
       {/* Las dos fotos, en el orden en que se publican. */}
       <div className="grid grid-cols-2 gap-1.5">
