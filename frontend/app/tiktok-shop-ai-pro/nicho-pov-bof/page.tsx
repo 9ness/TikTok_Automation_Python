@@ -473,7 +473,7 @@ export default function NichoPovBofPage() {
               key={s.slug}
               type="button"
               onClick={() => switchSource(s.slug)}
-              className={`truncate rounded-lg border px-2 py-2 text-[11px] transition sm:text-xs ${
+              className={`break-words leading-tight rounded-lg border px-2 py-2 text-[11px] transition sm:text-xs ${
                 source === s.slug
                   ? "border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/30"
@@ -545,7 +545,7 @@ export default function NichoPovBofPage() {
               key={f.id || f.name}
               type="button"
               onClick={() => setPicked(f.name)}
-              className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+              className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
                 // La carpeta ABIERTA se pinta según esté hecha o no: en verde
                 // si ya se completó y en azul si aún no. Antes la abierta y las
                 // completadas eran del mismo color y no se sabía si la que
@@ -786,24 +786,24 @@ export default function NichoPovBofPage() {
                 en el escaparate con lo que ya se publicó. */}
             <div className="grid grid-cols-2 gap-1.5">
               <div
-                className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
+                className={`flex items-center justify-center gap-1.5 break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
                   subidos === totalProductos && totalProductos > 0
                     ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                     : "border-border/60 text-muted-foreground"
                 }`}
               >
-                <span className="truncate">📤 Subidos {subidos}/{totalProductos}</span>
+                <span className="break-words leading-tight">📤 Subidos {subidos}/{totalProductos}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setVerEscaparate(true)}
-                className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
+                className={`flex items-center justify-center gap-1.5 break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
                   enEscaparate === totalProductos && totalProductos > 0
                     ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                     : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
                 }`}
               >
-                <span className="truncate">🏪 Escaparate {enEscaparate}/{totalProductos}</span>
+                <span className="break-words leading-tight">🏪 Escaparate {enEscaparate}/{totalProductos}</span>
               </button>
             </div>
 
@@ -1567,7 +1567,7 @@ function ProductoCard({
           href={producto.product_url}
           target="_blank"
           rel="noreferrer"
-          className="block truncate rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-500"
+          className="block break-words leading-tight rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-500"
           title={producto.url_match_name}
         >
           🔗 Ver ficha en TikTok Shop

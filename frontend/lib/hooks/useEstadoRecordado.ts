@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ultimoUsuario } from "@/lib/cache-persistente";
 import { useMe } from "@/lib/queries/auth";
 
 /** `useState` que sobrevive a que Android mate la app.
@@ -32,6 +31,10 @@ export function useEstadoRecordado<T>(
   const inicialRef = useRef(inicial);
 
   useEffect(() => {
+    // Clave vacía = todavía no se sabe de quién es esto (ver
+    // `useEstadoDeUsuario`). Ni se lee ni se escribe: se queda en el valor por
+    // defecto hasta saberlo.
+    if (!clave) return;
     try {
       const guardado = localStorage.getItem(clave);
       // Si la clave CAMBIA y ahí no hay nada, se vuelve al valor por defecto en
@@ -48,7 +51,7 @@ export function useEstadoRecordado<T>(
   useEffect(() => {
     // Sin esta guarda, el primer render pisaría lo guardado con el valor por
     // defecto justo antes de leerlo.
-    if (!leido.current) return;
+    if (!leido.current || !clave) return;
     try {
       localStorage.setItem(clave, JSON.stringify(valor));
     } catch {
@@ -67,19 +70,18 @@ export function useEstadoRecordado<T>(
  *  en la que lleva la otra persona — cosmético, pero despista al entrar a
  *  ayudarles. (Es local a cada dispositivo: nunca viajó a su móvil.)
  *
- *  El usuario se saca de `/me`, y mientras contesta se usa el último que entró
- *  (lo deja escrito el propio cambio de cuenta, ver `cache-persistente`), así
- *  que en la práctica la clave ya es la buena en el primer render. Si acaba
- *  siendo otro, la clave cambia y `useEstadoRecordado` recarga lo suyo.
+ *  Se espera a que `/me` diga QUIÉN es; hasta entonces no se lee ni se guarda
+ *  nada. Se probó a adelantarlo con el último que entró (lo que hace la caché
+ *  de arranque) y no vale aquí: en un móvil donde antes hubo otra sesión, Ana
+ *  aterrizaba en la carpeta de ness durante ese instante y, si tocaba algo, se
+ *  guardaba bajo la clave de él. Lo que se gana es imperceptible —el valor
+ *  guardado se aplica en un efecto, nunca en el primer render— y lo que se
+ *  arriesga es escribir en lo de otra persona.
  */
 export function useEstadoDeUsuario<T>(
   clave: string,
   inicial: T,
 ): [T, (v: T | ((prev: T) => T)) => void] {
-  const deLaSesion = useMe().data?.username;
-  const [ultimo] = useState(() =>
-    typeof window === "undefined" ? "" : ultimoUsuario(),
-  );
-  const quien = deLaSesion || ultimo || "?";
-  return useEstadoRecordado(`u:${quien}:${clave}`, inicial);
+  const quien = useMe().data?.username;
+  return useEstadoRecordado(quien ? `u:${quien}:${clave}` : "", inicial);
 }

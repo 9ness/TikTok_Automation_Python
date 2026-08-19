@@ -201,7 +201,7 @@ export function EscaparateModal({
                             grupo parecía mal montado). Es literalmente lo que
                             pone la ficha de TikTok. */}
                         <span className="shrink-0 font-normal opacity-70">Vendido por</span>
-                        <span className="truncate">{tienda}</span>
+                        <span className="break-words leading-tight">{tienda}</span>
                         <ClipboardCopy className="h-3 w-3 shrink-0 opacity-60" />
                       </button>
                       <span className="shrink-0 text-[10px] text-muted-foreground">
@@ -252,7 +252,7 @@ export function EscaparateModal({
                           className="mt-0.5 flex max-w-full items-center gap-1 text-[10px] text-muted-foreground transition hover:text-foreground"
                         >
                           <ClipboardCopy className="h-3 w-3 shrink-0" />
-                          <span className="truncate">Copiar título exacto</span>
+                          <span className="break-words leading-tight">Copiar título exacto</span>
                         </button>
                       )}
                     </div>

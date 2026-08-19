@@ -60,7 +60,7 @@ export function PanelCarruseles() {
             key={s.slug}
             type="button"
             onClick={() => setSource(s.slug)}
-            className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+            className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
               source === s.slug
                 ? "border-cyan-500 bg-cyan-500/15 text-cyan-500"
                 : "border-border/60 text-muted-foreground hover:border-foreground/40"

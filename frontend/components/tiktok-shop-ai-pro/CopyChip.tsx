@@ -30,10 +30,10 @@ export function CopyChip({
     return (
       <span
         title={`Sin ${label.toLowerCase()}`}
-        className="inline-flex max-w-full cursor-not-allowed items-center gap-1 truncate rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground/40"
+        className="inline-flex max-w-full cursor-not-allowed items-center gap-1 break-words leading-tight rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground/40"
       >
         <Copy className="h-3 w-3 shrink-0" />
-        <span className="truncate">{label}</span>
+        <span className="break-words leading-tight">{label}</span>
       </span>
     );
   }
@@ -45,10 +45,10 @@ export function CopyChip({
         toast.success("Copiado");
       }}
       title={`Copiar: ${label}`}
-      className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+      className="inline-flex max-w-full items-center gap-1 break-words leading-tight rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
     >
       <Copy className="h-3 w-3 shrink-0" />
-      <span className="truncate">{label}</span>
+      <span className="break-words leading-tight">{label}</span>
     </button>
   );
 }

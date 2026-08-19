@@ -132,7 +132,7 @@ export default function NichoRopaPersonasPage() {
               key={c.slug}
               type="button"
               onClick={() => setCarpeta(c.slug)}
-              className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+              className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
                 activa === c.slug
                   ? "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/40"
@@ -368,7 +368,7 @@ function ChicasPanel() {
                 type="button"
                 onClick={() => copiar(`JSON de ${c.nombre}`, c.ficha_texto)}
                 title="Copiar su ficha JSON"
-                className="flex max-w-[14rem] items-center gap-1 truncate rounded-lg border border-fuchsia-500/50 bg-fuchsia-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-fuchsia-500 transition hover:bg-fuchsia-500/20"
+                className="flex max-w-[14rem] items-center gap-1 break-words leading-tight rounded-lg border border-fuchsia-500/50 bg-fuchsia-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-fuchsia-500 transition hover:bg-fuchsia-500/20"
               >
                 <ClipboardCopy className="h-3 w-3 shrink-0" />
                 <span className="truncate">{c.nombre}</span>

@@ -77,7 +77,7 @@ export function MagnificSpaces({ spaces }: { spaces: MagnificSpaceId[] }) {
         className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/50 bg-fuchsia-500/10 px-3 py-2 text-xs font-semibold text-fuchsia-400 transition hover:bg-fuchsia-500/20"
       >
         <Wand2 className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">Magnific ({spaces.length})</span>
+        <span className="break-words leading-tight">Magnific ({spaces.length})</span>
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 transition ${abierto ? "rotate-180" : ""}`}
         />
@@ -102,8 +102,10 @@ export function MagnificSpaces({ spaces }: { spaces: MagnificSpaceId[] }) {
                   >
                     <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fuchsia-400" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11px] font-semibold">{s.label}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
+                      <span className="block break-words text-[11px] font-semibold leading-tight">
+                        {s.label}
+                      </span>
+                      <span className="block break-words text-[10px] leading-tight text-muted-foreground">
                         {s.hint}
                       </span>
                     </span>

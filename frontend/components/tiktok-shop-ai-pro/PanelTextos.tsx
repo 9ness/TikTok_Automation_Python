@@ -60,7 +60,7 @@ export function PanelTextos() {
             key={s.slug}
             type="button"
             onClick={() => setSource(s.slug)}
-            className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+            className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
               source === s.slug
                 ? "border-violet-500 bg-violet-500/15 text-violet-400"
                 : "border-border/60 text-muted-foreground hover:border-foreground/40"

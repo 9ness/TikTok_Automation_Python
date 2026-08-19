@@ -163,7 +163,7 @@ export default function CreativosProPage() {
                 setSource(s.slug);
                 setPicked(null);
               }}
-              className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+              className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
                 source === s.slug
                   ? "border-cyan-500 bg-cyan-500/15 text-cyan-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/40"
@@ -202,7 +202,7 @@ export default function CreativosProPage() {
               key={f.name}
               type="button"
               onClick={() => setPicked(f.name)}
-              className={`truncate rounded border px-2 py-1 text-[10px] transition ${
+              className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
                 // Verde si la carpeta abierta está hecha, azul si no (igual
                 // que en POV BOF): con un solo color no se sabía si la que
                 // tienes delante está terminada.
@@ -295,24 +295,24 @@ export default function CreativosProPage() {
 
           <div className="grid grid-cols-2 gap-1.5">
             <div
-              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
+              className={`flex items-center justify-center gap-1.5 break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${
                 subidosCarpeta === items.length && items.length > 0
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-border/60 text-muted-foreground"
               }`}
             >
-              <span className="truncate">📤 Subidos {subidosCarpeta}/{items.length}</span>
+              <span className="break-words leading-tight">📤 Subidos {subidosCarpeta}/{items.length}</span>
             </div>
             <button
               type="button"
               onClick={() => setVerEscaparate(true)}
-              className={`flex items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
+              className={`flex items-center justify-center gap-1.5 break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
                 enEscaparate === items.length && items.length > 0
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                   : "border-sky-500/50 bg-sky-500/10 text-sky-500 hover:bg-sky-500/20"
               }`}
             >
-              <span className="truncate">🏪 Escaparate {enEscaparate}/{items.length}</span>
+              <span className="break-words leading-tight">🏪 Escaparate {enEscaparate}/{items.length}</span>
             </button>
           </div>
         </Paso>

@@ -98,7 +98,7 @@ export default function NichoBofCinePage() {
                 setSource(s.slug);
                 setPicked(null);
               }}
-              className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+              className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
                 source === s.slug
                   ? "border-indigo-500 bg-indigo-500/15 text-indigo-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/40"

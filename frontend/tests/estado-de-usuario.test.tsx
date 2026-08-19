@@ -70,3 +70,39 @@ describe("por dónde iba cada uno", () => {
     );
   });
 });
+
+describe("un móvil que ya tuvo otra sesión", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    quienMira.username = "ness";
+  });
+
+  it("mientras no se sepa quién entró, no se lee nada de nadie", async () => {
+    // Así queda un móvil que configuró otra persona: su rastro sigue ahí.
+    localStorage.setItem("qcache:ultimo", "ness");
+    localStorage.setItem(
+      "u:ness:povbof-largo:carpeta",
+      JSON.stringify("2 Pront Flow"),
+    );
+
+    quienMira.username = undefined; // `/me` todavía no ha contestado
+    const { result } = renderHook(() =>
+      useEstadoDeUsuario<string | null>("povbof-largo:carpeta", null),
+    );
+
+    // Nada de la persona anterior. Antes salía su carpeta durante ese instante
+    // y, si se tocaba algo, se guardaba bajo la clave de ÉL.
+    await waitFor(() => expect(result.current[0]).toBeNull());
+  });
+
+  it("ni se guarda nada bajo la clave del anterior", async () => {
+    localStorage.setItem("qcache:ultimo", "ness");
+    quienMira.username = undefined;
+    const { result } = renderHook(() =>
+      useEstadoDeUsuario<string | null>("povbof-largo:carpeta", null),
+    );
+    act(() => result.current[1]("8 Agosto 2026"));
+    await waitFor(() => expect(result.current[0]).toBe("8 Agosto 2026"));
+    expect(localStorage.getItem("u:ness:povbof-largo:carpeta")).toBeNull();
+  });
+});

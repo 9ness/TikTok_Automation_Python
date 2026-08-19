@@ -245,7 +245,7 @@ function CortarAudioLargo({ ponentes }: { ponentes: PonenteInfo[] }) {
                 key={p.slug}
                 type="button"
                 onClick={() => setPonente(p.slug)}
-                className={`truncate rounded-lg border px-3 py-2 text-xs transition ${
+                className={`break-words leading-tight rounded-lg border px-3 py-2 text-xs transition ${
                   elegido === p.slug
                     ? "border-amber-500 bg-amber-500/10 font-semibold text-amber-500"
                     : "border-border/60 text-muted-foreground hover:border-foreground/30"
@@ -814,7 +814,7 @@ export default function ViralizacionPage() {
                       key={valor}
                       type="button"
                       onClick={() => setCtaFinal(valor)}
-                      className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
+                      className={`break-words leading-tight rounded-md border px-2 py-1.5 text-xs transition ${
                         ctaFinal === valor
                           ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
                           : "border-border text-muted-foreground hover:border-foreground/40"
@@ -854,7 +854,7 @@ export default function ViralizacionPage() {
                 key={valor}
                 type="button"
                 onClick={() => setMusica(valor)}
-                className={`truncate rounded-md border px-2 py-1.5 text-xs transition ${
+                className={`break-words leading-tight rounded-md border px-2 py-1.5 text-xs transition ${
                   musica === valor
                     ? "border-amber-500 bg-amber-500/15 font-semibold text-amber-500"
                     : "border-border text-muted-foreground hover:border-foreground/40"
@@ -922,7 +922,7 @@ export default function ViralizacionPage() {
                       );
                     }}
                   />
-                  <span className="truncate">{s.label}</span>
+                  <span className="break-words leading-tight">{s.label}</span>
                 </span>
               </label>
             );

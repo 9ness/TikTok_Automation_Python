@@ -89,7 +89,7 @@ export default function NichoRopaPage() {
               key={c.slug}
               type="button"
               onClick={() => setCarpeta(c.slug)}
-              className={`truncate rounded-lg border px-3 py-2 text-xs transition ${
+              className={`break-words leading-tight rounded-lg border px-3 py-2 text-xs transition ${
                 carpeta === c.slug
                   ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
                   : "border-border/60 text-muted-foreground hover:border-foreground/30"

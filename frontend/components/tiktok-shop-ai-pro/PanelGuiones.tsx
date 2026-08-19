@@ -61,7 +61,7 @@ export function PanelGuiones() {
             key={s.slug}
             type="button"
             onClick={() => setSource(s.slug)}
-            className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+            className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
               source === s.slug
                 ? "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-400"
                 : "border-border/60 text-muted-foreground hover:border-foreground/40"

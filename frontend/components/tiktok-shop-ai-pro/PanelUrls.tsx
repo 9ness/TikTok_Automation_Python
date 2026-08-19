@@ -60,7 +60,7 @@ export function PanelUrls() {
               setSource(s.slug);
               setAbierta("");
             }}
-            className={`truncate rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
+            className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
               source === s.slug
                 ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
                 : "border-border/60 text-muted-foreground hover:border-foreground/40"

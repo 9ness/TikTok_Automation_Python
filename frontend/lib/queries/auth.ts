@@ -51,8 +51,16 @@ export function useEsPro(): boolean {
   return useMe().data?.rol === "pro";
 }
 
+/** Entrar con el PIN.
+ *
+ *  Al entrar se apunta quién es y se RECARGA, igual que al cambiar de cuenta.
+ *  No es ceremonia: en un móvil donde antes hubo otra sesión (el que se
+ *  configura entrando primero con la cuenta de uno), lo que quedaba en memoria
+ *  y en la caché de arranque era de la persona anterior, y se veía un instante
+ *  antes de que `/me` dijera quién había entrado de verdad. Recargando no hay
+ *  nada que arrastrar.
+ */
 export function useLogin() {
-  const qc = useQueryClient();
   return useMutation<
     { username: string; exp: number },
     Error,
@@ -60,15 +68,15 @@ export function useLogin() {
   >({
     mutationFn: (body) =>
       api.post<{ username: string; exp: number }>(`/api/v1/auth/login`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["auth", "me"] });
+    onSuccess: (datos) => {
+      fijarUsuario(datos.username);
+      window.location.assign("/");
     },
   });
 }
 
 /** Primera entrada: elegir el PIN. Solo vale si ese usuario no tiene aún. */
 export function useCrearPin() {
-  const qc = useQueryClient();
   return useMutation<
     { ok: boolean; username: string },
     Error,
@@ -76,8 +84,10 @@ export function useCrearPin() {
   >({
     mutationFn: (body) =>
       api.post<{ ok: boolean; username: string }>(`/api/v1/auth/crear-pin`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["auth", "me"] });
+    // Crear el PIN te deja dentro, así que vale lo mismo que el login.
+    onSuccess: (datos) => {
+      fijarUsuario(datos.username);
+      window.location.assign("/");
     },
   });
 }
