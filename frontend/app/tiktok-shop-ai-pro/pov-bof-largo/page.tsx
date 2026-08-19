@@ -200,6 +200,10 @@ export default function PovBofLargoPage() {
   const [videoProgress, setVideoProgress] = useState("");
 
   const esTopVendidos = activaSource === FUENTE_TOP_VENDIDOS;
+  // Trabajar solo con los que ya tienen la ficha enlazada: son los que se van
+  // a subir, y en una carpeta a medias el resto solo estorba. Filtra lo que se
+  // VE, y como los botones cuentan sobre lo que se ve, también lo que se baja.
+  const [soloConUrl, setSoloConUrl] = useEstadoDeUsuario("largo:solo-url", false);
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "largo:topventas:sinsubir", false,
   );
@@ -235,15 +239,15 @@ export default function PovBofLargoPage() {
   // ranking. Separados, cambiar de carpeta dejaba delante los mismos diez.
   const POR_PAGINA = 10;
 
-  const itemsVisibles = useMemo(
-    () =>
-      verTopVendidos(lista, {
-        activo: esTopVendidos,
-        soloSinSubir,
-        yaSubido: (p) => p.uploaded,
-      }),
-    [lista, esTopVendidos, soloSinSubir],
-  );
+  const itemsVisibles = useMemo(() => {
+    const base = verTopVendidos(lista, {
+      activo: esTopVendidos,
+      soloSinSubir,
+      yaSubido: (p) => p.uploaded,
+    });
+    return soloConUrl ? base.filter((p) => Boolean(p.product_url)) : base;
+  }, [lista, esTopVendidos, soloSinSubir, soloConUrl]);
+  const conUrlEnCarpeta = lista.filter((p) => Boolean(p.product_url)).length;
   // Los dos flujos de guion de la carpeta, contados sobre los que tienen foto.
   const paginado = esTopVendidos && verTodas;
   const paginas = paginado ? Math.max(1, Math.ceil(itemsVisibles.length / POR_PAGINA)) : 1;
@@ -1074,6 +1078,21 @@ export default function PovBofLargoPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
               {(productosQ.error as Error)?.message ?? "No se pudieron cargar los productos."}
             </p>
+          )}
+
+          {lista.length > 0 && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-500"
+                checked={soloConUrl}
+                onChange={(e) => setSoloConUrl(e.target.checked)}
+              />
+              Solo los que tienen URL
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {conUrlEnCarpeta}/{lista.length}
+              </span>
+            </label>
           )}
 
           {/* Solo en Top vendidos: ahí importa el orden (lo que más vende) y

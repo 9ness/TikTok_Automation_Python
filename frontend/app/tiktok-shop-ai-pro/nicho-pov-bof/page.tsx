@@ -99,12 +99,55 @@ const CAR_POR_SEG = 18.2;
 /** Los dos flujos de la carpeta. Un producto lleva guion de plazos o el de
  *  siempre según su precio, y cada uno se genera distinto (dos clips o uno),
  *  así que se bajan por separado. `todas` es la carpeta entera. */
-type Filtro = "todas" | "plazos" | "viejo";
-
-function cuadra(p: { modo_plazos: boolean }, filtro: Filtro): boolean {
-  if (filtro === "todas") return true;
-  return filtro === "plazos" ? p.modo_plazos : !p.modo_plazos;
+/** Cuántos clips pide este producto.
+ *
+ *  HOY: los de plazos llevan dos (su guion dura ~15s) y el resto uno. Si mañana
+ *  los normales pasan a dos, se cambia AQUÍ y lo siguen solos la tarjeta, los
+ *  recuentos y los botones de descarga — por eso no se pregunta por
+ *  `modo_plazos` en cada sitio.
+ */
+function clipsDe(p: { modo_plazos: boolean }): number {
+  return p.modo_plazos ? 2 : 1;
 }
+
+/** Qué subconjunto se baja. Mismo planteamiento que el POV BOF Largo, para que
+ *  las dos pantallas se usen igual: lo que importa es si el producto tiene ya
+ *  enlazada su ficha de TikTok Shop —es con los que se trabaja— y cuántos clips
+ *  pide, que es lo que hay que generar en Magnific. Los recuentos por clips van
+ *  SOBRE los que tienen ficha. */
+type Filtro = "todas" | "url" | "clips1" | "clips2";
+
+interface ParaFiltrar {
+  modo_plazos: boolean;
+  product_url?: string;
+}
+
+function cuadra(p: ParaFiltrar, filtro: Filtro): boolean {
+  if (filtro === "todas") return true;
+  const conUrl = Boolean(p.product_url);
+  if (filtro === "url") return conUrl;
+  return conUrl && clipsDe(p) === (filtro === "clips1" ? 1 : 2);
+}
+
+/** Cómo se nombra cada subconjunto cuando no hay nada que bajar. */
+function textoFiltro(filtro: Filtro): string {
+  if (filtro === "url") return "con la ficha enlazada";
+  if (filtro === "clips1") return "de 1 clip con la ficha enlazada";
+  if (filtro === "clips2") return "de 2 clips con la ficha enlazada";
+  return "";
+}
+
+// Un color por número de clips, el mismo que en el POV BOF Largo (allí son 3 y
+// 4). Ni verde ni violeta: ya significan "ficha enlazada" y "plazos".
+const BORDE_CLIPS: Record<number, string> = {
+  1: "border-l-4 border-l-sky-500",
+  2: "border-l-4 border-l-lime-500",
+};
+
+const CHIP_CLIPS: Record<number, string> = {
+  1: "bg-sky-500/15 text-sky-500",
+  2: "bg-lime-500/15 text-lime-500",
+};
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoDeUsuario("povbof:fuente", "aleatorios_1");
@@ -137,6 +180,10 @@ export default function NichoPovBofPage() {
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
   // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima
   // vez que entres quieres lo mismo.
+  // Trabajar solo con los que ya tienen la ficha enlazada: son los que se van
+  // a subir, y en una carpeta a medias el resto solo estorba. Filtra lo que se
+  // VE, y como los botones cuentan sobre lo que se ve, también lo que se baja.
+  const [soloConUrl, setSoloConUrl] = useEstadoDeUsuario("povbof:solo-url", false);
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "povbof:topventas:sinsubir", false,
   );
@@ -175,15 +222,15 @@ export default function NichoPovBofPage() {
   // cambiar de carpeta dejara delante los mismos diez primeros.
   const POR_PAGINA = 10;
 
-  const productosVisibles = useMemo(
-    () =>
-      verTopVendidos(listaProductos, {
-        activo: esTopVendidos,
-        soloSinSubir,
-        yaSubido: (p) => p.uploaded,
-      }),
-    [listaProductos, esTopVendidos, soloSinSubir],
-  );
+  const productosVisibles = useMemo(() => {
+    const base = verTopVendidos(listaProductos, {
+      activo: esTopVendidos,
+      soloSinSubir,
+      yaSubido: (p) => p.uploaded,
+    });
+    return soloConUrl ? base.filter((p) => Boolean(p.product_url)) : base;
+  }, [listaProductos, esTopVendidos, soloSinSubir, soloConUrl]);
+  const conUrlEnCarpeta = listaProductos.filter((p) => Boolean(p.product_url)).length;
   const paginado = esTopVendidos && verTodas;
   const paginas = paginado ? Math.max(1, Math.ceil(productosVisibles.length / POR_PAGINA)) : 1;
   const carpetas = data?.items ?? [];
@@ -229,19 +276,25 @@ export default function NichoPovBofPage() {
   const conFoto = enPantalla.filter((p) => p.clean_photo_id).length;
   // Los dos flujos de generación de la carpeta, contados sobre los que tienen
   // foto (que son los que se pueden bajar).
-  const conPlazos = enPantalla.filter(
-    (p) => p.clean_photo_id && p.modo_plazos,
+  const fotoConUrl = enPantalla.filter(
+    (p) => p.clean_photo_id && cuadra(p, "url"),
   ).length;
-  const conViejo = enPantalla.filter(
-    (p) => p.clean_photo_id && !p.modo_plazos,
+  const foto1 = enPantalla.filter(
+    (p) => p.clean_photo_id && cuadra(p, "clips1"),
+  ).length;
+  const foto2 = enPantalla.filter(
+    (p) => p.clean_photo_id && cuadra(p, "clips2"),
   ).length;
   // Lo mismo para los vídeos ya montados: bajar 20 para quedarse con 3 es lo
   // que se quería evitar.
-  const videosPlazos = enPantalla.filter(
-    (p) => p.video_path && p.modo_plazos,
+  const videoConUrl = enPantalla.filter(
+    (p) => p.video_path && cuadra(p, "url"),
   ).length;
-  const videosViejo = enPantalla.filter(
-    (p) => p.video_path && !p.modo_plazos,
+  const video1 = enPantalla.filter(
+    (p) => p.video_path && cuadra(p, "clips1"),
+  ).length;
+  const video2 = enPantalla.filter(
+    (p) => p.video_path && cuadra(p, "clips2"),
   ).length;
   // "Textos" es una acción de CARPETA (extrae la carpeta abierta), así que su
   // contador va sobre la carpeta y no sobre lo que se ve.
@@ -274,7 +327,7 @@ export default function NichoPovBofPage() {
       toast.error(
         filtro === "todas"
           ? "Ningún producto tiene vídeo montado todavía"
-          : `Ningún vídeo ${filtro === "plazos" ? "de plazos" : "de guion normal"} montado`,
+          : `Ningún vídeo montado ${textoFiltro(filtro)}`,
       );
       return;
     }
@@ -315,7 +368,7 @@ export default function NichoPovBofPage() {
       toast.error(
         filtro === "todas"
           ? "No hay fotos limpias en esta carpeta"
-          : `No hay productos ${filtro === "plazos" ? "de plazos" : "con guion viejo"} con foto`,
+          : `No hay productos con foto ${textoFiltro(filtro)}`,
       );
       return;
     }
@@ -838,7 +891,7 @@ export default function NichoPovBofPage() {
             <p className="text-[10px] font-semibold text-muted-foreground">
               Primero, baja las fotos
             </p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadCleanPhotos()}
                 cargando={downloadingPhotos}
@@ -847,19 +900,36 @@ export default function NichoPovBofPage() {
                 etiqueta={`Fotos ${conFoto}/${totalProductos}`}
               />
               <BotonDescarga
-                onClick={() => void downloadCleanPhotos("viejo")}
+                onClick={() => void downloadCleanPhotos("url")}
                 cargando={false}
-                disabled={downloadingPhotos || !conViejo}
-                etiqueta={`Normal (${conViejo})`}
-              />
-              <BotonDescarga
-                onClick={() => void downloadCleanPhotos("plazos")}
-                cargando={false}
-                disabled={downloadingPhotos || !conPlazos}
-                etiqueta={`💳 Plazos (${conPlazos})`}
-                tono="plazos"
+                disabled={downloadingPhotos || !fotoConUrl}
+                etiqueta={`🔗 Con URL (${fotoConUrl})`}
+                tono="url"
               />
             </div>
+            {(foto1 > 0 || foto2 > 0) && (
+              <>
+                <p className="pt-0.5 text-[10px] text-muted-foreground">
+                  De los que tienen URL, por clips:
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadCleanPhotos("clips1")}
+                    cargando={false}
+                    disabled={downloadingPhotos || !foto1}
+                    etiqueta={`1 clip (${foto1})`}
+                    tono="clips1"
+                  />
+                  <BotonDescarga
+                    onClick={() => void downloadCleanPhotos("clips2")}
+                    cargando={false}
+                    disabled={downloadingPhotos || !foto2}
+                    etiqueta={`2 clips (${foto2})`}
+                    tono="clips2"
+                  />
+                </div>
+              </>
+            )}
 
             <p className="pt-1 text-[10px] font-semibold text-muted-foreground">
               Y luego, créalos
@@ -919,7 +989,7 @@ export default function NichoPovBofPage() {
             hint="Los vídeos editados, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
             extra={`${conVideo}/${totalProductos}`}
           >
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <BotonDescarga
                 onClick={() => void downloadVideos()}
                 cargando={downloadingVideos}
@@ -928,19 +998,36 @@ export default function NichoPovBofPage() {
                 etiqueta={`Vídeos ${conVideo}/${totalProductos}`}
               />
               <BotonDescarga
-                onClick={() => void downloadVideos("viejo")}
+                onClick={() => void downloadVideos("url")}
                 cargando={false}
-                disabled={downloadingVideos || !videosViejo}
-                etiqueta={`Normal (${videosViejo})`}
-              />
-              <BotonDescarga
-                onClick={() => void downloadVideos("plazos")}
-                cargando={false}
-                disabled={downloadingVideos || !videosPlazos}
-                etiqueta={`💳 Plazos (${videosPlazos})`}
-                tono="plazos"
+                disabled={downloadingVideos || !videoConUrl}
+                etiqueta={`🔗 Con URL (${videoConUrl})`}
+                tono="url"
               />
             </div>
+            {(video1 > 0 || video2 > 0) && (
+              <>
+                <p className="pt-0.5 text-[10px] text-muted-foreground">
+                  De los que tienen URL, por clips:
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadVideos("clips1")}
+                    cargando={false}
+                    disabled={downloadingVideos || !video1}
+                    etiqueta={`1 clip (${video1})`}
+                    tono="clips1"
+                  />
+                  <BotonDescarga
+                    onClick={() => void downloadVideos("clips2")}
+                    cargando={false}
+                    disabled={downloadingVideos || !video2}
+                    etiqueta={`2 clips (${video2})`}
+                    tono="clips2"
+                  />
+                </div>
+              </>
+            )}
           </Paso>
         </section>
       )}
@@ -958,6 +1045,21 @@ export default function NichoPovBofPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-500">
               {(productos.error as Error)?.message ?? "No se pudieron cargar los productos."}
             </p>
+          )}
+
+          {listaProductos.length > 0 && (
+            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-500"
+                checked={soloConUrl}
+                onChange={(e) => setSoloConUrl(e.target.checked)}
+              />
+              Solo los que tienen URL
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {conUrlEnCarpeta}/{listaProductos.length}
+              </span>
+            </label>
           )}
 
           {/* Solo en Top vendidos: ahí el orden importa (los que más venden
@@ -1360,7 +1462,7 @@ function ProductoCard({
         producto.video_path
           ? "border-emerald-500/50"
           : "border-border/60 hover:border-emerald-500/30"
-      }`}
+      } ${BORDE_CLIPS[clipsDe(producto)] ?? ""}`}
     >
       <div className="flex gap-2">
         {producto.clean_photo_id ? (
@@ -1464,9 +1566,21 @@ function ProductoCard({
               )}
               {producto.modo_plazos && (
                 <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-500">
-                  💳 Plazos · 2 clips
+                  💳 Plazos
                 </span>
               )}
+              {/* Cuántos clips pide, siempre: aquí uno y dos son los dos casos
+                  normales, así que hay que poder distinguirlos de un vistazo.
+                  El número ya no cuelga del distintivo de plazos — si mañana
+                  los normales pasan a dos clips, esto sigue diciendo la
+                  verdad (ver `clipsDe`). */}
+              <span
+                className={`rounded px-1.5 py-0.5 font-semibold ${
+                  CHIP_CLIPS[clipsDe(producto)]
+                }`}
+              >
+                🎞️ {clipsDe(producto)} clip{clipsDe(producto) > 1 ? "s" : ""}
+              </span>
               {/* Cuándo entró en el Drive del curso. Las carpetas no son
                   cerradas: van añadiendo productos durante el día, y sin la
                   fecha no hay forma de saber cuáles son nuevos. */}
@@ -1776,9 +1890,9 @@ function ProductoCard({
         )
       )}
 
-      {producto.modo_plazos ? (
-        /* Producto de plazos: el guion dura ~15s, así que hacen falta DOS
-           clips y no se monta hasta tener los dos. */
+      {clipsDe(producto) === 2 ? (
+        /* Dos clips (hoy, los de plazos: su guion dura ~15s). No se monta
+           hasta tener los dos. */
         <div className="grid grid-cols-2 gap-1.5">
           {([1, 2] as const).map((slot) => {
             const puesto = slot === 1 ? producto.clip1 : producto.clip2;
