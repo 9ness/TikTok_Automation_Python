@@ -46,6 +46,7 @@ import { QueueBadge } from "@/components/queue/QueueBadge";
 import { DiagnosticsPanel } from "@/components/layout/DiagnosticsPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { useLogout, useMe } from "@/lib/queries/auth";
+import { SelectorCuenta } from "@/components/layout/SelectorCuenta";
 import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
 import { useGlobalFolderCounts } from "@/lib/queries/editor-auto";
 import { Inbox, LogOut, User } from "lucide-react";
@@ -236,6 +237,8 @@ function navPara(rol: string | null | undefined): NavGroup[] {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const me = useMe();
+  const puedeCambiar = Boolean(me.data?.puede_cambiar_usuario);
+  const suplantando = Boolean(me.data?.admin_real);
   // Estado de cada grupo expandido — auto-abrir si la ruta actual cae dentro.
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -261,21 +264,37 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="flex h-20 items-center gap-3 border-b px-5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/logo.png"
-          alt="NebulabsAI"
-          width={36}
-          height={36}
-          className="rounded-md"
-        />
-        <div className="leading-tight">
+        {/* El avatar sustituye al logo cuando hay selector de cuenta (solo lo
+            tiene el admin): dos círculos juntos se comen la cabecera, y el que
+            hay que poder tocar es este. */}
+        {puedeCambiar ? (
+          <SelectorCuenta />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src="/brand/logo.png"
+            alt="NebulabsAI"
+            width={36}
+            height={36}
+            className="rounded-md"
+          />
+        )}
+        <div className="min-w-0 leading-tight">
           <p className="brand-gradient-text text-base font-bold tracking-tight">
             NebulabsAI
           </p>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            TikTok Automation
-          </p>
+          {/* Suplantando, el subtítulo dice de quién es la pantalla. Junto al
+              anillo ámbar del avatar es la señal que se ve SIEMPRE sin abrir
+              nada — para no tocar los vídeos de otro sin darse cuenta. */}
+          {suplantando ? (
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-500">
+              Viendo como {me.data?.nombre || me.data?.username}
+            </p>
+          ) : (
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              TikTok Automation
+            </p>
+          )}
         </div>
       </div>
 
@@ -339,6 +358,41 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <ThemeToggle />
         </div>
       </div>
+    </>
+  );
+}
+
+/** Logo + nombre de la cabecera MÓVIL. Con selector de cuenta, el círculo
+ *  ocupa el sitio del logo: en 3.5rem de alto no caben los dos, y el que hay
+ *  que poder tocar es el círculo. */
+function MarcaMovil() {
+  const me = useMe();
+  const suplantando = Boolean(me.data?.admin_real);
+  if (me.data?.puede_cambiar_usuario) {
+    return (
+      <>
+        <SelectorCuenta size="sm" />
+        {suplantando ? (
+          <span className="truncate text-xs font-semibold text-amber-500">
+            Como {me.data?.nombre || me.data?.username}
+          </span>
+        ) : (
+          <span className="brand-gradient-text text-sm font-bold">NebulabsAI</span>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/brand/logo.png"
+        alt="NebulabsAI"
+        width={28}
+        height={28}
+        className="rounded"
+      />
+      <span className="brand-gradient-text text-sm font-bold">NebulabsAI</span>
     </>
   );
 }
@@ -445,16 +499,8 @@ export function Sidebar() {
           botón de Cola quedan debajo del reloj y la batería. En el navegador
           normal el inset es 0 y la barra mide lo de siempre. */}
       <div className="sticky top-0 z-40 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b bg-background/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/70 md:hidden">
-        <div className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/logo.png"
-            alt="NebulabsAI"
-            width={28}
-            height={28}
-            className="rounded"
-          />
-          <span className="brand-gradient-text text-sm font-bold">NebulabsAI</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <MarcaMovil />
         </div>
         <div className="flex items-center gap-1">
           <QueueBadge />

@@ -63,6 +63,44 @@ def _verify(token: str, key: str) -> dict | None:
 
 
 
+def _nombre_cookie_suplantacion(base: str) -> str:
+    """Cookie EXTRA solo del modo dev (sin `AUTH_COOKIE_KEY`).
+
+    En producción la suplantación viaja dentro del cookie FIRMADO (campo `a`),
+    que es lo único que no se puede falsear desde el navegador. En dev no hay
+    clave con la que firmar, así que se usa un cookie plano — vale porque en
+    dev tampoco hay login.
+    """
+    return f"{base}_como"
+
+
+def _nombre_cookie_admin_real(base: str) -> str:
+    """Compañera de la anterior, también solo de dev: quién es el admin de
+    verdad detrás de la suplantación."""
+    return f"{base}_admin"
+
+
+def admin_real_de_request(request: "Request | WebSocket") -> str | None:
+    """Quién abrió la sesión DE VERDAD cuando un admin está viendo la app
+    como otro usuario. `None` si nadie está suplantando.
+
+    Es lo que permite volver atrás: la sesión sigue siendo la del admin, solo
+    que `usuario_de_request` responde el usuario suplantado para que TODO el
+    backend (cola, cuotas, progreso por usuario, permisos por rol) actúe como
+    esa persona sin tener que tocar un solo call-site.
+    """
+    key, name, _ = _cookie_config()
+    if not key:
+        quien = (request.cookies.get(_nombre_cookie_admin_real(name)) or "").strip()
+        return quien if quien and users.es_admin(quien) else None
+    token = request.cookies.get(name)
+    payload = _verify(token, key) if token else None
+    quien = payload.get("a") if payload else None
+    # Se revalida el rol AHORA: si a alguien se le quita el admin, sus
+    # sesiones suplantando dejan de serlo solas.
+    return quien if quien and users.existe(quien) and users.es_admin(quien) else None
+
+
 def usuario_de_request(request: "Request | WebSocket") -> str | None:
     """Username del cookie, o None si no hay sesión válida.
 
@@ -74,6 +112,9 @@ def usuario_de_request(request: "Request | WebSocket") -> str | None:
     """
     key, name, _ = _cookie_config()
     if not key:
+        como = (request.cookies.get(_nombre_cookie_suplantacion(name)) or "").strip()
+        if como and users.existe(como):
+            return como
         forzado = os.getenv("WEB_USER", "").strip()
         if forzado and users.existe(forzado):
             return forzado

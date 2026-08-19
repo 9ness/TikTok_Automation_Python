@@ -15,6 +15,8 @@ Endpoints:
 - GET  /api/v1/auth/me     → { username | null, available_users }
 - POST /api/v1/auth/login  → valida bcrypt, emite cookie. body: {username, password}
 - POST /api/v1/auth/logout → borra cookie
+- POST /api/v1/auth/cambiar-usuario → SOLO admin: seguir en la app como otro
+  usuario (Ana, Mauro) sin pedirle su PIN. Ver `admin_real_de_request`.
 """
 
 from __future__ import annotations
@@ -31,7 +33,15 @@ from pydantic import BaseModel
 
 from src.api import users
 from src.api.dependencies import get_current_user
-from src.api.session import _cookie_config, _sign, _verify
+from src.api.session import (
+    _cookie_config,
+    _nombre_cookie_admin_real,
+    _nombre_cookie_suplantacion,
+    _sign,
+    _verify,
+    admin_real_de_request,
+    usuario_de_request,
+)
 from src.api.exceptions import APIError, UnauthorizedError
 
 
@@ -72,6 +82,10 @@ class CrearPinRequest(BaseModel):
     pin2: str
 
 
+class CambiarUsuarioRequest(BaseModel):
+    username: str
+
+
 @router.get("/me")
 def get_me(
     request: Request,
@@ -87,13 +101,18 @@ def get_me(
     # Modo dev: sin AUTH_COOKIE_KEY no exigimos login.
     if not cookie_key:
         forced = os.getenv("WEB_USER", "").strip()
-        quien = forced or (available[0] if available else "ness")
+        quien = usuario_de_request(request) or forced or (
+            available[0] if available else "ness"
+        )
+        admin_real = admin_real_de_request(request)
         return {
             "username": quien,
             "nombre": users.nombre_de(quien),
             "rol": users.rol_de(quien),
             "available_users": available,
             "usuarios": fichas,
+            "admin_real": admin_real,
+            "puede_cambiar_usuario": users.es_admin(admin_real or quien),
         }
     token = request.cookies.get(cookie_name)
     payload = _verify(token, cookie_key) if token else None
@@ -101,12 +120,18 @@ def get_me(
     # Si el usuario desaparece de la lista, la sesión deja de valer.
     if username and not users.existe(username):
         username = None
+    admin_real = admin_real_de_request(request)
     return {
         "username": username,
         "nombre": users.nombre_de(username) if username else None,
         "rol": users.rol_de(username) if username else None,
         "available_users": available,
         "usuarios": fichas,
+        # Quién abrió la sesión de verdad si está viendo la app como otro.
+        # `null` en el caso normal. La UI lo usa para pintar el aviso y el
+        # "volver a mi cuenta"; el permiso lo decide el backend, no esto.
+        "admin_real": admin_real,
+        "puede_cambiar_usuario": users.es_admin(admin_real or username),
     }
 
 
@@ -186,7 +211,83 @@ def login(payload: LoginRequest, response: Response) -> dict:
     return {"username": payload.username, "exp": exp}
 
 
+@router.post("/cambiar-usuario")
+def cambiar_usuario(
+    payload: CambiarUsuarioRequest, request: Request, response: Response,
+) -> dict:
+    """El admin sigue en la app COMO otro usuario, sin pedirle su PIN.
+
+    Para qué: Ana y Mauro se atascan y hay que entrar a ver su pantalla —sus
+    productos, su cola, su progreso— para desatascarles. Pedirles el PIN cada
+    vez no es práctico y hacer una pantalla de "modo administrador" paralela
+    sería duplicar media app.
+
+    Cómo: se reemite el MISMO cookie firmado con `u` = el usuario destino y
+    `a` = el admin de verdad. A partir de ahí `usuario_de_request` responde el
+    destino, así que TODO el backend (cola, cuotas, progreso por usuario, y el
+    corte por rol de `_permisos_por_rol`) trata la sesión como esa persona —
+    sin tocar un solo call-site. `a` es lo que permite volver.
+
+    Quién puede: solo un admin, y se comprueba contra el admin REAL (`a`), no
+    contra el usuario efectivo — si no, al pasar a Mauro (rol `pro`) el admin
+    se quedaría encerrado sin poder volver a lo suyo.
+    """
+    real = admin_real_de_request(request) or usuario_de_request(request) or ""
+    if not users.es_admin(real):
+        raise UnauthorizedError(
+            "Solo el administrador puede cambiar de cuenta."
+        )
+    destino = (payload.username or "").strip()
+    if not users.existe(destino):
+        raise APIError("Usuario desconocido.", status_code=404)
+
+    # Volver a la cuenta propia es el mismo endpoint con el admin de destino:
+    # una sola ruta y un solo permiso que revisar.
+    suplantando = destino != real
+    cookie_key, cookie_name, expiry_days = _cookie_config()
+    max_age = expiry_days * 86400
+
+    if not cookie_key:
+        # Modo dev (sin login): cookies planos, ver `session.py`.
+        comun = dict(max_age=max_age, httponly=True, samesite="lax",
+                     secure=False, path="/")
+        if suplantando:
+            response.set_cookie(
+                _nombre_cookie_suplantacion(cookie_name), destino, **comun)
+            response.set_cookie(
+                _nombre_cookie_admin_real(cookie_name), real, **comun)
+        else:
+            response.delete_cookie(
+                _nombre_cookie_suplantacion(cookie_name), path="/")
+            response.delete_cookie(
+                _nombre_cookie_admin_real(cookie_name), path="/")
+    else:
+        datos: dict = {"u": destino, "exp": int(time.time()) + max_age}
+        if suplantando:
+            datos["a"] = real
+        response.set_cookie(
+            key=cookie_name,
+            value=_sign(datos, cookie_key),
+            max_age=max_age,
+            httponly=True,
+            samesite="lax",
+            secure=os.getenv("AUTH_COOKIE_SECURE", "true").lower() != "false",
+            path="/",
+        )
+
+    return {
+        "username": destino,
+        "nombre": users.nombre_de(destino),
+        "rol": users.rol_de(destino),
+        "admin_real": real if suplantando else None,
+    }
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(response: Response) -> None:
     _, cookie_name, _ = _cookie_config()
     response.delete_cookie(cookie_name, path="/")
+    # Los de dev también: si no, al volver a entrar en local seguirías siendo
+    # el usuario que estabas suplantando.
+    response.delete_cookie(_nombre_cookie_suplantacion(cookie_name), path="/")
+    response.delete_cookie(_nombre_cookie_admin_real(cookie_name), path="/")

@@ -19,6 +19,14 @@ export interface MeResponse {
   /** Ficha de cada usuario: sirve para saber quién tiene que CREAR su PIN
    *  la primera vez y quién solo tiene que entrar. */
   usuarios?: UsuarioFicha[];
+  /** Quién abrió la sesión DE VERDAD cuando el admin está viendo la app como
+   *  otro usuario. `null` en el caso normal. */
+  admin_real?: string | null;
+  /** ¿Puede usar el selector de cuenta? Lo decide el backend mirando el
+   *  admin real, no el rol efectivo: al pasarse a Mauro (rol `pro`) el rol
+   *  que llega aquí es `pro` y el selector tiene que seguir estando para
+   *  poder volver. */
+  puede_cambiar_usuario?: boolean;
 }
 
 export function useMe() {
@@ -69,6 +77,34 @@ export function useCrearPin() {
       api.post<{ ok: boolean; username: string }>(`/api/v1/auth/crear-pin`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+}
+
+/** ¿El admin está ahora mismo viendo la app como otra persona? */
+export function useSuplantando(): string | null {
+  return useMe().data?.admin_real ?? null;
+}
+
+/** Cambiar de cuenta sin pedir el PIN del otro (solo admin).
+ *
+ *  Pasar el propio username del admin es lo que le devuelve a su cuenta: es
+ *  el mismo endpoint, no hay dos.
+ *
+ *  Tras el cambio se RECARGA la página entera a propósito. Todo lo que hay en
+ *  caché (productos, progreso, cola, cuota) es de la persona anterior, y la
+ *  mitad de las pantallas ni siquiera son visibles para el rol nuevo — vaciar
+ *  query por query sería más frágil que empezar de cero. */
+export function useCambiarUsuario() {
+  return useMutation<
+    { username: string; nombre: string; rol: string; admin_real: string | null },
+    Error,
+    { username: string }
+  >({
+    mutationFn: (body) =>
+      api.post(`/api/v1/auth/cambiar-usuario`, body),
+    onSuccess: () => {
+      window.location.assign("/");
     },
   });
 }
