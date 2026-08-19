@@ -7,9 +7,10 @@ Drive.
 Orden del pipeline (cada paso escribe un fichero intermedio en `work_dir`
 para poder depurar si algo falla a mitad de camino):
 
-  1. (ya no hay paso de marca de agua: Veo3 dejó de ponerla en 2026-07, y
-     Kling nunca la puso, así que no había nada que quitar)
-  2. Normalizar a 1080x1920 @ 30fps (cover-fit + crop). Se hace ANTES de
+  1. (no hay paso de marca de agua: la de GenAI Pro se la come la ampliación
+     del paso 2, y ni Veo3 desde 2026-07 ni Kling ponen ninguna)
+  2. Normalizar a 1080x1920 @ 30fps (cover-fit + crop, con un 5% de más para
+     que el recorte se lleve la marca de la esquina). Se hace ANTES de
      cuadrar duración porque `duration_match` asume que el vídeo YA tiene el
      tamaño final: solo toca duración, no resolución.
   3. Cuadrar la duración del vídeo con la del audio (`duration_match`, ya
@@ -110,14 +111,13 @@ def _font_path(name: str = "Montserrat-ExtraBold.ttf") -> str:
 # Paso 2 — Normalizar resolución/fps
 # ---------------------------------------------------------------------------
 def _normalize_resolution(video_in: Path, out_path: Path, on_log: OnLog) -> Path:
-    """Cover-fit (escala cubriendo el frame + recorte centrado) a
-    1080x1920 @ 30fps. `setsar=1` evita que un SAR raro del vídeo de origen
-    deforme el recorte."""
-    w, h, fps = config.TARGET_W, config.TARGET_H, config.TARGET_FPS
-    vf = (
-        f"scale={w}:{h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h},fps={fps},setsar=1"
-    )
+    """Cover-fit (escala cubriendo el frame + recorte) a 1080x1920 @ 30fps.
+
+    El recorte se lleva además la ampliación anti-marca-de-agua
+    (`config.filtro_encuadre`): los clips de 8s de GenAI Pro traen la marca de
+    Veo en una esquina y con un 5% de más deja de salir en el vídeo.
+    """
+    vf = config.filtro_encuadre()
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(video_in),
         "-vf", vf, "-an",

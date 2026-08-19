@@ -508,6 +508,8 @@ PIXABAY_API_KEY=...
 # CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
 # FISH_API_KEY=sk-fish-...                   # TTS del POV BOF Largo
 # NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
+# ZOOM_MARCA_AGUA=1.05                       # ampliación que se come la marca
+# ESQUINA_MARCA_AGUA=abajo-derecha           #   de agua del generador de vídeo
 ```
 
 ---

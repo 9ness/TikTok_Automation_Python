@@ -385,6 +385,55 @@ def photo_cache_dir() -> str:
 # ---------------------------------------------------------------------------
 TARGET_W, TARGET_H, TARGET_FPS = 1080, 1920, 30
 
+# Ampliación anti-marca-de-agua. Las plataformas de generación (GenAI Pro con
+# Veo, desde 2026-08) devuelven el clip con una marca pequeña en una esquina.
+# No se tapa con un parche —un rectángulo encima canta más que la marca—: se
+# AMPLÍA el vídeo un poco y el recorte se lleva la esquina entera.
+ZOOM_MARCA_AGUA = float(os.getenv("ZOOM_MARCA_AGUA", "1.05"))
+# En qué esquina cae la marca. El sobrante del recorte se concentra AHÍ en vez
+# de repartirse por igual entre los cuatro lados: con la misma ampliación se
+# quita el doble donde hace falta y el encuadre solo se desplaza un 2,5%.
+# "centro" reparte como se hacía antes.
+ESQUINA_MARCA_AGUA = os.getenv("ESQUINA_MARCA_AGUA", "abajo-derecha")
+
+
+def _par(n: float) -> int:
+    """Redondea a entero par: los códecs no tragan dimensiones impares."""
+    return int(round(n / 2)) * 2
+
+
+def filtro_encuadre(
+    w: int = TARGET_W, h: int = TARGET_H, fps: int = TARGET_FPS,
+    *, zoom: float | None = None, esquina: str = "",
+) -> str:
+    """Cadena de filtros ffmpeg que encuadra a `w`x`h` y se come la marca.
+
+    El vídeo se escala CUBRIENDO un lienzo un `zoom` más grande y luego se
+    recorta al tamaño final. El desplazamiento del recorte está acotado a ese
+    sobrante (`max(0, ...)`): así un clip 9:16 pierde toda la ampliación por la
+    esquina de la marca, pero uno apaisado —donde el recorte lateral es enorme—
+    sigue saliendo centrado en vez de quedarse con el borde izquierdo.
+    """
+    zoom = ZOOM_MARCA_AGUA if zoom is None else zoom
+    esquina = (esquina or ESQUINA_MARCA_AGUA).strip().lower()
+    if zoom <= 1.0:
+        return (
+            f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h},fps={fps},setsar=1"
+        )
+    zw, zh = _par(w * zoom), _par(h * zoom)
+    dx, dy = (zw - w) // 2, (zh - h) // 2
+    # Hacia dónde se desplaza la ventana de recorte. Restar corre la ventana
+    # hacia el origen, o sea que se tira el lado contrario.
+    corre_x = -dx if "derecha" in esquina else (dx if "izquierda" in esquina else 0)
+    corre_y = -dy if "abajo" in esquina else (dy if "arriba" in esquina else 0)
+    x = rf"max(0\,(in_w-out_w)/2{corre_x:+d})" if corre_x else "(in_w-out_w)/2"
+    y = rf"max(0\,(in_h-out_h)/2{corre_y:+d})" if corre_y else "(in_h-out_h)/2"
+    return (
+        f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h}:{x}:{y},fps={fps},setsar=1"
+    )
+
 # Zonas seguras de TikTok — mismas que el resto del proyecto
 # (`src/subtitles.py`): fuera de aquí la UI de TikTok tapa el texto.
 SAFE_X = (0.05, 0.78)
