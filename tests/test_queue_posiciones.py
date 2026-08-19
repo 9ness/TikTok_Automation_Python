@@ -12,6 +12,7 @@ import tempfile
 
 import pytest
 
+from src.queue import manager as queue_manager
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -74,3 +75,41 @@ def test_sin_pendientes_no_hay_puestos(cola: JobQueue):
     job = _encolar(cola, JobMode.NICHO_POV_BOF_LARGO_VIDEO, "ness")
     job.status = JobStatus.RUNNING
     assert cola.posiciones_pendientes() == {}
+
+
+class TestHistorial:
+    """El histórico no se limpiaba solo: cada trabajo acabado se quedaba para
+    siempre, y esa lista se reescribe entera en disco en cada cambio de estado
+    y se recorre entera cada segundo por cada pestaña abierta."""
+
+    def test_se_queda_con_los_ultimos_y_tira_los_viejos(self, cola, monkeypatch):
+        monkeypatch.setattr(queue_manager, "HISTORIAL_MAX", 5)
+        for i in range(12):
+            j = _encolar(cola, JobMode.NICHO_POV_BOF_LARGO_VIDEO, "ness")
+            j.title = f"t{i}"
+            j.status = JobStatus.COMPLETED
+            j.finished_at = 1000 + i
+
+        with cola._lock:
+            cola._save_state_locked()
+
+        quedan = [j.title for j in cola.get_all()]
+        assert quedan == ["t7", "t8", "t9", "t10", "t11"]
+
+    def test_no_toca_lo_pendiente_ni_lo_que_corre(self, cola, monkeypatch):
+        monkeypatch.setattr(queue_manager, "HISTORIAL_MAX", 2)
+        for i in range(6):
+            j = _encolar(cola, JobMode.NICHO_POV_BOF_LARGO_VIDEO, "ness")
+            j.status = JobStatus.COMPLETED
+            j.finished_at = 1000 + i
+        pendiente = _encolar(cola, JobMode.NICHO_POV_BOF_LARGO_VIDEO, "ana")
+        corriendo = _encolar(cola, JobMode.NICHO_POV_BOF_LARGO_VIDEO, "mauro")
+        corriendo.status = JobStatus.RUNNING
+
+        with cola._lock:
+            cola._save_state_locked()
+
+        ids = {j.id for j in cola.get_all()}
+        assert pendiente.id in ids
+        assert corriendo.id in ids
+        assert len(ids) == 4  # 2 del histórico + los dos vivos

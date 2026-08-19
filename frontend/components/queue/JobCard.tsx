@@ -74,6 +74,8 @@ function statusBadge(job: ActiveJob): {
   cls: string;
   Icon: typeof Clock;
   spin?: boolean;
+  /** Texto del `title` cuando hace falta explicar la etiqueta. */
+  titulo?: string;
 } {
   if (job.status === "pending") {
     // Si está programado para el futuro, mostramos badge ámbar específico
@@ -97,6 +99,14 @@ function statusBadge(job: ActiveJob): {
         : "En cola",
       cls: "border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300",
       Icon: Clock,
+      // La cola es de la máquina, no de cada uno: el total puede ser mayor que
+      // lo que se ve en pantalla. Sin decirlo, "nº 3 de 9" con un solo trabajo
+      // en la lista parece un fallo.
+      titulo: puesto
+        ? `Va el ${puesto}º de ${job.queue_pending_total} en espera. ` +
+          "La cola es compartida por todas las cuentas, así que puede haber " +
+          "trabajos de otra persona por delante."
+        : undefined,
     };
   }
   if (job.status === "running") {
@@ -375,7 +385,7 @@ export function JobCard({ job }: { job: ActiveJob }) {
                   "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
                   meta.cls,
                 )}
-                title={job.current_step || meta.label}
+                title={meta.titulo || job.current_step || meta.label}
               >
                 <meta.Icon
                   className={cn("h-3 w-3", meta.spin && "animate-spin")}
