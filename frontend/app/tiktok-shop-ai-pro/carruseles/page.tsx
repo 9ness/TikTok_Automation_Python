@@ -1039,6 +1039,11 @@ function FraseDeReferencia() {
       color="violeta"
       titulo="La frase de la que salen los mensajes"
       hint="Coge un carrusel de otra cuenta que esté funcionando: su frase, traducida. Los mensajes de la foto 2 serán variantes de esa, adaptadas a cada producto."
+      // Plegado como el 5: la frase se cambia de uvas a peras y su caja de
+      // texto separaba las carpetas del botón de bajar fotos, que es lo que
+      // de verdad se pulsa todos los días. `extra` sigue diciendo si está.
+      plegable
+      abiertoPorDefecto={false}
       extra={frase.data?.texto ? "puesta" : "sin poner"}
     >
       <textarea
