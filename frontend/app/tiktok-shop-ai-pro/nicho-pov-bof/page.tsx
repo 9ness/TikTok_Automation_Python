@@ -70,6 +70,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
+import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -1353,6 +1354,7 @@ function ProductoCard({
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
+  const [verVoz, setVerVoz] = useState(false);
   const sortear = useSortearGuionPlazos();
   const borrar = useBorrarMiProducto();
   const qc = useQueryClient();
@@ -1725,9 +1727,31 @@ function ProductoCard({
         </button>
       ))}
 
+      {/* Una sola fila para los ajustes de la tarjeta (ver `ChipAjuste`), igual
+          que en el POV BOF Largo: la voz va casi siempre en Auto y las
+          herramientas casi siempre las cuatro, así que enseñan su valor y se
+          abren solo cuando hay que cambiarlos. */}
+      <div className="flex items-stretch gap-1.5">
+        <ChipAjuste
+          icono={sexo === "auto" ? "🖐️" : sexo === "hombre" ? "👨" : "👩"}
+          valor={sexo === "auto" ? "Auto" : sexo === "hombre" ? "Hombre" : "Mujer"}
+          abierto={verVoz}
+          onToggle={() => setVerVoz((v) => !v)}
+          title="Quién pone la voz"
+        />
+        <ChipAjuste
+          icono="✨"
+          valor={`${Object.values(tools).filter(Boolean).length}/${TOOLS.length}`}
+          abierto={verTools}
+          onToggle={() => setVerTools((v) => !v)}
+          title="Qué se añade al vídeo"
+        />
+      </div>
+
       {/* Ya no se elige el generador (Veo3/Kling): Veo3 dejó de poner marca de
           agua en 2026-07 y Kling nunca la puso, así que no hay nada que
           quitar y la elección no cambiaba el resultado. */}
+      {verVoz && (
       <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
         {(["auto", "hombre", "mujer"] as const).map((s) => (
           <button
@@ -1747,27 +1771,12 @@ function ProductoCard({
           </button>
         ))}
       </div>
+      )}
 
       {/* Cada herramienta por separado. Todas marcadas = montaje completo;
-          ninguna = vídeo limpio (solo la voz, y sin marca si es Veo3). */}
+          ninguna = vídeo limpio (solo la voz). */}
+      {verTools && (
       <div className="space-y-1.5 rounded-md border border-border/60 p-2">
-        {/* Plegado por defecto: casi siempre van las cuatro marcadas, así que
-            desplegado solo ocupaba media pantalla en el móvil. El resumen dice
-            cuántas van sin abrirlo. */}
-        <button
-          type="button"
-          onClick={() => setVerTools((v) => !v)}
-          className="flex w-full items-center justify-between text-[10px] font-medium text-muted-foreground"
-        >
-          <span>
-            Qué añadir al vídeo
-            <span className="ml-1 opacity-70">
-              ({Object.values(tools).filter(Boolean).length}/{TOOLS.length})
-            </span>
-          </span>
-          <span>{verTools ? "▾" : "▸"}</span>
-        </button>
-        {verTools && (
         <div className="grid grid-cols-2 gap-1.5">
           {TOOLS.map((t) => (
             <label
@@ -1788,13 +1797,15 @@ function ProductoCard({
             </label>
           ))}
         </div>
-        )}
-        {!Object.values(tools).some(Boolean) && (
-          <p className="text-[10px] text-amber-500">
-            Vídeo limpio: solo la voz, sin nada encima.
-          </p>
-        )}
       </div>
+      )}
+      {/* El aviso se ve SIEMPRE, plegado o no: que el vídeo salga sin nada
+          encima no puede quedar escondido detrás de un chip. */}
+      {!Object.values(tools).some(Boolean) && (
+        <p className="text-[10px] text-amber-500">
+          Vídeo limpio: solo la voz, sin nada encima.
+        </p>
+      )}
 
       {/* Vídeo ya montado: verlo y descargarlo sin salir de aquí. Al remontar
           el producto, `video_listo_at` cambia y la URL con él, así que apunta

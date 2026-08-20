@@ -34,6 +34,7 @@ import {
 } from "@/lib/topVendidos";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
+import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -1343,6 +1344,7 @@ function ProductoCard({
   const [verFoto, setVerFoto] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
+  const [verVoz, setVerVoz] = useState(false);
   // El guion guardado se escribió en el otro modo (con o sin la frase de
   // plazos). No es un error: pasa con todo lo escrito antes de que existieran
   // los plazos y cada vez que se corrige un precio.
@@ -1635,27 +1637,41 @@ function ProductoCard({
         </button>
       ))}
 
-      {/* El guion es lo primero: sin él no se puede subir clip. Va plegado
-          porque se lee UNA vez, al escribirlo; después solo estorba entre el
-          precio y los clips. La cabecera ya dice lo que se mira de reojo
-          (cuánto dura) sin abrirlo. */}
-      {p.guion ? (
+      {/* Una sola fila para los tres ajustes de la tarjeta (ver `ChipAjuste`):
+          el guion se lee una vez al escribirlo, las herramientas van casi
+          siempre las cuatro y la voz casi siempre en Auto. Cada uno ocupaba
+          una fila entera para enseñar algo que no se toca. La de voz y
+          herramientas sale aunque no haya guion todavía: son ajustes del
+          producto, no del guion. */}
+      <div className="flex items-stretch gap-1.5">
+        {p.guion && (
+          <ChipAjuste
+            icono={guionDesfasado ? "⚠️" : "🎬"}
+            valor={`${p.guion_caracteres} car.`}
+            abierto={verGuion}
+            onToggle={() => setVerGuion((v) => !v)}
+            aviso={guionDesfasado}
+            title={`Guion · ~${Math.round(p.guion_caracteres / CAR_POR_SEG)}s`}
+          />
+        )}
+          <ChipAjuste
+            icono={sexo === "auto" ? "🖐️" : sexo === "hombre" ? "👨" : "👩"}
+            valor={sexo === "auto" ? "Auto" : sexo === "hombre" ? "Hombre" : "Mujer"}
+            abierto={verVoz}
+            onToggle={() => setVerVoz((v) => !v)}
+            title="Quién pone la voz"
+          />
+          <ChipAjuste
+            icono="✨"
+            valor={`${Object.values(tools).filter(Boolean).length}/${TOOLS.length}`}
+            abierto={verTools}
+            onToggle={() => setVerTools((v) => !v)}
+            title="Qué se añade al vídeo"
+          />
+      </div>
+
+      {p.guion && verGuion && (
         <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
-          <button
-            type="button"
-            onClick={() => setVerGuion((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
-          >
-            <span className={guionDesfasado ? "text-amber-500" : undefined}>
-              {guionDesfasado ? "⚠️ 🎬 Guion" : "🎬 Guion"}
-              <span className="ml-1 opacity-70">
-                {p.guion_caracteres} car. · ~{Math.round(p.guion_caracteres / CAR_POR_SEG)}s
-              </span>
-            </span>
-            <span>{verGuion ? "▾" : "▸"}</span>
-          </button>
-          {verGuion && (
-          <>
           {/* El guion guardado puede ser del OTRO modo: escrito antes de que
               existieran los plazos, o antes de corregir el precio. El montaje
               lo reescribe solo, pero sin decirlo aquí parecería que el vídeo
@@ -1686,10 +1702,9 @@ function ProductoCard({
               {guionDesfasado ? "Reescribir" : "Otro guion"}
             </button>
           </div>
-          </>
-          )}
         </div>
-      ) : (
+      )}
+      {!p.guion && (
         <button
           type="button"
           disabled={guion.isPending || !p.titulo}
@@ -1709,7 +1724,7 @@ function ProductoCard({
         </button>
       )}
 
-      {/* Voz */}
+      {verVoz && (
       <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
         {(["auto", "hombre", "mujer"] as const).map((s) => (
           <button
@@ -1730,25 +1745,10 @@ function ProductoCard({
           </button>
         ))}
       </div>
+      )}
 
-      {/* Qué añadir al vídeo */}
+      {verTools && (
       <div className="space-y-1.5 rounded-md border border-border/60 p-2">
-        {/* Plegado por defecto, como en el POV BOF: casi siempre van las
-            cuatro y desplegado se comía media pantalla en el móvil. */}
-        <button
-          type="button"
-          onClick={() => setVerTools((v) => !v)}
-          className="flex w-full items-center justify-between text-[10px] font-medium text-muted-foreground"
-        >
-          <span>
-            Qué añadir al vídeo
-            <span className="ml-1 opacity-70">
-              ({Object.values(tools).filter(Boolean).length}/{TOOLS.length})
-            </span>
-          </span>
-          <span>{verTools ? "▾" : "▸"}</span>
-        </button>
-        {verTools && (
         <div className="grid grid-cols-2 gap-1.5">
           {TOOLS.map((t) => (
             <label
@@ -1767,11 +1767,13 @@ function ProductoCard({
             </label>
           ))}
         </div>
-        )}
-        {!Object.values(tools).some(Boolean) && (
-          <p className="text-[10px] text-amber-500">Vídeo limpio: solo la voz, sin nada encima.</p>
-        )}
       </div>
+      )}
+      {/* El aviso se ve SIEMPRE, plegado o no: que el vídeo salga sin nada
+          encima no puede quedar escondido detrás de un chip. */}
+      {!Object.values(tools).some(Boolean) && (
+        <p className="text-[10px] text-amber-500">Vídeo limpio: solo la voz, sin nada encima.</p>
+      )}
 
       {/* Los clips. No se encola hasta tenerlos todos y el guion. Son DOS,
           salvo que la voz no quepa en veinte segundos: entonces hace falta un
