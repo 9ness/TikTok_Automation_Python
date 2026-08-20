@@ -3,8 +3,9 @@
 import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const APK_URL =
-  "https://github.com/9ness/TikTok_Automation_Python/releases/download/apk-latest/tiktok-auto.apk";
+// Nuestro dominio, no el de GitHub: ver `app/apk/route.ts`. Yendo a GitHub la
+// descarga se quedaba clavada en "Descargando…" dentro de la app.
+const APK_URL = "/apk";
 const OCULTO_KEY = "apk-banner-oculto";
 const OCULTO_ACTUALIZAR_KEY = "apk-banner-actualizar-oculto";
 

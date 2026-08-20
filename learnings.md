@@ -672,3 +672,5 @@
 - La APK pasó de TWA a WebView propio (`android-app/`): una TWA delega en Chrome y desde ahí no hay forma de elegir carpeta de descarga ni de seguir subiendo con el móvil bloqueado. Se validó antes con una APK de usar y tirar instalada al lado de la buena.
 - Instalar una APK encima de otra exige MISMO `applicationId` y MISMA clave de firma; aun así la sesión no sobrevive si se cambia de TWA a WebView, porque las cookies de la TWA viven en Chrome.
 - `InputStream.readAllBytes()` en Android es API 33: compila con minSdk 29 y revienta en el móvil.
+- La APK bajada desde la release de GitHub se quedaba clavada en "Descargando…" dentro de la app (GitHub redirige a otro dominio): se sirve desde `/apk`, mismo dominio y con `vnd.android.package-archive` + `Content-Disposition`.
+- El bundle minificado de Next escapa los acentos (`versión` → `versi\xf3n`): comprobar un despliegue por curl+grep con una cadena acentuada da falso negativo.
