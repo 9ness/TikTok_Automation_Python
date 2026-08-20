@@ -22,6 +22,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -61,6 +62,7 @@ public class MainActivity extends Activity {
     private static final String URL_APP = "https://tiktok-factory.tailbff00e.ts.net/";
 
     private WebView web;
+    private SwipeRefreshLayout deslizar;
     private AvisoDescargas avisosDescarga;
     /** Lo ÚLTIMO que eligió el usuario en el selector: nombre → `content://`.
      *
@@ -77,7 +79,17 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
         web = new WebView(this);
-        setContentView(web);
+        // Deslizar hacia abajo para recargar. Un WebView no lo trae: en la app
+        // de siempre lo pone Chrome, aquí hay que montarlo.
+        deslizar = new SwipeRefreshLayout(this);
+        deslizar.addView(web);
+        deslizar.setColorSchemeColors(0xFF15DBF9, 0xFFA855F7);
+        deslizar.setProgressBackgroundColorSchemeColor(0xFF0A0A0B);
+        deslizar.setOnRefreshListener(() -> web.reload());
+        // Solo se dispara ARRIBA DEL TODO: si no, al desplazarse por una lista
+        // larga el gesto se lo comía el recargador y la página no bajaba.
+        deslizar.setOnChildScrollUpCallback((padre, hijo) -> web.getScrollY() > 0);
+        setContentView(deslizar);
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -120,6 +132,7 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView v, String url) {
+                if (deslizar != null) deslizar.setRefreshing(false);
                 // El nombre del fichero vive en el atributo `download` del
                 // enlace, y al llegar como `blob:` ya se ha perdido. Se apunta
                 // en cuanto se pulsa, ANTES de que el navegador haga nada.

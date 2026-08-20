@@ -23,3 +23,9 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // Solo para el "deslizar para recargar": un WebView no lo trae, lo pone
+    // Chrome. Es la única dependencia del experimento.
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+}

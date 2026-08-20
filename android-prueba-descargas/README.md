@@ -26,6 +26,13 @@ Cuando se decida, esta carpeta se borra.
   NADA: en un WebView el `<input type="file">` no abre nada si la app no
   implementa `onShowFileChooser`. En la TWA funciona solo porque es Chrome.
   O sea que migrar no es solo rehacer las descargas: también las SUBIDAS.
+- **Las descargas en tanda SÍ van, y con la app cerrada.** Era la duda que
+  decidía el experimento. Resulta que las tandas del POV BOF y del Largo NO
+  usan `blob:`: van con la URL directa, así que las coge el gestor de Android y
+  siguen aunque se salga de la app. El camino de `blob:` (base64) solo lo usa
+  **Carruseles**, y son fotos, mucho más pequeñas.
+- **Deslizar para recargar hay que montarlo** (`SwipeRefreshLayout`): un
+  WebView no lo trae, lo pone Chrome.
 - **La notificación hay que montarla.** El gestor de Android pone UNA por
   fichero (diez vídeos = diez avisos iguales) y en Android 13+ ni eso, si la
   app no pide `POST_NOTIFICATIONS`. `AvisoDescargas` las apaga y publica una
