@@ -239,6 +239,30 @@ def _concatenar_cuadrado(
     if n == 2:
         corte = _punto_de_corte(audio_path, audio_dur, work_dir, on_log)
         primero = corte if corte is not None else audio_dur / 2
+        # Ningún clip puede aportar más metraje del que tiene. La pausa puede
+        # caer descentrada —la ventana llega al 20/80— y con clips de 8s eso
+        # pedía 9,6s a uno de los dos en un audio de 12s: lo que falta lo
+        # rellenaba el rebobinado, teniendo material de sobra en el otro clip.
+        # Se mueve el corte lo justo para que quepa; sobra metraje, así que lo
+        # que se descarta sale del FINAL de cada clip (`match_video_to_audio`
+        # recorta por el final), que es justo donde el generador de vídeo suele
+        # hacer cosas raras.
+        try:
+            cabe1 = probe_duration(clips[0])
+            cabe2 = probe_duration(clips[1])
+        except Exception:  # noqa: BLE001
+            cabe1 = cabe2 = 0.0
+        if cabe1 > 0 and cabe2 > 0:
+            minimo, maximo = max(0.0, audio_dur - cabe2), min(cabe1, audio_dur)
+            if minimo <= maximo:
+                ajustado = min(max(primero, minimo), maximo)
+                if abs(ajustado - primero) > 0.01:
+                    on_log(
+                        f"[pov_bof_largo] el corte en {primero:.2f}s le pedía a "
+                        f"un clip más de lo que dura; se mueve a {ajustado:.2f}s "
+                        "para no tener que rebobinar"
+                    )
+                primero = ajustado
         objetivos = [primero, audio_dur - primero]
     else:
         objetivos = [audio_dur / n] * n
