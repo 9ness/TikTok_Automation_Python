@@ -31,9 +31,13 @@ Cuando se decida, esta carpeta se borra.
   app no pide `POST_NOTIFICATIONS`. `AvisoDescargas` las apaga y publica una
   sola con el progreso de la tanda. Es trabajo que en la TWA sale gratis
   porque lo hace Chrome, pero el resultado se puede dejar MEJOR que el suyo.
-- **La subida en segundo plano no existiría.** La app usa Background Fetch
-  (`sw-subidas.js`) para que una tanda de vídeos siga subiendo con el móvil
-  bloqueado. Esa API es de Chrome; un WebView no la tiene.
+- **La subida en segundo plano SÍ se puede, y mejor.** Al principio se dio por
+  perdida: la app usa Background Fetch (`sw-subidas.js`), que es de Chrome. Pero
+  el equivalente nativo —un servicio en primer plano— es MÁS fiable, porque a
+  Background Fetch lo corta Chrome cuando quiere (de ahí que "a veces no se
+  suben"). Montado en `ServicioSubidas`: sube en streaming desde el
+  `content://`, con wake lock y notificación propia. La web solo dice qué y a
+  dónde; el reparto y la cola siguen donde estaban.
 
 ## Cuidado
 

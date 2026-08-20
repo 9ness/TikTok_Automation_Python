@@ -24,6 +24,9 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.net.URLDecoder;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +62,13 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private AvisoDescargas avisosDescarga;
+    /** Lo ÚLTIMO que eligió el usuario en el selector: nombre → `content://`.
+     *
+     *  La web tiene los `File` del `<input type="file">` y aquí se tienen las
+     *  URIs del mismo selector. Se casan por NOMBRE, que es lo único que
+     *  comparten los dos lados, y así el servicio puede leer los bytes sin que
+     *  la web se los pase (pasarlos costaría base64 de 30 MB por vídeo). */
+    private final Map<String, Uri> ultimaSeleccion = new LinkedHashMap<>();
     /** Dónde devolver los ficheros que elija el usuario (ver `onShowFileChooser`). */
     private ValueCallback<Uri[]> esperandoFicheros;
     private static final int PEDIR_FICHEROS = 1;
@@ -134,6 +144,7 @@ public class MainActivity extends Activity {
 
         avisosDescarga = new AvisoDescargas(this);
         pedirPermisoDeNotificaciones();
+        pedirSalirDelAhorroDeBateria();
         // De cuándo es esta APK. Con varias reinstalaciones seguidas es lo
         // único que dice si se está probando la última o una vieja.
         aviso("Prueba del " + getString(R.string.build_date));
@@ -153,6 +164,67 @@ public class MainActivity extends Activity {
         }
         requestPermissions(
             new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 2);
+    }
+
+    /**
+     * Pide quedar FUERA del ahorro de batería.
+     *
+     * Es lo que más corta las tandas largas: con el ahorro puesto, Android
+     * duerme la app en cuanto se apaga la pantalla y la subida se queda a
+     * medias. Se pregunta UNA vez; si se dice que no, todo sigue funcionando,
+     * solo que con menos margen.
+     */
+    private void pedirSalirDelAhorroDeBateria() {
+        try {
+            android.os.PowerManager pm = getSystemService(android.os.PowerManager.class);
+            if (pm.isIgnoringBatteryOptimizations(getPackageName())) return;
+            startActivity(new Intent(
+                android.provider.Settings
+                    .ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignorada) {
+            // Hay móviles que no traen esa pantalla; no es imprescindible.
+        }
+    }
+
+    /** Se queda con lo elegido para que el servicio pueda subirlo luego. */
+    private void recordarSeleccion(Intent datos) {
+        if (datos == null) return;
+        ultimaSeleccion.clear();
+        java.util.List<Uri> uris = new ArrayList<>();
+        if (datos.getClipData() != null) {
+            for (int i = 0; i < datos.getClipData().getItemCount(); i++) {
+                uris.add(datos.getClipData().getItemAt(i).getUri());
+            }
+        } else if (datos.getData() != null) {
+            uris.add(datos.getData());
+        }
+        for (Uri u : uris) {
+            try {
+                // Sin esto el permiso de lectura se pierde en cuanto el
+                // servicio intenta abrir el fichero desde otro proceso.
+                getContentResolver().takePersistableUriPermission(
+                    u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignorada) {
+                // No todos los selectores lo permiten; con el permiso temporal
+                // de la propia Intent suele bastar.
+            }
+            ultimaSeleccion.put(nombreDeUri(u), u);
+        }
+    }
+
+    private String nombreDeUri(Uri uri) {
+        try (android.database.Cursor c =
+                 getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (i >= 0) return c.getString(i);
+            }
+        } catch (Exception ignorada) {
+            // Da igual: se usará el último trozo de la URI.
+        }
+        String s = uri.getLastPathSegment();
+        return s == null ? uri.toString() : s;
     }
 
     /** El nombre de fichero que manda el servidor, con los acentos bien.
@@ -243,6 +315,52 @@ public class MainActivity extends Activity {
         public void fallo(String motivo) {
             aviso("Falló el blob: " + motivo);
         }
+
+        /** ¿Puede la web delegar la subida en la app? */
+        @JavascriptInterface
+        public boolean puedeSubirEnSegundoPlano() {
+            return true;
+        }
+
+        /**
+         * La web dice QUÉ subir y A DÓNDE; los bytes los mueve el servicio.
+         *
+         * `nombres` son los ficheros que eligió el usuario, en el orden en que
+         * hay que subirlos: se casan con las URIs que se guardaron del
+         * selector. Así no hay que pasar 30 MB por el puente.
+         */
+        @JavascriptInterface
+        public boolean subirTanda(String url, String apiKey, String source,
+                                  String folder, String nombres) {
+            ArrayList<String> uris = new ArrayList<>();
+            for (String nombre : nombres.split("\\n")) {
+                Uri u = ultimaSeleccion.get(nombre.trim());
+                if (u != null) uris.add(u.toString());
+            }
+            if (uris.isEmpty()) return false;
+            Intent i = new Intent(MainActivity.this, ServicioSubidas.class)
+                .putStringArrayListExtra(ServicioSubidas.EXTRA_URIS, uris)
+                .putExtra(ServicioSubidas.EXTRA_URL, url)
+                .putExtra(ServicioSubidas.EXTRA_API_KEY, apiKey)
+                .putExtra(ServicioSubidas.EXTRA_COOKIE,
+                    CookieManager.getInstance().getCookie(url))
+                .putExtra(ServicioSubidas.EXTRA_SOURCE, source)
+                .putExtra(ServicioSubidas.EXTRA_FOLDER, folder);
+            startForegroundService(i);
+            return true;
+        }
+
+        /** Lo que dejó el servicio, para que la web reparta al volver. */
+        @JavascriptInterface
+        public String recogerResultados() {
+            android.content.SharedPreferences p = getSharedPreferences(
+                ServicioSubidas.PREFS, Context.MODE_PRIVATE);
+            String r = p.getString(ServicioSubidas.CLAVE_RESULTADOS, "");
+            // Se entregan UNA vez: si no, al volver a abrir la app se repetiría
+            // el reparto de una tanda ya repartida.
+            p.edit().remove(ServicioSubidas.CLAVE_RESULTADOS).apply();
+            return r;
+        }
     }
 
     /** Escribe en `Download/TTShopAIPro/` sin pedir permisos (API 29+). */
@@ -272,11 +390,25 @@ public class MainActivity extends Activity {
             return;
         }
         if (esperandoFicheros == null) return;
+        recordarSeleccion(datos);
         // Hay que contestar SIEMPRE, aunque se cancele: si no, el input se
         // queda bloqueado y no vuelve a abrirse nunca.
         esperandoFicheros.onReceiveValue(
             WebChromeClient.FileChooserParams.parseResult(resultado, datos));
         esperandoFicheros = null;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Si el servicio terminó con la app cerrada, sus respuestas están
+        // guardadas: se le entregan a la web para que reparta.
+        if (web != null) {
+            web.evaluateJavascript(
+                "(function(){try{var r=PruebaAndroid.recogerResultados();"
+                + "if(r&&window.__subidaPruebaLista)window.__subidaPruebaLista(r);}"
+                + "catch(e){}})()", null);
+        }
     }
 
     @Override

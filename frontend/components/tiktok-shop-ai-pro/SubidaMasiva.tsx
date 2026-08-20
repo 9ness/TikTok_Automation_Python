@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { escucharAvisos, lanzarEnSegundoPlano, soportaBgFetch, tandaEnMarcha } from "@/lib/bgFetch";
+import { haySubidaNativa, subirConLaApp } from "@/lib/subidaNativa";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   actualizarLote,
@@ -337,6 +338,26 @@ export function SubidaMasiva({
       },
       files,
     );
+
+    // Si la app sabe subir por su cuenta, se le deja a ella: su servicio en
+    // primer plano aguanta la pantalla apagada mejor que Background Fetch, que
+    // lo corta Chrome. En el navegador y en la app actual esto no existe y se
+    // sigue por el camino de siempre.
+    if (haySubidaNativa()) {
+      const lanzada = subirConLaApp({
+        url: urlSubidaLote(root),
+        apiKey: claveApi(),
+        source,
+        folder,
+        files,
+      });
+      if (lanzada) {
+        setEnSegundoPlano(true);
+        setPendiente({ subidos: 0, total: files.length });
+        toast.success("Subiendo con la app: ya puedes bloquear el móvil.");
+        return;
+      }
+    }
 
     // Camino bueno: el sistema se encarga y la app puede cerrarse.
     if (soportaBgFetch()) {

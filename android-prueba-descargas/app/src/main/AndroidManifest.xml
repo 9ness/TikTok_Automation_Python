@@ -9,6 +9,16 @@
     <!-- Para poder APAGAR la notificación que el gestor pone por cada fichero:
          con diez vídeos eran diez avisos iguales. Se resume en uno solo. -->
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
+    <!-- Subir en segundo plano: el servicio en primer plano es lo que impide
+         que Android mate la subida al salir de la app o bloquear el móvil. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Mantiene la CPU despierta con la pantalla apagada: sin esto el móvil se
+         duerme a mitad de una subida larga y corta la conexión. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Para poder PEDIR que no se le aplique el ahorro de batería, que es lo
+         que más corta las tandas largas. Lo concede el usuario. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="false"
@@ -24,5 +34,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".ServicioSubidas"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
