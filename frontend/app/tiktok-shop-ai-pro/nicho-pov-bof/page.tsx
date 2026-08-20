@@ -98,9 +98,9 @@ const MOSTRAR_ECHOTIK = false;
 // Ritmo medido con las voces reales de Fish, igual que en el POV BOF Largo.
 const CAR_POR_SEG = 18.2;
 
-/** Los dos flujos de la carpeta. Un producto lleva guion de plazos o el de
- *  siempre según su precio, y cada uno se genera distinto (dos clips o uno),
- *  así que se bajan por separado. `todas` es la carpeta entera. */
+/** Los dos flujos de la carpeta: un producto lleva guion de plazos o el de
+ *  siempre, según su precio. Ya NO cambia cuántos clips hace falta subir (son
+ *  dos en los dos casos), solo de dónde sale la voz. */
 /** Cuántos clips pide este producto: DOS, siempre.
  *
  *  Sale de medir el banco: los audios duran entre 9,7s y 13,9s (mediana 12s) y
@@ -517,8 +517,9 @@ export default function NichoPovBofPage() {
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Los productos salen del Drive del curso (solo lectura) y lo que
-          marques aquí —textos, escaparate, subido— es de este nicho. Los que
-          pasan de 40 € llevan guion de plazos y van con dos clips.
+          marques aquí —textos, escaparate, subido— es de este nicho. Todos los
+          vídeos llevan dos clips; los que pasan de 40 € cambian la voz por el
+          guion de plazos.
         </p>
       </header>
 
@@ -1529,10 +1530,10 @@ function ProductoCard({
               {producto.titulo_tiktok_completo}
             </p>
           )}
-          {/* El precio decide el guion (por encima del umbral son dos clips y
-              el guion de plazos), así que se ve pegado al producto. Cuando la
-              carpeta tiene textos pero no se pudo leer el precio se dice: en
-              silencio parecería barato y se iría al guion de siempre. */}
+          {/* El precio decide el GUION (por encima del umbral, el de plazos),
+              así que se ve pegado al producto. Cuando la carpeta tiene textos
+              pero no se pudo leer el precio se dice: en silencio parecería
+              barato y se iría al guion de siempre. */}
           {esTopVendidos && producto.ventas > 0 && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">

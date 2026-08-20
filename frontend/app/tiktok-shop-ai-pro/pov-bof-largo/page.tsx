@@ -1856,16 +1856,15 @@ function ProductoCard({
           );
         })}
       </div>
-      {!p.guion ? (
+      {/* Cuántos clips pide ya no se explica con una frase: lo dicen la franja
+          del lado de la tarjeta y el distintivo de junto al precio, que se ven
+          sin leer. Lo que sí hay que decir es cuándo NO se puede subir nada
+          todavía. */}
+      {!p.guion && (
         <p className="text-[10px] text-muted-foreground">
           Escribe el guion antes de subir los clips: la voz decide la duración.
         </p>
-      ) : necesarios > 2 ? (
-        <p className="text-[10px] text-amber-500">
-          Este guion pasa de 25s ({p.guion_caracteres} car. · ~
-          {Math.round(p.guion_caracteres / 18.2)}s): hacen falta {necesarios} clips.
-        </p>
-      ) : null}
+      )}
 
       {p.montando && (
         <p className="flex items-center gap-1.5 rounded border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-[10px] text-violet-500">
