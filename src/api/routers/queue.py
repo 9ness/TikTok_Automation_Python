@@ -59,6 +59,31 @@ def _to_response(
     )
 
 
+def _copia_local(job: Job) -> Path | None:
+    """La copia en disco del vídeo de ese job, si la hay.
+
+    Los vídeos de los nichos se publican en el mount de Drive y ADEMÁS se
+    guardan en una caché local. Servir desde el mount cuesta ~36s hasta el
+    primer byte si rclone no lo tiene (hay que traerlo entero de Google);
+    desde disco es instantáneo.
+
+    Las pantallas de producto ya tiraban de la copia local; la descarga de la
+    COLA no, y por eso se notaba lenta justo ahí.
+    """
+    p = job.params or {}
+    folder, producto = str(p.get("folder") or ""), str(p.get("producto") or "")
+    if not folder or not producto:
+        return None
+    quien = str(p.get("operator") or job.enqueued_by or "")
+    try:
+        from src.nicho_pov_bof import config as pov_config
+
+        local = Path(pov_config.video_cache_path(folder, producto, quien))
+    except Exception:  # noqa: BLE001
+        return None
+    return local if local.is_file() else None
+
+
 def _tipo_de(path: Path) -> str:
     """Tipo MIME por la extensión. Cae en `octet-stream` si no se reconoce.
 
@@ -689,7 +714,8 @@ def stream_job_video(
             f"Job '{job_id}' no tiene MP4 asociado.",
             details={"job_id": job_id, "status": job.status.value},
         )
-    path = Path(job.result_path)
+    # La copia local primero: el `result_path` apunta al mount de Drive.
+    path = _copia_local(job) or Path(job.result_path)
     if not path.exists() or not path.is_file():
         raise VideoFileNotFoundError(
             f"Archivo no existe en disco: {job.result_path}",
@@ -713,12 +739,17 @@ def download_job_video(
             f"Job '{job_id}' no tiene MP4 asociado.",
             details={"job_id": job_id},
         )
-    path = Path(job.result_path)
+    # De dónde salen los BYTES: la copia local si la hay (ver `_copia_local`),
+    # que es la diferencia entre instantáneo y ~36s.
+    path = _copia_local(job) or Path(job.result_path)
     if not path.exists() or not path.is_file():
         raise VideoFileNotFoundError(
             f"Archivo no existe en disco: {job.result_path}",
             details={"job_id": job_id, "path": job.result_path},
         )
+    # Y el NOMBRE, del de Drive: el de la copia local es una clave aplanada
+    # (`ness__2__24 Pront Flow.mp4`) que no le dice nada a nadie.
+    nombre = Path(job.result_path).name or path.name
     # El tipo REAL del fichero, no `application/octet-stream`. Con octet-stream
     # el gestor de descargas de Android hace caso al tipo y no al nombre: el
     # `.mp4` de la cabecera se convertía en `.bin`, y un `.bin` ni se abre al
@@ -726,9 +757,9 @@ def download_job_video(
     # una app con WebView, pero la cabecera estaba mal para todo el mundo.
     return FileResponse(
         path=str(path),
-        media_type=_tipo_de(path),
-        filename=path.name,
-        headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
+        media_type=_tipo_de(Path(nombre)),
+        filename=nombre,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
 
 

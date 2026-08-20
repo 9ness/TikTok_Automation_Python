@@ -3,6 +3,7 @@ package ai.nebulabs.tiktok.prueba;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -123,7 +124,23 @@ public class MainActivity extends Activity {
             bajarConDownloadManager(url, disposicion, tipo);
         });
 
+        pedirPermisoDeNotificaciones();
         web.loadUrl(URL_APP);
+    }
+
+    /**
+     * En Android 13+ hay que PEDIR poder notificar. Sin esto el gestor de
+     * descargas baja igual pero en silencio: no se ve la barra de progreso ni
+     * el "listo", que es justo lo que se echaba de menos frente a Chrome.
+     */
+    private void pedirPermisoDeNotificaciones() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        requestPermissions(
+            new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 2);
     }
 
     /** Caso 1: URL normal. Lo hace `DownloadManager`, que sabe poner subcarpeta. */
@@ -135,8 +152,12 @@ public class MainActivity extends Activity {
             // Sin la cookie de sesión el servidor devuelve el login.
             String cookie = CookieManager.getInstance().getCookie(url);
             if (cookie != null) r.addRequestHeader("Cookie", cookie);
+            // VISIBLE_NOTIFY_COMPLETED = barra mientras baja Y aviso al
+            // terminar. Es lo que hacía Chrome y lo que se echaba en falta.
             r.setNotificationVisibility(
                 DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            r.setTitle(nombre);
+            r.setDescription("TTShop AI Pro");
             // ESTO es lo que se está probando.
             r.setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_DOWNLOADS, CARPETA + "/" + nombre);
