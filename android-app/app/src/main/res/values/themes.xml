@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sin esto Android pone su barra de título con el nombre de la app encima
+     del WebView: ~56dp comidos para repetir algo que ya se ve en el lanzador.
+     La TWA no la tenía porque Chrome no la pone.
+
+     La barra de estado (hora, batería) SÍ se deja: quitarla obligaría a
+     gestionar el modo inmersivo y en una app de trabajo estorba más que ayuda.
+     Solo se le pone el color del fondo de la web para que no se note el corte. -->
+<resources>
+    <style name="TemaApp" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/fondo</item>
+        <item name="android:statusBarColor">@color/fondo</item>
+        <item name="android:navigationBarColor">@color/fondo</item>
+        <!-- Fondo oscuro → iconos claros. -->
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
