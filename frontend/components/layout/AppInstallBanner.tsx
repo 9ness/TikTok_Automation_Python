@@ -3,6 +3,8 @@
 import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { enAlgunaApp, enLaApp } from "@/lib/entorno-app";
+
 // Nuestro dominio, no el de GitHub: ver `app/apk/route.ts`. Yendo a GitHub la
 // descarga se quedaba clavada en "Descargando…" dentro de la app.
 const APK_URL = "/apk";
@@ -39,18 +41,9 @@ export function AppInstallBanner() {
     const esAndroid = /android/i.test(navigator.userAgent);
     if (!esAndroid) return;
 
-    const enLaAppNueva = /TTShopApp/.test(navigator.userAgent);
-    if (enLaAppNueva) return;
+    if (enLaApp()) return;
 
-    // Cualquier señal de estar DENTRO de una app: la TWA (referrer, solo en el
-    // arranque) o el icono de la pantalla de inicio.
-    const enAlgunaAppVieja =
-      document.referrer.startsWith("android-app://") ||
-      window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS lo expone aquí; se mira igualmente por si se añade soporte.
-      (window.navigator as { standalone?: boolean }).standalone === true;
-
-    if (enAlgunaAppVieja) {
+    if (enAlgunaApp()) {
       if (sessionStorage.getItem(OCULTO_ACTUALIZAR_KEY) !== "1") setModo("actualizar");
       return;
     }

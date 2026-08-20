@@ -674,3 +674,4 @@
 - `InputStream.readAllBytes()` en Android es API 33: compila con minSdk 29 y revienta en el móvil.
 - La APK bajada desde la release de GitHub se quedaba clavada en "Descargando…" dentro de la app (GitHub redirige a otro dominio): se sirve desde `/apk`, mismo dominio y con `vnd.android.package-archive` + `Content-Disposition`.
 - El bundle minificado de Next escapa los acentos (`versión` → `versi\xf3n`): comprobar un despliegue por curl+grep con una cadena acentuada da falso negativo.
+- Un WebView propio no cumple `display-mode: standalone` ni deja referrer `android-app://` (la TWA sí): detectar "estoy en la app" por ahí rompió el aviso de actualizar y el restaurar-pantalla. Señal fiable = marca en el User-Agent (`frontend/lib/entorno-app.ts`).

@@ -4,17 +4,12 @@ import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { enAlgunaApp } from "@/lib/entorno-app";
+
 const CLAVE = "ultima-pantalla";
 /** Más allá de esto se entiende que es una sesión nueva y se entra al
  *  dashboard, que es lo que uno espera al abrir la app por la mañana. */
 const FRESCURA_MS = 6 * 60 * 60 * 1000;
-
-function esAppInstalada() {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    document.referrer.startsWith("android-app://")
-  );
-}
 
 /** Devuelve a la pantalla donde estabas cuando Android mata la app.
  *
@@ -23,7 +18,8 @@ function esAppInstalada() {
  *  hacer que no duela: al arrancar de cero, si estabas en otra pantalla hace
  *  poco, se vuelve a ella.
  *
- *  Solo actúa con la app INSTALADA (o la APK). En el navegador normal abrir una
+ *  Solo actúa con la app INSTALADA (o la APK) — ver `lib/entorno-app.ts`, que
+ *  es donde está la parte delicada de saberlo. En el navegador normal abrir una
  *  pestaña en "/" y que te mande a otro sitio sería un secuestro molesto —ahí
  *  hay pestañas e historial, y el problema del reinicio no existe.
  *
@@ -39,7 +35,7 @@ export function RestaurarPantalla() {
   useEffect(() => {
     if (yaMirado.current) return;
     yaMirado.current = true;
-    if (pathname !== "/" || !esAppInstalada()) return;
+    if (pathname !== "/" || !enAlgunaApp()) return;
 
     try {
       const crudo = localStorage.getItem(CLAVE);
