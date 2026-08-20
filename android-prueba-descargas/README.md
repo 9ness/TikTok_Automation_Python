@@ -35,6 +35,13 @@ Cuando se decida, esta carpeta se borra.
   (`sw-subidas.js`) para que una tanda de vídeos siga subiendo con el móvil
   bloqueado. Esa API es de Chrome; un WebView no la tiene.
 
+## Cuidado
+
+- Los PNG hay que meterlos con **`git add -f`**: el `.gitignore` tiene un
+  `*.png` global. Sin ellos el build muere con `resource mipmap/ic_launcher not
+  found`. Es el mismo tropiezo que ya está apuntado en `APK.md` para la APK
+  buena.
+
 ## Cómo se genera
 
 GitHub → Actions → **"APK de prueba (descargas)"** → Run workflow.
