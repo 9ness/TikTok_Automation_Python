@@ -69,6 +69,10 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        // Se identifica para que la web sepa que está dentro de ESTA app. Sin
+        // esto salía el banner de "instala la app", que ofrece la APK BUENA, y
+        // es facilísimo pulsarlo por error estando en la de prueba.
+        s.setUserAgentString(s.getUserAgentString() + " TTShopPrueba/1");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -125,6 +129,9 @@ public class MainActivity extends Activity {
         });
 
         pedirPermisoDeNotificaciones();
+        // De cuándo es esta APK. Con varias reinstalaciones seguidas es lo
+        // único que dice si se está probando la última o una vieja.
+        aviso("Prueba del " + getString(R.string.build_date));
         web.loadUrl(URL_APP);
     }
 

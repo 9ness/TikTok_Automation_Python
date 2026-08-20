@@ -36,6 +36,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Con varias reinstalaciones seguidas, saber de cuándo es la que tienes
+      # instalada es la mitad de la prueba.
+      - name: Sellar la fecha del build
+        run: |
+          FECHA=$(TZ=Europe/Madrid date "+%d %b %H:%M")
+          sed -i "s|<string name=\"build_date\">.*</string>|<string name=\"build_date\">$FECHA</string>|" \
+            android-prueba-descargas/app/src/main/res/values/strings.xml
+          grep build_date android-prueba-descargas/app/src/main/res/values/strings.xml
+
       # `debug` a posta: es sideload para probar, no va a ninguna tienda, y así
       # no hace falta la keystore de la app buena.
       - name: Construir la APK de prueba
