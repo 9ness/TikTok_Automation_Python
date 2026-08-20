@@ -40,12 +40,15 @@ import java.util.ArrayList;
  */
 public class ServicioSubidas extends Service {
 
-    static final String EXTRA_URIS = "uris";
-    static final String EXTRA_URL = "url";
+    /** Las tareas, en JSON: `[{"uri":…,"nombre":…,"url":…,"campos":{…}}]`.
+     *
+     *  Una lista de tareas y no "una tanda con campos comunes" porque los dos
+     *  sitios que suben mandan cosas distintas: la tanda va a `video/upload`
+     *  con `source`+`folder`, y cada clip a `clip/upload` con su producto, su
+     *  hueco y las herramientas de ESA tarjeta. */
+    static final String EXTRA_TAREAS = "tareas";
     static final String EXTRA_API_KEY = "apiKey";
     static final String EXTRA_COOKIE = "cookie";
-    static final String EXTRA_SOURCE = "source";
-    static final String EXTRA_FOLDER = "folder";
 
     /** Dónde se dejan las respuestas hasta que la pantalla vuelva a estar viva. */
     static final String PREFS = "subidas";
@@ -77,27 +80,32 @@ public class ServicioSubidas extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        ArrayList<String> uris = intent.getStringArrayListExtra(EXTRA_URIS);
-        String url = intent.getStringExtra(EXTRA_URL);
+        String tareasJson = intent.getStringExtra(EXTRA_TAREAS);
         String apiKey = intent.getStringExtra(EXTRA_API_KEY);
         String cookie = intent.getStringExtra(EXTRA_COOKIE);
-        String source = intent.getStringExtra(EXTRA_SOURCE);
-        String folder = intent.getStringExtra(EXTRA_FOLDER);
+
+        org.json.JSONArray tareas;
+        try {
+            tareas = new org.json.JSONArray(tareasJson == null ? "[]" : tareasJson);
+        } catch (Exception e) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
         // La notificación tiene que estar ANTES de empezar: es lo que convierte
         // esto en un servicio en primer plano y lo que impide que Android lo
         // mate al salir de la app.
-        startForeground(ID_AVISO, aviso(0, uris == null ? 0 : uris.size(), "", 0));
+        startForeground(ID_AVISO, aviso(0, tareas.length(), "", 0));
 
-        hilo = new Thread(() -> trabajar(uris, url, apiKey, cookie, source, folder));
+        final org.json.JSONArray lista = tareas;
+        hilo = new Thread(() -> trabajar(lista, apiKey, cookie));
         hilo.start();
         // START_NOT_STICKY: si el sistema lo matara igualmente, no se reintenta
         // solo — repetir una subida a medias duplicaría vídeos en la carpeta.
         return START_NOT_STICKY;
     }
 
-    private void trabajar(ArrayList<String> uris, String url, String apiKey,
-                          String cookie, String source, String folder) {
+    private void trabajar(org.json.JSONArray tareas, String apiKey, String cookie) {
         // Mantiene la CPU despierta con la pantalla apagada. Sin esto, el móvil
         // se duerme a mitad de una subida larga y la conexión se corta.
         PowerManager pm = getSystemService(PowerManager.class);
@@ -106,15 +114,21 @@ public class ServicioSubidas extends Service {
         candado.acquire(30 * 60 * 1000L);
 
         StringBuilder resultados = new StringBuilder("[");
-        int total = uris == null ? 0 : uris.size();
+        int total = tareas.length();
         try {
             for (int i = 0; i < total; i++) {
-                Uri uri = Uri.parse(uris.get(i));
-                String nombre = nombreDe(uri);
-                aviso(i, total, nombre, 0);
-                String respuesta = subirUno(uri, nombre, url, apiKey, cookie, source, folder, i);
+                org.json.JSONObject t = tareas.getJSONObject(i);
+                Uri uri = Uri.parse(t.getString("uri"));
+                String nombre = t.optString("nombre", nombreDe(uri));
+                notificar(aviso(i, total, nombre, 0));
+                String respuesta = subirUno(
+                    uri, nombre, t.getString("url"), apiKey, cookie,
+                    t.optJSONObject("campos"));
                 if (resultados.length() > 1) resultados.append(",");
                 resultados.append(respuesta);
+                // Se avisa fichero a fichero: la pantalla marca ese hueco como
+                // subido sin esperar a que acabe toda la tanda.
+                Avisador.subido(this, nombre, respuesta);
                 notificar(aviso(i + 1, total, nombre, 100));
             }
         } catch (Throwable e) {
@@ -134,12 +148,10 @@ public class ServicioSubidas extends Service {
 
     /** Un fichero, en multipart, leyendo del `content://` sin cargarlo en RAM. */
     private String subirUno(Uri uri, String nombre, String url, String apiKey,
-                            String cookie, String source, String folder, int indice)
+                            String cookie, org.json.JSONObject campos)
             throws Exception {
         String limite = "----ttshop" + System.nanoTime();
-        // `?i=` es como el servidor sabe qué respuesta es de qué fichero: todas
-        // van a la misma dirección (igual que hace la web hoy).
-        HttpURLConnection con = (HttpURLConnection) new URL(url + "?i=" + indice).openConnection();
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setDoOutput(true);
         con.setRequestMethod("POST");
         con.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + limite);
@@ -149,8 +161,13 @@ public class ServicioSubidas extends Service {
         con.setChunkedStreamingMode(256 * 1024);
 
         try (DataOutputStream out = new DataOutputStream(con.getOutputStream())) {
-            campo(out, limite, "source", source);
-            campo(out, limite, "folder", folder);
+            if (campos != null) {
+                java.util.Iterator<String> claves = campos.keys();
+                while (claves.hasNext()) {
+                    String k = claves.next();
+                    campo(out, limite, k, campos.optString(k, ""));
+                }
+            }
             out.writeBytes("--" + limite + "\r\n");
             out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\""
                 + nombre + "\"\r\n");

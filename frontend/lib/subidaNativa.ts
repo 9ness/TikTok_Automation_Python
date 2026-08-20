@@ -16,11 +16,20 @@
  *  devuelve `false` y no cambia nada.
  */
 
+/** Una subida: el fichero elegido, a dónde va y con qué campos. */
+export interface TareaSubida {
+  /** Nombre del fichero, que es como la app lo casa con lo que eligió el
+   *  usuario en el selector. Por el puente NO viajan los bytes. */
+  nombre: string;
+  /** A dónde. Si se omite, la URL común de la llamada. */
+  url?: string;
+  /** Los campos del formulario, distintos en cada sitio que sube. */
+  campos: Record<string, string>;
+}
+
 interface PuenteAndroid {
   puedeSubirEnSegundoPlano?: () => boolean;
-  subirTanda?: (
-    url: string, apiKey: string, source: string, folder: string, nombres: string,
-  ) => boolean;
+  subirVarios?: (url: string, apiKey: string, tareasJson: string) => boolean;
   recogerResultados?: () => string;
 }
 
@@ -33,27 +42,37 @@ function puente(): PuenteAndroid | null {
 /** ¿Se está dentro de una app que sabe subir por su cuenta? */
 export function haySubidaNativa(): boolean {
   const p = puente();
-  return Boolean(p?.puedeSubirEnSegundoPlano?.() && p?.subirTanda);
+  return Boolean(p?.puedeSubirEnSegundoPlano?.() && p?.subirVarios);
 }
 
-/** Le pasa la tanda a la app. `false` = no se pudo y sube la web. */
+/** Le pasa las subidas a la app. `false` = no se pudo y sube la web. */
 export function subirConLaApp(v: {
   url: string;
   apiKey: string;
-  source: string;
-  folder: string;
-  files: File[];
+  tareas: TareaSubida[];
 }): boolean {
   const p = puente();
-  if (!p?.subirTanda) return false;
+  if (!p?.subirVarios || !v.tareas.length) return false;
   try {
-    // Los nombres, en el MISMO orden en que hay que subirlos: es lo que casa
-    // cada fichero con lo que la app guardó del selector.
-    const nombres = v.files.map((f) => f.name).join("\n");
-    return p.subirTanda(v.url, v.apiKey, v.source, v.folder, nombres);
+    return p.subirVarios(v.url, v.apiKey, JSON.stringify(v.tareas));
   } catch {
     return false;
   }
+}
+
+/** Avisa de CADA fichero según lo va subiendo la app, para ir marcando la
+ *  pantalla sin esperar al final de la tanda. */
+export function alSubirCadaFichero(
+  fn: (nombre: string, respuesta: string) => void,
+): () => void {
+  if (typeof window === "undefined") return () => {};
+  const w = window as unknown as {
+    __subidaAppFichero?: (nombre: string, respuesta: string) => void;
+  };
+  w.__subidaAppFichero = fn;
+  return () => {
+    delete w.__subidaAppFichero;
+  };
 }
 
 /** Se avisa cuando la app termina una tanda que acabó con la app cerrada. */

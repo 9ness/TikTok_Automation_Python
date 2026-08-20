@@ -347,9 +347,13 @@ export function SubidaMasiva({
       const lanzada = subirConLaApp({
         url: urlSubidaLote(root),
         apiKey: claveApi(),
-        source,
-        folder,
-        files,
+        // `?i=` es como el servidor sabe qué respuesta es de qué fichero:
+        // todas van a la misma dirección (igual que con Background Fetch).
+        tareas: files.map((f, i) => ({
+          nombre: f.name,
+          url: `${urlSubidaLote(root)}?i=${i}`,
+          campos: { source, folder },
+        })),
       });
       if (lanzada) {
         setEnSegundoPlano(true);

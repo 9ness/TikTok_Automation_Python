@@ -143,6 +143,15 @@ public class MainActivity extends Activity {
         });
 
         avisosDescarga = new AvisoDescargas(this);
+        // Cada fichero que sube el servicio se le cuenta a la pantalla en el
+        // momento, para que marque ese hueco sin esperar al final de la tanda.
+        Avisador.escuchar((nombre, respuesta) -> runOnUiThread(() -> {
+            if (web == null) return;
+            String js = "if(window.__subidaAppFichero)window.__subidaAppFichero("
+                + org.json.JSONObject.quote(nombre) + ","
+                + org.json.JSONObject.quote(respuesta) + ")";
+            web.evaluateJavascript(js, null);
+        }));
         pedirPermisoDeNotificaciones();
         pedirSalirDelAhorroDeBateria();
         // De cuándo es esta APK. Con varias reinstalaciones seguidas es lo
@@ -325,29 +334,41 @@ public class MainActivity extends Activity {
         /**
          * La web dice QUÉ subir y A DÓNDE; los bytes los mueve el servicio.
          *
-         * `nombres` son los ficheros que eligió el usuario, en el orden en que
-         * hay que subirlos: se casan con las URIs que se guardaron del
-         * selector. Así no hay que pasar 30 MB por el puente.
+         * `tareasJson` es `[{"nombre":…,"url":…,"campos":{…}}]`. Cada tarea
+         * lleva SUS campos porque los dos sitios que suben mandan cosas
+         * distintas: la tanda va con `source`+`folder` y cada clip con su
+         * producto, su hueco y las herramientas de esa tarjeta.
+         *
+         * Del fichero solo viaja el NOMBRE: se casa con la URI que se guardó
+         * del selector, y así no hay que pasar 30 MB por el puente.
          */
         @JavascriptInterface
-        public boolean subirTanda(String url, String apiKey, String source,
-                                  String folder, String nombres) {
-            ArrayList<String> uris = new ArrayList<>();
-            for (String nombre : nombres.split("\\n")) {
-                Uri u = ultimaSeleccion.get(nombre.trim());
-                if (u != null) uris.add(u.toString());
+        public boolean subirVarios(String url, String apiKey, String tareasJson) {
+            try {
+                org.json.JSONArray entran = new org.json.JSONArray(tareasJson);
+                org.json.JSONArray salen = new org.json.JSONArray();
+                for (int i = 0; i < entran.length(); i++) {
+                    org.json.JSONObject t = entran.getJSONObject(i);
+                    String nombre = t.getString("nombre");
+                    Uri u = ultimaSeleccion.get(nombre);
+                    // Un fichero que no está en la última selección no se puede
+                    // leer: mejor no subir esa tarea que subir otra cosa.
+                    if (u == null) continue;
+                    t.put("uri", u.toString());
+                    if (!t.has("url")) t.put("url", url);
+                    salen.put(t);
+                }
+                if (salen.length() == 0) return false;
+                Intent i = new Intent(MainActivity.this, ServicioSubidas.class)
+                    .putExtra(ServicioSubidas.EXTRA_TAREAS, salen.toString())
+                    .putExtra(ServicioSubidas.EXTRA_API_KEY, apiKey)
+                    .putExtra(ServicioSubidas.EXTRA_COOKIE,
+                        CookieManager.getInstance().getCookie(url));
+                startForegroundService(i);
+                return true;
+            } catch (Exception e) {
+                return false;
             }
-            if (uris.isEmpty()) return false;
-            Intent i = new Intent(MainActivity.this, ServicioSubidas.class)
-                .putStringArrayListExtra(ServicioSubidas.EXTRA_URIS, uris)
-                .putExtra(ServicioSubidas.EXTRA_URL, url)
-                .putExtra(ServicioSubidas.EXTRA_API_KEY, apiKey)
-                .putExtra(ServicioSubidas.EXTRA_COOKIE,
-                    CookieManager.getInstance().getCookie(url))
-                .putExtra(ServicioSubidas.EXTRA_SOURCE, source)
-                .putExtra(ServicioSubidas.EXTRA_FOLDER, folder);
-            startForegroundService(i);
-            return true;
         }
 
         /** Lo que dejó el servicio, para que la web reparta al volver. */

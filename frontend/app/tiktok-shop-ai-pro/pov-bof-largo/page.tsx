@@ -35,6 +35,7 @@ import {
   verTopVendidos,
 } from "@/lib/topVendidos";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { alSubirCadaFichero, haySubidaNativa, subirConLaApp } from "@/lib/subidaNativa";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
@@ -173,6 +174,12 @@ export default function PovBofLargoPage() {
   const [picked, setPicked] = useEstadoDeUsuario<string | null>("povbof-largo:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
+
+  // La app avisa de cada fichero que termina de subir. Sin esto el hueco se
+  // quedaría sin marcar hasta recargar a mano.
+  useEffect(() => alSubirCadaFichero(() => {
+    void qc.invalidateQueries({ queryKey: largoKeys.all });
+  }), [qc]);
 
   const folders = useFoldersLargo(activaSource);
   const markCompleted = useMarkCompletedLargo(activaSource);
@@ -1397,6 +1404,35 @@ function ProductoCard({
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
   // Cada slot va por su cuenta: no se bloquea el otro clip ni las demás fichas.
   function subirClip(slot: 1 | 2 | 3 | 4, file: File) {
+    const campos = {
+      source,
+      folder,
+      producto: p.producto,
+      slot: String(slot),
+      sexo,
+      con_gancho: String(tools.gancho),
+      con_titulo: String(tools.titulo),
+      con_cta: String(tools.cta),
+      con_flecha: String(tools.flecha),
+    };
+    // Si la app sabe subir por su cuenta, se le deja: con ocho productos a
+    // tres clips son veinticuatro esperas con la pantalla encendida. Su
+    // servicio aguanta el móvil bloqueado; en el navegador esto no existe y
+    // se sigue por el XHR de siempre.
+    if (haySubidaNativa()) {
+      const lanzada = subirConLaApp({
+        url: `${apiBase}/api/v1/nicho-pov-bof-largo/clip/upload`,
+        apiKey,
+        tareas: [{ nombre: file.name, campos }],
+      });
+      if (lanzada) {
+        const ref = refs[slot].current;
+        if (ref) ref.value = "";
+        toast.success("Subiendo con la app: puedes bloquear el móvil");
+        return;
+      }
+    }
+
     setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
     fd.append("file", file);
