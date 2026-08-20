@@ -59,6 +59,19 @@ def _to_response(
     )
 
 
+def _tipo_de(path: Path) -> str:
+    """Tipo MIME por la extensión. Cae en `octet-stream` si no se reconoce.
+
+    Importa más de lo que parece en el móvil: el gestor de descargas de Android
+    renombra el fichero según el TIPO, así que un MP4 servido como
+    `application/octet-stream` se guarda como `.bin`.
+    """
+    import mimetypes
+
+    tipo, _ = mimetypes.guess_type(path.name)
+    return tipo or "application/octet-stream"
+
+
 def _safe_params(params: dict) -> dict:
     """Subset de params relevantes para el frontend. Excluye flags internos
     como `_cancel_requested` y `temp_folder`."""
@@ -706,10 +719,14 @@ def download_job_video(
             f"Archivo no existe en disco: {job.result_path}",
             details={"job_id": job_id, "path": job.result_path},
         )
-    # FileResponse con `filename=` añade Content-Disposition: attachment
+    # El tipo REAL del fichero, no `application/octet-stream`. Con octet-stream
+    # el gestor de descargas de Android hace caso al tipo y no al nombre: el
+    # `.mp4` de la cabecera se convertía en `.bin`, y un `.bin` ni se abre al
+    # tocarlo ni lo indexa la galería. Se descubrió probando descargas desde
+    # una app con WebView, pero la cabecera estaba mal para todo el mundo.
     return FileResponse(
         path=str(path),
-        media_type="application/octet-stream",
+        media_type=_tipo_de(path),
         filename=path.name,
         headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
     )
