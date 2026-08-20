@@ -755,11 +755,15 @@ def download_job_video(
     # `.mp4` de la cabecera se convertía en `.bin`, y un `.bin` ni se abre al
     # tocarlo ni lo indexa la galería. Se descubrió probando descargas desde
     # una app con WebView, pero la cabecera estaba mal para todo el mundo.
+    # El `Content-Disposition` lo pone Starlette a partir de `filename=`, y lo
+    # pone BIEN: si el nombre lleva acentos usa `filename*=utf-8''…`, que es la
+    # forma de meter algo que no sea ASCII en una cabecera HTTP. Escribirlo a
+    # mano —como estaba— mandaba los bytes en crudo y en el móvil se veía
+    # "Ergonómica" como "Ergon?mica".
     return FileResponse(
         path=str(path),
         media_type=_tipo_de(Path(nombre)),
         filename=nombre,
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
 
 

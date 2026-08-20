@@ -1667,11 +1667,14 @@ def ver_foto(
     # La URL lleva el `v=<mtime>` de la foto: al sustituirla cambia la
     # dirección, así que se puede cachear un día sin quedarse con la vieja.
     headers = {"Cache-Control": "public, max-age=86400"}
+    nombre = None
     if descargar:
         pos = 1 if tipo.startswith("chica") else 2
+        # Se pasa por `filename=` y NO se escribe la cabecera a mano: Starlette
+        # codifica los acentos (`filename*=utf-8''…`), que es lo único que
+        # funciona en una cabecera HTTP. A mano llegaban rotos al móvil.
         nombre = fotos_svc.nombre_descarga(source, folder, producto, pos)
-        headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
-    return FileResponse(ruta, media_type=media, headers=headers)
+    return FileResponse(ruta, media_type=media, headers=headers, filename=nombre)
 
 
 # ---------------------------------------------------------------------------

@@ -49,6 +49,15 @@
             android:maxLines="1"
             android:ellipsize="middle" />
 
+        <TextView
+            android:id="@+id/cifras"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/brand_cyan"
+            android:textSize="11sp"
+            android:maxLines="1" />
+
         <ProgressBar
             android:id="@+id/barra"
             style="?android:attr/progressBarStyleHorizontal"

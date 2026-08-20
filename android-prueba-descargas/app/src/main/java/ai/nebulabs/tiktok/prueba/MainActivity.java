@@ -24,6 +24,9 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.OutputStream;
+import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * APK de PRUEBA. Responde una sola pregunta: ¿puede un WebView guardar las
@@ -152,10 +155,33 @@ public class MainActivity extends Activity {
             new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 2);
     }
 
+    /** El nombre de fichero que manda el servidor, con los acentos bien.
+     *
+     *  Una cabecera HTTP no puede llevar caracteres fuera de ASCII, así que un
+     *  nombre con tildes viaja como `filename*=utf-8''Ergon%C3%B3mica.mp4`
+     *  (RFC 5987). `URLUtil.guessFileName` no entiende esa forma y devolvía
+     *  "Ergon?mica". Se lee a mano y, si no está, se cae en lo de siempre.
+     */
+    private String nombreDelServidor(String url, String disposicion, String tipo) {
+        if (disposicion != null) {
+            Matcher m = Pattern.compile(
+                "filename\\*\\s*=\\s*utf-8''([^;]+)", Pattern.CASE_INSENSITIVE
+            ).matcher(disposicion);
+            if (m.find()) {
+                try {
+                    return URLDecoder.decode(m.group(1).trim(), "UTF-8");
+                } catch (Exception ignorada) {
+                    // Si viniera mal codificado, mejor el nombre de siempre.
+                }
+            }
+        }
+        return URLUtil.guessFileName(url, disposicion, tipo);
+    }
+
     /** Caso 1: URL normal. Lo hace `DownloadManager`, que sabe poner subcarpeta. */
     private void bajarConDownloadManager(String url, String disposicion, String tipo) {
         try {
-            String nombre = URLUtil.guessFileName(url, disposicion, tipo);
+            String nombre = nombreDelServidor(url, disposicion, tipo);
             DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
             r.setMimeType(tipo);
             // Sin la cookie de sesión el servidor devuelve el login.

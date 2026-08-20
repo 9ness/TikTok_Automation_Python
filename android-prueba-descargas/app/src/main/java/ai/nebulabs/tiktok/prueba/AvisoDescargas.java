@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.drawable.Icon;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
@@ -166,13 +167,19 @@ class AvisoDescargas {
         vista.setTextViewText(R.id.detalle, detalle);
         if (acabado) {
             vista.setViewVisibility(R.id.barra, View.GONE);
+            vista.setViewVisibility(R.id.cifras, View.GONE);
         } else {
             vista.setViewVisibility(R.id.barra, View.VISIBLE);
             boolean conocido = total > 0 && !indeterminado;
-            vista.setProgressBar(
-                R.id.barra, 100,
-                conocido ? (int) Math.min(100, hechos * 100 / total) : 0,
-                !conocido);
+            int pct = conocido ? (int) Math.min(100, hechos * 100 / total) : 0;
+            vista.setProgressBar(R.id.barra, 100, pct, !conocido);
+            // El porcentaje y los megas: mirando solo la barra no se sabe si
+            // va lento o si se ha quedado colgado.
+            vista.setViewVisibility(R.id.cifras, conocido ? View.VISIBLE : View.GONE);
+            if (conocido) {
+                vista.setTextViewText(
+                    R.id.cifras, pct + "%  ·  " + megas(hechos) + " de " + megas(total));
+            }
         }
 
         Notification.Builder n = new Notification.Builder(ctx, CANAL)
@@ -186,8 +193,19 @@ class AvisoDescargas {
             .setContentIntent(abrirDescargas())
             .setAutoCancel(acabado)
             .setOngoing(!acabado);
+        if (acabado) {
+            // Al terminar, un botón para ir a los ficheros sin buscarlos.
+            n.addAction(new Notification.Action.Builder(
+                Icon.createWithResource(ctx, R.drawable.ic_descarga),
+                "Abrir carpeta", abrirDescargas()).build());
+        }
 
         avisos.notify(ID_AVISO, n.build());
+    }
+
+    private static String megas(long bytes) {
+        double mb = bytes / 1024d / 1024d;
+        return (mb >= 10 ? String.valueOf(Math.round(mb)) : String.format("%.1f", mb)) + " MB";
     }
 
     /** Al tocar la notificación se abre la lista de descargas del móvil. */
