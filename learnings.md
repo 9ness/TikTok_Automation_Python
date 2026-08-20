@@ -678,3 +678,4 @@
 - Un WebView solo entiende http/https: la ficha de TikTok Shop redirige a `intent://ec/pdp?…` y moría con `ERR_UNKNOWN_URL_SCHEME`. Se resuelve en `shouldOverrideUrlLoading` con `Intent.parseUri(..., URI_INTENT_SCHEME)` + `browser_fallback_url`.
 - `FotoModal` usaba un `<img>` pelado: si la API devolvía 502 para la foto del visor (900 px es otra entrada de caché que sí toca Drive), el visor salía con alto cero y parecía que no abría. Ahora reusa `FotoProducto`, que reintenta.
 - Android 11+ esconde las apps instaladas: `setPackage(\"com.zhiliaoapp.musically\")` falla aunque TikTok esté puesto si no se declara en `<queries>`. Y TikTok se publica con DOS paquetes (`musically` y `ugc.trill`).
+- Un `<img loading="lazy">` dentro de un modal que se inserta ya montado NO se pide nunca en el WebView (lo da por fuera de pantalla): ni carga ni dispara `onError`, así que ningún reintento salta y el modal se queda con la altura de su cabecera.

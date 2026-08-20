@@ -88,17 +88,18 @@ export function FotoModal({
           </div>
         )}
 
-        {/* Con reintento, igual que las miniaturas. Aquí era un `<img>` pelado
-            y por eso al abrir una foto salía SOLO la cabecera del visor: si la
-            API devolvía 502 para esa imagen —la del visor es más grande que la
-            miniatura, así que es otra entrada de caché y toca Drive— la imagen
-            se quedaba con alto cero y no lo decía. */}
+        {/* Con reintento, igual que las miniaturas, pero SIN carga perezosa:
+            eso último es lo que dejaba el visor con solo la cabecera. La imagen
+            se inserta ya montada y el WebView la daba por fuera de pantalla, así
+            que no la pedía nunca — ni cargaba ni fallaba, y por eso tampoco
+            saltaba el reintento. */}
         {src ? (
           <FotoProducto
             src={src}
             alt={titulo}
-            className="w-full rounded-md border border-border/60 object-contain"
+            className="min-h-[12rem] w-full rounded-md border border-border/60 object-contain"
             claseHueco="min-h-[12rem]"
+            perezoso={false}
           />
         ) : (
           <p className="py-8 text-center text-xs text-muted-foreground">

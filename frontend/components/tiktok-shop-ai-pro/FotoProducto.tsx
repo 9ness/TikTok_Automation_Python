@@ -17,6 +17,7 @@ export function FotoProducto({
   alt,
   className = "",
   claseHueco = "",
+  perezoso = true,
   onClick,
 }: {
   src: string | null;
@@ -26,6 +27,12 @@ export function FotoProducto({
    *  que da altura —el visor a pantalla completa—: sin un alto mínimo, el
    *  aviso sale aplastado y parece que no ha pasado nada. */
   claseHueco?: string;
+  /** `loading="lazy"` está bien en una rejilla de veinte miniaturas, pero NO
+   *  donde la foto aparece de golpe: el visor se inserta ya montado y el
+   *  WebView lo daba por fuera de pantalla, así que no llegaba a pedir la
+   *  imagen nunca. Ni cargaba ni fallaba —el reintento tampoco salta—, y el
+   *  visor se quedaba con la altura de su cabecera y parecía roto. */
+  perezoso?: boolean;
   onClick?: () => void;
 }) {
   const [intento, setIntento] = useState(0);
@@ -55,7 +62,7 @@ export function FotoProducto({
       // sirve el fallo cacheado y el reintento no llega a pedir nada.
       src={intento ? `${src}&reintento=${intento}` : src}
       alt={alt}
-      loading="lazy"
+      loading={perezoso ? "lazy" : "eager"}
       onClick={onClick}
       onError={() => {
         if (intento >= 2) {
