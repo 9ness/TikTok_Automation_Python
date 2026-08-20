@@ -680,3 +680,4 @@
 - Android 11+ esconde las apps instaladas: `setPackage(\"com.zhiliaoapp.musically\")` falla aunque TikTok esté puesto si no se declara en `<queries>`. Y TikTok se publica con DOS paquetes (`musically` y `ugc.trill`).
 - Un `<img loading="lazy">` dentro de un modal que se inserta ya montado NO se pide nunca en el WebView (lo da por fuera de pantalla): ni carga ni dispara `onError`, así que ningún reintento salta y el modal se queda con la altura de su cabecera.
 - Un modal `position: fixed` se recorta a un ancestro si ese ancestro tiene `transform`/`filter`/`contain` — en el móvil salía una tira con el título cortado. Se cuelga del `<body>` con `createPortal`.
+- Una `<img>` con `object-contain` dentro de un `flex-col` con `max-h` se COMPRIME (los hijos flex encogen por defecto) y sale con franjas a los lados: hace falta `shrink-0` además del alto.

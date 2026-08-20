@@ -33,29 +33,16 @@ export function FotoModal({
   textoDescarga?: string;
 }) {
   const [cual, setCual] = useState<"limpia" | "titulo">("limpia");
-  /** A pantalla completa: la foto y nada más. Es para mirar el detalle de un
-   *  producto —lo que pone la etiqueta, cómo es el acabado—, y ahí el título y
-   *  los botones estorban más que ayudan. */
-  const [ampliada, setAmpliada] = useState(false);
   const src = cual === "limpia" ? urlLimpia : urlTitulo;
-
-  useEffect(() => {
-    if (!open) setAmpliada(false);
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      // Escape sale de la ampliación primero y del visor después: cerrarlo
-      // todo de golpe obliga a volver a buscar el producto.
-      if (e.key === "Escape") {
-        if (ampliada) setAmpliada(false);
-        else onOpenChange(false);
-      }
+      if (e.key === "Escape") onOpenChange(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onOpenChange, ampliada]);
+  }, [open, onOpenChange]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -65,26 +52,6 @@ export function FotoModal({
   // es exactamente lo que se veía en el móvil —una tira con el título cortado
   // por abajo— mientras que en el escritorio salía bien. Sacándolo del árbol
   // no hay ancestro que valga.
-  if (ampliada && src) {
-    return createPortal(
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={() => setAmpliada(false)}
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black p-1"
-      >
-        <FotoProducto
-          src={src}
-          alt={titulo}
-          className="max-h-full w-full object-contain"
-          claseHueco="min-h-[12rem] w-full"
-          perezoso={false}
-        />
-      </div>,
-      document.body,
-    );
-  }
-
   return createPortal(
     <div
       role="dialog"
@@ -140,10 +107,9 @@ export function FotoModal({
           <FotoProducto
             src={src}
             alt={titulo}
-            className="min-h-[12rem] w-full cursor-zoom-in rounded-md border border-border/60 object-contain"
+            className="h-[70vh] w-full shrink-0 rounded-md border border-border/60 object-contain"
             claseHueco="min-h-[12rem]"
             perezoso={false}
-            onClick={() => setAmpliada(true)}
           />
         ) : (
           <p className="py-8 text-center text-xs text-muted-foreground">
@@ -154,12 +120,6 @@ export function FotoModal({
         {/* Salida de emergencia: si la foto no viene, abrirla aparte enseña el
             error de verdad (un 502, un 401, lo que sea) en vez de dejar un
             hueco que no explica nada. */}
-        {src && (
-          <p className="text-center text-[10px] text-muted-foreground">
-            Toca la foto para verla a pantalla completa
-          </p>
-        )}
-
         {src && (
           <a
             href={src}
