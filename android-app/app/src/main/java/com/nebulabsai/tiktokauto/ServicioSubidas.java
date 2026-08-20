@@ -1,4 +1,4 @@
-package ai.nebulabs.tiktok.prueba;
+package com.nebulabsai.tiktokauto;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -110,7 +110,7 @@ public class ServicioSubidas extends Service {
         // se duerme a mitad de una subida larga y la conexión se corta.
         PowerManager pm = getSystemService(PowerManager.class);
         PowerManager.WakeLock candado = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK, "prueba:subidas");
+            PowerManager.PARTIAL_WAKE_LOCK, "ttshop:subidas");
         candado.acquire(30 * 60 * 1000L);
 
         StringBuilder resultados = new StringBuilder("[");
@@ -134,7 +134,7 @@ public class ServicioSubidas extends Service {
         } catch (Throwable e) {
             // Se guarda lo que se haya conseguido: media tanda subida es mejor
             // que perderlo todo por el último fichero.
-            android.util.Log.e("PruebaSubidas", "falló la tanda", e);
+            android.util.Log.e("TikTokAuto", "falló la tanda", e);
         } finally {
             resultados.append("]");
             getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -14,11 +14,11 @@ const OCULTO_KEY = "apk-banner-oculto";
  *  inicio, ofrecer "instala la app" es ruido. Esos dos casos se detectan
  *  distinto y hacen falta los dos:
  *    - instalada desde el navegador → `display-mode: standalone`
- *    - abierta desde la APK (TWA)   → el referrer es `android-app://`
- *    - abierta desde OTRA app nuestra (la de prueba de descargas, que es un
- *      WebView y no cumple ninguna de las dos) → se identifica en el
- *      User-Agent. Sin esto, dentro de la app de prueba salía el banner
- *      ofreciendo la APK buena, que es justo la que no toca instalar ahí.
+ *    - abierta desde la APK → se identifica en el User-Agent (`TTShopApp`).
+ *      Hace falta porque la APK es un WebView y no cumple ninguna de las dos
+ *      anteriores; sin esto el banner salía DENTRO de la propia app.
+ *    - el referrer `android-app://` se deja por la APK vieja (la TWA), que
+ *      sigue instalada hasta que cada uno actualice.
  *
  *  El descarte se recuerda en localStorage: un aviso que reaparece en cada
  *  carga acaba siendo peor que no ponerlo.
@@ -36,7 +36,7 @@ export function AppInstallBanner() {
       (window.navigator as { standalone?: boolean }).standalone === true;
     const dentroDeLaApk =
       document.referrer.startsWith("android-app://") ||
-      /TTShopPrueba/.test(navigator.userAgent);
+      /TTShopApp/.test(navigator.userAgent);
 
     setVisible(esAndroid && !instalada && !dentroDeLaApk);
   }, []);

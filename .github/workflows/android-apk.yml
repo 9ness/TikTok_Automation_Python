@@ -1,40 +1,30 @@
-# Genera la APK de la app (TWA — Trusted Web Activity).
+# APK de la app (WebView).
 #
-# Por qué TWA y no Capacitor: una TWA no es un WebView, es Chrome con la barra
-# oculta. Eso importa aquí porque media app son DESCARGAS (fotos de fichas,
-# vídeos montados) y dentro de un WebView el `<a download>` no baja nada — no
-# hay gestor de descargas. En la TWA funcionan igual que en el navegador.
+# Sustituye a la TWA. El porqué está en APK.md: una TWA delega las descargas en
+# Chrome, y desde ahí no se puede ni elegir carpeta ni subir en segundo plano —
+# que es justo lo que hace falta cuando se bajan diez vídeos de una tanda o se
+# suben los clips de ocho productos seguidos. El workflow de la TWA sigue en
+# `android-apk-twa.yml` por si hay que volver atrás.
 #
-# No empaqueta la web: la APK abre https://<host>, así que cada deploy actualiza
-# la app sola y no hay que reinstalar nada. Solo hay que volver a generarla si
-# cambia el dominio, el icono o el nombre.
+# Se instala ENCIMA de la anterior porque comparte `applicationId` y clave de
+# firma. Lo que NO se conserva es la sesión: la TWA guardaba las cookies en
+# Chrome y el WebView tiene su propio almacén, así que la primera vez hay que
+# volver a entrar con el PIN.
 #
-# Se lanza a mano: Actions → "Build Android APK" → Run workflow.
+# Se lanza a mano: Actions → "APK (app)" → Run workflow.
 
-name: Build Android APK
+name: APK (app)
 
 on:
   workflow_dispatch:
-    inputs:
-      host:
-        description: "Dominio de la web (sin https://). Vacío = el de android/twa-manifest.json"
-        required: false
-        default: ""
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # El GITHUB_TOKEN por defecto es de solo lectura, así que publicar la
-    # release daba «HTTP 403: Resource not accessible by integration» con la
-    # APK ya construida y firmada.
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
 
       - uses: actions/setup-java@v4
         with:
@@ -43,96 +33,66 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Instalar Bubblewrap
-        run: npm i -g @bubblewrap/cli@latest
+      - uses: gradle/actions/setup-gradle@v4
 
-      - name: Apuntar Bubblewrap al JDK y al SDK del runner
-        # Sin esto se descarga su propio JDK/SDK y el build tarda el triple (o
-        # falla si el mirror está caído). El fichero de config es su única vía.
+      # La app compara su `versionCode` con el que va en las notas de la
+      # release para avisar de que hay una nueva. Si se publicara una APK cuyo
+      # `versionCode` no ha subido, Android se negaría a instalarla encima y el
+      # aviso no llegaría nunca: mejor parar aquí.
+      - name: Sacar el versionCode
+        id: version
         run: |
-          mkdir -p ~/.bubblewrap
-          cat > ~/.bubblewrap/config.json <<JSON
-          { "jdkPath": "$JAVA_HOME", "androidSdkPath": "$ANDROID_SDK_ROOT" }
-          JSON
-          cat ~/.bubblewrap/config.json
+          CODE=$(grep -oP 'versionCode\s+\K\d+' android-app/app/build.gradle | head -1)
+          NAME=$(grep -oP 'versionName\s+"\K[^"]+' android-app/app/build.gradle | head -1)
+          if [ -z "$CODE" ] || [ -z "$NAME" ]; then
+            echo "::error::No encuentro versionCode/versionName en android-app/app/build.gradle"
+            exit 1
+          fi
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Construyendo la $NAME (versionCode $CODE)"
 
-      - name: Cambiar de dominio si se pidió
-        if: inputs.host != ''
-        run: |
-          cd android
-          python3 - <<'PY'
-          import json, os
-          host = os.environ["HOST"]
-          m = json.load(open("twa-manifest.json"))
-          viejo = m["host"]
-          for k, v in m.items():
-              if isinstance(v, str) and viejo in v:
-                  m[k] = v.replace(viejo, host)
-          m["host"] = host
-          json.dump(m, open("twa-manifest.json", "w"), indent=2)
-          print("host →", host)
-          PY
+      - name: Comprobar que el versionCode ha subido
         env:
-          HOST: ${{ inputs.host }}
-
-      - name: Comprobar que la web responde
-        # Bubblewrap descarga el manifest y los iconos del dominio. Si el
-        # servidor está apagado o el Funnel caído, falla con un error críptico
-        # a mitad del build; mejor decirlo aquí y en claro.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HOST=$(python3 -c "import json;print(json.load(open('android/twa-manifest.json'))['host'])")
-          echo "comprobando https://$HOST/manifest.json"
-          curl -fsS --max-time 30 "https://$HOST/manifest.json" > /dev/null \
-            || { echo "::error::No se pudo leer https://$HOST/manifest.json — ¿está el servidor encendido y el Funnel activo?"; exit 1; }
+          PUBLICADO=$(gh release view apk-latest --json body -q .body 2>/dev/null \
+                      | grep -oP 'versionCode=\K\d+' || echo 0)
+          if [ "${{ steps.version.outputs.code }}" -le "$PUBLICADO" ]; then
+            echo "::error::versionCode ${{ steps.version.outputs.code }} no supera al publicado ($PUBLICADO). Súbelo en android-app/app/build.gradle."
+            exit 1
+          fi
+          echo "OK: $PUBLICADO -> ${{ steps.version.outputs.code }}"
 
-      - name: Generar el proyecto Android
-        working-directory: android
-        run: bubblewrap update --skipVersionUpgrade
-
-      - name: Comprobar que la tarea no se reinicia sola
-        working-directory: android
-        # `alwaysRetainTaskState` evita que Android borre las pantallas de la
-        # tarea cuando la app lleva un rato en segundo plano y vuelves desde el
-        # lanzador. La plantilla de Bubblewrap YA lo pone; esto es una alarma
-        # por si un día deja de ponerlo, no un parche.
-        #
-        # Ojo: no arregla que el sistema mate el proceso por falta de memoria.
-        # Eso no se puede evitar desde una app web — se compensa en el
-        # frontend volviendo a la pantalla donde estabas (RestaurarPantalla).
-        run: |
-          grep -q 'android:alwaysRetainTaskState="true"' app/src/main/AndroidManifest.xml \
-            || { echo "::error::Bubblewrap ya no pone alwaysRetainTaskState — hay que parchear el AndroidManifest a mano"; exit 1; }
-          echo "alwaysRetainTaskState presente"
-
-      - name: Construir y firmar la APK
-        working-directory: android
-        env:
-          # La keystore va versionada a propósito (mismo criterio que en
-          # planificador-viajes y fitness-life): es autofirmada y solo sirve
-          # para instalar de lado. Lo que NO puede cambiar es la huella, porque
-          # está en /.well-known/assetlinks.json y es lo que quita la barra de
-          # direcciones. Si se regenera la clave, hay que actualizar ese fichero.
-          BUBBLEWRAP_KEYSTORE_PASSWORD: tiktokauto
-          BUBBLEWRAP_KEY_PASSWORD: tiktokauto
-        run: |
-          bubblewrap build --skipPwaValidation
-          ls -la *.apk
+      # La keystore va versionada a propósito (mismo criterio que en
+      # planificador-viajes y fitness-life): es autofirmada y solo sirve para
+      # instalar de lado. Aquí ADEMÁS es lo que permite instalar encima de la
+      # TWA sin desinstalarla: si cambiara la clave, Android lo rechazaría.
+      - name: Construir y firmar
+        working-directory: android-app
+        run: gradle --no-daemon assembleRelease
 
       - name: Renombrar
-        working-directory: android
-        run: mv app-release-signed.apk tiktok-auto.apk
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release.apk tiktok-auto.apk
+          ls -la tiktok-auto.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: tiktok-auto-apk
-          path: android/tiktok-auto.apk
+          path: tiktok-auto.apk
+          if-no-files-found: error
 
-      - name: Publicar en la release "apk-latest"
-        # Enlace estable para descargar siempre la última desde el móvil.
+      # Enlace fijo: la propia app manda aquí cuando avisa de que hay versión
+      # nueva, así que la etiqueta NO puede cambiar de nombre.
+      - name: Publicar
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest android/tiktok-auto.apk \
-            --title "APK (última)" \
-            --notes "TWA de $(python3 -c "import json;print(json.load(open('android/twa-manifest.json'))['host'])"). Descarga e instala permitiendo orígenes desconocidos."
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest tiktok-auto.apk \
+            --title "TikTok Auto ${{ steps.version.outputs.name }}" \
+            --notes "versionCode=${{ steps.version.outputs.code }}
+
+          Descarga \`tiktok-auto.apk\` y ábrela para instalar. Se pone encima de la que ya tienes.
+          La primera vez pedirá el PIN otra vez."

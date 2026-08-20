@@ -1,0 +1,54 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "com.nebulabsai.tiktokauto"
+    compileSdk 34
+
+    defaultConfig {
+        // EL MISMO de la TWA: así la nueva se instala ENCIMA de la que ya
+        // tiene el operador en vez de quedarse las dos.
+        applicationId "com.nebulabsai.tiktokauto"
+        minSdk 29          // MediaStore con RELATIVE_PATH, sin permisos.
+        targetSdk 34
+        // Sube en cada versión publicada: es lo que mira Android para dejar
+        // instalar encima, y lo que compara la app para avisar de que hay una
+        // nueva (ver `Actualizaciones`).
+        versionCode 2
+        versionName "2.0"
+    }
+
+    signingConfigs {
+        release {
+            // La MISMA clave que la TWA. Si cambiara, Android se negaría a
+            // instalar la nueva encima y habría que desinstalar antes,
+            // perdiendo la sesión y los ajustes.
+            storeFile file("../../android-keys/tiktok.keystore")
+            storePassword "tiktokauto"
+            keyAlias "tiktok"
+            keyPassword "tiktokauto"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    buildFeatures {
+        // Para leer `VERSION_CODE` desde el código y compararlo con el
+        // publicado.
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Para el "deslizar para recargar": un WebView no lo trae, lo pone Chrome.
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+}

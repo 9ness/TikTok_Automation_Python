@@ -1,4 +1,4 @@
-package ai.nebulabs.tiktok.prueba;
+package com.nebulabsai.tiktokauto;
 
 import android.app.Activity;
 import android.app.DownloadManager;
@@ -33,12 +33,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * APK de PRUEBA. Responde una sola pregunta: ¿puede un WebView guardar las
- * descargas en una carpeta propia, `Download/TTShopAIPro/`?
+ * La app: un WebView que carga la web.
  *
- * La app de verdad es una TWA (Chrome sin barra) y ahí las descargas las
- * gestiona Chrome: no hay dónde engancharse. Esto prueba la alternativa antes
- * de tocar nada, que es lo que pidió el operador.
+ * Antes era una TWA (Chrome sin barra) y las descargas las gestionaba Chrome:
+ * no había dónde engancharse para elegir carpeta ni para seguir subiendo con el
+ * móvil bloqueado. El porqué del cambio está en `APK.md`.
  *
  * Los dos casos que tiene la app, y por qué no son el mismo problema:
  *
@@ -55,7 +54,7 @@ import java.util.regex.Pattern;
  */
 public class MainActivity extends Activity {
 
-    private static final String TAG = "PruebaDescargas";
+    private static final String TAG = "TikTokAuto";
     /** La carpeta que se quiere conseguir, dentro de Descargas. */
     private static final String CARPETA = "TTShopAIPro";
     /** El mismo dominio que la app buena (`android/twa-manifest.json`). */
@@ -95,10 +94,11 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        // Se identifica para que la web sepa que está dentro de ESTA app. Sin
-        // esto salía el banner de "instala la app", que ofrece la APK BUENA, y
-        // es facilísimo pulsarlo por error estando en la de prueba.
-        s.setUserAgentString(s.getUserAgentString() + " TTShopPrueba/1");
+        // Se identifica para que la web sepa que está dentro de la app. Sin
+        // esto sale el banner de "instala la app" dentro de la propia app: un
+        // WebView no cumple `display-mode: standalone` ni tiene el referrer
+        // `android-app://` que delataba a la TWA.
+        s.setUserAgentString(s.getUserAgentString() + " TTShopApp/1");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -110,8 +110,8 @@ public class MainActivity extends Activity {
              * `<input type="file">` no abre ningún selector si la app no lo
              * implementa. En la TWA funciona solo porque es Chrome.
              *
-             * Se apunta como hallazgo de la prueba: una migración a WebView no
-             * es solo rehacer las descargas, también las SUBIDAS.
+             * Se descubrió al migrar: pasar a WebView no es solo rehacer las
+             * descargas, también las SUBIDAS.
              */
             @Override
             public boolean onShowFileChooser(WebView v,
@@ -137,15 +137,15 @@ public class MainActivity extends Activity {
                 // enlace, y al llegar como `blob:` ya se ha perdido. Se apunta
                 // en cuanto se pulsa, ANTES de que el navegador haga nada.
                 v.evaluateJavascript(
-                    "(function(){if(window.__pruebaEnganchada)return;" +
-                    "window.__pruebaEnganchada=1;window.__ultimoNombre='';" +
+                    "(function(){if(window.__appEnganchada)return;" +
+                    "window.__appEnganchada=1;window.__ultimoNombre='';" +
                     "document.addEventListener('click',function(e){" +
                     "var a=e.target&&e.target.closest?e.target.closest('a[download]'):null;" +
                     "if(a){window.__ultimoNombre=a.getAttribute('download')||'';}}," +
                     "true);})()", null);
             }
         });
-        web.addJavascriptInterface(new Puente(), "PruebaAndroid");
+        web.addJavascriptInterface(new Puente(), "AppAndroid");
 
         web.setDownloadListener((url, agente, disposicion, tipo, tamano) -> {
             if (url.startsWith("blob:")) {
@@ -167,9 +167,11 @@ public class MainActivity extends Activity {
         }));
         pedirPermisoDeNotificaciones();
         pedirSalirDelAhorroDeBateria();
-        // De cuándo es esta APK. Con varias reinstalaciones seguidas es lo
-        // único que dice si se está probando la última o una vieja.
-        aviso("Prueba del " + getString(R.string.build_date));
+        // Antes esto no hacía falta: la app era una carcasa de la web y se
+        // actualizaba sola con cada despliegue. Ahora trae cosas propias
+        // (descargas, subida en segundo plano) que solo llegan con una APK
+        // nueva, así que hay que avisar de que existe.
+        Actualizaciones.comprobar(this);
         web.loadUrl(URL_APP);
     }
 
@@ -300,17 +302,18 @@ public class MainActivity extends Activity {
 
     /**
      * Caso 2: `blob:`. El dato ya está en el navegador, así que se le pide que
-     * lo lea y lo mande en base64. Es el punto flojo y por eso se prueba.
+     * lo lea y lo mande en base64. Es el punto flojo: lo usan los carruseles y
+     * no se ha probado con tandas grandes.
      */
     private void pedirBlobAlNavegador(String url) {
         String js =
             "(function(){var x=new XMLHttpRequest();x.open('GET','" + url + "',true);" +
             "x.responseType='blob';x.onload=function(){" +
             "var r=new FileReader();r.onloadend=function(){" +
-            "PruebaAndroid.guardarBlob(r.result, window.__ultimoNombre||'descarga', x.response.type);};" +
-            "r.onerror=function(){PruebaAndroid.fallo('no se pudo leer el blob');};" +
+            "AppAndroid.guardarBlob(r.result, window.__ultimoNombre||'descarga', x.response.type);};" +
+            "r.onerror=function(){AppAndroid.fallo('no se pudo leer el blob');};" +
             "r.readAsDataURL(x.response);};" +
-            "x.onerror=function(){PruebaAndroid.fallo('no se pudo pedir el blob');};" +
+            "x.onerror=function(){AppAndroid.fallo('no se pudo pedir el blob');};" +
             "x.send();})()";
         web.evaluateJavascript(js, null);
     }
@@ -439,8 +442,8 @@ public class MainActivity extends Activity {
         // guardadas: se le entregan a la web para que reparta.
         if (web != null) {
             web.evaluateJavascript(
-                "(function(){try{var r=PruebaAndroid.recogerResultados();"
-                + "if(r&&window.__subidaPruebaLista)window.__subidaPruebaLista(r);}"
+                "(function(){try{var r=AppAndroid.recogerResultados();"
+                + "if(r&&window.__subidaAppLista)window.__subidaAppLista(r);}"
                 + "catch(e){}})()", null);
         }
     }

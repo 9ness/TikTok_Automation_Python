@@ -1,4 +1,4 @@
-package ai.nebulabs.tiktok.prueba;
+package com.nebulabsai.tiktokauto;
 
 import android.app.DownloadManager;
 import android.app.Notification;

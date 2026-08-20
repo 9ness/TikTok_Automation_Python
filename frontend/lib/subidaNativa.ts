@@ -2,7 +2,8 @@
 
 /** Subida en segundo plano DELEGADA en la app de Android.
  *
- *  Existe por lo que se midió con la APK de prueba: hoy las tandas van con
+ *  Existe por lo que se midió antes de migrar la APK: en la TWA las tandas van
+ *  con
  *  Background Fetch, que lo gestiona Chrome y lo corta cuando le parece —de ahí
  *  que "a veces no se suben"—. Una app propia lo hace con un servicio en primer
  *  plano, al que Android no mata mientras tenga su notificación puesta.
@@ -12,8 +13,8 @@
  *  (serían 30 MB por vídeo en base64): la app se quedó con lo que eligió el
  *  usuario en el selector y los dos lados los casan por NOMBRE.
  *
- *  En el navegador y en la app actual esto no existe, así que todo lo de aquí
- *  devuelve `false` y no cambia nada.
+ *  En el navegador —y en la APK vieja, hasta que cada uno actualice— esto no
+ *  existe, así que todo lo de aquí devuelve `false` y no cambia nada.
  */
 
 /** Una subida: el fichero elegido, a dónde va y con qué campos. */
@@ -35,7 +36,7 @@ interface PuenteAndroid {
 
 function puente(): PuenteAndroid | null {
   if (typeof window === "undefined") return null;
-  const p = (window as unknown as { PruebaAndroid?: PuenteAndroid }).PruebaAndroid;
+  const p = (window as unknown as { AppAndroid?: PuenteAndroid }).AppAndroid;
   return p ?? null;
 }
 
@@ -78,8 +79,8 @@ export function alSubirCadaFichero(
 /** Se avisa cuando la app termina una tanda que acabó con la app cerrada. */
 export function alTerminarLaApp(fn: (respuestas: unknown[]) => void): () => void {
   if (typeof window === "undefined") return () => {};
-  const w = window as unknown as { __subidaPruebaLista?: (json: string) => void };
-  w.__subidaPruebaLista = (json: string) => {
+  const w = window as unknown as { __subidaAppLista?: (json: string) => void };
+  w.__subidaAppLista = (json: string) => {
     try {
       const datos = JSON.parse(json || "[]");
       if (Array.isArray(datos) && datos.length) fn(datos);
@@ -88,6 +89,6 @@ export function alTerminarLaApp(fn: (respuestas: unknown[]) => void): () => void
     }
   };
   return () => {
-    delete w.__subidaPruebaLista;
+    delete w.__subidaAppLista;
   };
 }

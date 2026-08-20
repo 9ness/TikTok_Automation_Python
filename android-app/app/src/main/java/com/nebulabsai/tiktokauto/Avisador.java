@@ -1,4 +1,4 @@
-package ai.nebulabs.tiktok.prueba;
+package com.nebulabsai.tiktokauto;
 
 /**
  * Le cuenta a la pantalla lo que va haciendo el servicio, fichero a fichero.
