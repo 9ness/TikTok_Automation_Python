@@ -37,13 +37,31 @@ export function FotoProducto({
 }) {
   const [intento, setIntento] = useState(0);
   const [fallo, setFallo] = useState(false);
+  const [cargada, setCargada] = useState(false);
 
   // Al cambiar de carpeta la tarjeta se reutiliza (los productos se numeran
   // 1..10 en todas): sin esto se quedaría en "no cargó" para la foto nueva.
   useEffect(() => {
     setIntento(0);
     setFallo(false);
+    setCargada(false);
   }, [src]);
+
+  /** Una petición que se queda colgada no dispara `onError` NUNCA, así que el
+   *  reintento de abajo no llega a saltar: la imagen se queda a medias y quien
+   *  mira solo ve un hueco, sin saber si va a venir o no. Pasado un rato se da
+   *  por fallida y se reintenta como si hubiera dado error.
+   *
+   *  Solo donde la carga NO es perezosa: en una rejilla, una miniatura que aún
+   *  no se ha mirado está pendiente a propósito y esto la daría por rota. */
+  useEffect(() => {
+    if (perezoso || !src || cargada || fallo) return;
+    const t = setTimeout(() => {
+      if (intento >= 2) setFallo(true);
+      else setIntento((n) => n + 1);
+    }, 12000);
+    return () => clearTimeout(t);
+  }, [perezoso, src, cargada, fallo, intento]);
 
   if (!src || fallo) {
     return (
@@ -64,6 +82,7 @@ export function FotoProducto({
       alt={alt}
       loading={perezoso ? "lazy" : "eager"}
       onClick={onClick}
+      onLoad={() => setCargada(true)}
       onError={() => {
         if (intento >= 2) {
           setFallo(true);

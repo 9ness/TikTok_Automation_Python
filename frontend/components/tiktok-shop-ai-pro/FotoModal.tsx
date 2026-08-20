@@ -107,6 +107,20 @@ export function FotoModal({
           </p>
         )}
 
+        {/* Salida de emergencia: si la foto no viene, abrirla aparte enseña el
+            error de verdad (un 502, un 401, lo que sea) en vez de dejar un
+            hueco que no explica nada. */}
+        {src && (
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center text-[10px] text-muted-foreground underline decoration-dotted"
+          >
+            ¿No sale? Ábrela aparte
+          </a>
+        )}
+
         {urlDescarga && (
           <a
             href={urlDescarga}
