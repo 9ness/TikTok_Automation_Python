@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from src.nicho_pov_bof.pipeline.duration_match import probe_duration
 from src.nicho_pov_bof_largo.pipeline import video_editor
 
 
@@ -48,7 +49,7 @@ class TestReparto:
         video_editor._concatenar_cuadrado(clips, audio, tmp_path / "w")
 
         assert len(objetivos) == 2
-        assert sum(objetivos) == pytest.approx(12, abs=0.05)
+        assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
         for o in objetivos:
             assert o <= 8.01, f"le pide {o:.2f}s a un clip de 8s"
 
@@ -68,3 +69,56 @@ class TestReparto:
         video_editor._concatenar_cuadrado(clips, audio, tmp_path / "w")
 
         assert objetivos[0] == pytest.approx(6.5, abs=0.01)
+
+
+class TestClipsDeDistintaDuracion:
+    """La herramienta que genera los clips ha dado vídeos de 10s antes y de 8s
+    ahora, así que un vídeo de 3 o 4 clips puede llevarlos mezclados."""
+
+    def test_reparte_en_proporcion_a_lo_que_dura_cada_uno(self, tmp_path, monkeypatch):
+        clips = [
+            _clip(tmp_path / "c1.mp4", 8),
+            _clip(tmp_path / "c2.mp4", 10),
+            _clip(tmp_path / "c3.mp4", 8),
+        ]
+        audio = _voz(tmp_path / "v.mp3", 25)
+
+        objetivos: list[float] = []
+        real = video_editor.match_video_to_audio
+
+        def espia(video, objetivo, work, **kw):
+            objetivos.append(objetivo)
+            return real(video, objetivo, work, **kw)
+
+        monkeypatch.setattr(video_editor, "match_video_to_audio", espia)
+        video_editor._concatenar_cuadrado(clips, audio, tmp_path / "w")
+
+        assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
+        # A partes iguales serían 8,33s a cada uno y habría que rebobinar los
+        # dos de 8s teniendo 1,7s sin usar en el de 10s.
+        for objetivo, dura in zip(objetivos, (8, 10, 8)):
+            assert objetivo <= dura + 0.01, f"pide {objetivo:.2f}s a un clip de {dura}s"
+        assert objetivos[1] > objetivos[0], "al más largo le toca más voz"
+
+    def test_si_no_hay_metraje_suficiente_se_reparte_igual_de_mal(self, tmp_path, monkeypatch):
+        """Con menos vídeo que voz hay que estirar sí o sí; que el estirón se
+        reparta y no caiga entero sobre uno."""
+        clips = [
+            _clip(tmp_path / "c1.mp4", 4),
+            _clip(tmp_path / "c2.mp4", 4),
+            _clip(tmp_path / "c3.mp4", 4),
+        ]
+        audio = _voz(tmp_path / "v.mp3", 18)
+
+        objetivos: list[float] = []
+        real = video_editor.match_video_to_audio
+
+        def espia(video, objetivo, work, **kw):
+            objetivos.append(objetivo)
+            return real(video, objetivo, work, **kw)
+
+        monkeypatch.setattr(video_editor, "match_video_to_audio", espia)
+        video_editor._concatenar_cuadrado(clips, audio, tmp_path / "w")
+
+        assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
+        assert max(objetivos) - min(objetivos) < 0.1

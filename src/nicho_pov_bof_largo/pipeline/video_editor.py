@@ -210,6 +210,41 @@ def _punto_de_corte(
     return centro
 
 
+def _reparto_por_capacidad(
+    total: float, clips: list[Path], on_log: OnLog = _noop,
+) -> list[float]:
+    """Cuánta voz le toca a cada clip, en proporción a lo que DURA cada uno.
+
+    A partes iguales no vale cuando los clips no miden lo mismo: con tres de
+    8s, 10s y 8s y una voz de 25s, el reparto igualado pide 8,33s a cada uno,
+    así que los dos de 8s hay que rebobinarlos mientras el de 10s se queda con
+    1,7s sin usar. Y sí pasa: la herramienta que genera los clips ha dado
+    vídeos de 10s antes y de 8s ahora.
+
+    Repartir en proporción a la duración resuelve las dos cosas de una vez:
+    mientras haya metraje de sobra, a nadie se le pide más de lo que tiene
+    (`total * dura_i / suma <= dura_i` en cuanto `total <= suma`), y lo que se
+    descarta sale del final de cada clip repartido por igual en porcentaje.
+
+    Si no se pueden medir, se vuelve al reparto a partes iguales.
+    """
+    n = max(1, len(clips))
+    try:
+        duraciones = [probe_duration(c) for c in clips]
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[pov_bof_largo] no se pudieron medir los clips ({e}); reparto igualado")
+        return [total / n] * n
+    suma = sum(duraciones)
+    if suma <= 0 or any(d <= 0 for d in duraciones):
+        return [total / n] * n
+    if suma + 0.05 < total:
+        on_log(
+            f"[pov_bof_largo] los clips suman {suma:.1f}s y la voz dura "
+            f"{total:.1f}s: hay que alargar {total - suma:.1f}s"
+        )
+    return [total * d / suma for d in duraciones]
+
+
 def _concatenar_cuadrado(
     clips: list[Path], audio_path: Path, work_dir: Path, on_log: OnLog = _noop,
 ) -> Path:
@@ -265,7 +300,7 @@ def _concatenar_cuadrado(
                 primero = ajustado
         objetivos = [primero, audio_dur - primero]
     else:
-        objetivos = [audio_dur / n] * n
+        objetivos = _reparto_por_capacidad(audio_dur, clips, on_log)
     on_log(
         f"[pov_bof_largo] voz {audio_dur:.2f}s → clips de "
         + ", ".join(f"{o:.2f}s" for o in objetivos)
