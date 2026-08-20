@@ -1,0 +1,65 @@
+# APK de PRUEBA para ver dónde caen las descargas.
+#
+# NO toca la APK buena (`android-apk.yml`) ni su firma. Es un experimento de
+# usar y tirar: un WebView mínimo que apunta al mismo dominio y manda las
+# descargas a `Download/TTShopAIPro/`. Se instala AL LADO de la app real porque
+# lleva otro `applicationId`.
+#
+# Para qué: la app es una TWA y ahí las descargas las gestiona Chrome, así que
+# no hay forma de elegir carpeta. Antes de migrar a WebView —que es lo que
+# `APK.md` descartó en su día por las descargas— se mide si la alternativa
+# funciona de verdad en el móvil, y sobre todo si aguanta el caso difícil: las
+# descargas en tanda, que van por `blob:` y hay que pasar por base64.
+#
+# Se lanza a mano: Actions → "APK de prueba (descargas)" → Run workflow.
+# Cuando se decida qué hacer, esta carpeta y este fichero se borran.
+
+name: APK de prueba (descargas)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # `debug` a posta: es sideload para probar, no va a ninguna tienda, y así
+      # no hace falta la keystore de la app buena.
+      - name: Construir la APK de prueba
+        working-directory: android-prueba-descargas
+        run: gradle --no-daemon assembleDebug
+
+      - name: Dónde ha quedado
+        working-directory: android-prueba-descargas
+        run: ls -la app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-prueba-descargas
+          path: android-prueba-descargas/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # Enlace fijo para instalarla desde el móvil sin pasar por Actions.
+      - name: Publicar en la release de pruebas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp android-prueba-descargas/app/build/outputs/apk/debug/app-debug.apk \
+             ttshop-prueba-descargas.apk
+          gh release delete apk-prueba --yes --cleanup-tag || true
+          gh release create apk-prueba ttshop-prueba-descargas.apk \
+            --title "APK de prueba — descargas" \
+            --notes "Experimento: ¿puede un WebView guardar en Download/TTShopAIPro/? Se instala al lado de la app buena. No es la app."
