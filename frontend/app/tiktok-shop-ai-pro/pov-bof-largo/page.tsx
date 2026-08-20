@@ -21,6 +21,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { nombreDescarga } from "@/lib/descargas";
+
 import { ApiError } from "@/lib/api";
 import { horaCorta, fechaCorta } from "@/lib/hora";
 import {
@@ -337,8 +339,8 @@ export default function PovBofLargoPage() {
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
         // El número de delante es lo que hace que la galería los enseñe en el
         // mismo orden que la pantalla.
-        a.download = `${String(i + 1).padStart(2, "0")}_${suya}_${p.producto}${sufijo}.mp4`
-          .replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        a.download =
+          nombreDescarga(String(i + 1).padStart(2, "0"), suya, `${p.producto}${sufijo}`) + ".mp4";
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -373,8 +375,9 @@ export default function PovBofLargoPage() {
         const suya = p.folder || folder;
         a.href = buildCleanPhotoDownloadUrl(activaSource, suya, p.producto);
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
-        a.download = `${String(i + 1).padStart(2, "0")}_${suya}_${p.producto}${sufijo}`
-          .replace(/[^a-zA-Z0-9_.-]+/g, "_");
+        a.download = nombreDescarga(
+          String(i + 1).padStart(2, "0"), suya, `${p.producto}${sufijo}`,
+        );
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -1885,7 +1888,7 @@ function ProductoCard({
           </button>
           <a
             href={videoLargoUrl(source, folder, p.producto, p.video_listo_at ?? 0, true)}
-            download={`${folder}_${p.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_")}
+            download={nombreDescarga(folder, p.producto) + ".mp4"}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
           >
             <Download className="h-3.5 w-3.5" /> Descargar

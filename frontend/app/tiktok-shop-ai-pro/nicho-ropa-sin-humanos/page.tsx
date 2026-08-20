@@ -13,6 +13,8 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { nombreDescarga } from "@/lib/descargas";
+
 import { ApiError } from "@/lib/api";
 import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
@@ -64,7 +66,7 @@ export default function NichoRopaPage() {
     for (const [i, p] of conFoto.entries()) {
       const a = document.createElement("a");
       a.href = buildFotoLimpiaRopaUrl(p.producto, carpeta);
-      a.download = `ropa_${p.producto}.jpg`;
+      a.download = nombreDescarga("ropa", p.producto) + ".jpg";
       document.body.appendChild(a);
       a.click();
       a.remove();

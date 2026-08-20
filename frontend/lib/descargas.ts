@@ -1,3 +1,28 @@
+/** Prefijo de TODO lo que se baja del programa.
+ *
+ *  Una página web NO puede elegir en qué carpeta guarda el navegador: el
+ *  atributo `download` es solo el NOMBRE del fichero y los navegadores quitan
+ *  cualquier barra para que no se pueda escribir donde no toca. En el móvil
+ *  todo cae en "Descargas" mezclado con lo demás, y no hay forma de cambiarlo
+ *  desde aquí.
+ *
+ *  Lo que sí se puede: que todo empiece igual. Así en la app de Archivos se
+ *  ordenan juntos, se buscan escribiendo "ttshop" y se seleccionan en bloque
+ *  para borrarlos sin tocar nada del móvil.
+ */
+export const PREFIJO_DESCARGA = "TTShopAIPro_";
+
+/** Nombre de fichero para bajar: con el prefijo del programa y sin caracteres
+ *  que el sistema no acepte. La extensión, si la hay, se respeta. */
+export function nombreDescarga(...partes: (string | number)[]): string {
+  const limpio = partes
+    .map((x) => String(x ?? "").trim())
+    .filter(Boolean)
+    .join("_")
+    .replace(/[^a-zA-Z0-9_.-]+/g, "_");
+  return `${PREFIJO_DESCARGA}${limpio}`;
+}
+
 /** Bajar varias fotos EN ORDEN, de verdad.
  *
  *  Con `<a download>` el navegador solo *empieza* la descarga: el fichero se

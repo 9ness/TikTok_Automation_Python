@@ -12,6 +12,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { nombreDescarga } from "@/lib/descargas";
+
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
 import {
@@ -121,7 +123,7 @@ export default function CreativosProPage() {
       // la descarga es el Content-Disposition del backend. Con la URL de ver,
       // el móvil abría las fotos en pestañas y no bajaba ninguna.
       a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto, "ficha");
-      a.download = `${folder}_${p.producto}_ficha`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      a.download = nombreDescarga(folder, p.producto, "ficha");
       document.body.appendChild(a);
       a.click();
       a.remove();

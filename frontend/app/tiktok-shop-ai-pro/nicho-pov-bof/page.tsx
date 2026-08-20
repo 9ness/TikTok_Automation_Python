@@ -22,6 +22,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { nombreDescarga } from "@/lib/descargas";
+
 import { ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
 import {
@@ -355,9 +357,7 @@ export default function NichoPovBofPage() {
         a.href = buildVideoUrl(source, suya, p.producto, p.video_listo_at ?? 0, true);
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
         const orden = String(i + 1).padStart(2, "0");
-        a.download = `${orden}_${suya}_${p.producto}${sufijo}.mp4`.replace(
-          /[^a-zA-Z0-9_.-]+/g, "_",
-        );
+        a.download = nombreDescarga(orden, suya, `${p.producto}${sufijo}`) + ".mp4";
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -404,9 +404,7 @@ export default function NichoPovBofPage() {
         // mismo orden que la pantalla.
         const sufijo = filtro === "todas" ? "" : `_${filtro}`;
         const orden = String(i + 1).padStart(2, "0");
-        a.download = `${orden}_${suya}_${p.producto}${sufijo}`.replace(
-          /[^a-zA-Z0-9_.-]+/g, "_",
-        );
+        a.download = nombreDescarga(orden, suya, `${p.producto}${sufijo}`);
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -1827,7 +1825,7 @@ function ProductoCard({
               en vez de descargar directamente. */}
           <a
             href={buildVideoUrl(source, folder, producto.producto, producto.video_listo_at ?? 0, true)}
-            download={`${folder}_${producto.producto}.mp4`.replace(/[^a-zA-Z0-9_.-]+/g, "_")}
+            download={nombreDescarga(folder, producto.producto) + ".mp4"}
             className="flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/50 px-2 py-1.5 text-[11px] text-emerald-500"
           >
             <Download className="h-3.5 w-3.5" /> Descargar

@@ -21,7 +21,7 @@ import {
   useEstadoDeUsuario,
   useEstadoRecordado,
 } from "@/lib/hooks/useEstadoRecordado";
-import { bajarEnOrden } from "@/lib/descargas";
+import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
@@ -264,7 +264,7 @@ export default function CarruselesPage() {
       const a = document.createElement("a");
       a.href = buildCleanPhotoDownloadUrl(p.source, p.folder, p.producto);
       const orden = String(i + 1).padStart(2, "0");
-      a.download = `${orden}_${p.folder}_${p.producto}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      a.download = nombreDescarga(orden, p.folder, p.producto);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -303,9 +303,10 @@ export default function CarruselesPage() {
     }
     const archivos = cola.map((item, i) => ({
       href: buildFotoCarruselUrl(source, folder, item.producto, item.tipo, item.version, true),
-      nombre: `${String(i + 1).padStart(2, "0")}_${folder}_${item.producto}_${
-        item.tipo === "chica_txt" ? 1 : 2
-      }`.replace(/[^a-zA-Z0-9_.-]+/g, "_"),
+      nombre: nombreDescarga(
+        String(i + 1).padStart(2, "0"), folder, item.producto,
+        item.tipo === "chica_txt" ? 1 : 2,
+      ),
     }));
     const r = await bajarEnOrden(archivos, (hechos, total) =>
       setBajandoCarpeta(`${hechos}/${total}`),
@@ -329,7 +330,7 @@ export default function CarruselesPage() {
         .filter(([, version]) => version)
         .map(([tipo, version], i) => ({
           href: buildFotoCarruselUrl(source, folder, producto, tipo, version, true),
-          nombre: `${folder}_${producto}_${i + 1}`.replace(/[^a-zA-Z0-9_.-]+/g, "_"),
+          nombre: nombreDescarga(folder, producto, i + 1),
         })),
     );
     setBajando("");
@@ -1142,7 +1143,7 @@ function PorNicho() {
       if (!version) continue;
       const a = document.createElement("a");
       a.href = buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true);
-      a.download = `${p.folder}_${p.producto}_${i + 1}`.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      a.download = nombreDescarga(p.folder, p.producto, i + 1);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1163,9 +1164,7 @@ function PorNicho() {
         if (!version) continue;
         archivos.push({
           href: buildFotoCarruselUrl(p.source, p.folder, p.producto, tipo, version, true),
-          nombre: `${orden}_${p.folder}_${p.producto}_${i + 1}`.replace(
-            /[^a-zA-Z0-9_.-]+/g, "_",
-          ),
+          nombre: nombreDescarga(orden, p.folder, p.producto, i + 1),
         });
       }
     }
