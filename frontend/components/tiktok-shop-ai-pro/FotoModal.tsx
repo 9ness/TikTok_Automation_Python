@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { FotoProducto } from "./FotoProducto";
 
@@ -43,8 +44,15 @@ export function FotoModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
 
-  if (!open) return null;
-  return (
+  if (!open || typeof document === "undefined") return null;
+
+  // Colgado del `<body>` y no de donde se usa. `position: fixed` deja de
+  // referirse a la pantalla en cuanto CUALQUIER ancestro tiene `transform`,
+  // `filter` o `contain`, y entonces el visor se recorta a ese ancestro: eso
+  // es exactamente lo que se veía en el móvil —una tira con el título cortado
+  // por abajo— mientras que en el escritorio salía bien. Sacándolo del árbol
+  // no hay ancestro que valga.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -53,7 +61,9 @@ export function FotoModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-2 overflow-y-auto rounded-lg border bg-card p-3"
+        // El alto mínimo es un seguro: si algo vuelve a encoger el visor, que
+        // se note que es el visor y no una tira sin sentido.
+        className="flex max-h-[90vh] min-h-[16rem] w-[calc(100vw-2rem)] max-w-sm flex-col gap-2 overflow-y-auto rounded-lg border bg-card p-3"
       >
         <div className="flex items-start justify-between gap-2">
           <p className="min-w-0 flex-1 truncate text-sm font-semibold">{titulo}</p>
@@ -130,6 +140,7 @@ export function FotoModal({
           </a>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
