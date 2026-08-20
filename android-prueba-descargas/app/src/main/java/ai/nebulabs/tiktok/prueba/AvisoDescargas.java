@@ -101,11 +101,23 @@ class AvisoDescargas {
         reloj.postDelayed(this::mirar, CADA_MS);
     }
 
-    /** Le pregunta al gestor cuánto lleva de lo que sigue vivo. */
+    /** Le pregunta al gestor cuánto lleva de lo que sigue vivo.
+     *
+     *  El progreso que se pinta es GLOBAL —ficheros terminados más el trozo
+     *  que lleve el que está en marcha— y no la suma de bytes de todos. El
+     *  motivo: de los que aún no ha empezado, Android no sabe el tamaño
+     *  (`COLUMN_TOTAL_SIZE_BYTES` es -1 hasta que contesta el servidor), así
+     *  que sumando bytes no había total fiable y la cifra no aparecía hasta el
+     *  final, cuando ya quedaban pocos. Contando ficheros siempre se sabe.
+     */
     private synchronized void mirar() {
-        long hechos = 0;
-        long total = 0;
-        boolean algunoSinTamano = false;
+        // Del que está bajando AHORA, para poder decir por dónde va ese.
+        long bytesActivo = 0;
+        long totalActivo = 0;
+        String nombreActivo = "";
+        // Cuánto llevan, en fracción, los que están vivos: es lo que hace que
+        // la barra avance entre fichero y fichero.
+        double fraccion = 0;
 
         DownloadManager.Query q = new DownloadManager.Query();
         long[] ids = new long[enMarcha.size()];
@@ -127,14 +139,22 @@ class AvisoDescargas {
                     terminadas += 1;
                     continue;
                 }
-                hechos += Math.max(0, lleva);
-                if (mide > 0) total += mide; else algunoSinTamano = true;
+                if (mide > 0) {
+                    fraccion += Math.min(1.0, Math.max(0, lleva) / (double) mide);
+                    // El "activo" es el que más lleva bajado: con varios a la
+                    // vez, es el que de verdad se está moviendo.
+                    if (lleva > bytesActivo) {
+                        bytesActivo = lleva;
+                        totalActivo = mide;
+                        nombreActivo = enMarcha.get(id);
+                    }
+                }
             }
         } catch (Exception ignorada) {
             // Preguntar por el progreso no puede tumbar nada.
         }
 
-        pintar(hechos, total, algunoSinTamano);
+        pintar(bytesActivo, totalActivo, nombreActivo, fraccion);
 
         if (!enMarcha.isEmpty()) {
             reloj.postDelayed(this::mirar, CADA_MS);
@@ -144,10 +164,11 @@ class AvisoDescargas {
     }
 
     private void pintar() {
-        pintar(0, 0, true);
+        pintar(0, 0, "", 0);
     }
 
-    private void pintar(long hechos, long total, boolean indeterminado) {
+    private void pintar(long bytesActivo, long totalActivo, String nombreActivo,
+                        double fraccionViva) {
         boolean acabado = enMarcha.isEmpty() && terminadas >= lanzadas && lanzadas > 0;
 
         String titulo;
@@ -158,8 +179,10 @@ class AvisoDescargas {
         } else {
             int quedan = Math.max(0, lanzadas - terminadas);
             titulo = quedan == 1 ? "Bajando 1 archivo" : "Bajando " + quedan + " archivos";
+            String cual = (nombreActivo == null || nombreActivo.isEmpty())
+                ? ultimoNombre : nombreActivo;
             detalle = (lanzadas > 1 ? (terminadas + 1) + " de " + lanzadas + " · " : "")
-                + ultimoNombre;
+                + cual;
         }
 
         RemoteViews vista = new RemoteViews(ctx.getPackageName(), R.layout.aviso_descargas);
@@ -170,15 +193,23 @@ class AvisoDescargas {
             vista.setViewVisibility(R.id.cifras, View.GONE);
         } else {
             vista.setViewVisibility(R.id.barra, View.VISIBLE);
-            boolean conocido = total > 0 && !indeterminado;
-            int pct = conocido ? (int) Math.min(100, hechos * 100 / total) : 0;
-            vista.setProgressBar(R.id.barra, 100, pct, !conocido);
-            // El porcentaje y los megas: mirando solo la barra no se sabe si
-            // va lento o si se ha quedado colgado.
-            vista.setViewVisibility(R.id.cifras, conocido ? View.VISIBLE : View.GONE);
-            if (conocido) {
-                vista.setTextViewText(
-                    R.id.cifras, pct + "%  ·  " + megas(hechos) + " de " + megas(total));
+            // Barra GLOBAL: lo ya terminado más lo que lleve el de ahora. Se
+            // sabe siempre, así que avanza desde el primer momento.
+            int pctGlobal = lanzadas <= 0 ? 0
+                : (int) Math.min(100, Math.round((terminadas + fraccionViva) * 100.0 / lanzadas));
+            vista.setProgressBar(R.id.barra, 100, pctGlobal, false);
+
+            // Y la cifra, del fichero que está bajando AHORA: es lo que dice si
+            // ese en concreto va o se ha quedado parado. Hasta que el servidor
+            // no contesta no se sabe su tamaño, y entonces se enseña el global.
+            vista.setViewVisibility(R.id.cifras, View.VISIBLE);
+            if (totalActivo > 0) {
+                int pctActivo = (int) Math.min(100, bytesActivo * 100 / totalActivo);
+                vista.setTextViewText(R.id.cifras,
+                    "este " + pctActivo + "%  ·  " + megas(bytesActivo)
+                        + " de " + megas(totalActivo) + "   ·   total " + pctGlobal + "%");
+            } else {
+                vista.setTextViewText(R.id.cifras, "total " + pctGlobal + "%");
             }
         }
 
