@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
+import android.widget.RemoteViews;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,6 +27,13 @@ import java.util.Map;
  * El progreso se saca preguntándole al gestor cada poco cuántos bytes lleva de
  * cada descarga viva: no avisa por su cuenta mientras baja, solo cuando
  * termina.
+ *
+ * El aspecto es el de la WEB y no el del sistema: tarjeta oscura, el logo de
+ * NebulabsAI y la barra con el degradado cian → violeta de la marca
+ * (`res/layout/aviso_descargas.xml`). Va con `DecoratedCustomViewStyle`, que
+ * es lo que deja meter un diseño propio conservando la cabecera de Android —
+ * una notificación totalmente a medida se ve distinta en cada versión y acaba
+ * peor que la del sistema.
  */
 class AvisoDescargas {
 
@@ -140,33 +149,44 @@ class AvisoDescargas {
     private void pintar(long hechos, long total, boolean indeterminado) {
         boolean acabado = enMarcha.isEmpty() && terminadas >= lanzadas && lanzadas > 0;
 
-        Notification.Builder n = new Notification.Builder(ctx, CANAL)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setOnlyAlertOnce(true)
-            .setContentIntent(abrirDescargas());
-
+        String titulo;
+        String detalle;
         if (acabado) {
-            String cuantos = lanzadas == 1 ? "1 archivo" : lanzadas + " archivos";
-            n.setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle(cuantos + " en TTShopAIPro")
-                .setContentText(lanzadas == 1 ? ultimoNombre : "Toca para abrir la carpeta")
-                .setAutoCancel(true)
-                .setOngoing(false);
+            titulo = (lanzadas == 1 ? "1 archivo listo" : lanzadas + " archivos listos");
+            detalle = lanzadas == 1 ? ultimoNombre : "Toca para abrir la carpeta";
         } else {
             int quedan = Math.max(0, lanzadas - terminadas);
-            n.setContentTitle(
-                    quedan == 1 ? "Bajando 1 archivo" : "Bajando " + quedan + " archivos")
-                // Cuál va y por dónde va la tanda, en una línea.
-                .setContentText(
-                    (lanzadas > 1 ? (terminadas + 1) + " de " + lanzadas + " · " : "")
-                        + ultimoNombre)
-                .setOngoing(true);
-            if (total > 0 && !indeterminado) {
-                n.setProgress(100, (int) Math.min(100, hechos * 100 / total), false);
-            } else {
-                n.setProgress(0, 0, true);
-            }
+            titulo = quedan == 1 ? "Bajando 1 archivo" : "Bajando " + quedan + " archivos";
+            detalle = (lanzadas > 1 ? (terminadas + 1) + " de " + lanzadas + " · " : "")
+                + ultimoNombre;
         }
+
+        RemoteViews vista = new RemoteViews(ctx.getPackageName(), R.layout.aviso_descargas);
+        vista.setTextViewText(R.id.titulo, titulo);
+        vista.setTextViewText(R.id.detalle, detalle);
+        if (acabado) {
+            vista.setViewVisibility(R.id.barra, View.GONE);
+        } else {
+            vista.setViewVisibility(R.id.barra, View.VISIBLE);
+            boolean conocido = total > 0 && !indeterminado;
+            vista.setProgressBar(
+                R.id.barra, 100,
+                conocido ? (int) Math.min(100, hechos * 100 / total) : 0,
+                !conocido);
+        }
+
+        Notification.Builder n = new Notification.Builder(ctx, CANAL)
+            .setSmallIcon(R.drawable.ic_descarga)
+            // Tiñe el icono y la cabecera con el cian de la marca.
+            .setColor(0xFF15DBF9)
+            .setColorized(true)
+            .setStyle(new Notification.DecoratedCustomViewStyle())
+            .setCustomContentView(vista)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(abrirDescargas())
+            .setAutoCancel(acabado)
+            .setOngoing(!acabado);
+
         avisos.notify(ID_AVISO, n.build());
     }
 

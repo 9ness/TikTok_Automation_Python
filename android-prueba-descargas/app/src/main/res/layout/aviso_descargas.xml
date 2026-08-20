@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La notificación, con la estética de la web: tarjeta oscura, el logo de
+     NebulabsAI, título en blanco, línea de detalle en gris y la barra con el
+     degradado cian → violeta de la marca.
+
+     Ojo con `RemoteViews`: aquí NO vale cualquier vista ni cualquier atributo.
+     Solo los contenedores y widgets básicos, y nada de estilos del tema. Por
+     eso todo va con colores y tamaños escritos a mano. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/fondo_aviso"
+    android:padding="12dp"
+    android:gravity="center_vertical">
+
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginEnd="12dp"
+        android:src="@drawable/logo_nb"
+        android:contentDescription="@string/app_name" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/titulo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/texto"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="@string/app_name" />
+
+        <TextView
+            android:id="@+id/detalle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="@color/texto_suave"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="middle" />
+
+        <ProgressBar
+            android:id="@+id/barra"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:progressDrawable="@drawable/barra_progreso"
+            android:max="100" />
+    </LinearLayout>
+</LinearLayout>

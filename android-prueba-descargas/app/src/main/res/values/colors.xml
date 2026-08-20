@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los MISMOS colores de la web (`frontend/app/globals.css`), para que la
+     notificación no parezca de otra aplicación. -->
+<resources>
+    <color name="brand_cyan">#15DBF9</color>
+    <color name="brand_violet">#A855F7</color>
+    <color name="fondo">#0A0A0B</color>
+    <color name="texto">#FFFFFF</color>
+    <color name="texto_suave">#9CA3AF</color>
+    <color name="borde">#1F2937</color>
+</resources>
