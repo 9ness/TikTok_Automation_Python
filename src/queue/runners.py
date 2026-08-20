@@ -2027,9 +2027,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         audio = work / "voz.mp3"
         info = voz_svc.sintetizar(
             escrito["guion"], audio, sexo=sexo, on_log=on_log,
-            # Los clips ya están subidos: se sabe cuánto vídeo hay, así que se
-            # sortea solo entre las voces cuyo ritmo quepa ahí.
-            segundos_max=len(clips) * largo_config.CLIP_MAX_S,
+            # Los clips ya están subidos: se MIDEN, no se suponen. Contarlos a
+            # 8s cada uno dejaba fuera voces que sí cabían cuando alguno venía
+            # de 10s (pasa al usar otra herramienta de vídeo).
+            segundos_max=_segundos_de_video(clips),
         )
         # Cada vídeo afina la velocidad de SU voz: es lo que hace que la
         # próxima estimación de cuántos clips hacen falta sea mejor.
@@ -2075,6 +2076,22 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     on_progress(1.0, "✅ Listo")
     return str(salida)
 
+
+
+def _segundos_de_video(clips: list[Path]) -> float:
+    """Cuánto vídeo hay de verdad entre todos los clips.
+
+    Se mide en vez de contar "tantos clips por 8 segundos": el operador manda a
+    veces clips de 10s porque usa otra herramienta, y suponerlos de 8 descarta
+    del sorteo voces lentas que sí cabrían. Si no se puede medir, 0 = "no se
+    sabe" y el sorteo entra entre todas, como antes.
+    """
+    from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+
+    try:
+        return float(sum(probe_duration(c) for c in clips))
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2171,7 +2188,7 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
 
         info = voz_svc.sintetizar(
             guion, audio, sexo=sexo, rng=rng, on_log=on_log,
-            segundos_max=len(clips) * largo_config.CLIP_MAX_S,
+            segundos_max=_segundos_de_video(clips),
         )
         on_log(
             f"[pov_bof_plazos] voz: {info.get('voz_label')} · "
