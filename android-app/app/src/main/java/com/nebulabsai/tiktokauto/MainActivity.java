@@ -202,12 +202,31 @@ public class MainActivity extends Activity {
         web.loadUrl(URL_APP);
     }
 
+    /** Los dos paquetes con los que se publica TikTok. El segundo es el que
+     *  llevan algunos móviles según de dónde vengan; probar solo el primero
+     *  dejaba a esos abriendo el navegador. */
+    private static final String[] PAQUETES_TIKTOK = {
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill",
+    };
+
     /**
-     * Abre un enlace fuera de esta app y dice si se ha podido.
+     * Abre un enlace fuera de esta app, y en la APP de TikTok si se puede.
      *
-     * Los `intent://` traen dentro un `browser_fallback_url` para cuando la app
-     * de destino no está instalada; sin usarlo, quien no tenga TikTok se queda
-     * sin ver la ficha y sin saber por qué.
+     * Que abra la app y no el navegador no es un detalle: la ficha se abre para
+     * meter el producto en el escaparate, y eso solo se puede hacer estando
+     * dentro de TikTok con la cuenta puesta. En el navegador se acaba en una
+     * página que pide instalar la app.
+     *
+     * Se intenta en este orden, y cada paso solo se usa si el anterior no ha
+     * podido:
+     *   1. El enlace, pero dirigido a TikTok por su nombre de paquete.
+     *   2. Cualquier app que NO sea un navegador (`REQUIRE_NON_BROWSER`).
+     *   3. Lo que sea — navegador incluido —, que es mejor que no abrir nada.
+     *
+     * Los `intent://` ya vienen apuntando a su app, así que van por su lado; lo
+     * que traen dentro es un `browser_fallback_url` para cuando esa app no está
+     * instalada, y sin usarlo el operador se queda en blanco sin saber por qué.
      */
     private boolean abrirFuera(String url) {
         if (url.startsWith("intent:")) {
@@ -228,8 +247,37 @@ public class MainActivity extends Activity {
                 return true;
             }
         }
+
+        Uri destino = Uri.parse(url);
+
+        for (String paquete : PAQUETES_TIKTOK) {
+            Intent enLaApp = new Intent(Intent.ACTION_VIEW, destino);
+            enLaApp.setPackage(paquete);
+            enLaApp.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(enLaApp);
+                return true;
+            } catch (android.content.ActivityNotFoundException noEstaONoLoAbre) {
+                // Ni instalada, ni sabe abrir ese enlace: se prueba el siguiente.
+            }
+        }
+
+        // Android 11+ sabe decir "cualquiera menos un navegador", que es lo que
+        // hace falta cuando el enlace lo puede atender otra app instalada.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            Intent noNavegador = new Intent(Intent.ACTION_VIEW, destino);
+            noNavegador.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER);
+            try {
+                startActivity(noNavegador);
+                return true;
+            } catch (android.content.ActivityNotFoundException soloNavegadores) {
+                // Solo hay navegadores: se abre uno, abajo.
+            }
+        }
+
         try {
-            Intent ver = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            Intent ver = new Intent(Intent.ACTION_VIEW, destino);
             ver.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(ver);
             return true;

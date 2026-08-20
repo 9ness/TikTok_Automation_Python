@@ -20,6 +20,19 @@
          que más corta las tandas largas. Lo concede el usuario. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Desde Android 11 una app no ve qué otras hay instaladas salvo que las
+         declare. Sin esto, mandar la ficha a TikTok por su nombre de paquete
+         falla SIEMPRE —aunque TikTok esté instalado— y se acaba abriendo el
+         navegador, que es justo lo que no sirve para el escaparate. -->
+    <queries>
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.ss.android.ugc.trill" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
