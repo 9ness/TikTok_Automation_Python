@@ -10,22 +10,26 @@ const OCULTO_ACTUALIZAR_KEY = "apk-banner-actualizar-oculto";
 
 /** Aviso de la APK, solo a quien le sirve. Tiene DOS casos.
  *
- *  1. **Instalar** — se navega desde el navegador de Android. Si ya se abrió
- *     desde la APK o desde el icono de la pantalla de inicio, ofrecer "instala
- *     la app" es ruido. Se detecta con `display-mode: standalone` (icono) y con
- *     `TTShopApp` en el User-Agent (la APK, que es un WebView y no cumple lo
- *     anterior; sin esto el banner salía DENTRO de la propia app).
+ *  1. **Actualizar** — se está en Android y NO en la APK nueva. Es el caso
+ *     gordo mientras dure la migración: quien sigue en la TWA no tiene forma de
+ *     enterarse de que hay una app nueva, porque el aviso de versión va DENTRO
+ *     de la nueva.
  *
- *  2. **Actualizar** — se abre desde la APK VIEJA, la TWA. Se reconoce porque
- *     el referrer es `android-app://` pero el User-Agent no lleva `TTShopApp`.
- *     Hace falta porque la TWA no tiene forma de avisarse a sí misma: el aviso
- *     de versión nueva va dentro de la app nueva. Sin esto, quien no lea el
- *     mensaje se queda para siempre en la vieja, sin carpeta de descargas ni
- *     subida en segundo plano.
+ *     Se detecta por descarte —Android sin `TTShopApp` en el User-Agent— y no
+ *     por el referrer `android-app://`, que era lo suyo pero NO sirve: la TWA
+ *     solo lo pone en la navegación de arranque, así que en cuanto se recarga o
+ *     se navega, desaparece y el banner no salía nunca. Pasó en el móvil.
+ *
+ *  2. **Instalar** — igual pero sin señal de que haya ninguna app: se ofrece
+ *     instalarla. Si ya está abierta desde el icono de la pantalla de inicio
+ *     (`display-mode: standalone`) no se dice nada, que ahí es ruido.
+ *
+ *  Dentro de la APK nueva (`TTShopApp`) no sale nada: ella ya avisa sola.
  *
  *  El descarte del de instalar se recuerda para siempre (reaparecer en cada
- *  carga es peor que no ponerlo). El de actualizar solo hasta cerrar: es un
- *  salto de una vez y darle a la X no debería dejarte en la vieja para siempre.
+ *  carga es peor que no ponerlo). El de actualizar solo hasta cerrar la app: es
+ *  un salto de una vez y darle a la X no debería dejarte en la vieja para
+ *  siempre.
  */
 export function AppInstallBanner() {
   const [modo, setModo] = useState<"instalar" | "actualizar" | null>(null);
@@ -37,17 +41,22 @@ export function AppInstallBanner() {
     const enLaAppNueva = /TTShopApp/.test(navigator.userAgent);
     if (enLaAppNueva) return;
 
-    if (document.referrer.startsWith("android-app://")) {
+    // Cualquier señal de estar DENTRO de una app: la TWA (referrer, solo en el
+    // arranque) o el icono de la pantalla de inicio.
+    const enAlgunaAppVieja =
+      document.referrer.startsWith("android-app://") ||
+      window.matchMedia("(display-mode: standalone)").matches ||
+      // iOS lo expone aquí; se mira igualmente por si se añade soporte.
+      (window.navigator as { standalone?: boolean }).standalone === true;
+
+    if (enAlgunaAppVieja) {
       if (sessionStorage.getItem(OCULTO_ACTUALIZAR_KEY) !== "1") setModo("actualizar");
       return;
     }
 
-    const instalada =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS lo expone aquí; se mira igualmente por si se añade soporte.
-      (window.navigator as { standalone?: boolean }).standalone === true;
-    if (instalada) return;
-
+    // Ni app nueva ni señal de app vieja: o es el navegador, o es la TWA que ya
+    // perdió el referrer. Mientras dure la migración se ofrece igual, porque
+    // quedarse callado deja a quien está en la vieja sin enterarse.
     if (localStorage.getItem(OCULTO_KEY) !== "1") setModo("instalar");
   }, []);
 
@@ -73,7 +82,7 @@ export function AppInstallBanner() {
           <p className="text-[11px] leading-tight text-muted-foreground">
             {actualizar
               ? "Se instala encima. Después habrá que meter el PIN otra vez."
-              : "Pantalla completa y con su icono. Se actualiza sola."}
+              : "Descargas en su carpeta y subidas en segundo plano."}
           </p>
         </div>
         <a
