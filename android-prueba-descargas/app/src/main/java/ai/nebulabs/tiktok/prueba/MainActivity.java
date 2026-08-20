@@ -2,6 +2,7 @@ package ai.nebulabs.tiktok.prueba;
 
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.content.Intent;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -14,6 +15,7 @@ import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -52,6 +54,9 @@ public class MainActivity extends Activity {
     private static final String URL_APP = "https://tiktok-factory.tailbff00e.ts.net/";
 
     private WebView web;
+    /** Dónde devolver los ficheros que elija el usuario (ver `onShowFileChooser`). */
+    private ValueCallback<Uri[]> esperandoFicheros;
+    private static final int PEDIR_FICHEROS = 1;
 
     @Override
     protected void onCreate(Bundle estado) {
@@ -66,7 +71,33 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            /**
+             * SIN ESTO, tocar "Clip 1" no hace absolutamente nada.
+             *
+             * Es otra cosa que un WebView no trae de serie: el
+             * `<input type="file">` no abre ningún selector si la app no lo
+             * implementa. En la TWA funciona solo porque es Chrome.
+             *
+             * Se apunta como hallazgo de la prueba: una migración a WebView no
+             * es solo rehacer las descargas, también las SUBIDAS.
+             */
+            @Override
+            public boolean onShowFileChooser(WebView v,
+                                             ValueCallback<Uri[]> callback,
+                                             FileChooserParams params) {
+                if (esperandoFicheros != null) esperandoFicheros.onReceiveValue(null);
+                esperandoFicheros = callback;
+                try {
+                    startActivityForResult(params.createIntent(), PEDIR_FICHEROS);
+                    return true;
+                } catch (Exception e) {
+                    esperandoFicheros = null;
+                    aviso("No se pudo abrir el selector de ficheros: " + e);
+                    return false;
+                }
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView v, String url) {
@@ -176,6 +207,20 @@ public class MainActivity extends Activity {
 
     private void aviso(String texto) {
         runOnUiThread(() -> Toast.makeText(this, texto, Toast.LENGTH_LONG).show());
+    }
+
+    @Override
+    protected void onActivityResult(int codigo, int resultado, Intent datos) {
+        if (codigo != PEDIR_FICHEROS) {
+            super.onActivityResult(codigo, resultado, datos);
+            return;
+        }
+        if (esperandoFicheros == null) return;
+        // Hay que contestar SIEMPRE, aunque se cancele: si no, el input se
+        // queda bloqueado y no vuelve a abrirse nunca.
+        esperandoFicheros.onReceiveValue(
+            WebChromeClient.FileChooserParams.parseResult(resultado, datos));
+        esperandoFicheros = null;
     }
 
     @Override

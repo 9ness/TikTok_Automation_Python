@@ -20,6 +20,16 @@ el móvil del operador, y en concreto los dos casos que tiene la app:
 Se instala AL LADO de la app buena (otro `applicationId`), así que no la pisa.
 Cuando se decida, esta carpeta se borra.
 
+## Lo que va saliendo (hallazgos)
+
+- **El selector de ficheros hay que implementarlo.** Tocar "Clip 1" no hacía
+  NADA: en un WebView el `<input type="file">` no abre nada si la app no
+  implementa `onShowFileChooser`. En la TWA funciona solo porque es Chrome.
+  O sea que migrar no es solo rehacer las descargas: también las SUBIDAS.
+- **La subida en segundo plano no existiría.** La app usa Background Fetch
+  (`sw-subidas.js`) para que una tanda de vídeos siga subiendo con el móvil
+  bloqueado. Esa API es de Chrome; un WebView no la tiene.
+
 ## Cómo se genera
 
 GitHub → Actions → **"APK de prueba (descargas)"** → Run workflow.
