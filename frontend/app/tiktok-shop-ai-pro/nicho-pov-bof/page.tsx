@@ -69,6 +69,7 @@ import {
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -1821,6 +1822,7 @@ function ProductoCard({
           </a>
         </div>
       )}
+      {producto.video_path && <MontadoEl ts={producto.video_listo_at} />}
 
       <VideoModal
         open={verVideo}
