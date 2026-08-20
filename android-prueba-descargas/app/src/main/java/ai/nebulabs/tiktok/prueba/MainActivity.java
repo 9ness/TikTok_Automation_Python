@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private static final String URL_APP = "https://tiktok-factory.tailbff00e.ts.net/";
 
     private WebView web;
+    private AvisoDescargas avisosDescarga;
     /** Dónde devolver los ficheros que elija el usuario (ver `onShowFileChooser`). */
     private ValueCallback<Uri[]> esperandoFicheros;
     private static final int PEDIR_FICHEROS = 1;
@@ -128,6 +129,7 @@ public class MainActivity extends Activity {
             bajarConDownloadManager(url, disposicion, tipo);
         });
 
+        avisosDescarga = new AvisoDescargas(this);
         pedirPermisoDeNotificaciones();
         // De cuándo es esta APK. Con varias reinstalaciones seguidas es lo
         // único que dice si se está probando la última o una vieja.
@@ -159,17 +161,17 @@ public class MainActivity extends Activity {
             // Sin la cookie de sesión el servidor devuelve el login.
             String cookie = CookieManager.getInstance().getCookie(url);
             if (cookie != null) r.addRequestHeader("Cookie", cookie);
-            // VISIBLE_NOTIFY_COMPLETED = barra mientras baja Y aviso al
-            // terminar. Es lo que hacía Chrome y lo que se echaba en falta.
+            // Su notificación se apaga: pone UNA por fichero y con diez
+            // vídeos eran diez avisos iguales. La nuestra las resume en una
+            // sola con el progreso de toda la tanda (ver `AvisoDescargas`).
             r.setNotificationVisibility(
-                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            r.setTitle(nombre);
-            r.setDescription("TTShop AI Pro");
+                DownloadManager.Request.VISIBILITY_HIDDEN);
             // ESTO es lo que se está probando.
             r.setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_DOWNLOADS, CARPETA + "/" + nombre);
-            ((DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE)).enqueue(r);
-            aviso("Bajando a " + CARPETA + "/: " + nombre);
+            long id = ((DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE))
+                .enqueue(r);
+            avisosDescarga.empezada(id, nombre);
         } catch (Exception e) {
             Log.e(TAG, "fallo con DownloadManager", e);
             aviso("Falló la descarga normal: " + e);
@@ -200,9 +202,9 @@ public class MainActivity extends Activity {
             try {
                 int coma = dataUrl.indexOf(',');
                 byte[] datos = Base64.decode(dataUrl.substring(coma + 1), Base64.DEFAULT);
+                avisosDescarga.empezadaSinGestor(nombre);
                 guardarEnDescargas(nombre, tipo, datos);
-                aviso("Guardado en " + CARPETA + "/: " + nombre
-                    + " (" + (datos.length / 1024 / 1024) + " MB)");
+                avisosDescarga.terminadaSinGestor();
             } catch (Throwable e) {
                 // `Throwable` a posta: con un vídeo grande esto puede ser un
                 // OutOfMemoryError, que es justo lo que se quiere descubrir.

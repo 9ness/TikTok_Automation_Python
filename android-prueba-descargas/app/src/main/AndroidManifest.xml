@@ -6,6 +6,9 @@
          NO se ve: la app no puede publicar notificaciones. Chrome sí la tiene,
          y por eso en la app buena sí sale el aviso de "descargando 3 de 10". -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Para poder APAGAR la notificación que el gestor pone por cada fichero:
+         con diez vídeos eran diez avisos iguales. Se resume en uno solo. -->
+    <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
 
     <application
         android:allowBackup="false"

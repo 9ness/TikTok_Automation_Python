@@ -26,6 +26,11 @@ Cuando se decida, esta carpeta se borra.
   NADA: en un WebView el `<input type="file">` no abre nada si la app no
   implementa `onShowFileChooser`. En la TWA funciona solo porque es Chrome.
   O sea que migrar no es solo rehacer las descargas: también las SUBIDAS.
+- **La notificación hay que montarla.** El gestor de Android pone UNA por
+  fichero (diez vídeos = diez avisos iguales) y en Android 13+ ni eso, si la
+  app no pide `POST_NOTIFICATIONS`. `AvisoDescargas` las apaga y publica una
+  sola con el progreso de la tanda. Es trabajo que en la TWA sale gratis
+  porque lo hace Chrome, pero el resultado se puede dejar MEJOR que el suyo.
 - **La subida en segundo plano no existiría.** La app usa Background Fetch
   (`sw-subidas.js`) para que una tanda de vídeos siga subiendo con el móvil
   bloqueado. Esa API es de Chrome; un WebView no la tiene.
