@@ -170,6 +170,8 @@ VOCES: dict[str, list[dict[str, str]]] = {
         {"id": "58852a3fb88946a18a1be7c69ed13774", "label": "Vendedora belixe"},
         {"id": "9e13aa87d990415fb435b63562cb6893", "label": "Voz Vendedora Amigable"},
         {"id": "c16b3df04d9c4e9b9264091c2e6baa45", "label": "Voz vendedora viral ttw"},
+        {"id": "7f44c1fdaef9471488d531e66aa01e9a", "label": "Influencer 1 colombiana"},
+        {"id": "b8db28cc8d7e4be4a6fc2cce8a260ca5", "label": "Voz Influencer Tuxpa Woman"},
     ],
 }
 
