@@ -16,6 +16,7 @@ import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
+import android.webkit.WebResourceRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -130,6 +131,32 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebViewClient(new WebViewClient() {
+            /**
+             * Todo lo que no sea NUESTRA web se le pasa a Android.
+             *
+             * Un WebView solo entiende `http`/`https`. La ficha de un producto
+             * en TikTok Shop acaba redirigiendo a `intent://ec/pdp?…`, que es
+             * cómo TikTok pide que se abra su app, y eso aquí moría con
+             * `ERR_UNKNOWN_URL_SCHEME` en una pantalla blanca. En Chrome —y por
+             * tanto en la TWA— funcionaba porque Chrome sí sabe resolver esos
+             * enlaces.
+             *
+             * Se hace por descarte y no listando esquemas: `intent://`,
+             * `tiktok://`, `market://`, `tel:`, `mailto:`… son todos el mismo
+             * caso. Y los `https` de FUERA también se mandan al sistema: son
+             * fichas de producto que se abren para copiar algo, y dejarlas
+             * dentro de esta app deja al operador atrapado en una web ajena.
+             */
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                Uri destino = req.getUrl();
+                String host = destino.getHost();
+                if (host != null && host.equalsIgnoreCase(Uri.parse(URL_APP).getHost())) {
+                    return false;   // lo nuestro se queda dentro
+                }
+                return abrirFuera(destino.toString());
+            }
+
             @Override
             public void onPageFinished(WebView v, String url) {
                 if (deslizar != null) deslizar.setRefreshing(false);
@@ -173,6 +200,43 @@ public class MainActivity extends Activity {
         // nueva, así que hay que avisar de que existe.
         Actualizaciones.comprobar(this);
         web.loadUrl(URL_APP);
+    }
+
+    /**
+     * Abre un enlace fuera de esta app y dice si se ha podido.
+     *
+     * Los `intent://` traen dentro un `browser_fallback_url` para cuando la app
+     * de destino no está instalada; sin usarlo, quien no tenga TikTok se queda
+     * sin ver la ficha y sin saber por qué.
+     */
+    private boolean abrirFuera(String url) {
+        if (url.startsWith("intent:")) {
+            try {
+                Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    startActivity(intent);
+                    return true;
+                } catch (android.content.ActivityNotFoundException sinApp) {
+                    String plan_b = intent.getStringExtra("browser_fallback_url");
+                    if (plan_b != null) return abrirFuera(plan_b);
+                    aviso("No tienes instalada la app que abre ese enlace");
+                    return true;
+                }
+            } catch (Exception e) {
+                aviso("Enlace que no se entiende: " + e);
+                return true;
+            }
+        }
+        try {
+            Intent ver = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            ver.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(ver);
+            return true;
+        } catch (Exception e) {
+            aviso("No se pudo abrir el enlace: " + e);
+            return true;
+        }
     }
 
     /**

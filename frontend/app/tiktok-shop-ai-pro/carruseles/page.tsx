@@ -6,6 +6,7 @@ import {
   Download,
   Flame,
   GalleryHorizontalEnd,
+  Link2,
   Loader2,
   ShoppingBag,
   Sparkles,
@@ -27,6 +28,7 @@ import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -180,6 +182,7 @@ export default function CarruselesPage() {
   const totalPorCategoria = todosAptos.data?.por_categoria ?? {};
 
   const [verTodos, setVerTodos] = useEstadoRecordado("carruseles:vertodos", false);
+  const [soloConUrl, setSoloConUrl] = useEstadoDeUsuario("carruseles:solo-url", false);
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const abrirCola = useDrawerStore((s) => s.openQueue);
@@ -202,7 +205,15 @@ export default function CarruselesPage() {
   const horasSubida = subidos.data ?? {};
   const conTexto = items.filter((p) => p.titulo).length;
   const aptos = items.filter((p) => (porProducto[p.producto] ?? VACIO).apto);
-  const visibles = verTodos ? items : aptos;
+  const enPantalla = verTodos ? items : aptos;
+  // La ficha de TikTok Shop es lo que hace falta para publicar, así que este
+  // filtro es "enséñame solo lo que puedo subir hoy". El contador va sobre los
+  // que ya se están viendo, no sobre los diez de la carpeta: si estás en
+  // "solo aptos", 3/4 es la cuenta que importa.
+  const conUrlEnPantalla = enPantalla.filter((p) => Boolean(p.product_url)).length;
+  const visibles = soloConUrl
+    ? enPantalla.filter((p) => Boolean(p.product_url))
+    : enPantalla;
   const conMensaje = aptos.filter((p) => porProducto[p.producto]?.mensaje1).length;
   const listos = aptos.filter((p) => {
     const f = porProducto[p.producto]?.fotos;
@@ -282,9 +293,10 @@ export default function CarruselesPage() {
    *  productos, no solo los aptos de ahora: si uno se quedó fuera del filtro
    *  después de haberle hecho las fotos, sus dos fotos siguen ahí y hay que
    *  poder bajarlas. */
-  function colaEditada() {
+  function colaEditada(soloUrl = false) {
     const cola: { producto: string; tipo: keyof FotosCarrusel; version: string }[] = [];
     for (const p of items) {
+      if (soloUrl && !p.product_url) continue;
       const f = porProducto[p.producto]?.fotos;
       if (f?.chica_txt)
         cola.push({ producto: p.producto, tipo: "chica_txt", version: f.chica_txt });
@@ -294,11 +306,15 @@ export default function CarruselesPage() {
     return cola;
   }
 
-  async function descargarCarpetaEditada() {
+  async function descargarCarpetaEditada(soloUrl = false) {
     if (!folder) return;
-    const cola = colaEditada();
+    const cola = colaEditada(soloUrl);
     if (!cola.length) {
-      toast.error("Esta carpeta no tiene ninguna foto editada todavía");
+      toast.error(
+        soloUrl
+          ? "Ninguno de los que tienen URL tiene las fotos editadas"
+          : "Esta carpeta no tiene ninguna foto editada todavía",
+      );
       return;
     }
     const archivos = cola.map((item, i) => ({
@@ -904,7 +920,7 @@ export default function CarruselesPage() {
           <button
             type="button"
             disabled={Boolean(bajandoCarpeta) || !colaEditada().length}
-            onClick={descargarCarpetaEditada}
+            onClick={() => descargarCarpetaEditada()}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-500 transition hover:bg-sky-500/20 disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
@@ -912,6 +928,22 @@ export default function CarruselesPage() {
               ? `Bajando ${bajandoCarpeta}`
               : `Bajar las ${colaEditada().length} fotos de esta carpeta, en orden`}
           </button>
+
+          {/* Sin ficha no se puede publicar, así que en una carpeta a medias lo
+              que se baja al móvil es solo lo que se va a subir hoy. Se esconde
+              cuando ya están todas: ahí duplicaría el botón de arriba. */}
+          {colaEditada(true).length > 0 &&
+            colaEditada(true).length < colaEditada().length && (
+              <button
+                type="button"
+                disabled={Boolean(bajandoCarpeta)}
+                onClick={() => descargarCarpetaEditada(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Con URL ({colaEditada(true).length})
+              </button>
+            )}
           <p className="text-center text-[10px] text-muted-foreground">
             Salen numeradas 01, 02, 03… — foto 1 y 2 del primer producto, luego las del
             segundo, y así.
@@ -984,15 +1016,24 @@ export default function CarruselesPage() {
           />
           Ver también los que no valen
           <span className="ml-auto text-[10px] text-muted-foreground">
-            {visibles.length}/{items.length}
+            {enPantalla.length}/{items.length}
           </span>
         </label>
 
+        <FiltroSoloUrl
+          activo={soloConUrl}
+          onChange={setSoloConUrl}
+          conUrl={conUrlEnPantalla}
+          total={enPantalla.length}
+        />
+
         {!visibles.length && !productos.isLoading && (
           <p className="py-4 text-center text-[11px] text-muted-foreground">
-            {clasificada
-              ? "En esta carpeta no hay ningún producto que encaje en un carrusel."
-              : "Pulsa «Filtrar belleza y suplementos» para saber cuáles valen."}
+            {soloConUrl && enPantalla.length
+              ? "Ninguno de estos tiene la ficha enlazada todavía."
+              : clasificada
+                ? "En esta carpeta no hay ningún producto que encaje en un carrusel."
+                : "Pulsa «Filtrar belleza y suplementos» para saber cuáles valen."}
           </p>
         )}
 

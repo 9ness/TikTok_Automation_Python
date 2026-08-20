@@ -16,11 +16,16 @@ export function FotoProducto({
   src,
   alt,
   className = "",
+  claseHueco = "",
   onClick,
 }: {
   src: string | null;
   alt: string;
   className?: string;
+  /** Clases para el hueco de "no cargó". Hace falta donde la foto es lo único
+   *  que da altura —el visor a pantalla completa—: sin un alto mínimo, el
+   *  aviso sale aplastado y parece que no ha pasado nada. */
+  claseHueco?: string;
   onClick?: () => void;
 }) {
   const [intento, setIntento] = useState(0);
@@ -36,7 +41,7 @@ export function FotoProducto({
   if (!src || fallo) {
     return (
       <div
-        className={`flex items-center justify-center bg-muted text-center text-[9px] leading-tight text-muted-foreground ${className}`}
+        className={`flex items-center justify-center bg-muted text-center text-[9px] leading-tight text-muted-foreground ${className} ${claseHueco}`}
       >
         {src ? "no cargó" : ""}
       </div>

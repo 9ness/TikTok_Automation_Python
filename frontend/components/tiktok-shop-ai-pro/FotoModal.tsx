@@ -3,6 +3,8 @@
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { FotoProducto } from "./FotoProducto";
+
 /** Las dos fotos de un producto: la limpia y la captura con el título.
  *
  *  Compartido entre nichos a propósito. Las URLs se pasan ya construidas
@@ -86,12 +88,17 @@ export function FotoModal({
           </div>
         )}
 
+        {/* Con reintento, igual que las miniaturas. Aquí era un `<img>` pelado
+            y por eso al abrir una foto salía SOLO la cabecera del visor: si la
+            API devolvía 502 para esa imagen —la del visor es más grande que la
+            miniatura, así que es otra entrada de caché y toca Drive— la imagen
+            se quedaba con alto cero y no lo decía. */}
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <FotoProducto
             src={src}
             alt={titulo}
             className="w-full rounded-md border border-border/60 object-contain"
+            claseHueco="min-h-[12rem]"
           />
         ) : (
           <p className="py-8 text-center text-xs text-muted-foreground">
