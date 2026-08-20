@@ -157,6 +157,12 @@ VOCES: dict[str, list[dict[str, str]]] = {
         {"id": "c5a26d53f9fa41dc92479d065a2c9b8e", "label": "Voz Vendedor Colombiano"},
         {"id": "77087ce820a74b2793a67371db067e89", "label": "Luquitas Influencer"},
         {"id": "d2ee7bb7cb3946d1b1994c1e4a6ff44e", "label": "MY COMBOY (El vaqueroff)"},
+        {"id": "6b66be3c8bda4c1cb59dc1446362b290", "label": "Experto de Marketing"},
+        # La más LENTA del banco (14,0 car/s medidos). Se queda porque el
+        # sorteo ya descarta las voces que no quepan en los clips que hay
+        # (`voz.elegir_voz`); sin ese filtro obligaría a subir un clip más en
+        # el 15% de los guiones.
+        {"id": "79ec4c10f80e4e0592b6e2f86b650e22", "label": "Vendedor Entusiasta"},
     ],
     "mujer": [
         {"id": "b08746cb224a4277a14b901c3591c3b9", "label": "voz publicidad"},

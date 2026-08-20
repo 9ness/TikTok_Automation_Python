@@ -37,6 +37,12 @@ MEDIDAS_INICIALES: dict[str, float] = {
     "3fa82ba878ca4740ac6bba8ae0c38d76": 16.7,  # Voz Clara Influencer 1
     "77087ce820a74b2793a67371db067e89": 16.0,  # Luquitas Influencer
     "9ba6a6e4ecd84af58b7913f3944f54f2": 15.4,  # influencer
+    # Medidas con el mismo guion de 236 caracteres el 20 ago 2026, antes de
+    # meterlas en el banco. La de Renzo es la más lenta que hay.
+    "6b66be3c8bda4c1cb59dc1446362b290": 19.6,  # Experto de Marketing
+    "b8db28cc8d7e4be4a6fc2cce8a260ca5": 18.2,  # Voz Influencer Tuxpa Woman
+    "7f44c1fdaef9471488d531e66aa01e9a": 17.4,  # Influencer 1 colombiana
+    "79ec4c10f80e4e0592b6e2f86b650e22": 14.0,  # Vendedor Entusiasta (Renzo)
 }
 
 # Fuera de esta banda la medida es basura (el audio salió cortado, o el guion

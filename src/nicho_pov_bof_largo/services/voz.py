@@ -41,12 +41,42 @@ _noop: OnLog = lambda _m: None
 FISH_USD_PER_MILLON_BYTES = 15.0
 
 
-def elegir_voz(sexo: str, rng: random.Random | None = None) -> dict[str, str]:
-    """Una voz al azar del banco del sexo pedido."""
+def elegir_voz(
+    sexo: str,
+    rng: random.Random | None = None,
+    *,
+    caracteres: int = 0,
+    segundos_max: float = 0.0,
+) -> dict[str, str]:
+    """Una voz al azar del banco del sexo pedido.
+
+    Si se dice cuánto texto hay (`caracteres`) y cuánto vídeo cabe
+    (`segundos_max`), se descartan las voces que NO quepan: cada una habla a su
+    ritmo y la diferencia es enorme —de 14 a 23,6 caracteres por segundo—, así
+    que el mismo guion son 15s con una y 25s con otra. Locutar con una lenta un
+    guion medido para una media obliga al montaje a estirar el vídeo, y ahí es
+    donde se deforma el gesto de la mano.
+
+    Se puede filtrar porque cuando se locuta los clips YA están subidos: se sabe
+    cuánto material hay. Antes se sorteaba a ciegas entre todas.
+
+    Si no cabe ninguna se sortea entre todas igualmente: quedarse sin voz sería
+    peor que estirar un poco, y el aviso lo da el log del montaje.
+    """
     sexo = (sexo or "").strip().lower()
     if sexo not in config.VOCES:
         raise ValueError(f"sexo debe ser {' o '.join(config.SEXOS)}, recibido: {sexo!r}")
-    return (rng or random).choice(config.VOCES[sexo])
+    candidatas = list(config.VOCES[sexo])
+    if caracteres > 0 and segundos_max > 0:
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        caben = [
+            v for v in candidatas
+            if caracteres / velocidad_voz.caracteres_por_segundo(v["id"]) <= segundos_max
+        ]
+        if caben:
+            candidatas = caben
+    return (rng or random).choice(candidatas)
 
 
 def sintetizar(
@@ -56,6 +86,9 @@ def sintetizar(
     sexo: str = "hombre",
     voz: dict[str, str] | None = None,
     rng: random.Random | None = None,
+    # Cuánto vídeo hay para esta voz. Sirve para no sortear una voz lenta que
+    # no quepa (ver `elegir_voz`). 0 = no se sabe, se sortea entre todas.
+    segundos_max: float = 0.0,
     on_log: OnLog = _noop,
 ) -> dict:
     """Genera el mp3 crudo y lo deja nivelado en `destino`.
@@ -71,7 +104,9 @@ def sintetizar(
     if not texto:
         raise ValueError("no hay texto que locutar")
 
-    elegida = voz or elegir_voz(sexo, rng)
+    elegida = voz or elegir_voz(
+        sexo, rng, caracteres=len(texto), segundos_max=segundos_max,
+    )
     on_log(f"[nicho_pov_bof_largo] voz: {elegida['label']} ({sexo})")
 
     destino = Path(destino)

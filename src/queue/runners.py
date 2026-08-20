@@ -2027,6 +2027,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         audio = work / "voz.mp3"
         info = voz_svc.sintetizar(
             escrito["guion"], audio, sexo=sexo, on_log=on_log,
+            # Los clips ya están subidos: se sabe cuánto vídeo hay, así que se
+            # sortea solo entre las voces cuyo ritmo quepa ahí.
+            segundos_max=len(clips) * largo_config.CLIP_MAX_S,
         )
         # Cada vídeo afina la velocidad de SU voz: es lo que hace que la
         # próxima estimación de cuántos clips hacen falta sea mejor.
@@ -2164,7 +2167,12 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
     output_local = work_dir / "output.mp4"
     try:
         audio = work_dir / "voz.mp3"
-        info = voz_svc.sintetizar(guion, audio, sexo=sexo, rng=rng, on_log=on_log)
+        from src.nicho_pov_bof_largo import config as largo_config
+
+        info = voz_svc.sintetizar(
+            guion, audio, sexo=sexo, rng=rng, on_log=on_log,
+            segundos_max=len(clips) * largo_config.CLIP_MAX_S,
+        )
         on_log(
             f"[pov_bof_plazos] voz: {info.get('voz_label')} · "
             f"{info.get('duracion', 0):.1f}s"
