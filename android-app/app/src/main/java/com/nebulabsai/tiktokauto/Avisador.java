@@ -19,6 +19,8 @@ final class Avisador {
 
     interface Escucha {
         void subido(String nombre, String respuesta);
+        /** Cuánto lleva ese fichero, de 0 a 100. */
+        void avanza(String nombre, int pct);
     }
 
     private static volatile Escucha escucha;
@@ -36,6 +38,16 @@ final class Avisador {
             e.subido(nombre, respuesta);
         } catch (Throwable t) {
             // Avisar a la pantalla no puede tumbar la subida.
+        }
+    }
+
+    static void avanza(String nombre, int pct) {
+        Escucha e = escucha;
+        if (e == null) return;
+        try {
+            e.avanza(nombre, pct);
+        } catch (Throwable t) {
+            // Idem: el porcentaje es un adorno, la subida es lo que importa.
         }
     }
 }

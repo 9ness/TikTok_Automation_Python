@@ -61,18 +61,56 @@ export function subirConLaApp(v: {
   }
 }
 
+/** Los que escuchan. Un conjunto y no una función suelta porque hay DOS
+ *  interesados a la vez y con distinta vida: la pantalla, que refresca la lista
+ *  cuando entra un clip, y cada tarjeta, que pinta el porcentaje de SU botón.
+ *  Con una sola ranura, el último en montarse borraba al anterior. */
+const alTerminarFichero = new Set<(nombre: string, respuesta: string) => void>();
+const alAvanzarFichero = new Set<(nombre: string, pct: number) => void>();
+
+/** Engancha los callbacks que llama la app. Se hace una vez y se queda: lo que
+ *  entra y sale son los suscriptores, no el puente. */
+function engancharPuente() {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as {
+    __subidaAppFichero?: (nombre: string, respuesta: string) => void;
+    __subidaAppProgreso?: (nombre: string, pct: number) => void;
+  };
+  w.__subidaAppFichero = (nombre, respuesta) => {
+    alTerminarFichero.forEach((fn) => fn(nombre, respuesta));
+  };
+  w.__subidaAppProgreso = (nombre, pct) => {
+    alAvanzarFichero.forEach((fn) => fn(nombre, pct));
+  };
+}
+
 /** Avisa de CADA fichero según lo va subiendo la app, para ir marcando la
  *  pantalla sin esperar al final de la tanda. */
 export function alSubirCadaFichero(
   fn: (nombre: string, respuesta: string) => void,
 ): () => void {
   if (typeof window === "undefined") return () => {};
-  const w = window as unknown as {
-    __subidaAppFichero?: (nombre: string, respuesta: string) => void;
-  };
-  w.__subidaAppFichero = fn;
+  engancharPuente();
+  alTerminarFichero.add(fn);
   return () => {
-    delete w.__subidaAppFichero;
+    alTerminarFichero.delete(fn);
+  };
+}
+
+/** Cuánto lleva subido el fichero que va ahora (0-100).
+ *
+ *  Existe porque al pasar la subida a la app se perdió el porcentaje del botón:
+ *  la app avisaba solo al TERMINAR cada clip, y mientras tanto el botón se
+ *  quedaba mudo. Con ocho productos a tres clips, no saber si algo avanza es
+ *  justo lo que hace dudar de si se ha quedado colgado. */
+export function alProgresoDeFichero(
+  fn: (nombre: string, pct: number) => void,
+): () => void {
+  if (typeof window === "undefined") return () => {};
+  engancharPuente();
+  alAvanzarFichero.add(fn);
+  return () => {
+    alAvanzarFichero.delete(fn);
   };
 }
 

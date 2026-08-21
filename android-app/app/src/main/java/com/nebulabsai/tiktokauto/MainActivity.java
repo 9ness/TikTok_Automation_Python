@@ -185,13 +185,31 @@ public class MainActivity extends Activity {
         avisosDescarga = new AvisoDescargas(this);
         // Cada fichero que sube el servicio se le cuenta a la pantalla en el
         // momento, para que marque ese hueco sin esperar al final de la tanda.
-        Avisador.escuchar((nombre, respuesta) -> runOnUiThread(() -> {
-            if (web == null) return;
-            String js = "if(window.__subidaAppFichero)window.__subidaAppFichero("
-                + org.json.JSONObject.quote(nombre) + ","
-                + org.json.JSONObject.quote(respuesta) + ")";
-            web.evaluateJavascript(js, null);
-        }));
+        Avisador.escuchar(new Avisador.Escucha() {
+            @Override
+            public void subido(String nombre, String respuesta) {
+                runOnUiThread(() -> {
+                    if (web == null) return;
+                    web.evaluateJavascript(
+                        "if(window.__subidaAppFichero)window.__subidaAppFichero("
+                        + org.json.JSONObject.quote(nombre) + ","
+                        + org.json.JSONObject.quote(respuesta) + ")", null);
+                });
+            }
+
+            /** El porcentaje del fichero que va ahora. Al pasar la subida al
+             *  servicio se perdió el que salía en el botón: solo se avisaba al
+             *  TERMINAR cada clip y, mientras, el botón se quedaba mudo. */
+            @Override
+            public void avanza(String nombre, int pct) {
+                runOnUiThread(() -> {
+                    if (web == null) return;
+                    web.evaluateJavascript(
+                        "if(window.__subidaAppProgreso)window.__subidaAppProgreso("
+                        + org.json.JSONObject.quote(nombre) + "," + pct + ")", null);
+                });
+            }
+        });
         pedirPermisoDeNotificaciones();
         pedirSalirDelAhorroDeBateria();
         // Antes esto no hacía falta: la app era una carcasa de la web y se

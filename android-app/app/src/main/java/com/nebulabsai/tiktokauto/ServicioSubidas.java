@@ -123,7 +123,7 @@ public class ServicioSubidas extends Service {
                 notificar(aviso(i, total, nombre, 0));
                 String respuesta = subirUno(
                     uri, nombre, t.getString("url"), apiKey, cookie,
-                    t.optJSONObject("campos"));
+                    t.optJSONObject("campos"), i, total);
                 if (resultados.length() > 1) resultados.append(",");
                 resultados.append(respuesta);
                 // Se avisa fichero a fichero: la pantalla marca ese hueco como
@@ -146,9 +146,19 @@ public class ServicioSubidas extends Service {
         }
     }
 
+    /** Cuánto pesa lo que hay detrás de un `content://`, o -1 si no se sabe. */
+    private long tamanoDe(ContentResolver cr, Uri uri) {
+        try (android.os.ParcelFileDescriptor fd = cr.openFileDescriptor(uri, "r")) {
+            return fd == null ? -1 : fd.getStatSize();
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     /** Un fichero, en multipart, leyendo del `content://` sin cargarlo en RAM. */
     private String subirUno(Uri uri, String nombre, String url, String apiKey,
-                            String cookie, org.json.JSONObject campos)
+                            String cookie, org.json.JSONObject campos,
+                            int indice, int total)
             throws Exception {
         String limite = "----ttshop" + System.nanoTime();
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
@@ -174,11 +184,28 @@ public class ServicioSubidas extends Service {
             out.writeBytes("Content-Type: video/mp4\r\n\r\n");
 
             ContentResolver cr = getContentResolver();
+            // El tamaño hace falta para el porcentaje. Si no se puede saber
+            // (algún proveedor no lo da), se sube igual y solo se queda sin
+            // porcentaje: no es motivo para no subir.
+            long tamano = tamanoDe(cr, uri);
             try (InputStream in = cr.openInputStream(uri)) {
                 byte[] buf = new byte[128 * 1024];
                 int leidos;
+                long enviados = 0;
+                int ultimoPct = -1;
                 while (in != null && (leidos = in.read(buf)) != -1) {
                     out.write(buf, 0, leidos);
+                    enviados += leidos;
+                    if (tamano <= 0) continue;
+                    // Solo al cambiar de entero: cada trozo son 128 KB y en un
+                    // vídeo de 30 MB serían 240 saltos al WebView para pintar
+                    // el mismo número.
+                    int pct = (int) Math.min(99, enviados * 100 / tamano);
+                    if (pct != ultimoPct) {
+                        ultimoPct = pct;
+                        Avisador.avanza(nombre, pct);
+                        notificar(aviso(indice, total, nombre, pct));
+                    }
                 }
             }
             out.writeBytes("\r\n--" + limite + "--\r\n");
@@ -186,7 +213,13 @@ public class ServicioSubidas extends Service {
 
         int codigo = con.getResponseCode();
         try (InputStream in = codigo < 400 ? con.getInputStream() : con.getErrorStream()) {
-            return in == null ? "{}" : new String(in.readAllBytes(), "UTF-8");
+            if (in == null) return "{}";
+            // Nada de `readAllBytes`: es API 33 y el mínimo aquí es 29.
+            java.io.ByteArrayOutputStream cuerpo = new java.io.ByteArrayOutputStream();
+            byte[] trozo = new byte[8192];
+            int leidos;
+            while ((leidos = in.read(trozo)) != -1) cuerpo.write(trozo, 0, leidos);
+            return cuerpo.toString("UTF-8");
         } finally {
             con.disconnect();
         }

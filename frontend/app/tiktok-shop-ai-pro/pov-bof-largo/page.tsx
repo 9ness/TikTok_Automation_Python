@@ -35,7 +35,12 @@ import {
   verTopVendidos,
 } from "@/lib/topVendidos";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
-import { alSubirCadaFichero, haySubidaNativa, subirConLaApp } from "@/lib/subidaNativa";
+import {
+  alProgresoDeFichero,
+  alSubirCadaFichero,
+  haySubidaNativa,
+  subirConLaApp,
+} from "@/lib/subidaNativa";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
@@ -1404,6 +1409,35 @@ function ProductoCard({
     3: number | null;
     4: number | null;
   }>({ 1: null, 2: null, 3: null, 4: null });
+  // Qué fichero está subiendo la app en cada hueco. Los dos lados se casan por
+  // NOMBRE porque es lo único que viaja por el puente: los bytes se quedan en
+  // la app (un vídeo en base64 serían 30 MB de cadena).
+  const [ficheroApp, setFicheroApp] = useState<Record<number, string>>({});
+  /** El porcentaje que manda la app, al hueco que le toca. */
+  useEffect(() => {
+    const huecos = Object.entries(ficheroApp);
+    if (!huecos.length) return;
+    const quitarProgreso = alProgresoDeFichero((nombre, pct) => {
+      const hueco = huecos.find(([, n]) => n === nombre);
+      if (hueco) setPcts((prev) => ({ ...prev, [Number(hueco[0])]: pct }));
+    });
+    const quitarFin = alSubirCadaFichero((nombre) => {
+      const hueco = huecos.find(([, n]) => n === nombre);
+      if (!hueco) return;
+      const slot = Number(hueco[0]);
+      setPcts((prev) => ({ ...prev, [slot]: null }));
+      setFicheroApp((prev) => {
+        const copia = { ...prev };
+        delete copia[slot];
+        return copia;
+      });
+    });
+    return () => {
+      quitarProgreso();
+      quitarFin();
+    };
+  }, [ficheroApp]);
+
   // Auto por defecto: el montaje mira la mano del clip 1 y elige la voz
   // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
   const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
@@ -1460,6 +1494,10 @@ function ProductoCard({
       if (lanzada) {
         const ref = refs[slot].current;
         if (ref) ref.value = "";
+        // El botón se pone a 0% aquí: el primer aviso de la app tarda lo que
+        // tarde el primer trozo, y hasta entonces no se vería que va.
+        setPcts((prev) => ({ ...prev, [slot]: 0 }));
+        setFicheroApp((prev) => ({ ...prev, [slot]: file.name }));
         toast.success("Subiendo con la app: puedes bloquear el móvil");
         return;
       }
