@@ -237,6 +237,14 @@ export default function CreativosProPage() {
             >
               {f.completed && "✓ "}
               {f.name}
+              {/* Cuántos productos de esta carpeta tienen ya la ficha
+                  enlazada: es el trabajo que hay dentro, sin entrar a mirar.
+                  No sale cuando es 0 — un cero en cada chip es ruido. */}
+              {!!f.con_url && (
+                <span className="ml-1 rounded-full bg-emerald-500/15 px-1 py-px text-[9px] font-semibold text-emerald-500">
+                  {f.con_url}
+                </span>
+              )}
             </button>
           ))}
         </div>

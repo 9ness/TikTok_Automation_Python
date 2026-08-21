@@ -80,6 +80,7 @@ def list_folders(
     cuáles están hechas: un creativo no es un vídeo.
     """
     from src.nicho_creativos.repos import progress_repo
+    from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import drive_client
 
     try:
@@ -94,9 +95,20 @@ def list_folders(
     except RuntimeError:
         hechas = set()
     nombres = [c.get("name", "") for c in carpetas]
+    # Cuántos productos de cada carpeta tienen ya la ficha enlazada. Sale del
+    # índice COMPARTIDO del POV BOF (la ficha es del producto, no del nicho),
+    # y es lo que dice desde el listado dónde hay trabajo sin entrar a mirar.
+    try:
+        con_url = product_repo.con_url_por_carpeta(source, nombres)
+    except Exception:  # noqa: BLE001
+        # Un fallo contando no puede dejar sin listado de carpetas.
+        con_url = {}
     return {
         "source": source,
-        "items": [{"name": n, "completed": n in hechas} for n in nombres],
+        "items": [
+            {"name": n, "completed": n in hechas, "con_url": int(con_url.get(n, 0))}
+            for n in nombres
+        ],
         "current": next((n for n in nombres if n not in hechas), None),
         "done": len(hechas),
         "total": len(nombres),

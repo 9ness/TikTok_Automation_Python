@@ -791,6 +791,32 @@ def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     return salida
 
 
+def _casa_solo_titulo(clave: str, indice) -> str:
+    """La clave del índice con el MISMO título aunque la tienda sea otra.
+
+    `casa_clave` cubre el título cortado por TikTok, pero no el otro modo de
+    quedarse huérfana una ficha: que cambie la TIENDA. Pasa de verdad — la
+    tienda se lee de la captura igual que el título, y al releer los textos un
+    producto puede pasar de "DEWINNER" a "TEENO" (la marca del producto y la
+    del vendedor no siempre son la misma). La URL seguía guardada con la
+    tienda vieja y el botón salía apagado.
+
+    Misma regla que el resto: solo si NO hay duda. Si el título cuadra con dos
+    tiendas distintas se devuelve vacío, que es mejor que abrir la ficha
+    equivocada.
+    """
+    if "|" not in clave:
+        return ""
+    titulo = clave.split("|", 1)[1]
+    if not titulo:
+        return ""
+    casan = {
+        otra for otra in indice
+        if "|" in otra and otra.split("|", 1)[1] == titulo
+    }
+    return casan.pop() if len(casan) == 1 else ""
+
+
 def url_de(prod: dict, indice: dict[str, str] | None = None) -> str:
     """La ficha de ese producto: la del índice o la que guardó EchoTik."""
     if indice is None:
@@ -801,6 +827,11 @@ def url_de(prod: dict, indice: dict[str, str] | None = None) -> str:
             return str(indice[clave])
     for clave in claves:
         equivalente = casa_clave(clave, indice)
+        if equivalente and indice.get(equivalente):
+            return str(indice[equivalente])
+    # Último intento: mismo título, otra tienda.
+    for clave in claves:
+        equivalente = _casa_solo_titulo(clave, indice)
         if equivalente and indice.get(equivalente):
             return str(indice[equivalente])
     return str(prod.get("product_url") or "")

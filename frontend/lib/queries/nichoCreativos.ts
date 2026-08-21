@@ -23,6 +23,10 @@ export interface PromptCreativos {
 export interface CarpetaCreativos {
   name: string;
   completed: boolean;
+  /** Cuántos productos de la carpeta tienen ya la ficha de TikTok Shop
+   *  enlazada. Sale del índice COMPARTIDO del POV BOF: la ficha es del
+   *  producto, no del nicho. */
+  con_url?: number;
 }
 
 export interface FoldersCreativos {
