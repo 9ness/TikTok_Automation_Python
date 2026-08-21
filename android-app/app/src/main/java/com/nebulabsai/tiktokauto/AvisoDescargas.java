@@ -69,8 +69,13 @@ class AvisoDescargas {
 
     /** Una descarga que lleva el gestor de Android (fichero por URL). */
     synchronized void empezada(long id, String nombre) {
-        enMarcha.put(id, nombre);
+        // `apuntar` ANTES de meterla en la lista: es quien decide si esto
+        // empieza una tanda nueva, y lo decide mirando si queda algo vivo. Al
+        // revés, la primera de cada tanda ya estaba dentro, la cuenta no se
+        // reiniciaba nunca y se iba sumando a la anterior — de ahí el "11 de
+        // 17" al bajar una carpeta de 10 (los 10 de antes + los 7 de ahora).
         apuntar(nombre);
+        enMarcha.put(id, nombre);
         arrancarVigilancia();
     }
 

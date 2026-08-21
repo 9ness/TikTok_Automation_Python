@@ -683,3 +683,4 @@
 - Una `<img>` con `object-contain` dentro de un `flex-col` con `max-h` se COMPRIME (los hijos flex encogen por defecto) y sale con franjas a los lados: hace falta `shrink-0` además del alto.
 - Al pasar la subida al servicio de Android se perdió el % del botón: el servicio solo avisaba al TERMINAR cada fichero. Ahora cuenta los bytes y lo manda por `window.__subidaAppProgreso`, y solo al cambiar de entero (128 KB por trozo serían 240 saltos al WebView por vídeo).
 - `subidaNativa.ts` guardaba UN solo callback por evento: la tarjeta pisaba al de la página. Con un `Set` de suscriptores conviven los dos.
+- La notificación de descargas sumaba tandas ("11 de 17" al bajar 10): `empezada()` metía la descarga en `enMarcha` ANTES de `apuntar()`, que decide si es tanda nueva mirando si queda algo vivo — así nunca se reiniciaba la cuenta.
