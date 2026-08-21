@@ -4,6 +4,7 @@ import {
   Check,
   ClipboardCopy,
   Download,
+  Link2,
   Loader2,
   Sparkles,
   Store,
@@ -28,6 +29,7 @@ import {
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
+import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -89,9 +91,10 @@ export default function CreativosProPage() {
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "creativos:topventas:sinsubir", false,
   );
+  const [soloConUrl, setSoloConUrl] = useEstadoDeUsuario("creativos:solo-url", false);
   // "Subido" aquí es el CREATIVO, no el vídeo: un producto puede tener el
   // vídeo publicado y el creativo aún no.
-  const itemsVisibles = useMemo(
+  const enPantalla = useMemo(
     () =>
       verTopVendidos(items, {
         activo: esTopVendidos,
@@ -100,17 +103,32 @@ export default function CreativosProPage() {
       }),
     [items, esTopVendidos, soloSinSubir, horasSubida],
   );
+  // Sin la ficha enlazada no se puede publicar, así que este filtro es
+  // "enséñame solo lo que puedo sacar hoy" — el mismo de los dos POV BOF.
+  const conUrlEnPantalla = enPantalla.filter((p) => Boolean(p.product_url)).length;
+  const itemsVisibles = useMemo(
+    () => (soloConUrl ? enPantalla.filter((p) => Boolean(p.product_url)) : enPantalla),
+    [enPantalla, soloConUrl],
+  );
   const enEscaparate = items.filter((p) => p.en_escaparate).length;
+  const fotosTotales = items.filter((p) => p.titled_photo_id).length;
+  const fotosConUrl = items.filter((p) => p.titled_photo_id && p.product_url).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
 
   // Se bajan las fotos CON LA DESCRIPCIÓN (la captura de la ficha), no las
   // limpias: el prompt del creativo pide integrar los beneficios del producto,
   // y esos solo están en la ficha. Con la foto limpia el generador no tiene de
   // dónde sacarlos y se los inventa — que es justo lo que el prompt prohíbe.
-  async function descargarFotos() {
-    const conFoto = items.filter((p) => p.titled_photo_id);
+  async function descargarFotos(soloUrl = false) {
+    const conFoto = items.filter(
+      (p) => p.titled_photo_id && (!soloUrl || p.product_url),
+    );
     if (!folder || !conFoto.length) {
-      toast.error("Ningún producto de esta carpeta tiene foto de la ficha");
+      toast.error(
+        soloUrl
+          ? "Ninguno de los que tienen ficha enlazada tiene foto de la ficha"
+          : "Ningún producto de esta carpeta tiene foto de la ficha",
+      );
       return;
     }
     // Una a una con un respiro: varias descargas simultáneas se bloquean o se
@@ -328,7 +346,7 @@ export default function CreativosProPage() {
           <button
             type="button"
             disabled={Boolean(bajando) || !items.length}
-            onClick={descargarFotos}
+            onClick={() => void descargarFotos()}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
@@ -336,6 +354,21 @@ export default function CreativosProPage() {
               ? `Bajando ${bajando}`
               : `Fotos de la ficha (${items.filter((p) => p.titled_photo_id).length})`}
           </button>
+
+          {/* En una carpeta a medias, lo único que hace falta bajarse es lo que
+              se va a publicar. Se esconde si ya están todas enlazadas: ahí
+              duplicaría el botón de arriba. */}
+          {fotosConUrl > 0 && fotosConUrl < fotosTotales && (
+            <button
+              type="button"
+              disabled={Boolean(bajando)}
+              onClick={() => void descargarFotos(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Con URL ({fotosConUrl})
+            </button>
+          )}
 
           <MagnificSpaces spaces={["carrusel"]} />
           <OSepara />
@@ -421,10 +454,17 @@ export default function CreativosProPage() {
             />
             Solo los que no he subido
             <span className="ml-auto text-[10px] text-muted-foreground">
-              {itemsVisibles.length}/{items.length}
+              {enPantalla.length}/{items.length}
             </span>
           </label>
         )}
+
+        <FiltroSoloUrl
+          activo={soloConUrl}
+          onChange={setSoloConUrl}
+          conUrl={conUrlEnPantalla}
+          total={enPantalla.length}
+        />
 
         {/* Carpeta vacía: casi siempre es que el curso ha borrado sus fotos
             del Drive de origen (pasa cada pocas semanas). Nuestra copia las
