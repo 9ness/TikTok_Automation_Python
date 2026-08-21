@@ -116,7 +116,7 @@ const CAR_POR_SEG = 18.2;
  *  eso decide cuántos hay que generar en Magnific. Los de 3 y 4 se cuentan
  *  SOBRE los que tienen URL, que es el conjunto de trabajo.
  */
-type Filtro = "todas" | "url" | "clips3" | "clips4";
+type Filtro = "todas" | "url" | "clips2" | "clips3" | "clips4";
 
 interface ParaFiltrar {
   product_url?: string;
@@ -126,13 +126,21 @@ interface ParaFiltrar {
 // Cuántos clips pide un guion es lo que más trabajo cambia (hay que generar uno
 // más en Magnific por cada uno), así que se ve de un vistazo: una franja en el
 // lado de la tarjeta y un distintivo junto al precio, del MISMO color que su
-// botón de descarga. Dos clips es lo normal y no se marca.
+// botón de descarga.
+//
+// Los de DOS también van marcados. Antes no: eran "lo normal" y se dejaban sin
+// color. Pero en una carpeta mezclada eso convierte al más común en el único
+// que no se distingue —y en el único que no se podía bajar por separado—, así
+// que había que ir producto a producto. Los colores son los MISMOS del POV BOF
+// corto para que las dos pantallas se lean igual.
 const BORDE_CLIPS: Record<number, string> = {
+  2: "border-l-4 border-l-lime-500",
   3: "border-l-4 border-l-amber-500",
   4: "border-l-4 border-l-rose-500",
 };
 
 const CHIP_CLIPS: Record<number, string> = {
+  2: "bg-lime-500/15 text-lime-500",
   3: "bg-amber-500/15 text-amber-500",
   4: "bg-rose-500/15 text-rose-500",
 };
@@ -140,6 +148,7 @@ const CHIP_CLIPS: Record<number, string> = {
 /** Cómo se nombra cada subconjunto cuando no hay nada que bajar. */
 function textoFiltro(filtro: Filtro): string {
   if (filtro === "url") return "con la ficha enlazada";
+  if (filtro === "clips2") return "de 2 clips con la ficha enlazada";
   if (filtro === "clips3") return "de 3 clips con la ficha enlazada";
   if (filtro === "clips4") return "de 4 clips con la ficha enlazada";
   return "";
@@ -154,7 +163,8 @@ function cuadra(p: ParaFiltrar, filtro: Filtro): boolean {
   if (filtro === "todas") return true;
   const conUrl = Boolean(p.product_url);
   if (filtro === "url") return conUrl;
-  return conUrl && clipsDe(p) === (filtro === "clips3" ? 3 : 4);
+  const pide = filtro === "clips2" ? 2 : filtro === "clips3" ? 3 : 4;
+  return conUrl && clipsDe(p) === pide;
 }
 
 /** EchoTik apagado (ver la misma bandera en el Nicho POV BOF). */
@@ -285,9 +295,11 @@ export default function PovBofLargoPage() {
   // Los conjuntos que de verdad se bajan aquí: los que tienen la ficha
   // enlazada, y dentro de esos, los que piden 3 y 4 clips.
   const fotoConUrl = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "url")).length;
+  const foto2 = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "clips2")).length;
   const foto3 = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "clips3")).length;
   const foto4 = enPantalla.filter((p) => p.clean_photo_id && cuadra(p, "clips4")).length;
   const videoConUrl = enPantalla.filter((p) => p.video_path && cuadra(p, "url")).length;
+  const video2 = enPantalla.filter((p) => p.video_path && cuadra(p, "clips2")).length;
   const video3 = enPantalla.filter((p) => p.video_path && cuadra(p, "clips3")).length;
   const video4 = enPantalla.filter((p) => p.video_path && cuadra(p, "clips4")).length;
   // "Textos + guiones" actúa sobre la CARPETA abierta, así que su total es el
@@ -938,7 +950,7 @@ export default function PovBofLargoPage() {
             n={2}
             color="fucsia"
             titulo="Generar los clips fuera"
-            hint="Baja las fotos y crea los clips en Magnific. Cada vídeo lleva dos clips, o tres o cuatro si el guion es largo: los que piden más van marcados con una franja de color."
+            hint="Baja las fotos y crea los clips en Magnific. Cada vídeo lleva dos clips, o tres o cuatro si el guion es largo: cada tarjeta lleva una franja de color según cuántos pida, y hay un botón por cada número."
             extra={`${conFoto} foto(s)`}
           >
             <p className="text-[10px] font-semibold text-muted-foreground">
@@ -964,12 +976,22 @@ export default function PovBofLargoPage() {
                 cuántos hay que generar en Magnific, así que se hace por tandas.
                 Solo salen si hay alguno — en una carpeta donde todos van con
                 dos clips, estos botones serían dos huecos apagados. */}
-            {(foto3 > 0 || foto4 > 0) && (
+            {(foto2 > 0 || foto3 > 0 || foto4 > 0) && (
               <>
                 <p className="pt-0.5 text-[10px] text-muted-foreground">
                   De los que tienen URL, por clips:
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                {/* Tres columnas: los de dos clips son los más numerosos y
+                    antes no tenían botón, así que había que bajarlos de uno en
+                    uno o llevarse la carpeta entera. */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadCleanPhotos("clips2")}
+                    cargando={false}
+                    disabled={downloadingPhotos || !foto2}
+                    etiqueta={`2 clips (${foto2})`}
+                    tono="clips2"
+                  />
                   <BotonDescarga
                     onClick={() => void downloadCleanPhotos("clips3")}
                     cargando={false}
@@ -1061,12 +1083,22 @@ export default function PovBofLargoPage() {
                 tono="url"
               />
             </div>
-            {(video3 > 0 || video4 > 0) && (
+            {(video2 > 0 || video3 > 0 || video4 > 0) && (
               <>
                 <p className="pt-0.5 text-[10px] text-muted-foreground">
                   De los que tienen URL, por clips:
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                {/* Tres columnas: los de dos clips son los más numerosos y
+                    antes no tenían botón, así que había que bajarlos de uno en
+                    uno o llevarse la carpeta entera. */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  <BotonDescarga
+                    onClick={() => void downloadVideos("clips2")}
+                    cargando={false}
+                    disabled={downloadingVideos || !video2}
+                    etiqueta={`2 clips (${video2})`}
+                    tono="clips2"
+                  />
                   <BotonDescarga
                     onClick={() => void downloadVideos("clips3")}
                     cargando={false}
@@ -1571,12 +1603,13 @@ function ProductoCard({
                   💳 Guion con plazos
                 </span>
               )}
-              {/* Cuántos clips pide, cuando son más de los dos de siempre.
-                  Va arriba, junto al precio, y no solo en el aviso del final de
-                  la tarjeta: es lo que hay que saber ANTES de ponerse a
-                  generarlos, y desplazándose se ve por la franja del lado sin
-                  tener que abrir nada. */}
-              {necesarios > 2 && (
+              {/* Cuántos clips pide. Va arriba, junto al precio, y no solo en
+                  el aviso del final de la tarjeta: es lo que hay que saber
+                  ANTES de ponerse a generarlos, y desplazándose se ve por la
+                  franja del lado sin tener que abrir nada.
+                  También en los de dos: dejarlos sin marcar hacía del caso más
+                  común el único que no se reconocía de un vistazo. */}
+              {necesarios >= 2 && (
                 <span className={`rounded px-1.5 py-0.5 font-semibold ${CHIP_CLIPS[necesarios]}`}>
                   🎞️ {necesarios} clips
                 </span>
