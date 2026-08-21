@@ -684,3 +684,5 @@
 - Al pasar la subida al servicio de Android se perdió el % del botón: el servicio solo avisaba al TERMINAR cada fichero. Ahora cuenta los bytes y lo manda por `window.__subidaAppProgreso`, y solo al cambiar de entero (128 KB por trozo serían 240 saltos al WebView por vídeo).
 - `subidaNativa.ts` guardaba UN solo callback por evento: la tarjeta pisaba al de la página. Con un `Set` de suscriptores conviven los dos.
 - La notificación de descargas sumaba tandas ("11 de 17" al bajar 10): `empezada()` metía la descarga en `enMarcha` ANTES de `apuntar()`, que decide si es tanda nueva mirando si queda algo vivo — así nunca se reiniciaba la cuenta.
+- La tanda de descargas se lanza fichero a fichero con pausas, así que a ratos NO queda ninguna viva en mitad de la tanda: decidir "tanda nueva" por eso reiniciaba la cuenta a medias ("9 de 9" con una bajando). Se decide por tiempo desde la última alta (20 s).
+- Si `DownloadManager.query` deja de devolver un id (borrado de su lista), esa descarga se quedaba viva para siempre y la notificación se congelaba: hay que barrer los ids que la consulta ya no devuelve — y solo si la consulta fue bien, o se dan por acabadas todas.

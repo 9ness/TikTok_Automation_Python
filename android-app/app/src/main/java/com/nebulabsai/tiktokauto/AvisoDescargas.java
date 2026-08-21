@@ -54,6 +54,21 @@ class AvisoDescargas {
     private int terminadas = 0;
     private String ultimoNombre = "";
     private boolean mirando = false;
+    /** Cuándo se dio de alta la última descarga, para saber dónde acaba una
+     *  tanda. */
+    private long ultimaAlta = 0;
+    /** Si está esperando a la red en vez de bajando, para decirlo en vez de
+     *  dejar la barra congelada. */
+    private boolean esperando = false;
+
+    /** Dos descargas separadas por menos de esto son la MISMA tanda.
+     *
+     *  La tanda se lanza fichero a fichero con una pausa entre medias (varias
+     *  a la vez se cancelan solas en el móvil), así que a ratos no queda
+     *  ninguna viva EN MEDIO de la tanda. Decidir por "no queda nada vivo"
+     *  reiniciaba la cuenta a mitad y salía "9 de 9" con una todavía bajando.
+     *  Por tiempo no se confunde: entre tanda y tanda pasan minutos. */
+    private static final long VENTANA_TANDA_MS = 20_000;
 
     AvisoDescargas(Context ctx) {
         this.ctx = ctx.getApplicationContext();
@@ -91,11 +106,15 @@ class AvisoDescargas {
     }
 
     private void apuntar(String nombre) {
-        // Tanda nueva: si no quedaba nada vivo, se reinicia la cuenta.
-        if (enMarcha.isEmpty() && lanzadas == terminadas) {
+        long ahora = android.os.SystemClock.elapsedRealtime();
+        // Tanda nueva: no queda nada vivo Y hace rato que no se daba de alta
+        // ninguna. Las dos condiciones hacen falta — ver `VENTANA_TANDA_MS`.
+        if (enMarcha.isEmpty() && lanzadas == terminadas
+            && ahora - ultimaAlta > VENTANA_TANDA_MS) {
             lanzadas = 0;
             terminadas = 0;
         }
+        ultimaAlta = ahora;
         lanzadas += 1;
         if (nombre != null && !nombre.isEmpty()) ultimoNombre = nombre;
     }
@@ -130,10 +149,21 @@ class AvisoDescargas {
         for (Long id : enMarcha.keySet()) ids[i++] = id;
         q.setFilterById(ids);
 
+        // Las que el gestor ya no conoce (borradas de su lista, canceladas a
+        // mano) no volverían a aparecer NUNCA, y sin esto se quedaban vivas
+        // para siempre: la notificación se congelaba en "bajando 1 archivo".
+        java.util.Set<Long> vistas = new java.util.HashSet<>();
+        boolean algunaEsperando = false;
+        boolean preguntaOk = false;
+
         try (Cursor c = gestor.query(q)) {
             while (c != null && c.moveToNext()) {
                 long id = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID));
+                vistas.add(id);
                 int estado = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                // Parada esperando red o esperando a reintentar. Se queda viva
+                // y sin avanzar, que es lo que parece "trabado".
+                if (estado == DownloadManager.STATUS_PAUSED) algunaEsperando = true;
                 long lleva = c.getLong(
                     c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                 long mide = c.getLong(
@@ -155,9 +185,23 @@ class AvisoDescargas {
                     }
                 }
             }
+            preguntaOk = true;
         } catch (Exception ignorada) {
             // Preguntar por el progreso no puede tumbar nada.
         }
+
+        // SOLO si la consulta fue bien: si falló, `vistas` está vacío y esto
+        // daría por terminada toda la tanda de golpe.
+        if (preguntaOk) {
+            java.util.Iterator<Long> it = enMarcha.keySet().iterator();
+            while (it.hasNext()) {
+                if (!vistas.contains(it.next())) {
+                    it.remove();
+                    terminadas += 1;
+                }
+            }
+        }
+        esperando = algunaEsperando;
 
         pintar(bytesActivo, totalActivo, nombreActivo, fraccion);
 
@@ -186,8 +230,11 @@ class AvisoDescargas {
             titulo = quedan == 1 ? "Bajando 1 archivo" : "Bajando " + quedan + " archivos";
             String cual = (nombreActivo == null || nombreActivo.isEmpty())
                 ? ultimoNombre : nombreActivo;
-            detalle = (lanzadas > 1 ? (terminadas + 1) + " de " + lanzadas + " · " : "")
+            detalle = (lanzadas > 1 ? Math.min(terminadas + 1, lanzadas) + " de " + lanzadas + " · " : "")
                 + cual;
+            // Decirlo cambia mucho: una barra parada parece la app colgada,
+            // y "esperando red" es algo que se puede arreglar.
+            if (esperando) titulo = "Esperando red · " + titulo.toLowerCase();
         }
 
         RemoteViews vista = new RemoteViews(ctx.getPackageName(), R.layout.aviso_descargas);
