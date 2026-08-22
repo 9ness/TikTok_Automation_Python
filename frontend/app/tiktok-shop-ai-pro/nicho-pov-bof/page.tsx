@@ -1638,7 +1638,12 @@ function ProductoCard({
         />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
-        <BotonUrl url={producto.product_url} />
+        <BotonUrl
+          url={producto.product_url}
+          source={source}
+          folder={producto.folder || folder}
+          producto={producto.producto}
+        />
         {producto.clean_photo_id && (
           <>
             {/* Sin botón "Ver foto": la miniatura de arriba ya abre el visor

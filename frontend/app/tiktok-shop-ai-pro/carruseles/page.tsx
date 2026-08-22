@@ -1323,7 +1323,12 @@ function PorNicho() {
                       [p.caption, p.emojis, hashtags.join(" ")].filter(Boolean).join(" ")
                     }
                   />
-                  <BotonUrl url={p.product_url} />
+                  <BotonUrl
+                    url={p.product_url}
+                    source={p.source}
+                    folder={p.folder}
+                    producto={p.producto}
+                  />
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -2128,7 +2133,12 @@ function CarruselCard({
         {/* La ficha de TikTok Shop, igual que en POV BOF, Largo y Creativos:
             el índice de URLs es del PRODUCTO, así que la misma pegada una vez
             vale aquí sin hacer nada más. */}
-        <BotonUrl url={p.product_url} />
+        <BotonUrl
+          url={p.product_url}
+          source={source}
+          folder={p.folder || folder}
+          producto={p.producto}
+        />
       </div>
 
       <div className="flex gap-1">

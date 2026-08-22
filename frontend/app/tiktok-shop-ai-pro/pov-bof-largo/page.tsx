@@ -1672,7 +1672,12 @@ function ProductoCard({
             se ha bajado DENTRO del guion plegado: ahí siguen a mano (el
             subliminal no lo pone el vídeo, solo se copia) sin ocupar sitio en
             la ficha. */}
-        <BotonUrl url={p.product_url} />
+        <BotonUrl
+          url={p.product_url}
+          source={source}
+          folder={p.folder || folder}
+          producto={p.producto}
+        />
         {p.clean_photo_id && (
           <a
             href={buildCleanPhotoDownloadUrl(source, folder, p.producto)}

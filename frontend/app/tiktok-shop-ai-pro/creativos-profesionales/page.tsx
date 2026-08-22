@@ -623,7 +623,12 @@ function CreativoCard({
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} siempre />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
         <CopyChip label="✍️ Caption" text={caption} siempre />
-        <BotonUrl url={p.product_url} />
+        <BotonUrl
+          url={p.product_url}
+          source={source}
+          folder={p.folder || folder}
+          producto={p.producto}
+        />
       </div>
 
       {p.caption_riesgo && (
