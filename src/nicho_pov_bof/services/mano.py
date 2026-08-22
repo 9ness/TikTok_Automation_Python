@@ -57,6 +57,10 @@ FOTOGRAMAS_POR_CLIP = 5
 # no están, mientras que distinguir una mano de mujer de una lampiña de hombre
 # falla hasta a ojo.
 MIN_SENALES = 2
+# Cuántos se miran cuando la señal de hombre NO está corroborada: una lectura
+# suelta que dice "hombre" entre varias limpias es lo que ponía voz de hombre a
+# manos de mujer. Antes se decidía con eso; ahora se va a mirar más.
+FOTOGRAMAS_CONFIRMAR = 10
 # Cuántos se miran en el segundo intento, cuando en el primero no salió ninguna
 # mano. Más y repartidos distinto: la mano entra y sale de plano.
 FOTOGRAMAS_REINTENTO = 9
@@ -167,16 +171,59 @@ def _fotogramas_de(
     return fotos
 
 
+def _con_senal(lecturas: list[dict]) -> list[dict]:
+    return [x for x in lecturas if x.get("hombre")]
+
+
+def _veredicto(lecturas: list[dict], confirmado: bool = False) -> str:
+    """Hombre o mujer con lo que se haya visto.
+
+    Con la PRIMERA tanda basta poco para sospechar: dos fotogramas con señal, o
+    UNO si es de las que no admiten discusión (vello o reloj). Eso no decide
+    nada por sí solo — solo manda mirar más material.
+
+    Ya CONFIRMADO —después de mirar el vídeo entero— se decide por proporción,
+    y ahí una lectura suelta deja de mandar: una mano de hombre de verdad
+    aparece en varios fotogramas, no en uno entre quince. Es lo que le ponía
+    voz de hombre a manos de mujer. Sigue bastando con un TERCIO (o dos señales
+    indiscutibles): el equilibrio se mantiene inclinado hacia hombre, que
+    colar voz de mujer con mano de hombre es el fallo que de verdad se nota.
+    """
+    con_senal = _con_senal(lecturas)
+    fuertes = [x for x in con_senal if x.get("fuerte")]
+    if not confirmado:
+        return "hombre" if len(con_senal) >= MIN_SENALES or fuertes else "mujer"
+    if len(fuertes) >= 2:
+        return "hombre"
+    return "hombre" if lecturas and len(con_senal) * 3 >= len(lecturas) else "mujer"
+
+
+def _rotundo(lecturas: list[dict]) -> bool:
+    """¿El "hombre" está fuera de duda sin mirar más?
+
+    Lo está cuando la señal aparece en al MENOS la mitad de los fotogramas en
+    los que se vio mano: una mano de hombre de verdad no se esconde en uno solo.
+    Con menos que eso conviene mirar más material antes de decidir.
+    """
+    if not lecturas:
+        return False
+    return len(_con_senal(lecturas)) * 2 >= len(lecturas)
+
+
 def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
     """`{sexo, votos, total, pistas}`. `sexo` vacío si no se ve ninguna mano.
 
     Acepta UN vídeo o la lista de clips de un mismo producto (plazos y POV BOF
     Largo van en dos clips): se mira material de todos en una sola llamada.
 
-    Si en los primeros fotogramas no sale ninguna mano se reintenta con más,
-    repartidos por otros sitios: la mano entra y sale de plano, y quedarse sin
-    verla manda el vídeo a la voz por defecto sin haberlo mirado bien. Pasó en
-    1 de 17 vídeos con mano de hombre.
+    Se mira DOS veces cuando hace falta, por dos motivos distintos:
+
+    - Si en los primeros fotogramas no sale ninguna mano: la mano entra y sale
+      de plano, y quedarse sin verla manda el vídeo a la voz por defecto sin
+      haberlo mirado bien. Pasó en 1 de 17 vídeos con mano de hombre.
+    - Si sale "hombre" con la señal en pocos fotogramas: se barre el vídeo
+      entero y se decide con todo. Una lectura suelta le ponía voz de hombre a
+      manos de mujer.
 
     No lanza nunca: si falla ffmpeg o Gemini se devuelve vacío y quien llama
     decide (en el montaje, la voz de mujer, que es la de por defecto).
@@ -213,19 +260,34 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
         if not lecturas:
             on_log("[mano] no se ve ninguna mano en el vídeo")
             return vacio
-        con_senal = [x for x in lecturas if x.get("hombre")]
-        fuertes = [x for x in con_senal if x.get("fuerte")]
-        # Dos fotogramas con señal, o UNO si es de las que no admiten discusión
-        # (vello o reloj de hombre). El equilibrio no es simétrico a propósito:
-        # colar voz de mujer en un vídeo con mano de hombre es el fallo que de
-        # verdad se nota, así que ante una señal clara se va a hombre aunque
-        # aparezca en un único fotograma; en cambio "mano ancha" —que es
-        # opinable— necesita repetirse.
-        sexo = (
-            "hombre"
-            if len(con_senal) >= MIN_SENALES or fuertes
-            else "mujer"
-        )
+        # Si la señal de hombre no está CORROBORADA, se mira más antes de
+        # decidir. El equilibrio sigue inclinado hacia hombre —colar voz de
+        # mujer en un vídeo con mano de hombre es el fallo que de verdad se
+        # nota—, pero una lectura suelta ya no decide: le ponía voz de hombre a
+        # manos de mujer sin más pruebas que un fotograma dudoso.
+        confirmado = False
+        if _veredicto(lecturas) == "hombre" and not _rotundo(lecturas):
+            on_log(
+                f"[mano] señal de hombre en {len(_con_senal(lecturas))}/"
+                f"{len(lecturas)} fotogramas; miro más antes de decidir"
+            )
+            mas = _fotogramas_de(
+                videos, trabajo,
+                n_uno=FOTOGRAMAS_CONFIRMAR,
+                n_varios=max(4, FOTOGRAMAS_CONFIRMAR // max(1, len(videos))),
+                # Repartidos por TODO el vídeo: mirar otra vez donde ya se miró
+                # no añade nada.
+                sesgo=False,
+            )
+            if mas:
+                extra = generate_json(_PROMPT, "", images=mas) or {}
+                lecturas += [
+                    x for x in (extra.get("fotogramas") or []) if x.get("hay_mano")
+                ]
+                confirmado = True
+
+        con_senal = _con_senal(lecturas)
+        sexo = _veredicto(lecturas, confirmado)
         pistas = "; ".join(
             str(x.get("senal") or "") for x in con_senal[:2] if x.get("senal")
         )
