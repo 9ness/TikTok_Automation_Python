@@ -1954,13 +1954,14 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # primero deja fuera la mitad del material.
     deteccion = {}
     if sexo == "auto":
-        from src.nicho_pov_bof.services import mano
+        from src.nicho_pov_bof.services import voz_clip
 
-        on_progress(0.02, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(clips, on_log=on_log)
+        on_progress(0.02, "🔎 Escuchando la voz del clip…")
+        deteccion = voz_clip.decidir(clips, on_log=on_log)
         if deteccion.get("error"):
             raise RuntimeError(
-                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                "No se pudo averiguar la voz del vídeo: el clip no dice nada "
+                "claro y la IA que mira la mano no contesta "
                 f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
                 "a mano en la ficha y vuelve a montarlo."
             )
@@ -2178,13 +2179,14 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
     # se ve ninguna mano: ahí no hay nada que contradecir y da variedad.
     deteccion: dict = {}
     if sexo not in ("hombre", "mujer"):
-        from src.nicho_pov_bof.services import mano
+        from src.nicho_pov_bof.services import voz_clip
 
-        on_progress(0.05, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(clips, on_log=on_log)
+        on_progress(0.05, "🔎 Escuchando la voz del clip…")
+        deteccion = voz_clip.decidir(clips, on_log=on_log)
         if deteccion.get("error"):
             raise RuntimeError(
-                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                "No se pudo averiguar la voz del vídeo: el clip no dice nada "
+                "claro y la IA que mira la mano no contesta "
                 f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
                 "a mano en la ficha y vuelve a montarlo."
             )
@@ -3253,13 +3255,14 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # única forma de saber si algún día se puede quitar el selector.
     deteccion = {}
     if sexo == "auto":
-        from src.nicho_pov_bof.services import mano
+        from src.nicho_pov_bof.services import voz_clip
 
-        on_progress(0.04, "🖐️ Mirando la mano del vídeo…")
-        deteccion = mano.detectar(clips, on_log=on_log)
+        on_progress(0.04, "🔎 Escuchando la voz del clip…")
+        deteccion = voz_clip.decidir(clips, on_log=on_log)
         if deteccion.get("error"):
             raise RuntimeError(
-                "No se pudo mirar la mano del vídeo para elegir la voz: la IA "
+                "No se pudo averiguar la voz del vídeo: el clip no dice nada "
+                "claro y la IA que mira la mano no contesta "
                 f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
                 "a mano en la ficha y vuelve a montarlo."
             )

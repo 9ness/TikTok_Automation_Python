@@ -168,6 +168,7 @@ def _call_with_key(
     temperature: float,
     enable_web_search: bool = False,
     videos: list[str] | None = None,
+    audios: list[str] | None = None,
     max_output_tokens: int = 8192,
 ) -> str:
     """Ejecuta UNA llamada a Gemini con la `api_key` indicada.
@@ -180,6 +181,10 @@ def _call_with_key(
             el modelo busca en internet y cita fuentes. Incompatible con
             `expect_json=True` (limitación de Gemini API).
         videos: lista de paths a archivos .mp4 para análisis visual.
+        audios: lista de paths a audio (.wav/.mp3) para ESCUCHARLO. Se usa
+            para saber si quien habla en un clip es hombre o mujer: el tono
+            medido con numpy resuelve la mayoría, pero entre 165 y 180 Hz hay
+            solapamiento y ahí hace falta que alguien escuche de verdad.
             Gemini 2.5 Pro acepta hasta 20 vídeos por request (cada uno
             counts como ~258 tokens/seg de duración).
     """
@@ -219,6 +224,10 @@ def _call_with_key(
     if videos:
         for vid in videos:
             parts.append({"mime_type": "video/mp4", "data": Path(vid).read_bytes()})
+    if audios:
+        for aud in audios:
+            mime = "audio/mpeg" if str(aud).lower().endswith(".mp3") else "audio/wav"
+            parts.append({"mime_type": mime, "data": Path(aud).read_bytes()})
 
     response = model_obj.generate_content(
         parts,
@@ -281,6 +290,7 @@ def generate_text(
     expect_json: bool = False,
     images: list[str | bytes] | None = None,
     videos: list[str] | None = None,
+    audios: list[str] | None = None,
     enable_web_search: bool = False,
     temperature: float = 0.8,
     max_retries_on_quota: int = 3,
@@ -296,12 +306,15 @@ def generate_text(
     # Si hay fallback OpenAI disponible (texto/imágenes, no vídeo/web), no
     # tiene sentido esperar los reintentos lentos de Gemini (15s+30s) cuando
     # está sin cuota: probamos cada key UNA vez y caemos a OpenAI al instante.
-    can_openai = _openai_available() and not videos and not enable_web_search
+    can_openai = (
+        _openai_available() and not videos and not audios and not enable_web_search
+    )
     retries = 1 if can_openai else max_retries_on_quota
     try:
         return _generate_text_gemini(
             system_prompt, user_prompt, model=model, expect_json=expect_json,
-            images=images, videos=videos, enable_web_search=enable_web_search,
+            images=images, videos=videos, audios=audios,
+            enable_web_search=enable_web_search,
             temperature=temperature, max_retries_on_quota=retries,
             max_output_tokens=max_output_tokens,
         )
@@ -309,7 +322,10 @@ def generate_text(
         # Fallback OpenAI: solo para texto/imágenes (vídeo no soportado) y solo
         # si Gemini falló por cuota/sin-keys (no por errores de request).
         fallback_ok = (_is_quota_error(e) or isinstance(e, EnvironmentError))
-        if fallback_ok and not videos and not enable_web_search and _openai_available():
+        if (
+            fallback_ok and not videos and not audios
+            and not enable_web_search and _openai_available()
+        ):
             log_warning(_LOGGER_NAME, "Gemini agotado → fallback a OpenAI", error=str(e)[:120])
             return _call_openai_fallback(
                 system_prompt, user_prompt, expect_json=expect_json,
@@ -381,6 +397,7 @@ def _generate_text_gemini(
     expect_json: bool = False,
     images: list[str | bytes] | None = None,
     videos: list[str] | None = None,
+    audios: list[str] | None = None,
     enable_web_search: bool = False,
     temperature: float = 0.8,
     max_retries_on_quota: int = 3,
@@ -423,7 +440,7 @@ def _generate_text_gemini(
                     api_key,
                     system_prompt=system_prompt, user_prompt=user_prompt,
                     model=model, expect_json=expect_json,
-                    images=images, videos=videos,
+                    images=images, videos=videos, audios=audios,
                     enable_web_search=enable_web_search,
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
@@ -494,6 +511,7 @@ def generate_json(
     *,
     model: str = DEFAULT_MODEL,
     images: list[str | bytes] | None = None,
+    audios: list[str] | None = None,
     temperature: float = 0.7,
     max_output_tokens: int = 32768,
 ) -> Any:
@@ -505,7 +523,8 @@ def generate_json(
     truncaban y reventaban el parseo."""
     raw = generate_text(
         system_prompt, user_prompt,
-        model=model, expect_json=True, images=images, temperature=temperature,
+        model=model, expect_json=True, images=images, audios=audios,
+        temperature=temperature,
         max_output_tokens=max_output_tokens,
     )
     try:
