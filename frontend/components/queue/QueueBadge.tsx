@@ -56,7 +56,14 @@ export function QueueBadge() {
       {summary.total > 0 && (
         <Badge
           variant={disconnected ? "secondary" : "destructive"}
-          className={cn("h-5 min-w-[1.25rem] px-1 text-xs", disconnected && "opacity-60")}
+          // `justify-center` y no solo el `min-w`: el `Badge` base centra en
+          // vertical pero no en horizontal, así que con un solo dígito el
+          // número se quedaba pegado a la izquierda del hueco mínimo.
+          // `tabular-nums` para que no baile al pasar de 9 a 10.
+          className={cn(
+            "h-5 min-w-[1.25rem] justify-center px-1 text-xs tabular-nums",
+            disconnected && "opacity-60",
+          )}
         >
           {summary.total}
         </Badge>
