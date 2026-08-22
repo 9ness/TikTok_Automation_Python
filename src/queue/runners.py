@@ -2067,6 +2067,21 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
+    # Copia LOCAL para servir las descargas, igual que el POV BOF corto. El
+    # vídeo se monta en el mount de Drive, y traerlo de ahí cuesta ~36s hasta
+    # el primer byte si rclone no lo tiene cacheado — con diez seguidos, el
+    # gestor de Android se cansa de esperar y deja alguno "esperando red".
+    # Aquí faltaba: el corto sí la hacía y el Largo no.
+    try:
+        cache = Path(config.video_cache_path(folder, producto, operator, nicho="largo"))
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(salida, cache)
+        config.limpiar_video_cache()
+    except OSError as e:
+        # Sin copia local se sigue sirviendo desde Drive: más lento, pero
+        # funciona. No es motivo para tumbar el montaje.
+        on_log(f"[pov_bof_largo] ⚠️ no pude guardar la copia local: {e}")
+
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
         source, folder, producto, usuario=operator,

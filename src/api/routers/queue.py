@@ -75,10 +75,15 @@ def _copia_local(job: Job) -> Path | None:
     if not folder or not producto:
         return None
     quien = str(p.get("operator") or job.enqueued_by or "")
+    # El POV BOF Largo guarda su copia aparte: es OTRO vídeo del mismo producto
+    # y de la misma carpeta, así que comparten todo menos el nicho.
+    from src.queue.models import JobMode
+
+    nicho = "largo" if job.mode == JobMode.NICHO_POV_BOF_LARGO_VIDEO else ""
     try:
         from src.nicho_pov_bof import config as pov_config
 
-        local = Path(pov_config.video_cache_path(folder, producto, quien))
+        local = Path(pov_config.video_cache_path(folder, producto, quien, nicho=nicho))
     except Exception:  # noqa: BLE001
         return None
     return local if local.is_file() else None

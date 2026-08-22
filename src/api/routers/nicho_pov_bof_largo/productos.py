@@ -1062,11 +1062,38 @@ def get_video(
 ) -> FileResponse:
     prod = product_repo.get_product(source, folder, producto, usuario)
     ruta = prod.get("video_path")
-    if not ruta or not Path(ruta).is_file():
+    if not ruta:
+        raise APIError(
+            f"El producto {producto} no tiene vídeo montado.", status_code=404,
+        )
+
+    # Primero la copia LOCAL. Servir desde el mount de Drive cuesta ~36s hasta
+    # el primer byte si rclone no lo tiene (hay que traerlo entero de Google), y
+    # al bajar los diez de una carpeta el gestor de Android se cansaba de
+    # esperar y dejaba el último "esperando red". El POV BOF corto ya lo hacía
+    # así; esto es lo mismo.
+    from src.nicho_pov_bof import config as pov_config
+
+    p = Path(pov_config.video_cache_path(folder, producto, usuario, nicho="largo"))
+    if not p.is_file():
+        p = Path(ruta)
+        # Se copia al vuelo para que la SIGUIENTE ya sea rápida: los vídeos
+        # montados antes de que existiera esta caché no la tienen.
+        if p.is_file():
+            try:
+                destino = Path(
+                    pov_config.video_cache_path(folder, producto, usuario, nicho="largo")
+                )
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, destino)
+                p = destino
+            except OSError:
+                pass
+    if not p.is_file():
         raise APIError(
             f"El producto {producto} no tiene vídeo montado.", status_code=404,
         )
     return FileResponse(
-        ruta, media_type="video/mp4",
-        filename=Path(ruta).name if descargar else None,
+        str(p), media_type="video/mp4",
+        filename=(Path(ruta).name or p.name) if descargar else None,
     )

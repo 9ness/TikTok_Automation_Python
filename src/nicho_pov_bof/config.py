@@ -339,14 +339,23 @@ def video_cache_dir() -> str:
     return os.path.join(root, "nicho_pov_bof_videos")
 
 
-def video_cache_path(folder: str, producto: str, usuario: str = "") -> str:
+def video_cache_path(
+    folder: str, producto: str, usuario: str = "", nicho: str = "",
+) -> str:
     """Ruta de la copia local de un vídeo. Nombre plano y saneado.
 
     Lleva el usuario porque cada uno monta SU vídeo del mismo producto: sin
     esto, Ana se descargaría el de ness.
+
+    Y lleva el NICHO porque el POV BOF y el POV BOF Largo hacen vídeos
+    distintos del MISMO producto de la MISMA carpeta: sin separarlos, el
+    segundo que se montara pisaría al primero en la caché y se descargaría el
+    que no es. Vacío = el POV BOF corto, que es quien ya tiene ficheros con el
+    nombre de antes.
     """
     quien = usuario or "ness"
-    seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{quien}__{producto}__{folder}")
+    marca = f"{nicho}__" if nicho else ""
+    seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{marca}{quien}__{producto}__{folder}")
     return os.path.join(video_cache_dir(), f"{seguro}.mp4")
 
 
