@@ -28,11 +28,18 @@ def _noop(_: str) -> None:
 
 
 SR = 16000
-# El corte entre voz de hombre y de mujer no es una raya: entre 165 y 180 Hz hay
-# hombres agudos y mujeres graves, y ahí es mejor no opinar y dejar que decida
-# la mano que jugársela con el tono.
-HZ_HOMBRE = 165.0
-HZ_MUJER = 180.0
+# Lo que se mide es el TONO (cada cuántas veces por segundo vibran las cuerdas
+# vocales), no el volumen: el volumen no dice nada del sexo de quien habla.
+#
+# El corte no es una raya. Los dos repartos se solapan —hay hombres agudos y
+# mujeres graves—, así que solo se decide con el tono cuando está LEJOS del
+# solapamiento. La franja de duda es ancha a propósito: 164 Hz no puede decidir
+# con la misma seguridad que 110 Hz, y antes lo hacía.
+HZ_HOMBRE = 150.0
+HZ_MUJER = 195.0
+# Dentro de la franja, hacia dónde se inclina. No decide por sí solo: es el
+# último recurso, cuando ni escuchar ni la mano han dicho nada.
+HZ_MEDIO = (HZ_HOMBRE + HZ_MUJER) / 2
 # Rango donde se busca el tono. Fuera de esto no es voz humana hablando, y
 # ampliarlo solo mete octavas falsas.
 HZ_MIN = 70.0
@@ -112,7 +119,7 @@ def de_un_clip(video: Path, *, on_log: OnLog = _noop) -> dict:
     """`{sexo, hz, tramos}` de UN clip. `sexo` vacío = no se puede decir."""
     import numpy as np
 
-    vacio = {"sexo": "", "hz": 0.0, "tramos": 0}
+    vacio = {"sexo": "", "hz": 0.0, "tramos": 0, "tendencia": ""}
     try:
         muestras = _audio_16k(Path(video))
         if muestras is None:
@@ -143,11 +150,12 @@ def de_un_clip(video: Path, *, on_log: OnLog = _noop) -> dict:
             sexo = "mujer"
         else:
             sexo = ""
+        tendencia = "hombre" if hz < HZ_MEDIO else "mujer"
         on_log(
             f"[voz_clip] {Path(video).name}: {hz:.0f} Hz en {len(tonos)} tramos "
-            f"→ {sexo or 'en duda'}"
+            f"→ {sexo or f'en duda (tira a {tendencia})'}"
         )
-        return {"sexo": sexo, "hz": hz, "tramos": len(tonos)}
+        return {"sexo": sexo, "hz": hz, "tramos": len(tonos), "tendencia": tendencia}
     except Exception as e:  # noqa: BLE001
         on_log(f"[voz_clip] {Path(video).name}: no se pudo medir ({e})")
         return vacio
@@ -164,7 +172,12 @@ def detectar(clips: list[Path], *, on_log: OnLog = _noop) -> dict:
     lecturas = [de_un_clip(Path(c), on_log=on_log) for c in clips]
     utiles = [x for x in lecturas if x["sexo"]]
     if not utiles:
-        return {"sexo": "", "hz": 0.0, "tramos": 0, "clips": len(clips)}
+        # Sin veredicto, pero puede haber tono medido: sirve de desempate al
+        # final del todo, cuando ni escuchar ni la mano dicen nada.
+        medidos = [x for x in lecturas if x.get("tramos")]
+        if medidos:
+            return {**medidos[0], "sexo": "", "clips": len(clips)}
+        return {"sexo": "", "hz": 0.0, "tramos": 0, "tendencia": "", "clips": len(clips)}
     manda = utiles[0]
     distintos = {x["sexo"] for x in utiles}
     if len(distintos) > 1:
@@ -236,11 +249,21 @@ def decidir(clips: list[Path], *, on_log: OnLog = _noop) -> dict:
     Además sale gratis y en local —ffmpeg y numpy—, así que cuando la voz habla
     claro ni siquiera se gasta la llamada a Gemini de la mano.
 
-    Tres intentos, de más fiable a menos: el TONO medido (gratis y en local),
-    ESCUCHAR el clip con Gemini si el tono cae en la franja donde hombres y
-    mujeres se solapan, y por último la MANO. Devuelve lo mismo que
-    `mano.detectar` más `fuente` ("tono", "escucha" o "mano"), para que quien
-    llama pueda seguir tratando el error igual.
+    Se pregunta por orden, de más fiable a menos, y manda el primero que lo
+    tenga claro:
+
+    1. El TONO medido, gratis y en local, pero SOLO fuera de la franja donde
+       los dos repartos se solapan (150-195 Hz).
+    2. ESCUCHAR el clip con Gemini. Es lo que decide dentro de esa franja.
+    3. La MANO, deduciendo por vello o reloj.
+    4. Y si nada de eso dice nada, hacia dónde tiraba el tono: 152 Hz no es
+       concluyente, pero es más que la voz por defecto.
+
+    Cuando dos fuentes se contradicen gana la de arriba y queda escrito en el
+    log — que es justo lo que hay que mirar si un vídeo sale con la voz rara.
+
+    Devuelve lo mismo que `mano.detectar` más `fuente` ("tono", "escucha",
+    "mano" o "tono flojo"), para que quien llama trate el error igual.
     """
     voz = detectar(clips, on_log=on_log)
     if voz.get("sexo"):
@@ -249,18 +272,49 @@ def decidir(clips: list[Path], *, on_log: OnLog = _noop) -> dict:
             "pistas": f"voz a {voz.get('hz', 0):.0f} Hz",
         }
 
-    # El tono no ha decidido. Antes de mirar la mano —que es deducir el sexo de
+    tendencia = str(voz.get("tendencia") or "")
+    hz = float(voz.get("hz") or 0)
+
+    # El tono no ha bastado. Antes de mirar la mano —que es deducir el sexo de
     # si hay vello o reloj—, que alguien ESCUCHE: sigue siendo la voz de quien
     # habla, que es la señal buena.
     if clips:
         escuchado = _escuchar(Path(clips[0]), on_log=on_log)
         if escuchado:
+            if tendencia and escuchado != tendencia:
+                # Se deja escrito: es justo el caso en el que conviene mirar el
+                # vídeo si la voz sale rara.
+                on_log(
+                    f"[voz_clip] el tono ({hz:.0f} Hz) tiraba a {tendencia} pero "
+                    f"escuchándolo es {escuchado}; mando lo escuchado"
+                )
             return {
                 "sexo": escuchado, "votos": 0, "total": 0, "fuente": "escucha",
-                "pistas": "voz escuchada",
+                "pistas": f"voz escuchada{f' · {hz:.0f} Hz' if hz else ''}",
             }
 
     from src.nicho_pov_bof.services import mano
 
     on_log("[voz_clip] la voz del clip no lo aclara; miro la mano")
-    return {**mano.detectar(clips, on_log=on_log), "fuente": "mano"}
+    det = mano.detectar(clips, on_log=on_log)
+    if det.get("sexo"):
+        if tendencia and det["sexo"] != tendencia:
+            on_log(
+                f"[voz_clip] el tono ({hz:.0f} Hz) tiraba a {tendencia} y la mano "
+                f"dice {det['sexo']}; mando la mano"
+            )
+        return {**det, "fuente": "mano"}
+
+    # Nadie lo ha dicho. Si al menos se midió tono, su inclinación es mejor que
+    # la voz por defecto: 152 Hz no es concluyente, pero tampoco es nada.
+    if tendencia:
+        on_log(
+            f"[voz_clip] nada concluyente; me quedo con lo que decía el tono "
+            f"({hz:.0f} Hz → {tendencia})"
+        )
+        return {
+            "sexo": tendencia, "votos": 0, "total": 0, "fuente": "tono flojo",
+            "pistas": f"voz a {hz:.0f} Hz (en la franja de duda)",
+        }
+
+    return {**det, "fuente": "mano"}
