@@ -181,6 +181,8 @@ export function SubidaMasiva({
   const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
   /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
   const [enSegundoPlano, setEnSegundoPlano] = useState(false);
+  /** Lo que se acaba de elegir en el selector, aún sin mandar. */
+  const [elegidos, setElegidos] = useState<File[]>([]);
   /** Lo que quedó sin encolar y por qué. En pantalla hasta que se cierre: en
    *  un toast se pierde y luego no cuadra la cuenta de la cola. */
   const [avisos, setAvisos] = useState<string[]>([]);
@@ -287,13 +289,13 @@ export function SubidaMasiva({
     for (const f of ficheros) if (f.token) nombres.set(f.token, f.nombre);
 
     try {
-      const faltan = ficheros.filter((f) => !f.token);
+      const faltan = ficheros.filter((f) => !f.token && f.blob);
       for (const [i, f] of faltan.entries()) {
         setProgreso({ n: ficheros.length - faltan.length + i + 1, total: ficheros.length, pct: 0 });
         const tok = await subirUno({
           source,
           folder,
-          file: f.blob,
+          file: f.blob as Blob,
           nombre: f.nombre,
           root,
           senal: ctrl.signal,
@@ -329,25 +331,29 @@ export function SubidaMasiva({
     const auto = !confirmarAntes;
     setReparto(null);
     setAvisos([]);
-    await crearLote(
-      {
-        id: loteId,
-        source,
-        folder,
-        root,
-        modo: soportaBgFetch() ? "bg" : "xhr",
-        auto,
-        sexo,
-        base: baseApi(),
-        apiKey: claveApi(),
-      },
-      files,
-    );
+
+    const meta = {
+      id: loteId,
+      source,
+      folder,
+      root,
+      modo: (soportaBgFetch() ? "bg" : "xhr") as "bg" | "xhr",
+      auto,
+      sexo,
+      base: baseApi(),
+      apiKey: claveApi(),
+    };
 
     // Si la app sabe subir por su cuenta, se le deja a ella: su servicio en
     // primer plano aguanta la pantalla apagada mejor que Background Fetch, que
-    // lo corta Chrome. En el navegador y en la app actual esto no existe y se
+    // lo corta Chrome. En el navegador y en la app vieja esto no existe y se
     // sigue por el camino de siempre.
+    //
+    // Se le pregunta ANTES de guardar nada: cuando sube la app, los ficheros
+    // los tiene ella y no hace falta la copia en el navegador. Guardarla era
+    // meter varios vídeos de 20 MB en el almacén del WebView, que tiene menos
+    // sitio que Chrome —y si eso falla, fallaba la tanda entera antes de
+    // empezar, sin decir nada.
     if (haySubidaNativa()) {
       const lanzada = subirConLaApp({
         url: urlSubidaLote(root),
@@ -361,12 +367,16 @@ export function SubidaMasiva({
         })),
       });
       if (lanzada) {
+        await crearLote(meta, files, false);
         setEnSegundoPlano(true);
         setPendiente({ subidos: 0, total: files.length });
         toast.success("Subiendo con la app: ya puedes bloquear el móvil.");
         return;
       }
+      toast.warning("La app no pudo con la tanda; la subo desde aquí.");
     }
+
+    await crearLote(meta, files);
 
     // Camino bueno: el sistema se encarga y la app puede cerrarse.
     if (soportaBgFetch()) {
@@ -714,10 +724,54 @@ export function SubidaMasiva({
               onChange={(e) => {
                 const f = Array.from(e.target.files ?? []);
                 e.target.value = "";
-                void enviar(f);
+                // No se sube al elegir: primero se enseña qué se ha cogido.
+                // Elegir diez vídeos y que la pantalla no acuse recibo deja sin
+                // saber si el selector devolvió algo o si falló la subida.
+                setElegidos(f);
               }}
             />
           </label>
+
+          {/* Lo elegido, antes de mandarlo. */}
+          {elegidos.length > 0 && !subiendo && (
+            <div className="space-y-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2">
+              <p className="text-[11px] font-semibold text-emerald-500">
+                {elegidos.length} vídeo{elegidos.length === 1 ? "" : "s"} elegido
+                {elegidos.length === 1 ? "" : "s"}
+              </p>
+              <p className="max-h-24 overflow-y-auto break-words text-[10px] leading-tight text-muted-foreground">
+                {elegidos.map((f) => f.name).join(" · ")}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const f = elegidos;
+                    setElegidos([]);
+                    // El error se ENSEÑA. Antes iba en un `void` suelto y, si
+                    // reventaba —guardar los vídeos en el navegador sin sitio,
+                    // por ejemplo—, no pasaba nada visible: ni subía ni avisaba.
+                    void enviar(f).catch((e) => {
+                      setElegidos(f);
+                      toast.error(
+                        e instanceof Error ? e.message : "No se pudo empezar la subida",
+                      );
+                    });
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600"
+                >
+                  <Upload className="h-3.5 w-3.5" /> Subir {elegidos.length}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setElegidos([])}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                >
+                  <Trash2 className="h-3 w-3" /> Quitar
+                </button>
+              </div>
+            </div>
+          )}
 
           {reparto && (
             <div className="space-y-1.5">

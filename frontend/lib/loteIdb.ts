@@ -27,7 +27,10 @@ export interface FicheroLote {
   loteId: string;
   idx: number;
   nombre: string;
-  blob: Blob;
+  /** El vídeo, para poder retomar la tanda si se corta. Va VACÍO cuando sube
+   *  la app: ahí los ficheros los tiene ella y guardar copia de todos —20 MB
+   *  cada uno— es lo que hacía saltar la cuota del WebView. */
+  blob?: Blob;
   /** Lo que devolvió el servidor. `null` = aún sin subir. */
   token: string | null;
 }
@@ -112,6 +115,8 @@ export function idDeLote(root: string, source: string, folder: string): string {
 export async function crearLote(
   meta: Omit<LoteMeta, "creado" | "total" | "reparto">,
   files: File[],
+  /** `false` = no guardar los vídeos, solo sus nombres. Ver `blob`. */
+  conBlobs = true,
 ): Promise<void> {
   await conDb(async (db) => {
     const tx = db.transaction([STORE_LOTES, STORE_FICHEROS], "readwrite");
@@ -129,7 +134,7 @@ export async function crearLote(
         loteId: meta.id,
         idx,
         nombre: f.name,
-        blob: f,
+        blob: conBlobs ? f : undefined,
         token: null,
       } as FicheroLote);
     });
