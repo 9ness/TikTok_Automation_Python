@@ -6,7 +6,12 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { escucharAvisos, lanzarEnSegundoPlano, soportaBgFetch, tandaEnMarcha } from "@/lib/bgFetch";
-import { haySubidaNativa, subirConLaApp } from "@/lib/subidaNativa";
+import {
+  alSubirCadaFichero,
+  alTerminarLaApp,
+  haySubidaNativa,
+  subirConLaApp,
+} from "@/lib/subidaNativa";
 import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   actualizarLote,
@@ -384,6 +389,71 @@ export function SubidaMasiva({
 
     await procesarPendientes();
   }
+
+  /** Lo que sube la app hay que RECOGERLO aquí.
+   *
+   *  Faltaba, y por eso "Subir todos los vídeos" no hacía nada en la APK nueva:
+   *  la app subía los ficheros y ahí se quedaba la cosa. Quien reparte los
+   *  vídeos entre productos y los encola es la web, y sin los tokens de vuelta
+   *  no tenía con qué. Con Background Fetch no pasaba porque de eso se encarga
+   *  el Service Worker (`sw-subidas.js`), que sí hace los tres pasos.
+   *
+   *  Se casa por NOMBRE de fichero, que es lo único que viaja por el puente
+   *  (los bytes se quedan en la app).
+   */
+  const recogerDeLaApp = useCallback(
+    async (nombre: string, token: string) => {
+      const meta = await leerLote(loteId);
+      if (!meta) return;
+      const ficheros = await ficherosDe(loteId);
+      const suyo = ficheros.find((f) => f.nombre === nombre && !f.token);
+      if (!suyo) return;
+      if (!token) {
+        toast.error(`No se pudo subir ${nombre}`);
+        return;
+      }
+      await marcarToken(loteId, suyo.idx, token);
+
+      const ahora = await ficherosDe(loteId);
+      const conToken = ahora.filter((f) => f.token);
+      setPendiente({ subidos: conToken.length, total: ahora.length });
+      // Solo cuando están TODOS: repartir a medias dejaría fuera a los que
+      // siguen subiendo y habría que volver a hacerlo entero.
+      if (conToken.length < ahora.length) return;
+
+      setEnSegundoPlano(false);
+      setPendiente(null);
+      const nombres = new Map<string, string>();
+      for (const f of conToken) if (f.token) nombres.set(f.token, f.nombre);
+      await repartirYSeguir(
+        conToken.map((f) => f.token as string), nombres, meta.auto, meta.sexo,
+      );
+    },
+    [loteId, repartirYSeguir],
+  );
+
+  // Fichero a fichero mientras la pantalla está abierta.
+  useEffect(() => alSubirCadaFichero((nombre, respuesta) => {
+    let token = "";
+    try {
+      token = String((JSON.parse(respuesta) as { token?: string })?.token || "");
+    } catch {
+      // Respuesta rota: se trata como fichero que no subió.
+    }
+    void recogerDeLaApp(nombre, token);
+  }), [recogerDeLaApp]);
+
+  // Y de golpe al volver, si la tanda acabó con la app cerrada: la app guarda
+  // las respuestas del servidor y las entrega al reaparecer la pantalla. Cada
+  // una trae `archivo` (el nombre que se subió), que es con lo que se casa.
+  useEffect(() => alTerminarLaApp((respuestas) => {
+    void (async () => {
+      for (const r of respuestas) {
+        const dato = r as { archivo?: string; token?: string };
+        if (dato?.archivo) await recogerDeLaApp(dato.archivo, String(dato.token || ""));
+      }
+    })();
+  }), [recogerDeLaApp]);
 
   // Al abrir la pantalla: ¿había una tanda a medias?
   useEffect(() => {
