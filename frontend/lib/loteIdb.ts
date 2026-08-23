@@ -114,7 +114,8 @@ export function idDeLote(root: string, source: string, folder: string): string {
 
 export async function crearLote(
   meta: Omit<LoteMeta, "creado" | "total" | "reparto">,
-  files: File[],
+  /** Con `conBlobs = false` basta el nombre: es lo único que se guarda. */
+  files: Array<File | { name: string }>,
   /** `false` = no guardar los vídeos, solo sus nombres. Ver `blob`. */
   conBlobs = true,
 ): Promise<void> {
@@ -134,7 +135,7 @@ export async function crearLote(
         loteId: meta.id,
         idx,
         nombre: f.name,
-        blob: conBlobs ? f : undefined,
+        blob: conBlobs ? (f as File) : undefined,
         token: null,
       } as FicheroLote);
     });

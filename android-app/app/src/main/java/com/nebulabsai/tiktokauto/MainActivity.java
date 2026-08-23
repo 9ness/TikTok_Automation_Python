@@ -70,7 +70,15 @@ public class MainActivity extends Activity {
      *  URIs del mismo selector. Se casan por NOMBRE, que es lo único que
      *  comparten los dos lados, y así el servicio puede leer los bytes sin que
      *  la web se los pase (pasarlos costaría base64 de 30 MB por vídeo). */
-    private final Map<String, Uri> ultimaSeleccion = new LinkedHashMap<>();
+    /** Lo último que eligió el usuario: nombre → fichero.
+     *
+     *  ESTÁTICO a propósito. Al abrir Google Fotos para elegir catorce vídeos,
+     *  Android puede matar y recrear esta pantalla por memoria; con un campo
+     *  normal, al volver la selección ya no existía y no se subía nada. El
+     *  proceso sí sobrevive, así que aquí aguanta. */
+    private static final Map<String, Uri> ultimaSeleccion = new LinkedHashMap<>();
+    /** Nombres pendientes de contarle a la web (ver `avisarDeLaSeleccion`). */
+    private static java.util.List<String> seleccionSinAvisar = new ArrayList<>();
     /** Dónde devolver los ficheros que elija el usuario (ver `onShowFileChooser`). */
     private ValueCallback<Uri[]> esperandoFicheros;
     private static final int PEDIR_FICHEROS = 1;
@@ -365,6 +373,34 @@ public class MainActivity extends Activity {
             }
             ultimaSeleccion.put(nombreDeUri(u), u);
         }
+        seleccionSinAvisar = new ArrayList<>(ultimaSeleccion.keySet());
+    }
+
+    /**
+     * Le cuenta a la web QUÉ se ha elegido, por su nombre.
+     *
+     * Existe porque el camino normal —devolverle los ficheros al
+     * `<input type="file">`— se rompe justo en el caso que importa: elegir
+     * catorce vídeos en Google Fotos gasta memoria, Android recrea esta
+     * pantalla mientras tanto y al volver ya no hay a quién contestarle. El
+     * usuario pulsaba "Hecho" y no pasaba nada.
+     *
+     * Para la subida no hacen falta los bytes en la web: los ficheros los tiene
+     * la app y los dos lados se casan por NOMBRE, que es justo lo que se manda
+     * aquí. Si la web no está lista todavía, se queda pendiente y se reintenta
+     * al volver a `onResume`.
+     */
+    private void avisarDeLaSeleccion() {
+        if (web == null || seleccionSinAvisar.isEmpty()) return;
+        org.json.JSONArray nombres = new org.json.JSONArray();
+        for (String n : seleccionSinAvisar) nombres.put(n);
+        String js = "if(window.__ficherosElegidos){window.__ficherosElegidos("
+            + org.json.JSONObject.quote(nombres.toString()) + ");true}else{false}";
+        web.evaluateJavascript(js, valor -> {
+            // Solo se da por contado si la web dijo que sí: si aún no había
+            // cargado la pantalla, se reintenta al volver.
+            if ("true".equals(valor)) seleccionSinAvisar = new ArrayList<>();
+        });
     }
 
     private String nombreDeUri(Uri uri) {
@@ -579,11 +615,16 @@ public class MainActivity extends Activity {
         }
         esperandoFicheros.onReceiveValue(elegidos);
         esperandoFicheros = null;
+        // Y por su cuenta, por si el `<input>` no se ha enterado.
+        avisarDeLaSeleccion();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        // Si al volver del selector la pantalla se había recreado, aquí es
+        // donde llega por fin lo que se eligió.
+        avisarDeLaSeleccion();
         // Si el servicio terminó con la app cerrada, sus respuestas están
         // guardadas: se le entregan a la web para que reparta.
         if (web != null) {

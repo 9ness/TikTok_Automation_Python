@@ -67,6 +67,7 @@ export function subirConLaApp(v: {
  *  Con una sola ranura, el último en montarse borraba al anterior. */
 const alTerminarFichero = new Set<(nombre: string, respuesta: string) => void>();
 const alAvanzarFichero = new Set<(nombre: string, pct: number) => void>();
+const alElegirFicheros = new Set<(nombres: string[]) => void>();
 
 /** Engancha los callbacks que llama la app. Se hace una vez y se queda: lo que
  *  entra y sale son los suscriptores, no el puente. */
@@ -75,12 +76,22 @@ function engancharPuente() {
   const w = window as unknown as {
     __subidaAppFichero?: (nombre: string, respuesta: string) => void;
     __subidaAppProgreso?: (nombre: string, pct: number) => void;
+    __ficherosElegidos?: (nombresJson: string) => void;
   };
   w.__subidaAppFichero = (nombre, respuesta) => {
     alTerminarFichero.forEach((fn) => fn(nombre, respuesta));
   };
   w.__subidaAppProgreso = (nombre, pct) => {
     alAvanzarFichero.forEach((fn) => fn(nombre, pct));
+  };
+  w.__ficherosElegidos = (nombresJson: string) => {
+    let nombres: string[] = [];
+    try {
+      nombres = JSON.parse(nombresJson || "[]") as string[];
+    } catch {
+      return;
+    }
+    if (nombres.length) alElegirFicheros.forEach((fn) => fn(nombres));
   };
 }
 
@@ -128,5 +139,26 @@ export function alTerminarLaApp(fn: (respuestas: unknown[]) => void): () => void
   };
   return () => {
     delete w.__subidaAppLista;
+  };
+}
+
+
+/** Qué ficheros ha elegido el usuario en el selector de la app.
+ *
+ *  Es el camino de repuesto —y el fiable— para las tandas grandes. El normal es
+ *  que el selector devuelva los ficheros al `<input type="file">`, pero elegir
+ *  catorce vídeos en Google Fotos gasta memoria y Android puede recrear la
+ *  pantalla mientras tanto: al volver ya no hay a quién contestarle y pulsar
+ *  "Hecho" no hacía nada.
+ *
+ *  Solo llegan los NOMBRES, que es todo lo que hace falta: cuando sube la app,
+ *  los bytes se quedan en ella y los dos lados se casan por nombre.
+ */
+export function alElegirEnLaApp(fn: (nombres: string[]) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  engancharPuente();
+  alElegirFicheros.add(fn);
+  return () => {
+    alElegirFicheros.delete(fn);
   };
 }

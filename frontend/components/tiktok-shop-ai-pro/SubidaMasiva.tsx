@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { escucharAvisos, lanzarEnSegundoPlano, soportaBgFetch, tandaEnMarcha } from "@/lib/bgFetch";
 import {
+  alElegirEnLaApp,
   alSubirCadaFichero,
   alTerminarLaApp,
   haySubidaNativa,
@@ -140,6 +141,10 @@ function ordenarPorProducto(
  *  segundo plano (`lib/bgFetch.ts`). Cerrar la app o que Android la mate ya no
  *  obliga a volver a subir 30 MB por vídeo.
  */
+/** Un vídeo elegido: el fichero entero, o solo su nombre cuando lo tiene la
+ *  app y no llegó al `<input>`. */
+type Elegido = File | { name: string };
+
 export function SubidaMasiva({
   source,
   folder,
@@ -181,8 +186,13 @@ export function SubidaMasiva({
   const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
   /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
   const [enSegundoPlano, setEnSegundoPlano] = useState(false);
-  /** Lo que se acaba de elegir en el selector, aún sin mandar. */
-  const [elegidos, setElegidos] = useState<File[]>([]);
+  /** Lo que se acaba de elegir en el selector, aún sin mandar.
+   *
+   *  Puede que NO sean ficheros de verdad, solo sus nombres: cuando el selector
+   *  de la app no llega a devolvérselos al `<input>` —pasa con tandas grandes
+   *  en Google Fotos—, la app avisa aparte con los nombres, y para que suba
+   *  ella no hace falta más. */
+  const [elegidos, setElegidos] = useState<Elegido[]>([]);
   /** Lo que quedó sin encolar y por qué. En pantalla hasta que se cierre: en
    *  un toast se pierde y luego no cuadra la cuenta de la cola. */
   const [avisos, setAvisos] = useState<string[]>([]);
@@ -326,7 +336,7 @@ export function SubidaMasiva({
     }
   }, [folder, loteId, repartirYSeguir, root, source]);
 
-  async function enviar(files: File[]) {
+  async function enviar(files: Elegido[]) {
     if (!files.length) return;
     const auto = !confirmarAntes;
     setReparto(null);
@@ -376,7 +386,16 @@ export function SubidaMasiva({
       toast.warning("La app no pudo con la tanda; la subo desde aquí.");
     }
 
-    await crearLote(meta, files);
+    // Sin la app hay que tener los bytes: si solo llegaron los nombres (porque
+    // el selector no pudo devolvérselos al `<input>`), no hay nada que subir
+    // desde el navegador y hay que volver a elegirlos.
+    const reales = files.filter((f): f is File => f instanceof File);
+    if (reales.length !== files.length) {
+      throw new Error(
+        "Estos vídeos los tenía la app y no ha podido subirlos. Vuelve a elegirlos.",
+      );
+    }
+    await crearLote(meta, reales);
 
     // Camino bueno: el sistema se encarga y la app puede cerrarse.
     if (soportaBgFetch()) {
@@ -386,7 +405,7 @@ export function SubidaMasiva({
         apiKey: claveApi(),
         source,
         folder,
-        files,
+        files: reales,
       });
       if (reg) {
         setEnSegundoPlano(true);
@@ -441,6 +460,15 @@ export function SubidaMasiva({
     },
     [loteId, repartirYSeguir],
   );
+
+  /** Lo que dice la app que se ha elegido, cuando el `<input>` no se enteró. */
+  useEffect(() => alElegirEnLaApp((nombres) => {
+    setElegidos((antes) =>
+      // Si el `<input>` SÍ los trajo, mandan esos: son ficheros de verdad y
+      // valen también para subir desde el navegador.
+      antes.length >= nombres.length ? antes : nombres.map((name) => ({ name })),
+    );
+  }), []);
 
   // Fichero a fichero mientras la pantalla está abierta.
   useEffect(() => alSubirCadaFichero((nombre, respuesta) => {
