@@ -712,7 +712,10 @@ export function SubidaMasiva({
               </>
             ) : (
               <>
-                <Upload className="h-3.5 w-3.5" /> Elegir vídeos
+                <Upload className="h-3.5 w-3.5" />{" "}
+                {elegidos.length
+                  ? `${elegidos.length} elegido${elegidos.length === 1 ? "" : "s"} · cambiar`
+                  : "Elegir vídeos"}
               </>
             )}
             <input
@@ -724,6 +727,13 @@ export function SubidaMasiva({
               onChange={(e) => {
                 const f = Array.from(e.target.files ?? []);
                 e.target.value = "";
+                // Que el selector no devuelva nada hay que DECIRLO. Si no, se
+                // confunde con "la web no se ha enterado" y no hay forma de
+                // saber cuál de las dos cosas ha pasado.
+                if (!f.length) {
+                  toast.error("El selector no devolvió ningún vídeo. Vuelve a intentarlo.");
+                  return;
+                }
                 // No se sube al elegir: primero se enseña qué se ha cogido.
                 // Elegir diez vídeos y que la pantalla no acuse recibo deja sin
                 // saber si el selector devolvió algo o si falló la subida.

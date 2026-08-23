@@ -557,11 +557,27 @@ public class MainActivity extends Activity {
             return;
         }
         if (esperandoFicheros == null) return;
-        recordarSeleccion(datos);
+        // Apuntar la selección va en su propia red: si fallara, la web se
+        // quedaría esperando una respuesta que no llega y el `<input>` no
+        // vuelve a abrirse nunca. Es un apunte para las subidas, no algo por lo
+        // que merezca la pena romper la pantalla.
+        try {
+            recordarSeleccion(datos);
+        } catch (Throwable e) {
+            Log.w(TAG, "no pude apuntar la selección", e);
+        }
         // Hay que contestar SIEMPRE, aunque se cancele: si no, el input se
         // queda bloqueado y no vuelve a abrirse nunca.
-        esperandoFicheros.onReceiveValue(
-            WebChromeClient.FileChooserParams.parseResult(resultado, datos));
+        Uri[] elegidos = null;
+        try {
+            elegidos = WebChromeClient.FileChooserParams.parseResult(resultado, datos);
+        } catch (Throwable e) {
+            Log.w(TAG, "no pude leer lo elegido", e);
+        }
+        if (elegidos != null && elegidos.length > 0) {
+            Log.i(TAG, "elegidos " + elegidos.length + " fichero(s)");
+        }
+        esperandoFicheros.onReceiveValue(elegidos);
         esperandoFicheros = null;
     }
 
