@@ -257,6 +257,10 @@ class VideoLoteResponse(BaseModel):
     folder: str
     items: list[VideoLoteItem] = Field(default_factory=list)
     reconocidos: int = 0
+    #: Entre cuántos productos ha podido elegir. Se enseña porque es lo que
+    #: dice si el "solo los que tienen URL" surtió efecto: si sigue poniendo
+    #: diez, el check no estaba puesto.
+    candidatos: int = 0
 
 
 class VideoLoteConfirmarRequest(BaseModel):

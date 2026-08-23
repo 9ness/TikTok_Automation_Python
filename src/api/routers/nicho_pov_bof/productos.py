@@ -783,6 +783,7 @@ def repartir_lote(
     return VideoLoteResponse(
         source=source, folder=folder, items=items,
         reconocidos=sum(1 for i in items if i.producto),
+        candidatos=len(candidatos),
     )
 
 

@@ -192,6 +192,8 @@ export function SubidaMasiva({
   const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
   /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
   const [enSegundoPlano, setEnSegundoPlano] = useState(false);
+  /** Entre cuántos productos eligió el último reparto. */
+  const [candidatos, setCandidatos] = useState(0);
   /** Qué clips tienen la tira de productos abierta. */
   const [cambiando, setCambiando] = useState<Record<string, boolean>>({});
   /** Repartir solo entre los productos con la ficha enlazada. Se acuerda: quien
@@ -269,6 +271,7 @@ export function SubidaMasiva({
         const r = await repartir.mutateAsync({
           source, folder, tokens, solo_con_url: soloConUrl,
         });
+        setCandidatos(r.candidatos ?? 0);
         const items = r.items.map((x) => ({
           ...x,
           archivo: nombres.get(x.token) ?? x.archivo,
@@ -863,6 +866,28 @@ export function SubidaMasiva({
 
           {reparto && (
             <div className="space-y-1.5">
+              {/* Entre cuántos ha podido elegir. Es lo que dice de un vistazo si
+                  el "solo los que tienen URL" surtió efecto: con el check
+                  puesto aquí salen los enlazados, no los diez de la carpeta. */}
+              {candidatos > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  Repartido entre {candidatos} producto{candidatos === 1 ? "" : "s"}
+                  {soloConUrl ? " con la ficha enlazada" : " de la carpeta"}.
+                  {!soloConUrl && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        onClick={() => setSoloConUrl(true)}
+                        className="underline decoration-dotted"
+                      >
+                        Acotar a los que tienen URL
+                      </button>{" "}
+                      y volver a subirlos si se ha equivocado.
+                    </>
+                  )}
+                </p>
+              )}
               {filas.map(({ it, idx: i, ficha, doble, clip, cuantos, falta, abreGrupo }) => {
                 const asignado = conFoto.find((p) => p.producto === it.producto);
                 const traidos = it.producto ? (porProducto.get(it.producto) ?? 0) : 0;

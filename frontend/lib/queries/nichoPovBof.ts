@@ -792,6 +792,8 @@ export interface LoteResponse {
   folder: string;
   items: LoteItem[];
   reconocidos: number;
+  /** Entre cuántos productos ha podido elegir. */
+  candidatos?: number;
 }
 
 /** Sube varios vídeos de golpe y devuelve de qué producto cree que es cada uno.
