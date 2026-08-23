@@ -872,7 +872,13 @@ export function useRepartirLote(root: string = ROOT) {
   return useMutation<
     LoteResponse,
     Error,
-    { source: string; folder: string; tokens: string[] }
+    {
+      source: string;
+      folder: string;
+      tokens: string[];
+      /** Repartir SOLO entre los productos con la ficha enlazada. */
+      solo_con_url?: boolean;
+    }
   >({
     mutationFn: (body) => api.post<LoteResponse>(`${root}/video/lote/repartir`, body),
   });

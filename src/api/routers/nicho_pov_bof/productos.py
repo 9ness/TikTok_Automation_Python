@@ -757,6 +757,17 @@ def repartir_lote(
 
     fichas = _list_productos(source, folder, None, usuario).items
     candidatos = [p.producto for p in fichas if p.clean_photo_id]
+    # Acotar a los que tienen la ficha enlazada cuando se pide. No es solo un
+    # filtro: si se han subido los vídeos de los cinco que se van a publicar, el
+    # reconocimiento no tiene por qué elegir entre los diez de la carpeta —y
+    # cuando se equivoca es justo ahí, con productos parecidos. Menos
+    # candidatos, menos formas de fallar.
+    if bool(body.get("solo_con_url")):
+        con_url = [p.producto for p in fichas if p.clean_photo_id and p.product_url]
+        # Si ninguno la tuviera, se ignora: mejor repartir entre todos que
+        # dejar la tanda sin repartir.
+        if con_url:
+            candidatos = con_url
     # Los de plazos llevan DOS clips: pueden llevarse dos vídeos de la tanda.
     dobles = {p.producto for p in fichas if p.modo_plazos}
     reparto = emparejador.emparejar(

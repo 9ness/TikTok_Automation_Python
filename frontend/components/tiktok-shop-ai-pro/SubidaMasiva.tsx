@@ -13,7 +13,7 @@ import {
   haySubidaNativa,
   subirConLaApp,
 } from "@/lib/subidaNativa";
-import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
+import { useEstadoDeUsuario, useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
 import {
   actualizarLote,
   borrarLote,
@@ -141,6 +141,12 @@ function ordenarPorProducto(
  *  segundo plano (`lib/bgFetch.ts`). Cerrar la app o que Android la mate ya no
  *  obliga a volver a subir 30 MB por vídeo.
  */
+/** ¿Es este el último clip de su producto? (para redondear el grupo abajo). */
+function cierraGrupo(filas: Fila[], idxReparto: number): boolean {
+  const pos = filas.findIndex((f) => f.idx === idxReparto);
+  return pos === -1 || pos === filas.length - 1 || Boolean(filas[pos + 1]?.abreGrupo);
+}
+
 /** Un vídeo elegido: el fichero entero, o solo su nombre cuando lo tiene la
  *  app y no llegó al `<input>`. */
 type Elegido = File | { name: string };
@@ -186,6 +192,14 @@ export function SubidaMasiva({
   const [pendiente, setPendiente] = useState<{ subidos: number; total: number } | null>(null);
   /** La subida va por su cuenta en el sistema: no hay que dejar la app abierta. */
   const [enSegundoPlano, setEnSegundoPlano] = useState(false);
+  /** Qué clips tienen la tira de productos abierta. */
+  const [cambiando, setCambiando] = useState<Record<string, boolean>>({});
+  /** Repartir solo entre los productos con la ficha enlazada. Se acuerda: quien
+   *  trabaja por URL lo hace SIEMPRE, y volver a marcarlo en cada carpeta es de
+   *  las cosas que se olvidan justo el día que importa. */
+  const [soloConUrl, setSoloConUrl] = useEstadoDeUsuario(
+    "subidamasiva:solo-url", false,
+  );
   /** Lo que se acaba de elegir en el selector, aún sin mandar.
    *
    *  Puede que NO sean ficheros de verdad, solo sus nombres: cuando el selector
@@ -252,7 +266,9 @@ export function SubidaMasiva({
     async (tokens: string[], nombres: Map<string, string>, auto: boolean, vozElegida: Sexo) => {
       setReconociendo(true);
       try {
-        const r = await repartir.mutateAsync({ source, folder, tokens });
+        const r = await repartir.mutateAsync({
+          source, folder, tokens, solo_con_url: soloConUrl,
+        });
         const items = r.items.map((x) => ({
           ...x,
           archivo: nombres.get(x.token) ?? x.archivo,
@@ -570,6 +586,16 @@ export function SubidaMasiva({
 
   const listos = (reparto ?? []).filter((i) => i.producto).length;
   // El repaso, agrupado por producto y con los clips numerados.
+  /** Cuántos clips de la tanda le han tocado a cada producto. Es lo que dice
+   *  si está completo sin tener que contar tarjetas a ojo. */
+  const porProducto = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const it of reparto ?? []) {
+      if (it.producto) cuenta.set(it.producto, (cuenta.get(it.producto) ?? 0) + 1);
+    }
+    return cuenta;
+  }, [reparto]);
+
   const filas = useMemo(
     () => ordenarPorProducto(reparto ?? [], productos, todosDobles),
     [productos, reparto, todosDobles],
@@ -625,6 +651,30 @@ export function SubidaMasiva({
             que estén todos: los productos sin vídeo se quedan como están, y si
             alguno no se reconoce lo asignas tú.
           </p>
+
+          {/* Acotar a qué productos puede ir cada vídeo. Quien trabaja por
+              fichas sube solo los de esos productos, y dejar que el
+              reconocimiento elija entre los diez de la carpeta es darle formas
+              de equivocarse que no hacen falta — y se equivoca justo con los
+              parecidos. */}
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border/60 p-2">
+            <input
+              type="checkbox"
+              checked={soloConUrl}
+              onChange={(e) => setSoloConUrl(e.target.checked)}
+              disabled={subiendo}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-emerald-500"
+            />
+            <span className="min-w-0">
+              <span className="block text-[11px] font-semibold">
+                Repartir solo entre los que tienen URL
+              </span>
+              <span className="block text-[10px] leading-tight text-muted-foreground">
+                Si subes solo los de las fichas enlazadas, así no puede colarte
+                otro producto de la carpeta.
+              </span>
+            </span>
+          </label>
 
           {/* Con el check quitado no hay repaso, así que la voz hay que
               elegirla ANTES de soltar los vídeos. */}
@@ -815,36 +865,83 @@ export function SubidaMasiva({
             <div className="space-y-1.5">
               {filas.map(({ it, idx: i, ficha, doble, clip, cuantos, falta, abreGrupo }) => {
                 const asignado = conFoto.find((p) => p.producto === it.producto);
+                const traidos = it.producto ? (porProducto.get(it.producto) ?? 0) : 0;
+                const pide = doble ? cuantos : 1;
+                const completo = Boolean(it.producto) && traidos >= pide;
                 return (
-                  <div
-                    key={it.token}
-                    className={`space-y-1.5 rounded-lg border p-2 ${
-                      it.producto ? "border-border/60" : "border-amber-500/50 bg-amber-500/5"
-                    } ${!abreGrupo ? "-mt-1 border-t-0" : ""}`}
-                  >
-                    {/* De un vistazo: si el producto va de plazos y cuál de sus
-                        dos clips es este. Sin esto había que abrir la ficha
-                        para saber por qué un producto llevaba dos vídeos. */}
-                    {(doble || falta) && (
-                      <div className="flex flex-wrap items-center gap-1">
+                  <div key={it.token}>
+                    {/* UNA cabecera por PRODUCTO, no por clip.
+                        Antes cada clip era una tarjeta con la foto, el título y
+                        la tira entera de productos repetidos, así que con
+                        catorce vídeos la pantalla era un muro donde no se veía
+                        lo único que importa: si cada producto tiene sus clips y
+                        si son los suyos. */}
+                    {abreGrupo && (
+                      <div
+                        className={`mt-2 flex items-center gap-2 rounded-t-lg border border-b-0 p-2 ${
+                          !it.producto
+                            ? "border-amber-500/50 bg-amber-500/10"
+                            : completo
+                              ? "border-emerald-500/50 bg-emerald-500/10"
+                              : "border-amber-500/50 bg-amber-500/10"
+                        }`}
+                      >
+                        {asignado?.clean_photo_id ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={fotoUrl(source, folder, asignado.clean_photo_id)}
+                            alt={asignado.producto}
+                            className="h-10 w-10 shrink-0 rounded border border-border/60 object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-amber-500/60 text-[10px] text-amber-500">
+                            ?
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[11px] font-semibold">
+                            {asignado
+                              ? `${asignado.producto} · ${asignado.titulo || "sin título"}`
+                              : "Sin reconocer"}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            {it.producto
+                              ? `${traidos} de ${pide} clip${pide === 1 ? "" : "s"}`
+                              : "elige el producto en cada clip, o déjalo fuera"}
+                          </span>
+                        </span>
                         {ficha?.modo_plazos && (
-                          <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-400">
-                            💳 Plazos
+                          <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-400">
+                            💳
                           </span>
                         )}
-                        {clip > 0 && (
-                          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-400">
-                            Clip {clip} de {cuantos}
-                          </span>
-                        )}
-                        {falta && (
-                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500">
-                            {cuantos > 2
-                              ? `este guion pide ${cuantos} clips · no se editará`
-                              : "falta el otro clip · no se editará"}
-                          </span>
-                        )}
+                        <span
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                            completo
+                              ? "bg-emerald-500/20 text-emerald-500"
+                              : "bg-amber-500/20 text-amber-500"
+                          }`}
+                        >
+                          {completo ? "✓" : "falta"}
+                        </span>
                       </div>
+                    )}
+
+                    <div
+                      className={`space-y-1.5 border-x border-b p-2 ${
+                        !it.producto
+                          ? "border-amber-500/50 bg-amber-500/5"
+                          : completo
+                            ? "border-emerald-500/50"
+                            : "border-amber-500/50"
+                      } ${cierraGrupo(filas, i) ? "rounded-b-lg" : ""}`}
+                    >
+                    {falta && clip === traidos && (
+                      <p className="text-[10px] font-semibold text-amber-500">
+                        {cuantos > 2
+                          ? `este guion pide ${cuantos} clips · no se editará`
+                          : "falta el otro clip · no se editará"}
+                      </p>
                     )}
 
                     <div className="flex gap-2">
@@ -859,24 +956,17 @@ export function SubidaMasiva({
                         className="h-24 w-16 shrink-0 rounded border border-border/60 bg-black object-cover"
                       />
                       <div className="min-w-0 flex-1 space-y-1">
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {it.archivo}
-                        </p>
-                        {asignado ? (
-                          <div className="flex items-center gap-1.5">
-                            {asignado.clean_photo_id && (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={fotoUrl(source, folder, asignado.clean_photo_id)}
-                                alt={asignado.producto}
-                                className="h-10 w-10 rounded border border-emerald-500/60 object-cover"
-                              />
-                            )}
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">
-                              {asignado.producto} · {asignado.titulo || "sin título"}
+                        <div className="flex items-center gap-1.5">
+                          {clip > 0 && (
+                            <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-400">
+                              Clip {clip}
                             </span>
-                          </div>
-                        ) : (
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+                            {it.archivo}
+                          </span>
+                        </div>
+                        {!asignado && (
                           <p className="text-[10px] text-amber-500">
                             No lo ha reconocido: elígelo abajo o déjalo fuera.
                           </p>
@@ -884,12 +974,27 @@ export function SubidaMasiva({
                         {it.por_que && (
                           <p className="text-[10px] text-muted-foreground">{it.por_que}</p>
                         )}
+                        {/* La tira de productos se abre a mano. Estaba SIEMPRE
+                            abierta, una por clip: con catorce vídeos eran
+                            catorce tiras idénticas y encontrar el que había que
+                            corregir costaba más que corregirlo. */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCambiando((v) => ({ ...v, [it.token]: !v[it.token] }))
+                          }
+                          className="text-[10px] text-muted-foreground underline decoration-dotted"
+                        >
+                          {cambiando[it.token] ? "cerrar" : "cambiar de producto"}
+                        </button>
                       </div>
                     </div>
 
                     {/* Las fotos de los productos, para elegir mirando y no
                         leyendo. La asignada va marcada. */}
-                    <div className="flex gap-1 overflow-x-auto pb-1">
+                    <div
+                      className={`${cambiando[it.token] || !it.producto ? "flex" : "hidden"} gap-1 overflow-x-auto pb-1`}
+                    >
                       <button
                         type="button"
                         onClick={() => cambiar(i, "")}
@@ -930,6 +1035,7 @@ export function SubidaMasiva({
                           </span>
                         </button>
                       ))}
+                    </div>
                     </div>
                   </div>
                 );
