@@ -159,7 +159,16 @@ export function VideoModal({
                 el.playbackRate = speed;
               }}
               className="w-full"
-              style={{ aspectRatio: "9 / 16", display: "block" }}
+              // El tope de alto es para que quepan debajo la velocidad y los
+              // botones sin desplazarse dentro de la ventana: un 9/16 a 320 px
+              // de ancho mide 569 px y en un móvil se comía la pantalla.
+              // `objectFit: contain` para que el recorte no deforme el vídeo.
+              style={{
+                aspectRatio: "9 / 16",
+                maxHeight: "55vh",
+                objectFit: "contain",
+                display: "block",
+              }}
             />
             {/* Velocidad de reproducción — repasar más rápido */}
             <div className="flex items-center justify-center gap-1 bg-black/80 px-2 py-1.5">

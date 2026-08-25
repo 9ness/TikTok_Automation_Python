@@ -726,7 +726,12 @@ def stream_job_video(
             f"Archivo no existe en disco: {job.result_path}",
             details={"job_id": job_id, "path": job.result_path},
         )
-    return FileResponse(path=str(path), media_type="video/mp4", filename=path.name)
+    # SIN `filename`: eso pone `Content-Disposition: attachment` y convierte la
+    # respuesta en una descarga. El navegador de escritorio lo reproduce igual,
+    # pero el WebView de Android no: se veía el hueco gris con la flecha y el
+    # vídeo no cargaba nunca. Para bajarlo ya está `/download`, que es el que
+    # sí debe marcarlo como adjunto.
+    return FileResponse(path=str(path), media_type="video/mp4")
 
 
 @video_router.get("/{job_id}/download")
