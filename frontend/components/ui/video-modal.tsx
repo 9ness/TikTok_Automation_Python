@@ -109,6 +109,7 @@ export function VideoModal({
           width: "320px",
           maxWidth: "calc(100vw - 2rem)",
           maxHeight: "calc(100vh - 2rem)",
+          minHeight: "16rem",
           overflowY: "auto",
           borderRadius: "0.5rem",
           padding: "1rem",
@@ -137,7 +138,12 @@ export function VideoModal({
 
         {/* Video */}
         {videoUrl ? (
-          <div className="overflow-hidden rounded-md bg-black">
+          // `flexShrink: 0` es la clave: esto es un hijo flex dentro de una
+          // caja con `maxHeight`, así que por defecto se encoge para caber. El
+          // vídeo se queda en nada y el modal sale como una TIRA con solo el
+          // título — que es exactamente lo que se veía en el móvil. Mismo
+          // fallo que tuvo el visor de fotos.
+          <div className="overflow-hidden rounded-md bg-black" style={{ flexShrink: 0 }}>
             <video
               ref={videoRef}
               src={videoUrl}
@@ -177,7 +183,7 @@ export function VideoModal({
         ) : (
           <div
             className="flex flex-col items-center justify-center gap-2 rounded-md border bg-muted text-muted-foreground"
-            style={{ aspectRatio: "9 / 16" }}
+            style={{ aspectRatio: "9 / 16", flexShrink: 0 }}
           >
             <Film className="h-8 w-8" />
             <p className="px-4 text-center text-sm">
