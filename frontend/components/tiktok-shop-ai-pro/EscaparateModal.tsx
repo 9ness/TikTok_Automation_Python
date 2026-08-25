@@ -14,6 +14,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 import { FotoModal } from "./FotoModal";
+import { Portal } from "@/components/ui/portal";
 
 /** Checklist para meter los productos de la carpeta en el escaparate.
  *
@@ -142,6 +143,7 @@ export function EscaparateModal({
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
@@ -307,5 +309,6 @@ export function EscaparateModal({
         )}
       </div>
     </div>
+    </Portal>
   );
 }

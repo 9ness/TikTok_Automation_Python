@@ -14,6 +14,7 @@ import {
   ANCHO_CHIP,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoBuscado } from "@/lib/types/nichoPovBof";
+import { Portal } from "@/components/ui/portal";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -63,6 +64,7 @@ export function VendidosModal({
   }, [onClose]);
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
@@ -252,6 +254,7 @@ export function VendidosModal({
         )}
       </div>
     </div>
+    </Portal>
   );
 }
 

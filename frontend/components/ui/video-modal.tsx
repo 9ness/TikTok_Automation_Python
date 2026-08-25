@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Film, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Portal } from "@/components/ui/portal";
 
 /** Volumen por defecto al abrir el modal (15%). El usuario puede subirlo
  *  en los controles del player si quiere. */
@@ -82,7 +83,10 @@ export function VideoModal({
 
   if (!open) return null;
 
+  // Colgado del `<body>`: este modal se usa DENTRO del cajón de la cola, y ahí
+  // no llegaba a abrirse.
   return (
+    <Portal>
     <div
       role="dialog"
       aria-modal="true"
@@ -213,5 +217,6 @@ export function VideoModal({
         )}
       </div>
     </div>
+    </Portal>
   );
 }

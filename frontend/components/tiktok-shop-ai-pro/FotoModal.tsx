@@ -2,7 +2,7 @@
 
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { Portal } from "@/components/ui/portal";
 
 import { FotoProducto } from "./FotoProducto";
 
@@ -46,13 +46,9 @@ export function FotoModal({
 
   if (!open || typeof document === "undefined") return null;
 
-  // Colgado del `<body>` y no de donde se usa. `position: fixed` deja de
-  // referirse a la pantalla en cuanto CUALQUIER ancestro tiene `transform`,
-  // `filter` o `contain`, y entonces el visor se recorta a ese ancestro: eso
-  // es exactamente lo que se veía en el móvil —una tira con el título cortado
-  // por abajo— mientras que en el escritorio salía bien. Sacándolo del árbol
-  // no hay ancestro que valga.
-  return createPortal(
+  // Colgado del `<body>` — el porqué, en `ui/portal.tsx`.
+  return (
+    <Portal>
     <div
       role="dialog"
       aria-modal="true"
@@ -140,7 +136,7 @@ export function FotoModal({
           </a>
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
+    </Portal>
   );
 }
