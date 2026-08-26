@@ -797,6 +797,30 @@ def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     return salida
 
 
+def productos_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
+    """`{carpeta: cuántos productos tiene HOY}`. Una sola lectura para todas.
+
+    Se usa para avisar de que una carpeta YA COMPLETADA ha crecido: el
+    catálogo de la web se actualiza y, sin esto, los productos nuevos de una
+    carpeta terminada no se ven nunca.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available() or not folders:
+        return {}
+    docs = r.mget_json([_key(source, n) for n in folders])
+    salida: dict[str, int] = {}
+    for nombre, doc in zip(folders, docs):
+        todos = ((doc or {}).get("productos") or {})
+        vigentes = (doc or {}).get("ids_vigentes")
+        # `ids_vigentes` es la lista de lo que la carpeta tiene HOY; sin ella
+        # el documento arrastra huérfanos y contaría de más.
+        salida[nombre] = (
+            len([i for i in vigentes if str(i) in todos])
+            if isinstance(vigentes, list) else len(todos)
+        )
+    return salida
+
+
 def _casa_solo_titulo(clave: str, indice) -> str:
     """La clave del índice con el MISMO título aunque la tienda sea otra.
 

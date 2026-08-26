@@ -46,8 +46,39 @@ def is_completed(source: str, folder: str, usuario: str = "") -> bool:
     return _require_redis().sismember(_key(source, usuario), folder)
 
 
-def mark_completed(source: str, folder: str, usuario: str = "") -> None:
-    _require_redis().sadd(_key(source, usuario), folder)
+def _key_tamano(source: str, usuario: str = "") -> str:
+    """Cuántos productos tenía cada carpeta AL COMPLETARLA."""
+    source = config.fuente_canonica(source)
+    if not usuario or usuario == "ness":
+        return f"completed:size:{source}"
+    return f"completed:size:{source}:{usuario}"
+
+
+def mark_completed(
+    source: str, folder: str, usuario: str = "", productos: int = 0,
+) -> None:
+    """Marca la carpeta como hecha y apunta CUÁNTOS productos tenía.
+
+    Lo segundo es para poder avisar después: el catálogo de la web se
+    actualiza, y una carpeta ya terminada puede recibir productos nuevos. Sin
+    guardar el tamaño de entonces no hay forma de saber cuántos han entrado
+    desde que la diste por hecha, y quedarían escondidos para siempre.
+    """
+    r = _require_redis()
+    r.sadd(_key(source, usuario), folder)
+    if productos > 0:
+        tamanos = r.get_json(_key_tamano(source, usuario)) or {}
+        tamanos[folder] = int(productos)
+        r.set_json(_key_tamano(source, usuario), tamanos)
+
+
+def tamanos_al_completar(source: str, usuario: str = "") -> dict[str, int]:
+    """`{carpeta: cuántos productos tenía al marcarla}`. Una lectura."""
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return {}
+    doc = r.get_json(_key_tamano(source, usuario)) or {}
+    return {str(k): int(v) for k, v in doc.items() if str(v).isdigit()}
 
 
 def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
@@ -55,3 +86,8 @@ def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
     r = get_nicho_pov_bof_redis()
     if r.is_available():
         r.srem(_key(source, usuario), folder)
+        # Y se olvida el tamaño: si se vuelve a marcar, se apunta el de
+        # entonces. Dejarlo haría que al recompletarla saliera un "+N" viejo.
+        tamanos = r.get_json(_key_tamano(source, usuario)) or {}
+        if tamanos.pop(folder, None) is not None:
+            r.set_json(_key_tamano(source, usuario), tamanos)

@@ -24,6 +24,10 @@ class ProductFolder(BaseModel):
     name: str
     id: str
     completed: bool
+    #: Productos que han entrado DESPUÉS de darla por hecha. El catálogo de la
+    #: web se actualiza, así que una carpeta terminada puede recibir más — y
+    #: sin esto quedarían escondidos.
+    nuevos_desde_completada: int = 0
     # El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. Se
     # marca para que se vea de dónde viene lo que se está trabajando.
     desde_copia: bool = False

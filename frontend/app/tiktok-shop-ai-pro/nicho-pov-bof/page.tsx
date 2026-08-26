@@ -873,6 +873,18 @@ export default function NichoPovBofPage() {
                   {f.con_url}
                 </span>
               )}
+              {/* Productos que entraron DESPUÉS de darla por hecha. El catálogo
+                  de la web se actualiza, y sin esto una carpeta ya terminada se
+                  queda con productos nuevos que no se ven nunca. Mismo aviso
+                  ámbar que el de los vendidos sin copiar. */}
+              {!!f.nuevos_desde_completada && (
+                <span
+                  title={`${f.nuevos_desde_completada} producto(s) nuevos desde que la completaste`}
+                  className="ml-1 rounded bg-amber-500/20 px-1 py-px text-[9px] font-bold text-amber-500"
+                >
+                  +{f.nuevos_desde_completada}
+                </span>
+              )}
             </button>
           ))}
         </div>

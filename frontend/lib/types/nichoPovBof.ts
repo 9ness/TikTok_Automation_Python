@@ -19,6 +19,8 @@ export interface ProductFolder {
   desde_copia?: boolean;
   /** Cuántos de sus productos ya tienen enlazada la ficha de TikTok Shop. */
   con_url?: number;
+  /** Productos que han entrado DESPUÉS de dar la carpeta por hecha. */
+  nuevos_desde_completada?: number;
 }
 
 export interface FoldersListResponse {

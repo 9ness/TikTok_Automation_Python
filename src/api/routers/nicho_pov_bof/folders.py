@@ -102,11 +102,26 @@ def list_folders(
     except Exception:  # noqa: BLE001
         # Un fallo contando no puede dejar sin listado de carpetas.
         con_url = {}
+    # Cuántos productos tiene hoy cada carpeta y cuántos tenía al completarla:
+    # la diferencia es lo que ha entrado desde entonces.
+    try:
+        nombres = [f["name"] for f in folders]
+        ahora = product_repo.productos_por_carpeta(source, nombres)
+        entonces = progress_repo.tamanos_al_completar(source, usuario)
+    except Exception:  # noqa: BLE001
+        ahora, entonces = {}, {}
+
+    def _nuevos(nombre: str) -> int:
+        if nombre not in completed or nombre not in entonces:
+            return 0
+        return max(0, ahora.get(nombre, 0) - entonces[nombre])
+
     items = [
         ProductFolder(
             name=f["name"], id=f["id"], completed=f["name"] in completed,
             desde_copia=bool(f.get("desde_copia")),
             con_url=int(con_url.get(f["name"], 0)),
+            nuevos_desde_completada=_nuevos(f["name"]),
         )
         for f in folders
     ]
@@ -394,7 +409,7 @@ def mark_completed(
     body: MarkCompletedRequest,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> MarkCompletedResponse:
-    from src.nicho_pov_bof.repos import progress_repo
+    from src.nicho_pov_bof.repos import product_repo, progress_repo
     from src.nicho_pov_bof.services import drive_client
 
     try:
@@ -410,7 +425,12 @@ def mark_completed(
 
     try:
         if body.completed:
-            progress_repo.mark_completed(body.source, body.folder, usuario)
+            cuantos = product_repo.productos_por_carpeta(
+                body.source, [body.folder],
+            ).get(body.folder, 0)
+            progress_repo.mark_completed(
+                body.source, body.folder, usuario, productos=cuantos,
+            )
         else:
             progress_repo.unmark_completed(body.source, body.folder, usuario)
         completed = progress_repo.get_completed(body.source, usuario)
