@@ -151,15 +151,20 @@ def _huella_fichero(ruta: Path) -> str:
         return ""
 
 
-def importar_zip(datos: bytes, nombre_zip: str) -> dict:
+def importar_zip(datos: bytes, nombre_zip: str, raiz: Path | None = None) -> dict:
     """Mete un ZIP de la web en su carpeta. Repetible: se puede resubir.
 
     Devuelve `{carpeta, nuevos, actualizados, iguales, incompletos}` con los
     números de producto de cada grupo — que es lo que dice a qué productos hay
     que ponerles la URL.
+
+    `raiz` deja apuntar a otro sitio: el Nicho Ropa importa los ZIP de prendas
+    con esta MISMA función, y duplicar aquí la inversión de nombres —que es
+    donde más fácil es equivocarse— sería pedir que las dos copias se
+    separaran.
     """
     carpeta = nombre_carpeta(nombre_zip)
-    destino = config.productos_web_dir() / carpeta
+    destino = (raiz or config.productos_web_dir()) / carpeta
     destino.mkdir(parents=True, exist_ok=True)
 
     try:

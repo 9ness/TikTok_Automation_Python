@@ -62,6 +62,14 @@ def list_photos(carpeta: str = "", *, refresh: bool = False) -> list[dict]:
     prefijo aunque el documento viva en el namespace del POV BOF: duplicar
     sesenta líneas de caché para cambiar el prefijo no compensa.
     """
+    # Las carpetas importadas por ZIP no están en Drive: se leen del disco del
+    # Drive MONTADO. Se atajan aquí para que todo lo de después —textos,
+    # estado, vídeo— siga sin enterarse de la diferencia.
+    if config.es_carpeta_web(carpeta):
+        from src.nicho_ropa.services import prendas_web
+
+        return prendas_web.listar_fotos_como_drive(carpeta)
+
     carpeta = carpeta or config.CARPETA_DEFECTO
 
     def cargar() -> list[dict]:

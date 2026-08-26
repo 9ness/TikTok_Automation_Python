@@ -73,10 +73,52 @@ def list_carpetas() -> CarpetasRopaResponse:
     personas, pero la misma prenda vale aquí colgada en percha: lo que cambia
     es el prompt, no la foto.
     """
-    return CarpetasRopaResponse(items=[
+    from src.nicho_ropa.services import prendas_web
+
+    items = [
         CarpetaRopa(slug=slug, label=meta["label"])
         for slug, meta in config.CARPETAS.items()
-    ])
+    ]
+    # Y las importadas por ZIP de la web, que son carpetas de diez como las de
+    # allí. Se listan detrás para no mover de sitio las de siempre.
+    try:
+        items += [
+            CarpetaRopa(
+                slug=config.slug_web(genero, carpeta),
+                label=config.carpeta_label(config.slug_web(genero, carpeta)),
+            )
+            for genero, carpeta in prendas_web.todas_las_carpetas()
+        ]
+    except Exception:  # noqa: BLE001
+        # Un fallo leyendo el mount no puede dejar sin las cuatro de siempre.
+        pass
+    return CarpetasRopaResponse(items=items)
+
+
+@router.post("/prendas-web/importar")
+async def importar_prendas_web(
+    genero: Annotated[str, Query()],
+    archivo: Annotated[UploadFile | None, File()] = None,
+    # La APP sube por su cuenta y manda el fichero como `file`: en el WebView
+    # el selector no le devuelve los ficheros al `<input>`.
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict:
+    """Importa un ZIP de prendas de la web del curso, a mujer o a hombre."""
+    from src.nicho_ropa.services import prendas_web
+
+    subido = archivo or file
+    if subido is None:
+        raise APIError("No llegó ningún ZIP.", status_code=400)
+    datos = await subido.read()
+    await subido.close()
+    if not datos:
+        raise APIError("El ZIP llegó vacío.", status_code=400)
+    try:
+        return prendas_web.importar_zip(datos, subido.filename or "", genero)
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except OSError as e:
+        raise APIError(f"No se pudo escribir en el Drive: {e}", status_code=500) from e
 
 
 def _montando(queue: JobQueue | None, carpeta: str) -> set[str]:

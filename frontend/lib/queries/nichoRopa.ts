@@ -33,6 +33,34 @@ export function usePromptsRopa() {
 
 /** Carpetas de producto. Las de mujer son las del nicho CON personas, pero la
  *  misma prenda vale aquí colgada en percha. */
+/** Importa un ZIP de prendas de la web del curso (mujer u hombre). */
+export function useImportarPrendasWeb() {
+  const qc = useQueryClient();
+  return useMutation<
+    {
+      carpeta: string;
+      genero: string;
+      slug: string;
+      nuevos: string[];
+      actualizados: string[];
+      iguales: string[];
+      incompletos: string[];
+    },
+    Error,
+    { archivo: File; genero: string }
+  >({
+    mutationFn: async ({ archivo, genero }) => {
+      const fd = new FormData();
+      fd.append("archivo", archivo);
+      return api.post(
+        `${ROOT}/prendas-web/importar?genero=${encodeURIComponent(genero)}`,
+        fd,
+      );
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  });
+}
+
 export function useCarpetasRopa() {
   return useQuery<CarpetasRopaResponse>({
     queryKey: nichoRopaKeys.carpetas(),

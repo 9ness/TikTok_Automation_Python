@@ -54,12 +54,74 @@ CARPETAS: dict[str, dict[str, str]] = {
 
 CARPETA_DEFECTO = "camisetas"
 
+# ---------------------------------------------------------------------------
+# Las prendas de la web del curso, importadas por ZIP
+# ---------------------------------------------------------------------------
+# Las cuatro de arriba son carpetas del Drive del curso, planas: una sola
+# carpeta con todas las prendas dentro. Lo de la web NO es así — son 31
+# carpetas de diez, mujer y hombre por separado—, así que necesitaba un nivel
+# más.
+#
+# En vez de meterle un nivel al nicho entero, cada carpeta importada ES una
+# carpeta más del selector, con su slug: `mujer_web__Carpeta 23`. Con eso todo
+# lo que ya existe —fotos, textos, estado, vídeo— funciona sin tocarse, porque
+# para el resto del código sigue siendo "una carpeta".
+GENEROS_WEB: dict[str, str] = {
+    "mujer_web": "👗 Mujer web",
+    "hombre_web": "👔 Hombre web",
+}
+SEPARADOR_WEB = "__"
+PRENDAS_WEB_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/prendas_web"
+)
+
+
+def es_carpeta_web(slug: str) -> bool:
+    return SEPARADOR_WEB in (slug or "")
+
+
+def partes_web(slug: str) -> tuple[str, str]:
+    """`mujer_web__Carpeta 23` → `("mujer_web", "Carpeta 23")`."""
+    genero, _, carpeta = (slug or "").partition(SEPARADOR_WEB)
+    return genero, carpeta
+
+
+def slug_web(genero: str, carpeta: str) -> str:
+    return f"{genero}{SEPARADOR_WEB}{carpeta}"
+
+
+_PRENDAS_WEB_DIR: Path | None = None
+
+
+def prendas_web_dir() -> Path:
+    """Raíz de las prendas importadas, en el Drive MONTADO."""
+    global _PRENDAS_WEB_DIR
+    if _PRENDAS_WEB_DIR is not None:
+        return _PRENDAS_WEB_DIR
+
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / PRENDAS_WEB_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "prendas_web"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    _PRENDAS_WEB_DIR = destino
+    return destino
+
 
 def es_carpeta_conocida(slug: str) -> bool:
+    if es_carpeta_web(slug):
+        genero, carpeta = partes_web(slug)
+        return genero in GENEROS_WEB and bool(carpeta)
     return slug in CARPETAS
 
 
 def carpeta_label(slug: str) -> str:
+    if es_carpeta_web(slug):
+        genero, carpeta = partes_web(slug)
+        return f"{GENEROS_WEB.get(genero, genero)} · {carpeta}"
     return CARPETAS.get(slug, {}).get("label", slug)
 
 
@@ -68,6 +130,11 @@ def carpeta_id(slug: str = "") -> str:
     forzado = (os.getenv("NICHO_ROPA_FOLDER_ID") or "").strip()
     if forzado:
         return forzado
+    if es_carpeta_web(slug):
+        raise ValueError(
+            f"{slug!r} es una carpeta importada por ZIP: no está en Drive, se "
+            "lee del disco."
+        )
     meta = CARPETAS.get(slug or CARPETA_DEFECTO)
     if not meta:
         raise ValueError(

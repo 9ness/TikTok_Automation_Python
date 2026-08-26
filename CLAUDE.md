@@ -291,7 +291,11 @@ Dos cosas no obvias:
   veces). El identificador canónico de una foto es su **file ID**, y se
   descarga con `rclone backend copyid`.
 
-Tiene una TERCERA fuente, «Mis productos», que NO es del curso: la sube el
+Tiene dos fuentes propias más, que NO son del Drive del curso y viven en el
+Drive montado: **«🌐 Productos Web»** (`productos_web`), que se llena
+importando los ZIP que publica la web del curso —carpetas de diez, y el ZIP
+trae la convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y «Mis
+productos», que NO es del curso: la sube el
 operador (foto limpia + ficha) y vive en su Drive
 (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos/`), en carpetas de 10. Las
 fotos se guardan con el MISMO convenio de nombres del Drive compartido
@@ -325,6 +329,11 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
   el operador al publicar); se le puede añadir voz hombre/mujer si se pide.
 - El prompt de vídeo tiene versión CON y SIN manos: se guarda un solo texto y
   la variante sin manos se deriva quitando `config.LINEA_MANOS`.
+- Además de las 4 carpetas del curso (planas), acepta las de la web por ZIP:
+  cada una es una carpeta MÁS del selector con slug `mujer_web__Carpeta 23`
+  (`services/prendas_web.py`), así el resto del nicho no se entera del nivel
+  nuevo. Reusa el importador del POV BOF para no duplicar la inversión de
+  nombres.
 
 Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
 motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.
