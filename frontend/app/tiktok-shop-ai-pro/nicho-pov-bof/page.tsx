@@ -93,6 +93,7 @@ import type {
   ProductoItem,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
+import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 
 /** EchoTik apagado a petición del operador: su cuota gratis no da para el
  *  volumen diario y de momento no lo usa. Poniéndolo a `true` vuelven el panel
@@ -187,6 +188,11 @@ export default function NichoPovBofPage() {
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
   const qc = useQueryClient();
+  // Igual que en el POV BOF Largo: en cuanto la cola dice que un montaje
+  // terminó, se repregunta, en vez de esperar al sondeo de 5 s.
+  useAlTerminarJob(() => {
+    void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+  });
   const productos = useProductos(source, folder);
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
   // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima

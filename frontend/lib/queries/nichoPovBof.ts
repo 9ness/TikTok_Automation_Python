@@ -314,8 +314,10 @@ export function useProductos(source: string, folder: string | null) {
   // esos dos campos A LA VEZ al terminar, así que la condición nunca era
   // cierta y el sondeo no arrancaba nunca — había que recargar a mano.
   return useQuery<ProductoItem[]>({
+    // 12 s: lo inmediato lo cubre el aviso de la cola al terminar el montaje
+    // (`useAlTerminarJob`); esto es solo la red de seguridad.
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((p) => p.montando) ? 5000 : false,
+      (query.state.data ?? []).some((p) => p.montando) ? 12000 : false,
     queryKey: nichoPovBofKeys.productos(source, folder ?? ""),
     queryFn: async () =>
       (await api.get<{ items: ProductoItem[] }>(
@@ -359,8 +361,10 @@ export function useProductosTodos(source: string, activo: boolean) {
         `${ROOT}/productos-todos?source=${encodeURIComponent(source)}`,
       )).items ?? [],
     enabled: Boolean(source && activo),
+    // 12 s: lo inmediato lo cubre el aviso de la cola al terminar el montaje
+    // (`useAlTerminarJob`); esto es solo la red de seguridad.
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((p) => p.montando) ? 5000 : false,
+      (query.state.data ?? []).some((p) => p.montando) ? 12000 : false,
   });
 }
 

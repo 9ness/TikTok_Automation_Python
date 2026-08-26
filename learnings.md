@@ -698,3 +698,5 @@
 - El endpoint de VER vídeo de la cola llevaba `filename=`, que pone `Content-Disposition: attachment`: el escritorio lo reproduce igual pero el WebView de Android no, y salía el hueco gris. Para bajarlo ya está `/download`.
 - `fuente_canonica` (que hace que "🗄️ Copia" comparta progreso con la fuente del curso) estaba solo en POV BOF y Largo: Carruseles, Creativos y BOF Cine guardaban el progreso bajo `backup_1/2`, así que trabajar desde la copia no contaba.
 - Perder el acceso al Drive compartido dejaba la lista de carpetas VACÍA y sin mensaje en tres pantallas; solo POV BOF y Largo enseñaban el error.
+- Las tarjetas solo se enteraban de que un montaje acabó por SONDEO (5 s, y React Query lo pausa si la pestaña no está delante). Ahora `useAlTerminarJob` invalida en cuanto la cola dice "completado", y el sondeo baja a 12 s.
+- Sumidero de lecturas de Redis: "Top vendidos" lista las CINCO carpetas por petición y cada una releía los mismos índices globales (escaparate, urls, ventas). Se leen una vez y se reparten.

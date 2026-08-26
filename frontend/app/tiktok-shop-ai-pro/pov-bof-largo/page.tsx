@@ -101,6 +101,7 @@ import type {
   ProductoItem,
 } from "@/lib/types/nichoPovBof";
 import type { ProductoLargo } from "@/lib/types/povBofLargo";
+import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -177,6 +178,12 @@ const MOSTRAR_ECHOTIK = false;
 
 export default function PovBofLargoPage() {
   const qc = useQueryClient();
+  // En cuanto la cola dice que un montaje terminó, se repregunta la lista. El
+  // sondeo de 5 s ya lo hacía, pero tarde —y se pausa si la pestaña no está
+  // delante—, así que el vídeo terminado tardaba en salir en su tarjeta.
+  useAlTerminarJob(() => {
+    void qc.invalidateQueries({ queryKey: largoKeys.all });
+  });
   // Solo el admin ve el space de "foto con IA": Ana y Mauro trabajan con la
   // foto limpia del Drive.
   const esAdmin = useMe().data?.rol === "admin";

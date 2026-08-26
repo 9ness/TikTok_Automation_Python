@@ -237,6 +237,12 @@ def _montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
 def _listar(
     source: str, folder: str, queue: JobQueue | None, usuario: str,
     refresh: bool = False,
+    *,
+    # Índices GLOBALES de la fuente. Se pueden pasar ya leídos para no
+    # releerlos por cada carpeta: "Top vendidos" pinta las cinco carpetas de
+    # una vez, y sin esto cada listado hacía quince lecturas de Redis idénticas
+    # —tres índices por carpeta— cada cinco segundos.
+    esc_index=None, urls=None, ventas=None,
 ) -> ProductosLargoResponse:
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
     from src.nicho_pov_bof.services import audience, drive_client, photo_pairing
@@ -272,13 +278,16 @@ def _listar(
     activos = _montandose(queue, source, folder)
     # Escaparate GLOBAL por (tienda|nombre): un producto marcado en cualquier
     # carpeta sale marcado en todas las que sean el mismo producto.
-    esc_index = product_repo.escaparate_index(usuario)
+    if esc_index is None:
+        esc_index = product_repo.escaparate_index(usuario)
     # La ficha de TikTok Shop es del producto y es común a los tres usuarios.
     from src.nicho_pov_bof.repos import product_repo as pov_repo
 
-    urls = pov_repo.urls_index()
+    if urls is None:
+        urls = pov_repo.urls_index()
     # Solo devuelve algo en "Top vendidos"; en las demás fuentes es {}.
-    ventas = top_vendidos.ventas_por_producto(source, usuario)
+    if ventas is None:
+        ventas = top_vendidos.ventas_por_producto(source, usuario)
 
     items: list[ProductoLargo] = []
     for par in pares:
@@ -393,9 +402,20 @@ def list_productos_todos(
 
     carpetas = top_vendidos.carpetas()
 
+    # Los tres índices son de la FUENTE, no de la carpeta: se leen una vez y se
+    # reparten. Antes cada carpeta los releía por su cuenta.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    esc_index = product_repo.escaparate_index(usuario)
+    urls = pov_repo.urls_index()
+    ventas = top_vendidos.ventas_por_producto(source, usuario)
+
     def _una(carpeta: str):
         try:
-            return carpeta, _listar(source, carpeta, queue, usuario)
+            return carpeta, _listar(
+                source, carpeta, queue, usuario,
+                esc_index=esc_index, urls=urls, ventas=ventas,
+            )
         except Exception:  # noqa: BLE001
             # Una carpeta ilegible no deja sin lista a las demás.
             return carpeta, None

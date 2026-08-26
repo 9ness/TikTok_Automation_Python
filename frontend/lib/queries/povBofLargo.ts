@@ -106,7 +106,11 @@ export function useProductosTodosLargo(source: string, activo: boolean) {
         `${ROOT}/productos-todos?source=${encodeURIComponent(source)}`,
       ),
     enabled: Boolean(source && activo),
-    refetchInterval: (q) => (q.state.data?.montando ? 5000 : false),
+    // 12 s y no 5: lo inmediato ya lo cubre el aviso de la cola al terminar
+    // (`useAlTerminarJob`). Esto queda de red de seguridad, y sondear cada 5 s
+    // la lista de "Top vendidos" —que lee las CINCO carpetas— era de donde
+    // salía el grueso de las lecturas de Redis.
+    refetchInterval: (q) => (q.state.data?.montando ? 12000 : false),
   });
 }
 
@@ -157,7 +161,11 @@ export function useProductosLargo(source: string, folder: string) {
       ),
     enabled: Boolean(source && folder),
     // Mientras haya un montaje en curso se refresca solo.
-    refetchInterval: (q) => (q.state.data?.montando ? 5000 : false),
+    // 12 s y no 5: lo inmediato ya lo cubre el aviso de la cola al terminar
+    // (`useAlTerminarJob`). Esto queda de red de seguridad, y sondear cada 5 s
+    // la lista de "Top vendidos" —que lee las CINCO carpetas— era de donde
+    // salía el grueso de las lecturas de Redis.
+    refetchInterval: (q) => (q.state.data?.montando ? 12000 : false),
   });
 }
 
