@@ -188,13 +188,27 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
   const [porLaApp, setPorLaApp] = useState<{ total: number; hechos: number } | null>(
     null,
   );
-  const [ultimo, setUltimo] = useState<{
+  // Una línea por carpeta, no solo la última: con 31 ZIP, ver solo el
+  // resultado del último no dice nada.
+  const [hechas, setHechas] = useState<
+    {
+      carpeta: string;
+      nuevos: string[];
+      actualizados: string[];
+      iguales: string[];
+      incompletos: string[];
+    }[]
+  >([]);
+
+  function apuntar(r: {
     carpeta: string;
     nuevos: string[];
     actualizados: string[];
     iguales: string[];
     incompletos: string[];
-  } | null>(null);
+  }) {
+    setHechas((antes) => [...antes.filter((x) => x.carpeta !== r.carpeta), r]);
+  }
 
   /** Se lo pasa a la app si sabe subir. `false` = que lo haga la web. */
   function lanzarConLaApp(nombres: string[]): boolean {
@@ -228,7 +242,7 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
       // Respuesta rota: cuenta igual, pero no se puede resumir.
     }
     if (r.carpeta) {
-      setUltimo({
+      apuntar({
         carpeta: r.carpeta,
         nuevos: r.nuevos ?? [],
         actualizados: r.actualizados ?? [],
@@ -290,7 +304,7 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
                 { archivo: uno },
                 {
                   onSuccess: (r) => {
-                    setUltimo(r);
+                    apuntar(r);
                     onImportado(r.carpeta);
                     const n = r.nuevos.length + r.actualizados.length;
                     toast.success(
@@ -323,31 +337,44 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
         </p>
       )}
 
-      {ultimo && (
-        <div className="space-y-0.5 text-[10px] leading-tight">
-          {!!ultimo.nuevos.length && (
-            <p className="text-emerald-500">
-              <strong>Nuevos ({ultimo.nuevos.length}):</strong>{" "}
-              {ultimo.nuevos.join(", ")} — a estos hay que ponerles la URL.
-            </p>
-          )}
-          {!!ultimo.actualizados.length && (
-            <p className="text-amber-500">
-              Cambiados ({ultimo.actualizados.length}): {ultimo.actualizados.join(", ")}
-            </p>
-          )}
-          {!!ultimo.iguales.length && (
-            <p className="text-muted-foreground">
-              Ya estaban igual: {ultimo.iguales.length}
-            </p>
-          )}
-          {!!ultimo.incompletos.length && (
-            <p className="text-muted-foreground">
-              Sin las dos fotos, no entraron: {ultimo.incompletos.join(", ")}
-            </p>
-          )}
+      {hechas.length > 0 && (
+        <div className="space-y-1 text-[10px] leading-tight">
+          {(() => {
+            const nuevos = hechas.reduce((n, x) => n + x.nuevos.length, 0);
+            const cambiados = hechas.reduce((n, x) => n + x.actualizados.length, 0);
+            const iguales = hechas.reduce((n, x) => n + x.iguales.length, 0);
+            return (
+              <p className="font-semibold text-foreground">
+                {hechas.length} carpeta(s) · {nuevos} nuevo(s), {cambiados} cambiado(s),
+                {" "}
+                {iguales} sin tocar
+              </p>
+            );
+          })()}
+          <div className="max-h-40 space-y-0.5 overflow-y-auto">
+            {hechas.map((x) => (
+              <p key={x.carpeta} className="text-muted-foreground">
+                <strong className="text-foreground">{x.carpeta}</strong>
+                {x.nuevos.length ? (
+                  <span className="text-emerald-500"> · nuevos: {x.nuevos.join(", ")}</span>
+                ) : null}
+                {x.actualizados.length ? (
+                  <span className="text-amber-500">
+                    {" "}
+                    · cambiados: {x.actualizados.join(", ")}
+                  </span>
+                ) : null}
+                {!x.nuevos.length && !x.actualizados.length ? " · sin cambios" : null}
+                {x.incompletos.length ? ` · sin las dos fotos: ${x.incompletos.length}` : null}
+              </p>
+            ))}
+          </div>
+          <p className="text-muted-foreground">
+            A los <span className="text-emerald-500">nuevos</span> hay que ponerles la URL.
+          </p>
         </div>
       )}
+
     </div>
   );
 }
