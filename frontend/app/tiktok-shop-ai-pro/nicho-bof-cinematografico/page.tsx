@@ -109,6 +109,14 @@ export default function NichoBofCinePage() {
           ))}
         </div>
 
+          {/* Un fallo leyendo el Drive tiene que DECIRSE. Si no, la lista sale
+              vacía y no hay forma de saber si es que no hay carpetas o que se
+              perdió el acceso al Drive compartido — que es lo que pasó. */}
+          {folders.isError && (
+            <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-500">
+              {(folders.error as Error)?.message ?? "No se pudo leer el Drive."}
+            </p>
+          )}
         <div className="flex items-center gap-2">
           <select
             value={folder ?? ""}

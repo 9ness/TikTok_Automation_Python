@@ -13,6 +13,7 @@ del mismo producto.
 from __future__ import annotations
 
 from src.nicho_bof_cine.repos.redis_base import get_nicho_bof_cine_redis
+from src.nicho_pov_bof import config as pov_config
 
 
 def _key(source: str, usuario: str = "") -> str:
@@ -21,6 +22,11 @@ def _key(source: str, usuario: str = "") -> str:
     El histórico (sin usuario) se conserva como clave de `ness`, que es quien
     lo generó — así no pierde por dónde iba al separar las cuentas.
     """
+    # La copia de seguridad comparte progreso con la fuente del curso: son las
+    # mismas carpetas, solo cambia de dónde se leen las fotos. Sin esto, al
+    # trabajar desde "🗄️ Copia" el progreso se guardaba aparte y la carpeta
+    # aparecía sin empezar al volver a la fuente normal.
+    source = pov_config.fuente_canonica(source)
     if not usuario or usuario == "ness":
         return f"completed:{source}"
     return f"completed:{source}:{usuario}"

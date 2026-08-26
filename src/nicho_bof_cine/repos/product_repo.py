@@ -20,6 +20,7 @@ import unicodedata
 from contextlib import contextmanager
 
 from src.nicho_bof_cine.repos.redis_base import get_nicho_bof_cine_redis
+from src.nicho_pov_bof import config as pov_config
 
 
 # Lo que es de CADA UNO y no se comparte. Todo lo demás (título, tienda,
@@ -37,7 +38,7 @@ CAMPOS_PRIVADOS = frozenset({
 
 def _key(source: str, folder: str) -> str:
     """Documento COMPARTIDO de la carpeta (textos y enlaces)."""
-    return f"folder:{source}:{folder}"
+    return f"folder:{pov_config.fuente_canonica(source)}:{folder}"
 
 
 def _key_privado(source: str, folder: str, usuario: str) -> str:
@@ -46,7 +47,7 @@ def _key_privado(source: str, folder: str, usuario: str) -> str:
     `ness` se queda en el documento compartido: es donde está su histórico y
     moverlo sería reescribir meses de trabajo sin ganar nada.
     """
-    return f"folder:{source}:{folder}:u:{usuario}"
+    return f"folder:{pov_config.fuente_canonica(source)}:{folder}:u:{usuario}"
 
 
 def _now() -> str:

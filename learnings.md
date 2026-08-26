@@ -696,3 +696,5 @@
 - Tercera aparición del mismo fallo: una ventana `position: fixed` sin portal no se ve o se recorta en el WebView (visor de fotos, reproductor de la cola dentro del cajón). Se centraliza en `components/ui/portal.tsx` — cualquier modal nuevo va envuelto en `<Portal>`.
 - El mismo `shrink-0` que necesitó la foto le faltaba al vídeo: hijo flex dentro de una caja con `maxHeight` se encoge hasta desaparecer y el modal sale como una tira con solo el título. El portal era necesario pero no suficiente.
 - El endpoint de VER vídeo de la cola llevaba `filename=`, que pone `Content-Disposition: attachment`: el escritorio lo reproduce igual pero el WebView de Android no, y salía el hueco gris. Para bajarlo ya está `/download`.
+- `fuente_canonica` (que hace que "🗄️ Copia" comparta progreso con la fuente del curso) estaba solo en POV BOF y Largo: Carruseles, Creativos y BOF Cine guardaban el progreso bajo `backup_1/2`, así que trabajar desde la copia no contaba.
+- Perder el acceso al Drive compartido dejaba la lista de carpetas VACÍA y sin mensaje en tres pantallas; solo POV BOF y Largo enseñaban el error.
