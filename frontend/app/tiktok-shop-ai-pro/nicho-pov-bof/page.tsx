@@ -62,6 +62,7 @@ import {
   useSetEstado,
   useQuitarClip,
   useBorrarMiProducto,
+  useImportarProductosWeb,
   useSortearGuionPlazos,
   useSources,
   useVendidos,
@@ -160,6 +161,100 @@ const CHIP_CLIPS: Record<number, string> = {
   1: "bg-sky-500/15 text-sky-500",
   2: "bg-lime-500/15 text-lime-500",
 };
+
+/** Subir un ZIP de la web del curso.
+ *
+ *  El catálogo se actualiza a menudo, así que esto está pensado para
+ *  RESUBIRSE: la carpeta se llama como el ZIP y cada producto se compara con
+ *  lo que ya había. Después de importar se dice cuáles son nuevos, porque son
+ *  justo a los que hay que ponerles la ficha de TikTok.
+ */
+function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => void }) {
+  const importar = useImportarProductosWeb();
+  const entrada = useRef<HTMLInputElement>(null);
+  const [ultimo, setUltimo] = useState<{
+    carpeta: string;
+    nuevos: string[];
+    actualizados: string[];
+    iguales: string[];
+    incompletos: string[];
+  } | null>(null);
+
+  return (
+    <div className="space-y-2 rounded-lg border border-cyan-500/40 bg-cyan-500/5 p-2">
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Sube el ZIP de una carpeta de la web. La carpeta se llamará como el
+        fichero, así que <strong className="text-foreground">puedes volver a
+        subirlo</strong> cuando lo actualicen: solo se tocan los productos que
+        hayan cambiado.
+      </p>
+
+      <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-600">
+        {importar.isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Importando…
+          </>
+        ) : (
+          <>
+            <Upload className="h-3.5 w-3.5" /> Subir ZIP de la web
+          </>
+        )}
+        <input
+          ref={entrada}
+          type="file"
+          accept=".zip,application/zip"
+          disabled={importar.isPending}
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            importar.mutate(
+              { archivo: f },
+              {
+                onSuccess: (r) => {
+                  setUltimo(r);
+                  onImportado(r.carpeta);
+                  const n = r.nuevos.length + r.actualizados.length;
+                  toast.success(
+                    n ? `${r.carpeta}: ${n} producto(s) puestos` : `${r.carpeta}: sin cambios`,
+                  );
+                },
+                onError: (err) => toast.error(err.message),
+              },
+            );
+          }}
+        />
+      </label>
+
+      {ultimo && (
+        <div className="space-y-0.5 text-[10px] leading-tight">
+          {!!ultimo.nuevos.length && (
+            <p className="text-emerald-500">
+              <strong>Nuevos ({ultimo.nuevos.length}):</strong>{" "}
+              {ultimo.nuevos.join(", ")} — a estos hay que ponerles la URL.
+            </p>
+          )}
+          {!!ultimo.actualizados.length && (
+            <p className="text-amber-500">
+              Cambiados ({ultimo.actualizados.length}): {ultimo.actualizados.join(", ")}
+            </p>
+          )}
+          {!!ultimo.iguales.length && (
+            <p className="text-muted-foreground">
+              Ya estaban igual: {ultimo.iguales.length}
+            </p>
+          )}
+          {!!ultimo.incompletos.length && (
+            <p className="text-muted-foreground">
+              Sin las dos fotos, no entraron: {ultimo.incompletos.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NichoPovBofPage() {
   const [source, setSource] = useEstadoDeUsuario("povbof:fuente", "aleatorios_1");
@@ -563,6 +658,15 @@ export default function NichoPovBofPage() {
             </button>
           ))}
         </div>
+
+        {source === "productos_web" && (
+          <ImportarZipWeb
+            onImportado={(carpeta) => {
+              setPicked(carpeta);
+              void qc.refetchQueries({ queryKey: nichoPovBofKeys.all });
+            }}
+          />
+        )}
 
         {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
         {source === "mis_productos" && (

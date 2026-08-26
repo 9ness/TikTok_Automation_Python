@@ -1068,6 +1068,31 @@ def _guardar_clip(
     )
 
 
+@router.post("/productos-web/importar")
+async def importar_productos_web(
+    archivo: Annotated[UploadFile, File()],
+) -> dict:
+    """Mete un ZIP de la web del curso en la fuente "🌐 Productos Web".
+
+    Es REPETIBLE a propósito: el catálogo se actualiza y hay que poder resubir
+    el mismo ZIP. La respuesta dice qué productos son nuevos, cuáles cambiaron
+    y cuáles estaban igual — que es lo que dice a cuáles hay que ponerles la
+    ficha de TikTok.
+    """
+    from src.nicho_pov_bof.services import productos_web
+
+    datos = await archivo.read()
+    await archivo.close()
+    if not datos:
+        raise _bad_request("el ZIP llegó vacío.")
+    try:
+        return productos_web.importar_zip(datos, archivo.filename or "")
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except OSError as e:
+        raise APIError(f"No se pudo escribir en el Drive: {e}", status_code=500) from e
+
+
 @router.post("/mis-productos")
 async def crear_mi_producto(
     foto_limpia: Annotated[UploadFile, File()],

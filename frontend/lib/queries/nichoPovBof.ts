@@ -236,6 +236,32 @@ export function useCrearMiProducto() {
   });
 }
 
+/** Importa un ZIP de la web del curso a "🌐 Productos Web".
+ *
+ *  Se puede resubir el mismo ZIP: el catálogo se actualiza y la respuesta dice
+ *  qué productos son nuevos, cuáles cambiaron y cuáles estaban igual. */
+export function useImportarProductosWeb() {
+  const qc = useQueryClient();
+  return useMutation<
+    {
+      carpeta: string;
+      nuevos: string[];
+      actualizados: string[];
+      iguales: string[];
+      incompletos: string[];
+    },
+    Error,
+    { archivo: File }
+  >({
+    mutationFn: async ({ archivo }) => {
+      const fd = new FormData();
+      fd.append("archivo", archivo);
+      return api.post(`${ROOT}/productos-web/importar`, fd);
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 export function useBorrarMiProducto() {
   const qc = useQueryClient();
   return useMutation<{ ok: boolean }, Error, { carpeta: string; producto: string }>({

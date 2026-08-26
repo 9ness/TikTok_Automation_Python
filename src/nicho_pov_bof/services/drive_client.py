@@ -231,13 +231,22 @@ def _lsjson(
 def _servicio_propio(source: str):
     """Qué módulo lleva las carpetas de una fuente que vive en NUESTRO Drive.
 
-    Hay dos y las dos hablan el mismo idioma que este cliente
+    Hay tres y las tres hablan el mismo idioma que este cliente
     (`listar_carpetas_como_drive` / `listar_fotos_como_drive`): los productos
-    que sube el operador y los que ya vendieron.
+    que sube el operador, los que ya vendieron y los importados por ZIP de la
+    web del curso.
     """
-    from src.nicho_pov_bof.services import mis_productos, top_vendidos
+    from src.nicho_pov_bof.services import (
+        mis_productos,
+        productos_web,
+        top_vendidos,
+    )
 
-    return top_vendidos if source == top_vendidos.SOURCE else mis_productos
+    if source == top_vendidos.SOURCE:
+        return top_vendidos
+    if source == "productos_web":
+        return productos_web
+    return mis_productos
 
 
 def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:

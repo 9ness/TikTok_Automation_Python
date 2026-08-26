@@ -330,3 +330,11 @@ recorta los audios largos en vez de tocar el render.
 - NO tocar el motor de silencios con reintentos por ahora.
 - Mientras: <90 se gestiona MANUALMENTE (revisar/aprobar o avisar y mejorar a mano).
 - Retomar solo con el "cambio grande" del motor, validándolo con un clip real <90.
+
+- [ ] **Rehacer el menú de Carruseles** (en pausa, esperando a Jonny): la idea es
+  simplificarlo al estilo de Creativos Pro —carpetas con productos, botón de
+  generar textos y prompts para copiar— en vez del emparejado de fotos, la
+  chica por escenarios y el quemado de texto de ahora. Bloqueado por una duda:
+  los prompts del curso (`Pront Cambiar Personaje` / `Cambiar Producto`) dicen
+  "elimina cualquier texto de la imagen", así que NO se sabe de dónde saldría
+  el texto quemado. Preguntar a Jonny qué prompt usa para eso.

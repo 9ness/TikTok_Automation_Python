@@ -60,6 +60,18 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "mis_productos",
         "propia": "1",
     },
+    # Los productos de la web del curso, importados por ZIP. También "propia"
+    # (vive en el Drive montado) y con el mismo convenio de nombres, así que
+    # todo lo de después funciona sin nada especial.
+    #
+    # Va aparte de "Mis productos" a propósito: aquellos los sube el operador
+    # uno a uno y estos llegan por tandas que se ACTUALIZAN — hay que poder
+    # resubir el mismo ZIP y saber qué cambió sin mezclarlo con lo suyo.
+    "productos_web": {
+        "label": "🌐 Productos Web",
+        "folder": "productos_web",
+        "propia": "1",
+    },
     # Los que YA vendieron, copiados aquí desde su carpeta de origen para
     # volver a grabarlos. También es "propia" (vive en el Drive montado) y usa
     # el mismo convenio de nombres, así que no necesita nada especial.
@@ -98,6 +110,13 @@ MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF
 # "Top vendidos" — mismas reglas (diez por carpeta) y raíz propia. NO lleva
 # subcarpeta por usuario porque el ranking de vendidos tampoco: es único y
 # global, y el progreso ya se separa por usuario dentro de Redis.
+# Los productos importados de la web del curso. Las carpetas se llaman como
+# el ZIP ("Carpeta 26"), no se numeran solas: así resubir el mismo ZIP cae
+# siempre en la misma carpeta y se puede comparar.
+PRODUCTOS_WEB_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_web"
+)
+
 TOP_VENDIDOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Top_Vendidos"
 TOP_VENDIDOS_PREFIJO = "Top"
 
@@ -164,6 +183,28 @@ def es_fuente_backup(source: str) -> bool:
 # Drive se desmonta hay que reiniciar la API — que es justo lo que ya pasa
 # cuando se desmonta, porque no hay nada que leer.
 _MIS_PRODUCTOS_DIR: Path | None = None
+
+
+_PRODUCTOS_WEB_DIR: Path | None = None
+
+
+def productos_web_dir() -> Path:
+    """Raíz de "Productos Web" en el Drive MONTADO. Ver `mis_productos_dir`:
+    el `mkdir` en frío cuesta segundos y por eso se recuerda."""
+    global _PRODUCTOS_WEB_DIR
+    if _PRODUCTOS_WEB_DIR is not None:
+        return _PRODUCTOS_WEB_DIR
+
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / PRODUCTOS_WEB_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "productos_web"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    _PRODUCTOS_WEB_DIR = destino
+    return destino
 
 
 def mis_productos_dir() -> Path:

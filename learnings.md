@@ -702,3 +702,4 @@
 - Sumidero de lecturas de Redis: "Top vendidos" lista las CINCO carpetas por petición y cada una releía los mismos índices globales (escaparate, urls, ventas). Se leen una vez y se reparten.
 - Los índices GLOBALES (escaparate, fichas) se leían una vez POR PRODUCTO dentro de los bucles: cientos de lecturas idénticas por pantalla. Memoria de 5 s en `product_repo`, invalidada en CADA escritura (`_olvidar`) para que marcar algo siga viéndose al instante; el TTL solo cubre que escriba otro proceso.
 - La fuente "🗄️ Copia" no cargaba: listaba las 15 copias EN FILA (~1,8 s cada rclone) = 22 s. Cuatro de ellas eran `RESCATE_2026-08-19` duplicadas en Drive (mismo nombre, mismo contenido). Sin repetidos y en paralelo: 5,2 s medidos.
+- Los ZIP de la web del curso traen la convención AL REVÉS que el Drive: su `N.png` es la FICHA y `N.1.jpeg` la limpia. Al importar hay que invertirlo o entran las parejas cambiadas y los textos se extraen de la foto que no es.
