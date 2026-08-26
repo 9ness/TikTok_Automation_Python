@@ -71,10 +71,19 @@ def copias() -> list[str]:
     """
     try:
         out = _rclone(["lsjson", _destino("").rstrip("/"), "--dirs-only"], timeout=120)
-        return sorted(
-            (d.get("Name", "") for d in json.loads(out or "[]") if d.get("Name")),
-            reverse=True,
-        )
+        # SIN REPETIDOS. Drive deja tener varias carpetas con el mismo nombre y
+        # llegó a haber cuatro `RESCATE_2026-08-19` con el mismo contenido; como
+        # rclone navega por nombre, listarlas todas es mirar cuatro veces lo
+        # mismo. Cada listado cuesta ~1,8 s, así que eran 7 s tirados en cada
+        # carga de la fuente "🗄️ Copia".
+        vistos: set[str] = set()
+        nombres: list[str] = []
+        for d in json.loads(out or "[]"):
+            n = d.get("Name", "")
+            if n and n not in vistos:
+                vistos.add(n)
+                nombres.append(n)
+        return sorted(nombres, reverse=True)
     except Exception:  # noqa: BLE001
         return []
 
@@ -141,18 +150,31 @@ def carpetas_de(fuente: str) -> list[str]:
     """
     from src.nicho_pov_bof import config as pov_config
 
-    vistas: dict[str, None] = {}
-    for copia in _copias_utiles() + _copias_antiguas():
+    # En PARALELO: cada copia es una llamada a rclone de ~1,8 s y hay una
+    # docena, así que en fila eran veinte segundos largos y la fuente "🗄️
+    # Copia" parecía no cargar. Son independientes entre sí —cada una es una
+    # carpeta distinta de Drive— y solo se juntan los nombres al final.
+    from concurrent.futures import ThreadPoolExecutor
+
+    lista = _copias_utiles() + _copias_antiguas()
+
+    def _de_una(copia: str) -> list[str]:
         try:
             out = _rclone(
                 ["lsjson", f"gdrive:{BACKUP_ROOT}/{copia}/{fuente}", "--dirs-only"],
                 timeout=120,
             )
         except Exception:  # noqa: BLE001
-            continue  # esa copia no llegó a tener esta fuente
-        for d in json.loads(out or "[]"):
-            if d.get("Name"):
-                vistas.setdefault(d["Name"], None)
+            return []  # esa copia no llegó a tener esta fuente
+        return [d["Name"] for d in json.loads(out or "[]") if d.get("Name")]
+
+    vistas: dict[str, None] = {}
+    if lista:
+        with ThreadPoolExecutor(max_workers=min(6, len(lista))) as pool:
+            # `map` conserva el orden, así que sigue ganando la copia más nueva.
+            for nombres in pool.map(_de_una, lista):
+                for n in nombres:
+                    vistas.setdefault(n, None)
     return sorted(vistas, key=pov_config.natural_sort_key)
 
 
