@@ -65,7 +65,9 @@ export function useCineProductos(source: string, folder: string | null) {
       ),
     enabled: Boolean(source && folder),
     // Mientras se monta algo, se refresca solo para que aparezca el vídeo.
-    refetchInterval: (q) => (q.state.data?.montando ? 5000 : false),
+    // 12 s, como los otros nichos: sondear cada 5 la lista entera era de donde
+    // salían las lecturas de Redis.
+    refetchInterval: (q) => (q.state.data?.montando ? 12000 : false),
   });
 }
 
