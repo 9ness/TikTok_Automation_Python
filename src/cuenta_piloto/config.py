@@ -45,6 +45,17 @@ MAX_FOTO_BYTES = 12 * 1024 * 1024
 SEXOS = ("hombre", "mujer")
 
 
+def prompts_dir() -> Path:
+    return Path(__file__).resolve().parent / "prompts"
+
+
+def prompt_live() -> str:
+    """El prompt del LIVE, tal cual se copia (ver `prompts/live.md`)."""
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt((prompts_dir() / "live.md").read_text(encoding="utf-8"))
+
+
 def _raiz_usuario(usuario: str) -> Path:
     """Carpeta persistente del usuario. Al Drive montado; si no hay mount
     (dev local), a `API_TEMP_ROOT` —pero FUERA de `api_uploads/`, que se

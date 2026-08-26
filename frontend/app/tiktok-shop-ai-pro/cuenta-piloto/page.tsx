@@ -10,6 +10,8 @@ import {
   Trash2,
   Upload,
   ShoppingBag,
+  ClipboardCopy,
+  Radio,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -26,6 +28,7 @@ import {
   useCrearProductoPiloto,
   useExtraerTextosPiloto,
   useProductosPiloto,
+  usePromptLive,
   useSetEstadoPiloto,
   useSubirVideoPiloto,
   videoPilotoUrl,
@@ -35,6 +38,71 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 function error(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
+}
+
+/** El LIVE, que es lo que hace hoy la Cuenta Piloto.
+ *
+ *  Ya no se monta un vídeo por producto: se hace un directo de ~10 minutos
+ *  sobre UNO. El guion lo escribe una IA fuera, así que esta pantalla no
+ *  genera nada — solo da el prompt y dice qué hay que mandarle con él.
+ *
+ *  Lo de abajo (subir productos, audios, montar) se deja donde estaba: sigue
+ *  sirviendo para los que ya tienes hechos.
+ */
+function GuionDelLive() {
+  const prompt = usePromptLive();
+
+  return (
+    <section className="space-y-2 rounded-xl border border-violet-500/50 bg-violet-500/5 p-3">
+      <div className="flex items-center gap-2">
+        <Radio className="h-4 w-4 shrink-0 text-violet-400" />
+        <p className="flex-1 text-sm font-semibold text-violet-300">
+          Guion del LIVE
+        </p>
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Copia el prompt, pégalo en ChatGPT o DeepSeek y detrás mándale{" "}
+        <strong className="text-foreground">
+          todas las fotos que tengas del producto y su descripción
+        </strong>
+        . Cuantas más le des, mejor sale — y sobre todo: solo escribe lo que
+        pueda leer ahí. Si le mandas la foto sola, se lo inventa, y eso es lo
+        que trae sanciones.
+      </p>
+
+      {prompt.isError && (
+        <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-500">
+          No se pudo leer el prompt.
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={!prompt.data?.prompt}
+        onClick={() => {
+          void navigator.clipboard.writeText(prompt.data?.prompt ?? "");
+          toast.success("Prompt copiado — pégalo y luego manda las fotos");
+        }}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+      >
+        {prompt.isLoading ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+          </>
+        ) : (
+          <>
+            <ClipboardCopy className="h-4 w-4" /> Copiar el prompt del LIVE
+          </>
+        )}
+      </button>
+
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        El guion sale por bloques de tiempo, con lo que tienes que decir y las
+        indicaciones entre corchetes. Al final trae una &quot;Verificación de
+        seguridad&quot;: léela, es la que confirma que no se ha inventado nada.
+      </p>
+    </section>
+  );
 }
 
 export default function CuentaPilotoPage() {
@@ -60,6 +128,8 @@ export default function CuentaPilotoPage() {
           </div>
         </div>
       </header>
+
+      <GuionDelLive />
 
       <AltaProducto />
 

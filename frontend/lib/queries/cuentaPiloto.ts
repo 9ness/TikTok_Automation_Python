@@ -14,7 +14,18 @@ const ROOT = "/api/v1/cuenta-piloto";
 export const pilotoKeys = {
   all: ["cuenta-piloto"] as const,
   productos: () => [...pilotoKeys.all, "productos"] as const,
+  promptLive: () => [...pilotoKeys.all, "prompt-live"] as const,
 };
+
+/** El prompt del LIVE, para copiarlo y pegarlo en el chat de IA. */
+export function usePromptLive() {
+  return useQuery<{ prompt: string }>({
+    queryKey: pilotoKeys.promptLive(),
+    queryFn: () => api.get<{ prompt: string }>(`${ROOT}/prompt-live`),
+    // No cambia salvo que el curso publique otro documento.
+    staleTime: Infinity,
+  });
+}
 
 export function useProductosPiloto() {
   return useQuery<ProductoPiloto[]>({

@@ -143,6 +143,20 @@ def _a_schema(
     )
 
 
+@router.get("/prompt-live")
+def get_prompt_live() -> dict:
+    """El prompt del LIVE, listo para pegar en el chat de IA.
+
+    La Cuenta Piloto ya no monta un vídeo por producto: ahora se hace un LIVE
+    sobre UNO. El guion lo escribe la IA fuera, así que lo único que tiene que
+    dar la pantalla es este texto y las instrucciones de qué mandarle.
+    """
+    try:
+        return {"prompt": config.prompt_live()}
+    except OSError as e:
+        raise APIError(f"No se pudo leer el prompt del LIVE: {e}", status_code=500) from e
+
+
 @router.get("/productos", response_model=ProductosPilotoResponse)
 def list_productos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
