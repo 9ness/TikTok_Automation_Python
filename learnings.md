@@ -700,3 +700,4 @@
 - Perder el acceso al Drive compartido dejaba la lista de carpetas VACÍA y sin mensaje en tres pantallas; solo POV BOF y Largo enseñaban el error.
 - Las tarjetas solo se enteraban de que un montaje acabó por SONDEO (5 s, y React Query lo pausa si la pestaña no está delante). Ahora `useAlTerminarJob` invalida en cuanto la cola dice "completado", y el sondeo baja a 12 s.
 - Sumidero de lecturas de Redis: "Top vendidos" lista las CINCO carpetas por petición y cada una releía los mismos índices globales (escaparate, urls, ventas). Se leen una vez y se reparten.
+- Los índices GLOBALES (escaparate, fichas) se leían una vez POR PRODUCTO dentro de los bucles: cientos de lecturas idénticas por pantalla. Memoria de 5 s en `product_repo`, invalidada en CADA escritura (`_olvidar`) para que marcar algo siga viéndose al instante; el TTL solo cubre que escriba otro proceso.

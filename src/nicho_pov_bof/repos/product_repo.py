@@ -697,6 +697,9 @@ def marcar_escaparate_producto(prod: dict, on: bool, usuario: str = "") -> None:
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return
+    # Cualquier escritura tira la memoria: si no, marcar algo tardaría en
+    # verse y parecería que no se ha guardado.
+    _olvidar(f"esc:{usuario}")
     if on:
         r.sadd(_key_escaparate(usuario), claves[0])
         return
@@ -726,10 +729,13 @@ _URLS_INDEX = "urls:index"
 
 def urls_index() -> dict[str, str]:
     """`{clave: url}` de todos los productos con ficha guardada."""
-    r = get_nicho_pov_bof_redis()
-    if not r.is_available():
-        return {}
-    return r.get_json(_URLS_INDEX) or {}
+    def _leer() -> dict[str, str]:
+        r = get_nicho_pov_bof_redis()
+        if not r.is_available():
+            return {}
+        return r.get_json(_URLS_INDEX) or {}
+
+    return _recordado("urls", _leer)
 
 
 def guardar_ids_vigentes(source: str, folder: str, ids: list[str]) -> None:
@@ -855,7 +861,47 @@ def guardar_url(prod: dict, url: str) -> str:
     if limpia:
         indice[claves[0]] = limpia
     r.set_json(_URLS_INDEX, indice)
+    _olvidar("urls")
     return limpia
+
+
+# ---------------------------------------------------------------------------
+# Memoria corta de los índices GLOBALES
+# ---------------------------------------------------------------------------
+# Estos tres índices —escaparate, fichas y vendidos— son de TODO el catálogo, no
+# de una carpeta, y se consultan una y otra vez dentro de la misma petición: hay
+# bucles que los piden por cada producto. Con diez productos por carpeta y cinco
+# carpetas en "Top vendidos", eran cientos de lecturas idénticas a Upstash por
+# pantalla.
+#
+# Se guardan unos segundos en memoria del proceso. El TTL es corto a propósito:
+# lo que de verdad evita servir datos rancios es que CUALQUIER escritura sobre
+# un índice lo tira (`_olvidar`), así que marcar algo se ve al instante. El TTL
+# solo cubre el caso de que escriba OTRO proceso (Ana desde su móvil), y ahí
+# unos segundos de retraso no molestan a nadie.
+_MEMO_S = 5.0
+_memo: dict[str, tuple[float, object]] = {}
+
+
+def _recordado(clave: str, leer):
+    """Lo que devuelva `leer()`, recordado unos segundos."""
+    import time
+
+    guardado = _memo.get(clave)
+    if guardado and (time.monotonic() - guardado[0]) < _MEMO_S:
+        return guardado[1]
+    valor = leer()
+    _memo[clave] = (time.monotonic(), valor)
+    return valor
+
+
+def _olvidar(prefijo: str = "") -> None:
+    """Tira lo recordado. Se llama en CADA escritura de un índice."""
+    if not prefijo:
+        _memo.clear()
+        return
+    for k in [k for k in _memo if k.startswith(prefijo)]:
+        _memo.pop(k, None)
 
 
 def _key_escaparate(usuario: str = "") -> str:
@@ -866,10 +912,13 @@ def _key_escaparate(usuario: str = "") -> str:
 
 def escaparate_index(usuario: str = "") -> set[str]:
     """Claves de los productos ya metidos en el escaparate por ese usuario."""
-    r = get_nicho_pov_bof_redis()
-    if not r.is_available():
-        return set()
-    return {str(x) for x in r.smembers(_key_escaparate(usuario)) if x}
+    def _leer() -> set[str]:
+        r = get_nicho_pov_bof_redis()
+        if not r.is_available():
+            return set()
+        return {str(x) for x in r.smembers(_key_escaparate(usuario)) if x}
+
+    return _recordado(f"esc:{usuario}", _leer)
 
 
 def en_escaparate(tienda: str, titulo: str, usuario: str = "") -> bool:
@@ -886,6 +935,7 @@ def set_escaparate(tienda: str, titulo: str, on: bool, usuario: str = "") -> Non
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return
+    _olvidar(f"esc:{usuario}")
     if on:
         r.sadd(_key_escaparate(usuario), clave)
     else:
