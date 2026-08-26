@@ -2423,6 +2423,79 @@ def run_nicho_pov_bof_backup(job: Job, on_log: OnLog, on_progress: OnProgress) -
 
 
 
+def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Importa de golpe los ZIP del catálogo de la web del curso.
+
+    Va a la cola porque son 31 ficheros de varios MB cada uno: en una petición
+    HTTP normal se agotaría el tiempo a mitad, y así además se ve por dónde va.
+
+    La PRIMERA vez escribe todo; las siguientes casi nada. Cada producto se
+    compara por el contenido de sus dos fotos, así que resubir el mismo ZIP no
+    toca el disco — que en el Drive montado es justo lo que cuesta tiempo.
+    """
+    import shutil
+
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.services import productos_web
+
+    p = job.params or {}
+    carpeta_tmp = Path(str(p.get("temp_folder") or ""))
+    if not carpeta_tmp.is_dir():
+        raise RuntimeError("No están los ZIP subidos (¿se limpió la carpeta temporal?).")
+
+    zips = sorted(
+        (f for f in carpeta_tmp.iterdir() if f.is_file() and f.suffix.lower() == ".zip"),
+        key=lambda f: pov_config.natural_sort_key(f.name),
+    )
+    if not zips:
+        raise RuntimeError("No llegó ningún ZIP.")
+
+    on_log(f"[web] {len(zips)} ZIP(s) por importar")
+    total_nuevos = 0
+    total_actualizados = 0
+    total_iguales = 0
+    fallidos: list[str] = []
+    resumen: list[str] = []
+
+    for i, z in enumerate(zips):
+        on_progress(i / len(zips), f"📦 {z.name} ({i + 1}/{len(zips)})")
+        try:
+            r = productos_web.importar_zip(z.read_bytes(), z.name)
+        except Exception as e:  # noqa: BLE001
+            # Un ZIP roto no puede dejar sin importar los otros treinta.
+            on_log(f"[web] ⚠️ {z.name}: {e}")
+            fallidos.append(z.name)
+            continue
+        total_nuevos += len(r["nuevos"])
+        total_actualizados += len(r["actualizados"])
+        total_iguales += len(r["iguales"])
+        detalle = (
+            f"{len(r['nuevos'])} nuevo(s), {len(r['actualizados'])} cambiado(s), "
+            f"{len(r['iguales'])} igual(es)"
+        )
+        if r["incompletos"]:
+            detalle += f", {len(r['incompletos'])} sin las dos fotos"
+        on_log(f"[web] {r['carpeta']}: {detalle}")
+        if r["nuevos"]:
+            resumen.append(f"{r['carpeta']}: {', '.join(r['nuevos'])}")
+
+    # Los ZIP no se guardan: ya están dentro del Drive como fotos.
+    shutil.rmtree(carpeta_tmp, ignore_errors=True)
+
+    if resumen:
+        on_log("[web] productos NUEVOS (son a los que hay que ponerles la URL):")
+        for linea in resumen:
+            on_log(f"  · {linea}")
+    if fallidos:
+        on_log(f"[web] no se pudieron leer: {', '.join(fallidos)}")
+
+    on_progress(1.0, "✅ Listo")
+    return (
+        f"{total_nuevos} nuevo(s), {total_actualizados} cambiado(s), "
+        f"{total_iguales} sin tocar"
+    )
+
+
 def run_nicho_pov_bof_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Extrae los textos de TODAS las carpetas de un catálogo, una tras otra.
 
@@ -3763,6 +3836,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_TEXTOS: run_nicho_pov_bof_textos,
+    JobMode.NICHO_POV_BOF_WEB_IMPORT: run_nicho_pov_bof_web_import,
     JobMode.NICHO_POV_BOF_REVISAR: run_nicho_pov_bof_revisar,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
@@ -3795,6 +3869,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_TEXTOS: "viralizacion",
+    JobMode.NICHO_POV_BOF_WEB_IMPORT: "viralizacion",
     JobMode.NICHO_POV_BOF_REVISAR: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",

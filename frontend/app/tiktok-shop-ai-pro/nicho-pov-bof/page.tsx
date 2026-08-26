@@ -63,6 +63,7 @@ import {
   useQuitarClip,
   useBorrarMiProducto,
   useImportarProductosWeb,
+  useImportarProductosWebLote,
   useSortearGuionPlazos,
   useSources,
   useVendidos,
@@ -171,6 +172,8 @@ const CHIP_CLIPS: Record<number, string> = {
  */
 function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => void }) {
   const importar = useImportarProductosWeb();
+  const lote = useImportarProductosWebLote();
+  const abrirCola = useDrawerStore((s) => s.openQueue);
   const entrada = useRef<HTMLInputElement>(null);
   const [ultimo, setUltimo] = useState<{
     carpeta: string;
@@ -183,42 +186,61 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
   return (
     <div className="space-y-2 rounded-lg border border-cyan-500/40 bg-cyan-500/5 p-2">
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Sube el ZIP de una carpeta de la web. La carpeta se llamará como el
-        fichero, así que <strong className="text-foreground">puedes volver a
-        subirlo</strong> cuando lo actualicen: solo se tocan los productos que
-        hayan cambiado.
+        Sube los ZIP de la web —<strong className="text-foreground">puedes
+        elegir los 31 de golpe</strong>—. Cada carpeta se llama como su fichero,
+        así que puedes volver a subirlos cuando los actualicen: solo se tocan
+        los productos que hayan cambiado, y la primera vez es la lenta. Con más
+        de uno va a la cola y ahí ves el avance.
       </p>
 
       <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-600">
-        {importar.isPending ? (
+        {lote.isPending || importar.isPending ? (
           <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Importando…
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…
           </>
         ) : (
           <>
-            <Upload className="h-3.5 w-3.5" /> Subir ZIP de la web
+            <Upload className="h-3.5 w-3.5" /> Subir ZIPs de la web
           </>
         )}
         <input
           ref={entrada}
           type="file"
           accept=".zip,application/zip"
-          disabled={importar.isPending}
+          multiple
+          disabled={lote.isPending || importar.isPending}
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
+            const fs = Array.from(e.target.files ?? []);
             e.target.value = "";
-            if (!f) return;
-            importar.mutate(
-              { archivo: f },
+            if (!fs.length) return;
+            // UNO se importa al momento, que es cuestión de segundos; VARIOS
+            // van a la cola: treinta y uno son cientos de MB y aquí se agotaría
+            // el tiempo a mitad, sin saber por dónde iba.
+            const uno = fs[0];
+            if (fs.length === 1 && uno) {
+              importar.mutate(
+                { archivo: uno },
+                {
+                  onSuccess: (r) => {
+                    setUltimo(r);
+                    onImportado(r.carpeta);
+                    const n = r.nuevos.length + r.actualizados.length;
+                    toast.success(
+                      n ? `${r.carpeta}: ${n} producto(s) puestos` : `${r.carpeta}: sin cambios`,
+                    );
+                  },
+                  onError: (err) => toast.error(err.message),
+                },
+              );
+              return;
+            }
+            lote.mutate(
+              { archivos: fs },
               {
                 onSuccess: (r) => {
-                  setUltimo(r);
-                  onImportado(r.carpeta);
-                  const n = r.nuevos.length + r.actualizados.length;
-                  toast.success(
-                    n ? `${r.carpeta}: ${n} producto(s) puestos` : `${r.carpeta}: sin cambios`,
-                  );
+                  toast.success(`${r.zips} ZIP(s) en la cola`);
+                  abrirCola();
                 },
                 onError: (err) => toast.error(err.message),
               },

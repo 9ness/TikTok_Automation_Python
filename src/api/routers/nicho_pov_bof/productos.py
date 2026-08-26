@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import FileResponse
 
 from src.api.dependencies import get_current_user, get_queue, get_web_user
@@ -1066,6 +1066,52 @@ def _guardar_clip(
             if es_plazos else "Los dos clips están: montando el vídeo."
         ),
     )
+
+
+@router.post("/productos-web/importar-lote", status_code=status.HTTP_201_CREATED)
+async def importar_productos_web_lote(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    archivos: Annotated[list[UploadFile], File()],
+) -> dict:
+    """Encola la importación de VARIOS ZIP de la web del curso.
+
+    A la cola y no aquí porque son 31 ficheros de varios MB: hacerlo en la
+    propia petición agotaría el tiempo a mitad y encima no se vería el avance.
+    Los ZIP se dejan en una carpeta temporal y el runner los procesa y la
+    borra.
+    """
+    import time
+    import uuid
+
+    from src.api.temp_storage import upload_subdir
+
+    if not archivos:
+        raise _bad_request("no llegó ningún ZIP.")
+
+    destino = upload_subdir("nicho_pov_bof") / f"web_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    destino.mkdir(parents=True, exist_ok=True)
+    guardados = 0
+    for f in archivos:
+        nombre = Path(f.filename or "").name
+        if not nombre.lower().endswith(".zip"):
+            continue
+        datos = await f.read()
+        await f.close()
+        if not datos:
+            continue
+        (destino / nombre).write_bytes(datos)
+        guardados += 1
+
+    if not guardados:
+        raise _bad_request("ninguno de los ficheros era un ZIP.")
+
+    title = f"🌐 Importar {guardados} ZIP(s) de la web"
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_WEB_IMPORT,
+        title=title,
+        params={"temp_folder": str(destino), "total": guardados},
+    )
+    return {"job_id": job.id, "title": title, "zips": guardados}
 
 
 @router.post("/productos-web/importar")

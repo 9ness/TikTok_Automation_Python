@@ -33,6 +33,10 @@ class JobMode(str, Enum):
     # Textos de TODAS las carpetas de un catálogo, de una tacada. Va por la
     # cola porque son ~1 min de Gemini por carpeta y hay 35 por fuente.
     NICHO_POV_BOF_TEXTOS = "nicho_pov_bof_textos"
+    # Importar por ZIP el catálogo de la web del curso. Va a la cola porque son
+    # 31 ficheros de varios MB: en una petición HTTP se agotaría el tiempo, y
+    # así además se ve el avance.
+    NICHO_POV_BOF_WEB_IMPORT = "nicho_pov_bof_web_import"
     NICHO_POV_BOF_REVISAR = "nicho_pov_bof_revisar"
     NICHO_POV_BOF_VIDEO = "nicho_pov_bof_video"  # montaje final por producto
     NICHO_ROPA_VIDEO = "nicho_ropa_video"  # ropa sin personas: encuadre + mudo
@@ -80,6 +84,7 @@ MODE_LABELS = {
     JobMode.VIRALIZACION_CLIPS: "✂️ Cortar audio largo",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",
     JobMode.NICHO_POV_BOF_TEXTOS: "🔤 Textos de todo el catálogo",
+    JobMode.NICHO_POV_BOF_WEB_IMPORT: "🌐 Importar ZIPs de la web",
     JobMode.NICHO_POV_BOF_REVISAR: "🔍 Revisar que cada texto es de su producto",
     JobMode.NICHO_POV_BOF_VIDEO: "🎬 Vídeo Nicho POV BOF",
     JobMode.NICHO_ROPA_VIDEO: "👕 Vídeo Nicho Ropa",

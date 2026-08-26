@@ -262,6 +262,26 @@ export function useImportarProductosWeb() {
   });
 }
 
+/** Encola la importación de VARIOS ZIP de golpe.
+ *
+ *  Van a la cola porque son 31 ficheros de varios MB: en la propia petición se
+ *  agotaría el tiempo y no se vería el avance. */
+export function useImportarProductosWebLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; zips: number },
+    Error,
+    { archivos: File[] }
+  >({
+    mutationFn: async ({ archivos }) => {
+      const fd = new FormData();
+      for (const f of archivos) fd.append("archivos", f);
+      return api.post(`${ROOT}/productos-web/importar-lote`, fd);
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 export function useBorrarMiProducto() {
   const qc = useQueryClient();
   return useMutation<{ ok: boolean }, Error, { carpeta: string; producto: string }>({
