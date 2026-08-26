@@ -15,6 +15,7 @@ lleva `source`/`folder` — a diferencia del Nicho POV BOF.
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import time
@@ -46,6 +47,8 @@ router = APIRouter(
     tags=["nicho-ropa"],
     dependencies=[Depends(get_current_user)],
 )
+
+logger = logging.getLogger(__name__)
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
 _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
@@ -97,9 +100,11 @@ def list_carpetas() -> CarpetasRopaResponse:
             )
             for genero, carpeta in prendas_web.todas_las_carpetas()
         ]
-    except Exception:  # noqa: BLE001
-        # Un fallo leyendo el mount no puede dejar sin las cuatro de siempre.
-        pass
+    except Exception as e:  # noqa: BLE001
+        # Un fallo leyendo el mount no puede dejar sin las cuatro de siempre,
+        # pero tampoco puede pasar por "aún no has importado nada": son cosas
+        # distintas y sin log no se distinguen (ya pasó con el Drive del curso).
+        logger.warning("[nicho_ropa] no se pudieron listar las carpetas web: %s", e)
     return CarpetasRopaResponse(items=items)
 
 

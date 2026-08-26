@@ -215,9 +215,16 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             </button>
           ))}
         </div>
-        <p className="text-xs font-medium sm:text-sm">
-          {items.length} prenda(s) · {conTexto} con texto · {conVideo} con vídeo
-        </p>
+        {esWeb && !misCarpetas.length && !carpetas.isLoading ? (
+          <p className="rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+            Aún no hay ninguna carpeta: sube arriba los ZIP que descargues de
+            la web y cada uno aparecerá aquí como una carpeta de diez prendas.
+          </p>
+        ) : (
+          <p className="text-xs font-medium sm:text-sm">
+            {items.length} prenda(s) · {conTexto} con texto · {conVideo} con vídeo
+          </p>
+        )}
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {esWeb ? (
             <>
