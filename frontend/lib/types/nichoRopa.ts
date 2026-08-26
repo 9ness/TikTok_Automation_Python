@@ -7,6 +7,11 @@ export interface PromptsRopaResponse {
   video_sin_manos: string;
   /** Otro escenario: la prenda colgada en una percha, sin nadie. */
   video_percha: string;
+  /** El de la web: la prenda puesta, frente al espejo. Ya viene en el sexo
+   *  que le toca a la carpeta pedida. */
+  video_espejo: string;
+  /** `mujer` | `hombre` — de qué carpeta se dedujo el prompt del espejo. */
+  sexo: string;
 }
 
 export interface CarpetaRopa {

@@ -67,7 +67,13 @@
       "Bash(pkill -f \"BACKUPS_Skool\")",
       "Bash(pkill -f \"rclone copy .*PAQUETE_Productos_Espana_2026-08-19\")",
       "Bash(nohup rclone copy \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" \"gdrive,root_folder_id=1LpXQ3m69M7DHZLGltcyG9UjeVhwmYpUq:PAQUETE_Productos_Espana_2026-08-19\" --transfers 16 --checkers 16 --drive-pacer-min-sleep 10ms --drive-pacer-burst 200 --stats 30s --stats-one-line)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(rclone check *)",
+      "Bash(python3 -)",
+      "Bash(python3 /tmp/renombrar.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" --aplicar)",
+      "Bash(python3 /tmp/renombrar.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\")",
+      "Bash(python3 /tmp/restaurar_nombres.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\")",
+      "Bash(python3 /tmp/restaurar_nombres.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" --aplicar)"
     ]
   }
 }

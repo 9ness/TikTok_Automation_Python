@@ -188,6 +188,84 @@ def prompt_video_percha() -> str:
     return _limpio("prompt_video_percha.md")
 
 
+# ---------------------------------------------------------------------------
+# Prompt del espejo (el de la web, con persona)
+# ---------------------------------------------------------------------------
+# Las carpetas del ZIP vienen de la web del curso, y allí la ropa NO se enseña
+# en percha: se enseña puesta, grabándose frente al espejo. Ese prompt solo
+# está publicado en su versión de mujer, así que la de hombre se deriva
+# cambiando las cinco piezas que hablan de quién graba — igual que hace Jonny
+# en el Nicho Zapatos, donde el par mujer/hombre es el mismo texto con
+# `adult woman` → `adult man`.
+SEXOS: dict[str, dict[str, str]] = {
+    "mujer": {
+        "label": "Mujer",
+        "CREADOR": "Una creadora española joven y guapa",
+        "SUJETO_DICE": "La mujer dice en español:",
+        "VOZ_SINC": "voz femenina española, juvenil y natural",
+        "EJEMPLO": (
+            "Han ajustado el precio de estos jeans virales. Son elásticos y de "
+            "campana. Comprueba tus cupones y aprovecha el pago a plazos en "
+            "pedidos de más de 30 euros."
+        ),
+        "VOZ_DESC": (
+            "Voz femenina ligera, viva y luminosa, perteneciente a una mujer de "
+            "aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un "
+            "timbre cálido, amigable y cercano. Ritmo conversacional ágil y "
+            "natural, ligeramente enérgico y espontáneo, como una creadora UGC "
+            "real. Pronunciación española clara, sin tono de locutora publicitaria "
+            "y sin entonación robótica. La misma voz debe mantenerse en las tres "
+            "escenas, con sincronización labial precisa."
+        ),
+    },
+    "hombre": {
+        "label": "Hombre",
+        "CREADOR": "Un creador español joven y atractivo",
+        "SUJETO_DICE": "El hombre dice en español:",
+        "VOZ_SINC": "voz masculina española, juvenil y natural",
+        "EJEMPLO": (
+            "Han ajustado el precio de esta sudadera viral. Es de algodón grueso "
+            "y cae perfecta. Comprueba tus cupones y aprovecha el pago a plazos "
+            "en pedidos de más de 30 euros."
+        ),
+        "VOZ_DESC": (
+            "Voz masculina natural, viva y cercana, perteneciente a un hombre de "
+            "aproximadamente 25 años. Tono medio-grave, limpio y claro, con un "
+            "timbre cálido, amigable y cercano. Ritmo conversacional ágil y "
+            "natural, ligeramente enérgico y espontáneo, como un creador UGC "
+            "real. Pronunciación española clara, sin tono de locutor publicitario "
+            "y sin entonación robótica. La misma voz debe mantenerse en las tres "
+            "escenas, con sincronización labial precisa."
+        ),
+    },
+}
+
+SEXO_DEFECTO = "mujer"
+
+
+def sexo_de_carpeta(slug: str) -> str:
+    """Qué versión del prompt del espejo le toca a una carpeta.
+
+    Las importadas por ZIP lo llevan en el slug (`hombre_web__Carpeta 3`). Las
+    cuatro del Drive son todas de mujer, así que caen en el defecto.
+    """
+    if es_carpeta_web(slug):
+        genero, _ = partes_web(slug)
+        if genero.startswith("hombre"):
+            return "hombre"
+    return SEXO_DEFECTO
+
+
+def prompt_video_espejo(sexo: str = SEXO_DEFECTO) -> str:
+    """El prompt de la web con las palabras de ESE sexo ya sustituidas."""
+    piezas = SEXOS.get(sexo) or SEXOS[SEXO_DEFECTO]
+    texto = _limpio("prompt_video_espejo.md")
+    for clave, valor in piezas.items():
+        if clave != "label":
+            texto = texto.replace("{{" + clave + "}}", valor)
+    return texto
+
+
 def prompt_imagen() -> str:
     return _limpio("prompt_imagen.md")
 

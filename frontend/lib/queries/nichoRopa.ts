@@ -17,16 +17,22 @@ export const nichoRopaKeys = {
   all: ["nicho-ropa"] as const,
   carpetas: () => [...nichoRopaKeys.all, "carpetas"] as const,
   prendas: (carpeta: string) => [...nichoRopaKeys.all, "prendas", carpeta] as const,
-  prompts: () => [...nichoRopaKeys.all, "prompts"] as const,
+  prompts: (carpeta: string) => [...nichoRopaKeys.all, "prompts", carpeta] as const,
 };
 
-/** Los prompts SÍ cambian (se afinan cada pocas semanas), así que no se
+/** Los prompts a copiar. La carpeta solo cambia el del espejo: es el único
+ *  que lleva a una persona dentro, y en las de hombre debe ser un hombre.
+ *
+ *  Los prompts SÍ cambian (se afinan cada pocas semanas), así que no se
  *  cachean para siempre: con `Infinity` el móvil se quedaba con el viejo
  *  aunque estuviera desplegado el nuevo (ver `usePrompts` del POV BOF). */
-export function usePromptsRopa() {
+export function usePromptsRopa(carpeta: string) {
   return useQuery<PromptsRopaResponse>({
-    queryKey: nichoRopaKeys.prompts(),
-    queryFn: () => api.get<PromptsRopaResponse>(`${ROOT}/prompts`),
+    queryKey: nichoRopaKeys.prompts(carpeta),
+    queryFn: () =>
+      api.get<PromptsRopaResponse>(
+        `${ROOT}/prompts?carpeta=${encodeURIComponent(carpeta)}`,
+      ),
     staleTime: 60_000,
   });
 }

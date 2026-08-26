@@ -1,6 +1,6 @@
 """Endpoints del Nicho Ropa Sin Personas (Programa 4 — módulo 8).
 
-- GET  /api/v1/nicho-ropa/prompts        → imagen + vídeo (con y sin manos)
+- GET  /api/v1/nicho-ropa/prompts        → imagen + vídeo (manos/percha/espejo)
 - GET  /api/v1/nicho-ropa/prendas        → prendas emparejadas + textos
 - POST /api/v1/nicho-ropa/extraer-textos → lee las capturas con Gemini
 - POST /api/v1/nicho-ropa/producto/estado → mete/saca del escaparate
@@ -52,14 +52,21 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 
 
 @router.get("/prompts", response_model=PromptsRopaResponse)
-def get_prompts() -> PromptsRopaResponse:
-    """Los prompts del curso. El de vídeo, en sus dos versiones."""
+def get_prompts(carpeta: str = Query("")) -> PromptsRopaResponse:
+    """Los prompts del curso. El de vídeo, en sus dos versiones.
+
+    `carpeta` solo decide el del espejo: es el único con una persona dentro, y
+    en las carpetas de hombre esa persona tiene que ser un hombre.
+    """
+    sexo = config.sexo_de_carpeta(carpeta)
     try:
         return PromptsRopaResponse(
             imagen=config.prompt_imagen(),
             video_con_manos=config.prompt_video(True),
             video_sin_manos=config.prompt_video(False),
             video_percha=config.prompt_video_percha(),
+            video_espejo=config.prompt_video_espejo(sexo),
+            sexo=sexo,
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e

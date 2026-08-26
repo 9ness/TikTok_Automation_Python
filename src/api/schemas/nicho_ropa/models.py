@@ -20,6 +20,10 @@ class PromptsRopaResponse(BaseModel):
     video_sin_manos: str
     # Segundo escenario del nicho: la prenda colgada en una percha, sin nadie.
     video_percha: str = ""
+    # El de la web: la prenda PUESTA, frente al espejo. Ya viene con las
+    # palabras del sexo que toque según la carpeta pedida.
+    video_espejo: str = ""
+    sexo: str = ""
 
 
 class CarpetaRopa(BaseModel):

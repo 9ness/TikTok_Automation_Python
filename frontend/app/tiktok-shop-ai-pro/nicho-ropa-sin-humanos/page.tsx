@@ -51,8 +51,8 @@ function ImportarPrendasWeb({ onImportado }: { onImportado: (slug: string) => vo
   return (
     <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-2">
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Sube los ZIP de la web. Elige primero de quién es —los prompts son los
-        mismos, pero las carpetas van separadas— y puedes{" "}
+        Sube los ZIP de la web. Elige primero de quién es —las carpetas van
+        separadas y el prompt del espejo sale en su sexo— y puedes{" "}
         <strong className="text-foreground">elegir varios de golpe</strong>.
         Volver a subirlos solo toca lo que haya cambiado.
       </p>
@@ -127,7 +127,7 @@ export default function NichoRopaPage() {
   const [carpeta, setCarpeta] = useEstadoDeUsuario("ropa:carpeta", "camisetas");
   const carpetas = useCarpetasRopa();
   const prendas = usePrendas(carpeta);
-  const prompts = usePromptsRopa();
+  const prompts = usePromptsRopa(carpeta);
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -307,6 +307,23 @@ export default function NichoRopaPage() {
             <ClipboardCopy className="h-3.5 w-3.5" /> Vídeo · percha
           </button>
         </div>
+        {/* El de la web, el único con una persona dentro: quién graba lo
+            decide la carpeta, así que en las de hombre sale en masculino. */}
+        <button
+          type="button"
+          onClick={() =>
+            copiar(
+              `Prompt espejo (${prompts.data?.sexo ?? ""})`,
+              prompts.data?.video_espejo,
+            )
+          }
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs transition hover:border-violet-400"
+        >
+          <ClipboardCopy className="h-3.5 w-3.5" /> Vídeo · espejo, puesta{" "}
+          <span className="text-muted-foreground">
+            ({prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"})
+          </span>
+        </button>
         <button
           type="button"
           onClick={descargarFotos}
