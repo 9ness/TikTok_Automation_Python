@@ -333,7 +333,12 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
   cada una es una carpeta MÁS del selector con slug `mujer_web__Carpeta 23`
   (`services/prendas_web.py`), así el resto del nicho no se entera del nivel
   nuevo. Reusa el importador del POV BOF para no duplicar la inversión de
-  nombres.
+  nombres. Pero **son dos pantallas**, no una: en la web la prenda va PUESTA
+  frente al espejo, así que las carpetas del ZIP viven en "Ropa Mujer/Hombre"
+  (`/tiktok-shop-ai-pro/nicho-ropa-web`) con su prompt y conservando la voz
+  del clip, y "Sin humanos" se queda con las 4 del Drive. Mismo backend y
+  mismo Redis: las separa el flag `web` de `/carpetas`, y la pantalla es el
+  mismo componente con `variante`.
 
 Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
 motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.

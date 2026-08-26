@@ -83,7 +83,7 @@ def list_carpetas() -> CarpetasRopaResponse:
     from src.nicho_ropa.services import prendas_web
 
     items = [
-        CarpetaRopa(slug=slug, label=meta["label"])
+        CarpetaRopa(slug=slug, label=meta["label"], web=False)
         for slug, meta in config.CARPETAS.items()
     ]
     # Y las importadas por ZIP de la web, que son carpetas de diez como las de
@@ -93,6 +93,7 @@ def list_carpetas() -> CarpetasRopaResponse:
             CarpetaRopa(
                 slug=config.slug_web(genero, carpeta),
                 label=config.carpeta_label(config.slug_web(genero, carpeta)),
+                web=True,
             )
             for genero, carpeta in prendas_web.todas_las_carpetas()
         ]
@@ -319,11 +320,14 @@ async def upload_video(
     carpeta: Annotated[str, Form()] = "",
     # Vacío = mudo, que es el modo por defecto de este nicho.
     sexo: Annotated[str, Form()] = "",
+    # "1"/"0" para forzarlo; vacío = lo decide la carpeta.
+    conservar_audio: Annotated[str, Form()] = "",
 ) -> VideoRopaUploadResponse:
     """Sube el vídeo generado fuera y encola el encuadre.
 
     Sin `sexo` el vídeo sale MUDO a propósito: la música la pone el operador
-    al publicar.
+    al publicar. Salvo en el catálogo de la web, donde el clip ya viene hablado
+    por la creadora: ahí se conserva su audio o el vídeo se queda sin nada.
     """
     from src.api.temp_storage import upload_subdir
 
@@ -339,6 +343,17 @@ async def upload_video(
     if sexo_norm and sexo_norm not in ("hombre", "mujer"):
         raise APIError("sexo debe ser 'hombre', 'mujer' o vacío.", status_code=400)
 
+    slug = carpeta or config.CARPETA_DEFECTO
+    pedido = (conservar_audio or "").strip().lower()
+    if pedido in ("1", "true", "si", "sí"):
+        con_audio = True
+    elif pedido in ("0", "false", "no"):
+        con_audio = False
+    else:
+        con_audio = config.es_carpeta_web(slug)
+    # Una voz del banco manda: no se pisa una voz con otra.
+    con_audio = con_audio and not sexo_norm
+
     dest_dir = upload_subdir("nicho_ropa")
     destino = Path(dest_dir) / f"{producto}_{int(time.time())}{ext}"
     with destino.open("wb") as out:
@@ -347,22 +362,24 @@ async def upload_video(
     job = queue.enqueue(
         JobMode.NICHO_ROPA_VIDEO,
         title=(
-            f"👕 Vídeo Nicho Ropa · {config.carpeta_label(carpeta or config.CARPETA_DEFECTO)}"
+            f"👕 Vídeo Nicho Ropa · {config.carpeta_label(slug)}"
             f" · prenda {producto}"
         ),
         params={
             "producto": producto,
-            "carpeta": carpeta or config.CARPETA_DEFECTO,
+            "carpeta": slug,
             "raw_path": str(destino),
             "sexo": sexo_norm,
+            "conservar_audio": con_audio,
             "operator": operator,
         },
     )
     return VideoRopaUploadResponse(
         job_id=job.id,
         message=(
-            "Encolado. Sale mudo" if not sexo_norm
-            else f"Encolado con voz de {sexo_norm}"
+            f"Encolado con voz de {sexo_norm}" if sexo_norm
+            else "Encolado con la voz del clip" if con_audio
+            else "Encolado. Sale mudo"
         ),
     )
 

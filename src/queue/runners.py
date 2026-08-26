@@ -1734,6 +1734,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     carpeta = str(p.get("carpeta") or ropa_config_carpeta_defecto())
     raw_path = Path(p["raw_path"])
     sexo = (p.get("sexo") or "").strip().lower()
+    # El catálogo de la web sale de VEO ya hablado: ahí el audio del clip es el
+    # vídeo, no un ambiente que sobre.
+    conservar_audio = bool(p.get("conservar_audio"))
 
     if not raw_path.is_file():
         raise FileNotFoundError(f"No está el vídeo subido: {raw_path}")
@@ -1755,7 +1758,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     salida = Path(ropa_config.video_dir()) / carpeta / pov_config.nombre_video(
         producto, titulo, folder=carpeta,
     )
-    video_editor.montar(raw_path, salida, voz=voz, on_log=on_log)
+    video_editor.montar(
+        raw_path, salida, voz=voz, conservar_audio=conservar_audio, on_log=on_log,
+    )
 
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(

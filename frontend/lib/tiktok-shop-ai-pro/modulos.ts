@@ -73,6 +73,19 @@ export const MODULOS: ModuloNicho[] = [
     listo: true,
   },
   {
+    // No es un módulo aparte del curso: es el catálogo de ropa que Jonny
+    // publica en su web y que entra por ZIP. Va suelto porque la prenda se
+    // enseña PUESTA frente al espejo — no pinta nada en "sin humanos".
+    slug: "nicho-ropa-web",
+    modulo: 8,
+    label: "Ropa Mujer/Hombre",
+    titulo: "Creación de Nicho Ropa Mujer/Hombre",
+    icon: Shirt,
+    resumen:
+      "El catálogo de ropa de la web, por ZIP: la prenda puesta y grabada frente al espejo.",
+    listo: true,
+  },
+  {
     slug: "nicho-general",
     modulo: 9,
     label: "Nicho General",

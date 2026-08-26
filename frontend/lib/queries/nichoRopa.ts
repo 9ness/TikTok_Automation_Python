@@ -106,13 +106,21 @@ export function useSubirVideoRopa() {
   return useMutation<
     VideoRopaUploadResponse,
     Error,
-    { producto: string; carpeta: string; file: File; sexo: string }
+    {
+      producto: string;
+      carpeta: string;
+      file: File;
+      sexo: string;
+      /** "0" para silenciar un clip de la web; vacío = lo decide la carpeta. */
+      conservar_audio?: string;
+    }
   >({
-    mutationFn: ({ producto, carpeta, file, sexo }) => {
+    mutationFn: ({ producto, carpeta, file, sexo, conservar_audio }) => {
       const fd = new FormData();
       fd.append("producto", producto);
       fd.append("carpeta", carpeta);
       fd.append("sexo", sexo);
+      if (conservar_audio) fd.append("conservar_audio", conservar_audio);
       fd.append("file", file);
       return api.post<VideoRopaUploadResponse>(`${ROOT}/video/upload`, fd);
     },

@@ -29,6 +29,10 @@ class PromptsRopaResponse(BaseModel):
 class CarpetaRopa(BaseModel):
     slug: str
     label: str
+    # Importada por ZIP del catálogo de la web (la prenda va puesta), frente a
+    # las cuatro planas del Drive del curso. Cada pantalla enseña solo las
+    # suyas, así que el filtro lo decide el backend y no un `slug.includes()`.
+    web: bool = False
 
 
 class CarpetasRopaResponse(BaseModel):

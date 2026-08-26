@@ -10,6 +10,11 @@ se enseña y ya. Lo único que se hace es:
    publicar, y el audio que trae el vídeo generado no sirve para nada.
 3. Opcionalmente, ponerle una voz del banco (hombre/mujer) si el operador la
    pide. Es la misma biblioteca de audios que usa el otro nicho.
+
+La excepción es el catálogo de la web (Ropa Mujer/Hombre): ahí el clip sale de
+VEO con el prompt del espejo, o sea que ya trae la voz de la creadora hablando
+y sincronizada con los labios. Ese audio SÍ vale, y silenciarlo se carga el
+vídeo entero — por eso existe `conservar_audio`.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ def montar(
     out_path: Path,
     *,
     voz: Path | None = None,
+    conservar_audio: bool = False,
     on_log: OnLog = _noop,
 ) -> Path:
     """Encuadra a 9:16 y deja el vídeo mudo (o con la voz que se le pase).
@@ -46,11 +52,28 @@ def montar(
     `-an` no es un descuido: el vídeo que sale del generador trae un audio
     ambiente que no aporta nada, y el operador quiere ponerle la música él al
     publicar.
+
+    `conservar_audio` es justo lo contrario, y es para el catálogo de la web:
+    el clip ya viene hablado por la creadora, sincronizado con los labios. Una
+    voz del banco manda sobre esto — no tiene sentido pisar una voz con otra.
     """
     # Mismo encuadre que el resto de nichos, con la ampliación que se come la
     # marca de agua del generador.
     vf = pov_config.filtro_encuadre()
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if voz is None and conservar_audio:
+        # `-c:a aac` y no `copy`: el contenedor de salida cambia y algunos
+        # clips llegan con audio en un códec que el MP4 de TikTok no traga.
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(video_in),
+            "-vf", vf, "-map", "0:v:0", "-map", "0:a:0?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart", str(out_path),
+        ], on_log)
+        on_log("[nicho_ropa] vídeo con SU audio (la voz que trae el clip)")
+        return out_path
 
     if voz is None:
         _run([

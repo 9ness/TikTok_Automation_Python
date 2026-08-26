@@ -17,6 +17,8 @@ export interface PromptsRopaResponse {
 export interface CarpetaRopa {
   slug: string;
   label: string;
+  /** Del catálogo de la web (prenda puesta) o de las del Drive del curso. */
+  web: boolean;
 }
 
 export interface CarpetasRopaResponse {
