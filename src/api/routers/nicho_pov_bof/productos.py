@@ -1116,7 +1116,11 @@ async def importar_productos_web_lote(
 
 @router.post("/productos-web/importar")
 async def importar_productos_web(
-    archivo: Annotated[UploadFile, File()],
+    archivo: Annotated[UploadFile | None, File()] = None,
+    # La APP sube por su cuenta y siempre manda el fichero como `file`: en el
+    # WebView el selector no le devuelve los ficheros al `<input>`, así que la
+    # web no puede mandarlos ella. Se aceptan los dos nombres.
+    file: Annotated[UploadFile | None, File()] = None,
 ) -> dict:
     """Mete un ZIP de la web del curso en la fuente "🌐 Productos Web".
 
@@ -1127,12 +1131,15 @@ async def importar_productos_web(
     """
     from src.nicho_pov_bof.services import productos_web
 
-    datos = await archivo.read()
-    await archivo.close()
+    subido = archivo or file
+    if subido is None:
+        raise _bad_request("no llegó ningún ZIP.")
+    datos = await subido.read()
+    await subido.close()
     if not datos:
         raise _bad_request("el ZIP llegó vacío.")
     try:
-        return productos_web.importar_zip(datos, archivo.filename or "")
+        return productos_web.importar_zip(datos, subido.filename or "")
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except OSError as e:

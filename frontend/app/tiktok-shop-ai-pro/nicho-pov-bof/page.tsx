@@ -95,6 +95,12 @@ import type {
   ProductoItem,
   VideoUploadResponse,
 } from "@/lib/types/nichoPovBof";
+import {
+  alElegirEnLaApp,
+  alSubirCadaFichero,
+  haySubidaNativa,
+  subirConLaApp,
+} from "@/lib/subidaNativa";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 
 /** EchoTik apagado a petición del operador: su cuota gratis no da para el
@@ -171,10 +177,17 @@ const CHIP_CLIPS: Record<number, string> = {
  *  justo a los que hay que ponerles la ficha de TikTok.
  */
 function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => void }) {
+  const qcWeb = useQueryClient();
   const importar = useImportarProductosWeb();
   const lote = useImportarProductosWebLote();
   const abrirCola = useDrawerStore((s) => s.openQueue);
   const entrada = useRef<HTMLInputElement>(null);
+  // Cuántos ZIP está subiendo la app y cuántos ha terminado. En el WebView el
+  // selector NO le devuelve los ficheros al `<input>` —pasó igual con los
+  // vídeos—, así que ahí sube la app y la web solo recoge el resultado.
+  const [porLaApp, setPorLaApp] = useState<{ total: number; hechos: number } | null>(
+    null,
+  );
   const [ultimo, setUltimo] = useState<{
     carpeta: string;
     nuevos: string[];
@@ -182,6 +195,59 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
     iguales: string[];
     incompletos: string[];
   } | null>(null);
+
+  /** Se lo pasa a la app si sabe subir. `false` = que lo haga la web. */
+  function lanzarConLaApp(nombres: string[]): boolean {
+    if (!haySubidaNativa() || !nombres.length) return false;
+    const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+    const lanzada = subirConLaApp({
+      url: `${base}/api/v1/nicho-pov-bof/productos-web/importar`,
+      apiKey: process.env.NEXT_PUBLIC_API_KEY ?? "",
+      // Uno por ZIP: el servidor importa cada uno en su petición y contesta
+      // con lo que ha entrado.
+      tareas: nombres.map((nombre) => ({ nombre, campos: {} })),
+    });
+    if (!lanzada) return false;
+    setPorLaApp({ total: nombres.length, hechos: 0 });
+    toast.success(`${nombres.length} ZIP(s) subiendo con la app`);
+    return true;
+  }
+
+  // Lo que va terminando la app, ZIP a ZIP.
+  useEffect(() => alSubirCadaFichero((nombre, respuesta) => {
+    let r: {
+      carpeta?: string;
+      nuevos?: string[];
+      actualizados?: string[];
+      iguales?: string[];
+      incompletos?: string[];
+    } = {};
+    try {
+      r = JSON.parse(respuesta || "{}");
+    } catch {
+      // Respuesta rota: cuenta igual, pero no se puede resumir.
+    }
+    if (r.carpeta) {
+      setUltimo({
+        carpeta: r.carpeta,
+        nuevos: r.nuevos ?? [],
+        actualizados: r.actualizados ?? [],
+        iguales: r.iguales ?? [],
+        incompletos: r.incompletos ?? [],
+      });
+    } else {
+      toast.error(`No se pudo importar ${nombre}`);
+    }
+    setPorLaApp((v) => (v ? { ...v, hechos: v.hechos + 1 } : v));
+    void qcWeb.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+  }), [qcWeb]);
+
+  // Si el selector de la app no llegó a devolverlos al `<input>`, la app avisa
+  // aparte con los NOMBRES y con eso basta: sube ella.
+  useEffect(() => alElegirEnLaApp((nombres) => {
+    const zips = nombres.filter((n) => n.toLowerCase().endsWith(".zip"));
+    if (zips.length) lanzarConLaApp(zips);
+  }), []);
 
   return (
     <div className="space-y-2 rounded-lg border border-cyan-500/40 bg-cyan-500/5 p-2">
@@ -217,6 +283,7 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
             // UNO se importa al momento, que es cuestión de segundos; VARIOS
             // van a la cola: treinta y uno son cientos de MB y aquí se agotaría
             // el tiempo a mitad, sin saber por dónde iba.
+            if (lanzarConLaApp(fs.map((f) => f.name))) return;
             const uno = fs[0];
             if (fs.length === 1 && uno) {
               importar.mutate(
@@ -248,6 +315,13 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
           }}
         />
       </label>
+
+      {porLaApp && porLaApp.hechos < porLaApp.total && (
+        <p className="flex items-center gap-1.5 text-[10px] text-cyan-400">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Subiendo con la app · {porLaApp.hechos} de {porLaApp.total}
+        </p>
+      )}
 
       {ultimo && (
         <div className="space-y-0.5 text-[10px] leading-tight">
