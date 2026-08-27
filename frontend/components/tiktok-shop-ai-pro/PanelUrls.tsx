@@ -266,20 +266,27 @@ function PegarUrlsEnLote({ source }: { source: string }) {
   // no vale con desplegarlas todas y leer al final — hay que leer cada una
   // mientras está abierta. Y el fichero en vez de `copy()`: con `await`,
   // Chrome envuelve el código y las utilidades de la consola dejan de existir.
-  const GUION = `const esperar = async (c) => {
-  for (let i = 0; i < 40; i++) {
-    if (c.querySelector(".prod")) return true;
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  return false;
-};
+  // Dos trampas de su web, las dos descubiertas a base de que no saliera:
+  //  - Es un ACORDEÓN: al abrir una carpeta cierra la anterior, así que hay
+  //    que leer cada una mientras está abierta, no desplegarlas todas.
+  //  - Al abrir, REPINTA la lista entera: el `div.carp` que tuvieras en la
+  //    mano queda descolgado y su `.prod` no llega nunca. Por eso se vuelve a
+  //    buscar por índice en cada vuelta.
+  // Y el fichero en vez de `copy()`: con `await`, Chrome envuelve el código y
+  // las utilidades de la consola dejan de existir.
+  const GUION = `const carps = () => [...document.querySelectorAll("div.carp")];
 const filas = [];
-for (const c of document.querySelectorAll("div.carp")) {
-  if (!c.querySelector(".prod")) {
-    c.querySelector(".carp-head")?.click();
-    await esperar(c);
+for (let i = 0; i < carps().length; i++) {
+  if (!carps()[i]?.querySelector(".prod")) {
+    carps()[i]?.querySelector(".carp-head")?.click();
+    for (let k = 0; k < 40 && !carps()[i]?.querySelector(".prod"); k++) {
+      await new Promise((r) => setTimeout(r, 150));
+    }
   }
+  const c = carps()[i];
+  if (!c) continue;
   const carpeta = c.querySelector(".carp-head b")?.textContent.trim();
+  const antes = filas.length;
   c.querySelectorAll(".prod").forEach((p) => {
     filas.push({
       carpeta,
@@ -287,13 +294,13 @@ for (const c of document.querySelectorAll("div.carp")) {
       url: p.querySelector("a.chip[href]")?.href ?? "",
     });
   });
-  console.log(carpeta, "->", filas.length);
+  console.log(carpeta, "· en esta:", filas.length - antes, "· total:", filas.length);
 }
 const a = document.createElement("a");
 a.href = URL.createObjectURL(new Blob([JSON.stringify(filas)]));
 a.download = "fichas.json";
 a.click();
-console.log("TOTAL", filas.length, "productos");`;
+console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con enlace");`;
 
   function enviar() {
     let filas: unknown[];
