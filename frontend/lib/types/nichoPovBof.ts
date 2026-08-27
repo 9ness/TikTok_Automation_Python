@@ -117,6 +117,10 @@ export interface ProductoItem {
   sin_stock: boolean;
   /** Guion de 10s escrito para este producto. Vacío = frase del banco. */
   guion_producto: string;
+  /** Cuántos clips hay que subir (lo calcula el backend con el guion). */
+  clips_necesarios: number;
+  /** Duración de los clips que genera el operador: 8 o 10 segundos. */
+  clip_s: number;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;
@@ -261,6 +265,8 @@ export interface EstadoRequest {
   /** Precio escrito a mano cuando la ficha no se deja leer. Sin precio el
    *  producto nunca pasa a plazos. -1 lo borra. */
   precio?: number;
+  /** Duración de los clips que va a generar: 8 o 10 segundos. */
+  clip_s?: number;
 }
 
 export interface VideoUploadResponse {

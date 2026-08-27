@@ -127,8 +127,11 @@ const CAR_POR_SEG = 18.2;
  *  si los clips dejan de durar 8s: lo siguen la tarjeta, los recuentos, los
  *  botones de descarga y cuántos huecos de subida se pintan.
  */
-function clipsDe(_p: { modo_plazos: boolean }): number {
-  return 2;
+function clipsDe(p: { modo_plazos: boolean; clips_necesarios?: number }): number {
+  // Lo calcula el backend: con guion propio manda la voz (223 caracteres caben
+  // en UN clip de 10s), y sin guion son dos, porque la frase del banco se
+  // sortea al montar y hay que ponerse en la más larga.
+  return Math.min(4, Math.max(1, p.clips_necesarios || 2));
 }
 
 /** Qué subconjunto se baja. Mismo planteamiento que el POV BOF Largo, para que
@@ -141,6 +144,7 @@ type Filtro = "todas" | "url" | "clips1" | "clips2";
 interface ParaFiltrar {
   modo_plazos: boolean;
   product_url?: string;
+  clips_necesarios?: number;
 }
 
 function cuadra(p: ParaFiltrar, filtro: Filtro): boolean {
@@ -2240,6 +2244,38 @@ function ProductoCard({
             Ver el guion de plazos
           </button>
         )
+      )}
+
+      {/* 8 o 10 segundos. Con guion propio decide cuántos clips hay que
+          subir: a 10s el guion entra en uno solo. */}
+      {producto.guion_producto && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span>Clips de</span>
+          {[8, 10].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() =>
+                setEstado.mutate({
+                  source,
+                  folder: producto.folder || folder,
+                  producto: producto.producto,
+                  clip_s: s,
+                })
+              }
+              className={`rounded px-1.5 py-0.5 font-semibold transition ${
+                (producto.clip_s || 8) === s
+                  ? "bg-violet-500/20 text-violet-400"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {s}s
+            </button>
+          ))}
+          <span className="ml-auto">
+            {clipsDe(producto)} hueco{clipsDe(producto) === 1 ? "" : "s"}
+          </span>
+        </div>
       )}
 
       {clipsDe(producto) === 2 ? (

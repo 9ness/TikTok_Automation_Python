@@ -237,6 +237,31 @@ def _subida_de(pair: dict) -> str:
     return min((f for f in fechas if f), default="")
 
 
+def _clips_que_pide(prod: dict) -> int:
+    """Cuántos clips hay que subir para este producto.
+
+    Con guion propio se pregunta con cuántos clips queda alguna voz sorteable
+    (`voz.clips_para`), no cuánto tardaría la más lenta del banco: esa ya no
+    entra en el sorteo, y contar con ella pedía dos clips donde con once voces
+    distintas cabía en uno. 223 caracteres caben en UNO de 10 s.
+
+    Sin guion son dos, que es lo que pedía el banco de audios: su frase se
+    sortea al montar y hay que ponerse en la más larga.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    guion = str(prod.get("guion_producto") or "").strip()
+    if not guion:
+        return 2
+    return voz_svc.clips_para(
+        len(guion),
+        float(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
+        segundos_min=pov_config.DURACION_MINIMA_S,
+    )
+
+
 def _producto_info(
     producto: str, prod: dict, source: str = "", folder: str = "",
     queue: JobQueue | None = None, usuario: str = "",
@@ -294,6 +319,8 @@ def _producto_info(
         tambien_en_drive=product_repo.tambien_en_drive(prod),
         sin_stock=bool(prod.get("sin_stock")),
         guion_producto=str(prod.get("guion_producto") or ""),
+        clips_necesarios=_clips_que_pide(prod),
+        clip_s=int(prod.get("clip_s") or 8),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
@@ -426,6 +453,8 @@ def _list_productos(
                 ),
                 sin_stock=bool(guardado.get("sin_stock")),
                 guion_producto=str(guardado.get("guion_producto") or ""),
+                clips_necesarios=_clips_que_pide(guardado),
+                clip_s=int(guardado.get("clip_s") or 8),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
                     producto,
@@ -1031,14 +1060,23 @@ def _guardar_clip(
         raise APIError(str(e), status_code=503) from e
 
     montado_at = float(prod.get("video_listo_at") or 0)
-    if not (
-        _clip_vigente(prod.get("clip1_path"), montado_at)
-        and _clip_vigente(prod.get("clip2_path"), montado_at)
-    ):
-        falta = 2 if slot == 1 else 1
+    # Cuántos clips pide ESTE producto. Con guion propio se calcula igual que
+    # en el Largo (la voz manda); con la frase del banco siguen siendo dos,
+    # porque no se sabe cuál va a tocar hasta el montaje.
+    hacen_falta = _clips_que_pide(prod)
+    rutas = [prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)]
+    puestos = [r for r in rutas if _clip_vigente(r, montado_at)]
+    if len(puestos) < hacen_falta:
+        faltan = [
+            n for n in range(1, hacen_falta + 1)
+            if not _clip_vigente(prod.get(f"clip{n}_path"), montado_at)
+        ]
         return VideoUploadResponse(
             ok=True, job_id="",
-            message=f"Clip {slot} guardado. Falta el clip {falta}.",
+            message=(
+                f"Clip {slot} guardado. Falta el clip "
+                f"{', '.join(map(str, faltan))}."
+            ),
         )
 
     # Los dos clips subidos a la vez: si el otro ya disparó el montaje, no se
@@ -1059,7 +1097,7 @@ def _guardar_clip(
         ),
         params={
             "source": source, "folder": folder, "producto": producto,
-            "clip1_path": prod["clip1_path"], "clip2_path": prod["clip2_path"],
+            **{f"clip{n}_path": prod[f"clip{n}_path"] for n in range(1, hacen_falta + 1)},
             "sexo": sexo, "operator": operator,
             **{k: bool(v) for k, v in flags.items()},
         },
@@ -1364,10 +1402,13 @@ def set_producto_estado(
         )
 
     try:
+        if body.clip_s is not None and body.clip_s not in (8, 10):
+            raise _bad_request(f"clip_s debe ser 8 o 10, recibido: {body.clip_s}")
         prod = product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
             en_escaparate=body.en_escaparate,
             uploaded=body.uploaded, sold=body.sold,
+            clip_s=body.clip_s,
         )
         # Y en el índice ÚNICO por (tienda|nombre): el mismo producto sale en
         # varias carpetas y se graba con varios nichos, pero al Marketplace se

@@ -3327,7 +3327,11 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     producto = p["producto"]
     sexo = p["sexo"]
 
-    clips = [Path(c) for c in (p.get("clip1_path"), p.get("clip2_path")) if c]
+    # Hasta cuatro: con guion propio el número lo decide la voz y la duración
+    # de clip elegida, igual que en el Largo. Sin guion siguen siendo dos.
+    clips = [
+        Path(c) for c in (p.get(f"clip{n}_path") for n in range(1, 5)) if c
+    ]
     if not clips:
         # Trabajo de antes del cambio a dos clips.
         clips = [Path(p["raw_path"])]

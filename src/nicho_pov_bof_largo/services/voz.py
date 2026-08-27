@@ -60,6 +60,40 @@ def tempo_para(caracteres: int, cps: float, segundos_max: float) -> float:
     return max(1.0, round(natural / segundos_max, 3))
 
 
+def clips_para(
+    caracteres: int,
+    clip_s: float,
+    *,
+    segundos_min: float = 0.0,
+    maximos: int = 4,
+    margen_s: float = MARGEN_VOZ_S,
+) -> int:
+    """Con cuántos clips de `clip_s` segundos se puede locutar ese guion.
+
+    No se calcula con "la voz más lenta del banco" como en el Largo, porque
+    aquí la voz ya no se sortea entre todas: se descartan las que no caben y
+    las que dejarían el vídeo por debajo del mínimo. Preguntar por la más lenta
+    daba dos clips cuando con once voces distintas cabía en uno.
+
+    Así que la pregunta correcta es al revés: el número MÁS PEQUEÑO de clips
+    con el que queda alguna voz sorteable.
+    """
+    from src.nicho_pov_bof_largo.services import velocidad_voz
+
+    todas = [v for banco in config.VOCES.values() for v in banco]
+    for n in range(1, max(1, maximos) + 1):
+        tope = round(clip_s * n * 1.2, 1) - max(0.0, margen_s)
+        for v in todas:
+            cps = velocidad_voz.caracteres_por_segundo(v["id"])
+            factor = tempo_para(caracteres, cps, tope)
+            if factor > config.VOZ_TEMPO_MAX:
+                continue
+            if segundos_min and (caracteres / cps) / factor < segundos_min:
+                continue
+            return n
+    return maximos
+
+
 def elegir_voz(
     sexo: str,
     rng: random.Random | None = None,

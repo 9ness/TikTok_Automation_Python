@@ -176,6 +176,11 @@ class ProductoInfo(BaseModel):
     sin_stock: bool = False
     # Guion de 10s escrito para ESTE producto. Vacío = usa el banco de audios.
     guion_producto: str = ""
+    # Cuántos clips hay que subir. Con guion propio lo decide la voz; sin él
+    # son dos (la frase del banco se sortea al montar).
+    clips_necesarios: int = 2
+    # Duración de los clips que genera el operador: 8 o 10 segundos.
+    clip_s: int = 8
     # Precio leído de la ficha. Decide el guion: por encima de
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.
@@ -323,6 +328,9 @@ class ProductoEstadoRequest(BaseModel):
     # pasa a plazos, así que una silla de 150 € se montaría con el guion corto
     # de un producto barato. `0` lo deja como estaba; para borrarlo, -1.
     precio: float | None = None
+    # Duración de los clips que va a generar (8 o 10 s). Con guion propio
+    # decide cuántos hay que subir: 223 caracteres caben en UNO de 10 s.
+    clip_s: int | None = None
 
 
 class ProductoBuscado(BaseModel):
