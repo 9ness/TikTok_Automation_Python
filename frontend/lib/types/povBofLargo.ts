@@ -59,6 +59,9 @@ export interface ProductoLargo {
   clip4?: boolean;
   /** Cuántos clips pide este guion (2, o 3 si la voz no cabe en dos). */
   clips_necesarios?: number;
+  /** Duración de los clips que genera el operador: 8 o 10 segundos. Cambia
+   *  cuántos pide el mismo guion (20 s son 3 de 8 s o 2 de 10 s). */
+  clip_s?: number;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.
@@ -120,4 +123,5 @@ export interface EstadoLargoRequest {
   uploaded?: boolean;
   sold?: boolean;
   nicho?: string;
+  clip_s?: number;
 }

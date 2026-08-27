@@ -1406,6 +1406,9 @@ function ProductoCard({
   // Cuántos clips pide ESTE guion. Lo calcula el backend con los caracteres
   // (la voz aún no existe cuando hay que decidirlo).
   const necesarios = Math.min(4, p.clips_necesarios || 2);
+  // Duración de los clips que genera el operador. No es cosmética: el mismo
+  // guion son 3 clips de 8s o 2 de 10s, así que cambiarla cambia los huecos.
+  const clipS = p.clip_s || 8;
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1904,6 +1907,35 @@ function ProductoCard({
           móvil estrecho salen tres botones apretados; encima con cuatro ya eran
           dos filas de dos, así que la pantalla cambiaba de forma según el
           producto. Dos columnas es igual en todos los casos (2, 2+1, 2+2). */}
+      {/* 8 o 10 segundos, pegado a los huecos porque es lo que cambia: con
+          clips de 10s el mismo guion pide uno menos. */}
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <span>Clips de</span>
+        {[8, 10].map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() =>
+              setEstado.mutate({
+                source,
+                folder: p.folder || folder,
+                producto: p.producto,
+                clip_s: s,
+              })
+            }
+            className={`rounded px-1.5 py-0.5 font-semibold transition ${
+              clipS === s
+                ? "bg-violet-500/20 text-violet-400"
+                : "hover:text-foreground"
+            }`}
+          >
+            {s}s
+          </button>
+        ))}
+        <span className="ml-auto">
+          {necesarios} hueco{necesarios === 1 ? "" : "s"}
+        </span>
+      </div>
       <div className="grid grid-cols-2 gap-1.5">
         {(
           [1, 2, 3, 4].slice(0, necesarios) as (1 | 2 | 3 | 4)[]

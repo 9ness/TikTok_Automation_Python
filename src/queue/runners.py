@@ -2037,14 +2037,16 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             # 8s cada uno dejaba fuera voces que sí cabían cuando alguno venía
             # de 10s (pasa al usar otra herramienta de vídeo).
             segundos_max=_segundos_de_video(clips),
+            segundos_min=largo_config.DURACION_MINIMA_S,
         )
         # Cada vídeo afina la velocidad de SU voz: es lo que hace que la
-        # próxima estimación de cuántos clips hacen falta sea mejor.
+        # próxima estimación de cuántos clips hacen falta sea mejor. Se pasa el
+        # tempo para descontarlo: la tabla guarda velocidades naturales.
         from src.nicho_pov_bof_largo.services import velocidad_voz
 
         velocidad_voz.apuntar(
             str(info.get("voz_id") or ""), len(escrito["guion"]),
-            float(info.get("duracion") or 0),
+            float(info.get("duracion") or 0), float(info.get("tempo") or 1.0),
         )
 
         salida = Path(largo_config.video_dir()) / source / folder / config.nombre_video(
@@ -2221,6 +2223,7 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
         info = voz_svc.sintetizar(
             guion, audio, sexo=sexo, rng=rng, on_log=on_log,
             segundos_max=_segundos_de_video(clips),
+            segundos_min=config.DURACION_MINIMA_S,
         )
         on_log(
             f"[pov_bof_plazos] voz: {info.get('voz_label')} · "
@@ -2230,7 +2233,7 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
 
         velocidad_voz.apuntar(
             str(info.get("voz_id") or ""), len(guion),
-            float(info.get("duracion") or 0),
+            float(info.get("duracion") or 0), float(info.get("tempo") or 1.0),
         )
 
         def _progreso(pct: float, label: str) -> None:
@@ -3385,6 +3388,7 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         info = voz_svc.sintetizar(
             guion, audio_ready, sexo=sexo, on_log=on_log,
             segundos_max=_segundos_de_video(clips),
+            segundos_min=config.DURACION_MINIMA_S,
         )
         on_log(f"[nicho_pov_bof] voz: {info.get('label') or info.get('id') or '?'}")
     else:

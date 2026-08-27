@@ -639,6 +639,11 @@ def limpiar_prompt(texto: str) -> str:
 # las lentas no cabe en un solo clip — de ahí el filtro de `elegir_voz`.
 GUION_PRODUCTO_MAX_CARACTERES = 190
 
+# Los retos de TikTok piden vídeos de al menos 10 segundos, y el vídeo dura lo
+# que dura la voz. Así que una voz tan rápida que lo deje corto se descarta del
+# sorteo en vez de acelerarla.
+DURACION_MINIMA_S = float(os.getenv("POV_BOF_DURACION_MINIMA_S", "10"))
+
 
 def prompt_guion_producto() -> str:
     """El prompt del curso, literal, sin la nota de cabecera."""

@@ -76,18 +76,21 @@ def clip_max_s(clip_s: float = 0.0) -> float:
 # audio de Fish). No es un detalle: con el mismo guion, "audio hombre vendedor"
 # corre a 23,6 car/s y "influencer" a 15,4 — 20s con una son 30s con la otra, y
 # de eso depende cuántos clips hay que generar.
-CARACTERES_POR_SEGUNDO = 19.6      # media de los 20 medidos, ya con VOZ_TEMPO
+CARACTERES_POR_SEGUNDO = 17.8      # media de los 20 medidos, sin acelerar
 # Para decidir CUÁNTOS CLIPS se usa la voz LENTA, no la media: la voz se sortea
 # después de escribir el guion, así que hay que ponerse en lo peor. Quedarse
 # corto obliga a estirar el vídeo y deforma el gesto de la mano; sobrar medio
 # clip no se nota, porque el montaje recorta a la duración de la voz.
-CARACTERES_POR_SEGUNDO_LENTA = 16.9
+CARACTERES_POR_SEGUNDO_LENTA = 15.4
 # Lo que tiene que DURAR el guion, que es una decisión del formato y no del
 # tamaño de los clips: el del curso cuenta el producto en unos veinte segundos.
 # Antes se calculaba como "lo que quepa en los clips" y al pasar a clips de 8s
 # habría dado 683 caracteres — guiones del doble de largos sin que nadie lo
 # pidiera. Los clips se adaptan al guion, no al revés.
 GUION_OBJETIVO_S = 20.0
+# Mínimo del reto en el que se usa este nicho. Ver `DURACION_MINIMA_S` del POV
+# BOF: mismo criterio, otro número.
+DURACION_MINIMA_S = float(os.getenv("POV_BOF_LARGO_DURACION_MINIMA_S", "15"))
 GUION_MAX_CARACTERES = int(GUION_OBJETIVO_S * CARACTERES_POR_SEGUNDO)  # ~356
 
 
@@ -237,17 +240,23 @@ VOZ_LIMITER = 0.89
 #     1,5s baja a 0,3s pero SIGUE habiendo pausa — respira, no atropella.
 # `detection=peak` es conservador: solo cuenta como silencio lo que baje de
 # -40 dB de pico, así que no se come el arranque suave de una palabra.
-# Un pelín más rápido. No es capricho: con el guion de 223 caracteres del POV
+# Cuánto se puede acelerar la voz. No es capricho: con el guion de 223 caracteres del POV
 # BOF, a velocidad normal solo DOS voces del banco caben en un clip de 10s
 # (12s con el estirado), así que todos los vídeos sonarían igual. Con +10%
 # entran siete, y en voz hablada un 10% no se percibe como acelerón — sí a
 # partir del 15%, donde empieza a sonar atropellado.
 #
-# Va en la cadena ANTES del nivelado, así que las velocidades que se apuntan
-# en `velocidad_voz` ya salen medidas con esto puesto. Las cifras de arranque
-# de esa tabla se midieron sin acelerar y se corrigieron a mano una vez; las
-# que ya estaban guardadas en Redis se reajustan solas en unos vídeos.
-VOZ_TEMPO = float(os.getenv("VOZ_TEMPO", "1.10"))
+# Va en la cadena ANTES del nivelado. Las velocidades de `velocidad_voz` se
+# guardan NATURALES (allí se descuenta el tempo usado), porque ya no es fijo.
+#
+# Y hay un suelo además del techo: los retos de TikTok piden vídeos de 10s o
+# 15s mínimo, y el vídeo dura lo que dura la voz. Así que una voz demasiado
+# rápida para el mínimo se descarta en vez de acelerarla (ver `DURACION_MINIMA`
+# de cada nicho).
+# TOPE del acelerón, no el acelerón: se acelera lo JUSTO para que la voz quepa
+# en los clips, y nunca más de esto. A partir del 15% suena atropellado; el 10%
+# está comprobado a oído.
+VOZ_TEMPO_MAX = float(os.getenv("VOZ_TEMPO", "1.10"))
 
 VOZ_SILENCIO = (
     "silenceremove="

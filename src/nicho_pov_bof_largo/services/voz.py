@@ -48,12 +48,25 @@ FISH_USD_PER_MILLON_BYTES = 15.0
 MARGEN_VOZ_S = 0.5
 
 
+def tempo_para(caracteres: int, cps: float, segundos_max: float) -> float:
+    """Cuánto hay que acelerar esta voz para que quepa. 1.0 = nada.
+
+    Se acelera lo JUSTO, no siempre lo máximo: acelerar de más acorta el vídeo
+    y los retos de TikTok piden un mínimo de duración.
+    """
+    if not segundos_max or cps <= 0:
+        return 1.0
+    natural = caracteres / cps
+    return max(1.0, round(natural / segundos_max, 3))
+
+
 def elegir_voz(
     sexo: str,
     rng: random.Random | None = None,
     *,
     caracteres: int = 0,
     segundos_max: float = 0.0,
+    segundos_min: float = 0.0,
     margen_s: float = MARGEN_VOZ_S,
     on_log: OnLog = _noop,
 ) -> dict[str, str]:
@@ -85,17 +98,23 @@ def elegir_voz(
     if caracteres > 0 and segundos_max > 0:
         from src.nicho_pov_bof_largo.services import velocidad_voz
 
-        def _caben(tope: float) -> list[dict[str, str]]:
-            return [
-                v for v in candidatas
-                if caracteres / velocidad_voz.caracteres_por_segundo(v["id"]) <= tope
-            ]
+        def _validas(tope: float, minimo: float) -> list[dict[str, str]]:
+            salida = []
+            for v in candidatas:
+                cps = velocidad_voz.caracteres_por_segundo(v["id"])
+                t = tempo_para(caracteres, cps, tope)
+                if t > config.VOZ_TEMPO_MAX:
+                    continue           # ni acelerando al máximo cabe
+                if minimo and (caracteres / cps) / t < minimo:
+                    continue           # tan rápida que el vídeo no llega al mínimo
+                salida.append(v)
+            return salida
 
-        con_colchon = _caben(segundos_max - max(0.0, margen_s))
+        con_colchon = _validas(segundos_max - max(0.0, margen_s), segundos_min)
         if con_colchon:
             candidatas = con_colchon
         else:
-            justas = _caben(segundos_max)
+            justas = _validas(segundos_max, segundos_min)
             if justas:
                 on_log(
                     f"[voz] ninguna voz cabe con {margen_s}s de margen en "
@@ -103,6 +122,14 @@ def elegir_voz(
                     "caben justas"
                 )
                 candidatas = justas
+            elif segundos_min:
+                sin_minimo = _validas(segundos_max, 0.0)
+                if sin_minimo:
+                    on_log(
+                        f"[voz] ninguna voz llega al mínimo de {segundos_min:.0f}s; "
+                        "se sortea entre las que caben y el vídeo saldrá más corto"
+                    )
+                    candidatas = sin_minimo
             else:
                 on_log(
                     f"[voz] NINGUNA voz cabe: {caracteres} caracteres no entran "
@@ -122,6 +149,9 @@ def sintetizar(
     # Cuánto vídeo hay para esta voz. Sirve para no sortear una voz lenta que
     # no quepa (ver `elegir_voz`). 0 = no se sabe, se sortea entre todas.
     segundos_max: float = 0.0,
+    # Suelo de duración: los retos de TikTok piden 10s o 15s mínimo y el vídeo
+    # dura lo que dura la voz. Descarta las voces demasiado rápidas.
+    segundos_min: float = 0.0,
     # Para audicionar a otra velocidad sin tocar la de producción.
     tempo: float | None = None,
     on_log: OnLog = _noop,
@@ -141,6 +171,7 @@ def sintetizar(
 
     elegida = voz or elegir_voz(
         sexo, rng, caracteres=len(texto), segundos_max=segundos_max,
+        segundos_min=segundos_min, on_log=on_log,
     )
     on_log(f"[nicho_pov_bof_largo] voz: {elegida['label']} ({sexo})")
 
@@ -168,6 +199,21 @@ def sintetizar(
         raise RuntimeError(f"Fish Audio devolvió {e.code}: {detalle}") from e
 
     _registrar_coste(texto, elegida)
+    # Lo justo para que quepa, nunca más del tope. Sin sitio que respetar
+    # (`segundos_max`=0) no se acelera nada.
+    if tempo is None:
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        tempo = min(
+            config.VOZ_TEMPO_MAX,
+            tempo_para(
+                len(texto),
+                velocidad_voz.caracteres_por_segundo(elegida["id"]),
+                segundos_max,
+            ),
+        )
+        if tempo > 1.0:
+            on_log(f"[voz] acelerada x{tempo:.2f} para que quepa en {segundos_max:.1f}s")
     medidas = _nivelar(crudo, destino, tempo=tempo, on_log=on_log)
     try:
         crudo.unlink()
@@ -178,6 +224,8 @@ def sintetizar(
         "voz_id": elegida["id"],
         "voz_label": elegida["label"],
         "caracteres": len(texto),
+        # Hace falta para apuntar la velocidad NATURAL de la voz.
+        "tempo": float(tempo or 1.0),
         **medidas,
     }
 
