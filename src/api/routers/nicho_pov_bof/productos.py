@@ -1545,8 +1545,15 @@ def importar_urls(body: dict) -> dict:
     if len(filas) > 5000:
         raise _bad_request(f"Demasiadas filas ({len(filas)}).")
 
+    from src.nicho_pov_bof.services import drive_client
+
     try:
-        return product_repo.importar_urls(source, filas)
+        reales = [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    except Exception:  # noqa: BLE001
+        reales = []
+
+    try:
+        return product_repo.importar_urls(source, filas, reales)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 

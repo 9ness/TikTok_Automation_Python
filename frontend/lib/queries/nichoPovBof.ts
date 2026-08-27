@@ -785,7 +785,13 @@ export function useUrlsCatalogo(source: string) {
 export function useImportarUrls() {
   const qc = useQueryClient();
   return useMutation<
-    { carpetas: number; guardados: number; en_indice: number },
+    {
+      carpetas: number;
+      guardados: number;
+      en_indice: number;
+      /** Carpetas del pegote que no casan con ninguna del catálogo. */
+      sin_carpeta: string[];
+    },
     Error,
     { source: string; filas: unknown[] }
   >({

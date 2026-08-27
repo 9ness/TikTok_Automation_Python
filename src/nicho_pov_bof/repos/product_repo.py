@@ -974,7 +974,9 @@ def tambien_en_drive(prod: dict, indice: set[str] | None = None) -> bool:
     return any(casa_clave(c, indice) for c in claves)
 
 
-def importar_urls(source: str, filas: list[dict]) -> dict:
+def importar_urls(
+    source: str, filas: list[dict], carpetas_reales: list[str] | None = None,
+) -> dict:
     """Guarda de golpe las fichas que vienen pegadas de la web del curso.
 
     Cada fila es `{carpeta, producto, url}` tal cual sale del DOM de su página
@@ -991,17 +993,31 @@ def importar_urls(source: str, filas: list[dict]) -> dict:
     Un producto por escritura serían 310 idas y vueltas a Upstash. Aquí es un
     documento por carpeta (31) más una sola pasada por el índice.
     """
+    # Su web dice "Carpeta 1" y en el ZIP la carpeta acabó llamándose
+    # "Carpeta_1": el nombre sale del fichero que descarga el navegador. Sin
+    # casarlos, cada enlace se guardaba en un documento fantasma y la pantalla
+    # seguía sin fichas — mal sin dar ningún error.
+    reales = {_llana(n): n for n in (carpetas_reales or [])}
+
     por_carpeta: dict[str, dict[str, str]] = {}
+    sin_carpeta: set[str] = set()
     for fila in filas:
-        carpeta = _carpeta_pegada(str(fila.get("carpeta") or ""))
+        pegada = _carpeta_pegada(str(fila.get("carpeta") or ""))
         producto = _numero_pegado(str(fila.get("producto") or ""))
         url = str(fila.get("url") or "").strip()
-        if not carpeta or not producto or not url:
+        if not pegada or not producto or not url:
+            continue
+        carpeta = reales.get(_llana(pegada), "" if reales else pegada)
+        if not carpeta:
+            sin_carpeta.add(pegada)
             continue
         por_carpeta.setdefault(carpeta, {})[producto] = url
 
     if not por_carpeta:
-        return {"carpetas": 0, "guardados": 0, "en_indice": 0}
+        return {
+            "carpetas": 0, "guardados": 0, "en_indice": 0,
+            "sin_carpeta": sorted(sin_carpeta),
+        }
 
     r = _require_redis()
     indice = r.get_json(_URLS_INDEX) or {}
@@ -1033,7 +1049,15 @@ def importar_urls(source: str, filas: list[dict]) -> dict:
         "carpetas": len(por_carpeta),
         "guardados": guardados,
         "en_indice": en_indice,
+        # Las que no casan con ninguna carpeta del catálogo. No se guardan en
+        # ningún sitio: se dicen, para no dejar enlaces en un limbo.
+        "sin_carpeta": sorted(sin_carpeta),
     }
+
+
+def _llana(texto: str) -> str:
+    """`Carpeta_1` y `📁 Carpeta 1` dan lo mismo: `carpeta1`."""
+    return re.sub(r"[^a-z0-9]", "", (texto or "").lower())
 
 
 def _carpeta_pegada(texto: str) -> str:

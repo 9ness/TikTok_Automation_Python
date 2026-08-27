@@ -300,6 +300,13 @@ copy(JSON.stringify(filas));`;
             `${r.guardados} ficha(s) en ${r.carpetas} carpeta(s)` +
               (r.en_indice ? ` · ${r.en_indice} ya con texto` : ""),
           );
+          // Callar esto dejaría enlaces sin guardar pareciendo que fue bien.
+          if (r.sin_carpeta?.length) {
+            toast.warning(
+              `Sin guardar, no hay esa carpeta en el catálogo: ${r.sin_carpeta.join(", ")}`,
+              { duration: 10000 },
+            );
+          }
           setTexto("");
           setAbierto(false);
         },
