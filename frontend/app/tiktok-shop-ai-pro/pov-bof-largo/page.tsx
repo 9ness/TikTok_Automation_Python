@@ -102,6 +102,7 @@ import type {
   ProductoItem,
 } from "@/lib/types/nichoPovBof";
 import type { ProductoLargo } from "@/lib/types/povBofLargo";
+import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 
 function err(e: unknown): string {
@@ -183,6 +184,11 @@ export default function PovBofLargoPage() {
   // sondeo de 5 s ya lo hacía, pero tarde —y se pausa si la pestaña no está
   // delante—, así que el vídeo terminado tardaba en salir en su tarjeta.
   useAlTerminarJob(() => {
+    void qc.invalidateQueries({ queryKey: largoKeys.all });
+  });
+  // Y al volver a la app: los trabajos que terminan con la pantalla en segundo
+  // plano no los ve el enganche de arriba, y la lista se queda desfasada.
+  useRefrescarAlVolver(() => {
     void qc.invalidateQueries({ queryKey: largoKeys.all });
   });
   // Solo el admin ve el space de "foto con IA": Ana y Mauro trabajan con la

@@ -109,6 +109,7 @@ import {
   haySubidaNativa,
   subirConLaApp,
 } from "@/lib/subidaNativa";
+import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 
 /** EchoTik apagado a petición del operador: su cuota gratis no da para el
@@ -421,6 +422,13 @@ export default function NichoPovBofPage() {
   // Igual que en el POV BOF Largo: en cuanto la cola dice que un montaje
   // terminó, se repregunta, en vez de esperar al sondeo de 5 s.
   useAlTerminarJob(() => {
+    void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
+  });
+  // Y al volver a la app. Los trabajos que terminan con la pantalla en segundo
+  // plano no los ve el enganche de arriba —los ya acabados al montar no
+  // disparan nada, a propósito— y la lista se queda diciendo "0/6" aunque el
+  // servidor tenga los guiones escritos.
+  useRefrescarAlVolver(() => {
     void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
   });
   const productos = useProductos(source, folder);
