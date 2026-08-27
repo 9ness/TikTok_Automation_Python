@@ -971,7 +971,14 @@ def tambien_en_drive(prod: dict, indice: set[str] | None = None) -> bool:
     if any(c in indice for c in claves):
         return True
     # Mismo producto con la ficha cortada por otro sitio.
-    return any(casa_clave(c, indice) for c in claves)
+    if any(casa_clave(c, indice) for c in claves):
+        return True
+    # Y mismo título con la tienda leída de otra forma ("MIKOMIKA" vs
+    # "MIKOMIKA Store"): la clave lleva la tienda dentro, así que sin esto un
+    # producto idéntico se daba por exclusivo de la web. Es el mismo rescate
+    # que ya hace `url_de`, y solo cuela si el título casa ENTERO y no hay
+    # más de un candidato.
+    return any(_casa_solo_titulo(c, indice) for c in claves)
 
 
 def importar_urls(
