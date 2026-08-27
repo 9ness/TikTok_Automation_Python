@@ -1044,14 +1044,32 @@ def importar_urls(
 
     if not por_carpeta and not agotados and not con_stock:
         return {
-            "carpetas": 0, "guardados": 0, "en_indice": 0, "agotados": 0,
+            "carpetas": 0, "guardados": 0, "con_id": 0, "en_indice": 0,
+            "agotados": 0,
             "sin_carpeta": sorted(sin_carpeta), "descartadas": descartadas,
         }
+
+    # El ID de producto sale de seguir el redirect del enlace, y es lo que se
+    # pega en TikTok Studio para enlazar sin bucear en la lista. Se saca AQUÍ,
+    # al guardar, y no en un botón aparte: si no, el operador pega las fichas y
+    # luego tiene que acordarse de un segundo paso.
+    from src.nicho_pov_bof.services import product_url as _url_svc
+
+    todas = [u for urls in por_carpeta.values() for u in urls.values()]
+    ids: dict[str, str] = {}
+    if todas:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            ids = {
+                u: i for u, i in zip(todas, pool.map(_url_svc.id_desde_url, todas)) if i
+            }
 
     r = _require_redis()
     indice = r.get_json(_URLS_INDEX) or {}
     guardados = 0
     en_indice = 0
+    con_id = 0
 
     agotados_escritos = 0
     for carpeta in sorted(set(por_carpeta) | set(agotados) | set(con_stock)):
@@ -1080,6 +1098,9 @@ def importar_urls(
                     # Vuelve a haber ficha: ya no está agotado.
                     prod["sin_stock"] = False
                     prod["updated_at"] = _now()
+                if ids.get(url):
+                    prod["product_id"] = ids[url]
+                    con_id += 1
                 guardados += 1
                 # Con textos ya extraídos, también al índice global.
                 claves = claves_escaparate(prod)
@@ -1095,6 +1116,7 @@ def importar_urls(
     return {
         "carpetas": len(set(por_carpeta) | set(agotados) | set(con_stock)),
         "guardados": guardados,
+        "con_id": con_id,
         "en_indice": en_indice,
         "agotados": agotados_escritos,
         # Las que no casan con ninguna carpeta del catálogo. No se guardan en

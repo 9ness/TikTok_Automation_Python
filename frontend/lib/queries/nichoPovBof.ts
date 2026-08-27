@@ -827,6 +827,7 @@ export function useImportarUrls() {
     {
       carpetas: number;
       guardados: number;
+      con_id: number;
       en_indice: number;
       /** Carpetas del pegote que no casan con ninguna del catálogo. */
       sin_carpeta: string[];

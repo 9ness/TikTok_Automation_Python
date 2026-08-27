@@ -321,6 +321,7 @@ console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con
         onSuccess: (r) => {
           toast.success(
             `${r.guardados} ficha(s) en ${r.carpetas} carpeta(s)` +
+              (r.con_id ? ` · ${r.con_id} con ID` : "") +
               (r.agotados ? ` · ${r.agotados} sin stock` : "") +
               (r.en_indice ? ` · ${r.en_indice} ya con texto` : ""),
           );

@@ -1879,7 +1879,19 @@ def guardar_url_producto(
         url = product_repo.guardar_url(prod, body.url)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return {"url": url}
+
+    # El ID, al vuelo: es una petición al redirect del enlace y evita que haya
+    # que acordarse de un segundo paso para poder enlazar en TikTok Studio.
+    from src.nicho_pov_bof.services import product_url as url_svc
+
+    pid_tiktok = url_svc.id_desde_url(url) if url else ""
+    try:
+        product_repo.update_product(
+            body.source, body.folder, body.producto, product_id=pid_tiktok,
+        )
+    except RuntimeError:
+        pass
+    return {"url": url, "product_id": pid_tiktok}
 
 
 @router.post("/productos/urls", response_model=ProductosUrlsResponse)

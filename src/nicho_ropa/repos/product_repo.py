@@ -160,7 +160,21 @@ def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
             continue
         por_carpeta.setdefault(carpeta, {})[producto] = url
 
-    guardados = agotados_escritos = en_indice = 0
+    # El ID de TikTok, al guardar (ver el gemelo del POV BOF): es lo que se
+    # pega en TikTok Studio para enlazar el producto sin buscarlo a mano.
+    from src.nicho_pov_bof.services import product_url as _url_svc
+
+    todas = [u for urls in por_carpeta.values() for u in urls.values()]
+    ids: dict[str, str] = {}
+    if todas:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            ids = {
+                u: i for u, i in zip(todas, pool.map(_url_svc.id_desde_url, todas)) if i
+            }
+
+    guardados = agotados_escritos = en_indice = con_id = 0
     tocadas = set(por_carpeta) | set(agotados) | set(con_stock)
     indice = {}
     if tocadas:
@@ -189,6 +203,9 @@ def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
                     prod["product_url"] = url
                     prod["sin_stock"] = False
                     prod["updated_at"] = _now()
+                if ids.get(url):
+                    prod["product_id"] = ids[url]
+                    con_id += 1
                 guardados += 1
                 claves = pov_repo.claves_escaparate(prod)
                 if claves:
@@ -207,6 +224,7 @@ def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
     return {
         "carpetas": len(tocadas),
         "guardados": guardados,
+        "con_id": con_id,
         "agotados": agotados_escritos,
         "en_indice": en_indice,
         "sin_carpeta": sorted(sin_carpeta),
