@@ -52,6 +52,8 @@ class JobMode(str, Enum):
     NICHO_POV_BOF_LARGO_GUIONES = "nicho_pov_bof_largo_guiones"
     # POV BOF: los guiones de 10s de TODA una carpeta, de una tacada.
     NICHO_POV_BOF_GUIONES = "nicho_pov_bof_guiones"
+    # Cerrar los huecos de numeración de "Mis productos" tras borrar uno.
+    NICHO_POV_BOF_RENUMERAR = "nicho_pov_bof_renumerar"
     # Carruseles: clasificar + escribir los dos mensajes de todo un catálogo.
     NICHO_CARRUSELES_PREPARAR = "nicho_carruseles_preparar"
     # Carruseles: reconocer con IA de qué producto es cada foto 2 de la tanda.
@@ -96,6 +98,7 @@ MODE_LABELS = {
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "🎙️ Vídeo POV BOF Largo",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "✍️ Guiones POV BOF Largo",
     JobMode.NICHO_POV_BOF_GUIONES: "✍️ Guiones POV BOF",
+    JobMode.NICHO_POV_BOF_RENUMERAR: "🔢 Renumerar Mis productos",
     JobMode.NICHO_CARRUSELES_PREPARAR: "🖼️ Preparar carruseles",
     JobMode.NICHO_CARRUSELES_REPARTO: "🧩 Repartir fotos de carrusel",
     JobMode.NICHO_CARRUSELES_QUEMAR: "🔥 Escribir los textos del carrusel",

@@ -1251,15 +1251,31 @@ async def crear_mi_producto(
 def borrar_mi_producto(
     carpeta: Annotated[str, Query()],
     producto: Annotated[str, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
 ) -> dict:
-    """Quita las fotos de un producto propio. Solo vale para `mis_productos`."""
+    """Quita las fotos de un producto propio. Solo vale para `mis_productos`.
+
+    Borra las fotos —que son dos ficheros y va al momento— y manda a la cola
+    el cierre del hueco de numeración, que es lo lento: renombra todos los
+    productos siguientes contra el Drive montado. Antes iba dentro de esta
+    misma petición y el borrado tardaba tanto que recargar la página lo dejaba
+    a medias.
+    """
     from src.nicho_pov_bof.services import mis_productos
 
-    if not mis_productos.borrar_producto(carpeta, producto):
+    if not mis_productos.borrar_producto(carpeta, producto, renumerar=False):
         raise APIError(
             f"No existe el producto {producto} en {carpeta}.", status_code=404,
         )
-    return {"ok": True}
+    job_id = ""
+    if queue is not None:
+        job = queue.enqueue(
+            JobMode.NICHO_POV_BOF_RENUMERAR,
+            title=f"🔢 Renumerar · {carpeta}",
+            params={"carpeta": carpeta},
+        )
+        job_id = job.id
+    return {"ok": True, "job_id": job_id}
 
 
 @router.post("/mis-productos/renumerar")

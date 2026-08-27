@@ -2866,6 +2866,31 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     return resumen
 
 
+def run_nicho_pov_bof_renumerar(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Cierra los huecos de numeración de una carpeta de "Mis productos".
+
+    Va por la cola y no dentro del borrado porque son renombrados contra el
+    Drive MONTADO: borrar el producto 3 de diez renombra catorce ficheros, y
+    cada uno es una operación de red. Metido en la petición HTTP, el borrado
+    tardaba una eternidad y si el operador recargaba la página se quedaba a
+    medias — la mitad de la carpeta renumerada y la otra mitad no.
+
+    Params: carpeta.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    carpeta = str(job.params["carpeta"])
+    on_progress(0.1, f"🔢 Cerrando huecos de {carpeta}…")
+    mapa = mis_productos.renumerar_carpeta(carpeta)
+    if not mapa:
+        on_log("[renumerar] no había huecos que cerrar")
+        return "sin-cambios"
+    for viejo, nuevo in sorted(mapa.items(), key=lambda x: int(x[0])):
+        on_log(f"[renumerar] {viejo} → {nuevo}")
+    on_progress(1.0, f"🔢 {len(mapa)} producto(s) renumerados")
+    return f"{len(mapa)} renumerados"
+
+
 def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Escribe los guiones de 10s de TODA una carpeta del POV BOF.
 
@@ -3959,6 +3984,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
     JobMode.NICHO_POV_BOF_GUIONES: run_nicho_pov_bof_guiones,
+    JobMode.NICHO_POV_BOF_RENUMERAR: run_nicho_pov_bof_renumerar,
     JobMode.NICHO_CARRUSELES_PREPARAR: run_nicho_carruseles_preparar,
     JobMode.NICHO_CARRUSELES_REPARTO: run_nicho_carruseles_reparto,
     JobMode.NICHO_CARRUSELES_QUEMAR: run_nicho_carruseles_quemar,
@@ -3993,6 +4019,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
     JobMode.NICHO_POV_BOF_GUIONES: "viralizacion",
+    JobMode.NICHO_POV_BOF_RENUMERAR: "viralizacion",
     JobMode.NICHO_CARRUSELES_PREPARAR: "viralizacion",
     JobMode.NICHO_CARRUSELES_REPARTO: "viralizacion",
     JobMode.NICHO_CARRUSELES_QUEMAR: "viralizacion",
