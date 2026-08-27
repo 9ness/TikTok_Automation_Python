@@ -3,6 +3,7 @@
 from .models import (
     CarpetaRopa,
     CarpetasRopaResponse,
+    EstiloMof10,
     PrendaEstadoRequest,
     PrendaInfo,
     PrendasListResponse,
@@ -13,6 +14,7 @@ from .models import (
 __all__ = [
     "CarpetaRopa",
     "CarpetasRopaResponse",
+    "EstiloMof10",
     "PrendaEstadoRequest",
     "PrendaInfo",
     "PrendasListResponse",

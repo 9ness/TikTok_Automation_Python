@@ -8,6 +8,17 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class EstiloMof10(BaseModel):
+    """Un estilo de vídeo de 10s: la imagen y el guion, ya en su sexo."""
+
+    clave: str
+    label: str
+    imagen: str
+    guion: str
+    # El texto no es suyo: lo derivamos cambiando las palabras de la persona.
+    derivado: bool = False
+
+
 class PromptsRopaResponse(BaseModel):
     """Los prompts que el operador copia fuera de la app.
 
@@ -24,6 +35,10 @@ class PromptsRopaResponse(BaseModel):
     # palabras del sexo que toque según la carpeta pedida.
     video_espejo: str = ""
     sexo: str = ""
+    # "MOF 10 segundos": imagen en Flow + guion/vídeo en Omni. Un clip único
+    # de 10s, en vez de generar el vídeo de una tirada. Van en lista porque
+    # publica estilos nuevos cada poco.
+    mof10: list[EstiloMof10] = Field(default_factory=list)
 
 
 class CarpetaRopa(BaseModel):

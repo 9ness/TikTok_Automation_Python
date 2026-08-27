@@ -70,6 +70,7 @@ def get_prompts(carpeta: str = Query("")) -> PromptsRopaResponse:
             video_percha=config.prompt_video_percha(),
             video_espejo=config.prompt_video_espejo(sexo),
             sexo=sexo,
+            mof10=config.prompts_mof10(sexo),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e

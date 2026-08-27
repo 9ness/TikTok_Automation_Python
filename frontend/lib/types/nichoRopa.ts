@@ -1,5 +1,14 @@
 // Espejo de `src/api/schemas/nicho_ropa/models.py`.
 
+export interface EstiloMof10 {
+  clave: string;
+  label: string;
+  imagen: string;
+  guion: string;
+  /** El texto no es del curso: lo derivamos cambiando lo de la persona. */
+  derivado: boolean;
+}
+
 export interface PromptsRopaResponse {
   imagen: string;
   /** Los dos se derivan del mismo texto: la diferencia es la frase de la mano. */
@@ -12,6 +21,8 @@ export interface PromptsRopaResponse {
   video_espejo: string;
   /** `mujer` | `hombre` — de qué carpeta se dedujo el prompt del espejo. */
   sexo: string;
+  /** Estilos de vídeo de 10s: imagen en Flow + guion/vídeo en Omni. */
+  mof10: EstiloMof10[];
 }
 
 export interface CarpetaRopa {

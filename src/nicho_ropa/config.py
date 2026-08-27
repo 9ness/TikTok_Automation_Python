@@ -266,6 +266,120 @@ def prompt_video_espejo(sexo: str = SEXO_DEFECTO) -> str:
     return texto
 
 
+# ---------------------------------------------------------------------------
+# "MOF 10 segundos": imagen en Flow + vídeo en Omni
+# ---------------------------------------------------------------------------
+# El otro camino de su web, y el que deja un clip ÚNICO de 10s: primero se
+# genera la imagen de la persona con la prenda puesta (Flow, con la foto de la
+# prenda como referencia) y después esa imagen se anima con voz en Omni. El
+# guion lo escribe ChatGPT a partir de la foto de la FICHA, así que sale con el
+# precio y los detalles de ESE producto — 180 caracteres, no 160.
+#
+# El texto de HOMBRE es suyo, literal. El de mujer se deriva.
+SEXOS_MOF10: dict[str, dict[str, str]] = {
+    "hombre": {
+        "PERSONA": "man",
+        "EL": "He",
+        "SU": "His",
+        "SU_MIN": "his",
+        "GENERO_ADJ": "masculine",
+        "GENERO_SUJETO": "male",
+        "MAQUILLAJE": "none",
+        "CARA": (
+            "realistic masculine facial features, visible pores and natural "
+            "skin texture, clean-shaven or subtle light stubble"
+        ),
+        "EL_SUJETO": "el chico dice",
+        "EL_SUJETO_MAY": "El chico",
+        "VOZ_ADJ": "masculina",
+        "VOZ_DESC": (
+            "Joven, natural, desenfadada, cercana. Tono medio-grave, cálido y "
+            "conversacional, sin cadencia publicitaria. Ritmo ágil, espontáneo, "
+            "como un creador UGC real. Pronunciación española clara. Misma voz "
+            "toda la escena."
+        ),
+        "CARA_ESPEJO": (
+            "none, natural skin texture, clean-shaven or light stubble, "
+            "realistic skin texture"
+        ),
+        "SUJETO_CORTO": "chico",
+        "UN_SUJETO": "Un chico",
+        "A": "",
+    },
+    "mujer": {
+        "PERSONA": "woman",
+        "EL": "She",
+        "SU": "Her",
+        "SU_MIN": "her",
+        "GENERO_ADJ": "feminine",
+        "GENERO_SUJETO": "female",
+        "MAQUILLAJE": "natural, minimal",
+        "CARA": (
+            "realistic feminine facial features, visible pores and natural "
+            "skin texture"
+        ),
+        "EL_SUJETO": "la chica dice",
+        "EL_SUJETO_MAY": "La chica",
+        "VOZ_ADJ": "femenina",
+        "VOZ_DESC": (
+            "Joven, natural, desenfadada, cercana. Tono medio-agudo, cálido y "
+            "conversacional, sin cadencia publicitaria. Ritmo ágil, espontáneo, "
+            "como una creadora UGC real. Pronunciación española clara. Misma "
+            "voz toda la escena."
+        ),
+        "CARA_ESPEJO": (
+            "natural and minimal, natural skin texture, realistic skin texture"
+        ),
+        "SUJETO_CORTO": "chica",
+        "UN_SUJETO": "Una chica",
+        "A": "a",
+    },
+}
+
+
+# Los estilos de 10s que tiene publicados. Van en lista porque va sacando más,
+# y cada uno son DOS prompts: la imagen y el guion+movimiento.
+#
+# `derivado` dice de qué sexos el texto NO es suyo sino nuestro, cambiando las
+# palabras de la persona. Se marca en la pantalla: un prompt derivado funciona,
+# pero si él publica el suyo hay que pegarlo encima.
+ESTILOS_MOF10: dict[str, dict] = {
+    "espejo": {
+        "label": "Frente al espejo · cuerpo entero",
+        "imagen": "prompt_mof10_espejo_imagen.md",
+        "guion": "prompt_mof10_espejo_guion.md",
+        "derivado": ("mujer",),
+    },
+    "movil": {
+        "label": "Colocando el móvil · medio cuerpo",
+        "imagen": "prompt_mof10_movil_imagen.md",
+        "guion": "prompt_mof10_movil_guion.md",
+        "derivado": ("mujer",),
+    },
+}
+
+
+def _con_sexo(fichero: str, sexo: str, piezas: dict) -> str:
+    texto = _limpio(fichero)
+    for clave, valor in (piezas.get(sexo) or piezas[SEXO_DEFECTO]).items():
+        texto = texto.replace("{{" + clave + "}}", valor)
+    return texto
+
+
+def prompts_mof10(sexo: str = SEXO_DEFECTO) -> list[dict]:
+    """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo."""
+    salida = []
+    for clave, meta in ESTILOS_MOF10.items():
+        salida.append({
+            "clave": clave,
+            "label": meta["label"],
+            "imagen": _con_sexo(meta["imagen"], sexo, SEXOS_MOF10),
+            "guion": _con_sexo(meta["guion"], sexo, SEXOS_MOF10),
+            "derivado": sexo in meta["derivado"],
+        })
+    return salida
+
+
 def prompt_imagen() -> str:
     return _limpio("prompt_imagen.md")
 

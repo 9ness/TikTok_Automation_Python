@@ -356,12 +356,48 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             }
             className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs transition hover:border-violet-400"
           >
-            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt del espejo{" "}
+            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt del espejo · 1
+            tirada{" "}
             <span className="text-muted-foreground">
               ({prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"})
             </span>
           </button>
-        ) : (
+        ) : null}
+        {esWeb &&
+          (prompts.data?.mof10 ?? []).map((e) => (
+            /* Dos pasos: la imagen se hace en Flow y esa imagen se anima con
+               voz en Omni. Sale un clip ÚNICO de 10s, sin montaje. */
+            <div key={e.clave} className="space-y-1 rounded-lg border border-border/60 p-2">
+              <p className="text-[11px] font-medium">
+                10 s · {e.label}
+                {e.derivado && (
+                  <span
+                    title="El curso solo publica este estilo para el otro sexo: este texto lo hemos derivado cambiando lo de la persona"
+                    className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500"
+                  >
+                    derivado
+                  </span>
+                )}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => copiar(`Imagen · ${e.label}`, e.imagen)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5" /> 1 · Imagen (Flow)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5" /> 2 · Guion (Omni)
+                </button>
+              </div>
+            </div>
+          ))}
+        {!esWeb && (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <button
               type="button"
