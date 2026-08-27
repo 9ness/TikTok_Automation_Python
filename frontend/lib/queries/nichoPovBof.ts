@@ -781,6 +781,19 @@ export function useUrlsCatalogo(source: string) {
   });
 }
 
+/** Sacar el ID de producto de los enlaces de la carpeta (para TikTok Studio). */
+export function useResolverIds() {
+  const qc = useQueryClient();
+  return useMutation<
+    { resueltos: number; con_url: number; sin_resolver: number },
+    Error,
+    { source: string; folder: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/ids/resolver`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 /** Encolar los guiones de 10s de TODA una carpeta. */
 export function useGuionesLote() {
   const qc = useQueryClient();

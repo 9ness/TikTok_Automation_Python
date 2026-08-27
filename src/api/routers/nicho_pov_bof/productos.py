@@ -1567,6 +1567,49 @@ def reconstruir_titulos_drive() -> dict:
     }
 
 
+@router.post("/ids/resolver")
+def resolver_ids(body: dict) -> dict:
+    """Saca el ID de producto de los enlaces de una carpeta y lo guarda.
+
+    Es lo que hace rápida la publicación: TikTok Studio busca por ID en
+    "Añade enlaces de productos", y sin él hay que ir pasando páginas hasta
+    dar con el producto. El ID sale de seguir el redirect del enlace corto, o
+    sea una petición HTTP por producto: ni API, ni cuota.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import product_url
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad_request("Falta la carpeta.")
+
+    doc = product_repo.load_folder(source, folder)
+    productos = doc.get("productos") or {}
+    indice = product_repo.urls_index()
+    urls = {
+        pid: product_repo.url_de(prod, indice) for pid, prod in productos.items()
+    }
+    hallados = product_url.ids_de_carpeta(productos, urls)
+    for pid, pid_tiktok in hallados.items():
+        try:
+            product_repo.update_product(source, folder, pid, product_id=pid_tiktok)
+        except RuntimeError:
+            pass
+    con_url = sum(1 for u in urls.values() if u)
+    return {
+        "resueltos": len(hallados),
+        "con_url": con_url,
+        "sin_resolver": con_url - len(hallados) - sum(
+            1 for pid, prod in productos.items()
+            if prod.get("product_id") and urls.get(pid)
+        ),
+    }
+
+
 @router.post("/guiones/lote", status_code=201)
 def guiones_lote(
     body: dict,

@@ -55,6 +55,7 @@ import {
   useGuardarHashtags,
   useEscribirGuionProducto,
   useGuionesLote,
+  useResolverIds,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -551,6 +552,10 @@ export default function NichoPovBofPage() {
   // Cuántos tienen ya el guion de 10s escrito, para el botón de la carpeta.
   const conGuion = (productos.data ?? []).filter((p) => p.guion_producto).length;
   const guionesLote = useGuionesLote();
+  const resolverIds = useResolverIds();
+  // Con ID se publica pegándolo en el buscador de TikTok Studio; sin él, a mano.
+  const conUrl = (productos.data ?? []).filter((p) => p.product_url).length;
+  const conId = (productos.data ?? []).filter((p) => p.product_id).length;
   const subidos = enPantalla.filter((p) => p.uploaded).length;
   const enEscaparate = enPantalla.filter((p) => p.en_escaparate).length;
   // Meter el producto en el escaparate es el paso más lento del día y no se
@@ -1147,6 +1152,36 @@ export default function NichoPovBofPage() {
                   <PenLine className="h-4 w-4 shrink-0" />
                 )}
                 Guiones de la carpeta ({conGuion}/{totalCarpeta})
+              </button>
+            )}
+
+            {/* Los IDs de producto, para publicar sin buscar. Va aquí porque
+                se hace una vez por carpeta, como los textos y los guiones. */}
+            {!esPro && conUrl > 0 && (
+              <button
+                type="button"
+                disabled={resolverIds.isPending}
+                onClick={() =>
+                  resolverIds.mutate(
+                    { source, folder },
+                    {
+                      onSuccess: (r: { resueltos: number; con_url: number }) =>
+                        toast.success(
+                          `${r.resueltos} ID(s) sacados de ${r.con_url} enlace(s)`,
+                        ),
+                      onError: (e: unknown) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
+              >
+                {resolverIds.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <span>🏷️</span>
+                )}
+                IDs de producto ({conId}/{conUrl})
               </button>
             )}
 
@@ -1964,6 +1999,11 @@ function ProductoCard({
         />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
+        {/* El ID que busca TikTok Studio al enlazar el producto. Sin él hay
+            que ir pasando páginas de la lista hasta dar con el tuyo. */}
+        {producto.product_id && (
+          <CopyChip label="🏷️ ID" text={producto.product_id} siempre />
+        )}
         <BotonUrl
           url={producto.product_url}
           source={source}

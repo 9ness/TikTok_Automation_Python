@@ -329,3 +329,66 @@ def find_product_url(
         "url_match_score": round(score, 3),
         "keyword": keyword,
     }
+
+
+# ---------------------------------------------------------------------------
+# El ID del producto, sacado del enlace corto
+# ---------------------------------------------------------------------------
+# Las fichas de la web del curso llegan como `vm.tiktok.com/ZN9k…`, que no dice
+# nada del producto. Pero ese enlace redirige a
+# `tiktok.com/view/product/<id>`, y ESE id es el que TikTok Studio acepta en el
+# buscador de "Añade enlaces de productos" — sin él hay que bucear 139 páginas
+# para encontrar el producto al publicar.
+#
+# Es una petición HTTP normal siguiendo el redirect: ni API, ni cuota, ni
+# EchoTik. Se hace una vez y se guarda.
+_ID_EN_URL = re.compile(r"/view/product/(\d{10,})")
+
+
+def id_desde_url(url: str, *, timeout: float = 15.0) -> str:
+    """El id de producto al que apunta ese enlace. Vacío si no se puede.
+
+    Nunca lanza: sin id el producto sigue valiendo, solo que al publicar hay
+    que buscarlo a mano.
+    """
+    limpia = (url or "").strip()
+    if not limpia:
+        return ""
+    # Si ya viene la ficha larga, no hace falta pedir nada.
+    directo = _ID_EN_URL.search(limpia)
+    if directo:
+        return directo.group(1)
+
+    try:
+        import requests
+
+        r = requests.get(
+            limpia, timeout=timeout, allow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        final = str(r.url or "")
+    except Exception:  # noqa: BLE001
+        return ""
+    m = _ID_EN_URL.search(final)
+    return m.group(1) if m else ""
+
+
+def ids_de_carpeta(
+    productos: dict[str, dict], urls: dict[str, str], *, hilos: int = 8,
+) -> dict[str, str]:
+    """`{producto: id}` resolviendo en paralelo los que no lo tengan.
+
+    En paralelo porque son diez enlaces y cada redirect tarda medio segundo: de
+    uno en uno son cinco segundos de espera con el operador delante.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    pendientes = {
+        pid: u for pid, u in urls.items()
+        if u and not (productos.get(pid) or {}).get("product_id")
+    }
+    if not pendientes:
+        return {}
+    with ThreadPoolExecutor(max_workers=max(1, hilos)) as pool:
+        hallados = list(pool.map(id_desde_url, pendientes.values()))
+    return {pid: i for pid, i in zip(pendientes, hallados) if i}
