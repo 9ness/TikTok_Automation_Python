@@ -3506,7 +3506,20 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             segundos_max=_segundos_de_video(clips),
             segundos_min=config.DURACION_MINIMA_S,
         )
-        on_log(f"[nicho_pov_bof] voz: {info.get('label') or info.get('id') or '?'}")
+        on_log(
+            f"[nicho_pov_bof] voz: {info.get('voz_label') or '?'} "
+            f"· {info.get('duracion', 0):.1f}s · x{info.get('tempo', 1):.2f}"
+        )
+        # Y se apunta lo que ha tardado DE VERDAD. Faltaba: sin esto las
+        # estimaciones de velocidad no se corregían nunca por este camino, y
+        # una voz mal estimada seguía dando vídeos más largos de la cuenta
+        # vídeo tras vídeo.
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        velocidad_voz.apuntar(
+            str(info.get("voz_id") or ""), len(guion),
+            float(info.get("duracion") or 0), float(info.get("tempo") or 1.0),
+        )
     else:
         on_progress(0.06, "🔊 Preparando audio…")
         audio_raw = audio_bank.pick_random(sexo)

@@ -238,12 +238,17 @@ def sintetizar(
     if tempo is None:
         from src.nicho_pov_bof_largo.services import velocidad_voz
 
+        # Contra el MISMO tope con el que se eligió la voz (con su colchón), no
+        # contra los segundos pelados: si no, se elegía una voz para que
+        # cupiera en 11,5s y luego se aceleraba solo lo justo para 12,0 — medio
+        # segundo de más en cada vídeo.
+        tope = max(0.1, segundos_max - MARGEN_VOZ_S) if segundos_max else 0.0
         tempo = min(
             config.VOZ_TEMPO_MAX,
             tempo_para(
                 len(texto),
                 velocidad_voz.caracteres_por_segundo(elegida["id"]),
-                segundos_max,
+                tope,
             ),
         )
         if tempo > 1.0:
