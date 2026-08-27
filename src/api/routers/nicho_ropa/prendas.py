@@ -75,6 +75,42 @@ def get_prompts(carpeta: str = Query("")) -> PromptsRopaResponse:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
 
 
+@router.post("/urls/importar")
+def importar_urls(body: dict) -> dict:
+    """Guarda de golpe las fichas copiadas del DOM de la web del curso.
+
+    `genero` dice de qué inventario es el pegote (`mujer_web` / `hombre_web`):
+    su página los tiene separados y las carpetas se llaman igual en los dos,
+    así que sin el sexo no se sabría a cuál van.
+    """
+    from src.nicho_ropa.repos import product_repo as ropa_repo
+    from src.nicho_ropa.services import prendas_web
+
+    genero = str(body.get("genero") or "").strip()
+    if genero not in config.GENEROS_WEB:
+        raise APIError(
+            f"Género desconocido: {genero!r}. Válidos: {sorted(config.GENEROS_WEB)}.",
+            status_code=400,
+        )
+
+    filas = body.get("filas")
+    if not isinstance(filas, list) or not filas:
+        raise APIError("No llegó ninguna fila. Sube el fichero de la consola.", status_code=400)
+    if len(filas) > 5000:
+        raise APIError(f"Demasiadas filas ({len(filas)}).", status_code=400)
+
+    reales = [config.slug_web(genero, c) for c in prendas_web.carpetas(genero)]
+    if not reales:
+        raise APIError(
+            f"No hay ninguna carpeta de {config.GENEROS_WEB[genero]}: sube antes los ZIP.",
+            status_code=400,
+        )
+    try:
+        return ropa_repo.importar_urls(filas, reales)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+
+
 @router.get("/carpetas", response_model=CarpetasRopaResponse)
 def list_carpetas() -> CarpetasRopaResponse:
     """Carpetas de producto disponibles.
@@ -203,6 +239,10 @@ def list_prendas(
             ),
             caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
             en_escaparate=pov_repo.marcado_en_escaparate(prod, escaparate),
+            # `url_de` mira además el índice global: si la ficha se pegó desde
+            # otro nicho, aquí ya sale enlazada.
+            product_url=pov_repo.url_de(prod),
+            sin_stock=bool(prod.get("sin_stock")),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),

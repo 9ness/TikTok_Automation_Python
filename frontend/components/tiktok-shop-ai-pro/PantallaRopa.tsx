@@ -23,6 +23,7 @@ import {
   buildVideoRopaUrl,
   useCarpetasRopa,
   useImportarPrendasWeb,
+  useImportarUrlsRopa,
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
@@ -31,6 +32,7 @@ import {
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
 import { VideoModal } from "@/components/ui/video-modal";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -44,9 +46,16 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
  *  uno. Cada carpeta importada aparece como una categoría más del selector,
  *  así que a partir de ahí funciona igual que las cuatro de siempre.
  */
-function ImportarPrendasWeb({ onImportado }: { onImportado: (slug: string) => void }) {
+function ImportarPrendasWeb({
+  genero,
+  setGenero,
+  onImportado,
+}: {
+  genero: string;
+  setGenero: (v: string) => void;
+  onImportado: (slug: string) => void;
+}) {
   const importar = useImportarPrendasWeb();
-  const [genero, setGenero] = useState("mujer_web");
 
   return (
     <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-2">
@@ -145,13 +154,19 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   // Si la guardada es de la otra pantalla (o ya no existe), se cae a la
   // primera. Pasa al estrenar esto: la web se elegía desde "sin humanos".
   const carpetaValida = misCarpetas.some((c) => c.slug === carpeta);
+  // De quién son los ZIP que se están subiendo. Sirve además para el prompt
+  // mientras no haya ninguna carpeta: sin esto, elegir "Hombre" y ver el
+  // prompt en femenino parece un fallo (y lo parecía).
+  const [genero, setGenero] = useState("mujer_web");
   const primera = misCarpetas[0]?.slug ?? "";
   useEffect(() => {
     if (!primera || carpetaValida) return;
     setCarpeta(primera);
   }, [carpetaValida, primera, setCarpeta]);
   const prendas = usePrendas(carpeta);
-  const prompts = usePromptsRopa(carpeta);
+  // Sin carpeta elegida manda el selector de arriba: `hombre_web__` no es una
+  // carpeta de verdad, pero al backend le basta para saber el sexo.
+  const prompts = usePromptsRopa(carpeta || (esWeb ? `${genero}__` : ""));
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -197,7 +212,16 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
       />
 
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        {esWeb && <ImportarPrendasWeb onImportado={(slug) => setCarpeta(slug)} />}
+        {esWeb && (
+          <ImportarPrendasWeb
+            genero={genero}
+            setGenero={setGenero}
+            onImportado={(slug) => setCarpeta(slug)}
+          />
+        )}
+        {esWeb && misCarpetas.length > 0 && (
+          <PegarFichasRopa genero={genero} />
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           {misCarpetas.map((c) => (
@@ -473,6 +497,11 @@ function PrendaCard({
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold">
             {prenda.producto}
+            {prenda.sin_stock && (
+              <span className="ml-1.5 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500">
+                🚫 Sin stock
+              </span>
+            )}
             {prenda.video_path && (
               <span className="ml-1.5 text-[10px] font-normal text-emerald-500">
                 <Check className="inline h-3 w-3" /> vídeo listo
@@ -509,6 +538,7 @@ function PrendaCard({
           producto en el Centro de Afiliados. */}
       <div className="flex flex-wrap gap-1">
         <CopyChip label="✍️ Caption" text={caption} siempre />
+        <BotonUrl url={prenda.product_url} />
         <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} siempre />
         <CopyChip label="🏪 Tienda" text={prenda.tienda} siempre />
       </div>
@@ -643,5 +673,111 @@ function EscaparateModalRopa({
       fotoFichaUrl={(p) => (p.titled_photo_id ? buildFotoRopaUrl(p.titled_photo_id) : null)}
       descargaUrl={(p) => buildFotoLimpiaRopaUrl(p.producto, carpeta)}
     />
+  );
+}
+
+
+/** Pegar de golpe las fichas de TikTok del catálogo de ropa de la web.
+ *
+ *  Va aquí y no en Configuración —donde están las del POV BOF— porque el
+ *  pegote no dice de quién es: su web tiene los dos inventarios con las
+ *  carpetas numeradas igual, y el sexo lo da el selector de arriba. Sacarlo de
+ *  ese selector es lo que evita meter la ropa de hombre en las carpetas de
+ *  mujer sin que nada chille.
+ */
+function PegarFichasRopa({ genero }: { genero: string }) {
+  const importar = useImportarUrlsRopa();
+  const [abierto, setAbierto] = useState(false);
+
+  async function subir(f: File | null) {
+    if (!f) return;
+    let filas: unknown[];
+    try {
+      filas = JSON.parse(await f.text());
+    } catch {
+      toast.error("Ese fichero no es el JSON de la consola.");
+      return;
+    }
+    if (!Array.isArray(filas) || !filas.length) {
+      toast.error("El fichero no trae ninguna fila.");
+      return;
+    }
+    importar.mutate(
+      { genero, filas },
+      {
+        onSuccess: (r) => {
+          toast.success(
+            `${r.guardados} ficha(s) en ${r.carpetas} carpeta(s)` +
+              (r.agotados ? ` · ${r.agotados} sin stock` : ""),
+          );
+          if (r.descartadas?.length) {
+            toast.warning(
+              `${r.descartadas.length} enlace(s) no son de TikTok, sin guardar`,
+              { duration: 10000 },
+            );
+          }
+          if (r.sin_carpeta?.length) {
+            toast.warning(
+              `Sin guardar, no hay esa carpeta: ${r.sin_carpeta.join(", ")}`,
+              { duration: 10000 },
+            );
+          }
+          setAbierto(false);
+        },
+        onError: (e) =>
+          toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-3 py-1.5 text-[11px] font-medium text-emerald-500 transition hover:border-emerald-400"
+      >
+        🔗 Pegar las fichas de TikTok de golpe
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2">
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        El mismo guion que en Configuración, pero ejecutado en la página de{" "}
+        <strong className="text-foreground">
+          {genero === "hombre_web" ? "ropa de hombre" : "ropa de mujer"}
+        </strong>{" "}
+        de su web. Sube aquí el <code>fichas.json</code> que te descargue.
+      </p>
+      <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700">
+        {importar.isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando…
+          </>
+        ) : (
+          <>📄 Elegir fichas.json</>
+        )}
+        <input
+          type="file"
+          accept=".json,application/json"
+          disabled={importar.isPending}
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            e.target.value = "";
+            void subir(f);
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => setAbierto(false)}
+        className="w-full rounded-lg border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+      >
+        Cerrar
+      </button>
+    </div>
   );
 }

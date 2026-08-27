@@ -55,6 +55,10 @@ class PrendaInfo(BaseModel):
     # Escaparate: sale del índice ÚNICO por (tienda|nombre), compartido con
     # los demás nichos — al Marketplace el producto se sube una sola vez.
     en_escaparate: bool = False
+    # Ficha de TikTok Shop, pegada en lote desde la web del curso.
+    product_url: str = ""
+    # Su web marca "SIN STOCK" en vez del enlace.
+    sin_stock: bool = False
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0

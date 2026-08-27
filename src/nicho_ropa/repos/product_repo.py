@@ -106,3 +106,109 @@ def update_product(carpeta: str, producto: str, **campos) -> dict:
         prod["updated_at"] = _now()
         r.set_json(_key(carpeta), doc)
         return prod
+
+
+def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
+    """Guarda de golpe las fichas copiadas del DOM de la web del curso.
+
+    Es el gemelo de `nicho_pov_bof.product_repo.importar_urls` y reusa sus
+    normalizadores: el pegote sale de la MISMA página y trae los mismos
+    `Carpeta 7` / `Producto 3`. Lo único distinto es que aquí la carpeta lleva
+    el sexo delante (`mujer_web__Carpeta 7`), así que el emparejado se hace
+    contra las carpetas que existen de ese sexo.
+
+    La ficha va al producto y, cuando ya tiene textos, también al índice global
+    de fichas —que es de TODOS los nichos, no del POV BOF—, para que el mismo
+    producto salga enlazado donde sea que aparezca.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    # El pegote dice "Carpeta 7" y aquí la carpeta se llama
+    # "mujer_web__Carpeta 7": se casa por la PARTE de la carpeta, no por el
+    # slug entero, o no coincidiría ninguna.
+    from src.nicho_ropa import config as ropa_config
+
+    reales = {}
+    for slug in carpetas_reales:
+        _, nombre = ropa_config.partes_web(slug)
+        reales[pov_repo._llana(nombre or slug)] = slug
+
+    por_carpeta: dict[str, dict[str, str]] = {}
+    agotados: dict[str, set[str]] = {}
+    con_stock: dict[str, set[str]] = {}
+    sin_carpeta: set[str] = set()
+    descartadas: list[str] = []
+
+    for fila in filas:
+        pegada = pov_repo._carpeta_pegada(str(fila.get("carpeta") or ""))
+        producto = pov_repo._numero_pegado(str(fila.get("producto") or ""))
+        url = str(fila.get("url") or "").strip()
+        if not pegada or not producto:
+            continue
+        carpeta = reales.get(pov_repo._llana(pegada), "")
+        if not carpeta:
+            sin_carpeta.add(pegada)
+            continue
+        if not url:
+            if fila.get("sin_stock"):
+                agotados.setdefault(carpeta, set()).add(producto)
+            elif "sin_stock" in fila:
+                con_stock.setdefault(carpeta, set()).add(producto)
+            continue
+        if not pov_repo._es_ficha_tiktok(url):
+            descartadas.append(f"{pegada} · {producto}: {url[:60]}")
+            continue
+        por_carpeta.setdefault(carpeta, {})[producto] = url
+
+    guardados = agotados_escritos = en_indice = 0
+    tocadas = set(por_carpeta) | set(agotados) | set(con_stock)
+    indice = {}
+    if tocadas:
+        r = _require_redis()
+        indice = r.get_json(pov_repo._URLS_INDEX) or {}
+
+    for carpeta in sorted(tocadas):
+        with _cerrojo(carpeta):
+            r = _require_redis()
+            doc = r.get_json(_key(carpeta)) or {}
+            productos = doc.setdefault("productos", {})
+            for producto in agotados.get(carpeta, set()):
+                prod = productos.setdefault(producto, {})
+                if not prod.get("sin_stock"):
+                    prod["sin_stock"] = True
+                    prod["updated_at"] = _now()
+                agotados_escritos += 1
+            for producto in con_stock.get(carpeta, set()):
+                prod = productos.get(producto)
+                if prod and prod.get("sin_stock"):
+                    prod["sin_stock"] = False
+                    prod["updated_at"] = _now()
+            for producto, url in por_carpeta.get(carpeta, {}).items():
+                prod = productos.setdefault(producto, {})
+                if prod.get("product_url") != url or prod.get("sin_stock"):
+                    prod["product_url"] = url
+                    prod["sin_stock"] = False
+                    prod["updated_at"] = _now()
+                guardados += 1
+                claves = pov_repo.claves_escaparate(prod)
+                if claves:
+                    for vieja in {
+                        c for cl in claves if (c := pov_repo.casa_clave(cl, indice))
+                    }:
+                        indice.pop(vieja, None)
+                    indice[claves[0]] = url
+                    en_indice += 1
+            r.set_json(_key(carpeta), doc)
+
+    if tocadas:
+        _require_redis().set_json(pov_repo._URLS_INDEX, indice)
+        pov_repo._olvidar("urls")
+
+    return {
+        "carpetas": len(tocadas),
+        "guardados": guardados,
+        "agotados": agotados_escritos,
+        "en_indice": en_indice,
+        "sin_carpeta": sorted(sin_carpeta),
+        "descartadas": descartadas,
+    }

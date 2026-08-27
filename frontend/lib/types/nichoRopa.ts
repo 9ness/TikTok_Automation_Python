@@ -40,6 +40,10 @@ export interface PrendaItem {
   caption_riesgo: string;
   /** Escaparate: índice único por (tienda|nombre), común a todos los nichos. */
   en_escaparate: boolean;
+  /** Ficha de TikTok Shop, pegada en lote desde la web del curso. */
+  product_url: string;
+  /** Su web lo marca "SIN STOCK". */
+  sin_stock: boolean;
   uploaded: boolean;
   video_path: string | null;
   video_listo_at: number;

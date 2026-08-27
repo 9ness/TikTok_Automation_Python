@@ -67,6 +67,26 @@ export function useImportarPrendasWeb() {
   });
 }
 
+/** Guardar de golpe las fichas copiadas del DOM de la web del curso. */
+export function useImportarUrlsRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    {
+      carpetas: number;
+      guardados: number;
+      agotados: number;
+      en_indice: number;
+      sin_carpeta: string[];
+      descartadas: string[];
+    },
+    Error,
+    { genero: string; filas: unknown[] }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/urls/importar`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  });
+}
+
 export function useCarpetasRopa() {
   return useQuery<CarpetasRopaResponse>({
     queryKey: nichoRopaKeys.carpetas(),
