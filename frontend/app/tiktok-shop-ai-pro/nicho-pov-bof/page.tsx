@@ -1280,43 +1280,14 @@ export default function NichoPovBofPage() {
               </div>
             )}
 
-            {/* Solo en "Mis productos": al borrar uno queda el hueco (5, 7, 8)
-                y esto lo cierra. Aparte del borrado a propósito — si borras
-                tres seguidos, reordenas UNA vez en vez de tres. */}
-            {source === "mis_productos" && (
-              <button
-                type="button"
-                disabled={renumerar.isPending}
-                title="Cierra los huecos de numeración que dejan los borrados"
-                onClick={() =>
-                  renumerar.mutate(
-                    { carpeta: folder },
-                    {
-                      onSuccess: (r: { title: string }) => {
-                        toast.success(`${r.title} en la cola`);
-                        openQueue();
-                      },
-                      onError: (e: unknown) =>
-                        toast.error(e instanceof ApiError ? e.message : String(e)),
-                    },
-                  )
-                }
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                {renumerar.isPending ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <span>🔢</span>
-                )}
-                Reordenar esta carpeta
-              </button>
-            )}
+            {/* De tanto borrar quedan carpetas a medias: esto las rellena de
+                diez en diez desde la primera y borra las que sobren. Cubre
+                también los huecos DENTRO de cada carpeta, porque reparte todos
+                los productos en una secuencia seguida — por eso no hace falta
+                un botón aparte por carpeta.
 
-            {/* Recolocar TODAS: de tanto borrar quedan cuatro carpetas a
-                medias, y esto las rellena de diez en diez desde la primera,
-                borrando las que sobren. Enseña el plan antes de ejecutarlo
-                porque mueve productos ENTRE carpetas, arrastrando sus textos,
-                guion, clips y vídeo. */}
+                Enseña el plan antes de ejecutarlo: mueve productos ENTRE
+                carpetas, arrastrando sus textos, guion, clips y vídeo. */}
             {source === "mis_productos" && (
               <button
                 type="button"
