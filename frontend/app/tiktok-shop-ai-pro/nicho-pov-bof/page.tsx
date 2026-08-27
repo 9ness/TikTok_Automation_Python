@@ -559,8 +559,9 @@ export default function NichoPovBofPage() {
   const resolverIds = useResolverIds();
   const clipSCarpeta = useClipSCarpeta();
   const renumerar = useRenumerarMisProductos();
-  const [verPlan, setVerPlan] = useState(false);
-  const plan = usePlanRecolocar(verPlan);
+  // El plan se consulta solo para poner el número en el botón y para poder
+  // apagarlo cuando no hay nada que mover. No toca nada: es de lectura.
+  const plan = usePlanRecolocar(source === "mis_productos");
   // Con ID se publica pegándolo en el buscador de TikTok Studio; sin él, a mano.
   const conUrl = (productos.data ?? []).filter((p) => p.product_url).length;
   const conId = (productos.data ?? []).filter((p) => p.product_id).length;
@@ -935,92 +936,6 @@ export default function NichoPovBofPage() {
         )}
       </button>
 
-      {/* El plan, antes de tocar nada: mover productos entre carpetas arrastra
-          sus textos, guion, clips y vídeo, así que se enseña qué va a pasar. */}
-      {verPlan && (
-        <Portal>
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setVerPlan(false)}
-          >
-            <div
-              className="w-[calc(100vw-2rem)] max-w-md space-y-3 overflow-y-auto rounded-xl border border-border/60 bg-card p-4 max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-sm font-semibold">Recolocar Mis productos</p>
-              {plan.isLoading && (
-                <p className="text-xs text-muted-foreground">Calculando…</p>
-              )}
-              {plan.data && (
-                <>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Rellena las carpetas de diez en diez desde la primera y borra
-                    las que se queden vacías. Cada producto se lleva sus textos,
-                    guion, clips y vídeo.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 text-[11px]">
-                    <div>
-                      <p className="mb-1 font-semibold">Ahora</p>
-                      {Object.entries(plan.data.antes).map(([c, n]) => (
-                        <p key={c} className="text-muted-foreground">
-                          {c}: {n}
-                        </p>
-                      ))}
-                    </div>
-                    <div>
-                      <p className="mb-1 font-semibold">Después</p>
-                      {Object.entries(plan.data.despues).map(([c, n]) => (
-                        <p key={c} className="text-emerald-500">
-                          {c}: {n}
-                        </p>
-                      ))}
-                      {plan.data.carpetas_borradas.map((c) => (
-                        <p key={c} className="text-rose-500 line-through">
-                          {c}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-[11px] font-medium">
-                    Se mueven {plan.data.movimientos} de {plan.data.total} productos.
-                  </p>
-                </>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setVerPlan(false)}
-                  className="rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={renumerar.isPending || !plan.data?.movimientos}
-                  onClick={() =>
-                    renumerar.mutate(
-                      { carpeta: "" },
-                      {
-                        onSuccess: (r: { title: string }) => {
-                          toast.success(`${r.title} en la cola`);
-                          setVerPlan(false);
-                          openQueue();
-                        },
-                        onError: (e: unknown) =>
-                          toast.error(e instanceof ApiError ? e.message : String(e)),
-                      },
-                    )
-                  }
-                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-black disabled:opacity-50"
-                >
-                  Recolocar
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
       {verVendidos && (
         <VendidosModal onClose={() => setVerVendidos(false)} />
       )}
@@ -1291,12 +1206,35 @@ export default function NichoPovBofPage() {
             {source === "mis_productos" && (
               <button
                 type="button"
-                disabled={renumerar.isPending}
-                onClick={() => setVerPlan(true)}
+                disabled={renumerar.isPending || !plan.data?.movimientos}
+                title={
+                  plan.data
+                    ? `Se moverían ${plan.data.movimientos} de ${plan.data.total} productos`
+                    : ""
+                }
+                onClick={() =>
+                  renumerar.mutate(
+                    { carpeta: "" },
+                    {
+                      onSuccess: (r: { title: string }) => {
+                        toast.success(`${r.title} en la cola`);
+                        openQueue();
+                      },
+                      onError: (e: unknown) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 px-3 py-2 text-xs font-medium text-amber-500 transition hover:bg-amber-500/10 disabled:opacity-50"
               >
-                <span>📦</span>
-                Recolocar todas las carpetas
+                {renumerar.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <span>📦</span>
+                )}
+                {plan.data?.movimientos
+                  ? `Recolocar (${plan.data.movimientos} de ${plan.data.total})`
+                  : "Carpetas ya recolocadas"}
               </button>
             )}
 
