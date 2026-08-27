@@ -236,6 +236,11 @@ rangos, configurables en `config.py`:
   vídeos de un estilo. El desplazamiento se aplica con `\an5\pos(...)` porque
   con `Alignment=5` libass IGNORA `MarginV` —no hay forma de bajarlo desde el
   estilo—, y con desplazamiento 0 el resultado es idéntico al de antes.
+- **Audio** (`config.jitter_db`, por vídeo): ganancia de la voz ±1,5 dB y de la
+  música ±2 dB, así que dos vídeos del mismo lote no comparten la mezcla exacta.
+  **No sirve contra la detección de copias**: las huellas acústicas normalizan
+  el nivel antes de comparar, o sea que el volumen es lo primero que ignoran.
+  Es variedad de mezcla, nada más.
 - **Gancho** (`renderer._hook_fx`, por vídeo): es el trozo con más riesgo de
   huella —siempre la misma cara, del mismo fuente, con el encuadre atado a la
   cara detectada y por tanto no movible—, así que se le mueve el COLOR y la

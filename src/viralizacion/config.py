@@ -508,6 +508,26 @@ TRANSITION_LANDSCAPE_JITTER_RANGE = (0.7, 1.1)
 # valor pelado idéntico en cada render.
 EQ_JITTER_FRAC = 0.05
 
+# --- Jitter de AUDIO (por vídeo) -------------------------------------------
+# Unos decibelios arriba o abajo en la voz y en la música, distintos en cada
+# vídeo. Rangos cortos a propósito: la mezcla que eligió el operador —música 4
+# dB por debajo de la voz— tiene que seguir sonando igual de bien, así que esto
+# la mueve, no la cambia.
+#
+# OJO con lo que esto NO hace: no despista a la detección de copias. Las
+# huellas acústicas normalizan el nivel antes de comparar, o sea que el volumen
+# es justo lo primero que ignoran. Esto es variedad de mezcla, no evasión.
+VOICE_VOLUME_JITTER_DB = 1.5
+MUSIC_VOLUME_JITTER_DB = 2.0
+
+
+def jitter_db(base: float, db: float, rng) -> float:
+    """`base` multiplicado por una ganancia aleatoria de +-`db` decibelios."""
+    if db <= 0:
+        return base
+    return round(base * (10 ** (rng.uniform(-db, db) / 20.0)), 4)
+
+
 # --- Jitter del RÓTULO (por vídeo) -----------------------------------------
 # El subtítulo es lo más repetido de la plantilla: mismo cuerpo de letra y
 # mismo centro exacto en todos los vídeos de un estilo. Movido unos píxeles y

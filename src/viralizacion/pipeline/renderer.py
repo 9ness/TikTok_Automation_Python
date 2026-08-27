@@ -784,7 +784,12 @@ def _finalize(
         "-t", f"{voz_dur:.3f}",
         "-i", str(voice_path),
     ]
-    audio_filters = [f"[1:a]volume={config.VOICE_VOLUME}[voice]"]
+    # Un pelín distinto en cada vídeo, como el zoom o el grade: dos vídeos del
+    # mismo lote no salen con la mezcla exacta. No sirve contra la detección de
+    # copias (ver la nota de `config.VOICE_VOLUME_JITTER_DB`).
+    vol_voz = config.jitter_db(config.VOICE_VOLUME, config.VOICE_VOLUME_JITTER_DB, random)
+    vol_mus = config.jitter_db(config.MUSIC_VOLUME, config.MUSIC_VOLUME_JITTER_DB, random)
+    audio_filters = [f"[1:a]volume={vol_voz}[voice]"]
 
     # La MÚSICA va justo detrás de la voz para no mover el índice [2:a] que
     # ya usaba su filtro; el CTA entra después, sea cual sea el caso.
@@ -793,7 +798,7 @@ def _finalize(
         input_args += ["-ss", "0", "-t", f"{target_duration:.3f}", "-i", str(music_path)]
         fade_start = max(0.0, target_duration - config.MUSIC_FADEOUT_DUR)
         audio_filters.append(
-            f"[2:a]volume={config.MUSIC_VOLUME},"
+            f"[2:a]volume={vol_mus},"
             f"afade=t=out:st={fade_start:.3f}:d={config.MUSIC_FADEOUT_DUR}[music]"
         )
         pistas.append("[music]")
@@ -804,7 +809,7 @@ def _finalize(
         ms = int(max(0.0, cta_delay) * 1000)
         input_args += ["-i", str(cta_path)]
         audio_filters.append(
-            f"[{idx_cta}:a]volume={config.VOICE_VOLUME},adelay={ms}|{ms}[cta]"
+            f"[{idx_cta}:a]volume={vol_voz},adelay={ms}|{ms}[cta]"
         )
         pistas.append("[cta]")
 
