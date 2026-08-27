@@ -781,6 +781,19 @@ export function useUrlsCatalogo(source: string) {
   });
 }
 
+/** Guardar de golpe las fichas copiadas del DOM de la web del curso. */
+export function useImportarUrls() {
+  const qc = useQueryClient();
+  return useMutation<
+    { carpetas: number; guardados: number; en_indice: number },
+    Error,
+    { source: string; filas: unknown[] }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/urls/importar`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 /** Pegar (o quitar) la ficha de un producto. Vale para todas sus carpetas. */
 export function useGuardarUrlProducto() {
   const qc = useQueryClient();

@@ -10,6 +10,7 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   buildCleanPhotoDownloadUrl,
   useGuardarUrlProducto,
+  useImportarUrls,
   useSources,
   useUrlsCatalogo,
 } from "@/lib/queries/nichoPovBof";
@@ -50,6 +51,8 @@ export function PanelUrls() {
         que hace falta para meterlo en el escaparate. Se guarda por producto, así
         que sirve para todas sus carpetas y para las cuentas de Mauro y Ana.
       </p>
+
+      <PegarUrlsEnLote source={source} />
 
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {(sources.data?.items ?? []).map((s) => (
@@ -242,6 +245,133 @@ function FilaUrl({
         urlLimpia={fotoGrande}
         urlTitulo={fotoFicha}
       />
+    </div>
+  );
+}
+
+
+/** Pegar de golpe las fichas sacadas del DOM de la web del curso.
+ *
+ *  Su página ya lleva el enlace de TikTok de cada producto, con la carpeta y
+ *  el número al lado. Sacarlos con un pegote en la consola es gratis y son los
+ *  ~310 de una vez; averiguarlos con EchoTik cuesta una llamada por producto
+ *  y el plan gratis son 100 al mes.
+ */
+function PegarUrlsEnLote({ source }: { source: string }) {
+  const importar = useImportarUrls();
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState("");
+
+  const GUION = `document.querySelectorAll("div.carp").forEach((c) => {
+  if (!c.querySelector(".carp-body")) c.querySelector(".carp-head")?.click();
+});
+await new Promise((r) => setTimeout(r, 3000));
+const filas = [];
+document.querySelectorAll("div.carp").forEach((c) => {
+  const carpeta = c.querySelector(".carp-head b")?.textContent.trim();
+  c.querySelectorAll(".prod").forEach((p) => {
+    filas.push({
+      carpeta,
+      producto: p.querySelector(".p-head b")?.textContent.trim(),
+      url: p.querySelector("a.chip[href]")?.href ?? "",
+    });
+  });
+});
+console.log(filas.length, "productos");
+copy(JSON.stringify(filas));`;
+
+  function enviar() {
+    let filas: unknown[];
+    try {
+      filas = JSON.parse(texto);
+    } catch {
+      toast.error("Eso no es el JSON de la consola.");
+      return;
+    }
+    if (!Array.isArray(filas) || !filas.length) {
+      toast.error("El JSON no trae ninguna fila.");
+      return;
+    }
+    importar.mutate(
+      { source, filas },
+      {
+        onSuccess: (r) => {
+          toast.success(
+            `${r.guardados} ficha(s) en ${r.carpetas} carpeta(s)` +
+              (r.en_indice ? ` · ${r.en_indice} ya con texto` : ""),
+          );
+          setTexto("");
+          setAbierto(false);
+        },
+        onError: (e) =>
+          toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-1.5 text-[11px] font-medium text-violet-400 transition hover:border-violet-400"
+      >
+        <Link2 className="h-3.5 w-3.5" /> Pegar las fichas de la web de golpe
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-2">
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        En la web del curso, con las carpetas a la vista: F12 →{" "}
+        <strong className="text-foreground">Console</strong> (si no deja pegar,
+        escribe <code>allow pasting</code>) → pega esto y pulsa Enter. Te deja
+        el resultado en el portapapeles.
+      </p>
+      <pre className="max-h-32 overflow-auto rounded bg-background p-2 text-[10px] leading-tight text-muted-foreground">
+        {GUION}
+      </pre>
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText(GUION);
+            toast.success("Guion copiado");
+          }}
+          className="rounded-lg border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30"
+        >
+          Copiar el guion
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="rounded-lg border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+        >
+          Cerrar
+        </button>
+      </div>
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        rows={4}
+        placeholder="Pega aquí lo que te dejó en el portapapeles…"
+        className="w-full rounded-lg border border-border/60 bg-background p-2 text-[11px]"
+      />
+      <button
+        type="button"
+        disabled={!texto.trim() || importar.isPending}
+        onClick={enviar}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+      >
+        {importar.isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando…
+          </>
+        ) : (
+          <>Guardar en “{source}”</>
+        )}
+      </button>
     </div>
   );
 }

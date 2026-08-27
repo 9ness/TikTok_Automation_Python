@@ -291,6 +291,7 @@ def _producto_info(
         en_escaparate=product_repo.marcado_en_escaparate(
             prod, product_repo.escaparate_index(usuario),
         ),
+        tambien_en_drive=product_repo.tambien_en_drive(prod),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
@@ -394,6 +395,12 @@ def _list_productos(
     urls = product_repo.urls_index()
     ventas = top_vendidos.ventas_por_producto(source, usuario)
 
+    # Una sola lectura para toda la carpeta: dentro del bucle serían 10.
+    titulos_del_drive = (
+        product_repo.titulos_drive()
+        if source not in product_repo.FUENTES_DRIVE else set()
+    )
+
     items: list[ProductoInfo] = []
     for pair in pairs:
         producto = pair["producto"]
@@ -412,6 +419,9 @@ def _list_productos(
                 titulo=guardado.get("titulo", ""),
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),
+                tambien_en_drive=bool(titulos_del_drive) and product_repo.tambien_en_drive(
+                    guardado, titulos_del_drive,
+                ),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
                     producto,
@@ -1472,6 +1482,73 @@ def _productos_de_la_carpeta(source: str, folder: str) -> set[str] | None:
     if not fotos:
         return None
     return {str(x["producto"]) for x in photo_pairing.pair_folder(fotos)}
+
+
+@router.post("/titulos-drive/reconstruir")
+def reconstruir_titulos_drive() -> dict:
+    """Rehace el índice de "qué hay en el Drive del curso".
+
+    Se mantiene solo al extraer textos, así que esto es para lo que YA estaba
+    extraído antes de que el índice existiera — cientos de productos. Un
+    listado de carpetas por fuente y un `mget`: lento pero de una vez.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    carpetas: dict[str, list[str]] = {}
+    fallos: list[str] = []
+    for fuente in product_repo.FUENTES_DRIVE:
+        if fuente not in pov_config.SOURCES:
+            continue
+        try:
+            carpetas[fuente] = [
+                c.get("name", "") for c in drive_client.list_product_folders(fuente)
+            ]
+        except Exception as e:  # noqa: BLE001
+            # Una fuente caída no puede dejar el índice a medias en silencio:
+            # se avisa y se reconstruye con las que sí contestan.
+            fallos.append(f"{fuente}: {e}")
+
+    try:
+        total = product_repo.reconstruir_titulos_drive(carpetas)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {
+        "titulos": total,
+        "fuentes": sorted(carpetas),
+        "carpetas": sum(len(v) for v in carpetas.values()),
+        "fallos": fallos,
+    }
+
+
+@router.post("/urls/importar")
+def importar_urls(body: dict) -> dict:
+    """Guarda de golpe las fichas copiadas del DOM de la web del curso.
+
+    Su página lleva el enlace de TikTok de cada producto en un `<a>`, con la
+    carpeta y el número al lado. Sacarlos de ahí es gratis; averiguarlos uno a
+    uno cuesta una llamada de EchoTik por producto, y el plan son 100 al mes.
+
+    Body: `{source, filas: [{carpeta, producto, url}]}`.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+
+    source = str(body.get("source") or "").strip()
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+
+    filas = body.get("filas")
+    if not isinstance(filas, list) or not filas:
+        raise _bad_request("No llegó ninguna fila. Pega el JSON de la consola.")
+    if len(filas) > 5000:
+        raise _bad_request(f"Demasiadas filas ({len(filas)}).")
+
+    try:
+        return product_repo.importar_urls(source, filas)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
 
 
 @router.get("/urls-catalogo")

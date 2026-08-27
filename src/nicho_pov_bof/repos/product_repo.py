@@ -249,6 +249,10 @@ def save_extracted_texts(source: str, folder: str, textos: dict[str, dict]) -> N
     data["textos_extraidos"] = True
     save_folder(source, folder, data)
     mudar_escaparate(mudanzas)
+    if source in FUENTES_DRIVE:
+        _sumar_titulos_drive({
+            c for prod in productos.values() for c in claves_escaparate(prod)
+        })
 
 
 def mudar_escaparate(
@@ -887,6 +891,165 @@ def guardar_url(prod: dict, url: str) -> str:
     r.set_json(_URLS_INDEX, indice)
     _olvidar("urls")
     return limpia
+
+
+# ---------------------------------------------------------------------------
+# Qué productos son EXCLUSIVOS de la web
+# ---------------------------------------------------------------------------
+# El catálogo de la web repite muchos productos del Drive del curso, y saber
+# cuáles son nuevos de verdad es lo que decide a cuál merece la pena dedicarle
+# un vídeo. Se compara por la misma clave que el escaparate (tienda|título),
+# que es la que ya trata dos fichas del mismo producto como una.
+#
+# Va en un índice aparte y no se recalcula al vuelo: leer los documentos de las
+# 61 carpetas del Drive en cada pantalla sería justo lo que se quitó de en
+# medio al optimizar Upstash. Se escribe al extraer textos, que es cuando de
+# verdad cambia.
+_TITULOS_DRIVE = "titulos:drive"
+
+# Las fuentes que SON el Drive del curso. Las demás ("Mis productos", la web,
+# top vendidos) son nuestras: un producto que solo esté ahí no cuenta como
+# "también en el Drive".
+FUENTES_DRIVE = ("aleatorios_1", "aleatorios_2", "backup_1", "backup_2")
+
+
+def titulos_drive() -> set[str]:
+    """Claves de todos los productos del Drive del curso con texto leído."""
+    def _leer() -> set[str]:
+        r = get_nicho_pov_bof_redis()
+        if not r.is_available():
+            return set()
+        return set(r.get_json(_TITULOS_DRIVE) or [])
+
+    return _recordado("titulos_drive", _leer)
+
+
+def _sumar_titulos_drive(claves: set[str]) -> None:
+    """Añade claves al índice. Solo escribe si hay alguna nueva."""
+    if not claves:
+        return
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    actuales = set(r.get_json(_TITULOS_DRIVE) or [])
+    if claves <= actuales:
+        return
+    r.set_json(_TITULOS_DRIVE, sorted(actuales | claves))
+    _olvidar("titulos_drive")
+
+
+def reconstruir_titulos_drive(carpetas_por_fuente: dict[str, list[str]]) -> int:
+    """Rehace el índice entero leyendo los documentos de las carpetas.
+
+    Hace falta una vez, para lo ya extraído antes de que esto existiera, y
+    cuando se sospeche que se ha quedado corto. Un `mget` por fuente.
+    """
+    r = _require_redis()
+    claves: set[str] = set()
+    for fuente, carpetas in carpetas_por_fuente.items():
+        if fuente not in FUENTES_DRIVE or not carpetas:
+            continue
+        for doc in r.mget_json([_key(fuente, n) for n in carpetas]):
+            for prod in ((doc or {}).get("productos") or {}).values():
+                claves.update(claves_escaparate(prod))
+    r.set_json(_TITULOS_DRIVE, sorted(claves))
+    _olvidar("titulos_drive")
+    return len(claves)
+
+
+def tambien_en_drive(prod: dict, indice: set[str] | None = None) -> bool:
+    """¿Este producto existe también en el Drive del curso?
+
+    `None` de verdad no existe aquí: sin texto leído no se puede comparar, y
+    eso lo distingue la UI mirando si hay título — no un tercer valor.
+    """
+    if indice is None:
+        indice = titulos_drive()
+    if not indice:
+        return False
+    claves = claves_escaparate(prod)
+    if any(c in indice for c in claves):
+        return True
+    # Mismo producto con la ficha cortada por otro sitio.
+    return any(casa_clave(c, indice) for c in claves)
+
+
+def importar_urls(source: str, filas: list[dict]) -> dict:
+    """Guarda de golpe las fichas que vienen pegadas de la web del curso.
+
+    Cada fila es `{carpeta, producto, url}` tal cual sale del DOM de su página
+    (`Carpeta 7` / `Producto 3`). Se escribe en dos sitios a la vez y no es
+    redundante:
+
+    - `product_url` en el documento de la carpeta, que es lo ÚNICO que funciona
+      antes de extraer los textos. La clave del índice es `tienda|título`, así
+      que sin título no hay dónde meterlo — y pegar los enlaces antes de leer
+      las capturas es justo el orden natural.
+    - el índice global, para los que ya tienen texto: así el mismo producto
+      enlazado aquí sale enlazado en los demás nichos y catálogos.
+
+    Un producto por escritura serían 310 idas y vueltas a Upstash. Aquí es un
+    documento por carpeta (31) más una sola pasada por el índice.
+    """
+    por_carpeta: dict[str, dict[str, str]] = {}
+    for fila in filas:
+        carpeta = _carpeta_pegada(str(fila.get("carpeta") or ""))
+        producto = _numero_pegado(str(fila.get("producto") or ""))
+        url = str(fila.get("url") or "").strip()
+        if not carpeta or not producto or not url:
+            continue
+        por_carpeta.setdefault(carpeta, {})[producto] = url
+
+    if not por_carpeta:
+        return {"carpetas": 0, "guardados": 0, "en_indice": 0}
+
+    r = _require_redis()
+    indice = r.get_json(_URLS_INDEX) or {}
+    guardados = 0
+    en_indice = 0
+
+    for carpeta, urls in por_carpeta.items():
+        with _cerrojo_carpeta(source, carpeta):
+            data = load_folder(source, carpeta)
+            productos = data.setdefault("productos", {})
+            for producto, url in urls.items():
+                prod = productos.setdefault(producto, {})
+                if prod.get("product_url") != url:
+                    prod["product_url"] = url
+                    prod["updated_at"] = _now()
+                guardados += 1
+                # Con textos ya extraídos, también al índice global.
+                claves = claves_escaparate(prod)
+                if claves:
+                    for vieja in {c for cl in claves if (c := casa_clave(cl, indice))}:
+                        indice.pop(vieja, None)
+                    indice[claves[0]] = url
+                    en_indice += 1
+            save_folder(source, carpeta, data)
+
+    r.set_json(_URLS_INDEX, indice)
+    _olvidar("urls")
+    return {
+        "carpetas": len(por_carpeta),
+        "guardados": guardados,
+        "en_indice": en_indice,
+    }
+
+
+def _carpeta_pegada(texto: str) -> str:
+    """`📁 Carpeta 7` → `Carpeta 7`, que es como se llama la del ZIP."""
+    limpio = " ".join(texto.split())
+    m = re.search(r"(Carpeta\s*\d+)", limpio, flags=re.IGNORECASE)
+    if m:
+        return f"Carpeta {m.group(1).split()[-1]}"
+    # Sin "Carpeta N" reconocible se devuelve el texto sin el emoji de delante.
+    return re.sub(r"^[^\w]+|[^\w]+$", "", limpio).strip()
+
+
+def _numero_pegado(texto: str) -> str:
+    """`Producto 3` → `3`, que es el id con el que se guardan las fotos."""
+    m = re.search(r"(\d+)", texto or "")
+    return m.group(1) if m else ""
 
 
 # ---------------------------------------------------------------------------

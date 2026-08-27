@@ -109,6 +109,10 @@ export interface ProductoItem {
    *  EchoTik solo da con la ficha 1 de cada 4 veces y su cuota gratis (100
    *  llamadas al mes) no llega ni de lejos al volumen diario. */
   en_escaparate: boolean;
+  /** El mismo producto está TAMBIÉN en el Drive del curso. Solo se sabe con
+   *  el texto leído en los dos sitios: sin título llega `false`, que no es lo
+   *  mismo que "exclusivo de la web". */
+  tambien_en_drive: boolean;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;

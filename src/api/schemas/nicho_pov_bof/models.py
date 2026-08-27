@@ -166,6 +166,11 @@ class ProductoInfo(BaseModel):
     # Marketplace, porque EchoTik solo encuentra la ficha 1 de cada 4 veces y
     # su cuota gratis no da para el volumen diario).
     en_escaparate: bool = False
+    # Del catálogo de la web: si ese producto está TAMBIÉN en el Drive del
+    # curso. Sirve para saber cuáles son nuevos de verdad. False también
+    # cuando no hay texto leído y no se puede comparar — lo distingue el
+    # título vacío, no un tercer valor.
+    tambien_en_drive: bool = False
     # Precio leído de la ficha. Decide el guion: por encima de
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.

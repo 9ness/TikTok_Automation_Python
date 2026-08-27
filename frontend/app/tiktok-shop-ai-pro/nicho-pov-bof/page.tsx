@@ -1573,6 +1573,9 @@ function ProductoCard({
   const [uploaded, setUploaded] = useState(producto.uploaded);
   const [sold, setSold] = useState(producto.sold);
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
+  // De dónde sale el producto: solo se marca en los catálogos que NO son el
+  // Drive del curso, porque ahí la pregunta no tiene sentido.
+  const esCatalogoPropio = source === "productos_web";
   // Arranca en automático: el montaje mira la mano del vídeo y elige la voz
   // (mujer salvo que vea reloj o vello, que es la regla del operador). Se
   // puede forzar a mano si el vídeo es de los dudosos.
@@ -1773,6 +1776,27 @@ function ProductoCard({
           {producto.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">
               {producto.titulo_tiktok_completo}
+            </p>
+          )}
+          {/* Solo con el título leído: sin texto no hay con qué comparar y
+              decir "exclusivo" sería inventárselo. */}
+          {esCatalogoPropio && producto.titulo && (
+            <p className="mt-0.5 inline-flex items-center gap-1 text-[10px]">
+              {producto.tambien_en_drive ? (
+                <span
+                  title="El mismo producto está también en el Drive del curso"
+                  className="rounded bg-sky-500/15 px-1.5 py-0.5 font-semibold text-sky-500"
+                >
+                  📁 también en Drive
+                </span>
+              ) : (
+                <span
+                  title="No aparece en ninguna carpeta del Drive de las que ya tienen los textos leídos"
+                  className="rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-400"
+                >
+                  🌐 solo web
+                </span>
+              )}
             </p>
           )}
           {/* El precio decide el GUION (por encima del umbral, el de plazos),
