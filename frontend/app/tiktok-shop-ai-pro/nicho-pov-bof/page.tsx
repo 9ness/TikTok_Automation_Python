@@ -1964,42 +1964,6 @@ function ProductoCard({
         />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
-        {/* Guion de 10s para ESTE producto. Con él, el vídeo deja de decir la
-            frase genérica del banco y nombra el producto. */}
-        <button
-          type="button"
-          disabled={escribirGuion.isPending || !producto.titulo}
-          title={
-            producto.titulo
-              ? producto.guion_producto
-              : "Extrae antes los textos: sin título el guion sale genérico"
-          }
-          onClick={() =>
-            escribirGuion.mutate(
-              {
-                source,
-                folder: producto.folder || folder,
-                producto: producto.producto,
-                rehacer: Boolean(producto.guion_producto),
-              },
-              {
-                onSuccess: (r: { reusado: boolean; caracteres: number }) =>
-                  toast.success(
-                    `${r.reusado ? "Guion ya escrito" : "Guion escrito"} · ${r.caracteres} car.`,
-                  ),
-                onError: (e: unknown) =>
-                  toast.error(e instanceof ApiError ? e.message : String(e)),
-              },
-            )
-          }
-          className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
-            producto.guion_producto
-              ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-              : "border-border/60 text-muted-foreground hover:border-foreground/30"
-          }`}
-        >
-          {escribirGuion.isPending ? "✍️ …" : producto.guion_producto ? "📝 Guion ✓" : "📝 Guion"}
-        </button>
         <BotonUrl
           url={producto.product_url}
           source={source}
@@ -2217,6 +2181,95 @@ function ProductoCard({
             : null
         }
       />
+
+      {/* El guion de 10s, con la MISMA pinta que el de plazos y que el del POV
+          BOF Largo: barra plegable con los caracteres y los segundos, y dentro
+          el texto, copiar y rehacer. Las dos pantallas son el mismo trabajo,
+          así que no deben verse distintas. */}
+      {!producto.modo_plazos &&
+        (producto.guion_producto ? (
+          <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
+            <button
+              type="button"
+              onClick={() => setVerGuion((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
+            >
+              <span>
+                🎬 Guion
+                <span className="ml-1 opacity-70">
+                  {producto.guion_producto.length} car. · ~
+                  {Math.round(producto.guion_producto.length / CAR_POR_SEG)}s
+                </span>
+              </span>
+              <span>{verGuion ? "▾" : "▸"}</span>
+            </button>
+            {verGuion && (
+              <>
+                <p className="text-[10px] leading-relaxed">{producto.guion_producto}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <CopyChip label="🎬 Guion" text={producto.guion_producto} />
+                  <button
+                    type="button"
+                    disabled={escribirGuion.isPending}
+                    onClick={() =>
+                      escribirGuion.mutate(
+                        {
+                          source,
+                          folder: producto.folder || folder,
+                          producto: producto.producto,
+                          rehacer: true,
+                        },
+                        {
+                          onError: (e: unknown) =>
+                            toast.error(e instanceof ApiError ? e.message : String(e)),
+                        },
+                      )
+                    }
+                    className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`h-3 w-3 ${escribirGuion.isPending ? "animate-spin" : ""}`}
+                    />
+                    Otro guion
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={escribirGuion.isPending || !producto.titulo}
+            title={
+              producto.titulo
+                ? "Escribe el guion de 10s de este producto"
+                : "Extrae antes los textos: sin título el guion sale genérico"
+            }
+            onClick={() =>
+              escribirGuion.mutate(
+                {
+                  source,
+                  folder: producto.folder || folder,
+                  producto: producto.producto,
+                },
+                {
+                  onSuccess: (r: { caracteres: number }) =>
+                    toast.success(`Guion escrito · ${r.caracteres} car.`),
+                  onError: (e: unknown) =>
+                    toast.error(e instanceof ApiError ? e.message : String(e)),
+                },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-1.5 text-xs font-medium text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
+          >
+            {escribirGuion.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PenLine className="h-3.5 w-3.5" />
+            )}
+            Escribir el guion
+          </button>
+        ))}
 
       {producto.modo_plazos && (
         /* Lo que va a decir la voz, a la vista antes de montar. Se sortea de
