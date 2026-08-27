@@ -1567,6 +1567,41 @@ def reconstruir_titulos_drive() -> dict:
     }
 
 
+@router.post("/clip-s/carpeta")
+def clip_s_carpeta(body: dict) -> dict:
+    """Pone la duración de clip (8 o 10 s) a TODOS los productos de la carpeta.
+
+    Es lo normal: el operador genera la tanda entera con la misma herramienta,
+    así que elegirlo diez veces era trabajo tonto. El de cada producto sigue
+    existiendo para la excepción.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    clip_s = int(body.get("clip_s") or 0)
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad_request("Falta la carpeta.")
+    if clip_s not in (8, 10):
+        raise _bad_request(f"clip_s debe ser 8 o 10, recibido: {clip_s}")
+
+    # Un solo load/save del documento: producto a producto serían diez idas y
+    # vueltas a Upstash por un campo de un dígito.
+    try:
+        with product_repo._cerrojo_carpeta(source, folder):
+            doc = product_repo.load_folder(source, folder)
+            productos = doc.setdefault("productos", {})
+            for prod in productos.values():
+                prod["clip_s"] = clip_s
+            product_repo.save_folder(source, folder, doc)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"clip_s": clip_s, "productos": len(productos)}
+
+
 @router.post("/ids/resolver")
 def resolver_ids(body: dict) -> dict:
     """Saca el ID de producto de los enlaces de una carpeta y lo guarda.

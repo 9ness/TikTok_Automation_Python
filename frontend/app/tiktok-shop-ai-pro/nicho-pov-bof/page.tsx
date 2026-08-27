@@ -56,6 +56,7 @@ import {
   useEscribirGuionProducto,
   useGuionesLote,
   useResolverIds,
+  useClipSCarpeta,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -553,6 +554,7 @@ export default function NichoPovBofPage() {
   const conGuion = (productos.data ?? []).filter((p) => p.guion_producto).length;
   const guionesLote = useGuionesLote();
   const resolverIds = useResolverIds();
+  const clipSCarpeta = useClipSCarpeta();
   // Con ID se publica pegándolo en el buscador de TikTok Studio; sin él, a mano.
   const conUrl = (productos.data ?? []).filter((p) => p.product_url).length;
   const conId = (productos.data ?? []).filter((p) => p.product_id).length;
@@ -1153,6 +1155,37 @@ export default function NichoPovBofPage() {
                 )}
                 Guiones de la carpeta ({conGuion}/{totalCarpeta})
               </button>
+            )}
+
+            {/* La duración de clip para TODA la carpeta: el operador genera la
+                tanda entera con la misma herramienta, así que elegirlo diez
+                veces era trabajo tonto. El de cada producto sigue estando para
+                la excepción. */}
+            {!esPro && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+                <span>Clips de toda la carpeta:</span>
+                {[8, 10].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={clipSCarpeta.isPending}
+                    onClick={() =>
+                      clipSCarpeta.mutate(
+                        { source, folder, clip_s: s },
+                        {
+                          onSuccess: (r: { productos: number }) =>
+                            toast.success(`${s}s en ${r.productos} producto(s)`),
+                          onError: (e: unknown) =>
+                            toast.error(e instanceof ApiError ? e.message : String(e)),
+                        },
+                      )
+                    }
+                    className="rounded border border-border/60 px-2 py-1 font-semibold transition hover:border-violet-500 hover:text-violet-400 disabled:opacity-50"
+                  >
+                    {s}s
+                  </button>
+                ))}
+              </div>
             )}
 
             {/* Los IDs de producto, para publicar sin buscar. Va aquí porque

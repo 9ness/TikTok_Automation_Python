@@ -53,6 +53,19 @@ export const nichoPovBofKeys = {
  *  menos de 2 letras) no se llama: barrer todo por una sola letra devolvería
  *  media base de datos.
  */
+/** La duración de clip (8 o 10 s) para TODOS los productos de la carpeta. */
+export function useClipSCarpeta() {
+  const qc = useQueryClient();
+  return useMutation<
+    { clip_s: number; productos: number },
+    Error,
+    { source: string; folder: string; clip_s: number }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/clip-s/carpeta`, body),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useBuscarProductos(source: string, q: string) {
   const limpio = q.trim();
   return useQuery<{ items: ProductoBuscado[]; total: number }>({

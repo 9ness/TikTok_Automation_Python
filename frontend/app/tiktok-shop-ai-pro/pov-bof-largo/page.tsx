@@ -83,6 +83,7 @@ import {
   largoKeys,
   useEscribirGuion,
   useGuionesLote,
+  useClipSCarpetaLargo,
   useFoldersLargo,
   useMarkCompletedLargo,
   useProductosLargo,
@@ -220,6 +221,7 @@ export default function PovBofLargoPage() {
   const esPro = useEsPro();
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
+  const clipSCarpeta = useClipSCarpetaLargo();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
   // Productos, no unidades: el botón habla de productos (ver POV BOF).
@@ -914,6 +916,34 @@ export default function PovBofLargoPage() {
                 </>
               )}
             </button>
+
+            {/* La duración de clip para TODA la carpeta. Cambia cuántos
+                huecos pide cada producto, así que se elige una vez por tanda y
+                no tarjeta a tarjeta. */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+              <span>Clips de toda la carpeta:</span>
+              {[8, 10].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={clipSCarpeta.isPending}
+                  onClick={() =>
+                    clipSCarpeta.mutate(
+                      { source, folder, clip_s: s },
+                      {
+                        onSuccess: (r: { productos: number }) =>
+                          toast.success(`${s}s en ${r.productos} producto(s)`),
+                        onError: (e: unknown) =>
+                          toast.error(e instanceof ApiError ? e.message : String(e)),
+                      },
+                    )
+                  }
+                  className="rounded border border-border/60 px-2 py-1 font-semibold transition hover:border-violet-500 hover:text-violet-400 disabled:opacity-50"
+                >
+                  {s}s
+                </button>
+              ))}
+            </div>
 
             <div className="grid grid-cols-2 gap-1.5">
               <div

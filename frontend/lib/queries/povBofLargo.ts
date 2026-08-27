@@ -36,6 +36,19 @@ export const largoKeys = {
   vendidos: (source: string) => [...largoKeys.all, "vendidos", source] as const,
 };
 
+/** La duración de clip (8 o 10 s) para TODOS los productos de la carpeta. */
+export function useClipSCarpetaLargo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { clip_s: number; productos: number },
+    Error,
+    { source: string; folder: string; clip_s: number }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/clip-s/carpeta`, body),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useVocesLargo() {
   return useQuery<VocesLargo>({
     queryKey: largoKeys.voces(),

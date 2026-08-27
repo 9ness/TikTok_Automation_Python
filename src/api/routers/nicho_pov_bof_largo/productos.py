@@ -501,6 +501,47 @@ def list_productos_todos(
     return ProductosLargoResponse(source=source, folder="", items=items, montando=montando)
 
 
+@router.post("/clip-s/carpeta")
+def clip_s_carpeta(
+    body: dict,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """La duración de clip (8 o 10 s) para TODOS los productos de la carpeta.
+
+    Va al documento del USUARIO, como el resto del progreso de este nicho: la
+    herramienta con la que genera cada uno es cosa suya.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    clip_s = int(body.get("clip_s") or 0)
+    if source not in pov_config.SOURCES:
+        raise _bad(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad("Falta la carpeta.")
+    if clip_s not in config.CLIPS_DURACIONES:
+        raise _bad(
+            f"clip_s debe ser {' o '.join(map(str, config.CLIPS_DURACIONES))}"
+        )
+
+    # Los ids salen del documento COMPARTIDO (los textos son del catálogo);
+    # lo que se escribe va al del usuario.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
+    tocados = 0
+    for pid in ids:
+        try:
+            product_repo.update_product(
+                source, folder, pid, usuario=usuario, clip_s=clip_s,
+            )
+            tocados += 1
+        except RuntimeError:
+            continue
+    return {"clip_s": clip_s, "productos": tocados}
+
+
 @router.post("/producto/estado", response_model=ProductoLargo)
 def set_producto_estado(
     body: ProductoEstadoLargoRequest,
