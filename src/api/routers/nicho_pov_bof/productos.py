@@ -1255,11 +1255,12 @@ def borrar_mi_producto(
 ) -> dict:
     """Quita las fotos de un producto propio. Solo vale para `mis_productos`.
 
-    Borra las fotos —que son dos ficheros y va al momento— y manda a la cola
-    el cierre del hueco de numeración, que es lo lento: renombra todos los
-    productos siguientes contra el Drive montado. Antes iba dentro de esta
-    misma petición y el borrado tardaba tanto que recargar la página lo dejaba
-    a medias.
+    Borra SOLO las fotos, que son dos ficheros y va al momento. El hueco de
+    numeración lo cierra el botón de reordenar, aparte y cuando el operador
+    quiera: renumerar renombra todos los productos siguientes contra el Drive
+    montado, y hacerlo en cada borrado significaba esperar eso tres veces
+    seguidas al limpiar tres productos. Antes iba dentro de esta petición y
+    recargar la página lo dejaba a medias.
     """
     from src.nicho_pov_bof.services import mis_productos
 
@@ -1267,29 +1268,31 @@ def borrar_mi_producto(
         raise APIError(
             f"No existe el producto {producto} en {carpeta}.", status_code=404,
         )
-    job_id = ""
-    if queue is not None:
-        job = queue.enqueue(
-            JobMode.NICHO_POV_BOF_RENUMERAR,
-            title=f"🔢 Renumerar · {carpeta}",
-            params={"carpeta": carpeta},
-        )
-        job_id = job.id
-    return {"ok": True, "job_id": job_id}
+    return {"ok": True}
 
 
 @router.post("/mis-productos/renumerar")
-def renumerar_mis_productos(carpeta: Annotated[str, Query()]) -> dict:
+def renumerar_mis_productos(
+    carpeta: Annotated[str, Query()],
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+) -> dict:
     """Cierra los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
 
-    Al borrar ya se cierran solos; esto es para los huecos que dejaron los
-    borrados de antes. Arrastra lo guardado de cada producto (textos, guion,
-    clips, vídeo, subidos, ventas) a su número nuevo.
-    """
-    from src.nicho_pov_bof.services import mis_productos
+    Se pulsa cuando toca, después de borrar lo que haya que borrar: así se
+    renumera UNA vez y no una por cada producto quitado. Arrastra lo guardado
+    de cada producto (textos, guion, clips, vídeo, subidos, ventas) a su
+    número nuevo.
 
-    mapa = mis_productos.renumerar_carpeta(carpeta)
-    return {"movidos": mapa, "total": len(mapa)}
+    Va por la cola porque son renombrados contra el Drive montado: catorce
+    operaciones de red al cerrar el hueco del 3 en una carpeta de diez. Dentro
+    de la petición, recargar la página lo dejaba a medias.
+    """
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_RENUMERAR,
+        title=f"🔢 Renumerar · {carpeta}",
+        params={"carpeta": carpeta},
+    )
+    return {"job_id": job.id, "title": job.title}
 
 
 @router.post("/top-vendidos/reparar")

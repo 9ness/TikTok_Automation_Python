@@ -54,6 +54,20 @@ export const nichoPovBofKeys = {
  *  media base de datos.
  */
 /** La duración de clip (8 o 10 s) para TODOS los productos de la carpeta. */
+/** Cerrar los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
+ *
+ *  Va por la cola: renumerar renombra las fotos de todos los productos
+ *  siguientes contra el Drive montado, y eso dentro de la petición se quedaba
+ *  a medias al recargar la página. */
+export function useRenumerarMisProductos() {
+  const qc = useQueryClient();
+  return useMutation<{ job_id: string; title: string }, Error, { carpeta: string }>({
+    mutationFn: ({ carpeta }) =>
+      api.post(`${ROOT}/mis-productos/renumerar?carpeta=${encodeURIComponent(carpeta)}`),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useClipSCarpeta() {
   const qc = useQueryClient();
   return useMutation<

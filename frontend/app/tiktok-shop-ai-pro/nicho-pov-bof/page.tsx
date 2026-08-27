@@ -57,6 +57,7 @@ import {
   useGuionesLote,
   useResolverIds,
   useClipSCarpeta,
+  useRenumerarMisProductos,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -555,6 +556,7 @@ export default function NichoPovBofPage() {
   const guionesLote = useGuionesLote();
   const resolverIds = useResolverIds();
   const clipSCarpeta = useClipSCarpeta();
+  const renumerar = useRenumerarMisProductos();
   // Con ID se publica pegándolo en el buscador de TikTok Studio; sin él, a mano.
   const conUrl = (productos.data ?? []).filter((p) => p.product_url).length;
   const conId = (productos.data ?? []).filter((p) => p.product_id).length;
@@ -1186,6 +1188,38 @@ export default function NichoPovBofPage() {
                   </button>
                 ))}
               </div>
+            )}
+
+            {/* Solo en "Mis productos": al borrar uno queda el hueco (5, 7, 8)
+                y esto lo cierra. Aparte del borrado a propósito — si borras
+                tres seguidos, reordenas UNA vez en vez de tres. */}
+            {source === "mis_productos" && (
+              <button
+                type="button"
+                disabled={renumerar.isPending}
+                title="Cierra los huecos de numeración que dejan los borrados"
+                onClick={() =>
+                  renumerar.mutate(
+                    { carpeta: folder },
+                    {
+                      onSuccess: (r: { title: string }) => {
+                        toast.success(`${r.title} en la cola`);
+                        openQueue();
+                      },
+                      onError: (e: unknown) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
+              >
+                {renumerar.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <span>🔢</span>
+                )}
+                Reordenar la numeración
+              </button>
             )}
 
             {/* Los IDs de producto, para publicar sin buscar. Va aquí porque
