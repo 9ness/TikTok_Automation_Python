@@ -71,6 +71,28 @@ def _precio(textos: dict, campo: str = "precio") -> float:
     return pov_config.precio_num(textos.get(campo))
 
 
+def _huecos(prod: dict) -> int:
+    """Cuántos clips hay que subir para este producto.
+
+    Se pregunta con cuántos queda alguna voz sorteable, no cuánto tardaría la
+    más lenta del banco: esa ya no entra en el sorteo (se descartan las que no
+    caben y las que dejarían el vídeo por debajo del mínimo del reto), así que
+    contar con ella pedía un clip de más. De propina, con menos clips la
+    duración del vídeo queda en una banda más estrecha.
+    """
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    guion = str(prod.get("guion") or "").strip()
+    if not guion:
+        return config.CLIPS_POR_VIDEO
+    return voz_svc.clips_para(
+        len(guion),
+        float(prod.get("clip_s") or config.CLIP_TARGET_S),
+        segundos_min=config.DURACION_MINIMA_S,
+        maximos=config.CLIPS_MAXIMOS,
+    )
+
+
 def _es_plazos(textos: dict) -> bool:
     """¿Al producto le toca el guion con la frase de financiación?
 
@@ -389,9 +411,7 @@ def _listar(
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
-            clips_necesarios=config.clips_necesarios(
-                guion, clip_s=float(mio.get("clip_s") or 0),
-            ),
+            clips_necesarios=_huecos({**mio, "guion": guion}),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
@@ -883,9 +903,7 @@ def confirmar_lote(
             mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
             continue
         montado_at = float(prod.get("video_listo_at") or 0)
-        hacen_falta = config.clips_necesarios(
-            str(prod.get("guion") or ""), clip_s=float(prod.get("clip_s") or 0),
-        )
+        hacen_falta = _huecos(prod)
         if vistos[item.producto] >= 2:
             # El enésimo vídeo de este producto en ESTA tanda va al hueco n.
             slot = min(vistos[item.producto], hacen_falta)
@@ -1066,9 +1084,7 @@ def _encolar_clip(
 
     montado_at = float(prod.get("video_listo_at") or 0)
     # Cuántos clips pide ESTE guion (dos, o tres si la voz no cabe en dos).
-    hacen_falta = config.clips_necesarios(
-        str(prod.get("guion") or ""), clip_s=float(prod.get("clip_s") or 0),
-    )
+    hacen_falta = _huecos(prod)
     rutas = [
         prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
     ]
