@@ -262,12 +262,23 @@ function PegarUrlsEnLote({ source }: { source: string }) {
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState("");
 
-  const GUION = `document.querySelectorAll("div.carp").forEach((c) => {
-  if (!c.querySelector(".carp-body")) c.querySelector(".carp-head")?.click();
-});
-await new Promise((r) => setTimeout(r, 3000));
+  // Su web es un ACORDEÓN: al abrir una carpeta cierra la anterior, así que
+  // no vale con desplegarlas todas y leer al final — hay que leer cada una
+  // mientras está abierta. Y el fichero en vez de `copy()`: con `await`,
+  // Chrome envuelve el código y las utilidades de la consola dejan de existir.
+  const GUION = `const esperar = async (c) => {
+  for (let i = 0; i < 40; i++) {
+    if (c.querySelector(".prod")) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
+};
 const filas = [];
-document.querySelectorAll("div.carp").forEach((c) => {
+for (const c of document.querySelectorAll("div.carp")) {
+  if (!c.querySelector(".prod")) {
+    c.querySelector(".carp-head")?.click();
+    await esperar(c);
+  }
   const carpeta = c.querySelector(".carp-head b")?.textContent.trim();
   c.querySelectorAll(".prod").forEach((p) => {
     filas.push({
@@ -276,9 +287,13 @@ document.querySelectorAll("div.carp").forEach((c) => {
       url: p.querySelector("a.chip[href]")?.href ?? "",
     });
   });
-});
-console.log(filas.length, "productos");
-copy(JSON.stringify(filas));`;
+  console.log(carpeta, "->", filas.length);
+}
+const a = document.createElement("a");
+a.href = URL.createObjectURL(new Blob([JSON.stringify(filas)]));
+a.download = "fichas.json";
+a.click();
+console.log("TOTAL", filas.length, "productos");`;
 
   function enviar() {
     let filas: unknown[];
@@ -333,8 +348,10 @@ copy(JSON.stringify(filas));`;
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         En la web del curso, con las carpetas a la vista: F12 →{" "}
         <strong className="text-foreground">Console</strong> (si no deja pegar,
-        escribe <code>allow pasting</code>) → pega esto y pulsa Enter. Te deja
-        el resultado en el portapapeles.
+        escribe <code>allow pasting</code>) → pega esto y pulsa Enter. Va
+        carpeta por carpeta (su web cierra una al abrir la siguiente) y al
+        acabar te <strong className="text-foreground">descarga</strong>{" "}
+        <code>fichas.json</code>. Ese fichero es el que se elige aquí abajo.
       </p>
       <pre className="max-h-32 overflow-auto rounded bg-background p-2 text-[10px] leading-tight text-muted-foreground">
         {GUION}
@@ -358,11 +375,24 @@ copy(JSON.stringify(filas));`;
           Cerrar
         </button>
       </div>
+      <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
+        📄 Elegir el fichero <code>fichas.json</code>
+        <input
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) setTexto(await f.text());
+          }}
+        />
+      </label>
       <textarea
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         rows={4}
-        placeholder="Pega aquí lo que te dejó en el portapapeles…"
+        placeholder="…o pega aquí el contenido a mano"
         className="w-full rounded-lg border border-border/60 bg-background p-2 text-[11px]"
       />
       <button
