@@ -292,6 +292,7 @@ def _producto_info(
             prod, product_repo.escaparate_index(usuario),
         ),
         tambien_en_drive=product_repo.tambien_en_drive(prod),
+        sin_stock=bool(prod.get("sin_stock")),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
@@ -422,6 +423,7 @@ def _list_productos(
                 tambien_en_drive=bool(titulos_del_drive) and product_repo.tambien_en_drive(
                     guardado, titulos_del_drive,
                 ),
+                sin_stock=bool(guardado.get("sin_stock")),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
                     producto,

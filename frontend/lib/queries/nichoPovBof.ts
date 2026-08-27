@@ -793,6 +793,8 @@ export function useImportarUrls() {
       sin_carpeta: string[];
       /** Enlaces que no son de TikTok (su web tiene alguno suelto). */
       descartadas: string[];
+      /** Productos marcados "SIN STOCK" en su web. */
+      agotados: number;
     },
     Error,
     { source: string; filas: unknown[] }

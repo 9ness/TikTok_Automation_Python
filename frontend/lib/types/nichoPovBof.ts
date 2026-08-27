@@ -113,6 +113,8 @@ export interface ProductoItem {
    *  el texto leído en los dos sitios: sin título llega `false`, que no es lo
    *  mismo que "exclusivo de la web". */
   tambien_en_drive: boolean;
+  /** Su web lo marca "SIN STOCK". Se actualiza al repegar las fichas. */
+  sin_stock: boolean;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;

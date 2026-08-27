@@ -1778,6 +1778,13 @@ function ProductoCard({
               {producto.titulo_tiktok_completo}
             </p>
           )}
+          {/* Agotado en su web. Va antes que lo demás porque decide si merece
+              la pena grabarlo hoy. */}
+          {producto.sin_stock && (
+            <p className="mt-0.5 inline-flex items-center gap-1 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500">
+              🚫 Sin stock
+            </p>
+          )}
           {/* Solo con el título leído: sin texto no hay con qué comparar y
               decir "exclusivo" sería inventárselo. */}
           {esCatalogoPropio && producto.titulo && (

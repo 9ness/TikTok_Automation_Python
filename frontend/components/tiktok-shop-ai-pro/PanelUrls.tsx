@@ -292,6 +292,7 @@ for (let i = 0; i < carps().length; i++) {
       carpeta,
       producto: p.querySelector(".p-head b")?.textContent.trim(),
       url: p.querySelector("a.chip[href]")?.href ?? "",
+      sin_stock: /sin\\s*stock/i.test(p.textContent || ""),
     });
   });
   console.log(carpeta, "· en esta:", filas.length - antes, "· total:", filas.length);
@@ -300,7 +301,7 @@ const a = document.createElement("a");
 a.href = URL.createObjectURL(new Blob([JSON.stringify(filas)]));
 a.download = "fichas.json";
 a.click();
-console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con enlace");`;
+console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con enlace ·", filas.filter((f) => f.sin_stock).length, "sin stock");`;
 
   function enviar() {
     let filas: unknown[];
@@ -320,6 +321,7 @@ console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con
         onSuccess: (r) => {
           toast.success(
             `${r.guardados} ficha(s) en ${r.carpetas} carpeta(s)` +
+              (r.agotados ? ` · ${r.agotados} sin stock` : "") +
               (r.en_indice ? ` · ${r.en_indice} ya con texto` : ""),
           );
           // Callar esto dejaría enlaces sin guardar pareciendo que fue bien.
