@@ -108,6 +108,52 @@ def _clip_puesto(ruta, desde: float = 0.0) -> bool:
         return False
 
 
+@router.get("/voz/muestra")
+def muestra_de_voz(
+    voz: Annotated[str, Query()] = "",
+    sexo: Annotated[str, Query()] = "mujer",
+    tempo: Annotated[float, Query()] = 0.0,
+    texto: Annotated[str, Query()] = "",
+) -> FileResponse:
+    """Un mp3 corto con esa voz, para escucharla antes de usarla.
+
+    `tempo` sirve para comparar a qué suena el acelerón: 1.0 es la voz tal
+    cual y sin el parámetro se usa el de producción (`VOZ_TEMPO`). Gasta una
+    llamada a Fish, así que es un botón, no algo que se dispare solo.
+    """
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+    from src.api.temp_storage import upload_subdir
+
+    frase = texto.strip() or (
+        "Han ajustado el precio de estos jeans virales. Son elásticos y de "
+        "campana. Comprueba tus cupones descuento y aprovecha el pago a plazos "
+        "en pedidos de más de 30 euros."
+    )
+    elegida = None
+    if voz:
+        elegida = next(
+            (v for v in largo_config.VOCES.get(sexo, []) if v["id"] == voz), None,
+        )
+        if elegida is None:
+            for banco in largo_config.VOCES.values():
+                elegida = next((v for v in banco if v["id"] == voz), None)
+                if elegida:
+                    break
+        if elegida is None:
+            raise _bad(f"Voz desconocida: {voz!r}")
+
+    destino = Path(upload_subdir("muestras_voz")) / f"m_{int(time.time()*1000)}.mp3"
+    try:
+        voz_svc.sintetizar(
+            frase, destino, sexo=sexo, voz=elegida,
+            tempo=(tempo if tempo > 0 else None),
+        )
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"Fish no pudo locutar la muestra: {e}", status_code=502) from e
+    return FileResponse(destino, media_type="audio/mpeg")
+
+
 @router.get("/voces", response_model=VocesLargoResponse)
 def list_voces() -> VocesLargoResponse:
     return VocesLargoResponse(

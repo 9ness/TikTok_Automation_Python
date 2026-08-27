@@ -122,6 +122,8 @@ def sintetizar(
     # Cuánto vídeo hay para esta voz. Sirve para no sortear una voz lenta que
     # no quepa (ver `elegir_voz`). 0 = no se sabe, se sortea entre todas.
     segundos_max: float = 0.0,
+    # Para audicionar a otra velocidad sin tocar la de producción.
+    tempo: float | None = None,
     on_log: OnLog = _noop,
 ) -> dict:
     """Genera el mp3 crudo y lo deja nivelado en `destino`.
@@ -166,7 +168,7 @@ def sintetizar(
         raise RuntimeError(f"Fish Audio devolvió {e.code}: {detalle}") from e
 
     _registrar_coste(texto, elegida)
-    medidas = _nivelar(crudo, destino, on_log=on_log)
+    medidas = _nivelar(crudo, destino, tempo=tempo, on_log=on_log)
     try:
         crudo.unlink()
     except OSError:
@@ -219,14 +221,17 @@ def _medir(audio: Path, extra: str = "") -> dict[str, str]:
     return medidas
 
 
-def _nivelar(crudo: Path, destino: Path, *, on_log: OnLog = _noop) -> dict:
+def _nivelar(
+    crudo: Path, destino: Path, *, tempo: float | None = None, on_log: OnLog = _noop,
+) -> dict:
     # El recorte de silencios va PRIMERO y forma parte de la cadena, para que la
     # medición de sonoridad y el render final vean el mismo audio ya ajustado.
     # El acelerón va detrás del recorte y delante del resto: así el compresor y
     # el `speechnorm` ven ya el ritmo definitivo, y la duración que se mide al
     # final —la que se apunta como velocidad de la voz— lo incluye.
-    tempo = f",atempo={config.VOZ_TEMPO}" if config.VOZ_TEMPO != 1.0 else ""
-    pre = f"{config.VOZ_SILENCIO}{tempo},{config.VOZ_CADENA}"
+    factor = config.VOZ_TEMPO if tempo is None else tempo
+    acelera = f",atempo={factor}" if factor != 1.0 else ""
+    pre = f"{config.VOZ_SILENCIO}{acelera},{config.VOZ_CADENA}"
     med = _medir(crudo, pre)
     norm = f"loudnorm=I={config.VOZ_LUFS}:TP={config.VOZ_TP}:LRA=7"
     if len(med) == 4:
