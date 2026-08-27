@@ -180,7 +180,7 @@ class ProductoInfo(BaseModel):
     # son dos (la frase del banco se sortea al montar).
     clips_necesarios: int = 2
     # Duración de los clips que genera el operador: 8 o 10 segundos.
-    clip_s: int = 8
+    clip_s: int = 10
     # Precio leído de la ficha. Decide el guion: por encima de
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.

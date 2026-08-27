@@ -566,6 +566,13 @@ export default function NichoPovBofPage() {
   const guionesLote = useGuionesLote();
   const resolverIds = useResolverIds();
   const clipSCarpeta = useClipSCarpeta();
+  // Cuál está puesto en la carpeta: el de sus productos si coinciden todos.
+  // Sin esto, al cambiar de carpeta no se marcaba ninguno y parecía que el
+  // ajuste se había perdido.
+  const clipSCarpetaActual = (() => {
+    const vistos = new Set((productos.data ?? []).map((p) => p.clip_s || 10));
+    return vistos.size === 1 ? [...vistos][0] : 0;
+  })();
   const renumerar = useRenumerarMisProductos();
   // El plan se consulta solo para poner el número en el botón y para poder
   // apagarlo cuando no hay nada que mover. No toca nada: es de lectura.
@@ -1195,7 +1202,11 @@ export default function NichoPovBofPage() {
                         },
                       )
                     }
-                    className="rounded border border-border/60 px-2 py-1 font-semibold transition hover:border-violet-500 hover:text-violet-400 disabled:opacity-50"
+                    className={`rounded border px-2 py-1 font-semibold transition disabled:opacity-50 ${
+                      clipSCarpetaActual === s
+                        ? "border-violet-500 bg-violet-500/15 text-violet-400"
+                        : "border-border/60 hover:border-violet-500 hover:text-violet-400"
+                    }`}
                   >
                     {s}s
                   </button>
@@ -2494,7 +2505,7 @@ function ProductoCard({
                 })
               }
               className={`rounded px-1.5 py-0.5 font-semibold transition ${
-                (producto.clip_s || 8) === s
+                (producto.clip_s || 10) === s
                   ? "bg-violet-500/20 text-violet-400"
                   : "hover:text-foreground"
               }`}

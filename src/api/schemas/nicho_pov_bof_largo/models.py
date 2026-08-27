@@ -67,7 +67,7 @@ class ProductoLargo(BaseModel):
     clip4: bool = False
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
-    clip_s: int = 8
+    clip_s: int = 10
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False

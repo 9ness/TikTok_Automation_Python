@@ -275,6 +275,7 @@ def _producto_info(
     de un producto suelto).
     """
     from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof_largo import config as largo_config
 
     clean, titled, aviso, subida = (
         _fotos_del_producto(source, folder, producto) if source and folder
@@ -320,7 +321,7 @@ def _producto_info(
         sin_stock=bool(prod.get("sin_stock")),
         guion_producto=str(prod.get("guion_producto") or ""),
         clips_necesarios=_clips_que_pide(prod),
-        clip_s=int(prod.get("clip_s") or 8),
+        clip_s=int(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
@@ -424,6 +425,8 @@ def _list_productos(
     urls = product_repo.urls_index()
     ventas = top_vendidos.ventas_por_producto(source, usuario)
 
+    from src.nicho_pov_bof_largo import config as largo_config
+
     # Una sola lectura para toda la carpeta: dentro del bucle serían 10.
     titulos_del_drive = (
         product_repo.titulos_drive()
@@ -454,7 +457,7 @@ def _list_productos(
                 sin_stock=bool(guardado.get("sin_stock")),
                 guion_producto=str(guardado.get("guion_producto") or ""),
                 clips_necesarios=_clips_que_pide(guardado),
-                clip_s=int(guardado.get("clip_s") or 8),
+                clip_s=int(guardado.get("clip_s") or largo_config.CLIP_TARGET_S),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
                     producto,

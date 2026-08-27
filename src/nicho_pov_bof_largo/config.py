@@ -38,10 +38,12 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 # nada: con uno solo no hay vídeo que montar (mismo criterio que el BOF
 # Cinematográfico).
 CLIPS_POR_VIDEO = 1
-# Cuánto dura un clip generado. La plataforma de vídeo los da de OCHO segundos
-# (antes eran de diez); si algún día vuelven a ser de diez, se cambia aquí y
-# todo lo demás —cuántos clips pedir y cuánto guion cabe— sale solo.
-CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "8"))
+# Cuánto dura un clip generado, por defecto. Se elige por carpeta y por
+# producto desde la pantalla; esto es con lo que arrancan los que no lo tengan
+# puesto. DIEZ, porque es con lo que se genera hoy y porque es lo que deja el
+# vídeo del POV BOF en un solo clip. De aquí sale todo lo demás: cuántos clips
+# pedir y cuánto guion cabe.
+CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "10"))
 # Más de cuatro deja de parecer una toma continua.
 CLIPS_MAXIMOS = 4
 # Hasta dónde se puede estirar un clip sin que se note: el montaje ya alarga un

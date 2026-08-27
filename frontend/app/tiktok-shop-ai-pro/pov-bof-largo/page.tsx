@@ -228,6 +228,11 @@ export default function PovBofLargoPage() {
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
   const clipSCarpeta = useClipSCarpetaLargo();
+  // Cuál está puesto en la carpeta (0 = mezclados), para marcarlo.
+  const clipSCarpetaActual = (() => {
+    const vistos = new Set(items.map((p) => p.clip_s || 10));
+    return vistos.size === 1 ? [...vistos][0] : 0;
+  })();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
   // Productos, no unidades: el botón habla de productos (ver POV BOF).
@@ -944,7 +949,11 @@ export default function PovBofLargoPage() {
                       },
                     )
                   }
-                  className="rounded border border-border/60 px-2 py-1 font-semibold transition hover:border-violet-500 hover:text-violet-400 disabled:opacity-50"
+                  className={`rounded border px-2 py-1 font-semibold transition disabled:opacity-50 ${
+                    clipSCarpetaActual === s
+                      ? "border-violet-500 bg-violet-500/15 text-violet-400"
+                      : "border-border/60 hover:border-violet-500 hover:text-violet-400"
+                  }`}
                 >
                   {s}s
                 </button>
@@ -1444,7 +1453,7 @@ function ProductoCard({
   const necesarios = Math.min(4, p.clips_necesarios || 2);
   // Duración de los clips que genera el operador. No es cosmética: el mismo
   // guion son 3 clips de 8s o 2 de 10s, así que cambiarla cambia los huecos.
-  const clipS = p.clip_s || 8;
+  const clipS = p.clip_s || 10;
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
