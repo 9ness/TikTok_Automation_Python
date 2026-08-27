@@ -2246,9 +2246,13 @@ function ProductoCard({
         )
       )}
 
-      {/* 8 o 10 segundos. Con guion propio decide cuántos clips hay que
-          subir: a 10s el guion entra en uno solo. */}
-      {producto.guion_producto && (
+      {/* 8 o 10 segundos. Con guion propio decide cuántos clips hay que subir:
+          a 10s el guion entra en uno solo.
+
+          Se enseña SIEMPRE, aunque sin guion no cambie nada: escondido hasta
+          tener guion no había manera de encontrarlo, y elegir la duración
+          antes de escribirlo es lo natural (ya sabes con qué vas a generar). */}
+      {(
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
           <span>Clips de</span>
           {[8, 10].map((s) => (
@@ -2273,7 +2277,9 @@ function ProductoCard({
             </button>
           ))}
           <span className="ml-auto">
-            {clipsDe(producto)} hueco{clipsDe(producto) === 1 ? "" : "s"}
+            {producto.guion_producto
+              ? `${clipsDe(producto)} hueco${clipsDe(producto) === 1 ? "" : "s"}`
+              : "2 huecos · sin guion"}
           </span>
         </div>
       )}
