@@ -174,6 +174,8 @@ class ProductoInfo(BaseModel):
     # Su web marca "SIN STOCK" en vez del enlace. Se guarda al pegar las
     # fichas y se quita solo cuando el producto vuelve a tener enlace.
     sin_stock: bool = False
+    # Guion de 10s escrito para ESTE producto. Vacío = usa el banco de audios.
+    guion_producto: str = ""
     # Precio leído de la ficha. Decide el guion: por encima de
     # `config.PRECIO_MIN_PLAZOS` el vídeo lleva el guion de Klarna (voz de
     # Fish, dos clips); por debajo, el audio grabado de siempre.

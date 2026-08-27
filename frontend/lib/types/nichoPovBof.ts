@@ -115,6 +115,8 @@ export interface ProductoItem {
   tambien_en_drive: boolean;
   /** Su web lo marca "SIN STOCK". Se actualiza al repegar las fichas. */
   sin_stock: boolean;
+  /** Guion de 10s escrito para este producto. Vacío = frase del banco. */
+  guion_producto: string;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;

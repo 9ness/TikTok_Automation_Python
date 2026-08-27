@@ -37,6 +37,9 @@ def escribir(
     caption: str = "",
     foto: Path | None = None,
     plazos: bool = False,
+    prompt: str = "",
+    max_caracteres: int = 0,
+    etiqueta: str = "nicho_pov_bof_largo",
     on_log: OnLog = _noop,
 ) -> dict:
     """`{nombre, guion, subliminal}` para un producto.
@@ -48,6 +51,11 @@ def escribir(
     `foto` es la foto limpia. El prompt insiste en NO mandar la foto sola, así
     que siempre va acompañada de la descripción; si no hay foto se manda solo
     el texto (Gemini se apaña, pero el guion sale más genérico).
+
+    `prompt` y `max_caracteres` los usa el POV BOF (el corto), que pide el
+    mismo JSON pero con otra estructura y 190 caracteres en vez de ~356. Se
+    parametriza aquí en vez de duplicar la función: lo único distinto es el
+    texto que se manda y con qué se compara el largo.
     """
     from src.tiktok_shop.api.gemini import generate_json
 
@@ -61,7 +69,9 @@ def escribir(
     if plazos:
         on_log("[nicho_pov_bof_largo] guion con la frase de plazos (producto caro)")
     datos = generate_json(
-        config.prompt_guion(plazos) + _FORMATO, descripcion, images=imagenes,
+        (prompt or config.prompt_guion(plazos)) + _FORMATO,
+        descripcion,
+        images=imagenes,
     )
     if not isinstance(datos, dict):
         raise ValueError(f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}")
@@ -70,11 +80,12 @@ def escribir(
     if not guion:
         raise ValueError("Gemini no devolvió guion")
 
-    if len(guion) > config.GUION_MAX_CARACTERES:
+    tope = max_caracteres or config.GUION_MAX_CARACTERES
+    if len(guion) > tope:
         on_log(
-            f"[nicho_pov_bof_largo] guion de {len(guion)} caracteres; en {config.CLIPS_POR_VIDEO} "
-            f"clips de {config.CLIP_TARGET_S:.0f}s caben ~{config.GUION_MAX_CARACTERES}. "
-            "El vídeo se alargará para que quepa la voz entera."
+            f"[{etiqueta}] guion de {len(guion)} caracteres; el objetivo eran "
+            f"~{tope}. No se recorta (ver la nota de arriba): el montaje cuadra "
+            "la duración y puede pedir un clip más."
         )
 
     return {

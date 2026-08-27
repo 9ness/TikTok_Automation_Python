@@ -627,6 +627,25 @@ def limpiar_prompt(texto: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", limpio).strip()
 
 
+# ---------------------------------------------------------------------------
+# Guion por producto (10 s)
+# ---------------------------------------------------------------------------
+# El banco de audios dice una frase que vale para cualquier producto. Esto es
+# lo contrario: un guion escrito para ESE producto, con su nombre y lo que
+# hace, siguiendo la estructura del curso. Se locuta con Fish.
+#
+# 190 caracteres es lo que pide su prompt para 10 segundos. Ojo: eso son 19
+# car/s, más rápido que cualquier voz medida del banco (14 a 23,6), así que con
+# las lentas no cabe en un solo clip — de ahí el filtro de `elegir_voz`.
+GUION_PRODUCTO_MAX_CARACTERES = 190
+
+
+def prompt_guion_producto() -> str:
+    """El prompt del curso, literal, sin la nota de cabecera."""
+    ruta = Path(__file__).resolve().parent / "prompts" / "guion_producto.md"
+    return limpiar_prompt(ruta.read_text(encoding="utf-8"))
+
+
 def guiones_plazos() -> list[str]:
     """Los guiones del documento del curso, uno por línea. Se sortea uno."""
     ruta = Path(__file__).resolve().parent / "prompts" / "guiones_plazos.md"

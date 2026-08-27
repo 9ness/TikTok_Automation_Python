@@ -3357,13 +3357,31 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             "'Obtener textos'?)"
         )
 
-    on_progress(0.06, "🔊 Preparando audio…")
-    audio_raw = audio_bank.pick_random(sexo)
-    audio_ready = audio_bank.prepare(audio_raw, on_log=on_log)
-    on_log(f"[nicho_pov_bof] audio elegido: {audio_raw.name} → {audio_ready.name}")
-
     work_dir = raw_path.parent / f"work_{producto}_{raw_path.stem}"
+    work_dir.mkdir(parents=True, exist_ok=True)
     output_local = work_dir / "output.mp4"
+
+    # Guion propio del producto si lo tiene: dice su nombre y lo que hace, en
+    # vez de la frase genérica del banco. Se locuta con Fish igual que el de
+    # plazos, y el sorteo de voz descarta las que no quepan en los clips que
+    # hay (`_segundos_de_video`), que es lo que deja el vídeo en UN clip.
+    guion = str((textos or {}).get("guion_producto") or "").strip()
+    if guion:
+        from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+        on_progress(0.06, f"🔊 Locutando el guion del producto ({sexo})…")
+        on_log(f"[nicho_pov_bof] guion propio ({len(guion)} car.): {guion}")
+        audio_ready = work_dir / "voz.mp3"
+        info = voz_svc.sintetizar(
+            guion, audio_ready, sexo=sexo, on_log=on_log,
+            segundos_max=_segundos_de_video(clips),
+        )
+        on_log(f"[nicho_pov_bof] voz: {info.get('label') or info.get('id') or '?'}")
+    else:
+        on_progress(0.06, "🔊 Preparando audio…")
+        audio_raw = audio_bank.pick_random(sexo)
+        audio_ready = audio_bank.prepare(audio_raw, on_log=on_log)
+        on_log(f"[nicho_pov_bof] audio del banco: {audio_raw.name} → {audio_ready.name}")
 
     def _pipeline_progress(pct: float, label: str) -> None:
         # Reserva 0-0.08 para la prep de arriba y 0.92-1.0 para publicar en

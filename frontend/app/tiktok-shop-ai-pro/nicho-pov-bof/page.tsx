@@ -52,6 +52,7 @@ import {
   useBuscarProductoUrl,
   useHashtags,
   useGuardarHashtags,
+  useEscribirGuionProducto,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -1576,6 +1577,9 @@ function ProductoCard({
   // De dónde sale el producto: solo se marca en los catálogos que NO son el
   // Drive del curso, porque ahí la pregunta no tiene sentido.
   const esCatalogoPropio = source === "productos_web";
+  // El guion propio sustituye a la frase del banco: nombra el producto. Sin
+  // él, el montaje sigue tirando del banco de audios como siempre.
+  const escribirGuion = useEscribirGuionProducto();
   // Arranca en automático: el montaje mira la mano del vídeo y elige la voz
   // (mujer salvo que vea reloj o vello, que es la regla del operador). Se
   // puede forzar a mano si el vídeo es de los dudosos.
@@ -1914,6 +1918,42 @@ function ProductoCard({
         />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
+        {/* Guion de 10s para ESTE producto. Con él, el vídeo deja de decir la
+            frase genérica del banco y nombra el producto. */}
+        <button
+          type="button"
+          disabled={escribirGuion.isPending || !producto.titulo}
+          title={
+            producto.titulo
+              ? producto.guion_producto
+              : "Extrae antes los textos: sin título el guion sale genérico"
+          }
+          onClick={() =>
+            escribirGuion.mutate(
+              {
+                source,
+                folder: producto.folder || folder,
+                producto: producto.producto,
+                rehacer: Boolean(producto.guion_producto),
+              },
+              {
+                onSuccess: (r: { reusado: boolean; caracteres: number }) =>
+                  toast.success(
+                    `${r.reusado ? "Guion ya escrito" : "Guion escrito"} · ${r.caracteres} car.`,
+                  ),
+                onError: (e: unknown) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
+          }
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+            producto.guion_producto
+              ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/30"
+          }`}
+        >
+          {escribirGuion.isPending ? "✍️ …" : producto.guion_producto ? "📝 Guion ✓" : "📝 Guion"}
+        </button>
         <BotonUrl
           url={producto.product_url}
           source={source}

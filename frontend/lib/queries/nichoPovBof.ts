@@ -781,6 +781,19 @@ export function useUrlsCatalogo(source: string) {
   });
 }
 
+/** Escribir el guion de 10s de un producto (lo dice la voz de Fish). */
+export function useEscribirGuionProducto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { guion: string; subliminal: string; caracteres: number; reusado: boolean },
+    Error,
+    { source: string; folder: string; producto: string; rehacer?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/guion`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 /** Guardar de golpe las fichas copiadas del DOM de la web del curso. */
 export function useImportarUrls() {
   const qc = useQueryClient();

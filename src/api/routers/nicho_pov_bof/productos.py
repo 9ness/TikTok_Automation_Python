@@ -293,6 +293,7 @@ def _producto_info(
         ),
         tambien_en_drive=product_repo.tambien_en_drive(prod),
         sin_stock=bool(prod.get("sin_stock")),
+        guion_producto=str(prod.get("guion_producto") or ""),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
         sold=bool(prod.get("sold")),
@@ -424,6 +425,7 @@ def _list_productos(
                     guardado, titulos_del_drive,
                 ),
                 sin_stock=bool(guardado.get("sin_stock")),
+                guion_producto=str(guardado.get("guion_producto") or ""),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
                     producto,
@@ -1521,6 +1523,88 @@ def reconstruir_titulos_drive() -> dict:
         "fuentes": sorted(carpetas),
         "carpetas": sum(len(v) for v in carpetas.values()),
         "fallos": fallos,
+    }
+
+
+@router.post("/guion")
+def escribir_guion(body: dict) -> dict:
+    """Escribe el guion de 10s de UN producto y lo guarda.
+
+    Es lo que sustituye a la frase del banco de audios: nombra el producto y
+    lo que hace. Se guarda COMPARTIDO (no por usuario) a propósito — el guion
+    habla del producto, no de quién lo graba, así que Mauro y Ana reaprovechan
+    el mismo y no se gastan tres llamadas a Gemini por producto.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof_largo.services import guionista
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    producto = str(body.get("producto") or "").strip()
+    if not (source and folder and producto):
+        raise _bad_request("Faltan source, folder o producto.")
+
+    prod = product_repo.get_product(source, folder, producto) or {}
+    if not prod.get("titulo"):
+        raise _bad_request(
+            "Este producto no tiene textos extraídos todavía: pulsa antes "
+            "'Obtener textos'. Sin título, el guion saldría genérico."
+        )
+    if prod.get("guion_producto") and not body.get("rehacer"):
+        return {
+            "guion": prod["guion_producto"],
+            "subliminal": prod.get("subliminal_producto", ""),
+            "caracteres": len(prod["guion_producto"]),
+            "reusado": True,
+        }
+
+    foto = None
+    try:
+        from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        par = next(
+            (x for x in photo_pairing.pair_folder(fotos)
+             if str(x.get("producto")) == producto), None,
+        )
+        limpia = (par or {}).get("clean") or {}
+        if limpia.get("id"):
+            foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+    except Exception:  # noqa: BLE001 — sin foto el guion sale más genérico
+        foto = None
+
+    try:
+        escrito = guionista.escribir(
+            titulo=prod.get("titulo", ""),
+            tienda=prod.get("tienda", ""),
+            caption=prod.get("caption", ""),
+            foto=foto,
+            prompt=pov_config.prompt_guion_producto(),
+            max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
+            etiqueta="nicho_pov_bof",
+        )
+    except ValueError as e:
+        raise APIError(str(e), status_code=422) from e
+    except Exception as e:
+        raise APIError(f"Gemini no pudo escribir el guion: {e}", status_code=502) from e
+
+    try:
+        product_repo.update_product(
+            source, folder, producto,
+            guion_producto=escrito["guion"],
+            subliminal_producto=escrito["subliminal"],
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {
+        "guion": escrito["guion"],
+        "subliminal": escrito["subliminal"],
+        "caracteres": len(escrito["guion"]),
+        "reusado": False,
     }
 
 
