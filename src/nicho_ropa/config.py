@@ -344,11 +344,22 @@ SEXOS_MOF10: dict[str, dict[str, str]] = {
 # palabras de la persona. Se marca en la pantalla: un prompt derivado funciona,
 # pero si él publica el suyo hay que pegarlo encima.
 ESTILOS_MOF10: dict[str, dict] = {
+    # De este publica los DOS sexos, así que no se deriva nada: van sus dos
+    # textos tal cual. Y hace falta, porque entre ellos cambia más que el
+    # género —maquillaje, joyería y un bloque de movimiento entero—.
     "espejo": {
         "label": "Frente al espejo · cuerpo entero",
-        "imagen": "prompt_mof10_espejo_imagen.md",
-        "guion": "prompt_mof10_espejo_guion.md",
-        "derivado": ("mujer",),
+        "por_sexo": {
+            "hombre": (
+                "prompt_mof10_espejo_hombre_imagen.md",
+                "prompt_mof10_espejo_hombre_guion.md",
+            ),
+            "mujer": (
+                "prompt_mof10_espejo_mujer_imagen.md",
+                "prompt_mof10_espejo_mujer_guion.md",
+            ),
+        },
+        "derivado": (),
     },
     "movil": {
         "label": "Colocando el móvil · medio cuerpo",
@@ -370,11 +381,18 @@ def prompts_mof10(sexo: str = SEXO_DEFECTO) -> list[dict]:
     """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo."""
     salida = []
     for clave, meta in ESTILOS_MOF10.items():
+        propios = (meta.get("por_sexo") or {}).get(sexo)
+        if propios:
+            # Suyos los dos: se sirven literales, sin sustituir nada.
+            imagen, guion = (_limpio(f) for f in propios)
+        else:
+            imagen = _con_sexo(meta["imagen"], sexo, SEXOS_MOF10)
+            guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
         salida.append({
             "clave": clave,
             "label": meta["label"],
-            "imagen": _con_sexo(meta["imagen"], sexo, SEXOS_MOF10),
-            "guion": _con_sexo(meta["guion"], sexo, SEXOS_MOF10),
+            "imagen": imagen,
+            "guion": guion,
             "derivado": sexo in meta["derivado"],
         })
     return salida

@@ -1,14 +1,12 @@
-<!-- "MOF 10 SEGUNDOS · frente a espejo", paso 1 de 2: la IMAGEN, en Flow con
-     la foto de la prenda como referencia.
+<!-- "MOF 10 SEGUNDOS · frente a espejo" (MUJER), paso 1 de 2: la IMAGEN, en
+     Flow con la foto de la prenda como referencia.
 
-     Se diferencia de la variante "colocando móvil" en el encuadre: aquí es un
-     selfie de espejo de CUERPO ENTERO y el escenario es aleatorio, no un
-     dormitorio concreto. Texto de hombre literal suyo; el de mujer, derivado
-     por los marcadores `{{...}}` (`config.SEXOS_MOF10`). -->
+     Literal de su web. No es el de hombre con las palabras cambiadas: además
+     del género, cambian `face.makeup` y `accessories.jewelry`. -->
 
 {
   "subject": {
-    "description": "A random young {{PERSONA}} of any appearance, with any hair type, length, color, and texture, any body type, any skin tone, any age between 18 and 35, standing barefoot in front of a random type of mirror inside a random indoor setting. {{EL}} is taking a mirror selfie, holding a smartphone in one hand while the other hand is in any natural position. {{SU}} full body is visible from head to toe, standing with any relaxed or natural posture.",
+    "description": "A random young woman of any appearance, with any hair type, length, color, and texture, any body type, any skin tone, any age between 18 and 35, standing barefoot in front of a random type of mirror inside a random indoor setting. She is taking a mirror selfie, holding a smartphone in one hand while the other hand is in any natural position. Her full body is visible from head to toe, standing with any relaxed or natural posture.",
     "age": "random between 18-35",
     "expression": "any natural expression",
     "hair_color": "any color",
@@ -27,10 +25,10 @@
     ]
   },
   "face": {
-    "makeup": "{{CARA_ESPEJO}}"
+    "makeup": "any natural makeup or none, realistic skin texture"
   },
   "accessories": {
-    "jewelry": "any jewelry or none, random and natural (watch, bracelet, necklace, chain, etc.)"
+    "jewelry": "any jewelry or none, random and natural"
   },
   "device": {
     "type": "smartphone",
