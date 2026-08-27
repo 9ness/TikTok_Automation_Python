@@ -1068,7 +1068,11 @@ def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) ->
         "-i", str(video_in), "-i", str(audio_in),
         "-map", "0:v:0", "-map", "1:a:0",
         "-af", _filtro_voz(audio_in, on_log),
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        # 48 kHz A PROPÓSITO: Fish devuelve el audio a 96 kHz y sin esto se
+        # quedaba así hasta el MP4 final. El decodificador AAC de Android está
+        # especificado hasta 48, y por encima el reproductor del WebView deja
+        # la pantalla en negro — el vídeo se ve bien en el PC y no en la app.
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-shortest", "-movflags", "+faststart",
         str(out_path),
     ], on_log)
