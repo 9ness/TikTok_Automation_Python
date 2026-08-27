@@ -1012,6 +1012,7 @@ def importar_urls(
     # el pegote es gratis, al repetirlo el estado se actualiza solo.
     por_carpeta: dict[str, dict[str, str]] = {}
     agotados: dict[str, set[str]] = {}
+    con_stock: dict[str, set[str]] = {}
     sin_carpeta: set[str] = set()
     descartadas: list[str] = []
     for fila in filas:
@@ -1025,13 +1026,14 @@ def importar_urls(
             sin_carpeta.add(pegada)
             continue
         if not url:
-            # En su web o hay enlace o pone "SIN STOCK": sin enlace, agotado.
-            # Aun así se mira el campo cuando VIENE, porque entonces el guion
-            # ha leído el cartel de verdad; deducirlo siempre marcaría diez
-            # agotados de golpe si una carpeta fallara al leerse. Los pegotes
-            # viejos no traen el campo y ahí sí se deduce.
-            if fila.get("sin_stock") or "sin_stock" not in fila:
+            # Sin enlace NO es sin stock: en su web hay productos sin ninguna
+            # de las dos cosas —simplemente no le ha puesto la ficha—. Solo se
+            # marca agotado cuando el guion ha leído el cartel de verdad, y se
+            # DESMARCA cuando el pegote dice que ya no lo lleva.
+            if fila.get("sin_stock"):
                 agotados.setdefault(carpeta, set()).add(producto)
+            elif "sin_stock" in fila:
+                con_stock.setdefault(carpeta, set()).add(producto)
             continue
         # Su web tiene enlaces que no son fichas (apareció un script de Google
         # en una). Guardarlos dejaría un botón 🔗 que abre cualquier cosa.
@@ -1040,7 +1042,7 @@ def importar_urls(
             continue
         por_carpeta.setdefault(carpeta, {})[producto] = url
 
-    if not por_carpeta and not agotados:
+    if not por_carpeta and not agotados and not con_stock:
         return {
             "carpetas": 0, "guardados": 0, "en_indice": 0, "agotados": 0,
             "sin_carpeta": sorted(sin_carpeta), "descartadas": descartadas,
@@ -1052,7 +1054,7 @@ def importar_urls(
     en_indice = 0
 
     agotados_escritos = 0
-    for carpeta in sorted(set(por_carpeta) | set(agotados)):
+    for carpeta in sorted(set(por_carpeta) | set(agotados) | set(con_stock)):
         urls = por_carpeta.get(carpeta, {})
         with _cerrojo_carpeta(source, carpeta):
             data = load_folder(source, carpeta)
@@ -1065,6 +1067,12 @@ def importar_urls(
                     prod["sin_stock"] = True
                     prod["updated_at"] = _now()
                 agotados_escritos += 1
+            # Ya no lleva el cartel: se quita, aunque siga sin enlace.
+            for producto in con_stock.get(carpeta, set()):
+                prod = productos.get(producto)
+                if prod and prod.get("sin_stock"):
+                    prod["sin_stock"] = False
+                    prod["updated_at"] = _now()
             for producto, url in urls.items():
                 prod = productos.setdefault(producto, {})
                 if prod.get("product_url") != url or prod.get("sin_stock"):
@@ -1085,7 +1093,7 @@ def importar_urls(
     r.set_json(_URLS_INDEX, indice)
     _olvidar("urls")
     return {
-        "carpetas": len(set(por_carpeta) | set(agotados)),
+        "carpetas": len(set(por_carpeta) | set(agotados) | set(con_stock)),
         "guardados": guardados,
         "en_indice": en_indice,
         "agotados": agotados_escritos,
