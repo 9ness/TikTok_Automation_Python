@@ -66,6 +66,8 @@ class ProductoLargo(BaseModel):
     clip3: bool = False
     clip4: bool = False
     clips_necesarios: int = 2
+    # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
+    clip_s: int = 8
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False
@@ -97,6 +99,9 @@ class ProductoEstadoLargoRequest(BaseModel):
     # A qué nicho se atribuye la venta en el ranking compartido. Aquí siempre
     # es "pov_bof_largo"; se acepta por si la UI lo manda explícito.
     nicho: str | None = None
+    # Duración de los clips que va a generar el operador (8 o 10 segundos).
+    # Cambia cuántos pide el mismo guion: 20s son 3 clips de 8s o 2 de 10s.
+    clip_s: int | None = None
 
 
 class FolderLargo(BaseModel):

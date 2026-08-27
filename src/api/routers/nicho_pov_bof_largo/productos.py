@@ -389,7 +389,10 @@ def _listar(
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
-            clips_necesarios=config.clips_necesarios(guion),
+            clips_necesarios=config.clips_necesarios(
+                guion, clip_s=float(mio.get("clip_s") or 0),
+            ),
+            clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             # Mismo criterio que el POV BOF y Creativos (índice compartido o
@@ -510,6 +513,14 @@ def set_producto_estado(
             # Vender implica haberlo subido — mismo criterio que el POV BOF.
             if body.sold:
                 campos["uploaded"] = True
+        if body.clip_s is not None:
+            if body.clip_s not in config.CLIPS_DURACIONES:
+                raise _bad(
+                    "clip_s debe ser "
+                    f"{' o '.join(map(str, config.CLIPS_DURACIONES))}, "
+                    f"recibido: {body.clip_s}"
+                )
+            campos["clip_s"] = body.clip_s
         if body.en_escaparate is not None:
             # Se guarda TAMBIÉN en el documento de este nicho (que es lo que
             # lee el listado): la clave del índice es `tienda|titulo`, así que
@@ -872,7 +883,9 @@ def confirmar_lote(
             mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
             continue
         montado_at = float(prod.get("video_listo_at") or 0)
-        hacen_falta = config.clips_necesarios(str(prod.get("guion") or ""))
+        hacen_falta = config.clips_necesarios(
+            str(prod.get("guion") or ""), clip_s=float(prod.get("clip_s") or 0),
+        )
         if vistos[item.producto] >= 2:
             # El enésimo vídeo de este producto en ESTA tanda va al hueco n.
             slot = min(vistos[item.producto], hacen_falta)
@@ -1053,7 +1066,9 @@ def _encolar_clip(
 
     montado_at = float(prod.get("video_listo_at") or 0)
     # Cuántos clips pide ESTE guion (dos, o tres si la voz no cabe en dos).
-    hacen_falta = config.clips_necesarios(str(prod.get("guion") or ""))
+    hacen_falta = config.clips_necesarios(
+        str(prod.get("guion") or ""), clip_s=float(prod.get("clip_s") or 0),
+    )
     rutas = [
         prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
     ]

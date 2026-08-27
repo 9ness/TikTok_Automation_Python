@@ -50,6 +50,17 @@ CLIPS_MAXIMOS = 4
 # segundos"). De ahí salen los cortes: 1 clip hasta ~9,5s, 2 hasta ~19s, 3
 # hasta ~28,5s y 4 hasta ~38s.
 CLIP_MAX_S = round(CLIP_TARGET_S * 1.2, 1)
+# Duraciones que el operador puede elegir. La plataforma de vídeo ha dado clips
+# de 8 y de 10 según la época y la herramienta, y de eso depende cuántos pedir:
+# el mismo guion de 20s son 3 clips de 8s o 2 de 10s.
+CLIPS_DURACIONES = (8, 10)
+
+
+def clip_max_s(clip_s: float = 0.0) -> float:
+    """Cuánta voz cubre un clip de esa duración, estirado incluido."""
+    if clip_s and clip_s > 0:
+        return round(float(clip_s) * 1.2, 1)
+    return CLIP_MAX_S
 
 # ---------------------------------------------------------------------------
 # Guion
@@ -95,7 +106,7 @@ def segundos_de(guion: str, voz: str = "") -> float:
     return n / velocidad_voz.caracteres_por_segundo(voz)
 
 
-def clips_necesarios(guion: str, voz: str = "") -> int:
+def clips_necesarios(guion: str, voz: str = "", clip_s: float = 0.0) -> int:
     """Cuántos clips hacen falta para que quepa ese guion.
 
     La voz manda: si dura más de lo que dan los clips, el montaje tiene que
@@ -104,6 +115,10 @@ def clips_necesarios(guion: str, voz: str = "") -> int:
 
     Sin voz elegida se cuenta con la más lenta del banco: es lo que evita
     quedarse corto justo cuando toca la que más se alarga.
+
+    `clip_s` es la duración de los clips que va a generar el operador (8 o 10
+    segundos). Cambia la cuenta entera: el mismo guion de 20s son tres clips de
+    8s o dos de 10s. Sin él se usa el valor de `.env`.
     """
     n = len((guion or "").strip())
     if not n:
@@ -114,7 +129,8 @@ def clips_necesarios(guion: str, voz: str = "") -> int:
         segundos = n / velocidad_voz.caracteres_por_segundo(voz)
     else:
         segundos = n / CARACTERES_POR_SEGUNDO_LENTA
-    hacen_falta = -(-int(segundos * 100) // int(CLIP_MAX_S * 100))  # techo
+    cabe = clip_max_s(clip_s)
+    hacen_falta = -(-int(segundos * 100) // int(cabe * 100))  # techo
     return max(CLIPS_POR_VIDEO, min(CLIPS_MAXIMOS, hacen_falta))
 
 
