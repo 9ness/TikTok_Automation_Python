@@ -41,12 +41,21 @@ _noop: OnLog = lambda _m: None
 FISH_USD_PER_MILLON_BYTES = 15.0
 
 
+# Colchón al descartar voces por velocidad. Las cifras de `velocidad_voz` se
+# reajustan solas con cada vídeo, así que una voz que hoy cuadra justo puede
+# bajar una décima mañana y colarse sin que quepa. Con medio segundo, la que
+# entra cabe de verdad.
+MARGEN_VOZ_S = 0.5
+
+
 def elegir_voz(
     sexo: str,
     rng: random.Random | None = None,
     *,
     caracteres: int = 0,
     segundos_max: float = 0.0,
+    margen_s: float = MARGEN_VOZ_S,
+    on_log: OnLog = _noop,
 ) -> dict[str, str]:
     """Una voz al azar del banco del sexo pedido.
 
@@ -60,8 +69,14 @@ def elegir_voz(
     Se puede filtrar porque cuando se locuta los clips YA están subidos: se sabe
     cuánto material hay. Antes se sorteaba a ciegas entre todas.
 
-    Si no cabe ninguna se sortea entre todas igualmente: quedarse sin voz sería
-    peor que estirar un poco, y el aviso lo da el log del montaje.
+    Se descarta con un COLCHÓN (`margen_s`): las velocidades se reajustan solas
+    con cada vídeo montado, así que una voz que cuadra por una décima hoy puede
+    no cuadrar mañana.
+
+    Si con el colchón no cabe ninguna se prueba sin él, y si aún así ninguna se
+    sortea entre todas: quedarse sin voz sería peor que estirar un poco. Los
+    dos escalones se dicen en el log, porque significan que el vídeo va a pedir
+    un clip más de lo previsto.
     """
     sexo = (sexo or "").strip().lower()
     if sexo not in config.VOCES:
@@ -70,12 +85,30 @@ def elegir_voz(
     if caracteres > 0 and segundos_max > 0:
         from src.nicho_pov_bof_largo.services import velocidad_voz
 
-        caben = [
-            v for v in candidatas
-            if caracteres / velocidad_voz.caracteres_por_segundo(v["id"]) <= segundos_max
-        ]
-        if caben:
-            candidatas = caben
+        def _caben(tope: float) -> list[dict[str, str]]:
+            return [
+                v for v in candidatas
+                if caracteres / velocidad_voz.caracteres_por_segundo(v["id"]) <= tope
+            ]
+
+        con_colchon = _caben(segundos_max - max(0.0, margen_s))
+        if con_colchon:
+            candidatas = con_colchon
+        else:
+            justas = _caben(segundos_max)
+            if justas:
+                on_log(
+                    f"[voz] ninguna voz cabe con {margen_s}s de margen en "
+                    f"{segundos_max:.1f}s; se sortea entre las {len(justas)} que "
+                    "caben justas"
+                )
+                candidatas = justas
+            else:
+                on_log(
+                    f"[voz] NINGUNA voz cabe: {caracteres} caracteres no entran "
+                    f"en {segundos_max:.1f}s. Se sortea entre todas y el montaje "
+                    "tendrá que estirar o pedir otro clip."
+                )
     return (rng or random).choice(candidatas)
 
 
