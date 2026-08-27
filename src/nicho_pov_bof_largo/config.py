@@ -65,12 +65,12 @@ CLIP_MAX_S = round(CLIP_TARGET_S * 1.2, 1)
 # audio de Fish). No es un detalle: con el mismo guion, "audio hombre vendedor"
 # corre a 23,6 car/s y "influencer" a 15,4 — 20s con una son 30s con la otra, y
 # de eso depende cuántos clips hay que generar.
-CARACTERES_POR_SEGUNDO = 17.8      # media de los 20 vídeos medidos
+CARACTERES_POR_SEGUNDO = 19.6      # media de los 20 medidos, ya con VOZ_TEMPO
 # Para decidir CUÁNTOS CLIPS se usa la voz LENTA, no la media: la voz se sortea
 # después de escribir el guion, así que hay que ponerse en lo peor. Quedarse
 # corto obliga a estirar el vídeo y deforma el gesto de la mano; sobrar medio
 # clip no se nota, porque el montaje recorta a la duración de la voz.
-CARACTERES_POR_SEGUNDO_LENTA = 15.4
+CARACTERES_POR_SEGUNDO_LENTA = 16.9
 # Lo que tiene que DURAR el guion, que es una decisión del formato y no del
 # tamaño de los clips: el del curso cuenta el producto en unos veinte segundos.
 # Antes se calculaba como "lo que quepa en los clips" y al pasar a clips de 8s
@@ -221,6 +221,18 @@ VOZ_LIMITER = 0.89
 #     1,5s baja a 0,3s pero SIGUE habiendo pausa — respira, no atropella.
 # `detection=peak` es conservador: solo cuenta como silencio lo que baje de
 # -40 dB de pico, así que no se come el arranque suave de una palabra.
+# Un pelín más rápido. No es capricho: con el guion de 223 caracteres del POV
+# BOF, a velocidad normal solo DOS voces del banco caben en un clip de 10s
+# (12s con el estirado), así que todos los vídeos sonarían igual. Con +10%
+# entran siete, y en voz hablada un 10% no se percibe como acelerón — sí a
+# partir del 15%, donde empieza a sonar atropellado.
+#
+# Va en la cadena ANTES del nivelado, así que las velocidades que se apuntan
+# en `velocidad_voz` ya salen medidas con esto puesto. Las cifras de arranque
+# de esa tabla se midieron sin acelerar y se corrigieron a mano una vez; las
+# que ya estaban guardadas en Redis se reajustan solas en unos vídeos.
+VOZ_TEMPO = float(os.getenv("VOZ_TEMPO", "1.10"))
+
 VOZ_SILENCIO = (
     "silenceremove="
     "start_periods=1:start_silence=0.08:start_threshold=-40dB:"

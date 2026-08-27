@@ -222,7 +222,11 @@ def _medir(audio: Path, extra: str = "") -> dict[str, str]:
 def _nivelar(crudo: Path, destino: Path, *, on_log: OnLog = _noop) -> dict:
     # El recorte de silencios va PRIMERO y forma parte de la cadena, para que la
     # medición de sonoridad y el render final vean el mismo audio ya ajustado.
-    pre = f"{config.VOZ_SILENCIO},{config.VOZ_CADENA}"
+    # El acelerón va detrás del recorte y delante del resto: así el compresor y
+    # el `speechnorm` ven ya el ritmo definitivo, y la duración que se mide al
+    # final —la que se apunta como velocidad de la voz— lo incluye.
+    tempo = f",atempo={config.VOZ_TEMPO}" if config.VOZ_TEMPO != 1.0 else ""
+    pre = f"{config.VOZ_SILENCIO}{tempo},{config.VOZ_CADENA}"
     med = _medir(crudo, pre)
     norm = f"loudnorm=I={config.VOZ_LUFS}:TP={config.VOZ_TP}:LRA=7"
     if len(med) == 4:
