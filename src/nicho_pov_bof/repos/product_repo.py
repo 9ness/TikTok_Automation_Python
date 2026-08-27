@@ -1025,7 +1025,12 @@ def importar_urls(
             sin_carpeta.add(pegada)
             continue
         if not url:
-            if fila.get("sin_stock"):
+            # En su web o hay enlace o pone "SIN STOCK": sin enlace, agotado.
+            # Aun así se mira el campo cuando VIENE, porque entonces el guion
+            # ha leído el cartel de verdad; deducirlo siempre marcaría diez
+            # agotados de golpe si una carpeta fallara al leerse. Los pegotes
+            # viejos no traen el campo y ahí sí se deduce.
+            if fila.get("sin_stock") or "sin_stock" not in fila:
                 agotados.setdefault(carpeta, set()).add(producto)
             continue
         # Su web tiene enlaces que no son fichas (apareció un script de Google
