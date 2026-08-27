@@ -2866,6 +2866,78 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     return resumen
 
 
+def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Escribe los guiones de 10s de TODA una carpeta del POV BOF.
+
+    El gemelo del lote del Largo, con dos diferencias: el prompt es el de 10
+    segundos (223 caracteres, no ~356) y el guion se guarda COMPARTIDO, no por
+    usuario — habla del producto, así que los tres operadores lo reaprovechan.
+
+    Un producto que falle no para los demás.
+
+    Params: source, folder, rehacer, productos (vacío = todos los de la carpeta).
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof_largo.services import guionista
+
+    p = job.params
+    source = str(p["source"])
+    folder = str(p["folder"])
+    rehacer = bool(p.get("rehacer"))
+    solo = {str(x) for x in (p.get("productos") or []) if str(x)}
+
+    doc = product_repo.load_folder(source, folder)
+    productos = (doc.get("productos") or {})
+    pendientes = []
+    for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
+        if solo and pid not in solo:
+            continue
+        if not (prod.get("titulo") or "").strip():
+            continue                      # sin textos el guion saldría genérico
+        if prod.get("guion_producto") and not rehacer:
+            continue
+        pendientes.append((pid, prod))
+
+    if not pendientes:
+        on_log("[guiones] nada que escribir: o ya tienen guion o les faltan textos")
+        return "sin-cambios"
+
+    on_log(f"[guiones] {len(pendientes)} guion(es) por escribir en {folder}")
+    hechos, fallidos = 0, []
+    prompt = pov_config.prompt_guion_producto()
+    for i, (pid, prod) in enumerate(pendientes):
+        on_progress(i / len(pendientes), f"✍️ {i + 1}/{len(pendientes)} · producto {pid}")
+        try:
+            escrito = guionista.escribir(
+                titulo=prod.get("titulo", ""),
+                tienda=prod.get("tienda", ""),
+                caption=prod.get("caption", ""),
+                foto=_foto_limpia(source, folder, pid),
+                prompt=prompt,
+                max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
+                etiqueta="nicho_pov_bof",
+                on_log=on_log,
+            )
+        except Exception as e:  # noqa: BLE001 — uno malo no para el resto
+            on_log(f"[guiones] producto {pid} falló: {e}")
+            fallidos.append(pid)
+            continue
+        product_repo.update_product(
+            source, folder, pid,
+            guion_producto=escrito["guion"],
+            subliminal_producto=escrito["subliminal"],
+        )
+        hechos += 1
+
+    on_progress(1.0, "✍️ Guiones listos")
+    resumen = f"{hechos}/{len(pendientes)} guiones"
+    if fallidos:
+        on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
+        resumen += f" · fallaron {len(fallidos)}"
+    return resumen
+
+
 def _foto_limpia(source: str, folder: str, producto: str):
     """La foto limpia del producto, para que el guion hable de lo que se ve.
 
@@ -3886,6 +3958,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
+    JobMode.NICHO_POV_BOF_GUIONES: run_nicho_pov_bof_guiones,
     JobMode.NICHO_CARRUSELES_PREPARAR: run_nicho_carruseles_preparar,
     JobMode.NICHO_CARRUSELES_REPARTO: run_nicho_carruseles_reparto,
     JobMode.NICHO_CARRUSELES_QUEMAR: run_nicho_carruseles_quemar,
@@ -3919,6 +3992,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
+    JobMode.NICHO_POV_BOF_GUIONES: "viralizacion",
     JobMode.NICHO_CARRUSELES_PREPARAR: "viralizacion",
     JobMode.NICHO_CARRUSELES_REPARTO: "viralizacion",
     JobMode.NICHO_CARRUSELES_QUEMAR: "viralizacion",

@@ -2,6 +2,7 @@
 
 import {
   Check,
+  PenLine,
   Clapperboard,
   ChevronLeft,
   ChevronRight,
@@ -53,6 +54,7 @@ import {
   useHashtags,
   useGuardarHashtags,
   useEscribirGuionProducto,
+  useGuionesLote,
   useBuscarUrlsCarpeta,
   useEchoTikEstado,
   useGuardarEchoTik,
@@ -546,6 +548,9 @@ export default function NichoPovBofPage() {
   // contador va sobre la carpeta y no sobre lo que se ve.
   const totalCarpeta = productos.data?.length ?? 0;
   const conTexto = (productos.data ?? []).filter((p) => p.titulo).length;
+  // Cuántos tienen ya el guion de 10s escrito, para el botón de la carpeta.
+  const conGuion = (productos.data ?? []).filter((p) => p.guion_producto).length;
+  const guionesLote = useGuionesLote();
   const subidos = enPantalla.filter((p) => p.uploaded).length;
   const enEscaparate = enPantalla.filter((p) => p.en_escaparate).length;
   // Meter el producto en el escaparate es el paso más lento del día y no se
@@ -1105,6 +1110,43 @@ export default function NichoPovBofPage() {
                       : `Obtener textos (${conTexto}/${totalCarpeta})`}
                   </>
                 )}
+              </button>
+            )}
+
+            {/* Los guiones de la carpeta entera, debajo de los textos porque
+                es el paso siguiente y necesita que estén. Van por la cola: son
+                diez llamadas a Gemini y con el operador delante serían diez
+                esperas seguidas. */}
+            {!esPro && (
+              <button
+                type="button"
+                disabled={guionesLote.isPending || conTexto === 0}
+                title={
+                  conTexto === 0
+                    ? "Extrae antes los textos: sin título el guion sale genérico"
+                    : "Escribe el guion de 10s de cada producto que no lo tenga"
+                }
+                onClick={() =>
+                  guionesLote.mutate(
+                    { source, folder },
+                    {
+                      onSuccess: (r: { title: string }) => {
+                        toast.success(`${r.title} en la cola`);
+                        openQueue();
+                      },
+                      onError: (e: unknown) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/10 disabled:opacity-50"
+              >
+                {guionesLote.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <PenLine className="h-4 w-4 shrink-0" />
+                )}
+                Guiones de la carpeta ({conGuion}/{totalCarpeta})
               </button>
             )}
 

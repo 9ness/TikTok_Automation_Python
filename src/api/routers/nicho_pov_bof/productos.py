@@ -1567,6 +1567,51 @@ def reconstruir_titulos_drive() -> dict:
     }
 
 
+@router.post("/guiones/lote", status_code=201)
+def guiones_lote(
+    body: dict,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    operator: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Encola los guiones de 10s de TODA una carpeta.
+
+    Son diez llamadas a Gemini, o sea diez esperas seguidas si se pulsa
+    producto a producto con el operador delante. Por la cola se lanza y se
+    sigue trabajando, igual que los textos y que los guiones del Largo.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    if source not in pov_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad_request("Falta la carpeta.")
+
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_GUIONES,
+        title=f"✍️ Guiones POV BOF · {folder}",
+        params={
+            "source": source,
+            "folder": folder,
+            "rehacer": bool(body.get("rehacer")),
+            "productos": [str(x) for x in (body.get("productos") or []) if str(x)],
+        },
+        enqueued_by=operator or None,
+    )
+    pendientes = [
+        j for j in queue.get_all()
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+    ]
+    return {
+        "job_id": job.id,
+        "title": job.title,
+        "position_in_queue": next(
+            (i for i, j in enumerate(pendientes) if j.id == job.id), 0
+        ),
+    }
+
+
 @router.post("/guion")
 def escribir_guion(body: dict) -> dict:
     """Escribe el guion de 10s de UN producto y lo guarda.

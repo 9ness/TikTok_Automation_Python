@@ -781,6 +781,19 @@ export function useUrlsCatalogo(source: string) {
   });
 }
 
+/** Encolar los guiones de 10s de TODA una carpeta. */
+export function useGuionesLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; position_in_queue: number },
+    Error,
+    { source: string; folder: string; rehacer?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/guiones/lote`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["queue"] }),
+  });
+}
+
 /** Escribir el guion de 10s de un producto (lo dice la voz de Fish). */
 export function useEscribirGuionProducto() {
   const qc = useQueryClient();
