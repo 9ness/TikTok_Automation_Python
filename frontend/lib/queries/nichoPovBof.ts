@@ -791,6 +791,8 @@ export function useImportarUrls() {
       en_indice: number;
       /** Carpetas del pegote que no casan con ninguna del catálogo. */
       sin_carpeta: string[];
+      /** Enlaces que no son de TikTok (su web tiene alguno suelto). */
+      descartadas: string[];
     },
     Error,
     { source: string; filas: unknown[] }

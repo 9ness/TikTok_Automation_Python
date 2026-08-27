@@ -1008,11 +1008,17 @@ def importar_urls(
 
     por_carpeta: dict[str, dict[str, str]] = {}
     sin_carpeta: set[str] = set()
+    descartadas: list[str] = []
     for fila in filas:
         pegada = _carpeta_pegada(str(fila.get("carpeta") or ""))
         producto = _numero_pegado(str(fila.get("producto") or ""))
         url = str(fila.get("url") or "").strip()
         if not pegada or not producto or not url:
+            continue
+        # Su web tiene enlaces que no son fichas (apareció un script de Google
+        # en una). Guardarlos dejaría un botón 🔗 que abre cualquier cosa.
+        if not _es_ficha_tiktok(url):
+            descartadas.append(f"{pegada} · {producto}: {url[:60]}")
             continue
         carpeta = reales.get(_llana(pegada), "" if reales else pegada)
         if not carpeta:
@@ -1023,7 +1029,7 @@ def importar_urls(
     if not por_carpeta:
         return {
             "carpetas": 0, "guardados": 0, "en_indice": 0,
-            "sin_carpeta": sorted(sin_carpeta),
+            "sin_carpeta": sorted(sin_carpeta), "descartadas": descartadas,
         }
 
     r = _require_redis()
@@ -1059,7 +1065,14 @@ def importar_urls(
         # Las que no casan con ninguna carpeta del catálogo. No se guardan en
         # ningún sitio: se dicen, para no dejar enlaces en un limbo.
         "sin_carpeta": sorted(sin_carpeta),
+        # Enlaces que no son una ficha de TikTok.
+        "descartadas": descartadas,
     }
+
+
+def _es_ficha_tiktok(url: str) -> bool:
+    """Solo enlaces de TikTok: el corto (`vm.tiktok.com`) o la ficha entera."""
+    return bool(re.match(r"^https?://([a-z0-9-]+\.)*tiktok\.com/", url.strip(), re.I))
 
 
 def _llana(texto: str) -> str:

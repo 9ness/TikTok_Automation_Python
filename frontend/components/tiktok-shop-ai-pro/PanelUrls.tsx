@@ -323,6 +323,13 @@ console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con
               (r.en_indice ? ` · ${r.en_indice} ya con texto` : ""),
           );
           // Callar esto dejaría enlaces sin guardar pareciendo que fue bien.
+          if (r.descartadas?.length) {
+            toast.warning(
+              `${r.descartadas.length} enlace(s) no son de TikTok y no se han guardado: ` +
+                r.descartadas.slice(0, 3).join(" · "),
+              { duration: 12000 },
+            );
+          }
           if (r.sin_carpeta?.length) {
             toast.warning(
               `Sin guardar, no hay esa carpeta en el catálogo: ${r.sin_carpeta.join(", ")}`,
