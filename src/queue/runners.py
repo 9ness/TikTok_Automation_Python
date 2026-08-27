@@ -2100,19 +2100,29 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
 
 def _segundos_de_video(clips: list[Path]) -> float:
-    """Cuánto vídeo hay de verdad entre todos los clips.
+    """Cuánta VOZ cabe entre todos los clips, estirado incluido.
 
-    Se mide en vez de contar "tantos clips por 8 segundos": el operador manda a
-    veces clips de 10s porque usa otra herramienta, y suponerlos de 8 descarta
-    del sorteo voces lentas que sí cabrían. Si no se puede medir, 0 = "no se
-    sabe" y el sorteo entra entre todas, como antes.
+    Se mide el vídeo en vez de contar "tantos clips por 8 segundos": el
+    operador manda a veces clips de 10s porque usa otra herramienta, y
+    suponerlos de 8 descarta del sorteo voces lentas que sí cabrían.
+
+    Y se multiplica por el estirado que el montaje ya aplica de todas formas
+    (`match_video_to_audio` alarga hasta un 20%, que es el margen acordado).
+    Sin eso, un clip de 10s se comparaba contra 10s pelados y solo cabía la voz
+    más rápida del banco — descartando voces que en el vídeo final entran de
+    sobra, porque esos 10s acaban siendo 12.
+
+    Si no se puede medir, 0 = "no se sabe" y el sorteo entra entre todas.
     """
     from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+    from src.nicho_pov_bof_largo import config as largo_config
 
     try:
-        return float(sum(probe_duration(c) for c in clips))
+        crudos = float(sum(probe_duration(c) for c in clips))
     except Exception:  # noqa: BLE001
         return 0.0
+    estirado = largo_config.CLIP_MAX_S / largo_config.CLIP_TARGET_S
+    return crudos * estirado
 
 
 def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
