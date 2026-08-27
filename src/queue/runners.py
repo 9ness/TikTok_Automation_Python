@@ -2879,7 +2879,22 @@ def run_nicho_pov_bof_renumerar(job: Job, on_log: OnLog, on_progress: OnProgress
     """
     from src.nicho_pov_bof.services import mis_productos
 
-    carpeta = str(job.params["carpeta"])
+    carpeta = str(job.params.get("carpeta") or "")
+    if not carpeta:
+        # Sin carpeta: compactar TODAS. Rellena de diez en diez desde la
+        # primera y borra las que se quedan vacías, que es lo que hace falta
+        # cuando de tanto borrar quedan cuatro carpetas a medias.
+        on_progress(0.1, "🔢 Recolocando todos los productos…")
+        res = mis_productos.compactar(on_log=on_log)
+        on_progress(1.0, f"🔢 {res['movidos']} producto(s) recolocados")
+        if not res["movidos"]:
+            return "sin-cambios"
+        borradas = res["carpetas_borradas"]
+        return (
+            f"{res['movidos']} recolocados"
+            + (f" · {len(borradas)} carpeta(s) borradas" if borradas else "")
+        )
+
     on_progress(0.1, f"🔢 Cerrando huecos de {carpeta}…")
     mapa = mis_productos.renumerar_carpeta(carpeta)
     if not mapa:

@@ -346,3 +346,100 @@ def copiar_a(destino: Path, foto_id: str) -> Path:
     destino.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(origen, destino)
     return destino
+
+
+# ---------------------------------------------------------------------------
+# Compactar TODAS las carpetas
+# ---------------------------------------------------------------------------
+# `renumerar_carpeta` cierra los huecos DENTRO de una carpeta. Esto es el paso
+# siguiente: si de tanto borrar quedan 2 productos en la carpeta 1, 4 en la 2 y
+# 5 en la 3, se rellenan de diez en diez —la 1 con diez, la 2 con uno— y las
+# que se quedan vacías desaparecen.
+#
+# Los productos NO cambian de orden: se concatenan las carpetas por su número y
+# se reparten por bloques de diez. Así el producto que estaba antes sigue
+# estando antes, que es lo que el operador espera al mirar la lista.
+POR_CARPETA = 10
+
+
+def _nombre_carpeta(indice: int) -> str:
+    """`0` → `Mis Productos 1`. El nombre lo pone el importador, no el usuario."""
+    return f"{_PREFIJO} {indice + 1}"
+
+
+def plan_compactar() -> list[dict]:
+    """Qué habría que mover para que no queden huecos. NO toca nada.
+
+    Devuelve `[{origen, producto, destino, numero}]` solo con los que cambian,
+    en un orden seguro: cada producto va a un sitio que ya se ha vaciado.
+    """
+    plan: list[dict] = []
+    hueco = 0
+    for carpeta in carpetas():
+        for numero in _numeros(carpeta):
+            destino = _nombre_carpeta(hueco // POR_CARPETA)
+            nuevo = str(hueco % POR_CARPETA + 1)
+            hueco += 1
+            if destino == carpeta and nuevo == str(numero):
+                continue
+            plan.append({
+                "origen": carpeta,
+                "producto": str(numero),
+                "destino": destino,
+                "numero": nuevo,
+            })
+    return plan
+
+
+def compactar(on_log=None) -> dict:
+    """Ejecuta el plan: mueve fotos, arrastra los datos y borra lo que sobre."""
+    def _log(m: str) -> None:
+        if on_log:
+            on_log(m)
+
+    plan = plan_compactar()
+    if not plan:
+        _log("[compactar] no hay nada que mover")
+        return {"movidos": 0, "carpetas_borradas": []}
+
+    raiz = config.mis_productos_dir()
+    # Las fotos primero, a un nombre TEMPORAL: un producto puede ir a un hueco
+    # que otro acaba de dejar en la misma pasada, y renombrar directamente
+    # pisaría ficheros. Con el paso intermedio no hay colisión posible.
+    temporales: list[tuple[Path, Path]] = []
+    for paso in plan:
+        d_ori = raiz / paso["origen"]
+        d_des = raiz / paso["destino"]
+        d_des.mkdir(parents=True, exist_ok=True)
+        for f in sorted(d_ori.iterdir()):
+            if not f.is_file():
+                continue
+            m = re.match(rf"^{re.escape(paso['producto'])}(\(\d+\))?$", f.stem)
+            if not m:
+                continue
+            tmp = d_des / f"__tmp_{paso['numero']}{m.group(1) or ''}{f.suffix}"
+            f.rename(tmp)
+            temporales.append((tmp, d_des / f"{paso['numero']}{m.group(1) or ''}{f.suffix}"))
+    for tmp, final in temporales:
+        tmp.rename(final)
+    _log(f"[compactar] {len(temporales)} foto(s) movidas")
+
+    from src.nicho_pov_bof.services import reanclaje
+
+    movidas = reanclaje.mover_entre_carpetas(
+        "mis_productos",
+        [(p["origen"], p["producto"], p["destino"], p["numero"]) for p in plan],
+    )
+    _log(f"[compactar] {movidas} entrada(s) de datos movidas")
+
+    borradas = []
+    for carpeta in carpetas():
+        d = raiz / carpeta
+        if d.is_dir() and not any(f.is_file() for f in d.iterdir()):
+            d.rmdir()
+            borradas.append(carpeta)
+    if borradas:
+        _log(f"[compactar] carpetas vacías borradas: {', '.join(borradas)}")
+
+    _invalidar()
+    return {"movidos": len(plan), "carpetas_borradas": borradas}

@@ -1271,9 +1271,36 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.get("/mis-productos/plan-recolocar")
+def plan_recolocar() -> dict:
+    """Qué pasaría al recolocar, SIN tocar nada.
+
+    Mover productos entre carpetas arrastra sus textos, guion, clips y vídeo
+    por varios documentos de Redis; enseñar antes el plan es lo que evita
+    ejecutarlo a ciegas.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    plan = mis_productos.plan_compactar()
+    antes = {c: len(mis_productos._numeros(c)) for c in mis_productos.carpetas()}
+    total = sum(antes.values())
+    despues: dict[str, int] = {}
+    for i in range(total):
+        despues[mis_productos._nombre_carpeta(i // mis_productos.POR_CARPETA)] = (
+            despues.get(mis_productos._nombre_carpeta(i // mis_productos.POR_CARPETA), 0) + 1
+        )
+    return {
+        "movimientos": len(plan),
+        "total": total,
+        "antes": antes,
+        "despues": despues,
+        "carpetas_borradas": [c for c in antes if c not in despues],
+    }
+
+
 @router.post("/mis-productos/renumerar")
 def renumerar_mis_productos(
-    carpeta: Annotated[str, Query()],
+    carpeta: Annotated[str, Query()] = "",
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
 ) -> dict:
     """Cierra los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
@@ -1289,7 +1316,7 @@ def renumerar_mis_productos(
     """
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_RENUMERAR,
-        title=f"🔢 Renumerar · {carpeta}",
+        title=f"🔢 Renumerar · {carpeta}" if carpeta else "🔢 Recolocar Mis productos",
         params={"carpeta": carpeta},
     )
     return {"job_id": job.id, "title": job.title}

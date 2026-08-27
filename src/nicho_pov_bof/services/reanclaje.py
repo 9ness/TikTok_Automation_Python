@@ -246,3 +246,74 @@ def mover_fotos(source: str, folder: str, mapa: dict[str, str]) -> None:
             carr_fotos.invalidar()
         except Exception:  # noqa: BLE001
             pass
+
+
+def mover_entre_carpetas(
+    source: str, movimientos: list[tuple[str, str, str, str]],
+) -> int:
+    """Mueve productos de una carpeta a OTRA, con todo lo que guardan.
+
+    `movimientos` son `(carpeta_origen, producto_origen, carpeta_destino,
+    producto_destino)`, YA en un orden en el que ningún destino esté ocupado
+    (al compactar, el destino de cada producto siempre va por delante del
+    origen, así que basta recorrerlos en orden).
+
+    El hermano de `mover_productos`, que solo sabe renumerar dentro de una
+    misma carpeta. Aquí hay que sacar la entrada de un documento y meterla en
+    otro, y eso por cada nicho y cada usuario: un producto lleva sus textos en
+    el compartido, su guion en el del Largo y su "subido" en el de quien lo
+    subió.
+
+    Devuelve cuántas entradas se movieron. Idempotente: repetirlo no duplica
+    nada, porque lo movido ya no está en el origen.
+    """
+    if not movimientos:
+        return 0
+
+    import importlib
+
+    movidas = 0
+    for modulo, getter in _DOCS:
+        try:
+            r = getattr(importlib.import_module(modulo), getter)()
+            if not r.is_available():
+                continue
+        except Exception:  # noqa: BLE001 — un nicho caído no para a los demás
+            continue
+
+        for sufijo in {"", *(f":u:{u or 'ness'}" for u in _USUARIOS)}:
+            # Todo el trasiego de un documento se hace en memoria y se escribe
+            # UNA vez: entrada a entrada serían cientos de idas a Upstash.
+            cache: dict[str, dict] = {}
+            tocados: set[str] = set()
+
+            def _doc(carpeta: str) -> dict:
+                clave = f"folder:{source}:{carpeta}{sufijo}"
+                if clave not in cache:
+                    cache[clave] = r.get_json(clave) or {}
+                return cache[clave]
+
+            for c_ori, p_ori, c_des, p_des in movimientos:
+                origen = _doc(c_ori)
+                prods = origen.get("productos") or {}
+                entrada = prods.pop(str(p_ori), None)
+                if entrada is None:
+                    continue
+                destino = _doc(c_des)
+                destino.setdefault("productos", {})[str(p_des)] = entrada
+                tocados.add(c_ori)
+                tocados.add(c_des)
+                movidas += 1
+
+            for carpeta in tocados:
+                clave = f"folder:{source}:{carpeta}{sufijo}"
+                doc = cache.get(clave)
+                if doc is not None:
+                    # `ids_vigentes` era de la composición vieja: se tira para
+                    # que se vuelva a escribir al listar la carpeta.
+                    doc.pop("ids_vigentes", None)
+                    try:
+                        r.set_json(clave, doc)
+                    except Exception:  # noqa: BLE001
+                        continue
+    return movidas

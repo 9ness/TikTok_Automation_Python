@@ -59,6 +59,22 @@ export const nichoPovBofKeys = {
  *  Va por la cola: renumerar renombra las fotos de todos los productos
  *  siguientes contra el Drive montado, y eso dentro de la petición se quedaba
  *  a medias al recargar la página. */
+/** Qué pasaría al recolocar todas las carpetas de Mis productos. No toca nada. */
+export function usePlanRecolocar(activo: boolean) {
+  return useQuery<{
+    movimientos: number;
+    total: number;
+    antes: Record<string, number>;
+    despues: Record<string, number>;
+    carpetas_borradas: string[];
+  }>({
+    queryKey: [...nichoPovBofKeys.all, "plan-recolocar"],
+    queryFn: () => api.get(`${ROOT}/mis-productos/plan-recolocar`),
+    enabled: activo,
+    staleTime: 0,
+  });
+}
+
 export function useRenumerarMisProductos() {
   const qc = useQueryClient();
   return useMutation<{ job_id: string; title: string }, Error, { carpeta: string }>({
