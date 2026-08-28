@@ -1795,6 +1795,28 @@ function ProductoCard({
   const [verGuion, setVerGuion] = useState(false);
   const [verVoz, setVerVoz] = useState(false);
   const sortear = useSortearGuionPlazos();
+  // Los dos guiones se tratan igual en la tarjeta: el de plazos se SORTEA
+  // (gratis, de los cinco del curso) y el normal lo ESCRIBE la IA, pero para
+  // el operador es lo mismo — un texto que dice la voz.
+  const guionActual = producto.modo_plazos
+    ? producto.guion || ""
+    : producto.guion_producto || "";
+  const pedirGuion = () => {
+    const onError = (e: unknown) =>
+      toast.error(e instanceof ApiError ? e.message : String(e));
+    if (producto.modo_plazos) {
+      sortear.mutate({ source, folder, producto: producto.producto }, { onError });
+      return;
+    }
+    escribirGuion.mutate(
+      { source, folder: producto.folder || folder, producto: producto.producto },
+      {
+        onSuccess: (r: { caracteres: number }) =>
+          toast.success(`Guion escrito · ${r.caracteres} car.`),
+        onError,
+      },
+    );
+  };
   const borrar = useBorrarMiProducto();
   const qc = useQueryClient();
   const hashtags = useHashtags().data ?? [];
@@ -2209,6 +2231,30 @@ function ProductoCard({
           herramientas casi siempre las cuatro, así que enseñan su valor y se
           abren solo cuando hay que cambiarlos. */}
       <div className="flex items-stretch gap-1.5">
+        {/* El guion, como en el Largo: un chip que dice cuánto ocupa y se
+            despliega. Antes era una barra de ancho completo entre el precio y
+            los clips, para enseñar un texto que se lee UNA vez. */}
+        {guionActual ? (
+          <ChipAjuste
+            icono="🎬"
+            valor={`${guionActual.length} car.`}
+            abierto={verGuion}
+            onToggle={() => setVerGuion((v) => !v)}
+            title={`Guion · ~${Math.round(guionActual.length / CAR_POR_SEG)}s`}
+          />
+        ) : (
+          <ChipAjuste
+            icono={escribirGuion.isPending || sortear.isPending ? "⏳" : "✍️"}
+            valor="Guion"
+            abierto={false}
+            onToggle={pedirGuion}
+            title={
+              producto.modo_plazos
+                ? "Sortear el guion de plazos"
+                : "Escribir el guion de este producto"
+            }
+          />
+        )}
         <ChipAjuste
           icono={sexo === "auto" ? "🖐️" : sexo === "hombre" ? "👨" : "👩"}
           valor={sexo === "auto" ? "Auto" : sexo === "hombre" ? "Hombre" : "Mujer"}
@@ -2228,6 +2274,53 @@ function ProductoCard({
       {/* Ya no se elige el generador (Veo3/Kling): Veo3 dejó de poner marca de
           agua en 2026-07 y Kling nunca la puso, así que no hay nada que
           quitar y la elección no cambiaba el resultado. */}
+      {/* El texto del guion, desplegado desde su chip. Uno solo para los dos
+          casos: el de plazos se vuelve a sortear (gratis) y el normal se
+          reescribe con IA, pero se ven igual. */}
+      {guionActual && verGuion && (
+        <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
+          <p className="text-[10px] leading-relaxed">{guionActual}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CopyChip label="🎬 Guion" text={guionActual} />
+            {producto.modo_plazos && (
+              <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-400">
+                plazos
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={escribirGuion.isPending || sortear.isPending}
+              onClick={() => {
+                if (producto.modo_plazos) {
+                  pedirGuion();
+                  return;
+                }
+                escribirGuion.mutate(
+                  {
+                    source,
+                    folder: producto.folder || folder,
+                    producto: producto.producto,
+                    rehacer: true,
+                  },
+                  {
+                    onError: (e: unknown) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                );
+              }}
+              className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-3 w-3 ${
+                  escribirGuion.isPending || sortear.isPending ? "animate-spin" : ""
+                }`}
+              />
+              Otro guion
+            </button>
+          </div>
+        </div>
+      )}
+
       {verVoz && (
       <div className="flex rounded-md border border-border/60 p-0.5 text-[11px]">
         {(["auto", "hombre", "mujer"] as const).map((s) => (
@@ -2329,165 +2422,6 @@ function ProductoCard({
             : null
         }
       />
-
-      {/* El guion de 10s, con la MISMA pinta que el de plazos y que el del POV
-          BOF Largo: barra plegable con los caracteres y los segundos, y dentro
-          el texto, copiar y rehacer. Las dos pantallas son el mismo trabajo,
-          así que no deben verse distintas. */}
-      {!producto.modo_plazos &&
-        (producto.guion_producto ? (
-          <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
-            <button
-              type="button"
-              onClick={() => setVerGuion((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
-            >
-              <span>
-                🎬 Guion
-                <span className="ml-1 opacity-70">
-                  {producto.guion_producto.length} car. · ~
-                  {Math.round(producto.guion_producto.length / CAR_POR_SEG)}s
-                </span>
-              </span>
-              <span>{verGuion ? "▾" : "▸"}</span>
-            </button>
-            {verGuion && (
-              <>
-                <p className="text-[10px] leading-relaxed">{producto.guion_producto}</p>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <CopyChip label="🎬 Guion" text={producto.guion_producto} />
-                  <button
-                    type="button"
-                    disabled={escribirGuion.isPending}
-                    onClick={() =>
-                      escribirGuion.mutate(
-                        {
-                          source,
-                          folder: producto.folder || folder,
-                          producto: producto.producto,
-                          rehacer: true,
-                        },
-                        {
-                          onError: (e: unknown) =>
-                            toast.error(e instanceof ApiError ? e.message : String(e)),
-                        },
-                      )
-                    }
-                    className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
-                  >
-                    <RefreshCw
-                      className={`h-3 w-3 ${escribirGuion.isPending ? "animate-spin" : ""}`}
-                    />
-                    Otro guion
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={escribirGuion.isPending || !producto.titulo}
-            title={
-              producto.titulo
-                ? "Escribe el guion de 10s de este producto"
-                : "Extrae antes los textos: sin título el guion sale genérico"
-            }
-            onClick={() =>
-              escribirGuion.mutate(
-                {
-                  source,
-                  folder: producto.folder || folder,
-                  producto: producto.producto,
-                },
-                {
-                  onSuccess: (r: { caracteres: number }) =>
-                    toast.success(`Guion escrito · ${r.caracteres} car.`),
-                  onError: (e: unknown) =>
-                    toast.error(e instanceof ApiError ? e.message : String(e)),
-                },
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-1.5 text-xs font-medium text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
-          >
-            {escribirGuion.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <PenLine className="h-3.5 w-3.5" />
-            )}
-            Escribir el guion
-          </button>
-        ))}
-
-      {producto.modo_plazos && (
-        /* Lo que va a decir la voz, a la vista antes de montar. Se sortea de
-           los cinco textos del curso y no gasta ninguna llamada de API, así
-           que pedir otro es gratis. */
-        producto.guion ? (
-          <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
-            {/* Plegado, como en el POV BOF Largo: el guion se lee una vez y
-                luego solo estorba entre el precio y los clips. */}
-            <button
-              type="button"
-              onClick={() => setVerGuion((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground"
-            >
-              <span>
-                🎬 Guion de plazos
-                <span className="ml-1 opacity-70">
-                  {producto.guion_caracteres} car. · ~
-                  {Math.round(producto.guion_caracteres / CAR_POR_SEG)}s
-                </span>
-              </span>
-              <span>{verGuion ? "▾" : "▸"}</span>
-            </button>
-            {verGuion && (
-            <>
-            <p className="text-[10px] leading-relaxed">{producto.guion}</p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <CopyChip label="🎬 Guion" text={producto.guion ?? ""} />
-              <button
-                type="button"
-                disabled={sortear.isPending}
-                onClick={() =>
-                  sortear.mutate(
-                    { source, folder, producto: producto.producto, rehacer: true },
-                    {
-                      onError: (e) =>
-                        toast.error(e instanceof ApiError ? e.message : String(e)),
-                    },
-                  )
-                }
-                className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3 w-3 ${sortear.isPending ? "animate-spin" : ""}`} />
-                Otro guion
-              </button>
-            </div>
-            </>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={sortear.isPending}
-            onClick={() =>
-              sortear.mutate(
-                { source, folder, producto: producto.producto },
-                { onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)) },
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-1.5 text-xs font-medium text-violet-500 transition hover:border-violet-500 disabled:opacity-50"
-          >
-            {sortear.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Eye className="h-3.5 w-3.5" />
-            )}
-            Ver el guion de plazos
-          </button>
-        )
-      )}
 
       {/* 8 o 10 segundos. Con guion propio decide cuántos clips hay que subir:
           a 10s el guion entra en uno solo.
