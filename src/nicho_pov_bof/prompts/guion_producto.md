@@ -6,13 +6,19 @@
      con Fish, no con la voz de Omni — con Fish sabemos qué se dice y a qué
      velocidad, y de eso depende cuántos clips hacen falta.
 
-     El formato de salida (JSON) lo añade el guionista; aquí va solo su texto. -->
+     El formato de salida (JSON) lo añade el guionista; aquí va solo su texto.
 
-Copia y Memoriza la siguiente estructura de este pront sin modificarla y adaptala a los productos que yo te vaya introduciendo con imágenes. Para la urgencia de precio utiliza alguna de estas opciones. Que Han mejorado el precio, o Han optimizado el precio, o han ajustado el precio, o Han dejado el precio más accesible, o Han mejorado el precio, o Han hecho un ajuste en el precio recientemente, o A un precio que merece la pena, o A un precio que está genial ahora mismo. No des una solución definitiva ni total del producto para evitar sanciones en la política de tik tok. No seas repetitivo con los guiones. Verás que después también hay un mensaje subliminal que es el que añadiremos al video final. Creame uno también siempre con el nombre del nuevo producto que te envie. Respeta la estructura del mensaje subliminal. Recuerda que el guión que generes es para un video de 10 segundos (unos 190 caracteres) sin excederte. Recuerda: No hagas promesas definitivas en el guión. No nombres precios. Respeta la estructura del guion base. La estructura del guión es: Urgencia de precio, nombre de producto, caracteristica del producto/ beneficio del producto y comprobacion de cupones y el pago a plazos. Y Recuerda que máximo son 190 caracteres para el mensaje en off. Recuerda respetar los ctas como estan en el siguiente guión de referencia. Obligatorio el cta de Comprueba tus cupones descuento y aprovecha el pago a plazos en pedidos de más de 30 euros.
+     Los marcadores `{{CTA_*}}` son nuestros, no suyos: su prompt pone la
+     frase del pago a plazos como OBLIGATORIA, y eso deja un producto de 11 €
+     diciendo "aprovecha el pago a plazos en pedidos de más de 30 euros". Suena
+     a relleno y encima es una afirmación que ese producto no sostiene. Solo se
+     mete a partir de `config.PRECIO_MIN_PLAZOS`. -->
+
+Copia y Memoriza la siguiente estructura de este pront sin modificarla y adaptala a los productos que yo te vaya introduciendo con imágenes. Para la urgencia de precio utiliza alguna de estas opciones. Que Han mejorado el precio, o Han optimizado el precio, o han ajustado el precio, o Han dejado el precio más accesible, o Han mejorado el precio, o Han hecho un ajuste en el precio recientemente, o A un precio que merece la pena, o A un precio que está genial ahora mismo. No des una solución definitiva ni total del producto para evitar sanciones en la política de tik tok. No seas repetitivo con los guiones. Verás que después también hay un mensaje subliminal que es el que añadiremos al video final. Creame uno también siempre con el nombre del nuevo producto que te envie. Respeta la estructura del mensaje subliminal. Recuerda que el guión que generes es para un video de 10 segundos (unos 190 caracteres) sin excederte. Recuerda: No hagas promesas definitivas en el guión. No nombres precios. Respeta la estructura del guion base. La estructura del guión es: Urgencia de precio, nombre de producto, caracteristica del producto/ beneficio del producto y {{CTA_ESTRUCTURA}}. Y Recuerda que máximo son 190 caracteres para el mensaje en off. Recuerda respetar los ctas como estan en el siguiente guión de referencia. Obligatorio el cta de {{CTA_LITERAL}}
 
 Guion de referencia:
 
-«Han ajustado el precio de estos jeans virales. Son elásticos y de campana. Vienen bien para poder estirarte o agacharte comodamente sin ningún problema. Comprueba tus cupones descuento y aprovecha el pago a plazos en pedidos de más de 30 euros.»
+«Han ajustado el precio de estos jeans virales. Son elásticos y de campana. Vienen bien para poder estirarte o agacharte comodamente sin ningún problema. {{CTA_EJEMPLO}}»
 
 Mensaje subliminal de referencia, en columna y con la misma estructura:
 
