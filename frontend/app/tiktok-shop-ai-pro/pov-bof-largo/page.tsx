@@ -1528,7 +1528,12 @@ function ProductoCard({
   // El guion guardado se escribió en el otro modo (con o sin la frase de
   // plazos). No es un error: pasa con todo lo escrito antes de que existieran
   // los plazos y cada vez que se corrige un precio.
-  const guionDesfasado = Boolean(p.guion) && p.modo_plazos !== p.guion_plazos;
+  // Desfasado por dos motivos: escrito con el otro modo de plazos, o con el
+  // otro MODO de guion (precio/dolor). En los dos casos no sirve.
+  const guionDesfasado =
+    Boolean(p.guion) &&
+    (p.modo_plazos !== p.guion_plazos ||
+      (p.guion_estilo || "precio") !== (p.estilo_guion || "precio"));
   // Cuántos clips pide ESTE guion. Lo calcula el backend con los caracteres
   // (la voz aún no existe cuando hay que decidirlo).
   const necesarios = Math.min(4, p.clips_necesarios || 2);
