@@ -82,10 +82,11 @@ export function FotoProducto({
 
   return (
     <>
-      {/* Mientras baja: la primera vez son 30s largos, y sin esto el visor es
-          un rectángulo en negro que no dice si la foto viene o no. La imagen
-          sigue en el DOM (oculta): `display:none` no impide que se descargue. */}
-      {!cargada && (
+      {/* Solo en el VISOR (`perezoso=false`). En la rejilla no: una miniatura
+          con `loading="lazy"` y `display:none` no entra nunca en pantalla, así
+          que el navegador no llega a pedirla y se queda en "Cargando…" para
+          siempre. Ahí la imagen se pinta desde el principio, como antes. */}
+      {!perezoso && !cargada && (
         <div
           className={`flex items-center justify-center bg-muted text-center text-[10px] text-muted-foreground ${className} ${claseHueco}`}
         >
@@ -108,7 +109,7 @@ export function FotoProducto({
           }
           setTimeout(() => setIntento((n) => n + 1), 800 * (intento + 1));
         }}
-        className={cargada ? className : "hidden"}
+        className={!perezoso && !cargada ? "hidden" : className}
       />
     </>
   );
