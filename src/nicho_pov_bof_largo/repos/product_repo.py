@@ -34,12 +34,32 @@ def _slug_usuario(usuario: str) -> str:
     return (usuario or "").strip() or "ness"
 
 
-def _key(source: str, folder: str, usuario: str) -> str:
+def _key(source: str, folder: str, usuario: str, estilo: str = "") -> str:
+    """Documento de una carpeta, POR usuario y POR modo de guion.
+
+    El modo va en la clave porque separa TODO lo de hacer el vídeo —guion,
+    clips, vídeo, "subido"— sin tocar lo del producto, que vive en los
+    documentos del POV BOF y se comparte (textos, escaparate, vendidos, ficha).
+    Recorrer el catálogo con "precio" y luego con "dolor" son dos trabajos, no
+    uno repetido.
+
+    El modo por DEFECTO se queda en la clave de siempre, sin sufijo: así el
+    histórico no se mueve de sitio y solo el modo nuevo estrena documento
+    (mismo criterio que `ness` con el usuario).
+    """
     # La fuente se canoniza: leer una carpeta desde la copia de seguridad es
     # leer la MISMA carpeta del curso, con el mismo progreso.
     from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo import config as largo_config
 
-    return f"folder:{pov_config.fuente_canonica(source)}:{folder}:u:{_slug_usuario(usuario)}"
+    base = (
+        f"folder:{pov_config.fuente_canonica(source)}:{folder}"
+        f":u:{_slug_usuario(usuario)}"
+    )
+    estilo = (estilo or largo_config.ESTILO_GUION_DEFECTO).strip()
+    if estilo == largo_config.ESTILO_GUION_DEFECTO:
+        return base
+    return f"{base}:m:{estilo}"
 
 
 def _lock(source: str, folder: str, usuario: str) -> str:
