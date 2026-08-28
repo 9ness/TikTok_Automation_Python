@@ -52,6 +52,13 @@ export function FotoProducto({
    *  mira solo ve un hueco, sin saber si va a venir o no. Pasado un rato se da
    *  por fallida y se reintenta como si hubiera dado error.
    *
+   *  45 SEGUNDOS, no 12: la primera vez que se pide una foto hay que bajarla
+   *  de Drive y eso son 30-36s medidos (la segunda son 0,08s, ya cacheada).
+   *  Con 12s el visor se rendía ANTES de que llegara, y encima cada reintento
+   *  cambia la URL —para saltarse la caché del navegador— así que volvía a
+   *  pagar la descarga entera. Resultado: tres esperas y un hueco en negro
+   *  para una foto que estaba perfectamente.
+   *
    *  Solo donde la carga NO es perezosa: en una rejilla, una miniatura que aún
    *  no se ha mirado está pendiente a propósito y esto la daría por rota. */
   useEffect(() => {
@@ -59,7 +66,7 @@ export function FotoProducto({
     const t = setTimeout(() => {
       if (intento >= 2) setFallo(true);
       else setIntento((n) => n + 1);
-    }, 12000);
+    }, 45000);
     return () => clearTimeout(t);
   }, [perezoso, src, cargada, fallo, intento]);
 
@@ -74,23 +81,35 @@ export function FotoProducto({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      // El contador va en la URL a propósito: sin cambiarla, el navegador
-      // sirve el fallo cacheado y el reintento no llega a pedir nada.
-      src={intento ? `${src}&reintento=${intento}` : src}
-      alt={alt}
-      loading={perezoso ? "lazy" : "eager"}
-      onClick={onClick}
-      onLoad={() => setCargada(true)}
-      onError={() => {
-        if (intento >= 2) {
-          setFallo(true);
-          return;
-        }
-        setTimeout(() => setIntento((n) => n + 1), 800 * (intento + 1));
-      }}
-      className={className}
-    />
+    <>
+      {/* Mientras baja: la primera vez son 30s largos, y sin esto el visor es
+          un rectángulo en negro que no dice si la foto viene o no. La imagen
+          sigue en el DOM (oculta): `display:none` no impide que se descargue. */}
+      {!cargada && (
+        <div
+          className={`flex items-center justify-center bg-muted text-center text-[10px] text-muted-foreground ${className} ${claseHueco}`}
+        >
+          {intento ? `Cargando… (intento ${intento + 1})` : "Cargando…"}
+        </div>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        // El contador va en la URL a propósito: sin cambiarla, el navegador
+        // sirve el fallo cacheado y el reintento no llega a pedir nada.
+        src={intento ? `${src}&reintento=${intento}` : src}
+        alt={alt}
+        loading={perezoso ? "lazy" : "eager"}
+        onClick={onClick}
+        onLoad={() => setCargada(true)}
+        onError={() => {
+          if (intento >= 2) {
+            setFallo(true);
+            return;
+          }
+          setTimeout(() => setIntento((n) => n + 1), 800 * (intento + 1));
+        }}
+        className={cargada ? className : "hidden"}
+      />
+    </>
   );
 }
