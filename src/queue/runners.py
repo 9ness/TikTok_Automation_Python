@@ -2935,19 +2935,32 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             continue
         if not (prod.get("titulo") or "").strip():
             continue                      # sin textos el guion saldría genérico
-        # Se respeta el guion ya escrito salvo que lleve la CTA vieja (la del
-        # pago a plazos, que aquí ya no va) o se pida rehacer.
-        if (
-            prod.get("guion_producto")
-            and not pov_config.guion_desfasado(prod["guion_producto"])
-            and not rehacer
-        ):
+        # Se respeta el guion ya escrito salvo que se pida rehacer.
+        if prod.get("guion_producto") and not rehacer:
             continue
         pendientes.append((pid, prod))
 
+    # Antes de gastar nada: a los que YA tienen guion pero con la frase del
+    # pago a plazos les basta con quitársela. Son treinta llamadas a Gemini de
+    # diferencia y el resto del texto, que está bien, no se toca.
+    limpiados = 0
+    for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
+        if solo and pid not in solo:
+            continue
+        guion = str(prod.get("guion_producto") or "")
+        if not guion or not pov_config.guion_desfasado(guion):
+            continue
+        limpio = pov_config.sin_cta_plazos(guion)
+        if limpio and limpio != guion:
+            product_repo.update_product(source, folder, pid, guion_producto=limpio)
+            limpiados += 1
+    if limpiados:
+        on_log(f"[guiones] {limpiados} guion(es) con la frase de plazos quitada (sin IA)")
+
     if not pendientes:
-        on_log("[guiones] nada que escribir: o ya tienen guion o les faltan textos")
-        return "sin-cambios"
+        resumen = f"{limpiados} limpiados" if limpiados else "sin-cambios"
+        on_log(f"[guiones] nada que escribir; {resumen}")
+        return resumen
 
     on_log(f"[guiones] {len(pendientes)} guion(es) por escribir en {folder}")
     hechos, fallidos = 0, []
@@ -2980,6 +2993,8 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
     on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
+    if limpiados:
+        resumen += f" · {limpiados} limpiados"
     if fallidos:
         on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
         resumen += f" · fallaron {len(fallidos)}"

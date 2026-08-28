@@ -1767,8 +1767,25 @@ def escribir_guion(body: dict) -> dict:
     # Los escritos con la CTA vieja se reescriben aunque no se pida rehacer:
     # se quedaban diciendo "aprovecha el pago a plazos en pedidos de más de 30
     # euros" en productos de 3 €.
-    viejo = pov_config.guion_desfasado(prod.get("guion_producto") or "")
-    if prod.get("guion_producto") and not viejo and not body.get("rehacer"):
+    guardado = str(prod.get("guion_producto") or "")
+    # Con la CTA vieja basta con quitarle la frase: no hace falta gastar una
+    # llamada a Gemini para reescribir un texto que por lo demás está bien.
+    if guardado and pov_config.guion_desfasado(guardado) and not body.get("rehacer"):
+        limpio = pov_config.sin_cta_plazos(guardado)
+        if limpio and limpio != guardado:
+            try:
+                product_repo.update_product(
+                    source, folder, producto, guion_producto=limpio,
+                )
+            except RuntimeError:
+                pass
+            return {
+                "guion": limpio,
+                "subliminal": prod.get("subliminal_producto", ""),
+                "caracteres": len(limpio),
+                "reusado": True,
+            }
+    if guardado and not body.get("rehacer"):
         return {
             "guion": prod["guion_producto"],
             "subliminal": prod.get("subliminal_producto", ""),

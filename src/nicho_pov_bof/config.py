@@ -666,6 +666,35 @@ def prompt_guion_producto() -> str:
     return texto
 
 
+# La frase del pago a plazos, tal y como la escribe Gemini. Medido sobre 30
+# guiones reales: tres variantes, todas con la misma forma —"y (aprovecha) el
+# pago a plazos en pedidos de más de 30 euros"— pegada al final de la CTA.
+#
+# Se quita con un reemplazo en vez de reescribir el guion con Gemini: son 30
+# llamadas menos y el resto del texto (que está bien) no cambia.
+_CTA_PLAZOS_RE = re.compile(
+    r"\s*(?:,|y)\s*(?:aprovecha\s+)?el\s+pago\s+a\s+plazos\b[^.]*",
+    re.IGNORECASE,
+)
+
+
+def sin_cta_plazos(guion: str) -> str:
+    """El guion con la frase del pago a plazos quitada.
+
+    Devuelve el texto tal cual si no la lleva, así que es idempotente.
+    """
+    limpio = re.sub(r"\s{2,}", " ", _CTA_PLAZOS_RE.sub("", guion or "")).strip()
+    if not limpio:
+        return ""
+    # Sin puntos ni espacios colgando, que al cortar quedaba "descuento..".
+    limpio = re.sub(r"[\s.]+$", "", limpio)
+    # Y se le devuelve el cierre de la CTA nueva: al quitar la frase quedaba
+    # "Comprueba tus cupones descuento" sin acabar.
+    if re.search(r"(cupones|descuento)$", limpio, re.IGNORECASE):
+        limpio += " antes de comprar"
+    return limpio + "."
+
+
 def guion_desfasado(guion: str) -> bool:
     """¿Ese guion se escribió con la CTA vieja (la del pago a plazos)?
 
