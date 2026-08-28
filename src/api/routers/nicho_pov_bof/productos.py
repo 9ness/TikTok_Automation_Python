@@ -1764,13 +1764,11 @@ def escribir_guion(body: dict) -> dict:
             "Este producto no tiene textos extraídos todavía: pulsa antes "
             "'Obtener textos'. Sin título, el guion saldría genérico."
         )
-    # Con qué CTA le toca: la del pago a plazos solo a partir del umbral.
-    con_plazos = _a_precio(prod.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
-    # Un guion escrito con la OTRA CTA no vale: en un producto de 11 € se
-    # queda diciendo "aprovecha el pago a plazos en pedidos de más de 30
-    # euros". Se reescribe aunque no se pida rehacer.
-    cuadra = bool(prod.get("guion_cta_plazos")) == con_plazos
-    if prod.get("guion_producto") and cuadra and not body.get("rehacer"):
+    # Los escritos con la CTA vieja se reescriben aunque no se pida rehacer:
+    # se quedaban diciendo "aprovecha el pago a plazos en pedidos de más de 30
+    # euros" en productos de 3 €.
+    viejo = pov_config.guion_desfasado(prod.get("guion_producto") or "")
+    if prod.get("guion_producto") and not viejo and not body.get("rehacer"):
         return {
             "guion": prod["guion_producto"],
             "subliminal": prod.get("subliminal_producto", ""),
@@ -1804,7 +1802,7 @@ def escribir_guion(body: dict) -> dict:
             foto=foto,
             # La frase del pago a plazos solo si el producto llega al umbral:
             # en uno de 11 € es relleno y encima no se sostiene.
-            prompt=pov_config.prompt_guion_producto(con_plazos),
+            prompt=pov_config.prompt_guion_producto(),
             max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
             etiqueta="nicho_pov_bof",
         )
@@ -1818,7 +1816,6 @@ def escribir_guion(body: dict) -> dict:
             source, folder, producto,
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
-            guion_cta_plazos=con_plazos,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

@@ -2935,15 +2935,11 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             continue
         if not (prod.get("titulo") or "").strip():
             continue                      # sin textos el guion saldría genérico
-        # Se respeta el guion ya escrito salvo que sea del OTRO modo de CTA
-        # (uno de 11 € con la frase del pago a plazos no vale) o se pida
-        # rehacer. Mismo criterio que el guion de plazos del Largo.
-        con_plazos = (
-            pov_config.precio_num(prod.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
-        )
+        # Se respeta el guion ya escrito salvo que lleve la CTA vieja (la del
+        # pago a plazos, que aquí ya no va) o se pida rehacer.
         if (
             prod.get("guion_producto")
-            and bool(prod.get("guion_cta_plazos")) == con_plazos
+            and not pov_config.guion_desfasado(prod["guion_producto"])
             and not rehacer
         ):
             continue
@@ -2957,10 +2953,7 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
     hechos, fallidos = 0, []
     # Dos versiones del prompt: con y sin la frase del pago a plazos. Se
     # eligen por PRECIO, no por carpeta, así que se preparan las dos una vez.
-    prompts = {
-        True: pov_config.prompt_guion_producto(True),
-        False: pov_config.prompt_guion_producto(False),
-    }
+    prompt = pov_config.prompt_guion_producto()
     for i, (pid, prod) in enumerate(pendientes):
         on_progress(i / len(pendientes), f"✍️ {i + 1}/{len(pendientes)} · producto {pid}")
         try:
@@ -2969,10 +2962,7 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 tienda=prod.get("tienda", ""),
                 caption=prod.get("caption", ""),
                 foto=_foto_limpia(source, folder, pid),
-                prompt=prompts[
-                    pov_config.precio_num(prod.get("precio"))
-                    >= pov_config.PRECIO_MIN_PLAZOS
-                ],
+                prompt=prompt,
                 max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
                 etiqueta="nicho_pov_bof",
                 on_log=on_log,
@@ -2985,10 +2975,6 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             source, folder, pid,
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
-            guion_cta_plazos=(
-                pov_config.precio_num(prod.get("precio"))
-                >= pov_config.PRECIO_MIN_PLAZOS
-            ),
         )
         hechos += 1
 
