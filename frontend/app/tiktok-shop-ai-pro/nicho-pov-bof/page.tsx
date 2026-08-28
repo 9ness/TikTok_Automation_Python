@@ -421,7 +421,22 @@ export default function NichoPovBofPage() {
   const qc = useQueryClient();
   // Igual que en el POV BOF Largo: en cuanto la cola dice que un montaje
   // terminó, se repregunta, en vez de esperar al sondeo de 5 s.
-  useAlTerminarJob(() => {
+  useAlTerminarJob((job) => {
+    // Apagar el "Montando el vídeo…" AL MOMENTO, sin esperar a la respuesta.
+    // Repreguntar la lista relee la carpeta del Drive y son 10-15s: el vídeo
+    // ya estaba hecho y la tarjeta seguía diciendo que se estaba montando.
+    //
+    // El producto sale del TÍTULO del trabajo ("… producto 9 · Carpeta_1"):
+    // el evento de la cola no trae los parámetros. Si no casa, no se toca
+    // nada y se queda el comportamiento de antes.
+    const m = /producto\s+(\S+)\s+·\s+(.+)$/.exec(job.title || "");
+    const pid = m?.[1];
+    if (pid && m?.[2]?.trim() === folder) {
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(source, folder),
+        (prev) => prev?.map((p) => (p.producto === pid ? { ...p, montando: false } : p)),
+      );
+    }
     void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all });
   });
   // Y al volver a la app. Los trabajos que terminan con la pantalla en segundo
