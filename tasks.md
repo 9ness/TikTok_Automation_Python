@@ -12,6 +12,17 @@ subir con el ⬆ de esa fila → quemar textos.
 - `1 Prod Aleatorios` sigue SIN textos ni filtro (31 carpetas): es la vía para
   ampliar catálogo cuando haga falta.
 
+## ⏳ Esperando a que Jonny lo publique (28 ago 2026)
+- [ ] **Gancho de PUNTO DE DOLOR para el POV BOF de 10s**: hoy solo lo publica
+  para los de 20s (ya metido en el Largo, `prompts/guion_dolor.md`, elegible
+  por carpeta). En 10s no cabe su estructura —sus propias partes suman 325
+  caracteres y en 10s caben 190—, así que habría que recortarlo a un solo punto
+  de dolor y sería NUESTRO, no suyo. Decisión del operador: **esperar unos días
+  a ver si saca la versión corta; por ahora solo prompts oficiales.**
+- [ ] **MOF MUJER · colocando el móvil**: es la única excepción viva a esa
+  regla — no lo publica y está derivado por nosotros (sale marcado "derivado"
+  en la pantalla de Ropa). Si aparece el suyo, se pega encima.
+
 ## 👤 Tareas Humanas
 
 - [ ] **APK nueva (WebView) — lo que queda por probar**: los CARRUSELES, que es lo único que baja por `blob:` (base64) y no se ha visto con tandas grandes. Lo demás ya está en uso: descargas a `Download/TTShopAIPro/`, subida de clips con el móvil bloqueado y el aviso de versión nueva (probado con el salto 2.0 → 2.1). Falta avisar a Ana y a Mauro de que actualicen — les sale el banner al entrar — y de que tendrán que meter el PIN otra vez.
