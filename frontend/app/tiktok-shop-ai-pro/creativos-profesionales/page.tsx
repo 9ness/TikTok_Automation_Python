@@ -51,6 +51,7 @@ import {
   buildCleanPhotoDownloadUrl,
   buildPhotoUrl,
   useExtraerTextos,
+  useResolverIds,
   useHashtags,
   useProductos,
   useSetEstado,
@@ -72,6 +73,7 @@ export default function CreativosProPage() {
   const productos = useProductos(source, folder);
   const prompt = usePromptCreativos();
   const extraer = useExtraerTextos();
+  const resolverIds = useResolverIds();
   // Los textos son del producto y se comparten: los extrae solo el admin.
   const esPro = useEsPro();
   const completar = useCompletarCarpetaCreativos();
@@ -86,6 +88,9 @@ export default function CreativosProPage() {
 
   const items = productos.data ?? [];
   const conTexto = items.filter((p) => p.titulo).length;
+  // Para el botón de los IDs: cuántos tienen enlace y cuántos ya tienen ID.
+  const conUrlCarpeta = items.filter((p) => p.product_url).length;
+  const conIdCarpeta = items.filter((p) => p.product_id).length;
   const subidosCarpeta = items.filter((p) => horasSubida[p.producto]).length;
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
@@ -326,6 +331,40 @@ export default function CreativosProPage() {
                   <Sparkles className="h-4 w-4" /> Obtener textos ({conTexto}/{items.length})
                 </>
               )}
+            </button>
+          )}
+
+          {/* Los IDs, para publicar desde el PC sin buscar el producto entre
+              139 páginas. Opcional: no hace falta para crear el creativo. */}
+          {conUrlCarpeta > 0 && (
+            <button
+              type="button"
+              disabled={resolverIds.isPending || !folder}
+              title="Para publicar desde el PC: el ID se pega en el buscador de TikTok Studio"
+              onClick={() =>
+                resolverIds.mutate(
+                  { source, folder: folder ?? "" },
+                  {
+                    onSuccess: (r: { resueltos: number; con_url: number }) =>
+                      toast.success(
+                        `${r.resueltos} ID(s) sacados de ${r.con_url} enlace(s)`,
+                      ),
+                    onError: (e: unknown) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                )
+              }
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
+            >
+              {resolverIds.isPending ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <span>🏷️</span>
+              )}
+              IDs de producto ({conIdCarpeta}/{conUrlCarpeta})
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
+                opcional · PC
+              </span>
             </button>
           )}
 
@@ -631,6 +670,9 @@ function CreativoCard({
         <CopyChip label="🔎 Título TikTok" text={p.titulo_tiktok_completo ?? ""} siempre />
         <CopyChip label="🏪 Tienda" text={p.tienda ?? ""} siempre />
         <CopyChip label="✍️ Caption" text={caption} siempre />
+        {/* El ID que pide TikTok Studio al enlazar el producto. Mismo catálogo
+            que el POV BOF, así que si se sacó allí aquí ya sale. */}
+        {p.product_id && <CopyChip label="🏷️ ID" text={p.product_id} siempre />}
         <BotonUrl
           url={p.product_url}
           source={source}
