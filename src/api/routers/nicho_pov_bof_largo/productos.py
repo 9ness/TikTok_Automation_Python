@@ -416,6 +416,11 @@ def _listar(
             estilo_guion=str(
                 mio.get("estilo_guion") or config.ESTILO_GUION_DEFECTO
             ),
+            # Con cuál se escribió el que hay guardado. Si no coincide con el
+            # elegido, ese guion no vale para este modo y hay que rehacerlo.
+            guion_estilo=str(
+                mio.get("guion_estilo") or config.ESTILO_GUION_DEFECTO
+            ),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             # Mismo criterio que el POV BOF y Creativos (índice compartido o
@@ -531,15 +536,12 @@ def estilo_guion_carpeta(
         )
 
     ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
-    tocados = 0
-    for pid in ids:
-        try:
-            product_repo.update_product(
-                source, folder, pid, usuario=usuario, estilo_guion=estilo,
-            )
-            tocados += 1
-        except RuntimeError:
-            continue
+    try:
+        tocados = product_repo.update_carpeta(
+            source, folder, ids, usuario=usuario, estilo_guion=estilo,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
     return {"estilo": estilo, "productos": tocados}
 
 
@@ -572,15 +574,12 @@ def clip_s_carpeta(
     from src.nicho_pov_bof.repos import product_repo as pov_repo
 
     ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
-    tocados = 0
-    for pid in ids:
-        try:
-            product_repo.update_product(
-                source, folder, pid, usuario=usuario, clip_s=clip_s,
-            )
-            tocados += 1
-        except RuntimeError:
-            continue
+    try:
+        tocados = product_repo.update_carpeta(
+            source, folder, ids, usuario=usuario, clip_s=clip_s,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
     return {"clip_s": clip_s, "productos": tocados}
 
 

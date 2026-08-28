@@ -71,6 +71,8 @@ class ProductoLargo(BaseModel):
     # Por dónde empieza el guion: "precio" o "dolor". No confundir con el
     # gancho del vídeo, que es el texto quemado de arriba.
     estilo_guion: str = "precio"
+    # Con qué modo se escribió el guion que hay guardado.
+    guion_estilo: str = "precio"
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False

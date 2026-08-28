@@ -65,6 +65,9 @@ export interface ProductoLargo {
   /** Por dónde empieza el guion: "precio" o "dolor". No es el gancho del
    *  vídeo (el texto quemado), es lo que dice la voz al arrancar. */
   estilo_guion?: string;
+  /** Con qué modo se escribió el guion guardado. Si no es el elegido, ese
+   *  guion no sirve: hay que reescribirlo. */
+  guion_estilo?: string;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.

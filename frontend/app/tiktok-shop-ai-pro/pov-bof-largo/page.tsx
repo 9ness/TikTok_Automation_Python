@@ -353,7 +353,13 @@ export default function PovBofLargoPage() {
   // de la carpeta y no el de lo que se ve.
   const totalCarpeta = items.length;
   const conTexto = items.filter((p) => p.titulo).length;
-  const conGuion = items.filter((p) => p.guion).length;
+  // Un guion escrito en el OTRO modo no cuenta como hecho: al pasar la
+  // carpeta a "punto de dolor", los diez de precio dejan de valer y el
+  // contador tiene que decir 0/10, no 10/10.
+  const guionSirve = (p: ProductoLargo) =>
+    Boolean(p.guion) &&
+    (p.guion_estilo || "precio") === (p.estilo_guion || "precio");
+  const conGuion = items.filter(guionSirve).length;
   const subidos = enPantalla.filter((p) => p.uploaded).length;
   const enEscaparate = enPantalla.filter((p) => p.en_escaparate).length;
   /** Le falta el guion o el que tiene es del otro modo (escrito antes de que
@@ -361,7 +367,8 @@ export default function PovBofLargoPage() {
    *  cuentan como pendientes: si no, el botón dice "guiones al día" mientras
    *  media carpeta lleva un guion sin la frase de plazos. */
   const pendienteGuion = (p: ProductoLargo) =>
-    Boolean(p.titulo) && (!p.guion || p.modo_plazos !== p.guion_plazos);
+    Boolean(p.titulo) &&
+    (!guionSirve(p) || p.modo_plazos !== p.guion_plazos);
   const sinGuion = items.filter(pendienteGuion).length;
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
   const pendientesUrl = items.filter(

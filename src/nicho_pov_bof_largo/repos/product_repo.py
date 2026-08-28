@@ -177,3 +177,29 @@ def _limpiar_legacy(claves: list[str], usuario: str) -> None:
     for clave in claves:
         if clave:
             r.srem(k, clave)
+
+
+def update_carpeta(
+    source: str, folder: str, ids: list[str], usuario: str = "", **campos
+) -> int:
+    """El mismo parche a TODOS los productos de la carpeta, de una escritura.
+
+    `update_product` en un bucle son diez idas y vueltas a Upstash por un campo
+    de una palabra, y con el cerrojo por medio eso eran ~10 segundos con el
+    operador mirando. Aquí es una lectura y una escritura del documento.
+    """
+    limpios = {k: v for k, v in campos.items() if v is not None}
+    if not ids or not limpios:
+        return 0
+    with _cerrojo(source, folder, usuario):
+        r = _require_redis()
+        clave = _key(source, folder, usuario)
+        doc = r.get_json(clave) or {}
+        productos = doc.setdefault("productos", {})
+        for pid in ids:
+            prod = productos.setdefault(str(pid), {})
+            prod.update(limpios)
+            prod["updated_at"] = _now()
+        doc["updated_at"] = _now()
+        r.set_json(clave, doc)
+    return len(ids)
