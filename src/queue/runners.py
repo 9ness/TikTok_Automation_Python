@@ -2760,6 +2760,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import drive_client
+    from src.nicho_pov_bof_largo import config as largo_config
     from src.nicho_pov_bof_largo.repos import product_repo
     from src.nicho_pov_bof_largo.services import guionista
 
@@ -2838,6 +2839,15 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
         )
         on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
+        # Por dónde empieza el guion: lo elige el operador por producto o por
+        # carpeta. `estilo_guion`, no `gancho` — aquí "gancho" es el texto
+        # quemado del vídeo.
+        estilo = str(
+            (product_repo.get_product(source, carpeta, pid, usuario) or {}).get(
+                "estilo_guion"
+            )
+            or largo_config.ESTILO_GUION_DEFECTO
+        )
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),
@@ -2845,6 +2855,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
                 caption=t.get("caption", ""),
                 foto=_foto_limpia(source, carpeta, pid),
                 plazos=plazos,
+                prompt=largo_config.prompt_guion(plazos, estilo),
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
@@ -2854,6 +2865,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             source, carpeta, pid, usuario=usuario,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
+            guion_estilo=estilo,
         )
         hechos += 1
 

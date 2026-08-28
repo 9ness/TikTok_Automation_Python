@@ -62,6 +62,9 @@ export interface ProductoLargo {
   /** Duración de los clips que genera el operador: 8 o 10 segundos. Cambia
    *  cuántos pide el mismo guion (20 s son 3 de 8 s o 2 de 10 s). */
   clip_s?: number;
+  /** Por dónde empieza el guion: "precio" o "dolor". No es el gancho del
+   *  vídeo (el texto quemado), es lo que dice la voz al arrancar. */
+  estilo_guion?: string;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.

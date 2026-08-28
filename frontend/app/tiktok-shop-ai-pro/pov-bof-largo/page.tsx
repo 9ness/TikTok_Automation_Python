@@ -84,6 +84,7 @@ import {
   useEscribirGuion,
   useGuionesLote,
   useClipSCarpetaLargo,
+  useEstiloGuionCarpeta,
   useFoldersLargo,
   useMarkCompletedLargo,
   useProductosLargo,
@@ -228,10 +229,16 @@ export default function PovBofLargoPage() {
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
   const clipSCarpeta = useClipSCarpetaLargo();
+  const estiloCarpeta = useEstiloGuionCarpeta();
   // Cuál está puesto en la carpeta (0 = mezclados), para marcarlo.
   const clipSCarpetaActual = (() => {
     const vistos = new Set(items.map((p) => p.clip_s || 10));
     return vistos.size === 1 ? [...vistos][0] : 0;
+  })();
+  // Igual para el estilo de guion: "" = mezclados en esta carpeta.
+  const estiloActual = (() => {
+    const vistos = new Set(items.map((p) => p.estilo_guion || "precio"));
+    return vistos.size === 1 ? [...vistos][0] : "";
   })();
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
@@ -927,6 +934,40 @@ export default function PovBofLargoPage() {
                 </>
               )}
             </button>
+
+            {/* Por dónde empieza el guion. Se recorre el catálogo con un
+                gancho y luego con el otro, así que se elige por tanda. */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="shrink-0">Guion:</span>
+              {[
+                { k: "precio", txt: "Precio" },
+                { k: "dolor", txt: "Punto de dolor" },
+              ].map((e) => (
+                <button
+                  key={e.k}
+                  type="button"
+                  disabled={estiloCarpeta.isPending}
+                  onClick={() =>
+                    estiloCarpeta.mutate(
+                      { source, folder, estilo: e.k },
+                      {
+                        onSuccess: (r: { productos: number }) =>
+                          toast.success(`${e.txt} en ${r.productos} producto(s)`),
+                        onError: (err: unknown) =>
+                          toast.error(err instanceof ApiError ? err.message : String(err)),
+                      },
+                    )
+                  }
+                  className={`rounded border px-2 py-1 font-semibold transition disabled:opacity-50 ${
+                    estiloActual === e.k
+                      ? "border-violet-500 bg-violet-500/15 text-violet-400"
+                      : "border-border/60 hover:border-violet-500 hover:text-violet-400"
+                  }`}
+                >
+                  {e.txt}
+                </button>
+              ))}
+            </div>
 
             {/* La duración de clip para TODA la carpeta. Cambia cuántos
                 huecos pide cada producto, así que se elige una vez por tanda y

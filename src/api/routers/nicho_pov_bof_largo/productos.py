@@ -413,6 +413,9 @@ def _listar(
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos({**mio, "guion": guion}),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
+            estilo_guion=str(
+                mio.get("estilo_guion") or config.ESTILO_GUION_DEFECTO
+            ),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             # Mismo criterio que el POV BOF y Creativos (índice compartido o
@@ -499,6 +502,45 @@ def list_productos_todos(
             items.extend(x.model_copy(update={"folder": carpeta}) for x in parcial.items)
     items.sort(key=lambda p: (p.ventas, p.vendido_at), reverse=True)
     return ProductosLargoResponse(source=source, folder="", items=items, montando=montando)
+
+
+@router.post("/estilo-guion/carpeta")
+def estilo_guion_carpeta(
+    body: dict,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """El estilo de guion (precio o dolor) para TODA la carpeta.
+
+    Se recorre el catálogo con un gancho y luego con el otro, así que se elige
+    por tanda, no producto a producto. Ojo con el nombre: aquí "gancho" es el
+    texto quemado del vídeo; esto es por dónde empieza lo que dice la voz.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    estilo = str(body.get("estilo") or "").strip()
+    if source not in pov_config.SOURCES:
+        raise _bad(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad("Falta la carpeta.")
+    if estilo not in config.ESTILOS_GUION:
+        raise _bad(
+            f"estilo debe ser {' o '.join(sorted(config.ESTILOS_GUION))}"
+        )
+
+    ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
+    tocados = 0
+    for pid in ids:
+        try:
+            product_repo.update_product(
+                source, folder, pid, usuario=usuario, estilo_guion=estilo,
+            )
+            tocados += 1
+        except RuntimeError:
+            continue
+    return {"estilo": estilo, "productos": tocados}
 
 
 @router.post("/clip-s/carpeta")
@@ -693,12 +735,17 @@ def escribir_guion(
         body.source, body.folder, body.producto, usuario
     )
     plazos = _es_plazos(textos)
+    # Por dónde empieza el guion (precio o dolor). Se guarda en el producto
+    # para saber después con cuál se escribió y reescribir solo si cambia.
+    # `estilo_guion`, no `gancho`: aquí "gancho" es el texto quemado del vídeo.
+    estilo = str(guardado.get("estilo_guion") or config.ESTILO_GUION_DEFECTO)
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (
         guardado.get("guion")
         and not body.rehacer
         and bool(guardado.get("guion_plazos")) == plazos
+        and str(guardado.get("guion_estilo") or config.ESTILO_GUION_DEFECTO) == estilo
     ):
         return _uno(body, queue, usuario)
 
@@ -733,6 +780,7 @@ def escribir_guion(
             caption=textos.get("caption", ""),
             foto=foto,
             plazos=plazos,
+            prompt=config.prompt_guion(plazos, estilo),
         )
     except ValueError as e:
         raise APIError(str(e), status_code=422) from e
@@ -744,6 +792,7 @@ def escribir_guion(
             body.source, body.folder, body.producto, usuario=usuario,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
+            guion_estilo=estilo,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

@@ -68,6 +68,9 @@ class ProductoLargo(BaseModel):
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
     clip_s: int = 10
+    # Por dónde empieza el guion: "precio" o "dolor". No confundir con el
+    # gancho del vídeo, que es el texto quemado de arriba.
+    estilo_guion: str = "precio"
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False

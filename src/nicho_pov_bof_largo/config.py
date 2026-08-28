@@ -143,15 +143,37 @@ def prompts_dir() -> Path:
     return Path(__file__).resolve().parent / "prompts"
 
 
-def prompt_guion(plazos: bool = False) -> str:
+# Los dos ESTILOS de guion que publica el curso para el vídeo de 20s. Cambian
+# por dónde
+# EMPIEZA el guion, que es lo que decide si alguien se queda:
+#   precio → "Han ajustado el precio de…" y el dolor va en medio.
+#   dolor  → tres a cinco problemas dirigidos al espectador y el precio al final.
+# No confundir con el "gancho" del vídeo, que es el texto quemado de arriba.
+# Lo demás (duración, tope de caracteres, salida) es igual en los dos, así que
+# el resto del nicho no se entera de cuál se usó.
+ESTILOS_GUION: dict[str, dict[str, str]] = {
+    "precio": {"label": "Urgencia de precio", "fichero": "guion.md"},
+    "dolor": {"label": "Punto de dolor", "fichero": "guion_dolor.md"},
+}
+ESTILO_GUION_DEFECTO = "precio"
+
+
+def prompt_guion(plazos: bool = False, estilo: str = ESTILO_GUION_DEFECTO) -> str:
     """El prompt del curso, con el bloque de plazos pegado si toca.
 
-    El de `guion.md` va LITERAL y nunca se toca. Lo de plazos es un añadido al
-    final (`guion_plazos.md`), no una versión aparte: así el guion de un
-    producto caro es el mismo de siempre con una frase más, y cualquier cambio
-    del curso se sigue aplicando a los dos.
+    Va LITERAL y nunca se toca. Lo de plazos es un añadido al final
+    (`guion_plazos.md`), no una versión aparte: así el guion de un producto
+    caro es el mismo de siempre con una frase más, y cualquier cambio del curso
+    se sigue aplicando a los dos ganchos.
     """
-    base = (prompts_dir() / "guion.md").read_text(encoding="utf-8").strip()
+    # OJO con el nombre: en este nicho "gancho" es el TEXTO QUEMADO de arriba
+    # del vídeo (`con_gancho`). Esto es otra cosa: por dónde empieza lo que
+    # dice la voz.
+    meta = ESTILOS_GUION.get(estilo) or ESTILOS_GUION[ESTILO_GUION_DEFECTO]
+    base = (prompts_dir() / meta["fichero"]).read_text(encoding="utf-8").strip()
+    # El de dolor lleva nota de cabecera para quien lo lea en el repo.
+    if base.startswith("<!--"):
+        base = base.split("-->", 1)[1].strip()
     if not plazos:
         return base
     extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")

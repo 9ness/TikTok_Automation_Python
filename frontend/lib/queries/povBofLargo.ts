@@ -37,6 +37,19 @@ export const largoKeys = {
 };
 
 /** La duración de clip (8 o 10 s) para TODOS los productos de la carpeta. */
+/** El estilo de guion (precio o dolor) para TODOS los de la carpeta. */
+export function useEstiloGuionCarpeta() {
+  const qc = useQueryClient();
+  return useMutation<
+    { estilo: string; productos: number },
+    Error,
+    { source: string; folder: string; estilo: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/estilo-guion/carpeta`, body),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useClipSCarpetaLargo() {
   const qc = useQueryClient();
   return useMutation<
