@@ -15,18 +15,33 @@ from src.nicho_pov_bof import config as pov_config
 from src.nicho_pov_bof_largo.repos.redis_base import get_nicho_pov_bof_largo_redis
 
 
-def _key(source: str, usuario: str = "") -> str:
-    """Clave del progreso. Es POR USUARIO: cada uno va por su carpeta.
+def _key(source: str, usuario: str = "", estilo: str = "") -> str:
+    """Clave del progreso. Es POR USUARIO y POR MODO de guion.
 
     `ness` se queda en la clave sin usuario (su histórico), igual que en el
-    POV BOF, para no perder por dónde iba al separar cuentas.
+    POV BOF, para no perder por dónde iba al separar cuentas. Y el modo por
+    defecto tampoco lleva sufijo, por lo mismo: recorrer el catálogo con
+    "precio" es lo que se llevaba haciendo hasta ahora.
+
+    El modo va aquí porque una carpeta hecha con un gancho NO está hecha con el
+    otro: son dos vueltas al catálogo, no una repetida.
     """
+    from src.nicho_pov_bof_largo import config as largo_config
+
     # La copia de seguridad comparte progreso con la fuente del curso: son las
     # MISMAS carpetas, solo cambia de dónde se leen las fotos.
     source = pov_config.fuente_canonica(source)
-    if not usuario or usuario == "ness":
-        return f"completed:{source}"
-    return f"completed:{source}:{usuario}"
+    base = (
+        f"completed:{source}"
+        if not usuario or usuario == "ness"
+        else f"completed:{source}:{usuario}"
+    )
+    # Igual que en `product_repo`: sin modo explícito se resuelve solo, para
+    # que ningún sitio se quede escribiendo el progreso del otro.
+    if not estilo:
+        estilo = get_modo(source, usuario)
+    estilo = (estilo or largo_config.ESTILO_GUION_DEFECTO).strip()
+    return base if estilo == largo_config.ESTILO_GUION_DEFECTO else f"{base}:m:{estilo}"
 
 
 def _require_redis():
@@ -40,21 +55,75 @@ def _require_redis():
     return r
 
 
-def get_completed(source: str, usuario: str = "") -> set[str]:
-    """Nombres de carpeta marcados como completados en esta fuente."""
-    return set(_require_redis().smembers(_key(source, usuario)))
+def get_completed(source: str, usuario: str = "", estilo: str = "") -> set[str]:
+    """Nombres de carpeta marcados como completados en esta fuente y modo."""
+    return set(_require_redis().smembers(_key(source, usuario, estilo)))
 
 
-def is_completed(source: str, folder: str, usuario: str = "") -> bool:
-    return _require_redis().sismember(_key(source, usuario), folder)
+def is_completed(source: str, folder: str, usuario: str = "", estilo: str = "") -> bool:
+    return _require_redis().sismember(_key(source, usuario, estilo), folder)
 
 
-def mark_completed(source: str, folder: str, usuario: str = "") -> None:
-    _require_redis().sadd(_key(source, usuario), folder)
+def mark_completed(source: str, folder: str, usuario: str = "", estilo: str = "") -> None:
+    _require_redis().sadd(_key(source, usuario, estilo), folder)
 
 
-def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
+def unmark_completed(
+    source: str, folder: str, usuario: str = "", estilo: str = "",
+) -> None:
     """Rollback — degrada en silencio si Redis no está."""
     r = get_nicho_pov_bof_largo_redis()
     if r.is_available():
-        r.srem(_key(source, usuario), folder)
+        r.srem(_key(source, usuario, estilo), folder)
+
+
+# ---------------------------------------------------------------------------
+# Con qué modo de guion se está recorriendo el catálogo
+# ---------------------------------------------------------------------------
+# Vive AQUÍ y no en el documento de la carpeta a propósito: ese documento ya va
+# separado por modo, así que guardar dentro "cuál es mi modo" se muerde la cola
+# —no habría forma de saber cuál leer sin saberlo antes—.
+#
+# Es del CATÁLOGO, no de cada carpeta: la idea es recorrerlo entero con un
+# gancho y luego otra vez con el otro. Y por usuario, porque cada uno va por su
+# vuelta.
+#
+# Memoria corta: `_key` de los productos lo consulta en cada acceso, y sin esto
+# sería una ida a Upstash por cada lectura de carpeta.
+_MEMO: dict[str, tuple[float, str]] = {}
+_MEMO_TTL_S = 5.0
+
+
+def _key_modo(source: str, usuario: str = "") -> str:
+    source = pov_config.fuente_canonica(source)
+    if not usuario or usuario == "ness":
+        return f"modo:{source}"
+    return f"modo:{source}:{usuario}"
+
+
+def get_modo(source: str, usuario: str = "") -> str:
+    """Con qué modo de guion se está trabajando este catálogo."""
+    import time
+
+    from src.nicho_pov_bof_largo import config as largo_config
+
+    clave = _key_modo(source, usuario)
+    guardado = _MEMO.get(clave)
+    if guardado and time.monotonic() - guardado[0] < _MEMO_TTL_S:
+        return guardado[1]
+    r = get_nicho_pov_bof_largo_redis()
+    valor = largo_config.ESTILO_GUION_DEFECTO
+    if r.is_available():
+        doc = r.get_json(clave) or {}
+        valor = str(doc.get("estilo") or largo_config.ESTILO_GUION_DEFECTO)
+    if valor not in largo_config.ESTILOS_GUION:
+        valor = largo_config.ESTILO_GUION_DEFECTO
+    _MEMO[clave] = (time.monotonic(), valor)
+    return valor
+
+
+def set_modo(source: str, estilo: str, usuario: str = "") -> None:
+    r = _require_redis()
+    clave = _key_modo(source, usuario)
+    r.set_json(clave, {"estilo": estilo})
+    _MEMO.pop(clave, None)

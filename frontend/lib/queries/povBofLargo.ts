@@ -37,15 +37,24 @@ export const largoKeys = {
 };
 
 /** La duración de clip (8 o 10 s) para TODOS los productos de la carpeta. */
-/** El estilo de guion (precio o dolor) para TODOS los de la carpeta. */
-export function useEstiloGuionCarpeta() {
+/** Con qué modo de guion se recorre el catálogo (precio o dolor).
+ *
+ *  Es del CATÁLOGO y por usuario, no de cada carpeta: la idea es recorrerlo
+ *  entero con un gancho y luego repetirlo con el otro. Cambiarlo no reescribe
+ *  nada — cada modo tiene su propio progreso, guiones, clips y vídeos. */
+export function useModoGuion(source: string) {
+  return useQuery<{ estilo: string }>({
+    queryKey: [...largoKeys.all, "modo", source],
+    queryFn: () => api.get(`${ROOT}/estilo-guion?source=${encodeURIComponent(source)}`),
+    enabled: Boolean(source),
+    staleTime: 30_000,
+  });
+}
+
+export function useSetModoGuion() {
   const qc = useQueryClient();
-  return useMutation<
-    { estilo: string; productos: number },
-    Error,
-    { source: string; folder: string; estilo: string }
-  >({
-    mutationFn: (body) => api.post(`${ROOT}/estilo-guion/carpeta`, body),
+  return useMutation<{ estilo: string }, Error, { source: string; estilo: string }>({
+    mutationFn: (body) => api.post(`${ROOT}/estilo-guion`, body),
     onSuccess: () => void qc.invalidateQueries(),
   });
 }

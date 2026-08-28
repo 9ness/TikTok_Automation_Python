@@ -84,7 +84,8 @@ import {
   useEscribirGuion,
   useGuionesLote,
   useClipSCarpetaLargo,
-  useEstiloGuionCarpeta,
+  useModoGuion,
+  useSetModoGuion,
   useFoldersLargo,
   useMarkCompletedLargo,
   useProductosLargo,
@@ -229,7 +230,8 @@ export default function PovBofLargoPage() {
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
   const clipSCarpeta = useClipSCarpetaLargo();
-  const estiloCarpeta = useEstiloGuionCarpeta();
+  const modoGuion = useModoGuion(source);
+  const setModo = useSetModoGuion();
   // Cuál está puesto en la carpeta (0 = mezclados), para marcarlo.
   const clipSCarpetaActual = (() => {
     const vistos = new Set(items.map((p) => p.clip_s || 10));
@@ -241,14 +243,11 @@ export default function PovBofLargoPage() {
   // relee la carpeta del Drive y son 10-15s, así que al pulsar seguía marcado
   // el anterior y parecían los dos a la vez (el que tocas se queda además con
   // el borde de foco).
+  // El modo es del CATÁLOGO. `recienElegido` manda mientras llega la
+  // respuesta, para que el botón se marque al tocarlo.
   const [recienElegido, setRecienElegido] = useState("");
-  useEffect(() => setRecienElegido(""), [folder, source]);
-  const estiloActual =
-    recienElegido ||
-    (() => {
-      const vistos = new Set(items.map((p) => p.estilo_guion || "precio"));
-      return vistos.size === 1 ? [...vistos][0] : "";
-    })();
+  useEffect(() => setRecienElegido(""), [source]);
+  const estiloActual = recienElegido || modoGuion.data?.estilo || "precio";
   // Verde = precio, ámbar = dolor. El color dice de un vistazo con qué gancho
   // se está trabajando esta carpeta, sin leer.
   const COLOR_ESTILO: Record<string, string> = {
@@ -914,7 +913,12 @@ export default function PovBofLargoPage() {
                 : "border-violet-500/40 bg-violet-500/[0.06]"
             }`}
           >
-            <span className="text-sm font-semibold">Modo del guion</span>
+            <span className="text-sm font-semibold">
+              Modo del guion{" "}
+              <span className="text-[11px] font-normal text-muted-foreground">
+                · todo el catálogo
+              </span>
+            </span>
             <div className="ml-auto flex gap-1.5">
               {[
                 { k: "precio", txt: "Precio" },
@@ -923,14 +927,13 @@ export default function PovBofLargoPage() {
                 <button
                   key={e.k}
                   type="button"
-                  disabled={estiloCarpeta.isPending}
+                  disabled={setModo.isPending}
                   onClick={() => {
                     setRecienElegido(e.k);
-                    estiloCarpeta.mutate(
-                      { source, folder, estilo: e.k },
+                    setModo.mutate(
+                      { source, estilo: e.k },
                       {
-                        onSuccess: (r: { productos: number }) =>
-                          toast.success(`${e.txt} en ${r.productos} producto(s)`),
+                        onSuccess: () => toast.success(`Modo: ${e.txt}`),
                         onError: (err: unknown) =>
                           toast.error(err instanceof ApiError ? err.message : String(err)),
                       },
@@ -949,7 +952,10 @@ export default function PovBofLargoPage() {
             <p className="w-full text-[11px] leading-relaxed text-muted-foreground">
               {estiloActual === "dolor"
                 ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
-                : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}
+                : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}{" "}
+              Cada modo lleva su propio progreso, guiones, clips y vídeos:
+              cambiar aquí no pisa lo del otro. El escaparate, los vendidos y
+              los textos sí son comunes.
             </p>
           </div>
 

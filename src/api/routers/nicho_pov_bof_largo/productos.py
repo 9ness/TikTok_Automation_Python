@@ -333,6 +333,12 @@ def _listar(
     # Si el Drive del curso vació la carpeta, las fotos vienen de nuestra copia.
     desde_copia = drive_client.desde_la_copia(fotos)
     pares = photo_pairing.pair_folder(fotos)
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    # Con qué modo se está recorriendo el catálogo. Lo que se lee del
+    # documento YA es de ese modo (va en la clave); esto es solo para decírselo
+    # a la pantalla.
+    estilo_catalogo = progress_repo.get_modo(source, usuario)
     propio = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
     # Los textos del POV BOF, de UNA lectura para toda la carpeta. Pedirlos
     # producto a producto eran diez viajes a Redis por carpeta —cuarenta en el
@@ -413,14 +419,14 @@ def _listar(
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos({**mio, "guion": guion}),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
-            estilo_guion=str(
-                mio.get("estilo_guion") or config.ESTILO_GUION_DEFECTO
-            ),
-            # Con cuál se escribió el que hay guardado. Si no coincide con el
-            # elegido, ese guion no vale para este modo y hay que rehacerlo.
-            guion_estilo=str(
-                mio.get("guion_estilo") or config.ESTILO_GUION_DEFECTO
-            ),
+            # El modo es del CATÁLOGO, no del producto: se repite en cada
+            # ficha solo para que la pantalla no tenga que cruzarlo.
+            estilo_guion=estilo_catalogo,
+            # Con cuál se escribió el guion guardado. Al ir el modo en la clave
+            # del documento, lo que se lee aquí YA es del modo activo, así que
+            # normalmente coincide; se manda para el aviso de los que se
+            # escribieron antes de que esto existiera.
+            guion_estilo=str(mio.get("guion_estilo") or estilo_catalogo),
             voz_label=str(mio.get("voz_label") or ""),
             voz_sexo=str(mio.get("voz_sexo") or ""),
             # Mismo criterio que el POV BOF y Creativos (índice compartido o
@@ -509,40 +515,47 @@ def list_productos_todos(
     return ProductosLargoResponse(source=source, folder="", items=items, montando=montando)
 
 
-@router.post("/estilo-guion/carpeta")
-def estilo_guion_carpeta(
+@router.post("/estilo-guion")
+def set_estilo_guion(
     body: dict,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """El estilo de guion (precio o dolor) para TODA la carpeta.
+    """Con qué modo de guion se recorre este catálogo (precio o dolor).
 
-    Se recorre el catálogo con un gancho y luego con el otro, así que se elige
-    por tanda, no producto a producto. Ojo con el nombre: aquí "gancho" es el
-    texto quemado del vídeo; esto es por dónde empieza lo que dice la voz.
+    Es del CATÁLOGO entero y por usuario: la idea es hacerlo con un gancho y
+    luego repetirlo con el otro. Cambiar de modo NO reescribe nada — cada modo
+    tiene su propio progreso, sus guiones, sus clips y sus vídeos, porque el
+    modo va dentro de la clave del documento. Lo del PRODUCTO (textos, ficha,
+    escaparate, vendidos) se comparte, que para eso es del producto.
     """
     from src.nicho_pov_bof import config as pov_config
-    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof_largo.repos import progress_repo
 
     source = str(body.get("source") or "").strip()
-    folder = str(body.get("folder") or "").strip()
     estilo = str(body.get("estilo") or "").strip()
     if source not in pov_config.SOURCES:
         raise _bad(f"Catálogo desconocido: {source!r}")
-    if not folder:
-        raise _bad("Falta la carpeta.")
     if estilo not in config.ESTILOS_GUION:
-        raise _bad(
-            f"estilo debe ser {' o '.join(sorted(config.ESTILOS_GUION))}"
-        )
+        raise _bad(f"estilo debe ser {' o '.join(sorted(config.ESTILOS_GUION))}")
 
-    ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
     try:
-        tocados = product_repo.update_carpeta(
-            source, folder, ids, usuario=usuario, estilo_guion=estilo,
-        )
+        progress_repo.set_modo(source, estilo, usuario)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return {"estilo": estilo, "productos": tocados}
+    return {"estilo": estilo}
+
+
+@router.get("/estilo-guion")
+def get_estilo_guion(
+    source: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Con qué modo está trabajando este catálogo."""
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    return {"estilo": progress_repo.get_modo(source, usuario)}
+
+
 
 
 @router.post("/clip-s/carpeta")

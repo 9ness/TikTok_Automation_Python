@@ -56,14 +56,21 @@ def _key(source: str, folder: str, usuario: str, estilo: str = "") -> str:
         f"folder:{pov_config.fuente_canonica(source)}:{folder}"
         f":u:{_slug_usuario(usuario)}"
     )
+    # Sin modo explícito se mira con cuál está trabajando ese usuario. Se
+    # resuelve AQUÍ y no en cada llamada: son dieciocho sitios y olvidarse de
+    # uno significa escribir en el documento del otro modo.
+    if not estilo:
+        from src.nicho_pov_bof_largo.repos import progress_repo
+
+        estilo = progress_repo.get_modo(source, usuario)
     estilo = (estilo or largo_config.ESTILO_GUION_DEFECTO).strip()
     if estilo == largo_config.ESTILO_GUION_DEFECTO:
         return base
     return f"{base}:m:{estilo}"
 
 
-def _lock(source: str, folder: str, usuario: str) -> str:
-    return f"lock:{_key(source, folder, usuario)}"
+def _lock(source: str, folder: str, usuario: str, estilo: str = "") -> str:
+    return f"lock:{_key(source, folder, usuario, estilo)}"
 
 
 def _now() -> str:
@@ -81,7 +88,7 @@ def _require_redis():
 
 
 @contextmanager
-def _cerrojo(source: str, folder: str, usuario: str, espera_s: float = 10.0):
+def _cerrojo(source: str, folder: str, usuario: str, espera_s: float = 10.0, estilo: str = ""):
     """Se guarda el documento ENTERO y la API corre con varios workers: sin
     cerrojo se pierden escrituras (dos clips subidos a la vez, por ejemplo)."""
     r = get_nicho_pov_bof_largo_redis()
@@ -89,7 +96,7 @@ def _cerrojo(source: str, folder: str, usuario: str, espera_s: float = 10.0):
     if r.is_available():
         limite = time.monotonic() + espera_s
         while time.monotonic() < limite:
-            if r.set_nx(_lock(source, folder, usuario), str(os.getpid()), ttl_s=30):
+            if r.set_nx(_lock(source, folder, usuario, estilo), str(os.getpid()), ttl_s=30):
                 mio = True
                 break
             time.sleep(0.15 + random.random() * 0.2)
@@ -97,29 +104,32 @@ def _cerrojo(source: str, folder: str, usuario: str, espera_s: float = 10.0):
         yield mio
     finally:
         if mio:
-            r.delete(_lock(source, folder, usuario))
+            r.delete(_lock(source, folder, usuario, estilo))
 
 
-def load_folder(source: str, folder: str, usuario: str = "") -> dict:
+def load_folder(source: str, folder: str, usuario: str = "", estilo: str = "") -> dict:
     r = get_nicho_pov_bof_largo_redis()
     if not r.is_available():
         return {}
-    return r.get_json(_key(source, folder, usuario)) or {}
+    return r.get_json(_key(source, folder, usuario, estilo)) or {}
 
 
-def get_product(source: str, folder: str, producto: str, usuario: str = "") -> dict:
+def get_product(
+    source: str, folder: str, producto: str, usuario: str = "", estilo: str = "",
+) -> dict:
     return (load_folder(source, folder, usuario).get("productos") or {}).get(
         str(producto), {}
     )
 
 
 def update_product(
-    source: str, folder: str, producto: str, usuario: str = "", **campos
+    source: str, folder: str, producto: str, usuario: str = "",
+    estilo: str = "", **campos,
 ) -> dict:
     """Parche parcial. Ignora los campos que vengan `None`."""
-    with _cerrojo(source, folder, usuario):
+    with _cerrojo(source, folder, usuario, estilo=estilo):
         r = _require_redis()
-        clave = _key(source, folder, usuario)
+        clave = _key(source, folder, usuario, estilo)
         doc = r.get_json(clave) or {}
         productos = doc.setdefault("productos", {})
         prod = productos.setdefault(str(producto), {})
@@ -200,7 +210,8 @@ def _limpiar_legacy(claves: list[str], usuario: str) -> None:
 
 
 def update_carpeta(
-    source: str, folder: str, ids: list[str], usuario: str = "", **campos
+    source: str, folder: str, ids: list[str], usuario: str = "",
+    estilo: str = "", **campos,
 ) -> int:
     """El mismo parche a TODOS los productos de la carpeta, de una escritura.
 
@@ -211,9 +222,9 @@ def update_carpeta(
     limpios = {k: v for k, v in campos.items() if v is not None}
     if not ids or not limpios:
         return 0
-    with _cerrojo(source, folder, usuario):
+    with _cerrojo(source, folder, usuario, estilo=estilo):
         r = _require_redis()
-        clave = _key(source, folder, usuario)
+        clave = _key(source, folder, usuario, estilo)
         doc = r.get_json(clave) or {}
         productos = doc.setdefault("productos", {})
         for pid in ids:
