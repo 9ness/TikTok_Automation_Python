@@ -236,10 +236,25 @@ export default function PovBofLargoPage() {
     return vistos.size === 1 ? [...vistos][0] : 0;
   })();
   // Igual para el estilo de guion: "" = mezclados en esta carpeta.
-  const estiloActual = (() => {
-    const vistos = new Set(items.map((p) => p.estilo_guion || "precio"));
-    return vistos.size === 1 ? [...vistos][0] : "";
-  })();
+  //
+  // `recienElegido` manda mientras llega la respuesta: repreguntar la lista
+  // relee la carpeta del Drive y son 10-15s, así que al pulsar seguía marcado
+  // el anterior y parecían los dos a la vez (el que tocas se queda además con
+  // el borde de foco).
+  const [recienElegido, setRecienElegido] = useState("");
+  useEffect(() => setRecienElegido(""), [folder, source]);
+  const estiloActual =
+    recienElegido ||
+    (() => {
+      const vistos = new Set(items.map((p) => p.estilo_guion || "precio"));
+      return vistos.size === 1 ? [...vistos][0] : "";
+    })();
+  // Verde = precio, ámbar = dolor. El color dice de un vistazo con qué gancho
+  // se está trabajando esta carpeta, sin leer.
+  const COLOR_ESTILO: Record<string, string> = {
+    precio: "border-emerald-500 bg-emerald-500/15 text-emerald-400",
+    dolor: "border-amber-500 bg-amber-500/15 text-amber-400",
+  };
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
   // Productos, no unidades: el botón habla de productos (ver POV BOF).
@@ -882,8 +897,11 @@ export default function PovBofLargoPage() {
           </div>
 
           <Paso
+            // Verde/violeta = precio, ámbar = punto de dolor. El paso entero
+            // se tiñe: es lo que pediste para saber en qué gancho estás sin
+            // leer.
+            color={estiloActual === "dolor" ? "ambar" : "violeta"}
             n={1}
-            color="violeta"
             titulo="Preparar textos y guion"
             hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Los textos salen de la ficha; el guion lo escribe la IA para ese producto y es lo que marca cuántos clips harán falta."}
             extra={`${conGuion}/${totalProductos} con guion`}
@@ -947,7 +965,8 @@ export default function PovBofLargoPage() {
                   key={e.k}
                   type="button"
                   disabled={estiloCarpeta.isPending}
-                  onClick={() =>
+                  onClick={() => {
+                    setRecienElegido(e.k);
                     estiloCarpeta.mutate(
                       { source, folder, estilo: e.k },
                       {
@@ -956,12 +975,12 @@ export default function PovBofLargoPage() {
                         onError: (err: unknown) =>
                           toast.error(err instanceof ApiError ? err.message : String(err)),
                       },
-                    )
-                  }
-                  className={`rounded border px-2 py-1 font-semibold transition disabled:opacity-50 ${
+                    );
+                  }}
+                  className={`rounded border px-2 py-1 font-semibold outline-none transition disabled:opacity-50 ${
                     estiloActual === e.k
-                      ? "border-violet-500 bg-violet-500/15 text-violet-400"
-                      : "border-border/60 hover:border-violet-500 hover:text-violet-400"
+                      ? COLOR_ESTILO[e.k]
+                      : "border-border/60 text-muted-foreground"
                   }`}
                 >
                   {e.txt}

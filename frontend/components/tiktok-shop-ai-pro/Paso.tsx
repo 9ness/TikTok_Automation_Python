@@ -17,7 +17,7 @@ import { useEstadoRecordado } from "@/lib/hooks/useEstadoRecordado";
  *  Cada paso lleva SU color y se mantiene igual en los tres nichos: quien
  *  aprende uno sabe usar los otros.
  */
-export type ColorPaso = "violeta" | "fucsia" | "esmeralda" | "azul";
+export type ColorPaso = "violeta" | "fucsia" | "esmeralda" | "azul" | "ambar";
 
 const COLORES: Record<ColorPaso, { borde: string; fondo: string; texto: string; num: string }> = {
   violeta: {
@@ -25,6 +25,15 @@ const COLORES: Record<ColorPaso, { borde: string; fondo: string; texto: string; 
     fondo: "bg-violet-500/[0.06]",
     texto: "text-violet-400",
     num: "bg-violet-500 text-white",
+  },
+  // Ámbar: lo usa el POV BOF Largo cuando la carpeta va con el guion de PUNTO
+  // DE DOLOR, para que se vea desde lejos con qué gancho se está trabajando
+  // sin tener que leer el selector.
+  ambar: {
+    borde: "border-amber-500/40",
+    fondo: "bg-amber-500/[0.06]",
+    texto: "text-amber-400",
+    num: "bg-amber-500 text-black",
   },
   fucsia: {
     borde: "border-fuchsia-500/40",
