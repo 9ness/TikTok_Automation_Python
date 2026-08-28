@@ -1113,8 +1113,8 @@ export default function NichoPovBofPage() {
           <Paso
             n={1}
             color="violeta"
-            titulo="Preparar los textos"
-            hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Lee la ficha de cada producto con IA (título, tienda, caption, precio). Se hace una vez por carpeta."}
+            titulo="Preparar la carpeta"
+            hint={esTopVendidos ? "Aquí los textos se copian del producto original: no se vuelven a leer con IA, que es lo que descuadraba la carpeta." : "Primero los textos (lee la ficha de cada producto), luego el guion que dice la voz. El tercero es opcional y solo para publicar desde el PC."}
             extra={`${conTexto}/${totalCarpeta}`}
           >
             {esPro ? (
@@ -1176,6 +1176,42 @@ export default function NichoPovBofPage() {
                   <PenLine className="h-4 w-4 shrink-0" />
                 )}
                 Guiones de la carpeta ({conGuion}/{totalCarpeta})
+              </button>
+            )}
+
+            {/* El tercero es OPCIONAL y solo sirve si publicas desde el PC:
+                saca el ID que TikTok Studio pide para enlazar el producto sin
+                buscarlo entre 139 páginas. No hace falta para montar el vídeo,
+                por eso va apagado de color y con la etiqueta. */}
+            {!esPro && conUrl > 0 && (
+              <button
+                type="button"
+                disabled={resolverIds.isPending}
+                title="Para publicar desde el PC: el ID se pega en el buscador de TikTok Studio"
+                onClick={() =>
+                  resolverIds.mutate(
+                    { source, folder },
+                    {
+                      onSuccess: (r: { resueltos: number; con_url: number }) =>
+                        toast.success(
+                          `${r.resueltos} ID(s) sacados de ${r.con_url} enlace(s)`,
+                        ),
+                      onError: (e: unknown) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
+              >
+                {resolverIds.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <span>🏷️</span>
+                )}
+                IDs de producto ({conId}/{conUrl})
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
+                  opcional · PC
+                </span>
               </button>
             )}
 
@@ -1254,36 +1290,6 @@ export default function NichoPovBofPage() {
                 {plan.data?.movimientos
                   ? `Recolocar (${plan.data.movimientos} de ${plan.data.total})`
                   : "Carpetas ya recolocadas"}
-              </button>
-            )}
-
-            {/* Los IDs de producto, para publicar sin buscar. Va aquí porque
-                se hace una vez por carpeta, como los textos y los guiones. */}
-            {!esPro && conUrl > 0 && (
-              <button
-                type="button"
-                disabled={resolverIds.isPending}
-                onClick={() =>
-                  resolverIds.mutate(
-                    { source, folder },
-                    {
-                      onSuccess: (r: { resueltos: number; con_url: number }) =>
-                        toast.success(
-                          `${r.resueltos} ID(s) sacados de ${r.con_url} enlace(s)`,
-                        ),
-                      onError: (e: unknown) =>
-                        toast.error(e instanceof ApiError ? e.message : String(e)),
-                    },
-                  )
-                }
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-foreground/30 disabled:opacity-50"
-              >
-                {resolverIds.isPending ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <span>🏷️</span>
-                )}
-                IDs de producto ({conId}/{conUrl})
               </button>
             )}
 
