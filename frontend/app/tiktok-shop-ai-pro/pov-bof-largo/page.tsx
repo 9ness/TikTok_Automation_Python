@@ -896,6 +896,56 @@ export default function PovBofLargoPage() {
             <span className="ml-auto text-[10px] text-muted-foreground">{folder}</span>
           </div>
 
+          {/* EL MODO, antes que los pasos: decide qué escribe la IA y por
+              tanto cómo suena el vídeo entero, así que es lo primero que hay
+              que elegir al abrir una carpeta — no un ajuste enterrado en el
+              paso 1. El color acompaña (violeta precio, ámbar dolor). */}
+          <div
+            className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 transition ${
+              estiloActual === "dolor"
+                ? "border-amber-500/40 bg-amber-500/[0.06]"
+                : "border-violet-500/40 bg-violet-500/[0.06]"
+            }`}
+          >
+            <span className="text-sm font-semibold">Modo del guion</span>
+            <div className="ml-auto flex gap-1.5">
+              {[
+                { k: "precio", txt: "Precio" },
+                { k: "dolor", txt: "Punto de dolor" },
+              ].map((e) => (
+                <button
+                  key={e.k}
+                  type="button"
+                  disabled={estiloCarpeta.isPending}
+                  onClick={() => {
+                    setRecienElegido(e.k);
+                    estiloCarpeta.mutate(
+                      { source, folder, estilo: e.k },
+                      {
+                        onSuccess: (r: { productos: number }) =>
+                          toast.success(`${e.txt} en ${r.productos} producto(s)`),
+                        onError: (err: unknown) =>
+                          toast.error(err instanceof ApiError ? err.message : String(err)),
+                      },
+                    );
+                  }}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold outline-none transition disabled:opacity-50 ${
+                    estiloActual === e.k
+                      ? COLOR_ESTILO[e.k]
+                      : "border-border/60 text-muted-foreground"
+                  }`}
+                >
+                  {e.txt}
+                </button>
+              ))}
+            </div>
+            <p className="w-full text-[11px] leading-relaxed text-muted-foreground">
+              {estiloActual === "dolor"
+                ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
+                : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}
+            </p>
+          </div>
+
           <Paso
             // Verde/violeta = precio, ámbar = punto de dolor. El paso entero
             // se tiñe: es lo que pediste para saber en qué gancho estás sin
@@ -952,42 +1002,6 @@ export default function PovBofLargoPage() {
                 </>
               )}
             </button>
-
-            {/* Por dónde empieza el guion. Se recorre el catálogo con un
-                gancho y luego con el otro, así que se elige por tanda. */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
-              <span className="shrink-0">Guion:</span>
-              {[
-                { k: "precio", txt: "Precio" },
-                { k: "dolor", txt: "Punto de dolor" },
-              ].map((e) => (
-                <button
-                  key={e.k}
-                  type="button"
-                  disabled={estiloCarpeta.isPending}
-                  onClick={() => {
-                    setRecienElegido(e.k);
-                    estiloCarpeta.mutate(
-                      { source, folder, estilo: e.k },
-                      {
-                        onSuccess: (r: { productos: number }) =>
-                          toast.success(`${e.txt} en ${r.productos} producto(s)`),
-                        onError: (err: unknown) =>
-                          toast.error(err instanceof ApiError ? err.message : String(err)),
-                      },
-                    );
-                  }}
-                  className={`rounded border px-2 py-1 font-semibold outline-none transition disabled:opacity-50 ${
-                    estiloActual === e.k
-                      ? COLOR_ESTILO[e.k]
-                      : "border-border/60 text-muted-foreground"
-                  }`}
-                >
-                  {e.txt}
-                </button>
-              ))}
-            </div>
-
             {/* La duración de clip para TODA la carpeta. Cambia cuántos
                 huecos pide cada producto, así que se elige una vez por tanda y
                 no tarjeta a tarjeta. */}
