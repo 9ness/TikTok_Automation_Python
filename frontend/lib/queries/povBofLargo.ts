@@ -290,6 +290,15 @@ export function useSetEstadoLargo() {
         uploaded: updated.uploaded,
         uploaded_at: updated.uploaded_at,
         sold: updated.sold,
+        // La duración de los clips va en esta misma mutación, así que TAMBIÉN
+        // hay que copiarla: sin esto el 8s/10s se guardaba en el servidor pero
+        // la tarjeta seguía marcando el anterior hasta recargar, y parecía que
+        // el botón estaba muerto. Y con ella viajan los huecos y los segundos,
+        // que dependen de la duración del clip.
+        clip_s: updated.clip_s,
+        clips_necesarios: updated.clips_necesarios,
+        segundos_min: updated.segundos_min,
+        segundos_max: updated.segundos_max,
       });
       qc.setQueryData<ProductosLargoResponse>(
         largoKeys.productos(vars.source, vars.folder),

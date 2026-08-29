@@ -401,7 +401,19 @@ def _listar(
         textos = textos_carpeta.get(pid) or {}
         mio = propio.get(pid) or {}
         fijos = textos_fijos(f"{pid} {folder}")
-        guion = str(mio.get("guion") or "")
+        # El guion se GUARDA entero y se enseña RECORTADO. La frase de plazos y
+        # la de envío gratis se quitan al vuelo (no caben en todos los
+        # productos), así que si la tarjeta pintara el texto crudo diría cosas
+        # que la voz no va a decir — y el operador que lo copia se lo cree.
+        # Crudo en Redis a propósito: si mañana sube el precio, la frase vuelve
+        # sola sin volver a pagar la llamada de escritura.
+        precio_p = pov_config.precio_num(textos.get("precio"))
+        envio_p = config.hay_envio_gratis(textos)
+        guion = config.recortar_cta(
+            str(mio.get("guion") or ""),
+            plazos=precio_p >= pov_config.PRECIO_MIN_PLAZOS,
+            envio=envio_p,
+        )
         items.append(ProductoLargo(
             producto=pid,
             desde_copia=desde_copia,
@@ -449,9 +461,7 @@ def _listar(
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
-                {**mio, "guion": guion},
-                pov_config.precio_num(textos.get("precio")),
-                config.hay_envio_gratis(textos),
+                {**mio, "guion": guion}, precio_p, envio_p,
             ),
             # Cuánto va a durar el vídeo. No es el guion partido por una
             # velocidad media: el vídeo dura lo que dure la voz, y la voz sale
@@ -459,12 +469,7 @@ def _listar(
             **dict(
                 zip(
                     ("segundos_min", "segundos_max"),
-                    _segundos(
-                        guion,
-                        {**mio, "guion": guion},
-                        pov_config.precio_num(textos.get("precio")),
-                        config.hay_envio_gratis(textos),
-                    ),
+                    _segundos(guion, {**mio, "guion": guion}, precio_p, envio_p),
                 )
             ),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
@@ -735,10 +740,22 @@ def set_producto_estado(
                 {**textos, **mio}, product_repo.escaparate_index(usuario),
             )
         )
+        # La duración de los clips y lo que arrastra (cuántos huecos y cuánto
+        # durará el vídeo) se recalcula aquí: es lo que acaba de tocar el
+        # operador y la pantalla se pinta con esta respuesta, sin relistar. Se
+        # devuelve SIEMPRE, no solo al cambiar `clip_s`, para que marcar
+        # Escaparate no deje estos campos con el valor por defecto del modelo.
+        precio_p = _precio(textos)
+        envio_p = config.hay_envio_gratis(textos)
+        segundos_p = _segundos(str(mio.get("guion") or ""), mio, precio_p, envio_p)
         return ProductoLargo(
             producto=body.producto,
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
+            clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
+            clips_necesarios=_huecos(mio, precio_p, envio_p),
+            segundos_min=segundos_p[0],
+            segundos_max=segundos_p[1],
             en_escaparate=bool(en_escaparate),
             uploaded=bool(mio.get("uploaded")),
             uploaded_at=float(mio.get("uploaded_at") or 0),

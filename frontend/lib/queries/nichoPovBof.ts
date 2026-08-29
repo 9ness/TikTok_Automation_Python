@@ -518,6 +518,11 @@ export function useSetEstado() {
         uploaded: updated.uploaded,
         uploaded_at: updated.uploaded_at,
         sold: updated.sold,
+        // El 8s/10s viaja por esta misma mutación: sin copiarlo, el servidor
+        // lo guardaba pero la tarjeta seguía marcando el anterior. Los huecos
+        // van con él porque el mismo guion pide uno menos a 10s.
+        clip_s: updated.clip_s,
+        clips_necesarios: updated.clips_necesarios,
       });
       qc.setQueryData<ProductoItem[]>(
         nichoPovBofKeys.productos(vars.source, vars.folder),
