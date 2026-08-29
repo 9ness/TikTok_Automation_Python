@@ -100,7 +100,7 @@ def _precio_y_modo(prod: dict) -> tuple[float, bool]:
     (el operador puede escribir el precio a mano si Gemini no lo pilló).
     """
     precio = nicho_config.precio_num(prod.get("precio"))
-    return precio, precio >= nicho_config.PRECIO_MIN_PLAZOS
+    return precio, nicho_config.hay_plazos(prod)
 
 
 def _clip_vigente(ruta, desde: float = 0.0) -> bool:

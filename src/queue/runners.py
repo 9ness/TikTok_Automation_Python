@@ -1914,7 +1914,7 @@ def _es_plazos(textos: dict) -> bool:
     """
     from src.nicho_pov_bof import config as pov_config
 
-    return pov_config.precio_num(textos.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+    return pov_config.hay_plazos(textos)
 
 
 def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2739,6 +2739,43 @@ def run_nicho_pov_bof_revisar(job: Job, on_log: OnLog, on_progress: OnProgress) 
     return resumen
 
 
+def _con_guion_desfasado(
+    source: str, carpetas: list[str], usuario: str,
+    product_repo, pov_config, largo_config,
+):
+    """Los productos cuyo guion GUARDADO promete algo que su ficha no cumple.
+
+    Devuelve `(carpeta, producto, datos, plazos)`, donde `datos` son los textos
+    del producto MÁS su guion: quien lo recibe necesita las dos cosas (el texto
+    para recortarlo, la ficha para saber qué puede prometer).
+
+    Se recorre aunque el producto ya tenga guion bueno y no toque reescribir:
+    corregir la CTA es un reemplazo de una frase, así que sale gratis quitarle
+    los plazos a un guion viejo en vez de gastar una llamada a Gemini.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    for carpeta in carpetas:
+        textos = (
+            pov_repo.load_folder_para(source, carpeta, usuario).get("productos") or {}
+        )
+        if not textos:
+            continue
+        mios = (
+            product_repo.load_folder(source, carpeta, usuario).get("productos") or {}
+        )
+        for pid in sorted(textos, key=lambda x: (len(x), x)):
+            guion = str((mios.get(pid) or {}).get("guion") or "").strip()
+            if not guion:
+                continue
+            t = textos[pid]
+            plazos = pov_config.hay_plazos(t)
+            if largo_config.cta_desfasada(
+                guion, plazos=plazos, envio=largo_config.hay_envio_gratis(t),
+            ):
+                yield carpeta, pid, {**t, "guion": guion}, plazos
+
+
 def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Escribe los guiones de TODA una carpeta del POV BOF Largo.
 
@@ -2800,12 +2837,9 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             t = textos[pid]
             if not str(t.get("titulo") or "").strip():
                 continue
-            # El umbral y el parseo del precio son los del POV BOF: mismo
-            # producto y misma cuenta, no puede haber dos criterios según el
-            # nicho desde el que se grabe.
-            plazos = (
-                pov_config.precio_num(t.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
-            )
+            # El criterio es el del POV BOF: mismo producto y misma cuenta, no
+            # puede haber dos según el nicho desde el que se grabe.
+            plazos = pov_config.hay_plazos(t)
             guardado = mios.get(pid) or {}
             ya = (
                 bool(guardado.get("guion"))

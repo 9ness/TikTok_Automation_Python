@@ -583,6 +583,28 @@ DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF"
 PRECIO_MIN_PLAZOS = float(os.getenv("PRECIO_MIN_PLAZOS", "40"))
 
 
+def hay_plazos(textos: dict) -> bool:
+    """¿Este producto se puede pagar a plazos de verdad?
+
+    Manda la FICHA (`plazos`, que lee el extractor): cuando la captura enseña
+    "Desde 3 pagos de 12,46 € con Klarna" no hay nada que deducir, lo pone.
+    Y al revés: si la ficha se ve entera y NO lo ofrece, no lo ofrece — por
+    caro que sea el producto.
+
+    Solo cuando no se sabe se cae al precio, que siempre fue una aproximación:
+    el umbral está en 40 € (y no en los 30 de Klarna) justo porque con cupones
+    el pedido baja y el guion se quedaba mintiendo. Leerlo de la ficha quita
+    ese margen de seguridad de en medio — y de paso pilla los productos de
+    30-40 € que sí lo llevan, que con el precio se perdían.
+    """
+    dice = str(textos.get("plazos") or "").strip().lower()
+    if dice in ("si", "sí"):
+        return True
+    if dice == "no":
+        return False
+    return precio_num(textos.get("precio")) >= PRECIO_MIN_PLAZOS
+
+
 def precio_num(valor) -> float:
     """Pasa a número el precio leído de la ficha. 0 si no hay nada legible.
 

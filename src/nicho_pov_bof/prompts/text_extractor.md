@@ -103,6 +103,19 @@ traducir literalmente del inglés si el título original viene en otro idioma:
   una línea y "Envío gratis en pedidos de más de 20 €" en la siguiente: eso es
   `condicionado`, no `gratis`.
 
+- `plazos`: si la ficha ofrece pagar a plazos, y solo si se ve. Dos valores:
+  - `"si"` cuando aparece la línea de financiación, sea como sea que la
+    escriban: **Desde 3 pagos de 12,46 € con un 0 % de interés con Klarna**,
+    **TikTok PagaDespués**, **Klarna**, **Paga en 3 plazos**…
+  - `"no"` cuando la ficha se ve entera (precio, envío y entrega) y ahí NO hay
+    ninguna línea de financiación.
+  - **Omite la clave** si la captura está cortada por arriba o por abajo y no
+    puedes asegurar ninguna de las dos cosas.
+
+  Va justo entre el precio y la línea del envío, así que si ves las dos y no
+  hay nada en medio, es `"no"`. Importa porque decide el guion entero: el de
+  financiación solo se usa cuando la ficha lo ofrece de verdad.
+
   El precio sale en TODAS estas capturas, justo debajo de la foto. Si de
   verdad no se lee ninguno, no devuelvas el campo — pero es la excepción, no
   lo normal.
@@ -165,12 +178,13 @@ las imágenes), y cuyo valor es el objeto con estos campos:
     "emojis": "...",
     "precio": "29.50",
     "precio_lista": "34.70",
-    "envio": "gratis"
+    "envio": "gratis",
+    "plazos": "si"
   },
   ...
 }
 ```
 
-`precio_lista` y `envio` son los únicos que pueden faltar (cuando no hay
-descuento y cuando la captura no enseña el envío). Los demás van siempre. No añadas claves extra, no añadas comentarios, no envuelvas
+`precio_lista`, `envio` y `plazos` son los únicos que pueden faltar (cuando no
+hay descuento y cuando la captura no enseña el envío o la financiación). Los demás van siempre. No añadas claves extra, no añadas comentarios, no envuelvas
 el JSON en ```json``` ni en ningún otro texto.

@@ -47,7 +47,9 @@ REQUIRED_FIELDS = (
 # `envio` dice si la ficha promete envío gratis o lo condiciona a un mínimo de
 # pedido. Es opcional porque muchas capturas no lo enseñan, y entonces se cae
 # al precio (ver `nicho_pov_bof_largo.config.hay_envio_gratis`).
-OPTIONAL_FIELDS = ("emojis", "tienda", "precio", "precio_lista", "envio")
+OPTIONAL_FIELDS = (
+    "emojis", "tienda", "precio", "precio_lista", "envio", "plazos",
+)
 
 # Cuántas capturas se mandan por llamada. Ver el comentario de
 # `extract_from_pairs`: con la carpeta entera el modelo cruza los textos.

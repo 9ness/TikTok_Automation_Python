@@ -72,27 +72,22 @@ def _precio(textos: dict, campo: str = "precio") -> float:
 
 
 def _segundos(
-    guion: str, prod: dict, precio: float = 0.0, envio: bool = True,
+    guion: str, prod: dict, plazos: bool = False, envio: bool = True,
 ) -> tuple[float, float]:
     """`(mínimo, máximo)` de duración del vídeo, sobre el guion ya recortado."""
-    from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof_largo.services import voz as voz_svc
 
     if not guion:
         return (0.0, 0.0)
-    limpio = config.recortar_cta(
-        guion,
-        plazos=precio >= pov_config.PRECIO_MIN_PLAZOS,
-        envio=envio,
-    )
+    limpio = config.recortar_cta(guion, plazos=plazos, envio=envio)
     clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
     return voz_svc.duracion_estimada(
-        len(limpio), clip_s, _huecos(prod, precio, envio),
+        len(limpio), clip_s, _huecos(prod, plazos, envio),
         segundos_min=config.DURACION_MINIMA_S,
     )
 
 
-def _huecos(prod: dict, precio: float = 0.0, envio: bool = True) -> int:
+def _huecos(prod: dict, plazos: bool = False, envio: bool = True) -> int:
     """Cuántos clips hay que subir para este producto.
 
     Se pregunta con cuántos queda alguna voz sorteable, no cuánto tardaría la
@@ -105,15 +100,12 @@ def _huecos(prod: dict, precio: float = 0.0, envio: bool = True) -> int:
     plazos o de envío gratis, esas frases se le quitan, y pedir un clip de más
     por un texto que no se va a locutar es trabajo de generación tirado.
     """
-    from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof_largo.services import voz as voz_svc
 
     guion = str(prod.get("guion") or "").strip()
     if not guion:
         return config.CLIPS_POR_VIDEO
-    guion = config.recortar_cta(
-        guion, plazos=precio >= pov_config.PRECIO_MIN_PLAZOS, envio=envio,
-    )
+    guion = config.recortar_cta(guion, plazos=plazos, envio=envio)
     return voz_svc.clips_para(
         len(guion),
         float(prod.get("clip_s") or config.CLIP_TARGET_S),
@@ -131,7 +123,7 @@ def _es_plazos(textos: dict) -> bool:
     """
     from src.nicho_pov_bof import config as pov_config
 
-    return pov_config.precio_num(textos.get("precio")) >= pov_config.PRECIO_MIN_PLAZOS
+    return pov_config.hay_plazos(textos)
 
 
 def _bad(msg: str) -> APIError:
@@ -407,12 +399,10 @@ def _listar(
         # que la voz no va a decir — y el operador que lo copia se lo cree.
         # Crudo en Redis a propósito: si mañana sube el precio, la frase vuelve
         # sola sin volver a pagar la llamada de escritura.
-        precio_p = pov_config.precio_num(textos.get("precio"))
+        plazos_p = pov_config.hay_plazos(textos)
         envio_p = config.hay_envio_gratis(textos)
         guion = config.recortar_cta(
-            str(mio.get("guion") or ""),
-            plazos=precio_p >= pov_config.PRECIO_MIN_PLAZOS,
-            envio=envio_p,
+            str(mio.get("guion") or ""), plazos=plazos_p, envio=envio_p,
         )
         items.append(ProductoLargo(
             producto=pid,
@@ -461,7 +451,7 @@ def _listar(
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
-                {**mio, "guion": guion}, precio_p, envio_p,
+                {**mio, "guion": guion}, plazos_p, envio_p,
             ),
             # Cuánto va a durar el vídeo. No es el guion partido por una
             # velocidad media: el vídeo dura lo que dure la voz, y la voz sale
@@ -469,7 +459,7 @@ def _listar(
             **dict(
                 zip(
                     ("segundos_min", "segundos_max"),
-                    _segundos(guion, {**mio, "guion": guion}, precio_p, envio_p),
+                    _segundos(guion, {**mio, "guion": guion}, plazos_p, envio_p),
                 )
             ),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
@@ -745,15 +735,17 @@ def set_producto_estado(
         # operador y la pantalla se pinta con esta respuesta, sin relistar. Se
         # devuelve SIEMPRE, no solo al cambiar `clip_s`, para que marcar
         # Escaparate no deje estos campos con el valor por defecto del modelo.
-        precio_p = _precio(textos)
+        from src.nicho_pov_bof import config as pov_config
+
+        plazos_p = pov_config.hay_plazos(textos)
         envio_p = config.hay_envio_gratis(textos)
-        segundos_p = _segundos(str(mio.get("guion") or ""), mio, precio_p, envio_p)
+        segundos_p = _segundos(str(mio.get("guion") or ""), mio, plazos_p, envio_p)
         return ProductoLargo(
             producto=body.producto,
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
-            clips_necesarios=_huecos(mio, precio_p, envio_p),
+            clips_necesarios=_huecos(mio, plazos_p, envio_p),
             segundos_min=segundos_p[0],
             segundos_max=segundos_p[1],
             en_escaparate=bool(en_escaparate),
@@ -1086,13 +1078,11 @@ def confirmar_lote(
             mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
             continue
         montado_at = float(prod.get("video_listo_at") or 0)
+        _t = product_repo.textos_producto(
+            body.source, body.folder, item.producto, usuario,
+        )
         hacen_falta = _huecos(
-            prod,
-            pov_config.precio_num(
-                product_repo.textos_producto(
-                    body.source, body.folder, item.producto, usuario,
-                ).get("precio")
-            ),
+            prod, pov_config.hay_plazos(_t), config.hay_envio_gratis(_t),
         )
         if vistos[item.producto] >= 2:
             # El enésimo vídeo de este producto en ESTA tanda va al hueco n.
@@ -1276,12 +1266,8 @@ def _encolar_clip(
 
     montado_at = float(prod.get("video_listo_at") or 0)
     # Cuántos clips pide ESTE guion (dos, o tres si la voz no cabe en dos).
-    hacen_falta = _huecos(
-        prod,
-        pov_config.precio_num(
-            product_repo.textos_producto(source, folder, producto, usuario).get("precio")
-        ),
-    )
+    _t = product_repo.textos_producto(source, folder, producto, usuario)
+    hacen_falta = _huecos(prod, pov_config.hay_plazos(_t), config.hay_envio_gratis(_t))
     rutas = [
         prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
     ]
