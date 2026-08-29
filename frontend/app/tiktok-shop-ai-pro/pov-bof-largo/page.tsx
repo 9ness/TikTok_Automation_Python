@@ -111,7 +111,6 @@ function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
 }
 
-const CAR_POR_SEG = 18.2;
 
 /** Los dos flujos de la carpeta: el guion lleva la frase de plazos o no, según
  *  el precio. Se bajan por separado porque no se generan igual. */

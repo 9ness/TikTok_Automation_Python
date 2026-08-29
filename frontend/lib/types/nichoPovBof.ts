@@ -121,6 +121,9 @@ export interface ProductoItem {
   clips_necesarios: number;
   /** Duración de los clips que genera el operador: 8 o 10 segundos. */
   clip_s: number;
+  // Cuánto durará el vídeo (rango: la voz se sortea). 0 sin guion propio.
+  segundos_min?: number;
+  segundos_max?: number;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = sin marcar. */
   uploaded_at: number;

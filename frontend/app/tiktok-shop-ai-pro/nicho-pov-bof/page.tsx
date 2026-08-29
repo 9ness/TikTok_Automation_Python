@@ -116,8 +116,6 @@ import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
  *  volumen diario y de momento no lo usa. Poniéndolo a `true` vuelven el panel
  *  de credenciales y los botones de buscar la ficha del producto. */
 const MOSTRAR_ECHOTIK = false;
-// Ritmo medido con las voces reales de Fish, igual que en el POV BOF Largo.
-const CAR_POR_SEG = 18.2;
 
 /** Los dos flujos de la carpeta: un producto lleva guion de plazos o el de
  *  siempre, según su precio. Ya NO cambia cuántos clips hace falta subir (son
@@ -2252,10 +2250,23 @@ function ProductoCard({
         {guionActual ? (
           <ChipAjuste
             icono="🎬"
-            valor={`${guionActual.length} car.`}
+            /* Segundos, no caracteres: lo que el operador necesita saber es si
+               el vídeo llega al mínimo del reto, y 192 caracteres no dicen
+               nada. El rango sale del servidor (la voz se sortea entre las que
+               caben, y cada una lee a su ritmo); si no lo manda —audio del
+               banco, que dura lo que dure— se cae a los caracteres. */
+            valor={
+              producto.segundos_min
+                ? `${producto.segundos_min}-${producto.segundos_max}s`
+                : `${guionActual.length} car.`
+            }
             abierto={verGuion}
             onToggle={() => setVerGuion((v) => !v)}
-            title={`Guion · ~${Math.round(guionActual.length / CAR_POR_SEG)}s`}
+            title={
+              producto.segundos_min
+                ? `Guion de ${guionActual.length} caracteres · el vídeo durará entre ${producto.segundos_min}s y ${producto.segundos_max}s según la voz que salga`
+                : `Guion · ${guionActual.length} caracteres`
+            }
           />
         ) : (
           <ChipAjuste

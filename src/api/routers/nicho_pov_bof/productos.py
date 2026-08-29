@@ -252,12 +252,47 @@ def _clips_que_pide(prod: dict) -> int:
     from src.nicho_pov_bof_largo import config as largo_config
     from src.nicho_pov_bof_largo.services import voz as voz_svc
 
-    guion = str(prod.get("guion_producto") or "").strip()
+    guion = _guion_hablado(prod)
     if not guion:
         return 2
     return voz_svc.clips_para(
         len(guion),
         float(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
+        segundos_min=pov_config.DURACION_MINIMA_S,
+    )
+
+
+def _guion_hablado(prod: dict) -> str:
+    """El guion que va a decir la voz, que no siempre es el del producto.
+
+    Por encima de `PRECIO_MIN_PLAZOS` el vídeo lo locuta el guion de Klarna
+    (`guion_plazos`, otro runner); por debajo, el escrito para el producto. Se
+    mira el mismo criterio que usa el montaje: contar clips o segundos sobre el
+    texto equivocado daba un hueco de más o de menos en los productos caros.
+    """
+    if _precio_y_modo(prod)[1]:
+        return str(prod.get("guion_plazos") or "").strip()
+    return str(prod.get("guion_producto") or "").strip()
+
+
+def _segundos_pov(prod: dict) -> tuple[float, float]:
+    """`(mínimo, máximo)` de lo que va a durar el vídeo, en segundos.
+
+    Mismo cálculo que el POV BOF Largo: el vídeo dura lo que dure la voz, y la
+    voz sale sorteada entre las que caben en los clips y llegan al mínimo del
+    reto. Sin guion propio manda el banco de audios y no hay nada que estimar.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    guion = _guion_hablado(prod)
+    if not guion:
+        return (0.0, 0.0)
+    return voz_svc.duracion_estimada(
+        len(guion),
+        float(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
+        _clips_que_pide(prod),
         segundos_min=pov_config.DURACION_MINIMA_S,
     )
 
@@ -321,6 +356,7 @@ def _producto_info(
         sin_stock=bool(prod.get("sin_stock")),
         guion_producto=str(prod.get("guion_producto") or ""),
         clips_necesarios=_clips_que_pide(prod),
+        **dict(zip(("segundos_min", "segundos_max"), _segundos_pov(prod))),
         clip_s=int(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
         uploaded=bool(prod.get("uploaded")),
         uploaded_at=float(prod.get("uploaded_at") or 0),
@@ -457,6 +493,7 @@ def _list_productos(
                 sin_stock=bool(guardado.get("sin_stock")),
                 guion_producto=str(guardado.get("guion_producto") or ""),
                 clips_necesarios=_clips_que_pide(guardado),
+                **dict(zip(("segundos_min", "segundos_max"), _segundos_pov(guardado))),
                 clip_s=int(guardado.get("clip_s") or largo_config.CLIP_TARGET_S),
                 caption=guardado.get("caption", ""),
                 emojis=guardado.get("emojis") or emojis_svc.emojis_para(
