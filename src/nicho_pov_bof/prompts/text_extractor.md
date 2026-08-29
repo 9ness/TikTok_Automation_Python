@@ -90,6 +90,19 @@ traducir literalmente del inglés si el título original viene en otro idioma:
     pon aquí el NORMAL, el de antes del descuento (`34.70`). Si solo hay uno,
     no devuelvas este campo.
 
+- `envio`: qué dice la ficha del envío, y solo si lo dice. Tres valores:
+  - `"gratis"` cuando pone **Envío gratis** a secas, sin condición.
+  - `"condicionado"` cuando el envío gratis depende de gastar un mínimo
+    (`Envío gratis en pedidos de más de 20 €`) o cuando cobra el envío
+    (`Hasta 3,99 € en el envío`).
+  - **Omite la clave** si la captura no enseña nada del envío.
+
+  Importa porque el guion del vídeo lo dice en voz alta: prometer envío gratis
+  en un producto que lo cobra es lo que trae reclamaciones. Y ojo, que las dos
+  cosas salen juntas — un producto puede poner "Hasta 3,99 € en el envío" en
+  una línea y "Envío gratis en pedidos de más de 20 €" en la siguiente: eso es
+  `condicionado`, no `gratis`.
+
   El precio sale en TODAS estas capturas, justo debajo de la foto. Si de
   verdad no se lee ninguno, no devuelvas el campo — pero es la excepción, no
   lo normal.
@@ -151,12 +164,13 @@ las imágenes), y cuyo valor es el objeto con estos campos:
     "caption": "...",
     "emojis": "...",
     "precio": "29.50",
-    "precio_lista": "34.70"
+    "precio_lista": "34.70",
+    "envio": "gratis"
   },
   ...
 }
 ```
 
-`precio_lista` es el único que puede faltar (cuando no hay descuento). Los
-demás van siempre. No añadas claves extra, no añadas comentarios, no envuelvas
+`precio_lista` y `envio` son los únicos que pueden faltar (cuando no hay
+descuento y cuando la captura no enseña el envío). Los demás van siempre. No añadas claves extra, no añadas comentarios, no envuelvas
 el JSON en ```json``` ni en ningún otro texto.

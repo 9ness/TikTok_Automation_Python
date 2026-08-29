@@ -159,6 +159,27 @@ def prompts_dir() -> Path:
 PRECIO_MIN_ENVIO_GRATIS = float(os.getenv("PRECIO_MIN_ENVIO_GRATIS", "10"))
 
 
+def hay_envio_gratis(textos: dict) -> bool:
+    """¿Este producto lleva envío gratis de verdad?
+
+    Lo que manda es lo que pone la FICHA (`envio`, que lee el extractor):
+    "gratis" a secas es gratis, y "condicionado" —el típico "envío gratis en
+    pedidos de más de 20 €" o "hasta 3,99 € en el envío"— NO lo es, por caro
+    que sea el producto.
+
+    Solo cuando la captura no dice nada se cae al precio, que es una
+    aproximación: por debajo del mínimo casi nunca lo hay.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    dice = str(textos.get("envio") or "").strip().lower()
+    if dice == "gratis":
+        return True
+    if dice:
+        return False
+    return pov_config.precio_num(textos.get("precio")) >= PRECIO_MIN_ENVIO_GRATIS
+
+
 def cta_final(plazos: bool, envio: bool) -> str:
     """La última frase del guion, con solo lo que ese producto cumple."""
     extras = []

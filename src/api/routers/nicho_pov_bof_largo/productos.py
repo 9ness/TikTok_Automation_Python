@@ -71,7 +71,9 @@ def _precio(textos: dict, campo: str = "precio") -> float:
     return pov_config.precio_num(textos.get(campo))
 
 
-def _segundos(guion: str, prod: dict, precio: float = 0.0) -> tuple[float, float]:
+def _segundos(
+    guion: str, prod: dict, precio: float = 0.0, envio: bool = True,
+) -> tuple[float, float]:
     """`(mínimo, máximo)` de duración del vídeo, sobre el guion ya recortado."""
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof_largo.services import voz as voz_svc
@@ -81,16 +83,16 @@ def _segundos(guion: str, prod: dict, precio: float = 0.0) -> tuple[float, float
     limpio = config.recortar_cta(
         guion,
         plazos=precio >= pov_config.PRECIO_MIN_PLAZOS,
-        envio=precio >= config.PRECIO_MIN_ENVIO_GRATIS,
+        envio=envio,
     )
     clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
     return voz_svc.duracion_estimada(
-        len(limpio), clip_s, _huecos(prod, precio),
+        len(limpio), clip_s, _huecos(prod, precio, envio),
         segundos_min=config.DURACION_MINIMA_S,
     )
 
 
-def _huecos(prod: dict, precio: float = 0.0) -> int:
+def _huecos(prod: dict, precio: float = 0.0, envio: bool = True) -> int:
     """Cuántos clips hay que subir para este producto.
 
     Se pregunta con cuántos queda alguna voz sorteable, no cuánto tardaría la
@@ -110,9 +112,7 @@ def _huecos(prod: dict, precio: float = 0.0) -> int:
     if not guion:
         return config.CLIPS_POR_VIDEO
     guion = config.recortar_cta(
-        guion,
-        plazos=precio >= pov_config.PRECIO_MIN_PLAZOS,
-        envio=precio >= config.PRECIO_MIN_ENVIO_GRATIS,
+        guion, plazos=precio >= pov_config.PRECIO_MIN_PLAZOS, envio=envio,
     )
     return voz_svc.clips_para(
         len(guion),
@@ -449,7 +449,9 @@ def _listar(
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
-                {**mio, "guion": guion}, pov_config.precio_num(textos.get("precio")),
+                {**mio, "guion": guion},
+                pov_config.precio_num(textos.get("precio")),
+                config.hay_envio_gratis(textos),
             ),
             # Cuánto va a durar el vídeo. No es el guion partido por una
             # velocidad media: el vídeo dura lo que dure la voz, y la voz sale
@@ -461,6 +463,7 @@ def _listar(
                         guion,
                         {**mio, "guion": guion},
                         pov_config.precio_num(textos.get("precio")),
+                        config.hay_envio_gratis(textos),
                     ),
                 )
             ),
@@ -806,10 +809,7 @@ def escribir_guion(
     estilo = progress_repo.get_modo(body.source, usuario)
     # Qué puede prometer este producto: los plazos y el envío gratis tienen su
     # mínimo de pedido, y decirlo en uno de 9 € es prometer lo que no hay.
-    envio_gratis = (
-        pov_config.precio_num(textos.get("precio"))
-        >= config.PRECIO_MIN_ENVIO_GRATIS
-    )
+    envio_gratis = config.hay_envio_gratis(textos)
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (

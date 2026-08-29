@@ -2840,10 +2840,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         source, carpetas, usuario, product_repo, pov_config, largo_config,
     ):
         guion = str(t_prod.get("guion") or "")
-        envio_prod = (
-            pov_config.precio_num(t_prod.get("precio"))
-            >= largo_config.PRECIO_MIN_ENVIO_GRATIS
-        )
+        envio_prod = largo_config.hay_envio_gratis(t_prod)
         nuevo = largo_config.recortar_cta(
             guion, plazos=plazos_prod, envio=envio_prod,
         )
@@ -2872,10 +2869,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
         # Lo que ese producto SÍ cumple: por debajo del mínimo no hay envío
         # gratis, igual que no hay plazos.
-        envio = (
-            pov_config.precio_num(t.get("precio"))
-            >= largo_config.PRECIO_MIN_ENVIO_GRATIS
-        )
+        envio = largo_config.hay_envio_gratis(t)
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),
