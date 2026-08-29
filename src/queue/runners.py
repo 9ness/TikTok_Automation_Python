@@ -2853,19 +2853,6 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             f"[guiones] sin textos (se saltan): {', '.join(sin_textos)} — "
             "sácalos en Configuración › Textos de todo un catálogo"
         )
-    if not pendientes:
-        if sin_textos and len(sin_textos) == len(carpetas):
-            raise RuntimeError(
-                "Ninguna carpeta tiene textos extraídos todavía: sácalos "
-                "primero (Configuración › Textos de todo un catálogo)."
-            )
-        on_log("[guiones] todo lo que tiene textos ya tiene guion")
-        return "sin-cambios"
-
-    on_log(
-        f"[guiones] {len(pendientes)} guion(es) por escribir en "
-        f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
-    )
     # Antes de gastar nada: a los que YA tienen guion pero prometen algo que su
     # precio no cumple (plazos o envío gratis) les basta con cambiarles la CTA.
     # Es un reemplazo de una frase, no una llamada a Gemini.
@@ -2886,6 +2873,22 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     if limpiados:
         on_log(f"[guiones] {limpiados} con la CTA corregida (sin IA)")
 
+    if not pendientes:
+        if limpiados:
+            on_progress(1.0, "✍️ CTAs corregidas")
+            return f"{limpiados} CTA(s) corregidas"
+        if sin_textos and len(sin_textos) == len(carpetas):
+            raise RuntimeError(
+                "Ninguna carpeta tiene textos extraídos todavía: sácalos "
+                "primero (Configuración › Textos de todo un catálogo)."
+            )
+        on_log("[guiones] todo lo que tiene textos ya tiene guion")
+        return "sin-cambios"
+
+    on_log(
+        f"[guiones] {len(pendientes)} guion(es) por escribir en "
+        f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
+    )
     hechos, fallidos = 0, []
     # Por dónde empieza el guion. Es del CATÁLOGO y por usuario, así que se lee
     # UNA vez: leerlo del producto devolvía siempre el de defecto —o sea,
