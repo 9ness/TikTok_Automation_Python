@@ -2833,21 +2833,20 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
     )
     hechos, fallidos = 0, []
+    # Por dónde empieza el guion. Es del CATÁLOGO y por usuario, así que se lee
+    # UNA vez: leerlo del producto devolvía siempre el de defecto —o sea,
+    # guiones de precio aunque estuvieras en punto de dolor— desde que el modo
+    # pasó a la clave del documento.
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    estilo = progress_repo.get_modo(source, usuario)
+    on_log(f"[guiones] modo: {estilo}")
     for i, (carpeta, pid, t, plazos) in enumerate(pendientes):
         on_progress(
             i / len(pendientes),
             f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
         )
         on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
-        # Por dónde empieza el guion: lo elige el operador por producto o por
-        # carpeta. `estilo_guion`, no `gancho` — aquí "gancho" es el texto
-        # quemado del vídeo.
-        estilo = str(
-            (product_repo.get_product(source, carpeta, pid, usuario) or {}).get(
-                "estilo_guion"
-            )
-            or largo_config.ESTILO_GUION_DEFECTO
-        )
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),

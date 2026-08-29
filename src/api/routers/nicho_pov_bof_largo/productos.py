@@ -750,7 +750,12 @@ def escribir_guion(
     # Por dónde empieza el guion (precio o dolor). Se guarda en el producto
     # para saber después con cuál se escribió y reescribir solo si cambia.
     # `estilo_guion`, no `gancho`: aquí "gancho" es el texto quemado del vídeo.
-    estilo = str(guardado.get("estilo_guion") or config.ESTILO_GUION_DEFECTO)
+    # Del CATÁLOGO, no del producto: al pasar el modo a la clave del documento
+    # dejó de guardarse por producto, y leerlo de ahí devolvía siempre el de
+    # defecto — o sea, guiones de precio aunque estuvieras en punto de dolor.
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    estilo = progress_repo.get_modo(body.source, usuario)
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (
