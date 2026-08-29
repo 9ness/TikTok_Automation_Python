@@ -73,6 +73,10 @@ class ProductoLargo(BaseModel):
     estilo_guion: str = "precio"
     # Con qué modo se escribió el guion que hay guardado.
     guion_estilo: str = "precio"
+    # Cuánto durará el vídeo: la voz manda, y sale sorteada entre las que
+    # caben, así que es un rango y no un número.
+    segundos_min: float = 0.0
+    segundos_max: float = 0.0
     voz_label: str = ""
     voz_sexo: str = ""
     en_escaparate: bool = False

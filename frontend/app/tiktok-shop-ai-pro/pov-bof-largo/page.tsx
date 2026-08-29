@@ -1909,11 +1909,21 @@ function ProductoCard({
         {p.guion && (
           <ChipAjuste
             icono={guionDesfasado ? "⚠️" : "🎬"}
-            valor={`${p.guion_caracteres} car.`}
+            // Los SEGUNDOS delante: es lo que decide si el vídeo sirve para
+            // el reto, y los caracteres solo interesan si algo va mal.
+            valor={
+              p.segundos_min && p.segundos_max
+                ? `${p.segundos_min}-${p.segundos_max}s`
+                : `${p.guion_caracteres} car.`
+            }
             abierto={verGuion}
             onToggle={() => setVerGuion((v) => !v)}
             aviso={guionDesfasado}
-            title={`Guion · ~${Math.round(p.guion_caracteres / CAR_POR_SEG)}s`}
+            title={
+              p.segundos_min
+                ? `Guion de ${p.guion_caracteres} caracteres · el vídeo durará entre ${p.segundos_min}s y ${p.segundos_max}s según la voz que salga`
+                : `Guion · ${p.guion_caracteres} caracteres`
+            }
           />
         )}
           <ChipAjuste

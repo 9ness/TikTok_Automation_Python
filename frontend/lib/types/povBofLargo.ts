@@ -68,6 +68,10 @@ export interface ProductoLargo {
   /** Con qué modo se escribió el guion guardado. Si no es el elegido, ese
    *  guion no sirve: hay que reescribirlo. */
   guion_estilo?: string;
+  /** Cuánto durará el vídeo. Es un rango porque la voz se sortea entre las
+   *  que caben, y el vídeo dura lo que dure la voz. */
+  segundos_min?: number;
+  segundos_max?: number;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.

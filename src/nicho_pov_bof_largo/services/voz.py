@@ -94,6 +94,40 @@ def clips_para(
     return maximos
 
 
+def duracion_estimada(
+    caracteres: int,
+    clip_s: float,
+    n_clips: int,
+    *,
+    segundos_min: float = 0.0,
+    margen_s: float = MARGEN_VOZ_S,
+) -> tuple[float, float]:
+    """Cuánto va a durar el vídeo: `(mínimo, máximo)` en segundos.
+
+    No es una regla de tres con una velocidad media: el vídeo dura lo que dure
+    la voz, y la voz sale sorteada entre las que CABEN en esos clips y llegan
+    al mínimo. Así que el rango son las duraciones de esas voces, con su
+    acelerón aplicado — que es lo que el operador va a ver de verdad.
+    """
+    from src.nicho_pov_bof_largo.services import velocidad_voz
+
+    tope = round(clip_s * max(1, n_clips) * 1.2, 1) - max(0.0, margen_s)
+    duraciones = []
+    for banco in config.VOCES.values():
+        for v in banco:
+            cps = velocidad_voz.caracteres_por_segundo(v["id"])
+            factor = tempo_para(caracteres, cps, tope)
+            if factor > config.VOZ_TEMPO_MAX:
+                continue
+            d = (caracteres / cps) / factor
+            if segundos_min and d < segundos_min:
+                continue
+            duraciones.append(d)
+    if not duraciones:
+        return (0.0, 0.0)
+    return (round(min(duraciones), 1), round(max(duraciones), 1))
+
+
 def elegir_voz(
     sexo: str,
     rng: random.Random | None = None,

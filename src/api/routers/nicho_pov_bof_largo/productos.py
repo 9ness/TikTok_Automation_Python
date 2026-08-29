@@ -71,6 +71,25 @@ def _precio(textos: dict, campo: str = "precio") -> float:
     return pov_config.precio_num(textos.get(campo))
 
 
+def _segundos(guion: str, prod: dict, precio: float = 0.0) -> tuple[float, float]:
+    """`(mínimo, máximo)` de duración del vídeo, sobre el guion ya recortado."""
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    if not guion:
+        return (0.0, 0.0)
+    limpio = config.recortar_cta(
+        guion,
+        plazos=precio >= pov_config.PRECIO_MIN_PLAZOS,
+        envio=precio >= config.PRECIO_MIN_ENVIO_GRATIS,
+    )
+    clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
+    return voz_svc.duracion_estimada(
+        len(limpio), clip_s, _huecos(prod, precio),
+        segundos_min=config.DURACION_MINIMA_S,
+    )
+
+
 def _huecos(prod: dict, precio: float = 0.0) -> int:
     """Cuántos clips hay que subir para este producto.
 
@@ -431,6 +450,19 @@ def _listar(
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
                 {**mio, "guion": guion}, pov_config.precio_num(textos.get("precio")),
+            ),
+            # Cuánto va a durar el vídeo. No es el guion partido por una
+            # velocidad media: el vídeo dura lo que dure la voz, y la voz sale
+            # sorteada entre las que caben. Así que es el rango real.
+            **dict(
+                zip(
+                    ("segundos_min", "segundos_max"),
+                    _segundos(
+                        guion,
+                        {**mio, "guion": guion},
+                        pov_config.precio_num(textos.get("precio")),
+                    ),
+                )
             ),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
             # El modo es del CATÁLOGO, no del producto: se repite en cada
