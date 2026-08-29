@@ -71,7 +71,7 @@ def _precio(textos: dict, campo: str = "precio") -> float:
     return pov_config.precio_num(textos.get(campo))
 
 
-def _huecos(prod: dict) -> int:
+def _huecos(prod: dict, precio: float = 0.0) -> int:
     """Cuántos clips hay que subir para este producto.
 
     Se pregunta con cuántos queda alguna voz sorteable, no cuánto tardaría la
@@ -79,12 +79,22 @@ def _huecos(prod: dict) -> int:
     caben y las que dejarían el vídeo por debajo del mínimo del reto), así que
     contar con ella pedía un clip de más. De propina, con menos clips la
     duración del vídeo queda en una banda más estrecha.
+
+    Y se cuenta sobre el guion RECORTADO: si el producto no llega al mínimo de
+    plazos o de envío gratis, esas frases se le quitan, y pedir un clip de más
+    por un texto que no se va a locutar es trabajo de generación tirado.
     """
+    from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof_largo.services import voz as voz_svc
 
     guion = str(prod.get("guion") or "").strip()
     if not guion:
         return config.CLIPS_POR_VIDEO
+    guion = config.recortar_cta(
+        guion,
+        plazos=precio >= pov_config.PRECIO_MIN_PLAZOS,
+        envio=precio >= config.PRECIO_MIN_ENVIO_GRATIS,
+    )
     return voz_svc.clips_para(
         len(guion),
         float(prod.get("clip_s") or config.CLIP_TARGET_S),
@@ -338,6 +348,8 @@ def _listar(
     # Con qué modo se está recorriendo el catálogo. Lo que se lee del
     # documento YA es de ese modo (va en la clave); esto es solo para decírselo
     # a la pantalla.
+    from src.nicho_pov_bof import config as pov_config
+
     estilo_catalogo = progress_repo.get_modo(source, usuario)
     propio = (product_repo.load_folder(source, folder, usuario).get("productos") or {})
     # Los textos del POV BOF, de UNA lectura para toda la carpeta. Pedirlos
@@ -417,7 +429,9 @@ def _listar(
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
-            clips_necesarios=_huecos({**mio, "guion": guion}),
+            clips_necesarios=_huecos(
+                {**mio, "guion": guion}, pov_config.precio_num(textos.get("precio")),
+            ),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
             # El modo es del CATÁLOGO, no del producto: se repite en cada
             # ficha solo para que la pantalla no tenga que cruzarlo.
@@ -755,7 +769,15 @@ def escribir_guion(
     # defecto — o sea, guiones de precio aunque estuvieras en punto de dolor.
     from src.nicho_pov_bof_largo.repos import progress_repo
 
+    from src.nicho_pov_bof import config as pov_config
+
     estilo = progress_repo.get_modo(body.source, usuario)
+    # Qué puede prometer este producto: los plazos y el envío gratis tienen su
+    # mínimo de pedido, y decirlo en uno de 9 € es prometer lo que no hay.
+    envio_gratis = (
+        pov_config.precio_num(textos.get("precio"))
+        >= config.PRECIO_MIN_ENVIO_GRATIS
+    )
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (
@@ -797,7 +819,7 @@ def escribir_guion(
             caption=textos.get("caption", ""),
             foto=foto,
             plazos=plazos,
-            prompt=config.prompt_guion(plazos, estilo),
+            prompt=config.prompt_guion(plazos, estilo, envio_gratis),
         )
     except ValueError as e:
         raise APIError(str(e), status_code=422) from e
@@ -807,7 +829,10 @@ def escribir_guion(
     try:
         product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
-            guion=escrito["guion"], subliminal=escrito["subliminal"],
+            guion=config.recortar_cta(
+                escrito["guion"], plazos=plazos, envio=envio_gratis,
+            ),
+            subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo,
         )
@@ -997,6 +1022,8 @@ def confirmar_lote(
     segundo el 2 y el tercero el 3 (los guiones largos piden tres). Un producto
     al que le falte alguno se queda esperando, igual que subiéndolos a mano.
     """
+    from src.nicho_pov_bof import config as pov_config
+
     encolados, pendientes, mensajes = 0, 0, []
     vistos: dict[str, int] = {}
     for item in body.items:
@@ -1010,7 +1037,14 @@ def confirmar_lote(
             mensajes.append(f"Producto {item.producto}: escribe antes el guion.")
             continue
         montado_at = float(prod.get("video_listo_at") or 0)
-        hacen_falta = _huecos(prod)
+        hacen_falta = _huecos(
+            prod,
+            pov_config.precio_num(
+                product_repo.textos_producto(
+                    body.source, body.folder, item.producto, usuario,
+                ).get("precio")
+            ),
+        )
         if vistos[item.producto] >= 2:
             # El enésimo vídeo de este producto en ESTA tanda va al hueco n.
             slot = min(vistos[item.producto], hacen_falta)
@@ -1181,6 +1215,8 @@ def _encolar_clip(
     suelto y la subida en tanda. Duplicarlo habría acabado en dos versiones de
     la regla de "no montar hasta tener los dos".
     """
+    from src.nicho_pov_bof import config as pov_config
+
     try:
         prod = product_repo.update_product(
             source, folder, producto, usuario=usuario,
@@ -1191,7 +1227,12 @@ def _encolar_clip(
 
     montado_at = float(prod.get("video_listo_at") or 0)
     # Cuántos clips pide ESTE guion (dos, o tres si la voz no cabe en dos).
-    hacen_falta = _huecos(prod)
+    hacen_falta = _huecos(
+        prod,
+        pov_config.precio_num(
+            product_repo.textos_producto(source, folder, producto, usuario).get("precio")
+        ),
+    )
     rutas = [
         prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
     ]

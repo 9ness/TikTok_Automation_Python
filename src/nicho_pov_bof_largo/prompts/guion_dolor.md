@@ -16,9 +16,7 @@ Varios puntos de dolor fuertes dirigidos al espectador.
 Presentación natural del tipo de producto.
 Mayor cantidad posible de características y beneficios confirmados.
 Urgencia mediante un ajuste de precio.
-CTA al carrito naranja.
-CTA para aplicar los cupones.
-CTA para comprobar el pago a plazos y el envío gratis.
+La llamada a la acción final: «{{CTA_FINAL}}»
 
 1. VARIOS PUNTOS DE DOLOR DIRIGIDOS AL ESPECTADOR
 Comienza mencionando entre tres y cinco problemas o situaciones cotidianas diferentes que el producto pueda abordar.
@@ -80,11 +78,9 @@ A un precio que está genial ahora mismo.
 No menciones precios concretos.
 
 5. LLAMADAS A LA ACCIÓN
-Después de la urgencia de precio, incluye siempre estas llamadas a la acción y respeta este orden:
-Indica al espectador que vaya al carrito naranja.
-Pídele que revise y aplique sus cupones para conseguirlo aún más barato.
-Indícale que compruebe si dispone de pago a plazos y envío gratis.
-Puedes variar ligeramente la redacción para evitar guiones repetitivos, pero no elimines ninguna de las tres llamadas a la acción.
+Después de la urgencia de precio, incluye siempre esta llamada a la acción, con esta redacción y este orden:
+«{{CTA_FINAL}}»
+Puedes variar ligeramente la redacción para evitar guiones repetitivos, pero no añadas nada que no esté ahí ni elimines ninguna de sus partes.
 
 REGLAS GENERALES
 El guion está destinado a una voz en off de aproximadamente 20 segundos.
@@ -109,7 +105,7 @@ Este nombre es informativo y no debe aparecer dentro del guion de voz en off.
 
 GUION — VOZ EN OFF (MÁXIMO 360 CARACTERES)
 El guion debe seguir exactamente este orden:
-Entre tres y cinco puntos de dolor dirigidos al espectador, nunca en forma de pregunta → «Y es que lo bueno que tiene esta/este [TIPO DE PRODUCTO] es que…» → mayor cantidad posible de características y beneficios confirmados → urgencia por ajuste de precio → carrito naranja → cupones → pago a plazos y envío gratis.
+Entre tres y cinco puntos de dolor dirigidos al espectador, nunca en forma de pregunta → «Y es que lo bueno que tiene esta/este [TIPO DE PRODUCTO] es que…» → mayor cantidad posible de características y beneficios confirmados → urgencia por ajuste de precio → «{{CTA_FINAL}}».
 Es obligatorio comprobar el número exacto de caracteres. Nunca debe superar los 360 caracteres.
 
 PROMPT DE MOVIMIENTO
@@ -130,7 +126,7 @@ Revisa también tus cupones de descuento
 para mejorarlo aún más.
 
 EJEMPLO DE ESTRUCTURA DEL GUIÓN
-«Si la alfombra de tu coche está sucia, tu sofá manchado o tus sillas ya no lucen igual, esto te interesa. Y es que lo bueno que tiene este limpiador es que es portátil, ligero y puede ayudar con distintas superficies. Han ajustado el precio. Ve al carrito naranja, aplica tus cupones y revisa el pago a plazos y el envío gratis».
+«Si la alfombra de tu coche está sucia, tu sofá manchado o tus sillas ya no lucen igual, esto te interesa. Y es que lo bueno que tiene este limpiador es que es portátil, ligero y puede ayudar con distintas superficies. Han ajustado el precio. {{CTA_FINAL}}».
 Este ejemplo sirve únicamente como referencia de estructura. Los nuevos guiones deben adaptarse al producto de cada imagen y no superar los 360 caracteres.
 
 Recuerda que debes devolver únicamente:

@@ -23,6 +23,7 @@ allí no significa haberlo hecho aquí — son vídeos distintos del mismo produ
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 REDIS_PREFIX = os.getenv("NICHO_POV_BOF_LARGO_REDIS_PREFIX", "nicho_pov_bof_largo:")
@@ -151,6 +152,29 @@ def prompts_dir() -> Path:
 # No confundir con el "gancho" del vídeo, que es el texto quemado de arriba.
 # Lo demás (duración, tope de caracteres, salida) es igual en los dos, así que
 # el resto del nicho no se entera de cuál se usó.
+# Por debajo de esto, el pedido no suele llevar envío gratis, así que la CTA
+# se queda sin esa parte: es el mismo criterio que con el pago a plazos, y por
+# el mismo motivo — un vídeo que promete algo que el comprador no se encuentra
+# es lo que trae infracciones.
+PRECIO_MIN_ENVIO_GRATIS = float(os.getenv("PRECIO_MIN_ENVIO_GRATIS", "10"))
+
+
+def cta_final(plazos: bool, envio: bool) -> str:
+    """La última frase del guion, con solo lo que ese producto cumple."""
+    extras = []
+    if plazos:
+        extras.append("el pago a plazos")
+    if envio:
+        extras.append("el envío gratis")
+    if not extras:
+        return "Ve al carrito naranja y aplica tus cupones."
+    return (
+        "Ve al carrito naranja, aplica tus cupones y revisa "
+        + " y ".join(extras)
+        + "."
+    )
+
+
 ESTILOS_GUION: dict[str, dict[str, str]] = {
     "precio": {"label": "Urgencia de precio", "fichero": "guion.md"},
     "dolor": {"label": "Punto de dolor", "fichero": "guion_dolor.md"},
@@ -158,7 +182,42 @@ ESTILOS_GUION: dict[str, dict[str, str]] = {
 ESTILO_GUION_DEFECTO = "precio"
 
 
-def prompt_guion(plazos: bool = False, estilo: str = ESTILO_GUION_DEFECTO) -> str:
+# La CTA final de un guion ya escrito, para poder cambiarla sin volver a
+# llamar a la IA: un producto de 9,71 € no tiene envío gratis y uno de 20 € no
+# llega al mínimo de los plazos, y el guion se queda prometiéndolo.
+#
+# Se sustituye la FRASE ENTERA en vez de recortar trozos: quitando solo "el
+# pago a plazos" se llevaba por delante el "revisa" y quedaba "…y el envío
+# gratis", que suena raro. La CTA empieza siempre por el carrito naranja.
+_CTA_FINAL_RE = re.compile(
+    r"(?:Ve|Haz\s+click|Vete|Entra)\s+(?:al|en\s+el)\s+carrito\s+naranja[^.]*\.",
+    re.IGNORECASE,
+)
+
+
+def recortar_cta(guion: str, *, plazos: bool, envio: bool) -> str:
+    """El guion con la CTA que le toca a ese precio. Idempotente."""
+    if not guion:
+        return ""
+    nueva = cta_final(plazos, envio)
+    if not _CTA_FINAL_RE.search(guion):
+        return guion          # sin CTA reconocible no se toca nada
+    return re.sub(r"\s{2,}", " ", _CTA_FINAL_RE.sub(nueva, guion, count=1)).strip()
+
+
+def cta_desfasada(guion: str, *, plazos: bool, envio: bool) -> bool:
+    """¿Este guion promete algo que su precio no cumple?"""
+    bajo = (guion or "").lower()
+    return (not plazos and "plazos" in bajo) or (
+        not envio and ("envío gratis" in bajo or "envio gratis" in bajo)
+    )
+
+
+def prompt_guion(
+    plazos: bool = False,
+    estilo: str = ESTILO_GUION_DEFECTO,
+    envio_gratis: bool = True,
+) -> str:
     """El prompt del curso, con el bloque de plazos pegado si toca.
 
     Va LITERAL y nunca se toca. Lo de plazos es un añadido al final
@@ -174,6 +233,7 @@ def prompt_guion(plazos: bool = False, estilo: str = ESTILO_GUION_DEFECTO) -> st
     # El de dolor lleva nota de cabecera para quien lo lea en el repo.
     if base.startswith("<!--"):
         base = base.split("-->", 1)[1].strip()
+    base = base.replace("{{CTA_FINAL}}", cta_final(plazos, envio_gratis))
     if not plazos:
         return base
     extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")

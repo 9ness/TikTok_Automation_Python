@@ -2832,6 +2832,29 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         f"[guiones] {len(pendientes)} guion(es) por escribir en "
         f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
     )
+    # Antes de gastar nada: a los que YA tienen guion pero prometen algo que su
+    # precio no cumple (plazos o envío gratis) les basta con cambiarles la CTA.
+    # Es un reemplazo de una frase, no una llamada a Gemini.
+    limpiados = 0
+    for carpeta, pid, t_prod, plazos_prod in _con_guion_desfasado(
+        source, carpetas, usuario, product_repo, pov_config, largo_config,
+    ):
+        guion = str(t_prod.get("guion") or "")
+        envio_prod = (
+            pov_config.precio_num(t_prod.get("precio"))
+            >= largo_config.PRECIO_MIN_ENVIO_GRATIS
+        )
+        nuevo = largo_config.recortar_cta(
+            guion, plazos=plazos_prod, envio=envio_prod,
+        )
+        if nuevo and nuevo != guion:
+            product_repo.update_product(
+                source, carpeta, pid, usuario=usuario, guion=nuevo,
+            )
+            limpiados += 1
+    if limpiados:
+        on_log(f"[guiones] {limpiados} con la CTA corregida (sin IA)")
+
     hechos, fallidos = 0, []
     # Por dónde empieza el guion. Es del CATÁLOGO y por usuario, así que se lee
     # UNA vez: leerlo del producto devolvía siempre el de defecto —o sea,
@@ -2847,6 +2870,12 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
         )
         on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
+        # Lo que ese producto SÍ cumple: por debajo del mínimo no hay envío
+        # gratis, igual que no hay plazos.
+        envio = (
+            pov_config.precio_num(t.get("precio"))
+            >= largo_config.PRECIO_MIN_ENVIO_GRATIS
+        )
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),
@@ -2854,7 +2883,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
                 caption=t.get("caption", ""),
                 foto=_foto_limpia(source, carpeta, pid),
                 plazos=plazos,
-                prompt=largo_config.prompt_guion(plazos, estilo),
+                prompt=largo_config.prompt_guion(plazos, estilo, envio),
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
@@ -2862,7 +2891,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             continue
         product_repo.update_product(
             source, carpeta, pid, usuario=usuario,
-            guion=escrito["guion"], subliminal=escrito["subliminal"],
+            guion=largo_config.recortar_cta(
+                escrito["guion"], plazos=plazos, envio=envio,
+            ),
+            subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo,
         )
