@@ -3038,41 +3038,19 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             continue
         if not (prod.get("titulo") or "").strip():
             continue                      # sin textos el guion saldría genérico
-        # Se respeta el guion ya escrito salvo que se pida rehacer O que se
-        # escribiera con la otra CTA: si el producto pasó a ser de plazos (o
-        # dejó de serlo), el cierre del guion ya no le corresponde.
-        plazos = pov_config.hay_plazos(prod)
-        envio = largo_config.hay_envio_gratis(prod)
-        guion_txt = str(prod.get("guion_producto") or "")
-        # Con qué CTA se escribió. La marca no existe en los guiones de antes
-        # de que hubiera varias, así que se mira también el TEXTO: uno que ya
-        # nombra los plazos (o el envío) vale tal cual para un producto que los
-        # tiene, y reescribirlo sería pagar una llamada por el mismo resultado.
-        escrito_con_plazos = bool(
-            prod.get("guion_producto_plazos")
-        ) or pov_config.guion_desfasado(guion_txt)
-        escrito_con_envio = bool(
-            prod.get("guion_producto_envio")
-        ) or pov_config.promete_envio(guion_txt)
-        if guion_txt and not rehacer:
-            if (escrito_con_plazos, escrito_con_envio) == (plazos, envio):
-                continue
-            # Lo que SOBRA se quita gratis (lo hace el bucle de abajo); solo se
-            # paga una reescritura cuando hay que AÑADIR algo, que eso sí exige
-            # rehacer el texto.
-            sobra_plazos = escrito_con_plazos and not plazos
-            sobra_envio = escrito_con_envio and not envio
-            falta = (plazos and not escrito_con_plazos) or (
-                envio and not escrito_con_envio
-            )
-            if not falta and (sobra_plazos or sobra_envio):
-                continue
-        pendientes.append((pid, prod, plazos, envio))
+        # Un guion ya escrito NUNCA se paga dos veces: si lo que promete no
+        # cuadra con la ficha, se le cambia el cierre gratis (el bucle de
+        # abajo). A Gemini solo se va cuando no hay guion o se pide rehacer.
+        if prod.get("guion_producto") and not rehacer:
+            continue
+        pendientes.append(
+            (pid, prod, pov_config.hay_plazos(prod),
+             largo_config.hay_envio_gratis(prod))
+        )
 
-    # Antes de gastar nada: al que promete plazos SIN tenerlos le basta con
-    # quitarle la frase. Son treinta llamadas a Gemini de diferencia y el resto
-    # del texto, que está bien, no se toca. Al revés no vale: meter la frase a
-    # un guion que no la tiene sí hay que escribirlo (va arriba, en pendientes).
+    # La CTA se pone al día GRATIS, en las dos direcciones: es un literal fijo
+    # del curso, así que sobra o falta la frase de plazos o la del envío, basta
+    # con sustituir el cierre. El cuerpo —lo que habla del producto— no se toca.
     limpiados = 0
     for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
         if solo and pid not in solo:
@@ -3080,21 +3058,17 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
         guion = str(prod.get("guion_producto") or "")
         if not guion:
             continue
-        limpio = guion
-        if not pov_config.hay_plazos(prod):
-            limpio = pov_config.sin_cta_plazos(limpio)
-        if not largo_config.hay_envio_gratis(prod):
-            limpio = pov_config.sin_cta_envio(limpio)
-        if limpio and limpio != guion:
+        plazos = pov_config.hay_plazos(prod)
+        envio = largo_config.hay_envio_gratis(prod)
+        nuevo = pov_config.ajustar_cta(guion, plazos=plazos, envio=envio)
+        if nuevo and nuevo != guion:
             product_repo.update_product(
-                source, folder, pid,
-                guion_producto=limpio,
-                guion_producto_plazos=pov_config.hay_plazos(prod),
-                guion_producto_envio=largo_config.hay_envio_gratis(prod),
+                source, folder, pid, guion_producto=nuevo,
+                guion_producto_plazos=plazos, guion_producto_envio=envio,
             )
             limpiados += 1
     if limpiados:
-        on_log(f"[guiones] {limpiados} guion(es) con la frase de plazos quitada (sin IA)")
+        on_log(f"[guiones] {limpiados} guion(es) con la CTA ajustada (sin IA)")
 
     if not pendientes:
         resumen = f"{limpiados} limpiados" if limpiados else "sin-cambios"

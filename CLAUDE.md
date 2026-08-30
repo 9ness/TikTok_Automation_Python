@@ -316,7 +316,10 @@ según lo que el producto CUMPLA (`config.hay_plazos` y
 `nicho_pov_bof_largo.config.hay_envio_gratis`: los leen de la ficha y caen al
 precio —40 € y 10 €— si la captura no lo enseña). Los flags
 `guion_producto_plazos` / `guion_producto_envio` guardan con cuál se escribió;
-con las dos promesas el guion se va a ~259 car (~14s) porque en 10s no caben. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
+con las dos promesas el guion se va a ~269 car (~15s) porque en 10s no caben.
+Cambiar de cierre NO cuesta una llamada: la CTA es un literal fijo del curso,
+así que `config.ajustar_cta` sustituye el final y deja el cuerpo — a Gemini
+solo se va cuando el producto no tiene guion o se pide rehacer. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
 `JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`) ya no se usan: son genéricos —no nombran
 el producto— y de 253-274 car, o sea vídeos de 13-20s donde se piden 10.
 

@@ -1803,45 +1803,23 @@ def escribir_guion(body: dict) -> dict:
     plazos = pov_config.hay_plazos(prod)
     envio = largo_config.hay_envio_gratis(prod)
     guardado = str(prod.get("guion_producto") or "")
-    escrito_plazos = bool(
-        prod.get("guion_producto_plazos")
-    ) or pov_config.guion_desfasado(guardado)
-    escrito_envio = bool(
-        prod.get("guion_producto_envio")
-    ) or pov_config.promete_envio(guardado)
-    # Si el guion promete algo que el producto NO cumple, basta con quitarle la
-    # frase: no hace falta gastar una llamada a Gemini para reescribir un texto
-    # que por lo demás está bien. Solo se paga cuando hay que AÑADIR algo.
-    falta = (plazos and not escrito_plazos) or (envio and not escrito_envio)
-    if guardado and not falta and not body.get("rehacer"):
-        limpio = guardado
-        if not plazos:
-            limpio = pov_config.sin_cta_plazos(limpio)
-        if not envio:
-            limpio = pov_config.sin_cta_envio(limpio)
-        if limpio and limpio != guardado:
+    # El guion guardado se reaprovecha SIEMPRE (salvo "rehacer"): si lo que
+    # promete no cuadra con la ficha, se le cambia el cierre —que es un literal
+    # fijo del curso— sin gastar una llamada a Gemini.
+    if guardado and not body.get("rehacer"):
+        ajustado = pov_config.ajustar_cta(guardado, plazos=plazos, envio=envio)
+        if ajustado and ajustado != guardado:
             try:
                 product_repo.update_product(
-                    source, folder, producto, guion_producto=limpio,
+                    source, folder, producto, guion_producto=ajustado,
                     guion_producto_plazos=plazos, guion_producto_envio=envio,
                 )
             except RuntimeError:
                 pass
-            return {
-                "guion": limpio,
-                "subliminal": prod.get("subliminal_producto", ""),
-                "caracteres": len(limpio),
-                "reusado": True,
-            }
-    if (
-        guardado
-        and not body.get("rehacer")
-        and (escrito_plazos, escrito_envio) == (plazos, envio)
-    ):
         return {
-            "guion": prod["guion_producto"],
+            "guion": ajustado or guardado,
             "subliminal": prod.get("subliminal_producto", ""),
-            "caracteres": len(prod["guion_producto"]),
+            "caracteres": len(ajustado or guardado),
             "reusado": True,
         }
 

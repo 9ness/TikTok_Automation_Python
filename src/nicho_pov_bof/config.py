@@ -685,33 +685,36 @@ CTA_GUION = {
 # Se combinan porque las dos cosas se dan a la vez y son independientes: un
 # escritorio de 70 € tiene financiación Y envío gratis, y callarse una de las
 # dos es tirar un argumento de venta que el comprador sí se va a encontrar.
-_CTA_CUPONES = "Comprueba tus cupones descuento"
-_CTA_PLAZOS = " y aprovecha el pago a plazos en pedidos de más de 30 euros"
-_CTA_ENVIO = " y recíbelo con envío gratis"
+# Cómo lo escribe el curso, que es lo que se copia: el envío gratis NUNCA va
+# como una orden más al final, va DENTRO de la frase de los cupones ("consigue
+# un precio aún mejor con envío gratis"), y los plazos van en su propia frase
+# antes. Apilar tres imperativos seguidos suena a formulario, no a alguien
+# hablando.
+_CTA_CUPONES = "Comprueba tus cupones descuento antes de comprar."
+_CTA_CUPONES_ENVIO = (
+    "Comprueba tus cupones y consigue un precio aún mejor con envío gratis."
+)
+_CTA_PLAZOS_FRASE = "Aprovecha el pago a plazos en pedidos de más de 30 euros."
 
 
 def _cta(plazos: bool, envio: bool) -> dict[str, str]:
     """El cierre del guion para un producto que cumple `plazos` y/o `envio`."""
+    cupones = _CTA_CUPONES_ENVIO if envio else _CTA_CUPONES
     if plazos and envio:
-        # Con las dos, la segunda va con coma: tres "y" seguidas se traban al
-        # locutarlas.
-        literal = f"{_CTA_CUPONES}{_CTA_PLAZOS}, {_CTA_ENVIO[3:]}."
-        estructura = "comprobacion de cupones, el pago a plazos y el envio gratis"
+        literal = f"{_CTA_PLAZOS_FRASE} {_CTA_CUPONES_ENVIO}"
+        estructura = "el pago a plazos y comprobacion de cupones con envio gratis"
     elif plazos:
-        literal, estructura = (
-            f"{_CTA_CUPONES}{_CTA_PLAZOS}.",
-            "comprobacion de cupones y el pago a plazos",
+        # Con solo plazos se mantiene la del curso, que los lleva en la misma
+        # frase que los cupones.
+        literal = (
+            "Comprueba tus cupones descuento y aprovecha el pago a plazos en "
+            "pedidos de más de 30 euros."
         )
+        estructura = "comprobacion de cupones y el pago a plazos"
     elif envio:
-        literal, estructura = (
-            f"{_CTA_CUPONES}{_CTA_ENVIO}.",
-            "comprobacion de cupones y el envio gratis",
-        )
+        literal, estructura = cupones, "comprobacion de cupones con envio gratis"
     else:
-        literal, estructura = (
-            f"{_CTA_CUPONES} antes de comprar.",
-            "comprobacion de cupones",
-        )
+        literal, estructura = cupones, "comprobacion de cupones"
     return {
         "CTA_ESTRUCTURA": estructura,
         "CTA_LITERAL": literal,
@@ -723,7 +726,7 @@ def _cta(plazos: bool, envio: bool) -> dict[str, str]:
 # CTA. Es lo que se mantiene fijo al cambiar de cierre — si se dejara el tope en
 # 190 con una CTA más larga, lo que se recortaría sería lo que habla DEL
 # PRODUCTO, que es justo lo que este guion aporta frente al de Klarna.
-_CTA_BASE = f"{_CTA_CUPONES} antes de comprar."
+_CTA_BASE = _CTA_CUPONES
 GUION_PRODUCTO_CUERPO_CARACTERES = 190 - len(_CTA_BASE)
 
 
@@ -804,6 +807,39 @@ _CTA_ENVIO_RE = re.compile(
     r"llevatelo)?\s*con\s+env[ií]o\s+gratis\b[^.]*",
     re.IGNORECASE,
 )
+
+
+# Por dónde EMPIEZA la CTA: la primera frase del final que habla de cupones,
+# plazos o envío. El cuerpo del guion (urgencia, producto, beneficio) nunca
+# nombra ninguna de las tres, así que sirve de frontera.
+_CTA_MARCAS_RE = re.compile(r"cupon|plazos|env[ií]o gratis", re.IGNORECASE)
+
+
+def ajustar_cta(guion: str, *, plazos: bool, envio: bool) -> str:
+    """El guion con la CTA que le toca a ese producto, sin reescribirlo.
+
+    Se cambia el CIERRE y se deja el cuerpo intacto, en las dos direcciones: da
+    igual que sobre una promesa o que falte. Antes solo se sabía QUITAR (un
+    regex sobre la frase de plazos) y añadir obligaba a gastar una llamada a
+    Gemini por producto; pero la CTA es un literal fijo del curso, así que
+    ponerla no es escribir nada — es sustituir el final.
+
+    Idempotente: aplicarla dos veces da lo mismo.
+    """
+    texto = (guion or "").strip()
+    if not texto:
+        return ""
+    frases = [f for f in re.split(r"(?<=[.!?])\s+", texto) if f.strip()]
+    # Se recorta desde el final mientras las frases sean CTA, pero nunca se
+    # deja el guion vacío: si TODAS lo parecen, es que no se ha entendido el
+    # texto y se prefiere no tocarlo.
+    corte = len(frases)
+    while corte > 0 and _CTA_MARCAS_RE.search(frases[corte - 1]):
+        corte -= 1
+    if corte == 0:
+        return texto
+    cuerpo = " ".join(frases[:corte]).strip()
+    return f"{cuerpo} {_cta(plazos, envio)['CTA_LITERAL']}".strip()
 
 
 def promete_envio(guion: str) -> bool:
