@@ -2123,7 +2123,7 @@ def _segundos_de_video(clips: list[Path]) -> float:
         crudos = float(sum(probe_duration(c) for c in clips))
     except Exception:  # noqa: BLE001
         return 0.0
-    estirado = largo_config.CLIP_MAX_S / largo_config.CLIP_TARGET_S
+    estirado = largo_config.ESTIRADO_CLIP
     return crudos * estirado
 
 

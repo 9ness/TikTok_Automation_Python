@@ -82,7 +82,7 @@ def clips_para(
 
     todas = [v for banco in config.VOCES.values() for v in banco]
     for n in range(1, max(1, maximos) + 1):
-        tope = round(clip_s * n * 1.2, 1) - max(0.0, margen_s)
+        tope = round(clip_s * n * config.ESTIRADO_CLIP, 1) - max(0.0, margen_s)
         for v in todas:
             cps = velocidad_voz.caracteres_por_segundo(v["id"])
             factor = tempo_para(caracteres, cps, tope)
@@ -111,7 +111,7 @@ def duracion_estimada(
     """
     from src.nicho_pov_bof_largo.services import velocidad_voz
 
-    tope = round(clip_s * max(1, n_clips) * 1.2, 1) - max(0.0, margen_s)
+    tope = round(clip_s * max(1, n_clips) * config.ESTIRADO_CLIP, 1) - max(0.0, margen_s)
     duraciones = []
     for banco in config.VOCES.values():
         for v in banco:

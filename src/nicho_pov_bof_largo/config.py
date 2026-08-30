@@ -47,12 +47,18 @@ CLIPS_POR_VIDEO = 1
 CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "10"))
 # Más de cuatro deja de parecer una toma continua.
 CLIPS_MAXIMOS = 4
-# Hasta dónde se puede estirar un clip sin que se note: el montaje ya alarga un
-# poco cada uno para cuadrar con la voz (`match_video_to_audio`). Un 20% sobre
-# los 8s son 9,6s, que es justo el margen que pidió el operador ("uno o dos
-# segundos"). De ahí salen los cortes: 1 clip hasta ~9,5s, 2 hasta ~19s, 3
-# hasta ~28,5s y 4 hasta ~38s.
-CLIP_MAX_S = round(CLIP_TARGET_S * 1.2, 1)
+# Hasta dónde se puede estirar un clip. Ojo con la palabra: el montaje NO
+# ralentiza, RELLENA — `match_video_to_audio` pega el tramo final marcha atrás
+# (`_build_pingpong`) hasta cubrir la voz. Así que este número es cuánto
+# rebobinado se acepta, y por eso no se sube alegremente.
+#
+# Estaba en 1.2 y se subió a 1.3: con la CTA larga (plazos + envío gratis) el
+# guion se va a ~270 caracteres y a 1.2 solo cabía UNA voz del banco —la más
+# rápida—, así que todos los productos caros sonaban igual. A 1.3 entran tres,
+# a cambio de 1,1s más de rebobinado en el peor caso. A 1.4 entrarían seis,
+# pero eso es un cuarto del vídeo yendo hacia atrás y ahí ya se ve.
+ESTIRADO_CLIP = float(os.getenv("POV_BOF_ESTIRADO_CLIP", "1.3"))
+CLIP_MAX_S = round(CLIP_TARGET_S * ESTIRADO_CLIP, 1)
 # Duraciones que el operador puede elegir. La plataforma de vídeo ha dado clips
 # de 8 y de 10 según la época y la herramienta, y de eso depende cuántos pedir:
 # el mismo guion de 20s son 3 clips de 8s o 2 de 10s.
@@ -62,7 +68,7 @@ CLIPS_DURACIONES = (8, 10)
 def clip_max_s(clip_s: float = 0.0) -> float:
     """Cuánta voz cubre un clip de esa duración, estirado incluido."""
     if clip_s and clip_s > 0:
-        return round(float(clip_s) * 1.2, 1)
+        return round(float(clip_s) * ESTIRADO_CLIP, 1)
     return CLIP_MAX_S
 
 # ---------------------------------------------------------------------------
