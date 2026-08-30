@@ -34,6 +34,13 @@ class ProductFolder(BaseModel):
     # Cuántos de sus productos tienen ya enlazada la ficha de TikTok Shop. Es
     # lo que dice, desde el listado, en qué carpeta hay trabajo — sin abrirla.
     con_url: int = 0
+    # Cuántos productos tiene la carpeta HOY. Va junto a `con_url` porque solo
+    # tienen sentido juntos: un "9" no dice si la carpeta tiene nueve o si le
+    # falta enlazar el décimo.
+    total: int = 0
+    # Marcados a mano como retirados del catálogo. No son trabajo pendiente,
+    # así que un "8/10" con 2 sin stock está DE HECHO terminado.
+    sin_stock: int = 0
 
 
 class FoldersListResponse(BaseModel):
@@ -336,6 +343,11 @@ class ProductoEstadoRequest(BaseModel):
     # Duración de los clips que va a generar (8 o 10 s). Con guion propio
     # decide cuántos hay que subir: 223 caracteres caben en UNO de 10 s.
     clip_s: int | None = None
+    # Retirado del catálogo. Lo marca el operador al ver que su enlace ya no
+    # abre: TikTok devuelve un captcha a cualquier comprobación automática, así
+    # que no hay forma de saberlo desde el servidor (medido sobre 221 enlaces:
+    # los vivos y los muertos responden exactamente igual).
+    sin_stock: bool | None = None
 
 
 class ProductoBuscado(BaseModel):

@@ -801,6 +801,41 @@ def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     return salida
 
 
+def resumen_por_carpeta(source: str, folders: list[str]) -> dict[str, dict]:
+    """`{carpeta: {total, con_url, sin_stock}}` con UNA sola lectura.
+
+    Las tres cifras salen del mismo documento, así que contarlas por separado
+    eran tres `mget` a Upstash para pintar la misma pantalla.
+
+    Es lo que hace falta para saber desde el listado qué carpeta merece abrirse:
+    `con_url` sola engaña —un "9" no dice si la carpeta tiene nueve productos o
+    diez con uno sin enlazar— y un producto retirado se sigue contando como
+    trabajo pendiente hasta que se marca.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available() or not folders:
+        return {}
+    indice = urls_index()
+    docs = r.mget_json([_key(source, n) for n in folders])
+    salida: dict[str, dict] = {}
+    for nombre, doc in zip(folders, docs):
+        todos = ((doc or {}).get("productos") or {})
+        # `ids_vigentes` es lo que la carpeta tiene HOY; sin ella el documento
+        # arrastra huérfanos y contaría de más. Si no está (carpeta que nadie ha
+        # abierto), se cuenta todo: es lo que había, y se corrige al abrirla.
+        vigentes = (doc or {}).get("ids_vigentes")
+        productos = (
+            [todos[str(i)] for i in vigentes if str(i) in todos]
+            if isinstance(vigentes, list) else list(todos.values())
+        )
+        salida[nombre] = {
+            "total": len(productos),
+            "con_url": sum(1 for prod in productos if indice and url_de(prod, indice)),
+            "sin_stock": sum(1 for prod in productos if prod.get("sin_stock")),
+        }
+    return salida
+
+
 def productos_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     """`{carpeta: cuántos productos tiene HOY}`. Una sola lectura para todas.
 

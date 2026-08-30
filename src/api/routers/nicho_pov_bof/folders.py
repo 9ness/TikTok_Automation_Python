@@ -95,21 +95,20 @@ def list_folders(
     completed = progress_repo.get_completed(source, usuario)
     # Cuántos productos de cada carpeta tienen ya la ficha enlazada: es lo que
     # dice desde el listado dónde hay trabajo, sin entrar a mirar.
+    nombres = [f["name"] for f in folders]
+    # Total, enlazados y sin stock salen del MISMO documento: una lectura, no
+    # tres. Un fallo contando no puede dejar sin listado de carpetas.
     try:
-        con_url = product_repo.con_url_por_carpeta(
-            source, [f["name"] for f in folders],
-        )
+        resumen = product_repo.resumen_por_carpeta(source, nombres)
     except Exception:  # noqa: BLE001
-        # Un fallo contando no puede dejar sin listado de carpetas.
-        con_url = {}
-    # Cuántos productos tiene hoy cada carpeta y cuántos tenía al completarla:
-    # la diferencia es lo que ha entrado desde entonces.
+        resumen = {}
+    ahora = {n: r.get("total", 0) for n, r in resumen.items()}
+    # Cuántos tenía al completarla: la diferencia es lo que ha entrado desde
+    # entonces.
     try:
-        nombres = [f["name"] for f in folders]
-        ahora = product_repo.productos_por_carpeta(source, nombres)
         entonces = progress_repo.tamanos_al_completar(source, usuario)
     except Exception:  # noqa: BLE001
-        ahora, entonces = {}, {}
+        entonces = {}
 
     def _nuevos(nombre: str) -> int:
         if nombre not in completed or nombre not in entonces:
@@ -120,7 +119,9 @@ def list_folders(
         ProductFolder(
             name=f["name"], id=f["id"], completed=f["name"] in completed,
             desde_copia=bool(f.get("desde_copia")),
-            con_url=int(con_url.get(f["name"], 0)),
+            con_url=int((resumen.get(f["name"]) or {}).get("con_url", 0)),
+            total=int((resumen.get(f["name"]) or {}).get("total", 0)),
+            sin_stock=int((resumen.get(f["name"]) or {}).get("sin_stock", 0)),
             nuevos_desde_completada=_nuevos(f["name"]),
         )
         for f in folders

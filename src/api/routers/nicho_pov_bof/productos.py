@@ -1483,6 +1483,16 @@ def set_producto_estado(
             body.source, body.folder, {body.producto: {"precio": nuevo}},
         )
 
+    # "Sin stock" también va al documento COMPARTIDO: que un producto se haya
+    # retirado del catálogo no depende de quién lo mire. Y el mismo producto
+    # sale repetido en varias carpetas, así que marcarlo aquí ahorra que el
+    # siguiente vuelva a abrir el enlace para descubrir lo mismo.
+    if body.sin_stock is not None:
+        product_repo.save_extracted_texts(
+            body.source, body.folder,
+            {body.producto: {"sin_stock": bool(body.sin_stock)}},
+        )
+
     try:
         if body.clip_s is not None and body.clip_s not in (8, 10):
             raise _bad_request(f"clip_s debe ser 8 o 10, recibido: {body.clip_s}")

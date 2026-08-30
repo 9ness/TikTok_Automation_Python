@@ -915,13 +915,32 @@ export default function NichoPovBofPage() {
                   desde nuestra copia, con el progreso de siempre. */}
               {f.desde_copia && "🗄️ "}
               {f.name}
-              {/* Cuántos productos de esta carpeta tienen ya la ficha
-                  enlazada: es el trabajo que hay dentro. Sin esto había que
-                  entrar carpeta por carpeta para descubrir que estaba a cero.
-                  No sale cuando es 0 — un cero en cada chip es ruido. */}
-              {!!f.con_url && (
-                <span className="ml-1 rounded-full bg-emerald-500/15 px-1 py-px text-[9px] font-semibold text-emerald-500">
-                  {f.con_url}
+              {/* Enlazados SOBRE EL TOTAL, no el enlazado a secas: un "9"
+                  solo no dice si la carpeta tiene nueve productos o diez con
+                  uno sin ficha, que es justo lo que hay que saber para decidir
+                  si merece abrirla. Con todo enlazado se enseña un número
+                  único ("10"), que es el caso normal y así no chilla. */}
+              {!!f.total && (
+                <span
+                  title={`${f.con_url ?? 0} de ${f.total} con la ficha enlazada`}
+                  className={`ml-1 rounded-full px-1 py-px text-[9px] font-semibold ${
+                    (f.con_url ?? 0) >= f.total
+                      ? "bg-emerald-500/15 text-emerald-500"
+                      : "bg-amber-500/15 text-amber-500"
+                  }`}
+                >
+                  {(f.con_url ?? 0) >= f.total ? f.total : `${f.con_url ?? 0}/${f.total}`}
+                </span>
+              )}
+              {/* Retirados del catálogo. No son trabajo pendiente, así que un
+                  "8/10" con dos sin stock está DE HECHO terminado — sin este
+                  dato esa carpeta parecía quedarse a medias para siempre. */}
+              {!!f.sin_stock && (
+                <span
+                  title={`${f.sin_stock} sin stock (retirados del catálogo)`}
+                  className="ml-1 rounded-full bg-red-500/15 px-1 py-px text-[9px] font-semibold text-red-400"
+                >
+                  ✕{f.sin_stock}
                 </span>
               )}
               {/* Productos que entraron DESPUÉS de darla por hecha. El catálogo
@@ -2001,10 +2020,24 @@ function ProductoCard({
           )}
           {/* Agotado en su web. Va antes que lo demás porque decide si merece
               la pena grabarlo hoy. */}
+          {/* Se puede quitar de un toque: un producto vuelve al catálogo, y
+              sin esto había que dejarlo marcado para siempre. */}
           {producto.sin_stock && (
-            <p className="mt-0.5 inline-flex items-center gap-1 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500">
-              🚫 Sin stock
-            </p>
+            <button
+              type="button"
+              title="Quitar la marca de sin stock"
+              onClick={() =>
+                setEstado.mutate({
+                  source,
+                  folder: producto.folder || folder,
+                  producto: producto.producto,
+                  sin_stock: false,
+                })
+              }
+              className="mt-0.5 inline-flex items-center gap-1 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500"
+            >
+              🚫 Sin stock · quitar
+            </button>
           )}
           {/* Solo con el título leído: sin texto no hay con qué comparar y
               decir "exclusivo" sería inventárselo. */}
@@ -2146,6 +2179,30 @@ function ProductoCard({
           folder={producto.folder || folder}
           producto={producto.producto}
         />
+        {/* Justo al lado del enlace, que es donde se descubre: se abre la
+            ficha, TikTok dice que ya no existe y se marca sin salir de aquí.
+            Comprobarlo automáticamente no se puede —TikTok responde un captcha
+            a cualquier petición del servidor y un enlace vivo y uno muerto
+            salen idénticos—, así que el toque lo da el operador.
+            Va al documento COMPARTIDO: el mismo producto se repite en varias
+            carpetas y así el siguiente ya no lo abre. */}
+        {producto.product_url && !producto.sin_stock && (
+          <button
+            type="button"
+            title="Marcar que su enlace ya no abre (retirado del catálogo)"
+            onClick={() =>
+              setEstado.mutate({
+                source,
+                folder: producto.folder || folder,
+                producto: producto.producto,
+                sin_stock: true,
+              })
+            }
+            className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-rose-500/50 hover:text-rose-500"
+          >
+            🚫 Sin stock
+          </button>
+        )}
         {producto.clean_photo_id && (
           <>
             {/* Sin botón "Ver foto": la miniatura de arriba ya abre el visor

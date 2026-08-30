@@ -523,6 +523,7 @@ export function useSetEstado() {
         // van con él porque el mismo guion pide uno menos a 10s.
         clip_s: updated.clip_s,
         clips_necesarios: updated.clips_necesarios,
+        sin_stock: updated.sin_stock,
       });
       qc.setQueryData<ProductoItem[]>(
         nichoPovBofKeys.productos(vars.source, vars.folder),

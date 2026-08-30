@@ -19,6 +19,10 @@ export interface ProductFolder {
   desde_copia?: boolean;
   /** Cuántos de sus productos ya tienen enlazada la ficha de TikTok Shop. */
   con_url?: number;
+  /** Cuántos productos tiene la carpeta HOY. */
+  total?: number;
+  /** Marcados a mano como retirados del catálogo. */
+  sin_stock?: number;
   /** Productos que han entrado DESPUÉS de dar la carpeta por hecha. */
   nuevos_desde_completada?: number;
 }
@@ -270,6 +274,9 @@ export interface EstadoRequest {
   precio?: number;
   /** Duración de los clips que va a generar: 8 o 10 segundos. */
   clip_s?: number;
+  /** Retirado del catálogo (su enlace ya no abre). Va al documento compartido:
+   *  no depende de quién lo mire. */
+  sin_stock?: boolean;
 }
 
 export interface VideoUploadResponse {
