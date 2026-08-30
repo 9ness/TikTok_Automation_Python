@@ -678,31 +678,94 @@ CTA_GUION = {
     "CTA_EJEMPLO": "Comprueba tus cupones descuento antes de comprar.",
 }
 
-# Literal del curso, sin tocar una coma.
-_CTA_PLAZOS_LITERAL = (
-    "Comprueba tus cupones descuento y aprovecha el pago a plazos en pedidos "
-    "de más de 30 euros."
-)
-CTA_GUION_PLAZOS = {
-    "CTA_ESTRUCTURA": "comprobacion de cupones y el pago a plazos",
-    "CTA_LITERAL": _CTA_PLAZOS_LITERAL,
-    "CTA_EJEMPLO": _CTA_PLAZOS_LITERAL,
-}
+# Cuatro cierres, uno por combinación de lo que el producto SÍ cumple. Los
+# literales salen del curso: la parte de plazos, de su prompt; la del envío,
+# de sus cinco guiones de Klarna, que acaban todos "…y con envío gratis".
+#
+# Se combinan porque las dos cosas se dan a la vez y son independientes: un
+# escritorio de 70 € tiene financiación Y envío gratis, y callarse una de las
+# dos es tirar un argumento de venta que el comprador sí se va a encontrar.
+_CTA_CUPONES = "Comprueba tus cupones descuento"
+_CTA_PLAZOS = " y aprovecha el pago a plazos en pedidos de más de 30 euros"
+_CTA_ENVIO = " y recíbelo con envío gratis"
 
 
-def prompt_guion_producto(plazos: bool = False) -> str:
-    """El prompt del curso, con la CTA que le toque al producto.
+def _cta(plazos: bool, envio: bool) -> dict[str, str]:
+    """El cierre del guion para un producto que cumple `plazos` y/o `envio`."""
+    if plazos and envio:
+        # Con las dos, la segunda va con coma: tres "y" seguidas se traban al
+        # locutarlas.
+        literal = f"{_CTA_CUPONES}{_CTA_PLAZOS}, {_CTA_ENVIO[3:]}."
+        estructura = "comprobacion de cupones, el pago a plazos y el envio gratis"
+    elif plazos:
+        literal, estructura = (
+            f"{_CTA_CUPONES}{_CTA_PLAZOS}.",
+            "comprobacion de cupones y el pago a plazos",
+        )
+    elif envio:
+        literal, estructura = (
+            f"{_CTA_CUPONES}{_CTA_ENVIO}.",
+            "comprobacion de cupones y el envio gratis",
+        )
+    else:
+        literal, estructura = (
+            f"{_CTA_CUPONES} antes de comprar.",
+            "comprobacion de cupones",
+        )
+    return {
+        "CTA_ESTRUCTURA": estructura,
+        "CTA_LITERAL": literal,
+        "CTA_EJEMPLO": literal,
+    }
 
-    Con `plazos` va la CTA original del curso (la que nombra la financiación);
-    sin él, la de cupones a secas. Es el MISMO prompt: solo cambia el cierre,
-    así que el guion sigue durando lo mismo (~190 caracteres, unos 10s) y sigue
-    hablando del producto — que es lo que los cinco textos de Klarna no hacen.
+
+# Lo que el curso reserva para el CUERPO del guion: sus 190 caracteres menos su
+# CTA. Es lo que se mantiene fijo al cambiar de cierre — si se dejara el tope en
+# 190 con una CTA más larga, lo que se recortaría sería lo que habla DEL
+# PRODUCTO, que es justo lo que este guion aporta frente al de Klarna.
+_CTA_BASE = f"{_CTA_CUPONES} antes de comprar."
+GUION_PRODUCTO_CUERPO_CARACTERES = 190 - len(_CTA_BASE)
+
+
+def caracteres_guion(plazos: bool = False, envio: bool = False) -> int:
+    """Cuántos caracteres pedirle a Gemini para ese producto."""
+    return GUION_PRODUCTO_CUERPO_CARACTERES + len(_cta(plazos, envio)["CTA_LITERAL"])
+
+
+def prompt_guion_producto(plazos: bool = False, envio: bool = False) -> str:
+    """El prompt del curso, con el cierre que le toque al producto.
+
+    Es el MISMO prompt: solo cambia la CTA (y con ella el tope de caracteres,
+    para que el cuerpo no se encoja). Los productos que cumplen las dos cosas
+    piden un guion más largo — el vídeo se va a ~13s en vez de ~10—, que es
+    exactamente lo que hacían los guiones de Klarna del curso, solo que éste sí
+    nombra el producto.
     """
     ruta = Path(__file__).resolve().parent / "prompts" / "guion_producto.md"
     texto = limpiar_prompt(ruta.read_text(encoding="utf-8"))
-    for clave, valor in (CTA_GUION_PLAZOS if plazos else CTA_GUION).items():
+    for clave, valor in _cta(plazos, envio).items():
         texto = texto.replace("{{" + clave + "}}", valor)
+    # El "190" y el "10 segundos" del curso son SU cuenta con SU CTA. Con un
+    # cierre más largo hay que rehacerla, o el prompt se contradice: pide tres
+    # promesas y un tope que no da para ellas.
+    tope = caracteres_guion(plazos, envio)
+    texto = texto.replace(
+        "máximo son 190 caracteres para el mensaje en off",
+        f"máximo son {tope} caracteres para el mensaje en off",
+    )
+    texto = texto.replace("(unos 190 caracteres)", f"(unos {tope} caracteres)")
+    texto = texto.replace(
+        "es para un video de 10 segundos",
+        f"es para un video de {round(tope / CARACTERES_POR_SEGUNDO_GUION)} segundos",
+    )
     return texto
+
+
+# Ritmo medio de las voces de Fish, para pasar de caracteres a segundos en el
+# prompt. No es el cálculo de la duración real del vídeo (ése mira voz a voz,
+# ver `velocidad_voz`): aquí solo hay que decirle a Gemini de cuánto va el
+# vídeo para que calibre el texto.
+CARACTERES_POR_SEGUNDO_GUION = 18.2
 
 
 # La frase del pago a plazos, tal y como la escribe Gemini. Medido sobre 30
@@ -729,6 +792,33 @@ def sin_cta_plazos(guion: str) -> str:
     limpio = re.sub(r"[\s.]+$", "", limpio)
     # Y se le devuelve el cierre de la CTA nueva: al quitar la frase quedaba
     # "Comprueba tus cupones descuento" sin acabar.
+    if re.search(r"(cupones|descuento)$", limpio, re.IGNORECASE):
+        limpio += " antes de comprar"
+    return limpio + "."
+
+
+# La frase del envío gratis, tal como la cierra el guion. Mismo planteamiento
+# que la de plazos: quitarla es un reemplazo, no una llamada a Gemini.
+_CTA_ENVIO_RE = re.compile(
+    r"\s*(?:,|y)\s*(?:recíbelo|recibelo|consíguelo|consiguelo|llévatelo|"
+    r"llevatelo)?\s*con\s+env[ií]o\s+gratis\b[^.]*",
+    re.IGNORECASE,
+)
+
+
+def promete_envio(guion: str) -> bool:
+    """¿Ese guion dice que el envío es gratis?"""
+    bajo = (guion or "").lower()
+    return "envío gratis" in bajo or "envio gratis" in bajo
+
+
+def sin_cta_envio(guion: str) -> str:
+    """El guion con la frase del envío gratis quitada. Idempotente."""
+    limpio = re.sub(r"\s{2,}", " ", _CTA_ENVIO_RE.sub("", guion or "")).strip()
+    if not limpio:
+        return ""
+    limpio = re.sub(r"[\s.,]+$", "", limpio)
+    # Si al quitarla queda la CTA colgando, se le devuelve su cierre.
     if re.search(r"(cupones|descuento)$", limpio, re.IGNORECASE):
         limpio += " antes de comprar"
     return limpio + "."

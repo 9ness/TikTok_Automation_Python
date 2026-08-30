@@ -311,10 +311,12 @@ de 12s, un tercio era ese rebote.
 
 TODOS los vídeos los locuta el guion escrito para ESE producto
 (`prompts/guion_producto.md`, ~190 car → ~10s, Fish) — `JobMode.NICHO_POV_BOF_VIDEO`.
-Lo único que cambia es la CTA: la del curso nombra el pago a plazos y se pone
-solo si el producto lo ofrece (`config.hay_plazos`, que lo LEE de la ficha y
-cae al precio si la captura no lo enseña); `guion_producto_plazos` guarda con
-cuál se escribió. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
+Lo único que cambia es la CTA, que nombra el pago a plazos y/o el envío gratis
+según lo que el producto CUMPLA (`config.hay_plazos` y
+`nicho_pov_bof_largo.config.hay_envio_gratis`: los leen de la ficha y caen al
+precio —40 € y 10 €— si la captura no lo enseña). Los flags
+`guion_producto_plazos` / `guion_producto_envio` guardan con cuál se escribió;
+con las dos promesas el guion se va a ~259 car (~14s) porque en 10s no caben. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
 `JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`) ya no se usan: son genéricos —no nombran
 el producto— y de 253-274 car, o sea vídeos de 13-20s donde se piden 10.
 

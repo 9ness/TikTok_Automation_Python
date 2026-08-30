@@ -1797,25 +1797,33 @@ def escribir_guion(body: dict) -> dict:
             "Este producto no tiene textos extraídos todavía: pulsa antes "
             "'Obtener textos'. Sin título, el guion saldría genérico."
         )
-    # Qué CTA le toca a ESTE producto: la del curso (que nombra el pago a
-    # plazos) solo si su ficha ofrece financiación de verdad.
+    # Qué cierre le toca a ESTE producto: lo que su ficha dice que cumple.
+    from src.nicho_pov_bof_largo import config as largo_config
+
     plazos = pov_config.hay_plazos(prod)
+    envio = largo_config.hay_envio_gratis(prod)
     guardado = str(prod.get("guion_producto") or "")
-    # Si el guion promete plazos y el producto NO los tiene, basta con quitarle
-    # la frase: no hace falta gastar una llamada a Gemini para reescribir un
-    # texto que por lo demás está bien.
-    if (
-        guardado
-        and not plazos
-        and pov_config.guion_desfasado(guardado)
-        and not body.get("rehacer")
-    ):
-        limpio = pov_config.sin_cta_plazos(guardado)
+    escrito_plazos = bool(
+        prod.get("guion_producto_plazos")
+    ) or pov_config.guion_desfasado(guardado)
+    escrito_envio = bool(
+        prod.get("guion_producto_envio")
+    ) or pov_config.promete_envio(guardado)
+    # Si el guion promete algo que el producto NO cumple, basta con quitarle la
+    # frase: no hace falta gastar una llamada a Gemini para reescribir un texto
+    # que por lo demás está bien. Solo se paga cuando hay que AÑADIR algo.
+    falta = (plazos and not escrito_plazos) or (envio and not escrito_envio)
+    if guardado and not falta and not body.get("rehacer"):
+        limpio = guardado
+        if not plazos:
+            limpio = pov_config.sin_cta_plazos(limpio)
+        if not envio:
+            limpio = pov_config.sin_cta_envio(limpio)
         if limpio and limpio != guardado:
             try:
                 product_repo.update_product(
                     source, folder, producto, guion_producto=limpio,
-                    guion_producto_plazos=False,
+                    guion_producto_plazos=plazos, guion_producto_envio=envio,
                 )
             except RuntimeError:
                 pass
@@ -1828,7 +1836,7 @@ def escribir_guion(body: dict) -> dict:
     if (
         guardado
         and not body.get("rehacer")
-        and bool(prod.get("guion_producto_plazos")) == plazos
+        and (escrito_plazos, escrito_envio) == (plazos, envio)
     ):
         return {
             "guion": prod["guion_producto"],
@@ -1863,8 +1871,8 @@ def escribir_guion(body: dict) -> dict:
             foto=foto,
             # La frase del pago a plazos solo si la ficha lo ofrece: en un
             # producto de 11 € es relleno y encima no se sostiene.
-            prompt=pov_config.prompt_guion_producto(plazos),
-            max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
+            prompt=pov_config.prompt_guion_producto(plazos, envio),
+            max_caracteres=pov_config.caracteres_guion(plazos, envio),
             etiqueta="nicho_pov_bof",
         )
     except ValueError as e:
@@ -1878,6 +1886,7 @@ def escribir_guion(body: dict) -> dict:
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
             guion_producto_plazos=plazos,
+            guion_producto_envio=envio,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
