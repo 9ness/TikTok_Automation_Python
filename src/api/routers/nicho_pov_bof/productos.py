@@ -263,15 +263,13 @@ def _clips_que_pide(prod: dict) -> int:
 
 
 def _guion_hablado(prod: dict) -> str:
-    """El guion que va a decir la voz, que no siempre es el del producto.
+    """El guion que va a decir la voz: siempre el escrito para ESTE producto.
 
-    Por encima de `PRECIO_MIN_PLAZOS` el vídeo lo locuta el guion de Klarna
-    (`guion_plazos`, otro runner); por debajo, el escrito para el producto. Se
-    mira el mismo criterio que usa el montaje: contar clips o segundos sobre el
-    texto equivocado daba un hueco de más o de menos en los productos caros.
+    Los de plazos también. Antes se iban por uno de los cinco textos de Klarna
+    del curso, que no nombran el producto y duran 253-274 caracteres (13-20s
+    de vídeo); ahora la frase de la financiación va DENTRO del guion propio,
+    con la CTA original del curso, y el vídeo se queda en los ~10s de siempre.
     """
-    if _precio_y_modo(prod)[1]:
-        return str(prod.get("guion_plazos") or "").strip()
     return str(prod.get("guion_producto") or "").strip()
 
 
@@ -1127,14 +1125,15 @@ def _guardar_clip(
             message=f"Clip {slot} guardado. Ya hay un montaje en marcha para este producto.",
         )
 
-    # De dónde sale la voz: guion de Klarna locutado (caros) o banco de audios.
-    es_plazos = bool(_precio_y_modo(prod)[1])
+    # Todos por el mismo runner: la voz locuta el guion escrito para ESTE
+    # producto, lleve la frase de plazos o no (la CTA del curso la trae ya el
+    # prompt cuando la ficha ofrece financiación). Antes los caros se iban por
+    # `NICHO_POV_BOF_PLAZOS_VIDEO`, que locuta uno de los cinco textos de
+    # Klarna: genéricos —no nombran el producto— y de 253-274 caracteres, o sea
+    # vídeos de 13-20s donde se pedían 10.
     job = queue.enqueue(
-        JobMode.NICHO_POV_BOF_PLAZOS_VIDEO if es_plazos else JobMode.NICHO_POV_BOF_VIDEO,
-        title=(
-            f"💳 POV BOF plazos: producto {producto} · {folder}" if es_plazos
-            else f"🎬 Nicho POV BOF: producto {producto} · {folder}"
-        ),
+        JobMode.NICHO_POV_BOF_VIDEO,
+        title=f"🎬 Nicho POV BOF: producto {producto} · {folder}",
         params={
             "source": source, "folder": folder, "producto": producto,
             **{f"clip{n}_path": prod[f"clip{n}_path"] for n in range(1, hacen_falta + 1)},
@@ -1153,10 +1152,7 @@ def _guardar_clip(
         pass
     return VideoUploadResponse(
         ok=True, job_id=job.id,
-        message=(
-            "Los dos clips están: locutando el guion de plazos y montando."
-            if es_plazos else "Los dos clips están: montando el vídeo."
-        ),
+        message="Los clips están: montando el vídeo.",
     )
 
 
@@ -1801,18 +1797,25 @@ def escribir_guion(body: dict) -> dict:
             "Este producto no tiene textos extraídos todavía: pulsa antes "
             "'Obtener textos'. Sin título, el guion saldría genérico."
         )
-    # Los escritos con la CTA vieja se reescriben aunque no se pida rehacer:
-    # se quedaban diciendo "aprovecha el pago a plazos en pedidos de más de 30
-    # euros" en productos de 3 €.
+    # Qué CTA le toca a ESTE producto: la del curso (que nombra el pago a
+    # plazos) solo si su ficha ofrece financiación de verdad.
+    plazos = pov_config.hay_plazos(prod)
     guardado = str(prod.get("guion_producto") or "")
-    # Con la CTA vieja basta con quitarle la frase: no hace falta gastar una
-    # llamada a Gemini para reescribir un texto que por lo demás está bien.
-    if guardado and pov_config.guion_desfasado(guardado) and not body.get("rehacer"):
+    # Si el guion promete plazos y el producto NO los tiene, basta con quitarle
+    # la frase: no hace falta gastar una llamada a Gemini para reescribir un
+    # texto que por lo demás está bien.
+    if (
+        guardado
+        and not plazos
+        and pov_config.guion_desfasado(guardado)
+        and not body.get("rehacer")
+    ):
         limpio = pov_config.sin_cta_plazos(guardado)
         if limpio and limpio != guardado:
             try:
                 product_repo.update_product(
                     source, folder, producto, guion_producto=limpio,
+                    guion_producto_plazos=False,
                 )
             except RuntimeError:
                 pass
@@ -1822,7 +1825,11 @@ def escribir_guion(body: dict) -> dict:
                 "caracteres": len(limpio),
                 "reusado": True,
             }
-    if guardado and not body.get("rehacer"):
+    if (
+        guardado
+        and not body.get("rehacer")
+        and bool(prod.get("guion_producto_plazos")) == plazos
+    ):
         return {
             "guion": prod["guion_producto"],
             "subliminal": prod.get("subliminal_producto", ""),
@@ -1854,9 +1861,9 @@ def escribir_guion(body: dict) -> dict:
             tienda=prod.get("tienda", ""),
             caption=prod.get("caption", ""),
             foto=foto,
-            # La frase del pago a plazos solo si el producto llega al umbral:
-            # en uno de 11 € es relleno y encima no se sostiene.
-            prompt=pov_config.prompt_guion_producto(),
+            # La frase del pago a plazos solo si la ficha lo ofrece: en un
+            # producto de 11 € es relleno y encima no se sostiene.
+            prompt=pov_config.prompt_guion_producto(plazos),
             max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
             etiqueta="nicho_pov_bof",
         )
@@ -1870,6 +1877,7 @@ def escribir_guion(body: dict) -> dict:
             source, folder, producto,
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
+            guion_producto_plazos=plazos,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

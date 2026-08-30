@@ -667,23 +667,40 @@ GUION_PRODUCTO_MAX_CARACTERES = 190
 DURACION_MINIMA_S = float(os.getenv("POV_BOF_DURACION_MINIMA_S", "10"))
 
 
-# La CTA. Su prompt pone como OBLIGATORIA la frase del pago a plazos, pero
-# aquí NO se usa: los productos que llegan al umbral se van por el guion de
-# Klarna (`guiones_plazos.md`), así que en este camino la frase solo aparecía
-# en productos que no llegan al mínimo del pedido — un soporte de 2,94 €
-# diciendo "aprovecha el pago a plazos en pedidos de más de 30 euros".
+# La CTA, en dos versiones. La del curso lleva la frase del pago a plazos y es
+# OBLIGATORIA en su prompt; se quitó de en medio porque dejaba un soporte de
+# 2,94 € diciendo "aprovecha el pago a plazos en pedidos de más de 30 euros".
+# Ahora que la financiación se lee de la ficha (`hay_plazos`) se puede volver a
+# poner donde toca: quien la ofrece la dice, y quien no, no.
 CTA_GUION = {
     "CTA_ESTRUCTURA": "comprobacion de cupones",
     "CTA_LITERAL": "Comprueba tus cupones descuento antes de comprar.",
     "CTA_EJEMPLO": "Comprueba tus cupones descuento antes de comprar.",
 }
 
+# Literal del curso, sin tocar una coma.
+_CTA_PLAZOS_LITERAL = (
+    "Comprueba tus cupones descuento y aprovecha el pago a plazos en pedidos "
+    "de más de 30 euros."
+)
+CTA_GUION_PLAZOS = {
+    "CTA_ESTRUCTURA": "comprobacion de cupones y el pago a plazos",
+    "CTA_LITERAL": _CTA_PLAZOS_LITERAL,
+    "CTA_EJEMPLO": _CTA_PLAZOS_LITERAL,
+}
 
-def prompt_guion_producto() -> str:
-    """El prompt del curso, con su CTA (sin la frase del pago a plazos)."""
+
+def prompt_guion_producto(plazos: bool = False) -> str:
+    """El prompt del curso, con la CTA que le toque al producto.
+
+    Con `plazos` va la CTA original del curso (la que nombra la financiación);
+    sin él, la de cupones a secas. Es el MISMO prompt: solo cambia el cierre,
+    así que el guion sigue durando lo mismo (~190 caracteres, unos 10s) y sigue
+    hablando del producto — que es lo que los cinco textos de Klarna no hacen.
+    """
     ruta = Path(__file__).resolve().parent / "prompts" / "guion_producto.md"
     texto = limpiar_prompt(ruta.read_text(encoding="utf-8"))
-    for clave, valor in CTA_GUION.items():
+    for clave, valor in (CTA_GUION_PLAZOS if plazos else CTA_GUION).items():
         texto = texto.replace("{{" + clave + "}}", valor)
     return texto
 

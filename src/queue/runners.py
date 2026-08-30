@@ -3019,8 +3019,6 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
     Params: source, folder, rehacer, productos (vacío = todos los de la carpeta).
     """
-    import random
-
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof_largo.services import guionista
@@ -3034,67 +3032,72 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
     doc = product_repo.load_folder(source, folder)
     productos = (doc.get("productos") or {})
     pendientes = []
-    # Los de plazos NO pasan por Gemini: su vídeo lo locuta uno de los cinco
-    # guiones de Klarna del curso (`NICHO_POV_BOF_PLAZOS_VIDEO`), así que el
-    # escrito para el producto no se diría nunca. Se les sortea el suyo aquí
-    # mismo, que es gratis — antes el lote pagaba una llamada por cada uno y la
-    # tarjeta seguía enseñándolos SIN guion, porque el que mira es el otro.
-    sorteados = 0
-    guiones_klarna = pov_config.guiones_plazos()
     for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
         if solo and pid not in solo:
             continue
         if not (prod.get("titulo") or "").strip():
             continue                      # sin textos el guion saldría genérico
-        if pov_config.hay_plazos(prod):
-            if prod.get("guion_plazos") and not rehacer:
+        # Se respeta el guion ya escrito salvo que se pida rehacer O que se
+        # escribiera con la otra CTA: si el producto pasó a ser de plazos (o
+        # dejó de serlo), el cierre del guion ya no le corresponde.
+        plazos = pov_config.hay_plazos(prod)
+        guion_txt = str(prod.get("guion_producto") or "")
+        # Con qué CTA se escribió. La marca no existe en los guiones de antes
+        # de que hubiera dos, así que se mira también el TEXTO: uno que ya
+        # nombra los plazos vale tal cual para un producto que los tiene, y
+        # reescribirlo sería pagar una llamada por el mismo resultado.
+        escrito_con_plazos = bool(
+            prod.get("guion_producto_plazos")
+        ) or pov_config.guion_desfasado(guion_txt)
+        if guion_txt and not rehacer:
+            if escrito_con_plazos == plazos:
                 continue
-            if not guiones_klarna:
-                on_log("[guiones] no hay guiones de plazos cargados; se saltan")
+            # Sobra la frase de plazos: eso se arregla GRATIS quitándola (lo
+            # hace el bucle de abajo). Pagar una reescritura por eso no tiene
+            # sentido; solo se paga cuando hay que AÑADIRLA, que sí exige
+            # rehacer el texto.
+            if not plazos:
                 continue
-            actual = str(prod.get("guion_plazos") or "").strip()
-            opciones = [g for g in guiones_klarna if g != actual] or guiones_klarna
-            product_repo.update_product(
-                source, folder, pid,
-                guion_plazos=random.Random(f"plazos|{job.id}|{pid}").choice(opciones),
-            )
-            sorteados += 1
-            continue
-        # Se respeta el guion ya escrito salvo que se pida rehacer.
-        if prod.get("guion_producto") and not rehacer:
-            continue
-        pendientes.append((pid, prod))
-    if sorteados:
-        on_log(f"[guiones] {sorteados} de plazos sorteados del curso (sin IA)")
+        pendientes.append((pid, prod, plazos))
 
-    # Antes de gastar nada: a los que YA tienen guion pero con la frase del
-    # pago a plazos les basta con quitársela. Son treinta llamadas a Gemini de
-    # diferencia y el resto del texto, que está bien, no se toca.
+    # Antes de gastar nada: al que promete plazos SIN tenerlos le basta con
+    # quitarle la frase. Son treinta llamadas a Gemini de diferencia y el resto
+    # del texto, que está bien, no se toca. Al revés no vale: meter la frase a
+    # un guion que no la tiene sí hay que escribirlo (va arriba, en pendientes).
     limpiados = 0
     for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
         if solo and pid not in solo:
             continue
         guion = str(prod.get("guion_producto") or "")
-        if not guion or not pov_config.guion_desfasado(guion):
+        if not guion or pov_config.hay_plazos(prod):
+            continue
+        if not pov_config.guion_desfasado(guion):
             continue
         limpio = pov_config.sin_cta_plazos(guion)
         if limpio and limpio != guion:
-            product_repo.update_product(source, folder, pid, guion_producto=limpio)
+            product_repo.update_product(
+                source, folder, pid,
+                guion_producto=limpio, guion_producto_plazos=False,
+            )
             limpiados += 1
     if limpiados:
         on_log(f"[guiones] {limpiados} guion(es) con la frase de plazos quitada (sin IA)")
 
     if not pendientes:
-        partes = [f"{n} {q}" for n, q in
-                  ((limpiados, "limpiados"), (sorteados, "de plazos")) if n]
-        resumen = " · ".join(partes) or "sin-cambios"
-        on_log(f"[guiones] nada que escribir con IA; {resumen}")
+        resumen = f"{limpiados} limpiados" if limpiados else "sin-cambios"
+        on_log(f"[guiones] nada que escribir; {resumen}")
         return resumen
 
     on_log(f"[guiones] {len(pendientes)} guion(es) por escribir en {folder}")
-    prompt = pov_config.prompt_guion_producto()
+    # Dos versiones del prompt del curso: la CTA de cupones a secas y la suya
+    # original, que además nombra el pago a plazos. Se eligen por producto (lo
+    # dice su ficha), así que se preparan las dos una vez.
+    prompts = {
+        False: pov_config.prompt_guion_producto(False),
+        True: pov_config.prompt_guion_producto(True),
+    }
 
-    def escribir_uno(pid: str, prod: dict) -> bool:
+    def escribir_uno(pid: str, prod: dict, plazos: bool) -> bool:
         """Escribe y guarda el guion de un producto. `False` si no pudo."""
         try:
             escrito = guionista.escribir(
@@ -3102,7 +3105,7 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 tienda=prod.get("tienda", ""),
                 caption=prod.get("caption", ""),
                 foto=_foto_limpia(source, folder, pid),
-                prompt=prompt,
+                prompt=prompts[plazos],
                 max_caracteres=pov_config.GUION_PRODUCTO_MAX_CARACTERES,
                 etiqueta="nicho_pov_bof",
                 on_log=on_log,
@@ -3114,41 +3117,43 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             source, folder, pid,
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
+            guion_producto_plazos=plazos,
         )
         return True
 
     hechos, fallidos = 0, []
-    for i, (pid, prod) in enumerate(pendientes):
+    for i, (pid, prod, plazos) in enumerate(pendientes):
         on_progress(i / len(pendientes), f"✍️ {i + 1}/{len(pendientes)} · producto {pid}")
-        if escribir_uno(pid, prod):
+        if escribir_uno(pid, prod, plazos):
             hechos += 1
         else:
-            fallidos.append((pid, prod))
+            fallidos.append((pid, prod, plazos))
 
     # Segunda pasada a los que fallaron. Casi siempre es Gemini devolviendo un
     # 429 o un 503 de paso, y dejar el hueco obligaba a volver a lanzar el lote
     # entero mirando cuál faltaba. Una sola vez: si falla dos, es del producto.
     if fallidos:
-        on_log(f"[guiones] reintentando {len(fallidos)}: {', '.join(p for p, _ in fallidos)}")
+        on_log(
+            f"[guiones] reintentando {len(fallidos)}: "
+            + ", ".join(p for p, _, _ in fallidos)
+        )
         pendientes_reintento, fallidos = fallidos, []
-        for pid, prod in pendientes_reintento:
+        for pid, prod, plazos in pendientes_reintento:
             time.sleep(2)
-            if escribir_uno(pid, prod):
+            if escribir_uno(pid, prod, plazos):
                 hechos += 1
             else:
-                fallidos.append((pid, prod))
+                fallidos.append((pid, prod, plazos))
 
     on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
-    if sorteados:
-        resumen += f" · {sorteados} de plazos"
     if limpiados:
         resumen += f" · {limpiados} limpiados"
     # Si queda alguno sin guion, el trabajo NO ha ido bien. Antes acababa en
     # verde con el hueco dentro y el operador se enteraba tarde, mirando las
     # fichas una a una para ver cuál se había quedado sin nada.
     if fallidos:
-        sin = ", ".join(pid for pid, _ in fallidos)
+        sin = ", ".join(pid for pid, _, _ in fallidos)
         on_log(f"[guiones] sin guion: {sin}")
         raise RuntimeError(
             f"{hechos}/{len(pendientes)} guiones escritos. Se quedaron sin "

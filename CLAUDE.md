@@ -309,11 +309,14 @@ una pausa del habla). Sale de medir el banco: los audios duran 9,7-13,9s
 en todos y el hueco lo rellenaba el rebobinado (`_build_pingpong`) — en un vídeo
 de 12s, un tercio era ese rebote.
 
-Lo que cambia según el precio es la VOZ, no el número de clips: por encima de
-`PRECIO_MIN_PLAZOS` (40 €) el vídeo lleva uno de los guiones de Klarna del curso
-(`prompts/guiones_plazos.md`, sorteado y locutado con Fish) —
-`JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`—, y por debajo, un audio del banco —
-`JobMode.NICHO_POV_BOF_VIDEO`.
+TODOS los vídeos los locuta el guion escrito para ESE producto
+(`prompts/guion_producto.md`, ~190 car → ~10s, Fish) — `JobMode.NICHO_POV_BOF_VIDEO`.
+Lo único que cambia es la CTA: la del curso nombra el pago a plazos y se pone
+solo si el producto lo ofrece (`config.hay_plazos`, que lo LEE de la ficha y
+cae al precio si la captura no lo enseña); `guion_producto_plazos` guarda con
+cuál se escribió. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
+`JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`) ya no se usan: son genéricos —no nombran
+el producto— y de 253-274 car, o sea vídeos de 13-20s donde se piden 10.
 
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
 Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.

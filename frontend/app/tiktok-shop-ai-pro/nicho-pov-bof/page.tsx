@@ -71,7 +71,6 @@ import {
   useBorrarMiProducto,
   useImportarProductosWeb,
   useImportarProductosWebLote,
-  useSortearGuionPlazos,
   useSources,
   useVendidos,
   useSumarUnidades,
@@ -1807,20 +1806,14 @@ function ProductoCard({
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
   const [verVoz, setVerVoz] = useState(false);
-  const sortear = useSortearGuionPlazos();
-  // Los dos guiones se tratan igual en la tarjeta: el de plazos se SORTEA
-  // (gratis, de los cinco del curso) y el normal lo ESCRIBE la IA, pero para
-  // el operador es lo mismo — un texto que dice la voz.
-  const guionActual = producto.modo_plazos
-    ? producto.guion || ""
-    : producto.guion_producto || "";
+  // UN solo guion para todos: el escrito para ESTE producto. Los de plazos
+  // también — la frase de la financiación va dentro, con la CTA original del
+  // curso, en vez de ir por los cinco textos de Klarna (genéricos, no nombran
+  // el producto y duran 13-20s donde se piden 10).
+  const guionActual = producto.guion_producto || "";
   const pedirGuion = () => {
     const onError = (e: unknown) =>
       toast.error(e instanceof ApiError ? e.message : String(e));
-    if (producto.modo_plazos) {
-      sortear.mutate({ source, folder, producto: producto.producto }, { onError });
-      return;
-    }
     escribirGuion.mutate(
       { source, folder: producto.folder || folder, producto: producto.producto },
       {
@@ -2270,15 +2263,11 @@ function ProductoCard({
           />
         ) : (
           <ChipAjuste
-            icono={escribirGuion.isPending || sortear.isPending ? "⏳" : "✍️"}
+            icono={escribirGuion.isPending ? "⏳" : "✍️"}
             valor="Guion"
             abierto={false}
             onToggle={pedirGuion}
-            title={
-              producto.modo_plazos
-                ? "Sortear el guion de plazos"
-                : "Escribir el guion de este producto"
-            }
+            title="Escribir el guion de este producto"
           />
         )}
         <ChipAjuste
@@ -2300,9 +2289,7 @@ function ProductoCard({
       {/* Ya no se elige el generador (Veo3/Kling): Veo3 dejó de poner marca de
           agua en 2026-07 y Kling nunca la puso, así que no hay nada que
           quitar y la elección no cambiaba el resultado. */}
-      {/* El texto del guion, desplegado desde su chip. Uno solo para los dos
-          casos: el de plazos se vuelve a sortear (gratis) y el normal se
-          reescribe con IA, pero se ven igual. */}
+      {/* El texto del guion, desplegado desde su chip. */}
       {guionActual && verGuion && (
         <div className="space-y-1 rounded border border-border/60 bg-muted/30 p-2">
           <p className="text-[10px] leading-relaxed">{guionActual}</p>
@@ -2315,12 +2302,8 @@ function ProductoCard({
             )}
             <button
               type="button"
-              disabled={escribirGuion.isPending || sortear.isPending}
+              disabled={escribirGuion.isPending}
               onClick={() => {
-                if (producto.modo_plazos) {
-                  pedirGuion();
-                  return;
-                }
                 escribirGuion.mutate(
                   {
                     source,
@@ -2337,9 +2320,7 @@ function ProductoCard({
               className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-[10px] transition hover:border-foreground/40 disabled:opacity-50"
             >
               <RefreshCw
-                className={`h-3 w-3 ${
-                  escribirGuion.isPending || sortear.isPending ? "animate-spin" : ""
-                }`}
+                className={`h-3 w-3 ${escribirGuion.isPending ? "animate-spin" : ""}`}
               />
               Otro guion
             </button>
