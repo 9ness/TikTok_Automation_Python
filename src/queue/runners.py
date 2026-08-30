@@ -2889,7 +2889,6 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         f"[guiones] {len(pendientes)} guion(es) por escribir en "
         f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
     )
-    hechos, fallidos = 0, []
     # Por dónde empieza el guion. Es del CATÁLOGO y por usuario, así que se lee
     # UNA vez: leerlo del producto devolvía siempre el de defecto —o sea,
     # guiones de precio aunque estuvieras en punto de dolor— desde que el modo
@@ -2898,14 +2897,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
 
     estilo = progress_repo.get_modo(source, usuario)
     on_log(f"[guiones] modo: {estilo}")
-    for i, (carpeta, pid, t, plazos) in enumerate(pendientes):
-        on_progress(
-            i / len(pendientes),
-            f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
-        )
-        on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
-        # Lo que ese producto SÍ cumple: por debajo del mínimo no hay envío
-        # gratis, igual que no hay plazos.
+
+    def escribir_uno(carpeta: str, pid: str, t: dict, plazos: bool) -> bool:
+        """Escribe y guarda el guion de un producto. `False` si no pudo."""
+        # Lo que ese producto SÍ cumple: sin envío gratis no se promete.
         envio = largo_config.hay_envio_gratis(t)
         try:
             escrito = guionista.escribir(
@@ -2918,8 +2913,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
-            fallidos.append(f"{carpeta}/{pid}")
-            continue
+            return False
         product_repo.update_product(
             source, carpeta, pid, usuario=usuario,
             guion=largo_config.recortar_cta(
@@ -2929,13 +2923,47 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo,
         )
-        hechos += 1
+        return True
+
+    hechos, fallidos = 0, []
+    for i, (carpeta, pid, t, plazos) in enumerate(pendientes):
+        on_progress(
+            i / len(pendientes),
+            f"✍️ {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
+        )
+        on_log(f"[guiones] {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}")
+        if escribir_uno(carpeta, pid, t, plazos):
+            hechos += 1
+        else:
+            fallidos.append((carpeta, pid, t, plazos))
+
+    # Segunda pasada a los que fallaron: casi siempre es Gemini devolviendo un
+    # 429 o un 503 de paso. Una sola vez — si falla dos, es del producto.
+    if fallidos:
+        on_log(
+            "[guiones] reintentando "
+            + ", ".join(f"{c}/{p}" for c, p, _, _ in fallidos)
+        )
+        reintento, fallidos = fallidos, []
+        for carpeta, pid, t, plazos in reintento:
+            time.sleep(2)
+            if escribir_uno(carpeta, pid, t, plazos):
+                hechos += 1
+            else:
+                fallidos.append((carpeta, pid, t, plazos))
 
     on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
+    # Con huecos dentro el trabajo NO ha ido bien: acabar en verde obligaba a
+    # repasar las fichas una a una para ver a cuál le faltaba el guion.
     if fallidos:
-        on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
-        resumen += f" · fallaron {len(fallidos)}"
+        sin = ", ".join(f"{c}/{p}" for c, p, _, _ in fallidos)
+        on_log(f"[guiones] sin guion: {sin}")
+        raise RuntimeError(
+            f"{hechos}/{len(pendientes)} guiones escritos. Se quedaron sin "
+            f"guion (ni al reintentar): {sin}. Vuelve a darle al botón: solo "
+            "se escriben los que faltan."
+        )
     on_log(f"[guiones] {resumen}")
     return resumen
 
@@ -3064,12 +3092,10 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
         return resumen
 
     on_log(f"[guiones] {len(pendientes)} guion(es) por escribir en {folder}")
-    hechos, fallidos = 0, []
-    # Dos versiones del prompt: con y sin la frase del pago a plazos. Se
-    # eligen por PRECIO, no por carpeta, así que se preparan las dos una vez.
     prompt = pov_config.prompt_guion_producto()
-    for i, (pid, prod) in enumerate(pendientes):
-        on_progress(i / len(pendientes), f"✍️ {i + 1}/{len(pendientes)} · producto {pid}")
+
+    def escribir_uno(pid: str, prod: dict) -> bool:
+        """Escribe y guarda el guion de un producto. `False` si no pudo."""
         try:
             escrito = guionista.escribir(
                 titulo=prod.get("titulo", ""),
@@ -3083,14 +3109,34 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[guiones] producto {pid} falló: {e}")
-            fallidos.append(pid)
-            continue
+            return False
         product_repo.update_product(
             source, folder, pid,
             guion_producto=escrito["guion"],
             subliminal_producto=escrito["subliminal"],
         )
-        hechos += 1
+        return True
+
+    hechos, fallidos = 0, []
+    for i, (pid, prod) in enumerate(pendientes):
+        on_progress(i / len(pendientes), f"✍️ {i + 1}/{len(pendientes)} · producto {pid}")
+        if escribir_uno(pid, prod):
+            hechos += 1
+        else:
+            fallidos.append((pid, prod))
+
+    # Segunda pasada a los que fallaron. Casi siempre es Gemini devolviendo un
+    # 429 o un 503 de paso, y dejar el hueco obligaba a volver a lanzar el lote
+    # entero mirando cuál faltaba. Una sola vez: si falla dos, es del producto.
+    if fallidos:
+        on_log(f"[guiones] reintentando {len(fallidos)}: {', '.join(p for p, _ in fallidos)}")
+        pendientes_reintento, fallidos = fallidos, []
+        for pid, prod in pendientes_reintento:
+            time.sleep(2)
+            if escribir_uno(pid, prod):
+                hechos += 1
+            else:
+                fallidos.append((pid, prod))
 
     on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
@@ -3098,9 +3144,17 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
         resumen += f" · {sorteados} de plazos"
     if limpiados:
         resumen += f" · {limpiados} limpiados"
+    # Si queda alguno sin guion, el trabajo NO ha ido bien. Antes acababa en
+    # verde con el hueco dentro y el operador se enteraba tarde, mirando las
+    # fichas una a una para ver cuál se había quedado sin nada.
     if fallidos:
-        on_log(f"[guiones] sin guion: {', '.join(fallidos)}")
-        resumen += f" · fallaron {len(fallidos)}"
+        sin = ", ".join(pid for pid, _ in fallidos)
+        on_log(f"[guiones] sin guion: {sin}")
+        raise RuntimeError(
+            f"{hechos}/{len(pendientes)} guiones escritos. Se quedaron sin "
+            f"guion (ni al reintentar): {sin}. Vuelve a darle al botón: solo "
+            "se escriben los que faltan."
+        )
     return resumen
 
 
