@@ -2991,6 +2991,8 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
     Params: source, folder, rehacer, productos (vacío = todos los de la carpeta).
     """
+    import random
+
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof_largo.services import guionista
@@ -3004,15 +3006,38 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
     doc = product_repo.load_folder(source, folder)
     productos = (doc.get("productos") or {})
     pendientes = []
+    # Los de plazos NO pasan por Gemini: su vídeo lo locuta uno de los cinco
+    # guiones de Klarna del curso (`NICHO_POV_BOF_PLAZOS_VIDEO`), así que el
+    # escrito para el producto no se diría nunca. Se les sortea el suyo aquí
+    # mismo, que es gratis — antes el lote pagaba una llamada por cada uno y la
+    # tarjeta seguía enseñándolos SIN guion, porque el que mira es el otro.
+    sorteados = 0
+    guiones_klarna = pov_config.guiones_plazos()
     for pid, prod in sorted(productos.items(), key=lambda x: (len(x[0]), x[0])):
         if solo and pid not in solo:
             continue
         if not (prod.get("titulo") or "").strip():
             continue                      # sin textos el guion saldría genérico
+        if pov_config.hay_plazos(prod):
+            if prod.get("guion_plazos") and not rehacer:
+                continue
+            if not guiones_klarna:
+                on_log("[guiones] no hay guiones de plazos cargados; se saltan")
+                continue
+            actual = str(prod.get("guion_plazos") or "").strip()
+            opciones = [g for g in guiones_klarna if g != actual] or guiones_klarna
+            product_repo.update_product(
+                source, folder, pid,
+                guion_plazos=random.Random(f"plazos|{job.id}|{pid}").choice(opciones),
+            )
+            sorteados += 1
+            continue
         # Se respeta el guion ya escrito salvo que se pida rehacer.
         if prod.get("guion_producto") and not rehacer:
             continue
         pendientes.append((pid, prod))
+    if sorteados:
+        on_log(f"[guiones] {sorteados} de plazos sorteados del curso (sin IA)")
 
     # Antes de gastar nada: a los que YA tienen guion pero con la frase del
     # pago a plazos les basta con quitársela. Son treinta llamadas a Gemini de
@@ -3032,8 +3057,10 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
         on_log(f"[guiones] {limpiados} guion(es) con la frase de plazos quitada (sin IA)")
 
     if not pendientes:
-        resumen = f"{limpiados} limpiados" if limpiados else "sin-cambios"
-        on_log(f"[guiones] nada que escribir; {resumen}")
+        partes = [f"{n} {q}" for n, q in
+                  ((limpiados, "limpiados"), (sorteados, "de plazos")) if n]
+        resumen = " · ".join(partes) or "sin-cambios"
+        on_log(f"[guiones] nada que escribir con IA; {resumen}")
         return resumen
 
     on_log(f"[guiones] {len(pendientes)} guion(es) por escribir en {folder}")
@@ -3067,6 +3094,8 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
     on_progress(1.0, "✍️ Guiones listos")
     resumen = f"{hechos}/{len(pendientes)} guiones"
+    if sorteados:
+        resumen += f" · {sorteados} de plazos"
     if limpiados:
         resumen += f" · {limpiados} limpiados"
     if fallidos:
