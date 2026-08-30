@@ -45,6 +45,7 @@ nichos.
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🎨 Creativos Pro | (sin modo — no edita vídeo) | Módulo 13: un creativo publicitario por producto. Mismo catálogo que POV BOF (fuentes, fotos, textos, hashtags, escaparate, vendidos); solo cambia el prompt y el formato 3:4 |
 | 🖼️ Carruseles | (sin modo — no edita vídeo) | Módulo 14: carrusel de DOS fotos (chica sorprendida + producto) con el texto quemado. Solo productos donde la chica pueda estar EN el sitio |
+| 💬 Plantillas mensajes | (sin modo — no edita vídeo) | Mensajes para el vendedor (muestra gratuita, colaboración) listos para copiar. Editables y guardados POR USUARIO (`src/plantillas/`, prefijo `plantillas:`) |
 | 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
 | 🎬 Nicho BOF Cinematográfico | `NICHO_BOF_CINE_VIDEO` | Módulo 10: como POV BOF pero sin mano — DOS clips de 5s con paneo, pegados y cuadrados por velocidad |
 | 👗 Nicho Ropa Con Personas | `NICHO_ROPA_PERSONAS_VIDEO` | Módulo 7: SOLO ropa de mujer, puesta por una modelo creada con IA (ficha JSON por usuario) |

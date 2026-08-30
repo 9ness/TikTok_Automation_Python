@@ -21,6 +21,7 @@ import {
   LineChart,
   Loader2,
   Menu,
+  MessageSquareText,
   Mic,
   Package,
   Radar,
@@ -131,6 +132,9 @@ const NAV: NavGroup[] = [
       // Al FINAL y fuera de los nichos: son ajustes comunes (hashtags, copia
       // de seguridad) que antes vivían plegados dentro de cada pantalla de
       // trabajo, donde solo estorbaban.
+      // Mensajes para el vendedor (muestras gratuitas, colaboraciones). No es
+      // un nicho: no genera nada y vale para todos.
+      { href: "/tiktok-shop-ai-pro/plantillas", label: "Plantillas mensajes", icon: MessageSquareText },
       { href: "/tiktok-shop-ai-pro/configuracion", label: "Configuración", icon: Settings },
     ],
   },
