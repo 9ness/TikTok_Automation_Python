@@ -16,6 +16,7 @@ Las cifras de arranque salen de medir los 20 primeros vídeos del nicho.
 from __future__ import annotations
 
 import logging
+import time
 
 from src.nicho_pov_bof_largo import config
 from src.nicho_pov_bof_largo.repos.redis_base import get_nicho_pov_bof_largo_redis
@@ -58,12 +59,36 @@ _MIN_CPS, _MAX_CPS = 10.0, 30.0
 _PESO_NUEVO = 0.3
 
 
+# La tabla se lee EN BUCLE: estimar cuánto durará un vídeo prueba las ~19 voces
+# del banco, y listar una carpeta hace eso dos veces por producto. Sin esto,
+# pintar diez productos eran 420 lecturas de Redis —más de un minuto de espera—
+# y todas devolviendo lo mismo, porque la tabla solo cambia cuando se monta un
+# vídeo. Se guarda en memoria unos segundos; `apuntar` la tira al escribir.
+_MEMO: tuple[float, dict[str, float]] | None = None
+_MEMO_TTL_S = 30.0
+
+
 def _guardadas() -> dict[str, float]:
+    global _MEMO
+
+    if _MEMO is not None and (time.monotonic() - _MEMO[0]) < _MEMO_TTL_S:
+        return _MEMO[1]
     r = get_nicho_pov_bof_largo_redis()
     if not r.is_available():
         return {}
     doc = r.get_json(_KEY) or {}
-    return {str(k): float(v) for k, v in doc.items() if _MIN_CPS <= float(v) <= _MAX_CPS}
+    medidas = {
+        str(k): float(v) for k, v in doc.items() if _MIN_CPS <= float(v) <= _MAX_CPS
+    }
+    _MEMO = (time.monotonic(), medidas)
+    return medidas
+
+
+def olvidar_memo() -> None:
+    """Tira la copia en memoria. La llama `apuntar` tras escribir."""
+    global _MEMO
+
+    _MEMO = None
 
 
 def caracteres_por_segundo(voz: str = "") -> float:
@@ -97,6 +122,9 @@ def apuntar(voz: str, caracteres: int, segundos: float, tempo: float = 1.0) -> N
             cps if not previa else previa * (1 - _PESO_NUEVO) + cps * _PESO_NUEVO, 2
         )
         r.set_json(_KEY, doc)
+        # La copia en memoria se queda vieja justo cuando acaba de cambiar el
+        # dato: se tira para que la siguiente estimación use lo recién medido.
+        olvidar_memo()
     except Exception as e:  # noqa: BLE001
         log.warning("no se pudo apuntar la velocidad de la voz: %s", e)
 
