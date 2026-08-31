@@ -13,13 +13,16 @@ import {
 
 /** Los huecos que se rellenan antes de copiar.
  *
- *  Solo la cuenta es fija; el producto NO hace falta porque al vendedor se le
- *  escribe desde la ficha y el chat ya dice de cuál se habla. Se deja
- *  disponible por si alguna plantilla propia lo necesita, pero la de fábrica
- *  no lo usa: un hueco de menos es un error de menos al enviar.
+ *  La cuenta y el WeChat son fijos; el producto NO hace falta porque al
+ *  vendedor se le escribe desde la ficha y el chat ya dice de cuál se habla. Se
+ *  deja disponible por si alguna plantilla propia lo necesita, pero la de
+ *  fábrica no lo usa: un hueco de menos es un error de menos al enviar.
  */
 const HUECOS = [
   { clave: "CUENTA", label: "Tu cuenta", ejemplo: "@micuenta" },
+  // Va el ID personalizado, NO el `wxid_...` de fábrica: ese es interno y no
+  // se puede buscar, así que pegarlo deja al vendedor sin poder encontrarte.
+  { clave: "WECHAT", label: "Tu ID de WeChat", ejemplo: "mi-id-wechat" },
   { clave: "PRODUCTO", label: "Producto (opcional)", ejemplo: "este producto" },
 ] as const;
 
