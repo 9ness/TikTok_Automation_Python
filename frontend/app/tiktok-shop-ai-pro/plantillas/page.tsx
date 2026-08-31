@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, MessageSquareText, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -156,14 +156,41 @@ export default function PlantillasPage() {
   const guardar = useGuardarPlantillas();
   const restaurar = useRestaurarPlantillas();
 
-  // Copia local: se edita sin guardar en cada tecla y se manda entera al pulsar.
+  // Copia local para escribir sin ir al servidor en cada tecla.
   const [items, setItems] = useState<Plantilla[]>([]);
   const [valores, setValores] = useState<Record<string, string>>({});
-  const sucio = JSON.stringify(items) !== JSON.stringify(data ?? []);
+  // `null` hasta que llega la primera respuesta: sin esto, el guardado
+  // automático se disparaba con la lista VACÍA del primer render y borraba las
+  // plantillas antes de que se pintaran.
+  const [cargado, setCargado] = useState(false);
+  const sucio =
+    cargado &&
+    (JSON.stringify(items) !== JSON.stringify(data?.items ?? []) ||
+      JSON.stringify(valores) !== JSON.stringify(data?.valores ?? {}));
 
   useEffect(() => {
-    if (data) setItems(data);
+    if (!data) return;
+    setItems(data.items);
+    setValores(data.valores);
+    setCargado(true);
   }, [data]);
+
+  // Guardado automático: la pantalla es para copiar y salir corriendo, así que
+  // exigir un botón garantizaba perder ediciones. Se espera a que pares de
+  // escribir (1,2s) en vez de guardar por tecla — son ~700 caracteres por
+  // plantilla y cada guardado es una escritura en Redis.
+  const guardarRef = useRef(guardar);
+  guardarRef.current = guardar;
+  useEffect(() => {
+    if (!sucio || guardarRef.current.isPending) return;
+    const t = setTimeout(() => {
+      guardarRef.current.mutate(
+        { items, valores },
+        { onError: (e) => toast.error(`No se pudo guardar: ${e.message}`) },
+      );
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [items, valores, sucio]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-3 p-3 sm:p-4">
@@ -228,19 +255,21 @@ export default function PlantillasPage() {
         >
           <Plus className="h-3.5 w-3.5" /> Añadir plantilla
         </button>
+        {/* Se guarda solo; esto es el indicador (y un empujón si tienes prisa
+            por salir de la pantalla antes de que salte el temporizador). */}
         <button
           type="button"
           disabled={!sucio || guardar.isPending}
           onClick={() =>
-            guardar.mutate(items, {
-              onSuccess: () => toast.success("Plantillas guardadas."),
-              onError: (e) => toast.error(e.message),
-            })
+            guardar.mutate(
+              { items, valores },
+              { onError: (e) => toast.error(e.message) },
+            )
           }
-          className="inline-flex items-center gap-1.5 rounded-md bg-violet-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-violet-400 transition hover:bg-violet-500/25 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition disabled:opacity-60 bg-violet-500/15 text-violet-400 hover:bg-violet-500/25"
         >
           <Save className="h-3.5 w-3.5" />
-          {guardar.isPending ? "Guardando…" : sucio ? "Guardar cambios" : "Guardado"}
+          {guardar.isPending ? "Guardando…" : sucio ? "Guardar ahora" : "Guardado ✓"}
         </button>
         <button
           type="button"
@@ -248,7 +277,7 @@ export default function PlantillasPage() {
           onClick={() => {
             if (!confirm("¿Descartar tus plantillas y volver a las de fábrica?")) return;
             restaurar.mutate(undefined, {
-              onSuccess: () => toast.success("Plantillas restauradas."),
+              onSuccess: () => toast.success("Plantillas restauradas (tu cuenta se conserva)."),
               onError: (e) => toast.error(e.message),
             });
           }}

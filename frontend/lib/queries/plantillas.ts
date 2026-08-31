@@ -17,14 +17,24 @@ export interface Plantilla {
 interface Respuesta {
   ok: boolean;
   items: Plantilla[];
+  /** Los huecos ya rellenados (`{CUENTA: "@micuenta"}`). */
+  valores: Record<string, string>;
+}
+
+export interface PlantillasDoc {
+  items: Plantilla[];
+  valores: Record<string, string>;
 }
 
 export const plantillasKeys = { all: ["plantillas"] as const };
 
 export function usePlantillas() {
-  return useQuery<Plantilla[]>({
+  return useQuery<PlantillasDoc>({
     queryKey: plantillasKeys.all,
-    queryFn: async () => (await api.get<Respuesta>(ROOT)).items ?? [],
+    queryFn: async () => {
+      const r = await api.get<Respuesta>(ROOT);
+      return { items: r.items ?? [], valores: r.valores ?? {} };
+    },
   });
 }
 
@@ -36,18 +46,26 @@ export function usePlantillas() {
  */
 export function useGuardarPlantillas() {
   const qc = useQueryClient();
-  return useMutation<Plantilla[], Error, Plantilla[]>({
-    mutationFn: async (items) =>
-      (await api.post<Respuesta>(ROOT, { items })).items ?? [],
-    onSuccess: (items) => qc.setQueryData(plantillasKeys.all, items),
+  return useMutation<PlantillasDoc, Error, { items: Plantilla[]; valores?: Record<string, string> }>({
+    mutationFn: async (body) => {
+      const r = await api.post<Respuesta>(ROOT, body);
+      return { items: r.items ?? [], valores: r.valores ?? {} };
+    },
+    // Se pisa la caché con lo que devuelve el servidor (ya limpio) en vez de
+    // invalidar: con el guardado automático, invalidar dispararía una recarga
+    // por cada pulsación y la pantalla parpadearía mientras escribes.
+    onSuccess: (doc) => qc.setQueryData(plantillasKeys.all, doc),
   });
 }
 
 /** Vuelve a las plantillas de fábrica (borra las del operador). */
 export function useRestaurarPlantillas() {
   const qc = useQueryClient();
-  return useMutation<Plantilla[], Error, void>({
-    mutationFn: async () => (await api.del<Respuesta>(ROOT)).items ?? [],
-    onSuccess: (items) => qc.setQueryData(plantillasKeys.all, items),
+  return useMutation<PlantillasDoc, Error, void>({
+    mutationFn: async () => {
+      const r = await api.del<Respuesta>(ROOT);
+      return { items: r.items ?? [], valores: r.valores ?? {} };
+    },
+    onSuccess: (doc) => qc.setQueryData(plantillasKeys.all, doc),
   });
 }

@@ -19,6 +19,10 @@ class Plantilla(BaseModel):
 class PlantillasResponse(BaseModel):
     ok: bool = True
     items: list[Plantilla] = Field(default_factory=list)
+    # Los huecos ya rellenados (`{"CUENTA": "@micuenta"}`). Se guardan con las
+    # plantillas: el `@` es del operador y no cambia, y volver a escribirlo en
+    # cada visita era el error más tonto de la pantalla.
+    valores: dict[str, str] = Field(default_factory=dict)
 
 
 class PlantillasRequest(BaseModel):
@@ -26,3 +30,6 @@ class PlantillasRequest(BaseModel):
     hashtags: son cuatro textos y así el orden y los borrados van gratis."""
 
     items: list[Plantilla] = Field(default_factory=list)
+    # `None` = no se tocan los que ya había. Así, guardar una edición del texto
+    # no borra la cuenta escrita antes (ni al revés).
+    valores: dict[str, str] | None = None

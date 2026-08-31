@@ -29,7 +29,8 @@ def listar(usuario: Annotated[str, Depends(get_web_user)] = "") -> PlantillasRes
     """Las plantillas de quien está usando la app."""
     from src.plantillas.repos import plantilla_repo
 
-    return PlantillasResponse(ok=True, items=plantilla_repo.listar(usuario))
+    doc = plantilla_repo.leer(usuario)
+    return PlantillasResponse(ok=True, items=doc["plantillas"], valores=doc["valores"])
 
 
 @router.post("", response_model=PlantillasResponse)
@@ -41,12 +42,12 @@ def guardar(
     from src.plantillas.repos import plantilla_repo
 
     try:
-        items = plantilla_repo.guardar(
-            [p.model_dump() for p in body.items], usuario,
+        doc = plantilla_repo.guardar(
+            [p.model_dump() for p in body.items], usuario, body.valores,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    return PlantillasResponse(ok=True, items=items)
+    return PlantillasResponse(ok=True, items=doc["plantillas"], valores=doc["valores"])
 
 
 @router.delete("", response_model=PlantillasResponse)
@@ -54,4 +55,5 @@ def restaurar(usuario: Annotated[str, Depends(get_web_user)] = "") -> Plantillas
     """Descarta los cambios del operador y vuelve a las de fábrica."""
     from src.plantillas.repos import plantilla_repo
 
-    return PlantillasResponse(ok=True, items=plantilla_repo.restaurar(usuario))
+    doc = plantilla_repo.restaurar(usuario)
+    return PlantillasResponse(ok=True, items=doc["plantillas"], valores=doc["valores"])
