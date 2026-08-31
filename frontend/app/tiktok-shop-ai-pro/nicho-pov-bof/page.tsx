@@ -45,6 +45,7 @@ import {
   useExtraerTextos,
   useFolders,
   useMarkCompleted,
+  useMarcarPendiente,
   usePhotos,
   usePrompts,
   useProductos,
@@ -406,6 +407,7 @@ export default function NichoPovBofPage() {
   const sources = useSources();
   const folders = useFolders(source);
   const markCompleted = useMarkCompleted(source);
+  const marcarPendiente = useMarcarPendiente(source);
 
   const openQueue = useDrawerStore((s) => s.openQueue);
 
@@ -751,6 +753,25 @@ export default function NichoPovBofPage() {
     if (next) setPicked(next.name);
   }
 
+  function togglePendiente(pendiente: boolean) {
+    if (!folder) return;
+    marcarPendiente.mutate(
+      { source, folder, pendiente },
+      {
+        onSuccess: () =>
+          toast.success(
+            pendiente
+              ? `"${folder}" con vídeos listos para subir`
+              : `"${folder}" ya no está pendiente de subir`,
+          ),
+        onError: (e) => {
+          const msg = e instanceof ApiError ? e.message : String(e);
+          toast.error(`No se pudo guardar: ${msg}`);
+        },
+      },
+    );
+  }
+
   function toggleCompleted(completed: boolean) {
     if (!folder) return;
     markCompleted.mutate(
@@ -901,15 +922,24 @@ export default function NichoPovBofPage() {
                 // si ya se completó y en azul si aún no. Antes la abierta y las
                 // completadas eran del mismo color y no se sabía si la que
                 // tenías delante estaba lista o te faltaba terminarla.
-                folder === f.name
-                  ? f.completed
-                    ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
-                    : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
-                  : f.completed
-                    ? "border-emerald-500/40 text-emerald-500"
-                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                // Y el NARANJA manda sobre los dos: "tiene los vídeos hechos
+                // pero sin subir" es lo que se busca de un vistazo cuando se
+                // preparan carpetas de días futuros. Que esté completada se
+                // sigue leyendo por el ✓.
+                f.pendiente_subir
+                  ? folder === f.name
+                    ? "border-orange-500 bg-orange-500/20 font-semibold text-orange-400"
+                    : "border-orange-500/50 bg-orange-500/10 text-orange-400"
+                  : folder === f.name
+                    ? f.completed
+                      ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                      : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
+                    : f.completed
+                      ? "border-emerald-500/40 text-emerald-500"
+                      : "border-border/60 text-muted-foreground hover:border-foreground/30"
               }`}
             >
+              {f.pendiente_subir && "📤 "}
               {f.completed && "✓ "}
               {/* El curso borró esta carpeta entera: se sigue trabajando
                   desde nuestra copia, con el progreso de siempre. */}
@@ -1105,23 +1135,47 @@ export default function NichoPovBofPage() {
             </>
           )}
 
-          <button
-            type="button"
-            onClick={() => toggleCompleted(!currentItem?.completed)}
-            disabled={markCompleted.isPending}
-            className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50 ${
-              currentItem?.completed
-                ? "border border-border/60 text-muted-foreground hover:text-foreground"
-                : "bg-emerald-500 text-white hover:bg-emerald-600"
-            }`}
-          >
-            {markCompleted.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
-            {currentItem?.completed ? "Desmarcar completada" : "Completada · siguiente"}
-          </button>
+          {/* Los dos estados de la carpeta, uno al lado del otro: cerrarla y
+              dejarla apartada con los vídeos hechos para subirlos otro día.
+              En móvil se apilan — el de completar es el ancho porque es el
+              que se pulsa a diario. */}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => toggleCompleted(!currentItem?.completed)}
+              disabled={markCompleted.isPending}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50 ${
+                currentItem?.completed
+                  ? "border border-border/60 text-muted-foreground hover:text-foreground"
+                  : "bg-emerald-500 text-white hover:bg-emerald-600"
+              }`}
+            >
+              {markCompleted.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              {currentItem?.completed ? "Desmarcar completada" : "Completada · siguiente"}
+            </button>
+            <button
+              type="button"
+              onClick={() => togglePendiente(!currentItem?.pendiente_subir)}
+              disabled={marcarPendiente.isPending}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition disabled:opacity-50 sm:shrink-0 ${
+                currentItem?.pendiente_subir
+                  ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                  : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
+              }`}
+              title="Los vídeos están hechos pero faltan por subir: la carpeta se marca en naranja en el listado"
+            >
+              {marcarPendiente.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {currentItem?.pendiente_subir ? "Sin subir ✓" : "Sin subir"}
+            </button>
+          </div>
         </Caja>
       )}
 

@@ -16,6 +16,9 @@ export interface CineFolder {
   name: string;
   id: string;
   completed: boolean;
+  /** Los vídeos ya están hechos pero falta subirlos (se preparan de días
+   *  futuros). Es independiente de `completed`. */
+  pendiente_subir?: boolean;
 }
 
 export interface CineFoldersResponse {

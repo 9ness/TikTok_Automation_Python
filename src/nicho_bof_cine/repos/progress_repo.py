@@ -61,3 +61,38 @@ def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
     r = get_nicho_bof_cine_redis()
     if r.is_available():
         r.srem(_key(source, usuario), folder)
+
+
+# ---------------------------------------------------------------------------
+# Carpetas con los vídeos hechos pero SIN subir todavía
+# ---------------------------------------------------------------------------
+# SET propio, no un flag dentro de las completadas: se preparan vídeos de días
+# futuros y esa carpeta no está cerrada —queda por subirlos—, y una ya cerrada
+# puede seguir sin subir. Mismo esquema que en el Nicho POV BOF.
+
+
+def _key_pendientes(source: str, usuario: str = "") -> str:
+    source = pov_config.fuente_canonica(source)
+    if not usuario or usuario == "ness":
+        return f"pending_upload:{source}"
+    return f"pending_upload:{source}:{usuario}"
+
+
+def get_pendientes(source: str, usuario: str = "") -> set[str]:
+    """Degrada a vacío si Redis no está: es un aviso de color, no puede dejar
+    sin listado de carpetas."""
+    r = get_nicho_bof_cine_redis()
+    if not r.is_available():
+        return set()
+    return set(r.smembers(_key_pendientes(source, usuario)))
+
+
+def set_pendiente(
+    source: str, folder: str, pendiente: bool, usuario: str = "",
+) -> None:
+    r = _require_redis()
+    clave = _key_pendientes(source, usuario)
+    if pendiente:
+        r.sadd(clave, folder)
+    else:
+        r.srem(clave, folder)

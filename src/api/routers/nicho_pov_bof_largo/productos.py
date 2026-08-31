@@ -44,6 +44,7 @@ from src.api.schemas.nicho_pov_bof_largo import (
     GuionesLoteRequest,
     GuionLargoResponse,
     MarkCompletedLargoRequest,
+    MarkPendienteLargoRequest,
     MarkCompletedLargoResponse,
     ProductoEstadoLargoRequest,
     ProductoLargo,
@@ -235,6 +236,7 @@ def list_folders(
         raise APIError(f"No se pudo leer el Drive: {e}", status_code=502) from e
 
     completed = progress_repo.get_completed(source, usuario)
+    pendientes = progress_repo.get_pendientes(source, usuario)
     # Igual que en el POV BOF: cuántos de cada carpeta tienen la ficha
     # enlazada. Los textos y el enlace son del producto y se comparten entre
     # los dos nichos, así que se lee el mismo índice.
@@ -252,6 +254,7 @@ def list_folders(
             completed=c.get("name") in completed,
             desde_copia=bool(c.get("desde_copia")),
             con_url=int(con_url.get(c.get("name", ""), 0)),
+            pendiente_subir=c.get("name") in pendientes,
         )
         for c in carpetas
     ]
@@ -263,6 +266,28 @@ def list_folders(
         completed_count=sum(1 for i in items if i.completed),
         current=current,
     )
+
+
+@router.post("/pendiente")
+def mark_pendiente(
+    body: MarkPendienteLargoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Marca/desmarca "vídeos hechos, falta subirlos" en una carpeta.
+
+    Como el progreso de este nicho, va por usuario Y por modo de guion: una
+    carpeta con los vídeos del gancho de precio listos no los tiene hechos con
+    el otro gancho.
+    """
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    try:
+        progress_repo.set_pendiente(
+            body.source, body.folder, body.pendiente, usuario,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "folder": body.folder, "pendiente": body.pendiente}
 
 
 @router.post("/complete", response_model=MarkCompletedLargoResponse)

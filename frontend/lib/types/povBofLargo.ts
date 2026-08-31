@@ -106,6 +106,9 @@ export interface FolderLargo {
   desde_copia?: boolean;
   /** Cuántos de sus productos ya tienen enlazada la ficha de TikTok Shop. */
   con_url?: number;
+  /** Los vídeos ya están hechos pero falta subirlos (se preparan de días
+   *  futuros). Es independiente de `completed`. */
+  pendiente_subir?: boolean;
 }
 
 export interface FoldersLargoResponse {

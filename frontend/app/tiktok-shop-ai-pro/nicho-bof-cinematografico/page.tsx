@@ -30,6 +30,7 @@ import {
   useCineExtraerTextos,
   useCineFolders,
   useCineMarcarCarpeta,
+  useCineMarcarPendiente,
   useCineProductos,
   useCinePrompts,
   useCineSources,
@@ -54,6 +55,7 @@ export default function NichoBofCinePage() {
   const productos = useCineProductos(source, folder);
   const extraer = useCineExtraerTextos();
   const marcar = useCineMarcarCarpeta();
+  const marcarPendiente = useCineMarcarPendiente();
   const prompts = useCinePrompts();
 
   const items = productos.data?.items ?? [];
@@ -63,6 +65,8 @@ export default function NichoBofCinePage() {
   const conTexto = items.filter((p) => p.titulo).length;
   const listos = items.filter((p) => p.clip1 && p.clip2).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
+  const sinSubir =
+    folders.data?.items.find((f) => f.name === folder)?.pendiente_subir ?? false;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24">
@@ -125,6 +129,9 @@ export default function NichoBofCinePage() {
           >
             {(folders.data?.items ?? []).map((f) => (
               <option key={f.name} value={f.name}>
+                {/* Aquí las carpetas van en un desplegable, no en chips de
+                    color: el aviso de "vídeos hechos sin subir" es el 📤. */}
+                {f.pendiente_subir ? "📤 " : ""}
                 {f.completed ? "✅ " : ""}
                 {f.name}
               </option>
@@ -136,31 +143,57 @@ export default function NichoBofCinePage() {
         </div>
 
         {folder && (
-          <button
-            type="button"
-            disabled={marcar.isPending}
-            onClick={() =>
-              marcar.mutate(
-                { source, folder, completed: !hecha },
-                {
-                  onSuccess: () => {
-                    toast.success(hecha ? "Desmarcada" : "Carpeta completada");
-                    if (!hecha) setPicked(null);
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              disabled={marcar.isPending}
+              onClick={() =>
+                marcar.mutate(
+                  { source, folder, completed: !hecha },
+                  {
+                    onSuccess: () => {
+                      toast.success(hecha ? "Desmarcada" : "Carpeta completada");
+                      if (!hecha) setPicked(null);
+                    },
+                    onError: (e) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
                   },
-                  onError: (e) =>
-                    toast.error(e instanceof ApiError ? e.message : String(e)),
-                },
-              )
-            }
-            className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-              hecha
-                ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-                : "border-border/60 text-muted-foreground hover:border-emerald-500 hover:text-emerald-500"
-            }`}
-          >
-            <Check className="h-3.5 w-3.5" />
-            {hecha ? "Completada" : "Marcar completada · siguiente"}
-          </button>
+                )
+              }
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                hecha
+                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                  : "border-border/60 text-muted-foreground hover:border-emerald-500 hover:text-emerald-500"
+              }`}
+            >
+              <Check className="h-3.5 w-3.5" />
+              {hecha ? "Completada" : "Marcar completada · siguiente"}
+            </button>
+            {/* Apartar la carpeta con los vídeos hechos para subirlos otro
+                día: sale con 📤 en el desplegable de arriba. */}
+            <button
+              type="button"
+              disabled={marcarPendiente.isPending}
+              onClick={() =>
+                marcarPendiente.mutate(
+                  { source, folder, pendiente: !sinSubir },
+                  {
+                    onError: (e) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                )
+              }
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition sm:shrink-0 ${
+                sinSubir
+                  ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                  : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
+              }`}
+              title="Los vídeos están hechos pero faltan por subir"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {sinSubir ? "Sin subir ✓" : "Sin subir"}
+            </button>
+          </div>
         )}
       </section>
 

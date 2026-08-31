@@ -81,6 +81,44 @@ def tamanos_al_completar(source: str, usuario: str = "") -> dict[str, int]:
     return {str(k): int(v) for k, v in doc.items() if str(v).isdigit()}
 
 
+# ---------------------------------------------------------------------------
+# Carpetas con los vídeos hechos pero SIN subir todavía
+# ---------------------------------------------------------------------------
+# SET propio, no un flag dentro de las completadas, porque son dos cosas
+# distintas: se preparan vídeos de días futuros y esa carpeta no está cerrada
+# —queda por subirlos—, y una carpeta ya cerrada puede seguir sin subir.
+
+
+def _key_pendientes(source: str, usuario: str = "") -> str:
+    source = config.fuente_canonica(source)
+    if not usuario or usuario == "ness":
+        return f"pending_upload:{source}"
+    return f"pending_upload:{source}:{usuario}"
+
+
+def get_pendientes(source: str, usuario: str = "") -> set[str]:
+    """Carpetas marcadas como "vídeos listos, falta subirlos".
+
+    Degrada a vacío si Redis no está: es un aviso de color, no puede dejar sin
+    listado de carpetas (igual que `tamanos_al_completar`).
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return set()
+    return set(r.smembers(_key_pendientes(source, usuario)))
+
+
+def set_pendiente(
+    source: str, folder: str, pendiente: bool, usuario: str = "",
+) -> None:
+    r = _require_redis()
+    clave = _key_pendientes(source, usuario)
+    if pendiente:
+        r.sadd(clave, folder)
+    else:
+        r.srem(clave, folder)
+
+
 def unmark_completed(source: str, folder: str, usuario: str = "") -> None:
     """Rollback — degrada en silencio si Redis no está (igual que viralización)."""
     r = get_nicho_pov_bof_redis()

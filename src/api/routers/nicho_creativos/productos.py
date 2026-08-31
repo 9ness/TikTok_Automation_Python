@@ -44,6 +44,14 @@ class CompletarRequest(BaseModel):
     completed: bool = True
 
 
+class PendienteRequest(BaseModel):
+    """Marca/desmarca "creativos hechos, falta subirlos"."""
+
+    source: str
+    folder: str
+    pendiente: bool = True
+
+
 class SubidoRequest(BaseModel):
     """Marcar a mano que el creativo de ese producto ya está publicado."""
 
@@ -94,6 +102,7 @@ def list_folders(
         hechas = progress_repo.get_completed(source, usuario)
     except RuntimeError:
         hechas = set()
+    pendientes = progress_repo.get_pendientes(source, usuario)
     nombres = [c.get("name", "") for c in carpetas]
     # Cuántos productos de cada carpeta tienen ya la ficha enlazada. Sale del
     # índice COMPARTIDO del POV BOF (la ficha es del producto, no del nicho),
@@ -106,7 +115,12 @@ def list_folders(
     return {
         "source": source,
         "items": [
-            {"name": n, "completed": n in hechas, "con_url": int(con_url.get(n, 0))}
+            {
+                "name": n,
+                "completed": n in hechas,
+                "con_url": int(con_url.get(n, 0)),
+                "pendiente_subir": n in pendientes,
+            }
             for n in nombres
         ],
         "current": next((n for n in nombres if n not in hechas), None),
@@ -130,6 +144,25 @@ def marcar_completada(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return {"ok": True}
+
+
+@router.post("/pendiente")
+def marcar_pendiente(
+    body: PendienteRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Marca/desmarca "creativos hechos, falta subirlos" en una carpeta.
+
+    Va aparte de `/complete`: se preparan creativos de días futuros y esa
+    carpeta no está cerrada —queda por subirlos—.
+    """
+    from src.nicho_creativos.repos import progress_repo
+
+    try:
+        progress_repo.set_pendiente(body.source, body.folder, body.pendiente, usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "folder": body.folder, "pendiente": body.pendiente}
 
 
 @router.get("/subidos")

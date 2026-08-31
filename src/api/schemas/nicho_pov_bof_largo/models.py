@@ -122,6 +122,9 @@ class FolderLargo(BaseModel):
     # Cuántos de sus productos tienen ya enlazada la ficha de TikTok Shop. Es
     # lo que dice, desde el listado, en qué carpeta hay trabajo — sin abrirla.
     con_url: int = 0
+    # Los vídeos ya están hechos pero falta subirlos (se preparan de días
+    # futuros). Independiente de `completed`.
+    pendiente_subir: bool = False
 
 
 class FoldersLargoResponse(BaseModel):
@@ -136,6 +139,14 @@ class MarkCompletedLargoRequest(BaseModel):
     source: str
     folder: str
     completed: bool = True
+
+
+class MarkPendienteLargoRequest(BaseModel):
+    """Marca/desmarca "vídeos hechos, falta subirlos"."""
+
+    source: str
+    folder: str
+    pendiente: bool = True
 
 
 class MarkCompletedLargoResponse(BaseModel):

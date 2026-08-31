@@ -93,6 +93,15 @@ export function useCineMarcarCarpeta() {
   });
 }
 
+/** "Vídeos hechos, falta subirlos" — el aviso del listado de carpetas. */
+export function useCineMarcarPendiente() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { source: string; folder: string; pendiente: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/pendiente`, body),
+    onSuccess: (_d, v) => void qc.invalidateQueries({ queryKey: cineKeys.folders(v.source) }),
+  });
+}
+
 /** Sube UNO de los dos clips. El backend solo encola cuando están los dos. */
 export function useCineSubirClip() {
   const qc = useQueryClient();

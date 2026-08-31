@@ -165,6 +165,22 @@ export function useMarkCompleted(source: string) {
   });
 }
 
+/** "Vídeos hechos, falta subirlos" — el aviso de color en el listado de
+ *  carpetas. No cierra la carpeta: son cosas distintas. */
+export function useMarcarPendiente(source: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; pendiente: boolean },
+    Error,
+    { source: string; folder: string; pendiente: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/pendiente`, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: nichoPovBofKeys.folders(source) });
+    },
+  });
+}
+
 export interface UltimaCopia {
   ts?: number;
   mode?: string;

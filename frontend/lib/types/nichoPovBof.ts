@@ -15,6 +15,9 @@ export interface ProductFolder {
   name: string;
   id: string;
   completed: boolean;
+  /** Los vídeos ya están hechos pero falta subirlos (se preparan de días
+   *  futuros). Es independiente de `completed`. */
+  pendiente_subir?: boolean;
   /** El Drive del curso ya no tiene esta carpeta: sale de nuestra copia. */
   desde_copia?: boolean;
   /** Cuántos de sus productos ya tienen enlazada la ficha de TikTok Shop. */

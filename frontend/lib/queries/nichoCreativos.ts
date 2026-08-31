@@ -27,6 +27,9 @@ export interface CarpetaCreativos {
    *  enlazada. Sale del índice COMPARTIDO del POV BOF: la ficha es del
    *  producto, no del nicho. */
   con_url?: number;
+  /** Los creativos ya están hechos pero falta subirlos. Independiente de
+   *  `completed`. */
+  pendiente_subir?: boolean;
 }
 
 export interface FoldersCreativos {
@@ -66,6 +69,20 @@ export function useCompletarCarpetaCreativos() {
     { source: string; folder: string; completed: boolean }
   >({
     mutationFn: (body) => api.post(`${ROOT}/complete`, body),
+    onSuccess: (_r, v) =>
+      void qc.invalidateQueries({ queryKey: creativosKeys.folders(v.source) }),
+  });
+}
+
+/** "Creativos hechos, falta subirlos" — el aviso de color del listado. */
+export function useMarcarPendienteCreativos() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; pendiente: boolean },
+    Error,
+    { source: string; folder: string; pendiente: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/pendiente`, body),
     onSuccess: (_r, v) =>
       void qc.invalidateQueries({ queryKey: creativosKeys.folders(v.source) }),
   });

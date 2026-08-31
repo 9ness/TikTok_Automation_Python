@@ -35,6 +35,7 @@ from src.api.schemas.nicho_bof_cine import (
     CineEstadoRequest,
     CineFoldersResponse,
     CineMarkCompletedRequest,
+    CineMarkPendienteRequest,
     CineMarkCompletedResponse,
     CinePromptsResponse,
     CineProductoInfo,
@@ -100,8 +101,12 @@ def list_folders(
         raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
 
     completed = progress_repo.get_completed(source, usuario)
+    pendientes = progress_repo.get_pendientes(source, usuario)
     items = [
-        CineProductFolder(name=f["name"], id=f["id"], completed=f["name"] in completed)
+        CineProductFolder(
+            name=f["name"], id=f["id"], completed=f["name"] in completed,
+            pendiente_subir=f["name"] in pendientes,
+        )
         for f in folders
     ]
     return CineFoldersResponse(
@@ -111,6 +116,19 @@ def list_folders(
         completed_count=sum(1 for i in items if i.completed),
         current=next((i.name for i in items if not i.completed), None),
     )
+
+
+@router.post("/pendiente")
+def mark_pendiente(
+    body: CineMarkPendienteRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Marca/desmarca "vídeos hechos, falta subirlos" en una carpeta."""
+    try:
+        progress_repo.set_pendiente(body.source, body.folder, body.pendiente, usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "folder": body.folder, "pendiente": body.pendiente}
 
 
 @router.post("/complete", response_model=CineMarkCompletedResponse)

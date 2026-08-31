@@ -113,6 +113,20 @@ export function useMarkCompletedLargo(source: string) {
   });
 }
 
+/** "Vídeos hechos, falta subirlos". Va por usuario Y por modo de guion, igual
+ *  que el progreso de este nicho. */
+export function useMarcarPendienteLargo(source: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; pendiente: boolean },
+    Error,
+    { source: string; folder: string; pendiente: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/pendiente`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: largoKeys.folders(source) }),
+  });
+}
+
 /** Relee del Drive saltándose la caché de listados del servidor.
  *
  *  El backend cachea qué fotos tiene cada carpeta: una carpeta que se listó

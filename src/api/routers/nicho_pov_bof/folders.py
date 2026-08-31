@@ -29,6 +29,7 @@ from src.api.schemas.nicho_pov_bof import (
     FoldersListResponse,
     MarkCompletedRequest,
     MarkCompletedResponse,
+    MarkPendienteRequest,
     PhotoInfo,
     PhotosListResponse,
     ProductFolder,
@@ -93,6 +94,7 @@ def list_folders(
         raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
 
     completed = progress_repo.get_completed(source, usuario)
+    pendientes = progress_repo.get_pendientes(source, usuario)
     # Cuántos productos de cada carpeta tienen ya la ficha enlazada: es lo que
     # dice desde el listado dónde hay trabajo, sin entrar a mirar.
     nombres = [f["name"] for f in folders]
@@ -123,6 +125,7 @@ def list_folders(
             total=int((resumen.get(f["name"]) or {}).get("total", 0)),
             sin_stock=int((resumen.get(f["name"]) or {}).get("sin_stock", 0)),
             nuevos_desde_completada=_nuevos(f["name"]),
+            pendiente_subir=f["name"] in pendientes,
         )
         for f in folders
     ]
@@ -403,6 +406,28 @@ def revisar_textos_enqueue(
         params={"source": source, "arreglar": bool(arreglar), "carpetas": solo},
     )
     return {"job_id": job.id, "title": title}
+
+
+@router.post("/pendiente")
+def mark_pendiente(
+    body: MarkPendienteRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Marca/desmarca "vídeos hechos, falta subirlos" en una carpeta.
+
+    No comprueba que la carpeta exista en el Drive, a diferencia de
+    `/complete`: es un aviso de color y no arrastra nada detrás, así que no
+    compensa un listado del Drive por cada pulsación.
+    """
+    from src.nicho_pov_bof.repos import progress_repo
+
+    try:
+        progress_repo.set_pendiente(
+            body.source, body.folder, body.pendiente, usuario,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "folder": body.folder, "pendiente": body.pendiente}
 
 
 @router.post("/complete", response_model=MarkCompletedResponse)

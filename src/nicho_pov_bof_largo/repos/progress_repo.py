@@ -78,6 +78,43 @@ def unmark_completed(
 
 
 # ---------------------------------------------------------------------------
+# Carpetas con los vídeos hechos pero SIN subir todavía
+# ---------------------------------------------------------------------------
+# SET propio, no un flag dentro de las completadas: se preparan vídeos de días
+# futuros y esa carpeta no está cerrada —queda por subirlos—, y una ya cerrada
+# puede seguir sin subir.
+
+
+def _key_pendientes(source: str, usuario: str = "", estilo: str = "") -> str:
+    """La MISMA partición que `_key` (usuario + modo de guion), otro SET.
+
+    Se deriva de `_key` en vez de repetir su lógica para que no se separen: el
+    modo de guion decide la clave y ahí ya está resuelto.
+    """
+    return "pending_upload:" + _key(source, usuario, estilo).removeprefix("completed:")
+
+
+def get_pendientes(source: str, usuario: str = "", estilo: str = "") -> set[str]:
+    """Degrada a vacío si Redis no está: es un aviso de color, no puede dejar
+    sin listado de carpetas."""
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available():
+        return set()
+    return set(r.smembers(_key_pendientes(source, usuario, estilo)))
+
+
+def set_pendiente(
+    source: str, folder: str, pendiente: bool, usuario: str = "", estilo: str = "",
+) -> None:
+    r = _require_redis()
+    clave = _key_pendientes(source, usuario, estilo)
+    if pendiente:
+        r.sadd(clave, folder)
+    else:
+        r.srem(clave, folder)
+
+
+# ---------------------------------------------------------------------------
 # Con qué modo de guion se está recorriendo el catálogo
 # ---------------------------------------------------------------------------
 # Vive AQUÍ y no en el documento de la carpeta a propósito: ese documento ya va

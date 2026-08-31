@@ -9,6 +9,7 @@ import {
   Sparkles,
   Store,
   ShoppingBag,
+  Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   useCompletarCarpetaCreativos,
+  useMarcarPendienteCreativos,
   useFoldersCreativos,
   useMarcarSubidoCreativo,
   usePromptCreativos,
@@ -77,6 +79,7 @@ export default function CreativosProPage() {
   // Los textos son del producto y se comparten: los extrae solo el admin.
   const esPro = useEsPro();
   const completar = useCompletarCarpetaCreativos();
+  const marcarPendiente = useMarcarPendienteCreativos();
   // Qué creativos ya se publicaron: propio de este nicho, se marca a mano.
   const subidos = useSubidosCreativos(source, folder);
   const marcarSubido = useMarcarSubidoCreativo(source, folder);
@@ -119,6 +122,8 @@ export default function CreativosProPage() {
   const fotosTotales = items.filter((p) => p.titled_photo_id).length;
   const fotosConUrl = items.filter((p) => p.titled_photo_id && p.product_url).length;
   const hecha = folders.data?.items.find((f) => f.name === folder)?.completed ?? false;
+  const sinSubir =
+    folders.data?.items.find((f) => f.name === folder)?.pendiente_subir ?? false;
 
   // Se bajan las fotos CON LA DESCRIPCIÓN (la captura de la ficha), no las
   // limpias: el prompt del creativo pide integrar los beneficios del producto,
@@ -239,15 +244,23 @@ export default function CreativosProPage() {
                 // Verde si la carpeta abierta está hecha, azul si no (igual
                 // que en POV BOF): con un solo color no se sabía si la que
                 // tienes delante está terminada.
-                folder === f.name
-                  ? f.completed
-                    ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
-                    : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
-                  : f.completed
-                    ? "border-emerald-500/40 text-emerald-500"
-                    : "border-border/60 text-muted-foreground"
+                // Y el NARANJA manda sobre los dos: "tiene los creativos
+                // hechos pero sin subir" es lo que se busca de un vistazo
+                // cuando se preparan carpetas de días futuros.
+                f.pendiente_subir
+                  ? folder === f.name
+                    ? "border-orange-500 bg-orange-500/20 font-semibold text-orange-400"
+                    : "border-orange-500/50 bg-orange-500/10 text-orange-400"
+                  : folder === f.name
+                    ? f.completed
+                      ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                      : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
+                    : f.completed
+                      ? "border-emerald-500/40 text-emerald-500"
+                      : "border-border/60 text-muted-foreground"
               }`}
             >
+              {f.pendiente_subir && "📤 "}
               {f.completed && "✓ "}
               {f.name}
               {/* Cuántos productos de esta carpeta tienen ya la ficha
@@ -265,24 +278,47 @@ export default function CreativosProPage() {
         {/* Cerrar la carpeta, dentro de su caja: es lo que se pulsa nada más
             terminar y antes quedaba suelto entre dos bloques. */}
         {folder && (
-        <button
-          type="button"
-          disabled={completar.isPending}
-          onClick={() =>
-            completar.mutate(
-              { source, folder, completed: !hecha },
-              { onError: (e) => toast.error(err(e)) },
-            )
-          }
-          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-            hecha
-              ? "border-border/60 text-muted-foreground"
-              : "border-emerald-500 bg-emerald-500/15 text-emerald-500"
-          }`}
-        >
-          <Check className="h-3.5 w-3.5" />
-          {hecha ? "Desmarcar carpeta" : "Carpeta completada"}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            disabled={completar.isPending}
+            onClick={() =>
+              completar.mutate(
+                { source, folder, completed: !hecha },
+                { onError: (e) => toast.error(err(e)) },
+              )
+            }
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+              hecha
+                ? "border-border/60 text-muted-foreground"
+                : "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+            }`}
+          >
+            <Check className="h-3.5 w-3.5" />
+            {hecha ? "Desmarcar carpeta" : "Carpeta completada"}
+          </button>
+          {/* Apartar la carpeta con los creativos hechos para subirlos otro
+              día: se pinta en naranja en el listado de arriba. */}
+          <button
+            type="button"
+            disabled={marcarPendiente.isPending}
+            onClick={() =>
+              marcarPendiente.mutate(
+                { source, folder, pendiente: !sinSubir },
+                { onError: (e) => toast.error(err(e)) },
+              )
+            }
+            className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition sm:shrink-0 ${
+              sinSubir
+                ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
+            }`}
+            title="Los creativos están hechos pero faltan por subir"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {sinSubir ? "Sin subir ✓" : "Sin subir"}
+          </button>
+        </div>
         )}
       </Caja>
 

@@ -29,6 +29,9 @@ class CineProductFolder(BaseModel):
     name: str
     id: str
     completed: bool = False
+    # Los vídeos ya están hechos pero falta subirlos (se preparan de días
+    # futuros). Independiente de `completed`.
+    pendiente_subir: bool = False
 
 
 class CineFoldersResponse(BaseModel):
@@ -43,6 +46,14 @@ class CineMarkCompletedRequest(BaseModel):
     source: str = Field(..., min_length=1)
     folder: str = Field(..., min_length=1)
     completed: bool = True
+
+
+class CineMarkPendienteRequest(BaseModel):
+    """Marca/desmarca "vídeos hechos, falta subirlos"."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    pendiente: bool = True
 
 
 class CineMarkCompletedResponse(BaseModel):

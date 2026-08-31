@@ -41,6 +41,10 @@ class ProductFolder(BaseModel):
     # Marcados a mano como retirados del catálogo. No son trabajo pendiente,
     # así que un "8/10" con 2 sin stock está DE HECHO terminado.
     sin_stock: int = 0
+    # Los vídeos ya están hechos pero falta subirlos (se preparan de días
+    # futuros). Es INDEPENDIENTE de `completed`: la carpeta no está cerrada
+    # hasta que se suben, y una cerrada puede seguir sin subir.
+    pendiente_subir: bool = False
 
 
 class FoldersListResponse(BaseModel):
@@ -70,6 +74,14 @@ class MarkCompletedRequest(BaseModel):
     source: str = Field(..., min_length=1)
     folder: str = Field(..., min_length=1)
     completed: bool = True
+
+
+class MarkPendienteRequest(BaseModel):
+    """Marca/desmarca "vídeos hechos, falta subirlos"."""
+
+    source: str = Field(..., min_length=1)
+    folder: str = Field(..., min_length=1)
+    pendiente: bool = True
 
 
 class BackupCheckResponse(BaseModel):
