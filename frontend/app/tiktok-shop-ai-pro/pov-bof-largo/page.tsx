@@ -902,12 +902,13 @@ export default function PovBofLargoPage() {
           {/* Los dos estados de la carpeta, uno al lado del otro: cerrarla y
               dejarla apartada con los vídeos hechos para subirlos otro día.
               Igual que en el POV BOF. */}
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex items-stretch gap-2">
             <button
               type="button"
               onClick={() => toggleCompleted(!currentItem?.completed)}
               disabled={markCompleted.isPending}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50 ${
+              title="Marca la carpeta como hecha y salta a la siguiente"
+              className={`flex min-w-0 flex-1 items-center justify-center gap-2 truncate rounded-lg px-3 py-3 text-sm font-semibold transition disabled:opacity-50 ${
                 currentItem?.completed
                   ? "border border-border/60 text-muted-foreground hover:text-foreground"
                   : "bg-violet-500 text-white hover:bg-violet-600"
@@ -918,13 +919,13 @@ export default function PovBofLargoPage() {
               ) : (
                 <Check className="h-4 w-4" />
               )}
-              {currentItem?.completed ? "Desmarcar completada" : "Completada · siguiente"}
+              {currentItem?.completed ? "Desmarcar" : "Completada"}
             </button>
             <button
               type="button"
               onClick={() => togglePendiente(!currentItem?.pendiente_subir)}
               disabled={marcarPendiente.isPending}
-              className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition disabled:opacity-50 sm:shrink-0 ${
+              className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold shrink-0 transition disabled:opacity-50 ${
                 currentItem?.pendiente_subir
                   ? "border-orange-500 bg-orange-500/20 text-orange-400"
                   : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
@@ -936,7 +937,7 @@ export default function PovBofLargoPage() {
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              {currentItem?.pendiente_subir ? "Sin subir ✓" : "Sin subir"}
+              {currentItem?.pendiente_subir ? "Pendiente ✓" : "Pendiente"}
             </button>
           </div>
         </Caja>

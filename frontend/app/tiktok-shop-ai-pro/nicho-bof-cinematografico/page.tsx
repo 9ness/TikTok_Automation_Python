@@ -143,7 +143,7 @@ export default function NichoBofCinePage() {
         </div>
 
         {folder && (
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex items-stretch gap-2">
             <button
               type="button"
               disabled={marcar.isPending}
@@ -160,14 +160,14 @@ export default function NichoBofCinePage() {
                   },
                 )
               }
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 truncate rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                 hecha
                   ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
                   : "border-border/60 text-muted-foreground hover:border-emerald-500 hover:text-emerald-500"
               }`}
             >
               <Check className="h-3.5 w-3.5" />
-              {hecha ? "Completada" : "Marcar completada · siguiente"}
+              {hecha ? "Desmarcar" : "Completada"}
             </button>
             {/* Apartar la carpeta con los vídeos hechos para subirlos otro
                 día: sale con 📤 en el desplegable de arriba. */}
@@ -183,7 +183,7 @@ export default function NichoBofCinePage() {
                   },
                 )
               }
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition sm:shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs shrink-0 font-semibold transition ${
                 sinSubir
                   ? "border-orange-500 bg-orange-500/20 text-orange-400"
                   : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
@@ -191,7 +191,7 @@ export default function NichoBofCinePage() {
               title="Los vídeos están hechos pero faltan por subir"
             >
               <Upload className="h-3.5 w-3.5" />
-              {sinSubir ? "Sin subir ✓" : "Sin subir"}
+              {sinSubir ? "Pendiente ✓" : "Pendiente"}
             </button>
           </div>
         )}
