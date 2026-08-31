@@ -1967,8 +1967,8 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             raise RuntimeError(
                 "No se pudo averiguar la voz del vídeo: el clip no dice nada "
                 "claro y la IA que mira la mano no contesta "
-                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
-                "a mano en la ficha y vuelve a montarlo."
+                f"({deteccion['error'][:120]}). Los clips siguen subidos: elige "
+                "Hombre o Mujer a mano en la ficha y vuelve a montarlo."
             )
         sexo = deteccion.get("sexo") or "mujer"
 
@@ -2204,8 +2204,8 @@ def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgr
             raise RuntimeError(
                 "No se pudo averiguar la voz del vídeo: el clip no dice nada "
                 "claro y la IA que mira la mano no contesta "
-                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
-                "a mano en la ficha y vuelve a montarlo."
+                f"({deteccion['error'][:120]}). Los clips siguen subidos: elige "
+                "Hombre o Mujer a mano en la ficha y vuelve a montarlo."
             )
         sexo = deteccion.get("sexo") or rng.choice(["hombre", "mujer"])
         if not deteccion.get("sexo"):
@@ -3624,10 +3624,13 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # porque el bruto ya está en disco local (sacar cinco fotogramas es
     # instantáneo) y porque así el operador no espera mirando la pantalla.
     #
-    # Sin mano visible o si falla la detección se usa MUJER, que es la regla
-    # del operador: mujer salvo que se vea reloj o vello. Se guarda lo detectado
-    # junto al producto para compararlo luego con lo que él elige a mano — es la
-    # única forma de saber si algún día se puede quitar el selector.
+    # Sin mano VISIBLE se usa mujer, que es la regla del operador: mujer salvo
+    # que se vea reloj o vello. Pero si la IA no CONTESTA (sin cuota, JSON roto)
+    # el trabajo se para: no es lo mismo "he mirado y no hay mano" que "no he
+    # podido mirar", y sortear el sexo a ciegas costó un día entero de vídeos
+    # con voz de mujer sobre mano de hombre. Se guarda lo detectado junto al
+    # producto para compararlo luego con lo que él elige a mano — es la única
+    # forma de saber si algún día se puede quitar el selector.
     deteccion = {}
     if sexo == "auto":
         from src.nicho_pov_bof.services import voz_clip
@@ -3638,8 +3641,8 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             raise RuntimeError(
                 "No se pudo averiguar la voz del vídeo: el clip no dice nada "
                 "claro y la IA que mira la mano no contesta "
-                f"no contesta ({deteccion['error'][:80]}). Elige Hombre o Mujer "
-                "a mano en la ficha y vuelve a montarlo."
+                f"({deteccion['error'][:120]}). Los clips siguen subidos: elige "
+                "Hombre o Mujer a mano en la ficha y vuelve a montarlo."
             )
         sexo = deteccion.get("sexo") or "mujer"
         if not deteccion.get("sexo"):

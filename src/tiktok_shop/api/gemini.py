@@ -505,6 +505,11 @@ def _extract_retry_delay(err_str: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
+# Reintentos cuando el modelo devuelve JSON mal formado. Dos bastan: es un
+# desliz de generación, no un prompt imposible.
+_INTENTOS_JSON = 2
+
+
 def generate_json(
     system_prompt: str,
     user_prompt: str,
@@ -521,16 +526,28 @@ def generate_json(
     `max_output_tokens` default alto (32K) porque los callers de JSON suelen
     pedir lotes grandes (presets, variantes) que con el cap default (8K) se
     truncaban y reventaban el parseo."""
-    raw = generate_text(
-        system_prompt, user_prompt,
-        model=model, expect_json=True, images=images, audios=audios,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
-    )
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Gemini devolvió JSON inválido: {e}\nRespuesta: {raw[:500]}")
+    # Un JSON mal cerrado es un tropiezo del modelo, no un problema del prompt:
+    # a la segunda sale bien casi siempre. Sin reintento, una coma de menos
+    # tiraba el trabajo entero — y en el POV BOF eso son dos clips ya generados
+    # que hay que volver a subir a mano.
+    ultimo: json.JSONDecodeError | None = None
+    for intento in range(_INTENTOS_JSON):
+        raw = generate_text(
+            system_prompt, user_prompt,
+            model=model, expect_json=True, images=images, audios=audios,
+            # Cada reintento va un poco más frío: con la misma temperatura, el
+            # modelo tiende a repetir exactamente el mismo desliz.
+            temperature=max(0.0, temperature - 0.3 * intento),
+            max_output_tokens=max_output_tokens,
+        )
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            ultimo = e
+            log_warning(
+                f"[gemini] JSON inválido (intento {intento + 1}/{_INTENTOS_JSON}): {e}"
+            )
+    raise ValueError(f"Gemini devolvió JSON inválido: {ultimo}\nRespuesta: {raw[:500]}")
 
 
 def _guess_mime(path: str) -> str:
