@@ -10,6 +10,7 @@ import {
   Download,
   Link2 as LinkIcon,
   Loader2,
+  Trash2,
   Eye,
   RefreshCw,
   Search,
@@ -89,6 +90,16 @@ import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
@@ -447,6 +458,7 @@ export default function NichoPovBofPage() {
   });
   const productos = useProductos(source, folder);
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
+  const esMisProductos = source === "mis_productos";
   // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima
   // vez que entres quieres lo mismo.
   // Trabajar solo con los que ya tienen la ficha enlazada: son los que se van
@@ -456,9 +468,45 @@ export default function NichoPovBofPage() {
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "povbof:topventas:sinsubir", false,
   );
+  // Selección múltiple, solo en "Mis productos" (los del operador; las
+  // carpetas del curso son de solo lectura). Se guardan las claves
+  // `carpeta|producto` porque en la vista global conviven varias carpetas.
+  const [seleccion, setSeleccion] = useState<string[]>([]);
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+  const borrarSeleccion = useBorrarMiProducto();
+  const [borrandoLote, setBorrandoLote] = useState(false);
+  async function borrarLote() {
+    // De uno en uno contra el endpoint que ya existe: son diez como mucho, y
+    // en serie el error dice EXACTAMENTE cuál falló en vez de morir el lote.
+    setBorrandoLote(true);
+    const fallados: string[] = [];
+    for (const k of seleccion) {
+      const [carpeta = "", ...resto] = k.split("|");
+      const producto = resto.join("|");
+      try {
+        await borrarSeleccion.mutateAsync({ carpeta, producto });
+      } catch {
+        fallados.push(producto);
+      }
+    }
+    setBorrandoLote(false);
+    setSeleccion([]);
+    if (fallados.length) {
+      toast.error(`No se pudieron borrar: ${fallados.join(", ")}`);
+    } else {
+      toast.success(
+        seleccion.length === 1
+          ? "Producto borrado"
+          : `${seleccion.length} productos borrados`,
+      );
+    }
+  }
   // Un solo botón para "tráete lo de verdad": carpetas, productos y las ventas
   // del ranking (que se cruzan al listar, no se guardan en el producto).
   const [refrescando, setRefrescando] = useState(false);
+  useEffect(() => {
+    setSeleccion([]);
+  }, [source, folder]);
   async function actualizarTodo() {
     setRefrescando(true);
     try {
@@ -1643,6 +1691,45 @@ export default function NichoPovBofPage() {
             </div>
           )}
 
+          {/* Borrar de varios en varios: son productos que sube el operador y
+              se quitan a puñados (una tanda que salió mal), no de uno en uno. */}
+          {esMisProductos && enPantalla.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
+              <button
+                type="button"
+                onClick={() =>
+                  setSeleccion(
+                    seleccion.length === enPantalla.length
+                      ? []
+                      : enPantalla.map((p) => claveSel(p.folder || folder, p.producto)),
+                  )
+                }
+                className="rounded-md border border-border/60 px-2 py-1 transition hover:border-foreground/40"
+              >
+                {seleccion.length === enPantalla.length ? "Ninguno" : "Todos"}
+              </button>
+              <span className="text-muted-foreground">
+                {seleccion.length} seleccionado(s)
+              </span>
+              <button
+                type="button"
+                disabled={!seleccion.length || borrandoLote}
+                onClick={() => setConfirmarBorrado(true)}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-40"
+              >
+                {borrandoLote ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" /> Borrando…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3 w-3" /> Borrar {seleccion.length || ""}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {enPantalla.length > 0 && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {enPantalla.map((p) => (
@@ -1655,10 +1742,63 @@ export default function NichoPovBofPage() {
                   carpetaHecha={Boolean(listaProductos.some((x) => x.titulo))}
                   esTopVendidos={esTopVendidos}
                   marcarClips={hayMezclaDeClips}
+                  seleccionado={
+                    esMisProductos &&
+                    seleccion.includes(claveSel(p.folder || folder, p.producto))
+                  }
+                  onSeleccion={
+                    esMisProductos
+                      ? (marcado) => {
+                          const k = claveSel(p.folder || folder, p.producto);
+                          setSeleccion((prev) =>
+                            marcado ? [...prev, k] : prev.filter((x) => x !== k),
+                          );
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
           )}
+
+          {/* La confirmación dice QUÉ se va y qué se lleva por delante. El
+              `confirm()` del navegador salía con el dominio de la app y un
+              texto suelto: ni se leía ni se sabía de dónde venía. */}
+          <AlertDialog open={confirmarBorrado} onOpenChange={setConfirmarBorrado}>
+            <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {seleccion.length === 1
+                    ? "Quitar 1 producto de Mis productos"
+                    : `Quitar ${seleccion.length} productos de Mis productos`}
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>
+                      Se borran del Drive sus fotos (la limpia y la de la ficha).
+                      Lo que ya esté montado o subido a TikTok no se toca, y el
+                      hueco de numeración lo cierras luego con «reordenar».
+                    </p>
+                    <p className="max-h-24 overflow-y-auto break-words rounded-md bg-muted/40 p-2 font-mono text-[11px]">
+                      {seleccion
+                        .map((k) => k.split("|").slice(1).join("|"))
+                        .join(" · ")}
+                    </p>
+                    <p className="font-medium text-foreground">No se puede deshacer.</p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Dejarlos</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => void borrarLote()}
+                  className="bg-red-500 text-white hover:bg-red-600"
+                >
+                  Sí, borrar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </section>
       )}
 
@@ -1799,6 +1939,12 @@ const TOOLS: { key: ToolKey; label: string }[] = [
 /** Tarjeta de producto: textos, sexo, subida de vídeo y toggles
  *  Subido/Vendió. Estado local + servidor para que los toggles se sientan
  *  instantáneos (mismo patrón que `OutcomeBar` del calendario). */
+/** Clave de una tarjeta para la selección múltiple. Lleva la carpeta porque
+ *  en la vista global conviven varias y el número de producto se repite. */
+function claveSel(carpeta: string, producto: string): string {
+  return `${carpeta}|${producto}`;
+}
+
 function ProductoCard({
   source,
   folder,
@@ -1806,10 +1952,16 @@ function ProductoCard({
   carpetaHecha = false,
   esTopVendidos = false,
   marcarClips = false,
+  seleccionado = false,
+  onSeleccion,
 }: {
   source: string;
   folder: string;
   producto: ProductoItem;
+  /** Marcado para el borrado en lote. */
+  seleccionado?: boolean;
+  /** Solo en "Mis productos": sin esto no se pinta la casilla. */
+  onSeleccion?: (marcado: boolean) => void;
   /** ¿Hay productos de distinto nº de clips en pantalla? Solo entonces vale la
    *  pena marcar cuántos pide cada uno. */
   marcarClips?: boolean;
@@ -1866,6 +2018,7 @@ function ProductoCard({
   // Los dos que se usan a diario (Caption y URL) van fuera; el resto detrás de
   // "más". Siete botones en fila hacían que buscar el de siempre costara mirar.
   const [verMasCopias, setVerMasCopias] = useState(false);
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
   const [verVoz, setVerVoz] = useState(false);
@@ -2018,6 +2171,15 @@ function ProductoCard({
       } ${marcarClips ? BORDE_CLIPS[clipsDe(producto)] ?? "" : ""}`}
     >
       <div className="flex gap-2">
+        {onSeleccion && (
+          <input
+            type="checkbox"
+            checked={seleccionado}
+            onChange={(e) => onSeleccion(e.target.checked)}
+            title="Seleccionar para borrar"
+            className="mt-1 h-4 w-4 shrink-0 accent-red-500"
+          />
+        )}
         {producto.clean_photo_id ? (
           <button
             type="button"
@@ -2740,25 +2902,11 @@ function ProductoCard({
       {/* Solo en "Mis productos": son los que sube el operador, así que
           también los puede quitar. Las del curso son de solo lectura. */}
       {source === "mis_productos" && (
+        <>
         <button
           type="button"
           disabled={borrar.isPending}
-          onClick={() => {
-            if (
-              !window.confirm(
-                `¿Quitar el producto ${producto.producto}? Se borran sus dos fotos.`,
-              )
-            )
-              return;
-            borrar.mutate(
-              { carpeta: folder, producto: producto.producto },
-              {
-                onSuccess: () => toast.success(`Producto ${producto.producto} borrado`),
-                onError: (e) =>
-                  toast.error(e instanceof ApiError ? e.message : String(e)),
-              },
-            );
-          }}
+          onClick={() => setConfirmarQuitar(true)}
           className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-50"
         >
           {borrar.isPending ? (
@@ -2769,6 +2917,51 @@ function ProductoCard({
             <>🗑️ Quitar este producto</>
           )}
         </button>
+        {/* Con nombre y apellidos: el `confirm()` del navegador salía con el
+            dominio de la app delante y una frase suelta, y no decía qué se
+            lleva por delante. */}
+        <AlertDialog open={confirmarQuitar} onOpenChange={setConfirmarQuitar}>
+          <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Quitar el producto {producto.producto}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p className="break-words">
+                    {producto.titulo || "Sin título extraído"} · carpeta «{folder}»
+                  </p>
+                  <p>
+                    Se borran del Drive sus fotos (la limpia y la de la ficha).
+                    Lo que ya esté montado o subido a TikTok no se toca, y el
+                    hueco de numeración lo cierras luego con «reordenar».
+                  </p>
+                  <p className="font-medium text-foreground">No se puede deshacer.</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Dejarlo</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() =>
+                  borrar.mutate(
+                    { carpeta: folder, producto: producto.producto },
+                    {
+                      onSuccess: () =>
+                        toast.success(`Producto ${producto.producto} borrado`),
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="bg-red-500 text-white hover:bg-red-600"
+              >
+                Sí, quitarlo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        </>
       )}
 
       {/* Lo de abajo NO es trabajo: es marcar en qué punto está el producto.
