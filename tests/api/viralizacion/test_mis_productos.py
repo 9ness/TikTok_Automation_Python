@@ -164,6 +164,56 @@ class TestMoverDeCatalogo:
             )
 
 
+class TestEndpointsDelCatalogo:
+    """Que los endpoints RESPONDAN, no solo que el servicio funcione.
+
+    El borrado en lote falló entero con un 500 porque el endpoint miraba
+    `pov_config`, que en ese fichero solo existe dentro de otras funciones.
+    Desde fuera solo se veía "no se pudieron borrar: 3, 5, 7, 8": el motivo
+    real no llegaba a la pantalla. Un test que llama de verdad lo caza.
+    """
+
+    def _cliente(self):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        return TestClient(app)
+
+    def test_borrar_un_producto_propio(self, raiz_temporal):
+        _subir(2)
+        r = self._cliente().request(
+            "DELETE", "/api/v1/nicho-pov-bof/mis-productos",
+            params={"carpeta": "Mis Productos 1", "producto": "1"},
+        )
+        assert r.status_code == 200, r.text
+        quedan = {p.name for p in (raiz_temporal / "Mis Productos 1").iterdir()}
+        assert quedan == {"2.png", "2(1).png"}
+
+    def test_borrar_en_el_catalogo_de_tareas(self, raiz_temporal):
+        mis_productos.guardar_producto(
+            b"limpia", b"ficha", nombre_limpia="f.png", nombre_ficha="f.png",
+            source="tareas_productos",
+        )
+        r = self._cliente().request(
+            "DELETE", "/api/v1/nicho-pov-bof/mis-productos",
+            params={
+                "carpeta": "Tareas Productos 1", "producto": "1",
+                "source": "tareas_productos",
+            },
+        )
+        assert r.status_code == 200, r.text
+
+    def test_no_se_borra_en_una_fuente_del_curso(self):
+        r = self._cliente().request(
+            "DELETE", "/api/v1/nicho-pov-bof/mis-productos",
+            params={
+                "carpeta": "1 Pront Flow", "producto": "1",
+                "source": "aleatorios_1",
+            },
+        )
+        assert r.status_code == 400, r.text
+
+
 class TestFuenteEnElMenu:
     def test_esta_registrada_como_fuente(self):
         assert "mis_productos" in config.SOURCES

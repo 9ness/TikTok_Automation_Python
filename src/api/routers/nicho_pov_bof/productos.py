@@ -1312,7 +1312,7 @@ async def crear_mi_producto(
     """
     from src.nicho_pov_bof.services import mis_productos
 
-    if not pov_config.es_catalogo_operador(source):
+    if not nicho_config.es_catalogo_operador(source):
         raise _bad_request(f"{source!r} no es un catálogo tuyo.")
 
     async def _leer(archivo: UploadFile, que: str) -> bytes:
@@ -1367,7 +1367,7 @@ def borrar_mi_producto(
     """
     from src.nicho_pov_bof.services import mis_productos
 
-    if not pov_config.es_catalogo_operador(source):
+    if not nicho_config.es_catalogo_operador(source):
         raise _bad_request(f"{source!r} no es un catálogo tuyo.")
     if not mis_productos.borrar_producto(
         carpeta, producto, renumerar=False, source=source,
