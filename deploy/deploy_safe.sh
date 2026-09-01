@@ -21,6 +21,13 @@ APP_DIR="/home/nebulabsai/TikTok_Automation_Python"
 API_CONTAINER="tiktok-api"
 QUEUE_STATE="/app/temp_work/queue_state.json"
 DEPLOY_STATUS="${APP_DIR}/temp_work/deploy_status.json"
+# Segundo sitio donde dejar el estado. `temp_work` la ha creado docker alguna
+# vez y puede acabar siendo de root: entonces el `>` fallaba, el script seguía
+# (no hay `set -e`) y el deploy salía bien pero SIN dejar rastro — la Cola no
+# pintaba fecha y el badge caía al fallback de git, que dice "success" mire lo
+# que mire. `logs/` la escribe este mismo script en cada vuelta, así que si una
+# de las dos vale, es esa.
+DEPLOY_STATUS_ALT="${APP_DIR}/logs/deploy_status.json"
 LOG="${APP_DIR}/logs/deploy.log"
 # Máximo esperando que la cola se vacíe. Eran 1h y NO llegaba: un lote de
 # Viralización de 13 vídeos tarda ~2h30. Al cumplirse la hora el deploy tiraba
@@ -44,8 +51,14 @@ write_status() {
     if [[ -n "$extra" ]]; then
         body="${body},${extra}"
     fi
-    echo "{${body}}" > "${DEPLOY_STATUS}.tmp"
-    mv "${DEPLOY_STATUS}.tmp" "$DEPLOY_STATUS"
+    local json="{${body}}"
+    if ! { echo "$json" > "${DEPLOY_STATUS}.tmp" && mv "${DEPLOY_STATUS}.tmp" "$DEPLOY_STATUS"; }; then
+        echo "[deploy_safe] ⚠️ no se pudo escribir ${DEPLOY_STATUS} — probando ${DEPLOY_STATUS_ALT}"
+        mkdir -p "$(dirname "$DEPLOY_STATUS_ALT")"
+        if ! { echo "$json" > "${DEPLOY_STATUS_ALT}.tmp" && mv "${DEPLOY_STATUS_ALT}.tmp" "$DEPLOY_STATUS_ALT"; }; then
+            echo "[deploy_safe] ❌ tampoco se pudo escribir ${DEPLOY_STATUS_ALT} — el deploy sigue, pero la UI no verá el estado"
+        fi
+    fi
 }
 
 mkdir -p "$(dirname "$LOG")"

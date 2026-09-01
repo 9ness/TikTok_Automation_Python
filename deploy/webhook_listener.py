@@ -593,9 +593,18 @@ def _smart_status() -> dict:
         in_progress = rc == 0 and bool(ps_out.strip())
     out["deploy_in_progress"] = in_progress
 
-    # Último deploy persistido
-    last_path = os.path.join(APP_DIR, "temp_work", "deploy_status.json")
-    if os.path.isfile(last_path):
+    # Último deploy persistido. Puede estar en temp_work o en logs (plan B de
+    # deploy_safe.sh cuando la primera no deja escribir).
+    last_path = ""
+    for cand in (
+        os.path.join(APP_DIR, "temp_work", "deploy_status.json"),
+        os.path.join(APP_DIR, "logs", "deploy_status.json"),
+    ):
+        if os.path.isfile(cand):
+            last_path = cand
+            break
+    out["status_file"] = last_path or None
+    if last_path:
         try:
             with open(last_path, "r", encoding="utf-8") as f:
                 out["last_deploy"] = json.load(f)

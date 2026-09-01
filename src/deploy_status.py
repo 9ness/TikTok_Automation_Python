@@ -33,7 +33,19 @@ def _repo_root() -> Path:
 
 
 def _status_path() -> Path:
-    return _repo_root() / "temp_work" / "deploy_status.json"
+    """La primera que exista. `temp_work/` es la de siempre; `logs/` es el
+    plan B de `deploy_safe.sh` para cuando la otra no deja escribir (ver el
+    comentario allí). Si no hay ninguna, devuelve la primera para que el
+    mensaje de error hable de la ruta esperada."""
+    root = _repo_root()
+    candidatas = (
+        root / "temp_work" / "deploy_status.json",
+        root / "logs" / "deploy_status.json",
+    )
+    for p in candidatas:
+        if p.exists():
+            return p
+    return candidatas[0]
 
 
 def _git_head_sha(short: bool = True) -> Optional[str]:
@@ -87,6 +99,10 @@ def get_status() -> dict:
         "finished_at": None,
         "target_sha": None,
         "age_seconds": None,
+        # De dónde sale lo de arriba: la ruta del JSON, o None si no había y
+        # esto es el fallback a git. Un "success" fabricado por el fallback
+        # significa "el repo está en tal commit", NO "el deploy fue bien".
+        "status_file": None,
     }
 
     # 1. Intentar leer deploy_status.json (lo escribe deploy_safe.sh)
@@ -95,6 +111,7 @@ def get_status() -> dict:
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
             info.update(data)
+            info["status_file"] = str(p)
         except Exception:
             pass
 

@@ -34,21 +34,36 @@ export function AvisoDespliegue({ enCurso }: { enCurso: number }) {
   // funciona", y había que preguntar para salir de dudas.
   if (!desplegando && pendientes === 0) {
     const cuando = d.last_deploy?.finished_at ?? d.last_deploy?.started_at ?? 0;
-    if (!cuando) return null;
     return (
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-1.5 text-[11px] text-muted-foreground">
         <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
         <p className="truncate">
-          Al día · último despliegue{" "}
-          <span className="font-medium text-foreground">
-            {new Date(cuando * 1000).toLocaleString("es-ES", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </span>
+          Al día ·{" "}
+          {cuando ? (
+            <>
+              último despliegue{" "}
+              <span className="font-medium text-foreground">
+                {new Date(cuando * 1000).toLocaleString("es-ES", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </span>
+            </>
+          ) : (
+            // Sin hora: el deploy no dejó su fichero de estado. Se enseña el
+            // commit igualmente — esconder la barra entera hacía que "no sale
+            // nada" significase a la vez "al día" y "esto está roto".
+            <>
+              versión{" "}
+              <span className="font-medium text-foreground">
+                {d.current_sha_short || "?"}
+              </span>{" "}
+              (sin hora de despliegue)
+            </>
+          )}
         </p>
       </div>
     );
