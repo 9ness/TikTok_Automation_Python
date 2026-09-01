@@ -1877,6 +1877,9 @@ function ProductoCard({
   const clipRefs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
+  // Los dos que se usan a diario (Caption y URL) van fuera; el resto detrás de
+  // "más". Siete botones en fila hacían que buscar el de siempre costara mirar.
+  const [verMasCopias, setVerMasCopias] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
   const [verVoz, setVerVoz] = useState(false);
@@ -2203,12 +2206,11 @@ function ProductoCard({
         </div>
       </div>
 
-      {/* Copiar textos extraídos — solo se muestran los que tengan valor */}
+      {/* Copiar textos extraídos — solo se muestran los que tengan valor.
+          Fuera van Caption y URL, que son los de cada producto; los demás
+          (título, tienda, ID, sin stock, foto) se usan de vez en cuando y
+          vivían igual de grandes, tapando a los dos de siempre. */}
       <div className="flex flex-wrap gap-1">
-        {/* El "Título" a secas no se copiaba nunca (el que se pega en TikTok
-            es el completo), así que solo hacía ruido en la ficha. */}
-        <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
-        <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} siempre />
         {/* El caption se copia YA con los hashtags pegados: es lo que se
             pega tal cual en TikTok, no hay que juntarlo a mano. */}
         <CopyChip
@@ -2221,6 +2223,28 @@ function ProductoCard({
               : ""
           }
         />
+        <BotonUrl
+          url={producto.product_url}
+          source={source}
+          folder={producto.folder || folder}
+          producto={producto.producto}
+        />
+        <button
+          type="button"
+          onClick={() => setVerMasCopias((v) => !v)}
+          title="Título, tienda, ID, sin stock y descarga de la foto"
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+        >
+          {verMasCopias ? "menos ▲" : "más ▼"}
+        </button>
+      </div>
+
+      {verMasCopias && (
+      <div className="flex flex-wrap gap-1">
+        {/* El "Título" a secas no se copiaba nunca (el que se pega en TikTok
+            es el completo), así que solo hacía ruido en la ficha. */}
+        <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo ?? ""} />
+        <CopyChip label="🏪 Tienda" text={producto.tienda ?? ""} siempre />
         {/* Gancho y CTA ya no se copian: los quema el propio montaje, y a
             mano solo se usaban cuando el vídeo se hacía en CapCut. */}
         {/* El ID que busca TikTok Studio al enlazar el producto. Sin él hay
@@ -2228,14 +2252,8 @@ function ProductoCard({
         {producto.product_id && (
           <CopyChip label="🏷️ ID" text={producto.product_id} siempre />
         )}
-        <BotonUrl
-          url={producto.product_url}
-          source={source}
-          folder={producto.folder || folder}
-          producto={producto.producto}
-        />
-        {/* Justo al lado del enlace, que es donde se descubre: se abre la
-            ficha, TikTok dice que ya no existe y se marca sin salir de aquí.
+        {/* Se descubre al abrir el enlace: TikTok dice que ya no existe y se
+            marca aquí mismo, sin salir de la ficha.
             Comprobarlo automáticamente no se puede —TikTok responde un captcha
             a cualquier petición del servidor y un enlace vivo y uno muerto
             salen idénticos—, así que el toque lo da el operador.
@@ -2271,6 +2289,7 @@ function ProductoCard({
           </>
         )}
       </div>
+      )}
 
       <FotoModal
         open={verFoto}
