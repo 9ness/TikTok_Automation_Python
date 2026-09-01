@@ -83,7 +83,6 @@ import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
-import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -1508,26 +1507,8 @@ export default function NichoPovBofPage() {
             </div>
           </Paso>
 
-          {/* Traer los vídeos generados. Es la acción MÁS importante del día y
-              antes se perdía entre los botones de copiar prompts. */}
-          {folder && productos.data && productos.data.length > 0 && (
-            <Paso
-              n={3}
-              color="esmeralda"
-              titulo="Traer los clips generados"
-              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1 y 2)."
-            >
-              <SubidaMasiva
-                source={source}
-                folder={folder}
-                productos={productos.data}
-                sinMarco
-              />
-            </Paso>
-          )}
-
           <Paso
-            n={4}
+            n={3}
             color="azul"
             titulo="Descargar lo ya montado"
             hint="Los vídeos con la voz puesta, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."

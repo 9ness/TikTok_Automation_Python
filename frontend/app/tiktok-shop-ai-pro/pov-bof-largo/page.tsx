@@ -44,7 +44,6 @@ import {
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
-import { SubidaMasiva } from "@/components/tiktok-shop-ai-pro/SubidaMasiva";
 import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -1239,26 +1238,8 @@ export default function PovBofLargoPage() {
             </div>
           </Paso>
 
-          {folder && items.length > 0 && (
-            <Paso
-              n={3}
-              color="esmeralda"
-              titulo="Traer los clips generados"
-              hint="Suéltalos todos de golpe: se reparten a su producto y en su orden (clip 1, 2, 3 y 4)."
-            >
-              <SubidaMasiva
-                source={activaSource}
-                folder={folder}
-                productos={items}
-                root="/api/v1/nicho-pov-bof-largo"
-                todosDobles
-                sinMarco
-              />
-            </Paso>
-          )}
-
           <Paso
-            n={4}
+            n={3}
             color="azul"
             titulo="Descargar lo ya montado"
             hint="Los vídeos con la voz puesta, listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
