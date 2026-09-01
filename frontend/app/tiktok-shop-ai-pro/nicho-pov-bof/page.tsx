@@ -481,6 +481,30 @@ export default function NichoPovBofPage() {
   const [borrandoLote, setBorrandoLote] = useState(false);
   const moverSeleccion = useMoverMiProducto();
   const [moviendoLote, setMoviendoLote] = useState(false);
+  const limpiarSeleccion = useLimpiarProducto();
+  const [limpiandoLote, setLimpiandoLote] = useState(false);
+  async function limpiarLote() {
+    setLimpiandoLote(true);
+    const fallados: string[] = [];
+    let limpiados = 0;
+    for (const k of seleccion) {
+      const [carpeta = "", ...resto] = k.split("|");
+      const producto = resto.join("|");
+      try {
+        await limpiarSeleccion.mutateAsync({ source, folder: carpeta, producto });
+        limpiados += 1;
+      } catch {
+        fallados.push(producto);
+      }
+    }
+    setLimpiandoLote(false);
+    setSeleccion([]);
+    if (fallados.length) {
+      toast.error(`No se pudieron limpiar: ${fallados.join(", ")}`);
+    } else {
+      toast.success(`${limpiados} producto(s) limpiados`);
+    }
+  }
   async function moverLote() {
     const destino = otroCatalogo(source);
     if (!destino) return;
@@ -1744,10 +1768,25 @@ export default function NichoPovBofPage() {
               </span>
               <button
                 type="button"
-                disabled={!seleccion.length || moviendoLote || borrandoLote}
+                disabled={!seleccion.length || limpiandoLote || moviendoLote || borrandoLote}
+                onClick={() => void limpiarLote()}
+                title="Quitarles el guion, el vídeo y las marcas; los textos se quedan"
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-amber-500/60 hover:text-amber-500 disabled:opacity-40"
+              >
+                {limpiandoLote ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" /> Limpiando…
+                  </>
+                ) : (
+                  <>🧹 Limpiar</>
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={!seleccion.length || limpiandoLote || moviendoLote || borrandoLote}
                 onClick={() => void moverLote()}
                 title={`Pasarlos a «${NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}»`}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-40"
               >
                 {moviendoLote ? (
                   <>
@@ -1759,7 +1798,7 @@ export default function NichoPovBofPage() {
               </button>
               <button
                 type="button"
-                disabled={!seleccion.length || borrandoLote}
+                disabled={!seleccion.length || limpiandoLote || borrandoLote}
                 onClick={() => setConfirmarBorrado(true)}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-40"
               >
