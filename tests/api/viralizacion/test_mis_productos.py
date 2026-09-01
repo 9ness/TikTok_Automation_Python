@@ -21,12 +21,28 @@ from src.nicho_pov_bof.services import mis_productos, photo_pairing
 
 @pytest.fixture(autouse=True)
 def raiz_temporal(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(mis_productos.config, "mis_productos_dir", lambda: tmp_path)
+    # Hay DOS catálogos del operador (muestras y tareas) y el módulo los
+    # distingue por `source`: cada uno va a su carpeta DENTRO del tmp_path del
+    # test. Fuera de él no: `tmp_path.parent` lo comparten todos los tests de
+    # la sesión y lo que dejara uno lo contaría el siguiente.
+    raices = {
+        "mis_productos": tmp_path / "muestras",
+        "tareas_productos": tmp_path / "tareas",
+    }
+    for d in raices.values():
+        d.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        mis_productos.config, "dir_operador",
+        lambda source="mis_productos": raices[source],
+    )
+    monkeypatch.setattr(
+        mis_productos.config, "mis_productos_dir", lambda: raices["mis_productos"],
+    )
     # Los listados se cachean (el Drive montado es lentísimo en frío) y la
     # caché vive en el módulo, no en la instancia: sin limpiarla, un test
     # heredaría las carpetas del tmp_path del anterior.
     mis_productos._invalidar()
-    return tmp_path
+    return raices["mis_productos"]
 
 
 def _subir(n: int = 1, con_ficha: bool = True) -> list[dict]:
@@ -115,10 +131,49 @@ class TestBorrado:
         assert "10.png" in quedan and "1.png" not in quedan
 
 
+class TestMoverDeCatalogo:
+    """Muestra ⇄ tarea. Por qué se graba un producto se sabe a veces DESPUÉS
+    de subirlo, y antes había que borrarlo y volver a subir las dos fotos."""
+
+    def test_las_fotos_cambian_de_catalogo(self, raiz_temporal, monkeypatch):
+        monkeypatch.setattr(
+            "src.nicho_pov_bof.services.reanclaje.mover_entre_carpetas",
+            lambda *a, **k: 0,
+        )
+        _subir(2)
+        destino = mis_productos.mover_producto(
+            "Mis Productos 1", "1", destino="tareas_productos",
+        )
+        assert destino == {"carpeta": "Tareas Productos 1", "producto": "1"}
+        # Se van del origen…
+        quedan = {p.name for p in (raiz_temporal / "Mis Productos 1").iterdir()}
+        assert quedan == {"2.png", "2(1).png"}
+        # …y llegan al destino con el convenio de nombres de siempre.
+        d = raiz_temporal.parent / "tareas" / "Tareas Productos 1"
+        assert {p.name for p in d.iterdir()} == {"1.png", "1(1).png"}
+
+    def test_no_se_mueve_a_si_mismo_ni_a_una_fuente_del_curso(self):
+        _subir(1)
+        with pytest.raises(ValueError):
+            mis_productos.mover_producto(
+                "Mis Productos 1", "1", destino="mis_productos",
+            )
+        with pytest.raises(ValueError):
+            mis_productos.mover_producto(
+                "Mis Productos 1", "1", destino="aleatorios_1",
+            )
+
+
 class TestFuenteEnElMenu:
     def test_esta_registrada_como_fuente(self):
         assert "mis_productos" in config.SOURCES
-        assert config.SOURCES["mis_productos"]["label"] == "Mis productos"
+        assert config.SOURCES["mis_productos"]["label"] == "Muestras productos"
+
+    def test_el_catalogo_de_tareas_es_el_otro(self):
+        """Muestras y tareas: el mismo código, distinta carpeta raíz."""
+        assert config.es_catalogo_operador("tareas_productos")
+        assert config.es_fuente_propia("tareas_productos")
+        assert config.SOURCES["tareas_productos"]["label"] == "Tareas Productos"
 
     def test_es_propia_y_las_del_curso_no(self):
         assert config.es_fuente_propia("mis_productos")
@@ -135,16 +190,16 @@ class TestPrecalentado:
         sin retrasar la caducidad, así que el TTL vencería igual."""
         _subir(1)
         mis_productos.precalentar()
-        antes = mis_productos._LISTADOS["carpetas"][0]
+        antes = mis_productos._LISTADOS["mis_productos:carpetas"][0]
         mis_productos.precalentar()
-        assert mis_productos._LISTADOS["carpetas"][0] > antes
+        assert mis_productos._LISTADOS["mis_productos:carpetas"][0] > antes
 
     def test_calienta_tambien_las_fotos_de_la_ultima_carpeta(self):
         """Es la que se abre, y está un nivel más hondo del mount: se paga
         aparte del listado de carpetas."""
         _subir(11)
         mis_productos.precalentar()
-        assert "fotos:Mis Productos 2" in mis_productos._LISTADOS
+        assert "mis_productos:fotos:Mis Productos 2" in mis_productos._LISTADOS
 
     def test_sin_carpetas_no_revienta(self):
         assert mis_productos.precalentar() == 0

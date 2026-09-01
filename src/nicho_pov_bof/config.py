@@ -55,9 +55,23 @@ SOURCES: dict[str, dict[str, str]] = {
     # compartido (`3.png` = limpia, `3(1).png` = ficha). Gracias a eso, todo lo
     # de después —emparejado, textos, ficha, escaparate, vendidos, montaje—
     # funciona sin una sola línea extra.
+    # Dos catálogos del operador, no uno: un producto se graba o porque la
+    # tienda mandó MUESTRA gratuita o porque es una TAREA pagada, y no se
+    # trabajan igual. Comparten todo el código —mismo convenio de nombres,
+    # mismas carpetas de diez— y solo cambian de carpeta raíz en el Drive.
+    #
+    # El slug de las muestras sigue siendo `mis_productos` a propósito: es la
+    # clave con la que están guardados en Redis y en Drive todos los productos
+    # de hasta hoy. Cambiarlo obligaría a una migración para ganar un nombre
+    # más bonito en el código.
     "mis_productos": {
-        "label": "Mis productos",
+        "label": "Muestras productos",
         "folder": "mis_productos",
+        "propia": "1",
+    },
+    "tareas_productos": {
+        "label": "Tareas Productos",
+        "folder": "tareas_productos",
         "propia": "1",
     },
     # Los productos de la web del curso, importados por ZIP. También "propia"
@@ -80,25 +94,6 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "top_vendidos",
         "propia": "1",
     },
-    # La COPIA de seguridad del Drive del curso, de solo lectura. El admin de
-    # aquel Drive borra carpetas cada cierto tiempo y entonces sus productos
-    # desaparecen de la pantalla aunque estén guardados en nuestro Drive: estas
-    # dos fuentes los vuelven a hacer accesibles: leen la última copia completa
-    # MÁS los deltas posteriores (ver `backup_sync._copias_utiles`), porque una
-    # carpeta que se subió y se borró después solo está en un delta.
-    "backup_1": {
-        "label": "🗄️ Copia · 1 Prod Aleatorios",
-        "folder": "1 Prod Aleatorios",
-        "backup": "1",
-        # El progreso NO es de esta fuente: es la misma carpeta del curso.
-        "canonica": "aleatorios_1",
-    },
-    "backup_2": {
-        "label": "🗄️ Copia · 2 Prod Aleatorios 2",
-        "folder": "2 Prod Aleatorios 2",
-        "backup": "1",
-        "canonica": "aleatorios_2",
-    },
 }
 
 # Cuántos productos entran en cada carpeta de "Mis productos". Diez, como las
@@ -106,6 +101,22 @@ SOURCES: dict[str, dict[str, str]] = {
 # de 200 imposible de mirar.
 MIS_PRODUCTOS_POR_CARPETA = 10
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
+TAREAS_PRODUCTOS_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/tareas_productos"
+)
+
+# Los dos catálogos que sube el operador, y cómo se llaman sus carpetas por
+# dentro. El prefijo de las muestras es el de siempre ("Mis Productos 3") para
+# no renombrar en Drive lo que ya existe.
+CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
+    "mis_productos": {"root": MIS_PRODUCTOS_ROOT, "prefijo": "Mis Productos"},
+    "tareas_productos": {"root": TAREAS_PRODUCTOS_ROOT, "prefijo": "Tareas Productos"},
+}
+
+
+def es_catalogo_operador(source: str) -> bool:
+    """True si es uno de los catálogos que sube el operador a mano."""
+    return source in CATALOGOS_OPERADOR
 
 # "Top vendidos" — mismas reglas (diez por carpeta) y raíz propia. NO lleva
 # subcarpeta por usuario porque el ranking de vendidos tampoco: es único y
@@ -207,22 +218,36 @@ def productos_web_dir() -> Path:
     return destino
 
 
-def mis_productos_dir() -> Path:
-    """Raíz de "Mis productos" en el Drive MONTADO (no el compartido)."""
-    global _MIS_PRODUCTOS_DIR
-    if _MIS_PRODUCTOS_DIR is not None:
-        return _MIS_PRODUCTOS_DIR
+_DIRS_OPERADOR: dict[str, Path] = {}
+
+
+def dir_operador(source: str) -> Path:
+    """Raíz de un catálogo del operador en el Drive MONTADO (no el compartido).
+
+    Se recuerda por el mismo motivo que antes: el `mkdir` contra el mount en
+    frío cuesta ~45s (rclone resuelve los cuatro niveles contra Google) y esta
+    función la llaman todas las demás del catálogo.
+    """
+    cacheado = _DIRS_OPERADOR.get(source)
+    if cacheado is not None:
+        return cacheado
 
     from src.nicho_pov_bof.services.audio_bank import mount_root
 
+    meta = CATALOGOS_OPERADOR.get(source) or CATALOGOS_OPERADOR["mis_productos"]
     raiz = mount_root()
     destino = (
-        raiz / MIS_PRODUCTOS_ROOT if raiz
-        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "mis_productos"
+        raiz / meta["root"] if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / source
     )
     destino.mkdir(parents=True, exist_ok=True)
-    _MIS_PRODUCTOS_DIR = destino
+    _DIRS_OPERADOR[source] = destino
     return destino
+
+
+def mis_productos_dir() -> Path:
+    """Raíz de las muestras. Se conserva porque la llaman otros módulos."""
+    return dir_operador("mis_productos")
 
 
 _TOP_VENDIDOS_DIR: Path | None = None

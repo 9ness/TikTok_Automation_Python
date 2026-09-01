@@ -257,6 +257,13 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
     # Fuente propia: las carpetas son del Drive MONTADO, no del compartido, y
     # se leen del disco. Sin caché: son cuatro entradas y cambian al subir.
     if config.es_fuente_propia(source):
+        if config.es_catalogo_operador(source):
+            # Los dos catálogos del operador (muestras y tareas) los lleva el
+            # mismo módulo: hay que decirle CUÁL, o los dos leerían el de las
+            # muestras.
+            from src.nicho_pov_bof.services import mis_productos
+
+            return mis_productos.listar_carpetas_como_drive(source)
         return _servicio_propio(source).listar_carpetas_como_drive()
 
     # La COPIA de seguridad: no es una carpeta del Drive del curso sino la
@@ -345,6 +352,10 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
     canónico (hay nombres duplicados).
     """
     if config.es_fuente_propia(source):
+        if config.es_catalogo_operador(source):
+            from src.nicho_pov_bof.services import mis_productos
+
+            return mis_productos.listar_fotos_como_drive(folder, source)
         return _servicio_propio(source).listar_fotos_como_drive(folder)
 
     if config.es_fuente_backup(source):

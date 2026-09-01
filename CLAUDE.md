@@ -292,16 +292,19 @@ Dos cosas no obvias:
   veces). El identificador canónico de una foto es su **file ID**, y se
   descarga con `rclone backend copyid`.
 
-Tiene dos fuentes propias más, que NO son del Drive del curso y viven en el
-Drive montado: **«🌐 Productos Web»** (`productos_web`), que se llena
-importando los ZIP que publica la web del curso —carpetas de diez, y el ZIP
-trae la convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y «Mis
-productos», que NO es del curso: la sube el
-operador (foto limpia + ficha) y vive en su Drive
-(`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos/`), en carpetas de 10. Las
-fotos se guardan con el MISMO convenio de nombres del Drive compartido
-(`3.png` / `3(1).png`) para que emparejado, textos, ficha y montaje funcionen
-sin código especial (`services/mis_productos.py`).
+Tiene fuentes propias más, que NO son del Drive del curso y viven en el Drive
+montado: **«🌐 Productos Web»** (`productos_web`), que se llena importando los
+ZIP que publica la web del curso —carpetas de diez, y el ZIP trae la
+convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálogos
+del operador**: «Muestras productos» (`mis_productos`, el slug es el viejo para
+no migrar lo ya guardado) y «Tareas Productos» (`tareas_productos`) — muestra
+gratuita o tarea pagada, que no se trabajan igual. Los sube él (foto limpia +
+ficha), viven en su Drive (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/<slug>/`) en
+carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus
+datos (`mis_productos.mover_producto`). Las fotos se guardan con el MISMO
+convenio de nombres del Drive compartido (`3.png` / `3(1).png`) para que
+emparejado, textos, ficha y montaje funcionen sin código especial
+(`services/mis_productos.py`, que lleva los dos catálogos con un `source`).
 
 **TODOS los vídeos son de DOS clips**, montados con el editor del POV BOF Largo
 (`montar`: cuadra cada clip con su parte de la voz y salta del uno al otro en

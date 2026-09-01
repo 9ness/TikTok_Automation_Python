@@ -675,8 +675,11 @@ export default function PovBofLargoPage() {
           ))}
         </div>
 
-        {activaSource === "mis_productos" && (
-          <AltaMiProducto onCreado={() => void folders.refetch()} />
+        {CATALOGOS_PROPIOS.includes(activaSource) && (
+          <AltaMiProducto
+            source={activaSource}
+            onCreado={() => void folders.refetch()}
+          />
         )}
 
         {/* La carpeta de Top vendidos es la misma para todos los nichos, así
@@ -1401,7 +1404,16 @@ export default function PovBofLargoPage() {
 
 /** Alta de productos PROPIOS (fuente "Mis productos"). Reusa el endpoint del
  *  POV BOF: crea el producto en el Drive compartido, así que sirve a los dos. */
-function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
+/** Los dos catálogos del operador: muestras gratuitas y tareas pagadas. */
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+
+function AltaMiProducto({
+  source = "mis_productos",
+  onCreado,
+}: {
+  source?: string;
+  onCreado: () => void;
+}) {
   const crear = useCrearMiProducto();
   const [limpia, setLimpia] = useState<File | null>(null);
   const [ficha, setFicha] = useState<File | null>(null);
@@ -1415,7 +1427,7 @@ function AltaMiProducto({ onCreado }: { onCreado: () => void }) {
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha },
+      { fotoLimpia: limpia, fotoFicha: ficha, source },
       {
         onSuccess: (r) => {
           toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
@@ -2289,20 +2301,20 @@ function ProductoCard({
           los puede quitar (los del curso son de solo lectura). Al borrar se
           cierra el hueco de la numeración, así que la carpeta no se queda en
           5, 7, 8. */}
-      {source === "mis_productos" && (
+      {CATALOGOS_PROPIOS.includes(source) && (
         <button
           type="button"
           disabled={borrarMio.isPending}
           onClick={() => {
             if (
               !window.confirm(
-                `¿Quitar el producto ${p.producto}? Se borran sus dos fotos y ` +
-                  "los siguientes se renumeran.",
+                `¿Quitar el producto ${p.producto}? Se borran sus dos fotos. ` +
+                  "El hueco de numeración lo cierras luego con «reordenar».",
               )
             )
               return;
             borrarMio.mutate(
-              { carpeta: folder, producto: p.producto },
+              { carpeta: folder, producto: p.producto, source },
               {
                 onSuccess: () => {
                   toast.success(`Producto ${p.producto} borrado`);

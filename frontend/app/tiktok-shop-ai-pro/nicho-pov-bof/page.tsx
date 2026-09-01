@@ -72,6 +72,7 @@ import {
   useSetEstado,
   useQuitarClip,
   useBorrarMiProducto,
+  useMoverMiProducto,
   useImportarProductosWeb,
   useImportarProductosWebLote,
   useSources,
@@ -458,7 +459,9 @@ export default function NichoPovBofPage() {
   });
   const productos = useProductos(source, folder);
   const esTopVendidos = source === FUENTE_TOP_VENDIDOS;
-  const esMisProductos = source === "mis_productos";
+  // Los dos catálogos del operador (muestras y tareas). Se comportan igual en
+  // toda la pantalla: se sube, se borra, se recoloca y se mueve entre ellos.
+  const esCatalogoOperador = CATALOGOS_PROPIOS.includes(source);
   // Se recuerda: si lo pones para ver lo que te queda por probar, la próxima
   // vez que entres quieres lo mismo.
   // Trabajar solo con los que ya tienen la ficha enlazada: son los que se van
@@ -468,13 +471,39 @@ export default function NichoPovBofPage() {
   const [soloSinSubir, setSoloSinSubir] = useEstadoRecordado(
     "povbof:topventas:sinsubir", false,
   );
-  // Selección múltiple, solo en "Mis productos" (los del operador; las
-  // carpetas del curso son de solo lectura). Se guardan las claves
+  // Selección múltiple, solo en los catálogos del operador (las carpetas del
+  // curso son de solo lectura). Se guardan las claves
   // `carpeta|producto` porque en la vista global conviven varias carpetas.
   const [seleccion, setSeleccion] = useState<string[]>([]);
   const [confirmarBorrado, setConfirmarBorrado] = useState(false);
   const borrarSeleccion = useBorrarMiProducto();
   const [borrandoLote, setBorrandoLote] = useState(false);
+  const moverSeleccion = useMoverMiProducto();
+  const [moviendoLote, setMoviendoLote] = useState(false);
+  async function moverLote() {
+    const destino = otroCatalogo(source);
+    if (!destino) return;
+    setMoviendoLote(true);
+    const fallados: string[] = [];
+    let movidos = 0;
+    for (const k of seleccion) {
+      const [carpeta = "", ...resto] = k.split("|");
+      const producto = resto.join("|");
+      try {
+        await moverSeleccion.mutateAsync({ carpeta, producto, origen: source, destino });
+        movidos += 1;
+      } catch {
+        fallados.push(producto);
+      }
+    }
+    setMoviendoLote(false);
+    setSeleccion([]);
+    if (fallados.length) {
+      toast.error(`No se pudieron mover: ${fallados.join(", ")}`);
+    } else {
+      toast.success(`${movidos} a «${NOMBRE_CATALOGO[destino] ?? destino}»`);
+    }
+  }
   async function borrarLote() {
     // De uno en uno contra el endpoint que ya existe: son diez como mucho, y
     // en serie el error dice EXACTAMENTE cuál falló en vez de morir el lote.
@@ -484,7 +513,7 @@ export default function NichoPovBofPage() {
       const [carpeta = "", ...resto] = k.split("|");
       const producto = resto.join("|");
       try {
-        await borrarSeleccion.mutateAsync({ carpeta, producto });
+        await borrarSeleccion.mutateAsync({ carpeta, producto, source });
       } catch {
         fallados.push(producto);
       }
@@ -638,7 +667,7 @@ export default function NichoPovBofPage() {
   const renumerar = useRenumerarMisProductos();
   // El plan se consulta solo para poner el número en el botón y para poder
   // apagarlo cuando no hay nada que mover. No toca nada: es de lectura.
-  const plan = usePlanRecolocar(source === "mis_productos");
+  const plan = usePlanRecolocar(esCatalogoOperador, source);
   // Con ID se publica pegándolo en el buscador de TikTok Studio; sin él, a mano.
   const conUrl = (productos.data ?? []).filter((p) => p.product_url).length;
   const conId = (productos.data ?? []).filter((p) => p.product_id).length;
@@ -912,11 +941,12 @@ export default function NichoPovBofPage() {
         )}
 
         {/* Solo en la fuente propia: en las del curso no hay nada que subir. */}
-        {source === "mis_productos" && (
+        {esCatalogoOperador && (
           /* Al crear se salta a la carpeta donde ha caído: las carpetas se
              llenan de diez en diez, así que el producto nuevo puede ir a la
              SIGUIENTE y quedarse invisible mientras miras la anterior. */
           <AltaMiProducto
+            source={source}
             onCreado={(carpeta) => {
               setPicked(carpeta);
               void qc.refetchQueries({
@@ -1392,7 +1422,7 @@ export default function NichoPovBofPage() {
 
                 Enseña el plan antes de ejecutarlo: mueve productos ENTRE
                 carpetas, arrastrando sus textos, guion, clips y vídeo. */}
-            {source === "mis_productos" && (
+            {esCatalogoOperador && (
               <button
                 type="button"
                 disabled={renumerar.isPending || !plan.data?.movimientos}
@@ -1403,7 +1433,7 @@ export default function NichoPovBofPage() {
                 }
                 onClick={() =>
                   renumerar.mutate(
-                    { carpeta: "" },
+                    { carpeta: "", source },
                     {
                       onSuccess: (r: { title: string }) => {
                         toast.success(`${r.title} en la cola`);
@@ -1693,7 +1723,7 @@ export default function NichoPovBofPage() {
 
           {/* Borrar de varios en varios: son productos que sube el operador y
               se quitan a puñados (una tanda que salió mal), no de uno en uno. */}
-          {esMisProductos && enPantalla.length > 0 && (
+          {esCatalogoOperador && enPantalla.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 p-2 text-[11px]">
               <button
                 type="button"
@@ -1713,9 +1743,24 @@ export default function NichoPovBofPage() {
               </span>
               <button
                 type="button"
+                disabled={!seleccion.length || moviendoLote || borrandoLote}
+                onClick={() => void moverLote()}
+                title={`Pasarlos a «${NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}»`}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-40"
+              >
+                {moviendoLote ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" /> Moviendo…
+                  </>
+                ) : (
+                  <>→ {NOMBRE_CATALOGO[otroCatalogo(source)] ?? "mover"}</>
+                )}
+              </button>
+              <button
+                type="button"
                 disabled={!seleccion.length || borrandoLote}
                 onClick={() => setConfirmarBorrado(true)}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 font-medium text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-40"
               >
                 {borrandoLote ? (
                   <>
@@ -1743,11 +1788,11 @@ export default function NichoPovBofPage() {
                   esTopVendidos={esTopVendidos}
                   marcarClips={hayMezclaDeClips}
                   seleccionado={
-                    esMisProductos &&
+                    esCatalogoOperador &&
                     seleccion.includes(claveSel(p.folder || folder, p.producto))
                   }
                   onSeleccion={
-                    esMisProductos
+                    esCatalogoOperador
                       ? (marcado) => {
                           const k = claveSel(p.folder || folder, p.producto);
                           setSeleccion((prev) =>
@@ -1769,8 +1814,10 @@ export default function NichoPovBofPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>
                   {seleccion.length === 1
-                    ? "Quitar 1 producto de Mis productos"
-                    : `Quitar ${seleccion.length} productos de Mis productos`}
+                    ? `Quitar 1 producto de ${NOMBRE_CATALOGO[source] ?? source}`
+                    : `Quitar ${seleccion.length} productos de ${
+                        NOMBRE_CATALOGO[source] ?? source
+                      }`}
                 </AlertDialogTitle>
                 <AlertDialogDescription asChild>
                   <div className="space-y-2">
@@ -1815,7 +1862,7 @@ export default function NichoPovBofPage() {
  *
  *  Lo importante es poder sumar unidades: un producto que REPITE venta vale
  *  mucho más que uno que vendió una vez, y no había forma de anotarlo. */
-/** Alta de productos PROPIOS. Solo sale en la fuente "Mis productos".
+/** Alta de productos PROPIOS. Solo sale en los catálogos del operador.
  *
  *  Las otras dos fuentes son carpetas del Drive del curso, de solo lectura;
  *  esta es la del operador. Sube la foto limpia y la captura de la ficha y el
@@ -1827,7 +1874,14 @@ export default function NichoPovBofPage() {
  *
  *  Va aquí, junto al selector de fuente, porque es lo primero que se hace al
  *  entrar: si acabas de marcar una venta, esto la baja a su carpeta. */
-function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) {
+function AltaMiProducto({
+  source = "mis_productos",
+  onCreado,
+}: {
+  /** En cuál de los dos catálogos del operador cae el producto. */
+  source?: string;
+  onCreado?: (carpeta: string) => void;
+}) {
   const crear = useCrearMiProducto();
   const [limpia, setLimpia] = useState<File | null>(null);
   const [ficha, setFicha] = useState<File | null>(null);
@@ -1841,7 +1895,7 @@ function AltaMiProducto({ onCreado }: { onCreado?: (carpeta: string) => void }) 
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha },
+      { fotoLimpia: limpia, fotoFicha: ficha, source },
       {
         onSuccess: (r) => {
           toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
@@ -1939,6 +1993,21 @@ const TOOLS: { key: ToolKey; label: string }[] = [
 /** Tarjeta de producto: textos, sexo, subida de vídeo y toggles
  *  Subido/Vendió. Estado local + servidor para que los toggles se sientan
  *  instantáneos (mismo patrón que `OutcomeBar` del calendario). */
+/** Los dos catálogos que sube el operador. Un producto se graba porque llegó
+ *  una MUESTRA gratuita o porque es una TAREA pagada, y eso no se trabaja
+ *  igual; por dentro son idénticos (mismas carpetas de diez, mismo convenio de
+ *  nombres) y se puede mover de uno a otro. */
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+const NOMBRE_CATALOGO: Record<string, string> = {
+  mis_productos: "Muestras productos",
+  tareas_productos: "Tareas Productos",
+};
+
+/** El otro catálogo del operador: a donde se mueve desde este. */
+function otroCatalogo(source: string): string {
+  return CATALOGOS_PROPIOS.find((c) => c !== source) ?? "";
+}
+
 /** Clave de una tarjeta para la selección múltiple. Lleva la carpeta porque
  *  en la vista global conviven varias y el número de producto se repite. */
 function claveSel(carpeta: string, producto: string): string {
@@ -1960,7 +2029,7 @@ function ProductoCard({
   producto: ProductoItem;
   /** Marcado para el borrado en lote. */
   seleccionado?: boolean;
-  /** Solo en "Mis productos": sin esto no se pinta la casilla. */
+  /** Solo en los catálogos del operador: sin esto no se pinta la casilla. */
   onSeleccion?: (marcado: boolean) => void;
   /** ¿Hay productos de distinto nº de clips en pantalla? Solo entonces vale la
    *  pena marcar cuántos pide cada uno. */
@@ -1978,6 +2047,7 @@ function ProductoCard({
   // Todos los huecos que pide este producto, cubiertos.
   const clipsPuestos =
     [producto.clip1, producto.clip2].slice(0, clipsDe(producto)).every(Boolean);
+  const mover = useMoverMiProducto();
   const quitarClip = useQuitarClip();
   const buscarUrl = useBuscarProductoUrl();
   // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
@@ -2899,10 +2969,46 @@ function ProductoCard({
       </button>
       )}
 
-      {/* Solo en "Mis productos": son los que sube el operador, así que
-          también los puede quitar. Las del curso son de solo lectura. */}
-      {source === "mis_productos" && (
+      {/* Solo en los catálogos del operador: son los que sube él, así que
+          también los puede quitar y cambiar de sitio. Los del curso son de
+          solo lectura. */}
+      {CATALOGOS_PROPIOS.includes(source) && (
         <>
+        {/* Muestra ⇄ tarea: por qué se graba un producto se sabe a veces
+            después de subirlo, y antes había que borrarlo y volver a subir
+            las dos fotos. */}
+        <button
+          type="button"
+          disabled={mover.isPending}
+          onClick={() =>
+            mover.mutate(
+              {
+                carpeta: folder,
+                producto: producto.producto,
+                origen: source,
+                destino: otroCatalogo(source),
+              },
+              {
+                onSuccess: (r) =>
+                  toast.success(
+                    `Movido a «${NOMBRE_CATALOGO[r.source] ?? r.source}» · ` +
+                      `${r.carpeta}, nº ${r.producto}`,
+                  ),
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
+          }
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-50"
+        >
+          {mover.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Moviendo…
+            </>
+          ) : (
+            <>→ Mover a «{NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}»</>
+          )}
+        </button>
         <button
           type="button"
           disabled={borrar.isPending}
@@ -2945,7 +3051,7 @@ function ProductoCard({
               <AlertDialogAction
                 onClick={() =>
                   borrar.mutate(
-                    { carpeta: folder, producto: producto.producto },
+                    { carpeta: folder, producto: producto.producto, source },
                     {
                       onSuccess: () =>
                         toast.success(`Producto ${producto.producto} borrado`),

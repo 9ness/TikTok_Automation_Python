@@ -1299,6 +1299,7 @@ async def importar_productos_web(
 async def crear_mi_producto(
     foto_limpia: Annotated[UploadFile, File()],
     foto_ficha: Annotated[UploadFile | None, File()] = None,
+    source: Annotated[str, Query()] = "mis_productos",
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
 
@@ -1310,6 +1311,9 @@ async def crear_mi_producto(
     siguiente sola.
     """
     from src.nicho_pov_bof.services import mis_productos
+
+    if not pov_config.es_catalogo_operador(source):
+        raise _bad_request(f"{source!r} no es un catálogo tuyo.")
 
     async def _leer(archivo: UploadFile, que: str) -> bytes:
         if not archivo:
@@ -1337,17 +1341,19 @@ async def crear_mi_producto(
             limpia, ficha or None,
             nombre_limpia=foto_limpia.filename or "",
             nombre_ficha=(foto_ficha.filename or "") if foto_ficha else "",
+            source=source,
         )
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
-    return {"source": "mis_productos", **creado}
+    return {"source": source, **creado}
 
 
 @router.delete("/mis-productos")
 def borrar_mi_producto(
     carpeta: Annotated[str, Query()],
     producto: Annotated[str, Query()],
+    source: Annotated[str, Query()] = "mis_productos",
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
 ) -> dict:
     """Quita las fotos de un producto propio. Solo vale para `mis_productos`.
@@ -1361,15 +1367,47 @@ def borrar_mi_producto(
     """
     from src.nicho_pov_bof.services import mis_productos
 
-    if not mis_productos.borrar_producto(carpeta, producto, renumerar=False):
+    if not pov_config.es_catalogo_operador(source):
+        raise _bad_request(f"{source!r} no es un catálogo tuyo.")
+    if not mis_productos.borrar_producto(
+        carpeta, producto, renumerar=False, source=source,
+    ):
         raise APIError(
             f"No existe el producto {producto} en {carpeta}.", status_code=404,
         )
     return {"ok": True}
 
 
+@router.post("/mis-productos/mover")
+def mover_mi_producto(body: dict) -> dict:
+    """Pasa un producto de "Muestras productos" a "Tareas Productos" (o al revés).
+
+    Por qué se graba un producto —muestra gratuita o tarea pagada— se sabe a
+    veces DESPUÉS de haberlo subido, y sin esto había que borrarlo y volver a
+    subir las dos fotos. Se lleva las fotos y lo que guardan los nichos de ese
+    producto; la venta apuntada y el escaparate no dependen de la carpeta.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    carpeta = str(body.get("carpeta") or "").strip()
+    producto = str(body.get("producto") or "").strip()
+    origen = str(body.get("origen") or "mis_productos").strip()
+    destino = str(body.get("destino") or "").strip()
+    if not (carpeta and producto and destino):
+        raise _bad_request("Faltan carpeta, producto o destino.")
+    try:
+        movido = mis_productos.mover_producto(
+            carpeta, producto, origen=origen, destino=destino,
+        )
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except OSError as e:
+        raise APIError(f"No se pudieron mover las fotos: {e}", status_code=500) from e
+    return {"ok": True, "source": destino, **movido}
+
+
 @router.get("/mis-productos/plan-recolocar")
-def plan_recolocar() -> dict:
+def plan_recolocar(source: Annotated[str, Query()] = "mis_productos") -> dict:
     """Qué pasaría al recolocar, SIN tocar nada.
 
     Mover productos entre carpetas arrastra sus textos, guion, clips y vídeo
@@ -1378,14 +1416,16 @@ def plan_recolocar() -> dict:
     """
     from src.nicho_pov_bof.services import mis_productos
 
-    plan = mis_productos.plan_compactar()
-    antes = {c: len(mis_productos._numeros(c)) for c in mis_productos.carpetas()}
+    plan = mis_productos.plan_compactar(source)
+    antes = {
+        c: len(mis_productos._numeros(c, source))
+        for c in mis_productos.carpetas(source)
+    }
     total = sum(antes.values())
     despues: dict[str, int] = {}
     for i in range(total):
-        despues[mis_productos._nombre_carpeta(i // mis_productos.POR_CARPETA)] = (
-            despues.get(mis_productos._nombre_carpeta(i // mis_productos.POR_CARPETA), 0) + 1
-        )
+        nombre = mis_productos._nombre_carpeta(i // mis_productos.POR_CARPETA, source)
+        despues[nombre] = despues.get(nombre, 0) + 1
     return {
         "movimientos": len(plan),
         "total": total,
@@ -1398,6 +1438,7 @@ def plan_recolocar() -> dict:
 @router.post("/mis-productos/renumerar")
 def renumerar_mis_productos(
     carpeta: Annotated[str, Query()] = "",
+    source: Annotated[str, Query()] = "mis_productos",
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
 ) -> dict:
     """Cierra los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
@@ -1413,8 +1454,8 @@ def renumerar_mis_productos(
     """
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_RENUMERAR,
-        title=f"🔢 Renumerar · {carpeta}" if carpeta else "🔢 Recolocar Mis productos",
-        params={"carpeta": carpeta},
+        title=f"🔢 Renumerar · {carpeta}" if carpeta else "🔢 Recolocar productos propios",
+        params={"carpeta": carpeta, "source": source},
     )
     return {"job_id": job.id, "title": job.title}
 

@@ -945,7 +945,7 @@ _TITULOS_DRIVE = "titulos:drive"
 # Las fuentes que SON el Drive del curso. Las demás ("Mis productos", la web,
 # top vendidos) son nuestras: un producto que solo esté ahí no cuenta como
 # "también en el Drive".
-FUENTES_DRIVE = ("aleatorios_1", "aleatorios_2", "backup_1", "backup_2")
+FUENTES_DRIVE = ("aleatorios_1", "aleatorios_2")
 
 
 def titulos_drive() -> set[str]:

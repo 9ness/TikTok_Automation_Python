@@ -2977,17 +2977,18 @@ def run_nicho_pov_bof_renumerar(job: Job, on_log: OnLog, on_progress: OnProgress
     tardaba una eternidad y si el operador recargaba la página se quedaba a
     medias — la mitad de la carpeta renumerada y la otra mitad no.
 
-    Params: carpeta.
+    Params: carpeta, source (cuál de los dos catálogos del operador).
     """
     from src.nicho_pov_bof.services import mis_productos
 
     carpeta = str(job.params.get("carpeta") or "")
+    source = str(job.params.get("source") or mis_productos.SOURCE)
     if not carpeta:
         # Sin carpeta: compactar TODAS. Rellena de diez en diez desde la
         # primera y borra las que se quedan vacías, que es lo que hace falta
         # cuando de tanto borrar quedan cuatro carpetas a medias.
         on_progress(0.1, "🔢 Recolocando todos los productos…")
-        res = mis_productos.compactar(on_log=on_log)
+        res = mis_productos.compactar(on_log=on_log, source=source)
         on_progress(1.0, f"🔢 {res['movidos']} producto(s) recolocados")
         if not res["movidos"]:
             return "sin-cambios"
@@ -2998,7 +2999,7 @@ def run_nicho_pov_bof_renumerar(job: Job, on_log: OnLog, on_progress: OnProgress
         )
 
     on_progress(0.1, f"🔢 Cerrando huecos de {carpeta}…")
-    mapa = mis_productos.renumerar_carpeta(carpeta)
+    mapa = mis_productos.renumerar_carpeta(carpeta, source)
     if not mapa:
         on_log("[renumerar] no había huecos que cerrar")
         return "sin-cambios"

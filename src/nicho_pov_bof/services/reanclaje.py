@@ -250,6 +250,7 @@ def mover_fotos(source: str, folder: str, mapa: dict[str, str]) -> None:
 
 def mover_entre_carpetas(
     source: str, movimientos: list[tuple[str, str, str, str]],
+    *, source_destino: str = "",
 ) -> int:
     """Mueve productos de una carpeta a OTRA, con todo lo que guardan.
 
@@ -264,6 +265,10 @@ def mover_entre_carpetas(
     el compartido, su guion en el del Largo y su "subido" en el de quien lo
     subió.
 
+    `source_destino` sirve para mover a OTRO catálogo (de "Muestras productos"
+    a "Tareas Productos"): el documento de destino es el de esa fuente. Vacío
+    = el mismo, que es el caso de compactar.
+
     Devuelve cuántas entradas se movieron. Idempotente: repetirlo no duplica
     nada, porque lo movido ya no está en el origen.
     """
@@ -272,6 +277,7 @@ def mover_entre_carpetas(
 
     import importlib
 
+    destino_src = source_destino or source
     movidas = 0
     for modulo, getter in _DOCS:
         try:
@@ -285,28 +291,31 @@ def mover_entre_carpetas(
             # Todo el trasiego de un documento se hace en memoria y se escribe
             # UNA vez: entrada a entrada serían cientos de idas a Upstash.
             cache: dict[str, dict] = {}
-            tocados: set[str] = set()
+            tocados: set[tuple[str, str]] = set()
 
-            def _doc(carpeta: str) -> dict:
-                clave = f"folder:{source}:{carpeta}{sufijo}"
+            def _clave(src: str, carpeta: str) -> str:
+                return f"folder:{src}:{carpeta}{sufijo}"
+
+            def _doc(src: str, carpeta: str) -> dict:
+                clave = _clave(src, carpeta)
                 if clave not in cache:
                     cache[clave] = r.get_json(clave) or {}
                 return cache[clave]
 
             for c_ori, p_ori, c_des, p_des in movimientos:
-                origen = _doc(c_ori)
+                origen = _doc(source, c_ori)
                 prods = origen.get("productos") or {}
                 entrada = prods.pop(str(p_ori), None)
                 if entrada is None:
                     continue
-                destino = _doc(c_des)
+                destino = _doc(destino_src, c_des)
                 destino.setdefault("productos", {})[str(p_des)] = entrada
-                tocados.add(c_ori)
-                tocados.add(c_des)
+                tocados.add((source, c_ori))
+                tocados.add((destino_src, c_des))
                 movidas += 1
 
-            for carpeta in tocados:
-                clave = f"folder:{source}:{carpeta}{sufijo}"
+            for src, carpeta in tocados:
+                clave = _clave(src, carpeta)
                 doc = cache.get(clave)
                 if doc is not None:
                     # `ids_vigentes` era de la composición vieja: se tira para

@@ -98,7 +98,7 @@ MODE_LABELS = {
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "🎙️ Vídeo POV BOF Largo",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "✍️ Guiones POV BOF Largo",
     JobMode.NICHO_POV_BOF_GUIONES: "✍️ Guiones POV BOF",
-    JobMode.NICHO_POV_BOF_RENUMERAR: "🔢 Renumerar Mis productos",
+    JobMode.NICHO_POV_BOF_RENUMERAR: "🔢 Renumerar productos propios",
     JobMode.NICHO_CARRUSELES_PREPARAR: "🖼️ Preparar carruseles",
     JobMode.NICHO_CARRUSELES_REPARTO: "🧩 Repartir fotos de carrusel",
     JobMode.NICHO_CARRUSELES_QUEMAR: "🔥 Escribir los textos del carrusel",

@@ -60,7 +60,7 @@ export const nichoPovBofKeys = {
  *  siguientes contra el Drive montado, y eso dentro de la petición se quedaba
  *  a medias al recargar la página. */
 /** Qué pasaría al recolocar todas las carpetas de Mis productos. No toca nada. */
-export function usePlanRecolocar(activo: boolean) {
+export function usePlanRecolocar(activo: boolean, source = "mis_productos") {
   return useQuery<{
     movimientos: number;
     total: number;
@@ -68,8 +68,9 @@ export function usePlanRecolocar(activo: boolean) {
     despues: Record<string, number>;
     carpetas_borradas: string[];
   }>({
-    queryKey: [...nichoPovBofKeys.all, "plan-recolocar"],
-    queryFn: () => api.get(`${ROOT}/mis-productos/plan-recolocar`),
+    queryKey: [...nichoPovBofKeys.all, "plan-recolocar", source],
+    queryFn: () =>
+      api.get(`${ROOT}/mis-productos/plan-recolocar?source=${encodeURIComponent(source)}`),
     enabled: activo,
     staleTime: 0,
   });
@@ -77,10 +78,33 @@ export function usePlanRecolocar(activo: boolean) {
 
 export function useRenumerarMisProductos() {
   const qc = useQueryClient();
-  return useMutation<{ job_id: string; title: string }, Error, { carpeta: string }>({
-    mutationFn: ({ carpeta }) =>
-      api.post(`${ROOT}/mis-productos/renumerar?carpeta=${encodeURIComponent(carpeta)}`),
+  return useMutation<
+    { job_id: string; title: string },
+    Error,
+    { carpeta: string; source?: string }
+  >({
+    mutationFn: ({ carpeta, source = "mis_productos" }) =>
+      api.post(
+        `${ROOT}/mis-productos/renumerar?carpeta=${encodeURIComponent(carpeta)}` +
+          `&source=${encodeURIComponent(source)}`,
+      ),
     onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
+/** Pasa un producto de "Muestras productos" a "Tareas Productos" (o al revés).
+ *
+ *  Por qué se graba —muestra gratuita o tarea pagada— se sabe a veces DESPUÉS
+ *  de subirlo, y antes había que borrarlo y volver a subir las dos fotos. */
+export function useMoverMiProducto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; source: string; carpeta: string; producto: string },
+    Error,
+    { carpeta: string; producto: string; origen: string; destino: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/mis-productos/mover`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
   });
 }
 
@@ -283,13 +307,13 @@ export function useCrearMiProducto() {
   return useMutation<
     { source: string; carpeta: string; producto: string },
     Error,
-    { fotoLimpia: File; fotoFicha?: File | null }
+    { fotoLimpia: File; fotoFicha?: File | null; source?: string }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, source = "mis_productos" }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
-      return api.post(`${ROOT}/mis-productos`, fd);
+      return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
   });
@@ -343,11 +367,16 @@ export function useImportarProductosWebLote() {
 
 export function useBorrarMiProducto() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean }, Error, { carpeta: string; producto: string }>({
-    mutationFn: ({ carpeta, producto }) =>
+  return useMutation<
+    { ok: boolean },
+    Error,
+    { carpeta: string; producto: string; source?: string }
+  >({
+    mutationFn: ({ carpeta, producto, source = "mis_productos" }) =>
       api.del(
         `${ROOT}/mis-productos?carpeta=${encodeURIComponent(carpeta)}` +
-          `&producto=${encodeURIComponent(producto)}`,
+          `&producto=${encodeURIComponent(producto)}` +
+          `&source=${encodeURIComponent(source)}`,
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
   });

@@ -28,7 +28,20 @@ from typing import Any, Callable
 from src.nicho_pov_bof import config
 
 _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
-_PREFIJO = "Mis Productos"
+# El catálogo por defecto: las MUESTRAS. Este módulo lleva los dos catálogos
+# del operador (muestras y tareas), que son idénticos salvo por su carpeta
+# raíz en Drive y el nombre de sus carpetas — de ahí el parámetro `source`
+# en todo, con el de siempre por defecto para no tocar a quien ya lo llama.
+SOURCE = "mis_productos"
+
+
+def _dir(source: str = SOURCE):
+    return config.dir_operador(source)
+
+
+def _prefijo(source: str = SOURCE) -> str:
+    meta = config.CATALOGOS_OPERADOR.get(source) or {}
+    return meta.get("prefijo") or "Mis Productos"
 
 # ---------------------------------------------------------------------------
 # Caché de listados
@@ -75,11 +88,11 @@ def _num_carpeta(nombre: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def carpetas() -> list[str]:
+def carpetas(source: str = SOURCE) -> list[str]:
     """Carpetas existentes, en orden natural. Vacío si aún no hay ninguna."""
 
     def leer() -> list[str]:
-        raiz = config.mis_productos_dir()
+        raiz = _dir(source)
         if not raiz.is_dir():
             return []
         return sorted(
@@ -87,12 +100,12 @@ def carpetas() -> list[str]:
             key=_num_carpeta,
         )
 
-    return _memo("carpetas", leer)
+    return _memo(f"{source}:carpetas", leer)
 
 
-def _productos_en(carpeta: str) -> set[str]:
+def _productos_en(carpeta: str, source: str = SOURCE) -> set[str]:
     """Números de producto que ya hay en la carpeta (por nombre de fichero)."""
-    d = config.mis_productos_dir() / carpeta
+    d = _dir(source) / carpeta
     if not d.is_dir():
         return set()
     numeros: set[str] = set()
@@ -104,24 +117,24 @@ def _productos_en(carpeta: str) -> set[str]:
     return numeros
 
 
-def carpeta_actual() -> str:
+def carpeta_actual(source: str = SOURCE) -> str:
     """La carpeta donde toca guardar: la última con hueco, o una nueva.
 
     Se mira cuántos PRODUCTOS hay (no cuántos ficheros): cada producto son dos
     fotos, y contando ficheros la carpeta se daría por llena a la mitad.
     """
-    existentes = carpetas()
+    existentes = carpetas(source)
     if existentes:
         ultima = existentes[-1]
-        if len(_productos_en(ultima)) < config.MIS_PRODUCTOS_POR_CARPETA:
+        if len(_productos_en(ultima, source)) < config.MIS_PRODUCTOS_POR_CARPETA:
             return ultima
-        return f"{_PREFIJO} {_num_carpeta(ultima) + 1}"
-    return f"{_PREFIJO} 1"
+        return f"{_prefijo(source)} {_num_carpeta(ultima) + 1}"
+    return f"{_prefijo(source)} 1"
 
 
-def siguiente_producto(carpeta: str) -> str:
+def siguiente_producto(carpeta: str, source: str = SOURCE) -> str:
     """Número del próximo producto DENTRO de esa carpeta (1..10)."""
-    usados = {int(n) for n in _productos_en(carpeta) if n.isdigit()}
+    usados = {int(n) for n in _productos_en(carpeta, source) if n.isdigit()}
     return str(1 + max(usados, default=0))
 
 
@@ -132,17 +145,17 @@ def _extension(filename: str) -> str:
 
 def guardar_producto(
     limpia: bytes, ficha: bytes | None, *,
-    nombre_limpia: str = "", nombre_ficha: str = "",
+    nombre_limpia: str = "", nombre_ficha: str = "", source: str = SOURCE,
 ) -> dict:
     """Guarda las dos fotos y devuelve `{carpeta, producto}`.
 
     La ficha es opcional: sin ella el producto existe igual y el título se
     escribe a mano (o se reintenta luego con otra captura).
     """
-    carpeta = carpeta_actual()
-    destino = config.mis_productos_dir() / carpeta
+    carpeta = carpeta_actual(source)
+    destino = _dir(source) / carpeta
     destino.mkdir(parents=True, exist_ok=True)
-    producto = siguiente_producto(carpeta)
+    producto = siguiente_producto(carpeta, source)
 
     # `3.png` y `3(1).png`: EL MISMO convenio del Drive del curso. De aquí
     # depende que el emparejado y todo lo de después funcionen sin tocarse.
@@ -155,7 +168,9 @@ def guardar_producto(
     return {"carpeta": carpeta, "producto": producto}
 
 
-def borrar_producto(carpeta: str, producto: str, *, renumerar: bool = True) -> bool:
+def borrar_producto(
+    carpeta: str, producto: str, *, renumerar: bool = True, source: str = SOURCE,
+) -> bool:
     """Quita las fotos de un producto y CIERRA EL HUECO que deja.
 
     Sin renumerar, borrar el 6 dejaba la carpeta en 5, 7, 8… y el operador se
@@ -165,7 +180,7 @@ def borrar_producto(carpeta: str, producto: str, *, renumerar: bool = True) -> b
     del producto, así que renombrar solo los ficheros le pondría a uno los
     textos del siguiente. Ver `_renumerar`.
     """
-    d = config.mis_productos_dir() / carpeta
+    d = _dir(source) / carpeta
     if not d.is_dir():
         return False
     borradas = 0
@@ -176,14 +191,14 @@ def borrar_producto(carpeta: str, producto: str, *, renumerar: bool = True) -> b
     if not borradas:
         return False
     if renumerar:
-        renumerar_carpeta(carpeta)
+        renumerar_carpeta(carpeta, source)
     _invalidar()
     return True
 
 
-def _numeros(carpeta: str) -> list[int]:
+def _numeros(carpeta: str, source: str = SOURCE) -> list[int]:
     """Los números de producto que hay HOY en la carpeta, ordenados."""
-    d = config.mis_productos_dir() / carpeta
+    d = _dir(source) / carpeta
     if not d.is_dir():
         return []
     vistos = set()
@@ -196,7 +211,7 @@ def _numeros(carpeta: str) -> list[int]:
     return sorted(vistos)
 
 
-def renumerar_carpeta(carpeta: str) -> dict[str, str]:
+def renumerar_carpeta(carpeta: str, source: str = SOURCE) -> dict[str, str]:
     """Cierra los huecos: 5, 7, 8 → 5, 6, 7. Devuelve el mapa viejo→nuevo.
 
     Se llama al borrar, y también a mano desde la pantalla para arreglar los
@@ -206,7 +221,7 @@ def renumerar_carpeta(carpeta: str) -> dict[str, str]:
     de menor a mayor y el nuevo número siempre es menor que el viejo, así que
     ningún renombrado pisa a otro.
     """
-    numeros = _numeros(carpeta)
+    numeros = _numeros(carpeta, source)
     mapa = {
         str(viejo): str(nuevo)
         for nuevo, viejo in enumerate(numeros, start=1)
@@ -219,7 +234,7 @@ def renumerar_carpeta(carpeta: str) -> dict[str, str]:
     # texto viejo del 6 chocaría con el 7 que pasa a ser 6.
     validos = {str(n) for n in numeros}
 
-    d = config.mis_productos_dir() / carpeta
+    d = _dir(source) / carpeta
     for viejo, nuevo in mapa.items():
         for f in sorted(d.iterdir()):
             if not f.is_file():
@@ -227,14 +242,16 @@ def renumerar_carpeta(carpeta: str) -> dict[str, str]:
             m = re.match(rf"^{re.escape(viejo)}(\(\d+\))?$", f.stem)
             if m:
                 f.rename(d / f"{nuevo}{m.group(1) or ''}{f.suffix}")
-    _mover_datos(carpeta, mapa, validos)
+    _mover_datos(carpeta, mapa, validos, source)
     # Sin esto el listado sigue sirviendo los números viejos y se cruzan con
     # los textos ya movidos: cada producto sale con el nombre del siguiente.
     _invalidar()
     return mapa
 
 
-def _mover_datos(carpeta: str, mapa: dict[str, str], validos: set[str]) -> None:
+def _mover_datos(
+    carpeta: str, mapa: dict[str, str], validos: set[str], source: str = SOURCE,
+) -> None:
     """Arrastra a su número nuevo lo que cada nicho guarda de esos productos.
 
     Es lo mismo que hace el reanclaje cuando el curso renumera una carpeta, así
@@ -242,15 +259,67 @@ def _mover_datos(carpeta: str, mapa: dict[str, str], validos: set[str]) -> None:
     """
     from src.nicho_pov_bof.services import reanclaje
 
-    reanclaje.mover_productos("mis_productos", carpeta, mapa, validos=validos)
+    reanclaje.mover_productos(source, carpeta, mapa, validos=validos)
 
 
-def listar_carpetas_como_drive() -> list[dict]:
+def mover_producto(
+    carpeta: str, producto: str, *, origen: str = SOURCE, destino: str,
+) -> dict:
+    """Pasa un producto de un catálogo del operador a otro.
+
+    Un producto se graba porque llegó una MUESTRA o porque es una TAREA
+    pagada, y eso se sabe a veces después de haberlo subido: sin esto había
+    que borrarlo y volver a subir las dos fotos.
+
+    Se lleva las fotos Y lo que guardan los nichos de ese producto (textos,
+    guion, clips, vídeo, subido). Lo que NO viaja es la venta apuntada —vive
+    en un documento por referencia `fuente|carpeta|numero`— ni el escaparate,
+    que va por tienda+título y por eso no depende de dónde esté el producto.
+
+    Devuelve `{carpeta, producto}` del DESTINO.
+    """
+    if origen not in config.CATALOGOS_OPERADOR:
+        raise ValueError(f"{origen!r} no es un catálogo del operador")
+    if destino not in config.CATALOGOS_OPERADOR:
+        raise ValueError(f"{destino!r} no es un catálogo del operador")
+    if origen == destino:
+        raise ValueError("El producto ya está en ese catálogo")
+
+    d_ori = _dir(origen) / carpeta
+    fotos = [
+        f for f in sorted(d_ori.iterdir())
+        if f.is_file() and re.match(rf"^{re.escape(producto)}(\(\d+\))?$", f.stem)
+    ] if d_ori.is_dir() else []
+    if not fotos:
+        raise ValueError(f"No existe el producto {producto} en {carpeta}")
+
+    c_des = carpeta_actual(destino)
+    d_des = _dir(destino) / c_des
+    d_des.mkdir(parents=True, exist_ok=True)
+    p_des = siguiente_producto(c_des, destino)
+
+    for f in fotos:
+        m = re.match(rf"^{re.escape(producto)}(\(\d+\))?$", f.stem)
+        shutil.move(str(f), str(d_des / f"{p_des}{m.group(1) or ''}{f.suffix}"))
+
+    from src.nicho_pov_bof.services import reanclaje
+
+    reanclaje.mover_entre_carpetas(
+        origen, [(carpeta, str(producto), c_des, str(p_des))],
+        source_destino=destino,
+    )
+    # Los dos listados cambian: el de origen pierde un producto y el de
+    # destino lo gana. Sin esto se ve el producto en los dos sitios.
+    _invalidar()
+    return {"carpeta": c_des, "producto": str(p_des)}
+
+
+def listar_carpetas_como_drive(source: str = SOURCE) -> list[dict]:
     """Mismo shape que `drive_client.list_product_folders`."""
-    return [{"name": c, "id": c} for c in carpetas()]
+    return [{"name": c, "id": c} for c in carpetas(source)]
 
 
-def listar_fotos_como_drive(carpeta: str) -> list[dict]:
+def listar_fotos_como_drive(carpeta: str, source: str = SOURCE) -> list[dict]:
     """Mismo shape que `drive_client.list_photos`.
 
     El `id` es la RUTA del fichero: en el Drive compartido el id lo pone
@@ -259,7 +328,7 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
     """
 
     def leer() -> list[dict]:
-        d = config.mis_productos_dir() / carpeta
+        d = _dir(source) / carpeta
         if not d.is_dir():
             return []
         fotos = [
@@ -281,7 +350,7 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
         fotos.sort(key=lambda p: config.natural_sort_key(p["name"]))
         return fotos
 
-    return _memo(f"fotos:{carpeta}", leer)
+    return _memo(f"{source}:fotos:{carpeta}", leer)
 
 
 # ---------------------------------------------------------------------------
@@ -304,15 +373,18 @@ def precalentar() -> int:
     NO valdría: si la caché aún vive, devuelve lo cacheado sin renovar la
     fecha de caducidad, y el TTL vencería igual con el operador delante.
     """
-    _LISTADOS.pop("carpetas", None)
-    nombres = carpetas()
-    if nombres:
-        # También las fotos de la última carpeta, que es la que se abre: son
-        # un nivel más hondo del mount y se pagan aparte.
-        ultima = nombres[-1]
-        _LISTADOS.pop(f"fotos:{ultima}", None)
-        listar_fotos_como_drive(ultima)
-    return len(nombres)
+    total = 0
+    for source in config.CATALOGOS_OPERADOR:
+        _LISTADOS.pop(f"{source}:carpetas", None)
+        nombres = carpetas(source)
+        if nombres:
+            # También las fotos de la última carpeta, que es la que se abre:
+            # son un nivel más hondo del mount y se pagan aparte.
+            ultima = nombres[-1]
+            _LISTADOS.pop(f"{source}:fotos:{ultima}", None)
+            listar_fotos_como_drive(ultima, source)
+        total += len(nombres)
+    return total
 
 
 async def bucle_precalentado(stop) -> None:
@@ -362,12 +434,12 @@ def copiar_a(destino: Path, foto_id: str) -> Path:
 POR_CARPETA = 10
 
 
-def _nombre_carpeta(indice: int) -> str:
+def _nombre_carpeta(indice: int, source: str = SOURCE) -> str:
     """`0` → `Mis Productos 1`. El nombre lo pone el importador, no el usuario."""
-    return f"{_PREFIJO} {indice + 1}"
+    return f"{_prefijo(source)} {indice + 1}"
 
 
-def plan_compactar() -> list[dict]:
+def plan_compactar(source: str = SOURCE) -> list[dict]:
     """Qué habría que mover para que no queden huecos. NO toca nada.
 
     Devuelve `[{origen, producto, destino, numero}]` solo con los que cambian,
@@ -375,9 +447,9 @@ def plan_compactar() -> list[dict]:
     """
     plan: list[dict] = []
     hueco = 0
-    for carpeta in carpetas():
-        for numero in _numeros(carpeta):
-            destino = _nombre_carpeta(hueco // POR_CARPETA)
+    for carpeta in carpetas(source):
+        for numero in _numeros(carpeta, source):
+            destino = _nombre_carpeta(hueco // POR_CARPETA, source)
             nuevo = str(hueco % POR_CARPETA + 1)
             hueco += 1
             if destino == carpeta and nuevo == str(numero):
@@ -391,18 +463,18 @@ def plan_compactar() -> list[dict]:
     return plan
 
 
-def compactar(on_log=None) -> dict:
+def compactar(on_log=None, source: str = SOURCE) -> dict:
     """Ejecuta el plan: mueve fotos, arrastra los datos y borra lo que sobre."""
     def _log(m: str) -> None:
         if on_log:
             on_log(m)
 
-    plan = plan_compactar()
+    plan = plan_compactar(source)
     if not plan:
         _log("[compactar] no hay nada que mover")
         return {"movidos": 0, "carpetas_borradas": []}
 
-    raiz = config.mis_productos_dir()
+    raiz = _dir(source)
     # Las fotos primero, a un nombre TEMPORAL: un producto puede ir a un hueco
     # que otro acaba de dejar en la misma pasada, y renombrar directamente
     # pisaría ficheros. Con el paso intermedio no hay colisión posible.
@@ -427,13 +499,13 @@ def compactar(on_log=None) -> dict:
     from src.nicho_pov_bof.services import reanclaje
 
     movidas = reanclaje.mover_entre_carpetas(
-        "mis_productos",
+        source,
         [(p["origen"], p["producto"], p["destino"], p["numero"]) for p in plan],
     )
     _log(f"[compactar] {movidas} entrada(s) de datos movidas")
 
     borradas = []
-    for carpeta in carpetas():
+    for carpeta in carpetas(source):
         d = raiz / carpeta
         if d.is_dir() and not any(f.is_file() for f in d.iterdir()):
             d.rmdir()
