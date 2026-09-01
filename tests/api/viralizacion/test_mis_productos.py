@@ -181,6 +181,41 @@ class TestMoverDeCatalogo:
             )
 
 
+class TestElNumeroSeReutiliza:
+    """Un producto nuevo NO puede heredar lo del que ocupaba su número.
+
+    Pasó de verdad: se borraron varios productos, se subieron dos y salieron
+    con los textos, el guion y hasta el vídeo montado de los borrados —
+    marcados como subidos el 27 de agosto sin haberlos tocado. El número es la
+    identidad dentro de la carpeta y al borrar queda libre, así que lo
+    guardado se tiene que ir con las fotos.
+    """
+
+    def test_borrar_se_lleva_lo_guardado(self, monkeypatch):
+        llamadas = []
+        monkeypatch.setattr(
+            "src.nicho_pov_bof.services.reanclaje.borrar_productos",
+            lambda *a: llamadas.append(a) or 0,
+        )
+        monkeypatch.setattr(
+            "src.nicho_pov_bof.services.reanclaje.mover_productos",
+            lambda *a, **k: None,
+        )
+        _subir(2)
+        mis_productos.borrar_producto("Mis Productos 1", "2", renumerar=False)
+        assert ("mis_productos", "Mis Productos 1", ["2"]) in llamadas
+
+    def test_el_alta_limpia_el_numero_que_va_a_ocupar(self, monkeypatch):
+        """Para lo borrado ANTES del arreglo, que sigue en Redis."""
+        llamadas = []
+        monkeypatch.setattr(
+            "src.nicho_pov_bof.services.reanclaje.borrar_productos",
+            lambda *a: llamadas.append(a) or 0,
+        )
+        _subir(1)
+        assert ("mis_productos", "Mis Productos 1", ["1"]) in llamadas
+
+
 class TestEndpointsDelCatalogo:
     """Que los endpoints RESPONDAN, no solo que el servicio funcione.
 

@@ -248,6 +248,93 @@ def mover_fotos(source: str, folder: str, mapa: dict[str, str]) -> None:
             pass
 
 
+def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
+    """Tira TODO lo guardado de unos productos que ya no existen.
+
+    El número ES la identidad de un producto dentro de su carpeta, y al borrar
+    uno el número queda libre: el siguiente que subes lo ocupa. Si lo guardado
+    sigue ahí, el producto nuevo nace con los textos, el guion, los clips, el
+    vídeo y el "subido" del que borraste — pasó con dos productos que salieron
+    montados y publicados el 27 de agosto sin haberse tocado.
+
+    Devuelve cuántas entradas se tiraron.
+    """
+    if not numeros:
+        return 0
+
+    import importlib
+
+    fuera = {str(n) for n in numeros}
+    borradas = 0
+
+    claves = {f"folder:{source}:{folder}"}
+    for u in _USUARIOS:
+        if u:
+            claves.add(f"folder:{source}:{folder}:u:{u}")
+        claves.add(f"folder:{source}:{folder}:u:{u or 'ness'}")
+
+    for modulo, getter in _DOCS:
+        try:
+            r = getattr(importlib.import_module(modulo), getter)()
+            if not r.is_available():
+                continue
+            for clave in claves:
+                doc = r.get_json(clave)
+                if not doc or not doc.get("productos"):
+                    continue
+                quedan = {
+                    k: v for k, v in doc["productos"].items() if str(k) not in fuera
+                }
+                if len(quedan) == len(doc["productos"]):
+                    continue
+                borradas += len(doc["productos"]) - len(quedan)
+                doc["productos"] = quedan
+                # De la composición vieja: se tira para que se rehaga al listar.
+                doc.pop("ids_vigentes", None)
+                r.set_json(clave, doc)
+        except Exception as e:  # noqa: BLE001 — un nicho caído no para a los demás
+            log.warning("borrado: %s no se pudo limpiar (%s)", modulo, e)
+
+    # Creativos Pro guarda `{producto: hora}` de lo ya publicado.
+    try:
+        from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
+
+        rc = get_nicho_creativos_redis()
+        if rc.is_available():
+            for u in _USUARIOS:
+                clave = f"subidos:{source}:{folder}" + (f":{u}" if u and u != "ness" else "")
+                doc = rc.get_json(clave)
+                if doc:
+                    rc.set_json(
+                        clave, {k: v for k, v in doc.items() if str(k) not in fuera},
+                    )
+    except Exception as e:  # noqa: BLE001
+        log.warning("borrado: creativos no se pudo limpiar (%s)", e)
+
+    # Carruseles: lo mismo con lo que marca como subido.
+    try:
+        from src.nicho_carruseles.repos import subidos_repo as carr_subidos
+
+        for u in ("", "ana", "mauro"):
+            for n in fuera:
+                carr_subidos.marcar(source, folder, n, False, u)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # La venta: `mover_venta` sin destino la borra. Se va con el producto — si
+    # no, el que ocupe su número nacería marcado como vendido.
+    try:
+        from src.nicho_pov_bof.repos import product_repo as pov
+
+        for u in _USUARIOS:
+            for n in fuera:
+                pov.mover_venta(source, folder, n, "", u)
+    except Exception as e:  # noqa: BLE001
+        log.warning("borrado: ventas no se pudieron limpiar (%s)", e)
+
+    return borradas
+
+
 def mover_entre_carpetas(
     source: str, movimientos: list[tuple[str, str, str, str]],
     *, source_destino: str = "",

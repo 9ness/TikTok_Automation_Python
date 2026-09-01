@@ -157,6 +157,15 @@ def guardar_producto(
     destino.mkdir(parents=True, exist_ok=True)
     producto = siguiente_producto(carpeta, source)
 
+    # El número que toca pudo ser de otro producto que se borró. Desde el
+    # arreglo, borrar ya se lleva sus datos, pero los que se borraron ANTES
+    # siguen ahí y el producto nuevo nacería con sus textos, su guion y su
+    # vídeo. Se limpia aquí también: cuesta una pasada y cierra el agujero
+    # para todo lo viejo.
+    from src.nicho_pov_bof.services import reanclaje
+
+    reanclaje.borrar_productos(source, carpeta, [producto])
+
     # `3.png` y `3(1).png`: EL MISMO convenio del Drive del curso. De aquí
     # depende que el emparejado y todo lo de después funcionen sin tocarse.
     (destino / f"{producto}{_extension(nombre_limpia)}").write_bytes(limpia)
@@ -190,6 +199,14 @@ def borrar_producto(
             borradas += 1
     if not borradas:
         return False
+
+    # Lo guardado se va CON las fotos. El número queda libre y lo ocupa el
+    # siguiente producto que subas: dejarlo ahí le regalaba los textos, el
+    # guion, el vídeo y el "subido" del que borraste.
+    from src.nicho_pov_bof.services import reanclaje
+
+    reanclaje.borrar_productos(source, carpeta, [str(producto)])
+
     if renumerar:
         renumerar_carpeta(carpeta, source)
     _invalidar()
