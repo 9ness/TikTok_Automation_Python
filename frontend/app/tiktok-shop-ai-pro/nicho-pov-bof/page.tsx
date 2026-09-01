@@ -67,6 +67,7 @@ import {
   useGuardarCuentaEchoTik,
   useActivarCuentaEchoTik,
   useBorrarCuentaEchoTik,
+  useMontarConLosClips,
   useSetEstado,
   useQuitarClip,
   useBorrarMiProducto,
@@ -1821,6 +1822,10 @@ function ProductoCard({
   carpetaHecha?: boolean;
 }) {
   const setEstado = useSetEstado();
+  const montar = useMontarConLosClips();
+  // Todos los huecos que pide este producto, cubiertos.
+  const clipsPuestos =
+    [producto.clip1, producto.clip2].slice(0, clipsDe(producto)).every(Boolean);
   const quitarClip = useQuitarClip();
   const buscarUrl = useBuscarProductoUrl();
   // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
@@ -2658,6 +2663,41 @@ function ProductoCard({
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locutando y montando…
         </p>
       ) : null}
+
+      {/* Los clips están puestos pero no hay vídeo: el montaje falló por algo
+          que no son los clips (Gemini sin cuota, la voz sin decidir). Se
+          cambia lo que haga falta —normalmente el sexo de la voz, ahí arriba—
+          y se relanza sin volver a generar ni subir nada. */}
+      {clipsPuestos && !producto.video_path && !producto.montando && (
+        <button
+          type="button"
+          disabled={montar.isPending}
+          onClick={() =>
+            montar.mutate(
+              {
+                source,
+                folder: producto.folder || folder,
+                producto: producto.producto,
+                sexo,
+              },
+              {
+                onSuccess: (r) => toast.success(r.message),
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
+          }
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-50"
+        >
+          {montar.isPending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Encolando…
+            </>
+          ) : (
+            <>🎬 Montar con los clips que ya están</>
+          )}
+        </button>
+      )}
 
       {clipsDe(producto) === 1 && (
       <input

@@ -860,6 +860,24 @@ export function useResolverIds() {
 }
 
 /** Encolar los guiones de 10s de TODA una carpeta. */
+/** Vuelve a montar con los clips que YA están subidos.
+ *
+ *  Para cuando el trabajo falla por algo ajeno a los clips (Gemini sin cuota,
+ *  la voz sin decidir): los ficheros siguen en disco, así que regenerarlos
+ *  sería tirar el trabajo de verdad.
+ */
+export function useMontarConLosClips() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; job_id: string | null; message: string },
+    Error,
+    { source: string; folder: string; producto: string; sexo?: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/video/montar`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 export function useGuionesLote() {
   const qc = useQueryClient();
   return useMutation<

@@ -1142,17 +1142,78 @@ def _guardar_clip(
         },
         enqueued_by=operator or None,
     )
-    try:
-        product_repo.update_product(
-            source, folder, producto, usuario=operator,
-            clip1_path="", clip2_path="",
-        )
-    except RuntimeError:
-        # El montaje ya está encolado; que no falle la respuesta por esto.
-        pass
+    # Las rutas se CONSERVAN. Antes se borraban aquí para que un clip ya
+    # consumido no disparase otro montaje, pero de eso se encarga ya
+    # `_clip_vigente` (compara la fecha del fichero con la del último montaje).
+    # Borrarlas tenía un precio que solo se ve cuando el trabajo FALLA: el
+    # producto se quedaba sin referencia a unos clips que siguen en disco, y
+    # había que volver a generarlos y subirlos por un JSON mal cerrado.
     return VideoUploadResponse(
         ok=True, job_id=job.id,
         message="Los clips están: montando el vídeo.",
+    )
+
+
+@router.post("/video/montar", response_model=VideoUploadResponse)
+def montar_con_los_clips(
+    body: dict,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    operator: Annotated[str, Depends(get_web_user)] = "",
+) -> VideoUploadResponse:
+    """Vuelve a montar con los clips que YA están subidos.
+
+    Existe para el trabajo que falla por algo ajeno a los clips —Gemini sin
+    cuota, un JSON mal cerrado, la voz sin decidir—: los ficheros siguen en
+    disco, así que volver a generarlos y resubirlos era tirar el trabajo de
+    verdad. Con esto se cambia lo que haya que cambiar (normalmente el sexo de
+    la voz) y se relanza.
+
+    Solo monta con clips VIGENTES: si el vídeo ya se montó, los de esa ronda
+    quedaron consumidos y hay que subir otros.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    producto = str(body.get("producto") or "").strip()
+    sexo = str(body.get("sexo") or "auto").strip().lower()
+    if not (source and folder and producto):
+        raise _bad_request("Faltan source, folder o producto.")
+
+    prod = product_repo.get_product(source, folder, producto, operator)
+    if not prod:
+        raise _bad_request(f"Producto {producto!r} no encontrado en {folder!r}.")
+
+    montado_at = float(prod.get("video_listo_at") or 0)
+    hacen_falta = _clips_que_pide(prod)
+    faltan = [
+        n for n in range(1, hacen_falta + 1)
+        if not _clip_vigente(prod.get(f"clip{n}_path"), montado_at)
+    ]
+    if faltan:
+        raise _bad_request(
+            f"No están los clips {', '.join(map(str, faltan))}: súbelos y se "
+            "monta solo."
+        )
+    if producto in _productos_montandose(queue, source, folder):
+        return VideoUploadResponse(
+            ok=True, job_id="",
+            message="Ya hay un montaje en marcha para este producto.",
+        )
+
+    flags = {k: bool(v) for k, v in (body.get("flags") or {}).items()}
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_VIDEO,
+        title=f"🎬 Nicho POV BOF: producto {producto} · {folder}",
+        params={
+            "source": source, "folder": folder, "producto": producto,
+            **{f"clip{n}_path": prod[f"clip{n}_path"] for n in range(1, hacen_falta + 1)},
+            "sexo": sexo, "operator": operator, **flags,
+        },
+        enqueued_by=operator or None,
+    )
+    return VideoUploadResponse(
+        ok=True, job_id=job.id, message="Montando con los clips que ya estaban.",
     )
 
 
