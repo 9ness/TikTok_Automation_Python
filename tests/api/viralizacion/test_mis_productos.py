@@ -38,6 +38,23 @@ def raiz_temporal(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         mis_productos.config, "mis_productos_dir", lambda: raices["mis_productos"],
     )
+
+    # Red de seguridad, y no es teórica: estos tests ESCRIBEN, y el día que el
+    # módulo empezó a resolver la carpeta por otra función (`dir_operador` en
+    # vez de `mis_productos_dir`) el parche dejó de valer sin que nada fallara
+    # — los tests siguieron corriendo, pero contra el Drive REAL del operador:
+    # 145 ficheros de mentira y siete carpetas nuevas en su catálogo, más dos
+    # borrados y un renumerado sobre sus productos de verdad.
+    #
+    # Por eso no basta con parchear: se COMPRUEBA que lo que devuelve el módulo
+    # cae dentro del tmp_path. Si mañana aparece una tercera forma de resolver
+    # la ruta, esto revienta aquí en vez de en el Drive de alguien.
+    for src in ("mis_productos", "tareas_productos"):
+        resuelta = mis_productos._dir(src)
+        assert tmp_path in resuelta.parents or resuelta == tmp_path, (
+            f"el catálogo {src!r} apunta FUERA del tmp_path ({resuelta}): "
+            "los tests escribirían en el Drive real"
+        )
     # Los listados se cachean (el Drive montado es lentísimo en frío) y la
     # caché vive en el módulo, no en la instancia: sin limpiarla, un test
     # heredaría las carpetas del tmp_path del anterior.
