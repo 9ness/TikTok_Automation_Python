@@ -92,6 +92,23 @@ export function useRenumerarMisProductos() {
   });
 }
 
+/** Deja un producto como recién subido: sin guion, voz, clips, vídeo ni las
+ *  marcas de subido/vendido. Los textos se quedan.
+ *
+ *  El número de producto se reutiliza al borrar, así que uno nuevo podía nacer
+ *  con lo del que ocupaba antes ese hueco. */
+export function useLimpiarProducto() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; borrados: string[] },
+    Error,
+    { source: string; folder: string; producto: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/producto/limpiar`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
+  });
+}
+
 /** Pasa un producto de "Muestras productos" a "Tareas Productos" (o al revés).
  *
  *  Por qué se graba —muestra gratuita o tarea pagada— se sabe a veces DESPUÉS

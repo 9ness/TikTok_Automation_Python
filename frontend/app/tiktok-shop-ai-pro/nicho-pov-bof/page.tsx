@@ -72,6 +72,7 @@ import {
   useSetEstado,
   useQuitarClip,
   useBorrarMiProducto,
+  useLimpiarProducto,
   useMoverMiProducto,
   useImportarProductosWeb,
   useImportarProductosWebLote,
@@ -2048,6 +2049,8 @@ function ProductoCard({
   const clipsPuestos =
     [producto.clip1, producto.clip2].slice(0, clipsDe(producto)).every(Boolean);
   const mover = useMoverMiProducto();
+  const limpiar = useLimpiarProducto();
+  const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
   const quitarClip = useQuitarClip();
   const buscarUrl = useBuscarProductoUrl();
   // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
@@ -3009,6 +3012,78 @@ function ProductoCard({
             <>→ Mover a «{NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}»</>
           )}
         </button>
+        {/* Cuando un producto nace con lo del que ocupaba antes su número:
+            se va lo generado y se quedan las fotos y los textos. Borrar y
+            volver a subir también valdría, pero obliga a tener las fotos. */}
+        <button
+          type="button"
+          disabled={limpiar.isPending}
+          onClick={() => setConfirmarLimpiar(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-amber-500/60 hover:text-amber-500 disabled:opacity-50"
+        >
+          {limpiar.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Limpiando…
+            </>
+          ) : (
+            <>🧹 Limpiar lo generado</>
+          )}
+        </button>
+        <AlertDialog open={confirmarLimpiar} onOpenChange={setConfirmarLimpiar}>
+          <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Limpiar lo generado del producto {producto.producto}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p className="break-words">
+                    {producto.titulo || "Sin título extraído"}
+                  </p>
+                  <p>
+                    Se van el guion, el subliminal, la voz, los clips, el vídeo
+                    montado y las marcas de subido y vendido.
+                  </p>
+                  <p>
+                    Se quedan las fotos y los textos (título, tienda, caption,
+                    hashtags y el enlace).
+                  </p>
+                  <p className="font-medium text-foreground">
+                    Es para cuando el producto salió con el guion o el vídeo de
+                    otro: después vuelve a pedirle el guion y a montarlo.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Dejarlo</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() =>
+                  limpiar.mutate(
+                    {
+                      source,
+                      folder: producto.folder || folder,
+                      producto: producto.producto,
+                    },
+                    {
+                      onSuccess: (r) =>
+                        toast.success(
+                          r.borrados.length
+                            ? `Limpiado (${r.borrados.length} campos)`
+                            : "No había nada que limpiar",
+                        ),
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="bg-amber-500 text-white hover:bg-amber-600"
+              >
+                Sí, limpiar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <button
           type="button"
           disabled={borrar.isPending}

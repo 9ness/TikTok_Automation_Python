@@ -1378,6 +1378,33 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.post("/producto/limpiar")
+def limpiar_producto(
+    body: dict,
+    operator: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Deja un producto como recién subido, sin tocar sus textos.
+
+    Fuera el guion, el subliminal, la voz, los clips, el vídeo y las marcas de
+    subido/vendido. Hace falta porque el número es la identidad del producto
+    dentro de su carpeta y se reutiliza: uno nuevo podía nacer con lo del que
+    ocupaba antes ese número. La otra salida era borrarlo y volver a subir las
+    dos fotos, que obliga a tenerlas a mano.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    producto = str(body.get("producto") or "").strip()
+    if not (source and folder and producto):
+        raise _bad_request("Faltan source, folder o producto.")
+    if source not in nicho_config.SOURCES:
+        raise _bad_request(f"Catálogo desconocido: {source!r}")
+
+    borrados = product_repo.limpiar_generado(source, folder, producto, operator)
+    return {"ok": True, "borrados": borrados}
+
+
 @router.post("/mis-productos/mover")
 def mover_mi_producto(body: dict) -> dict:
     """Pasa un producto de "Muestras productos" a "Tareas Productos" (o al revés).

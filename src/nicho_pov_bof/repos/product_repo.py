@@ -206,6 +206,67 @@ def update_product(
         return {**prod, **mio}
 
 
+# Lo que GENERA la app para un producto, frente a lo que se LEE de sus fotos.
+# Al limpiar se va esto y se queda lo otro: los textos son del producto (y
+# costaron una llamada a Gemini), pero el guion, la voz y el vídeo son de la
+# tanda que se hizo — y cuando un número se reutiliza, son de otro producto.
+CAMPOS_GENERADOS = frozenset({
+    "guion_producto", "subliminal_producto",
+    "guion_producto_plazos", "guion_producto_envio",
+    "guion_plazos", "modo_plazos",
+    "video_path", "video_listo_at",
+    "clip1_path", "clip2_path",
+    "voz_label", "voz_sexo", "mano_detectada", "mano_votos",
+    "uploaded", "uploaded_at", "sold",
+})
+
+
+def limpiar_generado(
+    source: str, folder: str, producto: str, usuario: str = "",
+) -> list[str]:
+    """Deja el producto como recién subido: fuera el guion, la voz, los clips,
+    el vídeo y las marcas de subido/vendido. Los textos NO se tocan.
+
+    Existe porque el número es la identidad dentro de la carpeta y se
+    reutiliza: un producto podía nacer con el guion y el vídeo del que ocupaba
+    antes ese número. Borrar y volver a subir las fotos también lo arregla,
+    pero esto no obliga a tenerlas a mano.
+
+    Devuelve los campos que había que borrar.
+    """
+    borrados: list[str] = []
+    with _cerrojo_carpeta(source, folder):
+        data = load_folder(source, folder)
+        prod = (data.get("productos") or {}).get(producto)
+        if prod:
+            for campo in list(prod):
+                if campo in CAMPOS_GENERADOS:
+                    prod.pop(campo, None)
+                    borrados.append(campo)
+            prod["updated_at"] = _now()
+            save_folder(source, folder, data)
+
+        if not _es_compartido(usuario):
+            r = _require_redis()
+            clave = _key_privado(source, folder, usuario)
+            doc = r.get_json(clave) or {}
+            mio = (doc.get("productos") or {}).get(producto)
+            if mio:
+                for campo in list(mio):
+                    if campo in CAMPOS_GENERADOS:
+                        mio.pop(campo, None)
+                        borrados.append(campo)
+                r.set_json(clave, doc)
+
+    # La venta vive en su propio documento: sin esto el producto seguiría en
+    # el ranking de vendidos aunque la tarjeta ya no lo marque.
+    try:
+        mover_venta(source, folder, producto, "", usuario)
+    except Exception:  # noqa: BLE001 — Redis caído no debe tumbar la limpieza
+        pass
+    return sorted(set(borrados))
+
+
 def _update_product_sin_cerrojo(
     source: str, folder: str, producto: str, **fields
 ) -> dict:
