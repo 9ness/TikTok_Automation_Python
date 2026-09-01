@@ -171,12 +171,19 @@ export default function PlantillasPage() {
     (JSON.stringify(items) !== JSON.stringify(data?.items ?? []) ||
       JSON.stringify(valores) !== JSON.stringify(data?.valores ?? {}));
 
+  // Hidratar desde el servidor SOLO si no hay nada tuyo sin guardar. Antes se
+  // hidrataba con cada respuesta, y la del propio guardado automático llegaba
+  // con lo de hace 1,2s: si seguías escribiendo mientras iba la petición, el
+  // campo se rebobinaba solo. Por eso parecía que había que reescribirlo todo.
+  const sucioRef = useRef(false);
+  sucioRef.current = sucio;
   useEffect(() => {
     if (!data) return;
+    if (cargado && sucioRef.current) return;
     setItems(data.items);
     setValores(data.valores);
     setCargado(true);
-  }, [data]);
+  }, [data, cargado]);
 
   // Guardado automático: la pantalla es para copiar y salir corriendo, así que
   // exigir un botón garantizaba perder ediciones. Se espera a que pares de
@@ -210,18 +217,45 @@ export default function PlantillasPage() {
 
       {/* Los huecos, arriba del todo: se rellenan UNA vez y valen para todas
           las plantillas de la pantalla. */}
-      <section className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 bg-card p-3 sm:grid-cols-2">
-        {HUECOS.map((h) => (
-          <label key={h.clave} className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground">{h.label}</span>
-            <input
-              value={valores[h.clave] ?? ""}
-              onChange={(e) => setValores((p) => ({ ...p, [h.clave]: e.target.value }))}
-              placeholder={h.ejemplo}
-              className="w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
-            />
-          </label>
-        ))}
+      <section className="space-y-2 rounded-lg border border-border/60 bg-card p-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {HUECOS.map((h) => (
+            <label key={h.clave} className="space-y-1">
+              <span className="text-[11px] font-medium text-muted-foreground">{h.label}</span>
+              <input
+                value={valores[h.clave] ?? ""}
+                onChange={(e) => setValores((p) => ({ ...p, [h.clave]: e.target.value }))}
+                placeholder={h.ejemplo}
+                className="w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+          ))}
+        </div>
+        {/* Se guardan solos, pero el botón está aquí a propósito: son los
+            datos que no quieres reescribir nunca más, y sin nada que pulsar
+            no había forma de saber que ya estaban a salvo. */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!sucio || guardar.isPending}
+            onClick={() =>
+              guardar.mutate(
+                { items, valores },
+                {
+                  onSuccess: () => toast.success("Guardado."),
+                  onError: (e) => toast.error(e.message),
+                },
+              )
+            }
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition disabled:opacity-60 bg-violet-500/15 text-violet-400 hover:bg-violet-500/25"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {guardar.isPending ? "Guardando…" : sucio ? "Guardar" : "Guardado ✓"}
+          </button>
+          <span className="text-[10px] text-muted-foreground">
+            Se rellenan una vez y valen para todos los mensajes.
+          </span>
+        </div>
       </section>
 
       {isLoading && <p className="text-xs text-muted-foreground">Cargando…</p>}
@@ -280,7 +314,13 @@ export default function PlantillasPage() {
           onClick={() => {
             if (!confirm("¿Descartar tus plantillas y volver a las de fábrica?")) return;
             restaurar.mutate(undefined, {
-              onSuccess: () => toast.success("Plantillas restauradas (tu cuenta se conserva)."),
+              onSuccess: (doc) => {
+                // Explícito porque la hidratación de arriba ya no pisa lo
+                // local: restaurar es justo el caso en que sí queremos pisarlo.
+                setItems(doc.items);
+                setValores(doc.valores);
+                toast.success("Plantillas restauradas (tu cuenta se conserva).");
+              },
               onError: (e) => toast.error(e.message),
             });
           }}

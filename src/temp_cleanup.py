@@ -8,7 +8,11 @@ import time
 from pathlib import Path
 
 CLEANUP_MARKER = ".last_cleanup"
-PROTECTED_NAMES = {CLEANUP_MARKER, ".gitkeep", ".gitignore"}
+# `deploy_status.json` no es un temporal: es el rastro del último despliegue y
+# lo lee la Cola. Si pasan 3 días sin desplegar, la limpieza se lo llevaba y el
+# badge se quedaba mudo (o peor: cayendo al fallback de git, que dice "success"
+# mire lo que mire).
+PROTECTED_NAMES = {CLEANUP_MARKER, ".gitkeep", ".gitignore", "deploy_status.json"}
 
 
 def cleanup_temp_files(temp_dir, max_age_days=3, throttle_hours=12, force=False):
