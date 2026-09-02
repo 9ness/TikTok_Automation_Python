@@ -78,9 +78,18 @@ def _memo(clave: str, calcular: Callable[[], Any]) -> Any:
     return valor
 
 
-def _invalidar() -> None:
-    """Tras escribir. Se tira todo: son cuatro entradas, no compensa hilar."""
-    _LISTADOS.clear()
+def _invalidar(source: str = "") -> None:
+    """Tras escribir. Sin `source` se tira todo.
+
+    Con él se tira SOLO lo de ese catálogo: tirarlo entero dejaba frío el otro
+    sin motivo, y volver a listarlo cuesta ~29s medidos cuando rclone tampoco
+    lo tiene cacheado. Son dos catálogos, no cuatro entradas.
+    """
+    if not source:
+        _LISTADOS.clear()
+        return
+    for clave in [k for k in _LISTADOS if k.startswith(f"{source}:")]:
+        _LISTADOS.pop(clave, None)
 
 
 def _num_carpeta(nombre: str) -> int:
@@ -104,16 +113,18 @@ def carpetas(source: str = SOURCE) -> list[str]:
 
 
 def _productos_en(carpeta: str, source: str = SOURCE) -> set[str]:
-    """Números de producto que ya hay en la carpeta (por nombre de fichero)."""
-    d = _dir(source) / carpeta
-    if not d.is_dir():
-        return set()
+    """Números de producto que ya hay en la carpeta (por nombre de fichero).
+
+    Sale del listado CACHEADO, no de un `iterdir` nuevo: es la misma pregunta y
+    la respuesta ya está en memoria. Dar de alta un producto lo llama dos veces
+    (para saber en qué carpeta cae y con qué número), y contra el mount frío
+    cada llamada se paga en segundos.
+    """
     numeros: set[str] = set()
-    for f in d.iterdir():
-        if f.is_file() and f.suffix.lower() in _EXTS:
-            m = re.match(r"^(\d+)", f.stem)
-            if m:
-                numeros.add(m.group(1))
+    for foto in listar_fotos_como_drive(carpeta, source):
+        m = re.match(r"^(\d+)", Path(foto["name"]).stem)
+        if m:
+            numeros.add(m.group(1))
     return numeros
 
 
@@ -164,6 +175,18 @@ def guardar_producto(
     destino.mkdir(parents=True, exist_ok=True)
     producto = siguiente_producto(carpeta, source)
 
+    # Red de seguridad: el número sale del listado CACHEADO, y si alguien tocó
+    # la carpeta a mano en Drive ese listado puede ir 15 minutos por detrás.
+    # Sin esto, el producto nuevo se escribiría ENCIMA de uno que ya está. Son
+    # cuatro `exists()` sobre una carpeta recién resuelta; si el hueco está
+    # ocupado se relee de verdad y se coge el siguiente.
+    if any((destino / f"{producto}{ext}").exists() for ext in _EXTS):
+        _LISTADOS.pop(f"{source}:fotos:{carpeta}", None)
+        carpeta = carpeta_actual(source)
+        destino = _dir(source) / carpeta
+        destino.mkdir(parents=True, exist_ok=True)
+        producto = siguiente_producto(carpeta, source)
+
     # El número que toca pudo ser de otro producto que se borró. Desde el
     # arreglo, borrar ya se lleva sus datos, pero los que se borraron ANTES
     # siguen ahí y el producto nuevo nacería con sus textos, su guion y su
@@ -185,8 +208,38 @@ def guardar_producto(
         if datos:
             (destino / f"{producto}({i}){_extension(nombre)}").write_bytes(datos)
 
-    # Sin esto el operador sube el producto y no lo ve hasta que vence el TTL.
-    _invalidar()
+    # La caché se ACTUALIZA, no se tira: se sabe exactamente qué ha entrado, y
+    # tirarla obligaba a releer la carpeta del mount en la siguiente pantalla
+    # (~29s medidos en frío). Antes de esto, dar de alta dos productos seguidos
+    # pagaba esa espera en medio, que es el "a veces tarda mucho".
+    fotos = _LISTADOS.get(f"{source}:fotos:{carpeta}")
+    if fotos:
+        caduca, listado = fotos
+        for f in sorted(destino.iterdir()):
+            if not (f.is_file() and f.suffix.lower() in _EXTS):
+                continue
+            if not re.match(rf"^{re.escape(producto)}(\(\d+\))?$", f.stem):
+                continue
+            if any(x["name"] == f.name for x in listado):
+                continue
+            listado.append({
+                "id": f"{f}#{int(f.stat().st_mtime)}",
+                "name": f.name,
+                "size": f.stat().st_size,
+                "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
+                "mtime": "",
+            })
+        listado.sort(key=lambda x: config.natural_sort_key(x["name"]))
+        _LISTADOS[f"{source}:fotos:{carpeta}"] = (caduca, listado)
+    else:
+        _LISTADOS.pop(f"{source}:fotos:{carpeta}", None)
+    # Si el producto ha estrenado carpeta, el listado de carpetas sí cambia.
+    carpetas_cache = _LISTADOS.get(f"{source}:carpetas")
+    if carpetas_cache and carpeta not in carpetas_cache[1]:
+        caduca, nombres = carpetas_cache
+        _LISTADOS[f"{source}:carpetas"] = (
+            caduca, sorted([*nombres, carpeta], key=_num_carpeta),
+        )
     return {"carpeta": carpeta, "producto": producto}
 
 
@@ -222,7 +275,7 @@ def borrar_producto(
 
     if renumerar:
         renumerar_carpeta(carpeta, source)
-    _invalidar()
+    _invalidar(source)
     return True
 
 
@@ -275,7 +328,7 @@ def renumerar_carpeta(carpeta: str, source: str = SOURCE) -> dict[str, str]:
     _mover_datos(carpeta, mapa, validos, source)
     # Sin esto el listado sigue sirviendo los números viejos y se cruzan con
     # los textos ya movidos: cada producto sale con el nombre del siguiente.
-    _invalidar()
+    _invalidar(source)
     return mapa
 
 
@@ -340,7 +393,8 @@ def mover_producto(
     )
     # Los dos listados cambian: el de origen pierde un producto y el de
     # destino lo gana. Sin esto se ve el producto en los dos sitios.
-    _invalidar()
+    _invalidar(origen)
+    _invalidar(destino)
     return {"carpeta": c_des, "producto": str(p_des)}
 
 
@@ -543,5 +597,5 @@ def compactar(on_log=None, source: str = SOURCE) -> dict:
     if borradas:
         _log(f"[compactar] carpetas vacías borradas: {', '.join(borradas)}")
 
-    _invalidar()
+    _invalidar(source)
     return {"movidos": len(plan), "carpetas_borradas": borradas}
