@@ -39,6 +39,11 @@ export interface FoldersListResponse {
   items: ProductFolder[];
   total: number;
   completed_count: number;
+  /** Vídeos montados, sin subir y con stock en las carpetas marcadas
+   *  "pendiente": los que se pueden publicar mañana. */
+  listos_para_subir?: number;
+  /** De cuántas carpetas pendientes salen. */
+  carpetas_pendientes?: number;
   /** Primera carpeta sin completar — lo que la UI muestra por defecto. */
   current: string | null;
 }
@@ -85,6 +90,11 @@ export interface MarkCompletedResponse {
   folder: string;
   completed: boolean;
   completed_count: number;
+  /** Vídeos montados, sin subir y con stock en las carpetas marcadas
+   *  "pendiente": los que se pueden publicar mañana. */
+  listos_para_subir?: number;
+  /** De cuántas carpetas pendientes salen. */
+  carpetas_pendientes?: number;
   total: number;
   next_folder: string | null;
 }

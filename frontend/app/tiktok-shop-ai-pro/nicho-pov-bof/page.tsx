@@ -987,9 +987,29 @@ export default function NichoPovBofPage() {
         {source === "top_vendidos" && <SincronizarTopVendidos folder={folder} />}
 
         <Sub>Carpetas</Sub>
-        <div className="flex items-center justify-between text-xs sm:text-sm">
-          <span className="font-medium">
-            {done} / {total} completadas
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+          <span className="flex flex-wrap items-center gap-2 font-medium">
+            <span>
+              {done} / {total} completadas
+            </span>
+            {/* Lo que se puede publicar mañana. Solo cuenta lo de las carpetas
+                marcadas "pendiente" (📤): son las que se preparan de días
+                futuros, y hasta ahora había que abrirlas una a una para saber
+                cuántos vídeos había hechos. Los sin stock no entran — están
+                montados pero no se pueden subir, y esos van a su chip. */}
+            {!!data?.listos_para_subir && (
+              <span
+                title={
+                  `${data.listos_para_subir} vídeo(s) montados y sin subir en ` +
+                  `${data.carpetas_pendientes ?? 0} carpeta(s) marcadas pendientes. ` +
+                  "Los sin stock no cuentan."
+                }
+                className="rounded-full border border-orange-500/50 bg-orange-500/10 px-2 py-0.5 text-[11px] font-semibold text-orange-400"
+              >
+                📤 {data.listos_para_subir} listo
+                {data.listos_para_subir === 1 ? "" : "s"} para subir
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-2">
             {/* Recargaba SOLO las carpetas: pulsarlo no cambiaba ni los

@@ -897,20 +897,22 @@ def resumen_por_carpeta(source: str, folders: list[str]) -> dict[str, dict]:
     return salida
 
 
-def esperando_stock(
+def videos_hechos(
     source: str, folders: list[str], usuario: str = "",
-) -> dict[str, list[str]]:
-    """`{carpeta: [números]}` de los productos con el vídeo hecho, marcados sin
-    stock y aún sin subir.
+) -> dict[str, dict[str, list[str]]]:
+    """`{carpeta: {"listos": [...], "esperando_stock": [...]}}`.
 
-    Es trabajo TERMINADO que no se puede publicar: la ficha de TikTok no está
-    disponible. No se tira —el producto puede volver— pero mezclado con el
-    resto se pierde de vista, y el vídeo estaba hecho. Al marcarlos subidos
-    salen solos de la lista, porque el filtro es este.
+    Los dos salen de la MISMA pregunta —¿tiene vídeo y sigue sin subir?— y solo
+    los separa el stock, así que se leen de una vez: son los mismos documentos
+    y contarlos por separado eran dos barridos de todas las carpetas.
+
+    - `listos`: se pueden subir hoy.
+    - `esperando_stock`: trabajo terminado que NO se puede publicar porque la
+      ficha de TikTok está caída.
 
     `video_path` y `uploaded` son campos privados: para `ness` viven en el
-    documento compartido y para los demás en el suyo, así que hay que mirar
-    los dos y quedarse con el privado, igual que hace `get_product`.
+    documento compartido y para los demás en el suyo, así que hay que mirar los
+    dos y quedarse con el privado, igual que hace `get_product`.
     """
     r = get_nicho_pov_bof_redis()
     if not r.is_available() or not folders:
@@ -922,7 +924,7 @@ def esperando_stock(
             doc = r.get_json(_key_privado(source, nombre, usuario)) or {}
             privados[nombre] = doc.get("productos") or {}
 
-    salida: dict[str, list[str]] = {}
+    salida: dict[str, dict[str, list[str]]] = {}
     for nombre, doc in zip(folders, docs):
         todos = ((doc or {}).get("productos") or {})
         mios = privados.get(nombre) or {}
@@ -931,14 +933,42 @@ def esperando_stock(
             [str(i) for i in vigentes if str(i) in todos]
             if isinstance(vigentes, list) else list(todos)
         )
-        aqui = []
+        listos: list[str] = []
+        esperando: list[str] = []
         for n in numeros:
             prod = {**todos.get(n, {}), **mios.get(n, {})}
-            if prod.get("sin_stock") and prod.get("video_path") and not prod.get("uploaded"):
-                aqui.append(str(n))
-        if aqui:
-            salida[nombre] = sorted(aqui, key=lambda x: int(x) if x.isdigit() else 0)
+            if not prod.get("video_path") or prod.get("uploaded"):
+                continue
+            (esperando if prod.get("sin_stock") else listos).append(str(n))
+        if listos or esperando:
+            def _orden(xs: list[str]) -> list[str]:
+                return sorted(xs, key=lambda x: int(x) if x.isdigit() else 0)
+
+            salida[nombre] = {
+                "listos": _orden(listos), "esperando_stock": _orden(esperando),
+            }
     return salida
+
+
+def esperando_stock(
+    source: str, folders: list[str], usuario: str = "",
+) -> dict[str, list[str]]:
+    """`{carpeta: [números]}` de los productos con el vídeo hecho, marcados sin
+    stock y aún sin subir.
+
+    Es trabajo TERMINADO que no se puede publicar: la ficha de TikTok no está
+    disponible. No se tira —el producto puede volver— pero mezclado con el
+    resto se pierde de vista, y el vídeo estaba hecho. Al marcarlos subidos
+    salen solos de la lista, porque el filtro es este.
+
+    Es la mitad de `videos_hechos`; se conserva porque la carpeta virtual solo
+    necesita esta.
+    """
+    return {
+        carpeta: estado["esperando_stock"]
+        for carpeta, estado in videos_hechos(source, folders, usuario).items()
+        if estado["esperando_stock"]
+    }
 
 
 def productos_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:

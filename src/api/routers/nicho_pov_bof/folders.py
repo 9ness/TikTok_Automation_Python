@@ -130,14 +130,20 @@ def list_folders(
         )
         for f in folders
     ]
-    # La carpeta virtual va al final y SOLO si tiene algo: un chip vacío en
-    # todas las fuentes es ruido, y aquí lo que importa es enterarse de que hay
-    # vídeos parados esperando a que el producto vuelva.
+    # Los vídeos ya montados que siguen sin subir, de una sola lectura: los que
+    # se pueden publicar (con stock) y los que esperan a que el producto vuelva.
     try:
-        esperando = product_repo.esperando_stock(source, nombres, usuario)
+        hechos = product_repo.videos_hechos(source, nombres, usuario)
     except Exception:  # noqa: BLE001 — contar no puede tumbar el listado
-        esperando = {}
-    cuantos = sum(len(v) for v in esperando.values())
+        hechos = {}
+    # Los "listos" se cuentan SOLO de las carpetas marcadas pendientes: es lo
+    # que el operador ha apartado para subir otro día. Sin ese filtro el número
+    # incluiría todo lo montado del catálogo, que no es lo que se pregunta.
+    pendientes_con_video = {
+        c: e["listos"] for c, e in hechos.items() if c in pendientes and e["listos"]
+    }
+    listos = sum(len(v) for v in pendientes_con_video.values())
+    cuantos = sum(len(e["esperando_stock"]) for e in hechos.values())
     if cuantos:
         items.append(ProductFolder(
             name=config.CARPETA_ESPERANDO_STOCK,
@@ -153,6 +159,8 @@ def list_folders(
     return FoldersListResponse(
         source=source,
         items=items,
+        listos_para_subir=listos,
+        carpetas_pendientes=len(pendientes_con_video),
         total=sum(1 for i in items if not i.virtual),
         completed_count=sum(1 for i in items if i.completed),
         current=current,

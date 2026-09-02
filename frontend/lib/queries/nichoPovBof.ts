@@ -625,6 +625,13 @@ export function useSetEstado() {
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
       }
+      // El contador de "listos para subir" vive en el listado de CARPETAS, y
+      // estas dos cosas lo mueven: subir uno lo baja y marcar sin stock lo
+      // saca de la cuenta. Solo con ellas — invalidarlo en cada toque de
+      // Escaparate sería una llamada de más en la acción más repetida del día.
+      if (vars.uploaded !== undefined || vars.sin_stock !== undefined) {
+        void qc.invalidateQueries({ queryKey: nichoPovBofKeys.folders(vars.source) });
+      }
       // El precio decide si el vídeo va con guion de plazos (dos clips) y lo
       // lee también el POV BOF Largo, que es otro nicho con sus propias
       // queries: se invalida TODO, que es lo único que garantiza que el

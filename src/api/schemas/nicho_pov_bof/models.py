@@ -56,6 +56,12 @@ class FoldersListResponse(BaseModel):
     items: list[ProductFolder]
     total: int
     completed_count: int
+    # Vídeos montados, sin subir y CON stock que hay en las carpetas marcadas
+    # "pendiente". Es lo que se puede publicar mañana: se preparan carpetas de
+    # días futuros y hasta ahora había que abrirlas una a una para contarlos.
+    listos_para_subir: int = 0
+    # De cuántas carpetas salen, para saber si están repartidos o todos juntos.
+    carpetas_pendientes: int = 0
     # Primera carpeta no completada — es lo que la UI muestra por defecto.
     # None si ya están todas hechas.
     current: str | None = None
