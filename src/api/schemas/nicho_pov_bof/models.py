@@ -227,6 +227,12 @@ class ProductoInfo(BaseModel):
     # Solo en modo plazos: cuáles de los dos clips están ya subidos.
     clip1: bool = False
     clip2: bool = False
+    # Un guion de 30s no cabe en dos clips: el montaje ya sabe pegar hasta
+    # cuatro (`CLIPS_MAXIMOS`), así que la ficha tiene que poder enseñarlos.
+    clip3: bool = False
+    clip4: bool = False
+    # Duración pedida para el guion (0 = la del curso).
+    segundos_guion: float = 0
     # El guion de plazos que le ha tocado, para poder leerlo antes de montar.
     guion: str = ""
     guion_caracteres: int = 0
@@ -371,6 +377,9 @@ class ProductoEstadoRequest(BaseModel):
     # suyo, y va en el documento compartido: es del trato, no de quién grabe.
     # `None` no lo toca; cadena vacía lo borra.
     notas: str | None = None
+    # Cuántos segundos debe durar el guion. `0` = el del curso (~10s), que es
+    # lo normal; se sube cuando la tienda pide vídeos de 30 o 40 segundos.
+    segundos_guion: float | None = None
 
 
 class ProductoBuscado(BaseModel):

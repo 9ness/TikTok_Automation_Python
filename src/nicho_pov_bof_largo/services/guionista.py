@@ -36,6 +36,7 @@ def escribir(
     tienda: str = "",
     caption: str = "",
     foto: Path | None = None,
+    fotos: list[Path] | None = None,
     plazos: bool = False,
     prompt: str = "",
     max_caracteres: int = 0,
@@ -52,6 +53,11 @@ def escribir(
     que siempre va acompañada de la descripción; si no hay foto se manda solo
     el texto (Gemini se apaña, pero el guion sale más genérico).
 
+    `fotos` son TODAS las del producto (limpia, ficha y las capturas de
+    características que haya subido el operador). Hacen falta para los guiones
+    largos: con el título solo no hay de qué hablar treinta segundos, y lo que
+    llena ese hueco son las capturas de la ficha — material, medidas, usos.
+
     `prompt` y `max_caracteres` los usa el POV BOF (el corto), que pide el
     mismo JSON pero con otra estructura y 190 caracteres en vez de ~356. Se
     parametriza aquí en vez de duplicar la función: lo único distinto es el
@@ -65,7 +71,7 @@ def escribir(
     if caption:
         descripcion += f" Descripción: {caption.strip()}"
 
-    imagenes = [str(foto)] if foto else None
+    imagenes = [str(f) for f in (fotos or ([foto] if foto else []))] or None
     if plazos:
         on_log("[nicho_pov_bof_largo] guion con la frase de plazos (producto caro)")
     datos = generate_json(

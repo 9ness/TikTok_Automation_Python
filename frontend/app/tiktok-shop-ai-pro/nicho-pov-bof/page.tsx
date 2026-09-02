@@ -1946,6 +1946,11 @@ function AltaMiProducto({
   const [ficha, setFicha] = useState<File | null>(null);
   const refLimpia = useRef<HTMLInputElement>(null);
   const refFicha = useRef<HTMLInputElement>(null);
+  // Capturas de MÁS: características, medidas, qué trae. Son las que dan de
+  // qué hablar cuando la tienda pide un vídeo de 30 o 40 segundos; con el
+  // título solo, Gemini estira lo mismo con más adjetivos.
+  const refExtras = useRef<HTMLInputElement>(null);
+  const [extras, setExtras] = useState<File[]>([]);
   const [abierto, setAbierto] = useState(false);
 
   function enviar() {
@@ -1954,15 +1959,20 @@ function AltaMiProducto({
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, source },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source },
       {
         onSuccess: (r) => {
-          toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
+          toast.success(
+            `Producto ${r.producto} añadido a «${r.carpeta}»` +
+              (extras.length ? ` · ${extras.length} captura(s) más` : ""),
+          );
           onCreado?.(r.carpeta);
           setLimpia(null);
           setFicha(null);
+          setExtras([]);
           if (refLimpia.current) refLimpia.current.value = "";
           if (refFicha.current) refFicha.current.value = "";
+          if (refExtras.current) refExtras.current.value = "";
         },
         onError: (e) =>
           toast.error(e instanceof ApiError ? e.message : String(e)),
@@ -2014,6 +2024,30 @@ function AltaMiProducto({
         {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
         {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
       </div>
+      {/* Solo hacen falta para los guiones largos, así que no ocupan sitio
+          arriba: van debajo y en una sola línea. */}
+      <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-emerald-500/60">
+        <span className="text-[11px] font-semibold">
+          Más capturas (opcional)
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          Características, medidas, qué trae. Con ellas se puede pedir un guion
+          de 30 o 40 segundos; con el título solo, no.
+        </span>
+        <input
+          ref={refExtras}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => setExtras(Array.from(e.target.files ?? []))}
+          className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
+        />
+        {!!extras.length && (
+          <span className="truncate text-[10px] text-emerald-500">
+            ✓ {extras.length} captura(s)
+          </span>
+        )}
+      </label>
       <button
         type="button"
         disabled={crear.isPending || !limpia}
@@ -2157,10 +2191,17 @@ function ProductoCard({
   // Progreso POR CLIP en los productos de plazos (null = ese no se está
   // subiendo). Cada slot va por su cuenta: se puede subir el clip 2 mientras
   // el 1 va por la mitad, y una ficha no bloquea a las demás.
-  const [pctsClip, setPctsClip] = useState<{ 1: number | null; 2: number | null }>({
-    1: null, 2: null,
+  // Hasta cuatro: un guion de 30s no cabe en dos clips y el montaje ya sabe
+  // pegar los que hagan falta.
+  const [pctsClip, setPctsClip] = useState<Record<number, number | null>>({
+    1: null, 2: null, 3: null, 4: null,
   });
-  const clipRefs = { 1: useRef<HTMLInputElement>(null), 2: useRef<HTMLInputElement>(null) };
+  const clipRefs: Record<number, React.RefObject<HTMLInputElement>> = {
+    1: useRef<HTMLInputElement>(null),
+    2: useRef<HTMLInputElement>(null),
+    3: useRef<HTMLInputElement>(null),
+    4: useRef<HTMLInputElement>(null),
+  };
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   // Los dos que se usan a diario (Caption y URL) van fuera; el resto detrás de
@@ -2250,7 +2291,7 @@ function ProductoCard({
   const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
-  function uploadVideo(file: File, slot: 0 | 1 | 2 = 0) {
+  function uploadVideo(file: File, slot = 0) {
     if (slot) setPctsClip((prev) => ({ ...prev, [slot]: 0 }));
     else {
       setUploading(true);
@@ -2895,12 +2936,61 @@ function ProductoCard({
         </div>
       )}
 
-      {clipsDe(producto) === 2 ? (
-        /* Dos clips (hoy, los de plazos: su guion dura ~15s). No se monta
-           hasta tener los dos. */
+      {/* Cuánto tiene que durar el guion. El del curso son ~10s y es lo normal;
+          se sube cuando la tienda pide vídeos de 30 o 40 segundos por la
+          muestra. Con más segundos hacen falta más clips (el montaje los pega)
+          y, sobre todo, más fotos: con el título solo, Gemini estira lo mismo
+          con más adjetivos. Se cambia ANTES de pedir el guion. */}
+      {CATALOGOS_PROPIOS.includes(source) && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+          <span>Guion de</span>
+          {[0, 20, 30, 40].map((sg) => (
+            <button
+              key={sg}
+              type="button"
+              title={
+                sg === 0
+                  ? "El del curso: ~190 caracteres, unos 10 segundos"
+                  : `~${Math.round(sg * 18.2)} caracteres. Necesita capturas del producto para tener qué contar`
+              }
+              onClick={() =>
+                setEstado.mutate(
+                  {
+                    source,
+                    folder: producto.folder || folder,
+                    producto: producto.producto,
+                    segundos_guion: sg,
+                  },
+                  {
+                    onError: (e) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                )
+              }
+              className={`rounded px-1.5 py-0.5 font-semibold transition ${
+                (producto.segundos_guion || 0) === sg
+                  ? "bg-amber-500/20 text-amber-500"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {sg === 0 ? "normal" : `${sg}s`}
+            </button>
+          ))}
+          {!!producto.segundos_guion && (
+            <span className="ml-auto text-amber-500/80">
+              rehaz el guion para aplicarlo
+            </span>
+          )}
+        </div>
+      )}
+
+      {clipsDe(producto) >= 2 ? (
+        /* Dos clips o más: el guion manda. No se monta hasta tenerlos todos. */
         <div className="grid grid-cols-2 gap-1.5">
-          {([1, 2] as const).map((slot) => {
-            const puesto = slot === 1 ? producto.clip1 : producto.clip2;
+          {Array.from({ length: clipsDe(producto) }, (_, i) => i + 1).map((slot) => {
+            const puesto = [
+              producto.clip1, producto.clip2, producto.clip3, producto.clip4,
+            ][slot - 1];
             const pctSlot = pctsClip[slot];
             const subiendoEste = pctSlot !== null;
             return (
@@ -2968,7 +3058,7 @@ function ProductoCard({
           })}
         </div>
       ) : null}
-      {producto.montando && clipsDe(producto) === 2 ? (
+      {producto.montando && clipsDe(producto) >= 2 ? (
         <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locutando y montando…
         </p>

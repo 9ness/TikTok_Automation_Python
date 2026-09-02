@@ -342,8 +342,13 @@ def _producto_info(
         # creer que solo falta el otro.
         guion=str(prod.get("guion_plazos") or ""),
         guion_caracteres=len(str(prod.get("guion_plazos") or "")),
-        clip1=_clip_vigente(prod.get("clip1_path"), float(prod.get("video_listo_at") or 0)),
-        clip2=_clip_vigente(prod.get("clip2_path"), float(prod.get("video_listo_at") or 0)),
+        **{
+            f"clip{n}": _clip_vigente(
+                prod.get(f"clip{n}_path"), float(prod.get("video_listo_at") or 0),
+            )
+            for n in range(1, 5)
+        },
+        segundos_guion=float(prod.get("segundos_guion") or 0),
         # El escaparate sale del índice ÚNICO por (tienda|nombre): el mismo
         # producto está repetido en varias carpetas y se graba con varios
         # nichos, pero al Marketplace se sube UNA vez. El flag viejo por
@@ -521,12 +526,14 @@ def _list_productos(
                 modo_plazos=_precio_y_modo(guardado)[1],
                 guion=str(guardado.get("guion_plazos") or ""),
                 guion_caracteres=len(str(guardado.get("guion_plazos") or "")),
-                clip1=_clip_vigente(
-                    guardado.get("clip1_path"), float(guardado.get("video_listo_at") or 0),
-                ),
-                clip2=_clip_vigente(
-                    guardado.get("clip2_path"), float(guardado.get("video_listo_at") or 0),
-                ),
+                **{
+                    f"clip{n}": _clip_vigente(
+                        guardado.get(f"clip{n}_path"),
+                        float(guardado.get("video_listo_at") or 0),
+                    )
+                    for n in range(1, 5)
+                },
+                segundos_guion=float(guardado.get("segundos_guion") or 0),
                 en_escaparate=product_repo.marcado_en_escaparate(guardado, escaparate),
                 uploaded=bool(guardado.get("uploaded")),
                 uploaded_at=float(guardado.get("uploaded_at") or 0),
@@ -986,7 +993,7 @@ def quitar_clip(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ProductoInfo:
-    """Quita un clip subido por error (solo productos de plazos, que llevan dos).
+    """Quita un clip subido por error (los productos llevan de dos a cuatro).
 
     Sin esto, un clip mal subido se quedaba puesto y el montaje arrancaba con
     él en cuanto entraba el otro. Solo se borra el hueco: ni el vídeo montado
@@ -994,8 +1001,8 @@ def quitar_clip(
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    if slot not in (1, 2):
-        raise _bad_request(f"slot debe ser 1 o 2, recibido: {slot}")
+    if slot not in (1, 2, 3, 4):
+        raise _bad_request(f"slot debe ir de 1 a 4, recibido: {slot}")
     prod = product_repo.get_product(source, folder, producto, usuario)
     ruta = str(prod.get(f"clip{slot}_path") or "")
     try:
@@ -1058,8 +1065,10 @@ async def upload_video(
     # de poner marca de agua. Se guarda tal cual llegue (vacío incluido) solo
     # como dato del job.
     origen_norm = (origen or "").strip().lower()
-    if slot not in (0, 1, 2):
-        raise _bad_request(f"slot debe ser 0, 1 o 2, recibido: {slot}")
+    # Hasta cuatro: un guion de 30s no cabe en dos clips y el montaje ya sabe
+    # pegar los que hagan falta (`CLIPS_MAXIMOS`).
+    if slot not in (0, 1, 2, 3, 4):
+        raise _bad_request(f"slot debe ir de 0 a 4, recibido: {slot}")
 
     filename = (file.filename or "").lower()
     ext = next((e for e in _ALLOWED_VIDEO_EXTS if filename.endswith(e)), "")
@@ -1354,6 +1363,7 @@ async def importar_productos_web(
 async def crear_mi_producto(
     foto_limpia: Annotated[UploadFile, File()],
     foto_ficha: Annotated[UploadFile | None, File()] = None,
+    fotos_extra: Annotated[list[UploadFile] | None, File()] = None,
     source: Annotated[str, Query()] = "mis_productos",
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
@@ -1390,6 +1400,15 @@ async def crear_mi_producto(
 
     limpia = await _leer(foto_limpia, "La foto del producto")
     ficha = await _leer(foto_ficha, "La captura de la ficha") if foto_ficha else b""
+    # Capturas de más (características, medidas, qué trae). Son las que dan de
+    # qué hablar en un guion largo.
+    extras: list[tuple[bytes, str]] = []
+    for i, extra in enumerate(fotos_extra or [], start=1):
+        if not (extra and extra.filename):
+            continue
+        extras.append((
+            await _leer(extra, f"La captura extra {i}"), extra.filename or "",
+        ))
 
     try:
         creado = mis_productos.guardar_producto(
@@ -1397,6 +1416,7 @@ async def crear_mi_producto(
             nombre_limpia=foto_limpia.filename or "",
             nombre_ficha=(foto_ficha.filename or "") if foto_ficha else "",
             source=source,
+            extras=extras,
         )
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
@@ -1673,6 +1693,14 @@ def set_producto_estado(
     # siguiente vuelva a abrir el enlace para descubrir lo mismo.
     # Los requisitos del vendedor van al documento COMPARTIDO por lo mismo que
     # "sin stock": son del trato con la tienda, no de quién grabe el vídeo.
+    # Cuántos segundos tiene que durar el guion de ESTE producto. Va al
+    # documento compartido: lo pide la tienda, no quien grabe.
+    if body.segundos_guion is not None:
+        product_repo.save_extracted_texts(
+            body.source, body.folder,
+            {body.producto: {"segundos_guion": float(body.segundos_guion or 0)}},
+        )
+
     if body.notas is not None:
         product_repo.save_extracted_texts(
             body.source, body.folder,
@@ -2004,6 +2032,9 @@ def escribir_guion(body: dict) -> dict:
 
     plazos = pov_config.hay_plazos(prod)
     envio = largo_config.hay_envio_gratis(prod)
+    # Duración pedida a mano (0 = la del curso, ~10s). La ponen los productos
+    # con requisitos: "dos vídeos de 30 segundos" no se cuenta en diez.
+    segundos = float(prod.get("segundos_guion") or 0)
     guardado = str(prod.get("guion_producto") or "")
     # El guion guardado se reaprovecha SIEMPRE (salvo "rehacer"): si lo que
     # promete no cuadra con la ficha, se le cambia el cierre —que es un literal
@@ -2026,6 +2057,7 @@ def escribir_guion(body: dict) -> dict:
         }
 
     foto = None
+    imagenes: list = []
     try:
         from src.nicho_pov_bof.services import drive_client, photo_pairing
 
@@ -2036,10 +2068,25 @@ def escribir_guion(body: dict) -> dict:
         par = next(
             (x for x in photo_pairing.pair_folder(fotos)
              if str(x.get("producto")) == producto), None,
-        )
-        limpia = (par or {}).get("clean") or {}
+        ) or {}
+        limpia = par.get("clean") or {}
         if limpia.get("id"):
             foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+            imagenes.append(foto)
+        # Para un guion largo hacen falta las CAPTURAS: el título solo no da
+        # para treinta segundos. Van la de la ficha y las de características
+        # que haya subido el operador. En el guion corto no se mandan — cuesta
+        # tokens y el prompt del curso solo necesita la limpia.
+        if segundos > 0:
+            otras = [par.get("titled")] + list(par.get("extras") or [])
+            for f in otras:
+                fid = (f or {}).get("id")
+                if not fid:
+                    continue
+                try:
+                    imagenes.append(drive_client.fetch_photo(fid, suffix=".jpg"))
+                except Exception:  # noqa: BLE001 — una foto ilegible no para el guion
+                    continue
     except Exception:  # noqa: BLE001 — sin foto el guion sale más genérico
         foto = None
 
@@ -2049,10 +2096,11 @@ def escribir_guion(body: dict) -> dict:
             tienda=prod.get("tienda", ""),
             caption=prod.get("caption", ""),
             foto=foto,
+            fotos=imagenes or None,
             # La frase del pago a plazos solo si la ficha lo ofrece: en un
             # producto de 11 € es relleno y encima no se sostiene.
-            prompt=pov_config.prompt_guion_producto(plazos, envio),
-            max_caracteres=pov_config.caracteres_guion(plazos, envio),
+            prompt=pov_config.prompt_guion_producto(plazos, envio, segundos),
+            max_caracteres=pov_config.caracteres_guion(plazos, envio, segundos),
             etiqueta="nicho_pov_bof",
         )
     except ValueError as e:

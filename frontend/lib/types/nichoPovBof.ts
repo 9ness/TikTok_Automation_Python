@@ -129,6 +129,10 @@ export interface ProductoItem {
   /** Lo que la TIENDA pide a cambio de la muestra: cuántos vídeos, duración,
    *  hashtags. Texto libre, uno por producto. */
   notas?: string;
+  /** Segundos que debe durar el guion. 0 = el del curso (~10s). */
+  segundos_guion?: number;
+  clip3?: boolean;
+  clip4?: boolean;
   /** Guion de 10s escrito para este producto. Vacío = frase del banco. */
   guion_producto: string;
   /** Cuántos clips hay que subir (lo calcula el backend con el guion). */
@@ -289,6 +293,8 @@ export interface EstadoRequest {
   sin_stock?: boolean;
   /** Requisitos del vendedor. `undefined` no lo toca; "" lo borra. */
   notas?: string;
+  /** Duración pedida para el guion (0 = la del curso, ~10s). */
+  segundos_guion?: number;
 }
 
 export interface VideoUploadResponse {

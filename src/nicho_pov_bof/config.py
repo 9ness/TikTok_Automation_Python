@@ -768,12 +768,29 @@ _CTA_BASE = _CTA_CUPONES
 GUION_PRODUCTO_CUERPO_CARACTERES = 190 - len(_CTA_BASE)
 
 
-def caracteres_guion(plazos: bool = False, envio: bool = False) -> int:
-    """Cuántos caracteres pedirle a Gemini para ese producto."""
+# Duraciones que se pueden pedir a mano. La de siempre (el guion del curso,
+# ~10s) es `0`: no se toca nada. Las demás son para los productos con
+# requisitos —"dos vídeos de 30 segundos"— donde el guion corto no llega.
+SEGUNDOS_GUION_OPCIONES = (0, 20, 30, 40)
+
+
+def caracteres_guion(
+    plazos: bool = False, envio: bool = False, segundos: float = 0,
+) -> int:
+    """Cuántos caracteres pedirle a Gemini para ese producto.
+
+    Con `segundos` se pide un guion de esa duración: el ritmo de las voces de
+    Fish es conocido, así que la cuenta es directa. Sin él manda el del curso
+    (~190 caracteres, unos 10s), que es lo normal.
+    """
+    if segundos and segundos > 0:
+        return int(round(segundos * CARACTERES_POR_SEGUNDO_GUION))
     return GUION_PRODUCTO_CUERPO_CARACTERES + len(_cta(plazos, envio)["CTA_LITERAL"])
 
 
-def prompt_guion_producto(plazos: bool = False, envio: bool = False) -> str:
+def prompt_guion_producto(
+    plazos: bool = False, envio: bool = False, segundos: float = 0,
+) -> str:
     """El prompt del curso, con el cierre que le toque al producto.
 
     Es el MISMO prompt: solo cambia la CTA (y con ella el tope de caracteres,
@@ -789,7 +806,7 @@ def prompt_guion_producto(plazos: bool = False, envio: bool = False) -> str:
     # El "190" y el "10 segundos" del curso son SU cuenta con SU CTA. Con un
     # cierre más largo hay que rehacerla, o el prompt se contradice: pide tres
     # promesas y un tope que no da para ellas.
-    tope = caracteres_guion(plazos, envio)
+    tope = caracteres_guion(plazos, envio, segundos)
     texto = texto.replace(
         "máximo son 190 caracteres para el mensaje en off",
         f"máximo son {tope} caracteres para el mensaje en off",
@@ -799,6 +816,17 @@ def prompt_guion_producto(plazos: bool = False, envio: bool = False) -> str:
         "es para un video de 10 segundos",
         f"es para un video de {round(tope / CARACTERES_POR_SEGUNDO_GUION)} segundos",
     )
+    if segundos and segundos > 0:
+        # En 10 segundos solo cabe el titular; en treinta hay que contar algo.
+        # Sin esta línea Gemini estira lo mismo con más adjetivos y el guion se
+        # queda hablando del precio media rueda.
+        texto += (
+            "\n\nEste vídeo es más largo que el habitual: usa TODAS las fotos "
+            "para contar características concretas del producto (materiales, "
+            "medidas, qué trae, cómo se usa, para quién es) en vez de repetir "
+            "lo del precio con otras palabras. Mantén el mismo tono y cierra "
+            "igual que se te pide arriba."
+        )
     return texto
 
 

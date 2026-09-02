@@ -324,12 +324,20 @@ export function useCrearMiProducto() {
   return useMutation<
     { source: string; carpeta: string; producto: string },
     Error,
-    { fotoLimpia: File; fotoFicha?: File | null; source?: string }
+    {
+      fotoLimpia: File;
+      fotoFicha?: File | null;
+      /** Más capturas de la ficha (características, medidas, qué trae). Son
+       *  las que dan de qué hablar en un guion de 30-40s. */
+      fotosExtra?: File[];
+      source?: string;
+    }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha, source = "mis_productos" }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos" }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
+      for (const f of fotosExtra ?? []) fd.append("fotos_extra", f);
       return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
@@ -537,7 +545,8 @@ export function useQuitarClip() {
   return useMutation<
     ProductoItem,
     Error,
-    { source: string; folder: string; producto: string; slot: 1 | 2 }
+    // Hasta cuatro: los guiones largos piden más de dos clips.
+    { source: string; folder: string; producto: string; slot: number }
   >({
     mutationFn: ({ source, folder, producto, slot }) =>
       api.post<ProductoItem>(
@@ -587,6 +596,7 @@ export function useSetEstado() {
         clips_necesarios: updated.clips_necesarios,
         sin_stock: updated.sin_stock,
         notas: updated.notas,
+        segundos_guion: updated.segundos_guion,
       });
       qc.setQueryData<ProductoItem[]>(
         nichoPovBofKeys.productos(vars.source, vars.folder),

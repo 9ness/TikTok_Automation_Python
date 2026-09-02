@@ -146,11 +146,18 @@ def _extension(filename: str) -> str:
 def guardar_producto(
     limpia: bytes, ficha: bytes | None, *,
     nombre_limpia: str = "", nombre_ficha: str = "", source: str = SOURCE,
+    extras: list[tuple[bytes, str]] | None = None,
 ) -> dict:
-    """Guarda las dos fotos y devuelve `{carpeta, producto}`.
+    """Guarda las fotos y devuelve `{carpeta, producto}`.
 
     La ficha es opcional: sin ella el producto existe igual y el título se
     escribe a mano (o se reintenta luego con otra captura).
+
+    `extras` son MÁS capturas de la ficha (características, medidas, qué trae).
+    Se guardan como `3(2).png`, `3(3).png`… siguiendo el mismo convenio, así
+    que el emparejador las deja en `extras` sin confundirlas con la limpia ni
+    con la principal. Sirven para los guiones largos: con el título solo no
+    hay de qué hablar treinta segundos.
     """
     carpeta = carpeta_actual(source)
     destino = _dir(source) / carpeta
@@ -171,6 +178,12 @@ def guardar_producto(
     (destino / f"{producto}{_extension(nombre_limpia)}").write_bytes(limpia)
     if ficha:
         (destino / f"{producto}(1){_extension(nombre_ficha)}").write_bytes(ficha)
+    # Las de más van numeradas a partir de la 2: (2), (3), (4)… Si no hay
+    # ficha, la primera extra NO ocupa su sitio — `(1)` es la de la ficha en
+    # todo el nicho y moverla ahí rompería la extracción de textos.
+    for i, (datos, nombre) in enumerate(extras or [], start=2):
+        if datos:
+            (destino / f"{producto}({i}){_extension(nombre)}").write_bytes(datos)
 
     # Sin esto el operador sube el producto y no lo ve hasta que vence el TTL.
     _invalidar()

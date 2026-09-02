@@ -102,6 +102,48 @@ class TestConvenioDeNombres:
         assert nombres == ["1.png"]
 
 
+class TestCapturasDeMas:
+    """Las fotos extra van a `(2)`, `(3)`… y NO tocan el par de siempre.
+
+    Son para los guiones largos (la tienda pide un vídeo de 30s y con el
+    título solo no hay de qué hablar), pero el emparejado sigue mandando: si
+    una de estas ocupara el `(1)`, la extracción de textos leería una captura
+    de características creyendo que es la ficha.
+    """
+
+    def test_se_numeran_a_partir_de_la_dos(self, raiz_temporal):
+        mis_productos.guardar_producto(
+            b"limpia", b"ficha",
+            nombre_limpia="a.png", nombre_ficha="b.png",
+            extras=[(b"c1", "c1.png"), (b"c2", "c2.png")],
+        )
+        nombres = sorted(p.name for p in (raiz_temporal / "Mis Productos 1").iterdir())
+        assert nombres == ["1(1).png", "1(2).png", "1(3).png", "1.png"]
+
+    def test_sin_ficha_la_extra_no_ocupa_su_sitio(self, raiz_temporal):
+        """`(1)` es la ficha en TODO el nicho: dejarla libre es lo correcto."""
+        mis_productos.guardar_producto(
+            b"limpia", None, nombre_limpia="a.png",
+            extras=[(b"c1", "c1.png")],
+        )
+        nombres = sorted(p.name for p in (raiz_temporal / "Mis Productos 1").iterdir())
+        assert nombres == ["1(2).png", "1.png"]
+
+    def test_el_emparejador_las_deja_en_extras(self, raiz_temporal):
+        mis_productos.guardar_producto(
+            b"limpia", b"ficha",
+            nombre_limpia="a.png", nombre_ficha="b.png",
+            extras=[(b"c1", "c1.png")],
+        )
+        fotos = mis_productos.listar_fotos_como_drive("Mis Productos 1")
+        for f in fotos:
+            captura = "(" in f["name"]
+            f.update(width=600 if captura else 800, height=1300 if captura else 800)
+        par = photo_pairing.pair_folder(fotos)[0]
+        assert par["clean"]["name"] == "1.png"
+        assert par["titled"] and par["extras"]
+
+
 class TestCarpetasDeDiez:
     def test_los_diez_primeros_van_juntos(self):
         creados = _subir(10)
