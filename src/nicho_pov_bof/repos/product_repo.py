@@ -897,6 +897,50 @@ def resumen_por_carpeta(source: str, folders: list[str]) -> dict[str, dict]:
     return salida
 
 
+def esperando_stock(
+    source: str, folders: list[str], usuario: str = "",
+) -> dict[str, list[str]]:
+    """`{carpeta: [números]}` de los productos con el vídeo hecho, marcados sin
+    stock y aún sin subir.
+
+    Es trabajo TERMINADO que no se puede publicar: la ficha de TikTok no está
+    disponible. No se tira —el producto puede volver— pero mezclado con el
+    resto se pierde de vista, y el vídeo estaba hecho. Al marcarlos subidos
+    salen solos de la lista, porque el filtro es este.
+
+    `video_path` y `uploaded` son campos privados: para `ness` viven en el
+    documento compartido y para los demás en el suyo, así que hay que mirar
+    los dos y quedarse con el privado, igual que hace `get_product`.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available() or not folders:
+        return {}
+    docs = r.mget_json([_key(source, n) for n in folders])
+    privados: dict[str, dict] = {}
+    if not _es_compartido(usuario):
+        for nombre in folders:
+            doc = r.get_json(_key_privado(source, nombre, usuario)) or {}
+            privados[nombre] = doc.get("productos") or {}
+
+    salida: dict[str, list[str]] = {}
+    for nombre, doc in zip(folders, docs):
+        todos = ((doc or {}).get("productos") or {})
+        mios = privados.get(nombre) or {}
+        vigentes = (doc or {}).get("ids_vigentes")
+        numeros = (
+            [str(i) for i in vigentes if str(i) in todos]
+            if isinstance(vigentes, list) else list(todos)
+        )
+        aqui = []
+        for n in numeros:
+            prod = {**todos.get(n, {}), **mios.get(n, {})}
+            if prod.get("sin_stock") and prod.get("video_path") and not prod.get("uploaded"):
+                aqui.append(str(n))
+        if aqui:
+            salida[nombre] = sorted(aqui, key=lambda x: int(x) if x.isdigit() else 0)
+    return salida
+
+
 def productos_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     """`{carpeta: cuántos productos tiene HOY}`. Una sola lectura para todas.
 

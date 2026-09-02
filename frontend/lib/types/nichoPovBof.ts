@@ -28,6 +28,10 @@ export interface ProductFolder {
   sin_stock?: number;
   /** Productos que han entrado DESPUÉS de dar la carpeta por hecha. */
   nuevos_desde_completada?: number;
+  /** No es una carpeta del Drive: la compone la app juntando productos de
+   *  varias (los que esperan a que vuelva el stock). Ni se completa ni cuenta
+   *  para el progreso. */
+  virtual?: boolean;
 }
 
 export interface FoldersListResponse {

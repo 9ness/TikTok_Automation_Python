@@ -45,6 +45,10 @@ class ProductFolder(BaseModel):
     # futuros). Es INDEPENDIENTE de `completed`: la carpeta no está cerrada
     # hasta que se suben, y una cerrada puede seguir sin subir.
     pendiente_subir: bool = False
+    # No es una carpeta del Drive: la compone la app juntando productos de
+    # varias (hoy, los que esperan a que vuelva el stock). No se marca como
+    # completada ni cuenta para el progreso.
+    virtual: bool = False
 
 
 class FoldersListResponse(BaseModel):

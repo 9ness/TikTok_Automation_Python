@@ -83,6 +83,7 @@ def list_folders(
     refresh: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FoldersListResponse:
+    from src.nicho_pov_bof import config
     from src.nicho_pov_bof.repos import product_repo, progress_repo
     from src.nicho_pov_bof.services import drive_client
 
@@ -129,12 +130,30 @@ def list_folders(
         )
         for f in folders
     ]
-    current = next((i.name for i in items if not i.completed), None)
+    # La carpeta virtual va al final y SOLO si tiene algo: un chip vacío en
+    # todas las fuentes es ruido, y aquí lo que importa es enterarse de que hay
+    # vídeos parados esperando a que el producto vuelva.
+    try:
+        esperando = product_repo.esperando_stock(source, nombres, usuario)
+    except Exception:  # noqa: BLE001 — contar no puede tumbar el listado
+        esperando = {}
+    cuantos = sum(len(v) for v in esperando.values())
+    if cuantos:
+        items.append(ProductFolder(
+            name=config.CARPETA_ESPERANDO_STOCK,
+            id=config.CARPETA_ESPERANDO_STOCK,
+            completed=False, virtual=True,
+            total=cuantos, sin_stock=cuantos,
+        ))
+
+    current = next(
+        (i.name for i in items if not i.completed and not i.virtual), None,
+    )
 
     return FoldersListResponse(
         source=source,
         items=items,
-        total=len(items),
+        total=sum(1 for i in items if not i.virtual),
         completed_count=sum(1 for i in items if i.completed),
         current=current,
     )

@@ -558,7 +558,60 @@ def list_productos(
     usuario: Annotated[str, Depends(get_web_user)] = "",
     refresh: Annotated[bool, Query()] = False,
 ) -> ProductosListResponse:
+    if nicho_config.es_carpeta_virtual(folder):
+        return _list_esperando_stock(source, queue, usuario, refresh=refresh)
     return _list_productos(source, folder, queue, usuario, refresh=refresh)
+
+
+def _list_esperando_stock(
+    source: str, queue, usuario: str, *, refresh: bool = False,
+) -> ProductosListResponse:
+    """Los productos con el vídeo hecho que esperan a que vuelva el stock.
+
+    No es una carpeta de Drive: se juntan de varias. Solo se leen las carpetas
+    que Redis dice que tienen alguno —normalmente dos o tres—, porque listar
+    las fotos de todas cuesta una llamada al Drive por carpeta y aquí se entra
+    a menudo, solo para mirar si alguno ha vuelto.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from src.nicho_pov_bof.repos import product_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    try:
+        nombres = [f["name"] for f in drive_client.list_product_folders(source)]
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"No se pudo leer el catálogo: {e}", status_code=502) from e
+
+    esperando = product_repo.esperando_stock(source, nombres, usuario)
+    if not esperando:
+        return ProductosListResponse(
+            source=source, folder=nicho_config.CARPETA_ESPERANDO_STOCK,
+            items=[], textos_extraidos=True, montando=False,
+        )
+
+    def _una(carpeta: str):
+        try:
+            return carpeta, _list_productos(source, carpeta, queue, usuario, refresh=refresh)
+        except Exception:  # noqa: BLE001 — una carpeta ilegible no deja sin lista al resto
+            return carpeta, None
+
+    items: list[ProductoInfo] = []
+    carpetas = sorted(esperando)
+    with ThreadPoolExecutor(max_workers=min(4, len(carpetas))) as pool:
+        for carpeta, parcial in pool.map(_una, carpetas):
+            if parcial is None:
+                continue
+            quiero = set(esperando.get(carpeta) or [])
+            items.extend(
+                x.model_copy(update={"folder": carpeta})
+                for x in parcial.items if str(x.producto) in quiero
+            )
+    return ProductosListResponse(
+        source=source, folder=nicho_config.CARPETA_ESPERANDO_STOCK,
+        items=items, textos_extraidos=True,
+        montando=any(p.montando for p in items),
+    )
 
 
 @router.get("/productos-todos", response_model=ProductosListResponse)

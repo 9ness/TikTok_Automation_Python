@@ -426,7 +426,10 @@ export default function NichoPovBofPage() {
 
   const data = folders.data;
   const folder = picked ?? data?.current ?? null;
-  const photos = usePhotos(source, folder);
+  // La carpeta que arma la app, no Drive: no tiene fotos propias que listar ni
+  // se marca como completada, y sus tarjetas vienen cada una de SU carpeta.
+  const esEsperandoStock = folder === CARPETA_ESPERANDO_STOCK;
+  const photos = usePhotos(source, esEsperandoStock ? null : folder);
 
   // --- Fase 2: automatización de vídeos ---
   const prompts = usePrompts();
@@ -1029,7 +1032,11 @@ export default function NichoPovBofPage() {
                 // pero sin subir" es lo que se busca de un vistazo cuando se
                 // preparan carpetas de días futuros. Que esté completada se
                 // sigue leyendo por el ✓.
-                f.pendiente_subir
+                f.virtual
+                  ? folder === f.name
+                    ? "border-amber-500 bg-amber-500/20 font-semibold text-amber-400"
+                    : "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                  : f.pendiente_subir
                   ? folder === f.name
                     ? "border-orange-500 bg-orange-500/20 font-semibold text-orange-400"
                     : "border-orange-500/50 bg-orange-500/10 text-orange-400"
@@ -1047,13 +1054,13 @@ export default function NichoPovBofPage() {
               {/* El curso borró esta carpeta entera: se sigue trabajando
                   desde nuestra copia, con el progreso de siempre. */}
               {f.desde_copia && "🗄️ "}
-              {f.name}
+              {nombreCarpeta(f.name)}
               {/* Enlazados SOBRE EL TOTAL, no el enlazado a secas: un "9"
                   solo no dice si la carpeta tiene nueve productos o diez con
                   uno sin ficha, que es justo lo que hay que saber para decidir
                   si merece abrirla. Con todo enlazado se enseña un número
                   único ("10"), que es el caso normal y así no chilla. */}
-              {!!f.total && (
+              {!!f.total && !f.virtual && (
                 <span
                   title={`${f.con_url ?? 0} de ${f.total} con la ficha enlazada`}
                   className={`ml-1 rounded-full px-1 py-px text-[9px] font-semibold ${
@@ -1070,7 +1077,11 @@ export default function NichoPovBofPage() {
                   dato esa carpeta parecía quedarse a medias para siempre. */}
               {!!f.sin_stock && (
                 <span
-                  title={`${f.sin_stock} sin stock (retirados del catálogo)`}
+                  title={
+                    f.virtual
+                      ? `${f.sin_stock} vídeo(s) hechos esperando a que vuelva el producto`
+                      : `${f.sin_stock} sin stock (retirados del catálogo)`
+                  }
                   className="ml-1 rounded-full bg-red-500/15 px-1 py-px text-[9px] font-semibold text-red-400"
                 >
                   ✕{f.sin_stock}
@@ -1157,10 +1168,15 @@ export default function NichoPovBofPage() {
           que vienen justo debajo. */}
       {data && folder && (
         <Caja
-          icono="📂"
-          titulo={folder}
-          hint={`Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`}
+          icono={esEsperandoStock ? "⏳" : "📂"}
+          titulo={nombreCarpeta(folder)}
+          hint={
+            esEsperandoStock
+              ? "Vídeos hechos que no se pueden subir: el producto está sin stock. Salen de aquí en cuanto los marques subidos."
+              : `Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`
+          }
         >
+          {!esEsperandoStock && (
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1185,6 +1201,7 @@ export default function NichoPovBofPage() {
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+          )}
 
           {photos.isLoading && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1242,6 +1259,7 @@ export default function NichoPovBofPage() {
               dejarla apartada con los vídeos hechos para subirlos otro día.
               En móvil se apilan — el de completar es el ancho porque es el
               que se pulsa a diario. */}
+          {!esEsperandoStock && (
           <div className="flex items-stretch gap-2">
             <button
               type="button"
@@ -1280,6 +1298,7 @@ export default function NichoPovBofPage() {
               {currentItem?.pendiente_subir ? "Pendiente ✓" : "Pendiente"}
             </button>
           </div>
+          )}
         </Caja>
       )}
 
@@ -1289,7 +1308,7 @@ export default function NichoPovBofPage() {
           nueva a usar esto y el orden tiene que leerse sin que nadie lo
           explique. Antes era una lista de botones donde "copiar el prompt" y
           "subir todos los vídeos" parecían lo mismo. */}
-      {data && folder && (
+      {data && folder && !esEsperandoStock && (
         <section className="space-y-2">
           <div className="flex items-center gap-2 px-1">
             <Sparkles className="h-4 w-4 shrink-0 text-purple-500" />
@@ -2038,6 +2057,16 @@ const TOOLS: { key: ToolKey; label: string }[] = [
  *  igual; por dentro son idénticos (mismas carpetas de diez, mismo convenio de
  *  nombres) y se puede mover de uno a otro. */
 const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+
+/** La carpeta que no está en Drive: la arma la app con los productos que
+ *  tienen el vídeo hecho, están marcados sin stock y siguen sin subir. Se sale
+ *  de ella al marcarlos subidos, porque la pertenencia se calcula. */
+const CARPETA_ESPERANDO_STOCK = "__esperando_stock__";
+const ETIQUETA_ESPERANDO_STOCK = "⏳ Esperando stock";
+
+function nombreCarpeta(nombre: string): string {
+  return nombre === CARPETA_ESPERANDO_STOCK ? ETIQUETA_ESPERANDO_STOCK : nombre;
+}
 const NOMBRE_CATALOGO: Record<string, string> = {
   mis_productos: "Muestras productos",
   tareas_productos: "Tareas Productos",

@@ -132,6 +132,19 @@ TOP_VENDIDOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Top_Vendidos"
 TOP_VENDIDOS_PREFIJO = "Top"
 
 
+# Carpeta que NO está en Drive: la compone la app juntando productos de varias.
+# Son los que tienen el vídeo hecho pero la ficha de TikTok caída (marcados sin
+# stock) y siguen sin subir: trabajo terminado que no se puede publicar todavía
+# y que, mezclado con el resto, se perdía de vista. Salen solos al marcarlos
+# subidos, porque la pertenencia se calcula, no se guarda.
+CARPETA_ESPERANDO_STOCK = "__esperando_stock__"
+ETIQUETA_ESPERANDO_STOCK = "⏳ Esperando stock"
+
+
+def es_carpeta_virtual(folder: str) -> bool:
+    return folder == CARPETA_ESPERANDO_STOCK
+
+
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""
     return bool((SOURCES.get(source) or {}).get("propia"))
