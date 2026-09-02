@@ -323,6 +323,7 @@ def _producto_info(
         titulo=prod.get("titulo", ""),
         titulo_tiktok_completo=prod.get("titulo_tiktok_completo", ""),
         tienda=prod.get("tienda", ""),
+        notas=str(prod.get("notas") or ""),
         caption=prod.get("caption", ""),
         emojis=prod.get("emojis") or emojis_svc.emojis_para(
             producto, prod.get("titulo", ""), prod.get("caption", ""),
@@ -485,6 +486,7 @@ def _list_productos(
                 titulo=guardado.get("titulo", ""),
                 titulo_tiktok_completo=guardado.get("titulo_tiktok_completo", ""),
                 tienda=guardado.get("tienda", ""),
+                notas=str(guardado.get("notas") or ""),
                 tambien_en_drive=bool(titulos_del_drive) and product_repo.tambien_en_drive(
                     guardado, titulos_del_drive,
                 ),
@@ -1669,6 +1671,14 @@ def set_producto_estado(
     # retirado del catálogo no depende de quién lo mire. Y el mismo producto
     # sale repetido en varias carpetas, así que marcarlo aquí ahorra que el
     # siguiente vuelva a abrir el enlace para descubrir lo mismo.
+    # Los requisitos del vendedor van al documento COMPARTIDO por lo mismo que
+    # "sin stock": son del trato con la tienda, no de quién grabe el vídeo.
+    if body.notas is not None:
+        product_repo.save_extracted_texts(
+            body.source, body.folder,
+            {body.producto: {"notas": body.notas.strip()}},
+        )
+
     if body.sin_stock is not None:
         product_repo.save_extracted_texts(
             body.source, body.folder,

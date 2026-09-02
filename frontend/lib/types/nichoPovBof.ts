@@ -126,6 +126,9 @@ export interface ProductoItem {
   tambien_en_drive: boolean;
   /** Su web lo marca "SIN STOCK". Se actualiza al repegar las fichas. */
   sin_stock: boolean;
+  /** Lo que la TIENDA pide a cambio de la muestra: cuántos vídeos, duración,
+   *  hashtags. Texto libre, uno por producto. */
+  notas?: string;
   /** Guion de 10s escrito para este producto. Vacío = frase del banco. */
   guion_producto: string;
   /** Cuántos clips hay que subir (lo calcula el backend con el guion). */
@@ -284,6 +287,8 @@ export interface EstadoRequest {
   /** Retirado del catálogo (su enlace ya no abre). Va al documento compartido:
    *  no depende de quién lo mire. */
   sin_stock?: boolean;
+  /** Requisitos del vendedor. `undefined` no lo toca; "" lo borra. */
+  notas?: string;
 }
 
 export interface VideoUploadResponse {

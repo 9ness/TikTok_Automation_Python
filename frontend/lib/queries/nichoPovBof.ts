@@ -586,6 +586,7 @@ export function useSetEstado() {
         clip_s: updated.clip_s,
         clips_necesarios: updated.clips_necesarios,
         sin_stock: updated.sin_stock,
+        notas: updated.notas,
       });
       qc.setQueryData<ProductoItem[]>(
         nichoPovBofKeys.productos(vars.source, vars.folder),

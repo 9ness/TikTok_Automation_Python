@@ -167,6 +167,8 @@ class ProductoInfo(BaseModel):
     titulo: str = ""
     titulo_tiktok_completo: str = ""
     tienda: str = ""
+    # Requisitos del vendedor para esta muestra (vídeos, duración, hashtags).
+    notas: str = ""
     caption: str = ""
     # Dos emojis para el caption: una reacción + uno del producto. Los da
     # Gemini; si el producto se extrajo antes de que existiera el campo, se
@@ -364,6 +366,11 @@ class ProductoEstadoRequest(BaseModel):
     # que no hay forma de saberlo desde el servidor (medido sobre 221 enlaces:
     # los vivos y los muertos responden exactamente igual).
     sin_stock: bool | None = None
+    # Lo que la TIENDA exige a cambio de la muestra: cuántos vídeos, de qué
+    # duración, con qué hashtags. Texto libre porque cada vendedor pide lo
+    # suyo, y va en el documento compartido: es del trato, no de quién grabe.
+    # `None` no lo toca; cadena vacía lo borra.
+    notas: str | None = None
 
 
 class ProductoBuscado(BaseModel):

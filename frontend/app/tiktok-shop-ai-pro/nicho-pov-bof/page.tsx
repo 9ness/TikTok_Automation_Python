@@ -2119,6 +2119,13 @@ function ProductoCard({
   const mover = useMoverMiProducto();
   const limpiar = useLimpiarProducto();
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
+  // Lo que la tienda pide a cambio de la muestra. Se edita en la tarjeta
+  // porque se consulta justo cuando vas a grabar, no en otra pantalla.
+  const [editandoNotas, setEditandoNotas] = useState(false);
+  const [notas, setNotas] = useState(producto.notas ?? "");
+  useEffect(() => {
+    setNotas(producto.notas ?? "");
+  }, [producto.notas]);
   const quitarClip = useQuitarClip();
   const buscarUrl = useBuscarProductoUrl();
   // La búsqueda puede terminar bien y aun así no traer URL (EchoTik no
@@ -3212,6 +3219,82 @@ function ProductoCard({
         </AlertDialog>
         </>
       )}
+
+      {/* Los requisitos del vendedor. Un producto caro no se regala: piden
+          tres vídeos, una duración o unos hashtags concretos, y eso no cabe en
+          ningún campo de los que ya hay — cada tienda pide lo suyo. Va en la
+          tarjeta y no en otra pantalla porque se consulta justo al grabar. */}
+      {editandoNotas ? (
+        <div className="space-y-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2">
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={4}
+            autoFocus
+            placeholder={"Qué pide la tienda. Por ejemplo:\n· 3 vídeos, mínimo 30s\n· hashtags #marca #producto\n· enlace del producto en el pie"}
+            className="w-full rounded border border-border/60 bg-background p-1.5 text-[11px] leading-relaxed"
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={setEstado.isPending}
+              onClick={() => {
+                setEstado.mutate(
+                  {
+                    source,
+                    folder: producto.folder || folder,
+                    producto: producto.producto,
+                    notas,
+                  },
+                  {
+                    onSuccess: () => setEditandoNotas(false),
+                    onError: (e) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                );
+              }}
+              className="rounded border border-amber-500/50 px-2 py-1 text-[10px] font-semibold text-amber-500 transition hover:bg-amber-500/10 disabled:opacity-50"
+            >
+              {setEstado.isPending ? "Guardando…" : "Guardar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setNotas(producto.notas ?? "");
+                setEditandoNotas(false);
+              }}
+              className="rounded border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : producto.notas ? (
+        <button
+          type="button"
+          onClick={() => setEditandoNotas(true)}
+          title="Editar los requisitos"
+          className="w-full space-y-1 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-left transition hover:border-amber-500/70"
+        >
+          <p className="text-[10px] font-semibold text-amber-500">
+            📋 Lo que pide la tienda
+          </p>
+          <p className="whitespace-pre-wrap text-[10px] leading-relaxed text-muted-foreground">
+            {producto.notas}
+          </p>
+        </button>
+      ) : CATALOGOS_PROPIOS.includes(source) ? (
+        // El hueco vacío solo donde hay trato con una tienda: en las 2.200
+        // fichas del curso sería un botón más en cada tarjeta sin usarse
+        // nunca. Si un producto del curso ya tiene notas, se ven igual.
+        <button
+          type="button"
+          onClick={() => setEditandoNotas(true)}
+          className="w-full rounded-md border border-dashed border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-amber-500/50 hover:text-amber-500"
+        >
+          📋 Apuntar lo que pide la tienda
+        </button>
+      ) : null}
 
       {/* Lo de abajo NO es trabajo: es marcar en qué punto está el producto.
           Separado con una línea para que no se confunda con los botones de
