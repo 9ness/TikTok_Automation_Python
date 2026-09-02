@@ -300,6 +300,7 @@ export function useSetEstadoLargo() {
       // miniatura, el guion y los clips de la pantalla.
       const soloEstado = (p: ProductoLargo): ProductoLargo => ({
         ...p,
+        segundos_guion: updated.segundos_guion,
         en_escaparate: updated.en_escaparate,
         uploaded: updated.uploaded,
         uploaded_at: updated.uploaded_at,

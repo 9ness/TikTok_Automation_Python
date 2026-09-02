@@ -240,10 +240,24 @@ def cta_desfasada(guion: str, *, plazos: bool, envio: bool) -> bool:
     )
 
 
+# Duraciones que se pueden pedir a mano, como en el POV BOF. `0` = la del
+# curso (~20s), que es lo normal; las demás son para los productos con
+# requisitos ("dos vídeos de 30 segundos" a cambio de la muestra).
+SEGUNDOS_GUION_OPCIONES = (0, 30, 40, 60)
+
+
+def caracteres_guion(segundos: float = 0) -> int:
+    """Tope de caracteres para ese guion. Sin `segundos`, el del curso."""
+    if segundos and segundos > 0:
+        return int(round(segundos * CARACTERES_POR_SEGUNDO))
+    return GUION_MAX_CARACTERES
+
+
 def prompt_guion(
     plazos: bool = False,
     estilo: str = ESTILO_GUION_DEFECTO,
     envio_gratis: bool = True,
+    segundos: float = 0,
 ) -> str:
     """El prompt del curso, con el bloque de plazos pegado si toca.
 
@@ -261,13 +275,42 @@ def prompt_guion(
     if base.startswith("<!--"):
         base = base.split("-->", 1)[1].strip()
     base = base.replace("{{CTA_FINAL}}", cta_final(plazos, envio_gratis))
-    if not plazos:
-        return base
-    extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
-    # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini solo
-    # se le manda lo que va después del separador.
-    _, _, cuerpo = extra.partition("\n---\n")
-    return f"{base}\n\n{cuerpo.strip()}"
+    if plazos:
+        extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
+        # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini
+        # solo se le manda lo que va después del separador.
+        _, _, cuerpo = extra.partition("\n---\n")
+        base = f"{base}\n\n{cuerpo.strip()}"
+    return _alargar(base, segundos)
+
+
+def _alargar(prompt: str, segundos: float) -> str:
+    """Reescribe el tope del prompt del curso para un vídeo más largo.
+
+    Los dos prompts llevan sus cifras metidas en la prosa —y distintas: el de
+    precio habla de 260 caracteres y el de dolor de 360—, así que no vale con
+    pegar una línea al final: se contradiría con lo que ya pone. Se sustituyen
+    las cifras y luego se pide lo que de verdad cambia, que no es el largo sino
+    QUÉ se cuenta: en veinte segundos cabe el titular y en treinta hay que
+    hablar del producto.
+    """
+    if not segundos or segundos <= 0:
+        return prompt
+
+    import re
+
+    tope = caracteres_guion(segundos)
+    prompt = re.sub(r"\b\d{3} caracteres", f"{tope} caracteres", prompt)
+    prompt = re.sub(r"\b\d{1,3} segundos", f"{round(segundos)} segundos", prompt)
+    return prompt + (
+        "\n\nEste vídeo es MÁS LARGO de lo habitual: "
+        f"{round(segundos)} segundos, unos {tope} caracteres. Mantén la "
+        "estructura y el orden que se te piden arriba, pero desarróllalos: usa "
+        "TODAS las fotos que te mando para contar características concretas "
+        "(materiales, medidas, qué trae, cómo se usa, para quién es) y, si el "
+        "guion empieza por puntos de dolor, da más y más concretos. No repitas "
+        "lo del precio con otras palabras para llenar."
+    )
 
 
 # ---------------------------------------------------------------------------

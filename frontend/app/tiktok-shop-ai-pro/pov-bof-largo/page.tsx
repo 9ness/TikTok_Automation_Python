@@ -1419,6 +1419,12 @@ function AltaMiProducto({
   const [ficha, setFicha] = useState<File | null>(null);
   const refLimpia = useRef<HTMLInputElement>(null);
   const refFicha = useRef<HTMLInputElement>(null);
+  // Capturas de MÁS (características, medidas, qué trae). Son las que dan de
+  // qué hablar cuando la tienda pide 30 segundos; con el título solo, Gemini
+  // estira lo mismo con más adjetivos. El catálogo es el mismo que el del POV
+  // BOF, así que subirlas aquí vale para las dos pantallas.
+  const refExtras = useRef<HTMLInputElement>(null);
+  const [extras, setExtras] = useState<File[]>([]);
   const [abierto, setAbierto] = useState(false);
 
   function enviar() {
@@ -1427,14 +1433,19 @@ function AltaMiProducto({
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, source },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source },
       {
         onSuccess: (r) => {
-          toast.success(`Producto ${r.producto} añadido a «${r.carpeta}»`);
+          toast.success(
+            `Producto ${r.producto} añadido a «${r.carpeta}»` +
+              (extras.length ? ` · ${extras.length} captura(s) más` : ""),
+          );
           setLimpia(null);
           setFicha(null);
+          setExtras([]);
           if (refLimpia.current) refLimpia.current.value = "";
           if (refFicha.current) refFicha.current.value = "";
+          if (refExtras.current) refExtras.current.value = "";
           onCreado();
         },
         onError: (e) => toast.error(err(e)),
@@ -1481,6 +1492,26 @@ function AltaMiProducto({
         {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
         {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
       </div>
+      <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-emerald-500/60">
+        <span className="text-[11px] font-semibold">Más capturas (opcional)</span>
+        <span className="text-[10px] text-muted-foreground">
+          Características, medidas, qué trae. Con ellas se puede pedir un guion
+          de 30 segundos o más; con el título solo, no.
+        </span>
+        <input
+          ref={refExtras}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => setExtras(Array.from(e.target.files ?? []))}
+          className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
+        />
+        {!!extras.length && (
+          <span className="truncate text-[10px] text-emerald-500">
+            ✓ {extras.length} captura(s)
+          </span>
+        )}
+      </label>
       <button
         type="button"
         disabled={crear.isPending || !limpia}
@@ -2128,6 +2159,47 @@ function ProductoCard({
         <span className="ml-auto">
           {necesarios} hueco{necesarios === 1 ? "" : "s"}
         </span>
+      </div>
+
+      {/* Cuánto tiene que durar el guion. Lo normal es lo del curso (~20s);
+          se sube cuando la tienda pide vídeos de 30 segundos por la muestra.
+          Vale para los DOS estilos: el prompt que se manda es el del modo en
+          el que estés (precio o dolor) con el tope reescrito, así que el vídeo
+          largo sigue empezando por donde toca. Sale del mismo sitio que en el
+          POV BOF —los textos del producto—, así que ponerlo aquí lo pone allí. */}
+      <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+        <span>Guion de</span>
+        {[0, 30, 40, 60].map((sg) => (
+          <button
+            key={sg}
+            type="button"
+            title={
+              sg === 0
+                ? "El del curso: ~356 caracteres, unos 20 segundos"
+                : `~${Math.round(sg * 17.8)} caracteres. Necesita capturas del producto para tener qué contar`
+            }
+            onClick={() =>
+              setEstado.mutate({
+                source,
+                folder: p.folder || folder,
+                producto: p.producto,
+                segundos_guion: sg,
+              })
+            }
+            className={`rounded px-1.5 py-0.5 font-semibold transition ${
+              (p.segundos_guion || 0) === sg
+                ? "bg-amber-500/20 text-amber-500"
+                : "hover:text-foreground"
+            }`}
+          >
+            {sg === 0 ? "normal" : `${sg}s`}
+          </button>
+        ))}
+        {!!p.segundos_guion && (
+          <span className="ml-auto text-amber-500/80">
+            rehaz el guion para aplicarlo
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         {(

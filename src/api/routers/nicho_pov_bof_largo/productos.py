@@ -431,6 +431,7 @@ def _listar(
         )
         items.append(ProductoLargo(
             producto=pid,
+            segundos_guion=float(textos.get("segundos_guion") or 0),
             desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
@@ -705,6 +706,15 @@ def set_producto_estado(
                     f"recibido: {body.clip_s}"
                 )
             campos["clip_s"] = body.clip_s
+        # Va a los textos del POV BOF (documento compartido): las dos pantallas
+        # lo leen de ahí, así que pedir 30s en una vale para la otra.
+        if body.segundos_guion is not None:
+            from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+            pov_repo.save_extracted_texts(
+                body.source, body.folder,
+                {body.producto: {"segundos_guion": float(body.segundos_guion or 0)}},
+            )
         if body.en_escaparate is not None:
             # Se guarda TAMBIÉN en el documento de este nicho (que es lo que
             # lee el listado): la clave del índice es `tienda|titulo`, así que
@@ -767,6 +777,7 @@ def set_producto_estado(
         segundos_p = _segundos(str(mio.get("guion") or ""), mio, plazos_p, envio_p)
         return ProductoLargo(
             producto=body.producto,
+            segundos_guion=float(textos.get("segundos_guion") or 0),
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
@@ -844,6 +855,10 @@ def escribir_guion(
     # Qué puede prometer este producto: los plazos y el envío gratis tienen su
     # mínimo de pedido, y decirlo en uno de 9 € es prometer lo que no hay.
     envio_gratis = config.hay_envio_gratis(textos)
+    # Cuántos segundos tiene que durar. Sale de los TEXTOS, que son los del
+    # POV BOF: el producto es el mismo y lo que pide la tienda no cambia
+    # porque el guion empiece por el precio o por el dolor.
+    segundos = float(textos.get("segundos_guion") or 0)
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (
@@ -851,6 +866,8 @@ def escribir_guion(
         and not body.rehacer
         and bool(guardado.get("guion_plazos")) == plazos
         and str(guardado.get("guion_estilo") or config.ESTILO_GUION_DEFECTO) == estilo
+        # Y de la misma duración: un guion de 20s no vale para un vídeo de 30.
+        and float(guardado.get("guion_segundos") or 0) == segundos
     ):
         return _uno(body, queue, usuario)
 
@@ -861,6 +878,7 @@ def escribir_guion(
         )
 
     foto = None
+    imagenes: list = []
     try:
         from src.nicho_pov_bof.services import drive_client, photo_pairing
 
@@ -871,10 +889,24 @@ def escribir_guion(
         par = next(
             (x for x in photo_pairing.pair_folder(fotos)
              if str(x.get("producto")) == body.producto), None,
-        )
-        limpia = (par or {}).get("clean") or {}
+        ) or {}
+        limpia = par.get("clean") or {}
         if limpia.get("id"):
             foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+            imagenes.append(foto)
+        # En los guiones largos van TAMBIÉN la ficha y las capturas de
+        # características: son las que dan de qué hablar treinta segundos. En
+        # el normal no se mandan — cuestan tokens y el prompt del curso solo
+        # necesita la limpia.
+        if segundos > 0:
+            for extra in [par.get("titled")] + list(par.get("extras") or []):
+                fid = (extra or {}).get("id")
+                if not fid:
+                    continue
+                try:
+                    imagenes.append(drive_client.fetch_photo(fid, suffix=".jpg"))
+                except Exception:  # noqa: BLE001 — una foto ilegible no para el guion
+                    continue
     except Exception:
         foto = None
 
@@ -884,8 +916,10 @@ def escribir_guion(
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
             foto=foto,
+            fotos=imagenes or None,
             plazos=plazos,
-            prompt=config.prompt_guion(plazos, estilo, envio_gratis),
+            prompt=config.prompt_guion(plazos, estilo, envio_gratis, segundos),
+            max_caracteres=config.caracteres_guion(segundos),
         )
     except ValueError as e:
         raise APIError(str(e), status_code=422) from e
@@ -900,7 +934,7 @@ def escribir_guion(
             ),
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
-            guion_estilo=estilo,
+            guion_estilo=estilo, guion_segundos=segundos,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

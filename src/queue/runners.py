@@ -2902,6 +2902,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         """Escribe y guarda el guion de un producto. `False` si no pudo."""
         # Lo que ese producto SÍ cumple: sin envío gratis no se promete.
         envio = largo_config.hay_envio_gratis(t)
+        # La duración pedida para ESE producto (0 = la del curso). Sin esto, un
+        # lote pisaba con veinte segundos el guion de treinta que se había
+        # pedido a mano.
+        segundos = float(t.get("segundos_guion") or 0)
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),
@@ -2909,7 +2913,8 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
                 caption=t.get("caption", ""),
                 foto=_foto_limpia(source, carpeta, pid),
                 plazos=plazos,
-                prompt=largo_config.prompt_guion(plazos, estilo, envio),
+                prompt=largo_config.prompt_guion(plazos, estilo, envio, segundos),
+                max_caracteres=largo_config.caracteres_guion(segundos),
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
@@ -2921,7 +2926,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             ),
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
-            guion_estilo=estilo,
+            guion_estilo=estilo, guion_segundos=segundos,
         )
         return True
 
@@ -3088,8 +3093,12 @@ def run_nicho_pov_bof_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 tienda=prod.get("tienda", ""),
                 caption=prod.get("caption", ""),
                 foto=_foto_limpia(source, folder, pid),
-                prompt=pov_config.prompt_guion_producto(plazos, envio),
-                max_caracteres=pov_config.caracteres_guion(plazos, envio),
+                prompt=pov_config.prompt_guion_producto(
+                    plazos, envio, float(prod.get("segundos_guion") or 0),
+                ),
+                max_caracteres=pov_config.caracteres_guion(
+                    plazos, envio, float(prod.get("segundos_guion") or 0),
+                ),
                 etiqueta="nicho_pov_bof",
                 on_log=on_log,
             )

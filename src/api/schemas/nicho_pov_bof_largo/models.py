@@ -73,6 +73,9 @@ class ProductoLargo(BaseModel):
     estilo_guion: str = "precio"
     # Con qué modo se escribió el guion que hay guardado.
     guion_estilo: str = "precio"
+    # Segundos pedidos para el guion (0 = los del curso, ~20s). Sale de los
+    # textos del POV BOF: el producto es el mismo en las dos pantallas.
+    segundos_guion: float = 0
     # Cuánto durará el vídeo: la voz manda, y sale sorteada entre las que
     # caben, así que es un rango y no un número.
     segundos_min: float = 0.0
@@ -111,6 +114,11 @@ class ProductoEstadoLargoRequest(BaseModel):
     # Duración de los clips que va a generar el operador (8 o 10 segundos).
     # Cambia cuántos pide el mismo guion: 20s son 3 clips de 8s o 2 de 10s.
     clip_s: int | None = None
+    # Cuántos segundos tiene que durar el guion (0 = el del curso, ~20s). Se
+    # guarda con los TEXTOS del POV BOF, no aquí: el producto es el mismo y lo
+    # que pide la tienda no cambia porque el guion empiece por el precio o por
+    # el dolor.
+    segundos_guion: float | None = None
 
 
 class FolderLargo(BaseModel):

@@ -72,6 +72,8 @@ export interface ProductoLargo {
    *  que caben, y el vídeo dura lo que dure la voz. */
   segundos_min?: number;
   segundos_max?: number;
+  /** Segundos pedidos para el guion (0 = los del curso). */
+  segundos_guion?: number;
   voz_label: string;
   voz_sexo: string;
   // Progreso INDIVIDUAL de este nicho.
@@ -137,4 +139,7 @@ export interface EstadoLargoRequest {
   sold?: boolean;
   nicho?: string;
   clip_s?: number;
+  /** Segundos que debe durar el guion (0 = los del curso, ~20s). Se guarda con
+   *  los textos del POV BOF: el producto es el mismo en las dos pantallas. */
+  segundos_guion?: number;
 }
