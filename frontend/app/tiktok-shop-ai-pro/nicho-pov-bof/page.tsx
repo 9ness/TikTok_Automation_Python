@@ -3142,12 +3142,18 @@ function ProductoCard({
           solo lectura. */}
       {CATALOGOS_PROPIOS.includes(source) && (
         <>
+        {/* Los cuatro en una fila: son acciones de mantenimiento y una por
+            línea se comía media tarjeta. En móvil quedan dos y dos. Las
+            etiquetas van cortas — lo que hace cada una lo cuenta el `title` y,
+            al pulsarla, el diálogo. */}
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {/* Muestra ⇄ tarea: por qué se graba un producto se sabe a veces
             después de subirlo, y antes había que borrarlo y volver a subir
             las dos fotos. */}
         <button
           type="button"
           disabled={mover.isPending}
+          title={`Pasarlo a «${NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}» con sus fotos y sus datos`}
           onClick={() =>
             mover.mutate(
               {
@@ -3174,7 +3180,7 @@ function ProductoCard({
               <Loader2 className="h-3 w-3 animate-spin" /> Moviendo…
             </>
           ) : (
-            <>→ Mover a «{NOMBRE_CATALOGO[otroCatalogo(source)] ?? ""}»</>
+            <>→ {NOMBRE_CATALOGO[otroCatalogo(source)]?.split(" ")[0] ?? "Mover"}</>
           )}
         </button>
         {/* Cuando un producto nace con lo del que ocupaba antes su número:
@@ -3183,6 +3189,7 @@ function ProductoCard({
         <button
           type="button"
           disabled={limpiar.isPending}
+          title="Quitarle el guion, el vídeo y las marcas; las fotos y los textos se quedan"
           onClick={() => setConfirmarLimpiar(true)}
           className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-amber-500/60 hover:text-amber-500 disabled:opacity-50"
         >
@@ -3191,9 +3198,37 @@ function ProductoCard({
               <Loader2 className="h-3 w-3 animate-spin" /> Limpiando…
             </>
           ) : (
-            <>🧹 Limpiar lo generado</>
+            <>🧹 Limpiar</>
           )}
         </button>
+        <button
+          type="button"
+          disabled={borrar.isPending}
+          title="Borrar el producto y sus fotos del Drive"
+          onClick={() => setConfirmarQuitar(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-50"
+        >
+          {borrar.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Borrando…
+            </>
+          ) : (
+            <>🗑️ Quitar</>
+          )}
+        </button>
+        {/* El cuarto hueco: solo cuando no hay requisitos escritos. Cuando los
+            hay, se leen en su caja de abajo y tocarla los edita. */}
+        {!producto.notas && (
+          <button
+            type="button"
+            title="Lo que pide la tienda a cambio de la muestra: vídeos, duración, hashtags"
+            onClick={() => setEditandoNotas(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-amber-500/60 hover:text-amber-500"
+          >
+            📋 Requisitos
+          </button>
+        )}
+        </div>
         <AlertDialog open={confirmarLimpiar} onOpenChange={setConfirmarLimpiar}>
           <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
             <AlertDialogHeader>
@@ -3249,23 +3284,6 @@ function ProductoCard({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <button
-          type="button"
-          disabled={borrar.isPending}
-          onClick={() => setConfirmarQuitar(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-red-500/60 hover:text-red-500 disabled:opacity-50"
-        >
-          {borrar.isPending ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" /> Borrando…
-            </>
-          ) : (
-            <>🗑️ Quitar este producto</>
-          )}
-        </button>
-        {/* Con nombre y apellidos: el `confirm()` del navegador salía con el
-            dominio de la app delante y una frase suelta, y no decía qué se
-            lleva por delante. */}
         <AlertDialog open={confirmarQuitar} onOpenChange={setConfirmarQuitar}>
           <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
             <AlertDialogHeader>
@@ -3372,17 +3390,6 @@ function ProductoCard({
           <p className="whitespace-pre-wrap text-[10px] leading-relaxed text-muted-foreground">
             {producto.notas}
           </p>
-        </button>
-      ) : CATALOGOS_PROPIOS.includes(source) ? (
-        // El hueco vacío solo donde hay trato con una tienda: en las 2.200
-        // fichas del curso sería un botón más en cada tarjeta sin usarse
-        // nunca. Si un producto del curso ya tiene notas, se ven igual.
-        <button
-          type="button"
-          onClick={() => setEditandoNotas(true)}
-          className="w-full rounded-md border border-dashed border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-amber-500/50 hover:text-amber-500"
-        >
-          📋 Apuntar lo que pide la tienda
         </button>
       ) : null}
 
