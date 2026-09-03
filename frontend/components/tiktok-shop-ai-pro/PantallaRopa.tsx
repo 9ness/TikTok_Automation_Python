@@ -616,19 +616,30 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
                   </span>
                 )}
               </p>
+              {/* En orden: primero la imagen (paso 1) a lo ancho, y debajo
+                  los DOS guiones del paso 2 uno al lado del otro — son la
+                  misma cosa en sus dos versiones, así que van juntos. */}
+              <button
+                type="button"
+                onClick={() => copiar(`Imagen · ${e.label}`, e.imagen)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1 · Imagen
+                (Flow)
+              </button>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => copiar(`Imagen · ${e.label}`, e.imagen)}
+                  onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
                   className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
                 >
-                  <ClipboardCopy className="h-3.5 w-3.5" /> 1 · Imagen (Flow)
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
                 </button>
                 <button
                   type="button"
                   onClick={() =>
                     copiar(
-                      `Guion · ${e.label}`,
+                      `Guion con plazos · ${e.label}`,
                       // El guion es lo único que cambia entre las dos
                       // versiones; la imagen del paso 1 es la misma.
                       (promptsPlazos.data?.mof10 ?? []).find(
@@ -636,16 +647,9 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
                       )?.guion ?? e.guion,
                     )
                   }
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
                 >
-                  <ClipboardCopy className="h-3.5 w-3.5" /> 2 · Guion 💳
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
-                >
-                  <ClipboardCopy className="h-3.5 w-3.5" /> 2 · Guion (Omni)
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion 💳
                 </button>
               </div>
             </div>
@@ -809,8 +813,17 @@ function PrendaCard({
     : "";
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-      <div className="flex gap-2.5">
+    /* Apretada como las del POV BOF: el borde marca el estado (verde en
+       cuanto hay vídeo) y los huecos son de 1,5 en vez de 2 — con veinte
+       prendas, cada respiro de más es media pantalla de scroll. */
+    <div
+      className={`space-y-1.5 rounded-xl border bg-card p-2.5 transition ${
+        prenda.video_path
+          ? "border-emerald-500/50"
+          : "border-border/60 hover:border-emerald-500/30"
+      }`}
+    >
+      <div className="flex gap-2">
         {prenda.clean_photo_id ? (
           <button
             type="button"
@@ -823,27 +836,29 @@ function PrendaCard({
               src={buildFotoRopaUrl(prenda.clean_photo_id)}
               alt={`Prenda ${prenda.producto}`}
               loading="lazy"
-              className="h-20 w-20 rounded-lg object-cover transition hover:opacity-80"
+              className="h-16 w-16 rounded-lg object-cover transition hover:opacity-80"
             />
           </button>
         ) : (
-          <div className="h-20 w-20 shrink-0 rounded-lg bg-muted" />
+          <div className="h-16 w-16 shrink-0 rounded-lg bg-muted" />
         )}
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold">
-            {prenda.producto}
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs font-semibold">
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+              {prenda.producto}
+            </span>
             {prenda.sin_stock && (
-              <span className="ml-1.5 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500">
+              <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-500">
                 🚫 Sin stock
               </span>
             )}
             {prenda.video_path && (
-              <span className="ml-1.5 text-[10px] font-normal text-emerald-500">
+              <span className="text-[10px] font-normal text-emerald-500">
                 <Check className="inline h-3 w-3" /> vídeo listo
               </span>
             )}
             {prenda.montando && (
-              <span className="ml-1.5 text-[10px] font-normal text-amber-500">
+              <span className="text-[10px] font-normal text-amber-500">
                 montando…
               </span>
             )}
@@ -985,7 +1000,13 @@ function PrendaCard({
           type="button"
           disabled={!prenda.video_path}
           onClick={() => setVerVideo(true)}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30 disabled:opacity-40"
+          // En verde cuando hay algo que ver, como en los demás nichos: es la
+          // señal de "esta prenda ya está hecha" sin leer nada.
+          className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-40 ${
+            prenda.video_path
+              ? "border-emerald-500/60 text-emerald-500 hover:bg-emerald-500/10"
+              : "border-border/60 hover:border-foreground/30"
+          }`}
         >
           Ver / descargar
         </button>

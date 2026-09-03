@@ -77,8 +77,18 @@ def todas_las_carpetas() -> list[tuple[str, str]]:
 
 def carpetas_del_operador() -> list[tuple[str, str]]:
     """`[(genero, carpeta)]` de los cuatro catálogos propios (mujer/hombre ×
-    muestras/tareas). Vacío mientras no se haya subido nada."""
-    return [(g, c) for g in config.GENEROS_OPERADOR for c in carpetas(g)]
+    muestras/tareas).
+
+    Los cuatro salen SIEMPRE, aunque no tengan nada: son sitios fijos donde
+    dejar prendas, y un catálogo que no aparece hasta que subes algo obliga a
+    adivinar que existe. La primera carpeta se nombra sola (`Muestras 1`) y no
+    se crea en Drive hasta que entra la primera prenda.
+    """
+    salida: list[tuple[str, str]] = []
+    for genero in config.GENEROS_OPERADOR:
+        suyas = carpetas(genero)
+        salida += [(genero, c) for c in suyas] or [(genero, f"{_prefijo(genero)} 1")]
+    return salida
 
 
 # ---------------------------------------------------------------------------
