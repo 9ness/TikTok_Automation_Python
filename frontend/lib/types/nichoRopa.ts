@@ -59,6 +59,9 @@ export interface PrendaItem {
   product_url: string;
   /** Su web lo marca "SIN STOCK". */
   sin_stock: boolean;
+  /** Su ficha ofrece pago a plazos. Lo marca el operador: decide qué prompt
+   *  de vídeo se usa, y el vídeo lo dice con la voz de la persona. */
+  plazos?: boolean;
   uploaded: boolean;
   video_path: string | null;
   video_listo_at: number;

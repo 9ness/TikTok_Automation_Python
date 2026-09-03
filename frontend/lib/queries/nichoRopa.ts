@@ -176,7 +176,13 @@ export function useSubirVideoRopa() {
  *  POV BOF o desde otra carpeta, aquí ya sale hecho. */
 export function useSetEstadoRopa(carpeta: string) {
   const qc = useQueryClient();
-  return useMutation<unknown, Error, { producto: string; en_escaparate: boolean }>({
+  return useMutation<
+    unknown,
+    Error,
+    // Solo se manda lo que cambia: el escaparate necesita textos y el flag de
+    // plazos no, así que van por separado.
+    { producto: string; en_escaparate?: boolean; plazos?: boolean }
+  >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, { carpeta, ...body }),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),

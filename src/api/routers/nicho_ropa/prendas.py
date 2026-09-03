@@ -322,6 +322,7 @@ def list_prendas(
             # otro nicho, aquí ya sale enlazada.
             product_url=pov_repo.url_de(prod),
             sin_stock=bool(prod.get("sin_stock")),
+            plazos=bool(prod.get("plazos")),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -353,14 +354,26 @@ def set_producto_estado(
     carpeta = body.carpeta or config.CARPETA_DEFECTO
     if not config.es_carpeta_conocida(carpeta):
         raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
-    guardado = product_repo.get_product(carpeta, body.producto)
-    if not guardado.get("titulo"):
-        raise APIError(
-            "Este producto no tiene textos todavía: sin el nombre y la tienda no "
-            "se puede saber si ya está en el escaparate.",
-            status_code=400,
-        )
-    pov_repo.marcar_escaparate_producto(guardado, body.en_escaparate, usuario)
+
+    # El pago a plazos es un dato de la PRENDA y no necesita textos: se marca
+    # mirando su ficha, y es lo que decide qué prompt de vídeo se usa.
+    if body.plazos is not None:
+        try:
+            product_repo.update_product(
+                carpeta, body.producto, plazos=bool(body.plazos),
+            )
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
+
+    if body.en_escaparate is not None:
+        guardado = product_repo.get_product(carpeta, body.producto)
+        if not guardado.get("titulo"):
+            raise APIError(
+                "Este producto no tiene textos todavía: sin el nombre y la tienda "
+                "no se puede saber si ya está en el escaparate.",
+                status_code=400,
+            )
+        pov_repo.marcar_escaparate_producto(guardado, body.en_escaparate, usuario)
 
     listado = list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
     for item in listado.items:

@@ -80,6 +80,10 @@ class PrendaInfo(BaseModel):
     product_url: str = ""
     # Su web marca "SIN STOCK" en vez del enlace.
     sin_stock: bool = False
+    # ¿Su ficha ofrece pago a plazos? Lo marca el operador mirándola: aquí no
+    # se extrae el precio, y de esto depende QUÉ PROMPT usar — el vídeo lo
+    # dice con la voz de la persona y no se puede corregir después.
+    plazos: bool = False
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
@@ -103,7 +107,10 @@ class PrendaEstadoRequest(BaseModel):
 
     carpeta: str
     producto: str
-    en_escaparate: bool
+    # Solo se aplica lo que venga: la tarjeta manda el campo que cambia.
+    en_escaparate: bool | None = None
+    # Si su ficha ofrece pago a plazos (decide el prompt del vídeo).
+    plazos: bool | None = None
 
 
 class VideoRopaUploadResponse(BaseModel):

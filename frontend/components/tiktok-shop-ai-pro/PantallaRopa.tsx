@@ -292,11 +292,12 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   const prendas = usePrendas(carpeta);
   // Sin carpeta elegida manda el selector de arriba: `hombre_web__` no es una
   // carpeta de verdad, pero al backend le basta para saber el sexo.
-  // Si la prenda admite pago a plazos. Va apagado a propósito: aquí la voz la
-  // pone el propio vídeo, así que una promesa de más no se arregla luego —
-  // habría que volver a generarlo en Flow.
-  const [conPlazos, setConPlazos] = useState(false);
-  const prompts = usePromptsRopa(carpeta || (esWeb ? `${genero}__` : ""), conPlazos);
+  // Los dos prompts a la vez: cada prenda usa el suyo según lo que ofrezca su
+  // ficha, y se trabaja por tandas (se bajan las fotos de un grupo y se pegan
+  // todas con el mismo prompt).
+  const slugPrompts = carpeta || (esWeb ? `${genero}__` : "");
+  const prompts = usePromptsRopa(slugPrompts);
+  const promptsPlazos = usePromptsRopa(slugPrompts, true);
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -312,8 +313,12 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
     toast.success(`${label} copiado`);
   }
 
-  async function descargarFotos() {
-    const conFoto = items.filter((p) => p.clean_photo_id);
+  async function descargarFotos(grupo: "todas" | "plazos" | "sin" = "todas") {
+    const conFoto = items
+      .filter((p) => p.clean_photo_id)
+      .filter((p) =>
+        grupo === "todas" ? true : grupo === "plazos" ? p.plazos : !p.plazos,
+      );
     if (!conFoto.length) return;
     // Una a una con retardo: el navegador móvil cancela las simultáneas.
     for (const [i, p] of conFoto.entries()) {
@@ -327,6 +332,12 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
     }
     toast.success(`${conFoto.length} foto(s) descargadas`);
   }
+
+  // Las prendas que ofrecen pago a plazos se trabajan aparte: llevan otro
+  // prompt, y el vídeo lo dice con la voz de la persona. Bajarlas por grupos
+  // es lo que evita pegar el prompt equivocado a media tanda.
+  const conPlazos = items.filter((p) => p.clean_photo_id && p.plazos).length;
+  const sinPlazos = items.filter((p) => p.clean_photo_id && !p.plazos).length;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
@@ -495,23 +506,24 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
           </button>
         ) : null}
         {esWeb && (
-          /* Lo que dice la persona lo genera el vídeo, así que si el ejemplo
-             promete plazos, el clip los promete. Y aquí no hay arreglo
-             posterior: no es una voz que se pueda volver a locutar, habría que
-             generar el vídeo otra vez. Por eso va apagado por defecto y se
-             enciende solo cuando la ficha de la prenda lo ofrece. */
-          <label className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-violet-500"
-              checked={conPlazos}
-              onChange={(e) => setConPlazos(e.target.checked)}
-            />
-            <span>
-              Esta prenda admite <strong>pago a plazos</strong> — lo dirá en el
-              vídeo. Compruébalo en su ficha antes de marcarlo.
-            </span>
-          </label>
+          /* Dos versiones del mismo prompt. Lo que dice la persona lo genera
+             el vídeo, así que el que promete plazos SOLO vale para las prendas
+             cuya ficha los ofrece: aquí no hay arreglo posterior, no es una voz
+             que se pueda volver a locutar. Se marca prenda a prenda con su
+             botón 💳 y las fotos se bajan por grupos, abajo. */
+          <button
+            type="button"
+            onClick={() =>
+              copiar(
+                `Prompt espejo con plazos (${promptsPlazos.data?.sexo ?? ""})`,
+                promptsPlazos.data?.video_espejo,
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs transition hover:border-violet-400"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt del espejo ·{" "}
+            <strong>con plazos</strong>
+          </button>
         )}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
@@ -536,6 +548,22 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
                   className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
                 >
                   <ClipboardCopy className="h-3.5 w-3.5" /> 1 · Imagen (Flow)
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copiar(
+                      `Guion · ${e.label}`,
+                      // El guion es lo único que cambia entre las dos
+                      // versiones; la imagen del paso 1 es la misma.
+                      (promptsPlazos.data?.mof10 ?? []).find(
+                        (x) => x.clave === e.clave,
+                      )?.guion ?? e.guion,
+                    )
+                  }
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5" /> 2 · Guion 💳
                 </button>
                 <button
                   type="button"
@@ -584,11 +612,33 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         )}
         <button
           type="button"
-          onClick={descargarFotos}
+          onClick={() => void descargarFotos()}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground"
         >
           <Download className="h-3.5 w-3.5" /> Descargar todas las fotos
         </button>
+        {/* Y por grupos, que es como se trabaja: se baja un grupo, se pega su
+            prompt y se generan todas seguidas. La foto es la misma en los dos;
+            lo que cambia es el prompt que le toca. */}
+        {esWeb && !!conPlazos && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => void descargarFotos("sin")}
+              disabled={!sinPlazos}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" /> Sin plazos ({sinPlazos})
+            </button>
+            <button
+              type="button"
+              onClick={() => void descargarFotos("plazos")}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 px-3 py-1.5 text-[11px] text-violet-400 transition hover:border-violet-400"
+            >
+              <Download className="h-3.5 w-3.5" /> 💳 Con plazos ({conPlazos})
+            </button>
+          </div>
+        )}
       </section>
 
       {prendas.isLoading && (
@@ -630,6 +680,7 @@ function PrendaCard({
   onCopiar: (label: string, texto?: string) => void;
 }) {
   const subir = useSubirVideoRopa();
+  const setEstado = useSetEstadoRopa(carpeta);
   // Qué audio lleva el vídeo. Vacío es el defecto de cada pantalla: mudo en
   // las del curso, y la voz que ya trae el clip en las de la web.
   const [audio, setAudio] = useState("");
@@ -717,6 +768,34 @@ function PrendaCard({
         <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-500">
           Caption arriesgado: {prenda.caption_riesgo}
         </p>
+      )}
+
+      {/* Si su ficha ofrece pago a plazos. Aquí no se extrae el precio, así
+          que lo marca el operador mirándola — y de esto depende QUÉ PROMPT le
+          toca: el vídeo lo dice con la voz de la persona y prometerlo de más
+          solo se arregla generando el clip otra vez. Con esto marcado, la
+          prenda entra en el grupo "💳 Con plazos" de la descarga de arriba. */}
+      {esWeb && (
+        <button
+          type="button"
+          onClick={() =>
+            setEstado.mutate(
+              { producto: prenda.producto, plazos: !prenda.plazos },
+              {
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
+          }
+          title="Lo dice su ficha de TikTok Shop. Cambia el prompt del vídeo."
+          className={`w-full rounded-md border px-2 py-1 text-[10px] font-medium transition ${
+            prenda.plazos
+              ? "border-violet-500 bg-violet-500/15 text-violet-400"
+              : "border-border/60 text-muted-foreground hover:border-violet-500/50"
+          }`}
+        >
+          {prenda.plazos ? "💳 Con pago a plazos" : "💳 ¿Tiene pago a plazos?"}
+        </button>
       )}
 
       {/* Los mismos tres botones que en el Nicho POV BOF: el caption para
