@@ -38,6 +38,44 @@ class TestSlugsDelOperador:
             assert genero.startswith(("mujer", "hombre"))
 
 
+class TestPlazosEnElPrompt:
+    """El prompt no puede prometer plazos por defecto.
+
+    En este nicho la voz la pone el propio vídeo (la persona habla), así que
+    lo que diga el ejemplo es lo que dirá el clip. Si promete financiación y
+    la prenda no la tiene, no hay arreglo posterior: hay que generar el vídeo
+    otra vez. Por eso el interruptor va apagado.
+    """
+
+    def _prompts(self, plazos: bool):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        r = TestClient(app).get(
+            "/api/v1/nicho-ropa/prompts",
+            params={"carpeta": "mujer_web__Carpeta 1", **({"plazos": 1} if plazos else {})},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def test_por_defecto_no_los_menciona(self):
+        datos = self._prompts(False)
+        assert "plazos" not in datos["video_espejo"].lower()
+        for estilo in datos["mof10"]:
+            assert "plazos" not in estilo["guion"].lower()
+
+    def test_con_el_interruptor_si(self):
+        datos = self._prompts(True)
+        assert "plazos" in datos["video_espejo"].lower()
+
+    def test_no_se_escapa_ningun_marcador(self):
+        for plazos in (True, False):
+            datos = self._prompts(plazos)
+            assert "{{" not in datos["video_espejo"]
+            for estilo in datos["mof10"]:
+                assert "{{" not in estilo["guion"] and "{{" not in estilo["imagen"]
+
+
 class TestAltaDeUnaPrenda:
     """El recorrido entero: subirla, verla y pedir su prompt."""
 
@@ -92,6 +130,36 @@ class TestAltaDeUnaPrenda:
             files={"foto_limpia": ("a.jpg", b"limpia", "image/jpeg")},
         )
         assert r.status_code == 400, r.text
+
+    def test_la_foto_se_puede_ver(self, raiz_temporal):
+        """La miniatura salía rota: el endpoint validaba el id con el patrón
+        de Drive y estas fotos llevan la RUTA como id, igual que las del ZIP."""
+        c = self._cliente()
+        alta = c.post(
+            "/api/v1/nicho-ropa/mis-prendas?genero=mujer_muestras",
+            files={"foto_limpia": ("a.jpg", b"\xff\xd8\xffdata", "image/jpeg")},
+        ).json()
+        listado = c.get(
+            "/api/v1/nicho-ropa/prendas", params={"carpeta": alta["slug"]},
+        ).json()
+        foto = listado["items"][0]["clean_photo_id"]
+        assert foto.startswith("/")          # es una ruta, no un ID de Google
+        r = c.get("/api/v1/nicho-ropa/foto", params={"file_id": foto})
+        assert r.status_code == 200, r.text
+        # Y NO se cachea: la ruta se reutiliza al borrar y volver a subir.
+        assert "no-cache" in r.headers.get("cache-control", "")
+
+    def test_la_foto_limpia_se_descarga(self, raiz_temporal):
+        c = self._cliente()
+        alta = c.post(
+            "/api/v1/nicho-ropa/mis-prendas?genero=mujer_muestras",
+            files={"foto_limpia": ("a.jpg", b"\xff\xd8\xffdata", "image/jpeg")},
+        ).json()
+        r = c.get(
+            "/api/v1/nicho-ropa/foto-limpia",
+            params={"producto": "1", "carpeta": alta["slug"]},
+        )
+        assert r.status_code == 200, r.text
 
     def test_lo_de_mujer_no_aparece_en_hombre(self, raiz_temporal):
         c = self._cliente()

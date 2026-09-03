@@ -292,7 +292,11 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   const prendas = usePrendas(carpeta);
   // Sin carpeta elegida manda el selector de arriba: `hombre_web__` no es una
   // carpeta de verdad, pero al backend le basta para saber el sexo.
-  const prompts = usePromptsRopa(carpeta || (esWeb ? `${genero}__` : ""));
+  // Si la prenda admite pago a plazos. Va apagado a propósito: aquí la voz la
+  // pone el propio vídeo, así que una promesa de más no se arregla luego —
+  // habría que volver a generarlo en Flow.
+  const [conPlazos, setConPlazos] = useState(false);
+  const prompts = usePromptsRopa(carpeta || (esWeb ? `${genero}__` : ""), conPlazos);
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -490,6 +494,25 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             </span>
           </button>
         ) : null}
+        {esWeb && (
+          /* Lo que dice la persona lo genera el vídeo, así que si el ejemplo
+             promete plazos, el clip los promete. Y aquí no hay arreglo
+             posterior: no es una voz que se pueda volver a locutar, habría que
+             generar el vídeo otra vez. Por eso va apagado por defecto y se
+             enciende solo cuando la ficha de la prenda lo ofrece. */
+          <label className="flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-violet-500"
+              checked={conPlazos}
+              onChange={(e) => setConPlazos(e.target.checked)}
+            />
+            <span>
+              Esta prenda admite <strong>pago a plazos</strong> — lo dirá en el
+              vídeo. Compruébalo en su ficha antes de marcarlo.
+            </span>
+          </label>
+        )}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
             /* Dos pasos: la imagen se hace en Flow y esa imagen se anima con

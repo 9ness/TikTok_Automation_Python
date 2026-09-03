@@ -103,7 +103,11 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg"):
     Se delega en el Nicho POV BOF a propósito: el ID es global en Drive, así
     que la misma función vale, y así hay una sola caché de fotos.
     """
-    if not _FILE_ID_RE.match(file_id or ""):
+    # Las fotos que NO son del Drive del curso —las de la web importadas por
+    # ZIP y las de los catálogos propios— llevan la RUTA como id, igual que en
+    # el POV BOF. Un ID de Google nunca empieza por "/", así que se distinguen
+    # sin ambigüedad y las resuelve la misma función de allí.
+    if not str(file_id).startswith("/") and not _FILE_ID_RE.match(file_id or ""):
         raise ValueError(f"file_id no válido: {file_id!r}")
     from src.nicho_pov_bof.services import drive_client as pov_drive
 

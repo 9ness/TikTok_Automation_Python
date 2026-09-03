@@ -26,12 +26,13 @@ export const nichoRopaKeys = {
  *  Los prompts SÍ cambian (se afinan cada pocas semanas), así que no se
  *  cachean para siempre: con `Infinity` el móvil se quedaba con el viejo
  *  aunque estuviera desplegado el nuevo (ver `usePrompts` del POV BOF). */
-export function usePromptsRopa(carpeta: string) {
+export function usePromptsRopa(carpeta: string, plazos = false) {
   return useQuery<PromptsRopaResponse>({
-    queryKey: nichoRopaKeys.prompts(carpeta),
+    queryKey: [...nichoRopaKeys.prompts(carpeta), plazos],
     queryFn: () =>
       api.get<PromptsRopaResponse>(
-        `${ROOT}/prompts?carpeta=${encodeURIComponent(carpeta)}`,
+        `${ROOT}/prompts?carpeta=${encodeURIComponent(carpeta)}` +
+          (plazos ? "&plazos=1" : ""),
       ),
     staleTime: 60_000,
   });

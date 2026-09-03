@@ -55,11 +55,18 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 
 
 @router.get("/prompts", response_model=PromptsRopaResponse)
-def get_prompts(carpeta: str = Query("")) -> PromptsRopaResponse:
+def get_prompts(
+    carpeta: str = Query(""), plazos: bool = Query(False),
+) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
     `carpeta` solo decide el del espejo: es el único con una persona dentro, y
     en las carpetas de hombre esa persona tiene que ser un hombre.
+
+    `plazos` mete la frase de la financiación en lo que dice la persona. Va
+    apagado por defecto a propósito: aquí la voz la pone el propio vídeo, así
+    que prometer plazos que la prenda no tiene no se puede corregir después —
+    habría que volver a generarlo.
     """
     sexo = config.sexo_de_carpeta(carpeta)
     try:
@@ -68,9 +75,9 @@ def get_prompts(carpeta: str = Query("")) -> PromptsRopaResponse:
             video_con_manos=config.prompt_video(True),
             video_sin_manos=config.prompt_video(False),
             video_percha=config.prompt_video_percha(),
-            video_espejo=config.prompt_video_espejo(sexo),
+            video_espejo=config.prompt_video_espejo(sexo, plazos),
             sexo=sexo,
-            mof10=config.prompts_mof10(sexo),
+            mof10=config.prompts_mof10(sexo, plazos),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
@@ -391,7 +398,11 @@ def extraer_textos(
 
 
 def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
-    if not _FILE_ID_RE.match(file_id or ""):
+    # Las fotos de la web y las de los catálogos propios llevan la RUTA como
+    # id (no hay ID de Google), así que aquí NO vale el patrón de Drive: con él
+    # la miniatura salía rota y el 400 no llegaba a verse en ningún sitio.
+    propia = str(file_id).startswith("/")
+    if not propia and not _FILE_ID_RE.match(file_id or ""):
         raise APIError(f"file_id no válido: {file_id!r}", status_code=400)
     try:
         path = drive_client.fetch_photo(file_id)
@@ -399,9 +410,15 @@ def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
         raise APIError(str(e), status_code=502) from e
     return FileResponse(
         str(path),
-        media_type="image/jpeg",
+        media_type="image/png" if path.suffix.lower() == ".png" else "image/jpeg",
         filename=nombre if descargar else None,
-        headers={"Cache-Control": "public, max-age=86400"},
+        # Una foto de Drive es inmutable (su ID lo es), pero una RUTA se
+        # reutiliza: borras una prenda, subes otra y `Tareas 1/1.jpg` es otra
+        # foto con la misma URL. Cachearla un día enseñaba la vieja — pasó en
+        # el POV BOF y allí se resolvió igual.
+        headers={
+            "Cache-Control": "no-cache" if propia else "public, max-age=86400",
+        },
     )
 
 

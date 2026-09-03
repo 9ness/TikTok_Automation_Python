@@ -262,7 +262,7 @@ SEXOS: dict[str, dict[str, str]] = {
         "VOZ_SINC": "voz femenina española, juvenil y natural",
         "EJEMPLO": (
             "Han ajustado el precio de estos jeans virales. Son elásticos y de "
-            "campana. Comprueba tus cupones y, si lo prefieres, págalo a plazos."
+            "campana. Comprueba tus cupones antes de comprar.{{FRASE_PLAZOS}}"
         ),
         "VOZ_DESC": (
             "Voz femenina ligera, viva y luminosa, perteneciente a una mujer de "
@@ -281,8 +281,8 @@ SEXOS: dict[str, dict[str, str]] = {
         "VOZ_SINC": "voz masculina española, juvenil y natural",
         "EJEMPLO": (
             "Han ajustado el precio de esta sudadera viral. Es de algodón grueso "
-            "y cae perfecta. Comprueba tus cupones y, si lo prefieres, págalo a "
-            "plazos."
+            "y cae perfecta. Comprueba tus cupones antes de comprar."
+            "{{FRASE_PLAZOS}}"
         ),
         "VOZ_DESC": (
             "Voz masculina natural, viva y cercana, perteneciente a un hombre de "
@@ -312,14 +312,19 @@ def sexo_de_carpeta(slug: str) -> str:
     return SEXO_DEFECTO
 
 
-def prompt_video_espejo(sexo: str = SEXO_DEFECTO) -> str:
-    """El prompt de la web con las palabras de ESE sexo ya sustituidas."""
+def prompt_video_espejo(sexo: str = SEXO_DEFECTO, plazos: bool = False) -> str:
+    """El prompt de la web con las palabras de ESE sexo ya sustituidas.
+
+    `plazos` mete la frase de la financiación en lo que dice la persona. Va
+    apagado por defecto: prometerla cuando no la hay es lo caro, y aquí no se
+    puede corregir después — la voz la pone el propio vídeo.
+    """
     piezas = SEXOS.get(sexo) or SEXOS[SEXO_DEFECTO]
     texto = _limpio("prompt_video_espejo.md")
     for clave, valor in piezas.items():
         if clave != "label":
             texto = texto.replace("{{" + clave + "}}", valor)
-    return texto
+    return _con_plazos(texto, plazos)
 
 
 # ---------------------------------------------------------------------------
@@ -426,6 +431,21 @@ ESTILOS_MOF10: dict[str, dict] = {
 }
 
 
+# La frase del pago a plazos, que va SUELTA y no dentro del ejemplo.
+#
+# En este nicho la voz la pone el propio vídeo (la persona habla), así que lo
+# que diga el ejemplo es lo que va a decir: si el ejemplo promete plazos, el
+# clip lo promete aunque esa prenda no los tenga. Y aquí no se puede arreglar
+# después como en el POV BOF —allí la voz se genera aparte y se puede
+# resintetizar—: habría que volver a generar el vídeo entero.
+FRASE_PLAZOS = " Y si lo prefieres, puedes pagarlo a plazos."
+
+
+def _con_plazos(texto: str, plazos: bool) -> str:
+    """Mete (o quita) la frase de los plazos en un prompt ya montado."""
+    return texto.replace("{{FRASE_PLAZOS}}", FRASE_PLAZOS if plazos else "")
+
+
 def _con_sexo(fichero: str, sexo: str, piezas: dict) -> str:
     texto = _limpio(fichero)
     for clave, valor in (piezas.get(sexo) or piezas[SEXO_DEFECTO]).items():
@@ -433,7 +453,7 @@ def _con_sexo(fichero: str, sexo: str, piezas: dict) -> str:
     return texto
 
 
-def prompts_mof10(sexo: str = SEXO_DEFECTO) -> list[dict]:
+def prompts_mof10(sexo: str = SEXO_DEFECTO, plazos: bool = False) -> list[dict]:
     """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo."""
     salida = []
     for clave, meta in ESTILOS_MOF10.items():
@@ -447,8 +467,8 @@ def prompts_mof10(sexo: str = SEXO_DEFECTO) -> list[dict]:
         salida.append({
             "clave": clave,
             "label": meta["label"],
-            "imagen": imagen,
-            "guion": guion,
+            "imagen": _con_plazos(imagen, plazos),
+            "guion": _con_plazos(guion, plazos),
             "derivado": sexo in meta["derivado"],
         })
     return salida
