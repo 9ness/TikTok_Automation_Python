@@ -76,6 +76,48 @@ systemctl status <nombre>
 
 ---
 
+## "No me va la web ni la app" — comprobar ANTES de tocar nada
+
+Pasó el 2-3 de septiembre de 2026: el móvil daba `ERR_NAME_NOT_RESOLVED` con
+`https://tiktok-factory.tailbff00e.ts.net/` y el servidor estaba perfecto. Se
+arregló solo al caducar la caché de DNS del teléfono — **no se tocó nada**.
+
+La app se sirve por **Tailscale Funnel**, así que ese nombre lo publica
+Tailscale: si el móvil no lo resuelve (Tailscale a medias en el propio
+teléfono, "DNS privado" de Android apuntando a un servidor que no responde,
+caché envenenada del router) no hay web, aunque el VPS esté impecable.
+
+Estas cuatro comprobaciones se hacen desde cualquier sitio, **sin SSH**, y
+dicen en un minuto si el problema es del servidor o del cliente:
+
+```bash
+# 1. Qué commit corre y si el último deploy acabó bien (sin auth)
+curl -s http://62.238.19.31:9000/version
+
+# 2. Contenedores vivos (API_KEY = la del .env)
+curl -s http://62.238.19.31:9000/admin/docker/ps -H "X-API-Key: $API_KEY"
+curl -s http://62.238.19.31:9000/admin/system   -H "X-API-Key: $API_KEY"
+
+# 3. ¿Resuelve el nombre en DNS públicos? (si aquí SÍ, es el cliente)
+dig +short @1.1.1.1 tiktok-factory.tailbff00e.ts.net
+
+# 4. ¿Sirve por la ruta PÚBLICA? Ojo: desde un equipo del tailnet, el nombre
+#    resuelve por dentro y un 200 NO prueba nada. Hay que forzar la IP del
+#    ingress de Tailscale (las del paso 3):
+curl -so /dev/null -w '%{http_code}\n' \
+  --resolve tiktok-factory.tailbff00e.ts.net:443:185.40.234.55 \
+  https://tiktok-factory.tailbff00e.ts.net/
+```
+
+**Plan B inmediato para el operador**: `http://62.238.19.31` sirve la app sin
+DNS ni Tailscale (Caddy escucha en el 80 con `DOMAIN` vacío). Es HTTP, así que
+solo para salir del paso.
+
+**Arreglo definitivo pendiente**: un subdominio propio (tienen
+`nebulabsmedia.com`) con un registro A a `62.238.19.31` y ese nombre añadido al
+`Caddyfile` — Caddy saca el certificado solo y la app deja de depender de
+Tailscale. Falta que el operador cree el DNS.
+
 ## Logs y debugging
 
 ```bash
