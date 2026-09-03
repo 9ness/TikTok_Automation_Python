@@ -117,12 +117,13 @@ export function useCarpetasRopa() {
 }
 
 /** Mientras haya un montaje en curso se sondea solo, y para al terminar. */
-export function usePrendas(carpeta: string) {
+export function usePrendas(carpeta: string, modo = "espejo") {
   return useQuery<PrendasListResponse>({
-    queryKey: nichoRopaKeys.prendas(carpeta),
+    queryKey: [...nichoRopaKeys.prendas(carpeta), modo],
     queryFn: () =>
       api.get<PrendasListResponse>(
-        `${ROOT}/prendas?carpeta=${encodeURIComponent(carpeta)}`,
+        `${ROOT}/prendas?carpeta=${encodeURIComponent(carpeta)}` +
+          `&modo=${encodeURIComponent(modo)}`,
       ),
     refetchInterval: (query) => (query.state.data?.montando ? 5000 : false),
     enabled: Boolean(carpeta),
@@ -215,11 +216,12 @@ export function buildFotoLimpiaRopaUrl(producto: string, carpeta: string): strin
 
 /** `v` es la marca de versión: sin ella el navegador reutiliza el vídeo viejo. */
 export function buildVideoRopaUrl(
-  producto: string, carpeta: string, v: number, descargar = false,
+  producto: string, carpeta: string, v: number, descargar = false, modo = "espejo",
 ): string {
   return conApiKey(
     `${ROOT}/video?producto=${encodeURIComponent(producto)}` +
       `&carpeta=${encodeURIComponent(carpeta)}&v=${v}` +
+      `&modo=${encodeURIComponent(modo)}` +
       (descargar ? "&descargar=true" : ""),
   );
 }

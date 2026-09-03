@@ -108,6 +108,50 @@ def update_product(carpeta: str, producto: str, **campos) -> dict:
         return prod
 
 
+def video_de(prod: dict, modo: str) -> dict:
+    """`{video_path, video_listo_at}` de ESE modo de grabación.
+
+    Los vídeos de antes de que hubiera modos viven en la raíz del producto y
+    son del modo por defecto: se leen desde ahí para no perderlos.
+    """
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    guardado = ((prod or {}).get("modos") or {}).get(modo) or {}
+    if not guardado and modo == config.MODO_DEFECTO:
+        guardado = {
+            "video_path": (prod or {}).get("video_path"),
+            "video_listo_at": (prod or {}).get("video_listo_at"),
+        }
+    return {
+        "video_path": guardado.get("video_path") or "",
+        "video_listo_at": int(guardado.get("video_listo_at") or 0),
+    }
+
+
+def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: int) -> dict:
+    """Apunta el vídeo de un modo sin tocar el de los demás."""
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        productos = doc.setdefault("productos", {})
+        prod = productos.setdefault(str(producto), {})
+        prod.setdefault("modos", {})[modo] = {
+            "video_path": ruta, "video_listo_at": listo_at,
+        }
+        # El de siempre se sigue escribiendo para el modo por defecto: hay
+        # código (y datos) que lo lee de la raíz.
+        if modo == config.MODO_DEFECTO:
+            prod["video_path"] = ruta
+            prod["video_listo_at"] = listo_at
+        prod["updated_at"] = _now()
+        r.set_json(_key(carpeta), doc)
+        return prod
+
+
 def quitar_campos(carpeta: str, producto: str, *campos: str) -> dict:
     """Borra campos del producto. `update_product` no sirve: ignora los `None`.
 

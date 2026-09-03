@@ -44,6 +44,15 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
+/** Los modos de grabación: dónde está la cámara. Cada uno es un vídeo
+ *  distinto de la MISMA prenda y guarda su propio estado — igual que los
+ *  estilos de guion del POV BOF Largo. Añadir uno es añadirlo aquí y en
+ *  `nicho_ropa/config.py:MODOS`. */
+const MODOS_ROPA: Record<string, string> = {
+  espejo: "🪞 Frente al espejo",
+  camara: "📱 Dejando la cámara",
+};
+
 /** Alta de prendas PROPIAS, en los cuatro catálogos del operador.
  *
  *  Mismo planteamiento que "Muestras/Tareas" del POV BOF y por el mismo
@@ -287,12 +296,16 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   // mientras no haya ninguna carpeta: sin esto, elegir "Hombre" y ver el
   // prompt en femenino parece un fallo (y lo parecía).
   const [genero, setGenero] = useState("mujer_web");
+  // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
+  // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
+  // maneras y son dos publicaciones distintas.
+  const [modo, setModo] = useEstadoDeUsuario("ropa-web:modo", "espejo");
   const primera = misCarpetas[0]?.slug ?? "";
   useEffect(() => {
     if (!primera || carpetaValida) return;
     setCarpeta(primera);
   }, [carpetaValida, primera, setCarpeta]);
-  const prendas = usePrendas(carpeta);
+  const prendas = usePrendas(carpeta, modo);
   // Sin carpeta elegida manda el selector de arriba: `hombre_web__` no es una
   // carpeta de verdad, pero al backend le basta para saber el sexo.
   // Los dos prompts a la vez: cada prenda usa el suyo según lo que ofrezca su
@@ -347,7 +360,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
     for (const [i, p] of conVideoBajar.entries()) {
       setBajandoVideos(`${i + 1}/${conVideoBajar.length}`);
       const a = document.createElement("a");
-      a.href = buildVideoRopaUrl(p.producto, carpeta, p.video_listo_at, true);
+      a.href = buildVideoRopaUrl(p.producto, carpeta, p.video_listo_at, true, modo);
       a.download = nombreDescarga("ropa", p.producto) + ".mp4";
       document.body.appendChild(a);
       a.click();
@@ -392,6 +405,38 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
           <PegarFichasRopa genero={genero} />
         )}
         {esWeb && <AltaMiPrenda onCreado={(slug) => setCarpeta(slug)} />}
+
+        {esWeb && (
+          /* El modo de grabación. Cada uno guarda SU vídeo de la misma
+             prenda: se graba de las dos maneras y son dos publicaciones. Es
+             lo mismo que los estilos de guion del POV BOF Largo — lo que se
+             comparte (textos, fotos, escaparate) no se duplica. */
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Modo de grabación
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {Object.entries(MODOS_ROPA).map(([clave, label]) => (
+                <button
+                  key={clave}
+                  type="button"
+                  onClick={() => setModo(clave)}
+                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition ${
+                    modo === clave
+                      ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                      : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Cada modo guarda su propio vídeo: cambiar aquí no pisa lo del
+              otro. Los textos, las fotos y el escaparate son comunes.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           {misCarpetas.map((c) => (
@@ -736,6 +781,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             prenda={p}
             carpeta={carpeta}
             esWeb={esWeb}
+            modo={modo}
             onCopiar={copiar}
           />
         ))}
@@ -748,11 +794,15 @@ function PrendaCard({
   prenda,
   carpeta,
   esWeb,
+  modo,
   onCopiar,
 }: {
   prenda: PrendaItem;
   carpeta: string;
   esWeb: boolean;
+  /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
+   *  y dónde se guarda el que se suba. */
+  modo: string;
   onCopiar: (label: string, texto?: string) => void;
 }) {
   const setEstado = useSetEstadoRopa(carpeta);
@@ -777,6 +827,7 @@ function PrendaCard({
     fd.append("carpeta", carpeta);
     fd.append("sexo", sexo);
     if (esWeb && audio === "mudo") fd.append("conservar_audio", "0");
+    fd.append("modo", modo);
     fd.append("file", file);
 
     const base =
@@ -1036,12 +1087,16 @@ function PrendaCard({
         filename={`ropa_${prenda.producto}.mp4`}
         videoUrl={
           prenda.video_path
-            ? buildVideoRopaUrl(prenda.producto, carpeta, prenda.video_listo_at)
+            ? buildVideoRopaUrl(
+                prenda.producto, carpeta, prenda.video_listo_at, false, modo,
+              )
             : null
         }
         downloadUrl={
           prenda.video_path
-            ? buildVideoRopaUrl(prenda.producto, carpeta, prenda.video_listo_at, true)
+            ? buildVideoRopaUrl(
+                prenda.producto, carpeta, prenda.video_listo_at, true, modo,
+              )
             : null
         }
         localPath={prenda.video_path}

@@ -38,6 +38,46 @@ class TestSlugsDelOperador:
             assert genero.startswith(("mujer", "hombre"))
 
 
+class TestModosDeGrabacion:
+    """Cada modo guarda SU vídeo de la misma prenda.
+
+    Es lo mismo que los estilos de guion del POV BOF Largo: se graba la prenda
+    frente al espejo y dejando la cámara, y son dos publicaciones. Lo que NO se
+    duplica son los textos ni el escaparate — son de la prenda, no de cómo se
+    grabe—, así que el modo cuelga del producto y no de la clave del documento.
+    """
+
+    def test_los_videos_de_antes_son_del_modo_por_defecto(self):
+        """No se pierde nada: lo guardado en la raíz es del espejo."""
+        from src.nicho_ropa.repos import product_repo
+
+        viejo = {"video_path": "/x/a.mp4", "video_listo_at": 111}
+        assert product_repo.video_de(viejo, "espejo")["video_path"] == "/x/a.mp4"
+        # Y en el otro modo no hay nada, que es lo correcto.
+        assert product_repo.video_de(viejo, "camara")["video_path"] == ""
+
+    def test_un_modo_no_pisa_al_otro(self):
+        from src.nicho_ropa.repos import product_repo
+
+        prod = {
+            "video_path": "/x/a.mp4",
+            "video_listo_at": 111,
+            "modos": {"camara": {"video_path": "/x/b.mp4", "video_listo_at": 222}},
+        }
+        assert product_repo.video_de(prod, "espejo")["video_path"] == "/x/a.mp4"
+        assert product_repo.video_de(prod, "camara")["video_path"] == "/x/b.mp4"
+
+    def test_un_modo_inventado_cae_al_defecto(self):
+        from src.nicho_ropa.repos import product_repo
+
+        prod = {"video_path": "/x/a.mp4"}
+        assert product_repo.video_de(prod, "loquesea")["video_path"] == "/x/a.mp4"
+
+    def test_los_modos_estan_declarados(self):
+        assert config.MODO_DEFECTO in config.MODOS
+        assert len(config.MODOS) >= 2
+
+
 class TestPlazosEnElPrompt:
     """El prompt no puede prometer plazos por defecto.
 

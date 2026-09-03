@@ -100,6 +100,24 @@ def es_genero_operador(genero: str) -> bool:
     return genero in GENEROS_OPERADOR
 
 
+# Los MODOS de grabación. Cada uno es un vídeo distinto de la MISMA prenda —
+# cambia dónde está la cámara—, así que cada uno guarda su vídeo por separado:
+# igual que los estilos de guion del POV BOF Largo (precio / punto de dolor).
+#
+# Lo que NO se separa son los textos ni el escaparate: son de la prenda, no de
+# cómo se grabe. Por eso el modo no entra en la clave del documento (eso
+# duplicaría los textos), sino que cuelga de cada producto.
+MODOS: dict[str, str] = {
+    "espejo": "🪞 Frente al espejo",
+    "camara": "📱 Dejando la cámara",
+}
+MODO_DEFECTO = "espejo"
+
+
+def modo_valido(modo: str) -> str:
+    return modo if modo in MODOS else MODO_DEFECTO
+
+
 def es_carpeta_web(slug: str) -> bool:
     return SEPARADOR_WEB in (slug or "")
 

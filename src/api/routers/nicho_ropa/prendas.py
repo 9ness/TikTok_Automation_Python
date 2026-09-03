@@ -278,6 +278,8 @@ def list_prendas(
     carpeta: Annotated[str, Query()] = "",
     refresh: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
+    # Con qué modo de grabación se está trabajando: cada uno tiene su vídeo.
+    modo: Annotated[str, Query()] = "",
 ) -> PrendasListResponse:
     """Prendas de la carpeta, con su foto limpia, su captura y sus textos."""
     from src.nicho_pov_bof import config as pov_config
@@ -334,8 +336,9 @@ def list_prendas(
             plazos_manual=prod.get("plazos_manual"),
             precio=str(prod.get("precio") or ""),
             uploaded=bool(prod.get("uploaded")),
-            video_path=prod.get("video_path"),
-            video_listo_at=int(prod.get("video_listo_at") or 0),
+            # El vídeo es de ESTE modo de grabación: la misma prenda tiene
+            # uno por modo, como los estilos de guion del POV BOF Largo.
+            **product_repo.video_de(prod, modo),
             montando=pid in activos,
         ))
     return PrendasListResponse(
@@ -483,6 +486,8 @@ async def upload_video(
     sexo: Annotated[str, Form()] = "",
     # "1"/"0" para forzarlo; vacío = lo decide la carpeta.
     conservar_audio: Annotated[str, Form()] = "",
+    # Dónde está la cámara en este vídeo. Cada modo guarda el suyo.
+    modo: Annotated[str, Form()] = "",
 ) -> VideoRopaUploadResponse:
     """Sube el vídeo generado fuera y encola el encuadre.
 
@@ -532,6 +537,7 @@ async def upload_video(
             "raw_path": str(destino),
             "sexo": sexo_norm,
             "conservar_audio": con_audio,
+            "modo": config.modo_valido(modo),
             "operator": operator,
         },
     )
@@ -550,10 +556,11 @@ def get_video(
     producto: Annotated[str, Query()],
     carpeta: Annotated[str, Query()] = "",
     descargar: Annotated[bool, Query()] = False,
+    modo: Annotated[str, Query()] = "",
 ) -> FileResponse:
-    """Sirve el vídeo ya montado."""
+    """Sirve el vídeo ya montado de ese modo de grabación."""
     prod = product_repo.get_product(carpeta or config.CARPETA_DEFECTO, producto)
-    ruta = prod.get("video_path")
+    ruta = product_repo.video_de(prod, modo)["video_path"]
     if not ruta or not Path(ruta).is_file():
         raise APIError(f"La prenda {producto} no tiene vídeo montado.", status_code=404)
     return FileResponse(

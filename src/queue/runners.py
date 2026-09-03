@@ -1755,17 +1755,22 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
 
     on_progress(0.4, "🎬 Encuadrando a 9:16…")
     titulo = str((product_repo.get_product(carpeta, producto) or {}).get("titulo") or "")
-    salida = Path(ropa_config.video_dir()) / carpeta / pov_config.nombre_video(
-        producto, titulo, folder=carpeta,
-    )
+    modo = ropa_config.modo_valido(str(p.get("modo") or ""))
+    nombre = pov_config.nombre_video(producto, titulo, folder=carpeta)
+    # El modo va en el nombre: sin él, el vídeo de "dejando la cámara" se
+    # escribía encima del del espejo (misma prenda, misma carpeta).
+    if modo != ropa_config.MODO_DEFECTO:
+        nombre = f"{Path(nombre).stem}__{modo}{Path(nombre).suffix}"
+    salida = Path(ropa_config.video_dir()) / carpeta / nombre
     video_editor.montar(
         raw_path, salida, voz=voz, conservar_audio=conservar_audio, on_log=on_log,
     )
 
     on_progress(0.95, "💾 Guardando estado…")
-    product_repo.update_product(
-        carpeta, producto, video_path=str(salida),
-        video_listo_at=int(time.time()),
+    # Por MODO de grabación: la misma prenda tiene un vídeo frente al espejo y
+    # otro dejando la cámara, y guardar en la raíz pisaba el anterior.
+    product_repo.guardar_video(
+        carpeta, producto, str(p.get("modo") or ""), str(salida), int(time.time()),
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)
