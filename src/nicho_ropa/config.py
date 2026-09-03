@@ -205,8 +205,7 @@ SEXOS: dict[str, dict[str, str]] = {
         "VOZ_SINC": "voz femenina española, juvenil y natural",
         "EJEMPLO": (
             "Han ajustado el precio de estos jeans virales. Son elásticos y de "
-            "campana. Comprueba tus cupones y aprovecha el pago a plazos en "
-            "pedidos de más de 30 euros."
+            "campana. Comprueba tus cupones y, si lo prefieres, págalo a plazos."
         ),
         "VOZ_DESC": (
             "Voz femenina ligera, viva y luminosa, perteneciente a una mujer de "
@@ -225,8 +224,8 @@ SEXOS: dict[str, dict[str, str]] = {
         "VOZ_SINC": "voz masculina española, juvenil y natural",
         "EJEMPLO": (
             "Han ajustado el precio de esta sudadera viral. Es de algodón grueso "
-            "y cae perfecta. Comprueba tus cupones y aprovecha el pago a plazos "
-            "en pedidos de más de 30 euros."
+            "y cae perfecta. Comprueba tus cupones y, si lo prefieres, págalo a "
+            "plazos."
         ),
         "VOZ_DESC": (
             "Voz masculina natural, viva y cercana, perteneciente a un hombre de "

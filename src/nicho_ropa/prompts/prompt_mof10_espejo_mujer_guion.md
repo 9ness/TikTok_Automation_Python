@@ -11,7 +11,7 @@ Te voy a pasar una pront base para que mantengas toda la estructura y guión. So
 
 La mujer dice en español:
 
-«Han ajustado el precio de estos jeans virales. Son elásticos y de campana. Es cómodo,  se ajusta perfecto  y muy hermoso. Comprueba tus cupones y aprovecha el pago a plazos en pedidos de más de 30 euros.«
+«Han ajustado el precio de estos jeans virales. Son elásticos y de campana. Es cómodo,  se ajusta perfecto  y muy hermoso. Comprueba tus cupones y, si lo prefieres, págalo a plazos.«
 
 Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un timbre cálido, amigable y cercano. Ritmo conversacional ágil y natural, ligeramente enérgico y espontáneo, como una creadora UGC real. Pronunciación española clara, sin tono de locutora publicitaria y sin entonación robótica. La misma voz debe mantenerse en las tres escenas, con sincronización labial precisa.
 

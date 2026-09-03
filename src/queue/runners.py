@@ -2025,6 +2025,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         )
     else:
         on_log("[pov_bof_largo] reutilizando el guion ya escrito")
+    # Lo mismo que en el corto: fuera el mínimo de pedido de los guiones
+    # viejos antes de que la voz lo diga.
+    escrito["guion"] = largo_config.sin_minimo_plazos(escrito["guion"])
     on_log(f"[pov_bof_largo] guion ({len(escrito['guion'])} car.): {escrito['guion']}")
 
     on_progress(0.22, f"🔊 Locutando ({sexo})…")
@@ -3676,6 +3679,13 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     # plazos, y el sorteo de voz descarta las que no quepan en los clips que
     # hay (`_segundos_de_video`), que es lo que deja el vídeo en UN clip.
     guion = str((textos or {}).get("guion_producto") or "").strip()
+    # Los guiones escritos antes de septiembre de 2026 arrastran la condición
+    # del curso ("en pedidos de más de 30 euros"), que ya no es cierta: TikTok
+    # ofrece los plazos en pedidos pequeños. Se quita AQUÍ además de en la
+    # pantalla, porque esto es lo que se locuta y no puede irse a un vídeo.
+    from src.nicho_pov_bof_largo import config as _largo_cfg
+
+    guion = _largo_cfg.sin_minimo_plazos(guion)
     if guion:
         from src.nicho_pov_bof_largo.services import voz as voz_svc
 

@@ -92,6 +92,50 @@ class TestVoz:
             voz.sintetizar("hola", tmp_path / "v.mp3", sexo="hombre")
 
 
+class TestMinimoDePlazos:
+    """Ningún guion puede decir "en pedidos de más de 30 euros".
+
+    Era la condición del curso y dejó de ser cierta: TikTok ofrece el pago a
+    plazos en pedidos pequeños (capturado el 3 de septiembre de 2026 un
+    producto de 20,99 € con tres pagos). Decirlo es mentir al espectador y
+    encima empujarle a llenar el carrito para llegar a un mínimo que no
+    existe. Hay 300+ guiones escritos con esa frase, así que se limpian al
+    vuelo — al pintarlos y, sobre todo, antes de locutarlos.
+    """
+
+    @pytest.mark.parametrize("frase", [
+        "y podrás financiarlo en cómodos plazos en pedidos superiores a 30 euros",
+        "y divide tu pago en cómodos plazos si tu pedido supera los 30 euros",
+        "puedes pagarlo cómodamente en varios plazos en pedidos de más de 30 €",
+        "y podrás financiarlo en cómodos plazos, en pedidos superiores a 30 euros",
+    ])
+    def test_se_quita_la_condicion_y_la_frase_sigue_entera(self, frase):
+        limpio = config.sin_minimo_plazos(f"Bla bla. {frase}. Ve al carrito naranja.")
+        assert "30" not in limpio
+        assert "plazos" in limpio          # la frase se queda, sin la condición
+        assert "  " not in limpio
+
+    def test_es_idempotente(self):
+        una = config.sin_minimo_plazos(
+            "Y podrás financiarlo en cómodos plazos en pedidos superiores a 30 euros."
+        )
+        assert config.sin_minimo_plazos(una) == una
+
+    def test_no_toca_un_guion_que_no_lo_dice(self):
+        guion = "Han ajustado el precio. Ve al carrito naranja y aplica tus cupones."
+        assert config.sin_minimo_plazos(guion) == guion
+
+    def test_el_cierre_del_pov_bof_ya_no_pone_condicion(self):
+        from src.nicho_pov_bof import config as pov_config
+
+        for plazos in (True, False):
+            for envio in (True, False):
+                literal = pov_config._cta(plazos, envio)["CTA_LITERAL"]
+                assert "30" not in literal
+                if plazos:
+                    assert "plazos" in literal.lower()
+
+
 class TestConfig:
     def test_el_tope_sale_de_los_dos_clips(self):
         """364 caracteres = 2 clips de 10s a 18,2 car/s. Si alguien cambia el

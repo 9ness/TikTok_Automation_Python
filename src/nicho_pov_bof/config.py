@@ -618,7 +618,7 @@ DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF"
 # Klarna financia a partir de 30 €, pero aquí el listón se pone más alto: con
 # cupones el pedido baja y un producto de 32 € puede quedarse por debajo de los
 # 30, dejando el guion mintiendo. 40 € deja margen.
-PRECIO_MIN_PLAZOS = float(os.getenv("PRECIO_MIN_PLAZOS", "40"))
+PRECIO_MIN_PLAZOS = float(os.getenv("PRECIO_MIN_PLAZOS", "20"))
 
 
 def hay_plazos(textos: dict) -> bool:
@@ -707,7 +707,7 @@ DURACION_MINIMA_S = float(os.getenv("POV_BOF_DURACION_MINIMA_S", "10"))
 
 # La CTA, en dos versiones. La del curso lleva la frase del pago a plazos y es
 # OBLIGATORIA en su prompt; se quitó de en medio porque dejaba un soporte de
-# 2,94 € diciendo "aprovecha el pago a plazos en pedidos de más de 30 euros".
+# 2,94 € diciendo que se puede pagar a plazos.
 # Ahora que la financiación se lee de la ficha (`hay_plazos`) se puede volver a
 # poner donde toca: quien la ofrece la dice, y quien no, no.
 CTA_GUION = {
@@ -732,7 +732,13 @@ _CTA_CUPONES = "Comprueba tus cupones descuento antes de comprar."
 _CTA_CUPONES_ENVIO = (
     "Comprueba tus cupones y consigue un precio aún mejor con envío gratis."
 )
-_CTA_PLAZOS_FRASE = "Aprovecha el pago a plazos en pedidos de más de 30 euros."
+# Sin la condición de los 30 €: TikTok ya ofrece los plazos en pedidos más
+# pequeños —capturado el 3 de septiembre de 2026 un producto de 20,99 € con
+# "3 pagos de 7,00 € con un 0 % de interés"—, así que decir "en pedidos de más
+# de 30 euros" era mentira por arriba (el de 21 € también lo tiene) y por abajo
+# (invitaba a llenar el carrito para llegar a un mínimo que ya no existe).
+# Tampoco se promete el 0 % ni "tres plazos": eso lo pone la ficha y cambia.
+_CTA_PLAZOS_FRASE = "Y si lo prefieres, puedes pagarlo a plazos."
 
 
 def _cta(plazos: bool, envio: bool) -> dict[str, str]:
@@ -745,8 +751,7 @@ def _cta(plazos: bool, envio: bool) -> dict[str, str]:
         # Con solo plazos se mantiene la del curso, que los lleva en la misma
         # frase que los cupones.
         literal = (
-            "Comprueba tus cupones descuento y aprovecha el pago a plazos en "
-            "pedidos de más de 30 euros."
+            "Comprueba tus cupones descuento y, si lo prefieres, págalo a plazos."
         )
         estructura = "comprobacion de cupones y el pago a plazos"
     elif envio:
@@ -839,7 +844,7 @@ CARACTERES_POR_SEGUNDO_GUION = 18.2
 
 # La frase del pago a plazos, tal y como la escribe Gemini. Medido sobre 30
 # guiones reales: tres variantes, todas con la misma forma —"y (aprovecha) el
-# pago a plazos en pedidos de más de 30 euros"— pegada al final de la CTA.
+# pago a plazos"— pegada al final de la CTA.
 #
 # Se quita con un reemplazo en vez de reescribir el guion con Gemini: son 30
 # llamadas menos y el resto del texto (que está bien) no cambia.

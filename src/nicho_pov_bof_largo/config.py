@@ -222,10 +222,36 @@ _CTA_FINAL_RE = re.compile(
 )
 
 
+# El mínimo de pedido que el curso metía en la frase de los plazos ("en
+# pedidos superiores a 30 euros"). Ya no es cierto —TikTok los ofrece en
+# pedidos pequeños: capturado uno de 20,99 € con tres pagos— y los guiones
+# escritos antes lo siguen diciendo. Se quita del texto, que es una condición
+# suelta: sin ella la frase sigue entera ("y podrás financiarlo en cómodos
+# plazos"). Reescribirlos con IA costaría una llamada por producto.
+_MINIMO_PLAZOS_RE = re.compile(
+    r"\s*,?\s*(?:"
+    r"(?:en|para)\s+(?:los\s+)?pedidos?\s+(?:superiores?\s+a|de\s+m[áa]s\s+de|"
+    r"por\s+encima\s+de|a\s+partir\s+de)"
+    r"|si\s+(?:tu|el)\s+pedido\s+(?:supera|pasa\s+de|es\s+superior\s+a)"
+    r"|(?:en\s+)?compras\s+(?:superiores?\s+a|de\s+m[áa]s\s+de)"
+    r")\s+(?:los\s+)?\d+[\d.,]*\s*(?:€|euros?)",
+    re.IGNORECASE,
+)
+
+
+def sin_minimo_plazos(guion: str) -> str:
+    """Quita del guion la condición de importe de los plazos. Idempotente."""
+    if not guion:
+        return ""
+    limpio = _MINIMO_PLAZOS_RE.sub("", guion)
+    return re.sub(r"\s{2,}", " ", limpio).strip()
+
+
 def recortar_cta(guion: str, *, plazos: bool, envio: bool) -> str:
     """El guion con la CTA que le toca a ese precio. Idempotente."""
     if not guion:
         return ""
+    guion = sin_minimo_plazos(guion)
     nueva = cta_final(plazos, envio)
     if not _CTA_FINAL_RE.search(guion):
         return guion          # sin CTA reconocible no se toca nada

@@ -171,8 +171,8 @@ def muestra_de_voz(
 
     frase = texto.strip() or (
         "Han ajustado el precio de estos jeans virales. Son elásticos y de "
-        "campana. Comprueba tus cupones descuento y aprovecha el pago a plazos "
-        "en pedidos de más de 30 euros."
+        "campana. Comprueba tus cupones descuento y, si lo prefieres, "
+        "págalo a plazos."
     )
     elegida = None
     if voz:
