@@ -40,6 +40,26 @@ export function usePromptsRopa(carpeta: string) {
 /** Carpetas de producto. Las de mujer son las del nicho CON personas, pero la
  *  misma prenda vale aquí colgada en percha. */
 /** Importa un ZIP de prendas de la web del curso (mujer u hombre). */
+/** Alta de una prenda PROPIA en uno de los cuatro catálogos del operador
+ *  (mujer/hombre × muestras/tareas). Mismo convenio de nombres que el resto
+ *  del proyecto, así que a partir de ahí es una prenda más. */
+export function useCrearMiPrenda() {
+  const qc = useQueryClient();
+  return useMutation<
+    { slug: string; carpeta: string; prenda: string },
+    Error,
+    { genero: string; fotoLimpia: File; fotoFicha?: File | null }
+  >({
+    mutationFn: async ({ genero, fotoLimpia, fotoFicha }) => {
+      const fd = new FormData();
+      fd.append("foto_limpia", fotoLimpia);
+      if (fotoFicha) fd.append("foto_ficha", fotoFicha);
+      return api.post(`${ROOT}/mis-prendas?genero=${encodeURIComponent(genero)}`, fd);
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  });
+}
+
 export function useImportarPrendasWeb() {
   const qc = useQueryClient();
   return useMutation<

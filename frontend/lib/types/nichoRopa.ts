@@ -30,6 +30,10 @@ export interface CarpetaRopa {
   label: string;
   /** Del catálogo de la web (prenda puesta) o de las del Drive del curso. */
   web: boolean;
+  /** Catálogo del OPERADOR: las prendas las sube él, no vienen en un ZIP. */
+  propia?: boolean;
+  /** `mujer_muestras`, `hombre_tareas`… Vacío en las del curso y las del ZIP. */
+  genero?: string;
 }
 
 export interface CarpetasRopaResponse {

@@ -43,6 +43,14 @@ def _invalidar() -> None:
 
 
 def _dir_genero(genero: str) -> Path:
+    """La raíz de ese género. Los del operador viven aparte de los del ZIP.
+
+    Se separan en Drive porque son cosas distintas —los de la web se
+    ACTUALIZAN resubiendo el mismo ZIP, y los del operador los sube él uno a
+    uno— pero para el resto del código son el mismo tipo de carpeta.
+    """
+    if config.es_genero_operador(genero):
+        return config.mis_prendas_dir() / genero
     return config.prendas_web_dir() / genero
 
 
@@ -63,8 +71,109 @@ def carpetas(genero: str) -> list[str]:
 
 
 def todas_las_carpetas() -> list[tuple[str, str]]:
-    """`[(genero, carpeta)]` de los dos géneros, para el selector."""
+    """`[(genero, carpeta)]` de los géneros de la web, para el selector."""
     return [(g, c) for g in config.GENEROS_WEB for c in carpetas(g)]
+
+
+def carpetas_del_operador() -> list[tuple[str, str]]:
+    """`[(genero, carpeta)]` de los cuatro catálogos propios (mujer/hombre ×
+    muestras/tareas). Vacío mientras no se haya subido nada."""
+    return [(g, c) for g in config.GENEROS_OPERADOR for c in carpetas(g)]
+
+
+# ---------------------------------------------------------------------------
+# Alta de prendas propias
+# ---------------------------------------------------------------------------
+# Mismo planteamiento que "Mis productos" del POV BOF, y por el mismo motivo:
+# las fotos se guardan con el convenio de nombres de siempre (`3.jpg` la
+# limpia, `3(1).jpg` la ficha), así que el emparejado, los textos, los prompts
+# y el montaje funcionan sin una línea extra. Lo único propio de aquí es que
+# el género forma parte del slug, así que lo que subes en mujer se queda en
+# mujer.
+_PREFIJO_CARPETA = {"muestras": "Muestras", "tareas": "Tareas"}
+
+
+def _prefijo(genero: str) -> str:
+    for clave, nombre in _PREFIJO_CARPETA.items():
+        if genero.endswith(clave):
+            return nombre
+    return "Carpeta"
+
+
+def _num_carpeta(nombre: str) -> int:
+    import re
+
+    m = re.search(r"(\d+)\s*$", nombre or "")
+    return int(m.group(1)) if m else 0
+
+
+def _prendas_en(genero: str, carpeta: str) -> set[str]:
+    """Números de prenda que ya hay en la carpeta."""
+    import re
+
+    numeros: set[str] = set()
+    for foto in listar_fotos_como_drive(config.slug_web(genero, carpeta)):
+        m = re.match(r"^(\d+)", Path(foto["name"]).stem)
+        if m:
+            numeros.add(m.group(1))
+    return numeros
+
+
+def carpeta_actual(genero: str) -> str:
+    """La carpeta donde toca guardar: la última con hueco, o una nueva."""
+    existentes = carpetas(genero)
+    if existentes:
+        ultima = existentes[-1]
+        if len(_prendas_en(genero, ultima)) < config.MIS_PRENDAS_POR_CARPETA:
+            return ultima
+        return f"{_prefijo(genero)} {_num_carpeta(ultima) + 1}"
+    return f"{_prefijo(genero)} 1"
+
+
+def _extension(nombre: str) -> str:
+    ext = Path(nombre or "").suffix.lower()
+    return ext if ext in _EXTS else ".jpg"
+
+
+def guardar_prenda(
+    genero: str, limpia: bytes, ficha: bytes | None, *,
+    nombre_limpia: str = "", nombre_ficha: str = "",
+) -> dict:
+    """Guarda las fotos de una prenda propia. Devuelve `{slug, carpeta, prenda}`.
+
+    La ficha es opcional, como en el POV BOF: sin ella la prenda existe igual
+    y los textos se escriben a mano o con otra captura.
+    """
+    if not config.es_genero_operador(genero):
+        raise ValueError(f"{genero!r} no es un catálogo tuyo")
+
+    carpeta = carpeta_actual(genero)
+    destino = _dir_genero(genero) / carpeta
+    destino.mkdir(parents=True, exist_ok=True)
+    usados = {int(n) for n in _prendas_en(genero, carpeta) if n.isdigit()}
+    prenda = str(1 + max(usados, default=0))
+
+    # Guardarraíl del POV BOF: el número sale de un listado cacheado y si
+    # alguien tocó la carpeta a mano se escribiría ENCIMA de una prenda.
+    if any((destino / f"{prenda}{ext}").exists() for ext in _EXTS):
+        _invalidar()
+        carpeta = carpeta_actual(genero)
+        destino = _dir_genero(genero) / carpeta
+        destino.mkdir(parents=True, exist_ok=True)
+        usados = {int(n) for n in _prendas_en(genero, carpeta) if n.isdigit()}
+        prenda = str(1 + max(usados, default=0))
+
+    (destino / f"{prenda}{_extension(nombre_limpia)}").write_bytes(limpia)
+    if ficha:
+        (destino / f"{prenda}(1){_extension(nombre_ficha)}").write_bytes(ficha)
+
+    # Sin esto el operador sube la prenda y no la ve hasta que vence el TTL.
+    _invalidar()
+    return {
+        "slug": config.slug_web(genero, carpeta),
+        "carpeta": carpeta,
+        "prenda": prenda,
+    }
 
 
 def listar_fotos_como_drive(slug: str) -> list[dict]:

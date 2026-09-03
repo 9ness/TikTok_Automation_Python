@@ -142,7 +142,78 @@ def list_carpetas() -> CarpetasRopaResponse:
         # pero tampoco puede pasar por "aún no has importado nada": son cosas
         # distintas y sin log no se distinguen (ya pasó con el Drive del curso).
         logger.warning("[nicho_ropa] no se pudieron listar las carpetas web: %s", e)
+
+    # Y los catálogos del operador (mujer/hombre × muestras/tareas). Van con
+    # `web=True` porque se trabajan igual que las de la web —la prenda va
+    # puesta y el clip conserva su voz—; lo que las separa es que las sube él.
+    try:
+        items += [
+            CarpetaRopa(
+                slug=config.slug_web(genero, carpeta),
+                label=config.carpeta_label(config.slug_web(genero, carpeta)),
+                web=True, propia=True, genero=genero,
+            )
+            for genero, carpeta in prendas_web.carpetas_del_operador()
+        ]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[nicho_ropa] no se pudieron listar las carpetas propias: %s", e)
     return CarpetasRopaResponse(items=items)
+
+
+@router.post("/mis-prendas")
+async def crear_mi_prenda(
+    genero: Annotated[str, Query()],
+    foto_limpia: Annotated[UploadFile, File()],
+    foto_ficha: Annotated[UploadFile | None, File()] = None,
+) -> dict:
+    """Alta de una prenda PROPIA en uno de los cuatro catálogos del operador.
+
+    Mismo convenio de nombres que en todo el proyecto (`3.jpg` la limpia,
+    `3(1).jpg` la ficha), así que a partir de aquí la prenda se comporta como
+    una de la web: textos, prompts y montaje sin nada especial.
+
+    El género va en el slug, así que lo que subes en mujer se queda en mujer.
+    """
+    from src.nicho_ropa.services import prendas_web
+
+    if not config.es_genero_operador(genero):
+        raise APIError(
+            f"{genero!r} no es un catálogo tuyo. "
+            f"Válidos: {sorted(config.GENEROS_OPERADOR)}.",
+            status_code=400,
+        )
+
+    async def _leer(archivo: UploadFile, que: str) -> bytes:
+        nombre = (archivo.filename or "").lower()
+        if not any(nombre.endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp")):
+            raise APIError(
+                f"{que} tiene un formato no soportado ({archivo.filename!r}). "
+                "Acepta jpg, jpeg, png o webp.",
+                status_code=400,
+            )
+        datos = await archivo.read()
+        if not datos:
+            raise APIError(f"{que} llegó vacía.", status_code=400)
+        if len(datos) > 12 * 1024 * 1024:
+            raise APIError(
+                f"{que} pesa {len(datos) / 1e6:.0f} MB; el tope son 12 MB.",
+                status_code=400,
+            )
+        return datos
+
+    limpia = await _leer(foto_limpia, "La foto de la prenda")
+    ficha = await _leer(foto_ficha, "La captura de la ficha") if foto_ficha else b""
+
+    try:
+        return prendas_web.guardar_prenda(
+            genero, limpia, ficha or None,
+            nombre_limpia=foto_limpia.filename or "",
+            nombre_ficha=(foto_ficha.filename or "") if foto_ficha else "",
+        )
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except OSError as e:
+        raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
 
 @router.post("/prendas-web/importar")

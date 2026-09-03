@@ -10,7 +10,7 @@ import {
   Upload,
   ShoppingBag,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { nombreDescarga } from "@/lib/descargas";
@@ -22,6 +22,7 @@ import {
   buildFotoRopaUrl,
   buildVideoRopaUrl,
   useCarpetasRopa,
+  useCrearMiPrenda,
   useImportarPrendasWeb,
   useImportarUrlsRopa,
   useExtraerTextosRopa,
@@ -39,6 +40,131 @@ import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
+
+/** Alta de prendas PROPIAS, en los cuatro catálogos del operador.
+ *
+ *  Mismo planteamiento que "Muestras/Tareas" del POV BOF y por el mismo
+ *  motivo: una prenda se graba porque la tienda mandó muestra o porque es una
+ *  tarea pagada. Aquí son CUATRO y no dos porque el género manda — lo que
+ *  subas en mujer no vale para hombre, ni la prenda ni la modelo—, así que el
+ *  catálogo lleva el género dentro y lo de mujer se queda en mujer.
+ */
+function AltaMiPrenda({ onCreado }: { onCreado: (slug: string) => void }) {
+  const crear = useCrearMiPrenda();
+  const [abierto, setAbierto] = useState(false);
+  const [catalogo, setCatalogo] = useState("mujer_muestras");
+  const [limpia, setLimpia] = useState<File | null>(null);
+  const [ficha, setFicha] = useState<File | null>(null);
+  const refLimpia = useRef<HTMLInputElement>(null);
+  const refFicha = useRef<HTMLInputElement>(null);
+
+  const CATALOGOS: [string, string][] = [
+    ["mujer_muestras", "👗 Mujer · muestras"],
+    ["mujer_tareas", "👗 Mujer · tareas"],
+    ["hombre_muestras", "👔 Hombre · muestras"],
+    ["hombre_tareas", "👔 Hombre · tareas"],
+  ];
+
+  function enviar() {
+    if (!limpia) {
+      toast.error("Falta la foto de la prenda.");
+      return;
+    }
+    crear.mutate(
+      { genero: catalogo, fotoLimpia: limpia, fotoFicha: ficha },
+      {
+        onSuccess: (r) => {
+          toast.success(`Prenda ${r.prenda} añadida a «${r.carpeta}»`);
+          setLimpia(null);
+          setFicha(null);
+          if (refLimpia.current) refLimpia.current.value = "";
+          if (refFicha.current) refFicha.current.value = "";
+          onCreado(r.slug);
+        },
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+      },
+    );
+  }
+
+  const campo = (
+    ref: React.RefObject<HTMLInputElement>,
+    titulo: string,
+    ayuda: string,
+    archivo: File | null,
+    set: (f: File | null) => void,
+  ) => (
+    <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-emerald-500/60">
+      <span className="text-[11px] font-semibold">{titulo}</span>
+      <span className="text-[10px] text-muted-foreground">{ayuda}</span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        onChange={(e) => set(e.target.files?.[0] ?? null)}
+        className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
+      />
+      {archivo && (
+        <span className="truncate text-[10px] text-emerald-500">✓ {archivo.name}</span>
+      )}
+    </label>
+  );
+
+  return (
+    <section className="space-y-2 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3">
+      {/* Plegado por defecto, como en el POV BOF: dar de alta es cosa de una
+          vez al día y desplegado empuja el selector de carpetas pantalla
+          abajo cada vez que se entra. */}
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-xs font-semibold sm:text-sm">
+          ➕ Añadir una prenda mía
+        </span>
+        <span className="text-[11px] text-muted-foreground">{abierto ? "▾" : "▸"}</span>
+      </button>
+      {!abierto ? null : (
+        <>
+          <div className="grid grid-cols-2 gap-1.5">
+            {CATALOGOS.map(([slug, label]) => (
+              <button
+                key={slug}
+                type="button"
+                onClick={() => setCatalogo(slug)}
+                className={`rounded-lg border px-2 py-1.5 text-[11px] transition ${
+                  catalogo === slug
+                    ? "border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {campo(refLimpia, "Foto limpia", "La prenda, sin texto encima", limpia, setLimpia)}
+            {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
+          </div>
+          <button
+            type="button"
+            disabled={crear.isPending || !limpia}
+            onClick={enviar}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {crear.isPending ? "Subiendo…" : "Añadir prenda"}
+          </button>
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Las carpetas se llenan de 10 en 10 y son independientes por
+            catálogo: lo que subas en mujer no aparece en hombre. A partir de
+            ahí se usa igual que una prenda de la web — textos, prompts y
+            vídeo.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
 
 /** Subir ZIPs de prendas de la web del curso.
  *
@@ -222,6 +348,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         {esWeb && misCarpetas.length > 0 && (
           <PegarFichasRopa genero={genero} />
         )}
+        {esWeb && <AltaMiPrenda onCreado={(slug) => setCarpeta(slug)} />}
 
         <div className="grid grid-cols-2 gap-2">
           {misCarpetas.map((c) => (

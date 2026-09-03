@@ -75,6 +75,30 @@ PRENDAS_WEB_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/prendas_web"
 )
 
+# Los catálogos del OPERADOR, igual que en el POV BOF: una prenda se graba
+# porque la tienda mandó MUESTRA o porque es una TAREA pagada, y no se
+# trabajan igual. Aquí hay cuatro y no dos porque el género manda: lo que
+# subas en mujer no tiene nada que ver con hombre, ni en prenda ni en modelo.
+#
+# Se comportan como un género más de los de la web (`mujer_web__Carpeta 23`),
+# así que reusan TODO lo que ya existe —slug, fotos, textos, estado, vídeo— y
+# solo cambian de carpeta raíz en Drive.
+GENEROS_OPERADOR: dict[str, str] = {
+    "mujer_muestras": "👗 Mujer · muestras",
+    "mujer_tareas": "👗 Mujer · tareas",
+    "hombre_muestras": "👔 Hombre · muestras",
+    "hombre_tareas": "👔 Hombre · tareas",
+}
+MIS_PRENDAS_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/mis_prendas"
+)
+# Cuántas prendas entran en cada carpeta. Diez, como en todo lo demás.
+MIS_PRENDAS_POR_CARPETA = 10
+
+
+def es_genero_operador(genero: str) -> bool:
+    return genero in GENEROS_OPERADOR
+
 
 def es_carpeta_web(slug: str) -> bool:
     return SEPARADOR_WEB in (slug or "")
@@ -88,6 +112,31 @@ def partes_web(slug: str) -> tuple[str, str]:
 
 def slug_web(genero: str, carpeta: str) -> str:
     return f"{genero}{SEPARADOR_WEB}{carpeta}"
+
+
+_MIS_PRENDAS_DIR: Path | None = None
+
+
+def mis_prendas_dir() -> Path:
+    """Raíz de las prendas que sube el operador, en el Drive MONTADO.
+
+    Se recuerda por lo mismo que en el POV BOF: el `mkdir` contra el mount en
+    frío cuesta segundos y la llaman todas las demás.
+    """
+    global _MIS_PRENDAS_DIR
+    if _MIS_PRENDAS_DIR is not None:
+        return _MIS_PRENDAS_DIR
+
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    destino = (
+        raiz / MIS_PRENDAS_ROOT if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "mis_prendas"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    _MIS_PRENDAS_DIR = destino
+    return destino
 
 
 _PRENDAS_WEB_DIR: Path | None = None
@@ -121,7 +170,8 @@ def es_carpeta_conocida(slug: str) -> bool:
 def carpeta_label(slug: str) -> str:
     if es_carpeta_web(slug):
         genero, carpeta = partes_web(slug)
-        return f"{GENEROS_WEB.get(genero, genero)} · {carpeta}"
+        etiqueta = GENEROS_WEB.get(genero) or GENEROS_OPERADOR.get(genero) or genero
+        return f"{etiqueta} · {carpeta}"
     return CARPETAS.get(slug, {}).get("label", slug)
 
 

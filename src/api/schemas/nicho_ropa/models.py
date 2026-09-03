@@ -48,6 +48,12 @@ class CarpetaRopa(BaseModel):
     # las cuatro planas del Drive del curso. Cada pantalla enseña solo las
     # suyas, así que el filtro lo decide el backend y no un `slug.includes()`.
     web: bool = False
+    # Catálogo del OPERADOR (muestras/tareas, por género). Se comporta como
+    # una carpeta de la web —la prenda va puesta— pero las prendas las sube
+    # él, así que la pantalla enseña ahí el formulario de alta.
+    propia: bool = False
+    # `mujer_muestras`, `hombre_tareas`… Vacío en las cuatro del curso.
+    genero: str = ""
 
 
 class CarpetasRopaResponse(BaseModel):
