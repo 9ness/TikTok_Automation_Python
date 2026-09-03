@@ -10,6 +10,7 @@ import {
   Upload,
   ShoppingBag,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ import {
   buildFotoLimpiaRopaUrl,
   buildFotoRopaUrl,
   buildVideoRopaUrl,
+  nichoRopaKeys,
   useCarpetasRopa,
   useCrearMiPrenda,
   useImportarPrendasWeb,
@@ -29,9 +31,10 @@ import {
   usePrendas,
   usePromptsRopa,
   useSetEstadoRopa,
-  useSubirVideoRopa,
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
+import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
+import { Paso } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -333,6 +336,31 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
     toast.success(`${conFoto.length} foto(s) descargadas`);
   }
 
+  const [bajandoVideos, setBajandoVideos] = useState("");
+
+  async function descargarVideos(soloConUrl = false) {
+    const conVideoBajar = items
+      .filter((p) => p.video_path)
+      .filter((p) => (soloConUrl ? p.product_url : true));
+    if (!conVideoBajar.length) return;
+    setBajandoVideos(`0/${conVideoBajar.length}`);
+    for (const [i, p] of conVideoBajar.entries()) {
+      setBajandoVideos(`${i + 1}/${conVideoBajar.length}`);
+      const a = document.createElement("a");
+      a.href = buildVideoRopaUrl(p.producto, carpeta, p.video_listo_at, true);
+      a.download = nombreDescarga("ropa", p.producto) + ".mp4";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Una a una y con pausa: el navegador del móvil cancela las simultáneas.
+      if (i < conVideoBajar.length - 1) await new Promise((r) => setTimeout(r, 900));
+    }
+    setBajandoVideos("");
+    toast.success(`${conVideoBajar.length} vídeo(s) descargados`);
+  }
+
+  const videosConUrl = items.filter((p) => p.video_path && p.product_url).length;
+
   // Las prendas que ofrecen pago a plazos se trabajan aparte: llevan otro
   // prompt, y el vídeo lo dice con la voz de la persona. Bajarlas por grupos
   // es lo que evita pegar el prompt equivocado a media tanda.
@@ -408,9 +436,15 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         </p>
       </section>
 
-      {/* Paso 1 — textos */}
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        <p className="text-sm font-semibold">1 · Textos</p>
+      {/* Los mismos pasos numerados y de colores que el POV BOF: entra gente
+          nueva a usar esto y el orden tiene que leerse sin explicarlo. */}
+      <Paso
+        n={1}
+        color="violeta"
+        titulo="Textos de la ficha"
+        hint="Lee las capturas con IA: título, tienda, caption, precio y si admite pago a plazos."
+        extra={`${conTexto}/${items.length}`}
+      >
         <button
           type="button"
           disabled={extraer.isPending || items.length === 0}
@@ -469,7 +503,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             </span>
           </button>
         )}
-      </section>
+      </Paso>
 
       {verEscaparate && (
         <EscaparateModalRopa
@@ -479,51 +513,92 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         />
       )}
 
-      {/* Paso 2 — prompts */}
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
-        <p className="text-sm font-semibold">2 · Generar fuera</p>
-        <p className="text-[11px] text-muted-foreground">
-          Copia el prompt y la foto de la prenda al generador.
-        </p>
+      {/* Paso 2 — las fotos, que es lo primero que se lleva uno al generador */}
+      <Paso
+        n={2}
+        color="fucsia"
+        titulo="Bajar las fotos"
+        hint={
+          esWeb
+            ? "La foto de la prenda es la referencia del generador. Si hay prendas con pago a plazos se bajan aparte: llevan otro prompt."
+            : "La foto de la prenda es la referencia del generador."
+        }
+        extra={`${items.filter((p) => p.clean_photo_id).length} foto(s)`}
+      >
+        <BotonDescarga
+          onClick={() => void descargarFotos()}
+          cargando={false}
+          etiqueta={`Todas (${sinPlazos + conPlazos})`}
+        />
+        {esWeb && !!conPlazos && (
+          /* Los dos grupos, a la misma altura: se baja uno, se pega SU prompt
+             y se generan todas seguidas. La foto es la misma en los dos; lo
+             que cambia es el prompt que le toca. */
+          <div className="grid grid-cols-2 gap-1.5">
+            <BotonDescarga
+              onClick={() => void descargarFotos("sin")}
+              cargando={false}
+              disabled={!sinPlazos}
+              etiqueta={`Sin plazos (${sinPlazos})`}
+            />
+            <BotonDescarga
+              onClick={() => void descargarFotos("plazos")}
+              cargando={false}
+              etiqueta={`💳 Con plazos (${conPlazos})`}
+              tono="url"
+            />
+          </div>
+        )}
+      </Paso>
+
+      {/* Paso 3 — el prompt que se pega en el generador */}
+      <Paso
+        n={3}
+        color="esmeralda"
+        titulo="Copiar el prompt"
+        hint={
+          esWeb
+            ? "Se pega en el generador junto con la foto. El de plazos SOLO para las prendas que lo ofrecen: lo dice la persona del vídeo y no hay arreglo después."
+            : "Se pega en el generador junto con la foto de la prenda."
+        }
+      >
         {esWeb ? (
-          /* El de la web es UNO solo, el del espejo, y quién graba lo decide
-             la carpeta: en las de hombre sale en masculino. */
-          <button
-            type="button"
-            onClick={() =>
-              copiar(
-                `Prompt espejo (${prompts.data?.sexo ?? ""})`,
-                prompts.data?.video_espejo,
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs transition hover:border-violet-400"
-          >
-            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt del espejo · 1
-            tirada{" "}
-            <span className="text-muted-foreground">
-              ({prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"})
-            </span>
-          </button>
+          /* Las dos versiones, a la misma altura. Quién graba lo decide la
+             carpeta: en las de hombre sale en masculino. */
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                copiar(
+                  `Prompt espejo (${prompts.data?.sexo ?? ""})`,
+                  prompts.data?.video_espejo,
+                )
+              }
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+            >
+              <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> Espejo · sin
+              plazos
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                copiar(
+                  `Prompt espejo con plazos (${promptsPlazos.data?.sexo ?? ""})`,
+                  promptsPlazos.data?.video_espejo,
+                )
+              }
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
+            >
+              <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> Espejo · 💳 con
+              plazos
+            </button>
+          </div>
         ) : null}
         {esWeb && (
-          /* Dos versiones del mismo prompt. Lo que dice la persona lo genera
-             el vídeo, así que el que promete plazos SOLO vale para las prendas
-             cuya ficha los ofrece: aquí no hay arreglo posterior, no es una voz
-             que se pueda volver a locutar. Se marca prenda a prenda con su
-             botón 💳 y las fotos se bajan por grupos, abajo. */
-          <button
-            type="button"
-            onClick={() =>
-              copiar(
-                `Prompt espejo con plazos (${promptsPlazos.data?.sexo ?? ""})`,
-                promptsPlazos.data?.video_espejo,
-              )
-            }
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs transition hover:border-violet-400"
-          >
-            <ClipboardCopy className="h-3.5 w-3.5" /> Prompt del espejo ·{" "}
-            <strong>con plazos</strong>
-          </button>
+          <p className="text-[10px] text-muted-foreground">
+            Quien graba lo decide la carpeta:{" "}
+            {prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"}.
+          </p>
         )}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
@@ -610,36 +685,33 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             </button>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => void descargarFotos()}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground"
-        >
-          <Download className="h-3.5 w-3.5" /> Descargar todas las fotos
-        </button>
-        {/* Y por grupos, que es como se trabaja: se baja un grupo, se pega su
-            prompt y se generan todas seguidas. La foto es la misma en los dos;
-            lo que cambia es el prompt que le toca. */}
-        {esWeb && !!conPlazos && (
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => void descargarFotos("sin")}
-              disabled={!sinPlazos}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-40"
-            >
-              <Download className="h-3.5 w-3.5" /> Sin plazos ({sinPlazos})
-            </button>
-            <button
-              type="button"
-              onClick={() => void descargarFotos("plazos")}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/40 px-3 py-1.5 text-[11px] text-violet-400 transition hover:border-violet-400"
-            >
-              <Download className="h-3.5 w-3.5" /> 💳 Con plazos ({conPlazos})
-            </button>
-          </div>
-        )}
-      </section>
+      </Paso>
+
+      {/* Paso 4 — lo que ya está montado */}
+      <Paso
+        n={4}
+        color="azul"
+        titulo="Descargar lo ya montado"
+        hint="Los vídeos listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
+        extra={`${conVideo}/${items.length}`}
+      >
+        <div className="grid grid-cols-2 gap-1.5">
+          <BotonDescarga
+            onClick={() => void descargarVideos()}
+            cargando={!!bajandoVideos}
+            progreso={bajandoVideos}
+            disabled={!conVideo}
+            etiqueta={`Vídeos ${conVideo}/${items.length}`}
+          />
+          <BotonDescarga
+            onClick={() => void descargarVideos(true)}
+            cargando={false}
+            disabled={!!bajandoVideos || !videosConUrl}
+            etiqueta={`🔗 Con URL (${videosConUrl})`}
+            tono="url"
+          />
+        </div>
+      </Paso>
 
       {prendas.isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -679,8 +751,12 @@ function PrendaCard({
   esWeb: boolean;
   onCopiar: (label: string, texto?: string) => void;
 }) {
-  const subir = useSubirVideoRopa();
   const setEstado = useSetEstadoRopa(carpeta);
+  const qc = useQueryClient();
+  // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
+  // decenas de MB desde el móvil y sin porcentaje no se sabe si va o se colgó
+  // (mismo patrón que el POV BOF).
+  const [pct, setPct] = useState<number | null>(null);
   // Qué audio lleva el vídeo. Vacío es el defecto de cada pantalla: mudo en
   // las del curso, y la voz que ya trae el clip en las de la web.
   const [audio, setAudio] = useState("");
@@ -691,19 +767,41 @@ function PrendaCard({
     if (!file) return;
     // "mudo" solo existe en la web: es pedir que se tire la voz del clip.
     const sexo = audio === "hombre" || audio === "mujer" ? audio : "";
-    subir.mutate(
-      {
-        producto: prenda.producto,
-        carpeta,
-        file,
-        sexo,
-        conservar_audio: esWeb && audio === "mudo" ? "0" : "",
-      },
-      {
-        onSuccess: (r) => toast.success(r.message),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
-      },
-    );
+    setPct(0);
+    const fd = new FormData();
+    fd.append("producto", prenda.producto);
+    fd.append("carpeta", carpeta);
+    fd.append("sexo", sexo);
+    if (esWeb && audio === "mudo") fd.append("conservar_audio", "0");
+    fd.append("file", file);
+
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${base}/api/v1/nicho-ropa/video/upload`);
+    const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+    if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      setPct(null);
+      try {
+        const r = JSON.parse(xhr.responseText) as { ok?: boolean; message?: string };
+        if (r.ok) toast.success(r.message || "En la cola, editando…");
+        else toast.error(r.message || "Error subiendo el vídeo");
+      } catch {
+        toast.error(`Error ${xhr.status} subiendo el vídeo`);
+      }
+      // Sin esto la lista no se entera de que hay un montaje en marcha y el
+      // sondeo no arranca: había que recargar para ver el botón de Ver.
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) });
+    };
+    xhr.onerror = () => {
+      setPct(null);
+      toast.error("Error de red al subir");
+    };
+    xhr.send(fd);
   }
 
   const caption = prenda.caption
@@ -856,14 +954,26 @@ function PrendaCard({
         ))}
       </div>
 
+      {/* Mientras se monta, igual que en el POV BOF: la lista se sondea sola
+          y el botón de Ver aparece al terminar, pero sin esta línea no se sabe
+          si el vídeo se está haciendo o se quedó a medias. */}
+      {prenda.montando && (
+        <p className="flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Montando el vídeo…
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
-          {subir.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {pct !== null ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo {pct}%
+            </>
           ) : (
-            <Upload className="h-3.5 w-3.5" />
+            <>
+              <Upload className="h-3.5 w-3.5" /> Subir vídeo
+            </>
           )}
-          Subir vídeo
           <input
             type="file"
             accept="video/*"
