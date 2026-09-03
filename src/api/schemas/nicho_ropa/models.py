@@ -80,10 +80,14 @@ class PrendaInfo(BaseModel):
     product_url: str = ""
     # Su web marca "SIN STOCK" en vez del enlace.
     sin_stock: bool = False
-    # ¿Su ficha ofrece pago a plazos? Lo marca el operador mirándola: aquí no
-    # se extrae el precio, y de esto depende QUÉ PROMPT usar — el vídeo lo
-    # dice con la voz de la persona y no se puede corregir después.
+    # ¿Su ficha ofrece pago a plazos? Sale de la propia ficha al extraer los
+    # textos —mismo criterio que el POV BOF: lo que diga, y si no se ve, el
+    # precio— y decide QUÉ PROMPT usar. Se puede corregir a mano.
     plazos: bool = False
+    # `True`/`False` si el operador lo corrigió; `None` si manda la ficha.
+    plazos_manual: bool | None = None
+    # Lo que paga hoy el comprador, tal cual se leyó de la captura.
+    precio: str = ""
     uploaded: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
@@ -109,8 +113,11 @@ class PrendaEstadoRequest(BaseModel):
     producto: str
     # Solo se aplica lo que venga: la tarjeta manda el campo que cambia.
     en_escaparate: bool | None = None
-    # Si su ficha ofrece pago a plazos (decide el prompt del vídeo).
+    # Corrige a mano lo que dijo la ficha sobre el pago a plazos. Mandar
+    # `null` no toca nada; para volver a lo que diga la ficha, `auto`.
     plazos: bool | None = None
+    # `True` devuelve el control a la ficha (borra la corrección manual).
+    plazos_auto: bool = False
 
 
 class VideoRopaUploadResponse(BaseModel):

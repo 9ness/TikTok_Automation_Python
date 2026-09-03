@@ -80,11 +80,55 @@ traducir literalmente del inglés si el título original viene en otro idioma:
 
 ## Este nicho NO lleva texto en pantalla
 
+- `precio`: **lo que paga hoy el comprador**, solo el número en euros y con
+  punto decimal (`29.50`). Con este número se decide qué guion lleva el vídeo,
+  así que míralo bien:
+
+  - TikTok pinta el precio **partido en dos tamaños**: los euros en grande y
+    los céntimos pequeños al lado (`34` + `,70 €` es `34.70`). No te quedes
+    solo con la parte grande.
+  - Si debajo hay una línea del tipo **`Paga 29,50 € con cupones`**, ESE es el
+    precio que vale, no el de arriba. Lo mismo con un precio tachado: manda el
+    que se paga, nunca el tachado.
+  - `precio_lista`: si hay dos precios (el normal y el de cupones/rebaja),
+    pon aquí el NORMAL, el de antes del descuento (`34.70`). Si solo hay uno,
+    no devuelvas este campo.
+
+- `envio`: qué dice la ficha del envío, y solo si lo dice. Tres valores:
+  - `"gratis"` cuando pone **Envío gratis** a secas, sin condición.
+  - `"condicionado"` cuando el envío gratis depende de gastar un mínimo
+    (`Envío gratis en pedidos de más de 20 €`) o cuando cobra el envío
+    (`Hasta 3,99 € en el envío`).
+  - **Omite la clave** si la captura no enseña nada del envío.
+
+  Importa porque el guion del vídeo lo dice en voz alta: prometer envío gratis
+  en un producto que lo cobra es lo que trae reclamaciones. Y ojo, que las dos
+  cosas salen juntas — un producto puede poner "Hasta 3,99 € en el envío" en
+  una línea y "Envío gratis en pedidos de más de 20 €" en la siguiente: eso es
+  `condicionado`, no `gratis`.
+
+- `plazos`: si la ficha ofrece pagar a plazos, y solo si se ve. Dos valores:
+  - `"si"` cuando aparece la línea de financiación, sea como sea que la
+    escriban: **Desde 3 pagos de 12,46 € con un 0 % de interés con Klarna**,
+    **TikTok PagaDespués**, **Klarna**, **Paga en 3 plazos**…
+  - `"no"` cuando la ficha se ve entera (precio, envío y entrega) y ahí NO hay
+    ninguna línea de financiación.
+  - **Omite la clave** si la captura está cortada por arriba o por abajo y no
+    puedes asegurar ninguna de las dos cosas.
+
+  Va justo entre el precio y la línea del envío, así que si ves las dos y no
+  hay nada en medio, es `"no"`. Importa porque decide el guion entero: el de
+  financiación solo se usa cuando la ficha lo ofrece de verdad.
+
+  El precio sale en TODAS estas capturas, justo debajo de la foto. Si de
+  verdad no se lee ninguno, no devuelvas el campo — pero es la excepción, no
+  lo normal.
+
 A diferencia de otros nichos, aquí **el vídeo no lleva ningún texto quemado**:
 ni gancho, ni título, ni llamada a la acción. La prenda se enseña y ya está.
 
 Así que **no devuelvas `gancho` ni `cta`**. Céntrate en `titulo`,
-`titulo_tiktok_completo`, `tienda`, `caption` y `emojis`.
+`titulo_tiktok_completo`, `tienda`, `caption`, `emojis` y `precio`.
 
 ## Si la imagen es la pantalla de DESCRIPCIÓN
 
@@ -114,11 +158,18 @@ identificadores que te doy en el mensaje de usuario:
     "titulo_tiktok_completo": "...",
     "tienda": "...",
     "caption": "...",
-    "emojis": "..."
+    "emojis": "...",
+    "precio": "29.50",
+    "precio_lista": "34.70",
+    "envio": "gratis",
+    "plazos": "si"
   },
   ...
 }
 ```
+
+`precio_lista`, `envio` y `plazos` son los únicos que pueden faltar (cuando no
+se ven en la captura). El resto van siempre.
 
 No añadas claves extra, no añadas comentarios, no envuelvas el JSON en
 ```json``` ni en ningún otro texto.

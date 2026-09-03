@@ -76,6 +76,35 @@ class TestPlazosEnElPrompt:
                 assert "{{" not in estilo["guion"] and "{{" not in estilo["imagen"]
 
 
+class TestPlazosDeLaFicha:
+    """El pago a plazos sale de la FICHA, como en el POV BOF.
+
+    Aquí no había precio: se marcaba a mano, y eso es justo lo que se pidió
+    replicar del otro nicho. Ahora el extractor lo lee (`precio`, `plazos`,
+    `envio`) y el botón solo sirve para corregirlo.
+    """
+
+    def test_el_prompt_del_extractor_pide_el_precio(self):
+        texto = (config.prompts_dir() / "text_extractor.md").read_text(encoding="utf-8")
+        for campo in ("`precio`", "`precio_lista`", "`envio`", "`plazos`"):
+            assert campo in texto, campo
+        # Y el ejemplo de salida los lleva, que es lo que copia el modelo.
+        assert '"precio": "29.50"' in texto
+        assert '"plazos": "si"' in texto
+
+    @pytest.mark.parametrize("ficha, precio, espera", [
+        ({"plazos": "si"}, "", True),      # lo dice la ficha
+        ({"plazos": "no"}, "999", False),  # la ficha manda sobre el precio
+        ({}, "25.00", True),               # sin ficha, decide el precio
+        ({}, "3.99", False),
+    ])
+    def test_mismo_criterio_que_el_pov_bof(self, ficha, precio, espera):
+        from src.nicho_pov_bof import config as pov_config
+
+        prod = {**ficha, **({"precio": precio} if precio else {})}
+        assert pov_config.hay_plazos(prod) is espera
+
+
 class TestAltaDeUnaPrenda:
     """El recorrido entero: subirla, verla y pedir su prompt."""
 

@@ -776,25 +776,37 @@ function PrendaCard({
           solo se arregla generando el clip otra vez. Con esto marcado, la
           prenda entra en el grupo "💳 Con plazos" de la descarga de arriba. */}
       {esWeb && (
+        /* Lo dice la FICHA: sale al extraer los textos, igual que en el POV
+           BOF. El botón está para corregirla —una captura cortada, o el
+           vendedor que lo cambia— y un toque más devuelve el control a la
+           ficha. De esto depende qué prompt le toca a la prenda. */
         <button
           type="button"
           onClick={() =>
             setEstado.mutate(
-              { producto: prenda.producto, plazos: !prenda.plazos },
+              prenda.plazos_manual == null
+                ? { producto: prenda.producto, plazos: !prenda.plazos }
+                : { producto: prenda.producto, plazos_auto: true },
               {
                 onError: (e) =>
                   toast.error(e instanceof ApiError ? e.message : String(e)),
               },
             )
           }
-          title="Lo dice su ficha de TikTok Shop. Cambia el prompt del vídeo."
+          title={
+            prenda.plazos_manual == null
+              ? "Lo dice su ficha. Tócalo para corregirlo."
+              : "Corregido a mano. Tócalo para volver a lo que diga la ficha."
+          }
           className={`w-full rounded-md border px-2 py-1 text-[10px] font-medium transition ${
             prenda.plazos
               ? "border-violet-500 bg-violet-500/15 text-violet-400"
               : "border-border/60 text-muted-foreground hover:border-violet-500/50"
           }`}
         >
-          {prenda.plazos ? "💳 Con pago a plazos" : "💳 ¿Tiene pago a plazos?"}
+          {prenda.plazos ? "💳 Con pago a plazos" : "💳 Sin pago a plazos"}
+          {prenda.plazos_manual != null && " · a mano"}
+          {prenda.precio ? ` · ${prenda.precio} €` : ""}
         </button>
       )}
 

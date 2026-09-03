@@ -181,7 +181,13 @@ export function useSetEstadoRopa(carpeta: string) {
     Error,
     // Solo se manda lo que cambia: el escaparate necesita textos y el flag de
     // plazos no, así que van por separado.
-    { producto: string; en_escaparate?: boolean; plazos?: boolean }
+    {
+      producto: string;
+      en_escaparate?: boolean;
+      plazos?: boolean;
+      /** Devuelve el control a lo que diga la ficha. */
+      plazos_auto?: boolean;
+    }
   >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, { carpeta, ...body }),
     onSuccess: () =>

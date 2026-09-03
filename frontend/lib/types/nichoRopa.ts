@@ -59,9 +59,13 @@ export interface PrendaItem {
   product_url: string;
   /** Su web lo marca "SIN STOCK". */
   sin_stock: boolean;
-  /** Su ficha ofrece pago a plazos. Lo marca el operador: decide qué prompt
-   *  de vídeo se usa, y el vídeo lo dice con la voz de la persona. */
+  /** Su ficha ofrece pago a plazos. Sale de la captura al extraer los textos
+   *  (mismo criterio que el POV BOF) y decide qué prompt de vídeo se usa. */
   plazos?: boolean;
+  /** `true`/`false` si se corrigió a mano; `null` si manda la ficha. */
+  plazos_manual?: boolean | null;
+  /** Lo que paga hoy el comprador, leído de la captura. */
+  precio?: string;
   uploaded: boolean;
   video_path: string | null;
   video_listo_at: number;

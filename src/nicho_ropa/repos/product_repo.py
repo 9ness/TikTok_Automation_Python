@@ -108,6 +108,25 @@ def update_product(carpeta: str, producto: str, **campos) -> dict:
         return prod
 
 
+def quitar_campos(carpeta: str, producto: str, *campos: str) -> dict:
+    """Borra campos del producto. `update_product` no sirve: ignora los `None`.
+
+    Hace falta para volver a "lo que diga la ficha" tras haber corregido algo
+    a mano — guardar `False` no es lo mismo que no haber opinado.
+    """
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        prod = (doc.get("productos") or {}).get(str(producto))
+        if not prod:
+            return {}
+        for campo in campos:
+            prod.pop(campo, None)
+        prod["updated_at"] = _now()
+        r.set_json(_key(carpeta), doc)
+        return prod
+
+
 def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
     """Guarda de golpe las fichas copiadas del DOM de la web del curso.
 

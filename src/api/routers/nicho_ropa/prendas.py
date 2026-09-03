@@ -280,6 +280,7 @@ def list_prendas(
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasListResponse:
     """Prendas de la carpeta, con su foto limpia, su captura y sus textos."""
+    from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado
     from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_pov_bof.services import emojis as emojis_svc
@@ -322,7 +323,16 @@ def list_prendas(
             # otro nicho, aquí ya sale enlazada.
             product_url=pov_repo.url_de(prod),
             sin_stock=bool(prod.get("sin_stock")),
-            plazos=bool(prod.get("plazos")),
+            # Manda la ficha; la corrección a mano solo si existe. Mismo
+            # criterio que el POV BOF (`hay_plazos`): lo que diga la captura y,
+            # si no se ve, el precio.
+            plazos=(
+                bool(prod["plazos_manual"])
+                if prod.get("plazos_manual") is not None
+                else pov_config.hay_plazos(prod)
+            ),
+            plazos_manual=prod.get("plazos_manual"),
+            precio=str(prod.get("precio") or ""),
             uploaded=bool(prod.get("uploaded")),
             video_path=prod.get("video_path"),
             video_listo_at=int(prod.get("video_listo_at") or 0),
@@ -355,13 +365,17 @@ def set_producto_estado(
     if not config.es_carpeta_conocida(carpeta):
         raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
 
-    # El pago a plazos es un dato de la PRENDA y no necesita textos: se marca
-    # mirando su ficha, y es lo que decide qué prompt de vídeo se usa.
-    if body.plazos is not None:
+    # El pago a plazos lo dice la ficha, pero se puede corregir: la captura
+    # puede venir cortada, o el vendedor cambiarlo. `plazos_auto` devuelve el
+    # control a la ficha.
+    if body.plazos_auto or body.plazos is not None:
         try:
-            product_repo.update_product(
-                carpeta, body.producto, plazos=bool(body.plazos),
-            )
+            if body.plazos_auto:
+                product_repo.quitar_campos(carpeta, body.producto, "plazos_manual")
+            else:
+                product_repo.update_product(
+                    carpeta, body.producto, plazos_manual=bool(body.plazos),
+                )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
 
