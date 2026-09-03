@@ -161,9 +161,16 @@ def prendas_web_dir() -> Path:
 
 
 def es_carpeta_conocida(slug: str) -> bool:
+    """¿Se puede trabajar con esa carpeta?
+
+    Los catálogos del operador cuentan igual que los de la web: son un género
+    más. Dejarlos fuera fue el fallo al estrenarlos — el alta funcionaba, la
+    carpeta salía en el selector y al abrirla contestaba "Carpeta desconocida:
+    'hombre_tareas__Tareas 1'", porque quien valida el slug es esto.
+    """
     if es_carpeta_web(slug):
         genero, carpeta = partes_web(slug)
-        return genero in GENEROS_WEB and bool(carpeta)
+        return bool(carpeta) and (genero in GENEROS_WEB or genero in GENEROS_OPERADOR)
     return slug in CARPETAS
 
 
