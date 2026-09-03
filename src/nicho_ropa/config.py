@@ -107,15 +107,23 @@ def es_genero_operador(genero: str) -> bool:
 # Lo que NO se separa son los textos ni el escaparate: son de la prenda, no de
 # cómo se grabe. Por eso el modo no entra en la clave del documento (eso
 # duplicaría los textos), sino que cuelga de cada producto.
-MODOS: dict[str, str] = {
-    "espejo": "🪞 Frente al espejo",
-    "camara": "📱 Dejando la cámara",
+# Cada modo dice además CON QUÉ estilo se graba, para que la pantalla enseñe
+# solo su prompt: estando en "frente al espejo" no pinta nada el de dejar el
+# móvil apoyado. `estilo_mof10` es la clave de `ESTILOS_MOF10`.
+MODOS: dict[str, dict[str, str]] = {
+    "espejo": {"label": "🪞 Frente al espejo", "estilo_mof10": "espejo"},
+    "camara": {"label": "📱 Dejando la cámara", "estilo_mof10": "movil"},
 }
 MODO_DEFECTO = "espejo"
 
 
 def modo_valido(modo: str) -> str:
     return modo if modo in MODOS else MODO_DEFECTO
+
+
+def estilo_de_modo(modo: str) -> str:
+    """La clave de `ESTILOS_MOF10` que le toca a ese modo."""
+    return MODOS[modo_valido(modo)]["estilo_mof10"]
 
 
 def es_carpeta_web(slug: str) -> bool:
@@ -471,10 +479,18 @@ def _con_sexo(fichero: str, sexo: str, piezas: dict) -> str:
     return texto
 
 
-def prompts_mof10(sexo: str = SEXO_DEFECTO, plazos: bool = False) -> list[dict]:
-    """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo."""
+def prompts_mof10(
+    sexo: str = SEXO_DEFECTO, plazos: bool = False, modo: str = "",
+) -> list[dict]:
+    """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo.
+
+    Con `modo` se devuelve SOLO el suyo: en la pantalla se trabaja un modo a la
+    vez y enseñar los dos era invitar a copiar el prompt equivocado.
+    """
     salida = []
     for clave, meta in ESTILOS_MOF10.items():
+        if modo and clave != estilo_de_modo(modo):
+            continue
         propios = (meta.get("por_sexo") or {}).get(sexo)
         if propios:
             # Suyos los dos: se sirven literales, sin sustituir nada.

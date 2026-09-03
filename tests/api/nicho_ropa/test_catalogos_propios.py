@@ -77,6 +77,36 @@ class TestModosDeGrabacion:
         assert config.MODO_DEFECTO in config.MODOS
         assert len(config.MODOS) >= 2
 
+    def test_cada_modo_apunta_a_un_estilo_que_existe(self):
+        """Si no, la pantalla se queda SIN prompt al elegir ese modo."""
+        for modo in config.MODOS:
+            assert config.estilo_de_modo(modo) in config.ESTILOS_MOF10
+
+    def test_solo_se_sirve_el_prompt_del_modo(self):
+        """Con los dos a la vista era cuestión de tiempo copiar el que no era."""
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        c = TestClient(app)
+
+        def estilos(modo: str) -> list[str]:
+            r = c.get(
+                "/api/v1/nicho-ropa/prompts",
+                params={"carpeta": "hombre_web__Carpeta 1", "modo": modo},
+            )
+            assert r.status_code == 200, r.text
+            return [e["clave"] for e in r.json()["mof10"]]
+
+        assert estilos("espejo") == ["espejo"]
+        assert estilos("camara") == ["movil"]
+        # Y el prompt de UNA tirada es del espejo: en el otro modo no se graba
+        # delante de uno, así que llega vacío y la pantalla no lo pinta.
+        sin_espejo = c.get(
+            "/api/v1/nicho-ropa/prompts",
+            params={"carpeta": "hombre_web__Carpeta 1", "modo": "camara"},
+        ).json()
+        assert sin_espejo["video_espejo"] == ""
+
 
 class TestPlazosEnElPrompt:
     """El prompt no puede prometer plazos por defecto.

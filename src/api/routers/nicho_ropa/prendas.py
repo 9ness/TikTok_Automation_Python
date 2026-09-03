@@ -57,6 +57,7 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 @router.get("/prompts", response_model=PromptsRopaResponse)
 def get_prompts(
     carpeta: str = Query(""), plazos: bool = Query(False),
+    modo: str = Query(""),
 ) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
@@ -75,9 +76,15 @@ def get_prompts(
             video_con_manos=config.prompt_video(True),
             video_sin_manos=config.prompt_video(False),
             video_percha=config.prompt_video_percha(),
-            video_espejo=config.prompt_video_espejo(sexo, plazos),
+            # El del espejo es el de UNA tirada, así que solo tiene sentido
+            # en ese modo: en "dejando la cámara" no se graba delante de uno.
+            video_espejo=(
+                config.prompt_video_espejo(sexo, plazos)
+                if not modo or config.modo_valido(modo) == "espejo"
+                else ""
+            ),
             sexo=sexo,
-            mof10=config.prompts_mof10(sexo, plazos),
+            mof10=config.prompts_mof10(sexo, plazos, modo),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e

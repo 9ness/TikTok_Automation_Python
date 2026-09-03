@@ -312,8 +312,10 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   // ficha, y se trabaja por tandas (se bajan las fotos de un grupo y se pegan
   // todas con el mismo prompt).
   const slugPrompts = carpeta || (esWeb ? `${genero}__` : "");
-  const prompts = usePromptsRopa(slugPrompts);
-  const promptsPlazos = usePromptsRopa(slugPrompts, true);
+  // Con el modo: la pantalla enseña SOLO el prompt del modo en el que estás.
+  // Con los dos a la vista era cuestión de tiempo copiar el que no era.
+  const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "");
+  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "");
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -607,9 +609,10 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
             : "Se pega en el generador junto con la foto de la prenda."
         }
       >
-        {esWeb ? (
+        {esWeb && prompts.data?.video_espejo ? (
           /* Las dos versiones, a la misma altura. Quién graba lo decide la
-             carpeta: en las de hombre sale en masculino. */
+             carpeta: en las de hombre sale en masculino. Solo sale en el modo
+             espejo — el backend lo manda vacío en los demás. */
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -641,7 +644,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         ) : null}
         {esWeb && (
           <p className="text-[10px] text-muted-foreground">
-            Quien graba lo decide la carpeta:{" "}
+            {MODOS_ROPA[modo] ?? ""} · quien graba lo decide la carpeta:{" "}
             {prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"}.
           </p>
         )}
