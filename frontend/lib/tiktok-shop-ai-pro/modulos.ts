@@ -72,17 +72,33 @@ export const MODULOS: ModuloNicho[] = [
     resumen: "Ropa que vende sin mostrar caras: contenido limpio y de producto.",
     listo: true,
   },
+  // No son módulos aparte del curso: son el catálogo de ropa que Jonny
+  // publica en su web y que entra por ZIP. Van sueltos porque la prenda se
+  // enseña PUESTA — no pintan nada en "sin humanos".
+  //
+  // Y van SEPARADOS mujer y hombre, no en una pantalla con un selector: cada
+  // inventario se lleva en una cuenta de TikTok distinta, así que al entrar no
+  // hay que acordarse de en cuál estabas. Los formatos tampoco son los mismos
+  // (hombre tiene cuatro y mujer uno), así que compartir pantalla era enseñar
+  // la mitad de los botones apagados.
   {
-    // No es un módulo aparte del curso: es el catálogo de ropa que Jonny
-    // publica en su web y que entra por ZIP. Va suelto porque la prenda se
-    // enseña PUESTA frente al espejo — no pinta nada en "sin humanos".
-    slug: "nicho-ropa-web",
+    slug: "nicho-ropa-mujer",
     modulo: 8,
-    label: "Ropa Mujer/Hombre",
-    titulo: "Creación de Nicho Ropa Mujer/Hombre",
+    label: "Ropa Mujer",
+    titulo: "Creación de Nicho Ropa Mujer",
     icon: Shirt,
     resumen:
-      "El catálogo de ropa de la web, por ZIP: la prenda puesta y grabada frente al espejo.",
+      "El inventario de MUJER de la web, por ZIP: la prenda puesta y grabada frente al espejo.",
+    listo: true,
+  },
+  {
+    slug: "nicho-ropa-hombre",
+    modulo: 8,
+    label: "Ropa Hombre",
+    titulo: "Creación de Nicho Ropa Hombre",
+    icon: Shirt,
+    resumen:
+      "El inventario de HOMBRE de la web, por ZIP: espejo, selfie y las dos situaciones de calle.",
     listo: true,
   },
   {
@@ -150,5 +166,10 @@ export function moduloPorSlug(slug: string): ModuloNicho | undefined {
 
 /** Portada recortada del módulo (está en `frontend/public/`). */
 export function portadaDe(slug: string): string {
-  return `/tiktok-shop-ai-pro/modulos/${slug}.jpg`;
+  // Mujer y hombre son dos pantallas de un MISMO módulo del curso, así que
+  // comparten portada en vez de duplicar la imagen con dos nombres.
+  const foto = slug.startsWith("nicho-ropa-") && slug !== "nicho-ropa-sin-humanos"
+    ? "nicho-ropa"
+    : slug;
+  return `/tiktok-shop-ai-pro/modulos/${foto}.jpg`;
 }

@@ -83,7 +83,7 @@ function AltaMiPrenda({
   // Solo los del sexo que se está viendo: dar de alta en el otro dejaba la
   // prenda en una carpeta que la pantalla no enseña, o sea desaparecida.
   const CATALOGOS: [string, string][] =
-    sexo === "hombre"
+    sexo === "hombre"  // los dos del sexo de la pantalla, ver `sexoFijo`
       ? [
           ["hombre_muestras", "👔 Hombre · muestras"],
           ["hombre_tareas", "👔 Hombre · tareas"],
@@ -206,11 +206,9 @@ function AltaMiPrenda({
  */
 function ImportarPrendasWeb({
   genero,
-  setGenero,
   onImportado,
 }: {
   genero: string;
-  setGenero: (v: string) => void;
   onImportado: (slug: string) => void;
 }) {
   const importar = useImportarPrendasWeb();
@@ -218,31 +216,14 @@ function ImportarPrendasWeb({
   return (
     <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-2">
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Sube los ZIP de la web. Elige primero de quién es —las carpetas van
-        separadas y el prompt del espejo sale en su sexo— y puedes{" "}
-        <strong className="text-foreground">elegir varios de golpe</strong>.
-        Volver a subirlos solo toca lo que haya cambiado.
+        Sube aquí los ZIP del inventario de{" "}
+        <strong className="text-foreground">
+          {genero === "mujer_web" ? "mujer" : "hombre"}
+        </strong>{" "}
+        — puedes elegir varios de golpe. Los del otro sexo van en su pantalla:
+        cada uno lleva sus carpetas. Volver a subirlos solo toca lo que haya
+        cambiado.
       </p>
-
-      <div className="grid grid-cols-2 gap-1.5">
-        {[
-          ["mujer_web", "👗 Mujer"],
-          ["hombre_web", "👔 Hombre"],
-        ].map(([slug, etiqueta]) => (
-          <button
-            key={slug}
-            type="button"
-            onClick={() => setGenero(slug as string)}
-            className={`rounded-lg border px-2 py-1.5 text-[11px] font-medium transition ${
-              genero === slug
-                ? "border-violet-500 bg-violet-500/15 text-violet-400"
-                : "border-border/60 text-muted-foreground"
-            }`}
-          >
-            {etiqueta}
-          </button>
-        ))}
-      </div>
 
       <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600">
         {importar.isPending ? (
@@ -299,19 +280,34 @@ function ImportarPrendasWeb({
  *  textos, mismo montaje), así que comparten pantalla y solo cambia lo que
  *  de verdad es distinto: las carpetas, el prompt y qué pasa con el audio. */
 export type Variante = "curso" | "web";
+export type SexoRopa = "mujer" | "hombre";
 
-export function PantallaRopa({ variante }: { variante: Variante }) {
+/** `sexo` solo llega en la variante web y lo fija la RUTA, no un selector.
+ *
+ *  Mujer y hombre son dos pantallas y no una con un botón porque cada
+ *  inventario se lleva en una cuenta de TikTok distinta: al entrar no hay que
+ *  acordarse de en cuál te quedaste, y no se sube un ZIP de mujer al catálogo
+ *  de hombre por no mirar. Todo lo demás —diseño, pasos, prompts— es idéntico.
+ */
+export function PantallaRopa({
+  variante,
+  sexo: sexoFijo = "mujer",
+}: {
+  variante: Variante;
+  sexo?: SexoRopa;
+}) {
   const esWeb = variante === "web";
+  // La carpeta y el modo se recuerdan POR PANTALLA: si compartieran clave, al
+  // pasar de mujer a hombre te encontrarías en la carpeta de la otra.
   const [carpeta, setCarpeta] = useEstadoDeUsuario(
-    esWeb ? "ropa-web:carpeta" : "ropa:carpeta",
+    esWeb ? `ropa-web:${sexoFijo}:carpeta` : "ropa:carpeta",
     esWeb ? "" : "camisetas",
   );
   const carpetas = useCarpetasRopa();
-  // De quién son los ZIP que se están subiendo. Sirve además para el prompt
-  // mientras no haya ninguna carpeta: sin esto, elegir "Hombre" y ver el
-  // prompt en femenino parece un fallo (y lo parecía).
-  const [genero, setGenero] = useState("mujer_web");
-  const sexo = genero.startsWith("hombre") ? "hombre" : "mujer";
+  // De quién es esta pantalla. Lo manda la ruta, así que ni hay selector ni
+  // estado: los ZIP que se suban y el prompt que se enseñe son de este sexo.
+  const sexo = sexoFijo;
+  const genero = `${sexo}_web`;
   // Cada pantalla ve SOLO sus carpetas — y en la web, SOLO las del sexo
   // elegido arriba: son dos inventarios distintos (mujer y hombre), y con los
   // dos a la vez el selector mezclaba las carpetas propias de hombre estando
@@ -325,7 +321,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
-  const [modo, setModo] = useEstadoDeUsuario("ropa-web:modo", "espejo");
+  const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
   const primera = misCarpetas[0]?.slug ?? "";
   useEffect(() => {
     if (!primera || carpetaValida) return;
@@ -435,7 +431,6 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         {esWeb && (
           <ImportarPrendasWeb
             genero={genero}
-            setGenero={setGenero}
             onImportado={(slug) => setCarpeta(slug)}
           />
         )}

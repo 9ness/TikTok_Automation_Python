@@ -1,10 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { PantallaRopa } from "@/components/tiktok-shop-ai-pro/PantallaRopa";
-
-/** El catálogo de ropa de la web del curso, que entra por ZIP en carpetas de
- *  diez. La prenda va PUESTA y grabada frente al espejo, así que aquí sí hay
- *  una persona y el prompt sale en el sexo de la carpeta. */
+/** La pantalla vieja, cuando mujer y hombre compartían una con un selector.
+ *
+ *  Se queda como redirección y no se borra: está en el historial del navegador
+ *  y en la pantalla de inicio del móvil de quien la tuviera anclada, y un 404
+ *  ahí parece que el nicho ha desaparecido. */
 export default function NichoRopaWebPage() {
-  return <PantallaRopa variante="web" />;
+  redirect("/tiktok-shop-ai-pro/nicho-ropa-mujer");
 }
