@@ -13,6 +13,16 @@ subir con el ⬆ de esa fila → quemar textos.
   ampliar catálogo cuando haga falta.
 
 ## ⏳ Esperando a que Jonny lo publique (28 ago 2026)
+- [ ] **Formato UGC nuevo — "Creación de contenido UGC desde 0"** (anunciado por
+  Jonny el 4 sep 2026, para el Q4). Está en Cursos → **NICHO GENERAL** y también
+  en la web/APP del curso: la categoría 🧿 Nicho General de `Asistente IA › 🎬
+  Prompts/Formatos` estaba con **0 formatos** en el volcado del 4 sep, así que
+  ahí es donde tiene que haber aparecido. Qué hacer: abrir el formato, copiar
+  sus dos prompts (imagen y guion) y decidir si va como modo nuevo de un nicho
+  existente o como pantalla propia (`nicho-general`, módulo 9, hoy pendiente).
+  Ojo al motivo del cambio: TikTok está sancionando volumen alto, así que el
+  formato es "menos vídeos y mejores" — ver la nota de publicación en
+  `TTSHOP_AI_PRO_WEB.md`.
 - [ ] **Ropa Mujer/Hombre con el diseño del POV BOF**: hoy abre con la portada
   del curso (media pantalla en el móvil) y los selectores van sueltos en una
   caja sin rótulos. Unificar como allí: cabecera de TEXTO (icono + título +

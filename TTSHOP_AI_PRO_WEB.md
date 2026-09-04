@@ -296,6 +296,18 @@ Los dos ganchos del POV MOF de 20s son exactamente los dos estilos del POV
 BOF Largo (`ESTILOS_GUION`), y confirman que ese formato es de 20 segundos —
 por eso el vídeo son DOS clips y no uno.
 
+### Cuánto publicar (4 sep 2026)
+
+Jonny anunció el cambio de estrategia para el Q4: **~10 vídeos diarios de más
+calidad** en vez de máximo volumen, porque están viendo **sanciones en perfiles
+que publican demasiado**. Nuestro criterio: las cuentas nuevas (Ropa Hombre y
+Ropa Mujer) van a 10; la antigua de `ness`, que ya aguanta ~20, sigue igual
+mientras no dé problemas.
+
+Con ese anuncio publicó el formato **"Creación de contenido UGC desde 0"** en
+Cursos → **Nicho General**, que es justo la categoría que en el volcado del 4
+sep salía con 0 formatos. Pendiente de copiar sus prompts (ver `tasks.md`).
+
 ### Volcados del mapa
 
 `docs/web-curso/mapa-<fecha>.json` — cada pantalla con su `firma` (hash de su
