@@ -34,6 +34,8 @@ export interface CarpetaRopa {
   propia?: boolean;
   /** `mujer_muestras`, `hombre_tareas`… Vacío en las del curso y las del ZIP. */
   genero?: string;
+  /** "mujer" / "hombre" — de quién es la carpeta, lo diga el slug o el género. */
+  sexo?: string;
 }
 
 export interface CarpetasRopaResponse {

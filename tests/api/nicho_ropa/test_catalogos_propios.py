@@ -272,3 +272,42 @@ class TestAltaDeUnaPrenda:
         )
         assert vacia.status_code == 200, vacia.text
         assert vacia.json()["items"] == []
+
+
+class TestCadaSexoVeLoSuyo:
+    """La pantalla de Ropa Mujer/Hombre enseña UN inventario cada vez.
+
+    Con "Mujer" elegido salían también las carpetas propias de hombre: el
+    filtro miraba solo si la carpeta era de la web, no de quién era. Ahora el
+    backend dice el sexo de cada una y la pantalla se queda con las suyas.
+    """
+
+    @pytest.fixture(autouse=True)
+    def raiz_temporal(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "mis_prendas_dir", lambda: tmp_path)
+        from src.nicho_ropa.services import prendas_web
+
+        prendas_web._invalidar()
+        return tmp_path
+
+    def _cliente(self):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        return TestClient(app)
+
+    def test_las_carpetas_dicen_de_quien_son(self, raiz_temporal):
+        c = self._cliente()
+        for genero in ("mujer_muestras", "hombre_tareas"):
+            c.post(
+                f"/api/v1/nicho-ropa/mis-prendas?genero={genero}",
+                files={"foto_limpia": ("a.jpg", b"limpia", "image/jpeg")},
+            )
+        items = c.get("/api/v1/nicho-ropa/carpetas").json()["items"]
+        propias = {i["slug"]: i["sexo"] for i in items if i.get("propia")}
+        assert propias["mujer_muestras__Muestras 1"] == "mujer"
+        assert propias["hombre_tareas__Tareas 1"] == "hombre"
+        # Y quedándose con las de mujer no se cuela ninguna de hombre, que es
+        # lo que hace la pantalla con este campo.
+        de_mujer = [i for i in items if i["web"] and i["sexo"] == "mujer"]
+        assert de_mujer and all("hombre" not in i["slug"] for i in de_mujer)

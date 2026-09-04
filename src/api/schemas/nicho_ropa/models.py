@@ -54,6 +54,11 @@ class CarpetaRopa(BaseModel):
     propia: bool = False
     # `mujer_muestras`, `hombre_tareas`… Vacío en las cuatro del curso.
     genero: str = ""
+    # "mujer" / "hombre". La pantalla de la web enseña UN inventario cada vez,
+    # así que necesita saber de quién es cada carpeta; el género no vale porque
+    # las del ZIP no lo llevan y las propias lo traen con el catálogo pegado
+    # (`mujer_muestras`). Lo decide el backend, no un `slug.startsWith()`.
+    sexo: str = ""
 
 
 class CarpetasRopaResponse(BaseModel):

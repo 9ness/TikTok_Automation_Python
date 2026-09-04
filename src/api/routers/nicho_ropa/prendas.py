@@ -137,7 +137,10 @@ def list_carpetas() -> CarpetasRopaResponse:
     from src.nicho_ropa.services import prendas_web
 
     items = [
-        CarpetaRopa(slug=slug, label=meta["label"], web=False)
+        CarpetaRopa(
+            slug=slug, label=meta["label"], web=False,
+            sexo=config.sexo_de_carpeta(slug),
+        )
         for slug, meta in config.CARPETAS.items()
     ]
     # Y las importadas por ZIP de la web, que son carpetas de diez como las de
@@ -148,6 +151,7 @@ def list_carpetas() -> CarpetasRopaResponse:
                 slug=config.slug_web(genero, carpeta),
                 label=config.carpeta_label(config.slug_web(genero, carpeta)),
                 web=True,
+                sexo=config.sexo_de_carpeta(config.slug_web(genero, carpeta)),
             )
             for genero, carpeta in prendas_web.todas_las_carpetas()
         ]
@@ -166,6 +170,7 @@ def list_carpetas() -> CarpetasRopaResponse:
                 slug=config.slug_web(genero, carpeta),
                 label=config.carpeta_label(config.slug_web(genero, carpeta)),
                 web=True, propia=True, genero=genero,
+                sexo=config.sexo_de_carpeta(config.slug_web(genero, carpeta)),
             )
             for genero, carpeta in prendas_web.carpetas_del_operador()
         ]

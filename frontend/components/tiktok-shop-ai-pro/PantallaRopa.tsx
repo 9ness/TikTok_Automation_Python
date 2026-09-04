@@ -61,21 +61,37 @@ const MODOS_ROPA: Record<string, string> = {
  *  subas en mujer no vale para hombre, ni la prenda ni la modelo—, así que el
  *  catálogo lleva el género dentro y lo de mujer se queda en mujer.
  */
-function AltaMiPrenda({ onCreado }: { onCreado: (slug: string) => void }) {
+function AltaMiPrenda({
+  sexo,
+  onCreado,
+}: {
+  sexo: string;
+  onCreado: (slug: string) => void;
+}) {
   const crear = useCrearMiPrenda();
   const [abierto, setAbierto] = useState(false);
-  const [catalogo, setCatalogo] = useState("mujer_muestras");
+  const [catalogo, setCatalogo] = useState(`${sexo}_muestras`);
   const [limpia, setLimpia] = useState<File | null>(null);
   const [ficha, setFicha] = useState<File | null>(null);
   const refLimpia = useRef<HTMLInputElement>(null);
   const refFicha = useRef<HTMLInputElement>(null);
 
-  const CATALOGOS: [string, string][] = [
-    ["mujer_muestras", "👗 Mujer · muestras"],
-    ["mujer_tareas", "👗 Mujer · tareas"],
-    ["hombre_muestras", "👔 Hombre · muestras"],
-    ["hombre_tareas", "👔 Hombre · tareas"],
-  ];
+  // Solo los del sexo que se está viendo: dar de alta en el otro dejaba la
+  // prenda en una carpeta que la pantalla no enseña, o sea desaparecida.
+  const CATALOGOS: [string, string][] =
+    sexo === "hombre"
+      ? [
+          ["hombre_muestras", "👔 Hombre · muestras"],
+          ["hombre_tareas", "👔 Hombre · tareas"],
+        ]
+      : [
+          ["mujer_muestras", "👗 Mujer · muestras"],
+          ["mujer_tareas", "👗 Mujer · tareas"],
+        ];
+  // Al cambiar de sexo arriba, el catálogo elegido es del otro inventario.
+  useEffect(() => {
+    setCatalogo(`${sexo}_muestras`);
+  }, [sexo]);
 
   function enviar() {
     if (!limpia) {
@@ -287,15 +303,21 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
     esWeb ? "" : "camisetas",
   );
   const carpetas = useCarpetasRopa();
-  // Cada pantalla ve SOLO sus carpetas.
-  const misCarpetas = (carpetas.data?.items ?? []).filter((c) => c.web === esWeb);
-  // Si la guardada es de la otra pantalla (o ya no existe), se cae a la
-  // primera. Pasa al estrenar esto: la web se elegía desde "sin humanos".
-  const carpetaValida = misCarpetas.some((c) => c.slug === carpeta);
   // De quién son los ZIP que se están subiendo. Sirve además para el prompt
   // mientras no haya ninguna carpeta: sin esto, elegir "Hombre" y ver el
   // prompt en femenino parece un fallo (y lo parecía).
   const [genero, setGenero] = useState("mujer_web");
+  const sexo = genero.startsWith("hombre") ? "hombre" : "mujer";
+  // Cada pantalla ve SOLO sus carpetas — y en la web, SOLO las del sexo
+  // elegido arriba: son dos inventarios distintos (mujer y hombre), y con los
+  // dos a la vez el selector mezclaba las carpetas propias de hombre estando
+  // en mujer. Se filtra por el `sexo` que da el backend, no por el slug.
+  const misCarpetas = (carpetas.data?.items ?? []).filter(
+    (c) => c.web === esWeb && (!esWeb || c.sexo === sexo),
+  );
+  // Si la guardada es de la otra pantalla (o ya no existe), se cae a la
+  // primera. Pasa al estrenar esto: la web se elegía desde "sin humanos".
+  const carpetaValida = misCarpetas.some((c) => c.slug === carpeta);
   // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
@@ -406,7 +428,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         {esWeb && misCarpetas.length > 0 && (
           <PegarFichasRopa genero={genero} />
         )}
-        {esWeb && <AltaMiPrenda onCreado={(slug) => setCarpeta(slug)} />}
+        {esWeb && <AltaMiPrenda sexo={sexo} onCreado={(slug) => setCarpeta(slug)} />}
 
         {esWeb && (
           /* El modo de grabación. Cada uno guarda SU vídeo de la misma
