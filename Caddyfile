@@ -55,10 +55,18 @@
 	}
 }
 
-# El sitio de siempre. Con $DOMAIN vacío es ":80" (HTTP), que es por donde
-# entra el Tailscale Funnel.
+# El :80 ya NO sirve la app: manda al dominio. Entrar por
+# `http://62.238.19.31` dejaba la herramienta abierta a cualquiera que probara
+# la IP, y en claro. Ahora rebota a la puerta buena, que va por HTTPS.
+#
+# El reto de Let's Encrypt sigue funcionando: Caddy atiende
+# `/.well-known/acme-challenge/` en el :80 por su cuenta, antes que esta regla,
+# así que los certificados se renuevan igual.
+#
+# El Tailscale Funnel entra por aquí (proxy a 127.0.0.1:80), así que su URL
+# también acaba en el dominio. Es lo que se quiere: una sola puerta.
 {$DOMAIN} {
-	import app
+	redir https://{$DOMAIN_PROPIO:factory.nebulabsmedia.com}{uri} permanent
 }
 
 # Nombre PÚBLICO con HTTPS propio, sin depender de Tailscale.
