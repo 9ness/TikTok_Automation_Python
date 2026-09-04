@@ -349,3 +349,39 @@ class TestModosPorSexo:
         dos = config.prompts_mof10("hombre", False, "calle_2")[0]
         assert uno["imagen"] == dos["imagen"]
         assert uno["guion"] != dos["guion"]
+
+
+class TestEstadoDeLaPrenda:
+    """Marcar en qué punto está la prenda, como en los demás nichos.
+
+    "Subido" lo escribía SOLO el runner al montar, así que no se podía marcar
+    a mano ni corregir si te equivocabas — y en la tarjeta del POV BOF es un
+    botón. Ahora el endpoint lo acepta.
+    """
+
+    @pytest.fixture(autouse=True)
+    def raiz_temporal(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "mis_prendas_dir", lambda: tmp_path)
+        from src.nicho_ropa.services import prendas_web
+
+        prendas_web._invalidar()
+        return tmp_path
+
+    def test_se_puede_marcar_y_desmarcar_subido(self, raiz_temporal):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+        from src.nicho_ropa.repos import product_repo
+
+        c = TestClient(app)
+        alta = c.post(
+            "/api/v1/nicho-ropa/mis-prendas?genero=mujer_muestras",
+            files={"foto_limpia": ("a.jpg", b"limpia", "image/jpeg")},
+        )
+        slug = alta.json()["slug"]
+        for valor in (True, False):
+            r = c.post(
+                "/api/v1/nicho-ropa/producto/estado",
+                json={"carpeta": slug, "producto": "1", "uploaded": valor},
+            )
+            assert r.status_code == 200, r.text
+            assert bool(product_repo.get_product(slug, "1").get("uploaded")) is valor

@@ -431,6 +431,14 @@ def set_producto_estado(
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
 
+    if body.uploaded is not None:
+        try:
+            product_repo.update_product(
+                carpeta, body.producto, uploaded=bool(body.uploaded),
+            )
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
+
     if body.en_escaparate is not None:
         guardado = product_repo.get_product(carpeta, body.producto)
         if not guardado.get("titulo"):

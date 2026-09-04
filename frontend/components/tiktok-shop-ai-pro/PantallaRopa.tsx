@@ -929,6 +929,15 @@ function PrendaCard({
   const [audio, setAudio] = useState("");
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
+  // Se pintan al pulsar y se revierten si la API falla (ver UI_NICHOS.md): el
+  // toggle tiene que responder al toque, no cuando vuelva el listado.
+  const [verMasCopias, setVerMasCopias] = useState(false);
+  const [enEscaparate, setEnEscaparate] = useState(prenda.en_escaparate);
+  const [subido, setSubido] = useState(prenda.uploaded);
+  useEffect(() => {
+    setEnEscaparate(prenda.en_escaparate);
+    setSubido(prenda.uploaded);
+  }, [prenda.en_escaparate, prenda.uploaded]);
 
   function elegirArchivo(file: File | null) {
     if (!file) return;
@@ -1086,15 +1095,28 @@ function PrendaCard({
         </button>
       )}
 
-      {/* Los mismos tres botones que en el Nicho POV BOF: el caption para
-          publicar, y el título de TikTok y la tienda para poder BUSCAR el
-          producto en el Centro de Afiliados. */}
-      <div className="flex flex-wrap gap-1">
+      {/* Como en el POV BOF: a la vista solo los dos de diario —el caption
+          para publicar y la ficha—, y detrás de "más" el título de TikTok y la
+          tienda, que sirven para BUSCAR el producto en el Centro de
+          Afiliados. Cuatro en fila hacían que encontrar el de siempre costara
+          mirar. */}
+      <div className="flex flex-wrap items-center gap-1">
         <CopyChip label="✍️ Caption" text={caption} siempre />
         <BotonUrl url={prenda.product_url} />
-        <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} siempre />
-        <CopyChip label="🏪 Tienda" text={prenda.tienda} siempre />
+        <button
+          type="button"
+          onClick={() => setVerMasCopias((v) => !v)}
+          className="rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+        >
+          más {verMasCopias ? "▴" : "▾"}
+        </button>
       </div>
+      {verMasCopias && (
+        <div className="flex flex-wrap gap-1">
+          <CopyChip label="🔎 Título TikTok" text={prenda.titulo_tiktok_completo} siempre />
+          <CopyChip label="🏪 Tienda" text={prenda.tienda} siempre />
+        </div>
+      )}
       {caption && (
         <p className="rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
           {caption}
@@ -1172,6 +1194,61 @@ function PrendaCard({
           }`}
         >
           Ver / descargar
+        </button>
+      </div>
+
+      {/* Lo de abajo NO es trabajo: es marcar en qué punto está la prenda.
+          Separado con una línea, en el mismo sitio y con los mismos colores
+          que en el POV BOF (ver UI_NICHOS.md) — se busca a ciegas después de
+          publicar. "Vendió" no está: el ranking de ventas es del catálogo del
+          curso y estas prendas no entran en él. */}
+      <div className="flex gap-1.5 border-t border-border/60 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            setEnEscaparate(!enEscaparate);
+            setEstado.mutate(
+              { producto: prenda.producto, en_escaparate: !enEscaparate },
+              {
+                onError: (e) => {
+                  // Deshacer lo pintado: si no, el botón se queda marcado y se
+                  // desmarca solo al llegar el listado, que se lee como "no me
+                  // deja marcar" sin saber por qué.
+                  setEnEscaparate(enEscaparate);
+                  toast.error(e instanceof ApiError ? e.message : String(e));
+                },
+              },
+            );
+          }}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            enEscaparate
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          🏪 Escaparate
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSubido(!subido);
+            setEstado.mutate(
+              { producto: prenda.producto, uploaded: !subido },
+              {
+                onError: (e) => {
+                  setSubido(subido);
+                  toast.error(e instanceof ApiError ? e.message : String(e));
+                },
+              },
+            );
+          }}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            subido
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          📤 Subido
         </button>
       </div>
 

@@ -141,6 +141,10 @@ class PrendaEstadoRequest(BaseModel):
     plazos: bool | None = None
     # `True` devuelve el control a la ficha (borra la corrección manual).
     plazos_auto: bool = False
+    # Ya publicado en TikTok. Lo escribía solo el runner al montar, así que no
+    # había forma de marcarlo (ni de desmarcarlo si te equivocabas) — y en el
+    # resto de nichos es un botón de la tarjeta.
+    uploaded: bool | None = None
 
 
 class VideoRopaUploadResponse(BaseModel):
