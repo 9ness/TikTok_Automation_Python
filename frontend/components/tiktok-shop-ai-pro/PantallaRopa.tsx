@@ -675,7 +675,14 @@ export function PantallaRopa({
         {/* Que no cargue NO es lo mismo que no tener carpetas, y con el mismo
             texto para los dos casos un error del servidor se lee como "aquí no
             hay nada" — y a subir otra vez los ZIP que ya estaban. */}
-        {esWeb && carpetas.isError ? (
+        {/* Mientras carga hay que DECIRLO: el listado tarda en frío (lista el
+            Drive montado) y sin esta línea la pantalla se ve como si no
+            hubiera ninguna carpeta. */}
+        {esWeb && carpetas.isLoading ? (
+          <p className="flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando carpetas…
+          </p>
+        ) : esWeb && carpetas.isError ? (
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-500">
             No se pudieron cargar las carpetas:{" "}
             {(carpetas.error as Error)?.message ?? "error del servidor"}. Tus

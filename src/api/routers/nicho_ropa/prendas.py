@@ -143,7 +143,7 @@ def _contar(slug: str, modo: str) -> dict[str, int]:
 
     try:
         genero, carpeta = config.partes_web(slug)
-        total = len(prendas_web._prendas_en(genero, carpeta))
+        total = prendas_web.cuantas_prendas(genero, carpeta)
     except Exception:  # noqa: BLE001
         total = 0
     productos = (product_repo.load(slug).get("productos") or {}).values()
@@ -215,7 +215,18 @@ def list_carpetas(
 
     if sexo in ("mujer", "hombre"):
         items = [i for i in items if i.web and i.sexo == sexo]
+        # Con un presupuesto: los contadores son un adorno del chip y el Drive
+        # montado en frío tarda lo que quiere. Antes de esto, un listado llegó
+        # a 25 s y la pantalla se quedaba cargando sin enseñar NADA. Lo que no
+        # dé tiempo sale a cero y la siguiente carga ya lo trae memoizado.
+        limite = time.monotonic() + 6.0
         for i in items:
+            if time.monotonic() > limite:
+                logger.warning(
+                    "[nicho_ropa] contando carpetas se agotó el tiempo; "
+                    "el resto va sin contadores",
+                )
+                break
             # Los contadores son un ADORNO del chip: si fallan, la carpeta
             # tiene que salir igual. Sin esta guarda, un error contando dejó la
             # pantalla entera sin carpetas y pareciendo que no había ninguna.

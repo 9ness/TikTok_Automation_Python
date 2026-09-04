@@ -129,6 +129,18 @@ def _prendas_en(genero: str, carpeta: str) -> set[str]:
     return numeros
 
 
+def cuantas_prendas(genero: str, carpeta: str) -> int:
+    """Cuántas prendas hay en la carpeta, MEMOIZADO.
+
+    Lo pide el chip de cada carpeta del selector, o sea una vez por carpeta y
+    en cada carga de la pantalla. Contarlas es listar el Drive montado y en
+    frío eso tarda: con once carpetas, el listado llegó a tardar 25 s y la
+    pantalla se quedaba cargando. El TTL es el mismo que el de los listados
+    (`_TTL_S`), y subir un ZIP invalida la caché igual que antes.
+    """
+    return _memo(f"cuantas:{genero}:{carpeta}", lambda: len(_prendas_en(genero, carpeta)))
+
+
 def carpeta_actual(genero: str) -> str:
     """La carpeta donde toca guardar: la última con hueco, o una nueva."""
     existentes = carpetas(genero)
