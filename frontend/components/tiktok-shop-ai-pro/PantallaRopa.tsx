@@ -596,7 +596,16 @@ export function PantallaRopa({
             );
           })}
         </div>
-        {esWeb && !misCarpetas.length && !carpetas.isLoading ? (
+        {/* Que no cargue NO es lo mismo que no tener carpetas, y con el mismo
+            texto para los dos casos un error del servidor se lee como "aquí no
+            hay nada" — y a subir otra vez los ZIP que ya estaban. */}
+        {esWeb && carpetas.isError ? (
+          <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-500">
+            No se pudieron cargar las carpetas:{" "}
+            {(carpetas.error as Error)?.message ?? "error del servidor"}. Tus
+            prendas siguen ahí — vuelve a entrar en un momento.
+          </p>
+        ) : esWeb && !misCarpetas.length && !carpetas.isLoading ? (
           <p className="rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
             Aún no hay ninguna carpeta: sube arriba los ZIP que descargues de
             la web y cada uno aparecerá aquí como una carpeta de diez prendas.
