@@ -19,6 +19,14 @@ Ante la duda, **se copia de ahí**. Si algo no encaja, la solución es añadir l
 pieza a los componentes comunes y usarla desde todos, nunca inventar un diseño
 propio en una pantalla.
 
+**Esto estandariza la FORMA, no obliga a tener la función.** Lo que un nicho no
+necesita, no se pone: el POV BOF marca "Vendió" porque su catálogo tiene
+ranking de ventas y la ropa de la web no entra en él, así que ahí la fila de
+estado son dos botones y no tres. La regla es al revés de como suena: *si lo
+tienes, se ve igual que en los demás; si no lo tienes, no lo inventes para
+parecerte*. Un botón de adorno que no lleva a ningún sitio confunde más que una
+pantalla con menos botones.
+
 ---
 
 ## 1. Anatomía de la pantalla
@@ -184,7 +192,8 @@ unificar.
 - [ ] Carpetas como chips con `hechas/total` en ámbar/esmeralda
 - [ ] Pasos numerados, con los colores de la tabla
 - [ ] Tarjetas en `sm:grid-cols-2`
-- [ ] Fila de estado (Escaparate · Subido · Vendió) la última, y optimista
+- [ ] Fila de estado la última y optimista — con los estados que ese nicho
+      tenga de verdad (Escaparate · Subido · Vendió)
 - [ ] Copiar: Caption y URL fuera, el resto tras `más ▾`
 - [ ] Probado en ancho de móvil (no solo en el navegador grande)
 - [ ] `npm run typecheck` y `npm run build` limpios

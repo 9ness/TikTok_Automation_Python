@@ -38,6 +38,9 @@ import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
+import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
+import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
+import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -291,6 +294,22 @@ function nombreCorto(label: string): string {
   return (partes[partes.length - 1] ?? label).trim() || label;
 }
 
+/** Qué audio puede llevar el vídeo. En la web el clip viene HABLADO, así que
+ *  el defecto es respetarle la voz; en el curso sale mudo. */
+const OPCIONES_AUDIO = (esWeb: boolean) =>
+  esWeb
+    ? [
+        { v: "", label: "Su voz" },
+        { v: "mudo", label: "Mudo" },
+        { v: "hombre", label: "Voz H" },
+        { v: "mujer", label: "Voz M" },
+      ]
+    : [
+        { v: "", label: "Mudo" },
+        { v: "hombre", label: "Voz H" },
+        { v: "mujer", label: "Voz M" },
+      ];
+
 export type Variante = "curso" | "web";
 export type SexoRopa = "mujer" | "hombre";
 
@@ -377,6 +396,8 @@ export function PantallaRopa({
     : 0;
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
+  const [soloConUrl, setSoloConUrl] = useState(false);
+  const enPantalla = soloConUrl ? items.filter((p) => p.product_url) : items;
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
@@ -883,11 +904,20 @@ export function PantallaRopa({
 
       <section className="space-y-2">
         <p className="text-sm font-semibold">Prendas</p>
+        {/* El mismo interruptor que en el POV BOF y el Largo: se trabaja con
+            lo que se va a poder subir. Sin ficha enlazada, la prenda no se
+            puede meter en el escaparate. */}
+        <FiltroSoloUrl
+          activo={soloConUrl}
+          onChange={setSoloConUrl}
+          conUrl={items.filter((p) => p.product_url).length}
+          total={items.length}
+        />
         {/* Dos por fila desde tablet, como los productos del POV BOF: en una
             sola columna hay que bajar diez pantallas para ver la carpeta
             entera, y lo que se hace aquí es ir saltando de prenda en prenda. */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {items.map((p) => (
+          {enPantalla.map((p) => (
             <PrendaCard
               key={p.producto}
               prenda={p}
@@ -932,6 +962,7 @@ function PrendaCard({
   // Se pintan al pulsar y se revierten si la API falla (ver UI_NICHOS.md): el
   // toggle tiene que responder al toque, no cuando vuelva el listado.
   const [verMasCopias, setVerMasCopias] = useState(false);
+  const [verVoz, setVerVoz] = useState(false);
   const [enEscaparate, setEnEscaparate] = useState(prenda.en_escaparate);
   const [subido, setSubido] = useState(prenda.uploaded);
   useEffect(() => {
@@ -1123,36 +1154,38 @@ function PrendaCard({
         </p>
       )}
 
-      <div className={`grid gap-1 ${esWeb ? "grid-cols-4" : "grid-cols-3"}`}>
-        {/* El defecto va primero: es lo que el operador quiere casi siempre.
-            En la web es la voz del propio clip; en el curso, mudo. */}
-        {(esWeb
-          ? [
-              { v: "", label: "Su voz" },
-              { v: "mudo", label: "Mudo" },
-              { v: "hombre", label: "Voz H" },
-              { v: "mujer", label: "Voz M" },
-            ]
-          : [
-              { v: "", label: "Mudo" },
-              { v: "hombre", label: "Voz H" },
-              { v: "mujer", label: "Voz M" },
-            ]
-        ).map((op) => (
-          <button
-            key={op.v || "defecto"}
-            type="button"
-            onClick={() => setAudio(op.v)}
-            className={`rounded-md border px-2 py-1 text-[10px] transition ${
-              audio === op.v
-                ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
-                : "border-border/60 text-muted-foreground hover:border-foreground/30"
-            }`}
-          >
-            {op.label}
-          </button>
-        ))}
+      {/* La voz, plegada en un chip como los ajustes del POV BOF: se deja en
+          el valor de siempre y solo se abre cuando de verdad hay que
+          cambiarla. Ocupaba una fila entera por prenda, diez por carpeta. */}
+      <div className="flex gap-1">
+        <ChipAjuste
+          icono={audio === "" ? (esWeb ? "🎙️" : "🔇") : audio === "mudo" ? "🔇" : audio === "hombre" ? "👨" : "👩"}
+          valor={OPCIONES_AUDIO(esWeb).find((o) => o.v === audio)?.label ?? "Voz"}
+          abierto={verVoz}
+          onToggle={() => setVerVoz((v) => !v)}
+          title="Qué audio lleva el vídeo montado"
+        />
       </div>
+      {verVoz && (
+        <div className={`grid gap-1 ${esWeb ? "grid-cols-4" : "grid-cols-3"}`}>
+          {/* El defecto va primero: es lo que el operador quiere casi siempre.
+              En la web es la voz del propio clip; en el curso, mudo. */}
+          {OPCIONES_AUDIO(esWeb).map((op) => (
+            <button
+              key={op.v || "defecto"}
+              type="button"
+              onClick={() => setAudio(op.v)}
+              className={`rounded-md border px-2 py-1 text-[10px] transition ${
+                audio === op.v
+                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {op.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Mientras se monta, igual que en el POV BOF: la lista se sondea sola
           y el botón de Ver aparece al terminar, pero sin esta línea no se sabe
@@ -1196,6 +1229,10 @@ function PrendaCard({
           Ver / descargar
         </button>
       </div>
+      {/* Cuándo se montó: el botón se ve igual para un vídeo de hace diez
+          minutos que para uno de hace cinco días, y una carpeta se trabaja en
+          varias sesiones. */}
+      <MontadoEl ts={prenda.video_listo_at} />
 
       {/* Lo de abajo NO es trabajo: es marcar en qué punto está la prenda.
           Separado con una línea, en el mismo sitio y con los mismos colores
