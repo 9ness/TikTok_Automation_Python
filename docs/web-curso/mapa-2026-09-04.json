@@ -1,0 +1,564 @@
+{
+ "sacado_el": "2026-09-04T13:56:44.399Z",
+ "pantallas_unicas": 31,
+ "rutas_recorridas": 172,
+ "pantallas": {
+  "(inicio)": {
+   "titulos": [
+    "TTShop AI ProCOMUNIDAD PRIVADA"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "👤",
+    "💬ComunidadChat, productos, ranking, eventos y recursos de l",
+    "💬",
+    "ComunidadChat, productos, ranking, eventos y recursos de la ",
+    "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata",
+    "🤖",
+    "Asistente IAVídeos, guiones, carruseles, resúmenes y platafo",
+    "🛒",
+    "❔ Guía del panel"
+   ],
+   "texto": "TTShop AI ProCOMUNIDAD PRIVADA👤Mi ÁreaPerfil, saldo, membresía y configuración de tu cuenta💬ComunidadChat, productos, ranking, eventos y recursos de la comunidad🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plataformas AI🛒ComprasServicios, generaciones adicionales, pedidos y entregas❔ Guía del panel",
+   "firma": "-2059420470"
+  },
+  "👤": {
+   "titulos": [
+    "👤 Mi Área"
+   ],
+   "prompts": [],
+   "enlaces": [
+    "💳MembresíaGestiona tu membresía en Skoo|https://www.skool.com/tiktokshopaipro"
+   ],
+   "hijos": [
+    "👤Mi perfilDatos personales, foto y privacidad",
+    "⚖️Centro legalCondiciones, privacidad y reglas del servicio",
+    "📜Mis guionesHistorial, escenas y revisión de seguridad"
+   ],
+   "texto": "TTShop AI Pro👤 Mi ÁreaGestiona tu perfil, compras, membresía y cuenta.✨Mis creacionesVídeos generados listos para descargar y publicar👤Mi perfilDatos personales, foto y privacidad💰SaldoRecarga y consulta tu saldo disponible🧾Mis comprasCompras activas y en preparación📦Pedidos y entregasPedidos completados y descargas💳MembresíaGestiona tu membresía en Skool🤝Programa de afiliadosInvitaciones y recompensas recurrentes⚖️Centro legalCondiciones, privacidad y reglas del servicio📜Mis guionesHistorial, escenas y revisión de seguridad",
+   "firma": "-365767331"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l": {
+   "titulos": [
+    "💬 Comunidad"
+   ],
+   "prompts": [],
+   "enlaces": [
+    "🎓Comunidad SkoolAbre la comunidad ofici|https://www.skool.com/tiktokshopaipro"
+   ],
+   "hijos": [
+    "📦ProductosProductos seleccionados e inventarios organizados",
+    "🏆Ranking de creadoresClasificación privada de rendimiento m",
+    "💡Peticiones de mejoraEnvía ideas para mejorar la plataforma",
+    "📍Eventos presencialesEncuentros presenciales de la comunida",
+    "🛡️Sanciones y normativaActualizaciones oficiales y práctica",
+    "📅CalendarioLlamadas y eventos publicados de la comunidad"
+   ],
+   "texto": "TTShop AI Pro💬 ComunidadTodo lo que necesitas para aprender, conectar y crecer.📦ProductosProductos seleccionados e inventarios organizados💬Chat GeneralChat privado en directo para Alumnos Premium🎓Comunidad SkoolAbre la comunidad oficial🏆Ranking de creadoresClasificación privada de rendimiento mensual💡Peticiones de mejoraEnvía ideas para mejorar la plataforma📍Eventos presencialesEncuentros presenciales de la comunidad🛡️Sanciones y normativaActualizaciones oficiales y prácticas seguras📅CalendarioLlamadas y eventos publicados de la comunidad",
+   "firma": "-1673683477"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata": {
+   "titulos": [
+    "🤖 Asistente IA"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "🎬",
+    "✍️",
+    "🖼️",
+    "🧠Resumen IAResúmenes de la comunidad y llamadas semanales.",
+    "🧠",
+    "Resumen IAResúmenes de la comunidad y llamadas semanales.",
+    "🌐Plataformas AIHerramientas recomendadas y enlaces de afili",
+    "🌐",
+    "Plataformas AIHerramientas recomendadas y enlaces de afiliac"
+   ],
+   "texto": "TTShop AI Pro🤖 Asistente IAElige qué contenido quieres crear.🎬Generador de vídeosFormatos y generación manual o automática guiada.✍️Generador de guionesGuiones de venta, ideas y planes de grabación.🖼️Generador de carruselesCarruseles interactivos listos para TikTok Shop.🧠Resumen IAResúmenes de la comunidad y llamadas semanales.🌐Plataformas AIHerramientas recomendadas y enlaces de afiliación de la comunidad.",
+   "firma": "1276273893"
+  },
+  "🛒": {
+   "titulos": [
+    "🛒 Compras"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "⚙️AutomatizacionesAutomatización gestionada de cuentas",
+    "🚀Estrategias de viralizaciónPacks de contenido diseñados pa"
+   ],
+   "texto": "TTShop AI Pro🛒 ComprasElige y compra servicios para tu cuenta.🤖Vídeos de IAPacks de vídeos generados con IA✍️Generaciones adicionalesAñade generaciones acumulables de guiones⚙️AutomatizacionesAutomatización gestionada de cuentas🚀Estrategias de viralizaciónPacks de contenido diseñados para escalar",
+   "firma": "1360449463"
+  },
+  "👤 › 👤Mi perfilDatos personales, foto y privacidad": {
+   "titulos": [
+    "👤 Mi perfil",
+    "Foto de perfil",
+    "Datos personales",
+    "Correo electrónico",
+    "Contraseña",
+    "Cuenta",
+    "🔐 Perfiles de TikTok para el ranking"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "Datos personalesNombreMáximo 40 caracteres.Guardar nombre",
+    "Guardar nombre",
+    "Cambiar correo",
+    "ContraseñaNueva contraseñaRepetir contraseñaCambiar contrase",
+    "Cambiar contraseña",
+    "🇪🇸 España⌄",
+    "Añadir perfil protegido"
+   ],
+   "texto": "👤 Mi perfilActualiza tus datos de acceso de forma segura.Foto de perfilNSubir fotoJPG, PNG o WEBP. La imagen se ajustará automáticamente.Datos personalesNombreMáximo 40 caracteres.Guardar nombreCorreo electrónicoCorreo actualCorreo nuevoCambiar correoRecibirás un enlace de confirmación.ContraseñaNueva contraseñaRepetir contraseñaCambiar contraseñaCuentaALUMNO PREMIUMEl saldo, los pedidos y las entregas permanecen vinculados a tu cuenta.🔐 Perfiles de TikTok para el rankingPrivacidad total: tus perfiles se almacenan cifrados y se procesan automáticamente para calcular el GMV. Ni otros alumnos ni los administradores pueden ver tus arrobas. En el ranking solamente aparecerán tu nombre y tu foto de TTShop AI Pro.🇪🇸 España🇺🇸 Estados Unidos🇪🇸 España⌄ Autorizo el procesamiento cifrado del perfil exclusivamente para calcular mi posición anónima en el ranking.Añadir perfil protegidoTodavía no has añadido perfiles de TikTok.",
+   "firma": "592051046"
+  },
+  "👤 › ⚖️Centro legalCondiciones, privacidad y reglas del servicio": {
+   "titulos": [
+    "⚖️ Centro legal"
+   ],
+   "prompts": [],
+   "enlaces": [
+    "📜CondicionesReglas del servicio y compr|https://ttshopaiproapp.com/terms.html",
+    "🔐PrivacidadTratamiento de datos y derec|https://ttshopaiproapp.com/privacy.html"
+   ],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "TTShop AI Pro⚖️ Centro legalTransparencia, privacidad y condiciones del servicio.❔ Cómo funciona📜CondicionesReglas del servicio y compras🔐PrivacidadTratamiento de datos y derechosLos documentos legales deben revisarse con un profesional cualificado antes del lanzamiento comercial.",
+   "firma": "1946049651"
+  },
+  "👤 › 📜Mis guionesHistorial, escenas y revisión de seguridad": {
+   "titulos": [
+    "📜 Mis guiones"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [],
+   "texto": "📜 Mis guionesHistorial de guiones generados y revisiones de seguridad.+ Crear nuevo guionCargando historial…",
+   "firma": "1520896090"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 📦ProductosProductos seleccionados e inventarios organizados": {
+   "titulos": [
+    "📦 Productos"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "USAInventarios y productos de Estados Unidos",
+    "USAInventarios y productos de Estados Unidos"
+   ],
+   "texto": "📦 ProductosElige el país para ver sus inventarios y productos.EspañaInventario General, Ropa Mujer y Ropa HombreUSAInventarios y productos de Estados Unidos",
+   "firma": "-1816068184"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 🏆Ranking de creadoresClasificación privada de rendimiento m": {
+   "titulos": [
+    "🏆 Ranking de creadores TTShop AI Pro"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "🏆 Ranking de creadores TTShop AI ProGMV mensual estimado. Las identidades de TikTok permanecen cifradas y privadas.Añade tus perfiles de TikTok en Mi perfil. El ranking muestra únicamente tu nombre y foto de TTShop AI Pro, nunca tu arroba real de TikTok.🥇AAlejandro Lisedas Gil1 perfil(es) incluido(s)539 US$GMV del mes❔ Cómo funciona",
+   "firma": "-1982461485"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 💡Peticiones de mejoraEnvía ideas para mejorar la plataforma": {
+   "titulos": [
+    "💡 Peticiones de mejora"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona",
+    "Experiencia⌄",
+    "📷 Añadir imagen",
+    "Quitar"
+   ],
+   "texto": "TTShop AI Pro💡 Peticiones de mejoraAyúdanos a construir la siguiente versión. Las ideas integradas podrán recibir créditos.❔ Cómo funcionaExperienciaContenidoAutomatizaciónOtroExperiencia⌄📷 Añadir imagenImagen preparadaQuitar💡 Enviar peticiónTodavía no hay peticiones.",
+   "firma": "-1812383445"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 📍Eventos presencialesEncuentros presenciales de la comunida": {
+   "titulos": [
+    "📍 Eventos presenciales"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "TTShop AI Pro📍 Eventos presencialesConfirma asistencia usando tu perfil de TTShop AI Pro.❔ Cómo funcionaEl apartado está preparado, pero falta activar su actualización de base de datos.",
+   "firma": "-1229207587"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 🛡️Sanciones y normativaActualizaciones oficiales y práctica": {
+   "titulos": [
+    "🛡️ Sanciones y normativa"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "TTShop AI Pro🛡️ Sanciones y normativaActualizaciones oficiales de TikTok Shop organizadas por mercado.❔ Cómo funcionaEl apartado está preparado, pero falta activar su actualización de base de datos.",
+   "firma": "-1688086935"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 📅CalendarioLlamadas y eventos publicados de la comunidad": {
+   "titulos": [
+    "📅 Calendario de la comunidad"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "TTShop AI Pro📅 Calendario de la comunidadPróximas llamadas y eventos de la comunidad.❔ Cómo funcionaEl apartado está preparado, pero falta activar su actualización de base de datos.",
+   "firma": "683604876"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬": {
+   "titulos": [
+    "📝 Prompts/Formatos"
+   ],
+   "prompts": [
+    "📝 Prompts/FormatosElige una categoría para ver sus formatos y vídeos de ejemplo.",
+    "📝 Prompts/FormatosElige una categoría para ver sus formatos y vídeos de ejemplo.",
+    "👔Moda HombreFormatos y estilos para moda masculina4 formatos",
+    "👗Moda MujerFormatos y estilos para moda femenina2 formatos",
+    "🎥Nichos POVIdeas y estructuras para nichos POV4 formatos",
+    "🧿Nicho GeneralFormatos adaptables a cualquier nicho0 formatos",
+    "🎨Creativos y CarruselesCreativos, carruseles y conceptos visuales1 formato"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "👔Moda HombreFormatos y estilos para moda masculina4 formato",
+    "👔",
+    "Moda HombreFormatos y estilos para moda masculina4 formatos",
+    "👗Moda MujerFormatos y estilos para moda femenina2 formatos",
+    "👗",
+    "Moda MujerFormatos y estilos para moda femenina2 formatos",
+    "🎥Nichos POVIdeas y estructuras para nichos POV4 formatos",
+    "🎥",
+    "Nichos POVIdeas y estructuras para nichos POV4 formatos",
+    "🧿",
+    "🎨Creativos y CarruselesCreativos, carruseles y conceptos vi",
+    "🎨",
+    "Creativos y CarruselesCreativos, carruseles y conceptos visu"
+   ],
+   "texto": "📝 Prompts/FormatosElige una categoría para ver sus formatos y vídeos de ejemplo.👔Moda HombreFormatos y estilos para moda masculina4 formatos👗Moda MujerFormatos y estilos para moda femenina2 formatos🎥Nichos POVIdeas y estructuras para nichos POV4 formatos🧿Nicho GeneralFormatos adaptables a cualquier nicho0 formatos🎨Creativos y CarruselesCreativos, carruseles y conceptos visuales1 formato",
+   "firma": "695176719"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › ✍️": {
+   "titulos": [
+    "Bienvenido al Asistente de guiones"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [],
+   "texto": "120 generaciones disponibles0 / 120 este mesTTShop AI ProBienvenido al Asistente de guionesCrea guiones de venta completos, seguros y listos para grabar mediante un recorrido sencillo.✨ Crear un guion",
+   "firma": "-1895498838"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🖼️": {
+   "titulos": [
+    "🖼️ Bienvenido al Asistente de carruseles"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [],
+   "texto": "31 carruseles disponibles0 / 31 este mesTTShop AI Pro🖼️ Bienvenido al Asistente de carruselesCrea un carrusel completo, visual y seguro para TikTok Shop mediante una experiencia guiada. Incluye 31 carruseles al mes.✨ Crear un carrusel",
+   "firma": "-2135621085"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🧠Resumen IAResúmenes de la comunidad y llamadas semanales.": {
+   "titulos": [
+    "🧠 Resumen IA"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "❔ Cómo funciona"
+   ],
+   "texto": "TTShop AI Pro🧠 Resumen IATemas diarios de los chats y llamadas semanales.❔ Cómo funcionaEl apartado está preparado, pero falta activar su actualización de base de datos.",
+   "firma": "-371212002"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🌐Plataformas AIHerramientas recomendadas y enlaces de afili": {
+   "titulos": [
+    "🤖 Plataformas AI"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "🔗FLOWAbrir plataforma ↗",
+    "🔗",
+    "FLOWAbrir plataforma ↗",
+    "🔗DEEPSEEKAbrir plataforma ↗",
+    "🔗",
+    "DEEPSEEKAbrir plataforma ↗",
+    "🔗KLINGAbrir plataforma ↗",
+    "🔗",
+    "KLINGAbrir plataforma ↗",
+    "🔗VMOS CLOUDAbrir plataforma ↗",
+    "🔗",
+    "VMOS CLOUDAbrir plataforma ↗",
+    "🔗ADSPOWERAbrir plataforma ↗",
+    "🔗",
+    "ADSPOWERAbrir plataforma ↗",
+    "🔗FISH AUDIOSAbrir plataforma ↗",
+    "🔗",
+    "FISH AUDIOSAbrir plataforma ↗"
+   ],
+   "texto": "🤖 Plataformas AIDescubre las herramientas de IA seleccionadas para la comunidad. Algunos enlaces son de afiliado y pueden generar una comisión para TTShop AI Pro sin coste adicional para ti.Herramientas y plataformas🔗FLOWAbrir plataforma ↗🔗DEEPSEEKAbrir plataforma ↗🔗KLINGAbrir plataforma ↗🔗VMOS CLOUDAbrir plataforma ↗🔗ADSPOWERAbrir plataforma ↗🔗FISH AUDIOSAbrir plataforma ↗",
+   "firma": "-1225800052"
+  },
+  "🛒 › ⚙️AutomatizacionesAutomatización gestionada de cuentas": {
+   "titulos": [
+    "🌍 Elige el país"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "EspañaAutomatización para TikTok Shop EspañaUSAAutomatizació",
+    "EspañaAutomatización para TikTok Shop España",
+    "EspañaAutomatización para TikTok Shop España",
+    "USAAutomatización para TikTok Shop USA",
+    "USAAutomatización para TikTok Shop USA",
+    "❔ Ayuda"
+   ],
+   "texto": "🌍 Elige el paísSelecciona el país para el que quieres automatizar la cuenta.1 · País2 · Formato3 · Plan4 · DatosEspañaAutomatización para TikTok Shop EspañaUSAAutomatización para TikTok Shop USA❔ Ayuda",
+   "firma": "1110921712"
+  },
+  "🛒 › 🚀Estrategias de viralizaciónPacks de contenido diseñados pa": {
+   "titulos": [
+    "🚀 Estrategia de viralización"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "⚙️",
+    "⚙️",
+    "⚙️",
+    "⚙️",
+    "⚙️"
+   ],
+   "texto": "🚀 Estrategia de viralizaciónSelecciona el pack que quieres comprar. Los precios se muestran en USD.⚙️Compra 20 vídeos$30 USDPago único mediante Stripe⚙️Compra 40 vídeos$50 USDPago único mediante Stripe⚙️Compra 60 vídeos$70 USDPago único mediante Stripe⚙️Compra 80 vídeos$90 USDPago único mediante Stripe⚙️Compra 100 vídeos$100 USDPago único mediante Stripe",
+   "firma": "852495244"
+  },
+  "👤 › 👤Mi perfilDatos personales, foto y privacidad › Guardar nombre": {
+   "titulos": [
+    "👤 Mi perfil",
+    "Foto de perfil",
+    "Datos personales",
+    "Correo electrónico",
+    "Contraseña",
+    "Cuenta",
+    "🔐 Perfiles de TikTok para el ranking"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "Datos personalesNombreMáximo 40 caracteres.Guardar nombreNom",
+    "Guardar nombre",
+    "Cambiar correo",
+    "ContraseñaNueva contraseñaRepetir contraseñaCambiar contrase",
+    "Cambiar contraseña",
+    "🇪🇸 España⌄",
+    "Añadir perfil protegido"
+   ],
+   "texto": "👤 Mi perfilActualiza tus datos de acceso de forma segura.Foto de perfilNSubir fotoJPG, PNG o WEBP. La imagen se ajustará automáticamente.Datos personalesNombreMáximo 40 caracteres.Guardar nombreNombre actualizado ✅Correo electrónicoCorreo actualCorreo nuevoCambiar correoRecibirás un enlace de confirmación.ContraseñaNueva contraseñaRepetir contraseñaCambiar contraseñaCuentaALUMNO PREMIUMEl saldo, los pedidos y las entregas permanecen vinculados a tu cuenta.🔐 Perfiles de TikTok para el rankingPrivacidad total: tus perfiles se almacenan cifrados y se procesan automáticamente para calcular el GMV. Ni otros alumnos ni los administradores pueden ver tus arrobas. En el ranking solamente aparecerán tu nombre y tu foto de TTShop AI Pro.🇪🇸 España🇺🇸 Estados Unidos🇪🇸 España⌄ Autorizo el procesamiento cifrado del perfil exclusivamente para calcular mi posición anónima en el ranking.Añadir perfil protegidoTodavía no has añadido perfiles de TikTok.",
+   "firma": "-2068943711"
+  },
+  "👤 › 👤Mi perfilDatos personales, foto y privacidad › Cambiar correo": {
+   "titulos": [
+    "👤 Mi perfil",
+    "Foto de perfil",
+    "Datos personales",
+    "Correo electrónico",
+    "Contraseña",
+    "Cuenta",
+    "🔐 Perfiles de TikTok para el ranking"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "Datos personalesNombreMáximo 40 caracteres.Guardar nombre",
+    "Guardar nombre",
+    "Correo electrónicoCorreo actualCorreo nuevoCambiar correoInt",
+    "Cambiar correo",
+    "ContraseñaNueva contraseñaRepetir contraseñaCambiar contrase",
+    "Cambiar contraseña",
+    "🇪🇸 España⌄",
+    "Añadir perfil protegido"
+   ],
+   "texto": "👤 Mi perfilActualiza tus datos de acceso de forma segura.Foto de perfilNSubir fotoJPG, PNG o WEBP. La imagen se ajustará automáticamente.Datos personalesNombreMáximo 40 caracteres.Guardar nombreCorreo electrónicoCorreo actualCorreo nuevoCambiar correoIntroduce un correo válidoContraseñaNueva contraseñaRepetir contraseñaCambiar contraseñaCuentaALUMNO PREMIUMEl saldo, los pedidos y las entregas permanecen vinculados a tu cuenta.🔐 Perfiles de TikTok para el rankingPrivacidad total: tus perfiles se almacenan cifrados y se procesan automáticamente para calcular el GMV. Ni otros alumnos ni los administradores pueden ver tus arrobas. En el ranking solamente aparecerán tu nombre y tu foto de TTShop AI Pro.🇪🇸 España🇺🇸 Estados Unidos🇪🇸 España⌄ Autorizo el procesamiento cifrado del perfil exclusivamente para calcular mi posición anónima en el ranking.Añadir perfil protegidoTodavía no has añadido perfiles de TikTok.",
+   "firma": "-1836220463"
+  },
+  "👤 › 👤Mi perfilDatos personales, foto y privacidad › Cambiar contraseña": {
+   "titulos": [
+    "👤 Mi perfil",
+    "Foto de perfil",
+    "Datos personales",
+    "Correo electrónico",
+    "Contraseña",
+    "Cuenta",
+    "🔐 Perfiles de TikTok para el ranking"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "Datos personalesNombreMáximo 40 caracteres.Guardar nombre",
+    "Guardar nombre",
+    "Cambiar correo",
+    "ContraseñaNueva contraseñaRepetir contraseñaCambiar contrase",
+    "Cambiar contraseña",
+    "🇪🇸 España⌄",
+    "Añadir perfil protegido"
+   ],
+   "texto": "👤 Mi perfilActualiza tus datos de acceso de forma segura.Foto de perfilNSubir fotoJPG, PNG o WEBP. La imagen se ajustará automáticamente.Datos personalesNombreMáximo 40 caracteres.Guardar nombreCorreo electrónicoCorreo actualCorreo nuevoCambiar correoRecibirás un enlace de confirmación.ContraseñaNueva contraseñaRepetir contraseñaCambiar contraseñaLa contraseña debe tener al menos 8 caracteresCuentaALUMNO PREMIUMEl saldo, los pedidos y las entregas permanecen vinculados a tu cuenta.🔐 Perfiles de TikTok para el rankingPrivacidad total: tus perfiles se almacenan cifrados y se procesan automáticamente para calcular el GMV. Ni otros alumnos ni los administradores pueden ver tus arrobas. En el ranking solamente aparecerán tu nombre y tu foto de TTShop AI Pro.🇪🇸 España🇺🇸 Estados Unidos🇪🇸 España⌄ Autorizo el procesamiento cifrado del perfil exclusivamente para calcular mi posición anónima en el ranking.Añadir perfil protegidoTodavía no has añadido perfiles de TikTok.",
+   "firma": "-969197462"
+  },
+  "👤 › 👤Mi perfilDatos personales, foto y privacidad › Añadir perfil protegido": {
+   "titulos": [
+    "👤 Mi perfil",
+    "Foto de perfil",
+    "Datos personales",
+    "Correo electrónico",
+    "Contraseña",
+    "Cuenta",
+    "🔐 Perfiles de TikTok para el ranking"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "Datos personalesNombreMáximo 40 caracteres.Guardar nombre",
+    "Guardar nombre",
+    "Cambiar correo",
+    "ContraseñaNueva contraseñaRepetir contraseñaCambiar contrase",
+    "Cambiar contraseña",
+    "🇪🇸 España⌄",
+    "Añadir perfil protegido"
+   ],
+   "texto": "👤 Mi perfilActualiza tus datos de acceso de forma segura.Foto de perfilNSubir fotoJPG, PNG o WEBP. La imagen se ajustará automáticamente.Datos personalesNombreMáximo 40 caracteres.Guardar nombreCorreo electrónicoCorreo actualCorreo nuevoCambiar correoRecibirás un enlace de confirmación.ContraseñaNueva contraseñaRepetir contraseñaCambiar contraseñaCuentaALUMNO PREMIUMEl saldo, los pedidos y las entregas permanecen vinculados a tu cuenta.🔐 Perfiles de TikTok para el rankingPrivacidad total: tus perfiles se almacenan cifrados y se procesan automáticamente para calcular el GMV. Ni otros alumnos ni los administradores pueden ver tus arrobas. En el ranking solamente aparecerán tu nombre y tu foto de TTShop AI Pro.🇪🇸 España🇺🇸 Estados Unidos🇪🇸 España⌄ Autorizo el procesamiento cifrado del perfil exclusivamente para calcular mi posición anónima en el ranking.Añadir perfil protegidoConfirma el tratamiento privado para continuar.Todavía no has añadido perfiles de TikTok.",
+   "firma": "876709718"
+  },
+  "💬ComunidadChat, productos, ranking, eventos y recursos de l › 📦ProductosProductos seleccionados e inventarios organizados › USAInventarios y productos de Estados Unidos": {
+   "titulos": [
+    "Productos de USA"
+   ],
+   "prompts": [],
+   "enlaces": [],
+   "hijos": [
+    "🏬",
+    "👗Ropa MujerInventario de ropa femenina",
+    "👗",
+    "Ropa MujerInventario de ropa femenina",
+    "👔Ropa HombreInventario de ropa masculina",
+    "👔",
+    "Ropa HombreInventario de ropa masculina"
+   ],
+   "texto": "Productos de USAElige un inventario para ver sus carpetas y productos.🏬Inventario General31 carpetas · 10 productos · fotos y links👗Ropa MujerInventario de ropa femenina👔Ropa HombreInventario de ropa masculina",
+   "firma": "1145371688"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬 › 👔Moda HombreFormatos y estilos para moda masculina4 formato": {
+   "titulos": [
+    "👔 Moda Hombre"
+   ],
+   "prompts": [
+    "← Categorías👔 Moda HombreFormatos y estilos para moda masculina",
+    "👔 Moda HombreFormatos y estilos para moda masculina"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "← Categorías",
+    "👔Vista previa no disponible▶⛶BOF Frente a Espejo 10s",
+    "▶",
+    "⛶",
+    "👔Vista previa no disponible▶⛶BOF Selfie 10s",
+    "▶",
+    "⛶",
+    "👔Vista previa no disponible▶⛶Situación Real 1 10s",
+    "▶",
+    "⛶",
+    "👔Vista previa no disponible▶⛶Situación Real 2 10s",
+    "▶",
+    "⛶"
+   ],
+   "texto": "← Categorías👔 Moda HombreFormatos y estilos para moda masculina👔Vista previa no disponible▶⛶BOF Frente a Espejo 10s👔Vista previa no disponible▶⛶BOF Selfie 10s👔Vista previa no disponible▶⛶Situación Real 1 10s👔Vista previa no disponible▶⛶Situación Real 2 10s",
+   "firma": "-312607052"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬 › 👗Moda MujerFormatos y estilos para moda femenina2 formatos": {
+   "titulos": [
+    "👗 Moda Mujer"
+   ],
+   "prompts": [
+    "← Categorías👗 Moda MujerFormatos y estilos para moda femenina",
+    "👗 Moda MujerFormatos y estilos para moda femenina"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "← Categorías",
+    "👗Vista previa no disponible▶⛶MOF MUJER 10 SEGUNDOS FRENTE A",
+    "▶",
+    "⛶",
+    "👗BOLSO MOF MUJER POV ONMI 10S"
+   ],
+   "texto": "← Categorías👗 Moda MujerFormatos y estilos para moda femenina👗Vista previa no disponible▶⛶MOF MUJER 10 SEGUNDOS FRENTE A ESPEJO DE IMAGEN A VIDEO EN ONMI👗BOLSO MOF MUJER POV ONMI 10S",
+   "firma": "-478684444"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬 › 🎥Nichos POVIdeas y estructuras para nichos POV4 formatos": {
+   "titulos": [
+    "🎥 Nichos POV"
+   ],
+   "prompts": [
+    "← Categorías🎥 Nichos POVIdeas y estructuras para nichos POV",
+    "🎥 Nichos POVIdeas y estructuras para nichos POV"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "← Categorías",
+    "🎥Vista previa no disponible▶⛶POV MOF ESP/USA 20 SEGUNDOS GA",
+    "▶",
+    "⛶",
+    "🎥Vista previa no disponible▶⛶POV/BOF 10 SEGUNDOS ONMI",
+    "▶",
+    "⛶",
+    "▶",
+    "⛶",
+    "🎥Vista previa no disponible▶⛶POV/BOF ESPAÑA PLANTILLA",
+    "▶",
+    "⛶"
+   ],
+   "texto": "← Categorías🎥 Nichos POVIdeas y estructuras para nichos POV🎥Vista previa no disponible▶⛶POV MOF ESP/USA 20 SEGUNDOS GANCHO PUNTO DE DOLOR🎥Vista previa no disponible▶⛶POV/BOF 10 SEGUNDOS ONMI🎥Vista previa no disponible▶⛶POV MOF ESP/USA 20 SEGUNDOS GANCHO URGENCIA DE PRECIO🎥Vista previa no disponible▶⛶POV/BOF ESPAÑA PLANTILLA",
+   "firma": "617465433"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬 › 🧿": {
+   "titulos": [
+    "🧿 Nicho General"
+   ],
+   "prompts": [
+    "← Categorías🧿 Nicho GeneralFormatos adaptables a cualquier nicho",
+    "🧿 Nicho GeneralFormatos adaptables a cualquier nicho"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "← Categorías"
+   ],
+   "texto": "← Categorías🧿 Nicho GeneralFormatos adaptables a cualquier nicho📝Aún no hay formatos en esta categoría",
+   "firma": "-1309598661"
+  },
+  "🤖Asistente IAVídeos, guiones, carruseles, resúmenes y plata › 🎬 › 🎨Creativos y CarruselesCreativos, carruseles y conceptos vi": {
+   "titulos": [
+    "🎨 Creativos y Carruseles"
+   ],
+   "prompts": [
+    "← Categorías🎨 Creativos y CarruselesCreativos, carruseles y conceptos visuales",
+    "🎨 Creativos y CarruselesCreativos, carruseles y conceptos visuales"
+   ],
+   "enlaces": [],
+   "hijos": [
+    "← Categorías",
+    "🎨CREATIVOS PUBLICITARIOS"
+   ],
+   "texto": "← Categorías🎨 Creativos y CarruselesCreativos, carruseles y conceptos visuales🎨CREATIVOS PUBLICITARIOS",
+   "firma": "889492910"
+  }
+ }
+}

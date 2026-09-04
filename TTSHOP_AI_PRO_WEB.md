@@ -22,7 +22,7 @@ los ZIP de productos y las fichas que se pegan hoy.
 |---|---|
 | Mapa general de la plataforma | ✅ los 10 pasos de su guía |
 | Catálogo de productos (el que sustituye a los ZIP) | ⬜ pendiente |
-| Formatos y prompts por nicho | ⬜ pendiente |
+| Formatos y prompts por nicho | ✅ las 5 categorías y los 11 formatos; ⬜ falta el texto de cada prompt |
 | Automatizaciones que trae la web | 🟨 lo esencial (qué es gratis y qué se paga) |
 | Qué usamos nosotros y qué no | ⬜ pendiente |
 
@@ -67,6 +67,23 @@ disponible`.
 **Lo que interesa a efectos nuestros:** el panel es *variable* según el plan.
 Cualquier cosa que documentemos aquí puede no estar en otra cuenta, así que
 conviene apuntar con qué membresía se vio (aquí: **Alumno Premium**).
+
+### Cómo se saca esto sin poder entrar (4 sep 2026)
+
+Ningún agente puede mirar la web (está tras el login), así que el mapa se
+extrae con un pegote en la consola y se pega aquí. Lo que hay que saber de su
+DOM para no empezar de cero cada vez:
+
+- La navegación es una SPA sin rutas: cada tarjeta es `div.mod[data-vista]`
+  (`mi-area`, `alumno-comunidad`, `asistente`, `alumno-compras`, y dentro
+  `prompts`, `guiones`, `carruseles`, `resumenes`, `ia`). Se navega
+  haciendo `click()` en ellas y se vuelve con `#btnHome`.
+- El contenido de la pantalla vive siempre en `#main`.
+- **El segundo nivel no siempre son `.mod`**: en Mi Área, Comunidad y Compras
+  las tarjetas son `<button>` sueltos, así que un crawler que busque solo
+  `.mod` se queda en la puerta.
+- Chrome bloquea el primer pegado en la consola: hay que escribir a mano
+  `allow pasting` una vez por perfil.
 
 ### El menú de verdad (4 sep 2026)
 
@@ -239,7 +256,67 @@ nueva antes de tocar nada:
 
 ## 3. Formatos y prompts por nicho
 
-_(pendiente: qué formatos publica para cada nicho y cuáles ya tenemos)_
+### Lo que hay dentro de "Prompts/Formatos" (4 sep 2026)
+
+`Asistente IA › Generador de vídeos` NO es un generador: es el catálogo de
+formatos, agrupados en cinco categorías, cada una con sus vídeos de ejemplo.
+El número dice cuántos formatos tiene hoy — o sea, cuánto queda por copiar:
+
+| Categoría | Formatos | Nuestro nicho |
+|---|---|---|
+| 👔 Moda Hombre | 4 | Ropa Mujer/Hombre (`nicho_ropa`, género `hombre_web`) |
+| 👗 Moda Mujer | 2 | Ropa (mujer) — el del espejo y el de percha |
+| 🎥 Nichos POV | 4 | POV BOF, POV BOF Largo, BOF Cine |
+| 🧿 Nicho General | 0 | vacío — aún no ha publicado nada |
+| 🎨 Creativos y Carruseles | 1 | Creativos Pro y Carruseles |
+
+### Los 11 formatos, uno a uno (4 sep 2026)
+
+`Asistente IA › 🎬 Generador de vídeos` → categoría. El **prompt de cada
+formato no está en el DOM**: la tarjeta solo trae el vídeo de ejemplo y los
+botones ▶ / ⛶, así que hay que abrirlo y copiarlo a mano — un crawler no lo
+saca.
+
+| Categoría | Formato | Nuestro equivalente |
+|---|---|---|
+| 👔 Moda Hombre | BOF Frente a Espejo 10s | `nicho_ropa` espejo (`hombre_web`) |
+| 👔 Moda Hombre | BOF Selfie 10s | ⬜ no lo tenemos |
+| 👔 Moda Hombre | Situación Real 1 10s | ⬜ no lo tenemos |
+| 👔 Moda Hombre | Situación Real 2 10s | ⬜ no lo tenemos |
+| 👗 Moda Mujer | MOF MUJER 10s FRENTE A ESPEJO (imagen→vídeo, ONMI) | `nicho_ropa` espejo (`mujer_web`) |
+| 👗 Moda Mujer | BOLSO MOF MUJER POV ONMI 10S | ⬜ no lo tenemos |
+| 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO PUNTO DE DOLOR | `nicho_pov_bof_largo/prompts/guion_dolor.md` |
+| 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO URGENCIA DE PRECIO | `nicho_pov_bof_largo/prompts/guion.md` |
+| 🎥 Nichos POV | POV/BOF 10 SEGUNDOS ONMI | `nicho_pov_bof/prompts/guion_producto.md` |
+| 🎥 Nichos POV | POV/BOF ESPAÑA PLANTILLA | ⬜ por contrastar |
+| 🎨 Creativos y Carruseles | CREATIVOS PUBLICITARIOS | Creativos Pro |
+| 🧿 Nicho General | _(vacío, 0 formatos)_ | — |
+
+Los dos ganchos del POV MOF de 20s son exactamente los dos estilos del POV
+BOF Largo (`ESTILOS_GUION`), y confirman que ese formato es de 20 segundos —
+por eso el vídeo son DOS clips y no uno.
+
+### Volcados del mapa
+
+`docs/web-curso/mapa-<fecha>.json` — cada pantalla con su `firma` (hash de su
+texto). Para ver si han cambiado cosas, se saca otro volcado y se comparan las
+firmas; no hay que releer nada. El del 4 sep 2026: 31 pantallas únicas de 172
+rutas recorridas (la misma vista se alcanza por varios caminos).
+
+### Cuotas de su generador (no nos afectan, pero explican su negocio)
+
+- **Guiones: 120 al mes** (`Asistente IA › Generador de guiones`).
+- **Carruseles: 31 al mes** (uno al día, `Generador de carruseles`).
+- **Resumen IA**: la pantalla está hecha pero sin datos — "falta activar su
+  actualización de base de datos".
+
+Nosotros generamos con nuestra clave de Gemini, así que estos topes solo
+importan para saber qué venden como "generaciones adicionales acumulables".
+
+### Plataformas AI que recomienda (enlaces de afiliado suyos)
+
+FLOW · DEEPSEEK · KLING · VMOS CLOUD · ADSPOWER · **FISH AUDIOS** — esta
+última es la que ya usamos para la voz del POV BOF Largo (`FISH_API_KEY`).
 
 **Lo que ya está copiado en el repo**, para no duplicar trabajo:
 
