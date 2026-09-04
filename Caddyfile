@@ -82,6 +82,17 @@
 	import app
 }
 
+# El dominio propio, que es el que debería quedarse. Caddy pide el certificado
+# solo en cuanto el registro A apunte aquí; hasta entonces reintenta y no
+# estorba a los demás sitios.
+#
+# OJO con Vercel: `nebulabsmedia.com` tiene un comodín que responde a
+# CUALQUIER subdominio, así que `factory` ya "resuelve" a Vercel. Hace falta
+# un registro A explícito para `factory` que gane al comodín.
+{$DOMAIN_PROPIO:factory.nebulabsmedia.com} {
+	import app
+}
+
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
 # URL pública existente del box (Tailscale Funnel / el mismo {$DOMAIN}), en la
 # ruta /api/*. No hace falta un subdominio dedicado por ahora. Si en el futuro
