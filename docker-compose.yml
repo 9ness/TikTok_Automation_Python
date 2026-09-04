@@ -127,8 +127,14 @@ services:
       args:
         # Build-time: estos valores quedan inlineados en el bundle JS del cliente.
         # Para cambiarlos hay que rebuild.
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL:-ws://localhost:8000}
+        # `-` y no `:-` a propósito: con `:-`, dejar la variable VACÍA aplica
+        # el valor por defecto, y vacío es justo lo que se quiere — significa
+        # "llama al mismo origen desde el que se abrió la página". Con la URL
+        # quemada, la app solo funcionaba por la puerta con la que se compiló:
+        # al caerse el nombre del Funnel, todas las llamadas daban "Failed to
+        # fetch" aunque la página cargara.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL-http://localhost:8000}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL-ws://localhost:8000}
         NEXT_PUBLIC_API_KEY: ${API_KEY:-}
     image: tiktok-web:latest
     container_name: tiktok-web
