@@ -310,6 +310,26 @@ const OPCIONES_AUDIO = (esWeb: boolean) =>
         { v: "mujer", label: "Voz M" },
       ];
 
+/** Los tres catálogos de un inventario. Son cosas distintas y se trabajan
+ *  distinto —lo de la web es el catálogo del curso, y muestras/tareas son
+ *  prendas que manda una tienda—, así que se eligen arriba como el "Catálogo"
+ *  del POV BOF y debajo salen SOLO sus carpetas. Mezcladas en una sola fila,
+ *  "Tareas 1" parecía una carpeta más de las del ZIP. */
+const CATALOGOS_ROPA = [
+  { clave: "web", label: "🌐 De la web" },
+  { clave: "muestras", label: "🎁 Muestras" },
+  { clave: "tareas", label: "💼 Tareas" },
+] as const;
+
+/** A qué catálogo pertenece una carpeta, por su prefijo
+ *  (`hombre_web__Carpeta_1`, `mujer_tareas__Tareas 1`). */
+function catalogoDe(slug: string): string {
+  const genero = slug.split("__")[0] ?? "";
+  if (genero.endsWith("_muestras")) return "muestras";
+  if (genero.endsWith("_tareas")) return "tareas";
+  return "web";
+}
+
 export type Variante = "curso" | "web";
 export type SexoRopa = "mujer" | "hombre";
 
@@ -334,6 +354,10 @@ export function PantallaRopa({
   const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
   // La carpeta y el modo se recuerdan POR PANTALLA: si compartieran clave, al
   // pasar de mujer a hombre te encontrarías en la carpeta de la otra.
+  const [catalogo, setCatalogo] = useEstadoDeUsuario(
+    `ropa-web:${sexoFijo}:catalogo`,
+    "web",
+  );
   const [carpeta, setCarpeta] = useEstadoDeUsuario(
     esWeb ? `ropa-web:${sexoFijo}:carpeta` : "ropa:carpeta",
     esWeb ? "" : "camisetas",
@@ -347,9 +371,13 @@ export function PantallaRopa({
   // elegido arriba: son dos inventarios distintos (mujer y hombre), y con los
   // dos a la vez el selector mezclaba las carpetas propias de hombre estando
   // en mujer. Se filtra por el `sexo` que da el backend, no por el slug.
-  const misCarpetas = (carpetas.data?.items ?? []).filter(
+  const todasLasCarpetas = (carpetas.data?.items ?? []).filter(
     (c) => c.web === esWeb && (!esWeb || c.sexo === sexo),
   );
+  // En la web, el selector de abajo enseña SOLO las del catálogo elegido.
+  const misCarpetas = esWeb
+    ? todasLasCarpetas.filter((c) => catalogoDe(c.slug) === catalogo)
+    : todasLasCarpetas;
   // Si la guardada es de la otra pantalla (o ya no existe), se cae a la
   // primera. Pasa al estrenar esto: la web se elegía desde "sin humanos".
   const carpetaValida = misCarpetas.some((c) => c.slug === carpeta);
@@ -513,9 +541,23 @@ export function PantallaRopa({
         {esWeb && (
           <>
             <Sub>Traer prendas</Sub>
-            <ImportarPrendasWeb genero={genero} onImportado={(slug) => setCarpeta(slug)} />
+            <ImportarPrendasWeb
+              genero={genero}
+              onImportado={(slug) => {
+                setCatalogo(catalogoDe(slug));
+                setCarpeta(slug);
+              }}
+            />
             {misCarpetas.length > 0 && <PegarFichasRopa genero={genero} />}
-            <AltaMiPrenda sexo={sexo} onCreado={(slug) => setCarpeta(slug)} />
+            <AltaMiPrenda
+              sexo={sexo}
+              onCreado={(slug) => {
+                // Se da de alta en "muestras" o "tareas" estando en la web:
+                // sin saltar de catálogo, la prenda nueva no se ve.
+                setCatalogo(catalogoDe(slug));
+                setCarpeta(slug);
+              }}
+            />
 
             <Sub>Modo de grabación</Sub>
             <div className="grid grid-cols-2 gap-1.5">
@@ -538,6 +580,40 @@ export function PantallaRopa({
               Cada modo guarda su propio vídeo: cambiar aquí no pisa lo del
               otro. Los textos, las fotos y el escaparate son comunes.
             </p>
+          </>
+        )}
+
+        {esWeb && (
+          <>
+            <Sub>Catálogo</Sub>
+            {/* Cuántas carpetas tiene cada uno: sin el número hay que entrar a
+                ver si ahí hay algo, y muestras/tareas suelen estar vacíos. */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {CATALOGOS_ROPA.map(({ clave, label }) => {
+                const cuantas = todasLasCarpetas.filter(
+                  (c) => catalogoDe(c.slug) === clave,
+                ).length;
+                return (
+                  <button
+                    key={clave}
+                    type="button"
+                    onClick={() => setCatalogo(clave)}
+                    className={`break-words leading-tight rounded-lg border px-2 py-2 text-[11px] transition ${
+                      catalogo === clave
+                        ? "border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-500"
+                        : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                    }`}
+                  >
+                    {label}
+                    {cuantas > 0 && (
+                      <span className="ml-1 rounded-full bg-muted px-1 py-px text-[9px] font-semibold">
+                        {cuantas}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </>
         )}
 
@@ -607,8 +683,9 @@ export function PantallaRopa({
           </p>
         ) : esWeb && !misCarpetas.length && !carpetas.isLoading ? (
           <p className="rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
-            Aún no hay ninguna carpeta: sube arriba los ZIP que descargues de
-            la web y cada uno aparecerá aquí como una carpeta de diez prendas.
+            {catalogo === "web"
+              ? "Aún no hay ninguna carpeta: sube arriba los ZIP que descargues de la web y cada uno aparecerá aquí como una carpeta de diez prendas."
+              : `Aún no hay nada en ${catalogo}: las prendas se dan de alta con "Añadir una prenda mía", eligiendo ese catálogo.`}
           </p>
         ) : (
           <p className="text-xs font-medium sm:text-sm">

@@ -57,7 +57,12 @@ conservan las pantallas que no tienen catálogo que elegir.
 `<Caja icono="📁" titulo="Dónde trabajas" hint="…" extra="X/Y hechas">`, con un
 `<Sub>` por bloque (`Catálogo`, `Carpetas`, `Modo de grabación`…).
 
-- **Catálogo**: botones en `grid grid-cols-2 gap-1.5 sm:grid-cols-4`.
+- **Catálogo**: botones en `grid grid-cols-2 gap-1.5 sm:grid-cols-4`, con el
+  número de carpetas que tiene cada uno. Si un nicho tiene sitios de origen
+  distintos —lo del curso, las muestras de una tienda, las tareas pagadas— van
+  SIEMPRE en este nivel, nunca mezclados entre las carpetas: una carpeta
+  llamada "Tareas 1" en la misma fila que "Carpeta_2" parece una carpeta más
+  del ZIP.
 - **Carpetas**: contador + barra (`h-1.5 w-full rounded-full bg-muted` con
   relleno `bg-emerald-500`) + **chips**: `flex flex-wrap gap-1`, cada uno
   `rounded border px-2 py-1 text-[10px]`, `✓ ` delante si está hecha y una
