@@ -403,11 +403,19 @@ if [[ "$NEEDS_WEB_REBUILD" == "true" ]]; then
 fi
 
 if [[ "$NEEDS_CADDY_RESTART" == "true" ]]; then
-    echo "[deploy_safe] 🐳 Caddyfile/compose modificado — restart caddy…"
-    if ! dc up -d caddy; then
-        echo "[deploy_safe] ⚠️ caddy restart falló — comprueba `docker compose logs caddy`"
+    echo "[deploy_safe] 🐳 Caddyfile/compose modificado — recargando caddy…"
+    # `up -d` NO aplica un cambio del Caddyfile: el fichero va montado, así que
+    # la definición del servicio no cambia y docker deja el contenedor como
+    # está ("Container tiktok-caddy Running"). El contenedor llevaba cinco
+    # semanas con la config vieja y el deploy decía "✅ caddy reiniciado".
+    #
+    # `caddy reload` sí la relee, y sin cortar ninguna conexión.
+    if dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null; then
+        echo "[deploy_safe] ✅ caddy recargado (sin corte)"
+    elif ! dc up -d caddy; then
+        echo "[deploy_safe] ⚠️ caddy no arrancó — mira `docker compose logs caddy`"
     else
-        echo "[deploy_safe] ✅ caddy reiniciado"
+        echo "[deploy_safe] ✅ caddy recreado"
     fi
 fi
 

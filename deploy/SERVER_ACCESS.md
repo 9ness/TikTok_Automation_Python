@@ -118,6 +118,41 @@ solo para salir del paso.
 `Caddyfile` — Caddy saca el certificado solo y la app deja de depender de
 Tailscale. Falta que el operador cree el DNS.
 
+## Las DOS puertas de entrada (y por qué hay dos)
+
+El 4 de septiembre de 2026 el Tailscale Funnel dejó de publicar el nombre
+`.ts.net` por segunda vez en dos días: el servidor perfecto y la web caída
+para todo el mundo, móvil y PC. Desde entonces hay una puerta que no depende
+de Tailscale:
+
+| URL | Quién la sirve | Notas |
+|---|---|---|
+| `https://tiktok-factory.tailbff00e.ts.net:8443` | Tailscale Funnel → portero `:8090` | La de siempre. Se cae si el Funnel deja de publicar el nombre. |
+| `https://62-238-19-31.sslip.io` | Caddy en `62.238.19.31:443` → portero | Pública, con certificado de Let's Encrypt. No pasa por Tailscale. |
+| `http://62.238.19.31` | Caddy en `:80` → la app **sin portero** | Plan B a pelo. Ojo: NO pide código. |
+
+`sslip.io` resuelve `<ip-con-guiones>.sslip.io` a esa IP, así que no hubo que
+comprar dominio ni crear DNS. Cuando haya uno propio, se cambia esa línea del
+`Caddyfile` por él y se crea el registro A.
+
+Tres cosas viven FUERA del repo, en esta máquina, y hay que saberlas:
+
+1. **`docker-compose.override.yml`** (root, no está en git): Caddy publica
+   `62.238.19.31:443` y no `0.0.0.0:443`, porque tailscaled ya escucha en el
+   `:443` de las IPs del tailnet y chocarían.
+2. **`juegos-bridge.socket` / `.service`**: el portero del código
+   (`juegos-server`) escucha solo en `127.0.0.1:8090` y desde el contenedor de
+   Caddy no se alcanza. Este puente de systemd lo abre en `172.18.0.1:8091`.
+3. **Regla ufw**: `allow from 172.18.0.0/16 to any port 8091` — sin ella, el
+   contenedor no llega al puente y sale un 502.
+
+Y un aviso que costó una hora: **`docker compose up -d caddy` NO aplica un
+cambio del `Caddyfile`**. El fichero va montado, así que la definición del
+servicio no cambia y docker deja el contenedor como está — el deploy decía
+"✅ caddy reiniciado" con un contenedor de cinco semanas y la config vieja. Se
+recarga con `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`
+(ya lo hace `deploy_safe.sh`).
+
 ## Logs y debugging
 
 ```bash

@@ -70,8 +70,22 @@
 # Tailscale y si deja de publicarlo no resuelve en ningún sitio.
 #
 # Cuando haya un dominio propio, se cambia esta línea por él y ya está.
+#
+# OJO: aquí NO va `import app`. Por el Funnel se entra por el portero de
+# `juegos-server` (:8090), que pide el código de acceso antes de dejar pasar a
+# la app; sirviendo la app directamente, esta URL quedaba abierta a internet.
+# Se manda al MISMO portero para que la puerta pública pida lo de siempre. El
+# :8091 es un puente de systemd (`juegos-bridge.socket`) hacia su :8090, que
+# escucha solo en loopback y desde el contenedor no se alcanza.
 {$DOMAIN_PUBLICO:62-238-19-31.sslip.io} {
-	import app
+	encode gzip
+	reverse_proxy 172.18.0.1:8091 {
+		flush_interval -1
+	}
+	log {
+		output stdout
+		format json
+	}
 }
 
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
