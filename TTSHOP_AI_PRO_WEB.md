@@ -20,7 +20,7 @@ los ZIP de productos y las fichas que se pegan hoy.
 
 | Sección | Estado |
 |---|---|
-| Mapa general de la plataforma | 🟨 en curso (1 de 10 pasos de su guía) |
+| Mapa general de la plataforma | 🟨 en curso (6 de 10 pasos de su guía) |
 | Catálogo de productos (el que sustituye a los ZIP) | ⬜ pendiente |
 | Formatos y prompts por nicho | ⬜ pendiente |
 | Automatizaciones que trae la web | ⬜ pendiente |
@@ -67,6 +67,66 @@ disponible`.
 **Lo que interesa a efectos nuestros:** el panel es *variable* según el plan.
 Cualquier cosa que documentemos aquí puede no estar en otra cuenta, así que
 conviene apuntar con qué membresía se vio (aquí: **Alumno Premium**).
+
+### Paso 2 de 10 — Productos
+
+> "Encuentra productos seleccionados. Consulta **inventarios de España y
+> Estados Unidos** organizados por **categorías y carpetas**."
+
+Etiquetas: `Inventarios`, `España y USA`, `GMV Max`.
+
+**Ojo:** hay inventario de **Estados Unidos**, no solo de España. Todo lo
+nuestro asume España (precios en €, "Productos España", las CTA en español).
+Si algún día se trabaja el de USA, no vale con traducir: cambian la moneda,
+las promesas de la ficha (plazos, envío) y el idioma del guion.
+
+Y aparece **GMV Max**, que es la estrategia que ya persigue nuestro Radar de
+Productos (`tiktok_shop/services/ads_signal.py`): productos con ADS inyectados
+y pocos creadores.
+
+### Paso 3 de 10 — Guiones
+
+> "Guiones TOF y BOF. Accede a guiones orientados a captar atención, convertir
+> y aumentar tus ventas."
+
+Etiquetas: `TOF`, `BOF`, `Ventas`.
+
+**Nuevo para nosotros:** lo que tenemos montado es todo **BOF** (el producto
+en primer plano, urgencia de precio, CTA al carrito). Los **TOF** —captar
+atención arriba del embudo— no existen en el repo.
+
+### Paso 4 de 10 — Prompts / Formatos
+
+> "Crea contenido con IA. Consulta **prompts, formatos, ejemplos y
+> categorías** para producir contenido con inteligencia artificial."
+
+Etiquetas: `Prompts`, `Formatos`, `Ejemplos`.
+
+Esta es **la sección de la que salen los prompts que ya están copiados en el
+repo** (tabla de arriba). Al mirarla hay que anotar qué formatos hay hoy y
+cuáles nos faltan — es lo que decide si un nicho necesita modos nuevos.
+
+### Paso 5 de 10 — Compras (servicios y recursos)
+
+> "Compra **vídeos de IA, estrategias de viralización y automatizaciones**, y
+> consulta después tus entregas."
+
+Etiquetas: `Vídeos IA`, `Automatizaciones`, `Mis compras`.
+
+Aquí es donde se gasta el **saldo en dólares** de la barra de arriba. Es la
+parte de pago por uso, y la que hay que mirar con cuidado: buena parte de eso
+—generar el vídeo, montar, publicar— ya lo hacemos nosotros sin pagar por
+unidad. Antes de comprar nada, comparar con lo que ya está montado.
+
+### Paso 6 de 10 — Ranking de creadores
+
+> "Consulta la clasificación por **GMV** manteniendo protegida la identidad
+> real de los perfiles de TikTok."
+
+Etiquetas: `GMV`, `Privacidad`, `Clasificación`.
+
+Es una clasificación entre alumnos, no una fuente de productos. No afecta al
+código; sirve para comparar resultados.
 
 ## 2. Catálogo de productos
 
