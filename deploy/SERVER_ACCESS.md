@@ -127,9 +127,10 @@ de Tailscale:
 
 | URL | Quién la sirve | Notas |
 |---|---|---|
-| `https://tiktok-factory.tailbff00e.ts.net:8443` | Tailscale Funnel → portero `:8090` | La de siempre. Se cae si el Funnel deja de publicar el nombre. |
-| `https://62-238-19-31.sslip.io` | Caddy en `62.238.19.31:443` → la app | Pública, con certificado de Let's Encrypt. No pasa por Tailscale. Entra directa, igual que la del Funnel en su `:443`. |
-| `http://62.238.19.31` | Caddy en `:80` → la app **sin portero** | Plan B a pelo. Ojo: NO pide código. |
+| **`https://factory.nebulabsmedia.com`** | Caddy en `62.238.19.31:443` | **La buena.** Dominio propio, certificado de Let's Encrypt, sin Tailscale de por medio. |
+| `https://62-238-19-31.sslip.io` | Caddy, mismo sitio | Reserva por si el DNS del dominio falla. `sslip.io` resuelve `<ip-con-guiones>` a esa IP. |
+| `http://62.238.19.31` | Caddy en `:80` | **Redirige** al dominio. Antes servía la app en claro a quien probara la IP. |
+| `https://tiktok-factory.tailbff00e.ts.net:8443` | Tailscale Funnel → portero `:8090` | La vieja. Depende de que Tailscale publique el nombre — dejó de hacerlo el 4/9/2026. |
 
 ### Cuando el Funnel deja de resolver
 
@@ -168,12 +169,25 @@ Tres cosas viven FUERA del repo, en esta máquina, y hay que saberlas:
 3. **Regla ufw**: `allow from 172.18.0.0/16 to any port 8091` — sin ella, el
    contenedor no llega al puente y sale un 502.
 
-Y un aviso que costó una hora: **`docker compose up -d caddy` NO aplica un
-cambio del `Caddyfile`**. El fichero va montado, así que la definición del
-servicio no cambia y docker deja el contenedor como está — el deploy decía
-"✅ caddy reiniciado" con un contenedor de cinco semanas y la config vieja. Se
-recarga con `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`
-(ya lo hace `deploy_safe.sh`).
+Y DOS avisos sobre el `Caddyfile`, que se tapaban el uno al otro y costaron
+una mañana:
+
+1. **`docker compose up -d caddy` no aplica un cambio del fichero.** Como va
+   montado, la definición del servicio no cambia y docker deja el contenedor
+   como está — el deploy cantaba "✅ caddy reiniciado" con un contenedor de
+   cinco semanas y la config vieja. Ahora `deploy_safe.sh` hace
+   `caddy reload`, que además no corta conexiones.
+2. **Un bind-mount de un FICHERO sigue el inodo, no la ruta.** `git pull` (o
+   cualquier cosa que reescriba el fichero) crea un inodo nuevo y el
+   contenedor se queda leyendo el viejo: `caddy reload` recarga… lo de antes.
+   Cuando el cambio no aparezca, comprobarlo desde dentro:
+
+   ```bash
+   docker exec tiktok-caddy grep -c nebulabsmedia /etc/caddy/Caddyfile
+   ```
+
+   Si no cuadra con el fichero del host, hay que
+   `docker compose up -d --force-recreate caddy`.
 
 ## Logs y debugging
 
