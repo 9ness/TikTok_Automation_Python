@@ -44,6 +44,12 @@ export interface CarpetaRopa {
   genero?: string;
   /** "mujer" / "hombre" — de quién es la carpeta, lo diga el slug o el género. */
   sexo?: string;
+  /** Lo que pinta el chip: prendas que tiene, cuántas llevan la ficha de
+   *  TikTok enlazada y cuántas tienen vídeo DEL MODO pedido. Solo vienen
+   *  cuando se piden las carpetas de un sexo concreto. */
+  total?: number;
+  con_url?: number;
+  con_video?: number;
 }
 
 export interface CarpetasRopaResponse {

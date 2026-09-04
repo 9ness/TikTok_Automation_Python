@@ -40,6 +40,14 @@ class PromptsRopaResponse(BaseModel):
     # palabras del sexo que toque según la carpeta pedida.
     video_espejo: str = ""
     sexo: str = ""
+    # Lo que enseña el chip de la carpeta, como en el POV BOF: cuántas prendas
+    # tiene, cuántas llevan ya la ficha de TikTok enlazada y cuántas tienen el
+    # vídeo del modo en el que se está trabajando. Solo se calculan cuando se
+    # pide un `sexo` concreto —una pantalla de trabajo—, porque cuesta una
+    # lectura de Redis por carpeta.
+    total: int = 0
+    con_url: int = 0
+    con_video: int = 0
     # "MOF 10 segundos": imagen en Flow + guion/vídeo en Omni. Un clip único
     # de 10s, en vez de generar el vídeo de una tirada. Van en lista porque
     # publica estilos nuevos cada poco.

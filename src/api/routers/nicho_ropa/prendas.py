@@ -127,8 +127,38 @@ def importar_urls(body: dict) -> dict:
         raise APIError(str(e), status_code=503) from e
 
 
+def _contar(slug: str, modo: str) -> dict[str, int]:
+    """Cuántas prendas tiene la carpeta y cómo van, para el chip del selector.
+
+    `total` sale del propio Drive (listar la carpeta) y lo demás del documento
+    de Redis. Se hace solo para las carpetas del sexo que se está mirando: son
+    una decena, pero es una lectura por carpeta y con todas puestas se nota.
+    """
+    from src.nicho_ropa.services import prendas_web
+
+    try:
+        genero, carpeta = config.partes_web(slug)
+        total = len(prendas_web._prendas_en(genero, carpeta))
+    except Exception:  # noqa: BLE001
+        total = 0
+    productos = (product_repo.load(slug).get("productos") or {}).values()
+    return {
+        "total": total,
+        "con_url": sum(1 for p in productos if (p or {}).get("product_url")),
+        "con_video": sum(
+            1 for p in productos if product_repo.video_de(p, modo).get("video_path")
+        ),
+    }
+
+
 @router.get("/carpetas", response_model=CarpetasRopaResponse)
-def list_carpetas() -> CarpetasRopaResponse:
+def list_carpetas(
+    # De qué pantalla se pregunta. Con él se devuelven SOLO sus carpetas y con
+    # los contadores puestos; sin él, todas y sin contar (es lo que necesita
+    # "Sin humanos", que no tiene sexo ni chips).
+    sexo: Annotated[str, Query()] = "",
+    modo: Annotated[str, Query()] = "",
+) -> CarpetasRopaResponse:
     """Carpetas de producto disponibles.
 
     Las de mujer (mono, pantalón corto, bikinis) son las del nicho CON
@@ -177,6 +207,12 @@ def list_carpetas() -> CarpetasRopaResponse:
         ]
     except Exception as e:  # noqa: BLE001
         logger.warning("[nicho_ropa] no se pudieron listar las carpetas propias: %s", e)
+
+    if sexo in ("mujer", "hombre"):
+        items = [i for i in items if i.web and i.sexo == sexo]
+        for i in items:
+            for campo, valor in _contar(i.slug, modo).items():
+                setattr(i, campo, valor)
     return CarpetasRopaResponse(items=items)
 
 

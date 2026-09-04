@@ -109,11 +109,24 @@ export function useImportarUrlsRopa() {
   });
 }
 
-export function useCarpetasRopa() {
+/** Las carpetas del selector.
+ *
+ *  Con `sexo` vienen SOLO las de esa pantalla y con los contadores del chip
+ *  (prendas, con ficha, con vídeo de ese modo); sin él, todas y sin contar,
+ *  que es lo que necesita "Sin humanos". Por eso el `modo` entra en la clave:
+ *  el contador de vídeos es de un modo concreto.
+ */
+export function useCarpetasRopa(sexo = "", modo = "") {
   return useQuery<CarpetasRopaResponse>({
-    queryKey: nichoRopaKeys.carpetas(),
-    queryFn: () => api.get<CarpetasRopaResponse>(`${ROOT}/carpetas`),
-    staleTime: Infinity,
+    queryKey: [...nichoRopaKeys.carpetas(), sexo, modo],
+    queryFn: () =>
+      api.get<CarpetasRopaResponse>(
+        `${ROOT}/carpetas?sexo=${encodeURIComponent(sexo)}&modo=${encodeURIComponent(modo)}`,
+      ),
+    // Ya no es Infinity: los contadores cambian al extraer textos, pegar
+    // fichas o montar un vídeo, y con la caché eterna el chip mentía hasta
+    // recargar la página entera.
+    staleTime: 30 * 1000,
   });
 }
 

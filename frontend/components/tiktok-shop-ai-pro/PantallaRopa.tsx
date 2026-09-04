@@ -35,7 +35,7 @@ import {
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
-import { Paso } from "@/components/tiktok-shop-ai-pro/Paso";
+import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -280,6 +280,17 @@ function ImportarPrendasWeb({
  *  Son dos nichos distintos con el mismo motor detrás (mismas fotos, mismos
  *  textos, mismo montaje), así que comparten pantalla y solo cambia lo que
  *  de verdad es distinto: las carpetas, el prompt y qué pasa con el audio. */
+/** Lo que se pinta en el chip de una carpeta.
+ *
+ *  La etiqueta que da el backend lleva el inventario delante ("👗 Mujer web ·
+ *  Carpeta_2") y en un chip no cabe — además el inventario ya lo dice la
+ *  pantalla entera. Se queda con lo que distingue a una carpeta de otra.
+ */
+function nombreCorto(label: string): string {
+  const partes = label.split("·");
+  return (partes[partes.length - 1] ?? label).trim() || label;
+}
+
 export type Variante = "curso" | "web";
 export type SexoRopa = "mujer" | "hombre";
 
@@ -298,13 +309,17 @@ export function PantallaRopa({
   sexo?: SexoRopa;
 }) {
   const esWeb = variante === "web";
+  // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
+  // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
+  // maneras y son dos publicaciones distintas.
+  const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
   // La carpeta y el modo se recuerdan POR PANTALLA: si compartieran clave, al
   // pasar de mujer a hombre te encontrarías en la carpeta de la otra.
   const [carpeta, setCarpeta] = useEstadoDeUsuario(
     esWeb ? `ropa-web:${sexoFijo}:carpeta` : "ropa:carpeta",
     esWeb ? "" : "camisetas",
   );
-  const carpetas = useCarpetasRopa();
+  const carpetas = useCarpetasRopa(esWeb ? sexoFijo : "", esWeb ? modo : "");
   // De quién es esta pantalla. Lo manda la ruta, así que ni hay selector ni
   // estado: los ZIP que se suban y el prompt que se enseñe son de este sexo.
   const sexo = sexoFijo;
@@ -322,7 +337,7 @@ export function PantallaRopa({
   // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
-  const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
+
   const primera = misCarpetas[0]?.slug ?? "";
   useEffect(() => {
     if (!primera || carpetaValida) return;
@@ -352,6 +367,14 @@ export function PantallaRopa({
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
+  // Una carpeta está "hecha" cuando todas sus prendas tienen el vídeo DE ESTE
+  // modo: el progreso es por modo, igual que el vídeo.
+  const carpetasHechas = misCarpetas.filter(
+    (c) => !!c.total && (c.con_video ?? 0) >= c.total,
+  ).length;
+  const pctCarpetas = misCarpetas.length
+    ? Math.round((carpetasHechas / misCarpetas.length) * 100)
+    : 0;
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -452,34 +475,35 @@ export function PantallaRopa({
         </>
       )}
 
-      <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      {/* "Dónde trabajas", igual que en el POV BOF y el Largo: la misma caja
+          con rótulos, el mismo contador y los mismos chips de carpeta. Quien
+          aprende un nicho sabe usar los otros — antes esto eran bloques
+          sueltos sin título y botones el doble de altos. */}
+      <Caja
+        icono="📁"
+        titulo="Dónde trabajas"
+        hint={
+          esWeb
+            ? `Elige la carpeta. El inventario es de ${sexo} y el vídeo, del modo elegido.`
+            : "Elige la carpeta de prendas."
+        }
+        extra={esWeb ? `${carpetasHechas}/${misCarpetas.length} con vídeo` : undefined}
+      >
         {esWeb && (
-          <ImportarPrendasWeb
-            genero={genero}
-            onImportado={(slug) => setCarpeta(slug)}
-          />
-        )}
-        {esWeb && misCarpetas.length > 0 && (
-          <PegarFichasRopa genero={genero} />
-        )}
-        {esWeb && <AltaMiPrenda sexo={sexo} onCreado={(slug) => setCarpeta(slug)} />}
+          <>
+            <Sub>Traer prendas</Sub>
+            <ImportarPrendasWeb genero={genero} onImportado={(slug) => setCarpeta(slug)} />
+            {misCarpetas.length > 0 && <PegarFichasRopa genero={genero} />}
+            <AltaMiPrenda sexo={sexo} onCreado={(slug) => setCarpeta(slug)} />
 
-        {esWeb && (
-          /* El modo de grabación. Cada uno guarda SU vídeo de la misma
-             prenda: se graba de las dos maneras y son dos publicaciones. Es
-             lo mismo que los estilos de guion del POV BOF Largo — lo que se
-             comparte (textos, fotos, escaparate) no se duplica. */
-          <div className="space-y-1">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Modo de grabación
-            </p>
+            <Sub>Modo de grabación</Sub>
             <div className="grid grid-cols-2 gap-1.5">
               {modos.map(({ clave, label }) => (
                 <button
                   key={clave}
                   type="button"
                   onClick={() => setModo(clave)}
-                  className={`rounded-lg border px-3 py-1.5 text-[11px] transition ${
+                  className={`break-words leading-tight rounded-lg border px-2 py-1.5 text-[11px] transition ${
                     modo === clave
                       ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
                       : "border-border/60 text-muted-foreground hover:border-foreground/30"
@@ -493,24 +517,63 @@ export function PantallaRopa({
               Cada modo guarda su propio vídeo: cambiar aquí no pisa lo del
               otro. Los textos, las fotos y el escaparate son comunes.
             </p>
-          </div>
+          </>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
-          {misCarpetas.map((c) => (
-            <button
-              key={c.slug}
-              type="button"
-              onClick={() => setCarpeta(c.slug)}
-              className={`break-words leading-tight rounded-lg border px-3 py-2 text-xs transition ${
-                carpeta === c.slug
-                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
-                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+        <Sub>Carpetas</Sub>
+        {esWeb && (
+          <>
+            <p className="text-xs font-medium sm:text-sm">
+              {carpetasHechas} / {misCarpetas.length} con vídeo
+            </p>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${pctCarpetas}%` }}
+              />
+            </div>
+          </>
+        )}
+        {/* Chips y no botones de dos columnas: son una decena y así caben a la
+            vista, que es lo que deja saltar a cualquiera sin desplegar nada. */}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {misCarpetas.map((c) => {
+            const hecha = !!c.total && (c.con_video ?? 0) >= c.total;
+            return (
+              <button
+                key={c.slug}
+                type="button"
+                onClick={() => setCarpeta(c.slug)}
+                className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
+                  carpeta === c.slug
+                    ? hecha
+                      ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                      : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
+                    : hecha
+                      ? "border-emerald-500/40 text-emerald-500"
+                      : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                }`}
+              >
+                {hecha && "✓ "}
+                {nombreCorto(c.label)}
+                {/* Con ficha SOBRE EL TOTAL, como en el POV BOF: un "9" solo no
+                    dice si la carpeta tiene nueve prendas o diez con una sin
+                    enlazar, que es lo que decide si merece abrirla. */}
+                {!!c.total && (
+                  <span
+                    title={`${c.con_url ?? 0} de ${c.total} con la ficha enlazada · ${c.con_video ?? 0} con vídeo`}
+                    className={`ml-1 rounded-full px-1 py-px text-[9px] font-semibold ${
+                      (c.con_url ?? 0) >= c.total
+                        ? "bg-emerald-500/15 text-emerald-500"
+                        : "bg-amber-500/15 text-amber-500"
+                    }`}
+                  >
+                    {(c.con_url ?? 0) >= c.total ? c.total : `${c.con_url ?? 0}/${c.total}`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         {esWeb && !misCarpetas.length && !carpetas.isLoading ? (
           <p className="rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
@@ -522,22 +585,7 @@ export function PantallaRopa({
             {items.length} prenda(s) · {conTexto} con texto · {conVideo} con vídeo
           </p>
         )}
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {esWeb ? (
-            <>
-              El clip sale del generador <strong>ya hablado</strong>, así que se
-              le respeta su voz. No lleva ningún texto en pantalla: ni gancho,
-              ni título, ni CTA.
-            </>
-          ) : (
-            <>
-              Este nicho NO lleva texto en pantalla: ni gancho, ni título, ni
-              CTA. Y el vídeo sale <strong>mudo</strong> — la música se la pones
-              tú al publicar.
-            </>
-          )}
-        </p>
-      </section>
+      </Caja>
 
       {/* Los mismos pasos numerados y de colores que el POV BOF: entra gente
           nueva a usar esto y el orden tiene que leerse sin explicarlo. */}
@@ -834,17 +882,22 @@ export function PantallaRopa({
       )}
 
       <section className="space-y-2">
-        <p className="text-sm font-semibold">3 · Prendas</p>
-        {items.map((p) => (
-          <PrendaCard
-            key={p.producto}
-            prenda={p}
-            carpeta={carpeta}
-            esWeb={esWeb}
-            modo={modo}
-            onCopiar={copiar}
-          />
-        ))}
+        <p className="text-sm font-semibold">Prendas</p>
+        {/* Dos por fila desde tablet, como los productos del POV BOF: en una
+            sola columna hay que bajar diez pantallas para ver la carpeta
+            entera, y lo que se hace aquí es ir saltando de prenda en prenda. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {items.map((p) => (
+            <PrendaCard
+              key={p.producto}
+              prenda={p}
+              carpeta={carpeta}
+              esWeb={esWeb}
+              modo={modo}
+              onCopiar={copiar}
+            />
+          ))}
+        </div>
       </section>
     </div>
   );

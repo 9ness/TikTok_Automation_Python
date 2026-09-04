@@ -194,6 +194,27 @@ programa: `betai:` (Pronósticos, escrito por `bet-ai-master`), `tiktok_shop:`,
 - **Errores defensivos:** el pipeline NUNCA aborta por un asset opcional que
   falte (perfil.png, sfx, logos) — loguea aviso y continúa.
 - **Logging UI:** los pipelines aceptan `log_callback`; default `_noop = lambda _: None`.
+- **Todas las pantallas de nicho se parecen (OBLIGATORIO).** Son once y las
+  usan tres personas: quien aprende una tiene que saber usar las demás. Una
+  pantalla nueva —o una que se toque— se monta con las piezas de
+  `components/tiktok-shop-ai-pro/Paso.tsx` y en este orden, copiando de
+  `app/tiktok-shop-ai-pro/nicho-pov-bof/page.tsx`, que es la de referencia:
+  1. `<header>` de TEXTO (icono + `h1` + una línea de qué hace + un párrafo de
+     contexto). **Nunca la portada del curso**: ocupa media pantalla en el
+     móvil y dice menos que dos líneas.
+  2. `<Caja icono="📁" titulo="Dónde trabajas" hint=… extra="X/Y">` con
+     `<Sub>` por bloque (Catálogo · Carpetas · Modo…), la barra de progreso
+     (`h-1.5 rounded-full`) y las carpetas como **chips** (`flex flex-wrap
+     gap-1`, `text-[10px]`, ✓ si está hecha) con su contador
+     `con_algo/total` en una píldora — ámbar si falta, esmeralda si está
+     completo. Botones grandes en dos columnas NO: con veinte carpetas obligan
+     a hacer scroll para ver dónde estás.
+  3. Los `<Paso n={1..N} color=…>`, en el mismo orden y con los mismos colores
+     en todos los nichos: violeta = preparar, fucsia = generar fuera,
+     esmeralda = copiar el prompt, azul = descargar lo montado.
+  4. Las tarjetas de producto en `grid grid-cols-1 gap-2 sm:grid-cols-2`.
+  Si un nicho necesita algo que no encaja, se añade la pieza a `Paso.tsx` y se
+  usa desde todos — no se inventa un diseño propio en esa pantalla.
 - **Frontend mobile-first:** grids `grid-cols-2 sm:grid-cols-N`, diálogos
   `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto `text-xs sm:text-sm`,
   `truncate`/`break-words`. La app se usa desde el móvil.
