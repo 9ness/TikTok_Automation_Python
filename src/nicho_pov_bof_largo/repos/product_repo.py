@@ -117,9 +117,9 @@ def load_folder(source: str, folder: str, usuario: str = "", estilo: str = "") -
 def get_product(
     source: str, folder: str, producto: str, usuario: str = "", estilo: str = "",
 ) -> dict:
-    return (load_folder(source, folder, usuario).get("productos") or {}).get(
-        str(producto), {}
-    )
+    return (
+        load_folder(source, folder, usuario, estilo).get("productos") or {}
+    ).get(str(producto), {})
 
 
 def update_product(

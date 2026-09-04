@@ -122,3 +122,79 @@ class TestClipsDeDistintaDuracion:
 
         assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
         assert max(objetivos) - min(objetivos) < 0.1
+
+
+class TestElEstironVaAlSegundoClip:
+    """Lo que pidió el operador: el cambio de plano, cuanto antes; y si hay que
+    rebobinar, que se note al FINAL y no en los primeros segundos."""
+
+    def _objetivos(self, tmp_path, monkeypatch, clips, audio, corte):
+        monkeypatch.setattr(video_editor, "_punto_de_corte", lambda *a, **k: corte)
+        objetivos: list[float] = []
+        real = video_editor.match_video_to_audio
+
+        def espia(video, objetivo, work, **kw):
+            objetivos.append(objetivo)
+            return real(video, objetivo, work, **kw)
+
+        monkeypatch.setattr(video_editor, "match_video_to_audio", espia)
+        video_editor._concatenar_cuadrado(clips, audio, tmp_path / "w")
+        return objetivos
+
+    def test_al_primero_no_se_le_pide_rebobinar_si_el_segundo_puede(self, tmp_path, monkeypatch):
+        """Voz de 22s con dos clips de 10s: antes el corte se quedaba donde la
+        pausa (12,5s) y el PRIMER clip se rebobinaba 2,5s — el rebote se veía a
+        los diez segundos de vídeo. Ahora lo pone el segundo."""
+        clips = [_clip(tmp_path / "c1.mp4", 10), _clip(tmp_path / "c2.mp4", 10)]
+        audio = _voz(tmp_path / "v.mp3", 22)
+        objetivos = self._objetivos(tmp_path, monkeypatch, clips, audio, 12.5)
+
+        assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
+        assert objetivos[0] <= 10.01, "el primer clip no debería rebobinarse"
+        assert objetivos[1] > objetivos[0], "el estirón va al segundo"
+
+    def test_si_ni_el_segundo_llega_el_primero_pone_solo_lo_que_falta(self, tmp_path, monkeypatch):
+        """Voz de 25s con 20s de metraje: el segundo clip rebobina hasta su
+        tope (45%) y el primero solo cubre el resto."""
+        clips = [_clip(tmp_path / "c1.mp4", 10), _clip(tmp_path / "c2.mp4", 10)]
+        audio = _voz(tmp_path / "v.mp3", 25)
+        objetivos = self._objetivos(tmp_path, monkeypatch, clips, audio, 15.0)
+
+        assert sum(objetivos) == pytest.approx(probe_duration(audio), abs=0.05)
+        assert objetivos[0] == pytest.approx(10.5, abs=0.1)
+        estiron1 = objetivos[0] / 10 - 1
+        estiron2 = objetivos[1] / 10 - 1
+        assert estiron2 > estiron1, "al segundo se le pide más que al primero"
+
+
+class TestDondeSeBuscaLaPausa:
+    def test_entre_dos_pausas_iguales_gana_la_primera(self, tmp_path, monkeypatch):
+        """El cambio de plano sostiene la atención: a igualdad de silencio,
+        antes es mejor."""
+        monkeypatch.setattr(video_editor, "_voz_como_se_oye", lambda a, w, l: a)
+        monkeypatch.setattr(
+            video_editor, "_detectar_silencios",
+            lambda _a: [(4.0, 4.5), (12.0, 12.5)],
+        )
+        assert video_editor._punto_de_corte(
+            Path("x.mp3"), 20.0, tmp_path, lambda _m: None,
+        ) == pytest.approx(4.25, abs=0.01)
+
+    def test_se_prefiere_una_pausa_que_no_obligue_a_rebobinar(self, tmp_path, monkeypatch):
+        """Con un tope de 10s, una pausa larguísima en el 15 no vale: cortar
+        ahí obligaría a estirar el primer clip."""
+        monkeypatch.setattr(video_editor, "_voz_como_se_oye", lambda a, w, l: a)
+        monkeypatch.setattr(
+            video_editor, "_detectar_silencios",
+            lambda _a: [(6.0, 6.3), (15.0, 16.0)],
+        )
+        assert video_editor._punto_de_corte(
+            Path("x.mp3"), 20.0, tmp_path, lambda _m: None, 10.0,
+        ) == pytest.approx(6.15, abs=0.01)
+
+    def test_sin_pausa_el_corte_cae_antes_de_la_mitad(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(video_editor, "_voz_como_se_oye", lambda a, w, l: a)
+        monkeypatch.setattr(video_editor, "_detectar_silencios", lambda _a: [])
+        assert video_editor._punto_de_corte(
+            Path("x.mp3"), 20.0, tmp_path, lambda _m: None,
+        ) is None

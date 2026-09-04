@@ -17,9 +17,20 @@ se nota menos. La técnica de alargar/recortar es la misma de siempre
 solo cambia que se aplica por clip.
 
 El PUNTO de reparto no es la mitad exacta: se busca una **minipausa** de la voz
-cerca del centro (`_punto_de_corte` con `silencedetect`) para que el cambio de
-vídeo caiga en un silencio y quede orgánico, no a mitad de palabra. Si no hay
-pausa aprovechable, se parte por la mitad.
+(`_punto_de_corte` con `silencedetect`) para que el cambio de vídeo caiga en un
+silencio y quede orgánico, no a mitad de palabra. Si no hay pausa aprovechable,
+se parte por `_PUNTO_IDEAL`.
+
+Y ese punto se busca PRONTO, no en el centro: el cambio de plano es lo que
+sostiene la atención, así que cuanto antes llegue, mejor. De ahí salen las dos
+reglas del reparto:
+
+1. El PRIMER clip no se rebobina mientras el segundo pueda con lo que falta.
+   Antes el corte caía donde estuviera la pausa y, con una voz más larga que
+   el metraje, el primer clip se llevaba todo el estirón: se veía el rebote al
+   principio del vídeo, que es donde más se nota.
+2. Si ni estirando el segundo llega (`_ESTIRON_MAX`), el primero pone solo lo
+   que falte — el resto del rebobinado se queda al final.
 """
 
 from __future__ import annotations
@@ -50,8 +61,14 @@ _noop: OnLog = lambda _msg: None
 # entre los dos clips se desmadra y uno acaba casi entero a base de rebobinado.
 _VENTANA = 0.20
 # Dos pausas que se diferencian en menos de esto son igual de buenas al oído,
-# así que decide la que reparta mejor el metraje.
+# así que decide la que corte ANTES.
 _EMPATE_S = 0.06
+# Dónde cae el corte cuando la voz no tiene ninguna pausa: antes de la mitad,
+# para que el cambio de plano no se haga esperar.
+_PUNTO_IDEAL = 0.40
+# Cuánto se le puede pedir de más al segundo clip antes de que el primero
+# tenga que ayudar. Un 45% de rebobinado al final se lleva bien; más, canta.
+_ESTIRON_MAX = 0.45
 # La cadena que el mux del POV BOF le aplica a la voz. Se IMPORTA, no se copia:
 # si allí se toca el compresor y aquí no, se medirían pausas que en el vídeo no
 # existen — que es justo el bug que esto arregla. Un rename revienta al cargar
@@ -169,6 +186,7 @@ def _detectar_silencios(audio_path: Path) -> list[tuple[float, float]]:
 
 def _punto_de_corte(
     audio_path: Path, dur: float, work_dir: Path, on_log: OnLog,
+    tope: float | None = None,
 ) -> float | None:
     """Instante donde partir los DOS clips, en la pausa MÁS LARGA de la voz.
 
@@ -178,34 +196,39 @@ def _punto_de_corte(
     de 0,3s (0,1s reales al oírlo) mientras la voz seguía hablando; un silencio
     grande algo descentrado se nota mucho menos que uno pequeño en el sitio.
 
+    `tope` es hasta dónde puede llegar el corte sin que el PRIMER clip tenga
+    que rebobinarse (su duración). Se buscan pausas ahí dentro primero: así el
+    cambio de plano llega pronto y, además, cae en un silencio de verdad. Solo
+    si no hay ninguna se mira el resto de la ventana, y entonces el reparto lo
+    recorta después.
+
     La ventana existe porque el reparto no puede desmadrarse: cortar al 10%
     deja el 90% de la voz sobre el segundo clip a base de rebobinado, y ahí sí
-    se ve el truco. Sin ninguna pausa dentro, se parte por la mitad.
+    se ve el truco. Sin ninguna pausa dentro, se parte por `_PUNTO_IDEAL`.
     """
     medible = _voz_como_se_oye(audio_path, work_dir, on_log)
-    objetivo = dur / 2
     lo, hi = dur * _VENTANA, dur * (1 - _VENTANA)
-    candidatos = [
+    todos = [
         (fin - inicio, (inicio + fin) / 2)
         for inicio, fin in _detectar_silencios(medible)
         if lo <= (inicio + fin) / 2 <= hi
     ]
+    candidatos = [c for c in todos if tope is None or c[1] <= tope + 0.01] or todos
     if not candidatos:
         on_log(
             "[pov_bof_largo] la voz no tiene ninguna pausa aprovechable; "
-            "parto por la mitad (el cambio se notará)"
+            f"corto al {100 * _PUNTO_IDEAL:.0f}% (el cambio se notará)"
         )
         return None
-    # Empates: entre dos pausas parecidas de largas, la más centrada reparte
-    # mejor el metraje entre los dos clips.
+    # Empates: entre dos pausas igual de largas al oído gana la PRIMERA, que es
+    # la que adelanta el cambio de plano.
     mejor = max(candidatos, key=lambda c: c[0])[0]
     larga, centro = min(
-        (c for c in candidatos if c[0] >= mejor - _EMPATE_S),
-        key=lambda c: abs(c[1] - objetivo),
+        (c for c in candidatos if c[0] >= mejor - _EMPATE_S), key=lambda c: c[1],
     )
     on_log(
         f"[pov_bof_largo] corte en la pausa de {larga:.2f}s a {centro:.2f}s "
-        f"({100 * centro / dur:.0f}% de la voz; la mitad exacta era {objetivo:.2f}s)"
+        f"({100 * centro / dur:.0f}% de la voz)"
     )
     return centro
 
@@ -272,32 +295,42 @@ def _concatenar_cuadrado(
 
     n = max(1, len(clips))
     if n == 2:
-        corte = _punto_de_corte(audio_path, audio_dur, work_dir, on_log)
-        primero = corte if corte is not None else audio_dur / 2
         # Ningún clip puede aportar más metraje del que tiene. La pausa puede
         # caer descentrada —la ventana llega al 20/80— y con clips de 8s eso
         # pedía 9,6s a uno de los dos en un audio de 12s: lo que falta lo
         # rellenaba el rebobinado, teniendo material de sobra en el otro clip.
-        # Se mueve el corte lo justo para que quepa; sobra metraje, así que lo
-        # que se descarta sale del FINAL de cada clip (`match_video_to_audio`
-        # recorta por el final), que es justo donde el generador de vídeo suele
-        # hacer cosas raras.
+        # Lo que se descarta sale del FINAL de cada clip
+        # (`match_video_to_audio` recorta por el final), que es justo donde el
+        # generador de vídeo suele hacer cosas raras.
         try:
             cabe1 = probe_duration(clips[0])
             cabe2 = probe_duration(clips[1])
         except Exception:  # noqa: BLE001
             cabe1 = cabe2 = 0.0
+        # El corte se busca ANTES de que el primer clip se quede sin metraje:
+        # el estirón, si hace falta, va al segundo.
+        maximo = min(cabe1, audio_dur) if cabe1 > 0 else None
+        corte = _punto_de_corte(audio_path, audio_dur, work_dir, on_log, maximo)
+        primero = corte if corte is not None else audio_dur * _PUNTO_IDEAL
         if cabe1 > 0 and cabe2 > 0:
-            minimo, maximo = max(0.0, audio_dur - cabe2), min(cabe1, audio_dur)
+            # Lo mínimo que tiene que poner el primero para que al segundo no
+            # haya que rebobinarlo teniendo metraje de sobra.
+            minimo = max(0.0, audio_dur - cabe2)
             if minimo <= maximo:
                 ajustado = min(max(primero, minimo), maximo)
-                if abs(ajustado - primero) > 0.01:
-                    on_log(
-                        f"[pov_bof_largo] el corte en {primero:.2f}s le pedía a "
-                        f"un clip más de lo que dura; se mueve a {ajustado:.2f}s "
-                        "para no tener que rebobinar"
-                    )
-                primero = ajustado
+                razon = "para no tener que rebobinar"
+            else:
+                # No hay vídeo para toda la voz: rebobina el SEGUNDO hasta su
+                # tope y solo lo que sobre de ahí se lo come el primero.
+                ajustado = max(maximo, audio_dur - cabe2 * (1 + _ESTIRON_MAX))
+                razon = "para que el estirón caiga en el segundo clip"
+            if abs(ajustado - primero) > 0.01:
+                on_log(
+                    f"[pov_bof_largo] el corte en {primero:.2f}s le pedía a "
+                    f"un clip más de lo que dura; se mueve a {ajustado:.2f}s "
+                    + razon
+                )
+            primero = ajustado
         objetivos = [primero, audio_dur - primero]
     else:
         objetivos = _reparto_por_capacidad(audio_dur, clips, on_log)

@@ -127,6 +127,25 @@ def _es_plazos(textos: dict) -> bool:
     return pov_config.hay_plazos(textos)
 
 
+def _modo(source: str, usuario: str) -> str:
+    """Con qué modo de guion (precio/dolor) está trabajando ese catálogo AHORA.
+
+    Se lee al ENCOLAR y viaja dentro del trabajo. El documento de Redis lleva
+    el modo en la clave, así que resolverlo al guardar —minutos después, con la
+    cola por medio— escribía en el documento del modo que estuviera activo en
+    ese instante y no en el que se pidió.
+    """
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    return progress_repo.get_modo(source, usuario)
+
+
+def _etiqueta_modo(source: str, usuario: str) -> str:
+    """"Urgencia de precio" / "Punto de dolor", para los títulos de la cola."""
+    estilo = _modo(source, usuario)
+    return (config.ESTILOS_GUION.get(estilo) or {}).get("label") or estilo
+
+
 def _bad(msg: str) -> APIError:
     return APIError(msg, status_code=400)
 
@@ -960,7 +979,13 @@ def guiones_lote(
     alcance = body.folder or (
         pov_config.SOURCES.get(body.source, {}).get("label") or body.source
     ) + " · todas"
-    title = f"✍️ Guiones · {alcance}" + (" (rehacer)" if body.rehacer else "")
+    # El modo va en el título: en la cola se ve para qué gancho es cada tanda,
+    # que es lo que decide en qué documento acaba.
+    estilo = _modo(body.source, usuario)
+    title = (
+        f"✍️ Guiones · {alcance} · {_etiqueta_modo(body.source, usuario)}"
+        + (" (rehacer)" if body.rehacer else "")
+    )
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_LARGO_GUIONES,
         title=title,
@@ -970,6 +995,12 @@ def guiones_lote(
             "usuario": usuario,
             "rehacer": bool(body.rehacer),
             "productos": [str(x) for x in (body.productos or [])],
+            # El modo CON EL QUE SE PIDIÓ. Va en el trabajo porque la cola
+            # tarda: si mientras escribe los guiones se cambia el catálogo al
+            # otro modo, resolverlo en el momento de guardar los metía en el
+            # documento del otro — guiones de precio dentro de "punto de
+            # dolor", y el de precio vacío.
+            "estilo": estilo,
         },
     )
     pendientes = [
@@ -1356,7 +1387,10 @@ def _encolar_clip(
 
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_LARGO_VIDEO,
-        title=f"🎙️ POV BOF Largo: producto {producto} · {folder}",
+        title=(
+            f"🎙️ POV BOF Largo: producto {producto} · {folder}"
+            f" · {_etiqueta_modo(source, usuario)}"
+        ),
         params={
             "source": source, "folder": folder, "producto": producto,
             # Todos los que pida el guion, no solo dos: con los clips de 8s un
@@ -1369,6 +1403,9 @@ def _encolar_clip(
             "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
+            # Con qué modo se mandó montar: el vídeo tiene que acabar en ese
+            # documento aunque el catálogo cambie de modo mientras se monta.
+            "estilo": _modo(source, usuario),
         },
         enqueued_by=usuario or None,
     )

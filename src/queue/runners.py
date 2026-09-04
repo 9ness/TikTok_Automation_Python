@@ -1958,6 +1958,11 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         if not c.is_file():
             raise FileNotFoundError(f"No está el clip subido: {c}")
     sexo = (p.get("sexo") or "mujer").strip().lower()
+    # El modo de guion (precio/dolor) con el que se MANDÓ montar. Va en el
+    # trabajo porque el modo forma parte de la clave del documento: si el
+    # operador cambia el catálogo de modo mientras la cola trabaja, resolverlo
+    # aquí guardaría el vídeo en el documento del otro modo.
+    estilo = str(p.get("estilo") or "")
     # "auto": la mano decide la voz (mismo criterio que el POV BOF — mujer
     # salvo que se vea reloj o vello). Se miran los DOS clips: son del mismo
     # producto, pero la mano no sale igual de cerca en los dos y mirar solo el
@@ -1987,7 +1992,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
     # El guion se guarda: si el operador remonta el mismo producto, se
     # reutiliza en vez de gastar otra llamada a Gemini y salir distinto.
-    guardado = product_repo.get_product(source, folder, producto, operator)
+    guardado = product_repo.get_product(source, folder, producto, operator, estilo)
     escrito = {k: guardado.get(k) for k in ("guion", "subliminal", "nombre_guion")}
     plazos = _es_plazos(textos)
     # Un guion guardado en el OTRO modo no vale: si el producto es de plazos y
@@ -2015,18 +2020,27 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
                 foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
         except Exception as e:
             on_log(f"[pov_bof_largo] sin foto para el guion ({e}) — solo texto")
+        # Con el modo que se pidió (precio o punto de dolor) y lo que ese
+        # producto puede prometer. Antes salía siempre el prompt de defecto:
+        # montar sin guion previo en "punto de dolor" daba un vídeo de precio.
+        modo = estilo or largo_config.ESTILO_GUION_DEFECTO
+        envio = largo_config.hay_envio_gratis(textos)
+        segundos = float(textos.get("segundos_guion") or 0)
         escrito = guionista.escribir(
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
             foto=foto,
             plazos=plazos,
+            prompt=largo_config.prompt_guion(plazos, modo, envio, segundos),
+            max_caracteres=largo_config.caracteres_guion(segundos),
             on_log=on_log,
         )
         product_repo.update_product(
-            source, folder, producto, usuario=operator,
+            source, folder, producto, usuario=operator, estilo=estilo,
             guion=escrito["guion"], subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
+            guion_estilo=modo, guion_segundos=segundos,
         )
     else:
         on_log("[pov_bof_largo] reutilizando el guion ya escrito")
@@ -2100,7 +2114,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
     on_progress(0.95, "💾 Guardando estado…")
     product_repo.update_product(
-        source, folder, producto, usuario=operator,
+        source, folder, producto, usuario=operator, estilo=estilo,
         video_path=str(salida), video_listo_at=int(time.time()),
         voz_label=info["voz_label"], voz_sexo=sexo,
     )
@@ -2752,7 +2766,7 @@ def run_nicho_pov_bof_revisar(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
 def _con_guion_desfasado(
     source: str, carpetas: list[str], usuario: str,
-    product_repo, pov_config, largo_config,
+    product_repo, pov_config, largo_config, estilo: str = "",
 ):
     """Los productos cuyo guion GUARDADO promete algo que su ficha no cumple.
 
@@ -2773,7 +2787,8 @@ def _con_guion_desfasado(
         if not textos:
             continue
         mios = (
-            product_repo.load_folder(source, carpeta, usuario).get("productos") or {}
+            product_repo.load_folder(source, carpeta, usuario, estilo)
+            .get("productos") or {}
         )
         for pid in sorted(textos, key=lambda x: (len(x), x)):
             guion = str((mios.get(pid) or {}).get("guion") or "").strip()
@@ -2820,6 +2835,13 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     # viejo habla del producto de al lado y "ya tiene guion" no vale. Solo tiene
     # sentido con UNA carpeta, que es de donde los manda la pantalla.
     forzados = {str(x) for x in (p.get("productos") or [])}
+    # Por dónde empieza el guion (precio o dolor). Se lee al ENCOLAR y viaja en
+    # el trabajo: el modo va en la clave del documento, así que cambiar el
+    # catálogo de modo con la cola a medias metía los guiones recién escritos
+    # en el documento del otro modo — y el suyo se quedaba vacío.
+    from src.nicho_pov_bof_largo.repos import progress_repo
+
+    estilo = str(p.get("estilo") or "") or progress_repo.get_modo(source, usuario)
     if not source:
         raise RuntimeError("Falta el catálogo del que escribir los guiones.")
 
@@ -2842,7 +2864,8 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             sin_textos.append(carpeta)
             continue
         mios = (
-            product_repo.load_folder(source, carpeta, usuario).get("productos") or {}
+            product_repo.load_folder(source, carpeta, usuario, estilo)
+            .get("productos") or {}
         )
         for pid in sorted(textos, key=lambda x: (len(x), x)):
             t = textos[pid]
@@ -2855,6 +2878,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             ya = (
                 bool(guardado.get("guion"))
                 and bool(guardado.get("guion_plazos")) == plazos
+                # Y del modo que se está haciendo: un guion de precio no vale
+                # como guion de punto de dolor por mucho que esté ahí.
+                and str(guardado.get("guion_estilo") or largo_config.ESTILO_GUION_DEFECTO)
+                == estilo
             )
             if rehacer or (folder and pid in forzados) or not ya:
                 pendientes.append((carpeta, pid, t, plazos))
@@ -2869,7 +2896,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
     # Es un reemplazo de una frase, no una llamada a Gemini.
     limpiados = 0
     for carpeta, pid, t_prod, plazos_prod in _con_guion_desfasado(
-        source, carpetas, usuario, product_repo, pov_config, largo_config,
+        source, carpetas, usuario, product_repo, pov_config, largo_config, estilo,
     ):
         guion = str(t_prod.get("guion") or "")
         envio_prod = largo_config.hay_envio_gratis(t_prod)
@@ -2878,7 +2905,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         )
         if nuevo and nuevo != guion:
             product_repo.update_product(
-                source, carpeta, pid, usuario=usuario, guion=nuevo,
+                source, carpeta, pid, usuario=usuario, estilo=estilo, guion=nuevo,
             )
             limpiados += 1
     if limpiados:
@@ -2900,13 +2927,6 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         f"[guiones] {len(pendientes)} guion(es) por escribir en "
         f"{len({c for c, _, _, _ in pendientes})} carpeta(s)"
     )
-    # Por dónde empieza el guion. Es del CATÁLOGO y por usuario, así que se lee
-    # UNA vez: leerlo del producto devolvía siempre el de defecto —o sea,
-    # guiones de precio aunque estuvieras en punto de dolor— desde que el modo
-    # pasó a la clave del documento.
-    from src.nicho_pov_bof_largo.repos import progress_repo
-
-    estilo = progress_repo.get_modo(source, usuario)
     on_log(f"[guiones] modo: {estilo}")
 
     def escribir_uno(carpeta: str, pid: str, t: dict, plazos: bool) -> bool:
@@ -2931,7 +2951,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             on_log(f"[guiones] {carpeta} · producto {pid} falló: {e}")
             return False
         product_repo.update_product(
-            source, carpeta, pid, usuario=usuario,
+            source, carpeta, pid, usuario=usuario, estilo=estilo,
             guion=largo_config.recortar_cta(
                 escrito["guion"], plazos=plazos, envio=envio,
             ),
