@@ -10,7 +10,10 @@
 #   /ws/*        → contenedor api:8000   (WebSocket /ws/queue, headers Upgrade)
 #   /            → contenedor web:3000   (Next.js standalone)
 
-{$DOMAIN} {
+# Todo lo que sirve la app, en un snippet: se usa igual para el sitio de
+# siempre y para el nombre público de abajo, y así no hay dos copias que se
+# separen con el tiempo.
+(app) {
 	# `encode` reduce ancho de banda HTTP. El WebSocket pasa intacto.
 	encode gzip
 
@@ -50,6 +53,25 @@
 		output stdout
 		format json
 	}
+}
+
+# El sitio de siempre. Con $DOMAIN vacío es ":80" (HTTP), que es por donde
+# entra el Tailscale Funnel.
+{$DOMAIN} {
+	import app
+}
+
+# Nombre PÚBLICO con HTTPS propio, sin depender de Tailscale.
+#
+# `sslip.io` resuelve cualquier `<ip-con-guiones>.sslip.io` a esa IP, así que
+# no hay DNS que crear ni dominio que comprar, y Caddy saca el certificado solo
+# por el puerto 80 (abierto). Existe porque el Funnel se ha caído dos veces en
+# dos días y con él se cae la web entera: el nombre `.ts.net` lo publica
+# Tailscale y si deja de publicarlo no resuelve en ningún sitio.
+#
+# Cuando haya un dominio propio, se cambia esta línea por él y ya está.
+{$DOMAIN_PUBLICO:62-238-19-31.sslip.io} {
+	import app
 }
 
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
