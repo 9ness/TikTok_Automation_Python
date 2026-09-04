@@ -636,6 +636,7 @@ herramientas del mismo grupo en el futuro.
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
 | [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + OpenAI GPT-4o |
 | [`TTSHOP_AI_PRO_WEB.md`](TTSHOP_AI_PRO_WEB.md) | **La web del curso** — cómo funciona `ttshopaiproapp.com`, de donde salen prompts, ZIP y fichas. Está tras login del operador: ningún agente puede mirarla, así que lo que se sepa se escribe ahí |
+| [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |
 | [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Playbook de depuración del cortador de vídeo** — LEER antes de tocar `silence_cutter.py`: jerarquía de señales (silero>energía>Whisper), pipeline, casuística de bugs reales (proteína…), cómo diagnosticar una queja, gotchas de cola/deploy, auto-corrección |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |

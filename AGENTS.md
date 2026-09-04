@@ -78,6 +78,7 @@ en VPS Hetzner con Tailscale Funnel.
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura, Redis, tiers, prompts, Pilot Program |
 | [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, registry de tools |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Obligatorio antes de tocar `silence_cutter.py`** |
+| [`UI_NICHOS.md`](UI_NICHOS.md) | **Obligatorio antes de crear o retocar una pantalla de nicho** — estándar visual del Programa 4 |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Schema Redis de `bet-ai-master`, segmentos, overlays |
 | [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local y troubleshooting WS/cache |
 | [`deploy/README.md`](deploy/README.md), [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Despliegue VPS y acceso SSH |
@@ -195,26 +196,17 @@ programa: `betai:` (Pronósticos, escrito por `bet-ai-master`), `tiktok_shop:`,
   falte (perfil.png, sfx, logos) — loguea aviso y continúa.
 - **Logging UI:** los pipelines aceptan `log_callback`; default `_noop = lambda _: None`.
 - **Todas las pantallas de nicho se parecen (OBLIGATORIO).** Son once y las
-  usan tres personas: quien aprende una tiene que saber usar las demás. Una
-  pantalla nueva —o una que se toque— se monta con las piezas de
-  `components/tiktok-shop-ai-pro/Paso.tsx` y en este orden, copiando de
-  `app/tiktok-shop-ai-pro/nicho-pov-bof/page.tsx`, que es la de referencia:
-  1. `<header>` de TEXTO (icono + `h1` + una línea de qué hace + un párrafo de
-     contexto). **Nunca la portada del curso**: ocupa media pantalla en el
-     móvil y dice menos que dos líneas.
-  2. `<Caja icono="📁" titulo="Dónde trabajas" hint=… extra="X/Y">` con
-     `<Sub>` por bloque (Catálogo · Carpetas · Modo…), la barra de progreso
-     (`h-1.5 rounded-full`) y las carpetas como **chips** (`flex flex-wrap
-     gap-1`, `text-[10px]`, ✓ si está hecha) con su contador
-     `con_algo/total` en una píldora — ámbar si falta, esmeralda si está
-     completo. Botones grandes en dos columnas NO: con veinte carpetas obligan
-     a hacer scroll para ver dónde estás.
-  3. Los `<Paso n={1..N} color=…>`, en el mismo orden y con los mismos colores
-     en todos los nichos: violeta = preparar, fucsia = generar fuera,
-     esmeralda = copiar el prompt, azul = descargar lo montado.
-  4. Las tarjetas de producto en `grid grid-cols-1 gap-2 sm:grid-cols-2`.
-  Si un nicho necesita algo que no encaja, se añade la pieza a `Paso.tsx` y se
-  usa desde todos — no se inventa un diseño propio en esa pantalla.
+  usan tres personas: quien aprende una tiene que saber usar las demás. El
+  estándar entero —anatomía de pantalla y de tarjeta, colores con significado,
+  tamaños y qué componentes reutilizar— está en
+  [`UI_NICHOS.md`](UI_NICHOS.md); **léelo antes de tocar una pantalla de
+  nicho**. En corto: cabecera de TEXTO (nunca la portada del curso), `Caja`
+  "Dónde trabajas" con `Sub` + barra + carpetas como CHIPS con `hechas/total`,
+  `Paso` numerados con sus colores fijos (violeta preparar · fucsia generar ·
+  esmeralda prompt · azul descargar), tarjetas en `sm:grid-cols-2` y la fila
+  Escaparate/Subido/Vendió siempre la última. Lo que no encaje se añade a
+  `components/tiktok-shop-ai-pro/` y se usa desde todos — no se inventa un
+  diseño por pantalla.
 - **Frontend mobile-first:** grids `grid-cols-2 sm:grid-cols-N`, diálogos
   `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto `text-xs sm:text-sm`,
   `truncate`/`break-words`. La app se usa desde el móvil.
