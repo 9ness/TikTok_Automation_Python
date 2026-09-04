@@ -216,8 +216,14 @@ def list_carpetas(
     if sexo in ("mujer", "hombre"):
         items = [i for i in items if i.web and i.sexo == sexo]
         for i in items:
-            for campo, valor in _contar(i.slug, modo).items():
-                setattr(i, campo, valor)
+            # Los contadores son un ADORNO del chip: si fallan, la carpeta
+            # tiene que salir igual. Sin esta guarda, un error contando dejó la
+            # pantalla entera sin carpetas y pareciendo que no había ninguna.
+            try:
+                for campo, valor in _contar(i.slug, modo).items():
+                    setattr(i, campo, valor)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[nicho_ropa] no se pudo contar %s: %s", i.slug, e)
     return CarpetasRopaResponse(items=items)
 
 

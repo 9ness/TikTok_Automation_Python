@@ -312,6 +312,27 @@ class TestCadaSexoVeLoSuyo:
         de_mujer = [i for i in items if i["web"] and i["sexo"] == "mujer"]
         assert de_mujer and all("hombre" not in i["slug"] for i in de_mujer)
 
+    def test_pidiendo_un_sexo_vienen_sus_carpetas_con_contadores(self, raiz_temporal):
+        """El caso que se rompió en producción.
+
+        Los contadores del chip acabaron declarados en la clase de al lado, así
+        que asignarlos reventaba y la pantalla se quedaba SIN CARPETAS —no con
+        los números a cero, sin ninguna—. Se pide el listado como lo pide la
+        pantalla y se comprueba que llega entero.
+        """
+        c = self._cliente()
+        c.post(
+            "/api/v1/nicho-ropa/mis-prendas?genero=mujer_muestras",
+            files={"foto_limpia": ("a.jpg", b"limpia", "image/jpeg")},
+        )
+        r = c.get("/api/v1/nicho-ropa/carpetas", params={"sexo": "mujer", "modo": "espejo"})
+        assert r.status_code == 200, r.text
+        items = r.json()["items"]
+        assert items, "sin carpetas: es justo el fallo que se busca"
+        assert all(i["sexo"] == "mujer" and i["web"] for i in items)
+        # Los campos del chip existen (aunque valgan 0 sin Redis).
+        assert all({"total", "con_url", "con_video"} <= set(i) for i in items)
+
 
 class TestModosPorSexo:
     """Los formatos del curso no son los mismos para hombre y para mujer.
