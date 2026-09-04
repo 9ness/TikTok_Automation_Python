@@ -13,6 +13,14 @@ subir con el ⬆ de esa fila → quemar textos.
   ampliar catálogo cuando haga falta.
 
 ## ⏳ Esperando a que Jonny lo publique (28 ago 2026)
+- [ ] **Ropa Mujer/Hombre con el diseño del POV BOF**: hoy abre con la portada
+  del curso (media pantalla en el móvil) y los selectores van sueltos en una
+  caja sin rótulos. Unificar como allí: cabecera de TEXTO (icono + título +
+  dos líneas de contexto) y una `Caja` "Dónde trabajas" con `Sub` para «De
+  quién» (mujer/hombre), «Carpetas» y «Modo de grabación», dejando subir ZIP /
+  pegar fichas / añadir prenda en su propio bloque. El selector de mujer/hombre
+  hay que SACARLO de `ImportarPrendasWeb`: no es una opción de la subida, es
+  dónde estás trabajando — el equivalente al "Catálogo" del POV BOF.
 - [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro de
   hombre (espejo, selfie, Situación Real 1 y 2) y falta el de mujer, **Bolso
   POV** — hay que pegar sus dos prompts. Dos cosas a vigilar: (1) Situación
