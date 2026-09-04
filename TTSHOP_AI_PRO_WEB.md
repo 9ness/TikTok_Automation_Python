@@ -23,7 +23,7 @@ los ZIP de productos y las fichas que se pegan hoy.
 | Mapa general de la plataforma | ✅ los 10 pasos de su guía |
 | Catálogo de productos (el que sustituye a los ZIP) | ⬜ pendiente |
 | Formatos y prompts por nicho | ⬜ pendiente |
-| Automatizaciones que trae la web | ⬜ pendiente |
+| Automatizaciones que trae la web | 🟨 lo esencial (qué es gratis y qué se paga) |
 | Qué usamos nosotros y qué no | ⬜ pendiente |
 
 ---
@@ -251,8 +251,31 @@ _(pendiente: qué formatos publica para cada nicho y cuáles ya tenemos)_
 
 ## 4. Automatizaciones de la web
 
-_(pendiente: qué automatiza ella. Interesa saber qué se solapa con lo que ya
-tenemos montado y qué no)_
+### Lo GRATIS es todo el método (4 sep 2026)
+
+Con el curso pagado, la plataforma da **los prompts y todo lo necesario para
+hacerlo a mano**. No hay que pagar nada para trabajar: se copian los prompts,
+se generan los vídeos por tu cuenta y se publica. Es exactamente de donde sale
+lo que ya tenemos copiado en el repo.
+
+### Lo de PAGO es delegar el trabajo, no desbloquear funciones
+
+Lo que se compra con el saldo en dólares no son funciones extra, sino que
+**otro haga el trabajo**:
+
+| Lo que vendes | Qué es en realidad |
+|---|---|
+| **Packs de vídeos de IA** | Alguien te genera los vídeos que tú harías a mano. Se paga por no hacerlos. |
+| **Estrategias de viralización** | Packs de contenido ya preparados para escalar. |
+| **Automatizaciones** | Un **móvil en la nube** configurado, y alguien que sube el contenido a ese móvil: la cuenta queda automatizada al 100%. |
+| Generaciones adicionales | Generaciones acumulables de guiones _(por confirmar si hay cuota en su generador)_. |
+
+**Por qué esto nos importa poco por ahora:** vamos por delante. El editor ya
+está montado y el tiempo que ahorra es justo lo que se compra en los packs de
+vídeos. Pagar por eso sería pagar por lo que ya tenemos.
+
+El **móvil en la nube** es otra historia — automatizar la publicación al 100%
+es lo único que hoy no hacemos—, pero es para más adelante.
 
 ## 5. Qué usamos y qué no
 
@@ -265,3 +288,7 @@ mirado.
 | **Guiones TOF** | 🔎 Por comprobar | La sospecha del operador es que su TOF equivale a nuestro **POV BOF Largo**. Hay que comparar los textos antes de dar por hecho que falta algo. |
 | Ranking de creadores | ➖ Informativo | Clasificación entre alumnos, no toca el código. |
 | Comunidad y Skool | ➖ Informativo | Formación y soporte, fuera del flujo de trabajo. |
+| **Packs de vídeos de IA** (de pago) | ❌ No (4 sep 2026) | Se paga por que otro genere los vídeos. Nuestro editor ya ahorra ese tiempo: sería pagar por lo que ya tenemos montado. |
+| **Estrategias de viralización** (packs) | ❌ No, por ahora | Mismo motivo: contenido preparado que ya sabemos producir. |
+| **Automatizaciones** (móvil en la nube + alguien subiendo) | ⏸️ Más adelante | Es lo ÚNICO que hoy no hacemos: publicar solo, al 100%. Interesa cuando el cuello de botella sea publicar y no producir. |
+| Prompts y método a mano | ✅ Sí, es lo que usamos | Va incluido con el curso; de ahí salen los prompts del repo. |
