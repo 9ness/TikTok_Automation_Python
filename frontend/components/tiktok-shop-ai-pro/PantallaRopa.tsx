@@ -8,6 +8,7 @@ import {
   Sparkles,
   Store,
   Upload,
+  Shirt,
   ShoppingBag,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -416,16 +417,40 @@ export function PantallaRopa({
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={portadaDe(esWeb ? "nicho-ropa" : "nicho-ropa-sin-humanos")}
-        alt={
-          esWeb
-            ? "Creación de Nicho Ropa Mujer/Hombre"
-            : "Creación de Nicho Ropa Sin Humanos"
-        }
-        className="h-auto w-full rounded-xl border border-border/60"
-      />
+      {/* Cabecera de TEXTO, como en el POV BOF: la portada del curso ocupaba
+          media pantalla en el móvil y decía menos que dos líneas. Lo primero
+          que hay que ver es en qué inventario estás. */}
+      {esWeb ? (
+        <header className="rounded-xl border border-border/60 bg-card p-3">
+          <div className="flex items-center gap-2">
+            <Shirt className="h-5 w-5 shrink-0 text-violet-500" />
+            <div className="min-w-0">
+              <h1 className="text-base font-bold sm:text-lg">
+                {sexo === "hombre" ? "Nicho Ropa Hombre" : "Nicho Ropa Mujer"}
+              </h1>
+              <p className="text-[11px] text-muted-foreground">
+                La prenda PUESTA, grabada con el móvil · un clip de 10s por
+                modo
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+            Las prendas entran por ZIP desde la web del curso y este inventario
+            es solo de {sexo}: el otro va en su pantalla. El clip sale del
+            generador ya hablado, así que se le respeta su voz y no lleva
+            ningún texto quemado.
+          </p>
+        </header>
+      ) : (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={portadaDe("nicho-ropa-sin-humanos")}
+            alt="Creación de Nicho Ropa Sin Humanos"
+            className="h-auto w-full rounded-xl border border-border/60"
+          />
+        </>
+      )}
 
       <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
         {esWeb && (
