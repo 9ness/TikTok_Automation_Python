@@ -20,7 +20,7 @@ los ZIP de productos y las fichas que se pegan hoy.
 
 | Sección | Estado |
 |---|---|
-| Mapa general de la plataforma | ⬜ pendiente |
+| Mapa general de la plataforma | 🟨 en curso (1 de 10 pasos de su guía) |
 | Catálogo de productos (el que sustituye a los ZIP) | ⬜ pendiente |
 | Formatos y prompts por nicho | ⬜ pendiente |
 | Automatizaciones que trae la web | ⬜ pendiente |
@@ -30,7 +30,43 @@ los ZIP de productos y las fichas que se pegan hoy.
 
 ## 1. Mapa general
 
-_(pendiente: qué secciones tiene el menú y para qué sirve cada una)_
+_Documentado a partir de la propia guía de la plataforma ("GUÍA DE LA
+PLATAFORMA", 10 pasos), que se puede saltar y volver a abrir._
+
+### La barra de arriba (4 sep 2026)
+
+De izquierda a derecha, con el usuario ya dentro:
+
+| Botón | Para qué |
+|---|---|
+| Avatar + "Bienvenido, \<nombre\>" | La cuenta con la que se entra. |
+| 🏠 **Inicio** | El panel principal. |
+| 💳 **Membresía** | El plan contratado. |
+| 👤 **Mi perfil** | Los datos del alumno. |
+| 💰 **Saldo `0,00 US$`** | Monedero de la plataforma. Se compran **servicios, vídeos y recursos** con él, así que hay cosas de pago aparte de la membresía. |
+| ◆ **Alumno Premium** | El nivel de la cuenta. Lo que se ve en el panel **depende de la membresía y del perfil**. |
+| 🔔 | Avisos. |
+| 🌐 EN | Idioma. |
+| **Salir** | Cerrar sesión. |
+
+En una cinta arriba del todo van rotando tres reclamos, que ya dicen por dónde
+va la plataforma:
+
+- «PREMIUM · Crea guiones y carruseles profesionales con inteligencia artificial»
+- «Compra servicios, vídeos y recursos directamente desde tu saldo»
+- «Participa en la comunidad privada y consulta tus menciones»
+
+### Paso 1 de 10 — Panel principal
+
+> "Este es tu centro de control privado. Los botones disponibles **se adaptan
+> automáticamente a tu membresía y a tu perfil**."
+
+Etiquetas del paso: `Tus herramientas`, `Acceso privado`, `Siempre
+disponible`.
+
+**Lo que interesa a efectos nuestros:** el panel es *variable* según el plan.
+Cualquier cosa que documentemos aquí puede no estar en otra cuenta, así que
+conviene apuntar con qué membresía se vio (aquí: **Alumno Premium**).
 
 ## 2. Catálogo de productos
 
