@@ -49,6 +49,13 @@ def _memo(clave: str, calcular: Callable[[], Any]) -> Any:
     return valor
 
 
+# El catálogo por defecto: el de la web vieja. Este módulo lleva los DOS que
+# entran por ZIP (`productos_web` y `inventario_general`), que son idénticos
+# salvo por su carpeta raíz — de ahí el `source` en todo, con el de siempre
+# por defecto para no tocar a quien ya lo llama.
+SOURCE = "productos_web"
+
+
 def _invalidar() -> None:
     _LISTADOS.clear()
 
@@ -59,9 +66,9 @@ def _num_carpeta(nombre: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def carpetas() -> list[str]:
+def carpetas(source: str = SOURCE) -> list[str]:
     def leer() -> list[str]:
-        raiz = config.productos_web_dir()
+        raiz = config.dir_zip(source)
         if not raiz.is_dir():
             return []
         return sorted(
@@ -69,15 +76,15 @@ def carpetas() -> list[str]:
             key=_num_carpeta,
         )
 
-    return _memo("carpetas", leer)
+    return _memo(f"{source}:carpetas", leer)
 
 
-def listar_carpetas_como_drive() -> list[dict]:
+def listar_carpetas_como_drive(source: str = SOURCE) -> list[dict]:
     """Mismo shape que `drive_client.list_product_folders`."""
-    return [{"name": c, "id": c} for c in carpetas()]
+    return [{"name": c, "id": c} for c in carpetas(source)]
 
 
-def listar_fotos_como_drive(carpeta: str) -> list[dict]:
+def listar_fotos_como_drive(carpeta: str, source: str = SOURCE) -> list[dict]:
     """Mismo shape que `drive_client.list_photos`.
 
     El `id` es la RUTA con el mtime pegado, igual que en "Mis productos": es
@@ -86,7 +93,7 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
     """
 
     def leer() -> list[dict]:
-        d = config.productos_web_dir() / carpeta
+        d = config.dir_zip(source) / carpeta
         if not d.is_dir():
             return []
         fotos = [
@@ -103,7 +110,7 @@ def listar_fotos_como_drive(carpeta: str) -> list[dict]:
         fotos.sort(key=lambda p: config.natural_sort_key(p["name"]))
         return fotos
 
-    return _memo(f"fotos:{carpeta}", leer)
+    return _memo(f"{source}:fotos:{carpeta}", leer)
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +158,10 @@ def _huella_fichero(ruta: Path) -> str:
         return ""
 
 
-def importar_zip(datos: bytes, nombre_zip: str, raiz: Path | None = None) -> dict:
+def importar_zip(
+    datos: bytes, nombre_zip: str, raiz: Path | None = None,
+    *, source: str = SOURCE,
+) -> dict:
     """Mete un ZIP de la web en su carpeta. Repetible: se puede resubir.
 
     Devuelve `{carpeta, nuevos, actualizados, iguales, incompletos}` con los
@@ -164,7 +174,7 @@ def importar_zip(datos: bytes, nombre_zip: str, raiz: Path | None = None) -> dic
     separaran.
     """
     carpeta = nombre_carpeta(nombre_zip)
-    destino = (raiz or config.productos_web_dir()) / carpeta
+    destino = (raiz or config.dir_zip(source)) / carpeta
     destino.mkdir(parents=True, exist_ok=True)
 
     try:

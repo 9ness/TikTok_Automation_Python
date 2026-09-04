@@ -86,6 +86,20 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "productos_web",
         "propia": "1",
     },
+    # El catálogo de la web NUEVA (`ttshopaiproapp.com`, sep 2026): su
+    # "Inventario General" de España, que alimenta POV BOF, POV BOF Largo y
+    # Creativos Pro.
+    #
+    # Va APARTE de "Productos Web" y no encima a propósito: los números de
+    # producto se reutilizan entre catálogos, así que importar lo nuevo sobre
+    # lo viejo dejaría textos, guiones y vídeos del producto anterior pegados
+    # al número. Con dos fuentes, lo de antes se conserva intacto y se va
+    # apagando solo.
+    "inventario_general": {
+        "label": "📦 Inventario General",
+        "folder": "inventario_general",
+        "propia": "1",
+    },
     # Los que YA vendieron, copiados aquí desde su carpeta de origen para
     # volver a grabarlos. También es "propia" (vive en el Drive montado) y usa
     # el mismo convenio de nombres, así que no necesita nada especial.
@@ -127,6 +141,21 @@ def es_catalogo_operador(source: str) -> bool:
 PRODUCTOS_WEB_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_web"
 )
+INVENTARIO_GENERAL_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/inventario_general"
+)
+
+# Los catálogos que entran por ZIP de la web del curso. Comparten TODO el
+# código (mismo importador, misma convención invertida de nombres, carpetas de
+# diez); solo cambia la carpeta raíz en Drive.
+CATALOGOS_ZIP: dict[str, str] = {
+    "productos_web": PRODUCTOS_WEB_ROOT,
+    "inventario_general": INVENTARIO_GENERAL_ROOT,
+}
+
+
+def es_catalogo_zip(source: str) -> bool:
+    return source in CATALOGOS_ZIP
 
 TOP_VENDIDOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Top_Vendidos"
 TOP_VENDIDOS_PREFIJO = "Top"
@@ -209,26 +238,35 @@ def es_fuente_backup(source: str) -> bool:
 _MIS_PRODUCTOS_DIR: Path | None = None
 
 
-_PRODUCTOS_WEB_DIR: Path | None = None
+_DIRS_ZIP: dict[str, Path] = {}
 
 
-def productos_web_dir() -> Path:
-    """Raíz de "Productos Web" en el Drive MONTADO. Ver `mis_productos_dir`:
-    el `mkdir` en frío cuesta segundos y por eso se recuerda."""
-    global _PRODUCTOS_WEB_DIR
-    if _PRODUCTOS_WEB_DIR is not None:
-        return _PRODUCTOS_WEB_DIR
+def dir_zip(source: str) -> Path:
+    """Raíz de un catálogo importado por ZIP, en el Drive MONTADO.
+
+    Se recuerda por lo de siempre: el `mkdir` contra el mount en frío cuesta
+    segundos y esta función la llaman todas las demás.
+    """
+    cacheado = _DIRS_ZIP.get(source)
+    if cacheado is not None:
+        return cacheado
 
     from src.nicho_pov_bof.services.audio_bank import mount_root
 
+    ruta = CATALOGOS_ZIP.get(source) or PRODUCTOS_WEB_ROOT
     raiz = mount_root()
     destino = (
-        raiz / PRODUCTOS_WEB_ROOT if raiz
-        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "productos_web"
+        raiz / ruta if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / source
     )
     destino.mkdir(parents=True, exist_ok=True)
-    _PRODUCTOS_WEB_DIR = destino
+    _DIRS_ZIP[source] = destino
     return destino
+
+
+def productos_web_dir() -> Path:
+    """Raíz de "Productos Web". Se conserva porque la llaman otros módulos."""
+    return dir_zip("productos_web")
 
 
 _DIRS_OPERADOR: dict[str, Path] = {}

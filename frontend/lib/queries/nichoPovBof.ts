@@ -359,12 +359,15 @@ export function useImportarProductosWeb() {
       incompletos: string[];
     },
     Error,
-    { archivo: File }
+    { archivo: File; source?: string }
   >({
-    mutationFn: async ({ archivo }) => {
+    mutationFn: async ({ archivo, source = "productos_web" }) => {
       const fd = new FormData();
       fd.append("archivo", archivo);
-      return api.post(`${ROOT}/productos-web/importar`, fd);
+      return api.post(
+        `${ROOT}/productos-web/importar?source=${encodeURIComponent(source)}`,
+        fd,
+      );
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
   });
@@ -379,12 +382,15 @@ export function useImportarProductosWebLote() {
   return useMutation<
     { job_id: string; title: string; zips: number },
     Error,
-    { archivos: File[] }
+    { archivos: File[]; source?: string }
   >({
-    mutationFn: async ({ archivos }) => {
+    mutationFn: async ({ archivos, source = "productos_web" }) => {
       const fd = new FormData();
       for (const f of archivos) fd.append("archivos", f);
-      return api.post(`${ROOT}/productos-web/importar-lote`, fd);
+      return api.post(
+        `${ROOT}/productos-web/importar-lote?source=${encodeURIComponent(source)}`,
+        fd,
+      );
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
   });

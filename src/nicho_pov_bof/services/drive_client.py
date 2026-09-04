@@ -264,6 +264,12 @@ def list_product_folders(source: str, *, refresh: bool = False) -> list[dict]:
             from src.nicho_pov_bof.services import mis_productos
 
             return mis_productos.listar_carpetas_como_drive(source)
+        if config.es_catalogo_zip(source):
+            # Lo mismo con los que entran por ZIP (la web vieja y el
+            # inventario de la nueva).
+            from src.nicho_pov_bof.services import productos_web
+
+            return productos_web.listar_carpetas_como_drive(source)
         return _servicio_propio(source).listar_carpetas_como_drive()
 
     # La COPIA de seguridad: no es una carpeta del Drive del curso sino la
@@ -356,6 +362,10 @@ def list_photos(source: str, folder: str, *, refresh: bool = False) -> list[dict
             from src.nicho_pov_bof.services import mis_productos
 
             return mis_productos.listar_fotos_como_drive(folder, source)
+        if config.es_catalogo_zip(source):
+            from src.nicho_pov_bof.services import productos_web
+
+            return productos_web.listar_fotos_como_drive(folder, source)
         return _servicio_propio(source).listar_fotos_como_drive(folder)
 
     if config.es_fuente_backup(source):

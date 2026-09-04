@@ -200,7 +200,14 @@ const CHIP_CLIPS: Record<number, string> = {
  *  lo que ya había. Después de importar se dice cuáles son nuevos, porque son
  *  justo a los que hay que ponerles la ficha de TikTok.
  */
-function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => void }) {
+function ImportarZipWeb({
+  source = "productos_web",
+  onImportado,
+}: {
+  /** A qué catálogo van los ZIP: el de la web vieja o el inventario nuevo. */
+  source?: string;
+  onImportado: (carpeta: string) => void;
+}) {
   const qcWeb = useQueryClient();
   const importar = useImportarProductosWeb();
   const lote = useImportarProductosWebLote();
@@ -325,7 +332,7 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
             const uno = fs[0];
             if (fs.length === 1 && uno) {
               importar.mutate(
-                { archivo: uno },
+                { archivo: uno, source },
                 {
                   onSuccess: (r) => {
                     apuntar(r);
@@ -341,7 +348,7 @@ function ImportarZipWeb({ onImportado }: { onImportado: (carpeta: string) => voi
               return;
             }
             lote.mutate(
-              { archivos: fs },
+              { archivos: fs, source },
               {
                 onSuccess: (r) => {
                   toast.success(`${r.zips} ZIP(s) en la cola`);
@@ -959,8 +966,9 @@ export default function NichoPovBofPage() {
           ))}
         </div>
 
-        {source === "productos_web" && (
+        {CATALOGOS_ZIP.includes(source) && (
           <ImportarZipWeb
+            source={source}
             onImportado={(carpeta) => {
               setPicked(carpeta);
               void qc.refetchQueries({ queryKey: nichoPovBofKeys.all });
@@ -2232,6 +2240,13 @@ const TOOLS: { key: ToolKey; label: string }[] = [
  *  igual; por dentro son idénticos (mismas carpetas de diez, mismo convenio de
  *  nombres) y se puede mover de uno a otro. */
 const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+
+/** Los que entran por ZIP de la web del curso: el de la web vieja y el
+ *  "Inventario General" de la nueva (`ttshopaiproapp.com`). Van separados a
+ *  propósito — los números de producto se reutilizan entre catálogos, así que
+ *  importar lo nuevo encima de lo viejo pegaría textos y vídeos del producto
+ *  anterior al mismo número. */
+const CATALOGOS_ZIP = ["productos_web", "inventario_general"];
 
 /** La carpeta que no está en Drive: la arma la app con los productos que
  *  tienen el vídeo hecho, están marcados sin stock y siguen sin subir. Se sale

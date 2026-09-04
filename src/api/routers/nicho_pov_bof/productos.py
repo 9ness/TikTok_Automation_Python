@@ -1285,6 +1285,7 @@ def montar_con_los_clips(
 async def importar_productos_web_lote(
     queue: Annotated[JobQueue, Depends(get_queue)],
     archivos: Annotated[list[UploadFile], File()],
+    source: Annotated[str, Query()] = "productos_web",
 ) -> dict:
     """Encola la importación de VARIOS ZIP de la web del curso.
 
@@ -1300,6 +1301,8 @@ async def importar_productos_web_lote(
 
     if not archivos:
         raise _bad_request("no llegó ningún ZIP.")
+    if not nicho_config.es_catalogo_zip(source):
+        raise _bad_request(f"{source!r} no es un catálogo que se importe por ZIP.")
 
     destino = upload_subdir("nicho_pov_bof") / f"web_{int(time.time())}_{uuid.uuid4().hex[:6]}"
     destino.mkdir(parents=True, exist_ok=True)
@@ -1318,11 +1321,12 @@ async def importar_productos_web_lote(
     if not guardados:
         raise _bad_request("ninguno de los ficheros era un ZIP.")
 
-    title = f"🌐 Importar {guardados} ZIP(s) de la web"
+    etiqueta = nicho_config.SOURCES.get(source, {}).get("label", source)
+    title = f"🌐 Importar {guardados} ZIP(s) · {etiqueta}"
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_WEB_IMPORT,
         title=title,
-        params={"temp_folder": str(destino), "total": guardados},
+        params={"temp_folder": str(destino), "total": guardados, "source": source},
     )
     return {"job_id": job.id, "title": title, "zips": guardados}
 
@@ -1330,6 +1334,7 @@ async def importar_productos_web_lote(
 @router.post("/productos-web/importar")
 async def importar_productos_web(
     archivo: Annotated[UploadFile | None, File()] = None,
+    source: Annotated[str, Query()] = "productos_web",
     # La APP sube por su cuenta y siempre manda el fichero como `file`: en el
     # WebView el selector no le devuelve los ficheros al `<input>`, así que la
     # web no puede mandarlos ella. Se aceptan los dos nombres.
@@ -1352,7 +1357,9 @@ async def importar_productos_web(
     if not datos:
         raise _bad_request("el ZIP llegó vacío.")
     try:
-        return productos_web.importar_zip(datos, subido.filename or "")
+        if not nicho_config.es_catalogo_zip(source):
+            raise _bad_request(f"{source!r} no es un catálogo que se importe por ZIP.")
+        return productos_web.importar_zip(datos, subido.filename or "", source=source)
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except OSError as e:

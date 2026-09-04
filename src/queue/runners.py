@@ -2486,7 +2486,10 @@ def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgres
     for i, z in enumerate(zips):
         on_progress(i / len(zips), f"📦 {z.name} ({i + 1}/{len(zips)})")
         try:
-            r = productos_web.importar_zip(z.read_bytes(), z.name)
+            r = productos_web.importar_zip(
+                z.read_bytes(), z.name,
+                source=str(job.params.get("source") or productos_web.SOURCE),
+            )
         except Exception as e:  # noqa: BLE001
             # Un ZIP roto no puede dejar sin importar los otros treinta.
             on_log(f"[web] ⚠️ {z.name}: {e}")
