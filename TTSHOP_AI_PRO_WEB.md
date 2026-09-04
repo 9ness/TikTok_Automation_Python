@@ -68,6 +68,64 @@ disponible`.
 Cualquier cosa que documentemos aquí puede no estar en otra cuenta, así que
 conviene apuntar con qué membresía se vio (aquí: **Alumno Premium**).
 
+### El menú de verdad (4 sep 2026)
+
+La guía de 10 pasos vende la plataforma; el menú real es **cuatro secciones**
+en el panel principal, cada una con sus tarjetas. Ojo: **"Productos" NO es una
+sección de primer nivel** — cuelga de Comunidad.
+
+```
+Inicio
+├── 👤 Mi Área ......... perfil, saldo, membresía y configuración
+│   ├── Mis creaciones ......... vídeos generados listos para descargar y publicar
+│   ├── Mi perfil .............. datos personales, foto y privacidad
+│   ├── Saldo .................. recarga y saldo disponible
+│   ├── Mis compras ............ compras activas y en preparación
+│   ├── Pedidos y entregas ..... pedidos completados y descargas
+│   ├── Membresía .............. gestiona la membresía en Skool
+│   ├── Programa de afiliados .. invitaciones y recompensas recurrentes
+│   ├── Centro legal ........... condiciones, privacidad y reglas del servicio
+│   └── Mis guiones ............ historial, escenas y REVISIÓN DE SEGURIDAD
+│
+├── 💬 Comunidad ....... chat, productos, ranking, eventos y recursos
+│   ├── Productos .............. productos seleccionados e inventarios organizados
+│   ├── Chat General ........... chat privado en directo para Alumnos Premium
+│   ├── Comunidad Skool ........ abre la comunidad oficial
+│   ├── Ranking de creadores ... clasificación privada de rendimiento mensual
+│   ├── Peticiones de mejora ... enviar ideas para mejorar la plataforma
+│   ├── Eventos presenciales
+│   ├── Sanciones y normativa .. actualizaciones oficiales y prácticas seguras
+│   └── Calendario ............. llamadas y eventos publicados
+│
+├── 🤖 Asistente IA .... vídeos, guiones, carruseles, resúmenes y plataformas
+│   ├── Generador de vídeos .... formatos y generación MANUAL o AUTOMÁTICA guiada
+│   ├── Generador de guiones ... guiones de venta, ideas y planes de grabación
+│   ├── Generador de carruseles  carruseles interactivos listos para TikTok Shop
+│   ├── Resumen IA ............. resúmenes de la comunidad y llamadas semanales
+│   └── Plataformas AI ......... herramientas recomendadas y enlaces de afiliación
+│
+└── 🛒 Compras ......... servicios, generaciones adicionales, pedidos y entregas
+    ├── Vídeos de IA ........... packs de vídeos generados con IA
+    ├── Generaciones adicionales  generaciones ACUMULABLES de guiones
+    ├── Automatizaciones ....... automatización GESTIONADA de cuentas
+    └── Estrategias de viralización  packs de contenido para escalar
+```
+
+**Lo que se lee entre líneas, y hay que confirmar:**
+
+- **Las generaciones de guiones están limitadas** — si se venden "generaciones
+  adicionales acumulables", la membresía trae una cuota. Nosotros generamos
+  con nuestra propia clave de Gemini, sin tope suyo.
+- **"Automatización gestionada de cuentas"** suena a servicio con personas
+  detrás, no a herramienta que se usa. Preguntar qué hace exactamente antes de
+  compararlo con nuestra cola.
+- **Mis guiones → "revisión de seguridad"**: parece que pasan los guiones por
+  un filtro de políticas. Interesa ver qué marcan: nosotros ya avisamos de
+  captions arriesgados (`caption_arriesgado`) y de promesas que el producto no
+  cumple.
+- El panel de **Inicio** enseña las dos banderas (🇪🇸 🇺🇸): la plataforma es
+  de los dos mercados, aunque nosotros nos quedemos con España.
+
 ### Paso 2 de 10 — Productos
 
 > "Encuentra productos seleccionados. Consulta **inventarios de España y
