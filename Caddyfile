@@ -10,6 +10,21 @@
 #   /ws/*        → contenedor api:8000   (WebSocket /ws/queue, headers Upgrade)
 #   /            → contenedor web:3000   (Next.js standalone)
 
+# Opciones globales. Van las PRIMERAS del fichero, antes de cualquier sitio.
+{
+	servers {
+		# Sin HTTP/3. Caddy lo anuncia con `Alt-Svc` y el navegador se pasa a
+		# QUIC (UDP 443)… que en este servidor NO está publicado: docker solo
+		# mapea el 443/TCP. El resultado era un "Failed to fetch" que se comía
+		# peticiones sueltas —el login, sin ir más lejos— mientras el resto de
+		# la app seguía funcionando por HTTP/2, así que parecía cosa del
+		# navegador o de la caché.
+		#
+		# Si algún día se publica el 443/UDP, se puede quitar esta línea.
+		protocols h1 h2
+	}
+}
+
 # Todo lo que sirve la app, en un snippet: se usa igual para el sitio de
 # siempre y para el nombre público de abajo, y así no hay dos copias que se
 # separen con el tiempo.
