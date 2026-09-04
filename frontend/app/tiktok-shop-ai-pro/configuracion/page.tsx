@@ -8,6 +8,7 @@ import { PanelCarruseles } from "@/components/tiktok-shop-ai-pro/PanelCarruseles
 import { PanelGuiones } from "@/components/tiktok-shop-ai-pro/PanelGuiones";
 import { PanelTextos } from "@/components/tiktok-shop-ai-pro/PanelTextos";
 import { PanelUrls } from "@/components/tiktok-shop-ai-pro/PanelUrls";
+import { PanelWebCurso } from "@/components/tiktok-shop-ai-pro/PanelWebCurso";
 
 /** EchoTik apagado a petición del operador (su cuota gratis no da para el
  *  volumen diario). Poniéndolo a `true` vuelve el panel de credenciales. */
@@ -36,6 +37,7 @@ export default function ConfiguracionAiProPage() {
       </header>
 
       <HashtagsPanel />
+      <PanelWebCurso />
       <PanelUrls />
       <PanelTextos />
       <PanelGuiones />

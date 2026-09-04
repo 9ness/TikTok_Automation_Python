@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { GUION_FICHAS } from "@/lib/tiktok-shop-ai-pro/guionesWeb";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import {
   buildCleanPhotoDownloadUrl,
@@ -262,47 +263,6 @@ function PegarUrlsEnLote({ source }: { source: string }) {
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState("");
 
-  // Su web es un ACORDEÓN: al abrir una carpeta cierra la anterior, así que
-  // no vale con desplegarlas todas y leer al final — hay que leer cada una
-  // mientras está abierta. Y el fichero en vez de `copy()`: con `await`,
-  // Chrome envuelve el código y las utilidades de la consola dejan de existir.
-  // Dos trampas de su web, las dos descubiertas a base de que no saliera:
-  //  - Es un ACORDEÓN: al abrir una carpeta cierra la anterior, así que hay
-  //    que leer cada una mientras está abierta, no desplegarlas todas.
-  //  - Al abrir, REPINTA la lista entera: el `div.carp` que tuvieras en la
-  //    mano queda descolgado y su `.prod` no llega nunca. Por eso se vuelve a
-  //    buscar por índice en cada vuelta.
-  // Y el fichero en vez de `copy()`: con `await`, Chrome envuelve el código y
-  // las utilidades de la consola dejan de existir.
-  const GUION = `const carps = () => [...document.querySelectorAll("div.carp")];
-const filas = [];
-for (let i = 0; i < carps().length; i++) {
-  if (!carps()[i]?.querySelector(".prod")) {
-    carps()[i]?.querySelector(".carp-head")?.click();
-    for (let k = 0; k < 40 && !carps()[i]?.querySelector(".prod"); k++) {
-      await new Promise((r) => setTimeout(r, 150));
-    }
-  }
-  const c = carps()[i];
-  if (!c) continue;
-  const carpeta = c.querySelector(".carp-head b")?.textContent.trim();
-  const antes = filas.length;
-  c.querySelectorAll(".prod").forEach((p) => {
-    filas.push({
-      carpeta,
-      producto: p.querySelector(".p-head b")?.textContent.trim(),
-      url: p.querySelector("a.chip[href]")?.href ?? "",
-      sin_stock: /sin\\s*stock/i.test(p.textContent || ""),
-    });
-  });
-  console.log(carpeta, "· en esta:", filas.length - antes, "· total:", filas.length);
-}
-const a = document.createElement("a");
-a.href = URL.createObjectURL(new Blob([JSON.stringify(filas)]));
-a.download = "fichas.json";
-a.click();
-console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con enlace ·", filas.filter((f) => f.sin_stock).length, "sin stock");`;
-
   function enviar() {
     let filas: unknown[];
     try {
@@ -371,13 +331,13 @@ console.log("TOTAL", filas.length, "·", filas.filter((f) => f.url).length, "con
         <code>fichas.json</code>. Ese fichero es el que se elige aquí abajo.
       </p>
       <pre className="max-h-32 overflow-auto rounded bg-background p-2 text-[10px] leading-tight text-muted-foreground">
-        {GUION}
+        {GUION_FICHAS}
       </pre>
       <div className="grid grid-cols-2 gap-1.5">
         <button
           type="button"
           onClick={() => {
-            navigator.clipboard.writeText(GUION);
+            navigator.clipboard.writeText(GUION_FICHAS);
             toast.success("Guion copiado");
           }}
           className="rounded-lg border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30"
