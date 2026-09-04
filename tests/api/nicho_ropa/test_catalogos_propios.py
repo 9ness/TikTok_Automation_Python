@@ -311,3 +311,41 @@ class TestCadaSexoVeLoSuyo:
         # lo que hace la pantalla con este campo.
         de_mujer = [i for i in items if i["web"] and i["sexo"] == "mujer"]
         assert de_mujer and all("hombre" not in i["slug"] for i in de_mujer)
+
+
+class TestModosPorSexo:
+    """Los formatos del curso no son los mismos para hombre y para mujer.
+
+    Un modo que se enseñe sin tener prompt es un botón que no lleva a nada, y
+    uno que falte deja al operador sin poder grabar ese formato. Por eso se
+    comprueban las dos cosas a la vez: qué modos hay y que todos traen sus dos
+    textos.
+    """
+
+    def test_hombre_tiene_los_cuatro_formatos(self):
+        assert [m["clave"] for m in config.modos_de("hombre")] == [
+            "espejo", "camara", "calle_1", "calle_2",
+        ]
+
+    def test_mujer_solo_los_que_tienen_prompt(self):
+        """El del bolso existe en su web pero aún no publica sus prompts."""
+        assert [m["clave"] for m in config.modos_de("mujer")] == ["espejo"]
+
+    @pytest.mark.parametrize("sexo", ["hombre", "mujer"])
+    def test_ningun_modo_se_queda_sin_sus_dos_prompts(self, sexo):
+        for modo in config.modos_de(sexo):
+            estilos = config.prompts_mof10(sexo, False, modo["clave"])
+            assert len(estilos) == 1, modo
+            assert estilos[0]["imagen"].strip(), modo
+            assert estilos[0]["guion"].strip(), modo
+
+    def test_las_dos_situaciones_comparten_la_imagen(self):
+        """Es el MISMO texto en su web: se apunta al fichero, no se duplica.
+
+        Si un día publican uno propio para Real 2, esto salta y hay que darle
+        su fichero — que es justo cuando toca enterarse.
+        """
+        uno = config.prompts_mof10("hombre", False, "calle_1")[0]
+        dos = config.prompts_mof10("hombre", False, "calle_2")[0]
+        assert uno["imagen"] == dos["imagen"]
+        assert uno["guion"] != dos["guion"]

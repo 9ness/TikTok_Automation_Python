@@ -110,15 +110,61 @@ def es_genero_operador(genero: str) -> bool:
 # Cada modo dice además CON QUÉ estilo se graba, para que la pantalla enseñe
 # solo su prompt: estando en "frente al espejo" no pinta nada el de dejar el
 # móvil apoyado. `estilo_mof10` es la clave de `ESTILOS_MOF10`.
-MODOS: dict[str, dict[str, str]] = {
-    "espejo": {"label": "🪞 Frente al espejo", "estilo_mof10": "espejo"},
-    "camara": {"label": "📱 Dejando la cámara", "estilo_mof10": "movil"},
+#
+# `sexos` dice a quién se le enseña: son los FORMATOS que publica el curso y no
+# publica los mismos para los dos. El de bolso es de mujer y las dos
+# situaciones de calle son de hombre; enseñarlos en el otro sexo sería ofrecer
+# un modo sin prompt.
+#
+# La clave `camara` se queda como está aunque su nombre sea ahora "BOF Selfie":
+# es la que lleva dentro cada producto (`modos.camara`) y renombrarla perdería
+# los vídeos ya grabados.
+MODOS: dict[str, dict] = {
+    "espejo": {
+        "label": "🪞 BOF Frente a Espejo",
+        "estilo_mof10": "espejo",
+        "sexos": ("mujer", "hombre"),
+    },
+    "camara": {
+        "label": "🤳 BOF Selfie",
+        "estilo_mof10": "movil",
+        "sexos": ("hombre",),
+    },
+    "calle_1": {
+        "label": "🚶 Situación Real 1",
+        "estilo_mof10": "real_1",
+        "sexos": ("hombre",),
+    },
+    "calle_2": {
+        "label": "☕ Situación Real 2",
+        "estilo_mof10": "real_2",
+        "sexos": ("hombre",),
+    },
+    # "BOLSO MOF MUJER POV ONMI 10S" existe en su web pero AÚN NO tiene
+    # prompts publicados, así que no se ofrece: un modo sin prompt es un botón
+    # que no lleva a nada. Al pegarlos, se añade aquí con `estilo_mof10:
+    # "bolso"` y su entrada en `ESTILOS_MOF10`. Ojo: solo vale para prendas
+    # que SEAN bolsos — necesita el filtro por categoría (ver tasks.md).
 }
 MODO_DEFECTO = "espejo"
 
 
 def modo_valido(modo: str) -> str:
     return modo if modo in MODOS else MODO_DEFECTO
+
+
+def modos_de(sexo: str) -> list[dict[str, str]]:
+    """Los modos que existen para ese sexo, en el orden de la web.
+
+    El de siempre (`espejo`) va el primero y vale para los dos, así que una
+    prenda nunca se queda sin ningún modo.
+    """
+    sexo = sexo if sexo in ("mujer", "hombre") else SEXO_DEFECTO
+    return [
+        {"clave": clave, "label": meta["label"]}
+        for clave, meta in MODOS.items()
+        if sexo in meta["sexos"]
+    ]
 
 
 def estilo_de_modo(modo: str) -> str:
@@ -453,6 +499,29 @@ ESTILOS_MOF10: dict[str, dict] = {
         "imagen": "prompt_mof10_movil_imagen.md",
         "guion": "prompt_mof10_movil_guion.md",
         "derivado": ("mujer",),
+    },
+    # Los de calle son SOLO de hombre (`MODOS[...]["sexos"]`), así que nunca
+    # se piden en mujer y no hay nada que derivar: el diálogo entero está
+    # escrito para él.
+    "real_1": {
+        "label": "Situación Real 1 · le paran por la calle",
+        "imagen": "prompt_mof10_real_1_imagen.md",
+        "guion": "prompt_mof10_real_1_guion.md",
+        "derivado": (),
+    },
+    # Comparte la IMAGEN con Real 1 —es el mismo texto en su web, palabra por
+    # palabra—; lo que cambia es la escena del vídeo. Se apunta al mismo
+    # fichero en vez de duplicarlo: dos copias se desincronizan a la primera.
+    #
+    # Y encaja: el paso 1 solo saca el RETRATO del chico con el outfit puesto,
+    # no la escena —esa la pone el paso 2, en la calle o en la terraza—. Si
+    # aun así resulta ser un descuido suyo y publican otro, se le pone aquí su
+    # propio fichero y ya está.
+    "real_2": {
+        "label": "Situación Real 2 · le reciben en una terraza",
+        "imagen": "prompt_mof10_real_1_imagen.md",
+        "guion": "prompt_mof10_real_2_guion.md",
+        "derivado": (),
     },
 }
 

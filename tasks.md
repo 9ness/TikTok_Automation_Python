@@ -13,6 +13,15 @@ subir con el ⬆ de esa fila → quemar textos.
   ampliar catálogo cuando haga falta.
 
 ## ⏳ Esperando a que Jonny lo publique (28 ago 2026)
+- [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro de
+  hombre (espejo, selfie, Situación Real 1 y 2) y falta el de mujer, **Bolso
+  POV** — hay que pegar sus dos prompts. Dos cosas a vigilar: (1) Situación
+  Real 1 y 2 comparten el prompt de IMAGEN, que encaja porque el paso 1 solo
+  saca el retrato con el outfit, pero conviene confirmarlo en la próxima
+  pasada por su web; (2) el modo Bolso solo vale para prendas que SEAN bolsos,
+  así que necesita un filtro por categoría como el del Nicho Carruseles
+  (Gemini sobre los títulos ya extraídos + interruptor manual, y el listado
+  diciendo cuántas aptas tiene cada carpeta).
 - [ ] **Gancho de PUNTO DE DOLOR para el POV BOF de 10s**: hoy solo lo publica
   para los de 20s (ya metido en el Largo, `prompts/guion_dolor.md`, elegible
   por carpeta). En 10s no cabe su estructura —sus propias partes suman 325

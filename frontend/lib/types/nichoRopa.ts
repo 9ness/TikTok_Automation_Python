@@ -23,6 +23,14 @@ export interface PromptsRopaResponse {
   sexo: string;
   /** Estilos de vídeo de 10s: imagen en Flow + guion/vídeo en Omni. */
   mof10: EstiloMof10[];
+  /** Los modos de grabación que existen para ESE sexo. Los manda el backend:
+   *  el curso no publica los mismos formatos para hombre y para mujer. */
+  modos?: ModoRopa[];
+}
+
+export interface ModoRopa {
+  clave: string;
+  label: string;
 }
 
 export interface CarpetaRopa {

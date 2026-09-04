@@ -48,10 +48,14 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
  *  distinto de la MISMA prenda y guarda su propio estado — igual que los
  *  estilos de guion del POV BOF Largo. Añadir uno es añadirlo aquí y en
  *  `nicho_ropa/config.py:MODOS`. */
-const MODOS_ROPA: Record<string, string> = {
-  espejo: "🪞 Frente al espejo",
-  camara: "📱 Dejando la cámara",
-};
+/** Los modos que enseñar mientras el backend no ha contestado.
+ *
+ *  Solo los dos de siempre y sin inventarse cuáles son de cada sexo: la lista
+ *  buena viene con los prompts (`modos`), porque el curso no publica los
+ *  mismos formatos para hombre y para mujer. */
+const MODOS_FALLBACK = [
+  { clave: "espejo", label: "🪞 BOF Frente a Espejo" },
+];
 
 /** Alta de prendas PROPIAS, en los cuatro catálogos del operador.
  *
@@ -337,6 +341,16 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
   // Con el modo: la pantalla enseña SOLO el prompt del modo en el que estás.
   // Con los dos a la vista era cuestión de tiempo copiar el que no era.
   const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "");
+  // Los modos son del SEXO, no de la pantalla: en hombre hay cuatro formatos
+  // y en mujer dos, y cada uno guarda su propio vídeo de la misma prenda.
+  const modos = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
+  // Al pasar de hombre a mujer, el modo guardado puede ser de los que solo
+  // existen en hombre: sin esto la pantalla se queda en un modo que ya no
+  // está en la lista y ningún botón sale marcado.
+  useEffect(() => {
+    if (!modos.length || modos.some((m) => m.clave === modo)) return;
+    setModo(modos[0]!.clave);
+  }, [modos, modo, setModo]);
   const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "");
   const extraer = useExtraerTextosRopa();
 
@@ -440,7 +454,7 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
               Modo de grabación
             </p>
             <div className="grid grid-cols-2 gap-1.5">
-              {Object.entries(MODOS_ROPA).map(([clave, label]) => (
+              {modos.map(({ clave, label }) => (
                 <button
                   key={clave}
                   type="button"
@@ -666,7 +680,8 @@ export function PantallaRopa({ variante }: { variante: Variante }) {
         ) : null}
         {esWeb && (
           <p className="text-[10px] text-muted-foreground">
-            {MODOS_ROPA[modo] ?? ""} · quien graba lo decide la carpeta:{" "}
+            {modos.find((m) => m.clave === modo)?.label ?? ""} · quien graba lo
+            decide la carpeta:{" "}
             {prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"}.
           </p>
         )}

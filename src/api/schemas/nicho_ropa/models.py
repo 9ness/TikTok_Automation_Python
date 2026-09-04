@@ -19,6 +19,11 @@ class EstiloMof10(BaseModel):
     derivado: bool = False
 
 
+class ModoRopa(BaseModel):
+    clave: str
+    label: str
+
+
 class PromptsRopaResponse(BaseModel):
     """Los prompts que el operador copia fuera de la app.
 
@@ -39,6 +44,11 @@ class PromptsRopaResponse(BaseModel):
     # de 10s, en vez de generar el vídeo de una tirada. Van en lista porque
     # publica estilos nuevos cada poco.
     mof10: list[EstiloMof10] = Field(default_factory=list)
+    # Los modos de grabación que existen PARA ESE SEXO: el curso no publica
+    # los mismos formatos para hombre y mujer (el bolso es de mujer, las dos
+    # situaciones de calle son de hombre). La lista la manda el backend para
+    # que la pantalla no tenga que saberse los formatos.
+    modos: list[ModoRopa] = Field(default_factory=list)
 
 
 class CarpetaRopa(BaseModel):

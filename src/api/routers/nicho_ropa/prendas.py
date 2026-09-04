@@ -85,6 +85,7 @@ def get_prompts(
             ),
             sexo=sexo,
             mof10=config.prompts_mof10(sexo, plazos, modo),
+            modos=config.modos_de(sexo),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
