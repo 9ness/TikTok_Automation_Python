@@ -44,6 +44,7 @@ from src.api.config import get_settings
 from src.api.exceptions import register_exception_handlers
 from src.api.routers import (
     auth_router,
+    ui_menu_router,
     cuotas_router,
     construccion_pov_router,
     deploy_router,
@@ -287,6 +288,7 @@ def create_app() -> FastAPI:
             "redis_configured": get_shop_redis().is_available(),
         }
 
+    app.include_router(ui_menu_router)
     app.include_router(products_router)
     app.include_router(product_photo_file_router)
     app.include_router(users_router)

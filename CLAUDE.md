@@ -395,6 +395,17 @@ BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
 `nicho_pov_bof_largo:` (`/producto/estado`). Dos progresos son GLOBALES a
 propósito (ver "Escaparate y vendidos" abajo).
 
+### Mi menú — la sidebar, por usuario
+
+Cada persona esconde y reordena su menú lateral desde `/settings` ("Mi menú",
+`components/settings/MenuPersonalizado.tsx`). Va en Redis
+(`ui:menu:<usuario>`, router transversal `src/api/routers/ui_menu.py`) y no en
+`localStorage`: la misma cuenta entra desde móvil, PC y APK. Se guardan solo
+CLAVES (el `href` de un item, el `basePath` de un grupo), nunca el menú entero
+— la lista la manda `Sidebar.tsx` y una copia guardada se quedaría vieja al
+añadir un nicho. Es COSMÉTICO: se aplica encima del menú que da el rol, que
+es lo que de verdad corta (y el backend lo comprueba aparte).
+
 ### Escaparate y vendidos — transversales a TODOS los nichos
 
 Dos cosas NO son de ningún nicho: se hacen una sola vez por producto porque la

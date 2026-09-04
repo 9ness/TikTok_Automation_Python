@@ -60,6 +60,7 @@ from .nicho_pov_bof import (
 from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
+from .ui_menu import router as ui_menu_router
 from .deploy import router as deploy_router
 from .cuotas import cuotas_router
 from .diagnostics import router as diagnostics_router
@@ -88,6 +89,7 @@ __all__ = [
     "fonts_router",
     "fonts_file_router",
     "auth_router",
+    "ui_menu_router",
     "deploy_router",
     "cuotas_router",
     "diagnostics_router",

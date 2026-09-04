@@ -49,18 +49,19 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useLogout, useMe } from "@/lib/queries/auth";
 import { SelectorCuenta } from "@/components/layout/SelectorCuenta";
 import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
+import { MENU_PREFS_VACIAS, useMenuPrefs, type MenuPrefs } from "@/lib/queries/uiMenu";
 import { useGlobalFolderCounts } from "@/lib/queries/editor-auto";
 import { Inbox, LogOut, User } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
 
-type NavItem = {
+export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
 };
 
-type NavGroup =
+export type NavGroup =
   | { kind: "single"; item: NavItem }
   | { kind: "group"; title: string; basePath: string; icon: LucideIcon; items: NavItem[] };
 
@@ -206,15 +207,61 @@ function esAiPro(n: NavGroup): boolean {
 
 /** Reordena dejando delante los de `orden`; el resto conserva el suyo (el
  *  `sort` de JS es estable). */
-function ordenar<T extends { href: string }>(items: T[], orden: string[]): T[] {
-  const puesto = (href: string) => {
-    const i = orden.indexOf(href);
-    return i === -1 ? orden.length : i;
-  };
-  return [...items].sort((a, b) => puesto(a.href) - puesto(b.href));
+function puestoEn(orden: string[], clave: string): number {
+  const i = orden.indexOf(clave);
+  return i === -1 ? orden.length : i;
 }
 
-function navPara(rol: string | null | undefined): NavGroup[] {
+function ordenar<T extends { href: string }>(items: T[], orden: string[]): T[] {
+  return [...items].sort(
+    (a, b) => puestoEn(orden, a.href) - puestoEn(orden, b.href),
+  );
+}
+
+/** La clave con la que se guarda cada entrada del menú: el `href` de un
+ *  enlace suelto, el `basePath` de un grupo. */
+export function claveNav(n: NavGroup): string {
+  return n.kind === "single" ? n.item.href : n.basePath;
+}
+
+/** Lo que NO se puede esconder, pase lo que pase: es desde donde se vuelve a
+ *  encender el resto. Sin esto, ocultar "Settings" deja el menú sin arreglo
+ *  posible salvo escribiendo la URL a mano. */
+export const NAV_FIJOS = ["/settings"];
+
+/** Aplica lo que cada uno haya elegido: fuera lo oculto, y el orden suyo.
+ *
+ *  Se hace SOBRE el menú que le toca por rol, no en vez de él: son cosas
+ *  distintas —lo que puedes ver y lo que quieres ver— y mezclarlas dejaría a
+ *  un `pro` enseñando pantallas que no son suyas con solo guardar una
+ *  preferencia.
+ */
+export function aplicarPrefs(nav: NavGroup[], prefs: MenuPrefs): NavGroup[] {
+  const ocultos = new Set(prefs.ocultos.filter((k) => !NAV_FIJOS.includes(k)));
+  const visibles = nav
+    .filter((n) => !ocultos.has(claveNav(n)))
+    .map((n) =>
+      n.kind === "group"
+        ? {
+            ...n,
+            items: ordenar(
+              n.items.filter((i) => !ocultos.has(i.href)),
+              prefs.orden_items[n.basePath] ?? [],
+            ),
+          }
+        : n,
+    );
+  // Un grupo al que se le han escondido TODOS los items no pinta nada: sería
+  // una cabecera que se abre y no tiene debajo.
+  const conContenido = visibles.filter(
+    (n) => n.kind === "single" || n.items.length > 0,
+  );
+  return [...conContenido].sort(
+    (a, b) => puestoEn(prefs.orden_grupos, claveNav(a)) - puestoEn(prefs.orden_grupos, claveNav(b)),
+  );
+}
+
+export function navPara(rol: string | null | undefined): NavGroup[] {
   if (rol !== "pro") {
     return NAV.map((n) =>
       esAiPro(n) && n.kind === "group"
@@ -241,6 +288,10 @@ function navPara(rol: string | null | undefined): NavGroup[] {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const me = useMe();
+  const prefs = useMenuPrefs();
+  // Mientras carga, el menú de siempre: es un parpadeo menos molesto que una
+  // sidebar vacía, y lo que se esconde no es secreto.
+  const nav = aplicarPrefs(navPara(me.data?.rol), prefs.data ?? MENU_PREFS_VACIAS);
   const puedeCambiar = Boolean(me.data?.puede_cambiar_usuario);
   const suplantando = Boolean(me.data?.admin_real);
   // Estado de cada grupo expandido — auto-abrir si la ruta actual cae dentro.
@@ -304,7 +355,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {navPara(me.data?.rol).map((node) =>
+          {nav.map((node) =>
             node.kind === "single" ? (
               <SidebarLink
                 key={node.item.href}
