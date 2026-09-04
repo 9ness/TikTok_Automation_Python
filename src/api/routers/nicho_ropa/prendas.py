@@ -50,6 +50,11 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
+# Con qué nombre entran estas prendas en el ranking de vendidos, que es común a
+# todos los nichos. La referencia es `fuente|carpeta|producto`, así que basta
+# con que la fuente sea la nuestra para no chocar con el Drive del curso.
+SOURCE_VENDIDOS = "nicho_ropa"
+
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
 _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 
@@ -385,6 +390,7 @@ def list_prendas(
             plazos_manual=prod.get("plazos_manual"),
             precio=str(prod.get("precio") or ""),
             uploaded=bool(prod.get("uploaded")),
+            sold=bool(prod.get("sold")),
             # El vídeo es de ESTE modo de grabación: la misma prenda tiene
             # uno por modo, como los estilos de guion del POV BOF Largo.
             **product_repo.video_de(prod, modo),
@@ -438,6 +444,36 @@ def set_producto_estado(
             )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
+
+    # El ranking de vendidos es POR USUARIO y común a todos los nichos: la
+    # venta es de la cuenta de quien la hizo, no del catálogo de donde saliera
+    # la prenda. Se guarda además en el documento para poder pintarlo sin leer
+    # el índice entero.
+    if body.sold is not None:
+        try:
+            product_repo.update_product(
+                carpeta, body.producto, sold=bool(body.sold),
+            )
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
+        guardado = product_repo.get_product(carpeta, body.producto)
+        try:
+            if body.sold:
+                pov_repo.marcar_vendido(
+                    SOURCE_VENDIDOS, carpeta, body.producto,
+                    titulo=guardado.get("titulo") or "",
+                    tienda=guardado.get("tienda") or "",
+                    product_url=guardado.get("product_url") or "",
+                    usuario=usuario,
+                )
+            else:
+                pov_repo.desmarcar_vendido(
+                    SOURCE_VENDIDOS, carpeta, body.producto, usuario,
+                )
+        except Exception:  # noqa: BLE001
+            # El dato bueno (`sold`) ya está guardado; que no se caiga por el
+            # ranking, igual que en el POV BOF Largo.
+            pass
 
     if body.en_escaparate is not None:
         guardado = product_repo.get_product(carpeta, body.producto)

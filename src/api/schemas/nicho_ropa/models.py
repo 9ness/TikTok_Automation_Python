@@ -112,6 +112,10 @@ class PrendaInfo(BaseModel):
     # Lo que paga hoy el comprador, tal cual se leyó de la captura.
     precio: str = ""
     uploaded: bool = False
+    # Vendió con esta prenda. El ranking es POR USUARIO y común a todos los
+    # nichos (`nicho_pov_bof/repos/product_repo.py`): la venta es de la cuenta
+    # de quien la hizo, no del catálogo de donde saliera la prenda.
+    sold: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
     # Hay un montaje de esta prenda en cola o en curso.
@@ -145,6 +149,8 @@ class PrendaEstadoRequest(BaseModel):
     # había forma de marcarlo (ni de desmarcarlo si te equivocabas) — y en el
     # resto de nichos es un botón de la tarjeta.
     uploaded: bool | None = None
+    # Vendió. Va al ranking común por usuario, igual que en el POV BOF Largo.
+    sold: bool | None = None
 
 
 class VideoRopaUploadResponse(BaseModel):

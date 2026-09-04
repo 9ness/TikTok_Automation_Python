@@ -965,10 +965,12 @@ function PrendaCard({
   const [verVoz, setVerVoz] = useState(false);
   const [enEscaparate, setEnEscaparate] = useState(prenda.en_escaparate);
   const [subido, setSubido] = useState(prenda.uploaded);
+  const [vendio, setVendio] = useState(!!prenda.sold);
   useEffect(() => {
     setEnEscaparate(prenda.en_escaparate);
     setSubido(prenda.uploaded);
-  }, [prenda.en_escaparate, prenda.uploaded]);
+    setVendio(!!prenda.sold);
+  }, [prenda.en_escaparate, prenda.uploaded, prenda.sold]);
 
   function elegirArchivo(file: File | null) {
     if (!file) return;
@@ -1237,8 +1239,9 @@ function PrendaCard({
       {/* Lo de abajo NO es trabajo: es marcar en qué punto está la prenda.
           Separado con una línea, en el mismo sitio y con los mismos colores
           que en el POV BOF (ver UI_NICHOS.md) — se busca a ciegas después de
-          publicar. "Vendió" no está: el ranking de ventas es del catálogo del
-          curso y estas prendas no entran en él. */}
+          publicar. "Vendió" también: el ranking es POR USUARIO y común a todos
+          los nichos —la venta es de la cuenta de quien la hizo, no del
+          catálogo de donde saliera la prenda—. */}
       <div className="flex gap-1.5 border-t border-border/60 pt-2">
         <button
           type="button"
@@ -1286,6 +1289,28 @@ function PrendaCard({
           }`}
         >
           📤 Subido
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setVendio(!vendio);
+            setEstado.mutate(
+              { producto: prenda.producto, sold: !vendio },
+              {
+                onError: (e) => {
+                  setVendio(vendio);
+                  toast.error(e instanceof ApiError ? e.message : String(e));
+                },
+              },
+            );
+          }}
+          className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+            vendio
+              ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40"
+          }`}
+        >
+          💰 Vendió
         </button>
       </div>
 

@@ -204,6 +204,8 @@ export function useSetEstadoRopa(carpeta: string) {
       plazos_auto?: boolean;
       /** Ya publicado en TikTok — el botón de la tarjeta, como en el POV BOF. */
       uploaded?: boolean;
+      /** Vendió con esta prenda: va al ranking común por usuario. */
+      sold?: boolean;
     }
   >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, { carpeta, ...body }),
