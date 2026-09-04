@@ -59,7 +59,11 @@ public class MainActivity extends Activity {
     /** La carpeta que se quiere conseguir, dentro de Descargas. */
     private static final String CARPETA = "TTShopAIPro";
     /** El mismo dominio que la app buena (`android/twa-manifest.json`). */
-    private static final String URL_APP = "https://tiktok-factory.tailbff00e.ts.net/";
+    // El DOMINIO PROPIO, no el nombre de Tailscale: aquel dejó de publicarse el
+    // 4/9/2026 y la app se quedaba en negro —el WebView no resuelve el host y
+    // no hay barra de direcciones donde enterarse—. Si algún día cambia, esto
+    // se toca y hay que REGENERAR la APK: va compilado dentro.
+    private static final String URL_APP = "https://factory.nebulabsmedia.com/";
 
     private WebView web;
     private SwipeRefreshLayout deslizar;

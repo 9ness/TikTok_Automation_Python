@@ -1,6 +1,6 @@
 # `android-app/` — la APK
 
-WebView propio que carga `https://tiktok-factory.tailbff00e.ts.net/`. El porqué
+WebView propio que carga `https://factory.nebulabsmedia.com/`. El porqué
 de no ser una TWA, cómo se construye y qué ya costó una vez está en
 [`../APK.md`](../APK.md) — esto es solo el mapa de los ficheros.
 
