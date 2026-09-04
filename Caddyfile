@@ -71,21 +71,15 @@
 #
 # Cuando haya un dominio propio, se cambia esta línea por él y ya está.
 #
-# OJO: aquí NO va `import app`. Por el Funnel se entra por el portero de
-# `juegos-server` (:8090), que pide el código de acceso antes de dejar pasar a
-# la app; sirviendo la app directamente, esta URL quedaba abierta a internet.
-# Se manda al MISMO portero para que la puerta pública pida lo de siempre. El
-# :8091 es un puente de systemd (`juegos-bridge.socket`) hacia su :8090, que
-# escucha solo en loopback y desde el contenedor no se alcanza.
+# Va DIRECTA a la app, igual que la del Funnel en su :443 — que es la que se
+# usa a diario. El portero del código (`juegos-server`, :8090) solo está en la
+# del :8443, y ahí no queremos entrar.
+#
+# Eso significa que quien tenga esta dirección entra: es la misma exposición
+# que ya tenía la del Funnel, ni más ni menos. Si algún día se quiere puerta,
+# el puente `juegos-bridge.socket` (172.18.0.1:8091) ya la sirve.
 {$DOMAIN_PUBLICO:62-238-19-31.sslip.io} {
-	encode gzip
-	reverse_proxy 172.18.0.1:8091 {
-		flush_interval -1
-	}
-	log {
-		output stdout
-		format json
-	}
+	import app
 }
 
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la

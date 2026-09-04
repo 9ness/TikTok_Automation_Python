@@ -128,8 +128,30 @@ de Tailscale:
 | URL | Quién la sirve | Notas |
 |---|---|---|
 | `https://tiktok-factory.tailbff00e.ts.net:8443` | Tailscale Funnel → portero `:8090` | La de siempre. Se cae si el Funnel deja de publicar el nombre. |
-| `https://62-238-19-31.sslip.io` | Caddy en `62.238.19.31:443` → portero | Pública, con certificado de Let's Encrypt. No pasa por Tailscale. |
+| `https://62-238-19-31.sslip.io` | Caddy en `62.238.19.31:443` → la app | Pública, con certificado de Let's Encrypt. No pasa por Tailscale. Entra directa, igual que la del Funnel en su `:443`. |
 | `http://62.238.19.31` | Caddy en `:80` → la app **sin portero** | Plan B a pelo. Ojo: NO pide código. |
+
+### Cuando el Funnel deja de resolver
+
+Pasó el 3 y el 4 de septiembre de 2026. Síntoma: `tailscale serve status` dice
+"Funnel on" y el servidor está perfecto, pero el nombre da NXDOMAIN **en el
+DNS autoritativo de `ts.net`** (comprobado contra `ns1.dnsimple.com`), no solo
+en el resolutor de turno. Eso NO se arregla desde la máquina: Tailscale ha
+dejado de publicar el nombre.
+
+Dónde mirar, en la consola de Tailscale:
+
+- **DNS → HTTPS Certificates**: tiene que estar activado.
+- **Access controls**: hace falta el atributo de Funnel para el nodo:
+  `"nodeAttrs": [{"target": ["*"], "attr": ["funnel"]}]`.
+
+Y después, en el servidor, el proxy correcto (a Caddy, NO a `127.0.0.1:443`,
+que es un lazo y devuelve 502):
+
+```bash
+sudo tailscale funnel --bg --https=443 http://127.0.0.1:80
+sudo tailscale serve status
+```
 
 `sslip.io` resuelve `<ip-con-guiones>.sslip.io` a esa IP, así que no hubo que
 comprar dominio ni crear DNS. Cuando haya uno propio, se cambia esa línea del
