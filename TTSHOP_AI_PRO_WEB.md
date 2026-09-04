@@ -20,7 +20,7 @@ los ZIP de productos y las fichas que se pegan hoy.
 
 | Sección | Estado |
 |---|---|
-| Mapa general de la plataforma | 🟨 en curso (6 de 10 pasos de su guía) |
+| Mapa general de la plataforma | ✅ los 10 pasos de su guía |
 | Catálogo de productos (el que sustituye a los ZIP) | ⬜ pendiente |
 | Formatos y prompts por nicho | ⬜ pendiente |
 | Automatizaciones que trae la web | ⬜ pendiente |
@@ -128,6 +128,42 @@ Etiquetas: `GMV`, `Privacidad`, `Clasificación`.
 Es una clasificación entre alumnos, no una fuente de productos. No afecta al
 código; sirve para comparar resultados.
 
+### Paso 7 de 10 — Comunidad (chat de alumnos)
+
+> "Chat privado de alumnos. Participa en el chat general, comparte avances y
+> recibe menciones y notificaciones."
+
+Etiquetas: `Chat en directo`, `Menciones`, `Comunidad`. Es la campana de la
+barra de arriba.
+
+### Paso 8 de 10 — Comunidad Skool (formación y soporte)
+
+> "Accede directamente a la comunidad de Skool, sus contenidos y el
+> acompañamiento del equipo."
+
+Etiquetas: `Formación`, `Soporte`, `Llamadas`. El curso en sí sigue viviendo
+en Skool; la plataforma es la herramienta.
+
+### Paso 9 de 10 — Saldo recargable
+
+> "Recarga y utiliza tu saldo disponible para realizar compras dentro de
+> TTShop AI Pro."
+
+Etiquetas: `Recargas`, `Compras`, `Historial`. Es el monedero que gasta la
+sección de Compras (paso 5).
+
+### Paso 10 de 10 — Mi perfil
+
+> "Cambia tu nombre, fotografía y contraseña, y **administra los perfiles
+> vinculados**."
+
+Etiquetas: `Datos`, `Fotografía`, `Seguridad`.
+
+Lo de los **perfiles vinculados** conviene mirarlo: nosotros trabajamos con
+varias cuentas de TikTok (el progreso y el escaparate van por usuario —
+`ness`, `ana`, `mauro`), y si su plataforma también las contempla, puede que
+haya algo que cruzar.
+
 ## 2. Catálogo de productos
 
 _(pendiente: cómo se navegan y descargan los productos, en qué formato salen,
@@ -162,5 +198,12 @@ tenemos montado y qué no)_
 
 ## 5. Qué usamos y qué no
 
-_(pendiente: decisión por funcionalidad — la usamos, la ignoramos, o la
-copiamos a nuestro flujo. Con el motivo, que es lo que se olvida)_
+Decisiones tomadas, con su motivo. Lo que no esté aquí es que aún no se ha
+mirado.
+
+| Funcionalidad suya | Decisión | Por qué |
+|---|---|---|
+| **Inventario de Estados Unidos** | ❌ No, por ahora (4 sep 2026) | Se sigue solo con España hasta escalar a buenos números con varias cuentas. Todo lo nuestro asume España: precios en €, plazos y envío de la ficha española, guiones en español. |
+| **Guiones TOF** | 🔎 Por comprobar | La sospecha del operador es que su TOF equivale a nuestro **POV BOF Largo**. Hay que comparar los textos antes de dar por hecho que falta algo. |
+| Ranking de creadores | ➖ Informativo | Clasificación entre alumnos, no toca el código. |
+| Comunidad y Skool | ➖ Informativo | Formación y soporte, fuera del flujo de trabajo. |
