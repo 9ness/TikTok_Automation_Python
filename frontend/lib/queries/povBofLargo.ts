@@ -421,7 +421,7 @@ export function useSubirClipLargo() {
 // --- URLs directas ----------------------------------------------------------
 
 function base(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  return api.baseUrl;
 }
 
 function keyQs(): string {

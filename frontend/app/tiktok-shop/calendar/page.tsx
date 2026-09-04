@@ -53,6 +53,7 @@ import { useProduct, productKeys } from "@/lib/queries/products";
 import { MonthGrid, shiftMonth, todayIso } from "./MonthGrid";
 import { OutcomeBar } from "./OutcomeBar";
 import { FormatRanking, StatsRow } from "./Stats";
+import { api } from "@/lib/api";
 
 const VERDICT: Record<string, string> = {
   fuerte: "📢🔥", media: "📢", baja: "🔇", desconocida: "❔",
@@ -60,7 +61,7 @@ const VERDICT: Record<string, string> = {
 
 /** URL al endpoint que sirve la foto (api_key por query — <img> no manda headers). */
 function buildPhotoUrl(productId: string, filename: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
   return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;
@@ -624,7 +625,7 @@ function ProductPrompts({ productId }: { productId: string }) {
   const [processingIdx, setProcessingIdx] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1.18);
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiBase = api.baseUrl;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
   const readyUrl = (i: number) =>
     `${apiBase}/api/v1/tiktok-shop/radar/videos/problem/ready?product_id=${productId}&concept_index=${i}` +

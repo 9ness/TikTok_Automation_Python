@@ -441,7 +441,7 @@ export const ANCHO_CHIP = 160;
 export function buildPhotoUrl(
   source: string, folder: string, fileId: string, ancho: number | null = ANCHO_MINIATURA,
 ): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const w = ancho ? `&w=${ancho}` : "";
@@ -861,7 +861,7 @@ export function buildVideoUrl(
   source: string, folder: string, producto: string,
   version = 0, descargar = false,
 ): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   return `${base}${ROOT}/video?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(
@@ -1035,7 +1035,7 @@ export function buildCleanPhotoDownloadUrl(
    *  donde solo hace falta reconocer el producto. */
   ancho = 0,
 ): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const w = ancho ? `&w=${ancho}` : "";
@@ -1071,7 +1071,7 @@ export interface LoteResponse {
  *  uno en uno a propósito — varios a la vez desde el móvil se atragantan.
  */
 export function baseApi(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  return api.baseUrl;
 }
 
 export function claveApi(): string {
@@ -1184,7 +1184,7 @@ export function useConfirmarLote(root: string = ROOT) {
  *  Lleva la api_key en la URL porque va en un `<video src>` y ahí no se pueden
  *  poner cabeceras. */
 export function archivoLoteUrl(root: string, token: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const k = process.env.NEXT_PUBLIC_API_KEY ?? "";
   return (
     `${base}${root}/video/lote/archivo?token=${encodeURIComponent(token)}` +

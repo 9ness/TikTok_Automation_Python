@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { api } from "@/lib/api";
+
 /** Se apunta cada pocos segundos para saber CUÁNDO dejó de vivir la app. */
 const CLAVE = "latido-app";
 const CADA_MS = 5000;
@@ -43,7 +45,7 @@ function memoria(): { memoriaMB?: number; limiteMB?: number } {
 }
 
 function avisar(evento: Record<string, unknown>) {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   try {
     void fetch(`${base}/api/v1/diagnostics/cliente`, {

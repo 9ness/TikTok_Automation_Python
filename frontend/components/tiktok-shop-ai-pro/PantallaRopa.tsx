@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 import { nombreDescarga } from "@/lib/descargas";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
   buildFotoLimpiaRopaUrl,
@@ -855,8 +855,7 @@ function PrendaCard({
     fd.append("modo", modo);
     fd.append("file", file);
 
-    const base =
-      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+    const base = api.baseUrl;
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${base}/api/v1/nicho-ropa/video/upload`);
     const apiKey = process.env.NEXT_PUBLIC_API_KEY;

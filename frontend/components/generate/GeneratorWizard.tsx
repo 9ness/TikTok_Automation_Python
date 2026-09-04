@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   useEnqueueGeneration,
   usePreviewNanoBananaPrompt,
@@ -637,8 +637,7 @@ function pickProductCoverUrl(product: Product): string | null {
     product.photos.generated.find((p) => !p.deleted) ??
     product.photos.source.find((p) => !p.deleted);
   if (!photo?.filename) return null;
-  const base =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
   return `${base}/api/v1/products/${product.id}/photos/${encodeURIComponent(photo.filename)}/file${qs}`;

@@ -23,7 +23,7 @@ import { toast } from "sonner";
 
 import { nombreDescarga } from "@/lib/descargas";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { horaCorta, fechaCorta } from "@/lib/hora";
 import {
   useEstadoDeUsuario,
@@ -1688,7 +1688,7 @@ function ProductoCard({
     );
   }
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiBase = api.baseUrl;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.

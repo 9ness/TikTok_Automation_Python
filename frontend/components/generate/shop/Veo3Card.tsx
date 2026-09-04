@@ -46,6 +46,7 @@ import type { VideoPreset } from "@/lib/types/product";
 import { cn } from "@/lib/utils";
 
 import { PresetControls } from "./PresetControls";
+import { api } from "@/lib/api";
 
 /** Modos paralelos al AutoVideoCard. Veo 3 no se encola (no hay API) →
  *  todos los modos terminan en un dialog con prompt(s) + fotos a
@@ -1511,8 +1512,7 @@ function ResultItemCard({
 // =============================================================
 function buildPhotoUrl(productId: string, filename: string): string | null {
   if (!productId || !filename) return null;
-  const base =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `?api_key=${encodeURIComponent(key)}` : "";
   return `${base}/api/v1/products/${productId}/photos/${encodeURIComponent(filename)}/file${qs}`;

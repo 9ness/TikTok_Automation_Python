@@ -12,8 +12,9 @@ import {
 import { toast } from "sonner";
 
 import type { ProblemVideo } from "@/lib/queries/radar";
+import { api } from "@/lib/api";
 
-const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+const apiBase = api.baseUrl;
 const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
 interface WhyViral {

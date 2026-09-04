@@ -68,7 +68,7 @@ export function useSetEstadoGorras(carpeta: string) {
 }
 
 function base(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  return api.baseUrl;
 }
 function keyQs(): string {
   const k = process.env.NEXT_PUBLIC_API_KEY;

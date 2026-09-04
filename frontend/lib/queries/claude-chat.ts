@@ -6,9 +6,9 @@
  * (SSE). Reusa NEXT_PUBLIC_API_URL + NEXT_PUBLIC_API_KEY (mismo gate admin).
  */
 import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
-const BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+const BASE = api.baseUrl;
 const KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 function headers(): Record<string, string> {

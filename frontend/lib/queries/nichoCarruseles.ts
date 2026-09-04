@@ -194,7 +194,7 @@ function subirTrozo(
   extra: Record<string, string>,
   onBytes: (subidos: number) => void,
 ): Promise<unknown> {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const fd = new FormData();
   Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
@@ -761,7 +761,7 @@ export function useBorrarSuelta() {
 }
 
 export function buildSueltaUrl(archivo: string, version: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   return `${base}${ROOT}/sin-asignar/foto?archivo=${encodeURIComponent(
@@ -879,7 +879,7 @@ export function buildReferenciaUrl(
   escenario = "",
   ancho = 0,
 ): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const dl = descargar ? "&descargar=1" : "";
@@ -901,7 +901,7 @@ export function buildFotoCarruselUrl(
   descargar = false,
   ancho = 0,
 ): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   const qs = key ? `&api_key=${encodeURIComponent(key)}` : "";
   const dl = descargar ? "&descargar=1" : "";

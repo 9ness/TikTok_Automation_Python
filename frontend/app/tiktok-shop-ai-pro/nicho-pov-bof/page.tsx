@@ -26,7 +26,7 @@ import { toast } from "sonner";
 
 import { nombreDescarga } from "@/lib/descargas";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { fechaCorta, horaCorta } from "@/lib/hora";
 import {
   useEstadoDeUsuario,
@@ -244,7 +244,7 @@ function ImportarZipWeb({
   /** Se lo pasa a la app si sabe subir. `false` = que lo haga la web. */
   function lanzarConLaApp(nombres: string[]): boolean {
     if (!haySubidaNativa() || !nombres.length) return false;
-    const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+    const base = api.baseUrl;
     const lanzada = subirConLaApp({
       url: `${base}/api/v1/nicho-pov-bof/productos-web/importar`,
       apiKey: process.env.NEXT_PUBLIC_API_KEY ?? "",
@@ -2444,7 +2444,7 @@ function ProductoCard({
     pushEstado(v && !uploaded ? { sold: true, uploaded: true } : { sold: v });
   };
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  const apiBase = api.baseUrl;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
   function uploadVideo(file: File, slot = 0) {

@@ -198,7 +198,7 @@ export function useSetEstadoRopa(carpeta: string) {
 }
 
 function conApiKey(path: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   return `${base}${path}${key ? `&api_key=${encodeURIComponent(key)}` : ""}`;
 }

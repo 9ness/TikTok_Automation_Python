@@ -36,6 +36,7 @@ import { useUsers } from "@/lib/queries/users";
 import type { Product } from "@/lib/types/product";
 import type { User } from "@/lib/types/user";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 // `useSearchParams` requiere un `<Suspense>` boundary para que Next pueda
 // pre-renderizar el shell estático.
@@ -677,8 +678,7 @@ function ProductCardChip({
 }) {
   // Primera foto source como thumbnail. Misma URL pattern que PresetsManager.
   const firstPhoto = product.photos?.source?.[0]?.filename;
-  const base =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  const base = api.baseUrl;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY;
   const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
   const thumb = firstPhoto
@@ -763,9 +763,7 @@ function ShortcutCard({
     .slice(0, 2)
     .toUpperCase();
   const firstPhoto = product?.photos?.source?.[0]?.filename;
-  const base =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
-    "http://localhost:8000";
+  const base = api.baseUrl;
   const apiKey = process.env.NEXT_PUBLIC_API_KEY;
   const qs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
   const thumb =

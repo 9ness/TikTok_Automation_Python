@@ -60,8 +60,34 @@ export class ApiError extends Error {
   }
 }
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+/** Contra qué servidor habla la app.
+ *
+ *  En producción manda SIEMPRE el host desde el que se abrió: Caddy sirve la
+ *  web y la API juntas (`/api/*` y `/ws/*` van al mismo sitio), así que una
+ *  ruta relativa acierta desde el dominio, desde la IP y desde la APK.
+ *
+ *  Lo configurado (`NEXT_PUBLIC_API_URL`) solo se respeta en local, que es
+ *  donde de verdad hacen falta dos puertos distintos (web :3000, API :8000).
+ *  Esa variable se INLINEA en el bundle al compilar: cuando se quedó con el
+ *  nombre viejo de Tailscale, el día que ese host dejó de publicarse la app
+ *  cargaba pero ninguna llamada llegaba — "Failed to fetch" en el login, con
+ *  el servidor perfecto. Un dominio quemado no puede volver a tirar esto.
+ */
+function esLocal(host: string): boolean {
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+const CONFIG_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+
+function resolverBase(): string {
+  // En el servidor (SSR/build) no hay `window` ni origen: se usa lo que haya
+  // configurado, y si no, la API local.
+  if (typeof window === "undefined") return CONFIG_URL || "http://localhost:8000";
+  if (esLocal(window.location.hostname)) return CONFIG_URL || "http://localhost:8000";
+  return "";
+}
+
+const BASE_URL = resolverBase();
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 function authHeaders(): Record<string, string> {
@@ -129,5 +155,22 @@ export const api = {
     request<T>("PATCH", path, body, init),
   del: <T>(path: string, init?: RequestInit) => request<T>("DELETE", path, undefined, init),
   baseUrl: BASE_URL,
-  wsUrl: (process.env.NEXT_PUBLIC_WS_URL ?? BASE_URL.replace(/^http/, "ws")).replace(/\/$/, ""),
+  wsUrl: resolverWs(),
 };
+
+/** Igual que la base REST, pero para el WebSocket de la cola.
+ *
+ *  Se deriva del origen en vez de dejarlo relativo: `new WebSocket("/ws/queue")`
+ *  depende del navegador, y aquí se entra también desde la APK.
+ */
+function resolverWs(): string {
+  const cfg = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, "") ?? "";
+  if (typeof window === "undefined") {
+    return (cfg || BASE_URL.replace(/^http/, "ws")).replace(/\/$/, "");
+  }
+  if (esLocal(window.location.hostname)) {
+    return (cfg || BASE_URL.replace(/^http/, "ws")).replace(/\/$/, "");
+  }
+  const esquema = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${esquema}://${window.location.host}`;
+}
