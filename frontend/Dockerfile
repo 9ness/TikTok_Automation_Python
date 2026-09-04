@@ -32,8 +32,17 @@ WORKDIR /app
 
 # Estos ARG se inlinean en el bundle (cualquier `NEXT_PUBLIC_*` se materializa
 # en build-time, no runtime). Pásalos via --build-arg en docker-compose.
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ARG NEXT_PUBLIC_WS_URL=ws://localhost:8000
+# Por defecto VACÍAS: vacío significa "llama al mismo origen desde el que se
+# abrió la página", que es lo que hace que la app funcione por cualquier
+# puerta (el dominio, el nombre de reserva, el que venga mañana).
+#
+# Y hay un motivo para que el defecto sea vacío y no una URL: docker ignora un
+# `--build-arg X=` vacío y se queda con el DEFECTO del Dockerfile. Con un
+# defecto que fuera una URL, dejar la variable vacía en el `.env` no servía de
+# nada — el bundle se construía con la URL de siempre y la app solo funcionaba
+# por la puerta con la que se compiló. Costó una mañana de "Failed to fetch".
+ARG NEXT_PUBLIC_API_URL=
+ARG NEXT_PUBLIC_WS_URL=
 ARG NEXT_PUBLIC_API_KEY=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
