@@ -1,0 +1,5 @@
+<!-- Personaje `belleza_hombre` — la alternativa masculina en cuidado personal
+     y suplementos. Aire cuidado y natural, sin pinta de gimnasio: para eso ya
+     está `fitness_hombre`. -->
+
+A full-body, high-definition photorealistic studio photograph in a vertical 9:16 aspect ratio of a man in his early thirties with a slim build, standing centered and facing the camera in a natural, relaxed frontal pose against a seamless pure white studio background. He has fair skin with a healthy, even tone, an oval face with soft features, blue-grey eyes, dark eyebrows, tousled dark brown wavy hair and light stubble. He has a calm, approachable expression with a subtle smile. He is dressed in an open beige linen shirt with the sleeves rolled to the forearms, worn over a plain taupe crew-neck t-shirt, with relaxed light-brown chino trousers and clean white low-top trainers. Both arms hang relaxed at his sides with his hands empty and clearly visible. He holds no objects of any kind and wears no sunglasses. Soft, even studio lighting with no harsh shadows, sharp focus across his entire body and clothing, full figure visible from head to toe. No text, watermarks or logos.
