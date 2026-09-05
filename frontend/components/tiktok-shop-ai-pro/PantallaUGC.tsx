@@ -341,6 +341,7 @@ function TarjetaUGC({
   duracion: string;
 }) {
   const montar = useMontarUGC();
+  const rehacer = useEscenasLote();
   const limpiar = useLimpiarClipsUGC();
   const estado = useEstadoUGC();
   const [subiendo, setSubiendo] = useState("");
@@ -358,6 +359,9 @@ function TarjetaUGC({
 
   const clave = { source, folder, producto: producto.producto, gancho, duracion };
   const escenas = producto.escenas;
+  // Lo que cabe hablando en ese clip. Sale de la proporción del curso —170
+  // caracteres para 10 s— y es lo que decide si una frase se corta.
+  const tope = duracion === "8" ? 136 : 170;
 
   async function adjuntar(files: FileList | null) {
     const lista = Array.from(files ?? []);
@@ -476,9 +480,41 @@ function TarjetaUGC({
             </div>
             {/* Cuántos caracteres tiene cada guion: es lo que decide si cabe en
                 el clip, y el propio curso lo hace contar. */}
-            <p className="text-[10px] text-muted-foreground">
-              {escenas.map((e) => `${e.n}: ${e.caracteres} car.`).join(" · ")}
-            </p>
+            {/* Los caracteres de cada guion y, si alguno no cabe, el botón de
+                rehacer SOLO este producto: por una escena larga no se vuelven
+                a pagar las diez de la carpeta. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[10px] text-muted-foreground">
+                {escenas.map((e) => (
+                  <span
+                    key={e.n}
+                    className={e.caracteres > tope * 1.15 ? "text-amber-500" : ""}
+                  >
+                    {e.n}: {e.caracteres} car.{" "}
+                  </span>
+                ))}
+              </p>
+              <button
+                type="button"
+                disabled={rehacer.isPending}
+                onClick={() =>
+                  rehacer.mutate(
+                    {
+                      source, folder, gancho, duracion,
+                      rehacer: true, productos: [producto.producto],
+                    },
+                    {
+                      onSuccess: () => toast.success("A la cola: solo este producto"),
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground transition hover:border-foreground/30"
+              >
+                ↻ rehacer
+              </button>
+            </div>
           </div>
         </>
       ) : (
