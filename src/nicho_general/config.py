@@ -254,6 +254,26 @@ def prompt_guion(
     )
 
 
+# Lo que hay que decirle al prompt del curso y él no dice: la persona sale con
+# lo que lleve en la foto de Pinterest, y ahí casi todo el mundo lleva bolso.
+# Ese bolso se queda en las TRES escenas de todos sus vídeos y estorba justo
+# cuando tiene que sujetar el producto.
+_SIN_ESTORBOS = (
+    "\n\nAÑADE ESTAS CONDICIONES AL PROMPT FINAL:\n"
+    "- La persona NO lleva bolso, mochila, cartera ni ningún objeto en las "
+    "manos. Los dos brazos caen relajados a los lados, con las manos vacías y "
+    "visibles: después tendrá que sostener productos.\n"
+    "- Sin gafas de sol ni nada que tape la cara.\n"
+    "- Nada de texto, marcas de agua ni logotipos en la imagen."
+)
+
+
 def prompt_personaje() -> str:
-    """El de crear la referencia de la persona (se usa una vez por personaje)."""
-    return _limpio("personaje.md")
+    """El de crear la referencia de la persona (se usa una vez por personaje).
+
+    Al texto del curso se le añaden tres condiciones nuestras: sin bolso, con
+    las manos libres y sin gafas. Se descubrió al crear el primero — salió con
+    un bolso en la mano y otra en el bolsillo, y esa pose se habría repetido en
+    los tres clips de todos sus vídeos.
+    """
+    return _limpio("personaje.md") + _SIN_ESTORBOS
