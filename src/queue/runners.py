@@ -3303,35 +3303,31 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
             f"[ugc] sin textos (se saltan): {', '.join(sin_textos)} — "
             "sácalos en Configuración › Textos de todo un catálogo"
         )
-    if not pendientes:
-        if sin_textos and len(sin_textos) == len(carpetas):
-            raise RuntimeError(
-                "Ninguna carpeta tiene textos extraídos todavía: sácalos primero."
-            )
-        on_log("[ugc] todo lo que tiene textos ya tiene sus tres escenas")
-        return "sin-cambios"
 
-    etiqueta = (
-        f"{ugc_config.GANCHOS[gancho]['label']} · "
-        f"{ugc_config.DURACIONES[duracion]['label']}"
-    )
-    on_log(f"[ugc] {len(pendientes)} producto(s) · {etiqueta}")
-
-    # De qué nicho es cada producto, que es lo que decide su personaje. Va
-    # ANTES y por carpeta entera: es una llamada de texto sobre los títulos ya
-    # extraídos —sin imágenes— y con ella el guion sabe si habla un hombre o
-    # una mujer. Sin nicho el vídeo se puede hacer igual, así que si falla solo
-    # se avisa.
+    # De qué nicho es cada producto, que es lo que decide su personaje. Se hace
+    # sobre TODA la carpeta y no solo sobre lo que hay que escribir: los
+    # productos que ya tenían escenas de antes tampoco tienen nicho, y sin él
+    # saldrían todos con el personaje genérico. Es una llamada de texto por
+    # carpeta —sobre los títulos ya extraídos, sin imágenes— así que clasificar
+    # de más no cuesta.
+    #
+    # Va antes del corte por "no hay nada pendiente" a propósito: una carpeta
+    # ya escrita del todo necesita esto igual.
     from src.nicho_general.services import clasificador
 
-    for carpeta in sorted({c for c, _, _ in pendientes}):
+    for carpeta in carpetas:
+        textos = (
+            pov_repo.load_folder_para(source, carpeta, usuario).get("productos") or {}
+        )
+        mios = (
+            product_repo.load_folder(source, carpeta, usuario, gancho, duracion)
+            .get("productos") or {}
+        )
         sin_nicho = {
             pid: str((t or {}).get("titulo") or "")
-            for c, pid, t in pendientes
-            if c == carpeta
-            and not product_repo.get_product(
-                source, c, pid, usuario, gancho, duracion,
-            ).get("nicho")
+            for pid, t in textos.items()
+            if str((t or {}).get("titulo") or "").strip()
+            and not (mios.get(pid) or {}).get("nicho")
         }
         if not sin_nicho:
             continue
@@ -3343,6 +3339,20 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
             on_log(f"[ugc] {carpeta}: {len(sin_nicho)} producto(s) clasificados")
         except Exception as e:  # noqa: BLE001
             on_log(f"[ugc] no se pudo clasificar {carpeta}: {e}")
+
+    if not pendientes:
+        if sin_textos and len(sin_textos) == len(carpetas):
+            raise RuntimeError(
+                "Ninguna carpeta tiene textos extraídos todavía: sácalos primero."
+            )
+        on_log("[ugc] todo lo que tiene textos ya tiene sus tres escenas")
+        return "sin escenas nuevas (los nichos sí se han repasado)"
+
+    etiqueta = (
+        f"{ugc_config.GANCHOS[gancho]['label']} · "
+        f"{ugc_config.DURACIONES[duracion]['label']}"
+    )
+    on_log(f"[ugc] {len(pendientes)} producto(s) · {etiqueta}")
 
     def escribir_uno(carpeta: str, pid: str, t: dict) -> bool:
         # El personaje decide el sexo de la voz: si el producto ya tiene uno
@@ -3359,8 +3369,13 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 gancho=gancho,
                 duracion=duracion,
                 plazos=pov_config.hay_plazos(t),
-                sexo_personaje=ugc_config.sexo_valido(
-                    str(mio.get("personaje_sexo") or "")
+                sexo_personaje=(
+                    ugc_config.sexo_valido(str(mio.get("personaje_sexo")))
+                    if mio.get("personaje_sexo")
+                    # Sin elección a mano manda el del nicho: el de fitness es
+                    # un hombre, y con el defecto global el guion le pedía voz
+                    # de mujer a un vídeo donde se ve un tío.
+                    else ugc_config.sexo_de_nicho(str(mio.get("nicho") or ""))
                 ),
                 on_log=on_log,
             )
