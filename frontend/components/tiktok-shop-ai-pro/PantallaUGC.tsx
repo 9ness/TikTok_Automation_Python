@@ -33,6 +33,7 @@ import type { ProductoUGC } from "@/lib/types/nichoGeneral";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { VideoModal } from "@/components/ui/video-modal";
 
@@ -167,11 +168,30 @@ export function PantallaUGC() {
               onClick={() => setFolder(c.name)}
               className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
                 folder === c.name
-                  ? "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
-                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                  ? c.completed
+                    ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
+                    : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
+                  : c.completed
+                    ? "border-emerald-500/40 text-emerald-500"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
               }`}
             >
+              {c.completed && "✓ "}
               {c.name}
+              {/* Con ficha SOBRE EL TOTAL, igual que en el POV BOF: un "9" solo
+                  no dice si faltan enlaces, y eso decide si merece abrirla. */}
+              {!!c.total && (
+                <span
+                  title={`${c.con_url ?? 0} de ${c.total} con la ficha enlazada`}
+                  className={`ml-1 rounded-full px-1 py-px text-[9px] font-semibold ${
+                    (c.con_url ?? 0) >= c.total
+                      ? "bg-emerald-500/15 text-emerald-500"
+                      : "bg-amber-500/15 text-amber-500"
+                  }`}
+                >
+                  {(c.con_url ?? 0) >= c.total ? c.total : `${c.con_url ?? 0}/${c.total}`}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -266,6 +286,22 @@ export function PantallaUGC() {
         </ol>
       </Paso>
 
+      <Paso
+        n={3}
+        color="azul"
+        titulo="Descargar lo ya montado"
+        hint="Los anuncios listos para subir a TikTok. Se bajan en el orden en que los ves."
+        extra={`${conVideo}/${items.length}`}
+      >
+        <BajarVideos
+          items={items}
+          source={source}
+          folder={folder}
+          gancho={gancho}
+          duracion={duracion}
+        />
+      </Paso>
+
       <section className="space-y-2">
         <p className="text-sm font-semibold">Productos</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -309,6 +345,7 @@ function TarjetaUGC({
   const estado = useEstadoUGC();
   const [subiendo, setSubiendo] = useState("");
   const [verVideo, setVerVideo] = useState(false);
+  const [verFoto, setVerFoto] = useState(false);
   const [verMas, setVerMas] = useState(false);
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   const [subido, setSubido] = useState(producto.uploaded);
@@ -345,14 +382,22 @@ function TarjetaUGC({
   return (
     <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
       <div className="flex gap-2">
-        {producto.clean_photo_id && (
-          /* eslint-disable-next-line @next/next/no-img-element */
+        {/* La miniatura se pide por producto, no por `file_id`: ese campo no
+            siempre está en los textos guardados y la foto se quedaba en
+            blanco. Toca para verla grande. */}
+        <button
+          type="button"
+          onClick={() => setVerFoto(true)}
+          className="shrink-0"
+          title="Ver las fotos del producto"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia", 120)}
             alt=""
-            className="h-14 w-14 shrink-0 rounded-md object-cover"
+            className="h-14 w-14 rounded-md border border-border/60 object-cover"
           />
-        )}
+        </button>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-xs font-semibold sm:text-sm">
             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">
@@ -441,6 +486,16 @@ function TarjetaUGC({
           Sin escenas todavía — dale al paso 1.
         </p>
       )}
+
+      {/* La foto LIMPIA es la que se adjunta en Flow con el personaje, así que
+          se baja desde la propia tarjeta como en los demás nichos. */}
+      <a
+        href={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia")}
+        download={nombreDescarga("ugc", producto.producto) + ".jpg"}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30"
+      >
+        <Download className="h-3.5 w-3.5" /> Bajar la foto del producto
+      </a>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
@@ -550,6 +605,15 @@ function TarjetaUGC({
         ))}
       </div>
 
+      <FotoModal
+        open={verFoto}
+        onOpenChange={setVerFoto}
+        titulo={`Producto ${producto.producto}`}
+        urlLimpia={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia")}
+        urlTitulo={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "ficha")}
+        urlDescarga={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia")}
+      />
+
       <VideoModal
         open={verVideo}
         onOpenChange={setVerVideo}
@@ -560,5 +624,65 @@ function TarjetaUGC({
         localPath={producto.video_path}
       />
     </div>
+  );
+}
+
+/** Bajarse los anuncios ya montados de la carpeta, de uno en uno.
+ *
+ *  Con retardo entre descargas porque el navegador del móvil cancela las
+ *  simultáneas — el mismo motivo que en el resto de nichos.
+ */
+function BajarVideos({
+  items,
+  source,
+  folder,
+  gancho,
+  duracion,
+}: {
+  items: ProductoUGC[];
+  source: string;
+  folder: string;
+  gancho: string;
+  duracion: string;
+}) {
+  const [bajando, setBajando] = useState("");
+  const conVideo = items.filter((p) => p.video_path);
+
+  async function bajarTodos() {
+    if (!conVideo.length) return;
+    setBajando(`0/${conVideo.length}`);
+    for (const [i, p] of conVideo.entries()) {
+      setBajando(`${i + 1}/${conVideo.length}`);
+      const a = document.createElement("a");
+      a.href = buildVideoUGCUrl(
+        { source, folder, producto: p.producto, gancho, duracion }, true,
+      );
+      a.download = nombreDescarga("ugc", p.producto) + ".mp4";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < conVideo.length - 1) await new Promise((r) => setTimeout(r, 800));
+    }
+    setBajando("");
+    toast.success(`${conVideo.length} vídeo(s) descargados`);
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={!conVideo.length || Boolean(bajando)}
+      onClick={() => void bajarTodos()}
+      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/60 px-3 py-2 text-[11px] text-sky-400 transition hover:bg-sky-500/10 disabled:opacity-40"
+    >
+      {bajando ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
+        </>
+      ) : (
+        <>
+          <Download className="h-3.5 w-3.5" /> Vídeos ({conVideo.length})
+        </>
+      )}
+    </button>
   );
 }
