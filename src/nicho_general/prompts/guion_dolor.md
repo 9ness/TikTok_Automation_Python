@@ -1,17 +1,18 @@
-<!-- "UGC DESDE 0", paso 2: LAS TRES ESCENAS.
+<!-- "UGC DESDE 0", gancho PUNTO DE DOLOR. Texto LITERAL del curso
+     (`UGC Gancho Punto Dolor .docx` del Drive), con cuatro marcadores para no
+     tener cuatro copias del mismo documento:
 
-     Se pega en DeepSeek junto con la foto de la ficha del producto y devuelve,
-     por cada escena, un prompt de imagen y un prompt de vídeo para Omni.
+       {{SEGUNDOS}}    duración de cada clip — 10 en Omni, 8 en GenAI Pro (Veo)
+       {{TOTAL}}       los tres clips sumados
+       {{CARACTERES}}  cuántos caracteres cabe hablar en ese tiempo
+       {{EXTRAS}}      lo que sabemos del producto y del personaje y él no:
+                       si tiene pago a plazos y si habla un hombre o una mujer
 
-     Lo que hay que entender de este formato, y que no se ve hasta leerlo
-     entero: el anuncio son TRES clips de 10s porque Omni no da para más, y la
-     continuidad NO se pide con "continúa" —lo prohíbe expresamente— sino
-     repitiendo en los tres: la misma persona de referencia, el mismo producto,
-     el mismo escenario y la MISMA descripción de voz palabra por palabra.
+     Los dos ganchos son el MISMO documento salvo las escenas 1 y 2, pero se
+     guardan enteros y no como base + bloque: así se pega tal cual el que
+     publique él y se ve de un vistazo qué cambió. -->
 
-     Texto literal del curso. -->
-
-Quiero crear anuncios UGC para productos de TikTok Shop utilizando Omni. Como Omni solo permite generar vídeos de 10 segundos, divide cada anuncio en tres clips independientes de 10 segundos que, al unirlos, formen un anuncio completo de 30 segundos.
+Quiero crear anuncios UGC para productos de TikTok Shop utilizando Omni. Como Omni solo permite generar vídeos de {{SEGUNDOS}} segundos, divide cada anuncio en tres clips independientes de {{SEGUNDOS}} segundos que, al unirlos, formen un anuncio completo de {{TOTAL}} segundos.
 Te iré enviando la imagen de cada producto. Para cada producto, crea tres escenas. Cada escena debe incluir:
 Un prompt para crear la imagen representativa de la escena.
 Un prompt de vídeo independiente y listo para introducir en Omni.
@@ -64,9 +65,9 @@ El guion hablado.
 La descripción completa de la voz.
 No añadas indicaciones sobre formato, resolución, teléfono, cámara, lente, iluminación, movimientos de cámara, planos, cortes, transiciones, música, subtítulos, textos añadidos o logotipos.
 GUION HABLADO
-Cada escena debe incluir un único guion hablado de aproximadamente 170 caracteres, contando espacios y signos de puntuación.
+Cada escena debe incluir un único guion hablado de aproximadamente {{CARACTERES}} caracteres, contando espacios y signos de puntuación.
 El guion debe:
-Poder pronunciarse con naturalidad durante 10 segundos.
+Poder pronunciarse con naturalidad durante {{SEGUNDOS}} segundos.
 Estar escrito en español.
 Sonar natural, cercano y convincente.
 Tener estilo UGC.
@@ -79,7 +80,7 @@ No realizar diagnósticos ni promesas absolutas.
 No mencionar precios ni descuentos concretos.
 No inventar características, materiales, funciones o resultados.
 Utilizar únicamente características visibles en la imagen o confirmadas mediante la información que proporcione.
-ESTRUCTURA DEL ANUNCIO
+{{EXTRAS}}ESTRUCTURA DEL ANUNCIO
 ESCENA 1 — PUNTOS DE DOLOR E IDENTIFICACIÓN
 Comienza directamente con varios puntos de dolor fuertes relacionados con el producto.
 Dirígete al espectador utilizando expresiones como «tú», «tu», «tus» o «contigo». Describe problemas o dificultades cotidianas con los que pueda identificarse.
@@ -122,19 +123,19 @@ Ejemplo del nivel de precisión requerido:
 «Voz femenina española de aproximadamente 25 años, con acento madrileño suave y pronunciación castellana natural. Timbre cálido, limpio y ligeramente luminoso; tono medio-agudo y ritmo de 165 palabras por minuto. Cadencia fluida, energía viva pero controlada, volumen medio y articulación clara. Expresividad cercana y convincente, con pausas naturales de entre 0,1 y 0,2 segundos. Voz sin cualidad nasal, rasgada ni excesivamente aireada. Enfatiza suavemente las palabras importantes sin sonar forzada.»
 Puedes crear otra identidad vocal, pero debes copiar literalmente la descripción elegida dentro de los tres prompts de vídeo.
 FORMATO DE ENTREGA
-ESCENA 1 — PUNTOS DE DOLOR — 10 SEGUNDOS
+ESCENA 1 — PUNTOS DE DOLOR — {{SEGUNDOS}} SEGUNDOS
 PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
 [Prompt completo para generar el fotograma inicial]
 PROMPT DE VÍDEO PARA OMNI:
 [Prompt completo con la acción, el guion hablado escrito una sola vez y la descripción vocal completa]
 Número de caracteres del guion: [cantidad]
-ESCENA 2 — PRODUCTO Y BENEFICIOS — 10 SEGUNDOS
+ESCENA 2 — PRODUCTO Y BENEFICIOS — {{SEGUNDOS}} SEGUNDOS
 PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
 [Prompt completo para generar el fotograma inicial]
 PROMPT DE VÍDEO PARA OMNI:
 [Prompt completo con la acción, el guion hablado escrito una sola vez y la descripción vocal completa]
 Número de caracteres del guion: [cantidad]
-ESCENA 3 — URGENCIA Y CTA — 10 SEGUNDOS
+ESCENA 3 — URGENCIA Y CTA — {{SEGUNDOS}} SEGUNDOS
 PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
 [Prompt completo para generar el fotograma inicial]
 PROMPT DE VÍDEO PARA OMNI:

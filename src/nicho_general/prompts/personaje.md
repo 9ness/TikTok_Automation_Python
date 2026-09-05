@@ -1,14 +1,14 @@
-<!-- "UGC DESDE 0", paso 1: EL PERSONAJE.
+<!-- "UGC DESDE 0", paso 0: EL PERSONAJE.
 
-     No es el prompt de un producto: se le pasa la foto de una persona y
-     devuelve un prompt INDEPENDIENTE que la recrea desde cero, de cuerpo
-     entero y sobre fondo blanco. Ese prompt (y la imagen que salga de él) es
-     lo que da la continuidad de las tres escenas, porque el paso 2 se remite
-     siempre a "la persona de la imagen de referencia".
+     No es de un producto: se busca una persona en Pinterest, se le pasa la
+     foto a ChatGPT con este texto y lo que devuelve es un prompt INDEPENDIENTE
+     que la recrea de cuerpo entero sobre fondo blanco. Esa imagen (hecha en
+     Flow) es la referencia fija de todas las escenas — igual que la chica del
+     Nicho Ropa Con Personas: la cara es de la CUENTA, no del producto.
 
-     Es el mismo planteamiento que la chica del Nicho Ropa Con Personas y la
-     de Carruseles: la cara es de la CUENTA y se reutiliza en todos sus
-     vídeos. Texto literal del curso. -->
+     Del documento del curso: «Crea una chica y un chico». Nosotros hacemos uno
+     por tipo de producto (fitness, belleza, hogar…) y se elige en cada vídeo.
+     Texto literal suyo. -->
 
 Analiza detalladamente a la persona de la imagen de referencia y crea un prompt completo para generar desde cero una persona muy similar. Describe con precisión su sexo, edad aparente, rostro, piel, cabello, peinado, barba, complexión, proporciones corporales, tatuajes, accesorios, ropa y calzado.
 El prompt debe mostrar a esa persona de pie, en una postura frontal, natural y relajada, con el cuerpo completo visible de la cabeza a los pies, sobre un fondo blanco puro de estudio. Añade iluminación suave y uniforme, fotografía fotorrealista en alta definición y formato vertical 9:16.

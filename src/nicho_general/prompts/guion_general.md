@@ -1,0 +1,141 @@
+<!-- "UGC DESDE 0", gancho GENERAL. Texto LITERAL del curso
+     (`UGC Gancho General (1).docx` del Drive), con cuatro marcadores para no
+     tener cuatro copias del mismo documento:
+
+       {{SEGUNDOS}}    duración de cada clip — 10 en Omni, 8 en GenAI Pro (Veo)
+       {{TOTAL}}       los tres clips sumados
+       {{CARACTERES}}  cuántos caracteres cabe hablar en ese tiempo
+       {{EXTRAS}}      lo que sabemos del producto y del personaje y él no:
+                       si tiene pago a plazos y si habla un hombre o una mujer
+
+     Los dos ganchos son el MISMO documento salvo las escenas 1 y 2, pero se
+     guardan enteros y no como base + bloque: así se pega tal cual el que
+     publique él y se ve de un vistazo qué cambió. -->
+
+Quiero crear anuncios UGC para productos de TikTok Shop utilizando Omni. Como Omni solo permite generar vídeos de {{SEGUNDOS}} segundos, divide cada anuncio en tres clips independientes de {{SEGUNDOS}} segundos que, al unirlos, formen un anuncio completo de {{TOTAL}} segundos.
+Te iré enviando la imagen de cada producto. Para cada producto, crea tres escenas. Cada escena debe incluir:
+Un prompt para crear la imagen representativa de la escena.
+Un prompt de vídeo independiente y listo para introducir en Omni.
+REFERENCIAS OBLIGATORIAS
+Tanto en el prompt de imagen como en el prompt de vídeo de cada escena debes mencionar expresamente:
+«La persona de la imagen de referencia».
+«El producto de la imagen de referencia».
+La persona debe conservar su rostro, edad aparente, cuerpo, peinado, ropa y apariencia física. El producto debe conservar exactamente su diseño, forma, colores, detalles y proporciones.
+CONTINUIDAD ENTRE LAS ESCENAS
+Las tres escenas deben formar una historia coherente y parecer partes del mismo anuncio. Mantén:
+La misma persona.
+La misma ropa.
+El mismo producto.
+El mismo escenario.
+Una evolución lógica de las acciones.
+Sin embargo, todos los prompts deben ser completamente independientes y comprensibles por sí solos.
+Dentro de los prompts de imagen y vídeo no utilices expresiones como:
+«Continúa».
+«Escena anterior».
+«Clip anterior».
+«Como antes».
+«Misma persona».
+«Misma voz».
+«Mantén la voz anterior».
+«En los tres clips».
+PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA
+Antes del prompt de vídeo de cada escena, crea un prompt independiente para generar la imagen representativa que servirá como fotograma inicial del vídeo.
+Cada prompt de imagen debe:
+Mostrar a la persona de la imagen de referencia.
+Mostrar el producto de la imagen de referencia.
+Representar el instante exacto en el que comienza la acción.
+Colocar a la persona en una postura natural y preparada para realizar la acción.
+Mostrar claramente el producto.
+Respetar el rostro, cuerpo, peinado, ropa y apariencia de la persona.
+Respetar la forma, diseño, colores, detalles y proporciones del producto.
+Mantener el escenario establecido para el anuncio.
+Adaptar la postura, la composición y la colocación del producto a la acción de esa escena.
+Crear una imagen realista, natural y propia de un contenido UGC.
+Ser completamente independiente y estar listo para copiar en un generador de imágenes.
+No incluir diálogos, movimientos, descripción vocal, subtítulos, textos, rótulos, interfaces, marcas de agua ni elementos gráficos.
+No mencionar otros clips, imágenes anteriores o escenas previas.
+PROMPT DE VÍDEO PARA OMNI
+Después del prompt de imagen, crea un prompt independiente para animar esa imagen en Omni.
+Cada prompt de vídeo debe contener únicamente:
+La descripción breve de la escena.
+La persona de la imagen de referencia.
+El producto de la imagen de referencia.
+La acción y los movimientos naturales que realiza la persona.
+El guion hablado.
+La descripción completa de la voz.
+No añadas indicaciones sobre formato, resolución, teléfono, cámara, lente, iluminación, movimientos de cámara, planos, cortes, transiciones, música, subtítulos, textos añadidos o logotipos.
+GUION HABLADO
+Cada escena debe incluir un único guion hablado de aproximadamente {{CARACTERES}} caracteres, contando espacios y signos de puntuación.
+El guion debe:
+Poder pronunciarse con naturalidad durante {{SEGUNDOS}} segundos.
+Estar escrito en español.
+Sonar natural, cercano y convincente.
+Tener estilo UGC.
+Aparecer una sola vez y únicamente dentro del prompt de vídeo.
+No aparecer en el prompt de imagen.
+No repetirse en ningún apartado adicional.
+No repetir información de las demás escenas.
+No realizar diagnósticos ni promesas absolutas.
+No mencionar precios ni descuentos concretos.
+No inventar características, materiales, funciones o resultados.
+Utilizar únicamente características visibles en la imagen o confirmadas mediante la información que proporcione.
+{{EXTRAS}}ESTRUCTURA DEL ANUNCIO
+ESCENA 1 — GANCHO Y PRESENTACIÓN
+Capta la atención desde el primer segundo, presenta una situación cotidiana relacionada con el producto e introduce el producto de manera natural.
+ESCENA 2 — CARACTERÍSTICAS Y BENEFICIOS
+Desarrolla las características visibles o confirmadas del producto y relaciónalas con beneficios prácticos para el espectador.
+ESCENA 3 — URGENCIA Y CTA
+Refuerza el beneficio principal e introduce urgencia utilizando y alternando una de estas expresiones:
+«Han mejorado el precio».
+«Han optimizado el precio».
+«Han ajustado el precio».
+«Han dejado el precio más accesible».
+«Han hecho un ajuste en el precio recientemente».
+«Está a un precio que merece la pena».
+«Está a un precio que está genial ahora mismo».
+No menciones precios, cantidades, porcentajes ni descuentos concretos.
+Termina indicando que vaya al carrito naranja, revise sus cupones y compruebe si dispone de pago a plazos y envío gratis.
+IDENTIDAD VOCAL
+Crea una identidad vocal detallada para el anuncio. Incluye exactamente la misma descripción vocal, palabra por palabra, dentro del prompt de vídeo de cada una de las tres escenas.
+La descripción vocal debe especificar:
+Sexo y edad aproximada.
+Idioma.
+Acento concreto y región de procedencia.
+Pronunciación.
+Timbre vocal.
+Tono y altura.
+Ritmo exacto en palabras por minuto.
+Velocidad y cadencia.
+Entonación.
+Nivel de energía.
+Intensidad y volumen.
+Claridad de articulación.
+Naturalidad y expresividad.
+Emoción predominante.
+Duración aproximada de las pausas.
+Presencia o ausencia de cualidades nasales, aireadas, graves, agudas o rasgadas.
+Manera de enfatizar las palabras importantes.
+La descripción vocal debe estar redactada como una instrucción autónoma para Omni. Dentro del prompt de vídeo no debe mencionar otros clips, otras generaciones, una voz anterior ni que debe conservarse la misma voz.
+Ejemplo del nivel de precisión requerido:
+«Voz femenina española de aproximadamente 25 años, con acento madrileño suave y pronunciación castellana natural. Timbre cálido, limpio y ligeramente luminoso; tono medio-agudo y ritmo de 165 palabras por minuto. Cadencia fluida, energía viva pero controlada, volumen medio y articulación clara. Expresividad cercana y convincente, con pausas naturales de entre 0,1 y 0,2 segundos. Voz sin cualidad nasal, rasgada ni excesivamente aireada. Enfatiza suavemente las palabras importantes sin sonar forzada.»
+Puedes crear otra identidad vocal, pero debes copiar literalmente la descripción elegida dentro de los tres prompts de vídeo.
+FORMATO DE ENTREGA
+ESCENA 1 — GANCHO Y PRESENTACIÓN — {{SEGUNDOS}} SEGUNDOS
+PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
+[Prompt completo para generar el fotograma inicial]
+PROMPT DE VÍDEO PARA OMNI:
+[Prompt completo con la acción, el guion hablado escrito una sola vez y la descripción vocal completa]
+Número de caracteres del guion: [cantidad]
+ESCENA 2 — CARACTERÍSTICAS Y BENEFICIOS — {{SEGUNDOS}} SEGUNDOS
+PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
+[Prompt completo para generar el fotograma inicial]
+PROMPT DE VÍDEO PARA OMNI:
+[Prompt completo con la acción, el guion hablado escrito una sola vez y la descripción vocal completa]
+Número de caracteres del guion: [cantidad]
+ESCENA 3 — URGENCIA Y CTA — {{SEGUNDOS}} SEGUNDOS
+PROMPT PARA CREAR LA IMAGEN REPRESENTATIVA:
+[Prompt completo para generar el fotograma inicial]
+PROMPT DE VÍDEO PARA OMNI:
+[Prompt completo con la acción, el guion hablado escrito una sola vez y la descripción vocal completa]
+Número de caracteres del guion: [cantidad]
+No escribas el guion fuera del prompt de vídeo ni lo repitas en apartados separados. Devuélveme únicamente las tres escenas con sus respectivos prompts de imagen y vídeo.
