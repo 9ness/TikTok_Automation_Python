@@ -32,8 +32,8 @@ from src.api.schemas.nicho_general import (
 )
 from src.nicho_general import config
 from src.nicho_general.repos import product_repo
-from src.queue.job_queue import JobQueue
-from src.queue.models import JobMode
+from src.queue.manager import JobQueue
+from src.queue.models import JobMode, JobStatus
 
 router = APIRouter(
     prefix="/api/v1/nicho-general",
@@ -67,22 +67,21 @@ def get_config() -> ConfigUGCResponse:
 
 def _montando(queue: JobQueue | None, source: str, folder: str) -> set[str]:
     """Productos de esta carpeta con un montaje en cola o en curso."""
-    if not queue:
+    if queue is None:
         return set()
+    activos: set[str] = set()
     try:
-        activos = queue.list_jobs(states=("pending", "running"))
+        for job in queue.get_all() or []:
+            if job.mode != JobMode.NICHO_GENERAL_VIDEO:
+                continue
+            p = job.params or {}
+            if str(p.get("source")) != source or str(p.get("folder")) != folder:
+                continue
+            if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
+                activos.add(str(p.get("producto")))
     except Exception:  # noqa: BLE001
-        return set()
-    fuera = set()
-    for j in activos:
-        p = getattr(j, "params", None) or {}
-        if (
-            getattr(j, "mode", None) == JobMode.NICHO_GENERAL_VIDEO
-            and str(p.get("source") or "") == source
-            and str(p.get("folder") or "") == folder
-        ):
-            fuera.add(str(p.get("producto") or ""))
-    return fuera
+        pass
+    return activos
 
 
 @router.get("/productos", response_model=ProductosUGCResponse)
