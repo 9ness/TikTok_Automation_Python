@@ -61,6 +61,24 @@ def get_config() -> ConfigUGCResponse:
             OpcionUGC(clave=k, label=v["label"]) for k, v in config.DURACIONES.items()
         ],
         nichos=[OpcionUGC(clave=k, label=v["label"]) for k, v in config.NICHOS.items()],
+        # Todos los personajes que existen, para poder cambiar el de un
+        # producto a mano. Salen del nicho y de cuántas personas tenga.
+        personajes=[
+            OpcionUGC(
+                clave=config.clave_personaje(n, sexo, i),
+                label=(
+                    f'{meta["label"]} · {config.SEXOS[sexo]}'
+                    + (f" ({i})" if i > 1 else "")
+                ),
+            )
+            for n, meta in config.NICHOS.items()
+            for sexo in config.SEXOS
+            for i in range(1, config.personas_de(n) + 1)
+            # Solo se listan los del sexo del nicho salvo que se hayan creado
+            # más: enseñar los dieciséis cuando hay ocho es prometer caras que
+            # no existen.
+            if sexo == config.sexo_de_nicho(n)
+        ],
         sexos=[OpcionUGC(clave=k, label=v) for k, v in config.SEXOS.items()],
         escenas=config.ESCENAS,
         prompt_personaje=config.prompt_personaje(),
@@ -132,10 +150,13 @@ def list_productos(
             escenas=[EscenaUGC(**e) for e in (mio.get("escenas") or [])],
             voz=str(mio.get("voz") or ""),
             nicho=str(mio.get("nicho") or ""),
-            # El personaje que le toca: el elegido a mano o, si no, el del
-            # nicho — que es el único que existe de verdad (uno por nicho).
-            personaje_clave=config.clave_personaje(
-                str(mio.get("nicho") or ""), str(mio.get("personaje_sexo") or ""),
+            # El personaje que le toca. Si el operador eligió uno a mano manda
+            # ese; si no, el del nicho, repartiendo entre las personas que haya
+            # para no sacar la misma cara en todos.
+            personaje_clave=str(mio.get("personaje") or "") or config.clave_personaje(
+                str(mio.get("nicho") or ""),
+                str(mio.get("personaje_sexo") or ""),
+                config.reparte_persona(str(mio.get("nicho") or ""), folder, pid),
             ),
             personaje=str(mio.get("personaje") or ""),
             personaje_sexo=str(mio.get("personaje_sexo") or ""),

@@ -55,6 +55,10 @@ NICHOS: dict[str, dict[str, str]] = {
     "belleza": {
         "label": "Belleza y bienestar",
         "sexo": "mujer",
+        # TRES personas distintas: es el nicho con ~190 productos y con una
+        # sola la misma cara saldría en 190 vídeos de la cuenta, que es un
+        # patrón que se ve desde fuera. Al subir una más, se sube este número.
+        "personas": 3,
         # La pista para clasificar. La lee Gemini, así que se escribe como se
         # le explicaría a una persona.
         "descripcion": (
@@ -136,14 +140,44 @@ def sexo_de_nicho(nicho: str) -> str:
     return str(NICHOS[nicho_valido(nicho)].get("sexo") or SEXO_DEFECTO)
 
 
-def clave_personaje(nicho: str, sexo: str = "") -> str:
-    """`belleza_mujer`, `tech_hombre`… Es el nombre de su ficha y de su foto.
+def personas_de(nicho: str) -> int:
+    """Cuántas personas distintas hay creadas para ese nicho (mínimo una)."""
+    return max(1, int(NICHOS[nicho_valido(nicho)].get("personas") or 1))
 
-    Sin sexo se usa el del nicho, que es el personaje que de verdad existe:
-    solo se crea uno por nicho.
+
+def clave_personaje(nicho: str, sexo: str = "", persona: int = 1) -> str:
+    """`belleza_mujer`, `belleza_mujer_2`, `tech_hombre`… El nombre de su foto.
+
+    La primera va sin número: así, al añadir una segunda persona a un nicho,
+    lo que ya estaba grabado sigue apuntando a la misma cara.
     """
     nicho = nicho_valido(nicho)
-    return f"{nicho}_{sexo_valido(sexo) if sexo else sexo_de_nicho(nicho)}"
+    base = f"{nicho}_{sexo_valido(sexo) if sexo else sexo_de_nicho(nicho)}"
+    persona = max(1, min(int(persona or 1), personas_de(nicho)))
+    return base if persona == 1 else f"{base}_{persona}"
+
+
+def reparte_persona(nicho: str, folder: str, producto: str) -> int:
+    """Qué persona del nicho le toca a un producto, repartiendo por igual.
+
+    Determinista y sin estado: sale del nombre de la carpeta y del número de
+    producto, así que el mismo producto SIEMPRE cae en la misma persona —
+    reordenar la carpeta o rehacer los guiones no le cambia la cara— y a la
+    vez los diez de una carpeta se reparten entre las que haya.
+
+    Se puede cambiar a mano por producto; esto es solo el reparto por defecto,
+    para no tener que elegir en doscientas tarjetas.
+    """
+    cuantas = personas_de(nicho)
+    if cuantas <= 1:
+        return 1
+    try:
+        n = int("".join(c for c in str(producto) if c.isdigit()) or 0)
+    except ValueError:
+        n = 0
+    # La carpeta entra en la cuenta para que dos carpetas distintas no empiecen
+    # las dos por la misma persona.
+    return (n + sum(ord(c) for c in str(folder))) % cuantas + 1
 
 
 # Tres escenas SIEMPRE: es la estructura del anuncio (dolor/gancho → producto →

@@ -141,3 +141,47 @@ class TestPersonajePorNicho:
 
         sin = [k for k, v in config.NICHOS.items() if not v.get("sexo")]
         assert not sin, f"nichos sin personaje: {sin}"
+
+
+class TestRepartoDePersonas:
+    """Varias personas en un nicho y el reparto entre ellas.
+
+    Sin esto, la cara de `belleza_mujer` saldría en los ~190 productos de ese
+    nicho: un patrón que se ve desde fuera, justo cuando TikTok está mirando
+    la calidad de las cuentas.
+    """
+
+    def test_la_primera_persona_va_sin_numero(self):
+        """Al añadir una segunda, lo ya grabado tiene que seguir apuntando a
+        la misma cara."""
+        from src.nicho_general import config
+
+        assert config.clave_personaje("belleza", persona=1) == "belleza_mujer"
+        assert config.clave_personaje("belleza", persona=2) == "belleza_mujer_2"
+
+    def test_no_se_pide_una_persona_que_no_existe(self):
+        from src.nicho_general import config
+
+        # hogar tiene una sola: pedir la tercera devuelve la que hay.
+        assert config.clave_personaje("hogar", persona=3) == "hogar_mujer"
+
+    def test_el_reparto_es_estable_para_el_mismo_producto(self):
+        """Rehacer los guiones no puede cambiarle la cara a un producto: la
+        foto ya generada dejaría de valer."""
+        from src.nicho_general import config
+
+        una = config.reparte_persona("belleza", "Carpeta_1", "7")
+        otra = config.reparte_persona("belleza", "Carpeta_1", "7")
+        assert una == otra
+
+    def test_una_carpeta_usa_todas_las_personas(self):
+        from collections import Counter
+
+        from src.nicho_general import config
+
+        reparto = Counter(
+            config.reparte_persona("belleza", "Carpeta_1", str(i)) for i in range(1, 11)
+        )
+        assert len(reparto) == 3, f"no las reparte: {reparto}"
+        # Y sin que a una le toque el doble que a otra.
+        assert max(reparto.values()) - min(reparto.values()) <= 1

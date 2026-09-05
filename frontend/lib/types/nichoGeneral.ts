@@ -12,6 +12,8 @@ export interface ConfigUGCResponse {
    *  personaje distinto. */
   nichos: OpcionUGC[];
   sexos: OpcionUGC[];
+  /** Los personajes que existen de verdad (`belleza_mujer_2`…). */
+  personajes: OpcionUGC[];
   escenas: number;
   /** El de crear el personaje: se usa una vez por persona, con una foto de
    *  Pinterest, y su resultado va a Flow. */

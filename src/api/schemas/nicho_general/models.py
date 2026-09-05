@@ -19,6 +19,8 @@ class ConfigUGCResponse(BaseModel):
     # personaje, y es lo que se elige en la tarjeta.
     nichos: list[OpcionUGC] = Field(default_factory=list)
     sexos: list[OpcionUGC] = Field(default_factory=list)
+    # Los personajes que existen de verdad, ya con su nicho y su número.
+    personajes: list[OpcionUGC] = Field(default_factory=list)
     escenas: int = 3
     # El de crear el personaje. Va aquí y no por producto porque es el mismo
     # siempre: se usa una vez por persona, con una foto de Pinterest.
