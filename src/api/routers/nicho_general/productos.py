@@ -70,6 +70,7 @@ def get_config() -> ConfigUGCResponse:
                     f'{meta["label"]} · {config.SEXOS[sexo]}'
                     + (f" ({i})" if i > 1 else "")
                 ),
+                ficha=config.ficha_personaje(config.clave_personaje(n, sexo, i)),
             )
             for n, meta in config.NICHOS.items()
             for sexo in config.SEXOS

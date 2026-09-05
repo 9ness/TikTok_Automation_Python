@@ -365,6 +365,8 @@ function TarjetaUGC({
   // Lo que cabe hablando en ese clip. Sale de la proporción del curso —170
   // caracteres para 10 s— y es lo que decide si una frase se corta.
   const tope = duracion === "8" ? 136 : 170;
+  const fichaPersonaje =
+    (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
   async function adjuntar(files: FileList | null) {
     const lista = Array.from(files ?? []);
@@ -500,12 +502,24 @@ function TarjetaUGC({
             ))}
           </select>
         </div>
-        <p className="text-[10px] text-muted-foreground">
-          Adjunta en Flow la foto{" "}
-          <strong className="text-foreground">{producto.personaje_clave}</strong>
-          {!producto.personaje && " (repartido automáticamente)"}. Cambiarlo
-          solo afecta a los guiones que se escriban después.
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="min-w-0 flex-1 text-[10px] text-muted-foreground">
+            Adjunta en Flow la foto{" "}
+            <strong className="text-foreground">{producto.personaje_clave}</strong>
+            {!producto.personaje && " (repartido automáticamente)"}. Cambiarlo
+            solo afecta a los guiones que se escriban después.
+          </p>
+          {/* La ficha del personaje, por si hay que volver a generar su imagen:
+              se pega en Flow y sale la misma persona. Si aún no está creado, se
+              dice — un botón que copia nada despista más que no tenerlo. */}
+          {fichaPersonaje ? (
+            <CopyChip label="🧍 Su prompt" text={fichaPersonaje} />
+          ) : (
+            <span className="rounded border border-dashed border-amber-500/50 px-1.5 py-0.5 text-[10px] text-amber-500">
+              sin crear
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Los seis textos que se copian, en DOS bloques: primero se hacen las

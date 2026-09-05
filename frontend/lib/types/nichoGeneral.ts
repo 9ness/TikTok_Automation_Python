@@ -3,6 +3,9 @@
 export interface OpcionUGC {
   clave: string;
   label: string;
+  /** Solo en los personajes: su descripción, para regenerar la imagen. Vacía
+   *  si ese personaje aún no está creado. */
+  ficha?: string;
 }
 
 export interface ConfigUGCResponse {

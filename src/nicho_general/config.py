@@ -268,6 +268,32 @@ _SIN_ESTORBOS = (
 )
 
 
+def ficha_personaje(clave: str) -> str:
+    """La descripción de UN personaje ya creado, si la tenemos.
+
+    Es lo que se pega en Flow para volver a generar su imagen: no se usa a
+    diario —lo que se adjunta es la foto—, pero sin ella habría que buscar otra
+    vez la referencia de Pinterest cada vez que se quiera rehacer.
+
+    Cadena vacía si ese personaje aún no está hecho, que es lo normal mientras
+    se van creando.
+    """
+    fichero = prompts_dir() / "personajes" / f"{clave}.md"
+    if not fichero.exists():
+        return ""
+    from src.nicho_pov_bof.config import limpiar_prompt
+
+    return limpiar_prompt(fichero.read_text(encoding="utf-8"))
+
+
+def personajes_hechos() -> set[str]:
+    """Los personajes que ya tienen ficha escrita."""
+    carpeta = prompts_dir() / "personajes"
+    if not carpeta.is_dir():
+        return set()
+    return {f.stem for f in carpeta.glob("*.md") if f.stem != "README"}
+
+
 def prompt_personaje() -> str:
     """El de crear la referencia de la persona (se usa una vez por personaje).
 

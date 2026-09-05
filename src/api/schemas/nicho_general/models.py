@@ -6,10 +6,15 @@ from pydantic import BaseModel, Field
 
 
 class OpcionUGC(BaseModel):
-    """Un gancho o una duración, para pintarlos en la pantalla."""
+    """Un gancho, una duración o un personaje, para pintarlos en la pantalla."""
 
     clave: str
     label: str
+    # Solo en los personajes: su descripción, para poder volver a generar la
+    # imagen sin buscar otra vez la foto de referencia. Vacía = aún no está
+    # creado, y entonces la pantalla lo dice en vez de ofrecer un botón que
+    # copiaría nada.
+    ficha: str = ""
 
 
 class ConfigUGCResponse(BaseModel):
