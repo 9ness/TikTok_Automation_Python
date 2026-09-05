@@ -226,7 +226,30 @@ export function PantallaUGC() {
         titulo="Generar los clips fuera"
         hint="Con el personaje y la foto del producto: primero la imagen de cada escena, y sobre cada imagen, su vídeo."
       >
+        {/* El personaje se hace UNA vez por persona, no por producto: busca a
+            alguien en Pinterest que pegue con el tipo de producto, pásale su
+            foto a ChatGPT con este prompt y lleva lo que devuelva a Flow. Esa
+            imagen es la que se adjunta luego en todas las escenas. */}
+        <CopyChip
+          label="🧍 Prompt del personaje (una vez por persona)"
+          text={cfg.data?.prompt_personaje ?? ""}
+          siempre
+        />
         <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+          <li>
+            0. ¿Aún no tienes personaje? Busca a alguien en{" "}
+            <a
+              href="https://es.pinterest.com/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Pinterest
+            </a>{" "}
+            que pegue con el producto, pásale su foto a ChatGPT con el prompt de
+            arriba y mete el resultado en Flow. Sale de cuerpo entero sobre
+            fondo blanco y vale para todas sus escenas.
+          </li>
           <li>
             1. En Flow, con el <strong>personaje</strong> y la foto del producto
             adjuntos, pega el prompt de <strong>Foto 1</strong>. Repite con la 2

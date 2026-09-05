@@ -16,6 +16,9 @@ class ConfigUGCResponse(BaseModel):
     ganchos: list[OpcionUGC] = Field(default_factory=list)
     duraciones: list[OpcionUGC] = Field(default_factory=list)
     escenas: int = 3
+    # El de crear el personaje. Va aquí y no por producto porque es el mismo
+    # siempre: se usa una vez por persona, con una foto de Pinterest.
+    prompt_personaje: str = ""
 
 
 class EscenaUGC(BaseModel):

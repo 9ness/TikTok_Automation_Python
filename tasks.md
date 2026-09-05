@@ -13,27 +13,22 @@ subir con el ⬆ de esa fila → quemar textos.
   ampliar catálogo cuando haga falta.
 
 ## ⏳ Esperando a que Jonny lo publique (28 ago 2026)
-- [ ] **Nicho General · "UGC Desde 0"** — formato nuevo del curso (4 sep 2026,
-  para el Q4). Los DOS prompts ya están copiados en
-  `src/nicho_general/prompts/`; falta el vídeo tutorial del curso, que el
-  operador ve el 5 sep. Cómo funciona, leído de los prompts:
-  1. **El personaje** (`personaje.md`): de una foto de una persona sale un
-     prompt que la recrea de cuerpo entero sobre fondo blanco. Esa imagen es la
-     referencia fija de la cuenta — mismo planteamiento que la chica del Nicho
-     Ropa Con Personas y la de Carruseles.
-  2. **Las tres escenas** (`guion_tres_escenas.md`): DeepSeek devuelve, por
-     escena, un prompt de imagen y otro de vídeo para Omni. Son 3 clips de 10s
-     (dolor → producto/beneficios → urgencia+CTA) que al pegarlos dan el
-     anuncio. Cada guion ~170 caracteres.
-  3. **La continuidad NO se pide con "continúa"** —lo prohíbe expresamente—:
-     sale de repetir en los tres la misma persona de referencia, el mismo
-     producto, el mismo escenario y la MISMA descripción de voz palabra por
-     palabra. Por eso el ejemplo se ve seguido aunque sean tres generaciones.
-  Lo que habría que construir: catálogo (comparte con POV BOF), ficha de
-  personaje por usuario, y un montaje de TRES clips **ya hablados** — sin TTS
-  ni cuadrar con la voz, como en Nicho Ropa: concatenar, cuadrar duración y
-  quitar la marca de agua. El ejemplo dura ~25s y no 30 porque los clips de
-  Omni salen algo más cortos.
+- [ ] **Nicho General · UGC — lo que falta para usarlo de verdad**. El módulo
+  está montado (prompts, escenas con Gemini, montaje que ordena solo, API,
+  cola y pantalla). Queda:
+  1. **Los personajes**: buscar en Pinterest una persona por tipo de producto
+     (hombre fitness, mujer belleza, mujer 40 hogar…), pasarlos por el prompt
+     de personaje —el botón ya está en el paso 2— y guardar cada imagen. Luego
+     decidir dónde viven (Drive por usuario, como la chica del Nicho Ropa Con
+     Personas) y poder elegirlo por producto: el sexo ya viaja al prompt para
+     que la voz no lo contradiga.
+  2. **Clasificar los productos por tipo de persona**, como el escenario de la
+     chica en Carruseles (Gemini sobre los títulos ya extraídos).
+  3. **Probarlo entero con un producto**: escenas → 3 fotos en Flow → 3 clips →
+     adjuntar → montar. Vigilar que el orden por transcripción acierte y que el
+     recorte del silencio inicial no se coma el arranque de la voz.
+  4. Ver el vídeo tutorial del curso por si añade algo (sobre todo qué hacer
+     cuando los tres clips no llegan a los 30 s).
 - [ ] **Ropa Mujer/Hombre con el diseño del POV BOF**: hoy abre con la portada
   del curso (media pantalla en el móvil) y los selectores van sueltos en una
   caja sin rótulos. Unificar como allí: cabecera de TEXTO (icono + título +

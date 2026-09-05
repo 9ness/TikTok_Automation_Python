@@ -61,6 +61,7 @@ def get_config() -> ConfigUGCResponse:
             OpcionUGC(clave=k, label=v["label"]) for k, v in config.DURACIONES.items()
         ],
         escenas=config.ESCENAS,
+        prompt_personaje=config.prompt_personaje(),
     )
 
 

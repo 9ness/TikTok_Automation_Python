@@ -9,6 +9,9 @@ export interface ConfigUGCResponse {
   ganchos: OpcionUGC[];
   duraciones: OpcionUGC[];
   escenas: number;
+  /** El de crear el personaje: se usa una vez por persona, con una foto de
+   *  Pinterest, y su resultado va a Flow. */
+  prompt_personaje: string;
 }
 
 export interface EscenaUGC {
