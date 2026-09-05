@@ -60,6 +60,8 @@ def get_config() -> ConfigUGCResponse:
         duraciones=[
             OpcionUGC(clave=k, label=v["label"]) for k, v in config.DURACIONES.items()
         ],
+        nichos=[OpcionUGC(clave=k, label=v["label"]) for k, v in config.NICHOS.items()],
+        sexos=[OpcionUGC(clave=k, label=v) for k, v in config.SEXOS.items()],
         escenas=config.ESCENAS,
         prompt_personaje=config.prompt_personaje(),
     )
@@ -129,6 +131,12 @@ def list_productos(
             en_escaparate=pov_repo.marcado_en_escaparate(t, escaparate),
             escenas=[EscenaUGC(**e) for e in (mio.get("escenas") or [])],
             voz=str(mio.get("voz") or ""),
+            nicho=str(mio.get("nicho") or ""),
+            # El personaje que le toca: el elegido a mano o, si no, el del
+            # nicho — que es el único que existe de verdad (uno por nicho).
+            personaje_clave=config.clave_personaje(
+                str(mio.get("nicho") or ""), str(mio.get("personaje_sexo") or ""),
+            ),
             personaje=str(mio.get("personaje") or ""),
             personaje_sexo=str(mio.get("personaje_sexo") or ""),
             clips=[str(c) for c in (mio.get("clips") or [])],
@@ -284,7 +292,7 @@ def set_estado(
     duracion = config.duracion_valida(body.duracion)
     campos = {
         k: v for k, v in (
-            ("uploaded", body.uploaded), ("sold", body.sold),
+            ("uploaded", body.uploaded), ("sold", body.sold), ("nicho", body.nicho),
             ("personaje", body.personaje), ("personaje_sexo", body.personaje_sexo),
         ) if v is not None
     }

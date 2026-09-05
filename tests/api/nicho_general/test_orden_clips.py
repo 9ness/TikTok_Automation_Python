@@ -115,3 +115,29 @@ class TestRecorteDeGuiones:
         )
         originales = self._escenas([200, 190, 180])
         assert svc._acortar("p", "d", None, originales, 136, lambda _m: None) == originales
+
+
+class TestPersonajePorNicho:
+    """Un personaje por nicho, y el sexo se puede forzar por producto."""
+
+    def test_cada_nicho_trae_el_suyo(self):
+        from src.nicho_general import config
+
+        assert config.clave_personaje("belleza") == "belleza_mujer"
+        assert config.clave_personaje("fitness") == "fitness_hombre"
+        # Lo que no se clasifica tiene que caer en algo que EXISTA: un producto
+        # sin personaje no se puede grabar.
+        assert config.clave_personaje("loquesea") == "generico_mujer"
+
+    def test_se_puede_forzar_el_otro_sexo(self):
+        """Hay productos que funcionan con cualquiera de los dos; entonces hay
+        que haber creado también ese personaje."""
+        from src.nicho_general import config
+
+        assert config.clave_personaje("belleza", "hombre") == "belleza_hombre"
+
+    def test_los_ocho_nichos_tienen_sexo(self):
+        from src.nicho_general import config
+
+        sin = [k for k, v in config.NICHOS.items() if not v.get("sexo")]
+        assert not sin, f"nichos sin personaje: {sin}"

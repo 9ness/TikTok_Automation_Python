@@ -40,6 +40,112 @@ DURACIONES: dict[str, dict] = {
 }
 DURACION_DEFECTO = "10"
 
+# Los NICHOS de producto, sacados de contar los 734 títulos que hay extraídos
+# (sep 2026). No son categorías de tienda: son "quién sale en el vídeo", que es
+# lo único que decide qué personaje le toca a un producto.
+#
+# Cada nicho trae el `sexo` que le pega, que es el personaje que hay que crear:
+# UNO por nicho, ocho en total. El sexo se puede cambiar por producto (hay
+# cosas que funcionan con cualquiera de los dos), pero entonces hace falta
+# haber creado también ese personaje.
+#
+# Lo que no se pueda clasificar cae en `generico`, que existe para eso: un
+# producto sin personaje no se puede grabar.
+NICHOS: dict[str, dict[str, str]] = {
+    "belleza": {
+        "label": "Belleza y bienestar",
+        "sexo": "mujer",
+        # La pista para clasificar. La lee Gemini, así que se escribe como se
+        # le explicaría a una persona.
+        "descripcion": (
+            "cosmética, cuidado de la piel y el pelo, maquillaje, perfumes y "
+            "SUPLEMENTOS en cápsulas o polvo que no sean deportivos (colágeno, "
+            "vitaminas, moringa, coenzima Q10, melatonina)"
+        ),
+    },
+    "hogar": {
+        "label": "Hogar y cocina",
+        "sexo": "mujer",
+        "descripcion": (
+            "orden, limpieza, almacenaje, textil, plantas, menaje y pequeño "
+            "electrodoméstico de cocina, y accesorios de mascotas"
+        ),
+    },
+    "exterior": {
+        "label": "Exterior y bricolaje",
+        "sexo": "hombre",
+        "descripcion": (
+            "jardín, terraza, piscina, playa, camping, barbacoa, herramientas, "
+            "bicicletas y patinetes, y todo lo que hay que montar"
+        ),
+    },
+    "tech": {
+        "label": "Tecnología y gaming",
+        "sexo": "hombre",
+        "descripcion": (
+            "electrónica, gaming, escritorios y sillas de ordenador, "
+            "iluminación inteligente, audio, cargadores y gadgets"
+        ),
+    },
+    "fitness": {
+        "label": "Fitness",
+        "sexo": "hombre",
+        "descripcion": (
+            "material de entrenamiento y suplementos DEPORTIVOS: proteína, "
+            "creatina, pre-entreno. Los demás suplementos son de belleza"
+        ),
+    },
+    "bebe": {
+        "label": "Bebé y crianza",
+        "sexo": "mujer",
+        "descripcion": "todo lo de bebés y niños pequeños: biberones, pañales, cunas, juguetes",
+    },
+    "viaje": {
+        "label": "Viaje",
+        "sexo": "mujer",
+        "descripcion": "maletas, mochilas de cabina, neceseres y accesorios de viaje",
+    },
+    "generico": {
+        "label": "Genérico",
+        "sexo": "mujer",
+        "descripcion": (
+            "lo que no encaje claramente en los demás. Se usa cuando dudes: "
+            "vale más un genérico que un nicho equivocado"
+        ),
+    },
+}
+NICHO_DEFECTO = "generico"
+
+# De cada nicho hay dos personajes. El sexo se elige por producto: hay cosas
+# que funcionan igual con cualquiera de los dos y alternar evita que todos los
+# vídeos de la cuenta salgan con la misma cara.
+SEXOS = {"mujer": "Mujer", "hombre": "Hombre"}
+SEXO_DEFECTO = "mujer"
+
+
+def nicho_valido(nicho: str) -> str:
+    return nicho if nicho in NICHOS else NICHO_DEFECTO
+
+
+def sexo_valido(sexo: str) -> str:
+    return sexo if sexo in SEXOS else SEXO_DEFECTO
+
+
+def sexo_de_nicho(nicho: str) -> str:
+    """El personaje que le toca a ese nicho si no se ha elegido otro."""
+    return str(NICHOS[nicho_valido(nicho)].get("sexo") or SEXO_DEFECTO)
+
+
+def clave_personaje(nicho: str, sexo: str = "") -> str:
+    """`belleza_mujer`, `tech_hombre`… Es el nombre de su ficha y de su foto.
+
+    Sin sexo se usa el del nicho, que es el personaje que de verdad existe:
+    solo se crea uno por nicho.
+    """
+    nicho = nicho_valido(nicho)
+    return f"{nicho}_{sexo_valido(sexo) if sexo else sexo_de_nicho(nicho)}"
+
+
 # Tres escenas SIEMPRE: es la estructura del anuncio (dolor/gancho → producto →
 # urgencia y CTA), no un parámetro.
 ESCENAS = 3

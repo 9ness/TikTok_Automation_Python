@@ -29,7 +29,7 @@ import {
   useMontarUGC,
   useProductosUGC,
 } from "@/lib/queries/nichoGeneral";
-import type { ProductoUGC } from "@/lib/types/nichoGeneral";
+import type { ConfigUGCResponse, ProductoUGC } from "@/lib/types/nichoGeneral";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -313,6 +313,7 @@ export function PantallaUGC() {
               folder={folder}
               gancho={gancho}
               duracion={duracion}
+              cfg={cfg.data}
             />
           ))}
         </div>
@@ -333,12 +334,14 @@ function TarjetaUGC({
   folder,
   gancho,
   duracion,
+  cfg,
 }: {
   producto: ProductoUGC;
   source: string;
   folder: string;
   gancho: string;
   duracion: string;
+  cfg?: ConfigUGCResponse;
 }) {
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
@@ -451,6 +454,57 @@ function TarjetaUGC({
           <CopyChip label="🗣️ Voz" text={producto.voz} />
         </div>
       )}
+
+      {/* Con qué persona se graba: el nicho lo pone la IA al escribir las
+          escenas y aquí se corrige, y el sexo se alterna a mano para no sacar
+          la misma cara en todos los vídeos de la cuenta. */}
+      <div className="space-y-1 rounded-lg border border-border/60 p-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          🧍 Personaje
+        </p>
+        <div className="flex flex-wrap items-center gap-1">
+          <select
+            value={producto.nicho || "generico"}
+            onChange={(e) =>
+              estado.mutate(
+                { ...clave, nicho: e.target.value },
+                { onError: (err) => toast.error(String(err)) },
+              )
+            }
+            className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px]"
+          >
+            {(cfg?.nichos ?? []).map((n) => (
+              <option key={n.clave} value={n.clave}>
+                {n.label}
+              </option>
+            ))}
+          </select>
+          {(cfg?.sexos ?? []).map((sx) => (
+            <button
+              key={sx.clave}
+              type="button"
+              onClick={() =>
+                estado.mutate(
+                  { ...clave, personaje_sexo: sx.clave },
+                  { onError: (err) => toast.error(String(err)) },
+                )
+              }
+              className={`rounded-md border px-2 py-1 text-[11px] transition ${
+                (producto.personaje_sexo || "mujer") === sx.clave
+                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {sx.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          Adjunta en Flow el personaje{" "}
+          <strong className="text-foreground">{producto.personaje_clave}</strong>{" "}
+          — cambiarlo aquí solo afecta a los guiones que se escriban después.
+        </p>
+      </div>
 
       {/* Los seis textos que se copian, en DOS bloques: primero se hacen las
           tres fotos y luego, sobre cada una, su vídeo. Mezclados en una fila

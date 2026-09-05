@@ -8,6 +8,10 @@ export interface OpcionUGC {
 export interface ConfigUGCResponse {
   ganchos: OpcionUGC[];
   duraciones: OpcionUGC[];
+  /** Los nichos de producto y los dos sexos: de cada combinación hay un
+   *  personaje distinto. */
+  nichos: OpcionUGC[];
+  sexos: OpcionUGC[];
   escenas: number;
   /** El de crear el personaje: se usa una vez por persona, con una foto de
    *  Pinterest, y su resultado va a Flow. */
@@ -40,8 +44,13 @@ export interface ProductoUGC {
   en_escaparate: boolean;
   escenas: EscenaUGC[];
   voz: string;
+  /** De qué nicho es. Lo pone Gemini al escribir las escenas y se corrige a
+   *  mano si se equivoca; es lo que decide el personaje. */
+  nicho: string;
   personaje: string;
   personaje_sexo: string;
+  /** `belleza_mujer`… El nombre de la foto que se adjunta en Flow. */
+  personaje_clave: string;
   clips: string[];
   video_path?: string | null;
   video_listo_at: number;

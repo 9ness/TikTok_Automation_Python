@@ -92,6 +92,8 @@ export function useEstadoUGC() {
       source: string; folder: string; producto: string;
       gancho: string; duracion: string;
       uploaded?: boolean; sold?: boolean; en_escaparate?: boolean;
+      /** En qué nicho cae: lo pone la IA y se corrige a mano. */
+      nicho?: string;
       personaje?: string; personaje_sexo?: string;
     }
   >({

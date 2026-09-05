@@ -15,6 +15,10 @@ class OpcionUGC(BaseModel):
 class ConfigUGCResponse(BaseModel):
     ganchos: list[OpcionUGC] = Field(default_factory=list)
     duraciones: list[OpcionUGC] = Field(default_factory=list)
+    # Los nichos de producto y los dos sexos: de cada combinación hay un
+    # personaje, y es lo que se elige en la tarjeta.
+    nichos: list[OpcionUGC] = Field(default_factory=list)
+    sexos: list[OpcionUGC] = Field(default_factory=list)
     escenas: int = 3
     # El de crear el personaje. Va aquí y no por producto porque es el mismo
     # siempre: se usa una vez por persona, con una foto de Pinterest.
@@ -49,10 +53,17 @@ class ProductoUGC(BaseModel):
     # Lo propio de este nicho, por gancho y duración.
     escenas: list[EscenaUGC] = Field(default_factory=list)
     voz: str = ""
+    # De qué nicho es: lo decide Gemini al escribir las escenas y se puede
+    # corregir a mano. Es lo que elige el personaje.
+    nicho: str = ""
     # Con qué persona se graba. El sexo va al prompt para que la identidad
     # vocal no contradiga al personaje.
     personaje: str = ""
     personaje_sexo: str = ""
+    # `belleza_mujer`, `tech_hombre`… El nombre de la foto que hay que
+    # adjuntar en Flow. Lo calcula el backend para que la pantalla no tenga que
+    # saberse qué sexo le toca a cada nicho.
+    personaje_clave: str = ""
     clips: list[str] = Field(default_factory=list)
     video_path: str | None = None
     video_listo_at: int = 0
@@ -76,6 +87,7 @@ class EstadoUGCRequest(BaseModel):
     uploaded: bool | None = None
     sold: bool | None = None
     en_escaparate: bool | None = None
+    nicho: str | None = None
     personaje: str | None = None
     personaje_sexo: str | None = None
 
