@@ -75,10 +75,12 @@ def get_config() -> ConfigUGCResponse:
             for n, meta in config.NICHOS.items()
             for sexo in config.SEXOS
             for i in range(1, config.personas_de(n) + 1)
-            # Solo se listan los del sexo del nicho salvo que se hayan creado
-            # más: enseñar los dieciséis cuando hay ocho es prometer caras que
-            # no existen.
+            # El del sexo del nicho siempre, y el del otro solo cuando ya
+            # tiene ficha escrita: enseñar los dieciséis cuando hay diez es
+            # prometer caras que no existen, pero en cuanto se crea una
+            # aparece sola sin tocar código.
             if sexo == config.sexo_de_nicho(n)
+            or config.ficha_personaje(config.clave_personaje(n, sexo, i))
         ],
         sexos=[OpcionUGC(clave=k, label=v) for k, v in config.SEXOS.items()],
         escenas=config.ESCENAS,
