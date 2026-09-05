@@ -60,3 +60,58 @@ def test_sin_transcripcion_se_respeta_como_se_subieron(transcripciones):
 
 def test_un_solo_clip_no_se_toca():
     assert ve.ordenar_clips(CLIPS[:1], ESCENAS, Path("/tmp"), lambda _m: None) == CLIPS[:1]
+
+
+class TestRecorteDeGuiones:
+    """La segunda pasada cuando los guiones no caben en el clip.
+
+    Aquí sí se reintenta —al revés que en el POV BOF Largo—: allí el montaje
+    cuadra el vídeo a la voz, pero un clip de Omni dura lo que dura y la frase
+    que no quepa se corta por la mitad.
+    """
+
+    def _escenas(self, largos: list[int]) -> list[dict]:
+        return [
+            {"n": i + 1, "titulo": "", "prompt_imagen": "img", "prompt_video": "vid",
+             "guion": "x" * n, "caracteres": n}
+            for i, n in enumerate(largos)
+        ]
+
+    def test_se_queda_con_lo_mas_corto(self, monkeypatch):
+        from src.nicho_general.services import escenas as svc
+
+        cortas = [
+            {"n": 1, "guion": "corto uno", "prompt_video": "vid"},
+            {"n": 2, "guion": "corto dos", "prompt_video": "vid"},
+            {"n": 3, "guion": "corto tres", "prompt_video": "vid"},
+        ]
+        monkeypatch.setattr(
+            "src.tiktok_shop.api.gemini.generate_json",
+            lambda *a, **k: {"escenas": cortas},
+        )
+        salida = svc._acortar(
+            "p", "d", None, self._escenas([200, 200, 200]), 136, lambda _m: None,
+        )
+        assert [e["caracteres"] for e in salida] == [9, 9, 10]
+
+    def test_si_devuelve_algo_mas_largo_no_se_acepta(self, monkeypatch):
+        """Pedir que acorte y que devuelva MÁS pasa: entonces vale lo de antes."""
+        from src.nicho_general.services import escenas as svc
+
+        monkeypatch.setattr(
+            "src.tiktok_shop.api.gemini.generate_json",
+            lambda *a, **k: {"escenas": [{"n": i + 1, "guion": "y" * 300} for i in range(3)]},
+        )
+        originales = self._escenas([200, 190, 180])
+        salida = svc._acortar("p", "d", None, originales, 136, lambda _m: None)
+        assert [e["caracteres"] for e in salida] == [200, 190, 180]
+
+    def test_si_no_devuelve_las_mismas_escenas_se_deja_lo_anterior(self, monkeypatch):
+        from src.nicho_general.services import escenas as svc
+
+        monkeypatch.setattr(
+            "src.tiktok_shop.api.gemini.generate_json",
+            lambda *a, **k: {"escenas": [{"n": 1, "guion": "solo una"}]},
+        )
+        originales = self._escenas([200, 190, 180])
+        assert svc._acortar("p", "d", None, originales, 136, lambda _m: None) == originales

@@ -28,12 +28,12 @@ _noop: OnLog = lambda _m: None
 # DENTRO de cada uno y además suelta, para poder comprobarlo en la pantalla.
 _FORMATO = (
     "\n\nDevuelve SOLO un JSON, sin texto alrededor, con esta forma exacta:\n"
-    '{"voz": "la identidad vocal completa, tal y como la pide el documento",\n'
+    '{{"voz": "la identidad vocal completa, tal y como la pide el documento",\n'
     ' "escenas": [\n'
-    '   {"n": 1, "titulo": "...", "prompt_imagen": "...", "prompt_video": "...",\n'
-    '    "guion": "solo lo que se dice en voz alta", "caracteres": 0},\n'
-    "   {\"n\": 2, ...}, {\"n\": 3, ...}\n"
-    " ]}\n"
+    '   {{"n": 1, "titulo": "...", "prompt_imagen": "...", "prompt_video": "...",\n'
+    '    "guion": "solo lo que se dice en voz alta", "caracteres": 0}},\n'
+    "   {{\"n\": 2, ...}}, {{\"n\": 3, ...}}\n"
+    " ]}}\n"
     "El campo `prompt_video` debe llevar dentro el guion hablado y la identidad "
     "vocal completa, palabra por palabra igual en las tres escenas, tal y como "
     "exige el documento. `guion` es ese mismo texto hablado repetido aparte "
@@ -49,7 +49,12 @@ _FORMATO = (
     "2. EL MISMO ESCENARIO en las tres escenas, descrito con las mismas "
     "palabras: si la primera pasa en el salón, las tres pasan en ese salón. "
     "Cambiar de habitación entre clips convierte el anuncio en tres vídeos "
-    "sueltos."
+    "sueltos.\n"
+    "3. La longitud del guion es un TOPE, no una sugerencia: {tope} caracteres "
+    "como máximo, contando espacios y signos. El clip dura {segundos} segundos "
+    "exactos y lo que no dé tiempo a decir se pierde a media frase. CUENTA "
+    "cada guion antes de responder y, si se pasa aunque sea por poco, "
+    "reescríbelo más corto — no lo entregues confiando en que quepa."
 )
 
 
@@ -80,13 +85,12 @@ def escribir(
     if caption:
         descripcion += f" Descripción: {caption.strip()}"
 
+    meta = config.DURACIONES[config.duracion_valida(duracion)]
     prompt = config.prompt_guion(
         gancho, duracion, plazos=plazos, sexo_personaje=sexo_personaje,
-    )
+    ) + _FORMATO.format(tope=meta["caracteres"], segundos=meta["segundos"])
     datos = generate_json(
-        prompt + _FORMATO,
-        descripcion,
-        images=[str(f) for f in (fotos or [])] or None,
+        prompt, descripcion, images=[str(f) for f in (fotos or [])] or None,
     )
     if not isinstance(datos, dict):
         raise ValueError(
@@ -120,15 +124,32 @@ def escribir(
     if vacias:
         raise ValueError(f"Escenas sin prompt: {vacias}")
 
-    tope = config.DURACIONES[config.duracion_valida(duracion)]["caracteres"]
-    largas = [f'{e["n"]} ({e["caracteres"]})' for e in escenas if e["caracteres"] > tope * 1.15]
+    tope = meta["caracteres"]
+    largas = [e for e in escenas if e["caracteres"] > tope * 1.15]
     if largas:
+        # AQUÍ SÍ se reintenta, al revés que en el POV BOF Largo: allí el
+        # montaje cuadra el vídeo a la voz, pero un clip de Omni dura lo que
+        # dura y la frase que no quepa se corta por la mitad. Una sola vez —si
+        # a la segunda tampoco entra, se avisa y se usa igual.
         on_log(
-            f"[nicho_general] guiones más largos de lo que cabe en "
-            f"{config.DURACIONES[config.duracion_valida(duracion)]['segundos']}s "
-            f"(~{tope} car): {', '.join(largas)}. No se recortan; si al montar "
-            "sobra voz, se rehacen."
+            f"[nicho_general] guiones largos para {meta['segundos']}s "
+            f"(tope {tope}): "
+            + ", ".join(f'{e["n"]}={e["caracteres"]}' for e in largas)
+            + ". Pidiendo que los acorte…"
         )
+        try:
+            escenas = _acortar(
+                prompt, descripcion, fotos, escenas, tope, on_log,
+            )
+        except Exception as e:  # noqa: BLE001 — lo de antes vale, aunque largo
+            on_log(f"[nicho_general] no se pudieron acortar: {e}")
+        largas = [e for e in escenas if e["caracteres"] > tope * 1.15]
+        if largas:
+            on_log(
+                "[nicho_general] siguen largos: "
+                + ", ".join(f'{e["n"]}={e["caracteres"]}' for e in largas)
+                + ". Se usan igual, pero revisa que la voz no se corte."
+            )
     # La voz suelta y la de dentro tienen que ser la misma: si el modelo se
     # inventa una distinta por escena, los tres clips suenan a tres personas.
     if voz and any(voz[:40] not in e["prompt_video"] for e in escenas):
@@ -149,6 +170,57 @@ _INVENTA_PERSONA = re.compile(
     r"muchach\w+|adolescente)\b|\b\d{2}\s*[-–]\s*\d{2}\s*a[ñn]os\b",
     re.IGNORECASE,
 )
+
+
+def _acortar(
+    prompt: str, descripcion: str, fotos, escenas: list[dict], tope: int,
+    on_log: OnLog,
+) -> list[dict]:
+    """Segunda pasada SOLO por longitud, enseñándole lo que se pasó.
+
+    Se le manda lo que escribió y por cuánto se pasó cada guion: pedirlo a
+    secas otra vez devolvía guiones igual de largos, porque el modelo no sabe
+    que ya falló.
+    """
+    from src.tiktok_shop.api.gemini import generate_json
+
+    cuentas = "; ".join(
+        f'escena {e["n"]}: {e["caracteres"]} caracteres' for e in escenas
+    )
+    aviso = (
+        f"\n\nATENCIÓN: en tu respuesta anterior los guiones se pasaron del "
+        f"tope de {tope} caracteres ({cuentas}). Devuelve el MISMO JSON con "
+        "las mismas escenas, el mismo escenario y la misma identidad vocal, "
+        "pero con cada guion reescrito por debajo del tope. No quites la CTA "
+        "ni cambies de qué va cada escena: di lo mismo con menos palabras."
+    )
+    datos = generate_json(
+        prompt + aviso, descripcion,
+        images=[str(f) for f in (fotos or [])] or None,
+    )
+    nuevas = (datos or {}).get("escenas") if isinstance(datos, dict) else None
+    if not isinstance(nuevas, list) or len(nuevas) != len(escenas):
+        on_log("[nicho_general] el recorte no devolvió las mismas escenas; se deja lo anterior")
+        return escenas
+
+    salida = []
+    for viejo, nuevo in zip(escenas, nuevas):
+        if not isinstance(nuevo, dict):
+            salida.append(viejo)
+            continue
+        guion = " ".join(str(nuevo.get("guion") or "").split())
+        # Solo se acepta lo que de verdad sea más corto: si el modelo devuelve
+        # otra cosa más larga, nos quedamos con lo que ya teníamos.
+        if not guion or len(guion) >= viejo["caracteres"]:
+            salida.append(viejo)
+            continue
+        salida.append({
+            **viejo,
+            "prompt_video": str(nuevo.get("prompt_video") or viejo["prompt_video"]).strip(),
+            "guion": guion,
+            "caracteres": len(guion),
+        })
+    return salida
 
 
 def _revisar(escenas: list[dict]) -> list[str]:
