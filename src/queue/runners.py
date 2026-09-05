@@ -3213,6 +3213,242 @@ def _foto_limpia(source: str, folder: str, producto: str):
 
 
 
+def _foto_ficha(source: str, folder: str, producto: str):
+    """La captura de la FICHA (la que lleva precio y características).
+
+    El UGC la necesita y no le vale la limpia: su escena 2 habla de
+    características y el prompt del curso prohíbe inventárselas, así que hay
+    que enseñarle dónde están escritas.
+    """
+    try:
+        from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        par = next(
+            (x for x in photo_pairing.pair_folder(fotos)
+             if str(x.get("producto")) == str(producto)), None,
+        )
+        ficha = (par or {}).get("titled") or {}
+        if ficha.get("id"):
+            return drive_client.fetch_photo(ficha["id"], suffix=".jpg")
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Escribe las tres escenas del UGC de una carpeta (o del catálogo entero).
+
+    Una llamada a Gemini por producto, como los guiones del POV BOF Largo y por
+    el mismo motivo: el anuncio habla de ESE producto. De uno en uno desde la
+    pantalla serían diez esperas seguidas con el operador delante.
+
+    El gancho y la duración viajan DENTRO del trabajo, no se leen al guardar:
+    la cola tarda, y si mientras tanto se cambia de gancho en la pantalla, lo
+    escrito acabaría en el documento del otro — y el suyo vacío. Es el mismo
+    fallo que ya costó una vez en el POV BOF Largo.
+
+    Params: source, folder (vacío = todas), usuario, gancho, duracion, rehacer,
+    productos.
+    """
+    from src.nicho_general import config as ugc_config
+    from src.nicho_general.repos import product_repo
+    from src.nicho_general.services import escenas as escenas_svc
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof.services import drive_client
+
+    p = job.params or {}
+    source, folder = str(p.get("source") or ""), str(p.get("folder") or "")
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+    gancho = ugc_config.gancho_valido(str(p.get("gancho") or ""))
+    duracion = ugc_config.duracion_valida(str(p.get("duracion") or ""))
+    rehacer = bool(p.get("rehacer"))
+    forzados = {str(x) for x in (p.get("productos") or [])}
+    if not source:
+        raise RuntimeError("Falta el catálogo del que escribir las escenas.")
+
+    carpetas = (
+        [folder] if folder
+        else [c.get("name", "") for c in drive_client.list_product_folders(source)]
+    )
+    if not carpetas:
+        raise RuntimeError(f"El catálogo {source!r} no tiene carpetas.")
+
+    pendientes: list[tuple[str, str, dict]] = []
+    sin_textos: list[str] = []
+    for carpeta in carpetas:
+        textos = (
+            pov_repo.load_folder_para(source, carpeta, usuario).get("productos") or {}
+        )
+        if not textos:
+            sin_textos.append(carpeta)
+            continue
+        mios = (
+            product_repo.load_folder(source, carpeta, usuario, gancho, duracion)
+            .get("productos") or {}
+        )
+        for pid in sorted(textos, key=lambda x: (len(x), x)):
+            if not str((textos[pid] or {}).get("titulo") or "").strip():
+                continue
+            ya = len((mios.get(pid) or {}).get("escenas") or []) == ugc_config.ESCENAS
+            if rehacer or (folder and pid in forzados) or not ya:
+                pendientes.append((carpeta, pid, textos[pid]))
+
+    if sin_textos:
+        on_log(
+            f"[ugc] sin textos (se saltan): {', '.join(sin_textos)} — "
+            "sácalos en Configuración › Textos de todo un catálogo"
+        )
+    if not pendientes:
+        if sin_textos and len(sin_textos) == len(carpetas):
+            raise RuntimeError(
+                "Ninguna carpeta tiene textos extraídos todavía: sácalos primero."
+            )
+        on_log("[ugc] todo lo que tiene textos ya tiene sus tres escenas")
+        return "sin-cambios"
+
+    etiqueta = (
+        f"{ugc_config.GANCHOS[gancho]['label']} · "
+        f"{ugc_config.DURACIONES[duracion]['label']}"
+    )
+    on_log(f"[ugc] {len(pendientes)} producto(s) · {etiqueta}")
+
+    def escribir_uno(carpeta: str, pid: str, t: dict) -> bool:
+        # El personaje ya elegido decide el sexo de la voz; si aún no hay,
+        # Gemini la elige y se puede rehacer al asignarlo.
+        mio = product_repo.get_product(source, carpeta, pid, usuario, gancho, duracion)
+        try:
+            escrito = escenas_svc.escribir(
+                titulo=t.get("titulo", ""),
+                tienda=t.get("tienda", ""),
+                caption=t.get("caption", ""),
+                fotos=[f for f in (_foto_ficha(source, carpeta, pid),) if f],
+                gancho=gancho,
+                duracion=duracion,
+                plazos=pov_config.hay_plazos(t),
+                sexo_personaje=str(mio.get("personaje_sexo") or ""),
+                on_log=on_log,
+            )
+        except Exception as e:  # noqa: BLE001 — uno malo no para el resto
+            on_log(f"[ugc] {carpeta} · producto {pid} falló: {e}")
+            return False
+        product_repo.guardar_escenas(
+            source, carpeta, pid, escrito["escenas"], escrito["voz"],
+            usuario=usuario, gancho=gancho, duracion=duracion,
+        )
+        return True
+
+    hechos, fallidos = 0, []
+    for i, (carpeta, pid, t) in enumerate(pendientes):
+        on_progress(
+            i / len(pendientes),
+            f"🎬 {i + 1}/{len(pendientes)} · {carpeta} · producto {pid}",
+        )
+        if escribir_uno(carpeta, pid, t):
+            hechos += 1
+        else:
+            fallidos.append((carpeta, pid, t))
+
+    # Una segunda pasada: casi siempre es un 429 o un 503 de paso de Gemini.
+    if fallidos:
+        on_log("[ugc] reintentando " + ", ".join(f"{c}/{p}" for c, p, _ in fallidos))
+        reintento, fallidos = fallidos, []
+        for carpeta, pid, t in reintento:
+            time.sleep(2)
+            if escribir_uno(carpeta, pid, t):
+                hechos += 1
+            else:
+                fallidos.append((carpeta, pid, t))
+
+    on_progress(1.0, "🎬 Escenas listas")
+    if fallidos:
+        sin = ", ".join(f"{c}/{p}" for c, p, _ in fallidos)
+        raise RuntimeError(
+            f"{hechos}/{len(pendientes)} productos con escenas. Sin escribir: "
+            f"{sin}. Vuelve a darle: solo se rehace lo que falta."
+        )
+    return f"{hechos}/{len(pendientes)} productos con sus tres escenas"
+
+
+def run_nicho_general_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Monta el anuncio: ordena los clips subidos, los limpia y los pega.
+
+    Params: source, folder, producto, usuario, gancho, duracion.
+    """
+    from pathlib import Path
+
+    from src.nicho_general import config as ugc_config
+    from src.nicho_general.pipeline import video_editor
+    from src.nicho_general.repos import product_repo
+
+    p = job.params or {}
+    source, folder = str(p.get("source") or ""), str(p.get("folder") or "")
+    producto = str(p.get("producto") or "")
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+    gancho = ugc_config.gancho_valido(str(p.get("gancho") or ""))
+    duracion = ugc_config.duracion_valida(str(p.get("duracion") or ""))
+    if not (source and folder and producto):
+        raise RuntimeError("Falta el producto que montar.")
+
+    mio = product_repo.get_product(source, folder, producto, usuario, gancho, duracion)
+    clips = [Path(c) for c in (mio.get("clips") or []) if c and Path(c).exists()]
+    if not clips:
+        raise RuntimeError(
+            "No hay clips subidos para este producto (o ya no están en el disco)."
+        )
+    escenas = mio.get("escenas") or []
+    if len(clips) != ugc_config.ESCENAS:
+        on_log(
+            f"[ugc] hay {len(clips)} clip(s) y el anuncio son "
+            f"{ugc_config.ESCENAS}: se monta con lo que hay."
+        )
+
+    on_progress(0.15, "🎬 Ordenando los clips por lo que dicen…")
+    salida = _salida_ugc(source, folder, producto, usuario, gancho, duracion)
+    video_editor.montar(clips, escenas, salida, on_log=on_log)
+
+    on_progress(0.95, "🎬 Guardando…")
+    product_repo.update_product(
+        source, folder, producto, usuario, gancho, duracion,
+        video_path=str(salida), video_listo_at=int(time.time()),
+    )
+    on_progress(1.0, "🎬 Vídeo listo")
+    return str(salida)
+
+
+def _salida_ugc(
+    source: str, folder: str, producto: str, usuario: str,
+    gancho: str, duracion: str,
+):
+    """Dónde se deja el anuncio montado, en el Drive MONTADO del operador.
+
+    Por usuario y por carpeta, y el nombre lleva el gancho y la duración: del
+    mismo producto salen hasta cuatro anuncios distintos y si se pisaran habría
+    que volver a generar los clips, que es lo caro.
+
+    Si no hay mount (desarrollo), a un temporal: quedarse sin montar por eso
+    sería peor que dejar el vídeo en otro sitio.
+    """
+    from pathlib import Path
+
+    from src.nicho_general import config as ugc_config
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    base = (
+        raiz / "TIKTOK_SHOP_AI_PRO" / "Nicho_General" if raiz
+        else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_general"
+    )
+    carpeta = base / (usuario or "ness") / folder
+    carpeta.mkdir(parents=True, exist_ok=True)
+    clave = ugc_config.clave_guion(gancho, duracion)
+    return carpeta / f"ugc_{producto}_{clave}_{int(time.time())}.mp4"
+
+
 def run_nicho_carruseles_preparar(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Filtra y escribe los mensajes de TODO un catálogo, carpeta por carpeta.
 
@@ -4230,6 +4466,8 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.CUENTA_PILOTO_VIDEO: run_cuenta_piloto_video,
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: run_nicho_pov_bof_largo_video,
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: run_nicho_pov_bof_largo_guiones,
+    JobMode.NICHO_GENERAL_ESCENAS: run_nicho_general_escenas,
+    JobMode.NICHO_GENERAL_VIDEO: run_nicho_general_video,
     JobMode.NICHO_POV_BOF_GUIONES: run_nicho_pov_bof_guiones,
     JobMode.NICHO_POV_BOF_RENUMERAR: run_nicho_pov_bof_renumerar,
     JobMode.NICHO_CARRUSELES_PREPARAR: run_nicho_carruseles_preparar,
@@ -4265,6 +4503,8 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.CUENTA_PILOTO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "viralizacion",
+    JobMode.NICHO_GENERAL_ESCENAS: "viralizacion",
+    JobMode.NICHO_GENERAL_VIDEO: "viralizacion",
     JobMode.NICHO_POV_BOF_GUIONES: "viralizacion",
     JobMode.NICHO_POV_BOF_RENUMERAR: "viralizacion",
     JobMode.NICHO_CARRUSELES_PREPARAR: "viralizacion",

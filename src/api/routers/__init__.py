@@ -49,6 +49,7 @@ from .nicho_ropa_personas import (
 from .nicho_bof_cine import productos_router as nicho_bof_cine_router
 from .cuenta_piloto import productos_router as cuenta_piloto_router
 from .nicho_pov_bof_largo import productos_router as nicho_pov_bof_largo_router
+from .nicho_general import router as nicho_general_router
 from .nicho_creativos import productos_router as nicho_creativos_router
 from .nicho_carruseles import carruseles_router as nicho_carruseles_router
 from .plantillas import plantillas_router
@@ -122,6 +123,7 @@ __all__ = [
     "nicho_gorras_router",
     "cuenta_piloto_router",
     "nicho_pov_bof_largo_router",
+    "nicho_general_router",
     "nicho_creativos_router",
     "nicho_carruseles_router",
     "plantillas_router",

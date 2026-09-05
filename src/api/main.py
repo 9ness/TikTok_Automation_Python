@@ -96,6 +96,7 @@ from src.api.routers import (
     nicho_gorras_router,
     cuenta_piloto_router,
     nicho_pov_bof_largo_router,
+    nicho_general_router,
     nicho_creativos_router,
     nicho_carruseles_router,
     plantillas_router,
@@ -335,6 +336,7 @@ def create_app() -> FastAPI:
     app.include_router(nicho_gorras_router)
     app.include_router(cuenta_piloto_router)
     app.include_router(nicho_pov_bof_largo_router)
+    app.include_router(nicho_general_router)
     app.include_router(nicho_creativos_router)
     app.include_router(nicho_carruseles_router)
     app.include_router(plantillas_router)

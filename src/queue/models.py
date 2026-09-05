@@ -50,6 +50,12 @@ class JobMode(str, Enum):
     NICHO_POV_BOF_LARGO_VIDEO = "nicho_pov_bof_largo_video"
     # POV BOF Largo: los guiones de TODA una carpeta, de una tacada.
     NICHO_POV_BOF_LARGO_GUIONES = "nicho_pov_bof_largo_guiones"
+    # Nicho General · UGC: las tres escenas del anuncio y el montaje de los
+    # tres clips. Van separadas porque son dos momentos distintos del trabajo
+    # —primero se escriben los prompts de toda la carpeta, luego se generan los
+    # clips fuera y se suben— y cada una tarda lo suyo.
+    NICHO_GENERAL_ESCENAS = "nicho_general_escenas"
+    NICHO_GENERAL_VIDEO = "nicho_general_video"
     # POV BOF: los guiones de 10s de TODA una carpeta, de una tacada.
     NICHO_POV_BOF_GUIONES = "nicho_pov_bof_guiones"
     # Cerrar los huecos de numeración de "Mis productos" tras borrar uno.
@@ -97,6 +103,8 @@ MODE_LABELS = {
     JobMode.CUENTA_PILOTO_VIDEO: "🧪 Vídeo Cuenta Piloto",
     JobMode.NICHO_POV_BOF_LARGO_VIDEO: "🎙️ Vídeo POV BOF Largo",
     JobMode.NICHO_POV_BOF_LARGO_GUIONES: "✍️ Guiones POV BOF Largo",
+    JobMode.NICHO_GENERAL_ESCENAS: "🎬 Escenas UGC",
+    JobMode.NICHO_GENERAL_VIDEO: "🎬 Vídeo UGC",
     JobMode.NICHO_POV_BOF_GUIONES: "✍️ Guiones POV BOF",
     JobMode.NICHO_POV_BOF_RENUMERAR: "🔢 Renumerar productos propios",
     JobMode.NICHO_CARRUSELES_PREPARAR: "🖼️ Preparar carruseles",
