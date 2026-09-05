@@ -1,0 +1,541 @@
+"use client";
+
+import {
+  Clapperboard,
+  Download,
+  Image as ImageIcon,
+  Loader2,
+  Sparkles,
+  Upload,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { ApiError } from "@/lib/api";
+import { nombreDescarga } from "@/lib/descargas";
+import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
+import {
+  buildCleanPhotoDownloadUrl,
+  useFolders,
+  useSources,
+} from "@/lib/queries/nichoPovBof";
+import {
+  buildVideoUGCUrl,
+  subirClipUGC,
+  useConfigUGC,
+  useEscenasLote,
+  useEstadoUGC,
+  useLimpiarClipsUGC,
+  useMontarUGC,
+  useProductosUGC,
+} from "@/lib/queries/nichoGeneral";
+import type { ProductoUGC } from "@/lib/types/nichoGeneral";
+import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
+import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
+import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
+import { VideoModal } from "@/components/ui/video-modal";
+
+/** Nicho General · UGC — el anuncio de TRES clips.
+ *
+ *  Se parece a las demás pantallas de nicho a propósito (ver `UI_NICHOS.md`) y
+ *  solo cambia en lo que este formato tiene distinto:
+ *
+ *  - Se elige GANCHO y DURACIÓN, y las dos cosas separan el trabajo: el guion
+ *    de 8 s no es el de 10 recortado, así que son anuncios distintos con sus
+ *    clips y su vídeo.
+ *  - Cada producto trae SEIS textos que copiar (tres fotos y tres vídeos), en
+ *    dos bloques para no confundirlos.
+ *  - Los clips se adjuntan TODOS DE GOLPE y sin decir cuál es cuál: el montaje
+ *    los ordena escuchándolos.
+ */
+export function PantallaUGC() {
+  const sources = useSources();
+  const cfg = useConfigUGC();
+  const [source, setSource] = useEstadoDeUsuario("ugc:source", "aleatorios_2");
+  const [folder, setFolder] = useEstadoDeUsuario("ugc:folder", "");
+  const [gancho, setGancho] = useEstadoDeUsuario("ugc:gancho", "dolor");
+  const [duracion, setDuracion] = useEstadoDeUsuario("ugc:duracion", "10");
+
+  const folders = useFolders(source);
+  const carpetas = folders.data?.items ?? [];
+  useEffect(() => {
+    if (!carpetas.length) return;
+    if (!carpetas.some((c) => c.name === folder)) setFolder(carpetas[0]!.name);
+  }, [carpetas, folder, setFolder]);
+
+  const productos = useProductosUGC(source, folder, gancho, duracion);
+  const items = productos.data?.items ?? [];
+  const conEscenas = items.filter((p) => p.escenas.length > 0).length;
+  const conVideo = items.filter((p) => p.video_path).length;
+
+  const escenasLote = useEscenasLote();
+
+  return (
+    <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-24 sm:space-y-4">
+      <header className="rounded-xl border border-border/60 bg-card p-3">
+        <div className="flex items-center gap-2">
+          <Clapperboard className="h-5 w-5 shrink-0 text-emerald-500" />
+          <div className="min-w-0">
+            <h1 className="text-base font-bold sm:text-lg">Nicho General · UGC</h1>
+            <p className="text-[11px] text-muted-foreground">
+              Un anuncio de TRES clips: dolor o gancho → producto → urgencia y
+              CTA
+            </p>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+          Cada escena se genera aparte y se pegan al final. La continuidad sale
+          del personaje, del escenario y de que la voz sea la misma en las
+          tres — por eso los clips hay que generarlos con la misma referencia.
+        </p>
+      </header>
+
+      <Caja
+        icono="📁"
+        titulo="Dónde trabajas"
+        hint="El catálogo y la carpeta son los del POV BOF; el gancho y la duración, de este nicho."
+        extra={`${conVideo}/${items.length} con vídeo`}
+      >
+        <Sub>Catálogo</Sub>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {(sources.data?.items ?? []).map((s) => (
+            <button
+              key={s.slug}
+              type="button"
+              onClick={() => setSource(s.slug)}
+              className={`break-words leading-tight rounded-lg border px-2 py-2 text-[11px] transition sm:text-xs ${
+                source === s.slug
+                  ? "border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-500"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <Sub>Gancho</Sub>
+        {/* Los dos enfoques del curso: el documento es el mismo salvo las
+            escenas 1 y 2, pero el anuncio que sale no se parece en nada. */}
+        <div className="grid grid-cols-2 gap-1.5">
+          {(cfg.data?.ganchos ?? []).map((g) => (
+            <button
+              key={g.clave}
+              type="button"
+              onClick={() => setGancho(g.clave)}
+              className={`rounded-lg border px-2 py-1.5 text-[11px] transition ${
+                gancho === g.clave
+                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        <Sub>Duración de cada clip</Sub>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(cfg.data?.duraciones ?? []).map((d) => (
+            <button
+              key={d.clave}
+              type="button"
+              onClick={() => setDuracion(d.clave)}
+              className={`rounded-lg border px-2 py-1.5 text-[11px] transition ${
+                duracion === d.clave
+                  ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Cada combinación guarda lo suyo: en 8 segundos no cabe lo mismo que
+          en 10, así que el guion se escribe entero para esa duración y el
+          vídeo es otro. Cambiar aquí no pisa lo que ya tengas hecho.
+        </p>
+
+        <Sub>Carpetas</Sub>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {carpetas.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => setFolder(c.name)}
+              className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
+                folder === c.name
+                  ? "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs font-medium sm:text-sm">
+          {items.length} producto(s) · {conEscenas} con escenas · {conVideo} con vídeo
+        </p>
+      </Caja>
+
+      <Paso
+        n={1}
+        color="violeta"
+        titulo="Escribir las escenas"
+        hint="Lee la ficha del producto y escribe las tres escenas: sus prompts de imagen, sus prompts de vídeo y lo que se dice en cada una."
+        extra={`${conEscenas}/${items.length}`}
+      >
+        <button
+          type="button"
+          disabled={escenasLote.isPending || !folder}
+          onClick={() =>
+            escenasLote.mutate(
+              { source, folder, gancho, duracion },
+              {
+                onSuccess: () => toast.success("A la cola: mira el progreso arriba"),
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
+          }
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Escribir las escenas que falten ({items.length - conEscenas})
+        </button>
+        <button
+          type="button"
+          disabled={escenasLote.isPending || !folder}
+          onClick={() =>
+            escenasLote.mutate(
+              { source, folder, gancho, duracion, rehacer: true },
+              { onSuccess: () => toast.success("Rehaciendo todas") },
+            )
+          }
+          className="w-full rounded-lg border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+        >
+          Rehacer todas las de esta carpeta
+        </button>
+      </Paso>
+
+      <Paso
+        n={2}
+        color="fucsia"
+        titulo="Generar los clips fuera"
+        hint="Con el personaje y la foto del producto: primero la imagen de cada escena, y sobre cada imagen, su vídeo."
+      >
+        <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+          <li>
+            1. En Flow, con el <strong>personaje</strong> y la foto del producto
+            adjuntos, pega el prompt de <strong>Foto 1</strong>. Repite con la 2
+            y la 3.
+          </li>
+          <li>
+            2. Sobre cada foto generada, pega su prompt de{" "}
+            <strong>Vídeo</strong>. Salen los tres clips ya hablados.
+          </li>
+          <li>
+            3. Vuelve aquí y adjúntalos todos de golpe: el orden lo pone el
+            montaje, no hace falta que los renombres.
+          </li>
+        </ol>
+      </Paso>
+
+      <section className="space-y-2">
+        <p className="text-sm font-semibold">Productos</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {items.map((p) => (
+            <TarjetaUGC
+              key={p.producto}
+              producto={p}
+              source={source}
+              folder={folder}
+              gancho={gancho}
+              duracion={duracion}
+            />
+          ))}
+        </div>
+        {!items.length && !productos.isLoading && (
+          <p className="rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+            Esta carpeta no tiene textos extraídos todavía. Sácalos en el Nicho
+            POV BOF o en Configuración: valen para todos los nichos.
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function TarjetaUGC({
+  producto,
+  source,
+  folder,
+  gancho,
+  duracion,
+}: {
+  producto: ProductoUGC;
+  source: string;
+  folder: string;
+  gancho: string;
+  duracion: string;
+}) {
+  const montar = useMontarUGC();
+  const limpiar = useLimpiarClipsUGC();
+  const estado = useEstadoUGC();
+  const [subiendo, setSubiendo] = useState("");
+  const [verVideo, setVerVideo] = useState(false);
+  const [verMas, setVerMas] = useState(false);
+  const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
+  const [subido, setSubido] = useState(producto.uploaded);
+  const [vendio, setVendio] = useState(producto.sold);
+  useEffect(() => {
+    setEnEscaparate(producto.en_escaparate);
+    setSubido(producto.uploaded);
+    setVendio(producto.sold);
+  }, [producto.en_escaparate, producto.uploaded, producto.sold]);
+
+  const clave = { source, folder, producto: producto.producto, gancho, duracion };
+  const escenas = producto.escenas;
+
+  async function adjuntar(files: FileList | null) {
+    const lista = Array.from(files ?? []);
+    if (!lista.length) return;
+    // De uno en uno y esperando: cada subida escribe en el mismo documento y
+    // lanzarlas a la vez solo se estorban.
+    for (const [i, f] of lista.entries()) {
+      setSubiendo(`${i + 1}/${lista.length}`);
+      try {
+        await subirClipUGC(f, clave, (pct) =>
+          setSubiendo(`${i + 1}/${lista.length} · ${pct}%`),
+        );
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : String(e));
+        break;
+      }
+    }
+    setSubiendo("");
+    toast.success(`${lista.length} clip(s) subidos`);
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+      <div className="flex gap-2">
+        {producto.clean_photo_id && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia", 120)}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-md object-cover"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-xs font-semibold sm:text-sm">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">
+              {producto.producto}
+            </span>
+            <span className="min-w-0 break-words leading-tight">
+              {producto.titulo || "— sin textos todavía —"}
+            </span>
+          </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+            {producto.precio && (
+              <span className="font-mono font-semibold">{producto.precio} €</span>
+            )}
+            <span
+              className={`rounded px-1.5 py-0.5 font-semibold ${
+                producto.plazos
+                  ? "bg-violet-500/15 text-violet-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {producto.plazos ? "💳 con plazos" : "sin plazos"}
+            </span>
+            {escenas.length > 0 && (
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">
+                {escenas.length} escenas
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        <CopyChip label="✍️ Caption" text={producto.caption} siempre />
+        <BotonUrl url={producto.product_url} />
+        <button
+          type="button"
+          onClick={() => setVerMas((v) => !v)}
+          className="rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+        >
+          más {verMas ? "▴" : "▾"}
+        </button>
+      </div>
+      {verMas && (
+        <div className="flex flex-wrap gap-1">
+          <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo} siempre />
+          <CopyChip label="🏪 Tienda" text={producto.tienda} siempre />
+          <CopyChip label="🗣️ Voz" text={producto.voz} />
+        </div>
+      )}
+
+      {/* Los seis textos que se copian, en DOS bloques: primero se hacen las
+          tres fotos y luego, sobre cada una, su vídeo. Mezclados en una fila
+          es cuestión de tiempo pegar el de vídeo en el generador de imagen. */}
+      {escenas.length > 0 ? (
+        <>
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <ImageIcon className="mr-1 inline h-3 w-3" />
+              Fotos · en Flow, con el personaje y el producto
+            </p>
+            <div className="grid grid-cols-3 gap-1">
+              {escenas.map((e) => (
+                <CopyChip key={`i${e.n}`} label={`📸 Foto ${e.n}`} text={e.prompt_imagen} siempre />
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Clapperboard className="mr-1 inline h-3 w-3" />
+              Vídeos · sobre la foto de cada escena
+            </p>
+            <div className="grid grid-cols-3 gap-1">
+              {escenas.map((e) => (
+                <CopyChip key={`v${e.n}`} label={`🎬 Vídeo ${e.n}`} text={e.prompt_video} siempre />
+              ))}
+            </div>
+            {/* Cuántos caracteres tiene cada guion: es lo que decide si cabe en
+                el clip, y el propio curso lo hace contar. */}
+            <p className="text-[10px] text-muted-foreground">
+              {escenas.map((e) => `${e.n}: ${e.caracteres} car.`).join(" · ")}
+            </p>
+          </div>
+        </>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+          Sin escenas todavía — dale al paso 1.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
+          {subiendo ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {subiendo}
+            </>
+          ) : (
+            <>
+              <Upload className="h-3.5 w-3.5" /> Adjuntar clips
+              {producto.clips.length > 0 && ` (${producto.clips.length})`}
+            </>
+          )}
+          <input
+            type="file"
+            accept="video/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              void adjuntar(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!producto.clips.length || producto.montando || montar.isPending}
+          onClick={() =>
+            montar.mutate(clave, {
+              onSuccess: () => toast.success("Montando: se ordenan solos"),
+              onError: (e) =>
+                toast.error(e instanceof ApiError ? e.message : String(e)),
+            })
+          }
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+        >
+          {producto.montando ? "Montando…" : "Montar anuncio"}
+        </button>
+      </div>
+      {producto.clips.length > 0 && !producto.montando && (
+        <button
+          type="button"
+          onClick={() =>
+            limpiar.mutate(clave, { onSuccess: () => toast.success("Clips vaciados") })
+          }
+          className="w-full rounded-lg border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
+        >
+          Quitar los {producto.clips.length} clip(s) y volver a subirlos
+        </button>
+      )}
+
+      {producto.video_path && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setVerVideo(true)}
+              className="rounded-lg border border-emerald-500/60 px-3 py-1.5 text-[11px] text-emerald-500 transition hover:bg-emerald-500/10"
+            >
+              Ver vídeo
+            </button>
+            <a
+              href={buildVideoUGCUrl(clave, true)}
+              download={nombreDescarga("ugc", producto.producto) + ".mp4"}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30"
+            >
+              <Download className="h-3.5 w-3.5" /> Descargar
+            </a>
+          </div>
+          <MontadoEl ts={producto.video_listo_at} />
+        </>
+      )}
+
+      <div className="flex gap-1.5 border-t border-border/60 pt-2">
+        {(
+          [
+            ["🏪 Escaparate", enEscaparate, setEnEscaparate, "en_escaparate", "sky"],
+            ["📤 Subido", subido, setSubido, "uploaded", "sky"],
+            ["💰 Vendió", vendio, setVendio, "sold", "emerald"],
+          ] as const
+        ).map(([label, valor, set, campo, color]) => (
+          <button
+            key={campo}
+            type="button"
+            onClick={() => {
+              set(!valor);
+              estado.mutate(
+                { ...clave, [campo]: !valor },
+                {
+                  onError: (e) => {
+                    set(valor);
+                    toast.error(e instanceof ApiError ? e.message : String(e));
+                  },
+                },
+              );
+            }}
+            className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition ${
+              valor
+                ? color === "emerald"
+                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-500"
+                  : "border-sky-500 bg-sky-500/15 text-sky-500"
+                : "border-border/60 text-muted-foreground hover:border-foreground/40"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <VideoModal
+        open={verVideo}
+        onOpenChange={setVerVideo}
+        title={`Producto ${producto.producto}`}
+        filename={`ugc_${producto.producto}.mp4`}
+        videoUrl={producto.video_path ? buildVideoUGCUrl(clave) : null}
+        downloadUrl={producto.video_path ? buildVideoUGCUrl(clave, true) : null}
+        localPath={producto.video_path}
+      />
+    </div>
+  );
+}

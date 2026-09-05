@@ -47,6 +47,7 @@ nichos.
 | 🖼️ Carruseles | (sin modo — no edita vídeo) | Módulo 14: carrusel de DOS fotos (chica sorprendida + producto) con el texto quemado. Solo productos donde la chica pueda estar EN el sitio |
 | 💬 Plantillas mensajes | (sin modo — no edita vídeo) | Mensajes para el vendedor (muestra gratuita, colaboración) listos para copiar. Editables y guardados POR USUARIO (`src/plantillas/`, prefijo `plantillas:`) |
 | 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
+| 🌐 Nicho General · UGC | `NICHO_GENERAL_ESCENAS` · `NICHO_GENERAL_VIDEO` | Módulo 9, formato "UGC Desde 0" (sep 2026): anuncio de TRES clips de 8 o 10s generados por separado y pegados. Dos ganchos (dolor / general) y dos duraciones, y cada combinación es un anuncio distinto |
 | 🎬 Nicho BOF Cinematográfico | `NICHO_BOF_CINE_VIDEO` | Módulo 10: como POV BOF pero sin mano — DOS clips de 5s con paneo, pegados y cuadrados por velocidad |
 | 👗 Nicho Ropa Con Personas | `NICHO_ROPA_PERSONAS_VIDEO` | Módulo 7: SOLO ropa de mujer, puesta por una modelo creada con IA (ficha JSON por usuario) |
 | 👕 Nicho Ropa Sin Personas | `NICHO_ROPA_VIDEO` | Módulo 8 del curso: prendas de una carpeta de Drive compartida POR ENLACE → textos/caption → prompts (vídeo con y sin manos) → montaje 9:16 SIN texto quemado y MUDO |
@@ -405,6 +406,33 @@ CLAVES (el `href` de un item, el `basePath` de un grupo), nunca el menú entero
 — la lista la manda `Sidebar.tsx` y una copia guardada se quedaría vieja al
 añadir un nicho. Es COSMÉTICO: se aplica encima del menú que da el rol, que
 es lo que de verdad corta (y el backend lo comprueba aparte).
+
+### Nicho General · UGC (mismo programa, módulo 9)
+
+Módulos en [`src/nicho_general/`](src/nicho_general/) (prefijo Redis
+`nicho_general:`). API: `/api/v1/nicho-general/*`. El formato que publicó el
+curso para el Q4, y el primero que NO es un vídeo de una sola pieza: el anuncio
+son **tres clips** (dolor o gancho → producto y beneficios → urgencia y CTA)
+que se generan uno a uno en Flow/Omni y se pegan aquí.
+
+Lo que no tiene ningún otro nicho:
+
+- **Dos ejes, no uno.** El gancho (`GANCHOS`: dolor / general) es como los
+  estilos del POV BOF Largo, pero además está la **duración**: 10s en Omni u 8s
+  en GenAI Pro (Veo). No es un ajuste de vídeo — en 8 segundos no cabe lo mismo,
+  así que el guion se escribe entero para esa duración y el vídeo es otro. Las
+  dos cosas van en la clave del documento.
+- **Un personaje fijo**, creado aparte desde una foto de Pinterest
+  (`prompts/personaje.md`) y reutilizado en todas las escenas: es lo que da la
+  continuidad, junto con el escenario y con que la identidad vocal vaya copiada
+  palabra por palabra en los tres prompts. El curso PROHÍBE decir "continúa" o
+  "misma persona" entre clips.
+- **Los clips se suben sin orden.** El operador los adjunta todos de golpe y
+  `pipeline/video_editor.py` los ordena transcribiéndolos y casándolos con el
+  guion de cada escena; solo se recorta el silencio de ENTRADA de cada uno.
+
+Comparte con el POV BOF catálogo, carpetas, fotos, textos, escaparate y
+vendidos. Lo suyo (escenas, clips, vídeo, subido) es por usuario.
 
 ### Escaparate y vendidos — transversales a TODOS los nichos
 

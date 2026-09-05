@@ -104,11 +104,13 @@ export const MODULOS: ModuloNicho[] = [
   {
     slug: "nicho-general",
     modulo: 9,
-    label: "Nicho General",
+    label: "Nicho General · UGC",
     titulo: "Creación de Nicho General",
     icon: Globe,
-    drive: "Nicho General",
-    resumen: "Nichos rentables en cualquier categoría, sin atarse a un vertical.",
+    drive: "Nicho UGC Desde 0",
+    resumen:
+      "Anuncio UGC de TRES clips: dolor o gancho → producto → urgencia y CTA.",
+    listo: true,
   },
   {
     slug: "nicho-bof-cinematografico",
