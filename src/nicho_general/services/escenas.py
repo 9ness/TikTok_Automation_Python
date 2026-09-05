@@ -13,6 +13,7 @@ prohíbe inventarse lo que no se vea.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -36,7 +37,19 @@ _FORMATO = (
     "El campo `prompt_video` debe llevar dentro el guion hablado y la identidad "
     "vocal completa, palabra por palabra igual en las tres escenas, tal y como "
     "exige el documento. `guion` es ese mismo texto hablado repetido aparte "
-    "para poder contarlo, y `caracteres` su longitud."
+    "para poder contarlo, y `caracteres` su longitud.\n"
+    # Dos cosas que el documento pide pero que se le olvidan en cuanto se
+    # pone a escribir, y las dos rompen la ilusión de que es un solo vídeo:
+    "\nDOS REGLAS QUE NO PUEDES SALTARTE:\n"
+    "1. NO describas a la persona. Ni su edad, ni su sexo, ni su papel (nada "
+    "de «una joven madre de 28-35 años» ni «un chico deportista»): la persona "
+    "ya existe y va adjunta como imagen. Refiérete a ella SIEMPRE y solo como "
+    "«la persona de la imagen de referencia». Cualquier descripción que añadas "
+    "pelea con la foto real y sale otra persona.\n"
+    "2. EL MISMO ESCENARIO en las tres escenas, descrito con las mismas "
+    "palabras: si la primera pasa en el salón, las tres pasan en ese salón. "
+    "Cambiar de habitación entre clips convierte el anuncio en tres vídeos "
+    "sueltos."
 )
 
 
@@ -123,4 +136,33 @@ def escribir(
             "[nicho_general] ojo: la identidad vocal no aparece igual en las "
             "tres escenas. Revísalo antes de generar los clips."
         )
+    for aviso in _revisar(escenas):
+        on_log(f"[nicho_general] {aviso}")
     return {"voz": voz, "escenas": escenas}
+
+
+# Palabras con las que se pone a describir a la persona en vez de remitirse a
+# la foto ("una joven madre de 30 años…"). Con el personaje adjunto, esa
+# descripción pelea con la imagen real y sale otra persona.
+_INVENTA_PERSONA = re.compile(
+    r"\b(un|una)\s+(joven|chico|chica|hombre|mujer|madre|padre|se[ñn]or\w*|"
+    r"muchach\w+|adolescente)\b|\b\d{2}\s*[-–]\s*\d{2}\s*a[ñn]os\b",
+    re.IGNORECASE,
+)
+
+
+def _revisar(escenas: list[dict]) -> list[str]:
+    """Avisos de lo que rompe la continuidad, sin bloquear nada.
+
+    No se reintenta: un anuncio con un aviso se puede usar igual —y el
+    operador lo ve al leer el prompt—, mientras que reintentar cuesta otra
+    llamada y tampoco garantiza que salga mejor.
+    """
+    avisos = []
+    inventadas = [e["n"] for e in escenas if _INVENTA_PERSONA.search(e["prompt_imagen"])]
+    if inventadas:
+        avisos.append(
+            f"las escenas {inventadas} describen a la persona en vez de "
+            "remitirse a la foto de referencia: puede salir otra cara."
+        )
+    return avisos
