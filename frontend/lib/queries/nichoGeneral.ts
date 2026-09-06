@@ -123,7 +123,9 @@ export function subirClipUGC(
     xhr.open("POST", `${api.baseUrl}${ROOT}/clips/subir`);
     const key = process.env.NEXT_PUBLIC_API_KEY;
     if (key) xhr.setRequestHeader("X-API-Key", key);
-    xhr.withCredentials = true;
+    // Sin `withCredentials`: la API va en el mismo origen, así que la cookie
+    // de sesión viaja igual, y en la APK esa bandera daba problemas. Es como
+    // sube los clips el Nicho Ropa, que funciona.
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgreso) {
         onProgreso(Math.round((e.loaded / e.total) * 100));

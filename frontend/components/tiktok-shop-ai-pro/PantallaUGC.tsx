@@ -410,9 +410,12 @@ function TarjetaUGC({
   const fichaPersonaje =
     (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
-  async function adjuntar(files: FileList | null) {
-    const lista = Array.from(files ?? []);
-    if (!lista.length) return;
+  async function adjuntar(lista: File[]) {
+    if (!lista.length) {
+      toast.error("El selector no devolvió ningún vídeo.");
+      return;
+    }
+    toast.info(`Subiendo ${lista.length} clip(s)…`);
     // De uno en uno y esperando: cada subida escribe en el mismo documento y
     // lanzarlas a la vez solo se estorban.
     for (const [i, f] of lista.entries()) {
@@ -705,8 +708,14 @@ function TarjetaUGC({
             multiple
             className="hidden"
             onChange={(e) => {
-              void adjuntar(e.target.files);
+              // Los ficheros se copian ANTES de tocar el input: al ponerle
+              // `value = ""` el navegador vacía su FileList, y si la subida
+              // aún no los ha leído se queda sin nada que enviar — que es lo
+              // que pasaba: se elegían los tres clips y no salía ninguna
+              // petición.
+              const elegidos = Array.from(e.target.files ?? []);
               e.target.value = "";
+              void adjuntar(elegidos);
             }}
           />
         </label>
