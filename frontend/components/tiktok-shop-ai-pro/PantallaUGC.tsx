@@ -255,6 +255,10 @@ export function PantallaUGC() {
           text={cfg.data?.prompt_personaje ?? ""}
           siempre
         />
+        {/* Lo primero de todo: las fotos de los productos, que es lo que se
+            adjunta en Flow junto al personaje. De la carpeta entera, como en
+            los demás nichos: se bajan las diez y se trabajan seguidas. */}
+        <BajarFotos items={items} source={source} folder={folder} />
         <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
           <li>
             0. ¿Aún no tienes personaje? Busca a alguien en{" "}
@@ -834,6 +838,64 @@ function BajarVideos({
       ) : (
         <>
           <Download className="h-3.5 w-3.5" /> Vídeos ({conVideo.length})
+        </>
+      )}
+    </button>
+  );
+}
+
+/** Bajarse las fotos LIMPIAS de toda la carpeta.
+ *
+ *  Es lo que se adjunta en Flow con el personaje para sacar las tres escenas,
+ *  así que se baja la carpeta entera de una vez y se trabaja seguida — igual
+ *  que en el POV BOF y en Ropa. De una en una y con retardo: el navegador del
+ *  móvil cancela las descargas simultáneas.
+ */
+function BajarFotos({
+  items,
+  source,
+  folder,
+}: {
+  items: ProductoUGC[];
+  source: string;
+  folder: string;
+}) {
+  const [bajando, setBajando] = useState("");
+  // Los que tienen textos leídos: sin ellos el producto ni siquiera sale en la
+  // lista, pero puede no tener foto limpia emparejada.
+  const conFoto = items.filter((p) => p.clean_photo_id !== null);
+
+  async function bajarTodas() {
+    if (!conFoto.length) return;
+    setBajando(`0/${conFoto.length}`);
+    for (const [i, p] of conFoto.entries()) {
+      setBajando(`${i + 1}/${conFoto.length}`);
+      const a = document.createElement("a");
+      a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto, "limpia");
+      a.download = nombreDescarga("ugc", p.producto) + ".jpg";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < conFoto.length - 1) await new Promise((r) => setTimeout(r, 600));
+    }
+    setBajando("");
+    toast.success(`${conFoto.length} foto(s) descargadas`);
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={!conFoto.length || Boolean(bajando)}
+      onClick={() => void bajarTodas()}
+      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/60 px-3 py-2 text-[11px] text-fuchsia-400 transition hover:bg-fuchsia-500/10 disabled:opacity-40"
+    >
+      {bajando ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
+        </>
+      ) : (
+        <>
+          <Download className="h-3.5 w-3.5" /> Fotos de los productos ({conFoto.length})
         </>
       )}
     </button>
