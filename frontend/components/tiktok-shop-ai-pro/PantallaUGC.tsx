@@ -365,6 +365,16 @@ function TarjetaUGC({
   // Lo que cabe hablando en ese clip. Sale de la proporción del curso —170
   // caracteres para 10 s— y es lo que decide si una frase se corta.
   const tope = duracion === "8" ? 136 : 170;
+  // Qué sexo trae el nicho por defecto: es con el que se escribió el guion si
+  // el operador no eligió otro.
+  const sexoDelNicho =
+    (cfg?.personajes ?? []).find(
+      (x) => x.clave === `${producto.nicho || "generico"}_hombre`,
+    ) && producto.personaje_clave.endsWith("_hombre")
+      ? "hombre"
+      : producto.personaje_clave.includes("_hombre")
+        ? "hombre"
+        : "mujer";
   const fichaPersonaje =
     (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
@@ -457,27 +467,29 @@ function TarjetaUGC({
         </div>
       )}
 
-      {/* Con qué persona se graba. El nicho lo pone la IA al escribir las
-          escenas y aquí se corrige; la persona se reparte sola entre las que
-          haya de ese nicho —para no sacar la misma cara en doscientos
-          vídeos— y se puede cambiar a mano. */}
+      {/* El personaje, en dos botones: se copia el prompt del hombre o el de
+          la mujer de ese nicho y se pega en Flow. No hay que elegir nada antes
+          — copiar ES elegir.
+
+          El que está marcado es el que cuadra con el guion ya escrito: la
+          identidad vocal va DENTRO de los prompts de vídeo, así que copiar el
+          otro deja un tío hablando con voz de mujer. Por eso, al copiar el que
+          no toca, se avisa de que hay que rehacer. */}
       <div className="space-y-1 rounded-lg border border-border/60 p-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          🧍 Personaje
-        </p>
-        <div className="grid grid-cols-2 gap-1">
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            🧍 Personaje
+          </p>
+          {/* El nicho lo pone la IA; se corrige aquí cuando se equivoca. */}
           <select
             value={producto.nicho || "generico"}
             onChange={(e) =>
               estado.mutate(
-                // Al cambiar de nicho se suelta el personaje elegido a mano:
-                // si no, un producto que pasa a fitness se quedaba con la cara
-                // de belleza.
                 { ...clave, nicho: e.target.value, personaje: "" },
                 { onError: (err) => toast.error(String(err)) },
               )
             }
-            className="min-w-0 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px]"
+            className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-0.5 text-[10px]"
           >
             {(cfg?.nichos ?? []).map((n) => (
               <option key={n.clave} value={n.clave}>
@@ -485,41 +497,50 @@ function TarjetaUGC({
               </option>
             ))}
           </select>
-          <select
-            value={producto.personaje_clave}
-            onChange={(e) =>
-              estado.mutate(
-                { ...clave, personaje: e.target.value },
-                { onError: (err) => toast.error(String(err)) },
-              )
-            }
-            className="min-w-0 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px]"
-          >
-            {(cfg?.personajes ?? []).map((x) => (
-              <option key={x.clave} value={x.clave}>
-                {x.clave}
-              </option>
-            ))}
-          </select>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="min-w-0 flex-1 text-[10px] text-muted-foreground">
-            Adjunta en Flow la foto{" "}
-            <strong className="text-foreground">{producto.personaje_clave}</strong>
-            {!producto.personaje && " (repartido automáticamente)"}. Cambiarlo
-            solo afecta a los guiones que se escriban después.
-          </p>
-          {/* La ficha del personaje, por si hay que volver a generar su imagen:
-              se pega en Flow y sale la misma persona. Si aún no está creado, se
-              dice — un botón que copia nada despista más que no tenerlo. */}
-          {fichaPersonaje ? (
-            <CopyChip label="🧍 Su prompt" text={fichaPersonaje} />
-          ) : (
-            <span className="rounded border border-dashed border-amber-500/50 px-1.5 py-0.5 text-[10px] text-amber-500">
-              sin crear
-            </span>
-          )}
+        <div className="grid grid-cols-2 gap-1">
+          {(["mujer", "hombre"] as const).map((sx) => {
+            const clavePers = `${producto.nicho || "generico"}_${sx}`;
+            const ficha =
+              (cfg?.personajes ?? []).find((x) => x.clave === clavePers)?.ficha ?? "";
+            const esElDelGuion = (producto.personaje_sexo || sexoDelNicho) === sx;
+            return (
+              <button
+                key={sx}
+                type="button"
+                disabled={!ficha}
+                onClick={() => {
+                  navigator.clipboard.writeText(ficha);
+                  if (esElDelGuion) {
+                    toast.success(`Prompt de ${sx} copiado`);
+                    return;
+                  }
+                  // Se guarda para que el próximo guion salga con esa voz, y
+                  // se dice claro que el de ahora ya no cuadra.
+                  estado.mutate({ ...clave, personaje_sexo: sx });
+                  toast.warning(
+                    `Copiado el de ${sx}, pero el guion está escrito con voz de ` +
+                      `${sexoDelNicho}. Dale a ↻ rehacer o el clip saldrá con ` +
+                      "una voz que no es de quien se ve.",
+                    { duration: 9000 },
+                  );
+                }}
+                className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-30 ${
+                  esElDelGuion
+                    ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                }`}
+              >
+                {sx === "mujer" ? "👩 Mujer" : "👨 Hombre"}
+                {!ficha && " (sin crear)"}
+              </button>
+            );
+          })}
         </div>
+        <p className="text-[10px] text-muted-foreground">
+          Copia el que quieras y pégalo en Flow. El marcado es el que cuadra con
+          la voz del guion escrito.
+        </p>
       </div>
 
       {/* Los seis textos que se copian, en DOS bloques: primero se hacen las
