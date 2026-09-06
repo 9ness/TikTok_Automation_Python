@@ -529,6 +529,16 @@ function TarjetaUGC({
           <CopyChip label="🔎 Título TikTok" text={producto.titulo_tiktok_completo} siempre />
           <CopyChip label="🏪 Tienda" text={producto.tienda} siempre />
           <CopyChip label="🗣️ Voz" text={producto.voz} />
+          {/* La foto va aquí y no suelta abajo: se baja de uvas a peras —lo
+              normal es bajarse la carpeta entera en el paso 2— y ahí abajo
+              estorbaba entre los botones que sí se usan en cada producto. */}
+          <a
+            href={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia")}
+            download={nombreDescarga("ugc", producto.producto) + ".jpg"}
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] transition hover:border-foreground/30"
+          >
+            <Download className="h-3 w-3" /> Foto del producto
+          </a>
         </div>
       )}
 
@@ -699,16 +709,6 @@ function TarjetaUGC({
           Sin escenas todavía — dale al paso 1.
         </p>
       )}
-
-      {/* La foto LIMPIA es la que se adjunta en Flow con el personaje, así que
-          se baja desde la propia tarjeta como en los demás nichos. */}
-      <a
-        href={buildCleanPhotoDownloadUrl(source, folder, producto.producto, "limpia")}
-        download={nombreDescarga("ugc", producto.producto) + ".jpg"}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30"
-      >
-        <Download className="h-3.5 w-3.5" /> Bajar la foto del producto
-      </a>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
