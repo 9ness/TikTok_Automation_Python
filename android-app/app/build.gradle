@@ -13,8 +13,8 @@ android {
         // Sube en cada versión publicada: es lo que mira Android para dejar
         // instalar encima, y lo que compara la app para avisar de que hay una
         // nueva (ver `Actualizaciones`).
-        versionCode 11
-        versionName "2.9"
+        versionCode 12
+        versionName "3.0"
     }
 
     signingConfigs {

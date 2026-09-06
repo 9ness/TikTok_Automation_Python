@@ -43,6 +43,8 @@ export interface ProductoUGC {
   titulo_tiktok_completo: string;
   tienda: string;
   caption: string;
+  /** Los dos emojis del caption; se pegan al copiarlo, como en el POV BOF. */
+  emojis: string;
   precio: string;
   plazos: boolean;
   clean_photo_id?: string | null;

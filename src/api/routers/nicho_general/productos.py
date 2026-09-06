@@ -126,6 +126,7 @@ def list_productos(
     """
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_pov_bof.services import emojis as emojis_svc
 
     gancho = config.gancho_valido(gancho)
     duracion = config.duracion_valida(duracion)
@@ -147,6 +148,9 @@ def list_productos(
             titulo_tiktok_completo=t.get("titulo_tiktok_completo", ""),
             tienda=t.get("tienda", ""),
             caption=t.get("caption", ""),
+            emojis=t.get("emojis") or emojis_svc.emojis_para(
+                pid, t.get("titulo", ""), t.get("caption", ""),
+            ),
             precio=str(t.get("precio") or ""),
             plazos=pov_config.hay_plazos(t),
             clean_photo_id=t.get("clean_photo_id"),

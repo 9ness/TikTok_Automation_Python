@@ -18,6 +18,7 @@ import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
   buildCleanPhotoDownloadUrl,
   useFolders,
+  useHashtags,
   useSources,
 } from "@/lib/queries/nichoPovBof";
 import {
@@ -372,6 +373,7 @@ function TarjetaUGC({
   cfg?: ConfigUGCResponse;
 }) {
   const qc = useQueryClient();
+  const hashtags = useHashtags().data ?? [];
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
   const limpiar = useLimpiarClipsUGC();
@@ -500,7 +502,19 @@ function TarjetaUGC({
       </div>
 
       <div className="flex flex-wrap items-center gap-1">
-        <CopyChip label="✍️ Caption" text={producto.caption} siempre />
+        {/* El caption se copia YA con los emojis y los hashtags pegados: es lo
+            que se pega tal cual en TikTok, igual que en el POV BOF. */}
+        <CopyChip
+          label="✍️ Caption"
+          text={
+            producto.caption
+              ? [producto.caption, producto.emojis, hashtags.join(" ")]
+                  .filter(Boolean)
+                  .join(" ")
+              : ""
+          }
+          siempre
+        />
         <BotonUrl url={producto.product_url} />
         <button
           type="button"

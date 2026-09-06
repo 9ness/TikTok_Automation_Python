@@ -55,6 +55,9 @@ class ProductoUGC(BaseModel):
     titulo_tiktok_completo: str = ""
     tienda: str = ""
     caption: str = ""
+    # Los emojis del producto: se pegan al caption al copiarlo, igual que en el
+    # POV BOF. Salen de los textos y, si no los tiene, se deducen del título.
+    emojis: str = ""
     precio: str = ""
     plazos: bool = False
     clean_photo_id: str | None = None

@@ -133,7 +133,7 @@ public class MainActivity extends Activity {
                 if (esperandoFicheros != null) esperandoFicheros.onReceiveValue(null);
                 esperandoFicheros = callback;
                 try {
-                    startActivityForResult(params.createIntent(), PEDIR_FICHEROS);
+                    startActivityForResult(elegirFicheros(params), PEDIR_FICHEROS);
                     return true;
                 } catch (Exception e) {
                     esperandoFicheros = null;
@@ -588,6 +588,35 @@ public class MainActivity extends Activity {
 
     private void aviso(String texto) {
         runOnUiThread(() -> Toast.makeText(this, texto, Toast.LENGTH_LONG).show());
+    }
+
+    /**
+     * El selector de ficheros, con multi-selección de verdad.
+     *
+     * `params.createIntent()` monta un ACTION_GET_CONTENT y, con el gestor de
+     * archivos de algunos móviles, ese intent abre una pantalla donde NO se
+     * pueden marcar varios: se elegían tres vídeos y la web recibía cero.
+     *
+     * Con ACTION_OPEN_DOCUMENT (el selector del sistema) el multi funciona
+     * siempre. Si el móvil no lo tuviera, se cae al de antes.
+     */
+    private Intent elegirFicheros(WebChromeClient.FileChooserParams params) {
+        boolean varios =
+                params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE;
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, varios);
+        String[] tipos = params.getAcceptTypes();
+        // `accept="video/*"` llega aquí como un solo tipo; si viniera vacío o
+        // con comodines raros, se abre a todo antes que no abrir nada.
+        if (tipos != null && tipos.length > 0 && tipos[0] != null && !tipos[0].isEmpty()) {
+            i.setType(tipos[0]);
+            if (tipos.length > 1) i.putExtra(Intent.EXTRA_MIME_TYPES, tipos);
+        } else {
+            i.setType("*/*");
+        }
+        if (i.resolveActivity(getPackageManager()) != null) return i;
+        return params.createIntent();
     }
 
     @Override
