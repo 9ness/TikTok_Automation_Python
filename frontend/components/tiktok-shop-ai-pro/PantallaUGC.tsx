@@ -8,6 +8,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -370,6 +371,7 @@ function TarjetaUGC({
   duracion: string;
   cfg?: ConfigUGCResponse;
 }) {
+  const qc = useQueryClient();
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
   const limpiar = useLimpiarClipsUGC();
@@ -430,6 +432,10 @@ function TarjetaUGC({
       }
     }
     setSubiendo("");
+    // Sin esto la tarjeta no se entera: los clips se guardaban bien pero el
+    // contador seguía a cero y "Montar anuncio" apagado, así que parecía que
+    // cada subida pisaba a la anterior.
+    await qc.invalidateQueries({ queryKey: ["nicho-general", "productos"] });
     toast.success(`${lista.length} clip(s) subidos`);
   }
 
@@ -756,7 +762,11 @@ function TarjetaUGC({
           }
           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
         >
-          {producto.montando ? "Montando…" : "Montar anuncio"}
+          {producto.montando
+            ? "Montando…"
+            : producto.clips.length
+              ? `Montar (${producto.clips.length})`
+              : "Montar anuncio"}
         </button>
       </div>
       {producto.clips.length > 0 && !producto.montando && (
