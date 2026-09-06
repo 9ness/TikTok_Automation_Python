@@ -29,7 +29,11 @@ import {
   useMontarUGC,
   useProductosUGC,
 } from "@/lib/queries/nichoGeneral";
-import type { ConfigUGCResponse, ProductoUGC } from "@/lib/types/nichoGeneral";
+import type {
+  ConfigUGCResponse,
+  OpcionUGC,
+  ProductoUGC,
+} from "@/lib/types/nichoGeneral";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -50,6 +54,20 @@ import { VideoModal } from "@/components/ui/video-modal";
  *  - Los clips se adjuntan TODOS DE GOLPE y sin decir cuál es cuál: el montaje
  *    los ordena escuchándolos.
  */
+/** El color de cada nicho, para reconocerlo de un vistazo en la tarjeta y en
+ *  los botones de descarga. Las clases van completas a propósito: Tailwind no
+ *  detecta las que se arman concatenando y las quitaría del bundle. */
+const COLOR_NICHO: Record<string, string> = {
+  belleza: "border-pink-500/50 bg-pink-500/10 text-pink-400",
+  hogar: "border-amber-500/50 bg-amber-500/10 text-amber-500",
+  exterior: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500",
+  tech: "border-sky-500/50 bg-sky-500/10 text-sky-400",
+  fitness: "border-orange-500/50 bg-orange-500/10 text-orange-400",
+  bebe: "border-violet-500/50 bg-violet-500/10 text-violet-400",
+  viaje: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400",
+  generico: "border-border/60 bg-muted text-muted-foreground",
+};
+
 export function PantallaUGC() {
   const sources = useSources();
   const cfg = useConfigUGC();
@@ -258,7 +276,12 @@ export function PantallaUGC() {
         {/* Lo primero de todo: las fotos de los productos, que es lo que se
             adjunta en Flow junto al personaje. De la carpeta entera, como en
             los demás nichos: se bajan las diez y se trabajan seguidas. */}
-        <BajarFotos items={items} source={source} folder={folder} />
+        <BajarFotos
+          items={items}
+          source={source}
+          folder={folder}
+          nichos={cfg.data?.nichos ?? []}
+        />
         <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
           <li>
             0. ¿Aún no tienes personaje? Busca a alguien en{" "}
@@ -453,6 +476,16 @@ function TarjetaUGC({
                 {escenas.length} escenas
               </span>
             )}
+            {/* El nicho, con su color: en una carpeta de diez mezclados es lo
+                que dice de un vistazo qué personaje toca en cada uno. */}
+            <span
+              className={`rounded border px-1.5 py-0.5 font-semibold ${
+                COLOR_NICHO[producto.nicho || "generico"] ?? COLOR_NICHO.generico
+              }`}
+            >
+              {(cfg?.nichos ?? []).find((n) => n.clave === producto.nicho)?.label ??
+                "Sin clasificar"}
+            </span>
           </p>
         </div>
       </div>
@@ -855,49 +888,88 @@ function BajarFotos({
   items,
   source,
   folder,
+  nichos,
 }: {
   items: ProductoUGC[];
   source: string;
   folder: string;
+  nichos: OpcionUGC[];
 }) {
   const [bajando, setBajando] = useState("");
   // Los que tienen textos leídos: sin ellos el producto ni siquiera sale en la
   // lista, pero puede no tener foto limpia emparejada.
   const conFoto = items.filter((p) => p.clean_photo_id !== null);
+  // Cuántas hay de cada nicho. Se baja por nicho porque se trabaja así: se
+  // generan seguidas las que llevan el mismo personaje, igual que en el POV
+  // BOF Largo se bajan juntas las de dos clips y las de tres.
+  const porNicho = conFoto.reduce<Record<string, number>>((acc, p) => {
+    const n = p.nicho || "generico";
+    acc[n] = (acc[n] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  async function bajarTodas() {
-    if (!conFoto.length) return;
-    setBajando(`0/${conFoto.length}`);
-    for (const [i, p] of conFoto.entries()) {
-      setBajando(`${i + 1}/${conFoto.length}`);
+  async function bajar(lista: ProductoUGC[], etiqueta: string) {
+    if (!lista.length) return;
+    setBajando(`0/${lista.length}`);
+    for (const [i, p] of lista.entries()) {
+      setBajando(`${i + 1}/${lista.length}`);
       const a = document.createElement("a");
       a.href = buildCleanPhotoDownloadUrl(source, folder, p.producto, "limpia");
       a.download = nombreDescarga("ugc", p.producto) + ".jpg";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      if (i < conFoto.length - 1) await new Promise((r) => setTimeout(r, 600));
+      if (i < lista.length - 1) await new Promise((r) => setTimeout(r, 600));
     }
     setBajando("");
-    toast.success(`${conFoto.length} foto(s) descargadas`);
+    toast.success(`${lista.length} foto(s) de ${etiqueta}`);
   }
 
   return (
-    <button
-      type="button"
-      disabled={!conFoto.length || Boolean(bajando)}
-      onClick={() => void bajarTodas()}
-      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/60 px-3 py-2 text-[11px] text-fuchsia-400 transition hover:bg-fuchsia-500/10 disabled:opacity-40"
-    >
-      {bajando ? (
-        <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
-        </>
-      ) : (
-        <>
-          <Download className="h-3.5 w-3.5" /> Fotos de los productos ({conFoto.length})
-        </>
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={!conFoto.length || Boolean(bajando)}
+        onClick={() => void bajar(conFoto, "la carpeta")}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/60 px-3 py-2 text-[11px] text-fuchsia-400 transition hover:bg-fuchsia-500/10 disabled:opacity-40"
+      >
+        {bajando ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
+          </>
+        ) : (
+          <>
+            <Download className="h-3.5 w-3.5" /> Todas las fotos ({conFoto.length})
+          </>
+        )}
+      </button>
+      {/* Por nicho: se generan seguidas las que comparten personaje, así no
+          hay que ir cambiando de referencia en Flow a cada producto. */}
+      {Object.keys(porNicho).length > 1 && (
+        <div className="grid grid-cols-2 gap-1">
+          {Object.entries(porNicho)
+            .sort((a, b) => b[1] - a[1])
+            .map(([nicho, cuantas]) => (
+              <button
+                key={nicho}
+                type="button"
+                disabled={Boolean(bajando)}
+                onClick={() =>
+                  void bajar(
+                    conFoto.filter((p) => (p.nicho || "generico") === nicho),
+                    nichos.find((n) => n.clave === nicho)?.label ?? nicho,
+                  )
+                }
+                className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[10px] transition disabled:opacity-40 ${
+                  COLOR_NICHO[nicho] ?? COLOR_NICHO.generico
+                }`}
+              >
+                <Download className="h-3 w-3" />
+                {nichos.find((n) => n.clave === nicho)?.label ?? nicho} ({cuantas})
+              </button>
+            ))}
+        </div>
       )}
-    </button>
+    </div>
   );
 }
