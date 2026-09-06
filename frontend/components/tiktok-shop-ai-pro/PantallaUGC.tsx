@@ -710,31 +710,6 @@ function TarjetaUGC({
         <Download className="h-3.5 w-3.5" /> Bajar la foto del producto
       </a>
 
-      {/* De uno en uno, por si el selector múltiple no devuelve nada — pasa en
-          algunos móviles y en el WebView de la APK. Es el mismo camino que usa
-          el POV BOF Largo, que va bien. El orden sigue dándolo el montaje: da
-          igual en qué orden se suban. */}
-      <div className="grid grid-cols-3 gap-1">
-        {[1, 2, 3].map((n) => (
-          <label
-            key={n}
-            className="flex cursor-pointer items-center justify-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
-          >
-            <Upload className="h-3 w-3" /> Clip suelto
-            <input
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => {
-                const uno = e.target.files?.[0];
-                e.target.value = "";
-                if (uno) void adjuntar([uno]);
-              }}
-            />
-          </label>
-        ))}
-      </div>
-
       <div className="grid grid-cols-2 gap-2">
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
           {subiendo ? (
