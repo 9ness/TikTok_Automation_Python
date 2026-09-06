@@ -373,6 +373,10 @@ function TarjetaUGC({
   cfg?: ConfigUGCResponse;
 }) {
   const qc = useQueryClient();
+  // La APK se marca en el user agent (`MainActivity`: "TTShopApp/1"), que es
+  // lo único que la distingue de Chrome desde la web.
+  const enLaApp =
+    typeof navigator !== "undefined" && navigator.userAgent.includes("TTShopApp");
   const hashtags = useHashtags().data ?? [];
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
@@ -718,14 +722,21 @@ function TarjetaUGC({
             </>
           ) : (
             <>
-              <Upload className="h-3.5 w-3.5" /> Adjuntar clips
-              {producto.clips.length > 0 && ` (${producto.clips.length})`}
+              <Upload className="h-3.5 w-3.5" />
+              {enLaApp ? "Añadir clip" : "Adjuntar clips"}
+              {producto.clips.length > 0 && ` (${producto.clips.length}/3)`}
             </>
           )}
           <input
             type="file"
             accept="video/*"
-            multiple
+            // Múltiple SOLO fuera de la app: el WebView de la APK devuelve la
+            // selección vacía cuando el input lleva `multiple` —se eligen los
+            // tres clips y no llega ninguno, sin error— mientras que de uno en
+            // uno funciona. Dentro de la app, el mismo botón se pulsa una vez
+            // por clip y los va acumulando; el orden lo pone el montaje, así
+            // que da igual en qué orden entren.
+            multiple={!enLaApp}
             className="hidden"
             onChange={(e) => {
               // Los ficheros se copian ANTES de tocar el input: al ponerle
