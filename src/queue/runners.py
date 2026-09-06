@@ -3371,7 +3371,16 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 titulo=t.get("titulo", ""),
                 tienda=t.get("tienda", ""),
                 caption=t.get("caption", ""),
-                fotos=[f for f in (_foto_ficha(source, carpeta, pid),) if f],
+                # Las DOS fotos: la ficha trae las características escritas
+                # y la limpia enseña el producto de verdad. Con la ficha sola,
+                # una luz que allí no se ve acaba inventada —el soporte de
+                # plantas salió con una barra morada flotando encima.
+                fotos=[
+                    f for f in (
+                        _foto_ficha(source, carpeta, pid),
+                        _foto_limpia(source, carpeta, pid),
+                    ) if f
+                ],
                 gancho=gancho,
                 duracion=duracion,
                 plazos=pov_config.hay_plazos(t),
