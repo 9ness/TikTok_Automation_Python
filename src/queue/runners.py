@@ -3371,16 +3371,13 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 titulo=t.get("titulo", ""),
                 tienda=t.get("tienda", ""),
                 caption=t.get("caption", ""),
-                # Las DOS fotos: la ficha trae las características escritas
-                # y la limpia enseña el producto de verdad. Con la ficha sola,
-                # una luz que allí no se ve acaba inventada —el soporte de
-                # plantas salió con una barra morada flotando encima.
-                fotos=[
-                    f for f in (
-                        _foto_ficha(source, carpeta, pid),
-                        _foto_limpia(source, carpeta, pid),
-                    ) if f
-                ],
+                # SOLO la captura de la ficha, como en el curso: es la que
+                # lleva las características escritas y es lo que Jonny manda.
+                # Se probó a añadir la foto limpia para que no se inventara lo
+                # que la ficha no enseña (la luz del soporte de plantas), pero
+                # eso ya es cambiarle el método: cuando pase, se corrige esa
+                # escena a mano al pegarla en Flow.
+                fotos=[f for f in (_foto_ficha(source, carpeta, pid),) if f],
                 gancho=gancho,
                 duracion=duracion,
                 plazos=pov_config.hay_plazos(t),
