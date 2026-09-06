@@ -373,20 +373,20 @@ function TarjetaUGC({
   cfg?: ConfigUGCResponse;
 }) {
   const qc = useQueryClient();
-  // La APK se marca en el user agent (`MainActivity`: "TTShopApp/1"), que es
-  // lo único que la distingue de Chrome desde la web.
-  const enLaApp =
-    typeof navigator !== "undefined" && navigator.userAgent.includes("TTShopApp");
   const hashtags = useHashtags().data ?? [];
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
   const limpiar = useLimpiarClipsUGC();
   const estado = useEstadoUGC();
-  const [subiendo, setSubiendo] = useState("");
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   const [verMas, setVerMas] = useState(false);
   const [pidiendoAlt, setPidiendoAlt] = useState(false);
+  // El porcentaje de cada hueco por separado, como en el POV BOF Largo: con
+  // uno solo, subir el segundo pisaba el aviso del primero.
+  const [pctsClip, setPctsClip] = useState<Record<number, number | null>>({
+    1: null, 2: null, 3: null,
+  });
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   const [subido, setSubido] = useState(producto.uploaded);
   const [vendio, setVendio] = useState(producto.sold);
@@ -418,31 +418,19 @@ function TarjetaUGC({
   const fichaPersonaje =
     (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
-  async function adjuntar(lista: File[]) {
-    if (!lista.length) {
-      toast.error("El selector no devolvió ningún vídeo.");
-      return;
+  async function subirUno(f: File, hueco: number) {
+    setPctsClip((p) => ({ ...p, [hueco]: 0 }));
+    try {
+      await subirClipUGC(f, clave, (pct) =>
+        setPctsClip((p) => ({ ...p, [hueco]: pct })),
+      );
+      await qc.invalidateQueries({ queryKey: ["nicho-general", "productos"] });
+      toast.success(`Clip ${hueco} subido`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPctsClip((p) => ({ ...p, [hueco]: null }));
     }
-    toast.info(`Subiendo ${lista.length} clip(s)…`);
-    // De uno en uno y esperando: cada subida escribe en el mismo documento y
-    // lanzarlas a la vez solo se estorban.
-    for (const [i, f] of lista.entries()) {
-      setSubiendo(`${i + 1}/${lista.length}`);
-      try {
-        await subirClipUGC(f, clave, (pct) =>
-          setSubiendo(`${i + 1}/${lista.length} · ${pct}%`),
-        );
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : String(e));
-        break;
-      }
-    }
-    setSubiendo("");
-    // Sin esto la tarjeta no se entera: los clips se guardaban bien pero el
-    // contador seguía a cero y "Montar anuncio" apagado, así que parecía que
-    // cada subida pisaba a la anterior.
-    await qc.invalidateQueries({ queryKey: ["nicho-general", "productos"] });
-    toast.success(`${lista.length} clip(s) subidos`);
   }
 
   return (
@@ -714,72 +702,85 @@ function TarjetaUGC({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
-          {subiendo ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {subiendo}
-            </>
-          ) : (
-            <>
-              <Upload className="h-3.5 w-3.5" />
-              {enLaApp ? "Añadir clip" : "Adjuntar clips"}
-              {producto.clips.length > 0 && ` (${producto.clips.length}/3)`}
-            </>
-          )}
-          <input
-            type="file"
-            accept="video/*"
-            // Múltiple SOLO fuera de la app: el WebView de la APK devuelve la
-            // selección vacía cuando el input lleva `multiple` —se eligen los
-            // tres clips y no llega ninguno, sin error— mientras que de uno en
-            // uno funciona. Dentro de la app, el mismo botón se pulsa una vez
-            // por clip y los va acumulando; el orden lo pone el montaje, así
-            // que da igual en qué orden entren.
-            multiple={!enLaApp}
-            className="hidden"
-            onChange={(e) => {
-              // Los ficheros se copian ANTES de tocar el input: al ponerle
-              // `value = ""` el navegador vacía su FileList, y si la subida
-              // aún no los ha leído se queda sin nada que enviar — que es lo
-              // que pasaba: se elegían los tres clips y no salía ninguna
-              // petición.
-              const elegidos = Array.from(e.target.files ?? []);
-              e.target.value = "";
-              void adjuntar(elegidos);
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={!producto.clips.length || producto.montando || montar.isPending}
-          onClick={() =>
-            montar.mutate(clave, {
-              onSuccess: () => toast.success("Montando: se ordenan solos"),
-              onError: (e) =>
-                toast.error(e instanceof ApiError ? e.message : String(e)),
-            })
-          }
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
-        >
-          {producto.montando
-            ? "Montando…"
-            : producto.clips.length
-              ? `Montar (${producto.clips.length})`
-              : "Montar anuncio"}
-        </button>
+      {/* Un hueco por escena, como en el POV BOF Largo: mismo aspecto, mismo
+          ✓ al tenerlo y misma ✕ para quitarlo. Aquí el hueco es solo para
+          contar —el orden lo pone el montaje escuchándolos—, pero se trabaja
+          igual y eso vale más que ahorrarse dos clics.
+
+          Y de uno en uno porque el WebView de la app devuelve la selección
+          vacía cuando el input lleva `multiple` (ver learnings.md). */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {[1, 2, 3].map((hueco) => {
+          const puesto = producto.clips.length >= hueco;
+          const pct = pctsClip[hueco];
+          const subiendoEste = pct !== null && pct !== undefined;
+          return (
+            <label
+              key={hueco}
+              className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-[11px] font-medium transition ${
+                puesto
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-border/60 hover:border-violet-500/60"
+              } ${subiendoEste ? "pointer-events-none opacity-60" : ""}`}
+            >
+              {subiendoEste ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  {pct}%
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5 shrink-0" />
+                  {puesto ? `Clip ${hueco} ✓` : `Clip ${hueco}`}
+                </>
+              )}
+              <input
+                type="file"
+                accept="video/*"
+                disabled={subiendoEste}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void subirUno(f, hueco);
+                }}
+              />
+            </label>
+          );
+        })}
       </div>
-      {producto.clips.length > 0 && !producto.montando && (
+      {producto.clips.length > 0 && (
+        /* Se vacían todos y se vuelven a subir: los clips no llevan número
+           dentro, así que quitar "el segundo" no significa nada — el montaje
+           los ordena por lo que se dice en cada uno. */
         <button
           type="button"
           onClick={() =>
             limpiar.mutate(clave, { onSuccess: () => toast.success("Clips vaciados") })
           }
-          className="w-full rounded-lg border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-foreground/30"
+          className="w-full rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-destructive/60 hover:text-destructive"
         >
-          Quitar los {producto.clips.length} clip(s) y volver a subirlos
+          ✕ Quitar los {producto.clips.length} clip(s)
         </button>
       )}
+
+      <button
+        type="button"
+        disabled={!producto.clips.length || producto.montando || montar.isPending}
+        onClick={() =>
+          montar.mutate(clave, {
+            onSuccess: () => toast.success("Montando: se ordenan solos"),
+            onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
+          })
+        }
+        className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+      >
+        {producto.montando
+          ? "Montando…"
+          : producto.clips.length
+            ? `Montar (${producto.clips.length})`
+            : "Montar anuncio"}
+      </button>
 
       {producto.video_path && (
         <>
