@@ -49,7 +49,12 @@ export function useEscenasLote() {
   return useMutation<
     { job_id: string },
     Error,
-    { source: string; folder?: string; gancho: string; duracion: string; rehacer?: boolean; productos?: string[] }
+    {
+      source: string; folder?: string; gancho: string; duracion: string;
+      rehacer?: boolean; productos?: string[];
+      /** Pedir la versión del otro sexo de UN producto. */
+      sexo?: string;
+    }
   >({
     mutationFn: (body) => api.post(`${ROOT}/escenas/lote`, body),
     onSuccess: () =>

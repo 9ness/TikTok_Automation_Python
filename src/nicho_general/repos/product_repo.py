@@ -127,6 +127,7 @@ def update_product(
 def guardar_escenas(
     source: str, folder: str, producto: str, escenas: list[dict], voz: str,
     usuario: str = "", gancho: str = "", duracion: str = "",
+    alternativa: bool = False,
 ) -> dict:
     """Las tres escenas que escribió la IA, con la voz que las tres comparten.
 
@@ -134,10 +135,21 @@ def guardar_escenas(
     exija DENTRO de cada uno: así se puede enseñar en la pantalla y comprobar
     de un vistazo que es la misma en las tres, que es de lo que depende que el
     anuncio suene como un solo vídeo y no como tres.
+
+    `alternativa` es la versión con el OTRO sexo. Va en su propio campo y no en
+    otro documento porque en una carpeta hay productos de nichos distintos: la
+    pesa la vende un hombre y la crema una mujer, así que el sexo no puede ir
+    en la clave de la carpeta. Solo se escribe cuando el operador la pide para
+    ese producto — la primera pasada hace únicamente la que pega con el nicho.
     """
+    campo = "escenas_alt" if alternativa else "escenas"
     return update_product(
         source, folder, producto, usuario, gancho, duracion,
-        escenas=escenas, voz=voz, escenas_at=int(time.time()),
+        **{
+            campo: escenas,
+            ("voz_alt" if alternativa else "voz"): voz,
+            f"{campo}_at": int(time.time()),
+        },
     )
 
 

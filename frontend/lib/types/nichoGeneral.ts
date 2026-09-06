@@ -6,6 +6,8 @@ export interface OpcionUGC {
   /** Solo en los personajes: su descripción, para regenerar la imagen. Vacía
    *  si ese personaje aún no está creado. */
   ficha?: string;
+  /** Solo en los nichos: con qué sexo se escribe su versión principal. */
+  sexo?: string;
 }
 
 export interface ConfigUGCResponse {
@@ -49,6 +51,9 @@ export interface ProductoUGC {
   en_escaparate: boolean;
   escenas: EscenaUGC[];
   voz: string;
+  /** La versión con el otro sexo, si se ha pedido para este producto. */
+  escenas_alt: EscenaUGC[];
+  voz_alt: string;
   /** De qué nicho es. Lo pone Gemini al escribir las escenas y se corrige a
    *  mano si se equivoca; es lo que decide el personaje. */
   nicho: string;

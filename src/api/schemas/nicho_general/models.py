@@ -15,6 +15,10 @@ class OpcionUGC(BaseModel):
     # creado, y entonces la pantalla lo dice en vez de ofrecer un botón que
     # copiaría nada.
     ficha: str = ""
+    # Solo en los nichos: con qué sexo se escribe su versión principal. La
+    # pantalla lo necesita para saber cuál de los dos botones está hecho y cuál
+    # hay que generar.
+    sexo: str = ""
 
 
 class ConfigUGCResponse(BaseModel):
@@ -60,6 +64,10 @@ class ProductoUGC(BaseModel):
     # Lo propio de este nicho, por gancho y duración.
     escenas: list[EscenaUGC] = Field(default_factory=list)
     voz: str = ""
+    # La versión con el OTRO sexo, solo si se ha pedido para este producto. La
+    # pasada normal escribe únicamente la que pega con el nicho.
+    escenas_alt: list[EscenaUGC] = Field(default_factory=list)
+    voz_alt: str = ""
     # De qué nicho es: lo decide Gemini al escribir las escenas y se puede
     # corregir a mano. Es lo que elige el personaje.
     nicho: str = ""
@@ -106,6 +114,9 @@ class EscenasLoteRequest(BaseModel):
     duracion: str = ""
     rehacer: bool = False
     productos: list[str] = Field(default_factory=list)
+    # Pedir la versión del otro sexo. Solo tiene sentido con `productos`: es
+    # el botón de una tarjeta, no una pasada de carpeta.
+    sexo: str = ""
 
 
 class MontarUGCRequest(BaseModel):

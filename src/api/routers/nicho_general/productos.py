@@ -60,7 +60,10 @@ def get_config() -> ConfigUGCResponse:
         duraciones=[
             OpcionUGC(clave=k, label=v["label"]) for k, v in config.DURACIONES.items()
         ],
-        nichos=[OpcionUGC(clave=k, label=v["label"]) for k, v in config.NICHOS.items()],
+        nichos=[
+            OpcionUGC(clave=k, label=v["label"], sexo=config.sexo_de_nicho(k))
+            for k, v in config.NICHOS.items()
+        ],
         # Todos los personajes que existen, para poder cambiar el de un
         # producto a mano. Salen del nicho y de cuántas personas tenga.
         personajes=[
@@ -152,6 +155,8 @@ def list_productos(
             en_escaparate=pov_repo.marcado_en_escaparate(t, escaparate),
             escenas=[EscenaUGC(**e) for e in (mio.get("escenas") or [])],
             voz=str(mio.get("voz") or ""),
+            escenas_alt=[EscenaUGC(**e) for e in (mio.get("escenas_alt") or [])],
+            voz_alt=str(mio.get("voz_alt") or ""),
             nicho=str(mio.get("nicho") or ""),
             # El personaje que le toca. Si el operador eligió uno a mano manda
             # ese; si no, el del nicho, repartiendo entre las personas que haya
@@ -192,15 +197,23 @@ def escenas_lote(
         f"{config.GANCHOS[gancho]['label']} · {config.DURACIONES[duracion]['label']}"
     )
     alcance = body.folder or "todas"
+    sexo = config.sexo_valido(body.sexo) if body.sexo else ""
+    if sexo and not body.productos:
+        raise _bad(
+            "La versión del otro sexo se pide por producto, no de una carpeta "
+            "entera: la pasada normal ya escribe la que pega con cada nicho."
+        )
     job = queue.enqueue(
         JobMode.NICHO_GENERAL_ESCENAS,
         title=f"🎬 Escenas UGC · {alcance} · {etiqueta}"
+        + (f" · versión {sexo}" if sexo else "")
         + (" (rehacer)" if body.rehacer else ""),
         params={
             "source": body.source, "folder": body.folder, "usuario": usuario,
             "gancho": gancho, "duracion": duracion,
             "rehacer": bool(body.rehacer),
             "productos": [str(x) for x in (body.productos or [])],
+            "sexo": sexo,
         },
         enqueued_by=usuario or None,
     )

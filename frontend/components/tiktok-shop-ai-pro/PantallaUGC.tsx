@@ -351,6 +351,7 @@ function TarjetaUGC({
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   const [verMas, setVerMas] = useState(false);
+  const [pidiendoAlt, setPidiendoAlt] = useState(false);
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   const [subido, setSubido] = useState(producto.uploaded);
   const [vendio, setVendio] = useState(producto.sold);
@@ -361,20 +362,24 @@ function TarjetaUGC({
   }, [producto.en_escaparate, producto.uploaded, producto.sold]);
 
   const clave = { source, folder, producto: producto.producto, gancho, duracion };
-  const escenas = producto.escenas;
+  // Con qué sexo se escribe la versión PRINCIPAL de este nicho. Lo dice el
+  // backend y no la clave del personaje, que ya lleva dentro la elección
+  // manual: si no, al elegir hombre parecía que el principal era el hombre y
+  // no se veía que la versión alternativa era justo esa.
+  const sexoDelNicho =
+    (cfg?.nichos ?? []).find((n) => n.clave === (producto.nicho || "generico"))
+      ?.sexo ?? "mujer";
+  // Los guiones que se copian son los de la versión ELEGIDA. Sin esto, al
+  // pedir la de hombre se copiaba su personaje pero los prompts seguían siendo
+  // los de la mujer: el vídeo saldría con un tío diciendo el guion de ella.
+  const usandoAlt =
+    Boolean(producto.personaje_sexo) &&
+    producto.personaje_sexo !== sexoDelNicho &&
+    producto.escenas_alt.length > 0;
+  const escenas = usandoAlt ? producto.escenas_alt : producto.escenas;
   // Lo que cabe hablando en ese clip. Sale de la proporción del curso —170
   // caracteres para 10 s— y es lo que decide si una frase se corta.
   const tope = duracion === "8" ? 136 : 170;
-  // Qué sexo trae el nicho por defecto: es con el que se escribió el guion si
-  // el operador no eligió otro.
-  const sexoDelNicho =
-    (cfg?.personajes ?? []).find(
-      (x) => x.clave === `${producto.nicho || "generico"}_hombre`,
-    ) && producto.personaje_clave.endsWith("_hombre")
-      ? "hombre"
-      : producto.personaje_clave.includes("_hombre")
-        ? "hombre"
-        : "mujer";
   const fichaPersonaje =
     (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
@@ -503,43 +508,64 @@ function TarjetaUGC({
             const clavePers = `${producto.nicho || "generico"}_${sx}`;
             const ficha =
               (cfg?.personajes ?? []).find((x) => x.clave === clavePers)?.ficha ?? "";
-            const esElDelGuion = (producto.personaje_sexo || sexoDelNicho) === sx;
+            // El que pega con el nicho ya está escrito; del otro solo hay
+            // guiones si se pidieron para este producto.
+            const esElPrincipal = sexoDelNicho === sx;
+            const hecho = esElPrincipal
+              ? escenas.length > 0
+              : producto.escenas_alt.length > 0;
             return (
               <button
                 key={sx}
                 type="button"
-                disabled={!ficha}
+                disabled={!ficha || pidiendoAlt}
                 onClick={() => {
-                  navigator.clipboard.writeText(ficha);
-                  if (esElDelGuion) {
+                  if (hecho) {
+                    navigator.clipboard.writeText(ficha);
+                    // Copiar es elegir: los seis prompts de abajo pasan a ser
+                    // los de esta versión.
+                    if ((producto.personaje_sexo || sexoDelNicho) !== sx) {
+                      estado.mutate({ ...clave, personaje_sexo: sx });
+                    }
                     toast.success(`Prompt de ${sx} copiado`);
                     return;
                   }
-                  // Se guarda para que el próximo guion salga con esa voz, y
-                  // se dice claro que el de ahora ya no cuadra.
-                  estado.mutate({ ...clave, personaje_sexo: sx });
-                  toast.warning(
-                    `Copiado el de ${sx}, pero el guion está escrito con voz de ` +
-                      `${sexoDelNicho}. Dale a ↻ rehacer o el clip saldrá con ` +
-                      "una voz que no es de quien se ve.",
-                    { duration: 9000 },
+                  // Aún no existe esa versión: se pide solo para este producto.
+                  setPidiendoAlt(true);
+                  rehacer.mutate(
+                    {
+                      source, folder, gancho, duracion,
+                      productos: [producto.producto], sexo: sx,
+                    },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          `Escribiendo la versión de ${sx} de este producto`,
+                        ),
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                      onSettled: () => setPidiendoAlt(false),
+                    },
                   );
                 }}
                 className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-30 ${
-                  esElDelGuion
-                    ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
-                    : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                  hecho
+                    ? esElPrincipal
+                      ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-400"
+                      : "border-border/60 text-foreground hover:border-foreground/40"
+                    : "border-dashed border-border/60 text-muted-foreground hover:border-foreground/30"
                 }`}
               >
                 {sx === "mujer" ? "👩 Mujer" : "👨 Hombre"}
-                {!ficha && " (sin crear)"}
+                {!ficha ? " (sin crear)" : hecho ? "" : " ✨"}
               </button>
             );
           })}
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Copia el que quieras y pégalo en Flow. El marcado es el que cuadra con
-          la voz del guion escrito.
+          El marcado es el que se escribió para este producto: cópialo y pégalo
+          en Flow. El otro sale con ✨ — al tocarlo se escriben sus guiones (una
+          llamada, solo de este producto) y luego ya se copia igual.
         </p>
       </div>
 

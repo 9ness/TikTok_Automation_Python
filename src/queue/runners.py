@@ -3268,6 +3268,10 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
     duracion = ugc_config.duracion_valida(str(p.get("duracion") or ""))
     rehacer = bool(p.get("rehacer"))
     forzados = {str(x) for x in (p.get("productos") or [])}
+    # La versión del OTRO sexo, pedida desde la tarjeta de un producto. Sin
+    # esto se escribe la que pega con el nicho, que es lo que hace la pasada
+    # normal: la de hombre para las pesas y la de mujer para la crema.
+    sexo_pedido = str(p.get("sexo") or "")
     if not source:
         raise RuntimeError("Falta el catálogo del que escribir las escenas.")
 
@@ -3294,7 +3298,9 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
         for pid in sorted(textos, key=lambda x: (len(x), x)):
             if not str((textos[pid] or {}).get("titulo") or "").strip():
                 continue
-            ya = len((mios.get(pid) or {}).get("escenas") or []) == ugc_config.ESCENAS
+            guardado = mios.get(pid) or {}
+            campo = "escenas_alt" if sexo_pedido else "escenas"
+            ya = len(guardado.get(campo) or []) == ugc_config.ESCENAS
             if rehacer or (folder and pid in forzados) or not ya:
                 pendientes.append((carpeta, pid, textos[pid]))
 
@@ -3370,11 +3376,11 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 duracion=duracion,
                 plazos=pov_config.hay_plazos(t),
                 sexo_personaje=(
-                    ugc_config.sexo_valido(str(mio.get("personaje_sexo")))
-                    if mio.get("personaje_sexo")
-                    # Sin elección a mano manda el del nicho: el de fitness es
-                    # un hombre, y con el defecto global el guion le pedía voz
-                    # de mujer a un vídeo donde se ve un tío.
+                    ugc_config.sexo_valido(sexo_pedido)
+                    if sexo_pedido
+                    # Sin sexo pedido manda el del nicho: el de fitness es un
+                    # hombre, y con el defecto global el guion le pedía voz de
+                    # mujer a un vídeo donde se ve un tío.
                     else ugc_config.sexo_de_nicho(str(mio.get("nicho") or ""))
                 ),
                 on_log=on_log,
@@ -3385,6 +3391,7 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
         product_repo.guardar_escenas(
             source, carpeta, pid, escrito["escenas"], escrito["voz"],
             usuario=usuario, gancho=gancho, duracion=duracion,
+            alternativa=bool(sexo_pedido),
         )
         return True
 
