@@ -19,17 +19,63 @@ export const GUION_JSZIP = String.raw`await new Promise((ok, ko) => {
 });
 console.log("JSZip:", typeof JSZip);   // tiene que decir "function"`;
 
-/** Las carpetas se bajan pulsando su botón de descarga, con espera entre una y
- *  otra: el ZIP se arma en el navegador y encadenarlas se salta carpetas. */
-export const GUION_ZIPS = String.raw`const btns = [...document.querySelectorAll("button[data-dl]")];
-console.log("carpetas:", btns.length);
+/** Las carpetas se bajan pulsando su botón de descarga, esperando a que CADA
+ *  ZIP salga de verdad antes de pedir el siguiente.
+ *
+ *  Antes se esperaba un tiempo fijo y no valía: el ZIP se arma en el navegador
+ *  y tarda lo que tarda, así que unas carpetas se saltaban y a partir de la
+ *  quincena larga dejaba de generarlos —el bucle seguía dando clics y no bajaba
+ *  nada, sin un solo error—. Ahora:
+ *
+ *   - Se envuelve el `click()` del `<a download>` y `createObjectURL`, que es
+ *     por donde su web suelta el fichero: eso avisa de que ESE ZIP ya está.
+ *   - Se libera el blob unos segundos después (la descarga ya arrancó). Es lo
+ *     que quita de encima la memoria acumulada, que es lo que la mataba.
+ *   - Al terminar dice qué carpetas NO bajaron, listas para pegar en `QUIERO`.
+ */
+export const GUION_ZIPS = String.raw`const QUIERO = [];        // p. ej. [20,21,22]. Vacío = todas.
+const LIMITE = 180000;    // por carpeta, antes de darla por perdida
+
+let avisar = null;
+const clickOrig = HTMLAnchorElement.prototype.click;
+HTMLAnchorElement.prototype.click = function () {
+  if (this.download || String(this.href || "").startsWith("blob:")) {
+    avisar?.(this.download || this.href);
+  }
+  return clickOrig.apply(this, arguments);
+};
+const crearOrig = URL.createObjectURL.bind(URL);
+URL.createObjectURL = (b) => {
+  const u = crearOrig(b);
+  avisar?.(u);
+  setTimeout(() => URL.revokeObjectURL(u), 8000);
+  return u;
+};
+
+const esperarZip = () => new Promise((ok) => {
+  const t = setTimeout(() => { avisar = null; ok(null); }, LIMITE);
+  avisar = (n) => {
+    clearTimeout(t); avisar = null;
+    setTimeout(() => ok(n), 1500);
+  };
+});
+
+const btns = [...document.querySelectorAll("button[data-dl]")]
+  .filter((b) => !QUIERO.length || QUIERO.includes(Number(b.dataset.dl)));
+console.log("a bajar:", btns.length);
+const faltan = [];
 for (const b of btns) {
-  const nombre = b.closest(".carp-head")?.querySelector("b")?.textContent.trim();
+  b.scrollIntoView({ block: "center" });
   b.click();
-  console.log(b.dataset.dl, nombre, "→ descargando");
-  await new Promise((r) => setTimeout(r, 15000));
+  const listo = await esperarZip();
+  if (listo) {
+    console.log(b.dataset.dl, "OK");
+  } else {
+    faltan.push(Number(b.dataset.dl));
+    console.warn(b.dataset.dl, "NO bajó");
+  }
 }
-console.log("FIN");`;
+console.log("FIN · faltan:", JSON.stringify(faltan));`;
 
 /** Las fichas de TikTok de cada producto, que en su web están al lado del
  *  número. Dos trampas suyas, las dos descubiertas a base de que no saliera:

@@ -52,7 +52,7 @@ export function PanelWebCurso() {
           },
           {
             texto:
-              "Baja todas las carpetas, una cada 15 s. Chrome preguntará si permites descargar varios archivos: dile que sí. Al acabar comprueba que hay tantos ZIP como carpetas te haya dicho el log.",
+              "Baja las carpetas, esperando a que cada ZIP salga de verdad antes de pedir el siguiente. La primera vez Chrome bloquea las descargas múltiples: en el icono a la izquierda de la URL → Configuración del sitio → Descargas automáticas → Permitir. Al terminar dice «faltan: [...]»: si sale alguna, recarga la página, vuelve a cargar JSZip y relanza pegando esos números en QUIERO.",
             guion: GUION_ZIPS,
             etiqueta: "Copiar paso 2",
           },
