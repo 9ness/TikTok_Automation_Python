@@ -2522,6 +2522,11 @@ def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgres
         if r["incompletos"]:
             detalle += f", {len(r['incompletos'])} sin las dos fotos"
         on_log(f"[web] {r['carpeta']}: {detalle}")
+        if r.get("ejemplos"):
+            on_log(
+                f"[web] ⚠️ {r['carpeta']}: no ha entrado ninguna foto. Dentro "
+                f"del ZIP hay: {', '.join(r['ejemplos'])}"
+            )
         if r["nuevos"]:
             resumen.append(f"{r['carpeta']}: {', '.join(r['nuevos'])}")
 

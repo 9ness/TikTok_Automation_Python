@@ -186,6 +186,14 @@ def importar_zip(
     actualizados: list[str] = []
     iguales: list[str] = []
     incompletos: list[str] = []
+    # Si NINGÚN fichero del ZIP casa con la convención, el import sale 0/0/0 y
+    # no hay forma de saber por qué: parece que el ZIP viene vacío. Se guardan
+    # unos cuantos nombres para poder verlo desde el log de la cola — su web
+    # cambia cosas sin avisar y ya ha cambiado el nombre de los ficheros una
+    # vez (`3.png` → lo que sea).
+    ejemplos = [
+        Path(n).name for n in zf.namelist()[:60] if not n.endswith("/")
+    ][:8]
 
     for producto in sorted(_parejas(zf), key=lambda x: int(x)):
         par = _parejas(zf)[producto]
@@ -232,6 +240,9 @@ def importar_zip(
         "actualizados": actualizados,
         "iguales": iguales,
         "incompletos": incompletos,
+        # Solo cuando no ha entrado NADA: es el dato que dice si el ZIP venía
+        # vacío o si le han cambiado el nombre a las fotos.
+        "ejemplos": [] if (nuevos or actualizados or iguales) else ejemplos,
     }
 
 
