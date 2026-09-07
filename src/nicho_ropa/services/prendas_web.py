@@ -245,4 +245,17 @@ def importar_zip(datos: bytes, nombre_zip: str, genero: str) -> dict:
     destino.mkdir(parents=True, exist_ok=True)
     r = pov_web.importar_zip(datos, nombre_zip, raiz=destino)
     _invalidar()
-    return {**r, "genero": genero, "slug": config.slug_web(genero, r["carpeta"])}
+    slug = config.slug_web(genero, r["carpeta"])
+    # Una prenda que cambia de FOTO ya no es la misma prenda: su web renumera
+    # al añadir productos. Lo guardado cuelga del NÚMERO, así que se tira o la
+    # nueva nace con los textos y los vídeos de la anterior. Mismo criterio que
+    # en el importador del POV BOF, donde ya pasó.
+    reiniciados = 0
+    if r.get("actualizados"):
+        from src.nicho_ropa.repos import product_repo
+
+        try:
+            reiniciados = product_repo.borrar_productos(slug, r["actualizados"])
+        except Exception:  # noqa: BLE001 — Redis caído no puede tumbar el import
+            reiniciados = 0
+    return {**r, "genero": genero, "slug": slug, "reiniciados": reiniciados}

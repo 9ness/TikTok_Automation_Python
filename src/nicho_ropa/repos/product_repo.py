@@ -171,6 +171,33 @@ def quitar_campos(carpeta: str, producto: str, *campos: str) -> dict:
         return prod
 
 
+def borrar_productos(carpeta: str, numeros: list[str]) -> int:
+    """Tira TODO lo guardado de unos productos de una carpeta.
+
+    El número ES la identidad de una prenda dentro de su carpeta y su web
+    RENUMERA al añadir cosas: al reimportar, un número que ya existía puede
+    traer otra prenda. Si lo guardado sigue ahí, la nueva nace con los textos,
+    los vídeos de cada modo y el "subido" de la anterior — que es como salen
+    vídeos publicados con el texto de otro producto.
+
+    Devuelve cuántas entradas se tiraron.
+    """
+    fuera = {str(n) for n in numeros}
+    if not fuera:
+        return 0
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        productos = doc.get("productos") or {}
+        quedan = {k: v for k, v in productos.items() if str(k) not in fuera}
+        if len(quedan) == len(productos):
+            return 0
+        borradas = len(productos) - len(quedan)
+        doc["productos"] = quedan
+        r.set_json(_key(carpeta), doc)
+        return borradas
+
+
 def importar_urls(filas: list[dict], carpetas_reales: list[str]) -> dict:
     """Guarda de golpe las fichas copiadas del DOM de la web del curso.
 
