@@ -7,11 +7,17 @@ perdía matices y el guion salía sin gracia.
 Lo único que se añade al final es el formato de salida (JSON), porque aquí no
 hay una persona leyendo la respuesta como en ChatGPT.
 
-**Sin bucle de recorte.** El documento pide 260 caracteres, pero su propio
-ejemplo tiene 357; forzar los 260 con reintentos deja frases telegráficas
-("¿Piel grasa? ¿Residuo blanco? ¿Maquillaje mal?"). Si el guion se pasa de lo
-que cabe en los dos clips solo se AVISA: el montaje ya cuadra la duración, y un
-guion bueno y un poco largo vale más que uno corto y roto.
+**Una segunda pasada por longitud, no un bucle.** Forzar el tope a base de
+reintentos deja frases telegráficas ("¿Piel grasa? ¿Residuo blanco?"), así que
+durante un tiempo no se recortó nada: total, el montaje cuadra la duración y
+pide un clip más. Con los clips de pago eso dejó de ser gratis — medida la
+Carpeta_1 del Inventario General, los DIEZ guiones se pasaban (331 a 503
+caracteres para un tope de 356) y ninguno cabía en dos clips de 8 s: entre 3 y
+4 clips por vídeo, o sea un 50-100 % más de créditos por pasarse de largo.
+
+Así que si se pasa se pide UNA reescritura, enseñándole por cuánto se pasó (a
+secas devuelve lo mismo de largo). Si vuelve más largo o vacío, se queda el
+primero: un guion bueno y largo sigue valiendo más que uno roto.
 """
 
 from __future__ import annotations
@@ -89,10 +95,25 @@ def escribir(
     tope = max_caracteres or config.GUION_MAX_CARACTERES
     if len(guion) > tope:
         on_log(
-            f"[{etiqueta}] guion de {len(guion)} caracteres; el objetivo eran "
-            f"~{tope}. No se recorta (ver la nota de arriba): el montaje cuadra "
-            "la duración y puede pedir un clip más."
+            f"[{etiqueta}] guion de {len(guion)} caracteres para un tope de "
+            f"{tope}: se pide una reescritura más corta."
         )
+        try:
+            corto = _acortar(
+                (prompt or config.prompt_guion(plazos)), descripcion, imagenes,
+                guion, tope, on_log,
+            )
+        except Exception as e:  # noqa: BLE001 — lo de antes vale, aunque largo
+            on_log(f"[{etiqueta}] no se pudo acortar: {e}")
+            corto = ""
+        if corto:
+            on_log(f"[{etiqueta}] recortado a {len(corto)} caracteres")
+            guion = corto
+        elif len(guion) > tope:
+            on_log(
+                f"[{etiqueta}] sigue en {len(guion)}: se usa igual, pero puede "
+                "pedir un clip más."
+            )
 
     return {
         "nombre": " ".join(str(datos.get("nombre") or titulo).split()),
@@ -101,3 +122,30 @@ def escribir(
         # `\n` literal escapado y a veces con salto real.
         "subliminal": str(datos.get("subliminal") or "").replace("\\n", "\n").strip(),
     }
+
+
+def _acortar(
+    prompt: str, descripcion: str, imagenes, guion: str, tope: int,
+    on_log: OnLog,
+) -> str:
+    """Segunda pasada SOLO por longitud. Devuelve "" si no mejora.
+
+    Se le enseña lo que escribió y por cuánto se pasó: pedirlo a secas otra vez
+    devuelve un guion igual de largo, porque el modelo no sabe que ya falló.
+    """
+    from src.tiktok_shop.api.gemini import generate_json
+
+    aviso = (
+        f"\n\nATENCIÓN: tu guion anterior tenía {len(guion)} caracteres y el "
+        f"tope son {tope}. Este era:\n«{guion}»\n\nDevuelve el MISMO JSON, con "
+        "el mismo producto y la misma estructura, pero con el guion por debajo "
+        "del tope. No quites la llamada a la acción del final ni las "
+        "características principales: di lo mismo con menos palabras, sin "
+        "dejarlo telegráfico."
+    )
+    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
+    if not isinstance(datos, dict):
+        return ""
+    nuevo = " ".join(str(datos.get("guion") or "").split())
+    # Solo se acepta lo que de verdad sea más corto.
+    return nuevo if nuevo and len(nuevo) < len(guion) else ""
