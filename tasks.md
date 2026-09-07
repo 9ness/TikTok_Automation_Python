@@ -51,11 +51,14 @@ subir con el ⬆ de esa fila → quemar textos.
   Moda Chica. **Vista POV** resuelto: NO es un formato nuevo sino el POV BOF
   Largo con otra mano (su prompt de guion es `guion_dolor.md` palabra por
   palabra salvo la CTA, y sus instrucciones describen el mismo flujo — dos
-  clips de 10s, voz aparte en Fish, fuera el audio de Omni), así que solo hizo
-  falta guardar su prompt de imagen (`prompt_imagen_manos_mujer.md`, manos de
-  MUJER). Falta: la versión con mano de hombre —que él no publica, habría que
-  derivarla— y **Vista Sentado 20s**, que sí es otra escena (las zapatillas
-  puestas, sentado) y necesita su prompt de imagen.
+  clips de 10s, voz aparte en Fish, fuera el audio de Omni). Lo mismo con
+  **Vista Sentado**: otra escena, el MISMO guion. Así que de los dos solo hubo
+  que guardar su prompt de imagen (`prompt_imagen_manos_mujer.md` y
+  `prompt_imagen_piernas_mujer.md`), los dos de MUJER. Queda: la versión con
+  mano/pierna de hombre, que él no publica y habría que derivar, y decidir si
+  el de sentada necesita el filtro de calzado —el producto va PUESTO, así que
+  con cualquier otra cosa no tiene sentido— o basta con que se vea en la
+  pantalla que solo sirve para eso.
 - [ ] **Moda Hombre: tres formatos de 10s** (sep 2026) — Gafas en Coche,
   Camisetas Sarcásticas y Camiseta Maniquí. Se montan como modos del Nicho
   Ropa, igual que Situación Real 1 y 2: hacen falta sus dos prompts. Ojo:

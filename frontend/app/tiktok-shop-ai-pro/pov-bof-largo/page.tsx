@@ -1243,6 +1243,21 @@ export default function PovBofLargoPage() {
               >
                 <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 💅 manos
               </button>
+              {/* La tercera escena: sentada, de rodillas para abajo y con el
+                  producto PUESTO. Solo vale para calzado. */}
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(
+                    "Prompt imagen · sentada (calzado)",
+                    prompts.data?.imagen_piernas_mujer,
+                  )
+                }
+                disabled={!prompts.data?.imagen_piernas_mujer}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/50 bg-card px-3 py-2 text-xs text-fuchsia-300 transition hover:border-fuchsia-400 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 👟 sentada
+              </button>
               <button
                 type="button"
                 onClick={() => copyText("Prompt vídeo", prompts.data?.video)}

@@ -144,9 +144,10 @@ def get_prompts() -> PromptsResponse:
     vídeo, para Veo3/Kling/generador de imágenes). Viven en `.md` — nunca
     hardcoded en el código (convención del proyecto).
 
-    El de manos de mujer es una alternativa al de imagen, del formato de 20s
-    de Moda Chica: mismo guion y mismo montaje, solo cambia la mano. Lo sirve
-    este endpoint porque el POV BOF Largo reusa los prompts de aquí."""
+    Los de manos y piernas son alternativas al de imagen, de los formatos de
+    20s de Moda Chica: mismo guion y mismo montaje, solo cambia la escena. El
+    de piernas solo vale para CALZADO — el producto va puesto. Los sirve este
+    endpoint porque el POV BOF Largo reusa los prompts de aquí."""
     d = _prompts_dir()
     try:
         from src.nicho_pov_bof.config import limpiar_prompt
@@ -156,9 +157,15 @@ def get_prompts() -> PromptsResponse:
         manos = limpiar_prompt(
             (d / "prompt_imagen_manos_mujer.md").read_text(encoding="utf-8")
         )
+        piernas = limpiar_prompt(
+            (d / "prompt_imagen_piernas_mujer.md").read_text(encoding="utf-8")
+        )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
-    return PromptsResponse(imagen=imagen, video=video, imagen_manos_mujer=manos)
+    return PromptsResponse(
+        imagen=imagen, video=video,
+        imagen_manos_mujer=manos, imagen_piernas_mujer=piernas,
+    )
 
 
 def _aviso_foto(pair: dict) -> str:

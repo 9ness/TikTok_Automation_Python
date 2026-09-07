@@ -150,6 +150,9 @@ class PromptsResponse(BaseModel):
     # sosteniendo el producto, en vez de una mano señalándolo. Es la del
     # formato de 20s de Moda Chica, así que solo la enseña el POV BOF Largo.
     imagen_manos_mujer: str = ""
+    # Y la del formato sentado: de rodillas para abajo, con el producto
+    # PUESTO. Solo sirve para calzado.
+    imagen_piernas_mujer: str = ""
 
 
 class ProductoInfo(BaseModel):

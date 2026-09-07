@@ -108,6 +108,9 @@ export interface PromptsResponse {
    *  sosteniendo el producto. Es la del formato de 20s de Moda Chica, así que
    *  solo la enseña el POV BOF Largo. */
   imagen_manos_mujer?: string;
+  /** Y la del formato sentado: de rodillas para abajo, con el producto
+   *  PUESTO. Solo sirve para calzado. */
+  imagen_piernas_mujer?: string;
 }
 
 export interface ProductoItem {
