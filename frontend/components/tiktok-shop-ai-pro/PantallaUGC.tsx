@@ -87,6 +87,14 @@ const BORDE_NICHO: Record<string, string> = {
   generico: "border-l-border",
 };
 
+/** Corta por la última palabra entera antes del tope. */
+function recorta(texto: string, tope: number): string {
+  const limpio = (texto || "").replace(/\s+/g, " ").trim();
+  if (limpio.length <= tope) return limpio;
+  const corte = limpio.slice(0, tope);
+  return corte.slice(0, corte.lastIndexOf(" ")) + "…";
+}
+
 export function PantallaUGC() {
   const sources = useSources();
   const cfg = useConfigUGC();
@@ -721,11 +729,20 @@ function TarjetaUGC({
               </button>
             </p>
             {verEscenas && (
-              <ol className="space-y-0.5 rounded-lg border border-border/60 bg-muted/30 p-1.5 text-[10px] leading-tight text-muted-foreground">
+              <ol className="space-y-1 rounded-lg border border-border/60 bg-muted/30 p-1.5 text-[10px] leading-tight text-muted-foreground">
                 {escenas.map((e) => (
                   <li key={`d${e.n}`}>
                     <strong className="text-foreground">{e.n}. {e.titulo}</strong>
-                    {e.guion ? ` — «${e.guion}»` : ""}
+                    {/* Lo que se VE —dónde está la persona, qué hace, qué pasa
+                        con el producto— sale del prompt de imagen, que es el
+                        único que lo describe. Recortado: para saber cuál es
+                        cuál basta con el principio. */}
+                    {e.prompt_imagen ? (
+                      <span className="block">📸 {recorta(e.prompt_imagen, 240)}</span>
+                    ) : null}
+                    {e.guion ? (
+                      <span className="block opacity-70">🗣️ «{e.guion}»</span>
+                    ) : null}
                   </li>
                 ))}
               </ol>
