@@ -44,6 +44,7 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
+import type { ModoRopa } from "@/lib/types/nichoRopa";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
 /** Los modos de grabación: dónde está la cámara. Cada uno es un vídeo
@@ -55,8 +56,8 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
  *  Solo los dos de siempre y sin inventarse cuáles son de cada sexo: la lista
  *  buena viene con los prompts (`modos`), porque el curso no publica los
  *  mismos formatos para hombre y para mujer. */
-const MODOS_FALLBACK = [
-  { clave: "espejo", label: "🪞 BOF Frente a Espejo" },
+const MODOS_FALLBACK: ModoRopa[] = [
+  { clave: "espejo", label: "🪞 BOF Frente a Espejo", voz: true },
 ];
 
 /** Alta de prendas PROPIAS, en los cuatro catálogos del operador.
@@ -497,7 +498,7 @@ export function PantallaRopa({
 
             <Sub>Modo de grabación</Sub>
             <div className="grid grid-cols-2 gap-1.5">
-              {modos.map(({ clave, label }) => (
+              {modos.map(({ clave, label, voz }) => (
                 <button
                   key={clave}
                   type="button"
@@ -508,6 +509,10 @@ export function PantallaRopa({
                       : "border-border/60 text-muted-foreground hover:border-foreground/30"
                   }`}
                 >
+                  {/* 🔇 = el clip sale MUDO: su paso 2 solo dice el
+                      movimiento. Importa para el bolsillo, no para el
+                      montaje — la voz del generador es lo que se paga. */}
+                  {voz === false ? "🔇 " : "🗣️ "}
                   {label}
                 </button>
               ))}

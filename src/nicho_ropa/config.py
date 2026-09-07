@@ -182,7 +182,16 @@ def modos_de(sexo: str) -> list[dict[str, str]]:
     """
     sexo = sexo if sexo in ("mujer", "hombre") else SEXO_DEFECTO
     return [
-        {"clave": clave, "label": meta["label"]}
+        {
+            "clave": clave,
+            "label": meta["label"],
+            # Si el clip sale HABLADO. Los dos de camiseta no: su paso 2 es
+            # solo movimiento, así que no gastan voz del generador —que es lo
+            # caro— y la gracia la pone el texto de la prenda.
+            "voz": bool(
+                (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("voz", True)
+            ),
+        }
         for clave, meta in MODOS.items()
         if sexo in meta["sexos"]
     ]
@@ -541,6 +550,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     # género —maquillaje, joyería y un bloque de movimiento entero—.
     "espejo": {
         "label": "Frente al espejo · cuerpo entero",
+        "voz": True,
         "duraciones": True,
         "por_sexo": {
             "hombre": (
@@ -558,6 +568,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     # más que el género (maquillaje, joyería, el encuadre del brazo).
     "movil": {
         "label": "BOF Selfie · brazo estirado",
+        "voz": True,
         "duraciones": True,
         "por_sexo": {
             "hombre": (
@@ -577,6 +588,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     "gafas": {
         "duraciones": True,
         "label": "Gafas en el coche · selfie",
+        "voz": True,
         "imagen": "prompt_mof10_gafas_imagen.md",
         "guion": "prompt_mof10_gafas_guion.md",
         "derivado": (),
@@ -589,6 +601,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     "sarcastica": {
         "duraciones": False,
         "label": "Camiseta sarcástica · en el súper",
+        "voz": False,
         "imagen": "prompt_mof10_sarcastica_imagen.md",
         "guion": "prompt_mof10_sarcastica_guion.md",
         "derivado": (),
@@ -596,6 +609,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     "maniqui": {
         "duraciones": False,
         "label": "Camiseta en maniquí · sin persona",
+        "voz": False,
         "imagen": "prompt_mof10_maniqui_imagen.md",
         "guion": "prompt_mof10_maniqui_guion.md",
         "derivado": (),
@@ -609,6 +623,7 @@ ESTILOS_MOF10: dict[str, dict] = {
         # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
         "duraciones": False,
         "label": "Situación Real 1 · le paran por la calle",
+        "voz": True,
         "por_sexo": {
             "hombre": (
                 "prompt_mof10_real_1_imagen.md",
@@ -628,6 +643,7 @@ ESTILOS_MOF10: dict[str, dict] = {
         # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
         "duraciones": False,
         "label": "Situación Real 2 · le reciben en una terraza",
+        "voz": True,
         "por_sexo": {
             "hombre": (
                 # Comparte la IMAGEN con Real 1 —es el mismo texto en su web,

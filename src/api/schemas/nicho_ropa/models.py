@@ -34,6 +34,9 @@ class EstiloMof10(BaseModel):
 class ModoRopa(BaseModel):
     clave: str
     label: str
+    # Si el clip sale HABLADO por el generador. Los que no (las dos camisetas)
+    # son los baratos: no gastan la voz de Flow, que es lo que se paga.
+    voz: bool = True
 
 
 class PromptsRopaResponse(BaseModel):

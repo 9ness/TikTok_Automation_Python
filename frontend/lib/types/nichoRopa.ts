@@ -41,6 +41,8 @@ export interface PromptsRopaResponse {
 export interface ModoRopa {
   clave: string;
   label: string;
+  /** Si el clip sale hablado. Los mudos no gastan la voz del generador. */
+  voz?: boolean;
 }
 
 export interface CarpetaRopa {
