@@ -307,7 +307,25 @@ def prompt_guion(
         # solo se le manda lo que va después del separador.
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
-    return _alargar(base, segundos)
+    return _alargar(base, segundos) + _epoca()
+
+
+def _epoca() -> str:
+    """Añadido NUESTRO: en qué época del año se va a publicar.
+
+    El prompt del curso no sabe la fecha, así que para una tumbona escribe «si
+    te vas a la playa» aunque sea noviembre. Es la misma frase que lleva el
+    prompt de imagen y con la misma salvaguarda: al producto al que la época le
+    da igual no se le cambia nada.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    return (
+        "\n\nÚLTIMO APUNTE: el vídeo se publica en "
+        f"{pov_config.epoca_actual()}. Si el producto es de temporada, habla "
+        "de usarlo en esta época y no en otra. Si le da igual la época, no "
+        "cambies nada por esto."
+    )
 
 
 def _alargar(prompt: str, segundos: float) -> str:

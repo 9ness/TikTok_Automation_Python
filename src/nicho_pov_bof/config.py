@@ -912,7 +912,13 @@ def prompt_guion_producto(
             "lo del precio con otras palabras. Mantén el mismo tono y cierra "
             "igual que se te pide arriba."
         )
-    return texto
+    # Añadido NUESTRO, el mismo que lleva el prompt de imagen: sin la fecha,
+    # una tumbona se vende "para la playa" en noviembre.
+    return texto + (
+        f"\n\nÚLTIMO APUNTE: el vídeo se publica en {epoca_actual()}. Si el "
+        "producto es de temporada, habla de usarlo en esta época y no en otra. "
+        "Si le da igual la época, no cambies nada por esto."
+    )
 
 
 # Ritmo medio de las voces de Fish, para pasar de caracteres a segundos en el
