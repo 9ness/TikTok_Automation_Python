@@ -143,6 +143,24 @@ MODOS: dict[str, dict] = {
         # Desde sep 2026 también está en Moda Chica, con sus dos textos.
         "sexos": ("mujer", "hombre"),
     },
+    "gafas_coche": {
+        "label": "🕶️ Gafas en Coche",
+        "estilo_mof10": "gafas",
+        "sexos": ("hombre",),
+    },
+    "sarcastica": {
+        "label": "😏 Camiseta Sarcástica",
+        "estilo_mof10": "sarcastica",
+        "sexos": ("hombre",),
+    },
+    # El maniquí no lleva persona, así que la prenda podría ser de cualquiera;
+    # se deja en hombre porque es donde lo publica y porque el resto del menú
+    # de mujer va con modelo.
+    "maniqui": {
+        "label": "🧍 Camiseta Maniquí",
+        "estilo_mof10": "maniqui",
+        "sexos": ("hombre",),
+    },
     # "BOLSO MOF MUJER POV ONMI 10S" existe en su web pero AÚN NO tiene
     # prompts publicados, así que no se ofrece: un modo sin prompt es un botón
     # que no lleva a nada. Al pegarlos, se añade aquí con `estilo_mof10:
@@ -551,6 +569,35 @@ ESTILOS_MOF10: dict[str, dict] = {
                 "prompt_mof10_movil_mujer_guion.md",
             ),
         },
+        "derivado": (),
+    },
+    # El primero que NO va de ropa: unas gafas puestas, en el coche. Mismo
+    # molde de guion que el espejo y el selfie —tope de caracteres incluido—,
+    # así que también elige duración. Solo de hombre.
+    "gafas": {
+        "duraciones": True,
+        "label": "Gafas en el coche · selfie",
+        "imagen": "prompt_mof10_gafas_imagen.md",
+        "guion": "prompt_mof10_gafas_guion.md",
+        "derivado": (),
+    },
+    # Estos dos son distintos de todo lo demás: NADIE HABLA. Su paso 2 no es
+    # un guion sino tres líneas de movimiento, así que no hay tope que bajar y
+    # no eligen duración. En el de las camisetas la gracia la pone el texto de
+    # la prenda y la risa que se añade en Omni; en el del maniquí no sale
+    # ninguna persona, solo dos manos.
+    "sarcastica": {
+        "duraciones": False,
+        "label": "Camiseta sarcástica · en el súper",
+        "imagen": "prompt_mof10_sarcastica_imagen.md",
+        "guion": "prompt_mof10_sarcastica_guion.md",
+        "derivado": (),
+    },
+    "maniqui": {
+        "duraciones": False,
+        "label": "Camiseta en maniquí · sin persona",
+        "imagen": "prompt_mof10_maniqui_imagen.md",
+        "guion": "prompt_mof10_maniqui_guion.md",
         "derivado": (),
     },
     # Este va en los DOS menús de su web, cada uno con su imagen. El guion de

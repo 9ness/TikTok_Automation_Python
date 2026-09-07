@@ -64,11 +64,16 @@ subir con el ⬆ de esa fila → quemar textos.
   defecto) y en esos formatos hay que apagar gancho, texto y CTA — es el ÚNICO
   texto del vídeo. Si acaban siendo la mayoría de los vídeos, la combinación
   debería ir con el formato y no marcarse a mano cada vez.
-- [ ] **Moda Hombre: tres formatos de 10s** (sep 2026) — Gafas en Coche,
-  Camisetas Sarcásticas y Camiseta Maniquí. Se montan como modos del Nicho
-  Ropa, igual que Situación Real 1 y 2: hacen falta sus dos prompts. Ojo:
-  **Camiseta Maniquí no lleva persona**, así que ese modo no necesita
-  personaje.
+- [ ] **Los tres formatos de 10s de Moda Hombre, ya dados de alta** (Gafas en
+  Coche, Camiseta Sarcástica, Camiseta Maniquí) — queda lo que arrastran: (1)
+  ninguno de los tres va de ropa normal, así que el **filtro por categoría**
+  pasa de conveniente a necesario (gafas solo en gafas, sarcástica solo en
+  camisetas con texto); (2) los dos últimos **no llevan voz**: su paso 2 son
+  tres líneas de movimiento, no un guion, así que en la pantalla el botón
+  sigue diciendo "Guion" y el de plazos no cambia nada; (3) su imagen va en
+  Omni como FRAME INICIAL y no como ingrediente, al revés que el resto, y la
+  risa de la sarcástica se busca a mano en su banco de sonidos — está
+  apuntado en el comentario de cada `.md`, pero no lo dice la pantalla.
 - [ ] **Situación Real en 8s**: el selector de duración (10s Omni / 8s Veo)
   solo se le pone a los estilos cuyo guion se escribe fuera con un tope de
   caracteres —espejo y selfie—. Los dos de calle traen el diálogo CERRADO y
