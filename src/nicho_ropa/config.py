@@ -128,7 +128,8 @@ MODOS: dict[str, dict] = {
     "camara": {
         "label": "🤳 BOF Selfie",
         "estilo_mof10": "movil",
-        "sexos": ("hombre",),
+        # Desde sep 2026 lo publica también para mujer, con su propio texto.
+        "sexos": ("mujer", "hombre"),
     },
     "calle_1": {
         "label": "🚶 Situación Real 1",
@@ -494,11 +495,21 @@ ESTILOS_MOF10: dict[str, dict] = {
         },
         "derivado": (),
     },
+    # Ya publica los DOS sexos, así que se acabó derivar: entre ellos cambia
+    # más que el género (maquillaje, joyería, el encuadre del brazo).
     "movil": {
-        "label": "Colocando el móvil · medio cuerpo",
-        "imagen": "prompt_mof10_movil_imagen.md",
-        "guion": "prompt_mof10_movil_guion.md",
-        "derivado": ("mujer",),
+        "label": "BOF Selfie · brazo estirado",
+        "por_sexo": {
+            "hombre": (
+                "prompt_mof10_movil_hombre_imagen.md",
+                "prompt_mof10_movil_hombre_guion.md",
+            ),
+            "mujer": (
+                "prompt_mof10_movil_mujer_imagen.md",
+                "prompt_mof10_movil_mujer_guion.md",
+            ),
+        },
+        "derivado": (),
     },
     # Los de calle son SOLO de hombre (`MODOS[...]["sexos"]`), así que nunca
     # se piden en mujer y no hay nada que derivar: el diálogo entero está
