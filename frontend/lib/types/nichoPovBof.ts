@@ -113,6 +113,8 @@ export interface PromptsResponse {
   /** Y la del formato sentado: de rodillas para abajo, con el producto
    *  PUESTO. Solo sirve para calzado. */
   imagen_piernas_mujer?: string;
+  /** La misma sentada del menú de hombre: no fuerza el sexo de las piernas. */
+  imagen_piernas_hombre?: string;
 }
 
 export interface ProductoItem {

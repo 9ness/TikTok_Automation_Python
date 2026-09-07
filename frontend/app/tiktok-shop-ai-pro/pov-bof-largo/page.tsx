@@ -1269,7 +1269,20 @@ export default function PovBofLargoPage() {
                 disabled={!prompts.data?.imagen_piernas_mujer}
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/50 bg-card px-3 py-2 text-xs text-fuchsia-300 transition hover:border-fuchsia-400 disabled:opacity-50"
               >
-                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 👟 sentada
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 👟 sentada ♀
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(
+                    "Prompt imagen · sentado (calzado)",
+                    prompts.data?.imagen_piernas_hombre,
+                  )
+                }
+                disabled={!prompts.data?.imagen_piernas_hombre}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-sky-500/50 bg-card px-3 py-2 text-xs text-sky-300 transition hover:border-sky-400 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 👟 sentado ♂
               </button>
               <button
                 type="button"

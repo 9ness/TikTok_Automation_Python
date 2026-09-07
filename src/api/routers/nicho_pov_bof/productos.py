@@ -163,12 +163,15 @@ def get_prompts() -> PromptsResponse:
         piernas = limpiar_prompt(
             (d / "prompt_imagen_piernas_mujer.md").read_text(encoding="utf-8")
         )
+        piernas_h = limpiar_prompt(
+            (d / "prompt_imagen_piernas_hombre.md").read_text(encoding="utf-8")
+        )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
     return PromptsResponse(
         imagen=imagen, video=video,
         imagen_manos_mujer=manos, imagen_manos_hombre=manos_h,
-        imagen_piernas_mujer=piernas,
+        imagen_piernas_mujer=piernas, imagen_piernas_hombre=piernas_h,
     )
 
 

@@ -17,10 +17,12 @@ import { nombreDescarga } from "@/lib/descargas";
 import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
   buildCleanPhotoDownloadUrl,
+  useExtraerTextos,
   useFolders,
   useHashtags,
   useSources,
 } from "@/lib/queries/nichoPovBof";
+import { useEsPro } from "@/lib/queries/auth";
 import {
   buildVideoUGCUrl,
   subirClipUGC,
@@ -30,6 +32,7 @@ import {
   useLimpiarClipsUGC,
   useMontarUGC,
   useProductosUGC,
+  nichoGeneralKeys,
 } from "@/lib/queries/nichoGeneral";
 import type {
   ConfigUGCResponse,
@@ -41,6 +44,7 @@ import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
+import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { VideoModal } from "@/components/ui/video-modal";
 
 /** Nicho General · UGC — el anuncio de TRES clips.
@@ -88,6 +92,15 @@ export function PantallaUGC() {
   const productos = useProductosUGC(source, folder, gancho, duracion);
   const items = productos.data?.items ?? [];
   const conEscenas = items.filter((p) => p.escenas.length > 0).length;
+  // Las escenas se escriben leyendo el título y la ficha, así que sin textos
+  // no hay nada que escribir. Se sacan aquí mismo y no en el POV BOF: son del
+  // producto y valen para todos los nichos, pero mandar al operador a otra
+  // pantalla a mitad del paso 1 era perderlo.
+  const conTexto = items.filter((p) => p.titulo).length;
+  const extraerTextos = useExtraerTextos();
+  const qcPantalla = useQueryClient();
+  // Los textos son del producto y se comparten: los extrae solo el admin.
+  const esPro = useEsPro();
   const conVideo = items.filter((p) => p.video_path).length;
 
   const escenasLote = useEscenasLote();
@@ -224,9 +237,51 @@ export function PantallaUGC() {
         n={1}
         color="violeta"
         titulo="Escribir las escenas"
-        hint="Lee la ficha del producto y escribe las tres escenas: sus prompts de imagen, sus prompts de vídeo y lo que se dice en cada una."
+        hint="Primero los textos (lee la ficha de cada producto) y luego las tres escenas: sus prompts de imagen, sus prompts de vídeo y lo que se dice en cada una."
         extra={`${conEscenas}/${items.length}`}
       >
+        {esPro ? (
+          <TextosDelAdmin hechos={conTexto} total={items.length} />
+        ) : (
+          <button
+            type="button"
+            disabled={extraerTextos.isPending || !folder}
+            onClick={() =>
+              extraerTextos.mutate(
+                { source, folder },
+                {
+                  onSuccess: () => {
+                    // Los textos los guarda el POV BOF: esta lista es otra
+                    // consulta y sin recargarla se queda diciendo "sin textos".
+                    void qcPantalla.invalidateQueries({
+                      queryKey: nichoGeneralKeys.productos(
+                        source, folder, gancho, duracion,
+                      ),
+                    });
+                    toast.success("Textos extraídos");
+                  },
+                  onError: (e) =>
+                    toast.error(e instanceof ApiError ? e.message : String(e)),
+                },
+              )
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
+          >
+            {extraerTextos.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                Extrayendo textos…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                {conTexto >= items.length && items.length > 0
+                  ? "Textos al día · volver a extraer"
+                  : `Obtener textos (${conTexto}/${items.length})`}
+              </>
+            )}
+          </button>
+        )}
         <button
           type="button"
           disabled={escenasLote.isPending || !folder}

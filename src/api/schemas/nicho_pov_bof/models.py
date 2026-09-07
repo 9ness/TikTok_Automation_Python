@@ -154,6 +154,9 @@ class PromptsResponse(BaseModel):
     # Y la del formato sentado: de rodillas para abajo, con el producto
     # PUESTO. Solo sirve para calzado.
     imagen_piernas_mujer: str = ""
+    # El de su menú de hombre. No fuerza el sexo de las piernas: es el que no
+    # elige, frente al de mujer, que sí lo obliga.
+    imagen_piernas_hombre: str = ""
 
 
 class ProductoInfo(BaseModel):
