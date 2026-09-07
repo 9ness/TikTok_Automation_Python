@@ -375,11 +375,20 @@ function ImportarZipWeb({
             const cambiados = hechas.reduce((n, x) => n + x.actualizados.length, 0);
             const iguales = hechas.reduce((n, x) => n + x.iguales.length, 0);
             return (
-              <p className="font-semibold text-foreground">
-                {hechas.length} carpeta(s) · {nuevos} nuevo(s), {cambiados} cambiado(s),
-                {" "}
-                {iguales} sin tocar
-              </p>
+              <>
+                <p className="font-semibold text-foreground">
+                  {hechas.length} carpeta(s) · {nuevos} nuevo(s), {cambiados} cambiado(s),
+                  {" "}
+                  {iguales} sin tocar
+                </p>
+                {cambiados > 0 && (
+                  <p className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-500">
+                    Los cambiados llevaban otro producto en ese número: se les
+                    ha tirado todo lo guardado (textos, guion, escenas, clips,
+                    vídeo y las marcas). Vuelve a darles «Obtener textos».
+                  </p>
+                )}
+              </>
             );
           })()}
           <div className="max-h-40 space-y-0.5 overflow-y-auto">
@@ -390,9 +399,13 @@ function ImportarZipWeb({
                   <span className="text-emerald-500"> · nuevos: {x.nuevos.join(", ")}</span>
                 ) : null}
                 {x.actualizados.length ? (
+                  /* Cambiar de foto es cambiar de PRODUCTO: su web renumera
+                     al añadir cosas. Todo lo que había guardado con ese número
+                     se ha tirado, así que hay que volver a sacarles los
+                     textos. */
                   <span className="text-amber-500">
                     {" "}
-                    · cambiados: {x.actualizados.join(", ")}
+                    · cambiados (empiezan de cero): {x.actualizados.join(", ")}
                   </span>
                 ) : null}
                 {!x.nuevos.length && !x.actualizados.length ? " · sin cambios" : null}

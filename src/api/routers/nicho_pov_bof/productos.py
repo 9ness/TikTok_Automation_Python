@@ -1380,7 +1380,20 @@ async def importar_productos_web(
     try:
         if not nicho_config.es_catalogo_zip(source):
             raise _bad_request(f"{source!r} no es un catálogo que se importe por ZIP.")
-        return productos_web.importar_zip(datos, subido.filename or "", source=source)
+        r = productos_web.importar_zip(datos, subido.filename or "", source=source)
+        # Un producto que cambia de FOTO ya no es el mismo producto: su web
+        # renumera al añadir cosas, así que el 1 de la Carpeta 1 pasó de unas
+        # toallitas a un panel de herramientas. Lo guardado —textos, guion,
+        # escenas, clips, vídeo, subido, vendido— sigue colgando del NÚMERO, y
+        # dejarlo ahí es lo que ya hizo salir productos montados con el texto
+        # de otro. Así que se tira todo lo de esos números y empiezan de cero.
+        if r.get("actualizados"):
+            from src.nicho_pov_bof.services import reanclaje
+
+            r["reiniciados"] = reanclaje.borrar_productos(
+                source, r["carpeta"], r["actualizados"],
+            )
+        return r
     except ValueError as e:
         raise _bad_request(str(e)) from e
     except OSError as e:
