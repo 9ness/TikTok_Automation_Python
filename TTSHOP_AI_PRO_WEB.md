@@ -252,6 +252,14 @@ nueva antes de tocar nada:
   captura). Antes era `3.png` para la ficha y `3.1.jpeg` para la limpia, o sea
   AL REVÉS de lo nuestro. El importador acepta las dos
   (`nicho_pov_bof/services/productos_web.py`).
+- En Moda Hombre hay una TERCERA foto, `Producto_3_Trasera.jpeg`. **No se
+  importa**: ningún prompt la usa y el emparejado limpia↔ficha decide por
+  forma y peso, así que una segunda foto cuadrada del mismo producto se
+  colaría como "la limpia".
+- La única carpeta de Ropa Hombre (7 sep 2026) MEZCLA categorías: abrigos,
+  zapatillas, gafas y camisetas de texto en los mismos diez productos. O sea
+  que sus subcategorías (Ropa/Zapatos/Accesorios) todavía no separan nada y el
+  filtro por categoría sigue haciendo falta.
 - Las carpetas son de diez productos y se llaman como el ZIP (`Carpeta 26`).
 - **El ZIP solo existe en ESCRITORIO** (visto el 7 sep 2026). Si detecta móvil
   —y la vista de dispositivo de DevTools cuenta como tal— abre un panel

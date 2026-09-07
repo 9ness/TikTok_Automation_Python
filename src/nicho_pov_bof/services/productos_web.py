@@ -136,8 +136,16 @@ def nombre_carpeta(nombre_zip: str) -> str:
 # Se aceptan las dos: al cambiarla, los 31 ZIP importaron 0 de 0 sin decir por
 # qué, porque ningún fichero casaba con la única que había.
 _RE_VIEJO = re.compile(r"^(\d+)(\.1)?\.[A-Za-z0-9]+$")
+#
+# Y desde el 7 sep 2026 hay una TERCERA foto, `Producto_3_Trasera.jpeg`, que se
+# ignora a propósito: ningún prompt la usa —varios prohíben expresamente
+# enseñar la espalda— y meterla rompería el emparejado. `photo_pairing` decide
+# cuál es la limpia y cuál la captura por FORMA y PESO, no por el nombre, así
+# que con dos fotos cuadradas del mismo producto se colaría la trasera como
+# "la limpia" en todos los productos donde pese menos (que son la mayoría).
 _RE_NUEVO = re.compile(
-    r"^Producto[\s_-]*(\d+)[\s_-]*(Delantera|Ficha)\.[A-Za-z0-9]+$", re.IGNORECASE,
+    r"^Producto[\s_-]*(\d+)[\s_-]*(Delantera|Ficha|Trasera)\.[A-Za-z0-9]+$",
+    re.IGNORECASE,
 )
 
 
@@ -157,9 +165,12 @@ def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
 
         nuevo = _RE_NUEVO.match(base)
         if nuevo:
-            producto = nuevo.group(1)
-            cual = "limpia" if nuevo.group(2).lower() == "delantera" else "ficha"
-            salida.setdefault(producto, {})[cual] = nombre
+            cual = nuevo.group(2).lower()
+            if cual == "trasera":
+                continue
+            salida.setdefault(nuevo.group(1), {})[
+                "limpia" if cual == "delantera" else "ficha"
+            ] = nombre
             continue
 
         viejo = _RE_VIEJO.match(base)
