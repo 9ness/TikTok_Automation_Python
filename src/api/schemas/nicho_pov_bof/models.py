@@ -142,10 +142,14 @@ class MarkCompletedResponse(BaseModel):
 # FASE 2 — automatización de vídeos
 # ---------------------------------------------------------------------------
 class PromptsResponse(BaseModel):
-    """Los dos prompts fijos que copia el operador fuera de la app."""
+    """Los prompts fijos que copia el operador fuera de la app."""
 
     imagen: str
     video: str
+    # Otra forma de sacar la foto del paso 1: dos manos de mujer arregladas
+    # sosteniendo el producto, en vez de una mano señalándolo. Es la del
+    # formato de 20s de Moda Chica, así que solo la enseña el POV BOF Largo.
+    imagen_manos_mujer: str = ""
 
 
 class ProductoInfo(BaseModel):

@@ -140,18 +140,25 @@ def _prompts_dir() -> Path:
 
 @router.get("/prompts", response_model=PromptsResponse)
 def get_prompts() -> PromptsResponse:
-    """Los DOS prompts fijos que el operador copia fuera de la app (imagen y
+    """Los prompts fijos que el operador copia fuera de la app (imagen y
     vídeo, para Veo3/Kling/generador de imágenes). Viven en `.md` — nunca
-    hardcoded en el código (convención del proyecto)."""
+    hardcoded en el código (convención del proyecto).
+
+    El de manos de mujer es una alternativa al de imagen, del formato de 20s
+    de Moda Chica: mismo guion y mismo montaje, solo cambia la mano. Lo sirve
+    este endpoint porque el POV BOF Largo reusa los prompts de aquí."""
     d = _prompts_dir()
     try:
         from src.nicho_pov_bof.config import limpiar_prompt
 
         imagen = limpiar_prompt((d / "prompt_imagen.md").read_text(encoding="utf-8"))
         video = limpiar_prompt((d / "prompt_video.md").read_text(encoding="utf-8"))
+        manos = limpiar_prompt(
+            (d / "prompt_imagen_manos_mujer.md").read_text(encoding="utf-8")
+        )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
-    return PromptsResponse(imagen=imagen, video=video)
+    return PromptsResponse(imagen=imagen, video=video, imagen_manos_mujer=manos)
 
 
 def _aviso_foto(pair: dict) -> str:

@@ -1230,6 +1230,19 @@ export default function PovBofLargoPage() {
               >
                 <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
               </button>
+              {/* La otra mano. Mismo guion y mismo montaje que el de arriba:
+                  lo que cambia es que sostienen el producto dos manos de
+                  mujer arregladas en vez de una señalándolo. */}
+              <button
+                type="button"
+                onClick={() =>
+                  copyText("Prompt imagen · manos de mujer", prompts.data?.imagen_manos_mujer)
+                }
+                disabled={!prompts.data?.imagen_manos_mujer}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/50 bg-card px-3 py-2 text-xs text-fuchsia-300 transition hover:border-fuchsia-400 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 💅 manos
+              </button>
               <button
                 type="button"
                 onClick={() => copyText("Prompt vídeo", prompts.data?.video)}

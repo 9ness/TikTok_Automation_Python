@@ -104,6 +104,10 @@ export interface MarkCompletedResponse {
 export interface PromptsResponse {
   imagen: string;
   video: string;
+  /** La otra forma de sacar la foto: dos manos de mujer arregladas
+   *  sosteniendo el producto. Es la del formato de 20s de Moda Chica, así que
+   *  solo la enseña el POV BOF Largo. */
+  imagen_manos_mujer?: string;
 }
 
 export interface ProductoItem {

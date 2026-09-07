@@ -47,13 +47,20 @@ subir con el ⬆ de esa fila → quemar textos.
   diciendo cuántos aptos tiene cada carpeta. **Antes de montarlo, ver cómo lo
   filtra su web** — el operador lo va a enseñar.
 
-- [ ] **Moda Hombre: cinco formatos nuevos** (sep 2026) — Zapatillas Vista POV
-  20s, Zapatillas Vista Sentado 20s, Gafas en Coche 10s, Camisetas Sarcásticas
-  10s y Camiseta Maniquí 10s. Se montan como modos del Nicho Ropa, igual que
-  Situación Real 1 y 2: hacen falta sus dos prompts (imagen y guion). Ojo con
-  dos cosas: los de zapatillas duran **20s** —hay que ver si es un clip o dos
-  pegados, porque el montaje de ese nicho asume uno— y **Camiseta Maniquí no
-  lleva persona**, así que ese modo no necesita personaje.
+- [ ] **Formatos nuevos de zapatillas** (sep 2026) — están en Moda Hombre y en
+  Moda Chica. **Vista POV** resuelto: NO es un formato nuevo sino el POV BOF
+  Largo con otra mano (su prompt de guion es `guion_dolor.md` palabra por
+  palabra salvo la CTA, y sus instrucciones describen el mismo flujo — dos
+  clips de 10s, voz aparte en Fish, fuera el audio de Omni), así que solo hizo
+  falta guardar su prompt de imagen (`prompt_imagen_manos_mujer.md`, manos de
+  MUJER). Falta: la versión con mano de hombre —que él no publica, habría que
+  derivarla— y **Vista Sentado 20s**, que sí es otra escena (las zapatillas
+  puestas, sentado) y necesita su prompt de imagen.
+- [ ] **Moda Hombre: tres formatos de 10s** (sep 2026) — Gafas en Coche,
+  Camisetas Sarcásticas y Camiseta Maniquí. Se montan como modos del Nicho
+  Ropa, igual que Situación Real 1 y 2: hacen falta sus dos prompts. Ojo:
+  **Camiseta Maniquí no lleva persona**, así que ese modo no necesita
+  personaje.
 - [ ] **Situación Real en 8s**: el selector de duración (10s Omni / 8s Veo)
   solo se le pone a los estilos cuyo guion se escribe fuera con un tope de
   caracteres —espejo y selfie—. Los dos de calle traen el diálogo CERRADO y
