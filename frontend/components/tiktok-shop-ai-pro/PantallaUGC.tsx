@@ -438,6 +438,9 @@ function TarjetaUGC({
   const estado = useEstadoUGC();
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
+  // De qué va cada escena. Plegado: solo hace falta cuando no se distingue
+  // qué imagen generada era la 1, la 2 o la 3.
+  const [verEscenas, setVerEscenas] = useState(false);
   const [verMas, setVerMas] = useState(false);
   const [pidiendoAlt, setPidiendoAlt] = useState(false);
   // El porcentaje de cada hueco por separado, como en el POV BOF Largo: con
@@ -702,10 +705,31 @@ function TarjetaUGC({
       {escenas.length > 0 ? (
         <>
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <ImageIcon className="mr-1 inline h-3 w-3" />
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <ImageIcon className="h-3 w-3" />
               Fotos · en Flow, con el personaje y el producto
+              {/* Las tres imágenes generadas se parecen entre sí y a la hora
+                  de subir los clips no se sabe cuál era cuál. Esto dice de qué
+                  va cada escena; va plegado para no ocupar. */}
+              <button
+                type="button"
+                onClick={() => setVerEscenas((v) => !v)}
+                title="¿Qué se ve en cada foto?"
+                className="rounded-full border border-border/60 px-1 leading-none text-[10px] normal-case text-muted-foreground transition hover:border-foreground/40"
+              >
+                {verEscenas ? "×" : "?"}
+              </button>
             </p>
+            {verEscenas && (
+              <ol className="space-y-0.5 rounded-lg border border-border/60 bg-muted/30 p-1.5 text-[10px] leading-tight text-muted-foreground">
+                {escenas.map((e) => (
+                  <li key={`d${e.n}`}>
+                    <strong className="text-foreground">{e.n}. {e.titulo}</strong>
+                    {e.guion ? ` — «${e.guion}»` : ""}
+                  </li>
+                ))}
+              </ol>
+            )}
             <div className="grid grid-cols-3 gap-1">
               {escenas.map((e) => (
                 <CopyChip key={`i${e.n}`} label={`📸 Foto ${e.n}`} text={e.prompt_imagen} siempre />
