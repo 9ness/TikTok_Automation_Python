@@ -37,6 +37,13 @@ subir con el ⬆ de esa fila → quemar textos.
   pegar fichas / añadir prenda en su propio bloque. El selector de mujer/hombre
   hay que SACARLO de `ImportarPrendasWeb`: no es una opción de la subida, es
   dónde estás trabajando — el equivalente al "Catálogo" del POV BOF.
+- [ ] **Moda Hombre: cinco formatos nuevos** (sep 2026) — Zapatillas Vista POV
+  20s, Zapatillas Vista Sentado 20s, Gafas en Coche 10s, Camisetas Sarcásticas
+  10s y Camiseta Maniquí 10s. Se montan como modos del Nicho Ropa, igual que
+  Situación Real 1 y 2: hacen falta sus dos prompts (imagen y guion). Ojo con
+  dos cosas: los de zapatillas duran **20s** —hay que ver si es un clip o dos
+  pegados, porque el montaje de ese nicho asume uno— y **Camiseta Maniquí no
+  lleva persona**, así que ese modo no necesita personaje.
 - [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro de
   hombre (espejo, selfie, Situación Real 1 y 2) y falta el de mujer, **Bolso
   POV** — hay que pegar sus dos prompts. Dos cosas a vigilar: (1) Situación

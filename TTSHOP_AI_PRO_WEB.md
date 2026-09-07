@@ -296,6 +296,19 @@ Los dos ganchos del POV MOF de 20s son exactamente los dos estilos del POV
 BOF Largo (`ESTILOS_GUION`), y confirman que ese formato es de 20 segundos —
 por eso el vídeo son DOS clips y no uno.
 
+### Mezclar formatos, no solo repartir el volumen (6 sep 2026)
+
+Aviso nuevo en la pantalla de formatos: **hay que mezclar formatos distintos,
+incluso dentro del mismo nicho**, y combinar vídeos largos con cortos. Publicar
+mucho vídeo corto del mismo tipo es lo que dispara las sanciones. Va en la
+misma línea que el mensaje de los 10 vídeos diarios, pero apunta a otra cosa:
+no es solo cuántos, es que no se parezcan entre sí.
+
+Por eso Moda Hombre pasó de 4 formatos a 9 (sep 2026): a los de espejo, selfie
+y las dos situaciones de calle se suman Zapatillas Vista POV 20s, Zapatillas
+Vista Sentado 20s, Gafas en Coche 10s, Camisetas Sarcásticas 10s y Camiseta
+Maniquí 10s. Dos de ellos duran 20 segundos y uno no lleva persona.
+
 ### Cuánto publicar (4 sep 2026)
 
 Jonny anunció el cambio de estrategia para el Q4: **~10 vídeos diarios de más
