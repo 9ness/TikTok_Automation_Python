@@ -74,6 +74,19 @@ const COLOR_NICHO: Record<string, string> = {
   generico: "border-border/60 bg-muted text-muted-foreground",
 };
 
+/** El mismo color, para el borde izquierdo de la tarjeta. Van aparte porque
+ *  Tailwind necesita la clase entera escrita. */
+const BORDE_NICHO: Record<string, string> = {
+  belleza: "border-l-pink-500",
+  hogar: "border-l-amber-500",
+  exterior: "border-l-emerald-500",
+  tech: "border-l-sky-500",
+  fitness: "border-l-orange-500",
+  bebe: "border-l-violet-500",
+  viaje: "border-l-cyan-500",
+  generico: "border-l-border",
+};
+
 export function PantallaUGC() {
   const sources = useSources();
   const cfg = useConfigUGC();
@@ -321,15 +334,6 @@ export function PantallaUGC() {
         titulo="Generar los clips fuera"
         hint="Con el personaje y la foto del producto: primero la imagen de cada escena, y sobre cada imagen, su vídeo."
       >
-        {/* El personaje se hace UNA vez por persona, no por producto: busca a
-            alguien en Pinterest que pegue con el tipo de producto, pásale su
-            foto a ChatGPT con este prompt y lleva lo que devuelva a Flow. Esa
-            imagen es la que se adjunta luego en todas las escenas. */}
-        <CopyChip
-          label="🧍 Prompt del personaje (una vez por persona)"
-          text={cfg.data?.prompt_personaje ?? ""}
-          siempre
-        />
         {/* Lo primero de todo: las fotos de los productos, que es lo que se
             adjunta en Flow junto al personaje. De la carpeta entera, como en
             los demás nichos: se bajan las diez y se trabajan seguidas. */}
@@ -340,20 +344,6 @@ export function PantallaUGC() {
           nichos={cfg.data?.nichos ?? []}
         />
         <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
-          <li>
-            0. ¿Aún no tienes personaje? Busca a alguien en{" "}
-            <a
-              href="https://es.pinterest.com/"
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              Pinterest
-            </a>{" "}
-            que pegue con el producto, pásale su foto a ChatGPT con el prompt de
-            arriba y mete el resultado en Flow. Sale de cuerpo entero sobre
-            fondo blanco y vale para todas sus escenas.
-          </li>
           <li>
             1. En Flow, con el <strong>personaje</strong> y la foto del producto
             adjuntos, pega el prompt de <strong>Foto 1</strong>. Repite con la 2
@@ -489,7 +479,14 @@ function TarjetaUGC({
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+    /* El borde de la izquierda va del color del nicho, como los clips en el
+       POV BOF: en una carpeta con diez productos mezclados es lo que dice de
+       un vistazo qué personaje toca, sin leer el chip. */
+    <div
+      className={`space-y-2 rounded-xl border border-l-4 border-border/60 bg-card p-3 ${
+        BORDE_NICHO[producto.nicho || "generico"] ?? BORDE_NICHO.generico
+      }`}
+    >
       <div className="flex gap-2">
         {/* La miniatura se pide por producto, no por `file_id`: ese campo no
             siempre está en los textos guardados y la foto se quedaba en
@@ -996,9 +993,12 @@ function BajarFotos({
   nichos: OpcionUGC[];
 }) {
   const [bajando, setBajando] = useState("");
-  // Los que tienen textos leídos: sin ellos el producto ni siquiera sale en la
-  // lista, pero puede no tener foto limpia emparejada.
-  const conFoto = items.filter((p) => p.clean_photo_id !== null);
+  // TODOS los productos de la carpeta. La foto se pide por NÚMERO, no por file
+  // id —igual que la miniatura de la tarjeta—, así que no hace falta que el
+  // producto traiga `clean_photo_id`: ese campo lo calcula el POV BOF al
+  // listar y no se guarda, así que aquí llegaba vacío y el botón decía
+  // "Todas las fotos (0)" con la carpeta llena.
+  const conFoto = items;
   // Cuántas hay de cada nicho. Se baja por nicho porque se trabaja así: se
   // generan seguidas las que llevan el mismo personaje, igual que en el POV
   // BOF Largo se bajan juntas las de dos clips y las de tres.
