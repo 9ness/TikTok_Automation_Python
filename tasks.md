@@ -59,12 +59,9 @@ subir con el ⬆ de esa fila → quemar textos.
   caracteres —espejo y selfie—. Los dos de calle traen el diálogo CERRADO y
   medido para 10s: recortarlo sería reescribir su texto, así que se quedan en
   10s hasta que él publique una versión corta.
-- [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro de
-  hombre (espejo, selfie, Situación Real 1 y 2) y falta el de mujer, **Bolso
-  POV** — hay que pegar sus dos prompts. Dos cosas a vigilar: (1) Situación
-  Real 1 y 2 comparten el prompt de IMAGEN, que encaja porque el paso 1 solo
-  saca el retrato con el outfit, pero conviene confirmarlo en la próxima
-  pasada por su web; (2) el modo Bolso solo vale para prendas que SEAN bolsos,
+- [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro en
+  los DOS sexos (espejo, selfie, Situación Real 1 y 2) y falta el de mujer,
+  **Bolso POV** — hay que pegar sus dos prompts. El modo Bolso solo vale para prendas que SEAN bolsos,
   así que necesita un filtro por categoría como el del Nicho Carruseles
   (Gemini sobre los títulos ya extraídos + interruptor manual, y el listado
   diciendo cuántas aptas tiene cada carpeta).
@@ -74,12 +71,12 @@ subir con el ⬆ de esa fila → quemar textos.
   caracteres y en 10s caben 190—, así que habría que recortarlo a un solo punto
   de dolor y sería NUESTRO, no suyo. Decisión del operador: **esperar unos días
   a ver si saca la versión corta; por ahora solo prompts oficiales.**
-- [ ] **Situación Real 1 de mujer · vigilar el guion**: dado de alta con su
-  imagen propia y el MISMO guion que hombre, que es lo que su web publica en
-  Moda Chica. Pero ese texto dice que el que lleva el outfit es un chico y la
-  voz de fuera es la de ella, así que el clip puede salir con un hombre
-  puesto lo de mujer. Al primer vídeo generado se ve si es un descuido suyo
-  (y entonces hay que pedirle el bueno) o si la escena es esa a propósito.
+- [ ] **Situación Real 1 de mujer · su guion está mal en la web**: lo que
+  publica en Moda Chica es el de hombre tal cual (el del outfit es un chico y
+  la voz de fuera es de ella), y con la imagen de una chica eso saca a un
+  hombre con ropa de mujer. Se sirve el NUESTRO, que es el suyo con los
+  papeles cambiados, marcado "derivado" en la pantalla. Al primer vídeo se
+  confirma, y si algún día publica el bueno se pega encima.
 
 ## 👤 Tareas Humanas
 

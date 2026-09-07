@@ -140,7 +140,8 @@ MODOS: dict[str, dict] = {
     "calle_2": {
         "label": "☕ Situación Real 2",
         "estilo_mof10": "real_2",
-        "sexos": ("hombre",),
+        # Desde sep 2026 también está en Moda Chica, con sus dos textos.
+        "sexos": ("mujer", "hombre"),
     },
     # "BOLSO MOF MUJER POV ONMI 10S" existe en su web pero AÚN NO tiene
     # prompts publicados, así que no se ofrece: un modo sin prompt es un botón
@@ -552,10 +553,11 @@ ESTILOS_MOF10: dict[str, dict] = {
         },
         "derivado": (),
     },
-    # Este va en los DOS menús de su web, cada uno con su imagen. El GUION es
-    # el mismo fichero a propósito: el que publica en Moda Chica es el de
-    # hombre palabra por palabra, así que se apunta al mismo en vez de
-    # duplicarlo. No se deriva nada: los dos textos son suyos.
+    # Este va en los DOS menús de su web, cada uno con su imagen. El guion de
+    # mujer sí es NUESTRO: lo que publica en Moda Chica es el de hombre tal
+    # cual —el del outfit es un chico— y con la imagen de una chica el vídeo
+    # saldría con un hombre llevando ropa de mujer. Su propio Situación Real 2
+    # de mujer enseña cómo va el formato: la del outfit es ella.
     "real_1": {
         # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
         "duraciones": False,
@@ -567,25 +569,34 @@ ESTILOS_MOF10: dict[str, dict] = {
             ),
             "mujer": (
                 "prompt_mof10_real_1_mujer_imagen.md",
-                "prompt_mof10_real_1_guion.md",
+                "prompt_mof10_real_1_mujer_guion.md",
             ),
         },
-        "derivado": (),
+        "derivado": ("mujer",),
     },
-    # Comparte la IMAGEN con Real 1 —es el mismo texto en su web, palabra por
-    # palabra—; lo que cambia es la escena del vídeo. Se apunta al mismo
-    # fichero en vez de duplicarlo: dos copias se desincronizan a la primera.
-    #
-    # Y encaja: el paso 1 solo saca el RETRATO del chico con el outfit puesto,
-    # no la escena —esa la pone el paso 2, en la calle o en la terraza—. Si
-    # aun así resulta ser un descuido suyo y publican otro, se le pone aquí su
-    # propio fichero y ya está.
+    # El paso 1 solo saca el RETRATO con el outfit puesto, no la escena: esa la
+    # pone el paso 2, en la calle o en la terraza. Por eso una misma imagen
+    # sirve para los dos estilos.
     "real_2": {
         # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
         "duraciones": False,
         "label": "Situación Real 2 · le reciben en una terraza",
-        "imagen": "prompt_mof10_real_1_imagen.md",
-        "guion": "prompt_mof10_real_2_guion.md",
+        "por_sexo": {
+            "hombre": (
+                # Comparte la IMAGEN con Real 1 —es el mismo texto en su web,
+                # palabra por palabra—; lo que cambia es la escena del vídeo.
+                # Se apunta al mismo fichero en vez de duplicarlo: dos copias
+                # se desincronizan a la primera.
+                "prompt_mof10_real_1_imagen.md",
+                "prompt_mof10_real_2_guion.md",
+            ),
+            "mujer": (
+                # En mujer NO la comparte: cambian cinco frases sueltas
+                # respecto a la de Real 1, así que va su propio fichero.
+                "prompt_mof10_real_2_mujer_imagen.md",
+                "prompt_mof10_real_2_mujer_guion.md",
+            ),
+        },
         "derivado": (),
     },
 }
