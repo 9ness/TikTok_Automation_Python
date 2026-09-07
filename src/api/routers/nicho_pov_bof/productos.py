@@ -152,7 +152,8 @@ def get_prompts() -> PromptsResponse:
     try:
         from src.nicho_pov_bof.config import limpiar_prompt
 
-        imagen = limpiar_prompt((d / "prompt_imagen.md").read_text(encoding="utf-8"))
+        # Por el helper y no leyendo el fichero: es quien pone la época del año.
+        imagen = nicho_config.prompt_imagen()
         video = limpiar_prompt((d / "prompt_video.md").read_text(encoding="utf-8"))
         manos = limpiar_prompt(
             (d / "prompt_imagen_manos_mujer.md").read_text(encoding="utf-8")

@@ -719,6 +719,42 @@ def precio_num(valor) -> float:
         return 0.0
 
 
+# En qué época del año estamos, para que el generador no ponga una silla de
+# playa en la arena en noviembre. Va por MES y no por el equinoccio: lo que
+# importa es en qué piensa quien compra, y el 7 de septiembre ya nadie compra
+# para la playa.
+_ESTACIONES = {
+    12: "invierno", 1: "invierno", 2: "invierno",
+    3: "primavera", 4: "primavera", 5: "primavera",
+    6: "verano", 7: "verano", 8: "verano",
+    9: "otoño", 10: "otoño", 11: "otoño",
+}
+_MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+    "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def epoca_actual() -> str:
+    """`"septiembre, o sea otoño en España"`. Se calcula al pedir el prompt."""
+    from datetime import datetime
+
+    hoy = datetime.now()
+    return f"{_MESES[hoy.month - 1]}, o sea {_ESTACIONES[hoy.month]} en España"
+
+
+def prompts_dir() -> Path:
+    return Path(__file__).resolve().parent / "prompts"
+
+
+def prompt_imagen() -> str:
+    """El prompt de la foto del producto, con la época del año puesta."""
+    ruta = prompts_dir() / "prompt_imagen.md"
+    return limpiar_prompt(ruta.read_text(encoding="utf-8")).replace(
+        "{{EPOCA}}", epoca_actual(),
+    )
+
+
 def limpiar_prompt(texto: str) -> str:
     """Quita las notas `<!-- ... -->` del `.md` y deja el prompt listo para pegar.
 
