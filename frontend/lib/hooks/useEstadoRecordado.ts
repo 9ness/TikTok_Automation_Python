@@ -23,8 +23,12 @@ import { useMe } from "@/lib/queries/auth";
 export function useEstadoRecordado<T>(
   clave: string,
   inicial: T,
-): [T, (v: T | ((prev: T) => T)) => void] {
+): [T, (v: T | ((prev: T) => T)) => void, boolean] {
   const [valor, setValor] = useState<T>(inicial);
+  // Tercer elemento: si YA se aplicó lo guardado. Quien pinte una lista cara
+  // debería esperarlo — si no, se ve un parpadeo entrando en la carpeta por
+  // defecto y saltando a la de verdad medio segundo después.
+  const [listo, setListo] = useState(false);
   const leido = useRef(false);
   // El valor por defecto de la PRIMERA vez: si el caller lo recrea en cada
   // render (un objeto literal), volver a él no debe depender de esa identidad.
@@ -46,6 +50,7 @@ export function useEstadoRecordado<T>(
       /* localStorage lleno o JSON corrupto: se sigue con el valor inicial. */
     }
     leido.current = true;
+    setListo(true);
   }, [clave]);
 
   useEffect(() => {
@@ -59,7 +64,7 @@ export function useEstadoRecordado<T>(
     }
   }, [clave, valor]);
 
-  return [valor, setValor];
+  return [valor, setValor, listo];
 }
 
 
@@ -81,7 +86,7 @@ export function useEstadoRecordado<T>(
 export function useEstadoDeUsuario<T>(
   clave: string,
   inicial: T,
-): [T, (v: T | ((prev: T) => T)) => void] {
+): [T, (v: T | ((prev: T) => T)) => void, boolean] {
   const quien = useMe().data?.username;
   return useEstadoRecordado(quien ? `u:${quien}:${clave}` : "", inicial);
 }

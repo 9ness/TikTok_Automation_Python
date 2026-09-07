@@ -38,14 +38,20 @@ SHARED_WITH_ME_FLAG = "--drive-shared-with-me"
 
 # Fuentes de producto (las 2 que pidió el usuario). El `slug` es lo que viaja
 # por la API; el `folder` es el nombre literal en Drive.
+# `oculta` saca la fuente del SELECTOR sin borrarla: lo grabado sigue ahí y se
+# puede seguir leyendo por API. Es lo que le toca a las dos carpetas del Drive
+# compartido, que quedaron desfasadas cuando el curso sacó su web nueva con el
+# Inventario General.
 SOURCES: dict[str, dict[str, str]] = {
     "aleatorios_1": {
         "label": "1 Prod Aleatorios",
         "folder": "1 Prod Aleatorios",
+        "oculta": "1",
     },
     "aleatorios_2": {
         "label": "2 Prod Aleatorios 2",
         "folder": "2 Prod Aleatorios 2",
+        "oculta": "1",
     },
     # Los productos que sube el OPERADOR, no los del Drive del curso. Viven en
     # SU Drive (el montado), no en el compartido, así que se leen del mount y

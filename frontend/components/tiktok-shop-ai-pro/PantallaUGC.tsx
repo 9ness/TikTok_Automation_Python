@@ -90,19 +90,31 @@ const BORDE_NICHO: Record<string, string> = {
 export function PantallaUGC() {
   const sources = useSources();
   const cfg = useConfigUGC();
-  const [source, setSource] = useEstadoDeUsuario("ugc:source", "aleatorios_2");
-  const [folder, setFolder] = useEstadoDeUsuario("ugc:folder", "");
+  // El defecto es el catálogo VIVO: las dos carpetas del Drive compartido se
+  // quedaron desfasadas y ya no salen en el selector.
+  const [source, setSource, sourceListo] = useEstadoDeUsuario(
+    "ugc:source",
+    "inventario_general",
+  );
+  const [folder, setFolder, folderListo] = useEstadoDeUsuario("ugc:folder", "");
   const [gancho, setGancho] = useEstadoDeUsuario("ugc:gancho", "dolor");
   const [duracion, setDuracion] = useEstadoDeUsuario("ugc:duracion", "10");
 
-  const folders = useFolders(source);
+  // Nada se pide hasta saber POR DÓNDE IBA. Lo guardado se aplica en un
+  // efecto, así que el primer render trae el catálogo por defecto: sin esta
+  // espera se veía entrar en uno y saltar al otro medio segundo después.
+  const listo = sourceListo && folderListo;
+  const folders = useFolders(listo ? source : "");
   const carpetas = folders.data?.items ?? [];
   useEffect(() => {
-    if (!carpetas.length) return;
+    // Y la corrección de carpeta, igual: en el primer render la carpeta
+    // guardada todavía no está, así que esto la pisaba con la primera de la
+    // lista Y la dejaba guardada.
+    if (!listo || !carpetas.length) return;
     if (!carpetas.some((c) => c.name === folder)) setFolder(carpetas[0]!.name);
-  }, [carpetas, folder, setFolder]);
+  }, [carpetas, folder, listo, setFolder]);
 
-  const productos = useProductosUGC(source, folder, gancho, duracion);
+  const productos = useProductosUGC(listo ? source : "", folder, gancho, duracion);
   const items = productos.data?.items ?? [];
   const conEscenas = items.filter((p) => p.escenas.length > 0).length;
   // Las escenas se escriben leyendo el título y la ficha, así que sin textos
@@ -373,6 +385,7 @@ export function PantallaUGC() {
           folder={folder}
           gancho={gancho}
           duracion={duracion}
+          nichos={cfg.data?.nichos ?? []}
         />
       </Paso>
 
@@ -925,21 +938,30 @@ function BajarVideos({
   folder,
   gancho,
   duracion,
+  nichos,
 }: {
   items: ProductoUGC[];
   source: string;
   folder: string;
   gancho: string;
   duracion: string;
+  nichos: OpcionUGC[];
 }) {
   const [bajando, setBajando] = useState("");
   const conVideo = items.filter((p) => p.video_path);
+  // Por nicho, igual que las fotos: se suben seguidos los que llevan el mismo
+  // personaje, así que también se bajan juntos.
+  const porNicho = conVideo.reduce<Record<string, number>>((acc, p) => {
+    const n = p.nicho || "generico";
+    acc[n] = (acc[n] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  async function bajarTodos() {
-    if (!conVideo.length) return;
-    setBajando(`0/${conVideo.length}`);
-    for (const [i, p] of conVideo.entries()) {
-      setBajando(`${i + 1}/${conVideo.length}`);
+  async function bajar(lista: ProductoUGC[], etiqueta: string) {
+    if (!lista.length) return;
+    setBajando(`0/${lista.length}`);
+    for (const [i, p] of lista.entries()) {
+      setBajando(`${i + 1}/${lista.length}`);
       const a = document.createElement("a");
       a.href = buildVideoUGCUrl(
         { source, folder, producto: p.producto, gancho, duracion }, true,
@@ -948,29 +970,56 @@ function BajarVideos({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      if (i < conVideo.length - 1) await new Promise((r) => setTimeout(r, 800));
+      if (i < lista.length - 1) await new Promise((r) => setTimeout(r, 800));
     }
     setBajando("");
-    toast.success(`${conVideo.length} vídeo(s) descargados`);
+    toast.success(`${lista.length} vídeo(s) de ${etiqueta}`);
   }
 
   return (
-    <button
-      type="button"
-      disabled={!conVideo.length || Boolean(bajando)}
-      onClick={() => void bajarTodos()}
-      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/60 px-3 py-2 text-[11px] text-sky-400 transition hover:bg-sky-500/10 disabled:opacity-40"
-    >
-      {bajando ? (
-        <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
-        </>
-      ) : (
-        <>
-          <Download className="h-3.5 w-3.5" /> Vídeos ({conVideo.length})
-        </>
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={!conVideo.length || Boolean(bajando)}
+        onClick={() => void bajar(conVideo, "la carpeta")}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-500/60 px-3 py-2 text-[11px] text-sky-400 transition hover:bg-sky-500/10 disabled:opacity-40"
+      >
+        {bajando ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Bajando {bajando}
+          </>
+        ) : (
+          <>
+            <Download className="h-3.5 w-3.5" /> Vídeos ({conVideo.length})
+          </>
+        )}
+      </button>
+      {Object.keys(porNicho).length > 1 && (
+        <div className="grid grid-cols-2 gap-1">
+          {Object.entries(porNicho)
+            .sort((a, b) => b[1] - a[1])
+            .map(([nicho, cuantas]) => (
+              <button
+                key={nicho}
+                type="button"
+                disabled={Boolean(bajando)}
+                onClick={() =>
+                  void bajar(
+                    conVideo.filter((p) => (p.nicho || "generico") === nicho),
+                    nichos.find((n) => n.clave === nicho)?.label ?? nicho,
+                  )
+                }
+                className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[10px] transition disabled:opacity-40 ${
+                  COLOR_NICHO[nicho] ?? COLOR_NICHO.generico
+                }`}
+              >
+                <Download className="h-3 w-3" />
+                {nichos.find((n) => n.clave === nicho)?.label ?? nicho} ({cuantas})
+              </button>
+            ))}
+        </div>
       )}
-    </button>
+    </div>
   );
 }
 

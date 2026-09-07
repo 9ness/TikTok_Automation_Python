@@ -73,6 +73,9 @@ def list_sources(
                 pendientes=faltan if slug == top_vendidos.SOURCE else 0,
             )
             for slug, meta in config.SOURCES.items()
+            # Las ocultas no salen en ningún selector: siguen existiendo y se
+            # pueden pedir por API, pero ya no son sitio donde empezar nada.
+            if not meta.get("oculta")
         ]
     )
 
