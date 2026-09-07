@@ -2520,7 +2520,11 @@ def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgres
             f"{len(r['iguales'])} igual(es)"
         )
         if r["incompletos"]:
-            detalle += f", {len(r['incompletos'])} sin las dos fotos"
+            # Con el número: ese producto NO entra, y sin saber cuál es no hay
+            # forma de mirar en su web si le falta la ficha o la limpia.
+            detalle += (
+                f", sin las dos fotos: {', '.join(r['incompletos'])}"
+            )
         on_log(f"[web] {r['carpeta']}: {detalle}")
         if r.get("ejemplos"):
             on_log(
