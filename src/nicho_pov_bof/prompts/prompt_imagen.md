@@ -8,6 +8,6 @@ Este producto en una ubicación ideal adaptada en un entorno donde pueda estar u
 
 **Si la foto de referencia trae varias unidades, salen TODAS.** Muchos productos se venden en pack (dos botes, un set de tres, la crema y su sérum): la foto tiene que enseñar el pack entero, con las mismas unidades y en la misma disposición, no una sola pieza.
 
-**El sitio tiene que pegar con la ÉPOCA DEL AÑO: estamos en {{EPOCA}}.** Si el producto es de temporada —una silla de playa, una tumbona, un ventilador, una manta—, ponlo donde se usaría AHORA: una terraza, un porche, el salón, el maletero del coche. Nada de arena, piscina ni sol de agosto si no toca. Si al producto le da igual la época, no cambies nada por esto.
+**El sitio tiene que pegar con la ÉPOCA DEL AÑO: estamos en {{EPOCA}}.** Si el producto es de temporada, ponlo donde se usaría en esta época y no en otra. Si le da igual la época, no cambies nada por esto.
 
 **Respeta el TAMAÑO REAL del producto.** Un frasco o un bote caben en una mano; un mueble, un espejo de tocador, una escalera o un electrodoméstico NO: esos van apoyados en su sitio, a la escala que les toca frente a los muebles y las paredes de alrededor. Nunca encojas un producto grande para que quepa en una mano ni agrandes uno pequeño.
