@@ -4,7 +4,11 @@ import { Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useImportarPrendasWeb } from "@/lib/queries/nichoRopa";
+import {
+  useImportarPrendasWeb,
+  useImportarPrendasWebLote,
+} from "@/lib/queries/nichoRopa";
+import { useDrawerStore } from "@/lib/stores/drawerStore";
 
 /** Una línea del resumen: lo que dijo el import de ESE ZIP. */
 type Resultado = {
@@ -34,6 +38,8 @@ export function ImportarPrendasWeb({
   onImportado: (slug: string) => void;
 }) {
   const importar = useImportarPrendasWeb();
+  const lote = useImportarPrendasWebLote();
+  const abrirCola = useDrawerStore((s) => s.openQueue);
   const [hechas, setHechas] = useState<Resultado[]>([]);
   const [vaPor, setVaPor] = useState<{ hechos: number; total: number } | null>(null);
 
@@ -55,7 +61,7 @@ export function ImportarPrendasWeb({
       </p>
 
       <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600">
-        {importar.isPending ? (
+        {importar.isPending || lote.isPending ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {vaPor ? `Importando ${vaPor.hechos}/${vaPor.total}…` : "Importando…"}
@@ -70,7 +76,7 @@ export function ImportarPrendasWeb({
           type="file"
           accept=".zip,application/zip"
           multiple
-          disabled={importar.isPending}
+          disabled={importar.isPending || lote.isPending}
           className="hidden"
           onChange={async (e) => {
             const fs = Array.from(e.target.files ?? []);
@@ -80,6 +86,22 @@ export function ImportarPrendasWeb({
               return;
             }
             setHechas([]);
+            // VARIOS van a la cola: son cientos de MB y de uno en uno por HTTP
+            // se corta a mitad sin decir por dónde iba (con 27 entró UNO). Uno
+            // solo se hace al momento, que es cuestión de segundos.
+            if (fs.length > 1) {
+              lote.mutate(
+                { archivos: fs, genero },
+                {
+                  onSuccess: (r) => {
+                    toast.success(`${r.zips} ZIP(s) en la cola`);
+                    abrirCola();
+                  },
+                  onError: (err) => toast.error(err.message),
+                },
+              );
+              return;
+            }
             // De uno en uno y esperando: cada ZIP escribe en el Drive montado y
             // lanzarlos a la vez solo se estorbaría.
             for (const [i, f] of fs.entries()) {

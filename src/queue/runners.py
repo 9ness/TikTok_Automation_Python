@@ -2486,6 +2486,11 @@ def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgres
     if not carpeta_tmp.is_dir():
         raise RuntimeError("No están los ZIP subidos (¿se limpió la carpeta temporal?).")
 
+    # El mismo trabajo sirve para los dos: los catálogos del POV BOF y los
+    # inventarios de ropa. Solo cambia a qué carpeta van los ZIP, y el nicho de
+    # ropa ya reusa el importador de aquí — lo que le faltaba era la cola.
+    genero = str(p.get("genero") or "")
+
     zips = sorted(
         (f for f in carpeta_tmp.iterdir() if f.is_file() and f.suffix.lower() == ".zip"),
         key=lambda f: pov_config.natural_sort_key(f.name),
@@ -2503,10 +2508,15 @@ def run_nicho_pov_bof_web_import(job: Job, on_log: OnLog, on_progress: OnProgres
     for i, z in enumerate(zips):
         on_progress(i / len(zips), f"📦 {z.name} ({i + 1}/{len(zips)})")
         try:
-            r = productos_web.importar_zip(
-                z.read_bytes(), z.name,
-                source=str(job.params.get("source") or productos_web.SOURCE),
-            )
+            if genero:
+                from src.nicho_ropa.services import prendas_web
+
+                r = prendas_web.importar_zip(z.read_bytes(), z.name, genero)
+            else:
+                r = productos_web.importar_zip(
+                    z.read_bytes(), z.name,
+                    source=str(job.params.get("source") or productos_web.SOURCE),
+                )
         except Exception as e:  # noqa: BLE001
             # Un ZIP roto no puede dejar sin importar los otros treinta.
             on_log(f"[web] ⚠️ {z.name}: {e}")

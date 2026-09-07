@@ -298,6 +298,61 @@ async def crear_mi_prenda(
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
 
+@router.post("/prendas-web/importar-lote", status_code=201)
+async def importar_prendas_web_lote(
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    archivos: Annotated[list[UploadFile], File()],
+    genero: Annotated[str, Query()],
+) -> dict:
+    """Encola la importación de VARIOS ZIP del inventario de ropa.
+
+    Igual que en el POV BOF y por lo mismo: son 31 ficheros de varios MB, y de
+    uno en uno por HTTP se corta a mitad sin decir por dónde iba — con 27 ZIP
+    de mujer entró UNO. En la cola se ve el avance y un ZIP roto no para a los
+    demás.
+    """
+    import time
+    import uuid
+
+    from src.api.temp_storage import upload_subdir
+
+    if genero not in config.GENEROS_WEB:
+        raise APIError(
+            f"Género desconocido: {genero!r}. Válidos: {sorted(config.GENEROS_WEB)}.",
+            status_code=400,
+        )
+    if not archivos:
+        raise APIError("No llegó ningún ZIP.", status_code=400)
+
+    destino = (
+        upload_subdir("nicho_ropa") / f"web_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    )
+    destino.mkdir(parents=True, exist_ok=True)
+    guardados = 0
+    for f in archivos:
+        nombre = Path(f.filename or "").name
+        if not nombre.lower().endswith(".zip"):
+            continue
+        datos = await f.read()
+        await f.close()
+        if not datos:
+            continue
+        (destino / nombre).write_bytes(datos)
+        guardados += 1
+
+    if not guardados:
+        raise APIError("Ninguno de los ficheros era un ZIP.", status_code=400)
+
+    etiqueta = config.GENEROS_WEB.get(genero, genero)
+    title = f"👗 Importar {guardados} ZIP(s) · {etiqueta}"
+    job = queue.enqueue(
+        JobMode.NICHO_POV_BOF_WEB_IMPORT,
+        title=title,
+        params={"temp_folder": str(destino), "total": guardados, "genero": genero},
+    )
+    return {"job_id": job.id, "title": title, "zips": guardados}
+
+
 @router.post("/prendas-web/importar")
 async def importar_prendas_web(
     genero: Annotated[str, Query()],

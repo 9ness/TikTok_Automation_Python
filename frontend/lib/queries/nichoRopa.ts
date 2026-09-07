@@ -68,6 +68,30 @@ export function useCrearMiPrenda() {
   });
 }
 
+/** Varios ZIP a la vez → a la COLA.
+ *
+ *  De uno en uno por HTTP se corta a mitad y sin decir por dónde iba: con 27
+ *  ZIP del inventario de mujer entró UNO. Es el mismo trabajo que usa el POV
+ *  BOF para lo suyo, con el género dentro. */
+export function useImportarPrendasWebLote() {
+  const qc = useQueryClient();
+  return useMutation<
+    { job_id: string; title: string; zips: number },
+    Error,
+    { archivos: File[]; genero: string }
+  >({
+    mutationFn: async ({ archivos, genero }) => {
+      const fd = new FormData();
+      for (const f of archivos) fd.append("archivos", f);
+      return api.post(
+        `${ROOT}/prendas-web/importar-lote?genero=${encodeURIComponent(genero)}`,
+        fd,
+      );
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  });
+}
+
 export function useImportarPrendasWeb() {
   const qc = useQueryClient();
   return useMutation<
