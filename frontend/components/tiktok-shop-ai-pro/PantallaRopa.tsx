@@ -26,8 +26,6 @@ import {
   nichoRopaKeys,
   useCarpetasRopa,
   useCrearMiPrenda,
-  useImportarPrendasWeb,
-  useImportarUrlsRopa,
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
@@ -35,8 +33,6 @@ import {
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
-import { ImportarPrendasWeb } from "@/components/tiktok-shop-ai-pro/ImportarPrendasWeb";
-import { PegarFichasRopa } from "@/components/tiktok-shop-ai-pro/PegarFichasRopa";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
@@ -253,7 +249,7 @@ const OPCIONES_AUDIO = (esWeb: boolean) =>
  *  del POV BOF y debajo salen SOLO sus carpetas. Mezcladas en una sola fila,
  *  "Tareas 1" parecía una carpeta más de las del ZIP. */
 const CATALOGOS_ROPA = [
-  { clave: "web", label: "🌐 De la web" },
+  { clave: "web", label: "📦 Inventario" },
   { clave: "muestras", label: "🎁 Muestras" },
   { clave: "tareas", label: "💼 Tareas" },
 ] as const;
@@ -484,15 +480,11 @@ export function PantallaRopa({
       >
         {esWeb && (
           <>
+            {/* Subir los ZIP y pegar las fichas se hacen en Configuración,
+                con el flujo entero al lado (bajarlos de su web es la mitad
+                del trabajo) y para los tres inventarios de una. Aquí solo se
+                trabaja lo que ya está dentro. */}
             <Sub>Traer prendas</Sub>
-            <ImportarPrendasWeb
-              genero={genero}
-              onImportado={(slug) => {
-                setCatalogo(catalogoDe(slug));
-                setCarpeta(slug);
-              }}
-            />
-            {misCarpetas.length > 0 && <PegarFichasRopa genero={genero} />}
             <AltaMiPrenda
               sexo={sexo}
               onCreado={(slug) => {

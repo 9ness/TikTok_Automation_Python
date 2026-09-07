@@ -9,10 +9,11 @@ como una categoría más, con slug `mujer_web__Carpeta 23`. Para el resto del
 código sigue siendo "una carpeta", así que fotos, textos, estado y vídeo
 funcionan sin tocarse.
 
-La convención de nombres del ZIP es la misma que en POV BOF y viene AL REVÉS
-que la nuestra (`N` es la ficha, `N.1` la limpia), así que se reutiliza el
-importador de allí en vez de duplicar esa lógica — que es justo la que si se
-equivoca deja las diez parejas cambiadas.
+La convención de nombres del ZIP es la misma que en POV BOF —hoy
+`Producto_3_Delantera.jpeg` / `Producto_3_Ficha.png`, y antes `3.png` para la
+ficha y `3.1.jpeg` para la limpia, o sea AL REVÉS que la nuestra—, así que se
+reutiliza el importador de allí en vez de duplicar esa lógica, que es justo la
+que si se equivoca deja las diez parejas cambiadas.
 """
 
 from __future__ import annotations
