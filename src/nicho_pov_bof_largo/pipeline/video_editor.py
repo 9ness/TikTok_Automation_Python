@@ -360,6 +360,8 @@ def montar(
     con_titulo: bool = True,
     con_cta: bool = True,
     con_flecha: bool = True,
+    # El mensaje subliminal en pantalla, que solo llevan los formatos de 20s.
+    con_subliminal: bool = False,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -386,6 +388,7 @@ def montar(
         con_titulo=con_titulo,
         con_cta=con_cta,
         con_flecha=con_flecha,
+        con_subliminal=con_subliminal,
         semilla=semilla or Path(output_path).stem,
         on_log=on_log,
         on_progress=_progreso,

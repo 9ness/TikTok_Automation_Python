@@ -398,6 +398,7 @@ export function useSubirClipLargo() {
       conTitulo: boolean;
       conCta: boolean;
       conFlecha: boolean;
+      conSubliminal?: boolean;
     }
   >({
     mutationFn: async (v) => {
@@ -412,6 +413,7 @@ export function useSubirClipLargo() {
       fd.append("con_titulo", String(v.conTitulo));
       fd.append("con_cta", String(v.conCta));
       fd.append("con_flecha", String(v.conFlecha));
+      fd.append("con_subliminal", String(v.conSubliminal ?? false));
       return api.post<ClipLargoUploadResponse>(`${ROOT}/clip/upload`, fd);
     },
     onSuccess: (_r, v) => invalidarProductos(qc, v.source, v.folder),

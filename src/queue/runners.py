@@ -2082,7 +2082,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         video_editor.montar(
             clips=clips,
             audio_path=audio,
-            textos=textos,
+            # El subliminal no está en los textos del producto: lo escribe el
+            # mismo prompt que el guion, así que se junta aquí.
+            textos={**textos, "subliminal": escrito.get("subliminal") or ""},
             output_path=salida,
             work_dir=work,
             producto=producto,
@@ -2091,6 +2093,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             con_titulo=bool(p.get("con_titulo", True)),
             con_cta=bool(p.get("con_cta", True)),
             con_flecha=bool(p.get("con_flecha", True)),
+            con_subliminal=bool(p.get("con_subliminal", False)),
             on_log=on_log,
             on_progress=_progreso,
         )

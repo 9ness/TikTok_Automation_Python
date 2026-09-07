@@ -54,11 +54,16 @@ subir con el ⬆ de esa fila → quemar textos.
   clips de 10s, voz aparte en Fish, fuera el audio de Omni). Lo mismo con
   **Vista Sentado**: otra escena, el MISMO guion. Así que de los dos solo hubo
   que guardar su prompt de imagen (`prompt_imagen_manos_mujer.md` y
-  `prompt_imagen_piernas_mujer.md`), los dos de MUJER. Queda: la versión con
-  mano/pierna de hombre, que él no publica y habría que derivar, y decidir si
-  el de sentada necesita el filtro de calzado —el producto va PUESTO, así que
-  con cualquier otra cosa no tiene sentido— o basta con que se vea en la
-  pantalla que solo sirve para eso.
+  `prompt_imagen_piernas_mujer.md`) y el de manos en su versión de hombre
+  (`prompt_imagen_manos_hombre.md`). Queda: la versión SENTADO de hombre, que
+  aún no ha pasado, y decidir si el de sentada necesita el filtro de calzado
+  —el producto va PUESTO, así que con cualquier otra cosa no tiene sentido— o
+  basta con que se vea en la pantalla que solo sirve para eso.
+- [ ] **El subliminal quemado, de momento a mano**: ya se puede encender por
+  producto (herramienta "💬 Subliminal" en el POV BOF Largo, apagada por
+  defecto) y en esos formatos hay que apagar gancho, texto y CTA — es el ÚNICO
+  texto del vídeo. Si acaban siendo la mayoría de los vídeos, la combinación
+  debería ir con el formato y no marcarse a mano cada vez.
 - [ ] **Moda Hombre: tres formatos de 10s** (sep 2026) — Gafas en Coche,
   Camisetas Sarcásticas y Camiseta Maniquí. Se montan como modos del Nicho
   Ropa, igual que Situación Real 1 y 2: hacen falta sus dos prompts. Ojo:

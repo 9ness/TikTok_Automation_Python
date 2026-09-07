@@ -849,6 +849,97 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
     return elegida
 
 
+# ---------------------------------------------------------------------------
+# Mensaje subliminal (los formatos de 20 segundos)
+# ---------------------------------------------------------------------------
+# Cuatro líneas que el curso pide quemar en pantalla y que dicen SIEMPRE lo
+# mismo salvo el nombre del producto ("Han ajustado el precio de X / Revisa
+# también tus cupones de descuento / para mejorarlo aún más"). Las escribe el
+# mismo prompt que el guion, así que ya vienen guardadas con él.
+#
+# Va aparte del bloque de gancho/título/CTA y no con ellos: en estos formatos
+# es el ÚNICO texto del vídeo, todo del mismo tamaño y sin destello — se lee
+# de refilón mientras habla la voz, no es un titular.
+SUBLIMINAL_FONT_SIZE = 44
+SUBLIMINAL_MAX_LINEAS = 6
+
+
+def _render_subliminal_png(texto: str, on_log: OnLog = _noop) -> "Image.Image | None":
+    """Apila las líneas del subliminal en un PNG centrado."""
+    lineas = [l.strip() for l in (texto or "").splitlines() if l.strip()]
+    if not lineas:
+        return None
+    if len(lineas) > SUBLIMINAL_MAX_LINEAS:
+        on_log(f"[3/5] subliminal de {len(lineas)} líneas: se quedan las primeras "
+               f"{SUBLIMINAL_MAX_LINEAS}")
+        lineas = lineas[:SUBLIMINAL_MAX_LINEAS]
+
+    max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
+    partes = [
+        im for im in (
+            _render_text_line(
+                l, font_size=SUBLIMINAL_FONT_SIZE, max_w=max_w,
+                fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=1,
+            )
+            for l in lineas
+        ) if im is not None
+    ]
+    if not partes:
+        return None
+
+    partes = [_crop_visible(p) for p in partes]
+    gap = 6
+    ancho = max(p.width for p in partes)
+    alto = sum(p.height for p in partes) + gap * (len(partes) - 1)
+    # Misma red de seguridad que el bloque de siempre: el ajuste mide el texto
+    # y el borde se añade después, así que puede salirse de la zona segura.
+    if ancho > max_w:
+        factor = max_w / ancho
+        partes = [
+            p.resize((max(1, int(p.width * factor)), max(1, int(p.height * factor))),
+                     Image.LANCZOS)
+            for p in partes
+        ]
+        ancho = max(p.width for p in partes)
+        alto = sum(p.height for p in partes) + gap * (len(partes) - 1)
+
+    block = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+    y = 0
+    for parte in partes:
+        block.paste(parte, (int((ancho - parte.width) / 2), y), parte)
+        y += parte.height + gap
+    return block
+
+
+def _burn_subliminal(video_in: Path, texto: str, out_path: Path,
+                     on_log: OnLog) -> Path:
+    """Quema el mensaje subliminal arriba, dentro de la zona segura."""
+    block = _render_subliminal_png(texto, on_log)
+    if block is None:
+        on_log("[3/5] sin subliminal que quemar — se copia el vídeo tal cual")
+        _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
+              str(out_path)], on_log)
+        return out_path
+
+    png_path = out_path.with_suffix(".png")
+    block.save(png_path)
+    y_top = max(
+        int(config.SAFE_Y[0] * config.TARGET_H),
+        int(config.TEXT_BLOCK_Y * config.TARGET_H - block.height / 2),
+    )
+    _run([
+        "ffmpeg", "-y", "-v", "error",
+        "-i", str(video_in), "-i", str(png_path),
+        "-filter_complex", f"[0:v][1:v]overlay=(main_w-overlay_w)/2:{y_top}[v]",
+        "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "copy",
+        str(out_path),
+    ], on_log)
+    on_log(f"[3/5] subliminal quemado ({block.width}x{block.height}px @ y={y_top})")
+    return out_path
+
+
 def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog,
                      layout: str = "gancho_cta_titulo",
                      piezas: "set[str] | None" = None,
@@ -1099,6 +1190,10 @@ def build_video(
     con_titulo: bool = True,
     con_cta: bool = True,
     con_flecha: bool = True,
+    # El mensaje subliminal de los formatos de 20s (`textos["subliminal"]`).
+    # Apagado por defecto: solo lo llevan esos, y encenderlo en el resto
+    # taparía el bloque de gancho/CTA, que va a la misma altura.
+    con_subliminal: bool = False,
     # Identifica al producto y es lo que hace rotar emoji, color y tipografía.
     # Tiene que venir de fuera: `output_path` es siempre `output.mp4`, así que
     # usarlo daba la MISMA semilla a todos los vídeos y ni el rótulo ni el
@@ -1164,6 +1259,14 @@ def build_video(
         on_log("[3/5] Sin textos: se omite el bloque de texto")
         texted = matched
         on_progress(0.66, "Sin textos")
+
+    # 4.5) Mensaje subliminal, para los formatos de 20s
+    if con_subliminal:
+        on_log("[3/5] Quemando el mensaje subliminal…")
+        texted = _burn_subliminal(
+            texted, str((textos or {}).get("subliminal") or ""),
+            work_dir / "04b_subliminal.mp4", on_log,
+        )
 
     # 5) Flecha .mov
     if con_flecha:

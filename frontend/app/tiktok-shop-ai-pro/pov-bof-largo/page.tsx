@@ -1241,7 +1241,20 @@ export default function PovBofLargoPage() {
                 disabled={!prompts.data?.imagen_manos_mujer}
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/50 bg-card px-3 py-2 text-xs text-fuchsia-300 transition hover:border-fuchsia-400 disabled:opacity-50"
               >
-                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 💅 manos
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 💅 manos ♀
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(
+                    "Prompt imagen · manos de hombre",
+                    prompts.data?.imagen_manos_hombre,
+                  )
+                }
+                disabled={!prompts.data?.imagen_manos_hombre}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-sky-500/50 bg-card px-3 py-2 text-xs text-sky-300 transition hover:border-sky-400 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" /> Imagen · 🤝 manos ♂
               </button>
               {/* La tercera escena: sentada, de rodillas para abajo y con el
                   producto PUESTO. Solo vale para calzado. */}
@@ -1583,13 +1596,17 @@ function EscaparateModalLargo({
   );
 }
 
-type ToolKey = "gancho" | "titulo" | "cta" | "flecha";
+type ToolKey = "gancho" | "titulo" | "cta" | "flecha" | "subliminal";
 
+/* El subliminal va APAGADO por defecto y los otros cuatro encendidos: solo lo
+   llevan los formatos de 20s (Vista POV / Vista Sentado), donde además es el
+   único texto del vídeo — se ponen sus cuatro líneas y se quitan las otras. */
 const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "gancho", label: "🎣 Gancho" },
   { key: "titulo", label: "📝 Texto producto" },
   { key: "cta", label: "👉 CTA" },
   { key: "flecha", label: "⬇️ Flecha" },
+  { key: "subliminal", label: "💬 Subliminal" },
 ];
 
 /** Tarjeta de producto del Largo: como la del POV BOF (textos, enlace, foto,
@@ -1694,7 +1711,7 @@ function ProductoCard({
   // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
   const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
   const [tools, setTools] = useState<Record<ToolKey, boolean>>({
-    gancho: true, titulo: true, cta: true, flecha: true,
+    gancho: true, titulo: true, cta: true, flecha: true, subliminal: false,
   });
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
@@ -1732,6 +1749,7 @@ function ProductoCard({
       con_titulo: String(tools.titulo),
       con_cta: String(tools.cta),
       con_flecha: String(tools.flecha),
+      con_subliminal: String(tools.subliminal),
     };
     // Si la app sabe subir por su cuenta, se le deja: con ocho productos a
     // tres clips son veinticuatro esperas con la pantalla encendida. Su
@@ -1767,6 +1785,7 @@ function ProductoCard({
     fd.append("con_titulo", String(tools.titulo));
     fd.append("con_cta", String(tools.cta));
     fd.append("con_flecha", String(tools.flecha));
+    fd.append("con_subliminal", String(tools.subliminal));
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof-largo/clip/upload`);

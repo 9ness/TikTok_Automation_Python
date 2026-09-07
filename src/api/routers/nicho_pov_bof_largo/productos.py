@@ -1192,6 +1192,7 @@ def confirmar_lote(
             body.sexo, usuario,
             con_gancho=body.con_gancho, con_titulo=body.con_titulo,
             con_cta=body.con_cta, con_flecha=body.con_flecha,
+            con_subliminal=body.con_subliminal,
         )
         if r.encolado:
             encolados += 1
@@ -1260,6 +1261,7 @@ async def upload_clip(
     con_titulo: Annotated[bool, Form()] = True,
     con_cta: Annotated[bool, Form()] = True,
     con_flecha: Annotated[bool, Form()] = True,
+    con_subliminal: Annotated[bool, Form()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ClipLargoUploadResponse:
     """Sube UNO de los dos clips. Solo encola cuando están los dos.
@@ -1320,6 +1322,7 @@ async def upload_clip(
         queue, source, folder, producto, slot, destino, sexo_norm, usuario,
         con_gancho=con_gancho, con_titulo=con_titulo,
         con_cta=con_cta, con_flecha=con_flecha,
+        con_subliminal=con_subliminal,
     )
 
 
@@ -1337,6 +1340,7 @@ def _encolar_clip(
     con_titulo: bool = True,
     con_cta: bool = True,
     con_flecha: bool = True,
+    con_subliminal: bool = False,
 ) -> ClipLargoUploadResponse:
     """Guarda el clip en su hueco y encola el montaje si ya están los dos.
 
@@ -1403,6 +1407,7 @@ def _encolar_clip(
             "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
+            "con_subliminal": bool(con_subliminal),
             # Con qué modo se mandó montar: el vídeo tiene que acabar en ese
             # documento aunque el catálogo cambie de modo mientras se monta.
             "estilo": _modo(source, usuario),

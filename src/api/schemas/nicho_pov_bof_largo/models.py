@@ -219,6 +219,9 @@ class LoteLargoConfirmarRequest(BaseModel):
     con_titulo: bool = True
     con_cta: bool = True
     con_flecha: bool = True
+    # El mensaje subliminal quemado en pantalla. Solo lo llevan los formatos de
+    # 20s, así que va apagado por defecto.
+    con_subliminal: bool = False
 
 
 class LoteLargoConfirmarResponse(BaseModel):
