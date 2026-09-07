@@ -28,6 +28,10 @@ export interface ConfigUGCResponse {
 export interface EscenaUGC {
   n: number;
   titulo: string;
+  /** Qué HACE la persona en esa foto, en una frase: es lo que distingue las
+   *  tres imágenes generadas. Vacío en las escenas escritas antes de que
+   *  existiera — ahí se recorta el prompt. */
+  resumen?: string;
   /** Va a Flow con el personaje y la foto del producto. */
   prompt_imagen: string;
   /** Va sobre la imagen que salga del anterior. */

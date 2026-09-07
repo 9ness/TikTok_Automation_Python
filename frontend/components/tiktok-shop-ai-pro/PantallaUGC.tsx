@@ -730,19 +730,14 @@ function TarjetaUGC({
             </p>
             {verEscenas && (
               <ol className="space-y-1 rounded-lg border border-border/60 bg-muted/30 p-1.5 text-[10px] leading-tight text-muted-foreground">
+                {/* SOLO la foto: es la duda —cuál de las tres imágenes es la
+                    1— y para eso el guion sobra. Y en una frase: lo que las
+                    separa es qué hace la persona, porque el escenario y la luz
+                    son iguales en las tres a propósito. */}
                 {escenas.map((e) => (
                   <li key={`d${e.n}`}>
-                    <strong className="text-foreground">{e.n}. {e.titulo}</strong>
-                    {/* Lo que se VE —dónde está la persona, qué hace, qué pasa
-                        con el producto— sale del prompt de imagen, que es el
-                        único que lo describe. Recortado: para saber cuál es
-                        cuál basta con el principio. */}
-                    {e.prompt_imagen ? (
-                      <span className="block">📸 {recorta(e.prompt_imagen, 240)}</span>
-                    ) : null}
-                    {e.guion ? (
-                      <span className="block opacity-70">🗣️ «{e.guion}»</span>
-                    ) : null}
+                    <strong className="text-foreground">{e.n}. </strong>
+                    {e.resumen || recorta(e.prompt_imagen, 110)}
                   </li>
                 ))}
               </ol>

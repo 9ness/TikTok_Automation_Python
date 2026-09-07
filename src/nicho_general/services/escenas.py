@@ -30,10 +30,18 @@ _FORMATO = (
     "\n\nDevuelve SOLO un JSON, sin texto alrededor, con esta forma exacta:\n"
     '{{"voz": "la identidad vocal completa, tal y como la pide el documento",\n'
     ' "escenas": [\n'
-    '   {{"n": 1, "titulo": "...", "prompt_imagen": "...", "prompt_video": "...",\n'
+    '   {{"n": 1, "titulo": "...", "resumen": "...", "prompt_imagen": "...",\n'
+    '    "prompt_video": "...",\n'
     '    "guion": "solo lo que se dice en voz alta", "caracteres": 0}},\n'
     "   {{\"n\": 2, ...}}, {{\"n\": 3, ...}}\n"
     " ]}}\n"
+    # Sirve para UNA cosa: al volver con las tres imágenes generadas, saber
+    # cuál es cuál. Con el escenario y la luz no se distingue nada —son iguales
+    # en las tres a propósito—; lo que las separa es qué hace la persona.
+    "El campo `resumen` es UNA frase corta en español que diga qué HACE la "
+    "persona en esa foto, para reconocerla de un vistazo: «mira el producto "
+    "pensativa», «lo sujeta y sonríe a cámara», «señala el carrito». Sin "
+    "escenario, sin luz, sin ropa y sin adjetivos de más.\n"
     "El campo `prompt_video` debe llevar dentro el guion hablado y la identidad "
     "vocal completa, palabra por palabra igual en las tres escenas, tal y como "
     "exige el documento. `guion` es ese mismo texto hablado repetido aparte "
@@ -119,6 +127,7 @@ def escribir(
         escenas.append({
             "n": int(e.get("n") or i),
             "titulo": " ".join(str(e.get("titulo") or "").split()),
+            "resumen": " ".join(str(e.get("resumen") or "").split()),
             "prompt_imagen": str(e.get("prompt_imagen") or "").strip(),
             "prompt_video": str(e.get("prompt_video") or "").strip(),
             "guion": guion,
