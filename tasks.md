@@ -60,7 +60,13 @@ subir con el ⬆ de esa fila → quemar textos.
   Moda Chica. **Vista POV** resuelto: NO es un formato nuevo sino el POV BOF
   Largo con otra mano (su prompt de guion es `guion_dolor.md` palabra por
   palabra salvo la CTA, y sus instrucciones describen el mismo flujo — dos
-  clips de 10s, voz aparte en Fish, fuera el audio de Omni). Lo mismo con
+  clips de 10s, voz aparte en Fish, fuera el audio de Omni). PERO son formatos
+  de **Moda Hombre / Moda Mujer**, no del POV BOF Largo: ahí solo va el POV, y
+  sus cuatro botones se quitaron de esa pantalla (7 sep 2026). Para ponerlos
+  donde toca, el Nicho Ropa necesita antes lo que hoy solo tiene el Largo:
+  montar DOS clips y locutar el guion con Fish — su montaje es de un clip
+  suelto. Los cuatro prompts de imagen siguen guardados en
+  `nicho_pov_bof/prompts/`. Lo mismo con
   **Vista Sentado**: otra escena, el MISMO guion. Así que de los dos solo hubo
   que guardar su prompt de imagen (`prompt_imagen_manos_mujer.md` y
   `prompt_imagen_piernas_mujer.md`) y el de manos en su versión de hombre
