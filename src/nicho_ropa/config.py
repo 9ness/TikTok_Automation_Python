@@ -134,7 +134,8 @@ MODOS: dict[str, dict] = {
     "calle_1": {
         "label": "🚶 Situación Real 1",
         "estilo_mof10": "real_1",
-        "sexos": ("hombre",),
+        # Desde sep 2026 también está en Moda Chica, con su propia imagen.
+        "sexos": ("mujer", "hombre"),
     },
     "calle_2": {
         "label": "☕ Situación Real 2",
@@ -551,15 +552,24 @@ ESTILOS_MOF10: dict[str, dict] = {
         },
         "derivado": (),
     },
-    # Los de calle son SOLO de hombre (`MODOS[...]["sexos"]`), así que nunca
-    # se piden en mujer y no hay nada que derivar: el diálogo entero está
-    # escrito para él.
+    # Este va en los DOS menús de su web, cada uno con su imagen. El GUION es
+    # el mismo fichero a propósito: el que publica en Moda Chica es el de
+    # hombre palabra por palabra, así que se apunta al mismo en vez de
+    # duplicarlo. No se deriva nada: los dos textos son suyos.
     "real_1": {
         # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
         "duraciones": False,
         "label": "Situación Real 1 · le paran por la calle",
-        "imagen": "prompt_mof10_real_1_imagen.md",
-        "guion": "prompt_mof10_real_1_guion.md",
+        "por_sexo": {
+            "hombre": (
+                "prompt_mof10_real_1_imagen.md",
+                "prompt_mof10_real_1_guion.md",
+            ),
+            "mujer": (
+                "prompt_mof10_real_1_mujer_imagen.md",
+                "prompt_mof10_real_1_guion.md",
+            ),
+        },
         "derivado": (),
     },
     # Comparte la IMAGEN con Real 1 —es el mismo texto en su web, palabra por

@@ -4,9 +4,11 @@
      Texto literal suyo. Es el gemelo del de hombre: mismo esqueleto, cambia
      la persona y añade el bloque de maquillaje.
 
-     FALTA su paso 2: el diálogo de hombre no vale al derecho ni al revés
-     —ahí el que lleva el outfit es él y la voz de fuera es de ella—, así que
-     este modo sigue sin ofrecerse en mujer hasta que llegue su guion. -->
+     El paso 2 es EL MISMO fichero que en hombre: es el texto que su web
+     publica en Moda Chica, palabra por palabra. Ojo, porque ahí el que lleva
+     el outfit es un chico y la voz de fuera es la de ella — o lo tiene
+     duplicado en su web por descuido, o la escena es esa a propósito. Se
+     sirve tal cual y ya se cambiará si publica otro. -->
 
 {
   "subject": {

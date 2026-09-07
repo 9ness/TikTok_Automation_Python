@@ -74,12 +74,12 @@ subir con el ⬆ de esa fila → quemar textos.
   caracteres y en 10s caben 190—, así que habría que recortarlo a un solo punto
   de dolor y sería NUESTRO, no suyo. Decisión del operador: **esperar unos días
   a ver si saca la versión corta; por ahora solo prompts oficiales.**
-- [ ] **Situación Real 1 de mujer · falta su GUION**: pegada ya su imagen
-  (`prompt_mof10_real_1_mujer_imagen.md`), pero el paso 2 que llegó era el de
-  hombre —el que lleva el outfit es él y la voz de fuera es de ella—, así que
-  el modo sigue sin ofrecerse en mujer. La suya, según sus instrucciones, es
-  al revés: un chico la persigue por la calle hasta pararla. Falta también
-  Situación Real 2 de mujer.
+- [ ] **Situación Real 1 de mujer · vigilar el guion**: dado de alta con su
+  imagen propia y el MISMO guion que hombre, que es lo que su web publica en
+  Moda Chica. Pero ese texto dice que el que lleva el outfit es un chico y la
+  voz de fuera es la de ella, así que el clip puede salir con un hombre
+  puesto lo de mujer. Al primer vídeo generado se ve si es un descuido suyo
+  (y entonces hay que pedirle el bueno) o si la escena es esa a propósito.
 
 ## 👤 Tareas Humanas
 
