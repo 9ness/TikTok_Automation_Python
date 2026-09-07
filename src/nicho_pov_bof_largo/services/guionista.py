@@ -145,9 +145,16 @@ def _acortar(
         f"\n«{guion}»\n\nDevuelve el MISMO JSON, con "
         "el mismo producto y la misma estructura, pero con el guion por debajo "
         f"de esos {pedido} caracteres. No quites la llamada a la acción del "
-        "final ni las "
-        "características principales: di lo mismo con menos palabras, sin "
-        "dejarlo telegráfico."
+        "final: di lo mismo con menos palabras.\n"
+        # Lo que salió mal la primera vez: recortando por el medio dejó «lo
+        # bueno que tiene esta bicicleta es que con portaequipajes y
+        # conectividad app» — sin verbo. Lo va a LEER una voz en alto, así que
+        # una frase rota se oye.
+        "IMPORTANTE: el guion lo lee una voz en alto, así que todas las frases "
+        "tienen que estar completas y bien construidas, con su verbo. Si no "
+        "cabe todo, QUITA características enteras —una o dos— en vez de "
+        "recortar por el medio: mejor decir menos cosas y decirlas bien que "
+        "nombrarlas todas a trozos."
     )
     datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
     if not isinstance(datos, dict):
