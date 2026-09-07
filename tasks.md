@@ -54,6 +54,11 @@ subir con el ⬆ de esa fila → quemar textos.
   dos cosas: los de zapatillas duran **20s** —hay que ver si es un clip o dos
   pegados, porque el montaje de ese nicho asume uno— y **Camiseta Maniquí no
   lleva persona**, así que ese modo no necesita personaje.
+- [ ] **Situación Real en 8s**: el selector de duración (10s Omni / 8s Veo)
+  solo se le pone a los estilos cuyo guion se escribe fuera con un tope de
+  caracteres —espejo y selfie—. Los dos de calle traen el diálogo CERRADO y
+  medido para 10s: recortarlo sería reescribir su texto, así que se quedan en
+  10s hasta que él publique una versión corta.
 - [ ] **Nicho Ropa · formatos nuevos del curso**: dados de alta los cuatro de
   hombre (espejo, selfie, Situación Real 1 y 2) y falta el de mujer, **Bolso
   POV** — hay que pegar sus dos prompts. Dos cosas a vigilar: (1) Situación
@@ -69,9 +74,12 @@ subir con el ⬆ de esa fila → quemar textos.
   caracteres y en 10s caben 190—, así que habría que recortarlo a un solo punto
   de dolor y sería NUESTRO, no suyo. Decisión del operador: **esperar unos días
   a ver si saca la versión corta; por ahora solo prompts oficiales.**
-- [ ] **MOF MUJER · colocando el móvil**: es la única excepción viva a esa
-  regla — no lo publica y está derivado por nosotros (sale marcado "derivado"
-  en la pantalla de Ropa). Si aparece el suyo, se pega encima.
+- [ ] **Situación Real 1 de mujer · falta su GUION**: pegada ya su imagen
+  (`prompt_mof10_real_1_mujer_imagen.md`), pero el paso 2 que llegó era el de
+  hombre —el que lleva el outfit es él y la voz de fuera es de ella—, así que
+  el modo sigue sin ofrecerse en mujer. La suya, según sus instrucciones, es
+  al revés: un chico la persigue por la calle hasta pararla. Falta también
+  Situación Real 2 de mujer.
 
 ## 👤 Tareas Humanas
 

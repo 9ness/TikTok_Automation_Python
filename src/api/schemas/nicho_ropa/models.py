@@ -8,8 +8,16 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class DuracionRopa(BaseModel):
+    """Cuánto dura el clip que se va a generar (10s en Omni, 8s en Veo)."""
+
+    clave: str
+    label: str
+    segundos: int
+
+
 class EstiloMof10(BaseModel):
-    """Un estilo de vídeo de 10s: la imagen y el guion, ya en su sexo."""
+    """Un estilo de vídeo: la imagen y el guion, ya en su sexo y duración."""
 
     clave: str
     label: str
@@ -17,6 +25,10 @@ class EstiloMof10(BaseModel):
     guion: str
     # El texto no es suyo: lo derivamos cambiando las palabras de la persona.
     derivado: bool = False
+    # En qué duración viene servido el guion, y cuáles admite. Va vacía en los
+    # estilos con el diálogo cerrado: ahí no hay tope que bajar.
+    duracion: str = "10"
+    duraciones: list[DuracionRopa] = Field(default_factory=list)
 
 
 class ModoRopa(BaseModel):

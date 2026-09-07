@@ -62,12 +62,16 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 @router.get("/prompts", response_model=PromptsRopaResponse)
 def get_prompts(
     carpeta: str = Query(""), plazos: bool = Query(False),
-    modo: str = Query(""),
+    modo: str = Query(""), duracion: str = Query("10"),
 ) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
     `carpeta` solo decide el del espejo: es el único con una persona dentro, y
     en las carpetas de hombre esa persona tiene que ser un hombre.
+
+    `duracion` es la del clip que va a generar (10s en Omni, 8s en Veo). Baja
+    el tope de caracteres del guion: la voz la pone el propio vídeo, así que
+    lo que no entra sale cortado a media frase.
 
     `plazos` mete la frase de la financiación en lo que dice la persona. Va
     apagado por defecto a propósito: aquí la voz la pone el propio vídeo, así
@@ -89,7 +93,7 @@ def get_prompts(
                 else ""
             ),
             sexo=sexo,
-            mof10=config.prompts_mof10(sexo, plazos, modo),
+            mof10=config.prompts_mof10(sexo, plazos, modo, duracion),
             modos=config.modos_de(sexo),
         )
     except OSError as e:

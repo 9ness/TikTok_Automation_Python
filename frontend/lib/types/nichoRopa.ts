@@ -1,5 +1,11 @@
 // Espejo de `src/api/schemas/nicho_ropa/models.py`.
 
+export interface DuracionRopa {
+  clave: string;
+  label: string;
+  segundos: number;
+}
+
 export interface EstiloMof10 {
   clave: string;
   label: string;
@@ -7,6 +13,10 @@ export interface EstiloMof10 {
   guion: string;
   /** El texto no es del curso: lo derivamos cambiando lo de la persona. */
   derivado: boolean;
+  /** En qué duración viene el guion, y cuáles admite. Vacía cuando el
+   *  diálogo viene cerrado del curso y no hay tope que bajar. */
+  duracion?: string;
+  duraciones?: DuracionRopa[];
 }
 
 export interface PromptsRopaResponse {

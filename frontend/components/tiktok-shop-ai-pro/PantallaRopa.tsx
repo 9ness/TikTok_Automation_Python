@@ -352,6 +352,13 @@ export function PantallaRopa({
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
   const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
+  // Cuánto va a durar el clip: 10s en Omni, 8s en GenAI Pro (Veo). No es un
+  // ajuste de vídeo — baja el tope de caracteres del guion, porque la voz la
+  // pone el propio clip y lo que no entra sale cortado a media frase.
+  const [duracion, setDuracion] = useEstadoDeUsuario(
+    `ropa-web:${sexoFijo}:duracion`,
+    "10",
+  );
   // La carpeta y el modo se recuerdan POR PANTALLA: si compartieran clave, al
   // pasar de mujer a hombre te encontrarías en la carpeta de la otra.
   const [catalogo, setCatalogo] = useEstadoDeUsuario(
@@ -399,7 +406,7 @@ export function PantallaRopa({
   const slugPrompts = carpeta || (esWeb ? `${genero}__` : "");
   // Con el modo: la pantalla enseña SOLO el prompt del modo en el que estás.
   // Con los dos a la vista era cuestión de tiempo copiar el que no era.
-  const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "");
+  const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "", duracion);
   // Los modos son del SEXO, no de la pantalla: en hombre hay cuatro formatos
   // y en mujer dos, y cada uno guarda su propio vídeo de la misma prenda.
   const modos = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
@@ -410,7 +417,7 @@ export function PantallaRopa({
     if (!modos.length || modos.some((m) => m.clave === modo)) return;
     setModo(modos[0]!.clave);
   }, [modos, modo, setModo]);
-  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "");
+  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "", duracion);
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -873,7 +880,9 @@ export function PantallaRopa({
                voz en Omni. Sale un clip ÚNICO de 10s, sin montaje. */
             <div key={e.clave} className="space-y-1 rounded-lg border border-border/60 p-2">
               <p className="text-[11px] font-medium">
-                10 s · {e.label}
+                {(e.duraciones ?? []).find((d) => d.clave === (e.duracion ?? "10"))
+                  ?.segundos ?? 10}{" "}
+                s · {e.label}
                 {e.derivado && (
                   <span
                     title="El curso solo publica este estilo para el otro sexo: este texto lo hemos derivado cambiando lo de la persona"
@@ -883,6 +892,24 @@ export function PantallaRopa({
                   </span>
                 )}
               </p>
+              {(e.duraciones ?? []).length > 1 && (
+                <div className="flex gap-1.5">
+                  {(e.duraciones ?? []).map((d) => (
+                    <button
+                      key={d.clave}
+                      type="button"
+                      onClick={() => setDuracion(d.clave)}
+                      className={`flex-1 rounded-lg border px-2 py-1 text-[10px] transition ${
+                        (e.duracion ?? "10") === d.clave
+                          ? "border-fuchsia-500/60 bg-fuchsia-500/10 text-fuchsia-300"
+                          : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* En orden: primero la imagen (paso 1) a lo ancho, y debajo
                   los DOS guiones del paso 2 uno al lado del otro — son la
                   misma cosa en sus dos versiones, así que van juntos. */}

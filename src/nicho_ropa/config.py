@@ -471,6 +471,44 @@ SEXOS_MOF10: dict[str, dict[str, str]] = {
 }
 
 
+# La duración del clip que se va a generar. Omni da 10 segundos y GenAI Pro
+# (Veo) da 8, y en 8 segundos NO cabe el mismo guion: aquí la voz la pone el
+# propio vídeo, así que un guion que no entra sale cortado a media frase.
+#
+# El tope baja proporcional (18 car/s, que es lo que sale de sus 180 para 10s),
+# igual que en el Nicho General. Solo aplica a los estilos cuyo guion se
+# escribe con ChatGPT; los de calle traen el diálogo cerrado y no se tocan.
+CARACTERES_POR_SEGUNDO = 18
+DURACIONES: dict[str, dict] = {
+    "10": {"label": "10 s · Omni", "segundos": 10, "caracteres": 180},
+    "8": {"label": "8 s · GenAI Pro (Veo)", "segundos": 8, "caracteres": 144},
+}
+DURACION_DEFECTO = "10"
+
+
+def duracion_valida(duracion: str) -> str:
+    return duracion if duracion in DURACIONES else DURACION_DEFECTO
+
+
+# Aviso NUESTRO, y solo cuando el clip no dura los 10 segundos suyos: su
+# ejemplo está escrito para Omni y mide lo que mide, así que sin esta línea
+# ChatGPT copia esa longitud y el guion se sale del clip.
+NOTA_DURACION = (
+    "\n\nOJO: este clip dura {segundos} segundos, no 10. El ejemplo de arriba "
+    "está escrito para 10, así que el tuyo tiene que ser más corto: "
+    "{caracteres} caracteres como máximo."
+)
+
+
+def _con_duracion(texto: str, duracion: str) -> str:
+    """Rellena el tope de caracteres que le toca a esa duración."""
+    meta = DURACIONES[duracion_valida(duracion)]
+    return (
+        texto.replace("{{CARACTERES}}", str(meta["caracteres"]))
+        .replace("{{SEGUNDOS}}", str(meta["segundos"]))
+    )
+
+
 # Los estilos de 10s que tiene publicados. Van en lista porque va sacando más,
 # y cada uno son DOS prompts: la imagen y el guion+movimiento.
 #
@@ -483,6 +521,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     # género —maquillaje, joyería y un bloque de movimiento entero—.
     "espejo": {
         "label": "Frente al espejo · cuerpo entero",
+        "duraciones": True,
         "por_sexo": {
             "hombre": (
                 "prompt_mof10_espejo_hombre_imagen.md",
@@ -499,6 +538,7 @@ ESTILOS_MOF10: dict[str, dict] = {
     # más que el género (maquillaje, joyería, el encuadre del brazo).
     "movil": {
         "label": "BOF Selfie · brazo estirado",
+        "duraciones": True,
         "por_sexo": {
             "hombre": (
                 "prompt_mof10_movil_hombre_imagen.md",
@@ -515,6 +555,8 @@ ESTILOS_MOF10: dict[str, dict] = {
     # se piden en mujer y no hay nada que derivar: el diálogo entero está
     # escrito para él.
     "real_1": {
+        # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
+        "duraciones": False,
         "label": "Situación Real 1 · le paran por la calle",
         "imagen": "prompt_mof10_real_1_imagen.md",
         "guion": "prompt_mof10_real_1_guion.md",
@@ -529,6 +571,8 @@ ESTILOS_MOF10: dict[str, dict] = {
     # aun así resulta ser un descuido suyo y publican otro, se le pone aquí su
     # propio fichero y ya está.
     "real_2": {
+        # Diálogo cerrado: no hay tope que bajar, así que va siempre a 10s.
+        "duraciones": False,
         "label": "Situación Real 2 · le reciben en una terraza",
         "imagen": "prompt_mof10_real_1_imagen.md",
         "guion": "prompt_mof10_real_2_guion.md",
@@ -559,8 +603,16 @@ def _con_sexo(fichero: str, sexo: str, piezas: dict) -> str:
     return texto
 
 
+def _nota_duracion(guion: str, duracion: str) -> str:
+    """Le avisa del recorte cuando el clip no es de 10 segundos."""
+    if duracion_valida(duracion) == DURACION_DEFECTO:
+        return guion
+    return guion.rstrip() + NOTA_DURACION.format(**DURACIONES[duracion])
+
+
 def prompts_mof10(
     sexo: str = SEXO_DEFECTO, plazos: bool = False, modo: str = "",
+    duracion: str = DURACION_DEFECTO,
 ) -> list[dict]:
     """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo.
 
@@ -578,12 +630,22 @@ def prompts_mof10(
         else:
             imagen = _con_sexo(meta["imagen"], sexo, SEXOS_MOF10)
             guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
+        # El tope de caracteres solo se toca en los estilos cuyo guion se
+        # escribe fuera; en los de calle no hay marcador que rellenar.
+        dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO
         salida.append({
             "clave": clave,
             "label": meta["label"],
-            "imagen": _con_plazos(imagen, plazos),
-            "guion": _con_plazos(guion, plazos),
+            "imagen": _con_duracion(_con_plazos(imagen, plazos), dur),
+            "guion": _nota_duracion(
+                _con_duracion(_con_plazos(guion, plazos), dur), dur,
+            ),
             "derivado": sexo in meta["derivado"],
+            "duracion": dur,
+            "duraciones": [
+                {"clave": k, "label": v["label"], "segundos": v["segundos"]}
+                for k, v in DURACIONES.items()
+            ] if meta.get("duraciones") else [],
         })
     return salida
 
