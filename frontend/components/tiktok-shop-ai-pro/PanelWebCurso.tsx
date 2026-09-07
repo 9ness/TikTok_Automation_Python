@@ -42,6 +42,10 @@ export function PanelWebCurso() {
         pasos={[
           {
             texto:
+              "Desde un PC y SIN la vista móvil de DevTools (Ctrl+Shift+M la apaga). Desde sep 2026 su web detecta el móvil y ahí ya NO arma ZIP: abre un panel para guardar las fotos sueltas, así que el bucle da los clics y no baja nada.",
+          },
+          {
+            texto:
               "Carga JSZip. Su web lo usa para armar el ZIP y no lo carga: sin esto el botón de descargar carpeta falla con «JSZip is not defined». Tiene que responder «function».",
             guion: GUION_JSZIP,
             etiqueta: "Copiar paso 1",
@@ -89,7 +93,9 @@ function Bloque({
   icono: React.ReactNode;
   titulo: string;
   color: keyof typeof COLORES;
-  pasos: { texto: string; guion: string; etiqueta: string }[];
+  // Sin `guion` es un paso que se hace a mano y no tiene nada que copiar
+  // (apagar la vista móvil, por ejemplo).
+  pasos: { texto: string; guion?: string; etiqueta?: string }[];
   pie: string;
 }) {
   return (
@@ -99,7 +105,7 @@ function Bloque({
       </p>
       <ol className="space-y-2">
         {pasos.map((p, i) => (
-          <li key={p.etiqueta} className="flex gap-2">
+          <li key={p.etiqueta ?? i} className="flex gap-2">
             <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-background text-[9px] font-bold text-foreground">
               {i + 1}
             </span>
@@ -107,7 +113,9 @@ function Bloque({
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 {p.texto}
               </p>
-              <BotonCopiar etiqueta={p.etiqueta} guion={p.guion} />
+              {p.guion && p.etiqueta ? (
+                <BotonCopiar etiqueta={p.etiqueta} guion={p.guion} />
+              ) : null}
             </div>
           </li>
         ))}

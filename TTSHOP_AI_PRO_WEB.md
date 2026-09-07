@@ -251,6 +251,14 @@ nueva antes de tocar nada:
   captura de la ficha y `N.1` la foto limpia
   (`nicho_pov_bof/services/productos_web.py`).
 - Las carpetas son de diez productos y se llaman como el ZIP (`Carpeta 26`).
+- **El ZIP solo existe en ESCRITORIO** (visto el 7 sep 2026). Si detecta móvil
+  —y la vista de dispositivo de DevTools cuenta como tal— abre un panel
+  "Carpeta N · Descarga móvil" que guarda las fotos SUELTAS y avisa de que
+  "en móvil nunca se genera un ZIP". El bucle de descarga da sus clics y no
+  baja nada, sin ningún error en consola. Antes sí armaba el ZIP en móvil.
+- Y **renumera**: al añadir productos, el número de un producto que ya existía
+  puede pasar a ser otro distinto. Por eso el importador reinicia lo guardado
+  de todo lo que cambie de foto.
 - Las fichas de TikTok se traen copiando el DOM de su listado y pegándolo
   (`POST /api/v1/nicho-pov-bof/urls/importar`).
 
