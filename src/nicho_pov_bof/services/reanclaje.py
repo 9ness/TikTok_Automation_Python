@@ -177,6 +177,17 @@ def mover_productos(
         except Exception as e:  # noqa: BLE001
             log.warning("reanclaje: %s no se pudo mover (%s)", modulo, e)
 
+    # El UGC no entra en el barrido de arriba: sus claves llevan dentro el
+    # gancho y la duración, así que son cuatro documentos por usuario y no uno.
+    # Y es donde más se nota olvidarse — lo guardado son las tres escenas
+    # escritas para el producto anterior.
+    try:
+        from src.nicho_general.repos import product_repo as ugc
+
+        borradas += ugc.borrar_productos(source, folder, sorted(fuera))
+    except Exception as e:  # noqa: BLE001
+        log.warning("borrado: ugc no se pudo limpiar (%s)", e)
+
     # Creativos Pro guarda `{producto: hora}` de lo ya publicado.
     try:
         from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis

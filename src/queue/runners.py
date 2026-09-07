@@ -3359,11 +3359,20 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
             product_repo.load_folder(source, carpeta, usuario, gancho, duracion)
             .get("productos") or {}
         )
+        # Se reclasifica también lo que se está REHACIENDO: si el número
+        # cambió de producto, el nicho guardado es el del anterior y con él se
+        # elige el personaje — un panel de herramientas salía con la chica de
+        # "bebé y crianza". Lo demás solo si no tiene ninguno, que es una
+        # llamada de texto por carpeta.
+        def _hay_que_clasificar(pid: str) -> bool:
+            if rehacer or (folder and pid in forzados):
+                return True
+            return not (mios.get(pid) or {}).get("nicho")
+
         sin_nicho = {
             pid: str((t or {}).get("titulo") or "")
             for pid, t in textos.items()
-            if str((t or {}).get("titulo") or "").strip()
-            and not (mios.get(pid) or {}).get("nicho")
+            if str((t or {}).get("titulo") or "").strip() and _hay_que_clasificar(pid)
         }
         if not sin_nicho:
             continue

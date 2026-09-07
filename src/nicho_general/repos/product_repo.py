@@ -52,6 +52,46 @@ def _key(source: str, folder: str, usuario: str, gancho: str, duracion: str) -> 
     return base if clave == defecto else f"{base}:{clave}"
 
 
+def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
+    """Tira TODO lo de unos productos de esa carpeta, en TODAS sus versiones.
+
+    El número es la identidad del producto dentro de la carpeta y su web
+    RENUMERA al añadir cosas: al reimportar, un número puede traer otro
+    producto. Aquí eso se nota más que en ningún sitio porque lo guardado son
+    las TRES escenas escritas para el anterior —y el nicho, que decide el
+    personaje—: sin tirarlo, el producto nuevo aparece con el anuncio de otro.
+
+    Barre las cuatro combinaciones de gancho × duración y los usuarios: cada
+    una es un documento suyo.
+    """
+    fuera = {str(n) for n in numeros}
+    if not fuera:
+        return 0
+
+    from src.nicho_pov_bof.services.reanclaje import _USUARIOS
+
+    r = get_nicho_general_redis()
+    if not r.is_available():
+        return 0
+
+    borradas = 0
+    for usuario in {u or "ness" for u in _USUARIOS}:
+        for gancho in config.GANCHOS:
+            for duracion in config.DURACIONES:
+                clave = _key(source, folder, usuario, gancho, duracion)
+                doc = r.get_json(clave) or {}
+                productos = doc.get("productos") or {}
+                quedan = {
+                    k: v for k, v in productos.items() if str(k) not in fuera
+                }
+                if len(quedan) == len(productos):
+                    continue
+                borradas += len(productos) - len(quedan)
+                doc["productos"] = quedan
+                r.set_json(clave, doc)
+    return borradas
+
+
 def _require_redis():
     r = get_nicho_general_redis()
     if not r.is_available():
