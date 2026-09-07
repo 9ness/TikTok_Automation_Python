@@ -3331,6 +3331,12 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
             .get("productos") or {}
         )
         for pid in sorted(utiles, key=lambda x: (len(x), x)):
+            # Con productos concretos se hacen ESOS y ninguno más. Sin esto,
+            # pedir la versión de hombre de UNO encolaba los diez: a los otros
+            # nueve tampoco la tienen, así que entraban por la regla de "le
+            # falta" — y son diez llamadas a Gemini.
+            if folder and forzados and pid not in forzados:
+                continue
             guardado = mios.get(pid) or {}
             campo = "escenas_alt" if sexo_pedido else "escenas"
             ya = len(guardado.get(campo) or []) == ugc_config.ESCENAS
