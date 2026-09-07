@@ -37,6 +37,16 @@ subir con el ⬆ de esa fila → quemar textos.
   pegar fichas / añadir prenda en su propio bloque. El selector de mujer/hombre
   hay que SACARLO de `ImportarPrendasWeb`: no es una opción de la subida, es
   dónde estás trabajando — el equivalente al "Catálogo" del POV BOF.
+- [ ] **Nicho Ropa: filtrar los productos por modo**. Cada formato sirve para
+  un tipo de prenda —"Zapatillas Vista POV" solo para zapatillas, "Gafas en
+  Coche" solo para gafas, "Camiseta Maniquí" solo para camisetas—, así que al
+  elegir modo la carpeta tiene que enseñar SOLO los que valen; si no, se abre
+  una de diez para encontrar tres. Mismo patrón que el filtro de categoría de
+  Carruseles y que la clasificación por nicho del UGC: Gemini sobre los títulos
+  ya extraídos (texto, barato) + interruptor manual por producto, y el listado
+  diciendo cuántos aptos tiene cada carpeta. **Antes de montarlo, ver cómo lo
+  filtra su web** — el operador lo va a enseñar.
+
 - [ ] **Moda Hombre: cinco formatos nuevos** (sep 2026) — Zapatillas Vista POV
   20s, Zapatillas Vista Sentado 20s, Gafas en Coche 10s, Camisetas Sarcásticas
   10s y Camiseta Maniquí 10s. Se montan como modos del Nicho Ropa, igual que
