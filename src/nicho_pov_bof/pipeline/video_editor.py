@@ -1046,7 +1046,20 @@ def _arrow_end(t0: float, video_dur: float | None) -> float:
     return t0 + config.ARROW_DURATION_S
 
 
-def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: Path, on_log: OnLog) -> Path:
+def _overlay_arrow(
+    video_in: Path, audio_path: Path, work_dir: Path, out_path: Path,
+    on_log: OnLog, con_audio: bool = False,
+) -> Path:
+    """Pone la flecha del carrito sobre el vídeo.
+
+    `audio_path` es de donde se saca CUÁNDO entra (Whisper busca la palabra
+    gatillo); puede ser el propio vídeo si la voz ya va dentro.
+
+    `con_audio` conserva la pista del vídeo. Va apagado por defecto porque en
+    este pipeline el audio se mezcla en el paso siguiente y aquí el vídeo
+    llega mudo; el UGC es al revés —los clips vienen ya hablados— y sin esto
+    el vídeo salía sin voz.
+    """
     t0, t1 = _find_arrow_window(audio_path, work_dir, on_log, probe_duration(video_in))
     # Rotamos el punto de partida de la lista de flechas al azar por vídeo:
     # aquí no hay concepto de "versión" (a diferencia de ready_video), así
@@ -1079,6 +1092,7 @@ def _overlay_arrow(video_in: Path, audio_path: Path, work_dir: Path, out_path: P
             "-stream_loop", "-1", "-i", arrow_mov,
             "-filter_complex", filter_complex,
             "-map", "[v]",
+            *(["-map", "0:a?", "-c:a", "copy"] if con_audio else []),
             "-t", f"{dur:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-movflags", "+faststart", str(out_path),

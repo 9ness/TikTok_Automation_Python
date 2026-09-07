@@ -199,11 +199,39 @@ def montar(
         encoding="utf-8",
     )
     salida.parent.mkdir(parents=True, exist_ok=True)
+    pegado = work / "pegado.mp4"
     subprocess.run(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
          "-f", "concat", "-safe", "0", "-i", str(lista),
-         "-c", "copy", "-movflags", "+faststart", str(salida)],
+         "-c", "copy", "-movflags", "+faststart", str(pegado)],
         check=True, capture_output=True,
     )
+
+    _flecha(pegado, salida, work, on_log)
     on_log(f"[nicho_general] montado: {salida.name} ({len(recortados)} clips)")
     return salida
+
+
+def _flecha(video: Path, salida: Path, work: Path, on_log: OnLog) -> None:
+    """La flecha que apunta al carrito, la misma que el POV BOF.
+
+    Es lo único que este montaje quema encima: el anuncio no lleva texto (lo
+    dice la persona), pero la CTA sin nada a lo que apuntar se queda coja.
+
+    Dos diferencias con el POV BOF y las dos importan: la voz va DENTRO del
+    vídeo —así que de ahí se saca cuándo entra la flecha y hay que conservar
+    la pista de audio— y si algo falla se publica el vídeo tal cual, que un
+    adorno no puede tirar un montaje que ya está hecho.
+    """
+    import shutil
+
+    from src.nicho_pov_bof.pipeline import video_editor as pov
+
+    try:
+        con_flecha = pov._overlay_arrow(
+            video, video, work, work / "flecha.mp4", on_log, con_audio=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[nicho_general] sin flecha ({str(e)[:120]})")
+        con_flecha = video
+    shutil.move(str(con_flecha), str(salida))
