@@ -135,11 +135,17 @@ def _acortar(
     """
     from src.tiktok_shop.api.gemini import generate_json
 
+    # Se le pide MENOS de lo que cabe. Medido: pidiéndole 356 devolvió 375 —a
+    # cinco caracteres de no caber en dos clips de 8 s—, y esa diferencia
+    # cuesta un clip entero. Apuntando un 10% por debajo aterriza dentro.
+    pedido = int(tope * 0.9)
     aviso = (
-        f"\n\nATENCIÓN: tu guion anterior tenía {len(guion)} caracteres y el "
-        f"tope son {tope}. Este era:\n«{guion}»\n\nDevuelve el MISMO JSON, con "
+        f"\n\nATENCIÓN: tu guion anterior tenía {len(guion)} caracteres y no "
+        f"cabe. Tiene que quedarse en {pedido} caracteres o menos. Este era:"
+        f"\n«{guion}»\n\nDevuelve el MISMO JSON, con "
         "el mismo producto y la misma estructura, pero con el guion por debajo "
-        "del tope. No quites la llamada a la acción del final ni las "
+        f"de esos {pedido} caracteres. No quites la llamada a la acción del "
+        "final ni las "
         "características principales: di lo mismo con menos palabras, sin "
         "dejarlo telegráfico."
     )
