@@ -3288,8 +3288,11 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
     usuario = str(p.get("usuario") or job.enqueued_by or "")
     gancho = ugc_config.gancho_valido(str(p.get("gancho") or ""))
     duracion = ugc_config.duracion_valida(str(p.get("duracion") or ""))
-    rehacer = bool(p.get("rehacer"))
     forzados = {str(x) for x in (p.get("productos") or [])}
+    # "Rehacer" con productos concretos es rehacer ESOS, no la carpeta entera:
+    # el botón de la tarjeta manda las dos cosas y así el de un guion largo se
+    # llevaba por delante —y volvía a pagar— las diez escenas de la carpeta.
+    rehacer = bool(p.get("rehacer")) and not forzados
     # La versión del OTRO sexo, pedida desde la tarjeta de un producto. Sin
     # esto se escribe la que pega con el nicho, que es lo que hace la pasada
     # normal: la de hombre para las pesas y la de mujer para la crema.
