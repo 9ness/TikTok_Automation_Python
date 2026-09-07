@@ -918,6 +918,7 @@ def prompt_guion_producto(
         f"\n\nÚLTIMO APUNTE: el vídeo se publica en {epoca_actual()}. Si el "
         "producto es de temporada, habla de usarlo en esta época y no en otra. "
         "Si le da igual la época, no cambies nada por esto."
+        ' Esto cambia solo el CONTEXTO en el que se habla del producto, nunca lo que hace: no le atribuyas usos, materiales, resistencias ni capacidades de temporada que no estén en la ficha.'
     )
 
 
