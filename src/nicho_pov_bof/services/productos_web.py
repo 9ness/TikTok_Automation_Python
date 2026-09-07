@@ -125,12 +125,27 @@ def nombre_carpeta(nombre_zip: str) -> str:
     return limpio or "Carpeta"
 
 
-def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
-    """`{"1": {"ficha": "1.png", "limpia": "1.1.jpeg"}}` a partir del ZIP.
+# Cómo vienen nombradas las fotos dentro de su ZIP. Hay DOS convenciones
+# porque la cambió el 7 sep 2026 sin avisar y siguen circulando ZIP viejos:
+#
+#   vieja  `3.png` es la FICHA y `3.1.jpeg` la limpia — invertido respecto a
+#          lo nuestro, que es la trampa clásica de este importador.
+#   nueva  `Producto_3_Ficha.png` y `Producto_3_Delantera.jpeg`, que ya lo
+#          dicen por su nombre y no hay nada que invertir.
+#
+# Se aceptan las dos: al cambiarla, los 31 ZIP importaron 0 de 0 sin decir por
+# qué, porque ningún fichero casaba con la única que había.
+_RE_VIEJO = re.compile(r"^(\d+)(\.1)?\.[A-Za-z0-9]+$")
+_RE_NUEVO = re.compile(
+    r"^Producto[\s_-]*(\d+)[\s_-]*(Delantera|Ficha)\.[A-Za-z0-9]+$", re.IGNORECASE,
+)
 
-    En su ZIP el número suelto es la FICHA y el `.1` la limpia. Se acepta
-    cualquier profundidad de carpetas dentro: algunos descargadores meten todo
-    bajo un directorio con el nombre de la carpeta.
+
+def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
+    """`{"1": {"ficha": "...", "limpia": "..."}}` a partir del ZIP.
+
+    Se acepta cualquier profundidad de carpetas dentro: algunos descargadores
+    meten todo bajo un directorio con el nombre de la carpeta.
     """
     salida: dict[str, dict[str, str]] = {}
     for nombre in zf.namelist():
@@ -139,11 +154,18 @@ def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
         base = Path(nombre).name
         if Path(base).suffix.lower() not in _EXTS:
             continue
-        m = re.match(r"^(\d+)(\.1)?\.[A-Za-z0-9]+$", base)
-        if not m:
+
+        nuevo = _RE_NUEVO.match(base)
+        if nuevo:
+            producto = nuevo.group(1)
+            cual = "limpia" if nuevo.group(2).lower() == "delantera" else "ficha"
+            salida.setdefault(producto, {})[cual] = nombre
             continue
-        producto, es_limpia = m.group(1), bool(m.group(2))
-        salida.setdefault(producto, {})["limpia" if es_limpia else "ficha"] = nombre
+
+        viejo = _RE_VIEJO.match(base)
+        if viejo:
+            producto, es_limpia = viejo.group(1), bool(viejo.group(2))
+            salida.setdefault(producto, {})["limpia" if es_limpia else "ficha"] = nombre
     return salida
 
 

@@ -247,8 +247,10 @@ si sigue habiendo ZIP y con qué convención de nombres)_
 **Lo que hoy da por hecho nuestro código** — hay que confirmarlo contra la web
 nueva antes de tocar nada:
 
-- Los ZIP traen las fotos con la convención AL REVÉS de la nuestra: `N` es la
-  captura de la ficha y `N.1` la foto limpia
+- Los ZIP traen las fotos con nombre propio desde el 7 sep 2026:
+  `Producto_3_Delantera.jpeg` (la limpia) y `Producto_3_Ficha.png` (la
+  captura). Antes era `3.png` para la ficha y `3.1.jpeg` para la limpia, o sea
+  AL REVÉS de lo nuestro. El importador acepta las dos
   (`nicho_pov_bof/services/productos_web.py`).
 - Las carpetas son de diez productos y se llaman como el ZIP (`Carpeta 26`).
 - **El ZIP solo existe en ESCRITORIO** (visto el 7 sep 2026). Si detecta móvil
