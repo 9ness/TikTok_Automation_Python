@@ -34,10 +34,15 @@ const CATALOGOS = [
     clave: "inventario_general",
     label: "📦 Inventario General",
     // De dónde se bajan las cosas en su web, para no tener que adivinarlo.
-    donde: "Inicio › el listado de carpetas del inventario de España",
+    donde: "Productos de España › Inventario General",
   },
-  { clave: "hombre_web", label: "👔 Moda Hombre", donde: "Moda › Ropa de hombre" },
-  { clave: "mujer_web", label: "👗 Moda Mujer", donde: "Moda › Ropa de mujer" },
+  // "Moda Hombre" y "Moda Mujer" son TRES inventarios cada uno en su web
+  // (Ropa / Zapatos / Accesorios) y hoy solo hay productos en Ropa. Cuando
+  // llenen los otros dos habrá que darlos de alta aquí: no son la misma
+  // carpeta ni sirven para los mismos formatos —los zapatos van al POV BOF
+  // Largo y las gafas al modo del coche—.
+  { clave: "hombre_web", label: "👔 Ropa Hombre", donde: "Moda Hombre › Ropa Hombre" },
+  { clave: "mujer_web", label: "👗 Ropa Mujer", donde: "Moda Mujer › Ropa Mujer" },
 ] as const;
 
 type ClaveCatalogo = (typeof CATALOGOS)[number]["clave"];

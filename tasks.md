@@ -37,6 +37,15 @@ subir con el ⬆ de esa fila → quemar textos.
   pegar fichas / añadir prenda en su propio bloque. El selector de mujer/hombre
   hay que SACARLO de `ImportarPrendasWeb`: no es una opción de la subida, es
   dónde estás trabajando — el equivalente al "Catálogo" del POV BOF.
+- [ ] **Zapatos y Accesorios: inventarios nuevos en su web** (7 sep 2026) —
+  Moda Hombre y Moda Mujer se dividen en Ropa / Zapatos / Accesorios y hoy
+  solo Ropa tiene productos. Lo que importamos hoy es la subcategoría de Ropa.
+  Cuando los llenen: dar de alta cada uno como catálogo suyo (el selector de
+  Configuración y `GENEROS_WEB`), y ojo con a dónde van — los zapatos NO son
+  del Nicho Ropa sino del POV BOF Largo (Vista POV / Vista Sentado) y las
+  gafas del modo Gafas en Coche. Eso es justo el filtro por categoría de la
+  tarea de abajo, pero resuelto por ELLOS: si el inventario ya viene separado,
+  puede que no haga falta clasificar nada.
 - [ ] **Nicho Ropa: filtrar los productos por modo**. Cada formato sirve para
   un tipo de prenda —"Zapatillas Vista POV" solo para zapatillas, "Gafas en
   Coche" solo para gafas, "Camiseta Maniquí" solo para camisetas—, así que al

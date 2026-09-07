@@ -256,6 +256,14 @@ nueva antes de tocar nada:
   "Carpeta N · Descarga móvil" que guarda las fotos SUELTAS y avisa de que
   "en móvil nunca se genera un ZIP". El bucle de descarga da sus clics y no
   baja nada, sin ningún error en consola. Antes sí armaba el ZIP en móvil.
+- **"Productos de España" son TRES inventarios** (visto el 7 sep 2026):
+  Inventario General (31 carpetas de 10), Moda Mujer y Moda Hombre. Y los dos
+  de moda tienen a su vez tres subcategorías —Ropa, Zapatos y Accesorios—, de
+  las que hoy **solo Ropa tiene productos**. Lo que importamos como
+  `mujer_web` / `hombre_web` es esa subcategoría de Ropa, no el inventario de
+  moda entero. Cuando llenen las otras dos hay que darlas de alta aparte: no
+  valen para los mismos formatos (los zapatos van al POV BOF Largo con los
+  prompts de Vista POV / Vista Sentado, y las gafas al modo del coche).
 - Y **renumera**: al añadir productos, el número de un producto que ya existía
   puede pasar a ser otro distinto. Por eso el importador reinicia lo guardado
   de todo lo que cambie de foto.
