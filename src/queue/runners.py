@@ -3288,21 +3288,29 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
         textos = (
             pov_repo.load_folder_para(source, carpeta, usuario).get("productos") or {}
         )
-        if not textos:
+        # Un documento vacío y uno con productos pero SIN título son lo mismo
+        # aquí: no hay de qué escribir. Y el segundo caso existe —el documento
+        # de la carpeta lo crea también el importador o un "sin stock", sin
+        # pasar por el extractor—, así que mirar solo `if not textos` daba un
+        # trabajo que terminaba BIEN en dos segundos sin escribir nada, que es
+        # lo peor: parece que la carpeta ya está hecha.
+        utiles = {
+            pid: t for pid, t in textos.items()
+            if str((t or {}).get("titulo") or "").strip()
+        }
+        if not utiles:
             sin_textos.append(carpeta)
             continue
         mios = (
             product_repo.load_folder(source, carpeta, usuario, gancho, duracion)
             .get("productos") or {}
         )
-        for pid in sorted(textos, key=lambda x: (len(x), x)):
-            if not str((textos[pid] or {}).get("titulo") or "").strip():
-                continue
+        for pid in sorted(utiles, key=lambda x: (len(x), x)):
             guardado = mios.get(pid) or {}
             campo = "escenas_alt" if sexo_pedido else "escenas"
             ya = len(guardado.get(campo) or []) == ugc_config.ESCENAS
             if rehacer or (folder and pid in forzados) or not ya:
-                pendientes.append((carpeta, pid, textos[pid]))
+                pendientes.append((carpeta, pid, utiles[pid]))
 
     if sin_textos:
         on_log(
@@ -3348,8 +3356,11 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
 
     if not pendientes:
         if sin_textos and len(sin_textos) == len(carpetas):
+            cuales = ", ".join(sin_textos[:5]) + ("…" if len(sin_textos) > 5 else "")
             raise RuntimeError(
-                "Ninguna carpeta tiene textos extraídos todavía: sácalos primero."
+                f"Sin textos extraídos ({cuales}): las escenas se escriben "
+                "leyendo el título y la ficha del producto, así que primero "
+                "hay que sacarlos en Configuración › Textos de todo un catálogo."
             )
         on_log("[ugc] todo lo que tiene textos ya tiene sus tres escenas")
         return "sin escenas nuevas (los nichos sí se han repasado)"
