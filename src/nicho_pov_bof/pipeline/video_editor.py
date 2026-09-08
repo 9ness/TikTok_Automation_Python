@@ -134,6 +134,10 @@ def _render_text_line(
     text: str, *, font_size: int, max_w: int,
     fill: tuple, stroke: tuple, max_lines: int = 1,
     fuente: str = _FUENTE_RECTA,
+    # Grosor del borde en proporción al cuerpo. El de siempre (0.13) es el que
+    # despega la letra del vídeo; el estilo de contorno lo quiere más fino,
+    # porque ahí el borde ES el color y a 0.13 se come la letra.
+    stroke_frac: float = 0.13,
 ) -> "Image.Image | None":
     """Renderiza una línea (o varias, hasta `max_lines`) de texto+emoji a
     PNG con relleno + borde. Mismo enfoque que `ready_video._render_text_png`
@@ -186,7 +190,7 @@ def _render_text_line(
         # Ni al mínimo cabe (texto larguísimo): recortar es el último recurso.
         lines = lines[:max_lines]
 
-    stroke_w = max(3, int(font_size * 0.13))
+    stroke_w = max(2, int(font_size * stroke_frac))
 
     def w_of(sub: str) -> float:
         return _seg_width(_split_runs(sub), font, d0, emoji_size, gap)
@@ -499,6 +503,9 @@ def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int
         im = _render_text_line(
             texto, font_size=tamano, max_w=max_w, fill=(255, 255, 255),
             stroke=color, max_lines=max_lines, fuente=fuente,
+            # Aquí el borde ES el color, así que con el grosor de siempre se
+            # comía la letra: la mitad.
+            stroke_frac=0.065,
         )
         return _crop_visible(im) if im is not None else None
 
@@ -567,11 +574,9 @@ def _render_plano_png(
     return bloque
 
 
-_ROTULOS_PLANOS = (
-    {"nombre": "sombra-montserrat", "estilo": "sombra",
-     "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
-    {"nombre": "sombra-anton", "estilo": "sombra",
-     "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+# El de CONTORNO sigue fuera de la rotación: con el borde de siempre se comía
+# la letra y hay que verlo fino antes de meterlo.
+_ROTULOS_CONTORNO = (
     {"nombre": "contorno-montserrat", "estilo": "contorno",
      "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
     {"nombre": "contorno-anton", "estilo": "contorno",
@@ -735,7 +740,14 @@ def _texto_seguro(txt: str, respaldo: str, etiqueta: str, on_log: OnLog) -> str:
 #   - radio/pasadas/intensidad → lo ancho y denso del neón
 #   - offset → si el destello va centrado (neón) o desplazado (sombra dura)
 # El nombre del producto lleva su propia fuente, siempre recta y legible.
+# Los dos de SOMBRA van con los demás: son un rótulo más y salen 2 de cada 14.
+# El texto lleva su silueta sólida detrás en vez del halo, así que rompe la
+# sensación de plantilla sin ocupar más.
 _ROTULOS = (
+    {"nombre": "sombra-montserrat", "estilo": "sombra",
+     "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "sombra-anton", "estilo": "sombra",
+     "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
     {
         "nombre": "montserrat-neon",
         "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf",
@@ -1141,9 +1153,8 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     rotulo = _elegir_rotulo(semilla)
     on_log(f"[3/5] gancho {textos['gancho']!r} · CTA {textos['cta']!r}")
     on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
-    block = _render_text_block_png(
-        textos, layout, piezas, paleta, rotulo, on_log,
-    )
+    pintar = _render_plano_png if rotulo.get("estilo") else _render_text_block_png
+    block = pintar(textos, layout, piezas, paleta, rotulo, on_log)
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
         _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
