@@ -79,6 +79,20 @@ _FORMATO = (
 )
 
 
+# Cuánto se le perdona a un guion antes de pedirle que lo acorte. Estaba en
+# 1,15 y se bajó: con el tope de 170 caracteres de un clip de 10s, ese margen
+# daba por buenos guiones de 190 —11,2 segundos de voz en un clip que dura 10—,
+# y en la plancha de VEVOR le tocó justo a la escena 3, que es la de la CTA al
+# carrito. Un reintento cuesta una llamada de texto; una CTA cortada a media
+# frase es el vídeo entero, porque es lo único que la tienda exige.
+#
+# No se pone en 1,0 porque entonces reintentaría casi siempre: el modelo cuenta
+# los caracteres a ojo y se pasa por dos o tres constantemente, y eso sí que
+# cabe (170 caracteres son 10s justos, con 178 se va a 10,4 y el final de la
+# frase todavía entra en la cola del clip).
+MARGEN_TOPE = 1.05
+
+
 def escribir(
     *,
     titulo: str,
@@ -97,10 +111,11 @@ def escribir(
     `escenas_pedidas` son las que hacen falta para la duración que pide la
     tienda (`config.escenas_para`). Sin ella, las tres del curso.
 
-    No hay reintento por longitud: el documento pide ~170 caracteres (136 en la
-    versión de 8 s) y sus propios ejemplos se quedan en 162. Si un guion se
-    pasa solo se AVISA — forzarlo con reintentos deja frases telegráficas, que
-    es justo lo que aprendimos en el POV BOF Largo.
+    Si un guion se pasa del tope se pide UNA segunda pasada por longitud (ver
+    `MARGEN_TOPE`) y, si a la segunda tampoco entra, se avisa y se usa igual:
+    insistir más deja frases telegráficas, que es lo que se aprendió en el POV
+    BOF Largo. Aquí sí se reintenta —allí no— porque allí el montaje cuadra el
+    vídeo a la voz y un clip de Omni dura lo que dura.
     """
     from src.tiktok_shop.api.gemini import generate_json
 
@@ -158,7 +173,7 @@ def escribir(
         raise ValueError(f"Escenas sin prompt: {vacias}")
 
     tope = meta["caracteres"]
-    largas = [e for e in escenas if e["caracteres"] > tope * 1.15]
+    largas = [e for e in escenas if e["caracteres"] > tope * MARGEN_TOPE]
     if largas:
         # AQUÍ SÍ se reintenta, al revés que en el POV BOF Largo: allí el
         # montaje cuadra el vídeo a la voz, pero un clip de Omni dura lo que
@@ -176,7 +191,7 @@ def escribir(
             )
         except Exception as e:  # noqa: BLE001 — lo de antes vale, aunque largo
             on_log(f"[nicho_general] no se pudieron acortar: {e}")
-        largas = [e for e in escenas if e["caracteres"] > tope * 1.15]
+        largas = [e for e in escenas if e["caracteres"] > tope * MARGEN_TOPE]
         if largas:
             on_log(
                 "[nicho_general] siguen largos: "
