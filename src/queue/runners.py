@@ -3463,11 +3463,13 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 # eso ya es cambiarle el método: cuando pase, se corrige esa
                 # escena a mano al pegarla en Flow.
                 #
-                # Con más de tres escenas van también las capturas extra: ahí
-                # el problema es el contrario, que no hay de qué hablar.
-                fotos=_fotos_ugc(
-                    source, carpeta, pid, con_extras=cuantas > ugc_config.ESCENAS,
-                ),
+                # Con duración pedida van también las capturas extra: ahí el
+                # problema es el contrario, que no hay de qué hablar. Se mira
+                # la DURACIÓN y no el número de escenas porque 30 segundos con
+                # clips de 10 siguen siendo tres, y son tres escenas que hay
+                # que llenar de características igual (mismo criterio que el
+                # POV BOF Largo con sus guiones largos).
+                fotos=_fotos_ugc(source, carpeta, pid, con_extras=pedidos > 0),
                 gancho=gancho,
                 duracion=duracion,
                 escenas_pedidas=cuantas,
