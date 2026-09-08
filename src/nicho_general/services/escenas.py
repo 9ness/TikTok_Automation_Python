@@ -66,6 +66,17 @@ _FORMATO = (
     "nada que no sea el producto. Para la llamada a la acción no hace falta "
     "enseñar una pantalla: eso lo dice la voz. Un móvil en la mano tapa el "
     "producto y encima cambia de una escena a otra.\n"
+    # Cada escena se genera por separado, así que sin una referencia de tamaño
+    # el generador la decide por su cuenta: la misma plancha salía cubriendo la
+    # isla entera en una escena y como una bandeja pequeña en otra. El curso
+    # pide que el producto conserve sus "proporciones" y esto es lo que lo hace
+    # comprobable.
+    "7. Da la ESCALA del producto y repítela igual en las {escenas} escenas: "
+    "cuánto mide y qué ocupa respecto a lo que tiene al lado (la encimera, la "
+    "placa, las manos de la persona). Las medidas salen de la ficha; si no las "
+    "ves, dilo con una comparación («del ancho de dos quemadores», «le cabe en "
+    "una mano»). Sin eso, el mismo producto sale gigante en una escena y "
+    "diminuto en la siguiente, y se nota al pegar los clips.\n"
     "4. Describe el producto SOLO como se ve en su foto. No le añadas piezas, "
     "luces encendidas, pantallas ni accesorios que no aparezcan en ella, "
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
