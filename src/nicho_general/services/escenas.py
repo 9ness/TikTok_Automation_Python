@@ -77,6 +77,18 @@ _FORMATO = (
     "ves, dilo con una comparación («del ancho de dos quemadores», «le cabe en "
     "una mano»). Sin eso, el mismo producto sale gigante en una escena y "
     "diminuto en la siguiente, y se nota al pegar los clips.\n"
+    # El fallo más caro de la escena de dolor: el generador no tiene otro
+    # objeto al que echarle la culpa, así que ensucia o estropea EL PRODUCTO
+    # que se está vendiendo. Con la plancha de parrilla fue literal —"una
+    # parrilla sucia" y "la plancha de parrilla" son la misma palabra— y salió
+    # el producto lleno de grasa en el anuncio que lo promociona.
+    "8. En la escena del PUNTO DE DOLOR, lo que falla NUNCA es el producto. Lo "
+    "viejo, sucio, roto o incómodo tiene que ser OTRA cosa concreta y nombrada "
+    "(el utensilio de siempre, el electrodoméstico, el mueble, la superficie), "
+    "y lo dices explícitamente: «lo sucio es X, nunca el producto». El "
+    "producto, si aparece en esa escena, sale impecable y a un lado, separado "
+    "de eso que falla. Cuidado cuando el producto y lo que falla se llamen "
+    "parecido: ahí hay que repetirlo dos veces.\n"
     "4. Describe el producto SOLO como se ve en su foto. No le añadas piezas, "
     "luces encendidas, pantallas ni accesorios que no aparezcan en ella, "
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
