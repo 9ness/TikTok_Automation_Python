@@ -491,6 +491,11 @@ def _render_text_block_png(
 # Todavía NO entran en la rotación: viven en `_ROTULOS_PLANOS` hasta que el
 # operador vea la muestra.
 _SOMBRA_OFFSET = 7          # píxeles abajo y a la derecha
+# Punto medio, buscado a ojo sobre las siete paletas: con 0.13 (el de siempre)
+# el borde se come la letra, y con 0.045 y alfa 165 el color desaparece y queda
+# texto blanco a secas.
+_CONTORNO_GROSOR = 0.08     # del cuerpo de letra (el de siempre es 0.13)
+_CONTORNO_ALFA = 205        # de 255: se ve el color, pero no pesa
 _PLANO_GAP = 6
 
 
@@ -502,10 +507,11 @@ def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int
     if estilo == "contorno":
         im = _render_text_line(
             texto, font_size=tamano, max_w=max_w, fill=(255, 255, 255),
-            stroke=color, max_lines=max_lines, fuente=fuente,
-            # Aquí el borde ES el color, así que con el grosor de siempre se
-            # comía la letra: la mitad.
-            stroke_frac=0.065,
+            # Aquí el borde ES el color: fino y TRASLÚCIDO, para que se
+            # insinúe en vez de marcar. Opaco y grueso se comía la letra y
+            # parecía otra vez el estilo de siempre.
+            stroke=(*color, _CONTORNO_ALFA), max_lines=max_lines, fuente=fuente,
+            stroke_frac=_CONTORNO_GROSOR,
         )
         return _crop_visible(im) if im is not None else None
 
