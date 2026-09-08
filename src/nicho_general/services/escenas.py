@@ -294,6 +294,16 @@ def _revisar(escenas: list[dict]) -> list[str]:
     llamada y tampoco garantiza que salga mejor.
     """
     avisos = []
+    # El documento del curso prohíbe las preguntas en el gancho ("No contener
+    # preguntas en el gancho inicial") y aun así se cuelan: es la forma más
+    # fácil de abrir un anuncio y el modelo tira de ella. La escena 1 con
+    # pregunta hay que rehacerla — el gancho es lo único que decide si alguien
+    # se queda.
+    primera = next((e for e in escenas if e["n"] == 1), None)
+    if primera and ("¿" in primera["guion"] or "?" in primera["guion"]):
+        avisos.append(
+            "la escena 1 abre con una PREGUNTA y el curso lo prohíbe: rehazla."
+        )
     inventadas = [e["n"] for e in escenas if _INVENTA_PERSONA.search(e["prompt_imagen"])]
     if inventadas:
         avisos.append(

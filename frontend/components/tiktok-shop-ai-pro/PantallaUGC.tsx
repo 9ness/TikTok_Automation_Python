@@ -912,7 +912,11 @@ function TarjetaUGC({
                 },
               );
             }}
-            placeholder="#vevor #vevorttESshop @vevor_es"
+            /* El ejemplo NO puede ser el caso real que se está trabajando: se
+               puso "#vevor #vevorttESshop @vevor_es" y el operador lo dio por
+               guardado sin haber escrito nada — el campo estaba vacío en
+               Redis y el caption habría salido sin los hashtags del trato. */
+            placeholder="#marca #campaña @cuenta"
             className="mt-0.5 w-full rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none transition focus:border-violet-500/60"
           />
         </label>
