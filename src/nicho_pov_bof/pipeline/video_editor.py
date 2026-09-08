@@ -776,26 +776,27 @@ _PALETAS = (
         "cta_fill": (255, 255, 255),    "cta_glow": (255, 120, 0),
         "tono": 20, "familias": "🔥🌞🧨🚀",
     },
-    # Las dos de OTOÑO. Las seis de arriba son neón —pensadas para contrastar
+    # La gama de OTOÑO. Las seis de arriba son neón —pensadas para contrastar
     # con vídeo saturado— y con las fotos de esta época (luz cálida, madera,
-    # terracota) desentonan. Estas mantienen el relleno claro, que es lo que se
-    # lee, y bajan el halo a ámbar y teja.
+    # terracota) desentonan.
+    #
+    # Otoñal es que el color sea PROFUNDO y apagado, no que todo sea marrón:
+    # las primeras siete salieron todas cálidas y sobre un fondo de terraza no
+    # había quien las distinguiera. Estas van repartidas por toda la rueda
+    # (26° a 348°), que además es lo que necesita el criterio de contraste para
+    # tener siempre alguna que se lea sobre el fondo que toque.
+    #
+    # El relleno se queda claro —blanco o crema, que es lo que de verdad se
+    # lee— y lo que cambia es el halo.
     #
     # `estacion` las deja fuera del sorteo el resto del año: cuando toque
     # invierno se añaden las suyas y estas se apagan solas.
     {
-        "nombre": "ambar",
+        "nombre": "calabaza",
         "estacion": "otoño",
-        "gancho_fill": (255, 255, 255), "gancho_glow": (196, 98, 16),
-        "cta_fill": (255, 206, 122),    "cta_glow": (150, 62, 12),
-        "tono": 32, "familias": "🍂🏷️🔖💰🤎",
-    },
-    {
-        "nombre": "teja",
-        "estacion": "otoño",
-        "gancho_fill": (255, 236, 200), "gancho_glow": (168, 52, 30),
-        "cta_fill": (255, 255, 255),    "cta_glow": (120, 78, 20),
-        "tono": 14, "familias": "🍁🎟️💸🧣☕",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (224, 108, 8),
+        "cta_fill": (255, 236, 190),    "cta_glow": (168, 70, 10),
+        "tono": 26, "familias": "🎃🍁💸🔥🏷️",
     },
     {
         "nombre": "mostaza",
@@ -812,25 +813,32 @@ _PALETAS = (
         "tono": 78, "familias": "🌰🍐🧺✅🔖",
     },
     {
+        "nombre": "bosque",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (16, 122, 78),
+        "cta_fill": (198, 255, 224),    "cta_glow": (10, 88, 60),
+        "tono": 158, "familias": "🌲🍀🌿♻️💚",
+    },
+    {
+        "nombre": "petroleo",
+        "estacion": "otoño",
+        "gancho_fill": (222, 246, 255), "gancho_glow": (12, 92, 124),
+        "cta_fill": (255, 255, 255),    "cta_glow": (8, 66, 96),
+        "tono": 198, "familias": "🌧️🧊💧👀🔎",
+    },
+    {
+        "nombre": "ciruela",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (104, 40, 124),
+        "cta_fill": (240, 210, 255),    "cta_glow": (74, 28, 96),
+        "tono": 288, "familias": "🍇🔮💜🎟️✨",
+    },
+    {
         "nombre": "vino",
         "estacion": "otoño",
         "gancho_fill": (255, 255, 255), "gancho_glow": (140, 24, 56),
         "cta_fill": (255, 198, 176),    "cta_glow": (112, 30, 40),
-        "tono": 348, "familias": "🍇🍷🎟️💜🫐",
-    },
-    {
-        "nombre": "cafe",
-        "estacion": "otoño",
-        "gancho_fill": (255, 244, 224), "gancho_glow": (104, 62, 28),
-        "cta_fill": (255, 214, 150),    "cta_glow": (78, 44, 18),
-        "tono": 26, "familias": "☕🍂🤎💰🧣",
-    },
-    {
-        "nombre": "calabaza",
-        "estacion": "otoño",
-        "gancho_fill": (255, 255, 255), "gancho_glow": (224, 108, 8),
-        "cta_fill": (255, 236, 190),    "cta_glow": (168, 70, 10),
-        "tono": 26, "familias": "🎃🍁💸🔥🏷️",
+        "tono": 348, "familias": "🍷🧣💰🥀❤️",
     },
 )
 
@@ -898,14 +906,21 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
         # distancia circular de matiz, normalizada a 0-1
         d = abs(pal["tono"] - tono_fondo) % 360
         d = min(d, 360 - d) / 180
-        p += 3.0 * d
-        # Peso de temporada: en su estación mandan ellas. Menos que el emoji
-        # (6.0), así que un gancho con 💰 puede seguir llevándose el oro, y más
-        # que el contraste (3.0 como mucho) para que no las tape una neón por
-        # un matiz. Sin esto salían la mitad de las veces y la gama otoñal no
-        # se notaba.
-        p += 4.0 if pal.get("estacion") else 0.0
-        p += ((desempate + i) % len(candidatas)) * 0.1
+        # El contraste PESA: el texto tiene que resaltar sobre el vídeo, que es
+        # para lo que está. Subido de 3 a 5 al meter la gama de temporada — con
+        # el peso de estación por encima salía la paleta de la época aunque se
+        # comiera con el fondo, que es justo lo contrario de lo que hace falta.
+        p += 5.0 * d
+        # La temporada EMPUJA, no manda: entre las que se leen igual de bien
+        # gana la que pega con la época. Con 2.5 no le gana al contraste (5) ni
+        # a un emoji acertado (6).
+        p += 2.5 if pal.get("estacion") else 0.0
+        # Variedad: a igualdad de contraste, rota por producto. Subido de 0.1
+        # a 0.5 con la gama de temporada — con siete paletas parecidas en
+        # puntos, la más lejana del fondo se llevaba cuatro de cada diez
+        # vídeos y volvía a parecer una sola paleta. Con 0.5 se pasaba al otro
+        # lado: le ganaba al peso de temporada y volvían las neón.
+        p += ((desempate + i) % len(candidatas)) * 0.3
         return p
 
     elegida = max(enumerate(candidatas), key=puntos)[1]
