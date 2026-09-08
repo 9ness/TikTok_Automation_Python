@@ -100,6 +100,17 @@ _FORMATO = (
     "c ante e o i suenan como la 'th' inglesa, nada de seseo, entonación y "
     "vocabulario de España. Va dentro de la identidad vocal, así que se copia "
     "igual en las {escenas} escenas.\n"
+    # Y lo que de verdad decide el acento no es la descripción de la voz sino
+    # las PALABRAS del guion: en la plancha, la única escena que salió en
+    # peninsular fue la que decía "y encima" y "es una pelea"; las otras tres
+    # eran neutras —una hablaba de "pulgadas"— y salieron en latino, que es lo
+    # que el modelo ha oído más.
+    "10. Escribe el guion hablado en español DE ESPAÑA, con vocabulario y giros "
+    "de aquí («vale», «un montón», «una pasada», «de verdad», «encima»), y "
+    "nunca en español neutro internacional. Las medidas, en centímetros y "
+    "escritas con letra, jamás en pulgadas. El acento con el que se locuta lo "
+    "decide lo que se DICE, no solo la identidad vocal: con un texto neutro "
+    "sale acento latino aunque le pidas peninsular.\n"
     "4. Describe el producto SOLO como se ve en su foto. No le añadas piezas, "
     "luces encendidas, pantallas ni accesorios que no aparezcan en ella, "
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
