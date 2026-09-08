@@ -776,6 +776,27 @@ _PALETAS = (
         "cta_fill": (255, 255, 255),    "cta_glow": (255, 120, 0),
         "tono": 20, "familias": "🔥🌞🧨🚀",
     },
+    # Las dos de OTOÑO. Las seis de arriba son neón —pensadas para contrastar
+    # con vídeo saturado— y con las fotos de esta época (luz cálida, madera,
+    # terracota) desentonan. Estas mantienen el relleno claro, que es lo que se
+    # lee, y bajan el halo a ámbar y teja.
+    #
+    # `estacion` las deja fuera del sorteo el resto del año: cuando toque
+    # invierno se añaden las suyas y estas se apagan solas.
+    {
+        "nombre": "ambar",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (196, 98, 16),
+        "cta_fill": (255, 206, 122),    "cta_glow": (150, 62, 12),
+        "tono": 32, "familias": "🍂🏷️🔖💰🤎",
+    },
+    {
+        "nombre": "teja",
+        "estacion": "otoño",
+        "gancho_fill": (255, 236, 200), "gancho_glow": (168, 52, 30),
+        "cta_fill": (255, 255, 255),    "cta_glow": (120, 78, 20),
+        "tono": 14, "familias": "🍁🎟️💸🧣☕",
+    },
 )
 
 
@@ -829,6 +850,11 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
     emojis = (textos.get("gancho") or "") + (textos.get("cta") or "")
     tono_fondo, _luz = _tono_dominante(video)
     desempate = sum(ord(c) for c in str(semilla))
+    # Las de temporada solo juegan en la suya; las demás, todo el año.
+    ahora = config.estacion_actual()
+    candidatas = [
+        p for p in _PALETAS if p.get("estacion") in (None, ahora)
+    ]
 
     def puntos(i_p):
         i, pal = i_p
@@ -838,10 +864,10 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
         d = abs(pal["tono"] - tono_fondo) % 360
         d = min(d, 360 - d) / 180
         p += 3.0 * d
-        p += ((desempate + i) % len(_PALETAS)) * 0.1
+        p += ((desempate + i) % len(candidatas)) * 0.1
         return p
 
-    elegida = max(enumerate(_PALETAS), key=puntos)[1]
+    elegida = max(enumerate(candidatas), key=puntos)[1]
     on_log(
         f"[3/5] paleta '{elegida['nombre']}' (fondo ~{tono_fondo:.0f}°, "
         f"emojis {emojis.strip() or '—'})"

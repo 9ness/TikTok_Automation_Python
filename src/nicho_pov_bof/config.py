@@ -735,6 +735,13 @@ _MESES = (
 )
 
 
+def estacion_actual() -> str:
+    """`"otoño"`. La estación a secas, para lo que dependa de ella."""
+    from datetime import datetime
+
+    return _ESTACIONES[datetime.now().month]
+
+
 def epoca_actual() -> str:
     """`"septiembre, o sea otoño en España"`. Se calcula al pedir el prompt."""
     from datetime import datetime
