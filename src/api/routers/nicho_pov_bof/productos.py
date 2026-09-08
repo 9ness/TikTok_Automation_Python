@@ -1463,6 +1463,18 @@ async def crear_mi_producto(
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 
+    # Que exista para las pantallas que NO listan el Drive (el UGC saca sus
+    # productos de los textos): sin esto, un producto recién subido no aparecía
+    # allí hasta extraerlos, y desde el alta no se veía que hubiera entrado.
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+
+        product_repo.anadir_id_vigente(
+            source, str(creado.get("carpeta") or ""), str(creado.get("producto") or ""),
+        )
+    except Exception:  # noqa: BLE001 — las fotos ya están; esto es un apunte
+        pass
+
     return {"source": source, **creado}
 
 

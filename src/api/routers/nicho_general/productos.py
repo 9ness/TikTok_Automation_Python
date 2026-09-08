@@ -132,7 +132,16 @@ def list_productos(
 
     gancho = config.gancho_valido(gancho)
     duracion = config.duracion_valida(duracion)
-    textos = (pov_repo.load_folder_para(source, folder, usuario).get("productos") or {})
+    doc = pov_repo.load_folder_para(source, folder, usuario)
+    textos = doc.get("productos") or {}
+    # Un producto recién subido todavía NO tiene textos, así que no estaría en
+    # ese diccionario y desde esta pantalla parecía que no se había subido. Se
+    # añaden los que la carpeta tiene HOY (`ids_vigentes`, que apunta el alta y
+    # reescribe el POV BOF al listar el Drive): salen con la ficha vacía y el
+    # paso 1 los rellena. Aquí NO se lista el Drive a propósito — es lo que
+    # hace que esta pantalla abra rápido.
+    for pid in (doc.get("ids_vigentes") or []):
+        textos.setdefault(str(pid), {})
     mios = (
         product_repo.load_folder(source, folder, usuario, gancho, duracion)
         .get("productos") or {}

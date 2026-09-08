@@ -828,6 +828,28 @@ def guardar_ids_vigentes(source: str, folder: str, ids: list[str]) -> None:
     r.set_json(clave, doc)
 
 
+def anadir_id_vigente(source: str, folder: str, producto: str) -> None:
+    """Mete un producto recién creado en la lista de lo que la carpeta tiene.
+
+    `guardar_ids_vigentes` se escribe al LISTAR la carpeta desde el Drive, y
+    hay pantallas que no listan el Drive: el UGC saca sus productos de los
+    textos, así que un producto recién subido no existía para él hasta que se
+    extraían. Esto lo apunta en el alta, que es donde ya se sabe, sin pagar un
+    listado de Drive.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available():
+        return
+    clave = _key(source, folder)
+    doc = r.get_json(clave) or {}
+    vigentes = [str(x) for x in (doc.get("ids_vigentes") or [])]
+    if str(producto) in vigentes:
+        return
+    vigentes.append(str(producto))
+    doc["ids_vigentes"] = sorted(vigentes, key=lambda x: (len(x), x))
+    r.set_json(clave, doc)
+
+
 def con_url_por_carpeta(source: str, folders: list[str]) -> dict[str, int]:
     """`{carpeta: cuántos de sus productos tienen ficha enlazada}`.
 
