@@ -71,6 +71,21 @@ _FORMATO = (
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
     "así que todo lo que no esté ahí se lo inventa el generador y sale "
     "distinto en cada escena. De esas características ya habla la voz.\n"
+    # Con guiones largos se le mandan también las capturas de características,
+    # y ahí vienen fotos de catálogo del producto en OTROS sitios (una barbacoa
+    # en el jardín, un fregadero, una mesa puesta). Sin esta regla las toma por
+    # ambientación y escribe un escenario distinto en cada escena — que es
+    # justo lo que rompe la ilusión de que el anuncio es un solo vídeo.
+    "6. Las fotos que te mando pueden incluir capturas de características "
+    "(medidas, materiales, qué trae) y fotos de catálogo del producto en sitios "
+    "distintos. Están SOLO para que leas lo que el producto ES y hace. NO son "
+    "la ambientación del anuncio: el escenario lo eliges tú, es UNO solo para "
+    "las {escenas} escenas, y lo describes con las mismas palabras en todas. "
+    "Descríbelo con detalles concretos y repetibles (los muebles, la encimera, "
+    "qué se ve al fondo), no como «una cocina moderna y luminosa»: cada escena "
+    "se genera por separado y con una frase vaga sale una casa distinta cada "
+    "vez. Tampoco describas el peinado ni la ropa — salen de la foto de la "
+    "persona.\n"
     "5. La longitud del guion es un TOPE, no una sugerencia: {tope} caracteres "
     "como máximo, contando espacios y signos. El clip dura {segundos} segundos "
     "exactos y lo que no dé tiempo a decir se pierde a media frase. CUENTA "
