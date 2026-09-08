@@ -90,6 +90,11 @@ class ProductoUGC(BaseModel):
     # curso). Es del PRODUCTO y no de este nicho —vive en los textos del POV
     # BOF—, así que ponerlo aquí lo pone también allí.
     segundos_guion: float = 0
+    # Hashtags y menciones que EXIGE la tienda de este producto (`#vevor
+    # #vevorttESshop @vevor_es`). Van aparte de los hashtags generales porque
+    # son de UN trato: pegarlos a la lista global los metería en el caption de
+    # los otros doscientos productos. Se pegan al final del caption al copiarlo.
+    hashtags_extra: str = ""
     # Las escenas que hacen falta para esos segundos con la duración de clip
     # elegida. Lo calcula el backend: la pantalla no sabe de techos ni topes.
     escenas_pedidas: int = 3
@@ -122,6 +127,7 @@ class EstadoUGCRequest(BaseModel):
     # Va a los textos COMPARTIDOS del POV BOF: lo pide la tienda, no quien
     # grabe (mismo criterio que allí).
     segundos_guion: float | None = None
+    hashtags_extra: str | None = None
 
 
 class EscenasLoteRequest(BaseModel):

@@ -103,6 +103,8 @@ export function useEstadoUGC() {
       /** Segundos que pide la tienda (0 = el anuncio del curso). Va a los
        *  textos compartidos del POV BOF, así que lo ve todo el catálogo. */
       segundos_guion?: number;
+      /** Los que exige la tienda de ese producto. También compartidos. */
+      hashtags_extra?: string;
     }
   >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),

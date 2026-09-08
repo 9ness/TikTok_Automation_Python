@@ -34,6 +34,7 @@ import {
   FUENTE_TOP_VENDIDOS,
   verTopVendidos,
 } from "@/lib/topVendidos";
+import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import {
   alProgresoDeFichero,
@@ -66,7 +67,6 @@ import {
   useBuscarProductoUrl,
   useHashtags,
   useBuscarUrlsCarpeta,
-  useCrearMiProducto,
   useEchoTikCuentas,
   useEchoTikEstado,
   useExtraerTextos,
@@ -1411,128 +1411,6 @@ export default function PovBofLargoPage() {
 /** Los dos catálogos del operador: muestras gratuitas y tareas pagadas. */
 const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
 
-function AltaMiProducto({
-  source = "mis_productos",
-  onCreado,
-}: {
-  source?: string;
-  onCreado: () => void;
-}) {
-  const crear = useCrearMiProducto();
-  const [limpia, setLimpia] = useState<File | null>(null);
-  const [ficha, setFicha] = useState<File | null>(null);
-  const refLimpia = useRef<HTMLInputElement>(null);
-  const refFicha = useRef<HTMLInputElement>(null);
-  // Capturas de MÁS (características, medidas, qué trae). Son las que dan de
-  // qué hablar cuando la tienda pide 30 segundos; con el título solo, Gemini
-  // estira lo mismo con más adjetivos. El catálogo es el mismo que el del POV
-  // BOF, así que subirlas aquí vale para las dos pantallas.
-  const refExtras = useRef<HTMLInputElement>(null);
-  const [extras, setExtras] = useState<File[]>([]);
-  const [abierto, setAbierto] = useState(false);
-
-  function enviar() {
-    if (!limpia) {
-      toast.error("Falta la foto del producto.");
-      return;
-    }
-    crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source },
-      {
-        onSuccess: (r) => {
-          toast.success(
-            `Producto ${r.producto} añadido a «${r.carpeta}»` +
-              (extras.length ? ` · ${extras.length} captura(s) más` : ""),
-          );
-          setLimpia(null);
-          setFicha(null);
-          setExtras([]);
-          if (refLimpia.current) refLimpia.current.value = "";
-          if (refFicha.current) refFicha.current.value = "";
-          if (refExtras.current) refExtras.current.value = "";
-          onCreado();
-        },
-        onError: (e) => toast.error(err(e)),
-      },
-    );
-  }
-
-  const campo = (
-    ref: React.RefObject<HTMLInputElement>,
-    titulo: string,
-    ayuda: string,
-    archivo: File | null,
-    set: (f: File | null) => void,
-  ) => (
-    <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-violet-500/60">
-      <span className="text-[11px] font-semibold">{titulo}</span>
-      <span className="text-[10px] text-muted-foreground">{ayuda}</span>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        onChange={(e) => set(e.target.files?.[0] ?? null)}
-        className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
-      />
-      {archivo && <span className="truncate text-[10px] text-emerald-500">✓ {archivo.name}</span>}
-    </label>
-  );
-
-  return (
-    <section className="space-y-2 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
-      {/* Plegado por defecto (ver POV BOF): dar de alta un producto es cosa de
-          una vez al día y desplegado empujaba la lista media pantalla abajo. */}
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <span className="text-xs font-semibold sm:text-sm">➕ Añadir un producto mío</span>
-        <span className="text-[11px] text-muted-foreground">{abierto ? "▾" : "▸"}</span>
-      </button>
-      {!abierto ? null : (
-      <>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {campo(refLimpia, "Foto limpia", "La del producto, sin texto encima", limpia, setLimpia)}
-        {campo(refFicha, "Foto descripción", "La captura de la ficha (opcional)", ficha, setFicha)}
-      </div>
-      <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5 transition hover:border-emerald-500/60">
-        <span className="text-[11px] font-semibold">Más capturas (opcional)</span>
-        <span className="text-[10px] text-muted-foreground">
-          Características, medidas, qué trae. Con ellas se puede pedir un guion
-          de 30 segundos o más; con el título solo, no.
-        </span>
-        <input
-          ref={refExtras}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={(e) => setExtras(Array.from(e.target.files ?? []))}
-          className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
-        />
-        {!!extras.length && (
-          <span className="truncate text-[10px] text-emerald-500">
-            ✓ {extras.length} captura(s)
-          </span>
-        )}
-      </label>
-      <button
-        type="button"
-        disabled={crear.isPending || !limpia}
-        onClick={enviar}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50"
-      >
-        {crear.isPending ? "Subiendo…" : "Añadir producto"}
-      </button>
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Las carpetas se llenan de 10 en 10. Es el mismo catálogo que el POV BOF:
-        el producto vale para los dos nichos.
-      </p>
-      </>
-      )}
-    </section>
-  );
-}
 
 
 

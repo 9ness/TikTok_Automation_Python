@@ -40,6 +40,7 @@ import type {
   ProductoUGC,
 } from "@/lib/types/nichoGeneral";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
+import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
@@ -224,6 +225,28 @@ export function PantallaUGC() {
           en 10, así que el guion se escribe entero para esa duración y el
           vídeo es otro. Cambiar aquí no pisa lo que ya tengas hecho.
         </p>
+
+        {/* El alta va aquí y no solo en el POV BOF: el producto es el mismo
+            —lo guarda el mismo endpoint, en el mismo catálogo— y quien lo da
+            de alta es quien lo tiene delante. Como los textos también se
+            sacan desde esta pantalla, un producto de "Tareas Productos" se
+            puede llevar de la foto al anuncio sin cambiar de menú.
+
+            Al crearlo se salta a la carpeta donde ha caído: se llenan de
+            diez en diez, así que el nuevo puede ir a la SIGUIENTE y quedarse
+            invisible mientras miras la anterior. */}
+        {CATALOGOS_PROPIOS.includes(source) && (
+          <AltaMiProducto
+            source={source}
+            onCreado={(carpeta) => {
+              if (carpeta) setFolder(carpeta);
+              void folders.refetch();
+              void qcPantalla.invalidateQueries({
+                queryKey: ["nicho-general", "productos"],
+              });
+            }}
+          />
+        )}
 
         <Sub>Carpetas</Sub>
         <div className="mt-1 flex flex-wrap gap-1">
@@ -456,9 +479,15 @@ function TarjetaUGC({
   const [pctsClip, setPctsClip] = useState<Record<number, number | null>>({
     1: null, 2: null, 3: null,
   });
+  // Los hashtags que exige la tienda por la muestra. Se editan aquí y se
+  // guardan al salir del campo, como el resto de lo compartido.
+  const [tagsTienda, setTagsTienda] = useState(producto.hashtags_extra ?? "");
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   const [subido, setSubido] = useState(producto.uploaded);
   const [vendio, setVendio] = useState(producto.sold);
+  useEffect(() => {
+    setTagsTienda(producto.hashtags_extra ?? "");
+  }, [producto.hashtags_extra]);
   useEffect(() => {
     setEnEscaparate(producto.en_escaparate);
     setSubido(producto.uploaded);
@@ -580,7 +609,15 @@ function TarjetaUGC({
           label="✍️ Caption"
           text={
             producto.caption
-              ? [producto.caption, producto.emojis, hashtags.join(" ")]
+              ? [
+                  producto.caption,
+                  producto.emojis,
+                  hashtags.join(" "),
+                  // Los de la tienda VAN LOS ÚLTIMOS y en el mismo copiado:
+                  // son obligatorios para cobrar la muestra, y lo que se pega
+                  // aparte se olvida justo el día que hay prisa.
+                  producto.hashtags_extra,
+                ]
                   .filter(Boolean)
                   .join(" ")
               : ""
@@ -850,6 +887,35 @@ function TarjetaUGC({
               : ""}
           </span>
         </div>
+      )}
+
+      {/* Lo que la tienda OBLIGA a poner en el caption a cambio de la muestra
+          (`#vevor #vevorttESshop @vevor_es`). No van a la lista general de
+          hashtags: esa se pega a los doscientos productos del catálogo y estos
+          son de UN trato. Se copian con el caption, al final. */}
+      {CATALOGOS_PROPIOS.includes(source) && (
+        <label className="block">
+          <span className="text-[10px] text-muted-foreground">
+            Hashtags y menciones que pide la tienda
+          </span>
+          <input
+            value={tagsTienda}
+            onChange={(e) => setTagsTienda(e.target.value)}
+            onBlur={() => {
+              if ((producto.hashtags_extra ?? "") === tagsTienda.trim()) return;
+              estado.mutate(
+                { ...clave, hashtags_extra: tagsTienda.trim() },
+                {
+                  onSuccess: () => toast.success("Guardado"),
+                  onError: (e) =>
+                    toast.error(e instanceof Error ? e.message : String(e)),
+                },
+              );
+            }}
+            placeholder="#vevor #vevorttESshop @vevor_es"
+            className="mt-0.5 w-full rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none transition focus:border-violet-500/60"
+          />
+        </label>
       )}
 
       {/* Un hueco por escena, como en el POV BOF Largo: mismo aspecto, mismo

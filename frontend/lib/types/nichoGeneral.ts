@@ -73,6 +73,10 @@ export interface ProductoUGC {
   /** Segundos que pide la tienda por este producto (0 = el del curso). Es del
    *  producto: se guarda en los textos compartidos del POV BOF. */
   segundos_guion: number;
+  /** Hashtags y menciones que exige la tienda de ESTE producto (`#vevor
+   *  @vevor_es`). Van aparte de los generales: son de un trato, no de la
+   *  cuenta. Se pegan al final del caption al copiarlo. */
+  hashtags_extra: string;
   /** Cuántas escenas hacen falta para esos segundos. Lo calcula el backend. */
   escenas_pedidas: number;
   clips: string[];

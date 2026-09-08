@@ -177,6 +177,7 @@ def list_productos(
             # Los segundos que pide la tienda salen de los textos compartidos:
             # son del trato con ella, no de este nicho.
             segundos_guion=float(t.get("segundos_guion") or 0),
+            hashtags_extra=str(t.get("hashtags_extra") or ""),
             escenas_pedidas=config.escenas_para(
                 float(t.get("segundos_guion") or 0), duracion,
             ),
@@ -369,6 +370,14 @@ def set_estado(
         pov_repo.save_extracted_texts(
             body.source, body.folder,
             {body.producto: {"segundos_guion": float(body.segundos_guion or 0)}},
+        )
+
+    # Los hashtags que exige la tienda, también compartidos: son del producto
+    # y hay que ponerlos se publique desde el nicho que se publique.
+    if body.hashtags_extra is not None:
+        pov_repo.save_extracted_texts(
+            body.source, body.folder,
+            {body.producto: {"hashtags_extra": body.hashtags_extra.strip()}},
         )
 
     if body.en_escaparate is not None:
