@@ -1,10 +1,11 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
+import { enLaApp } from "@/lib/entorno-app";
 import { useCrearMiProducto } from "@/lib/queries/nichoPovBof";
 
 /** Alta de un producto PROPIO subiendo sus fotos: la limpia, la captura de la
@@ -40,6 +41,13 @@ export function AltaMiProducto({
   const refExtras = useRef<HTMLInputElement>(null);
   const [extras, setExtras] = useState<File[]>([]);
   const [abierto, setAbierto] = useState(false);
+  // El WebView de la APK devuelve la selección VACÍA cuando el input lleva
+  // `multiple`: se eligen las cuatro capturas y no llega ninguna, sin error
+  // (ver learnings.md). Dentro de la app el mismo botón acumula de una en una.
+  // Se mira en un efecto y no en el render porque el User-Agent no existe en
+  // el servidor y la hidratación se quejaría.
+  const [enApp, setEnApp] = useState(false);
+  useEffect(() => setEnApp(enLaApp()), []);
   // La cola de la sesión: los productos preparados que aún no se han subido.
   // Lo que tarda una subida NO es el servidor (las dos fotos se escriben en
   // Drive en el mismo segundo, medido); son los megas saliendo del móvil. Con
@@ -173,19 +181,38 @@ export function AltaMiProducto({
         </span>
         <span className="text-[10px] text-muted-foreground">
           Características, medidas, qué trae. Con ellas se puede pedir un guion
-          de 30 o 40 segundos; con el título solo, no.
+          de 30 o 60 segundos; con el título solo, no.
+          {enApp ? " Aquí van de una en una: elige, y vuelve a darle." : ""}
         </span>
         <input
           ref={refExtras}
           type="file"
           accept="image/*"
-          multiple
-          onChange={(e) => setExtras(Array.from(e.target.files ?? []))}
+          multiple={!enApp}
+          onChange={(e) => {
+            const nuevas = Array.from(e.target.files ?? []);
+            if (!nuevas.length) return;
+            // En la app se ACUMULA (una por toque); fuera, la selección es la
+            // lista entera y sustituye.
+            setExtras((prev) => (enApp ? [...prev, ...nuevas] : nuevas));
+            if (enApp) e.target.value = "";
+          }}
           className="mt-1 block w-full text-[10px] text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-[10px]"
         />
         {!!extras.length && (
-          <span className="truncate text-[10px] text-emerald-500">
-            ✓ {extras.length} captura(s)
+          <span className="flex items-center gap-2 text-[10px] text-emerald-500">
+            <span className="truncate">✓ {extras.length} captura(s)</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setExtras([]);
+                if (refExtras.current) refExtras.current.value = "";
+              }}
+              className="ml-auto rounded px-1 text-muted-foreground transition hover:text-red-500"
+            >
+              ✕ quitar
+            </button>
           </span>
         )}
       </label>
