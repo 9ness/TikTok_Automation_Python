@@ -473,75 +473,80 @@ def _render_text_block_png(
 
 
 # ---------------------------------------------------------------------------
-# Estilo PÍLDORA — el texto sobre una caja de color, sin halo
+# Estilos PLANOS — sin halo y sin caja
 # ---------------------------------------------------------------------------
-# Todo lo de arriba es el mismo tratamiento —relleno + halo + borde negro— y
-# lo único que cambia entre vídeos es el color y la letra. Esto es OTRA cosa:
-# el texto sobre una caja sólida con las esquinas redondeadas, que es como
-# rotula el propio TikTok. Se lee sobre cualquier fondo (la caja tapa lo que
-# haya debajo) y no se parece en nada al halo, que es de lo que se trata.
+# Todo lo de arriba es el mismo tratamiento (relleno + halo + borde negro) y
+# entre vídeos solo cambian el color y la letra. La píldora —el texto sobre una
+# caja sólida— se probó y se descartó: ocupa demasiado.
 #
-# Todavía NO entra en la rotación: vive en `_ROTULOS_PILDORA` hasta que el
+# Estos dos ocupan lo mismo que el de siempre:
+#   contorno  letra blanca con un borde grueso del color de la paleta.
+#   sombra    letra blanca con su silueta DETRÁS, sólida y desplazada abajo a
+#             la derecha. Sin desenfoque: eso es lo que la separa del halo.
+#
+# Todavía NO entran en la rotación: viven en `_ROTULOS_PLANOS` hasta que el
 # operador vea la muestra.
-_PILDORA_PAD = (26, 12)     # margen dentro de la caja: horizontal, vertical
-_PILDORA_RADIO = 20
-_PILDORA_GAP = 10           # entre líneas; más que con halo, que se pegaban
+_SOMBRA_OFFSET = 7          # píxeles abajo y a la derecha
+_PLANO_GAP = 6
 
 
-def _texto_sobre(caja: tuple[int, int, int]) -> tuple[int, int, int]:
-    """Blanco o negro según lo clara que sea la caja, para que se lea."""
-    luz = 0.299 * caja[0] + 0.587 * caja[1] + 0.114 * caja[2]
-    return (20, 20, 20) if luz > 150 else (255, 255, 255)
-
-
-def _pildora(texto: str, tamano: int, max_w: int, caja: tuple[int, int, int],
-             fuente: str, max_lines: int = 1) -> "Image.Image | None":
-    """Una línea metida en su caja redondeada."""
-    tinta = _texto_sobre(caja)
-    im = _render_text_line(
-        texto, font_size=tamano, max_w=max_w - _PILDORA_PAD[0] * 2,
-        # Sin borde negro: dentro de la caja no hace falta y ensucia.
-        fill=tinta, stroke=caja, max_lines=max_lines, fuente=fuente,
-    )
-    if im is None:
+def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int],
+                 fuente: str, estilo: str, max_lines: int = 1) -> "Image.Image | None":
+    """Una línea en contorno o con sombra sólida."""
+    if not texto:
         return None
-    im = _crop_visible(im)
-    w = im.width + _PILDORA_PAD[0] * 2
-    h = im.height + _PILDORA_PAD[1] * 2
-    fondo = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(fondo).rounded_rectangle(
-        (0, 0, w - 1, h - 1), radius=_PILDORA_RADIO, fill=(*caja, 255),
+    if estilo == "contorno":
+        im = _render_text_line(
+            texto, font_size=tamano, max_w=max_w, fill=(255, 255, 255),
+            stroke=color, max_lines=max_lines, fuente=fuente,
+        )
+        return _crop_visible(im) if im is not None else None
+
+    # Sombra: la MISMA línea dos veces, la de atrás en color y desplazada.
+    detras = _render_text_line(
+        texto, font_size=tamano, max_w=max_w, fill=color, stroke=color,
+        max_lines=max_lines, fuente=fuente,
     )
-    fondo.paste(im, (_PILDORA_PAD[0], _PILDORA_PAD[1]), im)
-    return fondo
+    delante = _render_text_line(
+        texto, font_size=tamano, max_w=max_w, fill=(255, 255, 255),
+        stroke=(20, 20, 20), max_lines=max_lines, fuente=fuente,
+    )
+    if detras is None or delante is None:
+        return None
+    d = _SOMBRA_OFFSET
+    lienzo = Image.new("RGBA", (delante.width + d, delante.height + d), (0, 0, 0, 0))
+    lienzo.paste(detras, (d, d), detras)
+    lienzo.paste(delante, (0, 0), delante)
+    return _crop_visible(lienzo)
 
 
-def _render_pildoras_png(
+def _render_plano_png(
     textos: dict, layout: str, piezas: "set[str] | None", paleta: dict,
     rotulo: dict, on_log: OnLog = _noop,
 ) -> "Image.Image | None":
-    """El bloque entero en píldoras. Mismo contrato que `_render_text_block_png`."""
+    """El bloque en estilo plano. Mismo contrato que `_render_text_block_png`."""
     quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
+    estilo = rotulo.get("estilo", "sombra")
     max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
-    fuente_titular = rotulo.get("titular", _FUENTE_RECTA)
+    titular = rotulo.get("titular", _FUENTE_RECTA)
     fuente_titulo = rotulo.get("titulo", _FUENTE_RECTA)
 
     def gancho():
         t = (textos.get("gancho") or "").strip()
-        return _pildora(t.upper(), config.HOOK_FONT_SIZE, max_w,
-                        paleta["gancho_glow"], fuente_titular) if t and "gancho" in quiere else None
+        return _linea_plana(t.upper(), config.HOOK_FONT_SIZE, max_w,
+                            paleta["gancho_glow"], titular, estilo) if t and "gancho" in quiere else None
 
     def titulo():
         t = _titulo_para_video(textos) if "titulo" in quiere else ""
-        # El nombre del producto en caja BLANCA con tinta negra: es lo
-        # informativo y así se separa de las dos de color.
-        return _pildora(t, config.TITLE_FONT_SIZE, max_w, (255, 255, 255),
-                        fuente_titulo, max_lines=_TITULO_MAX_LINEAS) if t else None
+        # El nombre del producto, en gris oscuro: es lo informativo y no tiene
+        # que competir con las dos líneas de color.
+        return _linea_plana(t, config.TITLE_FONT_SIZE, max_w, (32, 32, 32),
+                            fuente_titulo, estilo, max_lines=_TITULO_MAX_LINEAS) if t else None
 
     def cta():
         t = (textos.get("cta") or "").strip()
-        return _pildora(t.upper(), config.CTA_FONT_SIZE, max_w,
-                        paleta["cta_glow"], fuente_titular) if t and "cta" in quiere else None
+        return _linea_plana(t.upper(), config.CTA_FONT_SIZE, max_w,
+                            paleta["cta_glow"], titular, estilo) if t and "cta" in quiere else None
 
     orden = (
         (gancho, titulo, cta) if layout == "gancho_titulo_cta"
@@ -552,21 +557,24 @@ def _render_pildoras_png(
         return None
 
     ancho = max(p.width for p in partes)
-    alto = sum(p.height for p in partes) + _PILDORA_GAP * (len(partes) - 1)
+    alto = sum(p.height for p in partes) + _PLANO_GAP * (len(partes) - 1)
     bloque = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
     y = 0
     for p in partes:
         bloque.paste(p, (int((ancho - p.width) / 2), y), p)
-        y += p.height + _PILDORA_GAP
-    on_log(f"[3/5] estilo píldora ({ancho}x{alto}px)")
+        y += p.height + _PLANO_GAP
+    on_log(f"[3/5] estilo {estilo} ({ancho}x{alto}px)")
     return bloque
 
 
-# Los rótulos de píldora, a la espera de entrar en la rotación.
-_ROTULOS_PILDORA = (
-    {"nombre": "pildora-montserrat", "estilo": "pildora",
+_ROTULOS_PLANOS = (
+    {"nombre": "sombra-montserrat", "estilo": "sombra",
      "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
-    {"nombre": "pildora-anton", "estilo": "pildora",
+    {"nombre": "sombra-anton", "estilo": "sombra",
+     "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "contorno-montserrat", "estilo": "contorno",
+     "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "contorno-anton", "estilo": "contorno",
      "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
 )
 
