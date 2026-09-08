@@ -33,8 +33,11 @@ _FORMATO = (
     '   {{"n": 1, "titulo": "...", "resumen": "...", "prompt_imagen": "...",\n'
     '    "prompt_video": "...",\n'
     '    "guion": "solo lo que se dice en voz alta", "caracteres": 0}},\n'
-    "   {{\"n\": 2, ...}}, {{\"n\": 3, ...}}\n"
+    "   {{\"n\": 2, ...}}, …\n"
     " ]}}\n"
+    "La lista tiene EXACTAMENTE {escenas} escenas, con `n` de 1 a {escenas} y "
+    "en orden. Ni una más ni una menos: cada escena es un clip que hay que "
+    "generar aparte.\n"
     # Sirve para UNA cosa: al volver con las tres imágenes generadas, saber
     # cuál es cuál. Con el escenario y la luz no se distingue nada —son iguales
     # en las tres a propósito—; lo que las separa es qué hace la persona.
@@ -43,7 +46,8 @@ _FORMATO = (
     "pensativa», «lo sujeta y sonríe a cámara», «señala el carrito». Sin "
     "escenario, sin luz, sin ropa y sin adjetivos de más.\n"
     "El campo `prompt_video` debe llevar dentro el guion hablado y la identidad "
-    "vocal completa, palabra por palabra igual en las tres escenas, tal y como "
+    "vocal completa, palabra por palabra igual en las {escenas} escenas, tal y "
+    "como "
     "exige el documento. `guion` es ese mismo texto hablado repetido aparte "
     "para poder contarlo, y `caracteres` su longitud.\n"
     # Dos cosas que el documento pide pero que se le olvidan en cuanto se
@@ -54,8 +58,8 @@ _FORMATO = (
     "ya existe y va adjunta como imagen. Refiérete a ella SIEMPRE y solo como "
     "«la persona de la imagen de referencia». Cualquier descripción que añadas "
     "pelea con la foto real y sale otra persona.\n"
-    "2. EL MISMO ESCENARIO en las tres escenas, descrito con las mismas "
-    "palabras: si la primera pasa en el salón, las tres pasan en ese salón. "
+    "2. EL MISMO ESCENARIO en las {escenas} escenas, descrito con las mismas "
+    "palabras: si la primera pasa en el salón, todas pasan en ese salón. "
     "Cambiar de habitación entre clips convierte el anuncio en tres vídeos "
     "sueltos.\n"
     "3. En los prompts de IMAGEN, la persona NO sostiene móviles, tablets ni "
@@ -85,9 +89,13 @@ def escribir(
     duracion: str = config.DURACION_DEFECTO,
     plazos: bool = False,
     sexo_personaje: str = "",
+    escenas_pedidas: int = 0,
     on_log: OnLog = _noop,
 ) -> dict:
-    """`{voz, escenas: [...3]}` para un producto.
+    """`{voz, escenas: [...N]}` para un producto.
+
+    `escenas_pedidas` son las que hacen falta para la duración que pide la
+    tienda (`config.escenas_para`). Sin ella, las tres del curso.
 
     No hay reintento por longitud: el documento pide ~170 caracteres (136 en la
     versión de 8 s) y sus propios ejemplos se quedan en 162. Si un guion se
@@ -103,9 +111,16 @@ def escribir(
         descripcion += f" Descripción: {caption.strip()}"
 
     meta = config.DURACIONES[config.duracion_valida(duracion)]
+    cuantas = max(
+        config.ESCENAS,
+        min(int(escenas_pedidas or config.ESCENAS), config.ESCENAS_MAX),
+    )
     prompt = config.prompt_guion(
         gancho, duracion, plazos=plazos, sexo_personaje=sexo_personaje,
-    ) + _FORMATO.format(tope=meta["caracteres"], segundos=meta["segundos"])
+        escenas=cuantas,
+    ) + _FORMATO.format(
+        tope=meta["caracteres"], segundos=meta["segundos"], escenas=cuantas,
+    )
     datos = generate_json(
         prompt, descripcion, images=[str(f) for f in (fotos or [])] or None,
     )
@@ -120,7 +135,7 @@ def escribir(
         raise ValueError("Gemini no devolvió la lista de escenas")
 
     escenas = []
-    for i, e in enumerate(crudas[: config.ESCENAS], start=1):
+    for i, e in enumerate(crudas[:cuantas], start=1):
         if not isinstance(e, dict):
             continue
         guion = " ".join(str(e.get("guion") or "").split())
@@ -134,9 +149,9 @@ def escribir(
             "caracteres": len(guion),
         })
 
-    if len(escenas) != config.ESCENAS:
+    if len(escenas) != cuantas:
         raise ValueError(
-            f"Se esperaban {config.ESCENAS} escenas y llegaron {len(escenas)}."
+            f"Se esperaban {cuantas} escenas y llegaron {len(escenas)}."
         )
     vacias = [e["n"] for e in escenas if not e["prompt_imagen"] or not e["prompt_video"]]
     if vacias:
@@ -173,7 +188,7 @@ def escribir(
     if voz and any(voz[:40] not in e["prompt_video"] for e in escenas):
         on_log(
             "[nicho_general] ojo: la identidad vocal no aparece igual en las "
-            "tres escenas. Revísalo antes de generar los clips."
+            f"{cuantas} escenas. Revísalo antes de generar los clips."
         )
     for aviso in _revisar(escenas):
         on_log(f"[nicho_general] {aviso}")

@@ -16,6 +16,11 @@ arrancar con medio segundo mudo antes de que la persona hable, y tres medios
 segundos son un anuncio que empieza tres veces. En medio no se toca nada: ahí
 el silencio es de la propia interpretación.
 
+Y **no se recorta nada cuando la tienda pide un mínimo de segundos**: ahí los
+clips se cuentan para llegar justo a esa duración (`config.escenas_para`), así
+que quitar medio segundo por clip es lo que dejaba el vídeo por debajo del
+mínimo — que es el único motivo por el que se está grabando ese producto.
+
 No hay voz nuestra ni texto quemado: el clip ya viene hablado desde Omni.
 """
 
@@ -81,6 +86,11 @@ def ordenar_clips(
     Si no se puede transcribir (Whisper caído, clip mudo) se respeta el orden
     en que se subieron y se avisa: es mejor un anuncio con las escenas
     cambiadas —que se ve al reproducirlo— que ninguno.
+
+    Se prueban TODOS los órdenes posibles porque casar uno a uno se equivoca
+    cuando dos escenas empiezan parecido. Con el tope de ocho escenas
+    (`config.ESCENAS_MAX`) son 40.320 combinaciones de sumar tres números, que
+    es trabajo de milisegundos.
     """
     if len(clips) < 2:
         return list(clips)
@@ -94,16 +104,20 @@ def ordenar_clips(
         )
         return list(clips)
 
-    def parecido(a: str, b: str) -> float:
-        return SequenceMatcher(None, a, b).ratio()
+    # El parecido de CADA clip con CADA guion, calculado una sola vez. Antes se
+    # comparaba dentro del bucle de permutaciones y daba igual con tres clips
+    # (seis órdenes), pero un anuncio de ocho son 40.320 órdenes y comparar
+    # cadenas ahí dentro es lo que lo volvía lento: con la tabla, el bucle solo
+    # suma números.
+    tabla = [
+        [SequenceMatcher(None, d, g).ratio() for g in guiones] for d in dichos
+    ]
 
-    # Los seis emparejamientos posibles; gana el que más suma en total.
+    # Todos los emparejamientos posibles; gana el que más suma en total.
     mejor, mejor_suma = None, -1.0
     for orden in itertools.permutations(range(len(clips))):
         suma = sum(
-            parecido(dichos[c], guiones[i])
-            for i, c in enumerate(orden)
-            if i < len(guiones)
+            tabla[c][i] for i, c in enumerate(orden) if i < len(guiones)
         )
         if suma > mejor_suma:
             mejor, mejor_suma = orden, suma
@@ -159,19 +173,29 @@ def montar(
     salida: Path,
     *,
     work_dir: Path | None = None,
+    recortar_silencios: bool = True,
     on_log: OnLog = _noop,
 ) -> Path:
-    """Los clips ordenados, sin el silencio de entrada y pegados en un 9:16."""
+    """Los clips ordenados, sin el silencio de entrada y pegados en un 9:16.
+
+    Con `recortar_silencios=False` se pegan enteros: es lo que toca cuando la
+    tienda pide una duración mínima (ver la cabecera del módulo).
+    """
     if not clips:
         raise ValueError("No hay clips que montar.")
     work = work_dir or salida.parent / "_ugc_tmp"
     work.mkdir(parents=True, exist_ok=True)
 
     ordenados = ordenar_clips(clips, escenas, work, on_log)
+    if not recortar_silencios:
+        on_log(
+            "[nicho_general] duración pedida: los clips se pegan enteros, sin "
+            "quitarles el silencio de entrada."
+        )
 
     recortados = []
     for i, clip in enumerate(ordenados, start=1):
-        quitar = _silencio_inicial(clip)
+        quitar = _silencio_inicial(clip) if recortar_silencios else 0.0
         destino = work / f"clip{i}.mp4"
         cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
         if quitar > 0.05:

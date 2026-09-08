@@ -100,6 +100,9 @@ export function useEstadoUGC() {
       /** En qué nicho cae: lo pone la IA y se corrige a mano. */
       nicho?: string;
       personaje?: string; personaje_sexo?: string;
+      /** Segundos que pide la tienda (0 = el anuncio del curso). Va a los
+       *  textos compartidos del POV BOF, así que lo ve todo el catálogo. */
+      segundos_guion?: number;
     }
   >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),

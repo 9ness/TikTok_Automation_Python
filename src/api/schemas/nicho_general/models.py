@@ -31,6 +31,10 @@ class ConfigUGCResponse(BaseModel):
     # Los personajes que existen de verdad, ya con su nicho y su número.
     personajes: list[OpcionUGC] = Field(default_factory=list)
     escenas: int = 3
+    # El tope y las duraciones que se pueden pedir a mano. Las manda el backend
+    # por lo mismo que los ganchos: la pantalla no se sabe el formato.
+    escenas_max: int = 8
+    segundos_opciones: list[int] = Field(default_factory=list)
     # El de crear el personaje. Va aquí y no por producto porque es el mismo
     # siempre: se usa una vez por persona, con una foto de Pinterest.
     prompt_personaje: str = ""
@@ -82,6 +86,13 @@ class ProductoUGC(BaseModel):
     # adjuntar en Flow. Lo calcula el backend para que la pantalla no tenga que
     # saberse qué sexo le toca a cada nicho.
     personaje_clave: str = ""
+    # Cuántos segundos pide la tienda por este producto (0 = el anuncio del
+    # curso). Es del PRODUCTO y no de este nicho —vive en los textos del POV
+    # BOF—, así que ponerlo aquí lo pone también allí.
+    segundos_guion: float = 0
+    # Las escenas que hacen falta para esos segundos con la duración de clip
+    # elegida. Lo calcula el backend: la pantalla no sabe de techos ni topes.
+    escenas_pedidas: int = 3
     clips: list[str] = Field(default_factory=list)
     video_path: str | None = None
     video_listo_at: int = 0
@@ -108,6 +119,9 @@ class EstadoUGCRequest(BaseModel):
     nicho: str | None = None
     personaje: str | None = None
     personaje_sexo: str | None = None
+    # Va a los textos COMPARTIDOS del POV BOF: lo pide la tienda, no quien
+    # grabe (mismo criterio que allí).
+    segundos_guion: float | None = None
 
 
 class EscenasLoteRequest(BaseModel):

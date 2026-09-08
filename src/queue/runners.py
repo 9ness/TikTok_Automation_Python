@@ -3235,12 +3235,20 @@ def _foto_limpia(source: str, folder: str, producto: str):
 
 
 
-def _foto_ficha(source: str, folder: str, producto: str):
-    """La captura de la FICHA (la que lleva precio y características).
+def _fotos_ugc(source: str, folder: str, producto: str, con_extras: bool = False):
+    """Las fotos que se le mandan a Gemini para escribir las escenas.
 
-    El UGC la necesita y no le vale la limpia: su escena 2 habla de
-    características y el prompt del curso prohíbe inventárselas, así que hay
-    que enseñarle dónde están escritas.
+    Siempre la captura de la FICHA (la que lleva precio y características): no
+    vale la limpia, porque la escena del producto habla de características y el
+    prompt del curso prohíbe inventárselas, así que hay que enseñarle dónde
+    están escritas.
+
+    Con `con_extras` van TAMBIÉN las capturas de más que subió el operador
+    (medidas, materiales, qué trae). Es lo mismo que hace el POV BOF Largo con
+    sus guiones largos y por el mismo motivo: un anuncio de seis escenas
+    necesita seis cosas DISTINTAS que contar, y con una sola foto Gemini o
+    repite lo mismo con otras palabras o se salta la regla de no inventar. En
+    el anuncio normal no se mandan — cuestan tokens y con la ficha sobra.
     """
     try:
         from src.nicho_pov_bof.services import drive_client, photo_pairing
@@ -3252,13 +3260,23 @@ def _foto_ficha(source: str, folder: str, producto: str):
         par = next(
             (x for x in photo_pairing.pair_folder(fotos)
              if str(x.get("producto")) == str(producto)), None,
-        )
-        ficha = (par or {}).get("titled") or {}
-        if ficha.get("id"):
-            return drive_client.fetch_photo(ficha["id"], suffix=".jpg")
+        ) or {}
     except Exception:  # noqa: BLE001
-        return None
-    return None
+        return []
+
+    salida = []
+    candidatas = [par.get("titled")]
+    if con_extras:
+        candidatas += list(par.get("extras") or [])
+    for foto in candidatas:
+        fid = (foto or {}).get("id")
+        if not fid:
+            continue
+        try:
+            salida.append(drive_client.fetch_photo(fid, suffix=".jpg"))
+        except Exception:  # noqa: BLE001 — una foto ilegible no para el guion
+            continue
+    return salida
 
 
 def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -3339,7 +3357,13 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 continue
             guardado = mios.get(pid) or {}
             campo = "escenas_alt" if sexo_pedido else "escenas"
-            ya = len(guardado.get(campo) or []) == ugc_config.ESCENAS
+            # Las que pide ESTE producto: si la tienda exige un mínimo de
+            # segundos, son más de tres. Cambiar ese mínimo deja las escenas
+            # guardadas cortas, y entonces hay que reescribirlas — por eso se
+            # compara contra las que tocan y no contra tres.
+            ya = len(guardado.get(campo) or []) == ugc_config.escenas_para(
+                float((utiles[pid] or {}).get("segundos_guion") or 0), duracion,
+            )
             if rehacer or (folder and pid in forzados) or not ya:
                 pendientes.append((carpeta, pid, utiles[pid]))
 
@@ -3417,6 +3441,16 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
         # identidad vocal salía al azar y podía contradecir a la persona que
         # se ve en el vídeo.
         mio = product_repo.get_product(source, carpeta, pid, usuario, gancho, duracion)
+        # La duración la pide la TIENDA y vive en los textos compartidos del
+        # POV BOF (`segundos_guion`), no aquí: el mismo trato obliga a lo mismo
+        # se grabe con el nicho que se grabe.
+        pedidos = float((t or {}).get("segundos_guion") or 0)
+        cuantas = ugc_config.escenas_para(pedidos, duracion)
+        if cuantas != ugc_config.ESCENAS:
+            on_log(
+                f"[ugc] producto {pid}: {pedidos:.0f}s pedidos → {cuantas} "
+                f"escenas de {ugc_config.DURACIONES[duracion]['segundos']}s"
+            )
         try:
             escrito = escenas_svc.escribir(
                 titulo=t.get("titulo", ""),
@@ -3428,9 +3462,15 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 # que la ficha no enseña (la luz del soporte de plantas), pero
                 # eso ya es cambiarle el método: cuando pase, se corrige esa
                 # escena a mano al pegarla en Flow.
-                fotos=[f for f in (_foto_ficha(source, carpeta, pid),) if f],
+                #
+                # Con más de tres escenas van también las capturas extra: ahí
+                # el problema es el contrario, que no hay de qué hablar.
+                fotos=_fotos_ugc(
+                    source, carpeta, pid, con_extras=cuantas > ugc_config.ESCENAS,
+                ),
                 gancho=gancho,
                 duracion=duracion,
+                escenas_pedidas=cuantas,
                 plazos=pov_config.hay_plazos(t),
                 sexo_personaje=(
                     ugc_config.sexo_valido(sexo_pedido)
@@ -3511,15 +3551,34 @@ def run_nicho_general_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             "No hay clips subidos para este producto (o ya no están en el disco)."
         )
     escenas = mio.get("escenas") or []
-    if len(clips) != ugc_config.ESCENAS:
+    # Cuántos segundos pide la tienda por este producto. Vive en los textos
+    # compartidos del POV BOF, como al escribir las escenas.
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    try:
+        pedidos = float(
+            (pov_repo.get_product(source, folder, producto, usuario) or {})
+            .get("segundos_guion") or 0
+        )
+    except Exception:  # noqa: BLE001 — sin el dato se monta como siempre
+        pedidos = 0.0
+    esperados = len(escenas) or ugc_config.escenas_para(pedidos, duracion)
+    if len(clips) != esperados:
         on_log(
             f"[ugc] hay {len(clips)} clip(s) y el anuncio son "
-            f"{ugc_config.ESCENAS}: se monta con lo que hay."
+            f"{esperados}: se monta con lo que hay."
         )
 
     on_progress(0.15, "🎬 Ordenando los clips por lo que dicen…")
     salida = _salida_ugc(source, folder, producto, usuario, gancho, duracion)
-    video_editor.montar(clips, escenas, salida, on_log=on_log)
+    video_editor.montar(
+        clips, escenas, salida,
+        # Con duración pedida los clips se cuentan para llegar JUSTO a ella, así
+        # que quitarle medio segundo a cada uno deja el vídeo por debajo del
+        # mínimo — y el mínimo es el trato con la tienda.
+        recortar_silencios=pedidos <= 0,
+        on_log=on_log,
+    )
 
     on_progress(0.95, "🎬 Guardando…")
     product_repo.update_product(

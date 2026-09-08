@@ -180,9 +180,38 @@ def reparte_persona(nicho: str, folder: str, producto: str) -> int:
     return (n + sum(ord(c) for c in str(folder))) % cuantas + 1
 
 
-# Tres escenas SIEMPRE: es la estructura del anuncio (dolor/gancho → producto →
-# urgencia y CTA), no un parámetro.
+# Tres escenas es la estructura del anuncio (dolor/gancho → producto → urgencia
+# y CTA) y lo normal. Pero hay tiendas que piden un MÍNIMO de segundos a cambio
+# de la muestra ("dos vídeos de 30 segundos") y un clip dura lo que dura: la
+# única forma de llegar es generar más clips, porque alargar el guion de una
+# escena solo consigue que la frase se corte cuando el clip se acaba.
 ESCENAS = 3
+# Tope. Ocho son 64s con clips de 8s y 80s con los de 10: por encima de eso ni
+# la cara ni el escenario aguantan tantas generaciones sueltas.
+ESCENAS_MAX = 8
+# Duraciones que se pueden pedir a mano, las mismas del POV BOF Largo. `0` = el
+# anuncio del curso (tres escenas). El dato NO es de este nicho: vive en los
+# textos compartidos del POV BOF (`segundos_guion`), porque lo pide la TIENDA y
+# no depende de con qué nicho se grabe.
+SEGUNDOS_PEDIDOS_OPCIONES = (0, 30, 40, 60)
+
+
+def escenas_para(segundos_pedidos: float = 0, duracion: str = DURACION_DEFECTO) -> int:
+    """Cuántas escenas hacen falta para llegar a esos segundos.
+
+    Techo, no redondeo: con clips de 8s, 60 segundos son OCHO escenas (64s) y
+    no siete (56s), que se quedarían por debajo del mínimo que pide la tienda.
+
+    El resultado puede ser EXACTO —seis clips de 10s son 60,0s— y no pasa nada
+    porque cuando hay duración pedida el montaje no recorta el silencio de
+    entrada de cada clip (ver `pipeline/video_editor.py`): ese recorte es justo
+    lo que dejaba el vídeo por debajo del mínimo.
+    """
+    if not segundos_pedidos or segundos_pedidos <= 0:
+        return ESCENAS
+    seg = int(DURACIONES[duracion_valida(duracion)]["segundos"])
+    hacen_falta = -(-int(round(float(segundos_pedidos))) // seg)  # techo
+    return max(ESCENAS, min(ESCENAS_MAX, hacen_falta))
 
 
 def prompts_dir() -> Path:
@@ -219,6 +248,7 @@ def prompt_guion(
     *,
     plazos: bool = False,
     sexo_personaje: str = "",
+    escenas: int = ESCENAS,
 ) -> str:
     """El documento del curso listo para pegar en DeepSeek/ChatGPT.
 
@@ -229,6 +259,7 @@ def prompt_guion(
     identidad vocal no salga al azar y contradiga al personaje.
     """
     meta = DURACIONES[duracion_valida(duracion)]
+    escenas = max(ESCENAS, min(int(escenas or ESCENAS), ESCENAS_MAX))
     texto = _limpio(GANCHOS[gancho_valido(gancho)]["fichero"])
 
     extras = []
@@ -246,11 +277,53 @@ def prompt_guion(
         )
     bloque = ("\n".join(extras) + "\n") if extras else ""
 
-    return (
+    texto = (
         texto.replace("{{SEGUNDOS}}", str(meta["segundos"]))
-        .replace("{{TOTAL}}", str(meta["segundos"] * ESCENAS))
+        .replace("{{TOTAL}}", str(meta["segundos"] * escenas))
         .replace("{{CARACTERES}}", str(meta["caracteres"]))
         .replace("{{EXTRAS}}", bloque)
+    )
+    return _mas_escenas(texto, escenas, int(meta["segundos"]), int(meta["caracteres"]))
+
+
+def _mas_escenas(prompt: str, escenas: int, segundos: int, caracteres: int) -> str:
+    """El documento del curso, reescrito para un anuncio de más de tres clips.
+
+    El curso escribe SIEMPRE tres escenas, así que la palabra "tres" está
+    metida en su prosa media docena de veces y pegarle una línea al final no
+    valdría: se contradiría con lo que ya pone (es lo mismo que le pasa al POV
+    BOF Largo con su tope de caracteres, ver su `_alargar`). Así que primero se
+    sustituyen esas menciones y luego se dice lo único que de verdad cambia,
+    que no es el largo de cada escena sino CUÁNTAS hay y qué cuenta cada una.
+
+    Lo que NO se toca es el tope de caracteres por escena: cada clip sigue
+    durando lo que dura y la frase que no quepa se corta a media palabra. Lo
+    que crece es el número de clips.
+    """
+    if escenas == ESCENAS:
+        return prompt
+
+    import re
+
+    prompt = re.sub(r"\btres (clips|escenas)\b", rf"{escenas} \1", prompt)
+    contenido = escenas - 2  # todas menos el gancho y la CTA
+    return prompt + (
+        f"\n\nESTE ANUNCIO TIENE {escenas} ESCENAS, NO TRES. La estructura de "
+        "arriba describe los tres PAPELES del anuncio; repártelos así:\n"
+        "- ESCENA 1: la primera de arriba, tal cual.\n"
+        f"- ESCENAS 2 a {escenas - 1} ({contenido} escenas): producto, "
+        "características y beneficios. Cada una habla de cosas DISTINTAS "
+        "—material, medidas, qué trae, cómo se usa, para quién es, en qué "
+        "momento— y ninguna repite lo que ya dijo otra. Sácalas de las fotos "
+        "que te mando; si no dan para tantas, profundiza con ejemplos de uso "
+        "concretos en vez de inventarte características que no se vean.\n"
+        f"- ESCENA {escenas}: urgencia y CTA, la última de arriba. Va al final "
+        "y solo hay una.\n"
+        f"Cada escena sigue durando {segundos} segundos y su guion sigue "
+        f"teniendo un tope de {caracteres} caracteres: lo que crece es el "
+        "número de clips, no el largo de cada uno. La persona, la ropa, el "
+        f"escenario y la identidad vocal son los mismos en las {escenas}, "
+        "descritos con las mismas palabras."
     )
 
 

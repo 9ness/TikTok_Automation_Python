@@ -20,6 +20,9 @@ export interface ConfigUGCResponse {
   /** Los personajes que existen de verdad (`belleza_mujer_2`…). */
   personajes: OpcionUGC[];
   escenas: number;
+  /** Tope de escenas de un anuncio y duraciones que se pueden pedir a mano. */
+  escenas_max: number;
+  segundos_opciones: number[];
   /** El de crear el personaje: se usa una vez por persona, con una foto de
    *  Pinterest, y su resultado va a Flow. */
   prompt_personaje: string;
@@ -67,6 +70,11 @@ export interface ProductoUGC {
   personaje_sexo: string;
   /** `belleza_mujer`… El nombre de la foto que se adjunta en Flow. */
   personaje_clave: string;
+  /** Segundos que pide la tienda por este producto (0 = el del curso). Es del
+   *  producto: se guarda en los textos compartidos del POV BOF. */
+  segundos_guion: number;
+  /** Cuántas escenas hacen falta para esos segundos. Lo calcula el backend. */
+  escenas_pedidas: number;
   clips: string[];
   video_path?: string | null;
   video_listo_at: number;

@@ -484,6 +484,10 @@ function TarjetaUGC({
   // Lo que cabe hablando en ese clip. Sale de la proporción del curso —170
   // caracteres para 10 s— y es lo que decide si una frase se corta.
   const tope = duracion === "8" ? 136 : 170;
+  // Cuántos clips hay que generar y subir. Tres es el anuncio del curso; sube
+  // cuando la tienda pide un mínimo de segundos por la muestra, porque un clip
+  // dura lo que dura y la única forma de llegar es hacer más.
+  const huecos = producto.escenas_pedidas || cfg?.escenas || 3;
   const fichaPersonaje =
     (cfg?.personajes ?? []).find((x) => x.clave === producto.personaje_clave)?.ficha ?? "";
 
@@ -803,6 +807,51 @@ function TarjetaUGC({
         </p>
       )}
 
+      {/* Cuánto tiene que durar el anuncio. Lo normal es el del curso (tres
+          clips), y se sube cuando la tienda pide un mínimo por la muestra
+          ("dos vídeos de 30 segundos"). NO alarga cada escena —lo que no cabe
+          en su clip se corta a media palabra—: añade clips, y con ellos hacen
+          falta más capturas del producto para tener de qué hablar. Se cambia
+          ANTES de escribir las escenas. */}
+      {CATALOGOS_PROPIOS.includes(source) && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+          <span>Anuncio de</span>
+          {(cfg?.segundos_opciones ?? [0, 30, 40, 60]).map((sg) => (
+            <button
+              key={sg}
+              type="button"
+              title={
+                sg === 0
+                  ? "El del curso: tres clips"
+                  : `${Math.ceil(sg / (duracion === "8" ? 8 : 10))} clips de ${duracion === "8" ? 8 : 10}s. Necesita capturas del producto para tener qué contar`
+              }
+              onClick={() =>
+                estado.mutate(
+                  { ...clave, segundos_guion: sg },
+                  {
+                    onError: (e) =>
+                      toast.error(e instanceof Error ? e.message : String(e)),
+                  },
+                )
+              }
+              className={`rounded px-1.5 py-0.5 font-semibold transition ${
+                (producto.segundos_guion || 0) === sg
+                  ? "bg-amber-500/20 text-amber-500"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {sg === 0 ? "normal" : `${sg}s`}
+            </button>
+          ))}
+          <span className="ml-auto">
+            {huecos} clip{huecos === 1 ? "" : "s"}
+            {escenas.length > 0 && escenas.length !== huecos
+              ? " · rehaz las escenas"
+              : ""}
+          </span>
+        </div>
+      )}
+
       {/* Un hueco por escena, como en el POV BOF Largo: mismo aspecto, mismo
           ✓ al tenerlo y misma ✕ para quitarlo. Aquí el hueco es solo para
           contar —el orden lo pone el montaje escuchándolos—, pero se trabaja
@@ -811,7 +860,7 @@ function TarjetaUGC({
           Y de uno en uno porque el WebView de la app devuelve la selección
           vacía cuando el input lleva `multiple` (ver learnings.md). */}
       <div className="grid grid-cols-3 gap-1.5">
-        {[1, 2, 3].map((hueco) => {
+        {Array.from({ length: huecos }, (_, i) => i + 1).map((hueco) => {
           const puesto = producto.clips.length >= hueco;
           const pct = pctsClip[hueco];
           const subiendoEste = pct !== null && pct !== undefined;
@@ -1158,3 +1207,7 @@ function BajarFotos({
     </div>
   );
 }
+
+// Los catálogos que sube el operador. Solo ahí se pide una duración mínima: es
+// el trato por la muestra o la tarea, y los productos del curso no lo tienen.
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];

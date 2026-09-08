@@ -87,6 +87,8 @@ def get_config() -> ConfigUGCResponse:
         ],
         sexos=[OpcionUGC(clave=k, label=v) for k, v in config.SEXOS.items()],
         escenas=config.ESCENAS,
+        escenas_max=config.ESCENAS_MAX,
+        segundos_opciones=list(config.SEGUNDOS_PEDIDOS_OPCIONES),
         prompt_personaje=config.prompt_personaje(),
     )
 
@@ -172,6 +174,12 @@ def list_productos(
             ),
             personaje=str(mio.get("personaje") or ""),
             personaje_sexo=str(mio.get("personaje_sexo") or ""),
+            # Los segundos que pide la tienda salen de los textos compartidos:
+            # son del trato con ella, no de este nicho.
+            segundos_guion=float(t.get("segundos_guion") or 0),
+            escenas_pedidas=config.escenas_para(
+                float(t.get("segundos_guion") or 0), duracion,
+            ),
             clips=[str(c) for c in (mio.get("clips") or [])],
             video_path=mio.get("video_path"),
             video_listo_at=int(mio.get("video_listo_at") or 0),
@@ -354,6 +362,15 @@ def set_estado(
                 )
         except Exception:  # noqa: BLE001 — el dato ya está guardado
             pass
+    # Cuántos segundos pide la tienda. Va al documento COMPARTIDO del POV BOF
+    # (mismo campo y mismo motivo que allí): lo pide la tienda, no quien grabe,
+    # y así el mismo producto lo respeta en todos los nichos.
+    if body.segundos_guion is not None:
+        pov_repo.save_extracted_texts(
+            body.source, body.folder,
+            {body.producto: {"segundos_guion": float(body.segundos_guion or 0)}},
+        )
+
     if body.en_escaparate is not None:
         from src.nicho_pov_bof.repos import product_repo as pov
 
