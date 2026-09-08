@@ -89,6 +89,17 @@ _FORMATO = (
     "producto, si aparece en esa escena, sale impecable y a un lado, separado "
     "de eso que falla. Cuidado cuando el producto y lo que falla se llamen "
     "parecido: ahí hay que repetirlo dos veces.\n"
+    # Copiar la identidad vocal palabra por palabra —lo que manda el curso— no
+    # basta para el ACENTO: cada clip se sintetiza aparte desde esa descripción
+    # y "acento peninsular neutro" es demasiado blando. En la plancha salieron
+    # dos clips en peninsular y uno tirando a latino, y eso se nota más que un
+    # cambio de mueble. Hace falta la marca fonética y la prohibición expresa.
+    "9. En la identidad vocal, CLAVA el acento y prohíbe el otro. El anuncio es "
+    "para España: escribe «acento español de España (castellano peninsular), "
+    "NUNCA latinoamericano», y dale la marca concreta — distinción, la z y la "
+    "c ante e o i suenan como la 'th' inglesa, nada de seseo, entonación y "
+    "vocabulario de España. Va dentro de la identidad vocal, así que se copia "
+    "igual en las {escenas} escenas.\n"
     "4. Describe el producto SOLO como se ve en su foto. No le añadas piezas, "
     "luces encendidas, pantallas ni accesorios que no aparezcan en ella, "
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
