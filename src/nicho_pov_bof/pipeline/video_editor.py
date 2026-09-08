@@ -797,6 +797,41 @@ _PALETAS = (
         "cta_fill": (255, 255, 255),    "cta_glow": (120, 78, 20),
         "tono": 14, "familias": "🍁🎟️💸🧣☕",
     },
+    {
+        "nombre": "mostaza",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (206, 148, 12),
+        "cta_fill": (255, 226, 138),    "cta_glow": (140, 92, 8),
+        "tono": 46, "familias": "🤑💳🏷️🌾🥮",
+    },
+    {
+        "nombre": "oliva",
+        "estacion": "otoño",
+        "gancho_fill": (238, 255, 214), "gancho_glow": (92, 118, 30),
+        "cta_fill": (255, 255, 255),    "cta_glow": (64, 92, 24),
+        "tono": 78, "familias": "🌰🍐🧺✅🔖",
+    },
+    {
+        "nombre": "vino",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (140, 24, 56),
+        "cta_fill": (255, 198, 176),    "cta_glow": (112, 30, 40),
+        "tono": 348, "familias": "🍇🍷🎟️💜🫐",
+    },
+    {
+        "nombre": "cafe",
+        "estacion": "otoño",
+        "gancho_fill": (255, 244, 224), "gancho_glow": (104, 62, 28),
+        "cta_fill": (255, 214, 150),    "cta_glow": (78, 44, 18),
+        "tono": 26, "familias": "☕🍂🤎💰🧣",
+    },
+    {
+        "nombre": "calabaza",
+        "estacion": "otoño",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (224, 108, 8),
+        "cta_fill": (255, 236, 190),    "cta_glow": (168, 70, 10),
+        "tono": 26, "familias": "🎃🍁💸🔥🏷️",
+    },
 )
 
 
@@ -864,6 +899,12 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
         d = abs(pal["tono"] - tono_fondo) % 360
         d = min(d, 360 - d) / 180
         p += 3.0 * d
+        # Peso de temporada: en su estación mandan ellas. Menos que el emoji
+        # (6.0), así que un gancho con 💰 puede seguir llevándose el oro, y más
+        # que el contraste (3.0 como mucho) para que no las tape una neón por
+        # un matiz. Sin esto salían la mitad de las veces y la gama otoñal no
+        # se notaba.
+        p += 4.0 if pal.get("estacion") else 0.0
         p += ((desempate + i) % len(candidatas)) * 0.1
         return p
 
