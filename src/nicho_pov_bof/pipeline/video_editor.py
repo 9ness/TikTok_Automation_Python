@@ -580,16 +580,6 @@ def _render_plano_png(
     return bloque
 
 
-# El de CONTORNO sigue fuera de la rotación: con el borde de siempre se comía
-# la letra y hay que verlo fino antes de meterlo.
-_ROTULOS_CONTORNO = (
-    {"nombre": "contorno-montserrat", "estilo": "contorno",
-     "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
-    {"nombre": "contorno-anton", "estilo": "contorno",
-     "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
-)
-
-
 # ---------------------------------------------------------------------------
 # Cumplimiento TikTok Shop: qué se puede afirmar en pantalla
 # ---------------------------------------------------------------------------
@@ -754,6 +744,16 @@ _ROTULOS = (
      "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
     {"nombre": "sombra-anton", "estilo": "sombra",
      "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "sombra-bangers", "estilo": "sombra",
+     "titular": "Bangers-Regular.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "sombra-luckiest", "estilo": "sombra",
+     "titular": "LuckiestGuy-Regular.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "contorno-montserrat", "estilo": "contorno",
+     "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "contorno-anton", "estilo": "contorno",
+     "titular": "anton.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
+    {"nombre": "contorno-rubik", "estilo": "contorno",
+     "titular": "Rubik-Bold.ttf", "titulo": "Montserrat-ExtraBold.ttf"},
     {
         "nombre": "montserrat-neon",
         "titular": "Montserrat-BlackItalic.ttf", "titulo": "Montserrat-ExtraBold.ttf",
