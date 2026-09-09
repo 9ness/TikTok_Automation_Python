@@ -1557,7 +1557,11 @@ function ProductoCard({
   // Acabado del bloque de texto. Se guarda POR USUARIO y no por producto: es
   // cómo se edita, y mientras se prueba el estilo nuevo se quiere el mismo en
   // todo lo que se monte, no ir marcándolo tarjeta a tarjeta.
-  const [estiloTexto, setEstiloTexto] = useEstadoDeUsuario("largo:estilo-texto", "");
+  // Por defecto el blanco liso (sep 2026). La clave lleva `:v2` a propósito:
+  // el hook guarda también el valor por defecto en cuanto se abre la pantalla,
+  // así que cambiar solo el `inicial` no habría movido a nadie que ya hubiera
+  // entrado con el clásico de serie.
+  const [estiloTexto, setEstiloTexto] = useEstadoDeUsuario("largo:estilo-texto:v2", "blanco");
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
 
@@ -2017,8 +2021,8 @@ function ProductoCard({
         <div className="flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
           <span>Texto</span>
           {[
-            { v: "", label: "Clásico (color)" },
             { v: "blanco", label: "Blanco liso" },
+            { v: "", label: "Clásico (color)" },
           ].map((o) => (
             <button
               key={o.v}
