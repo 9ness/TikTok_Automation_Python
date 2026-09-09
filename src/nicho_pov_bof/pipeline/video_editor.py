@@ -560,17 +560,22 @@ BLANCO_FONT_SIZE = 42
 # bloque que ya no tiene ni color ni destello.
 _BLANCO_GANCHO = "Revisa tu cupón descuento"
 _BLANCO_CTA = "para mejorar aún más el precio de"
-# Lo ÚNICO con color del estilo: una pastilla detrás del nombre del producto,
-# del tono de la paleta que ya se elige para ese vídeo (en otoño, calabaza /
-# mostaza / oliva / bosque / petróleo). Sirve para dos cosas: separar el
-# nombre del resto de la frase, que es la parte que de verdad importa, y que
-# los vídeos no salgan todos calcados aunque el estilo sea fijo.
+# Lo ÚNICO con color del estilo: el nombre del producto lleva CONTORNO de
+# color (`_linea_plana` en modo "contorno"), del tono de la paleta que ya se
+# elige para ese vídeo — o sea que se sigue mirando qué emojis lleva y qué
+# color domina el fondo, y en otoño juegan calabaza, mostaza, oliva, bosque y
+# petróleo. Sirve para separar el nombre del resto de la frase, que es la
+# parte que de verdad importa, y para que los vídeos no salgan calcados
+# aunque el estilo sea fijo.
 #
-# Va translúcida y con las esquinas redondeadas: sólida se comía el bloque y
-# volvía a parecer la píldora que se descartó en su día.
-_PASTILLA_ALFA = 195
-_PASTILLA_PAD = (26, 8)     # a los lados / arriba y abajo
-_PASTILLA_RADIO = 16
+# Se probaron los tres y se ven las diferencias a este cuerpo (40, no 72):
+#   pastilla  el color se lee, pero mete un RECTÁNGULO que no está en los
+#             vídeos de referencia — es la píldora que ya se descartó.
+#   sombra    el desplazamiento de 7px está calibrado para el bloque grande;
+#             aquí la silueta se descuelga y parece un error de registro.
+#   contorno  abraza la letra, se distingue del resto y no añade ninguna
+#             forma. Es el que encaja con un estilo que quiere parecer texto
+#             escrito con la herramienta de TikTok.
 _BLANCO_BORDE = 0.09        # del cuerpo; el de siempre es 0.13 y aquí pesa
 
 
@@ -593,21 +598,6 @@ def _cuerpo_que_cabe(lineas: list[str], fuente: str, max_w: int) -> int:
             break
         cuerpo -= 2
     return cuerpo
-
-
-def _con_pastilla(im: "Image.Image | None", paleta: dict) -> "Image.Image | None":
-    """El nombre del producto sobre su pastilla de color."""
-    if im is None:
-        return None
-    color = (paleta or {}).get("gancho_glow") or (255, 124, 16)
-    px, py = _PASTILLA_PAD
-    fondo = Image.new("RGBA", (im.width + px * 2, im.height + py * 2), (0, 0, 0, 0))
-    ImageDraw.Draw(fondo).rounded_rectangle(
-        (0, 0, fondo.width - 1, fondo.height - 1), radius=_PASTILLA_RADIO,
-        fill=(*color, _PASTILLA_ALFA),
-    )
-    fondo.alpha_composite(im, (px, py))
-    return fondo
 
 
 def _render_blanco_png(
@@ -652,10 +642,16 @@ def _render_blanco_png(
         ("gancho", "titulo", "cta") if layout == "gancho_titulo_cta"
         else ("gancho", "cta", "titulo")
     )
+    color = (paleta or {}).get("gancho_glow") or (255, 124, 16)
     piezas_im = [
         im for im in (
-            _con_pastilla(linea(k, str((textos or {}).get(k) or "")), paleta)
-            if k == "titulo" else linea(k, str((textos or {}).get(k) or ""))
+            _linea_plana(
+                str((textos or {}).get(k) or ""), cuerpo, max_w, color, fuente,
+                "contorno",
+            )
+            if k == "titulo" and str((textos or {}).get(k) or "").strip()
+            and k in quiere
+            else linea(k, str((textos or {}).get(k) or ""))
             for k in orden
         ) if im is not None
     ]
