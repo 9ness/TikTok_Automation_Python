@@ -234,3 +234,44 @@ def update_carpeta(
         doc["updated_at"] = _now()
         r.set_json(clave, doc)
     return len(ids)
+
+
+def esperando_stock(
+    source: str, folders: list[str], usuario: str = "", estilo: str = "",
+) -> dict[str, list[str]]:
+    """`{carpeta: [números]}` con el vídeo hecho, sin subir y el producto caído.
+
+    Es trabajo TERMINADO que no se puede publicar: la ficha de TikTok no abre.
+    No se tira —el producto puede volver— pero mezclado con el resto se pierde
+    de vista, que es justo lo que pasaba: un vídeo montado de un producto sin
+    stock quedaba enterrado en su carpeta y nadie se acordaba de subirlo
+    cuando la tienda lo reponía.
+
+    Cruza dos sitios y no puede ser de otra forma:
+      - el vídeo y el "subido" son de ESTE nicho y de ESTE modo de guion, así
+        que salen del documento del Largo (`_key`, que ya resuelve el modo);
+      - "sin stock" es del PRODUCTO y lo comparten todos los nichos, así que
+        sale de los textos del POV BOF. Marcarlo aquí lo marca en todos.
+    """
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available() or not folders:
+        return {}
+
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    mios = r.mget_json([_key(source, n, usuario, estilo) for n in folders])
+    compartidos = pov_repo.load_folders([(source, n) for n in folders])
+
+    salida: dict[str, list[str]] = {}
+    for carpeta, doc, comun in zip(folders, mios, compartidos):
+        productos = ((doc or {}).get("productos") or {})
+        textos = ((comun or {}).get("productos") or {})
+        numeros = [
+            pid for pid, prod in productos.items()
+            if (prod or {}).get("video_path")
+            and not (prod or {}).get("uploaded")
+            and (textos.get(pid) or {}).get("sin_stock")
+        ]
+        if numeros:
+            salida[carpeta] = sorted(numeros, key=lambda x: (len(x), x))
+    return salida

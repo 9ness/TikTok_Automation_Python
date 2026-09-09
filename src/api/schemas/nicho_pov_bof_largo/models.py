@@ -20,6 +20,8 @@ class VocesLargoResponse(BaseModel):
 
 class ProductoLargo(BaseModel):
     producto: str
+    # Su ficha de TikTok no abre (retirado del catálogo). Dato compartido.
+    sin_stock: bool = False
     # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
     # (Top vendidos ordenado por ventas): ahí cada producto viene de una.
     folder: str = ""
@@ -119,6 +121,10 @@ class ProductoEstadoLargoRequest(BaseModel):
     # que pide la tienda no cambia porque el guion empiece por el precio o por
     # el dolor.
     segundos_guion: float | None = None
+    # "Su ficha de TikTok ya no abre". Va a los textos COMPARTIDOS del POV BOF:
+    # es del producto, no de cómo se grabe, así que marcarlo aquí lo marca en
+    # todos los nichos.
+    sin_stock: bool | None = None
 
 
 class FolderLargo(BaseModel):
@@ -133,6 +139,11 @@ class FolderLargo(BaseModel):
     # Los vídeos ya están hechos pero falta subirlos (se preparan de días
     # futuros). Independiente de `completed`.
     pendiente_subir: bool = False
+    # Carpeta que NO está en el Drive: la compone la app juntando los productos
+    # con el vídeo hecho que esperan a que vuelva el stock.
+    virtual: bool = False
+    # Cuántos hay dentro (solo en la virtual, para pintarlo en el chip).
+    esperando: int = 0
 
 
 class FoldersLargoResponse(BaseModel):

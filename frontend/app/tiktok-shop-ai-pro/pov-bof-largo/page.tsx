@@ -752,7 +752,9 @@ export default function PovBofLargoPage() {
               {/* El curso borró esta carpeta entera: se sigue trabajando
                   desde nuestra copia, con el progreso de siempre. */}
               {f.desde_copia && "🗄️ "}
-              {f.name}
+              {/* La virtual no es del Drive: son los vídeos terminados que
+                  esperan a que vuelva el stock, juntados de varias carpetas. */}
+              {f.virtual ? `⏳ Esperando stock (${f.esperando ?? 0})` : f.name}
               {/* Cuántos productos de esta carpeta tienen ya la ficha
                   enlazada: es el trabajo que hay dentro. Sin esto había que
                   entrar carpeta por carpeta para descubrir que estaba a cero.
@@ -1575,7 +1577,12 @@ function ProductoCard({
     ? fotoLargoUrl(source, folder, p.titled_photo_id, ANCHO_VISOR)
     : null;
 
-  function push(patch: { en_escaparate?: boolean; uploaded?: boolean; sold?: boolean }) {
+  function push(patch: {
+    en_escaparate?: boolean;
+    uploaded?: boolean;
+    sold?: boolean;
+    sin_stock?: boolean;
+  }) {
     setEstado.mutate(
       { source, folder, producto: p.producto, ...patch },
       { onError: (e) => toast.error(err(e)) },
@@ -1800,6 +1807,31 @@ function ProductoCard({
           folder={p.folder || folder}
           producto={p.producto}
         />
+        {/* Comprobar el enlace automáticamente no se puede —TikTok contesta un
+            captcha a cualquier petición del servidor—, así que el toque lo da
+            el operador. Va al documento COMPARTIDO: el mismo producto se
+            repite en varias carpetas y así el siguiente ya no lo abre. Con el
+            vídeo hecho, el producto pasa a la carpeta "⏳ Esperando stock". */}
+        {p.product_url && !p.sin_stock && (
+          <button
+            type="button"
+            title="Su enlace ya no abre. Si el vídeo está hecho, queda esperando a que vuelva"
+            onClick={() => push({ sin_stock: true })}
+            className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-rose-500/50 hover:text-rose-500"
+          >
+            🚫 Sin stock
+          </button>
+        )}
+        {p.sin_stock && (
+          <button
+            type="button"
+            title="Ha vuelto: quitar la marca y sacarlo de la lista de espera"
+            onClick={() => push({ sin_stock: false })}
+            className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-rose-500/50 bg-rose-500/10 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:border-emerald-500/50 hover:text-emerald-500"
+          >
+            🚫 Sin stock · ¿ha vuelto?
+          </button>
+        )}
         {p.clean_photo_id && (
           <a
             href={buildCleanPhotoDownloadUrl(source, folder, p.producto)}

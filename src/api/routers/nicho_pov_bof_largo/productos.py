@@ -277,7 +277,27 @@ def list_folders(
         )
         for c in carpetas
     ]
-    current = next((i.name for i in items if not i.completed), None)
+    # La virtual va la PRIMERA y solo si tiene algo: son vídeos terminados que
+    # no se pueden publicar, y mezclados con el resto se perdían de vista.
+    try:
+        from src.nicho_pov_bof import config as pov_config
+        from src.nicho_pov_bof_largo.repos import product_repo as largo_repo
+
+        esperando = largo_repo.esperando_stock(
+            source, [c.get("name", "") for c in carpetas], usuario,
+        )
+        cuantos = sum(len(v) for v in esperando.values())
+        if cuantos:
+            items.insert(0, FolderLargo(
+                name=pov_config.CARPETA_ESPERANDO_STOCK,
+                virtual=True, esperando=cuantos,
+            ))
+    except Exception:  # noqa: BLE001 — sin esto el listado sigue valiendo
+        pass
+
+    current = next(
+        (i.name for i in items if not i.completed and not i.virtual), None,
+    )
     return FoldersLargoResponse(
         source=source,
         items=items,
@@ -451,6 +471,7 @@ def _listar(
         items.append(ProductoLargo(
             producto=pid,
             segundos_guion=float(textos.get("segundos_guion") or 0),
+            sin_stock=bool(textos.get("sin_stock")),
             desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
@@ -544,7 +565,56 @@ def list_productos(
     usuario: Annotated[str, Depends(get_web_user)] = "",
     refresh: Annotated[bool, Query()] = False,
 ) -> ProductosLargoResponse:
+    from src.nicho_pov_bof import config as pov_config
+
+    if pov_config.es_carpeta_virtual(folder):
+        return _listar_esperando_stock(source, queue, usuario, refresh=refresh)
     return _listar(source, folder, queue, usuario, refresh=refresh)
+
+
+def _listar_esperando_stock(
+    source: str, queue, usuario: str, *, refresh: bool = False,
+) -> ProductosLargoResponse:
+    """Los productos con el vídeo hecho que esperan a que vuelva el stock.
+
+    Solo se leen las carpetas que Redis dice que tienen alguno —normalmente dos
+    o tres—, porque listar las fotos de una carpeta cuesta una llamada al Drive
+    y aquí se entra a menudo, solo para mirar si alguno ha vuelto.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.services import drive_client
+    from src.nicho_pov_bof_largo.repos import product_repo as largo_repo
+
+    try:
+        nombres = [f["name"] for f in drive_client.list_product_folders(source)]
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"No se pudo leer el catálogo: {e}", status_code=502) from e
+
+    esperando = largo_repo.esperando_stock(source, nombres, usuario)
+    if not esperando:
+        return ProductosLargoResponse(
+            source=source, folder=pov_config.CARPETA_ESPERANDO_STOCK, items=[],
+        )
+
+    def _una(carpeta: str) -> list:
+        try:
+            r = _listar(source, carpeta, queue, usuario, refresh=refresh)
+        except Exception:  # noqa: BLE001 — una carpeta ilegible no tira la lista
+            return []
+        quiere = set(esperando.get(carpeta) or [])
+        for item in r.items:
+            item.folder = carpeta
+        return [i for i in r.items if i.producto in quiere]
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        listas = list(pool.map(_una, esperando.keys()))
+
+    items = [i for lista in listas for i in lista]
+    return ProductosLargoResponse(
+        source=source, folder=pov_config.CARPETA_ESPERANDO_STOCK, items=items,
+    )
 
 
 @router.get("/productos-todos", response_model=ProductosLargoResponse)
@@ -727,6 +797,16 @@ def set_producto_estado(
             campos["clip_s"] = body.clip_s
         # Va a los textos del POV BOF (documento compartido): las dos pantallas
         # lo leen de ahí, así que pedir 30s en una vale para la otra.
+        # "Sin stock" es del PRODUCTO y va también al compartido: el mismo
+        # producto sale en varias carpetas y con varios nichos, y que su ficha
+        # no abra no depende de quién lo grabe.
+        if body.sin_stock is not None:
+            from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+            pov_repo.save_extracted_texts(
+                body.source, body.folder,
+                {body.producto: {"sin_stock": bool(body.sin_stock)}},
+            )
         if body.segundos_guion is not None:
             from src.nicho_pov_bof.repos import product_repo as pov_repo
 
@@ -797,6 +877,7 @@ def set_producto_estado(
         return ProductoLargo(
             producto=body.producto,
             segundos_guion=float(textos.get("segundos_guion") or 0),
+            sin_stock=bool(textos.get("sin_stock")),
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),

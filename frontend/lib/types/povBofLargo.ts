@@ -15,6 +15,8 @@ export interface VocesLargo {
 
 export interface ProductoLargo {
   producto: string;
+  /** Su ficha de TikTok ya no abre (retirado del catálogo). Compartido. */
+  sin_stock?: boolean;
   /** De qué carpeta es. Solo en el listado de TODAS las carpetas (Top
    *  vendidos por ventas). */
   folder?: string;
@@ -101,6 +103,9 @@ export interface ClipLargoUploadResponse {
 }
 
 export interface FolderLargo {
+  /** No está en el Drive: la compone la app con los que esperan stock. */
+  virtual?: boolean;
+  esperando?: number;
   name: string;
   id: string;
   completed: boolean;
@@ -142,4 +147,7 @@ export interface EstadoLargoRequest {
   /** Segundos que debe durar el guion (0 = los del curso, ~20s). Se guarda con
    *  los textos del POV BOF: el producto es el mismo en las dos pantallas. */
   segundos_guion?: number;
+  /** "Su ficha de TikTok ya no abre". Va a los textos COMPARTIDOS del POV BOF:
+   *  es del producto, así que marcarlo aquí lo marca en todos los nichos. */
+  sin_stock?: boolean;
 }
