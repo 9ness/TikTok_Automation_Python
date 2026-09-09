@@ -111,6 +111,14 @@ _FORMATO = (
     "escritas con letra, jamás en pulgadas. El acento con el que se locuta lo "
     "decide lo que se DICE, no solo la identidad vocal: con un texto neutro "
     "sale acento latino aunque le pidas peninsular.\n"
+    # El documento del curso dice "no añadas indicaciones sobre música", y con
+    # eso el generador la pone cuando le apetece: unos clips salen con banda
+    # sonora y otros no, y al pegarlos la música entra y sale de golpe. Hay que
+    # prohibirla explícitamente — no basta con no mencionarla.
+    "11. Termina cada `prompt_video` diciendo que el clip NO lleva música de "
+    "fondo, ni banda sonora, ni efectos de sonido añadidos: lo único que se "
+    "oye es la voz de la persona hablando, con el sonido natural de la escena. "
+    "Va en las {escenas}, con las mismas palabras.\n"
     "4. Describe el producto SOLO como se ve en su foto. No le añadas piezas, "
     "luces encendidas, pantallas ni accesorios que no aparezcan en ella, "
     "aunque el título los mencione: la foto es lo que se adjunta al generar, "
