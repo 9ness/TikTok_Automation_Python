@@ -1318,13 +1318,20 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
+    # La paleta se elige ANTES de tocar los textos, también en el estilo
+    # blanco: el criterio que más pesa (6) son los emojis del gancho, y esos
+    # rotan por producto. Al cambiarlos primero, la elección se quedaba solo
+    # con el contraste del fondo — y con fondos parecidos (baño, cocina) salía
+    # el mismo color una y otra vez: medido, 2 colores distintos en 12
+    # productos, frente a 6 eligiendo antes. Los emojis no se ven en este
+    # estilo, pero siguen valiendo para decidir el tono.
+    paleta = _elegir_paleta(video_in, textos, semilla, on_log)
     if estilo_texto == "blanco":
         # El orden importa: las tres líneas son UNA frase, así que el nombre
         # del producto va el último sí o sí (el layout que rota lo pone a
         # veces en medio y la frase se rompía).
         textos = {**textos, "gancho": _BLANCO_GANCHO, "cta": _BLANCO_CTA}
         layout = "gancho_cta_titulo"
-    paleta = _elegir_paleta(video_in, textos, semilla, on_log)
     rotulo = _elegir_rotulo(semilla)
     on_log(f"[3/5] gancho {textos['gancho']!r} · CTA {textos['cta']!r}")
     on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
