@@ -38,6 +38,20 @@ _FORMATO = (
     "La lista tiene EXACTAMENTE {escenas} escenas, con `n` de 1 a {escenas} y "
     "en orden. Ni una más ni una menos: cada escena es un clip que hay que "
     "generar aparte.\n"
+    # El "mensaje subliminal" del curso, que en el POV BOF va quemado en el
+    # vídeo. Aquí hacía falta por otra razón: el diagnóstico de la agencia
+    # marca como defecto que no haya TEXTO y pide un gancho en el primer
+    # segundo que diga de qué producto se habla. Cuatro líneas exactas.
+    "Añade además, fuera de las escenas, un campo `bloque_texto` con el "
+    "mensaje que se quema en pantalla al principio del anuncio. Son CUATRO "
+    "líneas, una por renglón, con esta forma exacta y sin preguntas:\n"
+    "Han ajustado el precio de\n"
+    "[NOMBRE CORTO DEL PRODUCTO]\n"
+    "Revisa también tus cupones de descuento\n"
+    "para mejorarlo aún más.\n"
+    "Sustituye SOLO la segunda línea por el nombre corto del producto (dos o "
+    "tres palabras, con la marca si la tiene). No pongas el nombre de la "
+    "tienda, ni precios, ni porcentajes.\n"
     # Sirve para UNA cosa: al volver con las tres imágenes generadas, saber
     # cuál es cuál. Con el escenario y la luz no se distingue nada —son iguales
     # en las tres a propósito—; lo que las separa es qué hace la persona.
@@ -213,6 +227,10 @@ def escribir(
         )
 
     voz = " ".join(str(datos.get("voz") or "").split())
+    bloque = "\n".join(
+        l.strip() for l in str(datos.get("bloque_texto") or "").splitlines()
+        if l.strip()
+    )
     crudas = datos.get("escenas") or []
     if not isinstance(crudas, list):
         raise ValueError("Gemini no devolvió la lista de escenas")
@@ -275,7 +293,7 @@ def escribir(
         )
     for aviso in _revisar(escenas):
         on_log(f"[nicho_general] {aviso}")
-    return {"voz": voz, "escenas": escenas}
+    return {"voz": voz, "escenas": escenas, "bloque_texto": bloque}
 
 
 # Palabras con las que se pone a describir a la persona en vez de remitirse a

@@ -3487,6 +3487,11 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto
             on_log(f"[ugc] {carpeta} · producto {pid} falló: {e}")
             return False
+        if escrito.get("bloque_texto"):
+            product_repo.update_product(
+                source, carpeta, pid, usuario, gancho, duracion,
+                bloque_texto=escrito["bloque_texto"],
+            )
         product_repo.guardar_escenas(
             source, carpeta, pid, escrito["escenas"], escrito["voz"],
             usuario=usuario, gancho=gancho, duracion=duracion,
@@ -3586,8 +3591,13 @@ def run_nicho_general_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             f"[ugc] ojo: este producto pide {pedidos:.0f}s y se le quita el "
             "silencio de entrada a cada clip. Comprueba que el vídeo llega."
         )
+    # El texto del principio, si el operador lo quiere quemado. Sin él, el
+    # anuncio sale sin una sola letra y eso es justo lo que la agencia marca
+    # como defecto ("no engancha, no hay texto").
+    bloque = str(mio.get("bloque_texto") or "") if mio.get("quemar_bloque", True) else ""
     video_editor.montar(
-        clips, escenas, salida, recortar_silencios=recortar, on_log=on_log,
+        clips, escenas, salida, recortar_silencios=recortar,
+        bloque_texto=bloque, on_log=on_log,
     )
 
     on_progress(0.95, "🎬 Guardando…")

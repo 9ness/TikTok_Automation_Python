@@ -176,6 +176,7 @@ def montar(
     *,
     work_dir: Path | None = None,
     recortar_silencios: bool = True,
+    bloque_texto: str = "",
     on_log: OnLog = _noop,
 ) -> Path:
     """Los clips ordenados, sin el silencio de entrada y pegados en un 9:16.
@@ -233,6 +234,11 @@ def montar(
         check=True, capture_output=True,
     )
 
+    # El bloque va ANTES de la flecha: así la flecha se pinta sobre el vídeo
+    # definitivo y no hay que volver a codificar por encima de ella.
+    if bloque_texto.strip():
+        pegado = _quemar_bloque(pegado, bloque_texto, work / "bloque.mp4", work, on_log)
+
     _flecha(pegado, salida, work, on_log)
     on_log(f"[nicho_general] montado: {salida.name} ({len(recortados)} clips)")
     return salida
@@ -261,3 +267,181 @@ def _flecha(video: Path, salida: Path, work: Path, on_log: OnLog) -> None:
         on_log(f"[nicho_general] sin flecha ({str(e)[:120]})")
         con_flecha = video
     shutil.move(str(con_flecha), str(salida))
+
+
+# ---------------------------------------------------------------------------
+# Bloque de texto del principio ("mensaje subliminal" del curso)
+# ---------------------------------------------------------------------------
+# Cuatro líneas en columna sobre los primeros segundos. El curso lo quema
+# durante todo el vídeo en el POV BOF, pero aquí hay una persona hablando 40
+# segundos: dejarlo puesto tapa la escena y el propio diagnóstico de la agencia
+# marca como defecto "la imagen tapa el vídeo". Así que entra y se va.
+BLOQUE_S = 4.0
+# Fuera de estas bandas no se pinta: arriba está el nombre de la cuenta y
+# abajo el caption y los botones de TikTok, que se comerían el texto.
+_BANDA_MIN, _BANDA_MAX = 0.10, 0.66
+
+
+def _frames_del_principio(video: Path, work: Path, segundos: float) -> list[Path]:
+    """Unos pocos fotogramas de esos primeros segundos, para mirarlos."""
+    destino = work / "frames"
+    destino.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-t", f"{segundos:.2f}", "-i", str(video),
+         "-vf", "fps=2,scale=270:-1", str(destino / "f%02d.png")],
+        check=True, capture_output=True,
+    )
+    return sorted(destino.glob("f*.png"))
+
+
+def _sitio_libre(video: Path, work: Path, alto_bloque: int, on_log: OnLog) -> float:
+    """Dónde cae el bloque para no tapar ni la cara ni el producto.
+
+    Devuelve la Y (0-1) de la esquina superior del bloque. Mira los primeros
+    segundos —que es cuando se ve— y busca la franja más VACÍA: cuenta bordes
+    (el producto, los muebles, las manos) y descarta las que pisen una cara.
+
+    Se hace por frames y no a ojo porque el sitio bueno cambia con el plano:
+    en un plano medio el hueco está arriba, y en uno donde la persona está de
+    pie con el producto en la encimera, el hueco está justo en el medio.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except Exception as e:  # noqa: BLE001 — sin OpenCV se pinta donde siempre
+        on_log(f"[nicho_general] sin OpenCV, bloque al 18% ({str(e)[:60]})")
+        return 0.18
+
+    frames = _frames_del_principio(video, work, BLOQUE_S)
+    if not frames:
+        return 0.18
+
+    cascada = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    )
+    coste: dict[int, float] = {}
+    caras: set[int] = set()
+    paso = 2  # en porcentaje de altura
+    for ruta in frames:
+        img = cv2.imread(str(ruta))
+        if img is None:
+            continue
+        h, w = img.shape[:2]
+        bordes = cv2.Canny(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 80, 200)
+        gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # OJO: `detectMultiScale` devuelve un array de numpy, así que no se
+        # puede hacer `or []` — el `if` sobre un array de varios elementos
+        # revienta ("truth value is ambiguous").
+        detectadas = cascada.detectMultiScale(gris, 1.15, 5)
+        for x, y, cw, ch in (detectadas if len(detectadas) else []):
+            # La cara con margen: el texto pegado a la barbilla también molesta.
+            for p in range(_int_pct(y - ch * 0.25, h), _int_pct(y + ch * 1.25, h) + 1):
+                caras.add(p - p % paso)
+        alto_rel = alto_bloque / float(ALTO)
+        for pct in range(int(_BANDA_MIN * 100), int(_BANDA_MAX * 100) + 1, paso):
+            y0 = int(h * pct / 100)
+            y1 = min(h, y0 + int(h * alto_rel))
+            if y1 <= y0:
+                continue
+            franja = bordes[y0:y1, :]
+            coste[pct] = coste.get(pct, 0.0) + float(np.mean(franja))
+
+    if not coste:
+        return 0.18
+    # Un bloque de cuatro líneas ocupa un 15% de la altura, así que no basta
+    # con que su BORDE SUPERIOR esté libre de cara: hay que mirar todo lo que
+    # tapa. Sin esto, el texto empezaba sobre la ventana y terminaba sobre los
+    # ojos de la persona.
+    alto_pct = max(paso, int(round(alto_bloque / float(ALTO) * 100)))
+
+    def pisa_cara(p: int) -> bool:
+        return any(p <= c <= p + alto_pct for c in caras)
+
+    libres = {p: c for p, c in coste.items() if not pisa_cara(p)}
+    if not libres:
+        on_log("[nicho_general] la cara ocupa todas las franjas; bloque abajo")
+        libres = coste
+    mejor = min(libres, key=lambda p: libres[p])
+    on_log(
+        f"[nicho_general] bloque de texto al {mejor}% de altura "
+        f"(bordes {libres[mejor]:.1f}, {len(caras)} franja(s) con cara)"
+    )
+    return mejor / 100.0
+
+
+def _int_pct(valor: float, total: int) -> int:
+    return max(0, min(100, int(round(valor / max(1, total) * 100))))
+
+
+def _png_bloque(texto: str, work: Path) -> tuple[Path, int]:
+    """El bloque de cuatro líneas como PNG transparente. Devuelve (ruta, alto).
+
+    Montserrat cursiva y blanco con borde negro, como el resto de los nichos:
+    quien monta uno a mano en CapCut usa esa misma tipografía, y así los vídeos
+    de la cuenta se parecen entre sí.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    from src.nicho_pov_bof.pipeline.video_editor import _font_path
+
+    lineas = [l.strip() for l in (texto or "").splitlines() if l.strip()]
+    if not lineas:
+        raise ValueError("bloque vacío")
+
+    # El cuerpo se ajusta hasta que la línea más larga QUEPA: con un tamaño
+    # fijo, "Revisa también tus cupones de descuento" se salía del 9:16 por los
+    # dos lados y se leía a medias. Se busca a la baja desde el tamaño bonito.
+    ruta_fuente = _font_path("Montserrat-BlackItalic.ttf")
+    medidor = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    max_ancho = int(ANCHO * 0.92)
+    cuerpo = 52
+    while cuerpo > 22:
+        fuente = ImageFont.truetype(ruta_fuente, cuerpo)
+        anchos = [medidor.textbbox((0, 0), l, font=fuente)[2] for l in lineas]
+        if max(anchos) + 40 <= max_ancho:
+            break
+        cuerpo -= 2
+    interlineado = int(cuerpo * 1.28)
+    ancho = max(anchos) + 40
+    alto = interlineado * len(lineas) + 30
+
+    im = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+    dib = ImageDraw.Draw(im)
+    for i, linea in enumerate(lineas):
+        dib.text(
+            (ancho // 2, 15 + i * interlineado), linea, font=fuente,
+            fill=(255, 255, 255, 255), stroke_width=6, stroke_fill=(0, 0, 0, 235),
+            anchor="ma",
+        )
+    ruta = work / "bloque.png"
+    im.save(ruta)
+    return ruta, alto
+
+
+def _quemar_bloque(
+    video: Path, texto: str, salida: Path, work: Path, on_log: OnLog,
+) -> Path:
+    """Pinta el bloque sobre los primeros segundos, donde no tape nada.
+
+    Si algo falla se devuelve el vídeo tal cual: un texto es un adorno y no
+    puede tirar un montaje que ya está hecho (mismo criterio que la flecha).
+    """
+    try:
+        png, alto = _png_bloque(texto, work)
+        y = _sitio_libre(video, work, alto, on_log)
+        subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+             "-i", str(video), "-i", str(png),
+             "-filter_complex",
+             f"[0:v][1:v]overlay=(main_w-overlay_w)/2:main_h*{y:.4f}:"
+             f"enable='between(t,0,{BLOQUE_S})'[v]",
+             "-map", "[v]", "-map", "0:a?",
+             "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+             "-c:a", "copy", "-movflags", "+faststart", str(salida)],
+            check=True, capture_output=True,
+        )
+        return salida
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[nicho_general] sin bloque de texto ({str(e)[:140]})")
+        return video

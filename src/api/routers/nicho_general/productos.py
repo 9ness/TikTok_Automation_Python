@@ -193,6 +193,8 @@ def list_productos(
             # Ausente = marcado: es el comportamiento por defecto y lo que
             # tenían los anuncios montados antes de que esto se pudiera elegir.
             recortar_silencios=bool(mio.get("recortar_silencios", True)),
+            bloque_texto=str(mio.get("bloque_texto") or ""),
+            quemar_bloque=bool(mio.get("quemar_bloque", True)),
             clips=[str(c) for c in (mio.get("clips") or [])],
             video_path=mio.get("video_path"),
             video_listo_at=int(mio.get("video_listo_at") or 0),
@@ -357,6 +359,7 @@ def set_estado(
             ("uploaded", body.uploaded), ("sold", body.sold), ("nicho", body.nicho),
             ("personaje", body.personaje), ("personaje_sexo", body.personaje_sexo),
             ("recortar_silencios", body.recortar_silencios),
+            ("bloque_texto", body.bloque_texto), ("quemar_bloque", body.quemar_bloque),
         ) if v is not None
     }
     if campos:

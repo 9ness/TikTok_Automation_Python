@@ -82,6 +82,10 @@ export interface ProductoUGC {
   /** Si al montar se le quita el silencio de entrada a cada clip. Marcado por
    *  defecto: el anuncio arranca antes y no parece que empiece N veces. */
   recortar_silencios: boolean;
+  /** El "mensaje subliminal" del curso: cuatro líneas quemadas sobre los
+   *  primeros segundos del anuncio. Lo escribe la IA y se puede corregir. */
+  bloque_texto: string;
+  quemar_bloque: boolean;
   clips: string[];
   video_path?: string | null;
   video_listo_at: number;

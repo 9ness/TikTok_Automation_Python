@@ -103,6 +103,10 @@ class ProductoUGC(BaseModel):
     # Se desmarca cuando el vídeo va justo de segundos para lo que pide la
     # tienda, porque el recorte se lleva medio segundo por clip.
     recortar_silencios: bool = True
+    # El "mensaje subliminal" del curso: cuatro líneas que se queman sobre los
+    # primeros segundos. Lo escribe la IA con las escenas y se puede corregir.
+    bloque_texto: str = ""
+    quemar_bloque: bool = True
     clips: list[str] = Field(default_factory=list)
     video_path: str | None = None
     video_listo_at: int = 0
@@ -134,6 +138,8 @@ class EstadoUGCRequest(BaseModel):
     segundos_guion: float | None = None
     hashtags_extra: str | None = None
     recortar_silencios: bool | None = None
+    bloque_texto: str | None = None
+    quemar_bloque: bool | None = None
 
 
 class EscenasLoteRequest(BaseModel):

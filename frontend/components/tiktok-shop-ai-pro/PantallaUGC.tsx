@@ -482,12 +482,16 @@ function TarjetaUGC({
   // Los hashtags que exige la tienda por la muestra. Se editan aquí y se
   // guardan al salir del campo, como el resto de lo compartido.
   const [tagsTienda, setTagsTienda] = useState(producto.hashtags_extra ?? "");
+  const [bloque, setBloque] = useState(producto.bloque_texto ?? "");
   const [enEscaparate, setEnEscaparate] = useState(producto.en_escaparate);
   const [subido, setSubido] = useState(producto.uploaded);
   const [vendio, setVendio] = useState(producto.sold);
   useEffect(() => {
     setTagsTienda(producto.hashtags_extra ?? "");
   }, [producto.hashtags_extra]);
+  useEffect(() => {
+    setBloque(producto.bloque_texto ?? "");
+  }, [producto.bloque_texto]);
   useEffect(() => {
     setEnEscaparate(producto.en_escaparate);
     setSubido(producto.uploaded);
@@ -920,6 +924,54 @@ function TarjetaUGC({
             className="mt-0.5 w-full rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none transition focus:border-violet-500/60"
           />
         </label>
+      )}
+
+      {/* El texto que se quema al principio: el "mensaje subliminal" del curso.
+          Se enseña editable porque el nombre corto del producto es lo que la
+          IA acierta o falla, y son cuatro líneas — corregirlo cuesta menos que
+          rehacer las escenas. Dónde va lo decide el montaje mirando los
+          primeros segundos, así que aquí no hay que elegir posición. */}
+      {!!producto.escenas.length && (
+        <div className="space-y-1 rounded-lg border border-border/60 p-2">
+          <label className="flex cursor-pointer items-center gap-2 text-[10px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={producto.quemar_bloque !== false}
+              onChange={(e) =>
+                estado.mutate(
+                  { ...clave, quemar_bloque: e.target.checked },
+                  {
+                    onError: (err) =>
+                      toast.error(err instanceof Error ? err.message : String(err)),
+                  },
+                )
+              }
+              className="h-3.5 w-3.5 shrink-0 accent-violet-500"
+            />
+            <strong className="font-semibold text-foreground">
+              Texto de los primeros 4 s
+            </strong>
+            <span className="ml-auto">se coloca solo, sin tapar cara ni producto</span>
+          </label>
+          <textarea
+            value={bloque}
+            onChange={(e) => setBloque(e.target.value)}
+            onBlur={() => {
+              if ((producto.bloque_texto ?? "") === bloque.trim()) return;
+              estado.mutate(
+                { ...clave, bloque_texto: bloque.trim() },
+                {
+                  onSuccess: () => toast.success("Guardado"),
+                  onError: (err) =>
+                    toast.error(err instanceof Error ? err.message : String(err)),
+                },
+              );
+            }}
+            rows={4}
+            placeholder={"Han ajustado el precio de\n…"}
+            className="w-full resize-none rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] leading-snug outline-none transition focus:border-violet-500/60"
+          />
+        </div>
       )}
 
       {/* Los clips generados arrancan con medio segundo mudo antes de que la
