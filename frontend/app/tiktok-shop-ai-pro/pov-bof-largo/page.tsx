@@ -2022,7 +2022,10 @@ function ProductoCard({
           <span>Texto</span>
           {[
             { v: "blanco", label: "Blanco liso" },
-            { v: "", label: "Clásico (color)" },
+            // "clasico" y no "": para el backend la cadena vacía significa
+            // "no me lo han dicho" y aplica el de serie (el blanco), así que
+            // pedir el clásico tiene que ser explícito.
+            { v: "clasico", label: "Clásico (color)" },
           ].map((o) => (
             <button
               key={o.v}
