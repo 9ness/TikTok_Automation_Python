@@ -545,7 +545,10 @@ def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int
 # (60) y el nombre va pequeño; aquí las tres pesan igual y el bloque se lee
 # como una frase seguida, que es de donde le viene el aire de "texto puesto en
 # la app" en vez de rótulo montado.
-BLANCO_FONT_SIZE = 52
+# Medido sobre la captura de referencia: las tres líneas ocupan unos 120 px de
+# alto en una imagen de 1968, o sea ~40 px de cuerpo en 1920. Es bastante menos
+# que el gancho del bloque de siempre (72) y por eso el rótulo no pesa.
+BLANCO_FONT_SIZE = 42
 # Y no reusa el gancho/CTA de siempre: el estilo nuevo no es el mismo texto
 # pintado de otro color, es OTRO texto. En los POV de 20s nuevos las tres
 # líneas son una frase seguida que termina en el nombre del producto —
@@ -558,6 +561,27 @@ BLANCO_FONT_SIZE = 52
 _BLANCO_GANCHO = "Revisa tu cupón descuento"
 _BLANCO_CTA = "para mejorar aún más el precio de"
 _BLANCO_BORDE = 0.09        # del cuerpo; el de siempre es 0.13 y aquí pesa
+
+
+def _cuerpo_que_cabe(lineas: list[str], fuente: str, max_w: int) -> int:
+    """El cuerpo más grande con el que TODAS las líneas caben de una pieza.
+
+    Las tres son una frase seguida, así que partir la del medio la rompe: hay
+    que bajar el cuerpo, no dejar que se envuelva. Tope por abajo en 32 — por
+    debajo no se lee en un móvil, y si un nombre de producto no entra ni así
+    es mejor que se parta a que salga diminuto.
+    """
+    medidor = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    textos = [t for t in lineas if (t or "").strip()]
+    cuerpo = BLANCO_FONT_SIZE
+    while cuerpo > 32:
+        f = ImageFont.truetype(_font_path(fuente), cuerpo)
+        # El borde se pinta DESPUÉS de medir: se descuenta aquí.
+        borde = 2 * max(2, int(round(cuerpo * _BLANCO_BORDE)))
+        if all(medidor.textbbox((0, 0), t, font=f)[2] + borde <= max_w for t in textos):
+            break
+        cuerpo -= 2
+    return cuerpo
 
 
 def _render_blanco_png(
@@ -578,13 +602,19 @@ def _render_blanco_png(
     # referencia el texto va tal cual se escribe, y es parte de lo que le da el
     # aire de "puesto con la herramienta de TikTok" en vez de rótulo montado.
     # Además, en mayúsculas ocupa más ancho y las líneas se parten en dos.
+    cuerpo = _cuerpo_que_cabe(
+        [str((textos or {}).get(k) or "") for k in ("gancho", "cta", "titulo")
+         if k in quiere],
+        fuente, max_w,
+    )
+
     def linea(clave: str, texto: str):
         if clave not in quiere or not (texto or "").strip():
             return None
         im = _render_text_line(
-            texto, font_size=BLANCO_FONT_SIZE,
+            texto, font_size=cuerpo,
             max_w=max_w, fill=(255, 255, 255), stroke=(0, 0, 0),
-            max_lines=2, fuente=fuente, stroke_frac=_BLANCO_BORDE,
+            max_lines=1, fuente=fuente, stroke_frac=_BLANCO_BORDE,
         )
         return _crop_visible(im) if im is not None else None
 
