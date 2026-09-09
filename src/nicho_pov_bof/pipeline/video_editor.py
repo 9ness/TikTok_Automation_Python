@@ -1544,6 +1544,43 @@ def _filtro_voz(audio_in: Path, on_log: OnLog) -> str:
     return f"{_VOZ_CADENA},{norm},alimiter=limit=0.9:level=disabled"
 
 
+def limpiar_metadatos(video: Path, on_log: OnLog = _noop) -> Path:
+    """Deja el fichero sin metadatos, EN SITIO. Sin recodificar.
+
+    Los clips que salen de un generador de vídeo llegan con su firma dentro
+    (herramienta, fecha, a veces credenciales de contenido), y el montaje la
+    arrastra hasta el fichero final. Se quita por lo mismo que se quita en
+    Quitar Copy y en Construcción POV: lo que se publica no tiene por qué
+    llevar la ficha técnica de cómo se hizo, y dos vídeos con la misma huella
+    se parecen entre sí para cualquiera que los compare.
+
+    OJO con lo que esto NO es: no exime de marcar el vídeo como generado con
+    IA al publicarlo. Esa etiqueta la pone el operador y es lo que evita la
+    sanción — el propio diagnóstico de la agencia lo dice con esas palabras.
+
+    Es un remux (`-c copy`), así que cuesta décimas y no toca la imagen. Si
+    falla, se deja el fichero como estaba: un vídeo con metadatos es mejor
+    que ningún vídeo.
+    """
+    limpio = video.with_name(video.stem + "__nometa" + video.suffix)
+    try:
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(video),
+            "-map_metadata", "-1", "-map_chapters", "-1",
+            # `bitexact` se lleva además lo que escribe el propio ffmpeg al
+            # remuxar (`encoder=Lavf…`, la fecha de creación). Sin él el
+            # fichero sale sin los tags del generador pero con los nuestros.
+            "-fflags", "+bitexact",
+            "-c", "copy", "-movflags", "+faststart", str(limpio),
+        ], on_log)
+        limpio.replace(video)
+        on_log("[5/5] metadatos limpiados")
+    except Exception as e:  # noqa: BLE001
+        limpio.unlink(missing_ok=True)
+        on_log(f"[5/5] no se pudieron limpiar los metadatos ({str(e)[:120]})")
+    return video
+
+
 def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) -> Path:
     """Sustituye la pista de audio del vídeo por `audio_in` (la locución ya
     recortada de silencios). El vídeo llega mudo desde el paso 3
@@ -1684,6 +1721,7 @@ def build_video(
     on_log("[5/5] Mezclando audio final…")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _mux_audio(arrowed, audio_path, output_path, on_log)
+    limpiar_metadatos(output_path, on_log)
     on_progress(1.0, "Listo")
 
     dur_out = probe_duration(output_path)

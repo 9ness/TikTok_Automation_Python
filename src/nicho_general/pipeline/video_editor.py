@@ -240,6 +240,11 @@ def montar(
         pegado = _quemar_bloque(pegado, bloque_texto, work / "bloque.mp4", work, on_log)
 
     _flecha(pegado, salida, work, on_log)
+    # Sin la ficha técnica de los generadores dentro (ver el helper del POV
+    # BOF). No sustituye a marcar el vídeo como IA al publicarlo.
+    from src.nicho_pov_bof.pipeline.video_editor import limpiar_metadatos
+
+    limpiar_metadatos(salida, on_log)
     on_log(f"[nicho_general] montado: {salida.name} ({len(recortados)} clips)")
     return salida
 
