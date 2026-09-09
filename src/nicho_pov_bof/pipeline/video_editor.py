@@ -546,6 +546,17 @@ def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int
 # como una frase seguida, que es de donde le viene el aire de "texto puesto en
 # la app" en vez de rótulo montado.
 BLANCO_FONT_SIZE = 52
+# Y no reusa el gancho/CTA de siempre: el estilo nuevo no es el mismo texto
+# pintado de otro color, es OTRO texto. En los POV de 20s nuevos las tres
+# líneas son una frase seguida que termina en el nombre del producto —
+#     Revisa tu cupón descuento
+#     para mejorar aún más el precio de
+#     Escritorio L HomeVibe
+# — sin emojis y sin mayúsculas. Los emojis de "🎟️ CUPÓN DESCUENTO 🎟️" son
+# justo lo que delata que el rótulo va montado, y encima cantan sobre un
+# bloque que ya no tiene ni color ni destello.
+_BLANCO_GANCHO = "Revisa tu cupón descuento"
+_BLANCO_CTA = "para mejorar aún más el precio de"
 _BLANCO_BORDE = 0.09        # del cuerpo; el de siempre es 0.13 y aquí pesa
 
 
@@ -890,7 +901,8 @@ def textos_fijos(semilla: str) -> dict[str, str]:
 
     Determinista por producto (misma semilla → mismo emoji), así un remontaje
     sale igual pero dos productos seguidos no comparten emoji.
-    """
+
+"""
     # Hace falta un hash de verdad. `sum(ord(...))` ignora la posición ("1",
     # "9" y "10" caían juntos) y crc32 es lineal, así que los dos índices
     # salían correlacionados: el mismo emoji de gancho arrastraba siempre el
@@ -1223,6 +1235,12 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
+    if estilo_texto == "blanco":
+        # El orden importa: las tres líneas son UNA frase, así que el nombre
+        # del producto va el último sí o sí (el layout que rota lo pone a
+        # veces en medio y la frase se rompía).
+        textos = {**textos, "gancho": _BLANCO_GANCHO, "cta": _BLANCO_CTA}
+        layout = "gancho_cta_titulo"
     paleta = _elegir_paleta(video_in, textos, semilla, on_log)
     rotulo = _elegir_rotulo(semilla)
     on_log(f"[3/5] gancho {textos['gancho']!r} · CTA {textos['cta']!r}")

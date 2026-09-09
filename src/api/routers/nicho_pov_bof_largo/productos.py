@@ -1412,7 +1412,9 @@ def _encolar_clip(
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
             "con_subliminal": bool(con_subliminal),
-            "estilo_texto": str(estilo_texto or ""),
+            # Se resuelve AQUÍ, no en el montador: un cliente viejo no manda
+            # el campo y hay que darle el de serie igualmente.
+            "estilo_texto": config.estilo_texto_valido(estilo_texto),
             # Con qué modo se mandó montar: el vídeo tiene que acabar en ese
             # documento aunque el catálogo cambie de modo mientras se monta.
             "estilo": _modo(source, usuario),

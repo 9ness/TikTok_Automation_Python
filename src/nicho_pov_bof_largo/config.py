@@ -271,6 +271,26 @@ def cta_desfasada(guion: str, *, plazos: bool, envio: bool) -> bool:
 # requisitos ("dos vídeos de 30 segundos" a cambio de la muestra).
 SEGUNDOS_GUION_OPCIONES = (0, 30, 40, 60)
 
+# Acabado del bloque de texto. Desde sep 2026 el de serie es el BLANCO LISO
+# (tres líneas iguales, sin color ni destello), que es el que usan los POV de
+# 20s nuevos. El defecto vive AQUÍ y no en la pantalla: la APK cachea el
+# bundle, así que un móvil con la versión vieja no manda el campo y el vídeo
+# salía con el estilo clásico sin que nadie lo hubiera pedido.
+#
+# Por eso "" no significa "clásico" sino "no me lo han dicho": para pedir el
+# clásico a propósito hay que mandar "clasico".
+ESTILO_TEXTO_DEFECTO = "blanco"
+
+
+def estilo_texto_valido(valor: str = "") -> str:
+    """Lo que hay que pasarle al montador: "blanco" o "" (el clásico)."""
+    v = (valor or "").strip().lower()
+    if v == "clasico":
+        return ""
+    if v == "blanco":
+        return "blanco"
+    return ESTILO_TEXTO_DEFECTO
+
 
 def caracteres_guion(segundos: float = 0) -> int:
     """Tope de caracteres para ese guion. Sin `segundos`, el del curso."""
