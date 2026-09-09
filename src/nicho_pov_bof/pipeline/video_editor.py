@@ -1155,11 +1155,14 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
     emojis = (textos.get("gancho") or "") + (textos.get("cta") or "")
     tono_fondo, _luz = _tono_dominante(video)
     desempate = sum(ord(c) for c in str(semilla))
-    # Las de temporada solo juegan en la suya; las demás, todo el año.
+    # En cuanto la estación tiene paleta propia, juegan SOLO las suyas: si se
+    # mezclan con las de todo el año, en otoño salen vídeos en magenta o cian
+    # eléctrico al lado de los de calabaza y la cuenta pierde el aire de
+    # temporada, que es justo para lo que se hizo la gama. Las neutras quedan
+    # de red de seguridad para una estación que aún no tenga las suyas.
     ahora = config.estacion_actual()
-    candidatas = [
-        p for p in _PALETAS if p.get("estacion") in (None, ahora)
-    ]
+    de_temporada = [p for p in _PALETAS if p.get("estacion") == ahora]
+    candidatas = de_temporada or [p for p in _PALETAS if not p.get("estacion")]
 
     def puntos(i_p):
         i, pal = i_p
@@ -1173,10 +1176,8 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
         # el peso de estación por encima salía la paleta de la época aunque se
         # comiera con el fondo, que es justo lo contrario de lo que hace falta.
         p += 5.0 * d
-        # La temporada EMPUJA, no manda: entre las que se leen igual de bien
-        # gana la que pega con la época. Con 2.5 no le gana al contraste (5) ni
-        # a un emoji acertado (6).
-        p += 2.5 if pal.get("estacion") else 0.0
+        # (Ya no hay bonus por temporada: o todas las candidatas son de la
+        # estación o ninguna lo es, así que sumaba lo mismo a todas.)
         # Variedad: a igualdad de contraste, rota por producto. Subido de 0.1
         # a 0.5 con la gama de temporada — con siete paletas parecidas en
         # puntos, la más lejana del fondo se llevaba cuatro de cada diez
