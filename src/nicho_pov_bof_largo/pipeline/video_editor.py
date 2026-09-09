@@ -362,6 +362,9 @@ def montar(
     con_flecha: bool = True,
     # El mensaje subliminal en pantalla, que solo llevan los formatos de 20s.
     con_subliminal: bool = False,
+    # Acabado del bloque de texto: "" el de siempre (color y destello, con su
+    # rotación) o "blanco" el de los POV de 20s nuevos.
+    estilo_texto: str = "",
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -389,6 +392,7 @@ def montar(
         con_cta=con_cta,
         con_flecha=con_flecha,
         con_subliminal=con_subliminal,
+        estilo_texto=estilo_texto,
         semilla=semilla or Path(output_path).stem,
         on_log=on_log,
         on_progress=_progreso,

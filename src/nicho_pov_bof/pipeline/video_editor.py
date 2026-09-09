@@ -533,6 +533,73 @@ def _linea_plana(texto: str, tamano: int, max_w: int, color: tuple[int, int, int
     return _crop_visible(lienzo)
 
 
+# ---------------------------------------------------------------------------
+# Estilo BLANCO — el que usan ahora en los POV de 20s
+# ---------------------------------------------------------------------------
+# Las tres líneas del MISMO tamaño, en blanco con un borde negro fino y sin
+# color ni destello. Es lo que se ve en los vídeos nuevos del curso y lo que
+# ya usa el UGC, así que es el mismo lenguaje visual en toda la cuenta.
+#
+# Cambia una cosa de fondo respecto a los demás estilos: aquí NO hay jerarquía
+# de tamaños. En el bloque de siempre el gancho manda (72), el CTA le sigue
+# (60) y el nombre va pequeño; aquí las tres pesan igual y el bloque se lee
+# como una frase seguida, que es de donde le viene el aire de "texto puesto en
+# la app" en vez de rótulo montado.
+BLANCO_FONT_SIZE = 52
+_BLANCO_BORDE = 0.09        # del cuerpo; el de siempre es 0.13 y aquí pesa
+
+
+def _render_blanco_png(
+    textos: dict, layout: str, piezas: "set[str] | None", paleta: dict,
+    rotulo: dict, on_log: OnLog = _noop,
+) -> "Image.Image | None":
+    """El bloque en blanco liso. Mismo contrato que `_render_text_block_png`.
+
+    Recibe `paleta` y `rotulo` para poder intercambiarse con los otros dos
+    pintores sin tocar quien llama, pero no los usa: la gracia del estilo es
+    justo que no cambia entre vídeos.
+    """
+    quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
+    max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
+    fuente = (rotulo or {}).get("titular", _FUENTE_CURSIVA)
+
+    # SIN mayúsculas, al revés que el bloque de siempre: en los vídeos de
+    # referencia el texto va tal cual se escribe, y es parte de lo que le da el
+    # aire de "puesto con la herramienta de TikTok" en vez de rótulo montado.
+    # Además, en mayúsculas ocupa más ancho y las líneas se parten en dos.
+    def linea(clave: str, texto: str):
+        if clave not in quiere or not (texto or "").strip():
+            return None
+        im = _render_text_line(
+            texto, font_size=BLANCO_FONT_SIZE,
+            max_w=max_w, fill=(255, 255, 255), stroke=(0, 0, 0),
+            max_lines=2, fuente=fuente, stroke_frac=_BLANCO_BORDE,
+        )
+        return _crop_visible(im) if im is not None else None
+
+    orden = (
+        ("gancho", "titulo", "cta") if layout == "gancho_titulo_cta"
+        else ("gancho", "cta", "titulo")
+    )
+    piezas_im = [
+        im for im in (
+            linea(k, str((textos or {}).get(k) or "")) for k in orden
+        ) if im is not None
+    ]
+    if not piezas_im:
+        return None
+
+    gap = _PLANO_GAP
+    ancho = max(p.width for p in piezas_im)
+    alto = sum(p.height for p in piezas_im) + gap * (len(piezas_im) - 1)
+    block = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+    y = 0
+    for parte in piezas_im:
+        block.paste(parte, (int((ancho - parte.width) / 2), y), parte)
+        y += parte.height + gap
+    return block
+
+
 def _render_plano_png(
     textos: dict, layout: str, piezas: "set[str] | None", paleta: dict,
     rotulo: dict, on_log: OnLog = _noop,
@@ -1151,7 +1218,8 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      layout: str = "gancho_cta_titulo",
                      piezas: "set[str] | None" = None,
                      semilla: str = "",
-                     y_frac: float | None = None) -> Path:
+                     y_frac: float | None = None,
+                     estilo_texto: str = "") -> Path:
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
@@ -1159,7 +1227,13 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     rotulo = _elegir_rotulo(semilla)
     on_log(f"[3/5] gancho {textos['gancho']!r} · CTA {textos['cta']!r}")
     on_log(f"[3/5] rótulo '{rotulo['nombre']}'")
-    pintar = _render_plano_png if rotulo.get("estilo") else _render_text_block_png
+    if estilo_texto == "blanco":
+        # Forzado desde la pantalla: se salta la rotación de rótulo y paleta a
+        # propósito — el sentido de este estilo es que NO varíe.
+        on_log("[3/5] estilo de texto: blanco liso (sin color ni destello)")
+        pintar = _render_blanco_png
+    else:
+        pintar = _render_plano_png if rotulo.get("estilo") else _render_text_block_png
     block = pintar(textos, layout, piezas, paleta, rotulo, on_log)
     if block is None:
         on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
@@ -1422,6 +1496,10 @@ def build_video(
     # Altura del bloque de texto (0-1). None = la de siempre. El Nicho Ropa
     # Con Personas lo pide centrado sobre la prenda.
     y_frac: float | None = None,
+    # Qué acabado lleva el bloque de texto. "" = el de siempre, con su rotación
+    # de color y tipografía. "blanco" = las tres líneas iguales, en blanco con
+    # borde negro fino, como los POV de 20s nuevos y como el UGC.
+    estilo_texto: str = "",
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -1473,6 +1551,7 @@ def build_video(
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
             piezas, semilla=semilla or str(output_path.stem), y_frac=y_frac,
+            estilo_texto=estilo_texto,
         )
         on_progress(0.66, "Texto quemado")
     else:

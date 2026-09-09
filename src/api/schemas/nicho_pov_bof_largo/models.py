@@ -222,6 +222,10 @@ class LoteLargoConfirmarRequest(BaseModel):
     # El mensaje subliminal quemado en pantalla. Solo lo llevan los formatos de
     # 20s, así que va apagado por defecto.
     con_subliminal: bool = False
+    # Acabado del bloque de texto: "" el de siempre (color + destello, con su
+    # rotación) o "blanco" el de los POV de 20s nuevos, las tres líneas iguales
+    # en blanco con borde negro fino.
+    estilo_texto: str = ""
 
 
 class LoteLargoConfirmarResponse(BaseModel):

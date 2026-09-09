@@ -2094,6 +2094,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             con_cta=bool(p.get("con_cta", True)),
             con_flecha=bool(p.get("con_flecha", True)),
             con_subliminal=bool(p.get("con_subliminal", False)),
+            # Viaja en el trabajo, no en el documento del producto: es cómo se
+            # EDITA este vídeo, y el operador está probando los dos acabados
+            # sobre los mismos productos.
+            estilo_texto=str(p.get("estilo_texto") or ""),
             on_log=on_log,
             on_progress=_progreso,
         )

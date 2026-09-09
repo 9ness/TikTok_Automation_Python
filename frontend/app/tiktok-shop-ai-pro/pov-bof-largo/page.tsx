@@ -1554,6 +1554,10 @@ function ProductoCard({
   const [tools, setTools] = useState<Record<ToolKey, boolean>>({
     gancho: true, titulo: true, cta: true, flecha: true, subliminal: false,
   });
+  // Acabado del bloque de texto. Se guarda POR USUARIO y no por producto: es
+  // cómo se edita, y mientras se prueba el estilo nuevo se quiere el mismo en
+  // todo lo que se monte, no ir marcándolo tarjeta a tarjeta.
+  const [estiloTexto, setEstiloTexto] = useEstadoDeUsuario("largo:estilo-texto", "");
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
 
@@ -1591,6 +1595,7 @@ function ProductoCard({
       con_cta: String(tools.cta),
       con_flecha: String(tools.flecha),
       con_subliminal: String(tools.subliminal),
+      estilo_texto: estiloTexto,
     };
     // Si la app sabe subir por su cuenta, se le deja: con ocho productos a
     // tres clips son veinticuatro esperas con la pantalla encendida. Su
@@ -1627,6 +1632,7 @@ function ProductoCard({
     fd.append("con_cta", String(tools.cta));
     fd.append("con_flecha", String(tools.flecha));
     fd.append("con_subliminal", String(tools.subliminal));
+    fd.append("estilo_texto", estiloTexto);
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${apiBase}/api/v1/nicho-pov-bof-largo/clip/upload`);
@@ -2002,6 +2008,30 @@ function ProductoCard({
               />
               <span className="truncate">{t.label}</span>
             </label>
+          ))}
+        </div>
+        {/* Los dos acabados del bloque. El clásico es el de siempre —color,
+            destello y su rotación de tipografías—; el blanco es el que usan
+            ahora en los POV de 20s: las tres líneas iguales, en blanco con
+            borde fino y sin mayúsculas, igual que el UGC. */}
+        <div className="flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
+          <span>Texto</span>
+          {[
+            { v: "", label: "Clásico (color)" },
+            { v: "blanco", label: "Blanco liso" },
+          ].map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => setEstiloTexto(o.v)}
+              className={`rounded px-1.5 py-0.5 font-semibold transition ${
+                estiloTexto === o.v
+                  ? "bg-violet-500/20 text-violet-400"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {o.label}
+            </button>
           ))}
         </div>
       </div>

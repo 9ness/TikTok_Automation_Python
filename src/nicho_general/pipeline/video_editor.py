@@ -292,6 +292,11 @@ def _safe():
 # de cuatro líneas pero el vídeo lleva a una persona hablando, así que ocupar
 # menos alto importa más que leerse enorme.
 CUERPO_BLOQUE = 44
+# Grosor del borde negro, en fracción del cuerpo de letra. El POV BOF usa 0,13
+# y aquí queda cargado: allí el texto va sobre un plano de producto y tiene que
+# pelear con él, y aquí cae sobre una persona real, donde un contorno grueso se
+# ve como un pegote. 0,08 sigue haciéndolo legible sobre fondo claro.
+_BORDE_FRAC = 0.08
 
 
 def _frames_del_principio(video: Path, work: Path, segundos: float) -> list[Path]:
@@ -426,13 +431,14 @@ def _png_bloque(texto: str, work: Path) -> tuple[Path, int]:
     ancho = max(anchos) + 40
     alto = interlineado * len(lineas) + 30
 
+    borde = max(2, int(round(cuerpo * _BORDE_FRAC)))
     im = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
     dib = ImageDraw.Draw(im)
     for i, linea in enumerate(lineas):
         dib.text(
             (ancho // 2, 15 + i * interlineado), linea, font=fuente,
-            fill=(255, 255, 255, 255), stroke_width=6, stroke_fill=(0, 0, 0, 235),
-            anchor="ma",
+            fill=(255, 255, 255, 255), stroke_width=borde,
+            stroke_fill=(0, 0, 0, 215), anchor="ma",
         )
     ruta = work / "bloque.png"
     im.save(ruta)
