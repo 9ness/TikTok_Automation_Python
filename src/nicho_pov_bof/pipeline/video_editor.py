@@ -596,7 +596,11 @@ def _render_blanco_png(
     """
     quiere = piezas if piezas is not None else {"gancho", "titulo", "cta"}
     max_w = int(config.TARGET_W * (config.SAFE_X[1] - config.SAFE_X[0]))
-    fuente = (rotulo or {}).get("titular", _FUENTE_CURSIVA)
+    # La tipografía es FIJA, no la del rótulo que rota: el sentido del estilo
+    # es que todos los vídeos salgan iguales. Y encima la rotación mete letras
+    # de caja alta (Bangers, Luckiest Guy), que convertían la frase en
+    # "REVISA TU CUPÓN DESCUENTO" — justo las mayúsculas que se habían quitado.
+    fuente = _FUENTE_CURSIVA
 
     # SIN mayúsculas, al revés que el bloque de siempre: en los vídeos de
     # referencia el texto va tal cual se escribe, y es parte de lo que le da el
