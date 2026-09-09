@@ -592,9 +592,16 @@ def _cuerpo_que_cabe(lineas: list[str], fuente: str, max_w: int) -> int:
     cuerpo = BLANCO_FONT_SIZE
     while cuerpo > 32:
         f = ImageFont.truetype(_font_path(fuente), cuerpo)
-        # El borde se pinta DESPUÉS de medir: se descuenta aquí.
-        borde = 2 * max(2, int(round(cuerpo * _BLANCO_BORDE)))
-        if all(medidor.textbbox((0, 0), t, font=f)[2] + borde <= max_w for t in textos):
+        # Se mide EXACTAMENTE como mide el renderer (`_seg_width`, que cuenta
+        # los emojis aparte) y con el mismo criterio que él usa para decidir
+        # si una línea cabe. Con `textbbox` a secas los dos números bailaban y
+        # el renderer podía seguir encogiendo por su cuenta justo lo que aquí
+        # se había dado por bueno.
+        if all(
+            _seg_width(_split_runs(t), f, medidor, int(cuerpo * 0.92),
+                       int(cuerpo * 0.06)) <= max_w
+            for t in textos
+        ):
             break
         cuerpo -= 2
     return cuerpo
@@ -622,10 +629,25 @@ def _render_blanco_png(
     # referencia el texto va tal cual se escribe, y es parte de lo que le da el
     # aire de "puesto con la herramienta de TikTok" en vez de rótulo montado.
     # Además, en mayúsculas ocupa más ancho y las líneas se parten en dos.
+    # De una pieza y sin saltos: el título llega repartido en renglones de
+    # pocas palabras (así lo escribe Gemini y así lo quiere el bloque de
+    # siempre), y aquí eso es veneno — `_render_text_line` RESPETA esos saltos,
+    # con `max_lines=1` cuenta dos líneas, encoge la letra hasta la mitad
+    # buscando que quepa y acaba recortando. Resultado: el nombre del producto
+    # salía a mitad de tamaño Y cortado ("Bella Aurora Crema" en vez de "Bella
+    # Aurora crema repigmentante"). Aquí las tres son una frase seguida, así
+    # que se aplanan antes de medir y de pintar.
+    def plano(clave: str) -> str:
+        return " ".join(str((textos or {}).get(clave) or "").split())
+
+    # El cuerpo lo marcan SOLO las dos líneas fijas, que son iguales en todos
+    # los vídeos: así el bloque se ve idéntico siempre. Si se metiera el
+    # título en la cuenta, un nombre larguísimo ("Plancha de parrilla VEVOR
+    # para barbacoa y teppanyaki") arrastraba las tres al cuerpo mínimo — y es
+    # mejor que ese nombre ocupe dos renglones, al mismo tamaño que el resto,
+    # a que el anuncio entero salga con la letra más pequeña.
     cuerpo = _cuerpo_que_cabe(
-        [str((textos or {}).get(k) or "") for k in ("gancho", "cta", "titulo")
-         if k in quiere],
-        fuente, max_w,
+        [plano(k) for k in ("gancho", "cta") if k in quiere], fuente, max_w,
     )
 
     def linea(clave: str, texto: str):
@@ -643,18 +665,20 @@ def _render_blanco_png(
         else ("gancho", "cta", "titulo")
     )
     color = (paleta or {}).get("gancho_glow") or (255, 124, 16)
-    piezas_im = [
-        im for im in (
-            _linea_plana(
-                str((textos or {}).get(k) or ""), cuerpo, max_w, color, fuente,
-                "contorno",
-            )
-            if k == "titulo" and str((textos or {}).get(k) or "").strip()
-            and k in quiere
-            else linea(k, str((textos or {}).get(k) or ""))
-            for k in orden
-        ) if im is not None
-    ]
+
+    def pieza(k: str):
+        texto = plano(k)
+        if k not in quiere or not texto:
+            return None
+        if k != "titulo":
+            return linea(k, texto)
+        # El nombre del producto es lo único con color. `max_lines=2` es la
+        # red de seguridad: si un nombre larguísimo no cabe ni al cuerpo
+        # mínimo, mejor que ocupe dos renglones a que salga cortado.
+        return _linea_plana(texto, cuerpo, max_w, color, fuente, "contorno",
+                            max_lines=2)
+
+    piezas_im = [im for im in (pieza(k) for k in orden) if im is not None]
     if not piezas_im:
         return None
 
