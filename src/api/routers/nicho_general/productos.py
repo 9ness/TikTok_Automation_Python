@@ -190,6 +190,9 @@ def list_productos(
             escenas_pedidas=config.escenas_para(
                 float(t.get("segundos_guion") or 0), duracion,
             ),
+            # Ausente = marcado: es el comportamiento por defecto y lo que
+            # tenían los anuncios montados antes de que esto se pudiera elegir.
+            recortar_silencios=bool(mio.get("recortar_silencios", True)),
             clips=[str(c) for c in (mio.get("clips") or [])],
             video_path=mio.get("video_path"),
             video_listo_at=int(mio.get("video_listo_at") or 0),
@@ -353,6 +356,7 @@ def set_estado(
         k: v for k, v in (
             ("uploaded", body.uploaded), ("sold", body.sold), ("nicho", body.nicho),
             ("personaje", body.personaje), ("personaje_sexo", body.personaje_sexo),
+            ("recortar_silencios", body.recortar_silencios),
         ) if v is not None
     }
     if campos:

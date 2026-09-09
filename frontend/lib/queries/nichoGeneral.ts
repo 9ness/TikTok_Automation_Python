@@ -105,6 +105,7 @@ export function useEstadoUGC() {
       segundos_guion?: number;
       /** Los que exige la tienda de ese producto. También compartidos. */
       hashtags_extra?: string;
+      recortar_silencios?: boolean;
     }
   >({
     mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),

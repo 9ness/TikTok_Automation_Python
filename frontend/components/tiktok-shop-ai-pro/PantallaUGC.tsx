@@ -922,6 +922,36 @@ function TarjetaUGC({
         </label>
       )}
 
+      {/* Los clips generados arrancan con medio segundo mudo antes de que la
+          persona hable, y cuatro medios segundos son un anuncio que empieza
+          cuatro veces. Se quita por defecto; se desmarca cuando el vídeo va
+          justo de segundos para lo que pide la tienda, porque el recorte se
+          lleva ese medio segundo por clip. En medio nunca se toca nada: ahí el
+          silencio es de la interpretación. */}
+      <label className="flex cursor-pointer items-start gap-2 text-[10px] leading-relaxed text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={producto.recortar_silencios !== false}
+          onChange={(e) =>
+            estado.mutate(
+              { ...clave, recortar_silencios: e.target.checked },
+              {
+                onError: (err) =>
+                  toast.error(err instanceof Error ? err.message : String(err)),
+              },
+            )
+          }
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-violet-500"
+        />
+        <span>
+          <strong className="font-semibold text-foreground">
+            Recortar el silencio del principio de cada clip
+          </strong>{" "}
+          — más dinámico. Quítalo si el vídeo va justo para los segundos que
+          pide la tienda: se lleva medio segundo por clip.
+        </span>
+      </label>
+
       {/* Un hueco por escena, como en el POV BOF Largo: mismo aspecto, mismo
           ✓ al tenerlo y misma ✕ para quitarlo. Aquí el hueco es solo para
           contar —el orden lo pone el montaje escuchándolos—, pero se trabaja

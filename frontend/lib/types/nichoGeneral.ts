@@ -79,6 +79,9 @@ export interface ProductoUGC {
   hashtags_extra: string;
   /** Cuántas escenas hacen falta para esos segundos. Lo calcula el backend. */
   escenas_pedidas: number;
+  /** Si al montar se le quita el silencio de entrada a cada clip. Marcado por
+   *  defecto: el anuncio arranca antes y no parece que empiece N veces. */
+  recortar_silencios: boolean;
   clips: string[];
   video_path?: string | null;
   video_listo_at: number;

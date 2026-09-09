@@ -98,6 +98,11 @@ class ProductoUGC(BaseModel):
     # Las escenas que hacen falta para esos segundos con la duración de clip
     # elegida. Lo calcula el backend: la pantalla no sabe de techos ni topes.
     escenas_pedidas: int = 3
+    # Si al montar se le quita el silencio de entrada a cada clip. Marcado por
+    # defecto: el anuncio arranca antes y no parece que empiece cuatro veces.
+    # Se desmarca cuando el vídeo va justo de segundos para lo que pide la
+    # tienda, porque el recorte se lleva medio segundo por clip.
+    recortar_silencios: bool = True
     clips: list[str] = Field(default_factory=list)
     video_path: str | None = None
     video_listo_at: int = 0
@@ -128,6 +133,7 @@ class EstadoUGCRequest(BaseModel):
     # grabe (mismo criterio que allí).
     segundos_guion: float | None = None
     hashtags_extra: str | None = None
+    recortar_silencios: bool | None = None
 
 
 class EscenasLoteRequest(BaseModel):

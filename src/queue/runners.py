@@ -3565,6 +3565,12 @@ def run_nicho_general_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     except Exception:  # noqa: BLE001 — sin el dato se monta como siempre
         pedidos = 0.0
     esperados = len(escenas) or ugc_config.escenas_para(pedidos, duracion)
+    # Lo elige el operador en la tarjeta (marcado por defecto). Antes se
+    # deducía de la duración pedida, pero eso se equivocaba en el caso normal:
+    # se pide un mínimo de 30s y se graban 40 «por si acaso», así que sobran
+    # diez segundos y el recorte no solo cabe — hace falta, porque cuatro
+    # medios segundos mudos son un anuncio que empieza cuatro veces.
+    recortar = bool(mio.get("recortar_silencios", True))
     if len(clips) != esperados:
         on_log(
             f"[ugc] hay {len(clips)} clip(s) y el anuncio son "
@@ -3573,13 +3579,15 @@ def run_nicho_general_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
 
     on_progress(0.15, "🎬 Ordenando los clips por lo que dicen…")
     salida = _salida_ugc(source, folder, producto, usuario, gancho, duracion)
+    if pedidos > 0 and recortar:
+        # No se bloquea: el margen lo sabe el operador (pide 30s, graba 40), y
+        # aquí solo se ve la duración que puso.
+        on_log(
+            f"[ugc] ojo: este producto pide {pedidos:.0f}s y se le quita el "
+            "silencio de entrada a cada clip. Comprueba que el vídeo llega."
+        )
     video_editor.montar(
-        clips, escenas, salida,
-        # Con duración pedida los clips se cuentan para llegar JUSTO a ella, así
-        # que quitarle medio segundo a cada uno deja el vídeo por debajo del
-        # mínimo — y el mínimo es el trato con la tienda.
-        recortar_silencios=pedidos <= 0,
-        on_log=on_log,
+        clips, escenas, salida, recortar_silencios=recortar, on_log=on_log,
     )
 
     on_progress(0.95, "🎬 Guardando…")

@@ -16,10 +16,12 @@ arrancar con medio segundo mudo antes de que la persona hable, y tres medios
 segundos son un anuncio que empieza tres veces. En medio no se toca nada: ahí
 el silencio es de la propia interpretación.
 
-Y **no se recorta nada cuando la tienda pide un mínimo de segundos**: ahí los
-clips se cuentan para llegar justo a esa duración (`config.escenas_para`), así
-que quitar medio segundo por clip es lo que dejaba el vídeo por debajo del
-mínimo — que es el único motivo por el que se está grabando ese producto.
+Lo elige el operador en la tarjeta y viene marcado. Se desmarca cuando el
+vídeo va JUSTO de segundos para lo que pide la tienda: los clips se cuentan
+para llegar a esa duración (`config.escenas_para`), así que medio segundo por
+clip puede dejarlo por debajo del mínimo — que es el motivo por el que se está
+grabando ese producto. Lo normal es que sobre margen (se pide un mínimo de 30s
+y se graban 40) y entonces el recorte solo hace bien.
 
 No hay voz nuestra ni texto quemado: el clip ya viene hablado desde Omni.
 """
