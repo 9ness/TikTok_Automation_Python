@@ -277,9 +277,21 @@ def _flecha(video: Path, salida: Path, work: Path, on_log: OnLog) -> None:
 # segundos: dejarlo puesto tapa la escena y el propio diagnóstico de la agencia
 # marca como defecto "la imagen tapa el vídeo". Así que entra y se va.
 BLOQUE_S = 4.0
-# Fuera de estas bandas no se pinta: arriba está el nombre de la cuenta y
-# abajo el caption y los botones de TikTok, que se comerían el texto.
-_BANDA_MIN, _BANDA_MAX = 0.10, 0.66
+# Las zonas seguras de TikTok, las MISMAS que el POV BOF y que el resto del
+# proyecto (`nicho_pov_bof.config.SAFE_X/SAFE_Y`): fuera de ahí la interfaz de
+# TikTok tapa el texto — arriba el nombre de la cuenta, abajo el caption y los
+# botones, y a la derecha la columna de iconos. Se importan en vez de copiar
+# los números para que un cambio valga para los dos nichos.
+def _safe():
+    from src.nicho_pov_bof import config as pov_config
+
+    return pov_config.SAFE_X, pov_config.SAFE_Y
+
+
+# Cuerpo de partida. El del POV BOF (44) y no más: aquí el bloque es el mismo
+# de cuatro líneas pero el vídeo lleva a una persona hablando, así que ocupar
+# menos alto importa más que leerse enorme.
+CUERPO_BLOQUE = 44
 
 
 def _frames_del_principio(video: Path, work: Path, segundos: float) -> list[Path]:
@@ -310,12 +322,20 @@ def _sitio_libre(video: Path, work: Path, alto_bloque: int, on_log: OnLog) -> fl
         import cv2
         import numpy as np
     except Exception as e:  # noqa: BLE001 — sin OpenCV se pinta donde siempre
-        on_log(f"[nicho_general] sin OpenCV, bloque al 18% ({str(e)[:60]})")
-        return 0.18
+        on_log(f"[nicho_general] sin OpenCV, bloque arriba ({str(e)[:60]})")
+        return _safe()[1][0]
+
+    _, (sy0, sy1) = _safe()
+    alto_rel = alto_bloque / float(ALTO)
+    # La banda va del borde de la zona segura hasta donde el bloque ENTERO
+    # siga dentro: si se busca hasta el 75% sin descontar su alto, las cuatro
+    # líneas acaban debajo del caption de TikTok.
+    banda_min = int(sy0 * 100)
+    banda_max = max(banda_min, int((sy1 - alto_rel) * 100))
 
     frames = _frames_del_principio(video, work, BLOQUE_S)
     if not frames:
-        return 0.18
+        return sy0
 
     cascada = cv2.CascadeClassifier(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -338,8 +358,7 @@ def _sitio_libre(video: Path, work: Path, alto_bloque: int, on_log: OnLog) -> fl
             # La cara con margen: el texto pegado a la barbilla también molesta.
             for p in range(_int_pct(y - ch * 0.25, h), _int_pct(y + ch * 1.25, h) + 1):
                 caras.add(p - p % paso)
-        alto_rel = alto_bloque / float(ALTO)
-        for pct in range(int(_BANDA_MIN * 100), int(_BANDA_MAX * 100) + 1, paso):
+        for pct in range(banda_min, banda_max + 1, paso):
             y0 = int(h * pct / 100)
             y1 = min(h, y0 + int(h * alto_rel))
             if y1 <= y0:
@@ -348,7 +367,7 @@ def _sitio_libre(video: Path, work: Path, alto_bloque: int, on_log: OnLog) -> fl
             coste[pct] = coste.get(pct, 0.0) + float(np.mean(franja))
 
     if not coste:
-        return 0.18
+        return sy0
     # Un bloque de cuatro líneas ocupa un 15% de la altura, así que no basta
     # con que su BORDE SUPERIOR esté libre de cara: hay que mirar todo lo que
     # tapa. Sin esto, el texto empezaba sobre la ventana y terminaba sobre los
@@ -394,8 +413,9 @@ def _png_bloque(texto: str, work: Path) -> tuple[Path, int]:
     # dos lados y se leía a medias. Se busca a la baja desde el tamaño bonito.
     ruta_fuente = _font_path("Montserrat-BlackItalic.ttf")
     medidor = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    max_ancho = int(ANCHO * 0.92)
-    cuerpo = 52
+    (sx0, sx1), _ = _safe()
+    max_ancho = int(ANCHO * (sx1 - sx0))
+    cuerpo = CUERPO_BLOQUE
     while cuerpo > 22:
         fuente = ImageFont.truetype(ruta_fuente, cuerpo)
         anchos = [medidor.textbbox((0, 0), l, font=fuente)[2] for l in lineas]
