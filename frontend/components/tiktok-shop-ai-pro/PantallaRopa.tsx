@@ -1220,8 +1220,14 @@ function PrendaCard({
               </span>
             )}
           </p>
-          <p className="line-clamp-2 whitespace-pre-line text-[11px] leading-snug">
-            {prenda.titulo || "— sin textos todavía —"}
+          {/* En UNA línea: el título viene con saltos del extractor y ocupaba
+              dos renglones en cada prenda. Completo sigue estando en el
+              tooltip y en el botón de copiar el título de TikTok. */}
+          <p
+            className="truncate text-[11px] leading-snug"
+            title={prenda.titulo || ""}
+          >
+            {(prenda.titulo || "— sin textos todavía —").replace(/\s+/g, " ")}
           </p>
           {prenda.tienda && (
             <p className="truncate text-[10px] text-muted-foreground">{prenda.tienda}</p>
@@ -1284,11 +1290,7 @@ function PrendaCard({
       )}
       {/* En los mudos el precio se enseña a secas: sigue sirviendo para saber
           si la prenda merece la pena, pero no hay nada que decidir con él. */}
-      {mudo && !!prenda.precio && (
-        <p className="text-[11px] font-medium text-muted-foreground">
-          {prenda.precio} €
-        </p>
-      )}
+
 
       {/* Como en el POV BOF: a la vista solo los dos de diario —el caption
           para publicar y la ficha—, y detrás de "más" el título de TikTok y la
@@ -1296,6 +1298,13 @@ function PrendaCard({
           Afiliados. Cuatro en fila hacían que encontrar el de siempre costara
           mirar. */}
       <div className="flex flex-wrap items-center gap-1">
+        {/* El precio va en la MISMA fila que los botones: solo hay que mirarlo,
+            no se pulsa, y en su propia línea ocupaba un renglón por prenda. */}
+        {mudo && !!prenda.precio && (
+          <span className="mr-1 text-[11px] font-medium text-muted-foreground">
+            {prenda.precio} €
+          </span>
+        )}
         <CopyChip label="✍️ Caption" text={caption} siempre />
         <BotonUrl url={prenda.product_url} />
         <button
