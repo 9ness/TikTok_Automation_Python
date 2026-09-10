@@ -127,12 +127,16 @@ def _quemar_texto(salida: Path, texto: dict, on_log: OnLog) -> None:
     """
     import tempfile
 
+    # El PNG puede vivir en /tmp, pero el MP4 de salida NO: se sustituye con
+    # `replace`, que es un `rename`, y renombrar de /tmp al Drive montado da
+    # "Invalid cross-device link". Va al lado del vídeo, como en la limpieza de
+    # metadatos.
     work = Path(tempfile.mkdtemp(prefix="moda_txt_"))
+    tmp = salida.with_name(salida.stem + "__texto" + salida.suffix)
     try:
         png = _png_texto_moda(texto["titulo"], texto.get("bajada", ""), work)
         seg = float(texto.get("segundos") or 0)
         enable = f":enable='between(t,0,{seg:.2f})'" if seg > 0 else ""
-        tmp = work / "con_texto.mp4"
         _run([
             "ffmpeg", "-y", "-v", "error", "-i", str(salida), "-i", str(png),
             "-filter_complex",
@@ -147,6 +151,7 @@ def _quemar_texto(salida: Path, texto: dict, on_log: OnLog) -> None:
             + (f" · {seg:.0f}s" if seg > 0 else " · todo el vídeo")
         )
     except Exception as e:  # noqa: BLE001 — un texto no tira un montaje
+        tmp.unlink(missing_ok=True)
         on_log(f"[nicho_ropa] sin texto quemado ({str(e)[:120]})")
     finally:
         import shutil
