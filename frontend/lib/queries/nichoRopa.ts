@@ -275,3 +275,28 @@ export function buildVideoRopaUrl(
 }
 
 export type { PrendaItem };
+
+/** Trae a Moda un producto de "Muestras/Tareas" del POV BOF.
+ *
+ *  Se COPIA, no se mueve: la misma prenda puede dar un vídeo en cada nicho y
+ *  lo que ya tenga hecho en el POV BOF —textos, guion, escaparate, vídeos—
+ *  cuelga de su número en su carpeta de allí.
+ */
+export function useCopiarDePovBof() {
+  const qc = useQueryClient();
+  return useMutation<
+    { slug: string; carpeta: string; prenda: string },
+    Error,
+    { genero: string; source: string; folder: string; producto: string }
+  >({
+    mutationFn: (v) =>
+      api.post(
+        `${ROOT}/prendas/copiar-de-pov-bof?genero=${encodeURIComponent(v.genero)}` +
+          `&source=${encodeURIComponent(v.source)}` +
+          `&folder=${encodeURIComponent(v.folder)}` +
+          `&producto=${encodeURIComponent(v.producto)}`,
+        {},
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["nicho-ropa"] }),
+  });
+}

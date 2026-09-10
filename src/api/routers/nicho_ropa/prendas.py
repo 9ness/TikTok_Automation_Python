@@ -242,6 +242,27 @@ def list_carpetas(
     return CarpetasRopaResponse(items=items)
 
 
+@router.post("/prendas/copiar-de-pov-bof")
+def copiar_de_pov_bof(
+    genero: Annotated[str, Query()],
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+) -> dict:
+    """Trae a Moda un producto de "Muestras/Tareas" del POV BOF.
+
+    Se copia, no se mueve: la misma prenda puede dar un vídeo en cada nicho y
+    lo que ya tenga hecho en el POV BOF —textos, guion, escaparate, vídeos—
+    cuelga de su número en su carpeta de allí.
+    """
+    try:
+        return prendas_web.copiar_desde_pov_bof(genero, source, folder, producto)
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except OSError as e:
+        raise APIError(f"No se pudieron copiar las fotos: {e}", status_code=500) from e
+
+
 @router.post("/mis-prendas")
 async def crear_mi_prenda(
     genero: Annotated[str, Query()],

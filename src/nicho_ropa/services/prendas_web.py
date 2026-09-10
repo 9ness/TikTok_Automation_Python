@@ -158,6 +158,53 @@ def _extension(nombre: str) -> str:
     return ext if ext in _EXTS else ".jpg"
 
 
+def copiar_desde_pov_bof(
+    genero: str, source: str, carpeta: str, producto: str,
+) -> dict:
+    """Copia un producto de "Muestras/Tareas" del POV BOF a un catálogo de Moda.
+
+    Se COPIA y no se mueve: la misma prenda puede dar un vídeo de POV BOF y
+    otro de moda, y moverla dejaría huérfano lo que ya tenga hecho allí
+    —textos, guion, escaparate, vídeos—, que cuelga de su número en su carpeta.
+
+    Sale gratis porque los dos catálogos son del operador y viven en el Drive
+    montado con EL MISMO convenio de nombres (`3.jpg` la limpia, `3(1).jpg` la
+    ficha): leer el par de allí y pasárselo a `guardar_prenda` es todo.
+
+    Lo que NO se lleva son los textos: el prompt de moda pregunta otras cosas
+    (tallas, tejido, cómo sienta) y su extractor los saca al entrar.
+    """
+    from src.nicho_pov_bof.services import mis_productos, photo_pairing
+
+    if not config.es_genero_operador(genero):
+        raise ValueError(f"{genero!r} no es un catálogo tuyo de moda")
+
+    fotos = mis_productos.listar_fotos_como_drive(carpeta, source)
+    par = next(
+        (x for x in photo_pairing.pair_folder(fotos)
+         if str(x.get("producto")) == str(producto)), None,
+    )
+    if not par:
+        raise ValueError(f"No encuentro el producto {producto} en {carpeta}")
+
+    def _leer(foto: dict | None) -> tuple[bytes, str]:
+        if not foto or not foto.get("id"):
+            return b"", ""
+        # El id de estos catálogos ES la ruta con el mtime pegado detrás.
+        ruta = Path(str(foto["id"]).split("#")[0])
+        return (ruta.read_bytes() if ruta.exists() else b""), ruta.name
+
+    limpia, nombre_limpia = _leer(par.get("clean"))
+    if not limpia:
+        raise ValueError("Ese producto no tiene foto limpia que copiar")
+    ficha, nombre_ficha = _leer(par.get("titled"))
+
+    return guardar_prenda(
+        genero, limpia, ficha or None,
+        nombre_limpia=nombre_limpia, nombre_ficha=nombre_ficha,
+    )
+
+
 def guardar_prenda(
     genero: str, limpia: bytes, ficha: bytes | None, *,
     nombre_limpia: str = "", nombre_ficha: str = "",

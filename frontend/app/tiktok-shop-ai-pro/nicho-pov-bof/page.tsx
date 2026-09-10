@@ -107,6 +107,7 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
+import { useCopiarDePovBof } from "@/lib/queries/nichoRopa";
 import { useEsPro, useMe } from "@/lib/queries/auth";
 import { ImportarZipWeb } from "@/components/tiktok-shop-ai-pro/ImportarZipWeb";
 import { Portal } from "@/components/ui/portal";
@@ -1825,6 +1826,9 @@ function ProductoCard({
   carpetaHecha?: boolean;
 }) {
   const setEstado = useSetEstado();
+  // Llevar el producto a Moda: a cuál de los cuatro catálogos y la llamada.
+  const aModa = useCopiarDePovBof();
+  const [destinoModa, setDestinoModa] = useState("mujer_muestras");
   const montar = useMontarConLosClips();
   // Todos los huecos que pide este producto, cubiertos.
   const clipsPuestos =
@@ -2275,6 +2279,51 @@ function ProductoCard({
             salen idénticos—, así que el toque lo da el operador.
             Va al documento COMPARTIDO: el mismo producto se repite en varias
             carpetas y así el siguiente ya no lo abre. */}
+        {/* Llevar el producto a Moda. Solo en TUS catálogos: las carpetas del
+            curso no se pueden copiar a ningún sitio. Se COPIA y no se mueve —
+            la misma prenda puede dar un vídeo en cada nicho, y lo que ya tenga
+            hecho aquí cuelga de su número en esta carpeta. Los textos no se
+            llevan: el prompt de moda pregunta otras cosas (tallas, tejido) y
+            su extractor los saca al entrar. */}
+        {CATALOGOS_PROPIOS.includes(source) && (
+          <span className="inline-flex items-center gap-1">
+            <select
+              value={destinoModa}
+              onChange={(e) => setDestinoModa(e.target.value)}
+              className="rounded-md border border-border/60 bg-background px-1.5 py-1 text-[11px] outline-none"
+              title="A qué catálogo de Moda se copia"
+            >
+              <option value="mujer_muestras">👗 Mujer · muestras</option>
+              <option value="mujer_tareas">👗 Mujer · tareas</option>
+              <option value="hombre_muestras">👔 Hombre · muestras</option>
+              <option value="hombre_tareas">👔 Hombre · tareas</option>
+            </select>
+            <button
+              type="button"
+              disabled={aModa.isPending}
+              title="Copia sus fotos a ese catálogo de Moda (no lo quita de aquí)"
+              onClick={() =>
+                aModa.mutate(
+                  {
+                    genero: destinoModa,
+                    source,
+                    folder: producto.folder || folder,
+                    producto: producto.producto,
+                  },
+                  {
+                    onSuccess: (r) =>
+                      toast.success(`Copiado a Moda · ${r.carpeta} · prenda ${r.prenda}`),
+                    onError: (e) =>
+                      toast.error(e instanceof ApiError ? e.message : String(e)),
+                  },
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-50"
+            >
+              {aModa.isPending ? "Copiando…" : "→ Moda"}
+            </button>
+          </span>
+        )}
         {producto.product_url && !producto.sin_stock && (
           <button
             type="button"
