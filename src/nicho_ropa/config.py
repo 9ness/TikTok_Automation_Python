@@ -166,25 +166,105 @@ MODOS: dict[str, dict] = {
     # que no lleva a nada. Al pegarlos, se añade aquí con `estilo_mof10:
     # "bolso"` y su entrada en `ESTILOS_MOF10`. Ojo: solo vale para prendas
     # que SEAN bolsos — necesita el filtro por categoría (ver tasks.md).
+    # ---- MARCA PERSONAL (sep 2026) -------------------------------------
+    # La otra modalidad de Moda Mujer. Lo que la separa de los de arriba no es
+    # el estilo, es la CUENTA: aquellos van con personajes distintos cada vez y
+    # estos repiten el mismo, que es lo que construye la marca. Por eso llevan
+    # `modalidad` y la pantalla los enseña por separado.
+    #
+    # `categoria` filtra el catálogo: dos de los tres son de calzado y en una
+    # carpeta con vestidos no pintan nada (ver `es_calzado`).
+    "marca_espejo": {
+        "label": "🪞 Espejo Multi Escena 10s",
+        "estilo_mof10": "marca_espejo",
+        "sexos": ("mujer",),
+        "modalidad": "marca",
+    },
+    "marca_zapatos": {
+        "label": "👢 Zapatos Multi Escena 10s",
+        "estilo_mof10": "marca_zapatos",
+        "sexos": ("mujer",),
+        "modalidad": "marca",
+        "categoria": "calzado",
+    },
+    "marca_pov": {
+        "label": "👟 Zapatos Vista POV 10s",
+        "estilo_mof10": "marca_pov",
+        "sexos": ("mujer",),
+        "modalidad": "marca",
+        "categoria": "calzado",
+    },
 }
 MODO_DEFECTO = "espejo"
+# Las dos modalidades de Moda Mujer. Los modos sin `modalidad` son los de
+# siempre (personajes aleatorios); es el defecto para no tocar lo ya guardado.
+MODALIDAD_DEFECTO = "aleatorios"
+# Palabras que delatan un calzado en el título ya extraído. Se filtra por
+# palabra y no con una llamada a la IA porque la pregunta es fácil: en
+# Carruseles hizo falta Gemini porque allí se preguntaba "¿este producto
+# funciona en este formato?", que es de criterio; "¿esto es un zapato?" lo
+# responde una lista.
+#
+# No pretende acertar siempre —"Dr. Martens 1460" no lleva ninguna—, por eso
+# hay interruptor manual por prenda: esto es para no tener que marcar las
+# nueve que sí son obvias.
+PALABRAS_CALZADO = (
+    "zapato", "zapatilla", "zapatillas", "bota", "botas", "botin", "botín",
+    "botines", "sandalia", "sandalias", "deportiva", "deportivas", "tacon",
+    "tacón", "tacones", "mocasin", "mocasín", "mocasines", "bailarina",
+    "bailarinas", "sneaker", "sneakers", "chancla", "chanclas", "alpargata",
+    "alpargatas", "playera", "playeras", "calzado", "slippers", "loafer",
+    "loafers", "heels", "boots", "shoes",
+)
+
+
+def es_calzado(titulo: str) -> bool:
+    """¿El título dice que esto es un zapato?"""
+    import unicodedata
+
+    t = unicodedata.normalize("NFKD", (titulo or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    palabras = set(t.replace("/", " ").replace("-", " ").split())
+    return any(
+        unicodedata.normalize("NFKD", w).encode("ascii", "ignore").decode() in palabras
+        for w in PALABRAS_CALZADO
+    )
+
+
+def categoria_de_modo(modo: str) -> str:
+    """`"calzado"` si ese modo solo vale para zapatos; `""` si vale para todo."""
+    return str(MODOS.get(modo_valido(modo), {}).get("categoria") or "")
+
+
+MODALIDADES: dict[str, str] = {
+    "aleatorios": "🎭 Personajes aleatorios",
+    "marca": "👤 Marca Personal",
+}
 
 
 def modo_valido(modo: str) -> str:
     return modo if modo in MODOS else MODO_DEFECTO
 
 
-def modos_de(sexo: str) -> list[dict[str, str]]:
+def modos_de(sexo: str, modalidad: str = MODALIDAD_DEFECTO) -> list[dict]:
     """Los modos que existen para ese sexo, en el orden de la web.
 
     El de siempre (`espejo`) va el primero y vale para los dos, así que una
     prenda nunca se queda sin ningún modo.
     """
     sexo = sexo if sexo in ("mujer", "hombre") else SEXO_DEFECTO
+    quiere = modalidad if modalidad in MODALIDADES else MODALIDAD_DEFECTO
     return [
         {
             "clave": clave,
             "label": meta["label"],
+            # Con qué se graba: los de marca personal necesitan el personaje
+            # de referencia y los de calzado, que la prenda sea un zapato.
+            "modalidad": meta.get("modalidad", MODALIDAD_DEFECTO),
+            "categoria": meta.get("categoria", ""),
+            "personaje": bool(
+                (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("personaje")
+            ),
             # Si el clip sale HABLADO. Los dos de camiseta no: su paso 2 es
             # solo movimiento, así que no gastan voz del generador —que es lo
             # caro— y la gracia la pone el texto de la prenda.
@@ -194,6 +274,7 @@ def modos_de(sexo: str) -> list[dict[str, str]]:
         }
         for clave, meta in MODOS.items()
         if sexo in meta["sexos"]
+        and meta.get("modalidad", MODALIDAD_DEFECTO) == quiere
     ]
 
 
@@ -545,6 +626,60 @@ def _con_duracion(texto: str, duracion: str) -> str:
 # palabras de la persona. Se marca en la pantalla: un prompt derivado funciona,
 # pero si él publica el suyo hay que pegarlo encima.
 ESTILOS_MOF10: dict[str, dict] = {
+    # ---- MARCA PERSONAL --------------------------------------------------
+    # Tres diferencias con los de arriba, y las tres importan al pegarlos:
+    #   `personaje`  se adjunta la imagen del personaje de referencia. En el
+    #                POV no: su prompt pide una mujer ALEATORIA.
+    #   `ingrediente` la imagen entra en Flow como ingrediente y no como frame
+    #                inicial. Solo el de zapatos multi escena, y equivocarse
+    #                no da error: sale otro vídeo.
+    #   `voz`        ninguno habla. El de zapatos lo prohíbe en su propio
+    #                prompt (`audio: none`), así que la música se pone en
+    #                TikTok al publicar — y aquí hace falta, porque un vídeo
+    #                mudo entero no retiene.
+    "marca_espejo": {
+        "label": "Marca personal · frente al espejo",
+        "voz": False,
+        "duraciones": False,
+        "personaje": True,
+        "ingrediente": False,
+        "por_sexo": {
+            "mujer": (
+                "prompt_marca_espejo_imagen.md",
+                "prompt_marca_espejo_guion.md",
+            ),
+        },
+        "derivado": (),
+    },
+    "marca_zapatos": {
+        "label": "Marca personal · zapatos multi escena",
+        "voz": False,
+        "duraciones": False,
+        "personaje": True,
+        "ingrediente": True,
+        "por_sexo": {
+            "mujer": (
+                "prompt_marca_zapatos_imagen.md",
+                "prompt_marca_zapatos_guion.md",
+            ),
+        },
+        "derivado": (),
+    },
+    "marca_pov": {
+        "label": "Marca personal · zapatos vista POV",
+        "voz": False,
+        "duraciones": False,
+        # Sin personaje: el prompt pide "a completely random young woman".
+        "personaje": False,
+        "ingrediente": False,
+        "por_sexo": {
+            "mujer": (
+                "prompt_marca_pov_imagen.md",
+                "prompt_marca_pov_guion.md",
+            ),
+        },
+        "derivado": (),
+    },
     # De este publica los DOS sexos, así que no se deriva nada: van sus dos
     # textos tal cual. Y hace falta, porque entre ellos cambia más que el
     # género —maquillaje, joyería y un bloque de movimiento entero—.
