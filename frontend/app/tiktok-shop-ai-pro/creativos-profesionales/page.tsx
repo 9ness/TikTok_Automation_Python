@@ -27,6 +27,7 @@ import {
   FUENTE_TOP_VENDIDOS,
   verTopVendidos,
 } from "@/lib/topVendidos";
+import { BotonHerramienta, FLOW_URL } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useEsPro } from "@/lib/queries/auth";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
@@ -36,8 +37,7 @@ import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { FotoProducto } from "@/components/tiktok-shop-ai-pro/FotoProducto";
-import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
-import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
+import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import {
   useCompletarCarpetaCreativos,
   useMarcarPendienteCreativos,
@@ -461,8 +461,12 @@ export default function CreativosProPage() {
             </button>
           )}
 
-          <MagnificSpaces spaces={["carrusel"]} />
-          <OSepara />
+          {/* Aquí no hay vídeo: el creativo es una imagen. */}
+          <BotonHerramienta
+            url={FLOW_URL}
+            label="🖼️ Google Flow"
+            hint="Nano Banana 2 · 3:4"
+          />
           <button
             type="button"
             disabled={!prompt.data}

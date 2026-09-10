@@ -32,6 +32,7 @@ import {
   useSetEstadoRopa,
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
+import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -890,6 +891,7 @@ export function PantallaRopa({
               className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
             >
               <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
+              <span className="text-[9px] text-muted-foreground">(NB2 · 9:16)</span>
             </button>
             {/* Las dos versiones del prompt de vídeo. La única diferencia es la
                 frase de la mano acariciando la ropa. */}
@@ -917,6 +919,9 @@ export function PantallaRopa({
             </button>
           </div>
         )}
+        {/* Aquí la foto Y el vídeo se hacen en Flow: el clip lleva la voz
+            dentro y GenAI Pro no locuta. */}
+        {!esWeb && <HerramientasIA video="flow" />}
       </Paso>
 
       {/* Paso 4 — lo que ya está montado */}

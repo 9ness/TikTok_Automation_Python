@@ -39,6 +39,7 @@ import type {
   OpcionUGC,
   ProductoUGC,
 } from "@/lib/types/nichoGeneral";
+import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -386,6 +387,9 @@ export function PantallaUGC() {
           folder={folder}
           nichos={cfg.data?.nichos ?? []}
         />
+        {/* Aquí la foto Y el vídeo se hacen en Flow: el clip sale ya hablado y
+            GenAI Pro no locuta. */}
+        <HerramientasIA video="flow" />
         <ol className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
           <li>
             1. En Flow, con el <strong>personaje</strong> y la foto del producto
@@ -760,7 +764,7 @@ function TarjetaUGC({
           <div className="space-y-1">
             <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               <ImageIcon className="h-3 w-3" />
-              Fotos · en Flow, con el personaje y el producto
+              Fotos · en Flow (Nano Banana 2 · 9:16), con el personaje y el producto
               {/* Las tres imágenes generadas se parecen entre sí y a la hora
                   de subir los clips no se sabe cuál era cuál. Esto dice de qué
                   va cada escena; va plegado para no ocupar. */}

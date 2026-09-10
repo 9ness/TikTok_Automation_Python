@@ -87,7 +87,8 @@ import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
 import { FiltroSoloUrl } from "@/components/tiktok-shop-ai-pro/FiltroSoloUrl";
-import { Caja, OSepara, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
+import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
+import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
@@ -103,7 +104,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
-import { MagnificSpaces } from "@/components/tiktok-shop-ai-pro/MagnificSpaces";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
@@ -1412,16 +1412,8 @@ export default function NichoPovBofPage() {
             <p className="pt-1 text-[10px] font-semibold text-muted-foreground">
               Y luego, créalos
             </p>
-            {/* Magnific O los prompts: dos caminos para lo mismo. El space de
-                "foto con IA" solo lo usa el admin. */}
-            <MagnificSpaces
-              spaces={[
-                "foto_limpia_normal",
-                "foto_limpia_plazos",
-                ...(esAdmin ? (["foto_ia", "foto_ia_2"] as const) : []),
-              ]}
-            />
-            <OSepara />
+            {/* Dónde se pegan los prompts que se copian debajo. */}
+            <HerramientasIA video="genaipro" />
             <div className="grid grid-cols-2 gap-1.5">
               <button
                 type="button"
@@ -1430,6 +1422,7 @@ export default function NichoPovBofPage() {
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
               >
                 <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
+                <span className="text-[9px] text-muted-foreground">(NB2 · 9:16)</span>
               </button>
               <button
                 type="button"
