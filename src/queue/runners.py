@@ -1765,7 +1765,8 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     video_editor.montar(
         raw_path, salida, voz=voz, conservar_audio=conservar_audio,
         # De él dependen el grado de color y el texto de temporada.
-        modo=str(p.get("modo") or ""), on_log=on_log,
+        modo=str(p.get("modo") or ""),
+        semilla=f"{p.get('carpeta')}/{p.get('producto')}", on_log=on_log,
     )
 
     on_progress(0.95, "💾 Guardando estado…")

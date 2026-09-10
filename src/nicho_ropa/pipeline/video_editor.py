@@ -49,6 +49,9 @@ def montar(
     # El modo de grabación. Los de marca personal llevan grado de color y el
     # texto de temporada quemado; el resto salen tal cual.
     modo: str = "",
+    # Identifica la prenda: de ella sale QUÉ variante de rótulo le toca, para
+    # que dos vídeos seguidos no lleven el mismo adorno.
+    semilla: str = "",
     on_log: OnLog = _noop,
 ) -> Path:
     """Encuadra a 9:16 y deja el vídeo mudo (o con la voz que se le pase).
@@ -81,7 +84,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo con SU audio (la voz que trae el clip)")
-        _rematar(out_path, modo, on_log)
+        _rematar(out_path, modo, semilla, on_log)
         return out_path
 
     if voz is None:
@@ -92,7 +95,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo mudo (sin voz ni música, a propósito)")
-        _rematar(out_path, modo, on_log)
+        _rematar(out_path, modo, semilla, on_log)
         return out_path
 
     # Con voz: el vídeo dura lo que dure la voz. `-shortest` corta por el más
@@ -107,19 +110,21 @@ def montar(
         "-movflags", "+faststart", str(out_path),
     ], on_log)
     on_log(f"[nicho_ropa] vídeo con voz: {voz.name}")
-    _rematar(out_path, modo, on_log)
+    _rematar(out_path, modo, semilla, on_log)
     return out_path
 
 
-def _rematar(salida: Path, modo: str, on_log: OnLog) -> None:
+def _rematar(salida: Path, modo: str, semilla: str, on_log: OnLog) -> None:
     """Texto de temporada (si el formato lo lleva) y metadatos fuera."""
     texto = config.texto_de_modo(modo) if modo else {}
     if texto.get("titulo"):
-        _quemar_texto(salida, texto, on_log)
+        _quemar_texto(salida, texto, semilla, on_log)
     _limpiar(salida, on_log)
 
 
-def _quemar_texto(salida: Path, texto: dict, on_log: OnLog) -> None:
+def _quemar_texto(
+    salida: Path, texto: dict, semilla: str, on_log: OnLog,
+) -> None:
     """Pinta las dos líneas sobre el vídeo. Si falla, el vídeo se queda igual.
 
     `segundos` a 0 significa TODO el vídeo: el formato de vista POV lo lleva
@@ -134,7 +139,10 @@ def _quemar_texto(salida: Path, texto: dict, on_log: OnLog) -> None:
     work = Path(tempfile.mkdtemp(prefix="moda_txt_"))
     tmp = salida.with_name(salida.stem + "__texto" + salida.suffix)
     try:
-        png = _png_texto_moda(texto["titulo"], texto.get("bajada", ""), work)
+        ad = adorno_de(semilla)
+        png = _png_texto_moda(
+            texto["titulo"], texto.get("bajada", ""), work, ad,
+        )
         seg = float(texto.get("segundos") or 0)
         enable = f":enable='between(t,0,{seg:.2f})'" if seg > 0 else ""
         _run([
@@ -147,7 +155,8 @@ def _quemar_texto(salida: Path, texto: dict, on_log: OnLog) -> None:
         ], on_log)
         tmp.replace(salida)
         on_log(
-            f"[nicho_ropa] texto quemado: {texto['titulo']}"
+            f"[nicho_ropa] texto quemado: {texto['titulo']} "
+            f"({ad['titulo'][0] or 'sin adorno'})"
             + (f" · {seg:.0f}s" if seg > 0 else " · todo el vídeo")
         )
     except Exception as e:  # noqa: BLE001 — un texto no tira un montaje
@@ -195,44 +204,87 @@ _TEXTO_Y = 0.42
 _TEXTO_CUERPO = 62
 _TEXTO_BAJADA = 0.75      # de la línea de arriba (medido sobre las capturas)
 
+# Variantes del rótulo: la MISMA idea con otros adornos. La cuenta tiene que
+# verse coherente, pero cien vídeos con el rótulo calcado se leen como una
+# plantilla. Se elige una por prenda y de forma determinista, así que un
+# producto remontado sale igual y dos seguidos no repiten.
+ADORNOS_TEXTO: tuple[dict, ...] = (
+    {"titulo": ("🤎", "🤎"), "bajada": ("🍂", "🍂"),
+     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
+    {"titulo": ("🍂", "🍂"), "bajada": ("🤎", "🤎"),
+     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
+    {"titulo": ("🍁", "🍁"), "bajada": ("✨", "✨"),
+     "fuente_titulo": "PlayfairDisplay-Black.ttf",
+     "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
+    {"titulo": ("🤎", "🤎"), "bajada": ("", ""),
+     "fuente_titulo": "PlayfairDisplay-Black.ttf",
+     "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
+    {"titulo": ("", ""), "bajada": ("🍂", "🍂"),
+     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
+)
 
-def _png_texto_moda(titulo: str, bajada: str, work: Path) -> Path:
-    """Las dos líneas: Italiana en mayúsculas espaciadas y Cormorant cursiva.
 
-    Las tipografías del repo (Montserrat, Playfair Black) no valen para esto:
-    el texto de estos vídeos es serif FINA con espaciado ancho.
+def adorno_de(semilla: str) -> dict:
+    """Qué variante le toca a esa prenda. Determinista: no cambia al remontar."""
+    import hashlib
+
+    h = hashlib.sha1(str(semilla or "").encode("utf-8")).digest()
+    return ADORNOS_TEXTO[h[0] % len(ADORNOS_TEXTO)]
+
+
+def _png_texto_moda(
+    titulo: str, bajada: str, work: Path, adorno: dict | None = None,
+) -> Path:
+    """Las dos líneas con sus adornos, como en los vídeos de referencia.
+
+    Se pinta con el renderizador del POV BOF y no con PIL a pelo porque ese
+    sabe meter EMOJIS en color (Noto) dentro de una línea de texto — y aquí los
+    corazones y las hojas no son un adorno cualquiera: son lo que hace que el
+    rótulo se lea como de moda y no como un subtítulo.
     """
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image
 
-    from src.nicho_pov_bof.pipeline.video_editor import _font_path
-
-    ancho_max = int(1080 * (pov_config.SAFE_X[1] - pov_config.SAFE_X[0]))
-    cuerpo = _TEXTO_CUERPO
-    espaciado = " ".join((titulo or "").strip())
-    medidor = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    # Que quepa: el título va espaciado letra a letra y con un nombre largo se
-    # sale del encuadre.
-    while cuerpo > 30:
-        f = ImageFont.truetype(_font_path("Italiana-Regular.ttf"), cuerpo)
-        if medidor.textbbox((0, 0), espaciado, font=f)[2] <= ancho_max:
-            break
-        cuerpo -= 2
-
-    f_tit = ImageFont.truetype(_font_path("Italiana-Regular.ttf"), cuerpo)
-    f_baj = ImageFont.truetype(
-        _font_path("CormorantGaramond-LightItalic.ttf"), int(cuerpo * _TEXTO_BAJADA),
+    from src.nicho_pov_bof.pipeline.video_editor import (
+        _crop_visible,
+        _render_text_line,
     )
-    alto = int(cuerpo * 2.4)
-    im = Image.new("RGBA", (ancho_max, alto), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    # Sombra suave en vez de borde: sobre estos planos cálidos un contorno
-    # negro se ve como un pegote, y aquí el texto no compite con nada.
-    for capa, color in (((3, 3), (0, 0, 0, 120)), ((0, 0), (255, 253, 250, 255))):
-        d.text((ancho_max // 2 + capa[0], capa[1]), espaciado, font=f_tit,
-               fill=color, anchor="ma")
-        if bajada:
-            d.text((ancho_max // 2 + capa[0], int(cuerpo * 1.25) + capa[1]),
-                   bajada, font=f_baj, fill=color, anchor="ma")
+
+    ad = adorno or ADORNOS_TEXTO[0]
+    ancho_max = int(1080 * (pov_config.SAFE_X[1] - pov_config.SAFE_X[0]))
+
+    def _linea(texto: str, par: tuple, fuente: str, cuerpo: int):
+        izq, der = par
+        completo = f"{izq} {texto} {der}".strip() if izq or der else texto
+        im = _render_text_line(
+            completo, font_size=cuerpo, max_w=ancho_max,
+            fill=(255, 253, 250), stroke=(40, 26, 18), max_lines=1,
+            fuente=fuente, stroke_frac=0.055,
+        )
+        return _crop_visible(im) if im is not None else None
+
+    # El título espaciado letra a letra, como en la referencia.
+    espaciado = " ".join((titulo or "").strip())
+    arriba = _linea(espaciado, ad["titulo"], ad["fuente_titulo"], _TEXTO_CUERPO)
+    abajo = (
+        _linea(bajada, ad["bajada"], ad["fuente_bajada"],
+               int(_TEXTO_CUERPO * _TEXTO_BAJADA))
+        if bajada else None
+    )
+    piezas = [x for x in (arriba, abajo) if x is not None]
+    if not piezas:
+        raise ValueError("texto vacío")
+
+    gap = 8
+    ancho = max(x.width for x in piezas)
+    alto = sum(x.height for x in piezas) + gap * (len(piezas) - 1)
+    im = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+    y = 0
+    for parte in piezas:
+        im.paste(parte, ((ancho - parte.width) // 2, y), parte)
+        y += parte.height + gap
     ruta = work / "texto_moda.png"
     im.save(ruta)
     return ruta
