@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { nombreDescarga } from "@/lib/descargas";
+import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
 
 import { api, ApiError } from "@/lib/api";
 import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
@@ -410,17 +410,19 @@ export function PantallaRopa({
         grupo === "todas" ? true : grupo === "plazos" ? p.plazos : !p.plazos,
       );
     if (!conFoto.length) return;
-    // Una a una con retardo: el navegador móvil cancela las simultáneas.
-    for (const [i, p] of conFoto.entries()) {
-      const a = document.createElement("a");
-      a.href = buildFotoLimpiaRopaUrl(p.producto, carpeta);
-      a.download = nombreDescarga("ropa", p.producto) + ".jpg";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      if (i < conFoto.length - 1) await new Promise((r) => setTimeout(r, 600));
+    // Igual que los vídeos: se baja el contenido y luego se guarda, que es lo
+    // que funciona dentro de la app y además respeta el orden en la galería.
+    const r = await bajarEnOrden(
+      conFoto.map((p) => ({
+        href: buildFotoLimpiaRopaUrl(p.producto, carpeta),
+        nombre: nombreDescarga("ropa", p.producto) + ".jpg",
+      })),
+    );
+    if (r.fallidas) {
+      toast.error(`${r.bajadas} bajadas · ${r.fallidas} fallaron`);
+    } else {
+      toast.success(`${r.bajadas} foto(s) descargadas`);
     }
-    toast.success(`${conFoto.length} foto(s) descargadas`);
   }
 
   const [bajandoVideos, setBajandoVideos] = useState("");
@@ -431,19 +433,24 @@ export function PantallaRopa({
       .filter((p) => (soloConUrl ? p.product_url : true));
     if (!conVideoBajar.length) return;
     setBajandoVideos(`0/${conVideoBajar.length}`);
-    for (const [i, p] of conVideoBajar.entries()) {
-      setBajandoVideos(`${i + 1}/${conVideoBajar.length}`);
-      const a = document.createElement("a");
-      a.href = buildVideoRopaUrl(p.producto, carpeta, p.video_listo_at, true, modo);
-      a.download = nombreDescarga("ropa", p.producto) + ".mp4";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Una a una y con pausa: el navegador del móvil cancela las simultáneas.
-      if (i < conVideoBajar.length - 1) await new Promise((r) => setTimeout(r, 900));
-    }
+    // Por BLOB (`bajarEnOrden`) y no con un `<a href>` a pelo: dentro de la
+    // app el enlace lo coge el gestor de descargas de Android, que guarda con
+    // el nombre que manda el servidor y falla en silencio si ya existe uno
+    // igual — remontar el mismo producto da el mismo nombre, así que el botón
+    // parecía no hacer nada. Es lo que ya usan los Carruseles.
+    const r = await bajarEnOrden(
+      conVideoBajar.map((p) => ({
+        href: buildVideoRopaUrl(p.producto, carpeta, p.video_listo_at, true, modo),
+        nombre: nombreDescarga("ropa", modo, p.producto) + ".mp4",
+      })),
+      (hechos, total) => setBajandoVideos(`${hechos}/${total}`),
+    );
     setBajandoVideos("");
-    toast.success(`${conVideoBajar.length} vídeo(s) descargados`);
+    if (r.fallidas) {
+      toast.error(`${r.bajadas} bajados · ${r.fallidas} fallaron`);
+    } else {
+      toast.success(`${r.bajadas} vídeo(s) descargados`);
+    }
   }
 
   const videosConUrl = items.filter((p) => p.video_path && p.product_url).length;

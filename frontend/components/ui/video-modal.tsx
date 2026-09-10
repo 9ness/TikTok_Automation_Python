@@ -16,6 +16,27 @@ const DEFAULT_VOLUME = 0.15;
  * en móvil. Usado por la cola (`JobVideoDialog`) y el histórico TikTok Shop
  * (`VideoPlayer`).
  */
+/** Baja el fichero y lo guarda. Devuelve `false` si no se pudo. */
+async function guardarComoBlob(url: string, nombre: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Revocarlo en el mismo tick corta la descarga en algunos móviles.
+    setTimeout(() => URL.revokeObjectURL(href), 4000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function VideoModal({
   open,
   onOpenChange,
@@ -42,6 +63,23 @@ export function VideoModal({
   // Velocidad de reproducción — para repasar vídeos más rápido (1x / 1.5x / 2x).
   const SPEEDS = [1, 1.5, 2] as const;
   const [speed, setSpeed] = useState<number>(1);
+  const [bajando, setBajando] = useState(false);
+
+  async function descargar() {
+    if (!downloadUrl) return;
+    setBajando(true);
+    const ok = await guardarComoBlob(downloadUrl, filename || "video.mp4");
+    setBajando(false);
+    if (ok) return;
+    // Red de seguridad: si el blob falla (ficheros enormes, memoria), se
+    // intenta el enlace de siempre antes de decir que no.
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = filename || "video.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
 
   function applySpeed(s: number) {
     setSpeed(s);
@@ -204,11 +242,21 @@ export function VideoModal({
         {/* Botones */}
         {downloadUrl && (
           <div className="grid grid-cols-2 gap-2">
-            <Button asChild variant="outline" size="sm">
-              <a href={downloadUrl} download={filename}>
-                <Download className="h-4 w-4" />
-                Descargar
-              </a>
+            {/* Se baja a BLOB y luego se guarda, en vez de un `<a href>` a
+                pelo. Dentro de la app un enlace normal lo coge el gestor de
+                descargas de Android, que escribe con el nombre del servidor y
+                falla EN SILENCIO si ya existe uno igual — el vídeo remontado
+                del mismo producto se llama igual que el de la vez anterior, y
+                el botón parecía muerto. Guardando el blob, el nombre lo
+                resuelve el sistema y siempre entra. */}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bajando}
+              onClick={() => void descargar()}
+            >
+              <Download className="h-4 w-4" />
+              {bajando ? "Bajando…" : "Descargar"}
             </Button>
             {driveSearchUrl && (
               <Button asChild variant="outline" size="sm">
