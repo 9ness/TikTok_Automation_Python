@@ -21,7 +21,8 @@ export const GENAIPRO_URL = "https://genaipro.io/video-image-ai";
 
 /** Las opciones que hay que dejar puestas en GenAI Pro. Se escriben aquí y no
  *  en cada pantalla porque son las mismas para todos los vídeos. */
-export const GENAIPRO_AJUSTES = "Frames · start + end frame · Portrait 9:16 · 1 vídeo · Original";
+export const GENAIPRO_AJUSTES =
+  "hasta 8s · Frames · start + end frame · Portrait 9:16 · 1 vídeo · Original";
 
 export function BotonHerramienta({
   url,
@@ -71,7 +72,7 @@ export function HerramientasIA({ video = "genaipro" }: { video?: "genaipro" | "f
         <BotonHerramienta
           url={FLOW_URL}
           label="🎬 Google Flow"
-          hint="el vídeo, que aquí lleva la voz dentro"
+          hint="hasta 10s · el vídeo, que aquí lleva la voz dentro"
         />
       )}
     </div>
