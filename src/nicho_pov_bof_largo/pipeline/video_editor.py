@@ -365,6 +365,9 @@ def montar(
     # Acabado del bloque de texto: "" el de siempre (color y destello, con su
     # rotación) o "blanco" el de los POV de 20s nuevos.
     estilo_texto: str = "",
+    # La foto limpia del producto: de ahí sale el COLOR del rótulo (ver
+    # `_elegir_paleta`). Opcional — sin ella se mira el propio vídeo.
+    foto_producto: "Path | None" = None,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -393,6 +396,7 @@ def montar(
         con_flecha=con_flecha,
         con_subliminal=con_subliminal,
         estilo_texto=estilo_texto,
+        foto_producto=foto_producto,
         semilla=semilla or Path(output_path).stem,
         on_log=on_log,
         on_progress=_progreso,

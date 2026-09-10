@@ -2004,25 +2004,29 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     if escrito.get("guion") and bool(guardado.get("guion_plazos")) != plazos:
         on_log("[pov_bof_largo] el guion guardado es del otro modo; lo reescribo")
         escrito = {}
+    # La foto limpia se busca SIEMPRE, no solo cuando hay que escribir el
+    # guion: también decide el color del rótulo, y con un guion ya guardado se
+    # quedaba sin ella (y sin color de producto).
+    foto = None
+    try:
+        from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+        fotos = [
+            drive_client.probe_dimensions(f)
+            for f in drive_client.list_photos(source, folder)
+        ]
+        par = next(
+            (x for x in photo_pairing.pair_folder(fotos)
+             if str(x.get("producto")) == producto), None,
+        )
+        limpia = (par or {}).get("clean") or {}
+        if limpia.get("id"):
+            foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
+    except Exception as e:  # noqa: BLE001 — sin foto se sigue, con menos tino
+        on_log(f"[pov_bof_largo] sin foto del producto ({e})")
+
     if not escrito.get("guion"):
         on_progress(0.10, "✍️ Escribiendo el guion…")
-        foto = None
-        try:
-            from src.nicho_pov_bof.services import drive_client, photo_pairing
-
-            fotos = [
-                drive_client.probe_dimensions(f)
-                for f in drive_client.list_photos(source, folder)
-            ]
-            par = next(
-                (x for x in photo_pairing.pair_folder(fotos)
-                 if str(x.get("producto")) == producto), None,
-            )
-            limpia = (par or {}).get("clean") or {}
-            if limpia.get("id"):
-                foto = drive_client.fetch_photo(limpia["id"], suffix=".jpg")
-        except Exception as e:
-            on_log(f"[pov_bof_largo] sin foto para el guion ({e}) — solo texto")
         # Con el modo que se pidió (precio o punto de dolor) y lo que ese
         # producto puede prometer. Antes salía siempre el prompt de defecto:
         # montar sin guion previo en "punto de dolor" daba un vídeo de precio.
@@ -2103,6 +2107,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             estilo_texto=largo_config.estilo_texto_valido(
                 str(p.get("estilo_texto") or "")
             ),
+            # La misma foto que se bajó para el guion: de ella sale el COLOR
+            # del rótulo. En el vídeo no se puede medir —medio encuadre es la
+            # mano y la encimera— y salía siempre la misma paleta.
+            foto_producto=foto,
             on_log=on_log,
             on_progress=_progreso,
         )

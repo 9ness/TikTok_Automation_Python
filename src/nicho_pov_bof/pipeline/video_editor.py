@@ -1164,7 +1164,97 @@ def _tono_dominante(video: Path) -> tuple[float, float]:
     )
 
 
-def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> dict:
+def _tono_de_imagen(img) -> tuple[float, float]:
+    """Matiz dominante de lo que tiene COLOR en una imagen, y cuánto hay.
+
+    Los grises (blanco del fondo de la ficha, negro del envase) no votan: lo
+    que se busca es el color de marca, que es el que va a llevar el rótulo.
+    """
+    import numpy as np
+
+    if img is None:
+        return 0.0, 0.0
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    matiz, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+    vale = (sat > 70) & (val > 60)
+    if not vale.any():
+        return 0.0, 0.0
+    votos = np.zeros(24)
+    # OpenCV da el matiz en 0-179: ×2 son grados, en bandas de 15°. El
+    # `astype` NO es cosmético: en uint8, un morado (150) por 2 se salía de
+    # rango y daba 44 — o sea, naranja. Todos los productos fríos se medían
+    # como cálidos.
+    grados = matiz[vale].astype(np.int32) * 2
+    for banda, cuenta in zip(*np.unique(grados // 15, return_counts=True)):
+        votos[int(banda) % 24] += float(cuenta)
+    return (
+        float(votos.argmax() * 15 + 7),
+        min(1.0, float(vale.sum()) / matiz.size / 0.35),
+    )
+
+
+def _tono_producto(video: Path, foto: "Path | None" = None) -> tuple[float, float]:
+    """Matiz del PRODUCTO y cuánto color tiene (0-1).
+
+    El fondo dice contra qué se lee el texto, pero no de qué va el vídeo: en
+    estos clips el fondo es casi siempre una cocina o una mesa —beige, madera—
+    y elegir solo por contraste sacaba la paleta más lejana de ese beige (el
+    cian de petróleo) en todos los vídeos, fuera el producto lo que fuera.
+
+    Aquí se mira la zona del CENTRO, que es donde está el producto en la mano,
+    y solo los píxeles con color de verdad (saturados): el matiz que más se
+    repite es el del bote. La segunda cifra es qué parte de esa zona tiene
+    color — con un producto blanco o negro sale casi cero y entonces este
+    criterio no debe pesar nada.
+    """
+    import numpy as np
+
+    # La FOTO manda cuando la hay: es el producto solo, recortado y sobre
+    # fondo claro. En el vídeo, el centro es medio bote y media mano, y la
+    # piel (~20°) le ganaba la votación a cualquier envase.
+    if foto is not None:
+        try:
+            tono, fuerza = _tono_de_imagen(cv2.imread(str(foto)))
+        except Exception:  # noqa: BLE001 — sin foto legible, se mira el vídeo
+            tono, fuerza = 0.0, 0.0
+        if fuerza > 0.03:
+            return tono, fuerza
+
+    votos = np.zeros(24)          # bandas de 15°
+    total, coloreados = 0, 0
+    for frac in (0.2, 0.5, 0.8):
+        f = video.with_name(f"_prod_{int(frac*100)}.jpg")
+        try:
+            dur = probe_duration(video)
+            _run(["ffmpeg", "-y", "-v", "error", "-ss", f"{dur*frac:.2f}",
+                  "-i", str(video), "-frames:v", "1", "-vf", "scale=240:-1",
+                  str(f)], _noop)
+            img = cv2.imread(str(f))
+            f.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001 — sin muestra, este criterio no juega
+            img = None
+        if img is None:
+            continue
+        h, w = img.shape[:2]
+        centro = img[int(h * 0.30):int(h * 0.92), int(w * 0.20):int(w * 0.80)]
+        hsv = cv2.cvtColor(centro, cv2.COLOR_BGR2HSV)
+        matiz, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+        vale = (sat > 70) & (val > 60)
+        total += matiz.size
+        coloreados += int(vale.sum())
+        if vale.any():
+            grados = matiz[vale].astype(np.int32) * 2   # ver `_tono_de_imagen`
+            for banda, cuenta in zip(*np.unique(grados // 15, return_counts=True)):
+                votos[int(banda) % 24] += float(cuenta)
+    if not votos.any() or not total:
+        return 0.0, 0.0
+    return float(votos.argmax() * 15 + 7), min(1.0, coloreados / total / 0.35)
+
+
+def _elegir_paleta(
+    video: Path, textos: dict, semilla: str, on_log: OnLog,
+    foto: "Path | None" = None,
+) -> dict:
     """Paleta para este producto: que pegue con los emojis y contraste con el vídeo.
 
     Tres criterios, en este orden de peso:
@@ -1178,6 +1268,7 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
     """
     emojis = (textos.get("gancho") or "") + (textos.get("cta") or "")
     tono_fondo, _luz = _tono_dominante(video)
+    tono_prod, color_prod = _tono_producto(video, foto)
     desempate = sum(ord(c) for c in str(semilla))
     # En cuanto la estación tiene paleta propia, juegan SOLO las suyas: si se
     # mezclan con las de todo el año, en otoño salen vídeos en magenta o cian
@@ -1200,6 +1291,14 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
         # el peso de estación por encima salía la paleta de la época aunque se
         # comiera con el fondo, que es justo lo contrario de lo que hace falta.
         p += 5.0 * d
+        # Que PEGUE con el producto. Sin esto mandaba solo el contraste con el
+        # fondo y, como el fondo es siempre una cocina beige, ganaba siempre la
+        # misma (el cian) — una creatina de cereza salía en azul. Pesa según lo
+        # coloreado que sea el producto: con uno blanco o negro no vota.
+        if color_prod > 0.05:
+            dp = abs(pal["tono"] - tono_prod) % 360
+            dp = min(dp, 360 - dp) / 180
+            p += 5.0 * (1 - dp) * color_prod
         # (Ya no hay bonus por temporada: o todas las candidatas son de la
         # estación o ninguna lo es, así que sumaba lo mismo a todas.)
         # Variedad: a igualdad de contraste, rota por producto. Subido de 0.1
@@ -1213,6 +1312,7 @@ def _elegir_paleta(video: Path, textos: dict, semilla: str, on_log: OnLog) -> di
     elegida = max(enumerate(candidatas), key=puntos)[1]
     on_log(
         f"[3/5] paleta '{elegida['nombre']}' (fondo ~{tono_fondo:.0f}°, "
+        f"producto ~{tono_prod:.0f}° x{color_prod:.2f}, "
         f"emojis {emojis.strip() or '—'})"
     )
     return elegida
@@ -1325,7 +1425,7 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
     # el mismo color una y otra vez: medido, 2 colores distintos en 12
     # productos, frente a 6 eligiendo antes. Los emojis no se ven en este
     # estilo, pero siguen valiendo para decidir el tono.
-    paleta = _elegir_paleta(video_in, textos, semilla, on_log)
+    paleta = _elegir_paleta(video_in, textos, semilla, on_log, foto_producto)
     if estilo_texto == "blanco":
         # El orden importa: las tres líneas son UNA frase, así que el nombre
         # del producto va el último sí o sí (el layout que rota lo pone a
@@ -1645,6 +1745,10 @@ def build_video(
     # de color y tipografía. "blanco" = las tres líneas iguales, en blanco con
     # borde negro fino, como los POV de 20s nuevos y como el UGC.
     estilo_texto: str = "",
+    # La foto LIMPIA del producto. Solo se usa para elegir el color del
+    # rótulo: es de donde sale el color de la marca, que en el vídeo no se
+    # puede medir (medio encuadre es la mano y la encimera).
+    foto_producto: "Path | None" = None,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
