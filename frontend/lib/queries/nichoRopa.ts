@@ -256,8 +256,13 @@ function conApiKey(path: string): string {
 }
 
 /** Un <img> no manda headers, así que la api_key va por query. */
-export function buildFotoRopaUrl(fileId: string): string {
-  return conApiKey(`${ROOT}/foto?file_id=${encodeURIComponent(fileId)}`);
+export function buildFotoRopaUrl(fileId: string, ancho = 0): string {
+  // Con ancho sale encogida: la tarjeta pinta un cuadrado pequeño y pedir la
+  // foto entera eran uno o dos megas por prenda.
+  return conApiKey(
+    `${ROOT}/foto?file_id=${encodeURIComponent(fileId)}` +
+      (ancho ? `&w=${ancho}` : ""),
+  );
 }
 
 export function buildFotoLimpiaRopaUrl(producto: string, carpeta: string): string {

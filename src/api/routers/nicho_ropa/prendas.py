@@ -624,7 +624,9 @@ def extraer_textos(
     return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
 
 
-def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
+def _servir_foto(
+    file_id: str, descargar: bool, nombre: str, ancho: int = 0,
+) -> FileResponse:
     # Las fotos de la web y las de los catálogos propios llevan la RUTA como
     # id (no hay ID de Google), así que aquí NO vale el patrón de Drive: con él
     # la miniatura salía rota y el 400 no llegaba a verse en ningún sitio.
@@ -635,6 +637,16 @@ def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
         path = drive_client.fetch_photo(file_id)
     except (RuntimeError, ValueError) as e:
         raise APIError(str(e), status_code=502) from e
+    # Encogida para las miniaturas, como en el POV BOF: la tarjeta pinta un
+    # cuadrado de 64px y mandaba la foto entera —uno o dos megas por prenda—,
+    # así que una carpeta de diez eran veinte megas cada vez que se entraba.
+    if ancho and not descargar:
+        try:
+            from src.nicho_pov_bof.services import thumbs
+
+            path = thumbs.miniatura(path, ancho) or path
+        except Exception:  # noqa: BLE001 — sin miniatura se sirve la original
+            pass
     return FileResponse(
         str(path),
         media_type="image/png" if path.suffix.lower() == ".png" else "image/jpeg",
@@ -644,15 +656,30 @@ def _servir_foto(file_id: str, descargar: bool, nombre: str) -> FileResponse:
         # foto con la misma URL. Cachearla un día enseñaba la vieja — pasó en
         # el POV BOF y allí se resolvió igual.
         headers={
-            "Cache-Control": "no-cache" if propia else "public, max-age=86400",
+            # Las de los catálogos propios llevan la fecha del fichero pegada
+            # al id (`ruta#mtime`), así que al sustituir una foto cambia la URL
+            # y se puede cachear igual que las de Drive. Solo van sin caché las
+            # que llegan sin esa marca, que son las que sí pueden repetir ruta.
+            "Cache-Control": (
+                "public, max-age=86400"
+                if (not propia or "#" in str(file_id))
+                else "no-cache"
+            ),
         },
     )
 
 
 @router.get("/foto")
-def get_foto(file_id: Annotated[str, Query()]) -> FileResponse:
-    """Miniatura/foto por file ID (el nombre no vale: hay duplicados)."""
-    return _servir_foto(file_id, descargar=False, nombre="")
+def get_foto(
+    file_id: Annotated[str, Query()],
+    w: Annotated[int, Query()] = 0,
+) -> FileResponse:
+    """Miniatura/foto por file ID (el nombre no vale: hay duplicados).
+
+    Con `w` sale encogida a ese ancho: es lo que pide la tarjeta, que solo
+    necesita reconocer la prenda.
+    """
+    return _servir_foto(file_id, descargar=False, nombre="", ancho=w)
 
 
 @router.get("/foto-limpia")

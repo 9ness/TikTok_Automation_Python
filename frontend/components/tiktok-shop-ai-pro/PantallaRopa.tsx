@@ -1190,7 +1190,9 @@ function PrendaCard({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={buildFotoRopaUrl(prenda.clean_photo_id)}
+              // 160 px: la tarjeta la pinta a 64 y el doble cubre pantallas
+              // retina sin traerse la foto de dos megas.
+              src={buildFotoRopaUrl(prenda.clean_photo_id, 160)}
               alt={`Prenda ${prenda.producto}`}
               loading="lazy"
               className="h-16 w-16 rounded-lg object-cover transition hover:opacity-80"
