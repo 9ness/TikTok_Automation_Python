@@ -349,6 +349,9 @@ export function PantallaRopa({
   // Con el modo: la pantalla enseña SOLO el prompt del modo en el que estás.
   // Con los dos a la vista era cuestión de tiempo copiar el que no era.
   const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "", duracion, modalidad);
+  // El backend manda SOLO el estilo del modo activo, así que el primero de
+  // la lista es el suyo.
+  const modoEstilo = (prompts.data?.mof10 ?? [])[0]?.clave ?? "";
   // Los modos son del SEXO, no de la pantalla: en hombre hay cuatro formatos
   // y en mujer dos, y cada uno guarda su propio vídeo de la misma prenda.
   const modos = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
@@ -1030,6 +1033,12 @@ export function PantallaRopa({
               prenda={p}
               carpeta={carpeta}
               esWeb={esWeb}
+              // Lo dice el formato elegido, no la pantalla: en marca personal
+              // los tres son mudos, pero mañana puede haber uno que hable.
+              mudo={
+                (prompts.data?.mof10 ?? []).find((e) => e.clave === modoEstilo)
+                  ?.voz === false
+              }
               modo={modo}
               onCopiar={copiar}
             />
@@ -1044,12 +1053,15 @@ function PrendaCard({
   prenda,
   carpeta,
   esWeb,
+  mudo = false,
   modo,
   onCopiar,
 }: {
   prenda: PrendaItem;
   carpeta: string;
   esWeb: boolean;
+  /** El formato no lleva voz (marca personal): no hay audio que elegir. */
+  mudo?: boolean;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
    *  y dónde se guarda el que se suba. */
   modo: string;
@@ -1266,6 +1278,10 @@ function PrendaCard({
       {/* La voz, plegada en un chip como los ajustes del POV BOF: se deja en
           el valor de siempre y solo se abre cuando de verdad hay que
           cambiarla. Ocupaba una fila entera por prenda, diez por carpeta. */}
+      {/* En los formatos mudos no hay nada que elegir: el clip sale sin voz
+          por diseño y la música se pone en TikTok. Enseñar "Su voz" ahí era
+          ofrecer un ajuste que no hace nada. */}
+      {!mudo && (
       <div className="flex gap-1">
         <ChipAjuste
           icono={audio === "" ? (esWeb ? "🎙️" : "🔇") : audio === "mudo" ? "🔇" : audio === "hombre" ? "👨" : "👩"}
@@ -1275,7 +1291,8 @@ function PrendaCard({
           title="Qué audio lleva el vídeo montado"
         />
       </div>
-      {verVoz && (
+      )}
+      {!mudo && verVoz && (
         <div className={`grid gap-1 ${esWeb ? "grid-cols-4" : "grid-cols-3"}`}>
           {/* El defecto va primero: es lo que el operador quiere casi siempre.
               En la web es la voz del propio clip; en el curso, mudo. */}
