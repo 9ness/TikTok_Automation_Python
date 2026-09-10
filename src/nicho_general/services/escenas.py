@@ -129,6 +129,16 @@ _FORMATO = (
     # eso el generador la pone cuando le apetece: unos clips salen con banda
     # sonora y otros no, y al pegarlos la música entra y sale de golpe. Hay que
     # prohibirla explícitamente — no basta con no mencionarla.
+    # El generador se inventa la interfaz cuando oye la llamada a la acción:
+    # en la escena de la CTA salió un botón de "SUSCRIBIRSE" flotando sobre la
+    # encimera. El prompt de IMAGEN ya lo prohíbe (lo dice el documento del
+    # curso), pero el de vídeo no decía nada y ahí es donde aparece.
+    "12. Di también en cada `prompt_video` que en el clip NO aparece ningún "
+    "elemento gráfico: ni botones, ni iconos de suscribirse o de me gusta, ni "
+    "flechas, ni rótulos, ni textos, ni logotipos, ni marcas de agua, ni "
+    "interfaces de ninguna app. Solo la persona, el producto y el escenario. "
+    "Insístelo sobre todo en la escena de la llamada a la acción: al oír «ve "
+    "al carrito» el generador tiende a dibujar la interfaz.\n"
     "11. Termina cada `prompt_video` diciendo que el clip NO lleva música de "
     "fondo, ni banda sonora, ni efectos de sonido añadidos: lo único que se "
     "oye es la voz de la persona hablando, con el sonido natural de la escena. "
