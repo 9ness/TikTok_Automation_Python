@@ -771,9 +771,13 @@ export function PantallaRopa({
         color="esmeralda"
         titulo="Copiar el prompt"
         hint={
-          esWeb
-            ? "Se pega en el generador junto con la foto. El de plazos SOLO para las prendas que lo ofrecen: lo dice la persona del vídeo y no hay arreglo después."
-            : "Se pega en el generador junto con la foto de la prenda."
+          // En marca personal no hay versión con plazos: nadie habla, así que
+          // no hay dónde meter la frase de la financiación.
+          esMarca
+            ? "Se pega en el generador junto con la foto. Estos formatos salen mudos: la música se pone en TikTok al publicar."
+            : esWeb
+              ? "Se pega en el generador junto con la foto. El de plazos SOLO para las prendas que lo ofrecen: lo dice la persona del vídeo y no hay arreglo después."
+              : "Se pega en el generador junto con la foto de la prenda."
         }
       >
         {esWeb && prompts.data?.video_espejo ? (
@@ -886,31 +890,45 @@ export function PantallaRopa({
                 <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1 · Imagen
                 (Flow)
               </button>
-              <div className="grid grid-cols-2 gap-2">
+              {/* En los formatos MUDOS el paso 2 no es un guion: es el prompt
+                  de MOVIMIENTO, y no existe versión con plazos — los plazos se
+                  meten en lo que DICE la persona, y aquí no dice nada. */}
+              {e.voz === false ? (
                 <button
                   type="button"
-                  onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                  onClick={() => copiar(`Vídeo · ${e.label}`, e.guion)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
                 >
-                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Vídeo
+                  (movimiento)
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    copiar(
-                      `Guion con plazos · ${e.label}`,
-                      // El guion es lo único que cambia entre las dos
-                      // versiones; la imagen del paso 1 es la misma.
-                      (promptsPlazos.data?.mof10 ?? []).find(
-                        (x) => x.clave === e.clave,
-                      )?.guion ?? e.guion,
-                    )
-                  }
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
-                >
-                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion 💳
-                </button>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copiar(
+                        `Guion con plazos · ${e.label}`,
+                        // El guion es lo único que cambia entre las dos
+                        // versiones; la imagen del paso 1 es la misma.
+                        (promptsPlazos.data?.mof10 ?? []).find(
+                          (x) => x.clave === e.clave,
+                        )?.guion ?? e.guion,
+                      )
+                    }
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion 💳
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         {!esWeb && (
