@@ -99,13 +99,6 @@ class TestModosDeGrabacion:
 
         assert estilos("espejo") == ["espejo"]
         assert estilos("camara") == ["movil"]
-        # Y el prompt de UNA tirada es del espejo: en el otro modo no se graba
-        # delante de uno, así que llega vacío y la pantalla no lo pinta.
-        sin_espejo = c.get(
-            "/api/v1/nicho-ropa/prompts",
-            params={"carpeta": "hombre_web__Carpeta 1", "modo": "camara"},
-        ).json()
-        assert sin_espejo["video_espejo"] == ""
 
 
 class TestPlazosEnElPrompt:
@@ -130,18 +123,32 @@ class TestPlazosEnElPrompt:
 
     def test_por_defecto_no_los_menciona(self):
         datos = self._prompts(False)
-        assert "plazos" not in datos["video_espejo"].lower()
         for estilo in datos["mof10"]:
+            # Salvo los que la llevan escrita en su propio ejemplo (selfie de
+            # mujer y gafas): eso es del curso, no del interruptor, y por eso
+            # se marcan con `plazos_fijo` y la pantalla lo avisa.
+            if estilo["plazos_fijo"]:
+                continue
             assert "plazos" not in estilo["guion"].lower()
 
     def test_con_el_interruptor_si(self):
         datos = self._prompts(True)
-        assert "plazos" in datos["video_espejo"].lower()
+        assert any("plazos" in e["guion"].lower() for e in datos["mof10"])
+
+    def test_solo_lo_dicen_los_formatos_que_lo_tienen(self):
+        """El botón "con plazos" solo sale donde de verdad cambia el texto.
+
+        El curso publicó la frase en el del espejo (y en el selfie de hombre);
+        en los demás formatos el prompt es el mismo la ofrezca o no, y el botón
+        copiaba exactamente lo mismo — que es peor que no tenerlo.
+        """
+        sin, con = self._prompts(False), self._prompts(True)
+        for a, b in zip(sin["mof10"], con["mof10"]):
+            assert a["plazos"] == (a["guion"] != b["guion"])
 
     def test_no_se_escapa_ningun_marcador(self):
         for plazos in (True, False):
             datos = self._prompts(plazos)
-            assert "{{" not in datos["video_espejo"]
             for estilo in datos["mof10"]:
                 assert "{{" not in estilo["guion"] and "{{" not in estilo["imagen"]
 
@@ -343,14 +350,31 @@ class TestModosPorSexo:
     textos.
     """
 
-    def test_hombre_tiene_los_cuatro_formatos(self):
+    def test_hombre_tiene_sus_formatos(self):
         assert [m["clave"] for m in config.modos_de("hombre")] == [
             "espejo", "camara", "calle_1", "calle_2",
+            "gafas_coche", "sarcastica", "maniqui",
         ]
 
     def test_mujer_solo_los_que_tienen_prompt(self):
         """El del bolso existe en su web pero aún no publica sus prompts."""
-        assert [m["clave"] for m in config.modos_de("mujer")] == ["espejo"]
+        assert [m["clave"] for m in config.modos_de("mujer")] == [
+            "espejo", "camara", "calle_1", "calle_2",
+        ]
+
+    def test_marca_personal_va_aparte(self):
+        """No son un ajuste de los de arriba: son otra cuenta de TikTok."""
+        assert [m["clave"] for m in config.modos_de("mujer", "marca")] == [
+            "marca_espejo", "marca_zapatos", "marca_pov",
+        ]
+        assert not config.modos_de("hombre", "marca")
+
+    def test_cada_modo_dice_lo_que_se_ve(self):
+        """Siete botones con un emoji no dicen qué sale en el vídeo."""
+        for modalidad in ("aleatorios", "marca"):
+            for sexo in ("hombre", "mujer"):
+                for m in config.modos_de(sexo, modalidad):
+                    assert m["desc"], m["clave"]
 
     @pytest.mark.parametrize("sexo", ["hombre", "mujer"])
     def test_ningun_modo_se_queda_sin_sus_dos_prompts(self, sexo):

@@ -121,34 +121,40 @@ def es_genero_operador(genero: str) -> bool:
 # los vídeos ya grabados.
 MODOS: dict[str, dict] = {
     "espejo": {
+        "desc": "La prenda puesta, grabándose frente a un espejo de cuerpo entero en casa. El de siempre, y de los pocos con versión de pago a plazos.",
         "label": "🪞 BOF Frente a Espejo",
         "estilo_mof10": "espejo",
         "sexos": ("mujer", "hombre"),
     },
     "camara": {
+        "desc": "Selfie con el móvil en la mano, hablando a cámara con la prenda puesta.",
         "label": "🤳 BOF Selfie",
         "estilo_mof10": "movil",
         # Desde sep 2026 lo publica también para mujer, con su propio texto.
         "sexos": ("mujer", "hombre"),
     },
     "calle_1": {
+        "desc": "En la calle: alguien le para y le piropea el outfit. El diálogo viene cerrado del curso.",
         "label": "🚶 Situación Real 1",
         "estilo_mof10": "real_1",
         # Desde sep 2026 también está en Moda Chica, con su propia imagen.
         "sexos": ("mujer", "hombre"),
     },
     "calle_2": {
+        "desc": "Igual que Situación Real 1 pero sentados en una terraza, y ahí habla primero el grupo.",
         "label": "☕ Situación Real 2",
         "estilo_mof10": "real_2",
         # Desde sep 2026 también está en Moda Chica, con sus dos textos.
         "sexos": ("mujer", "hombre"),
     },
     "gafas_coche": {
+        "desc": "Selfie en el asiento del conductor con el coche parado. Es para GAFAS, no para ropa.",
         "label": "🕶️ Gafas en Coche",
         "estilo_mof10": "gafas",
         "sexos": ("hombre",),
     },
     "sarcastica": {
+        "desc": "Camiseta con frase, comprando en un súper sin mirar a cámara. Sale MUDO: la gracia la pone el texto de la camiseta.",
         "label": "😏 Camiseta Sarcástica",
         "estilo_mof10": "sarcastica",
         "sexos": ("hombre",),
@@ -157,6 +163,7 @@ MODOS: dict[str, dict] = {
     # se deja en hombre porque es donde lo publica y porque el resto del menú
     # de mujer va con modelo.
     "maniqui": {
+        "desc": "La camiseta en un maniquí sin cabeza y dos manos estirándola. Sin persona y MUDO.",
         "label": "🧍 Camiseta Maniquí",
         "estilo_mof10": "maniqui",
         "sexos": ("hombre",),
@@ -175,12 +182,14 @@ MODOS: dict[str, dict] = {
     # `categoria` filtra el catálogo: dos de los tres son de calzado y en una
     # carpeta con vestidos no pintan nada (ver `es_calzado`).
     "marca_espejo": {
+        "desc": "Tu personaje fijo frente al espejo, varias escenas en un clip.",
         "label": "🪞 Espejo Multi Escena 10s",
         "estilo_mof10": "marca_espejo",
         "sexos": ("mujer",),
         "modalidad": "marca",
     },
     "marca_zapatos": {
+        "desc": "Tu personaje fijo con los zapatos, varias escenas. Solo calzado.",
         "label": "👢 Zapatos Multi Escena 10s",
         "estilo_mof10": "marca_zapatos",
         "sexos": ("mujer",),
@@ -188,6 +197,7 @@ MODOS: dict[str, dict] = {
         "categoria": "calzado",
     },
     "marca_pov": {
+        "desc": "Los zapatos vistos desde arriba, en primera persona. Solo calzado.",
         "label": "👟 Zapatos Vista POV 10s",
         "estilo_mof10": "marca_pov",
         "sexos": ("mujer",),
@@ -280,6 +290,10 @@ def modos_de(sexo: str, modalidad: str = MODALIDAD_DEFECTO) -> list[dict]:
             # Con qué se graba: los de marca personal necesitan el personaje
             # de referencia y los de calzado, que la prenda sea un zapato.
             "modalidad": meta.get("modalidad", MODALIDAD_DEFECTO),
+            # Qué se ve en ese vídeo, en una frase. Va en el backend y no en
+            # la pantalla porque es lo que dice el curso de cada formato, y
+            # sin ello los modos son siete botones con un emoji.
+            "desc": meta.get("desc", ""),
             "categoria": meta.get("categoria", ""),
             "personaje": bool(
                 (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("personaje")
@@ -449,55 +463,6 @@ def prompt_video_percha() -> str:
 
 # ---------------------------------------------------------------------------
 # Prompt del espejo (el de la web, con persona)
-# ---------------------------------------------------------------------------
-# Las carpetas del ZIP vienen de la web del curso, y allí la ropa NO se enseña
-# en percha: se enseña puesta, grabándose frente al espejo. Ese prompt solo
-# está publicado en su versión de mujer, así que la de hombre se deriva
-# cambiando las cinco piezas que hablan de quién graba — igual que hace Jonny
-# en el Nicho Zapatos, donde el par mujer/hombre es el mismo texto con
-# `adult woman` → `adult man`.
-SEXOS: dict[str, dict[str, str]] = {
-    "mujer": {
-        "label": "Mujer",
-        "CREADOR": "Una creadora española joven y guapa",
-        "SUJETO_DICE": "La mujer dice en español:",
-        "VOZ_SINC": "voz femenina española, juvenil y natural",
-        "EJEMPLO": (
-            "Han ajustado el precio de estos jeans virales. Son elásticos y de "
-            "campana. Comprueba tus cupones antes de comprar.{{FRASE_PLAZOS}}"
-        ),
-        "VOZ_DESC": (
-            "Voz femenina ligera, viva y luminosa, perteneciente a una mujer de "
-            "aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un "
-            "timbre cálido, amigable y cercano. Ritmo conversacional ágil y "
-            "natural, ligeramente enérgico y espontáneo, como una creadora UGC "
-            "real. Pronunciación española clara, sin tono de locutora publicitaria "
-            "y sin entonación robótica. La misma voz debe mantenerse en las tres "
-            "escenas, con sincronización labial precisa."
-        ),
-    },
-    "hombre": {
-        "label": "Hombre",
-        "CREADOR": "Un creador español joven y atractivo",
-        "SUJETO_DICE": "El hombre dice en español:",
-        "VOZ_SINC": "voz masculina española, juvenil y natural",
-        "EJEMPLO": (
-            "Han ajustado el precio de esta sudadera viral. Es de algodón grueso "
-            "y cae perfecta. Comprueba tus cupones antes de comprar."
-            "{{FRASE_PLAZOS}}"
-        ),
-        "VOZ_DESC": (
-            "Voz masculina natural, viva y cercana, perteneciente a un hombre de "
-            "aproximadamente 25 años. Tono medio-grave, limpio y claro, con un "
-            "timbre cálido, amigable y cercano. Ritmo conversacional ágil y "
-            "natural, ligeramente enérgico y espontáneo, como un creador UGC "
-            "real. Pronunciación española clara, sin tono de locutor publicitario "
-            "y sin entonación robótica. La misma voz debe mantenerse en las tres "
-            "escenas, con sincronización labial precisa."
-        ),
-    },
-}
-
 SEXO_DEFECTO = "mujer"
 
 
@@ -512,21 +477,6 @@ def sexo_de_carpeta(slug: str) -> str:
         if genero.startswith("hombre"):
             return "hombre"
     return SEXO_DEFECTO
-
-
-def prompt_video_espejo(sexo: str = SEXO_DEFECTO, plazos: bool = False) -> str:
-    """El prompt de la web con las palabras de ESE sexo ya sustituidas.
-
-    `plazos` mete la frase de la financiación en lo que dice la persona. Va
-    apagado por defecto: prometerla cuando no la hay es lo caro, y aquí no se
-    puede corregir después — la voz la pone el propio vídeo.
-    """
-    piezas = SEXOS.get(sexo) or SEXOS[SEXO_DEFECTO]
-    texto = _limpio("prompt_video_espejo.md")
-    for clave, valor in piezas.items():
-        if clave != "label":
-            texto = texto.replace("{{" + clave + "}}", valor)
-    return _con_plazos(texto, plazos)
 
 
 # ---------------------------------------------------------------------------
@@ -865,6 +815,12 @@ def prompts_mof10(
         if propios:
             # Suyos los dos: se sirven literales, sin sustituir nada.
             imagen, guion = (_limpio(f) for f in propios)
+        elif not meta.get("imagen"):
+            # Estilo que SOLO existe por sexo (los de marca personal son de
+            # mujer): pedido para el otro, no hay texto que derivar. Antes esto
+            # reventaba con KeyError y devolvía un 500 al pedir los prompts de
+            # una carpeta de hombre sin decir el modo.
+            continue
         else:
             imagen = _con_sexo(meta["imagen"], sexo, SEXOS_MOF10)
             guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
@@ -887,6 +843,16 @@ def prompts_mof10(
             "personaje": bool(meta.get("personaje")),
             "ingrediente": bool(meta.get("ingrediente")),
             "voz": bool(meta.get("voz", True)),
+            # Si ESTE formato tiene de verdad versión con plazos. La frase va
+            # dentro de lo que dice la persona, y el curso solo la publicó en
+            # el del espejo: en los demás el botón copiaba el MISMO texto y
+            # parecía que hacía algo.
+            "plazos": "{{FRASE_PLAZOS}}" in imagen or "{{FRASE_PLAZOS}}" in guion,
+            # Dos formatos del curso (selfie de mujer y gafas) llevan la
+            # financiación METIDA en su ejemplo, así que la prometen SIEMPRE,
+            # con el interruptor o sin él. Como la voz la pone el propio clip,
+            # eso no se arregla después: hay que avisarlo antes de generar.
+            "plazos_fijo": "pago a plazos" in _con_plazos(guion, False).lower(),
             "duracion": dur,
             "duraciones": [
                 {"clave": k, "label": v["label"], "segundos": v["segundos"]}

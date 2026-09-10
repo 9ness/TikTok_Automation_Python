@@ -22,6 +22,12 @@ export interface EstiloMof10 {
   /** La imagen entra en Flow como ingrediente, no como frame inicial. */
   ingrediente?: boolean;
   voz?: boolean;
+  /** Si existe versión con la frase de financiación. Solo el del espejo: en
+   *  los demás formatos el botón copiaba exactamente el mismo texto. */
+  plazos?: boolean;
+  /** Su guion promete plazos SIEMPRE: el curso lo dejó escrito en el ejemplo
+   *  y no hay interruptor que lo quite. */
+  plazos_fijo?: boolean;
 }
 
 export interface PromptsRopaResponse {
@@ -31,9 +37,6 @@ export interface PromptsRopaResponse {
   video_sin_manos: string;
   /** Otro escenario: la prenda colgada en una percha, sin nadie. */
   video_percha: string;
-  /** El de la web: la prenda puesta, frente al espejo. Ya viene en el sexo
-   *  que le toca a la carpeta pedida. */
-  video_espejo: string;
   /** `mujer` | `hombre` — de qué carpeta se dedujo el prompt del espejo. */
   sexo: string;
   /** Estilos de vídeo de 10s: imagen en Flow + guion/vídeo en Omni. */
@@ -54,6 +57,9 @@ export interface ModoRopa {
   categoria?: string;
   /** Si necesita el personaje de referencia adjunto. */
   personaje?: boolean;
+  /** Qué se ve en ese vídeo, en una frase. La manda el backend: es lo que
+   *  dice el curso de cada formato. */
+  desc?: string;
 }
 
 export interface CarpetaRopa {

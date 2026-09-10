@@ -368,7 +368,12 @@ export function PantallaRopa({
     if (!modos.length || modos.some((m) => m.clave === modo)) return;
     setModo(modos[0]!.clave);
   }, [modos, modo, setModo]);
-  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "", duracion, modalidad);
+  // Solo se pide si ese formato tiene de verdad versión con plazos: en el
+  // resto copiaba exactamente el mismo texto y era una llamada de más.
+  const promptsPlazos = usePromptsRopa(
+    slugPrompts, true, esWeb ? modo : "", duracion, modalidad,
+    !!(prompts.data?.mof10 ?? []).some((e) => e.plazos),
+  );
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -443,6 +448,12 @@ export function PantallaRopa({
   // Las prendas que ofrecen pago a plazos se trabajan aparte: llevan otro
   // prompt, y el vídeo lo dice con la voz de la persona. Bajarlas por grupos
   // es lo que evita pegar el prompt equivocado a media tanda.
+  // El formato del modo elegido: de él salen las instrucciones y si de verdad
+  // existe versión con plazos (solo la tiene el del espejo).
+  const estiloActivo = (prompts.data?.mof10 ?? []).find(
+    (e) => e.clave === modoEstilo,
+  );
+  const hayPlazos = !!estiloActivo?.plazos;
   const conPlazos = items.filter((p) => p.clean_photo_id && p.plazos).length;
   const sinPlazos = items.filter((p) => p.clean_photo_id && !p.plazos).length;
 
@@ -551,6 +562,13 @@ export function PantallaRopa({
                 </button>
               ))}
             </div>
+            {/* Qué es el modo elegido. Siete botones con un emoji no dicen
+                qué sale en el vídeo, y elegir mal se descubre al generarlo. */}
+            {!!modos.find((m) => m.clave === modo)?.desc && (
+              <p className="rounded-md border border-violet-500/30 bg-violet-500/5 px-2 py-1.5 text-[10px] leading-snug text-violet-200">
+                {modos.find((m) => m.clave === modo)?.desc}
+              </p>
+            )}
             <p className="text-[10px] text-muted-foreground">
               Cada modo guarda su propio vídeo: cambiar aquí no pisa lo del
               otro. Los textos, las fotos y el escaparate son comunes.
@@ -767,7 +785,9 @@ export function PantallaRopa({
           esWeb
             ? esMarca
               ? "La foto de la prenda es la referencia del generador: se adjunta en Flow junto a tu personaje."
-              : "La foto de la prenda es la referencia del generador. Si hay prendas con pago a plazos se bajan aparte: llevan otro prompt."
+              : hayPlazos
+                ? "La foto de la prenda es la referencia del generador. En este formato las prendas con pago a plazos llevan otro guion, así que se bajan aparte."
+                : "La foto de la prenda es la referencia del generador: se adjunta en Flow con el prompt de imagen."
             : "La foto de la prenda es la referencia del generador."
         }
         extra={`${items.filter((p) => p.clean_photo_id).length} foto(s)`}
@@ -777,7 +797,7 @@ export function PantallaRopa({
           cargando={false}
           etiqueta={`Todas (${sinPlazos + conPlazos})`}
         />
-        {esWeb && !!conPlazos && (
+        {esWeb && hayPlazos && !!conPlazos && (
           /* Los dos grupos, a la misma altura: se baja uno, se pega SU prompt
              y se generan todas seguidas. La foto es la misma en los dos; lo
              que cambia es el prompt que le toca. */
@@ -813,39 +833,6 @@ export function PantallaRopa({
               : "Se pega en el generador junto con la foto de la prenda."
         }
       >
-        {esWeb && prompts.data?.video_espejo ? (
-          /* Las dos versiones, a la misma altura. Quién graba lo decide la
-             carpeta: en las de hombre sale en masculino. Solo sale en el modo
-             espejo — el backend lo manda vacío en los demás. */
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                copiar(
-                  `Prompt espejo (${prompts.data?.sexo ?? ""})`,
-                  prompts.data?.video_espejo,
-                )
-              }
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
-            >
-              <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> Espejo · sin
-              plazos
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                copiar(
-                  `Prompt espejo con plazos (${promptsPlazos.data?.sexo ?? ""})`,
-                  promptsPlazos.data?.video_espejo,
-                )
-              }
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
-            >
-              <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> Espejo · 💳 con
-              plazos
-            </button>
-          </div>
-        ) : null}
         {esWeb && (
           <p className="text-[10px] text-muted-foreground">
             {modos.find((m) => m.clave === modo)?.label ?? ""} · quien graba lo
@@ -854,8 +841,9 @@ export function PantallaRopa({
           </p>
         )}
         {/* Dónde se pega cada uno. En marca personal el clip sale mudo, así
-            que el vídeo puede ir en GenAI Pro; la foto siempre en Flow. */}
-        {esMarca && <HerramientasIA video="genaipro" />}
+            que el vídeo puede ir en GenAI Pro; en los formatos hablados los
+            dos pasos son de Flow, que es lo único que locuta. */}
+        {esWeb && <HerramientasIA video={esMarca ? "genaipro" : "flow"} />}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
             /* Dos pasos: la imagen se hace en Flow y esa imagen se anima con
@@ -881,26 +869,44 @@ export function PantallaRopa({
               {/* Lo que hay que hacer AL PEGARLO y no se ve en el prompt. Sin
                   esto se copia bien y sale otro vídeo: equivocarse entre
                   "frame inicial" e "ingrediente" no da ningún error. */}
-              {(e.personaje || e.ingrediente || e.voz === false) && (
-                <ul className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
-                  <li>
-                    📎 Adjunta{" "}
-                    <strong className="text-foreground">
-                      {e.personaje ? "tu personaje y la foto del producto" : "solo la foto del producto"}
-                    </strong>
+              {/* Se pinta SIEMPRE, no solo en los formatos raros: son dos
+                  pegadas seguidas en dos sitios distintos y equivocarse no da
+                  ningún error, sale otro vídeo. */}
+              <ul className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
+                <li>
+                  1️⃣ Pega el <strong className="text-foreground">prompt de
+                  imagen</strong> en Flow y adjunta{" "}
+                  <strong className="text-foreground">
+                    {e.personaje
+                      ? "tu personaje y la foto de la prenda"
+                      : "solo la foto de la prenda"}
+                  </strong>
+                </li>
+                <li>
+                  2️⃣ Con esa imagen, pega el{" "}
+                  <strong className="text-foreground">
+                    {e.voz === false ? "prompt de movimiento" : "guion"}
+                  </strong>{" "}
+                  y ponla como{" "}
+                  <strong className="text-foreground">
+                    {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
+                  </strong>{" "}
+                  · 9:16 · 720p → reescalar a 1080
+                </li>
+                <li>
+                  {e.voz === false
+                    ? "🔇 Sale mudo: la música se pone en TikTok al publicar"
+                    : "🗣️ El clip sale ya hablado: se publica con su voz, sin texto quemado"}
+                </li>
+                <li>3️⃣ Sube el clip aquí abajo, en su tarjeta.</li>
+                {e.plazos_fijo && (
+                  <li className="text-amber-500">
+                    ⚠️ Este guion del curso PROMETE pago a plazos en pedidos de
+                    más de 30 €, siempre. Úsalo solo con prendas que lo tengan,
+                    o quítale esa frase antes de pegarlo.
                   </li>
-                  <li>
-                    🎬 En el vídeo, la imagen va como{" "}
-                    <strong className="text-foreground">
-                      {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
-                    </strong>{" "}
-                    · 9:16 · 720p → reescalar a 1080
-                  </li>
-                  {e.voz === false && (
-                    <li>🔇 Sale mudo: la música se pone en TikTok al publicar</li>
-                  )}
-                </ul>
-              )}
+                )}
+              </ul>
               {(e.duraciones ?? []).length > 1 && (
                 <div className="flex gap-1.5">
                   {(e.duraciones ?? []).map((d) => (
@@ -941,6 +947,18 @@ export function PantallaRopa({
                 >
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Vídeo
                   (movimiento)
+                </button>
+              ) : !e.plazos ? (
+                /* Sin versión de plazos: un solo botón. El curso solo publicó
+                   la frase de la financiación en el del espejo, y en los demás
+                   el botón "con plazos" copiaba el MISMO texto. */
+                <button
+                  type="button"
+                  onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
+                  (Flow)
                 </button>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1017,7 +1035,16 @@ export function PantallaRopa({
         n={4}
         color="azul"
         titulo="Descargar lo ya montado"
-        hint="Los vídeos listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
+        hint={
+          // Qué hace la app con el clip que se le sube, que no es evidente:
+          // en marca personal edita (grado + rótulo) y en los demás solo
+          // encuadra y limpia.
+          esMarca
+            ? "Sube el clip en su tarjeta y la app lo deja listo: encuadre 9:16, grado de color, el rótulo de temporada quemado y los metadatos fuera."
+            : esWeb
+              ? "Sube el clip en su tarjeta y la app lo encuadra a 9:16 comiéndose la marca de agua, le respeta su voz y le quita los metadatos. Sin texto quemado."
+              : "Los vídeos listos para subir a TikTok. Se bajan en el orden que ves en pantalla."
+        }
         extra={`${conVideo}/${items.length}`}
       >
         <div className="grid grid-cols-2 gap-1.5">
@@ -1077,6 +1104,9 @@ export function PantallaRopa({
                   ?.voz === false
               }
               modo={modo}
+              // Si ESTE formato tiene versión con plazos. Sin ella, marcar la
+              // prenda no cambia ningún prompt y el botón sobra.
+              conPlazos={hayPlazos}
               onCopiar={copiar}
             />
           ))}
@@ -1092,6 +1122,7 @@ function PrendaCard({
   esWeb,
   mudo = false,
   modo,
+  conPlazos = false,
   onCopiar,
 }: {
   prenda: PrendaItem;
@@ -1099,6 +1130,8 @@ function PrendaCard({
   esWeb: boolean;
   /** El formato no lleva voz (marca personal): no hay audio que elegir. */
   mudo?: boolean;
+  /** El formato tiene versión con la frase de financiación. */
+  conPlazos?: boolean;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
    *  y dónde se guarda el que se suba. */
   modo: string;
@@ -1272,7 +1305,7 @@ function PrendaCard({
       {/* En los formatos MUDOS no pinta nada: los plazos los promete la voz
           de la persona y aquí no habla nadie, así que el prompt es el mismo
           los ofrezca o no. */}
-      {esWeb && !mudo && (
+      {esWeb && !mudo && conPlazos && (
         /* Lo dice la FICHA: sale al extraer los textos, igual que en el POV
            BOF. El botón está para corregirla —una captura cortada, o el
            vendedor que lo cambia— y un toque más devuelve el control a la
@@ -1318,7 +1351,7 @@ function PrendaCard({
       <div className="flex flex-wrap items-center gap-1">
         {/* El precio va en la MISMA fila que los botones: solo hay que mirarlo,
             no se pulsa, y en su propia línea ocupaba un renglón por prenda. */}
-        {mudo && !!prenda.precio && (
+        {(mudo || !conPlazos) && !!prenda.precio && (
           <span className="mr-1 text-[11px] font-medium text-muted-foreground">
             {prenda.precio} €
           </span>

@@ -33,8 +33,12 @@ export function usePromptsRopa(
   duracion = "10",
   /** "aleatorios" (los formatos de siempre) o "marca" (marca personal). */
   modalidad = "",
+  /** La versión con plazos solo la tiene UN formato: en los demás pedirla era
+   *  una llamada más por pantalla para acabar copiando el mismo texto. */
+  activo = true,
 ) {
   return useQuery<PromptsRopaResponse>({
+    enabled: activo,
     queryKey: [
       ...nichoRopaKeys.prompts(carpeta), plazos, modo, duracion, modalidad,
     ],

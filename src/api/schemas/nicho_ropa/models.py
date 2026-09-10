@@ -34,6 +34,12 @@ class EstiloMof10(BaseModel):
     # no conoce, así que sin esto la pantalla nunca se entera —y el fallo no da
     # error, simplemente sigue pintando la versión de los formatos hablados.
     voz: bool = True
+    # Si tiene versión con la frase de financiación. Solo el del espejo: en el
+    # resto, el botón de "con plazos" copiaba el mismo texto.
+    plazos: bool = False
+    # Su ejemplo promete financiación SIEMPRE (el curso la dejó escrita
+    # dentro): solo vale para prendas que de verdad la tengan.
+    plazos_fijo: bool = False
     personaje: bool = False
     ingrediente: bool = False
 
@@ -50,6 +56,8 @@ class ModoRopa(BaseModel):
     categoria: str = ""
     # Si necesita el personaje de referencia adjunto.
     personaje: bool = False
+    # Qué se ve en ese vídeo, en una frase.
+    desc: str = ""
 
 
 class PromptsRopaResponse(BaseModel):
@@ -64,9 +72,6 @@ class PromptsRopaResponse(BaseModel):
     video_sin_manos: str
     # Segundo escenario del nicho: la prenda colgada en una percha, sin nadie.
     video_percha: str = ""
-    # El de la web: la prenda PUESTA, frente al espejo. Ya viene con las
-    # palabras del sexo que toque según la carpeta pedida.
-    video_espejo: str = ""
     sexo: str = ""
     # "MOF 10 segundos": imagen en Flow + guion/vídeo en Omni. Un clip único
     # de 10s, en vez de generar el vídeo de una tirada. Van en lista porque

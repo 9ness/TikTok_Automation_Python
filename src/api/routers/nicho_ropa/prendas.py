@@ -67,8 +67,8 @@ def get_prompts(
 ) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
-    `carpeta` solo decide el del espejo: es el único con una persona dentro, y
-    en las carpetas de hombre esa persona tiene que ser un hombre.
+    `carpeta` decide de quién es el vídeo: en las carpetas de hombre, la
+    persona que sale es un hombre.
 
     `duracion` es la del clip que va a generar (10s en Omni, 8s en Veo). Baja
     el tope de caracteres del guion: la voz la pone el propio vídeo, así que
@@ -86,13 +86,6 @@ def get_prompts(
             video_con_manos=config.prompt_video(True),
             video_sin_manos=config.prompt_video(False),
             video_percha=config.prompt_video_percha(),
-            # El del espejo es el de UNA tirada, así que solo tiene sentido
-            # en ese modo: en "dejando la cámara" no se graba delante de uno.
-            video_espejo=(
-                config.prompt_video_espejo(sexo, plazos)
-                if not modo or config.modo_valido(modo) == "espejo"
-                else ""
-            ),
             sexo=sexo,
             mof10=config.prompts_mof10(sexo, plazos, modo, duracion),
             # Los modos de ESA modalidad: personajes aleatorios (los de
