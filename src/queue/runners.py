@@ -3498,10 +3498,20 @@ def run_nicho_general_escenas(job: Job, on_log: OnLog, on_progress: OnProgress) 
                 source, carpeta, pid, usuario, gancho, duracion,
                 bloque_texto=escrito["bloque_texto"],
             )
+        # ALTERNATIVA es "el sexo que NO le toca a su nicho", no "me han
+        # pedido un sexo". Un producto de exterior es de hombre: pedir su
+        # versión de hombre es escribir la PRINCIPAL, y guardarla como
+        # alternativa la dejaba invisible —la pantalla lee `escenas` y ahí no
+        # había nada, así que decía "sin escenas todavía" con los guiones ya
+        # escritos y pagados—. Pasa siempre que el producto se clasifica en
+        # ESTA misma pasada: hasta entonces cuenta como genérico (mujer), así
+        # que el botón de hombre sale como el alternativo.
+        propio = ugc_config.sexo_de_nicho(str(mio.get("nicho") or ""))
+        alternativa = bool(sexo_pedido) and sexo_pedido != propio
         product_repo.guardar_escenas(
             source, carpeta, pid, escrito["escenas"], escrito["voz"],
             usuario=usuario, gancho=gancho, duracion=duracion,
-            alternativa=bool(sexo_pedido),
+            alternativa=alternativa,
         )
         return True
 
