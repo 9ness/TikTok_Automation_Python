@@ -311,7 +311,11 @@ export function PantallaRopa({
     esWeb ? `ropa-web:${sexoFijo}:carpeta` : "ropa:carpeta",
     esWeb ? "" : "camisetas",
   );
-  const carpetas = useCarpetasRopa(esWeb ? sexoFijo : "", esWeb ? modo : "");
+  // Se le dice QUÉ catálogo se está mirando: contar las 29 carpetas para
+  // enseñar las de uno costaba siete segundos en cada carga.
+  const carpetas = useCarpetasRopa(
+    esWeb ? sexoFijo : "", esWeb ? modo : "", esWeb ? catalogo : "",
+  );
   // De quién es esta pantalla. Lo manda la ruta, así que ni hay selector ni
   // estado: los ZIP que se suban y el prompt que se enseñe son de este sexo.
   const sexo = sexoFijo;

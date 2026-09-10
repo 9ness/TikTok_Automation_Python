@@ -151,12 +151,13 @@ export function useImportarUrlsRopa() {
  *  que es lo que necesita "Sin humanos". Por eso el `modo` entra en la clave:
  *  el contador de vídeos es de un modo concreto.
  */
-export function useCarpetasRopa(sexo = "", modo = "") {
+export function useCarpetasRopa(sexo = "", modo = "", catalogo = "") {
   return useQuery<CarpetasRopaResponse>({
-    queryKey: [...nichoRopaKeys.carpetas(), sexo, modo],
+    queryKey: [...nichoRopaKeys.carpetas(), sexo, modo, catalogo],
     queryFn: () =>
       api.get<CarpetasRopaResponse>(
-        `${ROOT}/carpetas?sexo=${encodeURIComponent(sexo)}&modo=${encodeURIComponent(modo)}`,
+        `${ROOT}/carpetas?sexo=${encodeURIComponent(sexo)}&modo=${encodeURIComponent(modo)}` +
+          (catalogo ? `&catalogo=${encodeURIComponent(catalogo)}` : ""),
       ),
     // Ya no es Infinity: los contadores cambian al extraer textos, pegar
     // fichas o montar un vídeo, y con la caché eterna el chip mentía hasta

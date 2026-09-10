@@ -170,6 +170,10 @@ def list_carpetas(
     # "Sin humanos", que no tiene sexo ni chips).
     sexo: Annotated[str, Query()] = "",
     modo: Annotated[str, Query()] = "",
+    # Qué catálogo está mirando la pantalla ("web", "muestras" o "tareas").
+    # Solo se cuentan las carpetas de ESE: las demás no se ven, y contarlas
+    # eran siete segundos por carga — se agotaba hasta el presupuesto.
+    catalogo: Annotated[str, Query()] = "",
 ) -> CarpetasRopaResponse:
     """Carpetas de producto disponibles.
 
@@ -227,7 +231,17 @@ def list_carpetas(
         # a 25 s y la pantalla se quedaba cargando sin enseñar NADA. Lo que no
         # dé tiempo sale a cero y la siguiente carga ya lo trae memoizado.
         limite = time.monotonic() + 6.0
-        for i in items:
+        # Las que de verdad se van a ver. Sin esto se contaban las 29 (27 del
+        # inventario más muestras y tareas) para enseñar una.
+        def _se_ve(c) -> bool:
+            if not catalogo:
+                return True
+            propio = (c.genero or "").endswith(("_muestras", "_tareas"))
+            if catalogo == "web":
+                return not propio
+            return (c.genero or "").endswith(f"_{catalogo}")
+
+        for i in [x for x in items if _se_ve(x)]:
             if time.monotonic() > limite:
                 logger.warning(
                     "[nicho_ropa] contando carpetas se agotó el tiempo; "
