@@ -450,19 +450,35 @@ export function PantallaRopa({
             <Shirt className="h-5 w-5 shrink-0 text-violet-500" />
             <div className="min-w-0">
               <h1 className="text-base font-bold sm:text-lg">
-                {sexo === "hombre" ? "Nicho Ropa Hombre" : "Nicho Ropa Mujer"}
+                {esMarca
+                  ? "Moda Mujer · Marca Personal"
+                  : sexo === "hombre"
+                    ? "Nicho Ropa Hombre"
+                    : "Moda Mujer · Aleatorios"}
               </h1>
               <p className="text-[11px] text-muted-foreground">
-                La prenda PUESTA, grabada con el móvil · un clip de 10s por
-                modo
+                {esMarca
+                  ? "Tu personaje fijo · un clip de 8-10s por formato"
+                  : "La prenda PUESTA, grabada con el móvil · un clip de 10s por modo"}
               </p>
             </div>
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-            Las prendas entran por ZIP desde la web del curso y este inventario
-            es solo de {sexo}: el otro va en su pantalla. El clip sale del
-            generador ya hablado, así que se le respeta su voz y no lleva
-            ningún texto quemado.
+            {esMarca ? (
+              <>
+                Los tres formatos repiten TU personaje, que es lo que construye
+                la marca — salvo el de vista POV, que va con una chica
+                aleatoria. Los clips salen mudos: la música se pone en TikTok
+                al publicar, y el texto de temporada lo quema el montaje.
+              </>
+            ) : (
+              <>
+                Las prendas entran por ZIP desde la web del curso y este
+                inventario es solo de {sexo}: el otro va en su pantalla. El clip
+                sale del generador ya hablado, así que se le respeta su voz y no
+                lleva ningún texto quemado.
+              </>
+            )}
           </p>
         </header>
       ) : (
@@ -659,7 +675,11 @@ export function PantallaRopa({
         n={1}
         color="violeta"
         titulo="Textos de la ficha"
-        hint="Lee las capturas con IA: título, tienda, caption, precio y si admite pago a plazos."
+        hint={
+          esMarca
+            ? "Lee las capturas con IA: título, tienda, caption y precio."
+            : "Lee las capturas con IA: título, tienda, caption, precio y si admite pago a plazos."
+        }
         extra={`${conTexto}/${items.length}`}
       >
         <button
@@ -737,7 +757,9 @@ export function PantallaRopa({
         titulo="Bajar las fotos"
         hint={
           esWeb
-            ? "La foto de la prenda es la referencia del generador. Si hay prendas con pago a plazos se bajan aparte: llevan otro prompt."
+            ? esMarca
+              ? "La foto de la prenda es la referencia del generador: se adjunta en Flow junto a tu personaje."
+              : "La foto de la prenda es la referencia del generador. Si hay prendas con pago a plazos se bajan aparte: llevan otro prompt."
             : "La foto de la prenda es la referencia del generador."
         }
         extra={`${items.filter((p) => p.clean_photo_id).length} foto(s)`}
