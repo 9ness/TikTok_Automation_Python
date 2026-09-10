@@ -54,6 +54,7 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
+import { useCopiarDePovBof } from "@/lib/queries/nichoRopa";
 import { useEsPro, useMe } from "@/lib/queries/auth";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -1477,6 +1478,10 @@ function ProductoCard({
     );
   }
   const setEstado = useSetEstadoLargo();
+  // Llevar el producto a Moda, igual que en el POV BOF corto: los dos
+  // catálogos son del operador y comparten convenio de nombres.
+  const aModa = useCopiarDePovBof();
+  const [destinoModa, setDestinoModa] = useState("mujer_muestras");
   const borrarMio = useBorrarMiProducto();
   const quitarClip = useQuitarClipLargo();
   const buscarUrl = useBuscarProductoUrl();
@@ -1827,6 +1832,46 @@ function ProductoCard({
           >
             🚫 Sin stock · ¿ha vuelto?
           </button>
+        )}
+        {/* Copiar el producto a un catálogo de Moda. Solo en los tuyos: las
+            carpetas del curso no se copian a ningún sitio. */}
+        {CATALOGOS_PROPIOS.includes(source) && (
+          <span className="inline-flex items-center gap-1">
+            <select
+              value={destinoModa}
+              onChange={(e) => setDestinoModa(e.target.value)}
+              className="rounded-md border border-border/60 bg-background px-1.5 py-1 text-[11px] outline-none"
+              title="A qué catálogo de Moda se copia"
+            >
+              <option value="mujer_muestras">👗 Mujer · muestras</option>
+              <option value="mujer_tareas">👗 Mujer · tareas</option>
+              <option value="hombre_muestras">👔 Hombre · muestras</option>
+              <option value="hombre_tareas">👔 Hombre · tareas</option>
+            </select>
+            <button
+              type="button"
+              disabled={aModa.isPending}
+              title="Copia sus fotos a ese catálogo de Moda (no lo quita de aquí)"
+              onClick={() =>
+                aModa.mutate(
+                  {
+                    genero: destinoModa,
+                    source,
+                    folder: p.folder || folder,
+                    producto: p.producto,
+                  },
+                  {
+                    onSuccess: (r) =>
+                      toast.success(`Copiado a Moda · ${r.carpeta} · prenda ${r.prenda}`),
+                    onError: (e) => toast.error(err(e)),
+                  },
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-50"
+            >
+              {aModa.isPending ? "Copiando…" : "→ Moda"}
+            </button>
+          </span>
         )}
         {p.clean_photo_id && (
           <a
