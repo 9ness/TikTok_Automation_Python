@@ -73,6 +73,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo con SU audio (la voz que trae el clip)")
+        _limpiar(out_path, on_log)
         return out_path
 
     if voz is None:
@@ -83,6 +84,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo mudo (sin voz ni música, a propósito)")
+        _limpiar(out_path, on_log)
         return out_path
 
     # Con voz: el vídeo dura lo que dure la voz. `-shortest` corta por el más
@@ -97,4 +99,19 @@ def montar(
         "-movflags", "+faststart", str(out_path),
     ], on_log)
     on_log(f"[nicho_ropa] vídeo con voz: {voz.name}")
+    _limpiar(out_path, on_log)
     return out_path
+
+
+def _limpiar(salida: Path, on_log: OnLog) -> None:
+    """Deja el fichero sin la ficha técnica del generador.
+
+    Lo mismo que hacen el POV BOF y el UGC desde sep 2026; aquí se olvidó al
+    añadirlo. Es un remux, así que no toca la imagen.
+    """
+    try:
+        from src.nicho_pov_bof.pipeline.video_editor import limpiar_metadatos
+
+        limpiar_metadatos(salida, on_log)
+    except Exception as e:  # noqa: BLE001 — el vídeo ya está montado
+        on_log(f"[nicho_ropa] no se pudieron limpiar los metadatos ({str(e)[:100]})")
