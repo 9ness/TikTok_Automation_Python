@@ -832,9 +832,13 @@ export function PantallaRopa({
                voz en Omni. Sale un clip ÚNICO de 10s, sin montaje. */
             <div key={e.clave} className="space-y-1 rounded-lg border border-border/60 p-2">
               <p className="text-[11px] font-medium">
-                {(e.duraciones ?? []).find((d) => d.clave === (e.duracion ?? "10"))
-                  ?.segundos ?? 10}{" "}
-                s · {e.label}
+                {/* Sin selector de duración el formato vale para los dos
+                    motores —8s en GenAI Pro, 10s en Omni—, así que se dicen
+                    los dos en vez de fingir que solo hay uno. */}
+                {(e.duraciones ?? []).length
+                  ? `${(e.duraciones ?? []).find((d) => d.clave === (e.duracion ?? "10"))?.segundos ?? 10} s`
+                  : "8-10 s"}{" "}
+                · {e.label}
                 {e.derivado && (
                   <span
                     title="El curso solo publica este estilo para el otro sexo: este texto lo hemos derivado cambiando lo de la persona"
@@ -1256,6 +1260,13 @@ function PrendaCard({
           {prenda.precio ? ` · ${prenda.precio} €` : ""}
         </button>
       )}
+      {/* En los mudos el precio se enseña a secas: sigue sirviendo para saber
+          si la prenda merece la pena, pero no hay nada que decidir con él. */}
+      {mudo && !!prenda.precio && (
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {prenda.precio} €
+        </p>
+      )}
 
       {/* Como en el POV BOF: a la vista solo los dos de diario —el caption
           para publicar y la ficha—, y detrás de "más" el título de TikTok y la
@@ -1279,7 +1290,9 @@ function PrendaCard({
           <CopyChip label="🏪 Tienda" text={prenda.tienda} siempre />
         </div>
       )}
-      {caption && (
+      {/* La descripción no se enseña en los mudos: es lo mismo que ya se
+          copia con el botón de Caption, y ocupaba tres líneas por prenda. */}
+      {caption && !mudo && (
         <p className="rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
           {caption}
         </p>
@@ -1362,7 +1375,7 @@ function PrendaCard({
               : "border-border/60 hover:border-foreground/30"
           }`}
         >
-          Ver / descargar
+          Descargar
         </button>
       </div>
       {/* Cuándo se montó: el botón se ve igual para un vídeo de hace diez
