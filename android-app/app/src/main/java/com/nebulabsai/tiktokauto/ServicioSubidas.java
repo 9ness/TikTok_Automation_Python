@@ -57,6 +57,14 @@ public class ServicioSubidas extends Service {
     private static final String CANAL = "subidas";
     private static final int ID_AVISO = 2001;
 
+    /** Lo que queda por subir. Una COLA y no un hilo por tanda: el servicio es
+     *  único, así que dos subidas a la vez (un clip del POV BOF y otro del POV
+     *  BOF Largo, o los dos clips de una misma ficha) arrancaban dos hilos y el
+     *  primero que acababa hacía `stopSelf()` — matando la otra a media subida,
+     *  sin aviso ninguno: el botón se quedaba en "Subiendo 0%" para siempre y
+     *  al servidor no llegaba nada. */
+    private final java.util.concurrent.BlockingQueue<Object[]> cola =
+        new java.util.concurrent.LinkedBlockingQueue<>();
     private Thread hilo;
 
     @Override
@@ -97,12 +105,32 @@ public class ServicioSubidas extends Service {
         // mate al salir de la app.
         startForeground(ID_AVISO, aviso(0, tareas.length(), "", 0));
 
-        final org.json.JSONArray lista = tareas;
-        hilo = new Thread(() -> trabajar(lista, apiKey, cookie));
-        hilo.start();
+        cola.add(new Object[] {tareas, apiKey, cookie});
+        // Un solo hilo vaciando la cola: si ya está trabajando, lo nuevo se
+        // suma a lo que le queda en vez de abrir otro.
+        if (hilo == null || !hilo.isAlive()) {
+            hilo = new Thread(this::vaciarCola);
+            hilo.start();
+        }
         // START_NOT_STICKY: si el sistema lo matara igualmente, no se reintenta
         // solo — repetir una subida a medias duplicaría vídeos en la carpeta.
         return START_NOT_STICKY;
+    }
+
+    /** Va sacando tandas de la cola hasta que no queda ninguna. */
+    private void vaciarCola() {
+        while (true) {
+            Object[] t = cola.poll();
+            if (t == null) break;
+            try {
+                trabajar((org.json.JSONArray) t[0], (String) t[1], (String) t[2]);
+            } catch (Throwable e) {
+                android.util.Log.e("TikTokAuto", "falló una tanda", e);
+            }
+        }
+        // Se apaga AQUÍ, con la cola vacía, y no al final de cada tanda.
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
     }
 
     private void trabajar(org.json.JSONArray tareas, String apiKey, String cookie) {
@@ -137,13 +165,32 @@ public class ServicioSubidas extends Service {
             android.util.Log.e("TikTokAuto", "falló la tanda", e);
         } finally {
             resultados.append("]");
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(CLAVE_RESULTADOS, resultados.toString()).apply();
+            // Se SUMA a lo ya guardado: con la cola puede acabar una tanda
+            // mientras la pantalla está cerrada y empezar otra, y machacar el
+            // apunte perdía las respuestas de la primera.
+            guardarResultados(resultados.toString());
             if (candado.isHeld()) candado.release();
-            stopForeground(STOP_FOREGROUND_REMOVE);
             avisoFinal(total);
-            stopSelf();
         }
+    }
+
+    /** Añade las respuestas de una tanda a las que aún no ha recogido la web. */
+    private void guardarResultados(String nuevas) {
+        android.content.SharedPreferences p =
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        org.json.JSONArray todas;
+        try {
+            todas = new org.json.JSONArray(p.getString(CLAVE_RESULTADOS, "[]"));
+        } catch (Exception e) {
+            todas = new org.json.JSONArray();
+        }
+        try {
+            org.json.JSONArray ahora = new org.json.JSONArray(nuevas);
+            for (int i = 0; i < ahora.length(); i++) todas.put(ahora.get(i));
+        } catch (Exception e) {
+            android.util.Log.w("TikTokAuto", "respuestas ilegibles", e);
+        }
+        p.edit().putString(CLAVE_RESULTADOS, todas.toString()).apply();
     }
 
     /** Cuánto pesa lo que hay detrás de un `content://`, o -1 si no se sabe. */

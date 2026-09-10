@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { nombreDescarga } from "@/lib/descargas";
@@ -1526,19 +1526,53 @@ function ProductoCard({
   // NOMBRE porque es lo único que viaja por el puente: los bytes se quedan en
   // la app (un vídeo en base64 serían 30 MB de cadena).
   const [ficheroApp, setFicheroApp] = useState<Record<number, string>>({});
+  // Si la app dice que sube y luego no da señales, sube la web. Pasó con estos
+  // clips: el puente contestaba que sí, el POST no salía nunca del móvil y el
+  // botón se quedaba en "Subiendo 0%" para siempre sin que llegara nada.
+  const vigilantes = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  /** Qué hacer si ese hueco se queda mudo: volver a mandarlo desde la web. */
+  const relevos = useRef<Record<number, () => void>>({});
+  const dejarDeVigilar = useCallback((slot: number) => {
+    const t = vigilantes.current[slot];
+    if (t) {
+      clearTimeout(t);
+      delete vigilantes.current[slot];
+    }
+    delete relevos.current[slot];
+  }, []);
+  /** Cuenta atrás que se REARMA con cada señal: quince segundos de silencio
+   *  significan que la app ya no está subiendo eso, empezara o no. */
+  const vigilar = useCallback((slot: number) => {
+    const t = vigilantes.current[slot];
+    if (t) clearTimeout(t);
+    vigilantes.current[slot] = setTimeout(() => {
+      const relevo = relevos.current[slot];
+      delete vigilantes.current[slot];
+      delete relevos.current[slot];
+      if (relevo) {
+        toast.warning("La app dejó la subida a medias; la subo desde aquí");
+        relevo();
+      }
+    }, 15000);
+  }, []);
   /** El porcentaje que manda la app, al hueco que le toca. */
   useEffect(() => {
     const huecos = Object.entries(ficheroApp);
     if (!huecos.length) return;
     const quitarProgreso = alProgresoDeFichero((nombre, pct) => {
       const hueco = huecos.find(([, n]) => n === nombre);
-      if (hueco) setPcts((prev) => ({ ...prev, [Number(hueco[0])]: pct }));
+      if (!hueco) return;
+      vigilar(Number(hueco[0]));   // da señales: se le da otro margen
+      setPcts((prev) => ({ ...prev, [Number(hueco[0])]: pct }));
     });
     const quitarFin = alSubirCadaFichero((nombre) => {
       const hueco = huecos.find(([, n]) => n === nombre);
       if (!hueco) return;
       const slot = Number(hueco[0]);
+      dejarDeVigilar(slot);
       setPcts((prev) => ({ ...prev, [slot]: null }));
+      const ref = refs[slot as 1 | 2 | 3 | 4].current;
+      if (ref) ref.value = "";   // subió la app: el <input> ya puede soltarlo
       setFicheroApp((prev) => {
         const copia = { ...prev };
         delete copia[slot];
@@ -1549,7 +1583,15 @@ function ProductoCard({
       quitarProgreso();
       quitarFin();
     };
-  }, [ficheroApp]);
+  }, [ficheroApp, dejarDeVigilar, vigilar, refs]);
+
+  // Al salir de la pantalla no queda ningún relevo pendiente.
+  useEffect(() => {
+    const pendientes = vigilantes.current;
+    return () => {
+      Object.values(pendientes).forEach(clearTimeout);
+    };
+  }, []);
 
   // Auto por defecto: el montaje mira la mano del clip 1 y elige la voz
   // (mujer salvo que vea reloj o vello). Se puede forzar a mano.
@@ -1620,16 +1662,31 @@ function ProductoCard({
         tareas: [{ nombre: file.name, campos }],
       });
       if (lanzada) {
-        const ref = refs[slot].current;
-        if (ref) ref.value = "";
         // El botón se pone a 0% aquí: el primer aviso de la app tarda lo que
         // tarde el primer trozo, y hasta entonces no se vería que va.
         setPcts((prev) => ({ ...prev, [slot]: 0 }));
         setFicheroApp((prev) => ({ ...prev, [slot]: file.name }));
         toast.success("Subiendo con la app: puedes bloquear el móvil");
+        // El `<input>` NO se vacía todavía: si la app se queda muda hay que
+        // volver a mandar ESTE fichero desde la web, y sin él no habría nada
+        // que subir.
+        relevos.current[slot] = () => {
+          setFicheroApp((prev) => {
+            const copia = { ...prev };
+            delete copia[slot];
+            return copia;
+          });
+          subirPorLaWeb(slot, file);
+        };
+        vigilar(slot);
         return;
       }
     }
+    subirPorLaWeb(slot, file);
+  }
+
+  /** El camino de siempre: XHR con porcentaje real, como en el POV BOF. */
+  function subirPorLaWeb(slot: 1 | 2 | 3 | 4, file: File) {
 
     setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
