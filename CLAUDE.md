@@ -353,6 +353,13 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
   mismo Redis: las separa el flag `web` de `/carpetas`, y la pantalla es el
   mismo componente con `variante`.
 
+- Los formatos cuyo guion se escribe FUERA (espejo, selfie, gafas) ya no piden
+  pasar por ChatGPT a mano: `services/guionista.py` manda a Gemini el MISMO
+  prompt del curso + los textos y fotos de la prenda, y el bloque para el
+  generador se **monta aquí** (`_montar_video`) con el movimiento literal —
+  pedirle a Gemini que lo copiara lo cortaba por RECITATION. Se guarda por
+  prenda **y por modo** (`product_repo.guardar_guion`).
+
 Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
 motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.
 

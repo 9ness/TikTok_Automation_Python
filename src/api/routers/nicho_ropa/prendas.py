@@ -3,6 +3,7 @@
 - GET  /api/v1/nicho-ropa/prompts        → imagen + vídeo (manos/percha/espejo)
 - GET  /api/v1/nicho-ropa/prendas        → prendas emparejadas + textos
 - POST /api/v1/nicho-ropa/extraer-textos → lee las capturas con Gemini
+- POST /api/v1/nicho-ropa/guiones        → escribe el guion de cada prenda
 - POST /api/v1/nicho-ropa/producto/estado → mete/saca del escaparate
 - GET  /api/v1/nicho-ropa/foto           → sirve una foto por file ID
 - GET  /api/v1/nicho-ropa/foto-limpia    → descarga la foto de la prenda
@@ -30,6 +31,7 @@ from src.api.exceptions import APIError
 from src.api.schemas.nicho_ropa import (
     CarpetaRopa,
     CarpetasRopaResponse,
+    GuionesRopaRequest,
     PrendaEstadoRequest,
     PrendaInfo,
     PrendasListResponse,
@@ -467,6 +469,10 @@ def list_prendas(
     escaparate = pov_repo.escaparate_index(usuario)
 
     items = []
+    guiones = {
+        pid: product_repo.guion_de(prod, modo)
+        for pid, prod in guardados.items()
+    }
     for par in pares:
         pid = par["producto"]
         prod = guardados.get(pid) or {}
@@ -500,6 +506,11 @@ def list_prendas(
             ),
             plazos_manual=prod.get("plazos_manual"),
             precio=str(prod.get("precio") or ""),
+            # El guion escrito para ESTE modo: cada formato lleva dentro su
+            # movimiento, así que el del espejo no vale para el del coche.
+            guion=guiones.get(pid, {}).get("video", ""),
+            guion_dice=guiones.get(pid, {}).get("dice", ""),
+            guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
             uploaded_at=int(prod.get("uploaded_at") or 0),
             sold=bool(prod.get("sold")),
@@ -634,6 +645,93 @@ def extraer_textos(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
+
+
+@router.post("/guiones", response_model=PrendasListResponse)
+def escribir_guiones(
+    body: GuionesRopaRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> PrendasListResponse:
+    """Escribe con Gemini el guion de cada prenda, con el prompt del curso.
+
+    Es lo que el curso manda hacer a mano en ChatGPT: su "pront base" + la
+    foto de la ficha, y lo que devuelve se pega en el generador. Aquí va por
+    prenda y se guarda, así que en la tarjeta queda un botón de copiar.
+
+    Solo tiene sentido en los formatos cuyo guion se escribe FUERA (los de
+    diálogo cerrado ya vienen con el texto puesto): si se pide en uno de esos,
+    se contesta con un aviso en vez de gastar llamadas.
+    """
+    from src.nicho_ropa.services import guionista
+
+    carpeta = body.carpeta or config.CARPETA_DEFECTO
+    sexo = config.sexo_de_carpeta(carpeta)
+    modo = config.modo_valido(body.modo)
+    estilos = config.prompts_mof10(sexo, False, modo, body.duracion)
+    if not estilos:
+        raise APIError(f"El modo {modo} no tiene prompt.", status_code=400)
+    estilo = estilos[0]
+    if not estilo.get("escrito_fuera"):
+        raise APIError(
+            "Este formato trae el guion cerrado del curso: se pega tal cual, "
+            "no hay nada que escribir.",
+            status_code=400,
+        )
+    tope = config.DURACIONES[config.duracion_valida(body.duracion)]["caracteres"]
+
+    doc = product_repo.load(carpeta)
+    guardados = doc.get("productos") or {}
+    pedidos = body.productos or list(guardados)
+    logs: list[str] = []
+    hechos, fallos = 0, []
+    for pid in pedidos:
+        prod = guardados.get(pid) or {}
+        if not prod.get("titulo"):
+            fallos.append(f"{pid}: sin textos")
+            continue
+        if not body.rehacer and product_repo.guion_de(prod, modo)["video"]:
+            continue
+        # La ficha ES la fuente del precio y las características, que es lo
+        # que el curso adjunta en ChatGPT. La limpia va también: sin ella el
+        # guion habla de la prenda de oídas.
+        fotos = []
+        for clave in ("titled_photo_id", "clean_photo_id"):
+            if prod.get(clave):
+                try:
+                    fotos.append(drive_client.fetch_photo(str(prod[clave])))
+                except (RuntimeError, ValueError) as e:  # noqa: PERF203
+                    logs.append(f"{pid}: sin {clave} ({e})")
+        try:
+            escrito = guionista.escribir(
+                prompt=estilo["guion"],
+                titulo=str(prod.get("titulo") or ""),
+                tienda=str(prod.get("tienda") or ""),
+                caption=str(prod.get("caption") or ""),
+                precio=str(prod.get("precio") or ""),
+                fotos=fotos,
+                max_caracteres=int(tope),
+                on_log=logs.append,
+            )
+        except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
+            fallos.append(f"{pid}: {str(e)[:120]}")
+            continue
+        try:
+            product_repo.guardar_guion(
+                carpeta, pid, modo, escrito["dice"], escrito["video"],
+            )
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
+        hechos += 1
+
+    if not hechos and fallos:
+        raise APIError(
+            "No se pudo escribir ningún guion. " + " · ".join(fallos[:3]),
+            status_code=502,
+        )
+    for linea in logs + fallos:
+        logger.info("[nicho_ropa/guiones] %s", linea)
+    return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario, modo=modo)
 
 
 def _servir_foto(

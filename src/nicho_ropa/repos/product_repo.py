@@ -129,6 +129,46 @@ def video_de(prod: dict, modo: str) -> dict:
     }
 
 
+def guion_de(prod: dict, modo: str) -> dict:
+    """`{dice, video}` del guion escrito para ESE modo. Vacío si no lo hay.
+
+    Va por modo y no por prenda porque el texto lleva dentro el movimiento del
+    formato: el del espejo no vale para el del coche.
+    """
+    from src.nicho_ropa import config
+
+    guardado = ((prod or {}).get("modos") or {}).get(config.modo_valido(modo)) or {}
+    guion = guardado.get("guion") or {}
+    return {
+        "dice": str(guion.get("dice") or ""),
+        "video": str(guion.get("video") or ""),
+        # Los primeros se guardaron con fecha en ISO: si no es un número, se
+        # sirve 0 en vez de reventar la lista entera de la carpeta.
+        "guion_at": int(guion.get("at") or 0) if str(guion.get("at") or "").isdigit() else 0,
+    }
+
+
+def guardar_guion(
+    carpeta: str, producto: str, modo: str, dice: str, video: str,
+) -> dict:
+    """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
+        prod.setdefault("modos", {}).setdefault(modo, {})["guion"] = {
+            # Epoch y no `_now()`: eso devuelve un ISO y la pantalla pinta las
+            # fechas con el mismo helper que las demás (`horaCorta`).
+            "dice": dice, "video": video, "at": int(time.time()),
+        }
+        prod["updated_at"] = _now()
+        r.set_json(_key(carpeta), doc)
+        return prod
+
+
 def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: int) -> dict:
     """Apunta el vídeo de un modo sin tocar el de los demás."""
     from src.nicho_ropa import config
@@ -139,9 +179,11 @@ def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: i
         doc = r.get_json(_key(carpeta)) or {}
         productos = doc.setdefault("productos", {})
         prod = productos.setdefault(str(producto), {})
-        prod.setdefault("modos", {})[modo] = {
+        # `update` y no asignación: en ese hueco vive también el guion de
+        # este modo, y sustituirlo entero lo borraba al montar el vídeo.
+        prod.setdefault("modos", {}).setdefault(modo, {}).update({
             "video_path": ruta, "video_listo_at": listo_at,
-        }
+        })
         # El de siempre se sigue escribiendo para el modo por defecto: hay
         # código (y datos) que lo lee de la raíz.
         if modo == config.MODO_DEFECTO:

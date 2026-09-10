@@ -28,6 +28,9 @@ export interface EstiloMof10 {
   /** Su guion promete plazos SIEMPRE: el curso lo dejó escrito en el ejemplo
    *  y no hay interruptor que lo quite. */
   plazos_fijo?: boolean;
+  /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
+   *  lo que va a Flow es lo que ese devuelva. */
+  escrito_fuera?: boolean;
 }
 
 export interface PromptsRopaResponse {
@@ -111,6 +114,12 @@ export interface PrendaItem {
   plazos_manual?: boolean | null;
   /** Lo que paga hoy el comprador, leído de la captura. */
   precio?: string;
+  /** El guion que escribió la IA para ESTE modo con el prompt del curso:
+   *  `guion` es el bloque entero que se pega en el generador y `guion_dice`,
+   *  solo lo que se oye (lo que tiene tope de caracteres). */
+  guion?: string;
+  guion_dice?: string;
+  guion_at?: number;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = no consta. */
   uploaded_at: number;

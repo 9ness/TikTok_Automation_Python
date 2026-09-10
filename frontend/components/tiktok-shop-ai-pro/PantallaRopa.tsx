@@ -26,6 +26,7 @@ import {
   nichoRopaKeys,
   useCarpetasRopa,
   useCrearMiPrenda,
+  useEscribirGuionesRopa,
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
@@ -375,6 +376,7 @@ export function PantallaRopa({
     !!(prompts.data?.mof10 ?? []).some((e) => e.plazos),
   );
   const extraer = useExtraerTextosRopa();
+  const guiones = useEscribirGuionesRopa();
 
   const items = prendas.data?.items ?? [];
   // Una carpeta está "hecha" cuando todas sus prendas tienen el vídeo DE ESTE
@@ -388,6 +390,7 @@ export function PantallaRopa({
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
   const subidos = items.filter((p) => p.uploaded).length;
+  const conGuion = items.filter((p) => p.guion).length;
   const [soloConUrl, setSoloConUrl] = useState(false);
   const enPantalla = soloConUrl ? items.filter((p) => p.product_url) : items;
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -882,23 +885,52 @@ export function PantallaRopa({
                       : "solo la foto de la prenda"}
                   </strong>
                 </li>
-                <li>
-                  2️⃣ Con esa imagen, pega el{" "}
-                  <strong className="text-foreground">
-                    {e.voz === false ? "prompt de movimiento" : "guion"}
-                  </strong>{" "}
-                  y ponla como{" "}
-                  <strong className="text-foreground">
-                    {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
-                  </strong>{" "}
-                  · 9:16 · 720p → reescalar a 1080
-                </li>
+                {/* El paso que faltaba y hacía que el botón "Guion" pareciera
+                    roto: ese texto NO es para Flow, es el encargo para
+                    ChatGPT, que devuelve el prompt de vídeo ya escrito para
+                    esta prenda. Los de diálogo cerrado se saltan este paso. */}
+                {e.escrito_fuera ? (
+                  <>
+                    <li>
+                      2️⃣ Pulsa{" "}
+                      <strong className="text-foreground">
+                        Escribir guiones
+                      </strong>{" "}
+                      aquí abajo: la IA hace lo que harías en ChatGPT con este
+                      prompt y la foto de la ficha, y deja el guion listo para
+                      copiar en cada tarjeta.
+                    </li>
+                    <li>
+                      3️⃣ Copia el guion de la tarjeta y pégalo en Flow con la
+                      imagen del paso 1 como{" "}
+                      <strong className="text-foreground">
+                        {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
+                      </strong>{" "}
+                      · 9:16 · 720p → reescalar a 1080
+                    </li>
+                  </>
+                ) : (
+                  <li>
+                    2️⃣ Pega el{" "}
+                    <strong className="text-foreground">
+                      {e.voz === false ? "prompt de movimiento" : "guion"}
+                    </strong>{" "}
+                    tal cual en Flow, con la imagen del paso 1 como{" "}
+                    <strong className="text-foreground">
+                      {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
+                    </strong>{" "}
+                    · 9:16 · 720p → reescalar a 1080
+                  </li>
+                )}
                 <li>
                   {e.voz === false
                     ? "🔇 Sale mudo: la música se pone en TikTok al publicar"
                     : "🗣️ El clip sale ya hablado: se publica con su voz, sin texto quemado"}
                 </li>
-                <li>3️⃣ Sube el clip aquí abajo, en su tarjeta.</li>
+                <li>
+                  {e.escrito_fuera ? "4️⃣" : "3️⃣"} Sube el clip aquí abajo, en
+                  su tarjeta.
+                </li>
                 {e.plazos_fijo && (
                   <li className="text-amber-500">
                     ⚠️ Este guion del curso PROMETE pago a plazos en pedidos de
@@ -924,6 +956,40 @@ export function PantallaRopa({
                     </button>
                   ))}
                 </div>
+              )}
+              {/* El botón que hace lo de ChatGPT: escribe el guion de cada
+                  prenda con ESTE prompt y sus fotos, y lo deja en su tarjeta.
+                  Solo en los formatos cuyo guion se escribe fuera — los de
+                  diálogo cerrado ya vienen con el texto puesto. */}
+              {e.escrito_fuera && (
+                <button
+                  type="button"
+                  disabled={guiones.isPending || !conTexto}
+                  onClick={() =>
+                    guiones.mutate(
+                      { carpeta, modo, duracion },
+                      {
+                        onSuccess: () => toast.success("Guiones escritos"),
+                        onError: (err) =>
+                          toast.error(
+                            err instanceof ApiError ? err.message : String(err),
+                          ),
+                      },
+                    )
+                  }
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/50 px-3 py-2 text-xs text-amber-500 transition hover:border-amber-400 disabled:opacity-40"
+                >
+                  {guiones.isPending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />{" "}
+                      Escribiendo guiones…
+                    </>
+                  ) : (
+                    <>
+                      ✍️ Escribir guiones ({conGuion}/{items.length})
+                    </>
+                  )}
+                </button>
               )}
               {/* En orden: primero la imagen (paso 1) a lo ancho, y debajo
                   los DOS guiones del paso 2 uno al lado del otro — son la
@@ -958,7 +1024,7 @@ export function PantallaRopa({
                   className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
                 >
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
-                  (Flow)
+                  {e.escrito_fuera ? " (ChatGPT)" : " (Flow)"}
                 </button>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1107,6 +1173,10 @@ export function PantallaRopa({
               // Si ESTE formato tiene versión con plazos. Sin ella, marcar la
               // prenda no cambia ningún prompt y el botón sobra.
               conPlazos={hayPlazos}
+              // El guion de este formato lo escribe la IA por prenda: la
+              // tarjeta enseña el botón de copiarlo (y el de rehacerlo).
+              conGuion={!!estiloActivo?.escrito_fuera}
+              modalidadDuracion={duracion}
               onCopiar={copiar}
             />
           ))}
@@ -1123,6 +1193,8 @@ function PrendaCard({
   mudo = false,
   modo,
   conPlazos = false,
+  conGuion = false,
+  modalidadDuracion = "10",
   onCopiar,
 }: {
   prenda: PrendaItem;
@@ -1132,12 +1204,18 @@ function PrendaCard({
   mudo?: boolean;
   /** El formato tiene versión con la frase de financiación. */
   conPlazos?: boolean;
+  /** El guion de este formato lo escribe la IA por prenda. */
+  conGuion?: boolean;
+  /** Con qué duración se pide (decide el tope de caracteres). */
+  modalidadDuracion?: string;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
    *  y dónde se guarda el que se suba. */
   modo: string;
   onCopiar: (label: string, texto?: string) => void;
 }) {
   const setEstado = useSetEstadoRopa(carpeta);
+  const escribirGuion = useEscribirGuionesRopa();
+  const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
   // decenas de MB desde el móvil y sin porcentaje no se sabe si va o se colgó
@@ -1415,6 +1493,65 @@ function PrendaCard({
               {op.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* El guion de ESTA prenda, escrito con el prompt del curso. Se copia
+          y se pega en el generador junto con la imagen del paso 1; el botón de
+          rehacerlo está porque cada pasada da un tono distinto y a veces la
+          primera no convence (cuesta una llamada a la IA). */}
+      {conGuion && (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            disabled={!prenda.guion}
+            onClick={() => onCopiar("Guion del vídeo", prenda.guion)}
+            className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-40 ${
+              prenda.guion
+                ? "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
+                : "border-border/60 text-muted-foreground"
+            }`}
+            title={prenda.guion_dice || "Aún no tiene guion escrito"}
+          >
+            ✍️ {prenda.guion ? "Copiar guion" : "Sin guion"}
+            {prenda.guion_dice ? ` · ${prenda.guion_dice.length} car` : ""}
+          </button>
+          <button
+            type="button"
+            disabled={escribiendo || !prenda.titulo}
+            onClick={() => {
+              setEscribiendo(true);
+              escribirGuion.mutate(
+                {
+                  carpeta,
+                  modo,
+                  duracion: modalidadDuracion,
+                  productos: [prenda.producto],
+                  rehacer: true,
+                },
+                {
+                  onSuccess: () => toast.success("Guion escrito"),
+                  onError: (e) =>
+                    toast.error(e instanceof ApiError ? e.message : String(e)),
+                  onSettled: () => setEscribiendo(false),
+                },
+              );
+            }}
+            className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-amber-500/50 disabled:opacity-40"
+            title={
+              prenda.titulo
+                ? "Escribirlo otra vez (una llamada a la IA)"
+                : "Primero hay que extraer los textos"
+            }
+          >
+            {escribiendo ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : prenda.guion ? (
+              "🔁"
+            ) : (
+              "✨"
+            )}
+          </button>
         </div>
       )}
 

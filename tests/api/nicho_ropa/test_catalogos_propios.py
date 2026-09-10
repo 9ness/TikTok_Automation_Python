@@ -430,3 +430,38 @@ class TestEstadoDeLaPrenda:
             )
             assert r.status_code == 200, r.text
             assert bool(product_repo.get_product(slug, "1").get("uploaded")) is valor
+
+
+class TestGuionDeLaPrenda:
+    """El guion lo escribe la app con el prompt del curso, no el operador.
+
+    El curso lo hace a mano en ChatGPT (su prompt + la foto de la ficha) y eso
+    son dos pegadas por prenda. Aquí es un botón — pero solo tiene sentido en
+    los formatos cuyo guion se escribe fuera: los de diálogo cerrado ya vienen
+    con el texto puesto y pedirlo gastaría llamadas para nada.
+    """
+
+    def test_el_bloque_para_flow_es_el_del_curso_con_otra_frase(self):
+        from src.nicho_ropa.services.guionista import _montar_video
+
+        prompt = config.prompts_mof10("hombre", False, "espejo")[0]["guion"]
+        bloque = _montar_video(prompt, "FRASE NUEVA.")
+        # Empieza en el diálogo: lo de antes son órdenes para ChatGPT ("no me
+        # devuelvas nada"), y en Flow las obedece.
+        assert bloque.startswith("El chico dice en español:")
+        assert "«FRASE NUEVA.»" in bloque
+        assert "No me devuelvas nada" not in bloque
+        assert "Máximo" not in bloque
+        # El movimiento va palabra por palabra como lo publicó el curso.
+        assert "espejo de cuerpo entero" in bloque
+
+    def test_los_de_dialogo_cerrado_no_lo_ofrecen(self):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        r = TestClient(app).post(
+            "/api/v1/nicho-ropa/guiones",
+            json={"carpeta": "hombre_web__Carpeta 1", "modo": "calle_1"},
+        )
+        assert r.status_code == 400, r.text
+        assert "cerrado" in r.json()["error"]

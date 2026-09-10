@@ -778,6 +778,16 @@ ESTILOS_MOF10: dict[str, dict] = {
 # resintetizar—: habría que volver a generar el vídeo entero.
 FRASE_PLAZOS = " Y si lo prefieres, puedes pagarlo a plazos."
 
+# Con la frase metida, el ejemplo del curso se va a 214 caracteres y el propio
+# prompt pide 180: dos órdenes que se contradicen, y ChatGPT resuelve por su
+# cuenta —normalmente cortando la CTA del final, que es lo que hace vender—. La
+# frase es NUESTRA, así que el aviso también: cuenta dentro del tope.
+NOTA_PLAZOS = (
+    "\n\nOJO: la frase del pago a plazos cuenta DENTRO del máximo de "
+    "caracteres. Recorta las características para que el total no se pase — "
+    "el ejemplo de arriba ya se pasa."
+)
+
 
 def _con_plazos(texto: str, plazos: bool) -> str:
     """Mete (o quita) la frase de los plazos en un prompt ya montado."""
@@ -796,6 +806,11 @@ def _nota_duracion(guion: str, duracion: str) -> str:
     if duracion_valida(duracion) == DURACION_DEFECTO:
         return guion
     return guion.rstrip() + NOTA_DURACION.format(**DURACIONES[duracion])
+
+
+def _nota_plazos(guion: str, avisar: bool) -> str:
+    """Avisa de que la frase de los plazos entra en el tope, si la lleva."""
+    return guion.rstrip() + NOTA_PLAZOS if avisar else guion
 
 
 def prompts_mof10(
@@ -831,8 +846,16 @@ def prompts_mof10(
             "clave": clave,
             "label": meta["label"],
             "imagen": _con_duracion(_con_plazos(imagen, plazos), dur),
-            "guion": _nota_duracion(
-                _con_duracion(_con_plazos(guion, plazos), dur), dur,
+            "guion": _nota_plazos(
+                _nota_duracion(
+                    _con_duracion(_con_plazos(guion, plazos), dur), dur,
+                ),
+                # Solo si ESTE guion lleva de verdad la frase y además su tope
+                # lo escribe ChatGPT: en los demás, el aviso hablaría de una
+                # frase que no está.
+                plazos
+                and "{{FRASE_PLAZOS}}" in guion
+                and "{{CARACTERES}}" in guion,
             ),
             "derivado": sexo in meta["derivado"],
             # Lo que hay que saber AL PEGARLO, y que no se ve en el prompt:
@@ -853,6 +876,11 @@ def prompts_mof10(
             # con el interruptor o sin él. Como la voz la pone el propio clip,
             # eso no se arregla después: hay que avisarlo antes de generar.
             "plazos_fijo": "pago a plazos" in _con_plazos(guion, False).lower(),
+            # Si ese "guion" es en realidad el encargo para ChatGPT/DeepSeek
+            # (lleva el tope de caracteres dentro) o el texto final que se pega
+            # tal cual en Flow. Son DOS pasos distintos y confundirlos es
+            # pegarle a Flow un "no me devuelvas nada".
+            "escrito_fuera": "{{CARACTERES}}" in guion,
             "duracion": dur,
             "duraciones": [
                 {"clave": k, "label": v["label"], "segundos": v["segundos"]}

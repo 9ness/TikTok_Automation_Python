@@ -197,6 +197,32 @@ export function useExtraerTextosRopa() {
   });
 }
 
+/** Escribe con IA el guion de cada prenda, con el prompt del curso.
+ *
+ *  Es lo que el curso hace a mano en ChatGPT (su prompt + la foto de la
+ *  ficha). Va síncrono y puede tardar: es una llamada a Gemini por prenda. */
+export function useEscribirGuionesRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    PrendasListResponse,
+    Error,
+    {
+      carpeta: string;
+      modo: string;
+      duracion?: string;
+      /** Vacío = las de la carpeta que aún no lo tengan. */
+      productos?: string[];
+      rehacer?: boolean;
+    }
+  >({
+    mutationFn: (body) => api.post<PrendasListResponse>(`${ROOT}/guiones`, body),
+    // Se INVALIDA en vez de escribir la respuesta encima: la lista va por
+    // (carpeta, modo) y escribirla en la clave sin modo la dejaba sin usar.
+    onSuccess: (_res, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
 export function useSubirVideoRopa() {
   const qc = useQueryClient();
   return useMutation<

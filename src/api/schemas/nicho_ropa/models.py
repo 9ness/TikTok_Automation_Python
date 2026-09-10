@@ -40,6 +40,9 @@ class EstiloMof10(BaseModel):
     # Su ejemplo promete financiación SIEMPRE (el curso la dejó escrita
     # dentro): solo vale para prendas que de verdad la tengan.
     plazos_fijo: bool = False
+    # El guion pasa antes por ChatGPT/DeepSeek (con la foto de la ficha) y lo
+    # que va a Flow es lo que ESE devuelva. Los de diálogo cerrado, no.
+    escrito_fuera: bool = False
     personaje: bool = False
     ingrediente: bool = False
 
@@ -144,6 +147,12 @@ class PrendaInfo(BaseModel):
     plazos_manual: bool | None = None
     # Lo que paga hoy el comprador, tal cual se leyó de la captura.
     precio: str = ""
+    # El guion que escribió la IA para ESTE modo con el prompt del curso: lo
+    # que se oye (`guion_dice`) y el bloque entero listo para pegar en el
+    # generador (`guion`). Vacíos mientras no se haya pedido.
+    guion: str = ""
+    guion_dice: str = ""
+    guion_at: int = 0
     uploaded: bool = False
     # Cuándo se marcó, para pintar "subido hoy" o la fecha. 0 = no consta.
     uploaded_at: int = 0
@@ -162,6 +171,19 @@ class PrendasListResponse(BaseModel):
     items: list[PrendaInfo] = Field(default_factory=list)
     textos_extraidos: bool = False
     montando: bool = False
+
+
+class GuionesRopaRequest(BaseModel):
+    """Escribir el guion de unas prendas con el prompt del curso."""
+
+    carpeta: str
+    # De qué modo: el guion lleva dentro el movimiento de ESE formato.
+    modo: str = ""
+    duracion: str = "10"
+    # Vacío = todas las de la carpeta que no lo tengan.
+    productos: list[str] = Field(default_factory=list)
+    # Rehacer el que ya esté escrito (cuesta una llamada a Gemini por prenda).
+    rehacer: bool = False
 
 
 class PrendaEstadoRequest(BaseModel):
