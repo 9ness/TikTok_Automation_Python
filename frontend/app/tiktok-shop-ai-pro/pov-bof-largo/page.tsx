@@ -1836,22 +1836,14 @@ function ProductoCard({
         {/* Copiar el producto a un catálogo de Moda. Solo en los tuyos: las
             carpetas del curso no se copian a ningún sitio. */}
         {CATALOGOS_PROPIOS.includes(source) && (
-          <span className="inline-flex items-center gap-1">
-            <select
-              value={destinoModa}
-              onChange={(e) => setDestinoModa(e.target.value)}
-              className="rounded-md border border-border/60 bg-background px-1.5 py-1 text-[11px] outline-none"
-              title="A qué catálogo de Moda se copia"
-            >
-              <option value="mujer_muestras">👗 Mujer · muestras</option>
-              <option value="mujer_tareas">👗 Mujer · tareas</option>
-              <option value="hombre_muestras">👔 Hombre · muestras</option>
-              <option value="hombre_tareas">👔 Hombre · tareas</option>
-            </select>
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/60 px-1 py-0.5">
+            {/* El botón PRIMERO y el destino después: puesto al revés, el
+                desplegable se leía como si dijera que el producto es "de
+                mujer · muestras", cuando lo que dice es a dónde se copiaría. */}
             <button
               type="button"
               disabled={aModa.isPending}
-              title="Copia sus fotos a ese catálogo de Moda (no lo quita de aquí)"
+              title="Copia sus fotos al catálogo de Moda elegido (no lo quita de aquí)"
               onClick={() =>
                 aModa.mutate(
                   {
@@ -1867,10 +1859,21 @@ function ProductoCard({
                   },
                 )
               }
-              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-50"
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:text-violet-400 disabled:opacity-50"
             >
-              {aModa.isPending ? "Copiando…" : "→ Moda"}
+              {aModa.isPending ? "Copiando…" : "→ Copiar a Moda"}
             </button>
+            <select
+              value={destinoModa}
+              onChange={(e) => setDestinoModa(e.target.value)}
+              className="rounded bg-transparent text-[10px] text-muted-foreground outline-none"
+              title="A qué catálogo de Moda se copia"
+            >
+              <option value="mujer_muestras">👗 mujer · muestras</option>
+              <option value="mujer_tareas">👗 mujer · tareas</option>
+              <option value="hombre_muestras">👔 hombre · muestras</option>
+              <option value="hombre_tareas">👔 hombre · tareas</option>
+            </select>
           </span>
         )}
         {p.clean_photo_id && (

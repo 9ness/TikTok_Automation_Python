@@ -2286,18 +2286,9 @@ function ProductoCard({
             llevan: el prompt de moda pregunta otras cosas (tallas, tejido) y
             su extractor los saca al entrar. */}
         {CATALOGOS_PROPIOS.includes(source) && (
-          <span className="inline-flex items-center gap-1">
-            <select
-              value={destinoModa}
-              onChange={(e) => setDestinoModa(e.target.value)}
-              className="rounded-md border border-border/60 bg-background px-1.5 py-1 text-[11px] outline-none"
-              title="A qué catálogo de Moda se copia"
-            >
-              <option value="mujer_muestras">👗 Mujer · muestras</option>
-              <option value="mujer_tareas">👗 Mujer · tareas</option>
-              <option value="hombre_muestras">👔 Hombre · muestras</option>
-              <option value="hombre_tareas">👔 Hombre · tareas</option>
-            </select>
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/60 px-1 py-0.5">
+            {/* El botón primero y el destino después: al revés, el desplegable
+                parecía decir que el producto ES de mujer · muestras. */}
             <button
               type="button"
               disabled={aModa.isPending}
@@ -2318,10 +2309,21 @@ function ProductoCard({
                   },
                 )
               }
-              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-violet-500/60 hover:text-violet-400 disabled:opacity-50"
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:text-violet-400 disabled:opacity-50"
             >
-              {aModa.isPending ? "Copiando…" : "→ Moda"}
+              {aModa.isPending ? "Copiando…" : "→ Copiar a Moda"}
             </button>
+            <select
+              value={destinoModa}
+              onChange={(e) => setDestinoModa(e.target.value)}
+              className="rounded bg-transparent text-[10px] text-muted-foreground outline-none"
+              title="A qué catálogo de Moda se copia"
+            >
+              <option value="mujer_muestras">👗 mujer · muestras</option>
+              <option value="mujer_tareas">👗 mujer · tareas</option>
+              <option value="hombre_muestras">👔 hombre · muestras</option>
+              <option value="hombre_tareas">👔 hombre · tareas</option>
+            </select>
           </span>
         )}
         {producto.product_url && !producto.sin_stock && (
