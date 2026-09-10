@@ -29,6 +29,13 @@ class EstiloMof10(BaseModel):
     # estilos con el diálogo cerrado: ahí no hay tope que bajar.
     duracion: str = "10"
     duraciones: list[DuracionRopa] = Field(default_factory=list)
+    # Lo que hay que saber AL PEGARLO y no se ve en el prompt. Van declaradas
+    # aunque el back ya las mande: Pydantic descarta las claves que el esquema
+    # no conoce, así que sin esto la pantalla nunca se entera —y el fallo no da
+    # error, simplemente sigue pintando la versión de los formatos hablados.
+    voz: bool = True
+    personaje: bool = False
+    ingrediente: bool = False
 
 
 class ModoRopa(BaseModel):
@@ -37,6 +44,12 @@ class ModoRopa(BaseModel):
     # Si el clip sale HABLADO por el generador. Los que no (las dos camisetas)
     # son los baratos: no gastan la voz de Flow, que es lo que se paga.
     voz: bool = True
+    # "aleatorios" o "marca": no es un ajuste, son dos cuentas de TikTok.
+    modalidad: str = "aleatorios"
+    # "calzado" cuando el formato solo vale para zapatos.
+    categoria: str = ""
+    # Si necesita el personaje de referencia adjunto.
+    personaje: bool = False
 
 
 class PromptsRopaResponse(BaseModel):
