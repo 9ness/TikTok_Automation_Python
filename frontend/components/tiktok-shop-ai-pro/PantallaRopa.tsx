@@ -823,6 +823,9 @@ export function PantallaRopa({
             {prompts.data?.sexo === "hombre" ? "👔 hombre" : "👗 mujer"}.
           </p>
         )}
+        {/* Dónde se pega cada uno. En marca personal el clip sale mudo, así
+            que el vídeo puede ir en GenAI Pro; la foto siempre en Flow. */}
+        {esMarca && <HerramientasIA video="genaipro" />}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
             /* Dos pasos: la imagen se hace en Flow y esa imagen se anima con
@@ -1100,7 +1103,11 @@ function PrendaCard({
     fd.append("producto", prenda.producto);
     fd.append("carpeta", carpeta);
     fd.append("sexo", sexo);
-    if (esWeb && audio === "mudo") fd.append("conservar_audio", "0");
+    // En los formatos MUDOS se tira la voz siempre, diga lo que diga el
+    // ajuste: el generador a veces devuelve el clip hablado aunque el prompt
+    // le pida silencio, y estos vídeos van con música puesta en TikTok. Sin
+    // esto salía la voz inventada del generador por encima.
+    if (esWeb && (mudo || audio === "mudo")) fd.append("conservar_audio", "0");
     fd.append("modo", modo);
     fd.append("file", file);
 
@@ -1212,7 +1219,10 @@ function PrendaCard({
           toca: el vídeo lo dice con la voz de la persona y prometerlo de más
           solo se arregla generando el clip otra vez. Con esto marcado, la
           prenda entra en el grupo "💳 Con plazos" de la descarga de arriba. */}
-      {esWeb && (
+      {/* En los formatos MUDOS no pinta nada: los plazos los promete la voz
+          de la persona y aquí no habla nadie, así que el prompt es el mismo
+          los ofrezca o no. */}
+      {esWeb && !mudo && (
         /* Lo dice la FICHA: sale al extraer los textos, igual que en el POV
            BOF. El botón está para corregirla —una captura cortada, o el
            vendedor que lo cambia— y un toque más devuelve el control a la
