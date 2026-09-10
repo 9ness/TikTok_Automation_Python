@@ -199,6 +199,25 @@ MODO_DEFECTO = "espejo"
 # Las dos modalidades de Moda Mujer. Los modos sin `modalidad` son los de
 # siempre (personajes aleatorios); es el defecto para no tocar lo ya guardado.
 MODALIDAD_DEFECTO = "aleatorios"
+
+# El texto que se quema en los formatos de marca personal. NO sale del
+# producto: en los vídeos de referencia el de espejo y el de POV llevan el
+# mismo ("AUTUMN / cozy season") y solo el de zapatos lo cambia por el tipo de
+# prenda. Es una etiqueta de TEMPORADA, así que se escribe aquí y se cambia
+# cuando cambie la estación, no producto a producto.
+#
+# `segundos` es cuánto se ve: medido sobre los vídeos del curso, el del espejo
+# lo enseña un par de segundos y el de POV lo deja el vídeo entero (0 = todo).
+TEXTO_MARCA: dict[str, dict] = {
+    "marca_espejo": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 3.0},
+    "marca_zapatos": {"titulo": "AUTUMN BOOTS", "bajada": "step into style", "segundos": 3.0},
+    "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0},
+}
+
+
+def texto_de_modo(modo: str) -> dict:
+    """El texto quemado que le toca a ese modo. `{}` si no lleva ninguno."""
+    return dict(TEXTO_MARCA.get(estilo_de_modo(modo)) or {})
 # Palabras que delatan un calzado en el título ya extraído. Se filtra por
 # palabra y no con una llamada a la IA porque la pregunta es fácil: en
 # Carruseles hizo falta Gemini porque allí se preguntaba "¿este producto

@@ -1763,7 +1763,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
         nombre = f"{Path(nombre).stem}__{modo}{Path(nombre).suffix}"
     salida = Path(ropa_config.video_dir()) / carpeta / nombre
     video_editor.montar(
-        raw_path, salida, voz=voz, conservar_audio=conservar_audio, on_log=on_log,
+        raw_path, salida, voz=voz, conservar_audio=conservar_audio,
+        # De él dependen el grado de color y el texto de temporada.
+        modo=str(p.get("modo") or ""), on_log=on_log,
     )
 
     on_progress(0.95, "💾 Guardando estado…")
