@@ -32,6 +32,7 @@ import {
   useSetEstadoRopa,
   type PrendaItem,
 } from "@/lib/queries/nichoRopa";
+import { useHashtags } from "@/lib/queries/nichoPovBof";
 import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -1169,8 +1170,16 @@ function PrendaCard({
     xhr.send(fd);
   }
 
+  // Con los hashtags pegados, como en el POV BOF: es lo que se pega tal cual
+  // en TikTok, y copiarlos aparte se olvida justo el día que hay prisa.
+  const hashtags = useHashtags().data ?? [];
   const caption = prenda.caption
-    ? `${prenda.emojis ? `${prenda.emojis} ` : ""}${prenda.caption}`
+    ? [
+        `${prenda.emojis ? `${prenda.emojis} ` : ""}${prenda.caption}`,
+        hashtags.join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
     : "";
 
   return (

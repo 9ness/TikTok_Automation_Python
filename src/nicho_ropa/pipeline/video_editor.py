@@ -201,7 +201,7 @@ FILTRO_MARCA = (
 )
 # El texto va centrado y a media altura, como en los vídeos de referencia.
 _TEXTO_Y = 0.42
-_TEXTO_CUERPO = 62
+_TEXTO_CUERPO = 74
 _TEXTO_BAJADA = 0.75      # de la línea de arriba (medido sobre las capturas)
 
 # Variantes del rótulo: la MISMA idea con otros adornos. La cuenta tiene que
@@ -258,10 +258,13 @@ def _png_texto_moda(
     def _linea(texto: str, par: tuple, fuente: str, cuerpo: int):
         izq, der = par
         completo = f"{izq} {texto} {der}".strip() if izq or der else texto
+        # Blanco PURO y borde más grueso: sobre estos planos cálidos y
+        # claros, un blanco roto con borde fino se difumina y el rótulo
+        # "apenas se nota" — que es justo lo que pasaba.
         im = _render_text_line(
             completo, font_size=cuerpo, max_w=ancho_max,
-            fill=(255, 253, 250), stroke=(40, 26, 18), max_lines=1,
-            fuente=fuente, stroke_frac=0.055,
+            fill=(255, 255, 255), stroke=(28, 18, 12), max_lines=1,
+            fuente=fuente, stroke_frac=0.085,
         )
         return _crop_visible(im) if im is not None else None
 
