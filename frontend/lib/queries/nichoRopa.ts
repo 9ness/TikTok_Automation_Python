@@ -31,14 +31,19 @@ export function usePromptsRopa(
   plazos = false,
   modo = "",
   duracion = "10",
+  /** "aleatorios" (los formatos de siempre) o "marca" (marca personal). */
+  modalidad = "",
 ) {
   return useQuery<PromptsRopaResponse>({
-    queryKey: [...nichoRopaKeys.prompts(carpeta), plazos, modo, duracion],
+    queryKey: [
+      ...nichoRopaKeys.prompts(carpeta), plazos, modo, duracion, modalidad,
+    ],
     queryFn: () =>
       api.get<PromptsRopaResponse>(
         `${ROOT}/prompts?carpeta=${encodeURIComponent(carpeta)}` +
           (plazos ? "&plazos=1" : "") +
           (modo ? `&modo=${encodeURIComponent(modo)}` : "") +
+          (modalidad ? `&modalidad=${encodeURIComponent(modalidad)}` : "") +
           `&duracion=${encodeURIComponent(duracion)}`,
       ),
     staleTime: 60_000,

@@ -860,6 +860,14 @@ def prompts_mof10(
                 _con_duracion(_con_plazos(guion, plazos), dur), dur,
             ),
             "derivado": sexo in meta["derivado"],
+            # Lo que hay que saber AL PEGARLO, y que no se ve en el prompt:
+            # si se adjunta el personaje de referencia, si la imagen entra
+            # como ingrediente en vez de como frame inicial, y si el clip
+            # sale hablado. Van con el prompt para que la pantalla los pinte
+            # al lado del botón de copiar y no haya que recordarlos.
+            "personaje": bool(meta.get("personaje")),
+            "ingrediente": bool(meta.get("ingrediente")),
+            "voz": bool(meta.get("voz", True)),
             "duracion": dur,
             "duraciones": [
                 {"clave": k, "label": v["label"], "segundos": v["segundos"]}

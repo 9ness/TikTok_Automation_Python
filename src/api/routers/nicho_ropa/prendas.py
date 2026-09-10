@@ -63,6 +63,7 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 def get_prompts(
     carpeta: str = Query(""), plazos: bool = Query(False),
     modo: str = Query(""), duracion: str = Query("10"),
+    modalidad: str = Query(""),
 ) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
@@ -94,7 +95,9 @@ def get_prompts(
             ),
             sexo=sexo,
             mof10=config.prompts_mof10(sexo, plazos, modo, duracion),
-            modos=config.modos_de(sexo),
+            # Los modos de ESA modalidad: personajes aleatorios (los de
+            # siempre) o marca personal. Son cuentas distintas, no un ajuste.
+            modos=config.modos_de(sexo, modalidad or config.MODALIDAD_DEFECTO),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e

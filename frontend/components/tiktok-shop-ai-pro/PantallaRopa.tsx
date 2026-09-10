@@ -278,26 +278,33 @@ export type SexoRopa = "mujer" | "hombre";
 export function PantallaRopa({
   variante,
   sexo: sexoFijo = "mujer",
+  modalidad = "aleatorios",
 }: {
   variante: Variante;
   sexo?: SexoRopa;
+  /** "aleatorios" son los formatos de siempre; "marca", los de personaje fijo.
+   *  Van en pantallas distintas y no en un selector porque son dos CUENTAS de
+   *  TikTok: al entrar no hay que acordarse de en cuál estabas. */
+  modalidad?: string;
 }) {
   const esWeb = variante === "web";
+  const esMarca = modalidad === "marca";
   // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
-  const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:modo`, "espejo");
+  const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:${modalidad}:modo`,
+    esMarca ? "marca_espejo" : "espejo");
   // Cuánto va a durar el clip: 10s en Omni, 8s en GenAI Pro (Veo). No es un
   // ajuste de vídeo — baja el tope de caracteres del guion, porque la voz la
   // pone el propio clip y lo que no entra sale cortado a media frase.
   const [duracion, setDuracion] = useEstadoDeUsuario(
-    `ropa-web:${sexoFijo}:duracion`,
+    `ropa-web:${sexoFijo}:${modalidad}:duracion`,
     "10",
   );
   // La carpeta y el modo se recuerdan POR PANTALLA: si compartieran clave, al
   // pasar de mujer a hombre te encontrarías en la carpeta de la otra.
   const [catalogo, setCatalogo] = useEstadoDeUsuario(
-    `ropa-web:${sexoFijo}:catalogo`,
+    `ropa-web:${sexoFijo}:${modalidad}:catalogo`,
     "web",
   );
   const [carpeta, setCarpeta] = useEstadoDeUsuario(
@@ -341,7 +348,7 @@ export function PantallaRopa({
   const slugPrompts = carpeta || (esWeb ? `${genero}__` : "");
   // Con el modo: la pantalla enseña SOLO el prompt del modo en el que estás.
   // Con los dos a la vista era cuestión de tiempo copiar el que no era.
-  const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "", duracion);
+  const prompts = usePromptsRopa(slugPrompts, false, esWeb ? modo : "", duracion, modalidad);
   // Los modos son del SEXO, no de la pantalla: en hombre hay cuatro formatos
   // y en mujer dos, y cada uno guarda su propio vídeo de la misma prenda.
   const modos = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
@@ -352,7 +359,7 @@ export function PantallaRopa({
     if (!modos.length || modos.some((m) => m.clave === modo)) return;
     setModo(modos[0]!.clave);
   }, [modos, modo, setModo]);
-  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "", duracion);
+  const promptsPlazos = usePromptsRopa(slugPrompts, true, esWeb ? modo : "", duracion, modalidad);
   const extraer = useExtraerTextosRopa();
 
   const items = prendas.data?.items ?? [];
@@ -827,6 +834,29 @@ export function PantallaRopa({
                   </span>
                 )}
               </p>
+              {/* Lo que hay que hacer AL PEGARLO y no se ve en el prompt. Sin
+                  esto se copia bien y sale otro vídeo: equivocarse entre
+                  "frame inicial" e "ingrediente" no da ningún error. */}
+              {(e.personaje || e.ingrediente || e.voz === false) && (
+                <ul className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
+                  <li>
+                    📎 Adjunta{" "}
+                    <strong className="text-foreground">
+                      {e.personaje ? "tu personaje y la foto del producto" : "solo la foto del producto"}
+                    </strong>
+                  </li>
+                  <li>
+                    🎬 En el vídeo, la imagen va como{" "}
+                    <strong className="text-foreground">
+                      {e.ingrediente ? "INGREDIENTE" : "FRAME INICIAL"}
+                    </strong>{" "}
+                    · 9:16 · 720p → reescalar a 1080
+                  </li>
+                  {e.voz === false && (
+                    <li>🔇 Sale mudo: la música se pone en TikTok al publicar</li>
+                  )}
+                </ul>
+              )}
               {(e.duraciones ?? []).length > 1 && (
                 <div className="flex gap-1.5">
                   {(e.duraciones ?? []).map((d) => (

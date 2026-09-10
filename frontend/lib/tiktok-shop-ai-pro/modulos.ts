@@ -81,14 +81,29 @@ export const MODULOS: ModuloNicho[] = [
   // hay que acordarse de en cuál estabas. Los formatos tampoco son los mismos
   // (hombre tiene cuatro y mujer uno), así que compartir pantalla era enseñar
   // la mitad de los botones apagados.
+  // Moda Mujer son DOS pantallas desde sep 2026, que es como lo publica la web:
+  // "personajes aleatorios" (los formatos de siempre, con una persona distinta
+  // cada vez) y "marca personal" (el mismo personaje repetido). No es un ajuste
+  // dentro de una pantalla — son dos CUENTAS de TikTok, y mezclarlas obligaría
+  // a acordarse de en cuál modo estabas antes de tocar nada.
   {
     slug: "nicho-ropa-mujer",
     modulo: 8,
-    label: "Ropa Mujer",
-    titulo: "Creación de Nicho Ropa Mujer",
+    label: "Moda Mujer · Aleatorios",
+    titulo: "Moda Mujer · Personajes aleatorios",
     icon: Shirt,
     resumen:
-      "El inventario de MUJER de la web, por ZIP: la prenda puesta y grabada frente al espejo.",
+      "El inventario de MUJER de la web, por ZIP: la prenda puesta, con una persona distinta en cada vídeo.",
+    listo: true,
+  },
+  {
+    slug: "moda-mujer-marca",
+    modulo: 8,
+    label: "Moda Mujer · Marca Personal",
+    titulo: "Moda Mujer · Marca Personal",
+    icon: Shirt,
+    resumen:
+      "Los tres formatos con TU personaje fijo: espejo multi escena, zapatos multi escena y zapatos vista POV.",
     listo: true,
   },
   {

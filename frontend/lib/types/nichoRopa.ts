@@ -17,6 +17,11 @@ export interface EstiloMof10 {
    *  diálogo viene cerrado del curso y no hay tope que bajar. */
   duracion?: string;
   duraciones?: DuracionRopa[];
+  /** Lo que hay que saber AL PEGARLO y no se ve en el prompt. */
+  personaje?: boolean;
+  /** La imagen entra en Flow como ingrediente, no como frame inicial. */
+  ingrediente?: boolean;
+  voz?: boolean;
 }
 
 export interface PromptsRopaResponse {
@@ -43,6 +48,12 @@ export interface ModoRopa {
   label: string;
   /** Si el clip sale hablado. Los mudos no gastan la voz del generador. */
   voz?: boolean;
+  /** "aleatorios" o "marca": son cuentas distintas, no un ajuste. */
+  modalidad?: string;
+  /** "calzado" cuando el formato solo vale para zapatos. */
+  categoria?: string;
+  /** Si necesita el personaje de referencia adjunto. */
+  personaje?: boolean;
 }
 
 export interface CarpetaRopa {
