@@ -163,6 +163,19 @@ _FORMATO = (
     "se genera por separado y con una frase vaga sale una casa distinta cada "
     "vez. Tampoco describas el peinado ni la ropa — salen de la foto de la "
     "persona.\n"
+    # Lo único del prompt que no es cuestión de gusto: el diagnóstico de la
+    # agencia lo pone en "Incumplimiento de Normas", que es retirada de
+    # contenido y no deboost. Y salta solo en cuanto el producto es una
+    # plataforma vibratoria, una faja o un suplemento.
+    "13. LÍMITES DE SALUD, innegociables: ni pérdida de peso, adelgazar, "
+    "quemar grasa, reducir barriga, tonificar, celulitis, cortisol o "
+    "inflamación; ni lenguaje médico (curar, tratar, aliviar, dolor, "
+    "circulación, terapéutico, clínicamente probado); ni promesas de resultado "
+    "corporal de refilón («notarás el cambio en tu cuerpo»). Habla del USO y "
+    "de la comodidad — cómo se usa, dónde cabe, qué trae, en qué momento del "
+    "día. Si sin eso te quedas sin nada que decir, cuenta el producto "
+    "(material, medidas, mando, niveles, silencioso) y no lo que le pasa a "
+    "quien lo usa.\n"
     "5. La longitud del guion es un TOPE, no una sugerencia: {tope} caracteres "
     "como máximo, contando espacios y signos. El clip dura {segundos} segundos "
     "exactos y lo que no dé tiempo a decir se pierde a media frase. CUENTA "

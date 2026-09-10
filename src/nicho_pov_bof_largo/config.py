@@ -327,7 +327,19 @@ def prompt_guion(
         # solo se le manda lo que va después del separador.
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
-    return _alargar(base, segundos) + _epoca()
+    return _alargar(base, segundos) + _epoca() + _limites_salud()
+
+
+def _limites_salud() -> str:
+    """Añadido NUESTRO: lo que TikTok Shop RETIRA, no lo que penaliza.
+
+    El prompt del curso no lo dice y el producto lo pide solo: con una
+    plataforma vibratoria, una faja o un suplemento, el guion se va a hablar de
+    adelgazar en la primera frase. El diagnóstico de la agencia lo clasifica
+    como "Incumplimiento de Normas" —retirada de contenido— y no como los
+    demás defectos, que solo quitan alcance.
+    """
+    return '\n\nLÍMITES DE SALUD (INNEGOCIABLES). TikTok Shop retira el contenido que los cruza, no lo penaliza: no es una recomendación de estilo.\n- NADA de pérdida de peso, adelgazar, quemar grasa, reducir barriga, tonificar, definir, celulitis, retención de líquidos, cortisol, inflamación abdominal ni medidas corporales.\n- NADA de lenguaje médico o farmacéutico: curar, tratar, aliviar, recuperar, circulación, dolor, lesión, terapéutico, clínicamente probado.\n- Tampoco de refilón («te ayuda a estar en forma», «notarás el cambio en tu cuerpo»): la promesa de resultado corporal es lo que se sanciona, aunque no se nombre la palabra.\nHabla del USO y de la comodidad: cómo se usa, dónde cabe, lo fácil que es, en qué momento del día, qué trae. Si el producto es de fitness, bienestar o suplementos y te quedas sin nada que decir sin cruzar esto, cuenta el producto (material, medidas, mando, niveles, silencioso) en vez de lo que le pasa a quien lo usa.'
 
 
 def _epoca() -> str:
