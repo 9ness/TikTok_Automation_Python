@@ -83,9 +83,12 @@ def escribir(
 
     descripcion = f"Producto: {titulo.strip()}."
     if precio:
-        # Con coma: el guion lo lee una voz en español y "33.57" se dice
-        # "treinta y tres punto cincuenta y siete".
-        descripcion += f" Precio hoy: {precio.replace('.', ',')} €."
+        # El precio se manda como CONTEXTO (si es caro o barato cambia el tono),
+        # pero el guion no lo dice: ver `_FORMATO`.
+        descripcion += (
+            f" Precio hoy, solo para que sepas de qué gama es: "
+            f"{precio.replace('.', ',')} € — NO lo digas en el guion."
+        )
     if tienda:
         descripcion += f" Tienda: {tienda.strip()}."
     if caption:

@@ -828,8 +828,12 @@ def prompts_mof10(
             continue
         propios = (meta.get("por_sexo") or {}).get(sexo)
         if propios:
-            # Suyos los dos: se sirven literales, sin sustituir nada.
-            imagen, guion = (_limpio(f) for f in propios)
+            # El texto es suyo, pero los marcadores se rellenan IGUAL: el del
+            # selfie de hombre los lleva dentro (`{{EL_SUJETO_MAY}}`, `{{VOZ_DESC}}`)
+            # para poder derivar el de mujer, y servirlo "literal" copiaba el
+            # prompt con las llaves puestas — el operador lo pegaba así en
+            # ChatGPT. Sustituir es inocuo en los que no tienen ninguno.
+            imagen, guion = (_con_sexo(f, sexo, SEXOS_MOF10) for f in propios)
         elif not meta.get("imagen"):
             # Estilo que SOLO existe por sexo (los de marca personal son de
             # mujer): pedido para el otro, no hay texto que derivar. Antes esto

@@ -13,4 +13,4 @@ Voz {{VOZ_ADJ}}:
 {{VOZ_DESC}}
 
 Movimiento:
-La toma general del video comienza con un movimiento/vibración de cámara brusco pero realista como si colocara el móvil con fuerza en el sitio. La cámara no queda estaticala inicio del vídeo. Se aleja hacia atrás tras colocarlo y gesticula con naturalidad explicando. No se gira ni muestra la parte trasera. Sin zooms ni cortes. luz natural, calidad iPhone. Expresión entusiasta y natural. Respeta el oufit de la imagen de referencia. Sin filtros, textos ni cortes. Labios sincronizados con la voz. Un solo clip continuo.
+El vídeo comienza con un movimiento brusco o vibración brusca pero realista de la cámara. {{EL_SUJETO_MAY}} se aleja hacia atrás después de colocarlo y gesticula con naturalidad mientras explica el producto. No se gira ni muestra la parte trasera. Sin zooms ni cortes. Luz natural y calidad de iPhone. Expresión entusiasta y natural. Respeta exactamente el outfit de la imagen de referencia. Sin filtros ni textos. Labios perfectamente sincronizados con la voz. Un solo clip continuo.

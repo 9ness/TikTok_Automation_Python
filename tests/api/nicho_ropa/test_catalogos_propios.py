@@ -147,10 +147,15 @@ class TestPlazosEnElPrompt:
             assert a["plazos"] == (a["guion"] != b["guion"])
 
     def test_no_se_escapa_ningun_marcador(self):
-        for plazos in (True, False):
-            datos = self._prompts(plazos)
-            for estilo in datos["mof10"]:
-                assert "{{" not in estilo["guion"] and "{{" not in estilo["imagen"]
+        # Los DOS sexos: el selfie de hombre trae el texto suyo pero lleno de
+        # marcadores (para poder derivar el de mujer), y se servía "literal" —
+        # o sea, con las llaves puestas: el operador pegaba en ChatGPT un
+        # «{{EL_SUJETO_MAY}} dice en español» y el guion salía con eso dentro.
+        for sexo in ("hombre", "mujer"):
+            for plazos in (True, False):
+                for estilo in config.prompts_mof10(sexo, plazos):
+                    assert "{{" not in estilo["guion"], (sexo, estilo["clave"])
+                    assert "{{" not in estilo["imagen"], (sexo, estilo["clave"])
 
 
 class TestPlazosDeLaFicha:
