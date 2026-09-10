@@ -508,6 +508,7 @@ def list_prendas(
             plazos_manual=prod.get("plazos_manual"),
             precio=str(prod.get("precio") or ""),
             uploaded=bool(prod.get("uploaded")),
+            uploaded_at=int(prod.get("uploaded_at") or 0),
             sold=bool(prod.get("sold")),
             # El vídeo es de ESTE modo de grabación: la misma prenda tiene
             # uno por modo, como los estilos de guion del POV BOF Largo.
@@ -557,8 +558,12 @@ def set_producto_estado(
 
     if body.uploaded is not None:
         try:
+            # Con la FECHA: sin ella el chip decía "subido" y no había forma de
+            # saber si fue hoy o hace una semana — que es justo lo que se
+            # mira al preparar la publicación del día.
             product_repo.update_product(
                 carpeta, body.producto, uploaded=bool(body.uploaded),
+                uploaded_at=int(time.time()) if body.uploaded else 0,
             )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e

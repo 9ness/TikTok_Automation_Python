@@ -45,6 +45,7 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { horaCorta } from "@/lib/hora";
 import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import type { ModoRopa } from "@/lib/types/nichoRopa";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
@@ -381,6 +382,7 @@ export function PantallaRopa({
     : 0;
   const conTexto = items.filter((p) => p.titulo).length;
   const conVideo = items.filter((p) => p.video_path).length;
+  const subidos = items.filter((p) => p.uploaded).length;
   const [soloConUrl, setSoloConUrl] = useState(false);
   const enPantalla = soloConUrl ? items.filter((p) => p.product_url) : items;
   const [verEscaparate, setVerEscaparate] = useState(false);
@@ -669,7 +671,8 @@ export function PantallaRopa({
           </p>
         ) : (
           <p className="text-xs font-medium sm:text-sm">
-            {items.length} prenda(s) · {conTexto} con texto · {conVideo} con vídeo
+            {items.length} prenda(s) · {conTexto} con texto · {conVideo} con
+            vídeo · 📤 {subidos} subida(s)
           </p>
         )}
       </Caja>
@@ -1482,6 +1485,11 @@ function PrendaCard({
           }`}
         >
           📤 Subido
+          {subido && prenda.uploaded_at ? (
+            <span className="ml-1 font-normal opacity-80">
+              {horaCorta(prenda.uploaded_at)}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"

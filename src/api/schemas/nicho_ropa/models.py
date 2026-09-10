@@ -140,6 +140,8 @@ class PrendaInfo(BaseModel):
     # Lo que paga hoy el comprador, tal cual se leyó de la captura.
     precio: str = ""
     uploaded: bool = False
+    # Cuándo se marcó, para pintar "subido hoy" o la fecha. 0 = no consta.
+    uploaded_at: int = 0
     # Vendió con esta prenda. El ranking es POR USUARIO y común a todos los
     # nichos (`nicho_pov_bof/repos/product_repo.py`): la venta es de la cuenta
     # de quien la hizo, no del catálogo de donde saliera la prenda.

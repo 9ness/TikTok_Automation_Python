@@ -106,6 +106,8 @@ export interface PrendaItem {
   /** Lo que paga hoy el comprador, leído de la captura. */
   precio?: string;
   uploaded: boolean;
+  /** Cuándo se marcó como subido (epoch). 0 = no consta. */
+  uploaded_at: number;
   /** Vendió con esta prenda. El ranking es por usuario y común a los nichos. */
   sold?: boolean;
   video_path: string | null;

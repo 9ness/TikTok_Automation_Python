@@ -210,19 +210,19 @@ _TEXTO_BAJADA = 0.75      # de la línea de arriba (medido sobre las capturas)
 # producto remontado sale igual y dos seguidos no repiten.
 ADORNOS_TEXTO: tuple[dict, ...] = (
     {"titulo": ("🤎", "🤎"), "bajada": ("🍂", "🍂"),
-     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_titulo": "PTSerif-Bold.ttf",
      "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
     {"titulo": ("🍂", "🍂"), "bajada": ("🤎", "🤎"),
-     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_titulo": "PlayfairDisplay-Black.ttf",
      "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
     {"titulo": ("🍁", "🍁"), "bajada": ("✨", "✨"),
-     "fuente_titulo": "PlayfairDisplay-Black.ttf",
+     "fuente_titulo": "PTSerif-Bold.ttf",
      "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
     {"titulo": ("🤎", "🤎"), "bajada": ("", ""),
      "fuente_titulo": "PlayfairDisplay-Black.ttf",
      "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
     {"titulo": ("", ""), "bajada": ("🍂", "🍂"),
-     "fuente_titulo": "Italiana-Regular.ttf",
+     "fuente_titulo": "PTSerif-Bold.ttf",
      "fuente_bajada": "CormorantGaramond-LightItalic.ttf"},
 )
 
@@ -233,6 +233,32 @@ def adorno_de(semilla: str) -> dict:
 
     h = hashlib.sha1(str(semilla or "").encode("utf-8")).digest()
     return ADORNOS_TEXTO[h[0] % len(ADORNOS_TEXTO)]
+
+
+def _sombra_suave(im):
+    """Pone una sombra desenfocada DETRÁS del texto.
+
+    Es lo que hace que el blanco despegue del fondo sin recurrir a un contorno
+    negro: sobre un plano claro el texto se lee igual de bien y sigue
+    pareciendo una foto de moda y no una pegatina.
+    """
+    from PIL import Image, ImageFilter
+
+    if im is None:
+        return None
+    margen = 18
+    lienzo = Image.new(
+        "RGBA", (im.width + margen * 2, im.height + margen * 2), (0, 0, 0, 0),
+    )
+    # La silueta del texto, en oscuro y borrosa. Dos pasadas: una ancha que
+    # apaga el fondo y otra corta que marca el canto.
+    for radio, alfa, desvio in ((9, 120, 3), (4, 150, 1)):
+        sombra = Image.new("RGBA", lienzo.size, (0, 0, 0, 0))
+        tinta = Image.new("RGBA", im.size, (26, 16, 10, alfa))
+        sombra.paste(tinta, (margen + desvio, margen + desvio), im)
+        lienzo.alpha_composite(sombra.filter(ImageFilter.GaussianBlur(radio)))
+    lienzo.alpha_composite(im, (margen, margen))
+    return lienzo
 
 
 def _png_texto_moda(
@@ -258,19 +284,59 @@ def _png_texto_moda(
     def _linea(texto: str, par: tuple, fuente: str, cuerpo: int):
         izq, der = par
         completo = f"{izq} {texto} {der}".strip() if izq or der else texto
-        # Blanco PURO y borde más grueso: sobre estos planos cálidos y
-        # claros, un blanco roto con borde fino se difumina y el rótulo
-        # "apenas se nota" — que es justo lo que pasaba.
+        # Blanco PURO y SIN contorno: lo que separa el texto del fondo es la
+        # sombra desenfocada de debajo (`_sombra_suave`) y el grosor de la
+        # letra. Con borde negro se lee, pero parece una pegatina, y estos
+        # vídeos van de parecer una foto de moda.
         im = _render_text_line(
             completo, font_size=cuerpo, max_w=ancho_max,
-            fill=(255, 255, 255), stroke=(28, 18, 12), max_lines=1,
-            fuente=fuente, stroke_frac=0.085,
+            fill=(255, 255, 255), stroke=None, max_lines=1,
+            fuente=fuente, stroke_frac=0.0,
         )
-        return _crop_visible(im) if im is not None else None
+        return _sombra_suave(_crop_visible(im)) if im is not None else None
 
-    # El título espaciado letra a letra, como en la referencia.
-    espaciado = " ".join((titulo or "").strip())
-    arriba = _linea(espaciado, ad["titulo"], ad["fuente_titulo"], _TEXTO_CUERPO)
+    def _titulo(texto: str, par: tuple, fuente: str, cuerpo: int):
+        """El título, espaciado letra a letra y con sus emojis a los lados.
+
+        Cada PALABRA se pinta por separado y se pegan con un hueco mayor: el
+        renderizador reparte por palabras y de paso normaliza los espacios
+        (`split()`), así que dentro de una sola cadena "AUTUMN BOOTS" sale
+        "AUTUMNBOOTS" da igual con qué espacio se separe.
+        """
+        izq, der = par
+        trozos = [(" ".join(w), cuerpo * 0.85) for w in (texto or "").split()]
+        if not trozos:
+            return None
+        if izq:
+            trozos.insert(0, (izq, cuerpo * 0.22))
+        if der:
+            trozos.append((der, 0))
+        ims = []
+        for txt, hueco in trozos:
+            im = _render_text_line(
+                txt, font_size=cuerpo, max_w=ancho_max,
+                fill=(255, 255, 255), stroke=None, max_lines=1,
+                fuente=fuente, stroke_frac=0.0,
+            )
+            if im is not None:
+                ims.append((_crop_visible(im), int(hueco)))
+        if not ims:
+            return None
+        ancho = sum(i.width + h for i, h in ims) - ims[-1][1]
+        alto = max(i.height for i, _ in ims)
+        linea = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+        x = 0
+        for im, hueco in ims:
+            linea.paste(im, (x, (alto - im.height) // 2), im)
+            x += im.width + hueco
+        if linea.width > ancho_max:      # título largo: se encoge, no se parte
+            escala = ancho_max / linea.width
+            linea = linea.resize(
+                (ancho_max, max(1, int(alto * escala))), Image.LANCZOS,
+            )
+        return _sombra_suave(linea)
+
+    arriba = _titulo(titulo, ad["titulo"], ad["fuente_titulo"], _TEXTO_CUERPO)
     abajo = (
         _linea(bajada, ad["bajada"], ad["fuente_bajada"],
                int(_TEXTO_CUERPO * _TEXTO_BAJADA))
