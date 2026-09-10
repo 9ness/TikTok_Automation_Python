@@ -2,6 +2,7 @@
 
 import {
   Clapperboard,
+  ClipboardCopy,
   Download,
   Image as ImageIcon,
   Loader2,
@@ -289,6 +290,45 @@ export function PantallaUGC() {
           {items.length} producto(s) · {conEscenas} con escenas · {conVideo} con vídeo
         </p>
       </Caja>
+
+      {/* Paso 0 — el personaje. Va antes que nada y se hace UNA vez por cuenta:
+          la persona que sale en los vídeos es la identidad del perfil, así que
+          quien no lo tenga hecho no puede empezar. Plegado, porque el día a
+          día es el paso 1 y esto se toca una vez cada muchos meses. */}
+      <details className="rounded-xl border border-border/60 bg-card p-3">
+        <summary className="cursor-pointer text-xs font-semibold">
+          👤 Paso 0 · Crear tu personaje{" "}
+          <span className="font-normal text-muted-foreground">
+            — una vez por cuenta
+          </span>
+        </summary>
+        <ol className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+          <li>
+            1. Busca en Pinterest una foto de <strong>cuerpo entero</strong>, con
+            el pelo suelto, las manos a la vista y sin marca de agua.
+          </li>
+          <li>
+            2. Copia el prompt de aquí abajo y pégalo en Gemini{" "}
+            <strong>junto con esa foto</strong>. Te devuelve la descripción de tu
+            personaje.
+          </li>
+          <li>
+            3. Genera esa descripción en Flow y guarda la imagen: es la que se
+            adjunta en cada vídeo.
+          </li>
+        </ol>
+        <button
+          type="button"
+          disabled={!cfg.data?.prompt_personaje}
+          onClick={() => {
+            void navigator.clipboard.writeText(cfg.data?.prompt_personaje ?? "");
+            toast.success("Prompt de personaje copiado");
+          }}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-xs transition hover:border-violet-500/60 disabled:opacity-50"
+        >
+          <ClipboardCopy className="h-3.5 w-3.5" /> Copiar prompt de personaje
+        </button>
+      </details>
 
       <Paso
         n={1}
