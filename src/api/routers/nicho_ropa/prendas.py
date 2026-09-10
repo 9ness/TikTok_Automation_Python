@@ -258,6 +258,10 @@ def copiar_de_pov_bof(
     lo que ya tenga hecho en el POV BOF —textos, guion, escaparate, vídeos—
     cuelga de su número en su carpeta de allí.
     """
+    # El import va DENTRO, como en el resto del router: el módulo toca el Drive
+    # montado al cargarse y a nivel de fichero encarece el arranque de la API.
+    from src.nicho_ropa.services import prendas_web
+
     try:
         return prendas_web.copiar_desde_pov_bof(genero, source, folder, producto)
     except ValueError as e:

@@ -179,7 +179,15 @@ def copiar_desde_pov_bof(
     if not config.es_genero_operador(genero):
         raise ValueError(f"{genero!r} no es un catálogo tuyo de moda")
 
-    fotos = mis_productos.listar_fotos_como_drive(carpeta, source)
+    # Con las DIMENSIONES: sin ellas `split_pair` decide cuál es la limpia por
+    # el peso del fichero, que se equivoca — y aquí equivocarse significa
+    # llevarse a Moda la captura de la ficha en vez de la foto del producto.
+    from src.nicho_pov_bof.services import drive_client as pov_drive
+
+    fotos = [
+        pov_drive.probe_dimensions(f)
+        for f in mis_productos.listar_fotos_como_drive(carpeta, source)
+    ]
     par = next(
         (x for x in photo_pairing.pair_folder(fotos)
          if str(x.get("producto")) == str(producto)), None,
