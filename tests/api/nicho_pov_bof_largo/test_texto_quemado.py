@@ -95,3 +95,47 @@ class TestQueAcabadoLeToca:
         assert config.estilo_texto_valido(encolado, "dolor") == "blanco", (
             "si esto cambia, es que alguien ha vuelto a resolverlo dos veces"
         )
+
+
+class TestCuantoDuraElVideo:
+    """Las duraciones se piden en CLIPS, no en segundos sueltos."""
+
+    def test_los_segundos_salen_de_la_duracion_de_clip(self):
+        from src.nicho_pov_bof_largo import config
+
+        assert config.opciones_guion(8) == ((2, 16), (3, 24), (4, 32), (5, 40))
+        # Con clips de 10s hay una opción menos: el tope son 40 segundos.
+        assert config.opciones_guion(10) == ((2, 20), (3, 30), (4, 40))
+
+    def test_lo_que_se_pide_y_el_metraje_son_el_mismo_numero(self):
+        """Era el fallo de los segundos absolutos.
+
+        "30 segundos" con clips de 8 no es múltiplo de nada: salían tres clips
+        (24s de material) y un vídeo de 26 acelerando la voz. Pidiendo por
+        clips, la ventana cae dentro del metraje siempre.
+        """
+        from src.nicho_pov_bof_largo import config
+
+        for clip_s in (8, 10):
+            for clips, segundos in config.opciones_guion(clip_s):
+                metraje = clips * clip_s
+                suelo, techo = config.ventana_video(segundos, metraje)
+                assert techo <= metraje, (clip_s, clips)
+                assert suelo < techo
+
+    def test_el_video_normal_no_lleva_el_parrafo_de_desarrollar(self):
+        """Solo los largos. Con la condición vieja —"que haya algún número"—
+        al normal se le pegaba el texto de contar más características."""
+        from src.nicho_pov_bof_largo import config
+
+        normal = config.opciones_guion(8)[0][1]
+        assert "MÁS LARGO" not in config.prompt_guion(False, "precio", True, normal)
+        assert "MÁS LARGO" in config.prompt_guion(False, "precio", True, 40)
+
+    def test_el_tope_de_caracteres_no_baila_por_un_redondeo(self):
+        """Se pide un número y se comprueba otro = una reescritura de balde."""
+        from src.nicho_pov_bof_largo import config
+
+        assert config.caracteres_guion(config.GUION_OBJETIVO_S) == (
+            config.GUION_MAX_CARACTERES
+        )

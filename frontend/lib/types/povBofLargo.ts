@@ -59,6 +59,7 @@ export interface ProductoLargo {
   /** Tercer clip: solo cuando el guion no cabe en dos. */
   clip3?: boolean;
   clip4?: boolean;
+  clip5?: boolean;
   /** Cuántos clips pide este guion (2, o 3 si la voz no cabe en dos). */
   clips_necesarios?: number;
   /** Duración de los clips que genera el operador: 8 o 10 segundos. Cambia
@@ -67,6 +68,9 @@ export interface ProductoLargo {
   /** Acabado del texto quemado: "blanco", "clasico" o "" (no elegido, y
    *  entonces manda el gancho: dolor → blanco liso, precio → clásico). */
   estilo_texto?: string;
+  /** Con cuántos segundos se escribió el guion que hay guardado. Si no es el
+   *  que está pedido, hay que rehacerlo para que sirva. */
+  guion_segundos?: number;
   /** Por dónde empieza el guion: "precio" o "dolor". No es el gancho del
    *  vídeo (el texto quemado), es lo que dice la voz al arrancar. */
   estilo_guion?: string;

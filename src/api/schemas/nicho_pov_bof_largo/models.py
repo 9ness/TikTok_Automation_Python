@@ -67,6 +67,7 @@ class ProductoLargo(BaseModel):
     # `config.clips_necesarios`). El tope es `config.CLIPS_MAXIMOS`.
     clip3: bool = False
     clip4: bool = False
+    clip5: bool = False
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
     clip_s: int = 8
@@ -74,6 +75,9 @@ class ProductoLargo(BaseModel):
     # entonces lo decide el gancho del catálogo — ver
     # `config.estilo_texto_de`).
     estilo_texto: str = ""
+    # Con cuántos segundos se escribió el guion que hay guardado. Es lo que
+    # deja avisar de que pedir otra duración no sirve de nada hasta rehacerlo.
+    guion_segundos: float = 0
     # Por dónde empieza el guion: "precio" o "dolor". No confundir con el
     # gancho del vídeo, que es el texto quemado de arriba.
     estilo_guion: str = "precio"

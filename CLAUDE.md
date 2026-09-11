@@ -400,9 +400,12 @@ Tres cosas del guion que no son del curso y hay que saber:
   largo → cierre corto y acelerar; guion corto → primero cierre largo y luego
   voz a tono normal. El cuerpo del guion NO se toca: cambiarlo cuesta una
   llamada y es lo que vende.
-- Cuando se piden 30/40/60s, **esa duración es el mínimo**, no los 15s del
-  reto: es lo que decide cuántos clips se piden (30s son CUATRO de 8s, no
-  tres) y qué voces entran en el sorteo. 60s no cabe en cuatro clips ni de 10s.
+- La duración se pide **en CLIPS, no en segundos sueltos** (`opciones_guion`):
+  con clips de 8s son 2/3/4/5 → 16/24/32/40s, y con los de 10s 2/3/4 →
+  20/30/40s. El tope son 40s (`SEGUNDOS_GUION_TOPE`); 60 se quitó porque la
+  ficha de un producto no da para tanto y el guion se llenaba de relleno.
+  Pedir "30s" con clips de 8 no era múltiplo de nada: salían 3 clips (24s de
+  material) y un vídeo de 26 acelerando la voz.
 - El banco de voces se cambió entero en sep 2026: fuera las de vendedor/locutor
   (suenan a anuncio en la primera frase), dentro diez `conversational` elegidas
   escuchándolas decir un guion nuestro. El car/s de cada una está MEDIDO con

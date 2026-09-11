@@ -240,7 +240,7 @@ export function useQuitarClipLargo() {
   return useMutation<
     ProductoLargo,
     Error,
-    { source: string; folder: string; producto: string; slot: 1 | 2 | 3 | 4 }
+    { source: string; folder: string; producto: string; slot: 1 | 2 | 3 | 4 | 5 }
   >({
     mutationFn: ({ source, folder, producto, slot }) =>
       api.post<ProductoLargo>(
@@ -408,7 +408,7 @@ export function useSubirClipLargo() {
       source: string;
       folder: string;
       producto: string;
-      slot: 1 | 2 | 3 | 4;
+      slot: 1 | 2 | 3 | 4 | 5;
       sexo: string;
       file: File;
       conGancho: boolean;

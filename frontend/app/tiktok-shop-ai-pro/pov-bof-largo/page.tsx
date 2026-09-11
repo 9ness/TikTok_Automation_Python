@@ -1564,6 +1564,25 @@ type ToolKey = "gancho" | "titulo" | "cta" | "flecha" | "subliminal";
 /* El subliminal va APAGADO por defecto y los otros cuatro encendidos: solo lo
    llevan los formatos de 20s (Vista POV / Vista Sentado), donde además es el
    único texto del vídeo — se ponen sus cuatro líneas y se quitan las otras. */
+// Las duraciones que se pueden pedir, por duración de clip: `[clips, segundos]`.
+// Espejo de `config.opciones_guion` — el backend manda, esto es solo pintarlo.
+// El tope son 40 segundos, así que con clips de 10s hay una opción menos.
+const OPCIONES_GUION: Record<8 | 10, [number, number][]> = {
+  8: [
+    [2, 16],
+    [3, 24],
+    [4, 32],
+    [5, 40],
+  ],
+  10: [
+    [2, 20],
+    [3, 30],
+    [4, 40],
+  ],
+};
+// Lo que significaba el 0 del selector viejo: la duración de serie del formato.
+const SEGUNDOS_NORMAL_VIEJO = 16;
+
 const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "gancho", label: "🎣 Gancho" },
   { key: "titulo", label: "📝 Texto producto" },
@@ -1614,6 +1633,7 @@ function ProductoCard({
     2: useRef<HTMLInputElement>(null),
     3: useRef<HTMLInputElement>(null),
     4: useRef<HTMLInputElement>(null),
+    5: useRef<HTMLInputElement>(null),
   };
 
   const [verFoto, setVerFoto] = useState(false);
@@ -1646,7 +1666,8 @@ function ProductoCard({
     2: number | null;
     3: number | null;
     4: number | null;
-  }>({ 1: null, 2: null, 3: null, 4: null });
+    5: number | null;
+  }>({ 1: null, 2: null, 3: null, 4: null, 5: null });
   // Qué fichero está subiendo la app en cada hueco. Los dos lados se casan por
   // NOMBRE porque es lo único que viaja por el puente: los bytes se quedan en
   // la app (un vídeo en base64 serían 30 MB de cadena).
@@ -1768,7 +1789,7 @@ function ProductoCard({
 
   // XHR (no fetch) para tener porcentaje real de subida, igual que el POV BOF.
   // Cada slot va por su cuenta: no se bloquea el otro clip ni las demás fichas.
-  function subirClip(slot: 1 | 2 | 3 | 4, file: File) {
+  function subirClip(slot: 1 | 2 | 3 | 4 | 5, file: File) {
     const campos = {
       source,
       folder,
@@ -1817,7 +1838,7 @@ function ProductoCard({
   }
 
   /** El camino de siempre: XHR con porcentaje real, como en el POV BOF. */
-  function subirPorLaWeb(slot: 1 | 2 | 3 | 4, file: File) {
+  function subirPorLaWeb(slot: 1 | 2 | 3 | 4 | 5, file: File) {
 
     setPcts((prev) => ({ ...prev, [slot]: 0 }));
     const fd = new FormData();
@@ -2357,51 +2378,58 @@ function ProductoCard({
         </span>
       </div>
 
-      {/* Cuánto tiene que durar el guion. Lo normal es lo del curso (~20s);
-          se sube cuando la tienda pide vídeos de 30 segundos por la muestra.
-          Vale para los DOS estilos: el prompt que se manda es el del modo en
-          el que estés (precio o dolor) con el tope reescrito, así que el vídeo
-          largo sigue empezando por donde toca. Sale del mismo sitio que en el
-          POV BOF —los textos del producto—, así que ponerlo aquí lo pone allí. */}
+      {/* Cuánto tiene que durar el guion, EN CLIPS. Antes eran segundos
+          absolutos (30/40/60) y no sabían con cuánto material contaban: pedir
+          "30s" con clips de 8 daba tres clips —24s de metraje— y un vídeo de
+          26 acelerando la voz. Contando por clips, lo que se pide y lo que hay
+          son el mismo número, y los segundos salen de la duración de clip de
+          este producto. Sale del mismo sitio que en el POV BOF —los textos del
+          producto—, así que ponerlo aquí lo pone allí. */}
       <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
         <span>Guion de</span>
-        {[0, 30, 40, 60].map((sg) => (
+        {OPCIONES_GUION[clipS === 10 ? 10 : 8].map(([clips, seg]) => (
           <button
-            key={sg}
+            key={clips}
             type="button"
             title={
-              sg === 0
-                ? "Lo normal: ~284 caracteres, unos 16 segundos — lo que dan dos clips de 8s"
-                : `~${Math.round(sg * 17.8)} caracteres. Necesita capturas del producto para tener qué contar`
+              clips === 2
+                ? `Lo normal: ~${Math.trunc(seg * 17.8)} caracteres, el vídeo entre ${Math.round(seg * 0.9375)} y ${seg} segundos`
+                : `${clips} clips de ${clipS}s = ${seg}s de material. ~${Math.trunc(
+                    seg * 17.8,
+                  )} caracteres: necesita una ficha con chicha para tener qué contar`
             }
             onClick={() =>
               setEstado.mutate({
                 source,
                 folder: p.folder || folder,
                 producto: p.producto,
-                segundos_guion: sg,
+                segundos_guion: seg,
               })
             }
             className={`rounded px-1.5 py-0.5 font-semibold transition ${
-              (p.segundos_guion || 0) === sg
+              (p.segundos_guion || 0) === seg ||
+              // Los guardados con el selector viejo: 0 era "lo normal".
+              (!p.segundos_guion && clips === 2)
                 ? "bg-amber-500/20 text-amber-500"
                 : "hover:text-foreground"
             }`}
           >
-            {sg === 0 ? "normal" : `${sg}s`}
+            {clips === 2 ? `normal (${seg}s)` : `${clips} clips (${seg}s)`}
           </button>
         ))}
-        {!!p.segundos_guion && (
-          <span className="ml-auto text-amber-500/80">
-            rehaz el guion para aplicarlo
-          </span>
-        )}
+        {!!p.guion &&
+          (p.segundos_guion || SEGUNDOS_NORMAL_VIEJO) !==
+            (p.guion_segundos || SEGUNDOS_NORMAL_VIEJO) && (
+            <span className="ml-auto text-amber-500/80">
+              rehaz el guion para aplicarlo
+            </span>
+          )}
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         {(
-          [1, 2, 3, 4].slice(0, necesarios) as (1 | 2 | 3 | 4)[]
+          [1, 2, 3, 4, 5].slice(0, necesarios) as (1 | 2 | 3 | 4 | 5)[]
         ).map((slot) => {
-          const puesto = [p.clip1, p.clip2, p.clip3, p.clip4][slot - 1];
+          const puesto = [p.clip1, p.clip2, p.clip3, p.clip4, p.clip5][slot - 1];
           const pctSlot = pcts[slot];
           const subiendoEste = pctSlot !== null;
           return (

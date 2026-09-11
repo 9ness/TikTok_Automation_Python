@@ -46,8 +46,11 @@ CLIPS_POR_VIDEO = 1
 # en diez, que era lo que daba el vídeo del POV BOF en un solo clip. De aquí
 # sale todo lo demás: cuántos clips pedir y cuánto guion cabe.
 CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "8"))
-# Más de cuatro deja de parecer una toma continua.
-CLIPS_MAXIMOS = 4
+# CINCO. Estuvo en cuatro con el argumento de que más deja de parecer una toma
+# continua, pero el tope de verdad lo pone la DURACIÓN: el vídeo más largo que
+# se ofrece son 40 segundos (`SEGUNDOS_GUION_TOPE`), y eso son cinco clips de
+# 8s o cuatro de 10s. De ahí no se pasa.
+CLIPS_MAXIMOS = 5
 # Hasta dónde se puede estirar un clip. Ojo con la palabra: el montaje NO
 # ralentiza, RELLENA — `match_video_to_audio` pega el tramo final marcha atrás
 # (`_build_pingpong`) hasta cubrir la voz. Así que este número es cuánto
@@ -318,13 +321,18 @@ def ventana_video(segundos_pedidos: float = 0, metraje: float = 0) -> tuple[floa
     no es a lo que se apunta.
     """
     pedidos = float(segundos_pedidos or 0)
-    suelo = pedidos if pedidos > 0 else DURACION_MINIMA_S
-    # El vídeo normal va de 15 a 16: un 6,7% de holgura sobre el suelo. Los
-    # pedidos de 30/40/60 se tratan igual (30 → 32) en vez de dejarles medio
-    # segundo, que no da para mover el cierre de sitio.
-    objetivo = suelo * (GUION_OBJETIVO_S / DURACION_MINIMA_S)
-    techo = min(objetivo, float(metraje)) if metraje and metraje > 0 else objetivo
-    return (round(suelo, 1), round(max(techo, suelo + 0.5), 1))
+    # Lo que se pide es el METRAJE que se quiere llenar (2, 3 o 4 clips), no un
+    # mínimo suelto: `opciones_guion` ya los da multiplicados por la duración
+    # de clip. Sin nada pedido, la duración de serie del formato.
+    # 0 = guardado con el selector viejo, cuando "normal" era un único número.
+    objetivo = pedidos if pedidos > 0 else GUION_OBJETIVO_S
+    if metraje and metraje > 0:
+        objetivo = min(objetivo, float(metraje))
+    # Y por abajo, la misma holgura del vídeo normal (15 de 16, un 6%): es lo
+    # que deja al cierre y al acelerón sitio para cuadrar sin que el vídeo se
+    # quede corto de verdad.
+    suelo = objetivo * (DURACION_MINIMA_S / GUION_OBJETIVO_S)
+    return (round(suelo, 1), round(max(objetivo, suelo + 0.5), 1))
 
 
 # Cuánto se tolera pasarse del techo antes de dar el encaje por malo.
@@ -404,10 +412,43 @@ def cta_desfasada(guion: str, *, plazos: bool, envio: bool) -> bool:
     )
 
 
-# Duraciones que se pueden pedir a mano, como en el POV BOF. `0` = la del
-# curso (~20s), que es lo normal; las demás son para los productos con
-# requisitos ("dos vídeos de 30 segundos" a cambio de la muestra).
+# Duraciones que se pueden pedir a mano. El número que se guarda son SEGUNDOS
+# —`segundos_guion`, que vive en los textos compartidos con el POV BOF— pero lo
+# que se elige en pantalla son CLIPS, y los segundos salen de multiplicar por
+# la duración de clip de ese producto.
+#
+# Antes eran absolutos (30/40/60) y no sabían con cuánto material contaban: se
+# pedía un vídeo "de 30s" con clips de 8, y como 30 no es múltiplo de 8 salían
+# tres clips (24s de material) y un vídeo de 26s acelerando la voz. Contando
+# por clips, lo que se pide y lo que hay son el mismo número.
+#
+# El vídeo más largo que se ofrece. Sesenta segundos se quitó: eran ocho clips
+# de 8s y, probado, el guion se llenaba de relleno ("es frustrante que el
+# cansancio te impida disfrutar del día") porque la ficha de un producto no da
+# para tanto. Cuarenta ya pide una ficha con chicha.
+SEGUNDOS_GUION_TOPE = 40
+# Compatibilidad: valores que se guardaron con el selector viejo.
 SEGUNDOS_GUION_OPCIONES = (0, 30, 40, 60)
+
+
+def opciones_guion(clip_s: float = 0) -> tuple[tuple[int, int], ...]:
+    """`((clips, segundos), …)` que se pueden pedir con esa duración de clip.
+
+    Con clips de 8s son 16 / 24 / 32 / 40 segundos, y con los de 10s, 20 / 30 /
+    40: el tope son los 40 (`SEGUNDOS_GUION_TOPE`), así que con clips largos
+    hay una opción menos.
+    Se guardan los SEGUNDOS, también los del primero ("lo normal"): antes ese
+    se guardaba como 0 y 0 significaba "la duración de serie", que son 16 —
+    pero con clips de 10s lo normal son 20, y con el 0 se quedaba escribiendo
+    guiones de 16s para 20s de material. El 0 sigue valiendo al LEER, que es
+    lo que hay guardado en los productos de antes.
+    """
+    cl = float(clip_s) if clip_s and clip_s > 0 else CLIP_TARGET_S
+    return tuple(
+        (n, int(round(n * cl)))
+        for n in range(CLIPS_POR_VIDEO + 1, CLIPS_MAXIMOS + 1)
+        if n * cl <= SEGUNDOS_GUION_TOPE
+    )
 
 # Acabado del bloque de texto. Desde sep 2026 el de serie es el BLANCO LISO
 # (tres líneas iguales, sin color ni destello), que es el que usan los POV de
@@ -453,7 +494,11 @@ def estilo_texto_valido(valor: str = "", estilo_guion: str = "") -> str:
 def caracteres_guion(segundos: float = 0) -> int:
     """Tope de caracteres para ese guion. Sin `segundos`, el del curso."""
     if segundos and segundos > 0:
-        return int(round(segundos * CARACTERES_POR_SEGUNDO))
+        # `int`, no `round`: `GUION_MAX_CARACTERES` trunca, y para 16 segundos
+        # redondear daba 285 contra ese tope de 284. Un carácter de diferencia
+        # entre lo que se pide y lo que se comprueba dispara una reescritura
+        # entera (una llamada más por producto).
+        return int(segundos * CARACTERES_POR_SEGUNDO)
     return GUION_MAX_CARACTERES
 
 
@@ -549,10 +594,13 @@ def _caracteristicas(segundos: float = 0) -> str:
         "cura'; di 'está pensado para', 'puede ayudarte a', 'mucha gente lo "
         "usa para'. Con lo que toque el cuerpo —dolor, músculos, sueño, piel, "
         "peso— ten el doble de cuidado: eso es lo que trae sanciones. "
-        "Y no te inventes NADA que no esté en la ficha o se vea en las fotos: "
-        "ni nombres de modelo ni cifras. Si la ficha dice '660 y 850 nm', no "
-        "salgas con 'Panel 61'. Si no sabes cómo se llama, di solo la marca y "
-        "qué es."
+        "Y el NOMBRE del producto es el que te doy en el TÍTULO, tal cual: no "
+        "le añadas números de modelo, siglas ni versiones que no estén ahí, "
+        "aunque creas leerlos en la foto (con 'Wellbeinn Panel luz roja "
+        "infrarroja' se sacó de la manga 'Wellbeinn Panel 61'). Tampoco te "
+        "inventes cifras: las medidas, potencias o capacidades solo se dicen "
+        "si están en la ficha. Y no repitas el nombre entero dos veces para "
+        "llenar; la segunda vez basta con 'este panel', 'estas zapatillas'."
     )
 
 
@@ -605,7 +653,11 @@ def _alargar(prompt: str, segundos: float) -> str:
     # sin la palabra "caracteres" detrás. Si no se cambia también, el prompt se
     # contradice: el cuerpo pide 284 y el añadido de plazos permite 360.
     prompt = re.sub(r"(?<=pasar de )\d{3}", str(tope), prompt)
-    if not segundos or segundos <= 0:
+    # Solo es "más largo" si pasa de la duración de serie. Ahora se guardan los
+    # segundos también en el vídeo normal (16 con clips de 8s), y con la
+    # condición vieja —"que haya algún número"— a un vídeo normal se le pegaba
+    # el párrafo de desarrollar el producto como si fuera de 30s.
+    if not segundos or segundos <= GUION_OBJETIVO_S:
         return prompt
 
     return prompt + (

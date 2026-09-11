@@ -557,6 +557,7 @@ def _listar(
             clip2=_clip_puesto(mio.get("clip2_path"), float(mio.get("video_listo_at") or 0)),
             clip3=_clip_puesto(mio.get("clip3_path"), float(mio.get("video_listo_at") or 0)),
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
+            clip5=_clip_puesto(mio.get("clip5_path"), float(mio.get("video_listo_at") or 0)),
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
@@ -575,6 +576,7 @@ def _listar(
             # Vacío = no lo han elegido, y entonces manda el gancho del
             # catálogo (dolor → blanco liso, precio → clásico de color).
             estilo_texto=str(mio.get("estilo_texto") or ""),
+            guion_segundos=float(mio.get("guion_segundos") or 0),
             # El modo es del CATÁLOGO, no del producto: se repite en cada
             # ficha solo para que la pantalla no tenga que cruzarlo.
             estilo_guion=estilo_catalogo,
