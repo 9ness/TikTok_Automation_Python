@@ -524,6 +524,15 @@ def _caracteristicas(segundos: float = 0) -> str:
         "qué trae, cómo se usa). No rellenes repitiendo lo del precio con "
         "otras palabras ni alargando el cierre: una característica de verdad "
         "vende más que un adjetivo."
+        "\n\nCÓMO SUENA: esto no se lee, lo DICE una persona grabándose con "
+        "el móvil en su casa. Frases completas y con verbo, como se habla. "
+        "Nada de titulares sin verbo ('Precio mejorado en estas zapatillas'), "
+        "nada de frases sueltas de tres palabras ('El impacto frustra.') y "
+        "nada de lengua de ficha de producto: no digas 'ofrece', 'cuenta "
+        "con', 'permite', 'proporciona' ni 'dispone de' — di lo que hace el "
+        "producto como se lo contarías a un amigo ('amortiguan un montón', "
+        "'agarran bien'). Y empieza con una de las aperturas de precio que se "
+        "te han dado ARRIBA, copiada tal cual: son verbales a propósito."
     )
 
 
