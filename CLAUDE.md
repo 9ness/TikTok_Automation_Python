@@ -40,7 +40,7 @@ nichos.
 | Función | Modo | Propósito |
 |---|---|---|
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
-| 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; dura ~20s, así que van DOS clips de 10s |
+| 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🎨 Creativos Pro | (sin modo — no edita vídeo) | Módulo 13: un creativo publicitario por producto. Mismo catálogo que POV BOF (fuentes, fotos, textos, hashtags, escaparate, vendidos); solo cambia el prompt y el formato 3:4 |
@@ -388,8 +388,25 @@ Redis `nicho_pov_bof_largo:`). API: `/api/v1/nicho-pov-bof-largo/*`. Es el POV
 BOF con la voz cambiada: en vez de una frase genérica del banco, un **guion
 escrito para ESE producto** (prompt del curso, literal en `prompts/guion.md`)
 y locutado con **Fish Audio** (`FISH_API_KEY`, modelo gratuito
-`s2.1-pro-free`). Como el guion dura ~20s y no ~11, el vídeo son **DOS clips
-de 10s** pegados; la duración la manda la voz y el vídeo se recorta a ella.
+`s2.1-pro-free`). El guion se escribe para ~16s (284 car), que es lo que dan
+**DOS clips de 8s** sin rebobinar; la duración la manda la voz y el vídeo se
+recorta a ella.
+
+Tres cosas del guion que no son del curso y hay que saber:
+- El **cierre es la pieza de ajuste**, no un texto fijo: hay una escalera de
+  CTA de 43 a 139 caracteres (`config.ctas_posibles`, solo con lo que el
+  producto CUMPLE) y al locutar se elige la que deja el vídeo en su ventana
+  (`ventana_video`, 15-16s), rematando con el acelerón (máx x1.10). Guion
+  largo → cierre corto y acelerar; guion corto → primero cierre largo y luego
+  voz a tono normal. El cuerpo del guion NO se toca: cambiarlo cuesta una
+  llamada y es lo que vende.
+- Cuando se piden 30/40/60s, **esa duración es el mínimo**, no los 15s del
+  reto: es lo que decide cuántos clips se piden (30s son CUATRO de 8s, no
+  tres) y qué voces entran en el sorteo. 60s no cabe en cuatro clips ni de 10s.
+- El banco de voces se cambió entero en sep 2026: fuera las de vendedor/locutor
+  (suenan a anuncio en la primera frase), dentro diez `conversational` elegidas
+  escuchándolas decir un guion nuestro. El car/s de cada una está MEDIDO con
+  nuestro texto: el que anuncia el catálogo de Fish se desvía hasta 3 car/s.
 
 Si el producto pasa de `PRECIO_MIN_PLAZOS`, al guion se le añade el bloque de
 `prompts/guion_plazos.md` (una frase de financiación, sin nombrar la pasarela):

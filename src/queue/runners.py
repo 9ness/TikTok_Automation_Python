@@ -2025,14 +2025,21 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     except Exception as e:  # noqa: BLE001 — sin foto se sigue, con menos tino
         on_log(f"[pov_bof_largo] sin foto del producto ({e})")
 
+    # Los segundos que se pidieron para ESTE producto (0 = el vídeo normal).
+    # Se leen fuera del `if` porque además de escribir el guion deciden el
+    # mínimo que tiene que durar el vídeo al sortear la voz.
+    segundos_pedidos = float(textos.get("segundos_guion") or 0)
+    # Lo que este producto puede prometer. Se lee aquí y no solo al escribir el
+    # guion porque también decide el CIERRE con el que se locuta (el encaje).
+    envio_gratis = largo_config.hay_envio_gratis(textos)
     if not escrito.get("guion"):
         on_progress(0.10, "✍️ Escribiendo el guion…")
         # Con el modo que se pidió (precio o punto de dolor) y lo que ese
         # producto puede prometer. Antes salía siempre el prompt de defecto:
         # montar sin guion previo en "punto de dolor" daba un vídeo de precio.
         modo = estilo or largo_config.ESTILO_GUION_DEFECTO
-        envio = largo_config.hay_envio_gratis(textos)
-        segundos = float(textos.get("segundos_guion") or 0)
+        envio = envio_gratis
+        segundos = segundos_pedidos
         escrito = guionista.escribir(
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
@@ -2060,14 +2067,36 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     work = Path(tempfile.mkdtemp(prefix=f"pov_largo_{producto}_"))
     try:
         audio = work / "voz.mp3"
+        # Los clips ya están subidos: se MIDEN, no se suponen. Contarlos a 8s
+        # cada uno dejaba fuera voces que sí cabían cuando alguno venía de 10s
+        # (pasa al usar otra herramienta de vídeo).
+        metraje = _segundos_de_video(clips, estirado=False)
         info = voz_svc.sintetizar(
             escrito["guion"], audio, sexo=sexo, on_log=on_log,
-            # Los clips ya están subidos: se MIDEN, no se suponen. Contarlos a
-            # 8s cada uno dejaba fuera voces que sí cabían cuando alguno venía
-            # de 10s (pasa al usar otra herramienta de vídeo).
-            segundos_max=_segundos_de_video(clips),
-            segundos_min=largo_config.DURACION_MINIMA_S,
+            # Lo máximo que se tolera (con el rebobinado que el montaje puede
+            # hacer) decide QUÉ VOCES entran en el sorteo…
+            segundos_max=round(metraje * largo_config.ESTIRADO_CLIP, 1),
+            # …pero el acelerón apunta al metraje de verdad: cuadrar con él es
+            # un vídeo sin un solo fotograma repetido.
+            segundos_ideal=metraje,
+            # Cuando se han pedido 30, 40 o 60 segundos, ESE es el mínimo: es
+            # lo que se le prometió al vendedor. Dejarlo en los 15 del reto
+            # metía en el sorteo voces rápidas que lo dejaban en 26s. Si con
+            # ese mínimo no cabe ninguna, `elegir_voz` afloja sola y lo dice.
+            segundos_min=(
+                segundos_pedidos if segundos_pedidos > 0
+                else largo_config.DURACION_MINIMA_S
+            ),
+            # El ENCAJE. El cuerpo del guion no se toca; con lo que se cuadra la
+            # duración es el cierre, que es un literal nuestro: corto si el
+            # guion viene largo, y con las promesas que el producto cumple si
+            # viene corto. Lo que no llegue a cuadrar, el acelerón.
+            ctas=largo_config.ctas_posibles(plazos, envio_gratis),
+            ventana=largo_config.ventana_video(segundos_pedidos, metraje),
         )
+        # El cierre puede haber cambiado, así que lo que se apunta y lo que se
+        # alinea es el texto que de VERDAD se ha locutado.
+        escrito["guion"] = str(info.get("texto") or escrito["guion"])
         # Cada vídeo afina la velocidad de SU voz: es lo que hace que la
         # próxima estimación de cuántos clips hacen falta sea mejor. Se pasa el
         # tempo para descontarlo: la tabla guarda velocidades naturales.
@@ -2143,8 +2172,12 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
 
 
 
-def _segundos_de_video(clips: list[Path]) -> float:
-    """Cuánta VOZ cabe entre todos los clips, estirado incluido.
+def _segundos_de_video(clips: list[Path], estirado: bool = True) -> float:
+    """Cuánta VOZ cabe entre todos los clips.
+
+    Con `estirado=False` devuelve el metraje pelado, que es a lo que apunta el
+    acelerón de la voz; con `True` (lo de siempre) le suma el rebobinado que el
+    montaje puede hacer, que es lo que decide qué voces entran en el sorteo.
 
     Se mide el vídeo en vez de contar "tantos clips por 8 segundos": el
     operador manda a veces clips de 10s porque usa otra herramienta, y
@@ -2165,8 +2198,7 @@ def _segundos_de_video(clips: list[Path]) -> float:
         crudos = float(sum(probe_duration(c) for c in clips))
     except Exception:  # noqa: BLE001
         return 0.0
-    estirado = largo_config.ESTIRADO_CLIP
-    return crudos * estirado
+    return crudos * (largo_config.ESTIRADO_CLIP if estirado else 1.0)
 
 
 def run_nicho_pov_bof_plazos_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:

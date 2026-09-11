@@ -60,6 +60,69 @@ def tempo_para(caracteres: int, cps: float, segundos_max: float) -> float:
     return max(1.0, round(natural / segundos_max, 3))
 
 
+def encaje_cta(
+    cuerpo: str,
+    cps: float,
+    ctas,
+    *,
+    ventana: tuple[float, float],
+    tempo_max: float = 0.0,
+) -> tuple[str, float, float]:
+    """Con qué cierre y qué acelerón cae este guion en la ventana de duración.
+
+    El cuerpo del guion lo escribe Gemini y no se toca: cambiarlo cuesta una
+    llamada y además es lo que vende. La pieza con la que se cuadra el vídeo es
+    el CIERRE, que es un literal nuestro — de 43 caracteres ("carrito naranja y
+    cupones") a 139 (el del curso entero, con envío y plazos). Entre las dos
+    puntas hay unos cinco segundos de margen, más que de sobra para encajar.
+
+    El orden de las dos palancas es el que pidió el operador:
+
+    - **Guion largo**: se acorta el cierre, y lo que siga sobrando lo pone el
+      acelerón (hasta `VOZ_TEMPO_MAX`; más allá suena atropellado).
+    - **Guion corto**: PRIMERO se alarga el cierre, y solo si aun así no llega
+      se deja la voz a tono normal. Un 10% de más se oye bien y de paso hace
+      que no todos los vídeos suenen igual.
+
+    Por eso, entre dos cierres que caen dentro, gana el MÁS LARGO: es más cosas
+    dichas al comprador y deja el vídeo más cerca del metraje que hay.
+
+    Devuelve `(cierre, tempo, duración estimada)`.
+    """
+    suelo, techo = float(ventana[0]), float(ventana[1])
+    tope_tempo = tempo_max or config.VOZ_TEMPO_MAX
+    cuerpo = (cuerpo or "").strip()
+    mejor: tuple[tuple[float, int], str, float, float] | None = None
+    for cta in ctas:
+        total = len(f"{cuerpo} {cta}".strip())
+        natural = total / cps if cps > 0 else 0.0
+        if natural <= 0:
+            continue
+        # El acelerón JUSTO para no pasar del metraje, nunca más del tope.
+        tempo = min(tope_tempo, max(1.0, round(natural / techo, 3))) if techo else 1.0
+        dur = natural / tempo
+        # Los dos lados no pesan igual. Quedarse corto ROMPE el reto (el vídeo
+        # no puntúa), así que cuenta triple; pasarse un segundo del metraje no
+        # se nota —es lo que rebobina el montaje— y casi no cuenta. Sin esta
+        # asimetría, un cierre que dejaba el vídeo en 14,3s empataba con otro
+        # que lo dejaba en 16,6 y ganaba el malo.
+        tol = config.VENTANA_TOLERANCIA_S
+        if dur < suelo:
+            fuera = (suelo - dur) * 3
+        elif dur > techo + tol:
+            fuera = (dur - techo - tol) * 2
+        elif dur > techo:
+            fuera = (dur - techo) * 0.1
+        else:
+            fuera = 0.0
+        clave = (round(fuera, 2), -len(cta))
+        if mejor is None or clave < mejor[0]:
+            mejor = (clave, cta, tempo, dur)
+    if mejor is None:
+        return ("", 1.0, 0.0)
+    return (mejor[1], mejor[2], round(mejor[3], 2))
+
+
 def clips_para(
     caracteres: int,
     clip_s: float,
@@ -81,17 +144,27 @@ def clips_para(
     from src.nicho_pov_bof_largo.services import velocidad_voz
 
     todas = [v for banco in config.VOCES.values() for v in banco]
-    for n in range(1, max(1, maximos) + 1):
-        tope = round(clip_s * n * config.ESTIRADO_CLIP, 1) - max(0.0, margen_s)
-        for v in todas:
-            cps = velocidad_voz.caracteres_por_segundo(v["id"])
-            factor = tempo_para(caracteres, cps, tope)
-            if factor > config.VOZ_TEMPO_MAX:
-                continue
-            if segundos_min and (caracteres / cps) / factor < segundos_min:
-                continue
-            return n
-    return maximos
+
+    def _buscar(minimo: float) -> int:
+        for n in range(1, max(1, maximos) + 1):
+            tope = round(clip_s * n * config.ESTIRADO_CLIP, 1) - max(0.0, margen_s)
+            for v in todas:
+                cps = velocidad_voz.caracteres_por_segundo(v["id"])
+                factor = tempo_para(caracteres, cps, tope)
+                if factor > config.VOZ_TEMPO_MAX:
+                    continue
+                if minimo and (caracteres / cps) / factor < minimo:
+                    continue
+                return n
+        return 0
+
+    # Sin el mínimo si con él no lo cumple NINGUNA combinación. Pasa cuando el
+    # guion se queda corto (Gemini escribió 209 caracteres de 284): entonces
+    # ninguna voz llega a los 15s, y como poner más clips no alarga la voz, el
+    # bucle terminaba devolviendo `maximos` — cuatro clips para un vídeo de
+    # trece segundos. Con el mínimo fuera devuelve los que de verdad hacen
+    # falta, y del vídeo corto ya avisa `elegir_voz` al locutar.
+    return _buscar(segundos_min) or _buscar(0.0) or maximos
 
 
 def duracion_estimada(
@@ -123,6 +196,30 @@ def duracion_estimada(
             if segundos_min and d < segundos_min:
                 continue
             duraciones.append(d)
+    if not duraciones:
+        return (0.0, 0.0)
+    return (round(min(duraciones), 1), round(max(duraciones), 1))
+
+
+def duracion_con_encaje(
+    cuerpo: str, ctas, *, ventana: tuple[float, float],
+) -> tuple[float, float]:
+    """`(mínimo, máximo)` contando con que el cierre se ajusta a cada voz.
+
+    `duracion_estimada` responde a "cuánto duraría este texto tal cual", que es
+    lo que valía cuando el guion se locutaba sin tocar. Con el encaje el texto
+    ya no es fijo —el cierre lo elige cada voz—, así que el rango honesto es el
+    de los vídeos que van a salir de verdad, y sale mucho más estrecho.
+    """
+    from src.nicho_pov_bof_largo.services import velocidad_voz
+
+    duraciones = []
+    for banco in config.VOCES.values():
+        for v in banco:
+            cps = velocidad_voz.caracteres_por_segundo(v["id"])
+            _cta, _t, dur = encaje_cta(cuerpo, cps, ctas, ventana=ventana)
+            if dur > 0:
+                duraciones.append(dur)
     if not duraciones:
         return (0.0, 0.0)
     return (round(min(duraciones), 1), round(max(duraciones), 1))
@@ -220,13 +317,26 @@ def sintetizar(
     # Suelo de duración: los retos de TikTok piden 10s o 15s mínimo y el vídeo
     # dura lo que dura la voz. Descarta las voces demasiado rápidas.
     segundos_min: float = 0.0,
+    # Los segundos de vídeo que hay DE VERDAD, sin contar el estirado. Es a lo
+    # que apunta el acelerón: `segundos_max` es lo máximo que se tolera (con
+    # rebobinado incluido) y sirve para no descartar voces del sorteo, pero
+    # cuadrar con esto deja el vídeo sin un solo fotograma repetido.
+    segundos_ideal: float = 0.0,
     # Para audicionar a otra velocidad sin tocar la de producción.
     tempo: float | None = None,
+    # Los cierres que este producto puede decir, de corto a largo
+    # (`config.ctas_posibles`). Con ellos se activa el ENCAJE: se prueba cuál
+    # deja el vídeo dentro de `ventana` con la voz que ha tocado, y si el audio
+    # de verdad se desvía de la ficha se vuelve a locutar con el cierre bueno
+    # (el modelo de Fish es gratuito). Sin ellos, el guion va tal cual.
+    ctas: tuple[str, ...] = (),
+    # `(suelo, techo)` de duración: lo prometido y el metraje que hay.
+    ventana: tuple[float, float] = (0.0, 0.0),
     on_log: OnLog = _noop,
 ) -> dict:
     """Genera el mp3 crudo y lo deja nivelado en `destino`.
 
-    Devuelve `{voz_id, voz_label, caracteres, duracion, lufs, pico}`.
+    Devuelve `{voz_id, voz_label, texto, caracteres, duracion, lufs, pico}`.
     """
     clave = config.fish_api_key()
     if not clave:
@@ -247,47 +357,135 @@ def sintetizar(
     destino.parent.mkdir(parents=True, exist_ok=True)
     crudo = destino.with_name(destino.stem + "_crudo.mp3")
 
-    cuerpo = json.dumps({
-        "text": texto, "reference_id": elegida["id"], "format": "mp3",
-    }).encode("utf-8")
-    peticion = urllib.request.Request(config.FISH_TTS_URL, data=cuerpo, headers={
-        "Authorization": f"Bearer {clave}",
-        "Content-Type": "application/json",
-        "model": config.FISH_MODEL,
-    })
-    try:
-        with urllib.request.urlopen(peticion, timeout=180) as r:
-            crudo.write_bytes(r.read())
-    except urllib.error.HTTPError as e:
-        detalle = ""
+    def _locutar(frase: str) -> None:
+        cuerpo = json.dumps({
+            "text": frase, "reference_id": elegida["id"], "format": "mp3",
+        }).encode("utf-8")
+        peticion = urllib.request.Request(config.FISH_TTS_URL, data=cuerpo, headers={
+            "Authorization": f"Bearer {clave}",
+            "Content-Type": "application/json",
+            "model": config.FISH_MODEL,
+        })
         try:
-            detalle = e.read().decode("utf-8", "replace")[:300]
-        except Exception:
-            pass
-        raise RuntimeError(f"Fish Audio devolvió {e.code}: {detalle}") from e
+            with urllib.request.urlopen(peticion, timeout=180) as r:
+                crudo.write_bytes(r.read())
+        except urllib.error.HTTPError as e:
+            detalle = ""
+            try:
+                detalle = e.read().decode("utf-8", "replace")[:300]
+            except Exception:
+                pass
+            raise RuntimeError(f"Fish Audio devolvió {e.code}: {detalle}") from e
+        _registrar_coste(frase, elegida)
 
-    _registrar_coste(texto, elegida)
-    # Lo justo para que quepa, nunca más del tope. Sin sitio que respetar
-    # (`segundos_max`=0) no se acelera nada.
-    if tempo is None:
+    # El ENCAJE: con qué cierre cae el vídeo donde tiene que caer. Esta primera
+    # decisión va con la velocidad de FICHA de la voz; al medir el audio se
+    # repasa con la de verdad.
+    cuerpo_guion = config.cuerpo_sin_cta(texto) if ctas else ""
+    encajando = bool(cuerpo_guion and ventana and ventana[1] > 0)
+    if encajando:
         from src.nicho_pov_bof_largo.services import velocidad_voz
 
-        # Contra el MISMO tope con el que se eligió la voz (con su colchón), no
-        # contra los segundos pelados: si no, se elegía una voz para que
-        # cupiera en 11,5s y luego se aceleraba solo lo justo para 12,0 — medio
-        # segundo de más en cada vídeo.
-        tope = max(0.1, segundos_max - MARGEN_VOZ_S) if segundos_max else 0.0
+        cta, _t, _d = encaje_cta(
+            cuerpo_guion, velocidad_voz.caracteres_por_segundo(elegida["id"]),
+            ctas, ventana=ventana,
+        )
+        if cta:
+            texto = f"{cuerpo_guion} {cta}".strip()
+    _locutar(texto)
+    # Lo justo para que quepa, nunca más del tope. Sin sitio que respetar
+    # (`segundos_max`=0) no se acelera nada.
+    # A qué duración se apunta. Son dos cosas distintas y por eso hay dos
+    # parámetros:
+    #
+    #   `segundos_ideal` es el metraje que hay de verdad. Cuadrar con él deja el
+    #   vídeo sin un fotograma repetido, y es lo que se busca.
+    #   `segundos_max` es lo máximo tolerable (metraje + lo que el montaje puede
+    #   rebobinar). Solo manda cuando no se sabe el metraje real.
+    #
+    # Y por debajo está el suelo del reto: antes de bajar de ahí es mejor que
+    # se repita un trozo de clip, porque un vídeo corto no puntúa.
+    if encajando:
+        # Con encaje el objetivo es el techo de la ventana (el metraje que hay):
+        # llegar ahí es el vídeo más largo posible sin repetir un fotograma.
+        objetivo = max(ventana[1], segundos_min)
+    elif segundos_ideal > 0:
+        objetivo = max(segundos_ideal, segundos_min)
+    elif segundos_max:
+        objetivo = max(0.1, segundos_max - MARGEN_VOZ_S)
+    else:
+        objetivo = 0.0
+
+    if encajando and tempo is None:
+        # SEGUNDA VUELTA del encaje, ya con audio de verdad. La primera se
+        # decidió con la velocidad de ficha de la voz, y esa se desvía: midiendo
+        # cinco guiones, una voz de ficha 16,6 car/s locutó a 18,7. Aquí se
+        # recalcula con la velocidad REAL y, si el cierre que toca es otro, se
+        # vuelve a locutar — el modelo de Fish es gratuito, así que la segunda
+        # llamada no cuesta nada y evita el vídeo de 13,5s.
+        # Hasta dos correcciones. Fish no locuta igual dos veces el mismo texto,
+        # así que la velocidad medida en un intento no clava la del siguiente y
+        # con una sola pasada quedaban vídeos de 18s. Se repite hasta que el
+        # cierre elegido coincide con el que ya está puesto. Cada vuelta es una
+        # llamada más al TTS, que con el modelo gratuito no cuesta nada.
+        natural = 0.0
+        for _vuelta in range(3):
+            medidas = _nivelar(crudo, destino, tempo=1.0, on_log=on_log)
+            natural = float(medidas.get("duracion") or 0)
+            cps_real = (len(texto) / natural) if natural > 0 else 0.0
+            puesta = texto[len(cuerpo_guion):].strip()
+            otra, _t2, _d2 = encaje_cta(
+                cuerpo_guion, cps_real, ctas, ventana=ventana,
+            )
+            if not otra or otra == puesta or _vuelta == 2:
+                break
+            on_log(
+                f"[voz] {elegida['label']} locuta a {cps_real:.1f} car/s: el "
+                f"cierre de {len(puesta)} car deja el vídeo fuera de sitio, "
+                f"pruebo con uno de {len(otra)}"
+            )
+            texto = f"{cuerpo_guion} {otra}".strip()
+            _locutar(texto)
+        tempo = 1.0
+        if natural > objetivo + 0.05:
+            tempo = min(config.VOZ_TEMPO_MAX, round(natural / objetivo, 3))
+            medidas = _nivelar(crudo, destino, tempo=tempo, on_log=on_log)
+        on_log(
+            f"[voz] encaje: cierre de {len(texto) - len(cuerpo_guion) - 1} car "
+            f"· x{tempo:.3f} · {medidas.get('duracion', 0):.1f}s "
+            f"(ventana {ventana[0]:.0f}-{ventana[1]:.0f}s)"
+        )
+    elif tempo is None:
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
         tempo = min(
             config.VOZ_TEMPO_MAX,
             tempo_para(
                 len(texto),
                 velocidad_voz.caracteres_por_segundo(elegida["id"]),
-                tope,
+                objetivo,
             ),
         )
         if tempo > 1.0:
-            on_log(f"[voz] acelerada x{tempo:.2f} para que quepa en {segundos_max:.1f}s")
-    medidas = _nivelar(crudo, destino, tempo=tempo, on_log=on_log)
+            on_log(f"[voz] acelerada x{tempo:.2f} para cuadrar con {objetivo:.1f}s")
+    if not (encajando and tempo is None):
+        # Con encaje ya se ha nivelado ahí arriba; aquí solo entra el camino de
+        # siempre y el de audicionar con un tempo impuesto.
+        medidas = _nivelar(crudo, destino, tempo=tempo, on_log=on_log)
+    # Lo de arriba es una PREDICCIÓN (caracteres / velocidad de ficha de la
+    # voz). Aquí ya hay audio de verdad, así que se comprueba: si se ha pasado
+    # del sitio que hay, se vuelve a nivelar con el tempo que de verdad hacía
+    # falta. Sin esto, una voz que ese día sale más lenta que su ficha alarga el
+    # vídeo, y todo el exceso lo rellena el montaje rebobinando clip.
+    if objetivo > 0 and not encajando:
+        tempo, medidas = _encajar(
+            crudo, destino,
+            tempo=float(tempo or 1.0),
+            medidas=medidas,
+            tope=objetivo,
+            minimo=segundos_min,
+            on_log=on_log,
+        )
     try:
         crudo.unlink()
     except OSError:
@@ -296,11 +494,69 @@ def sintetizar(
     return {
         "voz_id": elegida["id"],
         "voz_label": elegida["label"],
+        # El texto que de verdad se ha locutado: con encaje el cierre puede no
+        # ser el que traía el guion guardado.
+        "texto": texto,
         "caracteres": len(texto),
         # Hace falta para apuntar la velocidad NATURAL de la voz.
         "tempo": float(tempo or 1.0),
         **medidas,
     }
+
+
+# Por debajo de esto no se vuelve a codificar: rehacer el nivelado para ganar
+# dos décimas es medio minuto de ffmpeg por un recorte que nadie ve.
+_MERECE_LA_PENA_S = 0.25
+
+
+def _encajar(
+    crudo: Path,
+    destino: Path,
+    *,
+    tempo: float,
+    medidas: dict,
+    tope: float,
+    minimo: float = 0.0,
+    on_log: OnLog = _noop,
+) -> tuple[float, dict]:
+    """Segunda pasada: si la voz ha salido más larga de lo previsto, se encaja.
+
+    El tempo de la primera pasada se calcula con la velocidad de FICHA de la voz
+    (`velocidad_voz`), que es una media de vídeos anteriores. El audio de verdad
+    se desvía —el mismo guion no se locuta igual dos veces, y una voz recién
+    metida en el banco arranca con la media del banco—, y cuando se desvía por
+    arriba el vídeo dura más de lo que se anunció en la ficha del producto y el
+    montaje rellena la diferencia rebobinando clip.
+
+    Aquí ya está el mp3 medido, así que se corrige con una regla de tres sobre
+    la duración REAL. Se respetan los dos límites de siempre: el tope de
+    acelerón (`VOZ_TEMPO_MAX`, más allá suena atropellado) y el mínimo de
+    duración del reto — es preferible un vídeo con algo de rebobinado a uno que
+    no llega a los segundos que pide TikTok.
+    """
+    dur = float(medidas.get("duracion") or 0)
+    if dur <= 0 or dur <= tope + 0.05:
+        return tempo, medidas
+
+    # Lo que hace falta para caber, sin bajar del mínimo del reto.
+    objetivo = max(tope, minimo) if minimo else tope
+    if dur <= objetivo + _MERECE_LA_PENA_S:
+        return tempo, medidas
+    nuevo = min(config.VOZ_TEMPO_MAX, round(tempo * dur / objetivo, 3))
+    if nuevo <= tempo + 0.005:
+        on_log(
+            f"[voz] la voz ha salido en {dur:.1f}s y solo caben {tope:.1f}s, "
+            f"pero ya va al máximo (x{tempo:.2f}): el montaje rebobinará "
+            f"{dur - tope:.1f}s"
+        )
+        return tempo, medidas
+
+    on_log(
+        f"[voz] ha salido en {dur:.1f}s para {tope:.1f}s de sitio; "
+        f"reajusto x{tempo:.2f} → x{nuevo:.2f}"
+    )
+    nuevas = _nivelar(crudo, destino, tempo=nuevo, on_log=on_log)
+    return nuevo, nuevas
 
 
 def _registrar_coste(texto: str, voz: dict) -> None:

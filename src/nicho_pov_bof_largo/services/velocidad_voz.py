@@ -49,6 +49,22 @@ MEDIDAS_INICIALES: dict[str, float] = {
     "b8db28cc8d7e4be4a6fc2cce8a260ca5": 18.2,  # Voz Influencer Tuxpa Woman
     "7f44c1fdaef9471488d531e66aa01e9a": 17.4,  # Influencer 1 colombiana
     "79ec4c10f80e4e0592b6e2f86b650e22": 14.0,  # Vendedor Entusiasta (Renzo)
+    # Tanda natural (sep 2026). Estas NO salen de la ficha del catálogo de
+    # Fish: son car/s medidos locutando un guion nuestro de 281/294 caracteres
+    # con `voz.sintetizar`, el mismo camino que la cola. Importa porque la
+    # velocidad que anuncia el catálogo se desvía hasta 3 car/s de la real
+    # (`Chico` decía 18,7 y locuta a 15,8), y con esa cifra el reparto de
+    # clips sale mal antes de haber grabado nada.
+    "1584879dbfe1457c96b516aa14dcaac1": 18.8,  # Joven Conversador Relajado
+    "fa2683f51e2443ff9928e8ebfe997c83": 16.6,  # Joven Relajado
+    "712fb96185f646fda4849288e7f93585": 17.7,  # Amigo con Humor
+    "292a1a41081342988b816d8d7d79dbf8": 17.5,  # Hombre Relajado
+    "f2f858d51e8e4422acf0a4d838d85aa3": 15.8,  # Chico
+    "049dbfa772814ec88d030b6a4b9cc578": 17.9,  # Voz Dulce y Cercana
+    "429c4e4dbfa246d8a2cf7ee034aad518": 16.0,  # Voz Dulce Femenina
+    "1b3aceb9964445f1883b9a71eb335766": 18.4,  # Amiga Cercana
+    "039303edce924eb08c35580705d9bfcf": 14.8,  # Compania Suave (la más lenta)
+    "86151fb1bf8b4dc4a2f35e79e6c2ffd5": 16.7,  # Voz Joven Natural
 }
 
 # Fuera de esta banda la medida es basura (el audio salió cortado, o el guion

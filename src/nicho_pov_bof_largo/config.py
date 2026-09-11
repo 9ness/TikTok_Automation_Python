@@ -52,12 +52,17 @@ CLIPS_MAXIMOS = 4
 # (`_build_pingpong`) hasta cubrir la voz. Así que este número es cuánto
 # rebobinado se acepta, y por eso no se sube alegremente.
 #
-# Estaba en 1.2 y se subió a 1.3: con la CTA larga (plazos + envío gratis) el
-# guion se va a ~270 caracteres y a 1.2 solo cabía UNA voz del banco —la más
-# rápida—, así que todos los productos caros sonaban igual. A 1.3 entran tres,
-# a cambio de 1,1s más de rebobinado en el peor caso. A 1.4 entrarían seis,
-# pero eso es un cuarto del vídeo yendo hacia atrás y ahí ya se ve.
-ESTIRADO_CLIP = float(os.getenv("POV_BOF_ESTIRADO_CLIP", "1.3"))
+# Estuvo en 1.2 y luego en 1.3 para que cupieran más voces con la CTA larga.
+# El precio de eso se veía: con dos clips de 8s (16s de material) se aceptaba
+# una voz de hasta 20,3s, o sea 4,3s de vídeo yendo hacia atrás — un 27% del
+# vídeo. Y no era una excepción, era el caso normal, porque el guion se dejaba
+# llegar a 356 caracteres (ver `GUION_OBJETIVO_S`).
+#
+# Ahora es al revés: el guion se escribe para que quepa (~16s) y el estirado
+# solo cubre el resto. Con 1.1 el peor caso son 1,1s repetidos (7%), que no se
+# ve, y siguen entrando 11 de las 15 voces del banco — solo dos necesitan
+# acelerón. Bajar a 1.05 dejaría 0,3s pero obligaría a acelerar la mitad.
+ESTIRADO_CLIP = float(os.getenv("POV_BOF_ESTIRADO_CLIP", "1.1"))
 CLIP_MAX_S = round(CLIP_TARGET_S * ESTIRADO_CLIP, 1)
 # Duraciones que el operador puede elegir. La plataforma de vídeo ha dado clips
 # de 8 y de 10 según la época y la herramienta, y de eso depende cuántos pedir:
@@ -91,12 +96,17 @@ CARACTERES_POR_SEGUNDO = 17.8      # media de los 20 medidos, sin acelerar
 # corto obliga a estirar el vídeo y deforma el gesto de la mano; sobrar medio
 # clip no se nota, porque el montaje recorta a la duración de la voz.
 CARACTERES_POR_SEGUNDO_LENTA = 15.4
-# Lo que tiene que DURAR el guion, que es una decisión del formato y no del
-# tamaño de los clips: el del curso cuenta el producto en unos veinte segundos.
-# Antes se calculaba como "lo que quepa en los clips" y al pasar a clips de 8s
-# habría dado 683 caracteres — guiones del doble de largos sin que nadie lo
-# pidiera. Los clips se adaptan al guion, no al revés.
-GUION_OBJETIVO_S = 20.0
+# Lo que tiene que DURAR el guion. No se calcula como "lo que quepa en los
+# clips" (al pasar a clips de 8s habría dado 683 caracteres, guiones del doble
+# de largos sin que nadie lo pidiera): es una decisión del formato.
+#
+# DIECISÉIS y no veinte, que es lo que estaba: el vídeo son dos clips de 8s, o
+# sea 16s de material, y todo lo que la voz pase de ahí lo rellena el montaje
+# rebobinando. A 20s el guion se iba a 356 caracteres y el peor caso eran 4,3s
+# repetidos; a 16s son ~284 caracteres y como mucho 1,1s. De propina, 284 está
+# mucho más cerca de los 260 que pide el prompt del curso —que llevábamos
+# dejando pasar— y el vídeo sigue por encima de `DURACION_MINIMA_S`.
+GUION_OBJETIVO_S = 16.0
 # Mínimo del reto en el que se usa este nicho. Ver `DURACION_MINIMA_S` del POV
 # BOF: mismo criterio, otro número.
 DURACION_MINIMA_S = float(os.getenv("POV_BOF_LARGO_DURACION_MINIMA_S", "15"))
@@ -186,20 +196,138 @@ def hay_envio_gratis(textos: dict) -> bool:
     return pov_config.precio_num(textos.get("precio")) >= PRECIO_MIN_ENVIO_GRATIS
 
 
-def cta_final(plazos: bool, envio: bool) -> str:
-    """La última frase del guion, con solo lo que ese producto cumple."""
-    extras = []
-    if plazos:
-        extras.append("el pago a plazos")
+# Las dos CTA. Las dos cumplen lo que pide el curso —carrito naranja y aplicar
+# los cupones—; lo que cambia es si además se nombra el envío gratis.
+CTA_CUPONES = "Ve al carrito naranja y aplica tus cupones."
+CTA_CUPONES_ENVIO = (
+    "Ve al carrito naranja, aplica tus cupones y revisa el envío gratis."
+)
+# A partir de qué tamaño de guion cabe la CTA larga. En un guion de 284
+# caracteres los 67 de la CTA con envío son el 24% del vídeo: casi cuatro
+# segundos de los dieciséis gastados en el cierre, y lo que se queda fuera son
+# las características del producto, que es lo que vende. En uno de 30s (534
+# car) los mismos 67 son el 12%, y ahí sí sobra sitio.
+CTA_ENVIO_MIN_CARACTERES = 400
+
+
+def cta_final(plazos: bool, envio: bool, caracteres: int = 0) -> str:
+    """La última frase del guion, con solo lo que ese producto cumple y lo que
+    le CABE.
+
+    **Cada promesa se dice UNA vez.** Los plazos ya los cuenta el cuerpo del
+    guion —el bloque de `guion_plazos.md` pide una frase de financiación justo
+    antes del cierre—, así que la CTA no los repite: decir "puedes pagarlo en
+    cómodos plazos" y tres segundos después "revisa el pago a plazos" era la
+    misma promesa dos veces, y en un guion de 284 caracteres eso son 25 que no
+    se pueden gastar en vender.
+
+    Y el envío gratis solo entra si el guion da para ello (`caracteres`): es la
+    promesa MENOS importante de las tres —los cupones son lo que de verdad hay
+    que decir— y en el vídeo corto se lleva un cuarto del tiempo. En los de 30s
+    o más se dice, porque ahí no le quita sitio a nada. Sin `caracteres` se
+    asume que cabe.
+
+    `plazos` se sigue recibiendo porque las dos condiciones se leen juntas en
+    todo el nicho y quitarlo de la firma obligaría a tocar cada llamada por un
+    parámetro que puede volver el día que los plazos salgan del cuerpo.
+    """
+    if not envio:
+        return CTA_CUPONES
+    if caracteres and caracteres < CTA_ENVIO_MIN_CARACTERES:
+        return CTA_CUPONES
+    return CTA_CUPONES_ENVIO
+
+
+# La ESCALERA de cierres, de corta a larga. El cierre es la pieza con la que se
+# cuadra la duración del vídeo: el cuerpo lo escribe Gemini y no se toca, pero
+# la CTA es un literal nuestro y cambiarla no cuesta una llamada.
+#
+# Todas dicen lo obligatorio —carrito naranja y aplicar los cupones—; lo que
+# sube por la escalera son las promesas de más y la coletilla del curso. Solo
+# se ofrece lo que el producto CUMPLE (`plazos` / `envio`): prometer un envío
+# gratis que el comprador no se encuentra es lo que trae infracciones.
+CTA_CUPONES = "Ve al carrito naranja y aplica tus cupones."
+CTA_CUPONES_BARATO = (
+    "Ve al carrito naranja y aplica tus cupones para llevártelo aún más barato."
+)
+CTA_ENVIO = "Ve al carrito naranja, aplica tus cupones y revisa el envío gratis."
+CTA_PLAZOS = (
+    "Ve al carrito naranja, aplica tus cupones y revisa el pago a plazos."
+)
+CTA_ENVIO_BARATO = (
+    "Haz click en el carrito naranja y aplica tus cupones para llevártelo aún "
+    "más barato y con envío gratis."
+)
+CTA_TODO = (
+    "Haz click en el carrito naranja y aplica tus cupones para llevártelo aún "
+    "más barato, con envío gratis y pudiendo pagarlo en cómodos plazos."
+)
+
+
+def ctas_posibles(plazos: bool, envio: bool) -> tuple[str, ...]:
+    """Los cierres que ese producto puede decir, de corto a largo.
+
+    Los plazos van al final de la escalera a propósito: el cuerpo del guion ya
+    lleva su frase de financiación (`guion_plazos.md`), así que nombrarlos en
+    el cierre es decir la misma promesa dos veces. Se acepta solo cuando el
+    guion se ha quedado corto y hay que rellenar — antes que dejar el vídeo por
+    debajo del mínimo, mejor repetir la promesa.
+    """
+    escalera = [CTA_CUPONES, CTA_CUPONES_BARATO]
     if envio:
-        extras.append("el envío gratis")
-    if not extras:
-        return "Ve al carrito naranja y aplica tus cupones."
-    return (
-        "Ve al carrito naranja, aplica tus cupones y revisa "
-        + " y ".join(extras)
-        + "."
-    )
+        escalera += [CTA_ENVIO, CTA_ENVIO_BARATO]
+    if plazos:
+        escalera.append(CTA_PLAZOS)
+    if plazos and envio:
+        escalera.append(CTA_TODO)
+    return tuple(sorted(dict.fromkeys(escalera), key=len))
+
+
+def cuerpo_sin_cta(guion: str) -> str:
+    """El guion sin su última frase (el cierre). Vacío si no se reconoce."""
+    if not guion or not _CTA_FINAL_RE.search(guion):
+        return ""
+    return re.sub(r"\s{2,}", " ", _CTA_FINAL_RE.sub("", guion, count=1)).strip()
+
+
+def cambiar_cta(guion: str, nueva: str) -> str:
+    """El mismo guion con otro cierre. Devuelve el original si no lo reconoce."""
+    if not guion or not _CTA_FINAL_RE.search(guion):
+        return guion
+    # Con `lambda` y no con el texto suelto: un cierre con una barra invertida
+    # la interpretaría `re.sub` como grupo. Y con espacio delante, que el patrón
+    # se come el que separaba la frase anterior.
+    pegado = _CTA_FINAL_RE.sub(lambda _m: " " + nueva, guion, count=1)
+    return re.sub(r"\s{2,}", " ", pegado).strip()
+
+
+def ventana_video(segundos_pedidos: float = 0, metraje: float = 0) -> tuple[float, float]:
+    """Entre qué dos duraciones tiene que caer el vídeo.
+
+    El suelo es lo que se prometió: los 15s del reto, o los 30/40/60 que se
+    hayan pedido.
+
+    El techo son DOS cosas a la vez, y manda la más pequeña:
+
+    - la duración del formato (`GUION_OBJETIVO_S`, 16s), porque el vídeo se
+      quiere de 15-16s y no de los 20 que darían dos clips de 10;
+    - el metraje que hay de verdad, porque pasarse de ahí es rebobinar clip.
+
+    Un segundo por encima no se nota —lo tolera `VENTANA_TOLERANCIA_S`—, pero
+    no es a lo que se apunta.
+    """
+    pedidos = float(segundos_pedidos or 0)
+    suelo = pedidos if pedidos > 0 else DURACION_MINIMA_S
+    # El vídeo normal va de 15 a 16: un 6,7% de holgura sobre el suelo. Los
+    # pedidos de 30/40/60 se tratan igual (30 → 32) en vez de dejarles medio
+    # segundo, que no da para mover el cierre de sitio.
+    objetivo = suelo * (GUION_OBJETIVO_S / DURACION_MINIMA_S)
+    techo = min(objetivo, float(metraje)) if metraje and metraje > 0 else objetivo
+    return (round(suelo, 1), round(max(techo, suelo + 0.5), 1))
+
+
+# Cuánto se tolera pasarse del techo antes de dar el encaje por malo.
+VENTANA_TOLERANCIA_S = 1.0
 
 
 ESTILOS_GUION: dict[str, dict[str, str]] = {
@@ -216,8 +344,13 @@ ESTILO_GUION_DEFECTO = "precio"
 # Se sustituye la FRASE ENTERA en vez de recortar trozos: quitando solo "el
 # pago a plazos" se llevaba por delante el "revisa" y quedaba "…y el envío
 # gratis", que suena raro. La CTA empieza siempre por el carrito naranja.
+# La frase entera que habla del carrito naranja, empiece como empiece. Estuvo
+# atada a los verbos del curso ("Ve al…", "Haz click en el…") y se escapaban las
+# que Gemini escribe por su cuenta —"Clica el carrito naranja para aplicar
+# cupones…"—: con el cierre sin reconocer, ni se le quitaba la promesa que el
+# producto no cumple ni se podía usar para cuadrar la duración.
 _CTA_FINAL_RE = re.compile(
-    r"(?:Ve|Haz\s+click|Vete|Entra)\s+(?:al|en\s+el)\s+carrito\s+naranja[^.]*\.",
+    r"[^.!?]*\bcarrito\s+naranja\b[^.!?]*[.!?]",
     re.IGNORECASE,
 )
 
@@ -252,10 +385,14 @@ def recortar_cta(guion: str, *, plazos: bool, envio: bool) -> str:
     if not guion:
         return ""
     guion = sin_minimo_plazos(guion)
-    nueva = cta_final(plazos, envio)
+    # El tamaño del guion ES el que decide si el envío gratis cabe: un guion de
+    # 30s lo dice y uno de 16s no. Se mide el guion entero (CTA vieja incluida)
+    # porque las dos CTA se diferencian en 24 caracteres y el umbral está a 116
+    # de distancia: ninguna decisión cambia por ese matiz.
+    nueva = cta_final(plazos, envio, len(guion.strip()))
     if not _CTA_FINAL_RE.search(guion):
         return guion          # sin CTA reconocible no se toca nada
-    return re.sub(r"\s{2,}", " ", _CTA_FINAL_RE.sub(nueva, guion, count=1)).strip()
+    return cambiar_cta(guion, nueva)
 
 
 def cta_desfasada(guion: str, *, plazos: bool, envio: bool) -> bool:
@@ -320,14 +457,53 @@ def prompt_guion(
     # El de dolor lleva nota de cabecera para quien lo lea en el repo.
     if base.startswith("<!--"):
         base = base.split("-->", 1)[1].strip()
-    base = base.replace("{{CTA_FINAL}}", cta_final(plazos, envio_gratis))
+    base = base.replace(
+        "{{CTA_FINAL}}", cta_final(plazos, envio_gratis, caracteres_guion(segundos))
+    )
     if plazos:
         extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
         # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini
         # solo se le manda lo que va después del separador.
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
-    return _alargar(base, segundos) + _epoca()
+    return _alargar(base, segundos) + _caracteristicas(segundos) + _epoca()
+
+
+# Por debajo de qué parte del tope se considera que el guion se quedó corto.
+# Gemini apunta al máximo y se queda lejos: midiendo cinco productos salieron
+# 228, 240, 284, 287 y 410 caracteres para topes de 284 y 534, o sea vídeos de
+# 14,4s cuando el mínimo del reto son 15. Decirle el suelo es gratis; un
+# reintento por quedarse corto costaría una llamada por producto.
+GUION_MINIMO_RATIO = 0.93
+
+
+def _caracteristicas(segundos: float = 0) -> str:
+    """Añadido NUESTRO: cuánto tiene que medir el guion y en qué se gasta.
+
+    El cierre se recortó a propósito (`cta_final`) para que el hueco fuera a
+    contar el producto, y eso hay que pedirlo: si no, Gemini rellena los
+    caracteres que sobran estirando la urgencia de precio con otras palabras
+    ("a un precio increíble, aprovéchalo ahora"), que es exactamente lo que
+    hace que el vídeo suene a anuncio desde la primera frase.
+
+    Concretar es lo que vende y además es lo que no da problemas: una medida o
+    un material salen de la ficha, mientras que "lo soluciona todo" es una
+    promesa definitiva de las que el curso prohíbe.
+    """
+    tope = caracteres_guion(segundos)
+    minimo = int(tope * GUION_MINIMO_RATIO)
+    return (
+        f"\n\nOTRO APUNTE: el guion tiene que MEDIR entre {minimo} y {tope} "
+        "caracteres. El máximo ya lo sabes; el mínimo es igual de importante, "
+        "porque el vídeo dura lo que dure la voz y un guion corto deja el "
+        "vídeo por debajo de lo que hace falta. "
+        "Y el cierre es corto a propósito: todo el sitio que "
+        "queda va a CARACTERÍSTICAS CONCRETAS del producto que se vean en las "
+        "fotos o estén en la ficha (de qué es, qué medidas o capacidad tiene, "
+        "qué trae, cómo se usa). No rellenes repitiendo lo del precio con "
+        "otras palabras ni alargando el cierre: una característica de verdad "
+        "vende más que un adjetivo."
+    )
 
 
 def _epoca() -> str:
@@ -349,23 +525,39 @@ def _epoca() -> str:
 
 
 def _alargar(prompt: str, segundos: float) -> str:
-    """Reescribe el tope del prompt del curso para un vídeo más largo.
+    """Pone en el prompt del curso el tope que de verdad se quiere.
 
     Los dos prompts llevan sus cifras metidas en la prosa —y distintas: el de
     precio habla de 260 caracteres y el de dolor de 360—, así que no vale con
     pegar una línea al final: se contradiría con lo que ya pone. Se sustituyen
-    las cifras y luego se pide lo que de verdad cambia, que no es el largo sino
-    QUÉ se cuenta: en veinte segundos cabe el titular y en treinta hay que
-    hablar del producto.
+    las cifras.
+
+    Se hace SIEMPRE, no solo cuando se pide un vídeo más largo. Con el objetivo
+    en 284 caracteres, el prompt de punto de dolor seguiría pidiendo 360: se
+    pasaría en casi todos los productos y cada uno gastaría la llamada extra de
+    la reescritura (`guionista._acortar`). Pedirlo bien a la primera es gratis.
+
+    Con `segundos` se pide además lo que de verdad cambia en un vídeo largo, que
+    no es el número sino QUÉ se cuenta: en dieciséis segundos cabe el titular y
+    en treinta hay que hablar del producto.
     """
+    import re
+
+    objetivo = segundos if segundos and segundos > 0 else GUION_OBJETIVO_S
+    # `caracteres_guion(0)` es el tope de serie, y es el mismo con el que se
+    # comprueba el guion después (`guionista.escribir`). Calcularlo aquí a
+    # partir de los segundos daría 285 contra un tope de 284, y ese carácter de
+    # diferencia dispara una reescritura entera.
+    tope = caracteres_guion(segundos)
+    prompt = re.sub(r"\b\d{3} caracteres", f"{tope} caracteres", prompt)
+    prompt = re.sub(r"\b\d{1,3} segundos", f"{round(objetivo)} segundos", prompt)
+    # El bloque de plazos dice su tope de otra forma ("no debe pasar de 360"),
+    # sin la palabra "caracteres" detrás. Si no se cambia también, el prompt se
+    # contradice: el cuerpo pide 284 y el añadido de plazos permite 360.
+    prompt = re.sub(r"(?<=pasar de )\d{3}", str(tope), prompt)
     if not segundos or segundos <= 0:
         return prompt
 
-    import re
-
-    tope = caracteres_guion(segundos)
-    prompt = re.sub(r"\b\d{3} caracteres", f"{tope} caracteres", prompt)
-    prompt = re.sub(r"\b\d{1,3} segundos", f"{round(segundos)} segundos", prompt)
     return prompt + (
         "\n\nEste vídeo es MÁS LARGO de lo habitual: "
         f"{round(segundos)} segundos, unos {tope} caracteres. Mantén la "
@@ -387,34 +579,31 @@ def _alargar(prompt: str, segundos: float) -> str:
 # genérico a propósito: las voces más usadas del catálogo español son clones de
 # personas identificables (Farid Dieck, Mario Castañeda…) y usarlas en vídeos
 # de afiliación es suplantación.
+#
+# SEP 2026 — el banco se cambió ENTERO. Las veinte de antes se habían buscado
+# por título ("vendedor", "locutor", "publicidad", "influencer") y sonaban a
+# anuncio: el espectador sabe que le van a vender en la primera frase, que es
+# justo lo que hay que evitar. Estas se buscaron al revés —etiquetas
+# `conversational`, `friendly`, `relaxed`, `casual`, y fuera todo lo
+# `advertisement`/`announcer`/`narration`— y son gente hablando a cámara.
+# Las velocidades de las viejas siguen en `velocidad_voz.MEDIDAS_INICIALES`
+# porque hay vídeos ya montados con ellas.
 VOCES: dict[str, list[dict[str, str]]] = {
+    # Las diez las eligió el operador escuchándolas DECIR un guion nuestro
+    # (281/294 car, con su CTA), no la muestra del catálogo de Fish.
     "hombre": [
-        {"id": "51cdce697d8c4624b3135d473b4754e6", "label": "Vendedor Amable"},
-        {"id": "a0bd834b585944ba8200643a8b5dc405", "label": "audio hombre vendedor"},
-        {"id": "c5a26d53f9fa41dc92479d065a2c9b8e", "label": "Voz Vendedor Colombiano"},
-        {"id": "77087ce820a74b2793a67371db067e89", "label": "Luquitas Influencer"},
-        {"id": "d2ee7bb7cb3946d1b1994c1e4a6ff44e", "label": "MY COMBOY (El vaqueroff)"},
-        {"id": "6b66be3c8bda4c1cb59dc1446362b290", "label": "Experto de Marketing"},
-        # La más LENTA del banco (14,0 car/s medidos). Se queda porque el
-        # sorteo ya descarta las voces que no quepan en los clips que hay
-        # (`voz.elegir_voz`); sin ese filtro obligaría a subir un clip más en
-        # el 15% de los guiones.
-        {"id": "79ec4c10f80e4e0592b6e2f86b650e22", "label": "Vendedor Entusiasta"},
+        {"id": "1584879dbfe1457c96b516aa14dcaac1", "label": "Joven Conversador Relajado"},
+        {"id": "fa2683f51e2443ff9928e8ebfe997c83", "label": "Joven Relajado"},
+        {"id": "712fb96185f646fda4849288e7f93585", "label": "Amigo con Humor"},
+        {"id": "292a1a41081342988b816d8d7d79dbf8", "label": "Hombre Relajado"},
+        {"id": "f2f858d51e8e4422acf0a4d838d85aa3", "label": "Chico"},
     ],
     "mujer": [
-        {"id": "b08746cb224a4277a14b901c3591c3b9", "label": "voz publicidad"},
-        {"id": "3fa82ba878ca4740ac6bba8ae0c38d76", "label": "Voz Clara Influencer 1"},
-        {"id": "a67aae7d95154eecb6ad61c766de7afb", "label": "Ely Bell's influencer"},
-        {"id": "560b6e4e2e824ef5b87e8158544974af", "label": "Voz de Influencer"},
-        {"id": "c42b307a13c746d09f46d6799fd0f71f", "label": "Chica influencer"},
-        {"id": "9ba6a6e4ecd84af58b7913f3944f54f2", "label": "influencer"},
-        {"id": "ad03df9a92704fa9a0d931225754d057", "label": "Vendedora (joven)"},
-        {"id": "677365711ffb439e80a57f6c737f6baa", "label": "Vendedora virsl"},
-        {"id": "58852a3fb88946a18a1be7c69ed13774", "label": "Vendedora belixe"},
-        {"id": "9e13aa87d990415fb435b63562cb6893", "label": "Voz Vendedora Amigable"},
-        {"id": "c16b3df04d9c4e9b9264091c2e6baa45", "label": "Voz vendedora viral ttw"},
-        {"id": "7f44c1fdaef9471488d531e66aa01e9a", "label": "Influencer 1 colombiana"},
-        {"id": "b8db28cc8d7e4be4a6fc2cce8a260ca5", "label": "Voz Influencer Tuxpa Woman"},
+        {"id": "049dbfa772814ec88d030b6a4b9cc578", "label": "Voz Dulce y Cercana"},
+        {"id": "429c4e4dbfa246d8a2cf7ee034aad518", "label": "Voz Dulce Femenina"},
+        {"id": "1b3aceb9964445f1883b9a71eb335766", "label": "Amiga Cercana"},
+        {"id": "039303edce924eb08c35580705d9bfcf", "label": "Compania Suave"},
+        {"id": "86151fb1bf8b4dc4a2f35e79e6c2ffd5", "label": "Voz Joven Natural"},
     ],
 }
 
@@ -476,10 +665,20 @@ VOZ_LIMITER = 0.89
 # está comprobado a oído.
 VOZ_TEMPO_MAX = float(os.getenv("VOZ_TEMPO", "1.10"))
 
+# OJO con los dos números: la pausa que QUEDA es `stop_duration + stop_silence`,
+# no `stop_silence`. ffmpeg no sabe que hay silencio hasta que han pasado
+# `stop_duration` segundos, y ese trozo se queda en el audio. Medido con un wav
+# de pausas conocidas: 0.4+0.3 dejaba pausas de 0,70s (y una de 1,2s también
+# acababa en 0,70s, o sea que "capar" capaba poco).
+#
+# Con 0.25+0.18 quedan en 0,43s: sigue habiendo pausa —la voz respira antes de
+# la CTA, no atropella— pero se recortan ~0,27s en cada una. En un guion de 20s
+# con dos o tres pausas largas eso es medio segundo largo menos de vídeo, que es
+# medio segundo menos de rebobinado en los clips.
 VOZ_SILENCIO = (
     "silenceremove="
     "start_periods=1:start_silence=0.08:start_threshold=-40dB:"
-    "stop_periods=-1:stop_duration=0.4:stop_silence=0.3:stop_threshold=-40dB:"
+    "stop_periods=-1:stop_duration=0.25:stop_silence=0.18:stop_threshold=-40dB:"
     "detection=peak"
 )
 

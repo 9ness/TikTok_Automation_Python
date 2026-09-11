@@ -72,6 +72,34 @@ def _precio(textos: dict, campo: str = "precio") -> float:
     return pov_config.precio_num(textos.get(campo))
 
 
+def _minimo(prod: dict, caracteres: int, clip_s: float) -> float:
+    """Cuánto tiene que durar el vídeo como mínimo.
+
+    De serie es el mínimo del reto (15s), pero cuando el operador pide un vídeo
+    DE 30, 40 o 60 segundos ese número es una promesa al vendedor y el mínimo
+    pasa a ser la duración pedida. No es un detalle: sin esto se elegía el
+    número de clips con "que quepa alguna voz", y para un guion de 30s la
+    primera que cabía era una rápida acelerada que dejaba el vídeo en 26s — con
+    tres clips de 8s en vez de los cuatro que hacen falta.
+
+    Si ni con los clips que permite el formato (`CLIPS_MAXIMOS`) se llega a la
+    duración pedida, se vuelve al mínimo de siempre: más vale un vídeo corto
+    que uno sin voz. Pasa con 60s, que no caben en cuatro clips ni de 10s.
+    """
+    from src.nicho_pov_bof_largo.services import voz as voz_svc
+
+    pedidos = float(prod.get("guion_segundos") or 0)
+    if pedidos <= 0:
+        return config.DURACION_MINIMA_S
+    n = voz_svc.clips_para(
+        caracteres, clip_s, segundos_min=pedidos, maximos=config.CLIPS_MAXIMOS,
+    )
+    cabe = voz_svc.duracion_estimada(
+        caracteres, clip_s, n, segundos_min=pedidos,
+    )[1] > 0
+    return pedidos if cabe else config.DURACION_MINIMA_S
+
+
 def _segundos(
     guion: str, prod: dict, plazos: bool = False, envio: bool = True,
 ) -> tuple[float, float]:
@@ -82,9 +110,23 @@ def _segundos(
         return (0.0, 0.0)
     limpio = config.recortar_cta(guion, plazos=plazos, envio=envio)
     clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
+    huecos = _huecos(prod, plazos, envio)
+    # Con el cierre reconocible el rango se calcula CON el encaje: al locutar,
+    # cada voz se lleva el cierre que le cuadra, así que decir "13,5 a 19,2s"
+    # —lo que duraría el texto tal cual con la voz más lenta y la más rápida—
+    # es enseñar un vídeo que no se va a hacer.
+    cuerpo = config.cuerpo_sin_cta(limpio)
+    if cuerpo:
+        return voz_svc.duracion_con_encaje(
+            cuerpo,
+            config.ctas_posibles(plazos, envio),
+            ventana=config.ventana_video(
+                float(prod.get("guion_segundos") or 0), huecos * clip_s,
+            ),
+        )
     return voz_svc.duracion_estimada(
-        len(limpio), clip_s, _huecos(prod, plazos, envio),
-        segundos_min=config.DURACION_MINIMA_S,
+        len(limpio), clip_s, huecos,
+        segundos_min=_minimo(prod, len(limpio), clip_s),
     )
 
 
@@ -107,10 +149,11 @@ def _huecos(prod: dict, plazos: bool = False, envio: bool = True) -> int:
     if not guion:
         return config.CLIPS_POR_VIDEO
     guion = config.recortar_cta(guion, plazos=plazos, envio=envio)
+    clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
     return voz_svc.clips_para(
         len(guion),
-        float(prod.get("clip_s") or config.CLIP_TARGET_S),
-        segundos_min=config.DURACION_MINIMA_S,
+        clip_s,
+        segundos_min=_minimo(prod, len(guion), clip_s),
         maximos=config.CLIPS_MAXIMOS,
     )
 

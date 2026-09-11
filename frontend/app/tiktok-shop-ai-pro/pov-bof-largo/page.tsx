@@ -632,7 +632,7 @@ export default function PovBofLargoPage() {
             <h1 className="text-base font-bold sm:text-lg">POV BOF Largo</h1>
             <p className="text-[11px] text-muted-foreground">
               Igual que el POV BOF, pero la voz es un guion escrito por IA para
-              cada producto · DOS clips de 10s
+              cada producto · DOS clips, normalmente de 8s
             </p>
           </div>
         </div>
@@ -2233,7 +2233,7 @@ function ProductoCard({
             type="button"
             title={
               sg === 0
-                ? "El del curso: ~356 caracteres, unos 20 segundos"
+                ? "Lo normal: ~284 caracteres, unos 16 segundos — lo que dan dos clips de 8s"
                 : `~${Math.round(sg * 17.8)} caracteres. Necesita capturas del producto para tener qué contar`
             }
             onClick={() =>

@@ -137,12 +137,13 @@ class TestMinimoDePlazos:
 
 
 class TestConfig:
-    def test_el_tope_sale_de_los_dos_clips(self):
-        """364 caracteres = 2 clips de 10s a 18,2 car/s. Si alguien cambia el
-        número de clips, el tope tiene que moverse solo."""
-        esperado = int(
-            config.CLIPS_POR_VIDEO * config.CLIP_TARGET_S * config.CARACTERES_POR_SEGUNDO
-        )
+    def test_el_tope_sale_de_la_duracion_que_se_quiere(self):
+        """El tope NO es "lo que quepa en los clips" sino la duración decidida.
+
+        Se separaron a propósito: con clips de 8s, "lo que quepa" daba 683
+        caracteres —guiones del doble de largos sin que nadie los pidiera—. El
+        formato dice 16s y de ahí salen los caracteres."""
+        esperado = int(config.GUION_OBJETIVO_S * config.CARACTERES_POR_SEGUNDO)
         assert config.GUION_MAX_CARACTERES == esperado
 
     def test_no_hay_voces_repetidas_entre_sexos(self):
@@ -150,3 +151,82 @@ class TestConfig:
             {v["id"] for v in config.VOCES["hombre"]}
             & {v["id"] for v in config.VOCES["mujer"]}
         )
+
+
+class TestElCierreSeReconoce:
+    """El cierre hay que saber encontrarlo: es la pieza con la que se cuadra."""
+
+    def test_lo_pilla_aunque_no_empiece_por_el_verbo_del_curso(self):
+        """Gemini no siempre escribe "Ve al carrito naranja".
+
+        Cuando escribía "Clica el carrito naranja para aplicar cupones…" el
+        cierre se quedaba sin reconocer, y entonces ni se le quitaba la promesa
+        que el producto no cumple ni servía para ajustar la duración: el vídeo
+        salía de 13,6s.
+        """
+        g = (
+            "Han optimizado el precio de esta mesita LED. Ofrece carga "
+            "inalámbrica. Clica el carrito naranja para aplicar cupones."
+        )
+        assert config.cuerpo_sin_cta(g).endswith("inalámbrica.")
+        assert config.cambiar_cta(g, config.CTA_CUPONES).endswith(config.CTA_CUPONES)
+
+    def test_sin_cierre_no_se_inventa_nada(self):
+        g = "Un guion cualquiera que no manda a ningún sitio."
+        assert config.cuerpo_sin_cta(g) == ""
+        assert config.cambiar_cta(g, config.CTA_CUPONES) == g
+
+    def test_al_cambiarlo_no_se_pegan_las_palabras(self):
+        g = "Es cómoda. Ve al carrito naranja y aplica tus cupones."
+        assert " Ve al carrito" in config.cambiar_cta(g, config.CTA_ENVIO)
+
+
+class TestEncaje:
+    """El puzzle: cierre + acelerón para caer en la ventana de duración."""
+
+    def _dentro(self, cuerpo_car: int, cps: float, ventana=(15.0, 16.0)) -> float:
+        from src.nicho_pov_bof_largo.services import voz
+
+        cta, tempo, dur = voz.encaje_cta(
+            "x" * cuerpo_car, cps, config.ctas_posibles(True, True), ventana=ventana,
+        )
+        assert 1.0 <= tempo <= config.VOZ_TEMPO_MAX
+        return dur
+
+    def test_un_guion_corto_se_rellena_con_el_cierre(self):
+        """Primero se alarga el cierre; bajar el tempo es el segundo recurso."""
+        from src.nicho_pov_bof_largo.services import voz
+
+        cta, _t, dur = voz.encaje_cta(
+            "x" * 150, 17.8, config.ctas_posibles(True, True), ventana=(15.0, 16.0),
+        )
+        assert len(cta) > len(config.CTA_CUPONES)
+        assert 15.0 <= dur <= 16.0 + config.VENTANA_TOLERANCIA_S
+
+    def test_un_guion_largo_se_queda_con_el_cierre_corto(self):
+        from src.nicho_pov_bof_largo.services import voz
+
+        cta, tempo, _d = voz.encaje_cta(
+            "x" * 270, 17.8, config.ctas_posibles(True, True), ventana=(15.0, 16.0),
+        )
+        assert cta == config.CTA_CUPONES
+        assert tempo > 1.0
+
+    def test_queda_dentro_con_todas_las_voces_del_banco(self):
+        """Un guion de tamaño normal tiene que encajar con cualquiera."""
+        from src.nicho_pov_bof_largo.services import velocidad_voz
+
+        for banco in config.VOCES.values():
+            for v in banco:
+                cps = velocidad_voz.caracteres_por_segundo(v["id"])
+                dur = self._dentro(200, cps)
+                assert 15.0 <= dur <= 16.0 + config.VENTANA_TOLERANCIA_S, v["label"]
+
+    def test_pasarse_un_segundo_pesa_menos_que_no_llegar(self):
+        """Un vídeo de 16,6s no se nota; uno de 14,3s no puntúa en el reto."""
+        from src.nicho_pov_bof_largo.services import voz
+
+        _cta, _t, dur = voz.encaje_cta(
+            "x" * 165, 16.7, config.ctas_posibles(True, True), ventana=(15.0, 16.0),
+        )
+        assert dur >= 15.0
