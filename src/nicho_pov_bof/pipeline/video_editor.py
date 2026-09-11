@@ -1414,7 +1414,12 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      piezas: "set[str] | None" = None,
                      semilla: str = "",
                      y_frac: float | None = None,
-                     estilo_texto: str = "") -> Path:
+                     estilo_texto: str = "",
+                     # La foto LIMPIA del producto. Solo sirve para el color
+                     # del rótulo (ver `_elegir_paleta`): en el vídeo no se
+                     # puede medir el color de la marca porque medio encuadre
+                     # es la mano y la encimera.
+                     foto_producto: "Path | None" = None) -> Path:
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
@@ -1800,7 +1805,7 @@ def build_video(
         texted = _burn_text_block(
             matched, textos or {}, work_dir / "04_texted.mp4", on_log, layout,
             piezas, semilla=semilla or str(output_path.stem), y_frac=y_frac,
-            estilo_texto=estilo_texto,
+            estilo_texto=estilo_texto, foto_producto=foto_producto,
         )
         on_progress(0.66, "Texto quemado")
     else:
