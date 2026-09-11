@@ -57,6 +57,16 @@ import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { useCopiarDePovBof } from "@/lib/queries/nichoRopa";
 import { useEsPro, useMe } from "@/lib/queries/auth";
 import { SincronizarTopVendidos } from "@/components/tiktok-shop-ai-pro/SincronizarTopVendidos";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { VideoModal } from "@/components/ui/video-modal";
 import { useDrawerStore } from "@/lib/stores/drawerStore";
 import {
@@ -206,6 +216,10 @@ export default function PovBofLargoPage() {
   const [picked, setPicked] = useEstadoDeUsuario<string | null>("povbof-largo:carpeta", null);
   const [verVendidos, setVerVendidos] = useState(false);
   const [verEscaparate, setVerEscaparate] = useState(false);
+  // Rehacer los guiones se pregunta con el diálogo de la app, no con el
+  // `confirm()` del navegador: ese sale con el dominio delante, en el idioma
+  // del móvil y sin poder decir qué se pierde.
+  const [confirmarRehacer, setConfirmarRehacer] = useState(false);
 
   // La app avisa de cada fichero que termina de subir. Sin esto el hueco se
   // quedaría sin marcar hasta recargar a mano.
@@ -540,13 +554,6 @@ export default function PovBofLargoPage() {
    *  a Gemini por producto, así que se pregunta antes. */
   function rehacerTodosGuiones() {
     if (!folder || !conGuion) return;
-    if (
-      !window.confirm(
-        `¿Reescribir los ${conGuion} guiones de ${folder}? Se pierden los que ` +
-          "hay y cuesta una llamada a la IA por producto.",
-      )
-    )
-      return;
     guionesLote.mutate(
       { source: activaSource, folder, rehacer: true },
       {
@@ -1095,7 +1102,7 @@ export default function PovBofLargoPage() {
             <button
               type="button"
               onClick={() =>
-                sinGuion ? void generarTodosGuiones() : rehacerTodosGuiones()
+                sinGuion ? void generarTodosGuiones() : setConfirmarRehacer(true)
               }
               disabled={guionesLote.isPending || (!sinGuion && !conGuion)}
               className={`flex w-full items-center justify-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${
@@ -1481,6 +1488,42 @@ export default function PovBofLargoPage() {
           )}
         </section>
       )}
+
+      {/* Rehacer los guiones: se dice QUÉ se pierde y qué cuesta. El
+          `confirm()` del navegador salía con el dominio de la app delante y un
+          texto suelto — ni se leía ni se sabía de dónde venía. */}
+      <AlertDialog open={confirmarRehacer} onOpenChange={setConfirmarRehacer}>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Reescribir {conGuion} guion{conGuion === 1 ? "" : "es"}
+              {folder ? ` de ${folder}` : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Se pierden los que hay ahora y se escriben otros nuevos con el
+                  prompt de hoy. Los vídeos ya montados no se tocan.
+                </p>
+                <p>
+                  Cuesta <span className="font-medium text-foreground">una
+                  llamada a la IA por producto</span> y tarda un par de minutos;
+                  va por la cola, así que puedes seguir trabajando.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Dejarlos como están</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => rehacerTodosGuiones()}
+              className="bg-amber-500 text-white hover:bg-amber-600"
+            >
+              Sí, reescribirlos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
