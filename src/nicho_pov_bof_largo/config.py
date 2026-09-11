@@ -510,6 +510,15 @@ def _caracteristicas(segundos: float = 0) -> str:
     Concretar es lo que vende y además es lo que no da problemas: una medida o
     un material salen de la ficha, mientras que "lo soluciona todo" es una
     promesa definitiva de las que el curso prohíbe.
+
+    Y por eso el bloque acaba recordando el LÍMITE. Pedir registro hablado sin
+    recordarlo salía caro: con "cuéntalo como se lo contarías a un amigo", a un
+    panel de luz roja le escribió "este panel te alivia y mejora tu bienestar"
+    —una promesa definitiva y encima de salud— e inventó el modelo "Panel 61"
+    a partir de los 660 nm de la ficha. Lo de aquí abajo no es prompt nuevo:
+    es el "no hagas promesas definitivas" del curso repetido al final, que es
+    donde más pesa, porque lo que añadimos nosotros es solo para cuadrar los
+    segundos del vídeo y no puede aflojar lo que evita sanciones.
     """
     tope = caracteres_guion(segundos)
     minimo = int(tope * GUION_MINIMO_RATIO)
@@ -529,10 +538,21 @@ def _caracteristicas(segundos: float = 0) -> str:
         "Nada de titulares sin verbo ('Precio mejorado en estas zapatillas'), "
         "nada de frases sueltas de tres palabras ('El impacto frustra.') y "
         "nada de lengua de ficha de producto: no digas 'ofrece', 'cuenta "
-        "con', 'permite', 'proporciona' ni 'dispone de' — di lo que hace el "
-        "producto como se lo contarías a un amigo ('amortiguan un montón', "
-        "'agarran bien'). Y empieza con una de las aperturas de precio que se "
-        "te han dado ARRIBA, copiada tal cual: son verbales a propósito."
+        "con', 'permite', 'proporciona' ni 'dispone de' — cuéntalo como se lo "
+        "contarías a un amigo. Y empieza con una de las aperturas de precio "
+        "que se te han dado ARRIBA, copiada tal cual: son verbales a "
+        "propósito."
+        "\n\nESTO MANDA SOBRE TODO LO ANTERIOR, y ya te lo han dicho arriba: "
+        "NADA DE PROMESAS DEFINITIVAS. Hablar como una persona no es afirmar "
+        "en seco lo que el producto consigue. No digas 'te lo alivia', 'se te "
+        "va el dolor', 'te lo soluciona', 'acaba con', 'elimina' ni 'te lo "
+        "cura'; di 'está pensado para', 'puede ayudarte a', 'mucha gente lo "
+        "usa para'. Con lo que toque el cuerpo —dolor, músculos, sueño, piel, "
+        "peso— ten el doble de cuidado: eso es lo que trae sanciones. "
+        "Y no te inventes NADA que no esté en la ficha o se vea en las fotos: "
+        "ni nombres de modelo ni cifras. Si la ficha dice '660 y 850 nm', no "
+        "salgas con 'Panel 61'. Si no sabes cómo se llama, di solo la marca y "
+        "qué es."
     )
 
 
