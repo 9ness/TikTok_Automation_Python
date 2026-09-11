@@ -474,7 +474,7 @@ export default function CreativosProPage() {
               navigator.clipboard.writeText(prompt.data?.imagen ?? "");
               toast.success("Prompt copiado");
             }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-2 text-xs transition hover:border-foreground/30 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 px-3 py-2 text-xs font-semibold text-violet-400 transition hover:border-violet-400 hover:from-violet-500/30 hover:to-fuchsia-500/30 disabled:opacity-50"
           >
             <ClipboardCopy className="h-3.5 w-3.5" /> Prompt imagen
           </button>

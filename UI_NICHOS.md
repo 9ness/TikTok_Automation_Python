@@ -160,6 +160,16 @@ Reglas de la tarjeta:
 | violeta | la acción principal de la pantalla |
 | fucsia | algo recuperado o excepcional |
 
+Y un caso aparte, que no es un color sino un **degradado**:
+
+| Acabado | Qué dice |
+|---|---|
+| degradado violeta→fucsia | esto se COPIA para pegarlo en la herramienta de IA (los botones de «Prompt imagen» / «Prompt vídeo») |
+
+Es lo único con degradado a propósito: son los botones que sacan texto de la
+app hacia fuera, y van rodeados de otros que se le parecen (descargar fotos,
+abrir Flow). Con el borde gris de todos no se distinguían de un vistazo.
+
 **Formas**: `rounded-xl` las secciones, `rounded-lg` los botones, `rounded` los
 chips, `rounded-full` las píldoras y las barras.
 
