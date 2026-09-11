@@ -71,6 +71,22 @@ export function useClipSCarpetaLargo() {
   });
 }
 
+/** El acabado del texto quemado para TODA la carpeta.
+ *
+ *  Se elige una vez por tanda, igual que la duración de clip; la tarjeta puede
+ *  cambiarlo luego en un producto suelto. */
+export function useEstiloTextoCarpetaLargo() {
+  const qc = useQueryClient();
+  return useMutation<
+    { estilo_texto: string; productos: number },
+    Error,
+    { source: string; folder: string; estilo_texto: string }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/estilo-texto/carpeta`, body),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useVocesLargo() {
   return useQuery<VocesLargo>({
     queryKey: largoKeys.voces(),
@@ -311,6 +327,7 @@ export function useSetEstadoLargo() {
         // el botón estaba muerto. Y con ella viajan los huecos y los segundos,
         // que dependen de la duración del clip.
         clip_s: updated.clip_s,
+        estilo_texto: updated.estilo_texto,
         clips_necesarios: updated.clips_necesarios,
         segundos_min: updated.segundos_min,
         segundos_max: updated.segundos_max,

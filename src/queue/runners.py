@@ -2133,9 +2133,12 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             # Viaja en el trabajo, no en el documento del producto: es cómo se
             # EDITA este vídeo, y el operador está probando los dos acabados
             # sobre los mismos productos.
-            estilo_texto=largo_config.estilo_texto_valido(
-                str(p.get("estilo_texto") or "")
-            ),
+            # YA viene resuelto del encolado ("blanco" o "" = el clásico), y
+            # aquí NO se vuelve a pasar por `estilo_texto_valido`: esa función
+            # entiende "" como "no me lo han dicho" y lo convertía otra vez en
+            # blanco, así que pedir el clásico desde la tarjeta no servía de
+            # nada — salían todos con el bloque blanco liso.
+            estilo_texto=str(p.get("estilo_texto") or ""),
             # La misma foto que se bajó para el guion: de ella sale el COLOR
             # del rótulo. En el vídeo no se puede medir —medio encuadre es la
             # mano y la encimera— y salía siempre la misma paleta.

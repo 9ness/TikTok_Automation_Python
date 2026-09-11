@@ -572,6 +572,9 @@ def _listar(
                 )
             ),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),
+            # Vacío = no lo han elegido, y entonces manda el gancho del
+            # catálogo (dolor → blanco liso, precio → clásico de color).
+            estilo_texto=str(mio.get("estilo_texto") or ""),
             # El modo es del CATÁLOGO, no del producto: se repite en cada
             # ficha solo para que la pantalla no tenga que cruzarlo.
             estilo_guion=estilo_catalogo,
@@ -798,6 +801,43 @@ def clip_s_carpeta(
     return {"clip_s": clip_s, "productos": tocados}
 
 
+@router.post("/estilo-texto/carpeta")
+def estilo_texto_carpeta(
+    body: dict,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """El acabado del texto quemado para TODOS los productos de la carpeta.
+
+    Igual que la duración de clip: se elige una vez por tanda y la tarjeta
+    puede cambiarlo luego en un producto suelto. Va al documento del USUARIO
+    porque es cómo edita él sus vídeos, no un dato del producto.
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    source = str(body.get("source") or "").strip()
+    folder = str(body.get("folder") or "").strip()
+    estilo = str(body.get("estilo_texto") or "").strip().lower()
+    if source not in pov_config.SOURCES:
+        raise _bad(f"Catálogo desconocido: {source!r}")
+    if not folder:
+        raise _bad("Falta la carpeta.")
+    if estilo not in config.ESTILOS_TEXTO:
+        raise _bad(
+            f"estilo_texto debe ser {' o '.join(config.ESTILOS_TEXTO)}"
+        )
+
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    ids = list((pov_repo.load_folder(source, folder).get("productos") or {}))
+    try:
+        tocados = product_repo.update_carpeta(
+            source, folder, ids, usuario=usuario, estilo_texto=estilo,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"estilo_texto": estilo, "productos": tocados}
+
+
 @router.post("/producto/estado", response_model=ProductoLargo)
 def set_producto_estado(
     body: ProductoEstadoLargoRequest,
@@ -838,6 +878,14 @@ def set_producto_estado(
                     f"recibido: {body.clip_s}"
                 )
             campos["clip_s"] = body.clip_s
+        if body.estilo_texto is not None:
+            estilo = (body.estilo_texto or "").strip().lower()
+            if estilo not in config.ESTILOS_TEXTO:
+                raise _bad(
+                    "estilo_texto debe ser "
+                    f"{' o '.join(config.ESTILOS_TEXTO)}, recibido: {estilo!r}"
+                )
+            campos["estilo_texto"] = estilo
         # Va a los textos del POV BOF (documento compartido): las dos pantallas
         # lo leen de ahí, así que pedir 30s en una vale para la otra.
         # "Sin stock" es del PRODUCTO y va también al compartido: el mismo
@@ -1537,8 +1585,13 @@ def _encolar_clip(
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
             "con_subliminal": bool(con_subliminal),
             # Se resuelve AQUÍ, no en el montador: un cliente viejo no manda
-            # el campo y hay que darle el de serie igualmente.
-            "estilo_texto": config.estilo_texto_valido(estilo_texto),
+            # el campo y hay que darle el de serie igualmente. El orden es lo
+            # que pidió la tarjeta → lo que se puso para toda la carpeta → lo
+            # que le toca al gancho (dolor blanco liso, precio clásico).
+            "estilo_texto": config.estilo_texto_valido(
+                estilo_texto or str(prod.get("estilo_texto") or ""),
+                _modo(source, usuario),
+            ),
             # Con qué modo se mandó montar: el vídeo tiene que acabar en ese
             # documento aunque el catálogo cambie de modo mientras se monta.
             "estilo": _modo(source, usuario),

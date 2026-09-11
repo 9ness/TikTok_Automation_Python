@@ -84,6 +84,7 @@ import {
   useEscribirGuion,
   useGuionesLote,
   useClipSCarpetaLargo,
+  useEstiloTextoCarpetaLargo,
   useModoGuion,
   useSetModoGuion,
   useFoldersLargo,
@@ -231,11 +232,22 @@ export default function PovBofLargoPage() {
   const buscarUrls = useBuscarUrlsCarpeta();
   const guionesLote = useGuionesLote();
   const clipSCarpeta = useClipSCarpetaLargo();
+  const estiloTextoCarpeta = useEstiloTextoCarpetaLargo();
+  // Lo que hay puesto en la carpeta: solo se marca si TODOS coinciden. Sin
+  // elegir, cada producto se va al acabado que le toca por gancho, así que se
+  // enseña ese como el de partida.
+  const estiloCarpetaActual = (() => {
+    const porGancho = (items[0]?.estilo_guion || "precio") === "dolor"
+      ? "blanco"
+      : "clasico";
+    const vistos = new Set(items.map((p) => p.estilo_texto || porGancho));
+    return vistos.size === 1 ? [...vistos][0] : "";
+  })();
   const modoGuion = useModoGuion(source);
   const setModo = useSetModoGuion();
   // Cuál está puesto en la carpeta (0 = mezclados), para marcarlo.
   const clipSCarpetaActual = (() => {
-    const vistos = new Set(items.map((p) => p.clip_s || 10));
+    const vistos = new Set(items.map((p) => p.clip_s || 8));
     return vistos.size === 1 ? [...vistos][0] : 0;
   })();
   // Igual para el estilo de guion: "" = mezclados en esta carpeta.
@@ -1109,7 +1121,7 @@ export default function PovBofLargoPage() {
             {/* La duración de clip para TODA la carpeta. Cambia cuántos
                 huecos pide cada producto, así que se elige una vez por tanda y
                 no tarjeta a tarjeta. */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
               <span>Clips de toda la carpeta:</span>
               {[8, 10].map((s) => (
                 <button
@@ -1134,6 +1146,41 @@ export default function PovBofLargoPage() {
                   }`}
                 >
                   {s}s
+                </button>
+              ))}
+              {/* El acabado del texto quemado, para TODA la carpeta y al lado
+                  de la duración de clip porque se decide en el mismo momento:
+                  antes de ponerse a montar la tanda. La tarjeta sigue pudiendo
+                  cambiarlo en un producto suelto. */}
+              <span className="ml-auto">Texto:</span>
+              {[
+                { v: "blanco", label: "Blanco liso" },
+                { v: "clasico", label: "Clásico (color)" },
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  disabled={estiloTextoCarpeta.isPending}
+                  onClick={() =>
+                    estiloTextoCarpeta.mutate(
+                      { source, folder, estilo_texto: o.v },
+                      {
+                        onSuccess: (r: { productos: number }) =>
+                          toast.success(
+                            `${o.label} en ${r.productos} producto(s)`,
+                          ),
+                        onError: (e: unknown) =>
+                          toast.error(e instanceof ApiError ? e.message : String(e)),
+                      },
+                    )
+                  }
+                  className={`rounded border px-2 py-1 font-semibold transition disabled:opacity-50 ${
+                    estiloCarpetaActual === o.v
+                      ? "border-violet-500 bg-violet-500/15 text-violet-400"
+                      : "border-border/60 hover:border-violet-500 hover:text-violet-400"
+                  }`}
+                >
+                  {o.label}
                 </button>
               ))}
             </div>
@@ -1544,7 +1591,9 @@ function ProductoCard({
   const necesarios = Math.min(4, p.clips_necesarios || 2);
   // Duración de los clips que genera el operador. No es cosmética: el mismo
   // guion son 3 clips de 8s o 2 de 10s, así que cambiarla cambia los huecos.
-  const clipS = p.clip_s || 10;
+  // OCHO de serie: el guion se escribe para 16s y eso son justo dos clips
+  // de 8 (`config.CLIP_TARGET_S`). Estuvo en 10.
+  const clipS = p.clip_s || 8;
   const [verVideo, setVerVideo] = useState(false);
   // Progreso POR SLOT (null = ese clip no se está subiendo). Así se puede subir
   // el clip 2 mientras el 1 va por la mitad, y cada tarjeta es independiente de
@@ -1639,7 +1688,13 @@ function ProductoCard({
   // el hook guarda también el valor por defecto en cuanto se abre la pantalla,
   // así que cambiar solo el `inicial` no habría movido a nadie que ya hubiera
   // entrado con el clásico de serie.
-  const [estiloTexto, setEstiloTexto] = useEstadoDeUsuario("largo:estilo-texto:v2", "blanco");
+  // El acabado del texto ya NO es una preferencia del navegador: es del
+  // producto (se pone de golpe para toda la carpeta y se retoca aquí si hace
+  // falta). Sin elegir, manda el gancho del catálogo — el de punto de dolor
+  // va con el bloque blanco liso y el de precio con el clásico de color.
+  const estiloPorGancho =
+    (p.estilo_guion || "precio") === "dolor" ? "blanco" : "clasico";
+  const estiloTexto = p.estilo_texto || estiloPorGancho;
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
 
@@ -2196,7 +2251,14 @@ function ProductoCard({
             <button
               key={o.v}
               type="button"
-              onClick={() => setEstiloTexto(o.v)}
+              onClick={() =>
+                setEstado.mutate({
+                  source,
+                  folder: p.folder || folder,
+                  producto: p.producto,
+                  estilo_texto: o.v,
+                })
+              }
               className={`rounded px-1.5 py-0.5 font-semibold transition ${
                 estiloTexto === o.v
                   ? "bg-violet-500/20 text-violet-400"

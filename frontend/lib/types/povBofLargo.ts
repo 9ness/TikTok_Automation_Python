@@ -64,6 +64,9 @@ export interface ProductoLargo {
   /** Duración de los clips que genera el operador: 8 o 10 segundos. Cambia
    *  cuántos pide el mismo guion (20 s son 3 de 8 s o 2 de 10 s). */
   clip_s?: number;
+  /** Acabado del texto quemado: "blanco", "clasico" o "" (no elegido, y
+   *  entonces manda el gancho: dolor → blanco liso, precio → clásico). */
+  estilo_texto?: string;
   /** Por dónde empieza el guion: "precio" o "dolor". No es el gancho del
    *  vídeo (el texto quemado), es lo que dice la voz al arrancar. */
   estilo_guion?: string;
@@ -144,6 +147,9 @@ export interface EstadoLargoRequest {
   sold?: boolean;
   nicho?: string;
   clip_s?: number;
+  /** Acabado del texto de ESE producto ("blanco" / "clasico"). El de toda la
+   *  carpeta se pone de una vez desde la caja de arriba. */
+  estilo_texto?: string;
   /** Segundos que debe durar el guion (0 = los del curso, ~20s). Se guarda con
    *  los textos del POV BOF: el producto es el mismo en las dos pantallas. */
   segundos_guion?: number;

@@ -41,10 +41,11 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 CLIPS_POR_VIDEO = 1
 # Cuánto dura un clip generado, por defecto. Se elige por carpeta y por
 # producto desde la pantalla; esto es con lo que arrancan los que no lo tengan
-# puesto. DIEZ, porque es con lo que se genera hoy y porque es lo que deja el
-# vídeo del POV BOF en un solo clip. De aquí sale todo lo demás: cuántos clips
-# pedir y cuánto guion cabe.
-CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "10"))
+# puesto. OCHO, que es con lo que se genera hoy y para lo que está medido el
+# formato: el guion se escribe para 16s y eso son justo dos clips de 8. Estuvo
+# en diez, que era lo que daba el vídeo del POV BOF en un solo clip. De aquí
+# sale todo lo demás: cuántos clips pedir y cuánto guion cabe.
+CLIP_TARGET_S = float(os.getenv("POV_BOF_LARGO_CLIP_S", "8"))
 # Más de cuatro deja de parecer una toma continua.
 CLIPS_MAXIMOS = 4
 # Hasta dónde se puede estirar un clip. Ojo con la palabra: el montaje NO
@@ -417,16 +418,36 @@ SEGUNDOS_GUION_OPCIONES = (0, 30, 40, 60)
 # Por eso "" no significa "clásico" sino "no me lo han dicho": para pedir el
 # clásico a propósito hay que mandar "clasico".
 ESTILO_TEXTO_DEFECTO = "blanco"
+# Los dos acabados, como los eligen desde la pantalla.
+ESTILOS_TEXTO = ("blanco", "clasico")
+# Cuál le toca a cada gancho cuando nadie ha dicho nada. No es un capricho: el
+# de punto de dolor abre con preguntas al espectador y el bloque blanco liso
+# (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
+# de urgencia de precio va con el clásico de color, que llama más y es lo que
+# pega con una oferta.
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico"}
 
 
-def estilo_texto_valido(valor: str = "") -> str:
-    """Lo que hay que pasarle al montador: "blanco" o "" (el clásico)."""
+def estilo_texto_de(estilo_guion: str = "") -> str:
+    """El acabado que le toca a ese gancho si nadie ha elegido."""
+    return ESTILO_TEXTO_POR_GANCHO.get(
+        (estilo_guion or "").strip().lower(), ESTILO_TEXTO_DEFECTO,
+    )
+
+
+def estilo_texto_valido(valor: str = "", estilo_guion: str = "") -> str:
+    """Lo que hay que pasarle al montador: "blanco" o "" (el clásico).
+
+    Con `estilo_guion` (precio / dolor), el vacío deja de ser un único valor de
+    serie y pasa a ser el que le toca a ESE gancho.
+    """
     v = (valor or "").strip().lower()
     if v == "clasico":
         return ""
     if v == "blanco":
         return "blanco"
-    return ESTILO_TEXTO_DEFECTO
+    elegido = estilo_texto_de(estilo_guion)
+    return "" if elegido == "clasico" else elegido
 
 
 def caracteres_guion(segundos: float = 0) -> int:

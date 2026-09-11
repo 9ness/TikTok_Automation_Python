@@ -69,7 +69,11 @@ class ProductoLargo(BaseModel):
     clip4: bool = False
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
-    clip_s: int = 10
+    clip_s: int = 8
+    # Acabado del texto quemado: "blanco", "clasico" o "" (= no elegido, y
+    # entonces lo decide el gancho del catálogo — ver
+    # `config.estilo_texto_de`).
+    estilo_texto: str = ""
     # Por dónde empieza el guion: "precio" o "dolor". No confundir con el
     # gancho del vídeo, que es el texto quemado de arriba.
     estilo_guion: str = "precio"
@@ -116,6 +120,10 @@ class ProductoEstadoLargoRequest(BaseModel):
     # Duración de los clips que va a generar el operador (8 o 10 segundos).
     # Cambia cuántos pide el mismo guion: 20s son 3 clips de 8s o 2 de 10s.
     clip_s: int | None = None
+    # Acabado del texto quemado de ESE producto ("blanco" / "clasico"). El de
+    # toda la carpeta se pone de una vez en `/estilo-texto/carpeta`; esto es
+    # para cambiarlo en uno suelto.
+    estilo_texto: str | None = None
     # Cuántos segundos tiene que durar el guion (0 = el del curso, ~20s). Se
     # guarda con los TEXTOS del POV BOF, no aquí: el producto es el mismo y lo
     # que pide la tienda no cambia porque el guion empiece por el precio o por

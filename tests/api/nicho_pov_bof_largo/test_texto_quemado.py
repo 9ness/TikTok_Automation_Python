@@ -62,3 +62,36 @@ class TestElColorDelRotulo:
                 tmp_path / "out.mp4", lambda _m: None, semilla="7",
             )
         assert visto["foto"] is None
+
+
+class TestQueAcabadoLeToca:
+    """El acabado del texto sale del gancho cuando nadie ha elegido."""
+
+    def test_dolor_va_en_blanco_liso_y_precio_en_color(self):
+        from src.nicho_pov_bof_largo import config
+
+        assert config.estilo_texto_valido("", "dolor") == "blanco"
+        # "" ES el clásico para el montador: no es que falte el dato.
+        assert config.estilo_texto_valido("", "precio") == ""
+
+    def test_lo_que_elige_el_operador_manda_sobre_el_gancho(self):
+        from src.nicho_pov_bof_largo import config
+
+        assert config.estilo_texto_valido("clasico", "dolor") == ""
+        assert config.estilo_texto_valido("blanco", "precio") == "blanco"
+
+    def test_el_clasico_no_se_convierte_en_blanco_por_el_camino(self):
+        """Se resuelve UNA vez, al encolar.
+
+        El montaje volvía a pasar el valor por `estilo_texto_valido`, y como
+        para esa función "" significa "no me lo han dicho", el clásico se
+        convertía otra vez en blanco: elegirlo en la tarjeta no servía de nada.
+        """
+        from src.nicho_pov_bof_largo import config
+
+        encolado = config.estilo_texto_valido("clasico", "dolor")
+        assert encolado == ""
+        # Lo que llega al montador es este mismo valor, sin re-resolver.
+        assert config.estilo_texto_valido(encolado, "dolor") == "blanco", (
+            "si esto cambia, es que alguien ha vuelto a resolverlo dos veces"
+        )
