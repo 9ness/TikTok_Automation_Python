@@ -520,6 +520,33 @@ export default function PovBofLargoPage() {
     );
   }
 
+  /** Reescribe los guiones que YA están escritos.
+   *
+   *  El botón de arriba solo mira los que faltan, y cuando la carpeta está al
+   *  día se quedaba apagado: para aprovechar un prompt nuevo —o un cierre
+   *  nuevo— había que borrar los guiones a mano uno a uno. Cuesta una llamada
+   *  a Gemini por producto, así que se pregunta antes. */
+  function rehacerTodosGuiones() {
+    if (!folder || !conGuion) return;
+    if (
+      !window.confirm(
+        `¿Reescribir los ${conGuion} guiones de ${folder}? Se pierden los que ` +
+          "hay y cuesta una llamada a la IA por producto.",
+      )
+    )
+      return;
+    guionesLote.mutate(
+      { source: activaSource, folder, rehacer: true },
+      {
+        onSuccess: () => {
+          toast.success(`${conGuion} guion(es) a rehacer en la cola`);
+          openQueue();
+        },
+        onError: (e: unknown) => toast.error(err(e)),
+      },
+    );
+  }
+
   /** Extrae los textos de la carpeta y, seguido, escribe los guiones que
    *  falten.
    *
@@ -1055,9 +1082,15 @@ export default function PovBofLargoPage() {
                 está lo de la carpeta que tienes abierta. */}
             <button
               type="button"
-              onClick={() => void generarTodosGuiones()}
-              disabled={guionesLote.isPending || !sinGuion}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-500/60 bg-card px-3 py-2 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/10 disabled:opacity-50"
+              onClick={() =>
+                sinGuion ? void generarTodosGuiones() : rehacerTodosGuiones()
+              }
+              disabled={guionesLote.isPending || (!sinGuion && !conGuion)}
+              className={`flex w-full items-center justify-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+                sinGuion
+                  ? "border-violet-500/60 text-violet-400 hover:bg-violet-500/10"
+                  : "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
+              }`}
             >
               {guionesLote.isPending ? (
                 <>
@@ -1069,7 +1102,7 @@ export default function PovBofLargoPage() {
                   <Sparkles className="h-3.5 w-3.5 shrink-0" />
                   {sinGuion
                     ? `Escribir todos los guiones (${sinGuion})`
-                    : `Guiones al día (${conGuion}/${totalProductos})`}
+                    : `Rehacer los ${conGuion} guiones`}
                 </>
               )}
             </button>
