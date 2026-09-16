@@ -417,6 +417,11 @@ function AudiosDePonente({
     !ninguno && (elegidos.length === 0 || elegidos.includes(n));
   const largos = items.filter((a) => a.duracion_s >= 60).map((a) => a.nombre);
   const clips = items.filter((a) => a.origen === "clip");
+  // Los del curso son los que vinieron ya cortados en el banco original
+  // (`origen === "base"`); los `clip_*` los sacó el operador de charlas de
+  // YouTube. Poder quedarse solo con los primeros es para publicar con el
+  // material del curso y nada más cuando se está calentando una cuenta.
+  const delCurso = items.filter((a) => a.origen === "base").map((a) => a.nombre);
   const nuevos = clips.map((a) => a.nombre);
   // "Los últimos" = los clips de la ÚLTIMA CHARLA analizada, no los de la
   // última hora. Agrupar por tiempo era difuso (dos análisis seguidos caían
@@ -444,6 +449,15 @@ function AudiosDePonente({
               className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition hover:border-foreground/40"
             >
               Solo +1 min ({largos.length})
+            </button>
+          )}
+          {delCurso.length > 0 && delCurso.length < items.length && (
+            <button
+              type="button"
+              onClick={() => onChange(delCurso)}
+              className="rounded border border-emerald-500/60 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-500 transition hover:bg-emerald-500/20"
+            >
+              Solo del curso ({delCurso.length})
             </button>
           )}
           {/* Para probar de golpe los arranques nuevos sacados de YouTube. */}
