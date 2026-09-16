@@ -1,6 +1,6 @@
 "use client";
 
-import { Link2, Loader2 } from "lucide-react";
+import { Link2, Loader2, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -21,6 +21,12 @@ import { useGuardarUrlProducto } from "@/lib/queries/nichoPovBof";
  *  carpeta, el viaje costaba más que el trabajo. Solo el admin porque es quien
  *  las consigue (gasta las llamadas de EchoTik) y una URL mal pegada la
  *  arrastran los tres nichos y las tres cuentas.
+ *
+ *  Con ficha puesta, el lápiz de al lado la deja CAMBIAR sin salir de la
+ *  tarjeta. Hace falta porque un producto tiene variantes (color, medida) y
+ *  cada una es una ficha distinta: enlazar la que no sale en el clip es lo que
+ *  se lleva una infracción por "promoción de productos incoherente". Dejando
+ *  el campo vacío se quita la ficha.
  *
  *  Se le pasa el producto (`source`/`folder`/`producto`) solo donde se quiere
  *  poder pegar; sin eso se comporta como siempre y solo abre.
@@ -43,16 +49,32 @@ export function BotonUrl({
 
   const puedePegar = !esPro && Boolean(source && folder && producto);
 
-  if (url) {
+  if (url && !pegando) {
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 rounded-md border border-emerald-500 bg-emerald-500/15 px-2 py-1 text-[11px] font-semibold text-emerald-500 transition hover:bg-emerald-500/25"
-      >
-        <Link2 className="h-3 w-3" /> URL
-      </a>
+      <span className="inline-flex items-center gap-1">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 rounded-md border border-emerald-500 bg-emerald-500/15 px-2 py-1 text-[11px] font-semibold text-emerald-500 transition hover:bg-emerald-500/25"
+        >
+          <Link2 className="h-3 w-3" /> URL
+        </a>
+        {puedePegar ? (
+          <button
+            type="button"
+            onClick={() => {
+              setValor(url);
+              setPegando(true);
+            }}
+            aria-label="Cambiar la ficha"
+            title="Cambiar la ficha"
+            className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        ) : null}
+      </span>
     );
   }
 
@@ -76,7 +98,9 @@ export function BotonUrl({
 
   function grabar(texto = valor) {
     const limpia = texto.trim();
-    if (!limpia) {
+    // Vaciar el campo de una ficha que ya existía es cómo se QUITA (el backend
+    // acepta url vacía). Sin ficha previa, vacío es que no se quiso pegar nada.
+    if (!limpia && !url) {
       setPegando(false);
       return;
     }
@@ -86,7 +110,7 @@ export function BotonUrl({
         onSuccess: () => {
           // No se toca nada más: al invalidar, el producto vuelve con su
           // `product_url` y este mismo botón se pinta verde.
-          toast.success("Ficha guardada");
+          toast.success(limpia ? "Ficha guardada" : "Ficha quitada");
           setPegando(false);
           setValor("");
         },
@@ -115,14 +139,14 @@ export function BotonUrl({
           setValor(texto);
           grabar(texto);
         }}
-        placeholder="Pega la ficha…"
+        placeholder={url ? "Pega la ficha nueva (vacío la quita)…" : "Pega la ficha…"}
         className="min-w-0 flex-1 rounded-md border border-emerald-500/50 bg-transparent px-2 py-1 text-[11px] outline-none"
       />
       <button
         type="button"
         onClick={() => grabar()}
         disabled={guardar.isPending}
-        aria-label="Guardar la ficha"
+        aria-label={url ? "Guardar la ficha nueva" : "Guardar la ficha"}
         className="shrink-0 rounded-md border border-emerald-500/50 px-1.5 py-1 text-emerald-500 disabled:opacity-50"
       >
         {guardar.isPending ? (
